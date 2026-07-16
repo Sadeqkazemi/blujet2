@@ -1,13 +1,238 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider     = "prisma-client"
+  output       = "../generated/prisma"
+  moduleFormat = "cjs"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+// ─── Phase 1: auth, RBAC, panel shell, audit ────────────────────────────
+
+enum Role {
+  USER
+  AGENCY
+  EMPLOYEE
+  IT_MANAGER
+  COMMERCIAL_MANAGER
+  FINANCE_MANAGER
+  SENIOR_MANAGER
+  CEO
+  BOARD_CHAIR
+  SITE_ADMIN
+}
+
+model User {
+  id                String    @id @default(uuid())
+  role              Role
+  phone             String?   @unique
+  username          String?   @unique
+  passwordHash      String?
+  email             String?   @unique
+  fullName          String
+  twoFactorEnabled  Boolean   @default(false)
+  twoFactorSecret   String?
+  isActive          Boolean   @default(true)
+  deletedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  refreshTokens      RefreshToken[]
+  twoFactorChallenges TwoFactorChallenge[]
+  auditLogs          AuditLog[]         @relation("AuditActor")
+  panelAccessUpdates PanelAccessFlag[]  @relation("PanelAccessUpdatedBy")
+  ledgerEntries      LedgerEntry[]      @relation("LedgerCreatedBy")
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id         String    @id @default(uuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique
+  userAgent  String?
+  ip         String?
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+enum TwoFactorPurpose {
+  STAFF_LOGIN_2FA
+}
+
+model TwoFactorChallenge {
+  id          String            @id @default(uuid())
+  userId      String
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purpose     TwoFactorPurpose
+  codeHash    String
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  attempts    Int               @default(0)
+  createdAt   DateTime          @default(now())
+
+  @@index([userId])
+  @@map("two_factor_challenges")
+}
+
+enum AuditCategory {
+  AGENCY
+  PRICING
+  FINANCE
+  REFUND
+  STRATEGY
+  SYSTEM
+  CLUB
+  ACCOUNT
+  ACCESS
+  SECURITY
+  RESERVATION
+}
+
+model AuditLog {
+  id         String        @id @default(uuid())
+  actorId    String
+  actor      User          @relation("AuditActor", fields: [actorId], references: [id])
+  actorRole  Role
+  category   AuditCategory
+  action     String
+  detail     String
+  entityType String?
+  entityId   String?
+  metadata   Json?
+  requestId  String?
+  createdAt  DateTime      @default(now())
+
+  @@index([actorRole, category, createdAt])
+  @@map("audit_logs")
+}
+
+model PanelAccessFlag {
+  panelKey    String   @id
+  enabled     Boolean  @default(true)
+  updatedById String?
+  updatedBy   User?    @relation("PanelAccessUpdatedBy", fields: [updatedById], references: [id])
+  updatedAt   DateTime @updatedAt
+
+  @@map("panel_access_flags")
+}
+
+// ─── Phase 2 (minimal slice): flight/booking core for reporting ────────
+
+model Route {
+  id         String   @id @default(uuid())
+  originCode String
+  destCode   String
+  flights    Flight[]
+
+  @@unique([originCode, destCode])
+  @@map("routes")
+}
+
+model Flight {
+  id           String           @id @default(uuid())
+  flightNo     String           @unique
+  routeId      String
+  route        Route            @relation(fields: [routeId], references: [id])
+  aircraftType String
+  instances    FlightInstance[]
+
+  @@map("flights")
+}
+
+enum FlightInstanceStatus {
+  SCHEDULED
+  DEPARTED
+  CANCELLED
+}
+
+model FlightInstance {
+  id            String                @id @default(uuid())
+  flightId      String
+  flight        Flight                @relation(fields: [flightId], references: [id])
+  departureAt   DateTime
+  arrivalAt     DateTime
+  capacity      Int
+  charterSeats  Int                   @default(0)
+  status        FlightInstanceStatus  @default(SCHEDULED)
+  bookings      Booking[]
+
+  @@index([departureAt])
+  @@map("flight_instances")
+}
+
+// Matches the finance/sales-chart channel split used identically across all
+// 6 panels (سیستمی/چارتر/آژانس). ReservationSystem's own VIP/managerial
+// pseudo-channels are out of scope until Phase 9.
+enum BookingChannel {
+  SYSTEM
+  CHARTER
+  AGENCY
+}
+
+enum BookingStatus {
+  DRAFT
+  HELD
+  PAID
+  TICKETED
+  CANCELLED
+  EXPIRED
+  REFUNDED
+}
+
+model Booking {
+  id               String          @id @default(uuid())
+  pnr              String          @unique
+  flightInstanceId String
+  flightInstance   FlightInstance  @relation(fields: [flightInstanceId], references: [id])
+  channel          BookingChannel
+  agencyId         String?
+  status           BookingStatus   @default(DRAFT)
+  priceIrr         Int
+  createdAt        DateTime        @default(now())
+
+  passengers    Passenger[]
+  ledgerEntries LedgerEntry[]
+
+  @@index([flightInstanceId, status])
+  @@index([channel])
+  @@map("bookings")
+}
+
+model Passenger {
+  id             String  @id @default(uuid())
+  bookingId      String
+  booking        Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  fullName       String
+  nationalIdEnc  String?
+  mobileEnc      String?
+
+  @@map("passengers")
+}
+
+enum LedgerEntryType {
+  SALE
+  REFUND
+  SETTLEMENT
+  COMMISSION
+}
+
+model LedgerEntry {
+  id              String          @id @default(uuid())
+  bookingId       String?
+  booking         Booking?        @relation(fields: [bookingId], references: [id])
+  type            LedgerEntryType
+  signedAmountIrr Int
+  occurredAt      DateTime        @default(now())
+  createdById     String?
+  createdBy       User?           @relation("LedgerCreatedBy", fields: [createdById], references: [id])
+
+  @@index([occurredAt, type])
+  @@map("ledger_entries")
 }
