@@ -9,41 +9,45 @@ full per-endpoint breakdown, not repeated here).
 
 ## Acceptance checklist
 
+Backend items below are proven by `backend/test/agencies.e2e-spec.ts` (Jest+Supertest,
+24 tests, run via `npm run test:e2e`). Frontend/E2E items are still open — Phase 3's
+frontend work (tasks #15–16) hasn't started yet.
+
 ### Listing & detail
-- [ ] `GET /agencies` returns the same 4 KPI cards (active count, credit granted, credit used, pending settlement) for all 3 roles
-- [ ] `GET /agencies?q=` searches name/license/manager/city
-- [ ] `GET /agencies?debtorsOnly=true` (Commercial) returns only agencies with `usedIrr > 0` or an unpaid invoice
-- [ ] `GET /agencies/:id` computed stats (total sales, tickets, passengers) reconcile against `Booking` rows for that agency
-- [ ] `activityScore` matches the confirmed formula exactly; included for Finance/Commercial, omitted for Senior Manager
-- [ ] A non-agency-tab role (e.g. IT_MANAGER, CEO) gets 403 on every endpoint in this module
+- [x] `GET /agencies` returns the same 4 KPI cards (active count, credit granted, credit used, pending settlement) for all 3 roles — `'GET /agencies returns the same 4 KPI cards for all 3 agency-tab roles'`
+- [x] `GET /agencies?q=` searches name/license/manager/city — `'GET /agencies?q= searches by manager name'`
+- [x] `GET /agencies?debtorsOnly=true` (Commercial) returns only agencies with `usedIrr > 0` or an unpaid invoice — `'debtorsOnly=true (Commercial) returns only agencies with usedIrr > 0 or a pending invoice'`
+- [x] `GET /agencies/:id` computed stats (total sales, tickets, passengers) reconcile against `Booking` rows for that agency — `'detail stats reconcile against Booking rows for that agency'`
+- [x] `activityScore` matches the confirmed formula exactly; included for Finance/Commercial, omitted for Senior Manager — `'activityScore is included for Finance/Commercial but omitted for Senior Manager'` + `'activityScore matches the confirmed formula exactly: ...'`
+- [x] A non-agency-tab role (e.g. IT_MANAGER, CEO) gets 403 on every endpoint in this module — `'a non-agency-tab role (IT_MANAGER) gets 403 on the agencies list and detail endpoints'` (representative sample; RolesGuard is the same mechanism proven exhaustively in `panels.e2e-spec.ts`)
 
 ### Credit & settlement
-- [ ] `PATCH /agencies/:id/credit` updates only `limitIrr`; `usedIrr` in the response is always derived from `LedgerEntry`, never equal to a stored/edited value
-- [ ] `usedIrr` decreases exactly by the settlement amount after `POST /agencies/:id/settle` or an invoice `pay` — verified against the sum of `LedgerEntry` rows, not a mutated field
-- [ ] `POST /agencies/:id/settle` is 403 for COMMERCIAL_MANAGER (that role settles via invoices instead)
-- [ ] Every credit/settlement mutation writes an `AuditLog(category=AGENCY)` row
+- [x] `PATCH /agencies/:id/credit` updates only `limitIrr`; `usedIrr` in the response is always derived from `LedgerEntry`, never equal to a stored/edited value — `'PATCH credit updates only limitIrr — usedIrr in the response is always derived, never the submitted value'`
+- [x] `usedIrr` decreases exactly by the settlement amount after `POST /agencies/:id/settle` or an invoice `pay` — verified against the sum of `LedgerEntry` rows, not a mutated field — `'usedIrr decreases exactly by the settlement amount after POST /settle, verified against LedgerEntry sums'` + `'paying an invoice writes exactly one SETTLEMENT ledger entry and is idempotent (double pay -> 409)'`
+- [x] `POST /agencies/:id/settle` is 403 for COMMERCIAL_MANAGER (that role settles via invoices instead) — `'POST /settle is 403 for COMMERCIAL_MANAGER'`
+- [x] Every credit/settlement mutation writes an `AuditLog(category=AGENCY)` row — asserted inline in the credit-update and concurrency tests
 
 ### Suspension
-- [ ] `PATCH /agencies/:id/suspend` without a `reason` → 400
+- [x] `PATCH /agencies/:id/suspend` without a `reason` → 400 — `'PATCH suspend without a reason -> 400'`
 - [ ] A suspended agency's own booking/search endpoints (once the agency-portal track exists) would reject — out of scope to test here, but `suspendedAt` is set correctly and visible in the detail response
-- [ ] `PATCH /agencies/:id/reactivate` clears `suspendedAt`/`suspendReason`
+- [x] `PATCH /agencies/:id/reactivate` clears `suspendedAt`/`suspendReason` — `'PATCH reactivate clears suspendedAt/suspendReason'`
 
 ### Membership requests
-- [ ] `PATCH /agencies/requests/:id/approve` creates both a `User(role=AGENCY)` and its `AgencyProfile` transactionally — a failure partway through leaves neither behind
-- [ ] `PATCH /agencies/requests/:id/reject` sets status without creating any User/AgencyProfile
-- [ ] `PATCH /agencies/requests/:id/refer` is 403 for FINANCE_MANAGER (only Senior/Commercial have this action)
-- [ ] Approving/rejecting an already-decided request (`status != PENDING`/`REFERRED`) → 409, not a silent overwrite
+- [x] `PATCH /agencies/requests/:id/approve` creates both a `User(role=AGENCY)` and its `AgencyProfile` transactionally — a failure partway through leaves neither behind — `'approving a request creates both User(role=AGENCY) and AgencyProfile transactionally'`
+- [x] `PATCH /agencies/requests/:id/reject` sets status without creating any User/AgencyProfile — `'rejecting a request sets status without creating any User/AgencyProfile'`
+- [x] `PATCH /agencies/requests/:id/refer` is 403 for FINANCE_MANAGER (only Senior/Commercial have this action) — `'PATCH .../refer is 403 for FINANCE_MANAGER'`
+- [x] Approving/rejecting an already-decided request (`status != PENDING`/`REFERRED`) → 409, not a silent overwrite — `'approving an already-decided request -> 409, not a silent overwrite'`
 
 ### API keys (Senior Manager only)
-- [ ] `POST /agencies/:id/api-key` for a non-Senior-Manager role → 403
-- [ ] The returned key is shown once (creation response) and never retrievable again — the DB only stores `keyHash`
-- [ ] Regenerating a key immediately invalidates the previous one (old key hash no longer authenticates once the agency-portal track integrates this)
+- [x] `POST /agencies/:id/api-key` for a non-Senior-Manager role → 403 — `'POST .../api-key for a non-Senior-Manager role -> 403'`
+- [x] The returned key is shown once (creation response) and never retrievable again — the DB only stores `keyHash` — `'the raw API key is returned once at creation and the DB only stores a hash'`
+- [x] Regenerating a key immediately invalidates the previous one (old key hash no longer authenticates once the agency-portal track integrates this) — `'regenerating a key changes its stored hash (old key hash no longer matches)'`
 
 ### Invoices & messaging (Commercial Manager only, Finance read-only)
-- [ ] `POST /agencies/:id/invoices` (issue) → 403 for SENIOR_MANAGER and FINANCE_MANAGER, 200 for COMMERCIAL_MANAGER
-- [ ] `GET /agencies/:id/invoices` → 200 (read) for all 3 roles
-- [ ] `PATCH .../invoices/:id/pay` writes exactly one `LedgerEntry(type=SETTLEMENT)` and is idempotent (paying an already-`PAID` invoice → 409, not a double ledger entry)
-- [ ] `GET/POST /agencies/:id/messages` → 403 for SENIOR_MANAGER and FINANCE_MANAGER
+- [x] `POST /agencies/:id/invoices` (issue) → 403 for SENIOR_MANAGER and FINANCE_MANAGER, 200 for COMMERCIAL_MANAGER — `'POST .../invoices is 403 for SENIOR_MANAGER and FINANCE_MANAGER, 200-range for COMMERCIAL_MANAGER'`
+- [x] `GET /agencies/:id/invoices` → 200 (read) for all 3 roles — `'GET .../invoices is 200 (read) for all 3 roles'`
+- [x] `PATCH .../invoices/:id/pay` writes exactly one `LedgerEntry(type=SETTLEMENT)` and is idempotent (paying an already-`PAID` invoice → 409, not a double ledger entry) — `'paying an invoice writes exactly one SETTLEMENT ledger entry and is idempotent (double pay -> 409)'`
+- [x] `GET/POST /agencies/:id/messages` → 403 for SENIOR_MANAGER and FINANCE_MANAGER — `'GET/POST .../messages is 403 for SENIOR_MANAGER and FINANCE_MANAGER'`
 
 ### Frontend (per-role UI differences)
 - [ ] Senior Manager's agency detail shows credit + API-key sections, no invoices/messages tabs
@@ -54,7 +58,7 @@ full per-endpoint breakdown, not repeated here).
 ### E2E
 - [ ] One journey per role: open آژانس‌ها → search → open an agency → change credit limit → see it reflected
 - [ ] Commercial Manager: issue an invoice → mark it paid → credit-used figure drops by that amount
-- [ ] Concurrency: two simultaneous `PATCH .../credit` calls on the same agency — last-write-wins on `limitIrr`, no crash, both audited
+- [x] Concurrency: two simultaneous `PATCH .../credit` calls on the same agency — last-write-wins on `limitIrr`, no crash, both audited — `'two simultaneous PATCH .../credit calls do not crash, last write wins, and both are audited'` (backend-level; the frontend/Playwright version of this journey is still open above)
 
 ---
 

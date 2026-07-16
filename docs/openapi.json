@@ -460,6 +460,631 @@
           "reporting"
         ]
       }
+    },
+    "/agencies": {
+      "get": {
+        "operationId": "AgenciesController_list",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "جستجو در نام، شماره مجوز، مدیر، شهر",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "debtorsOnly",
+            "required": false,
+            "in": "query",
+            "description": "فقط آژانس‌های دارای بدهی (پنل مدیر بازرگانی)",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "لیست آژانس‌ها + کارت‌های KPI",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/requests": {
+      "get": {
+        "operationId": "AgenciesController_listRequests",
+        "parameters": [
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "لیست درخواست‌های عضویت آژانس",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/requests/{id}": {
+      "get": {
+        "operationId": "AgenciesController_getRequest",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "جزئیات درخواست عضویت + تاریخچه ارجاع",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/requests/{id}/approve": {
+      "patch": {
+        "operationId": "AgenciesController_approveRequest",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تأیید درخواست — ایجاد User+AgencyProfile تراکنشی",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/requests/{id}/reject": {
+      "patch": {
+        "operationId": "AgenciesController_rejectRequest",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "رد درخواست عضویت",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/requests/{id}/refer": {
+      "patch": {
+        "operationId": "AgenciesController_referRequest",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReferRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "ارجاع درخواست — فقط مدیر ارشد/بازرگانی",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/debtors/notify-all": {
+      "post": {
+        "operationId": "AgenciesController_notifyAllDebtors",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ارسال اعلان به همه آژانس‌های بدهکار",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/{id}": {
+      "get": {
+        "operationId": "AgenciesController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "جزئیات آژانس — پروفایل، اعتبار، آمار، فعالیت اخیر",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/{id}/suspend": {
+      "patch": {
+        "operationId": "AgenciesController_suspend",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuspendAgencyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تعلیق آژانس",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/{id}/reactivate": {
+      "patch": {
+        "operationId": "AgenciesController_reactivate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "رفع تعلیق آژانس",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/{id}/credit": {
+      "get": {
+        "operationId": "AgenciesController_getCredit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "سقف/مصرف/باقیمانده اعتبار (مصرف همیشه مشتق‌شده)",
+        "tags": [
+          "agencies"
+        ]
+      },
+      "patch": {
+        "operationId": "AgenciesController_updateCredit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCreditDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تغییر سقف اعتبار",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/{id}/settle": {
+      "post": {
+        "operationId": "AgenciesController_settle",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ثبت تسویه دستی — غیرفعال برای مدیر بازرگانی",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/{id}/api-key": {
+      "get": {
+        "operationId": "AgenciesController_listApiKeys",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "لیست کلیدهای API — فقط مدیر ارشد",
+        "tags": [
+          "agencies"
+        ]
+      },
+      "post": {
+        "operationId": "AgenciesController_issueApiKey",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateApiKeyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "صدور کلید API — فقط مدیر ارشد",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/{id}/api-key/{keyId}": {
+      "patch": {
+        "operationId": "AgenciesController_updateApiKey",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "keyId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateApiKeyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تعلیق/فعال‌سازی/صدور مجدد کلید API",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/{id}/invoices": {
+      "get": {
+        "operationId": "AgenciesController_listInvoices",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "لیست فاکتورها — همه ۳ نقش (خواندنی)",
+        "tags": [
+          "agencies"
+        ]
+      },
+      "post": {
+        "operationId": "AgenciesController_issueInvoice",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueInvoiceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "صدور فاکتور — فقط مدیر بازرگانی",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/{id}/invoices/{invoiceId}/pay": {
+      "patch": {
+        "operationId": "AgenciesController_payInvoice",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "invoiceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تسویه فاکتور — ثبت LedgerEntry(SETTLEMENT)، ایدمپوتنت",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/{id}/invoices/{invoiceId}/remind": {
+      "post": {
+        "operationId": "AgenciesController_remindInvoice",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "invoiceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "یادآوری فاکتور معوق",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/{id}/messages": {
+      "get": {
+        "operationId": "AgenciesController_listMessages",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "مکاتبه‌ها — فقط مدیر بازرگانی",
+        "tags": [
+          "agencies"
+        ]
+      },
+      "post": {
+        "operationId": "AgenciesController_postMessage",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMessageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ارسال پیام در مکاتبه‌ها — فقط مدیر بازرگانی",
+        "tags": [
+          "agencies"
+        ]
+      }
     }
   },
   "info": {
@@ -527,6 +1152,119 @@
         },
         "required": [
           "enabled"
+        ]
+      },
+      "RejectRequestDto": {
+        "type": "object",
+        "properties": {
+          "reviewNote": {
+            "type": "string",
+            "example": "مدارک مجوز فعالیت ناقص بود."
+          }
+        }
+      },
+      "ReferRequestDto": {
+        "type": "object",
+        "properties": {
+          "referredToId": {
+            "type": "string",
+            "description": "شناسه کاربر (کارمند/مدیر) مقصد ارجاع"
+          },
+          "note": {
+            "type": "string",
+            "example": "لطفاً وضعیت اعتباری متقاضی بررسی شود."
+          }
+        },
+        "required": [
+          "referredToId"
+        ]
+      },
+      "SuspendAgencyDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "example": "عدم تسویه بدهی معوق بیش از ۳۰ روز"
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "UpdateCreditDto": {
+        "type": "object",
+        "properties": {
+          "limitIrr": {
+            "type": "number",
+            "example": 1800000000,
+            "description": "سقف اعتبار به ریال"
+          }
+        },
+        "required": [
+          "limitIrr"
+        ]
+      },
+      "CreateApiKeyDto": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string",
+            "enum": [
+              "FULL",
+              "SEARCH_BOOK",
+              "SEARCH_ONLY"
+            ],
+            "example": "SEARCH_BOOK"
+          }
+        },
+        "required": [
+          "scope"
+        ]
+      },
+      "UpdateApiKeyDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "SUSPENDED"
+            ]
+          },
+          "regenerate": {
+            "type": "boolean",
+            "description": "true برای صدور مجدد کلید — کلید قبلی بلافاصله باطل می‌شود"
+          }
+        }
+      },
+      "IssueInvoiceDto": {
+        "type": "object",
+        "properties": {
+          "amountIrr": {
+            "type": "number",
+            "example": 800000000,
+            "description": "مبلغ فاکتور به ریال"
+          },
+          "dueAt": {
+            "type": "string",
+            "example": "2026-08-05T00:00:00.000Z"
+          }
+        },
+        "required": [
+          "amountIrr",
+          "dueAt"
+        ]
+      },
+      "CreateMessageDto": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "example": "سلام، لطفاً فاکتور را تسویه بفرمایید."
+          }
+        },
+        "required": [
+          "body"
         ]
       }
     }

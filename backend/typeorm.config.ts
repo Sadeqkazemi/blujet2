@@ -7,6 +7,7 @@ export default defineConfig({
   schema: "typeorm/schema.typeorm",
   migrations: {
     path: "typeorm/migrations",
+    seed: "tsx typeorm/seed.ts",
   },
   datasource: {
     url: process.env["DATABASE_URL"],
