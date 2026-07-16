@@ -13,7 +13,7 @@ separate track, expected to merge with this one later — see
 - [x] Design extraction — all 6 panels + shared shell + `ReservationSystem` read in full; findings folded into `docs/API.md` / `docs/DB_SCHEMA.md`
 - [x] **Phase 1 — staff auth + RBAC + panel shell + dashboard/reporting** — see `docs/features/panel-shell-dashboard.md` for the proven checklist (35 backend + 21 frontend unit + 5 E2E tests, all passing; lint+typecheck clean in both packages). Known deferred scope, not silently dropped: IT Manager's real (service-health) dashboard, day/month/flight chart-mode UI, pixel-diff visual regression — see that doc's scope notes.
 - [x] Phase 2 — flight/booking core (minimal read-side slice for reporting) — done as part of Phase 1's Prisma schema (Route/Flight/FlightInstance/Booking/LedgerEntry), since reporting needed real data to aggregate
-- [ ] Phase 3 — Agencies (list/detail/credit/settlement/membership requests)
+- [ ] **Phase 3 — Agencies (list/detail/credit/settlement/membership requests)** ← `docs/API.md`/`docs/DB_SCHEMA.md`/`docs/features/agencies.md` drafted, awaiting approval before implementation starts (same gate as Phase 1)
 - [ ] Phase 4 — Cartable, referrals, manager messaging
 - [ ] Phase 5 — VIP club card-request approval
 - [ ] Phase 6 — Ticket pricing proposals (commercial → CEO approval)
