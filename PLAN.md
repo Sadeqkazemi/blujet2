@@ -13,7 +13,7 @@ separate track, expected to merge with this one later — see
 - [x] Design extraction — all 6 panels + shared shell + `ReservationSystem` read in full; findings folded into `docs/API.md` / `docs/DB_SCHEMA.md`
 - [x] **Phase 1 — staff auth + RBAC + panel shell + dashboard/reporting** — see `docs/features/panel-shell-dashboard.md` for the proven checklist (35 backend + 21 frontend unit + 5 E2E tests, all passing; lint+typecheck clean in both packages). Known deferred scope, not silently dropped: IT Manager's real (service-health) dashboard, day/month/flight chart-mode UI, pixel-diff visual regression — see that doc's scope notes.
 - [x] Phase 2 — flight/booking core (minimal read-side slice for reporting) — done as part of Phase 1's Prisma schema (Route/Flight/FlightInstance/Booking/LedgerEntry), since reporting needed real data to aggregate
-- [ ] **Phase 3 — Agencies (list/detail/credit/settlement/membership requests)** ← `docs/API.md`/`docs/DB_SCHEMA.md`/`docs/features/agencies.md` drafted, awaiting approval before implementation starts (same gate as Phase 1)
+- [ ] **Phase 3 — Agencies (list/detail/credit/settlement/membership requests)** — backend done: Prisma schema/migration/seed, full `agencies` module (all endpoints from `docs/API.md`'s Phase 3 table, role-reconciled), 24 backend integration tests proving `docs/features/agencies.md`'s backend checklist items (59 backend tests total, all passing; lint+typecheck clean). Frontend (list/detail pages per role, Vitest+RTL, Playwright) not started — see that doc's remaining unchecked items.
 - [ ] Phase 4 — Cartable, referrals, manager messaging
 - [ ] Phase 5 — VIP club card-request approval
 - [ ] Phase 6 — Ticket pricing proposals (commercial → CEO approval)
@@ -41,6 +41,19 @@ a passing test — see `docs/features/panel-shell-dashboard.md` for Phase 1.
   client-formatted display strings for money — all explicitly overridden by
   `CLAUDE.md` in the real implementation (see inline notes in `DB_SCHEMA.md`/
   `API.md`).
+
+## Known technical debt (pre-launch, not blocking current phases)
+
+- All IRR money columns (`priceIrr`, `signedAmountIrr`, `limitIrr`,
+  `amountIrr`) are Postgres `integer` (max ~2.14e9 ≈ 214,000,000 toman).
+  Fine for per-ticket/per-invoice amounts and current seed data, but a
+  large agency's credit line or a yearly revenue aggregate could
+  plausibly exceed that. Needs an `Int` → `BigInt` migration (with a
+  matching Prisma/TS + JSON-serialization review, since `bigint` doesn't
+  `JSON.stringify` by default) before real financial figures are trusted
+  at scale — surfaced during Phase 3 seed data, not fixed inline to avoid
+  disturbing already-tested Phase 1 code without discussing the blast
+  radius first.
 
 ## Commands
 

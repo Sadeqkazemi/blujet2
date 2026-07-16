@@ -24,39 +24,46 @@ enum Role {
 }
 
 model User {
-  id                String    @id @default(uuid())
-  role              Role
-  phone             String?   @unique
-  username          String?   @unique
-  passwordHash      String?
-  email             String?   @unique
-  fullName          String
-  twoFactorEnabled  Boolean   @default(false)
-  twoFactorSecret   String?
-  isActive          Boolean   @default(true)
-  deletedAt         DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id               String    @id @default(uuid())
+  role             Role
+  phone            String?   @unique
+  username         String?   @unique
+  passwordHash     String?
+  email            String?   @unique
+  fullName         String
+  twoFactorEnabled Boolean   @default(false)
+  twoFactorSecret  String?
+  isActive         Boolean   @default(true)
+  deletedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
-  refreshTokens      RefreshToken[]
+  refreshTokens       RefreshToken[]
   twoFactorChallenges TwoFactorChallenge[]
-  auditLogs          AuditLog[]         @relation("AuditActor")
-  panelAccessUpdates PanelAccessFlag[]  @relation("PanelAccessUpdatedBy")
-  ledgerEntries      LedgerEntry[]      @relation("LedgerCreatedBy")
+  auditLogs           AuditLog[]           @relation("AuditActor")
+  panelAccessUpdates  PanelAccessFlag[]    @relation("PanelAccessUpdatedBy")
+  ledgerEntries       LedgerEntry[]        @relation("LedgerCreatedBy")
+
+  agencyProfile          AgencyProfile?            @relation("AgencyUser")
+  agencyCreditUpdates    AgencyCreditLine[]        @relation("AgencyCreditUpdatedBy")
+  agencyRequestsReferred AgencyMembershipRequest[] @relation("AgencyRequestReferredTo")
+  agencyRequestsReviewed AgencyMembershipRequest[] @relation("AgencyRequestReviewedBy")
+  agencyInvoicesIssued   AgencyInvoice[]           @relation("AgencyInvoiceIssuedBy")
+  agencyMessagesSent     AgencyMessage[]           @relation("AgencyMessageSender")
 
   @@map("users")
 }
 
 model RefreshToken {
-  id         String    @id @default(uuid())
-  userId     String
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash  String    @unique
-  userAgent  String?
-  ip         String?
-  expiresAt  DateTime
-  revokedAt  DateTime?
-  createdAt  DateTime  @default(now())
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  userAgent String?
+  ip        String?
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
 
   @@index([userId])
   @@map("refresh_tokens")
@@ -67,15 +74,15 @@ enum TwoFactorPurpose {
 }
 
 model TwoFactorChallenge {
-  id          String            @id @default(uuid())
-  userId      String
-  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  purpose     TwoFactorPurpose
-  codeHash    String
-  expiresAt   DateTime
-  consumedAt  DateTime?
-  attempts    Int               @default(0)
-  createdAt   DateTime          @default(now())
+  id         String           @id @default(uuid())
+  userId     String
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purpose    TwoFactorPurpose
+  codeHash   String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  attempts   Int              @default(0)
+  createdAt  DateTime         @default(now())
 
   @@index([userId])
   @@map("two_factor_challenges")
@@ -153,15 +160,15 @@ enum FlightInstanceStatus {
 }
 
 model FlightInstance {
-  id            String                @id @default(uuid())
-  flightId      String
-  flight        Flight                @relation(fields: [flightId], references: [id])
-  departureAt   DateTime
-  arrivalAt     DateTime
-  capacity      Int
-  charterSeats  Int                   @default(0)
-  status        FlightInstanceStatus  @default(SCHEDULED)
-  bookings      Booking[]
+  id           String               @id @default(uuid())
+  flightId     String
+  flight       Flight               @relation(fields: [flightId], references: [id])
+  departureAt  DateTime
+  arrivalAt    DateTime
+  capacity     Int
+  charterSeats Int                  @default(0)
+  status       FlightInstanceStatus @default(SCHEDULED)
+  bookings     Booking[]
 
   @@index([departureAt])
   @@map("flight_instances")
@@ -187,31 +194,33 @@ enum BookingStatus {
 }
 
 model Booking {
-  id               String          @id @default(uuid())
-  pnr              String          @unique
+  id               String         @id @default(uuid())
+  pnr              String         @unique
   flightInstanceId String
-  flightInstance   FlightInstance  @relation(fields: [flightInstanceId], references: [id])
+  flightInstance   FlightInstance @relation(fields: [flightInstanceId], references: [id])
   channel          BookingChannel
   agencyId         String?
-  status           BookingStatus   @default(DRAFT)
+  agency           AgencyProfile? @relation(fields: [agencyId], references: [userId])
+  status           BookingStatus  @default(DRAFT)
   priceIrr         Int
-  createdAt        DateTime        @default(now())
+  createdAt        DateTime       @default(now())
 
   passengers    Passenger[]
   ledgerEntries LedgerEntry[]
 
   @@index([flightInstanceId, status])
   @@index([channel])
+  @@index([agencyId])
   @@map("bookings")
 }
 
 model Passenger {
-  id             String  @id @default(uuid())
-  bookingId      String
-  booking        Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  fullName       String
-  nationalIdEnc  String?
-  mobileEnc      String?
+  id            String  @id @default(uuid())
+  bookingId     String
+  booking       Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  fullName      String
+  nationalIdEnc String?
+  mobileEnc     String?
 
   @@map("passengers")
 }
@@ -233,6 +242,154 @@ model LedgerEntry {
   createdById     String?
   createdBy       User?           @relation("LedgerCreatedBy", fields: [createdById], references: [id])
 
+  // Set for agency SALE entries (mirroring booking.agencyId) and for every
+  // SETTLEMENT entry (invoice payment / direct "ثبت تسویه", neither of which
+  // is necessarily tied to one booking) — lets AgencyCreditLine.usedIrr be
+  // derived as a single SUM(...WHERE agencyId=X) query instead of a join
+  // through Booking, which SETTLEMENT rows wouldn't have anyway.
+  agencyId String?
+  agency   AgencyProfile? @relation("AgencyLedgerEntries", fields: [agencyId], references: [userId])
+
   @@index([occurredAt, type])
+  @@index([agencyId, type])
   @@map("ledger_entries")
+}
+
+// ─── Phase 3: Agencies (credit, settlement, membership) ────────────────
+
+enum AgencyTier {
+  NORMAL
+  SILVER
+  GOLD
+}
+
+model AgencyProfile {
+  userId        String     @id
+  user          User       @relation("AgencyUser", fields: [userId], references: [id])
+  licenseNo     String
+  managerName   String
+  phone         String
+  email         String
+  city          String
+  address       String
+  tier          AgencyTier @default(NORMAL)
+  suspendedAt   DateTime?
+  suspendReason String?
+  joinedAt      DateTime   @default(now())
+
+  creditLine    AgencyCreditLine?
+  apiKeys       AgencyApiKey[]
+  invoices      AgencyInvoice[]
+  messages      AgencyMessage[]
+  bookings      Booking[]
+  ledgerEntries LedgerEntry[]     @relation("AgencyLedgerEntries")
+
+  @@map("agency_profiles")
+}
+
+// Only the limit is stored — "used" is always derived from LedgerEntry
+// (see docs/DB_SCHEMA.md), never a mutable balance column.
+model AgencyCreditLine {
+  agencyId    String        @id
+  agency      AgencyProfile @relation(fields: [agencyId], references: [userId])
+  limitIrr    Int
+  updatedById String?
+  updatedBy   User?         @relation("AgencyCreditUpdatedBy", fields: [updatedById], references: [id])
+  updatedAt   DateTime      @updatedAt
+
+  @@map("agency_credit_lines")
+}
+
+enum AgencyMembershipStatus {
+  PENDING
+  REFERRED
+  APPROVED
+  REJECTED
+}
+
+model AgencyMembershipRequest {
+  id            String                 @id @default(uuid())
+  applicantName String
+  managerName   String
+  licenseNo     String
+  city          String
+  phone         String
+  email         String
+  documents     Json?
+  status        AgencyMembershipStatus @default(PENDING)
+  referredToId  String?
+  referredTo    User?                  @relation("AgencyRequestReferredTo", fields: [referredToId], references: [id])
+  reviewNote    String?
+  reviewedById  String?
+  reviewedBy    User?                  @relation("AgencyRequestReviewedBy", fields: [reviewedById], references: [id])
+  reviewedAt    DateTime?
+  createdAt     DateTime               @default(now())
+
+  @@index([status])
+  @@map("agency_membership_requests")
+}
+
+enum AgencyApiScope {
+  FULL
+  SEARCH_BOOK
+  SEARCH_ONLY
+}
+
+enum AgencyApiKeyStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+// keyHash only — the raw key is shown once at creation and never stored/retrievable again.
+model AgencyApiKey {
+  id          String             @id @default(uuid())
+  agencyId    String
+  agency      AgencyProfile      @relation(fields: [agencyId], references: [userId])
+  keyHash     String             @unique
+  scope       AgencyApiScope
+  status      AgencyApiKeyStatus @default(ACTIVE)
+  activatedAt DateTime           @default(now())
+  expiresAt   DateTime?
+  lastUsedAt  DateTime?
+  callCount   Int                @default(0)
+
+  @@index([agencyId])
+  @@map("agency_api_keys")
+}
+
+enum AgencyInvoiceStatus {
+  UNPAID
+  PAID
+  OVERDUE
+}
+
+model AgencyInvoice {
+  id         String              @id @default(uuid())
+  agencyId   String
+  agency     AgencyProfile       @relation(fields: [agencyId], references: [userId])
+  invoiceNo  String              @unique
+  issuedById String
+  issuedBy   User                @relation("AgencyInvoiceIssuedBy", fields: [issuedById], references: [id])
+  issuedAt   DateTime            @default(now())
+  dueAt      DateTime
+  amountIrr  Int
+  status     AgencyInvoiceStatus @default(UNPAID)
+  paidAt     DateTime?
+
+  @@index([agencyId, status])
+  @@map("agency_invoices")
+}
+
+model AgencyMessage {
+  id             String        @id @default(uuid())
+  agencyId       String
+  agency         AgencyProfile @relation(fields: [agencyId], references: [userId])
+  senderId       String
+  sender         User          @relation("AgencyMessageSender", fields: [senderId], references: [id])
+  senderIsAgency Boolean
+  body           String
+  createdAt      DateTime      @default(now())
+
+  @@index([agencyId, createdAt])
+  @@map("agency_messages")
 }

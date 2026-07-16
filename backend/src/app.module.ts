@@ -12,6 +12,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { PanelsModule } from './modules/panels/panels.module';
 import { ReportingModule } from './modules/reporting/reporting.module';
 import { AuditModule } from './modules/audit/audit.module';
+import { AgenciesModule } from './modules/agencies/agencies.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { AuditModule } from './modules/audit/audit.module';
     PanelsModule,
     ReportingModule,
     AuditModule,
+    AgenciesModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

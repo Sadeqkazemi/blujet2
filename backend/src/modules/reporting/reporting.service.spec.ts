@@ -1,12 +1,13 @@
 import { BadRequestException } from '@nestjs/common';
 import { ReportingService } from './reporting.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AgenciesService } from '../agencies/agencies.service';
 
 describe('ReportingService (unit)', () => {
   let service: ReportingService;
 
   beforeEach(() => {
-    service = new ReportingService({} as PrismaService);
+    service = new ReportingService({} as PrismaService, {} as AgenciesService);
   });
 
   describe('buildBuckets', () => {

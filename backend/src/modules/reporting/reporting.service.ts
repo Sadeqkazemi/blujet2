@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AgenciesService } from '../agencies/agencies.service';
 import { ErrorCode } from '../../common/errors';
 import {
   Bucket,
@@ -14,7 +15,10 @@ const LOW_SALES_OCCUPANCY_THRESHOLD = 0.6;
 
 @Injectable()
 export class ReportingService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly agencies: AgenciesService,
+  ) {}
 
   private buildBuckets(
     granularity: SalesGranularity,
@@ -222,14 +226,16 @@ export class ReportingService {
     const marginPct =
       revenueIrr > 0 ? Math.round((profitIrr / revenueIrr) * 100) : 0;
 
+    const { agencyDebtIrr, agencyDebtCount } =
+      await this.agencies.getDebtSummary();
+
     return {
       revenueIrr,
       profitIrr,
       marginPct,
       operatingCostIrr,
-      // AgencyCreditLine lands in Phase 3 — honestly 0 until then, not fabricated.
-      agencyDebtIrr: 0,
-      agencyDebtCount: 0,
+      agencyDebtIrr,
+      agencyDebtCount,
     };
   }
 
