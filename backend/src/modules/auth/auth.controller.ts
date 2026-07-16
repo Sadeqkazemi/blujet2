@@ -4,6 +4,8 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  NotFoundException,
+  Param,
   Post,
   Req,
   Res,
@@ -121,5 +123,15 @@ export class AuthController {
   @ApiOperation({ summary: "Current authenticated user's identity and role" })
   me(@CurrentUser() user: AuthenticatedUser) {
     return { success: true, data: user };
+  }
+
+  @Get('_test/last-code/:username')
+  @ApiOperation({
+    summary: 'E2E-test only: reads back the mock 2FA code. 404s in production.',
+  })
+  async testLastCode(@Param('username') username: string) {
+    const code = await this.auth.getLastCodeForE2e(username);
+    if (code === null) throw new NotFoundException();
+    return { success: true, data: { code } };
   }
 }

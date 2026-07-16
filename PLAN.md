@@ -11,8 +11,8 @@ separate track, expected to merge with this one later — see
 
 - [x] Repo scaffold (frontend/backend/ml-service skeletons, design-reference import)
 - [x] Design extraction — all 6 panels + shared shell + `ReservationSystem` read in full; findings folded into `docs/API.md` / `docs/DB_SCHEMA.md`
-- [ ] **Phase 1 — staff auth + RBAC + panel shell + dashboard/reporting** ← awaiting approval of `docs/API.md`/`docs/DB_SCHEMA.md` before implementation starts
-- [ ] Phase 2 — flight/booking core (minimal read-side slice for reporting)
+- [x] **Phase 1 — staff auth + RBAC + panel shell + dashboard/reporting** — see `docs/features/panel-shell-dashboard.md` for the proven checklist (35 backend + 21 frontend unit + 5 E2E tests, all passing; lint+typecheck clean in both packages). Known deferred scope, not silently dropped: IT Manager's real (service-health) dashboard, day/month/flight chart-mode UI, pixel-diff visual regression — see that doc's scope notes.
+- [x] Phase 2 — flight/booking core (minimal read-side slice for reporting) — done as part of Phase 1's Prisma schema (Route/Flight/FlightInstance/Booking/LedgerEntry), since reporting needed real data to aggregate
 - [ ] Phase 3 — Agencies (list/detail/credit/settlement/membership requests)
 - [ ] Phase 4 — Cartable, referrals, manager messaging
 - [ ] Phase 5 — VIP club card-request approval
@@ -47,3 +47,16 @@ a passing test — see `docs/features/panel-shell-dashboard.md` for Phase 1.
 See `CLAUDE.md` → Commands. `docker compose up -d` starts Postgres+Redis;
 `cd backend && npm run start:dev` / `cd frontend && npm run dev` /
 `cd ml-service && uvicorn app.main:app --reload` for the three services.
+
+- `cd backend && npm run seed` — (re)seeds one dev account per role, all
+  sharing the password `Blujet@1404` (see `backend/prisma/seed.ts` — dev
+  usernames: `ceo`, `chair`, `senior.rahimi`, `finance.karimi`,
+  `comm.abbasi`, `itadmin`, `site.admin`, `com.ahmadi`), plus 6 months of
+  sample flights/bookings so the dashboard has real numbers to show.
+- Backend tests need a local Postgres reachable at the `DATABASE_URL` in
+  `backend/.env` (dev db) and `backend/.env.test` (test db, `blujet_test`) —
+  `npm run test:e2e` runs Jest+Supertest against the latter.
+- `cd frontend && npm test` — Vitest+RTL unit/component tests.
+- `cd frontend && npm run test:e2e` — Playwright, needs both dev servers
+  running (`backend: npm run start:dev` on :3000, `frontend: npm run dev`
+  on :5173).

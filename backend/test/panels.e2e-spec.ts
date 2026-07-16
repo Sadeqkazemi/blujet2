@@ -121,4 +121,40 @@ describe('Panels (e2e)', () => {
       .send({ enabled: false });
     expect(res.status).toBe(403);
   });
+
+  it('two simultaneous toggles of the same panel from two CEO sessions do not crash and leave a consistent final state', async () => {
+    const ceoA = await loginAs(app, 'ceo');
+    const ceoB = await loginAs(app, 'ceo');
+
+    const [resA, resB] = await Promise.all([
+      request(app.getHttpServer())
+        .patch('/panels/access/COMMERCIAL')
+        .set('Authorization', `Bearer ${ceoA.accessToken}`)
+        .send({ enabled: false }),
+      request(app.getHttpServer())
+        .patch('/panels/access/COMMERCIAL')
+        .set('Authorization', `Bearer ${ceoB.accessToken}`)
+        .send({ enabled: true }),
+    ]);
+
+    expect([resA.status, resB.status]).toEqual([200, 200]);
+
+    const finalFlag = await prisma.panelAccessFlag.findUniqueOrThrow({
+      where: { panelKey: 'COMMERCIAL' },
+    });
+    expect([true, false]).toContain(finalFlag.enabled);
+
+    const auditRows = await prisma.auditLog.findMany({
+      where: { category: 'ACCESS', entityId: 'COMMERCIAL' },
+      orderBy: { createdAt: 'desc' },
+      take: 2,
+    });
+    expect(auditRows).toHaveLength(2);
+
+    // Cleanup.
+    await request(app.getHttpServer())
+      .patch('/panels/access/COMMERCIAL')
+      .set('Authorization', `Bearer ${ceoA.accessToken}`)
+      .send({ enabled: true });
+  });
 });

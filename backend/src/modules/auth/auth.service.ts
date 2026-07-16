@@ -200,6 +200,22 @@ export class AuthService {
     });
   }
 
+  /**
+   * Non-production only: lets Playwright E2E runs read back the mock 2FA
+   * code instead of receiving a real SMS/email. Always 404s in production
+   * (enforced here AND by the controller, belt-and-braces).
+   */
+  async getLastCodeForE2e(username: string): Promise<string | null> {
+    if (
+      process.env.NODE_ENV === 'production' ||
+      !this.twoFactorProvider.getLastCode
+    )
+      return null;
+    const user = await this.prisma.user.findUnique({ where: { username } });
+    if (!user) return null;
+    return this.twoFactorProvider.getLastCode(user.id) ?? null;
+  }
+
   private signAccessToken(user: AuthenticatedUser): string {
     return this.jwt.sign(
       { sub: user.id, role: user.role, fullName: user.fullName },

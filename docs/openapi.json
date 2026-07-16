@@ -105,6 +105,30 @@
         ]
       }
     },
+    "/auth/_test/last-code/{username}": {
+      "get": {
+        "operationId": "AuthController_testLastCode",
+        "parameters": [
+          {
+            "name": "username",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "E2E-test only: reads back the mock 2FA code. 404s in production.",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/panels/nav": {
       "get": {
         "operationId": "PanelsController_getNav",

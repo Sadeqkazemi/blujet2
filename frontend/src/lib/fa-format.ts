@@ -12,7 +12,7 @@ export function faDigits(value: string | number): string {
  */
 export function faMoney(amountRial: number): string {
   const toman = Math.round(amountRial / 10);
-  const grouped = toman.toLocaleString('en-US');
+  const grouped = toman.toLocaleString('en-US').replace(/,/g, '٬');
   return faDigits(grouped);
 }
 

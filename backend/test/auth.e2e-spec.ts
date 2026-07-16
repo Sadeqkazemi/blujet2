@@ -175,4 +175,61 @@ describe('Auth (e2e)', () => {
     );
     expect(attempts.some((r) => r.status === 429)).toBe(true);
   });
+
+  it('/auth/refresh rotates the refresh token; the old one is rejected on reuse', async () => {
+    const agent = request.agent(app.getHttpServer());
+    const loginRes = await agent
+      .post('/auth/staff/login')
+      .send({ username: 'ceo', password: 'Blujet@1404' });
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { username: 'ceo' },
+    });
+    const code = app
+      .get<MockTwoFactorProvider>(TWO_FACTOR_PROVIDER)
+      .getLastCode(user.id)!;
+    const verifyRes = await agent
+      .post('/auth/staff/login/verify')
+      .send({ challengeId: loginRes.body.data.challengeId, code });
+    const oldCookie = verifyRes.headers['set-cookie'];
+    expect(oldCookie).toBeDefined();
+
+    const firstRefresh = await agent.post('/auth/refresh');
+    expect(firstRefresh.status).toBe(200);
+    expect(firstRefresh.body.data.accessToken).toBeDefined();
+    const newCookie = firstRefresh.headers['set-cookie'];
+    expect(String(newCookie)).not.toBe(String(oldCookie));
+
+    // Replay the OLD refresh cookie directly (bypassing the agent's rotated jar) — must be rejected.
+    const replay = await request(app.getHttpServer())
+      .post('/auth/refresh')
+      .set('Cookie', oldCookie);
+    expect(replay.status).toBe(401);
+    expect(replay.body.success).toBe(false);
+  });
+
+  it('/auth/logout revokes the refresh token; a subsequent refresh fails', async () => {
+    const agent = request.agent(app.getHttpServer());
+    const loginRes = await agent
+      .post('/auth/staff/login')
+      .send({ username: 'ceo', password: 'Blujet@1404' });
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { username: 'ceo' },
+    });
+    const code = app
+      .get<MockTwoFactorProvider>(TWO_FACTOR_PROVIDER)
+      .getLastCode(user.id)!;
+    const verifyRes = await agent
+      .post('/auth/staff/login/verify')
+      .send({ challengeId: loginRes.body.data.challengeId, code });
+
+    await agent
+      .post('/auth/logout')
+      .set(
+        'Authorization',
+        `Bearer ${verifyRes.body.data.accessToken as string}`,
+      );
+
+    const refreshAfterLogout = await agent.post('/auth/refresh');
+    expect(refreshAfterLogout.body.success).toBe(false);
+  });
 });
