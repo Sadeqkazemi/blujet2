@@ -20,3 +20,21 @@ export function faMoney(amountRial: number): string {
 export function faPercent(value: number): string {
   return `${faDigits(value)}٪`;
 }
+
+/** Converts Persian/Arabic digits in user input back to Latin digits. */
+export function latinDigits(value: string): string {
+  return value
+    .replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
+    .replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
+}
+
+/**
+ * Parses a تومان amount typed by the user (Persian or Latin digits, optional
+ * ٬/, separators) into integer IRR. The rial↔toman conversion lives ONLY in
+ * this module. Returns null for non-numeric input.
+ */
+export function parseTomanToRial(input: string): number | null {
+  const cleaned = latinDigits(input).replace(/[٬,\s]/g, '');
+  if (!/^\d+$/.test(cleaned)) return null;
+  return Number(cleaned) * 10;
+}
