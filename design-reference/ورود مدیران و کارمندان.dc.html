@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800;900&family=Roboto+Mono:wght@400&display=swap" rel="stylesheet">
+<style>*{box-sizing:border-box;}html,body{margin:0;}</style>
+<script src="./site-data.js"></script>
+</helmet>
+
+<div dir="rtl" style="font-family:Vazirmatn,sans-serif; background:#0b1220; color:#e7ecf3; min-height:100vh; --accent:#3b82f6; display:flex; align-items:center; justify-content:center; padding:22px;">
+  <div style="width:960px; max-width:100%; background:#0f1726; border:1px solid #1f2a3d; border-radius:22px; overflow:hidden; box-shadow:0 40px 100px -30px rgba(0,0,0,.7); display:grid; grid-template-columns:390px 1fr;">
+
+    <!-- BRAND PANEL -->
+    <div style="background:linear-gradient(165deg,#101d33,#0b1626); padding:32px 28px; display:flex; flex-direction:column; justify-content:space-between; position:relative; overflow:hidden; border-inline-end:1px solid #1c2740;">
+      <div style="position:absolute; top:-90px; inset-inline-start:-70px; width:280px; height:280px; border-radius:50%; background:rgba(59,130,246,.12);"></div>
+      <div style="position:relative;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:44px;"><div style="width:44px; height:44px; border-radius:12px; background:linear-gradient(135deg,#3b82f6,#1d4ed8); display:flex; align-items:center; justify-content:center; color:#fff; font-size:20px;">✈</div><div><div style="font-weight:900; font-size:20px; color:#fff;">blujet</div><div style="font-size:11px; color:#8fa1bb;">سامانهٔ مدیریت داخلی</div></div></div>
+        <h2 style="font-size:24px; font-weight:900; line-height:1.5; margin:0 0 14px; color:#fff;">ورود مدیران و کارمندان</h2>
+        <p style="font-size:12.5px; color:#8fa1bb; line-height:2.1; margin:0;">این درگاه مخصوص کارکنان سازمان است. با حساب کاربری‌ای که واحد فناوری اطلاعات برای شما ایجاد کرده است وارد شوید.</p>
+      </div>
+      <div style="position:relative; display:flex; flex-direction:column; gap:11px; margin-top:40px;">
+        <div style="display:flex; align-items:center; gap:9px; font-size:12px; color:#aebbd0;"><span style="width:27px; height:27px; border-radius:8px; background:rgba(59,130,246,.16); color:#60a5fa; display:flex; align-items:center; justify-content:center; flex:none;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5.5c0 4.2-2.9 7.4-7 8.5-4.1-1.1-7-4.3-7-8.5V6l7-3z"/></svg></span>احراز هویت امن و کنترل دسترسی نقش‌محور</div>
+        <div style="display:flex; align-items:center; gap:9px; font-size:12px; color:#aebbd0;"><span style="width:27px; height:27px; border-radius:8px; background:rgba(16,185,129,.14); color:#34d399; display:flex; align-items:center; justify-content:center; flex:none;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>هر نقش فقط به بخش‌های مجاز خود دسترسی دارد</div>
+        <div style="display:flex; align-items:center; gap:9px; font-size:12px; color:#aebbd0;"><span style="width:27px; height:27px; border-radius:8px; background:rgba(167,139,250,.16); color:#a78bfa; display:flex; align-items:center; justify-content:center; flex:none;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>ثبت گزارش خودکار فعالیت‌ها برای مدیران</div>
+      </div>
+    </div>
+
+    <!-- FORM PANEL -->
+    <div style="padding:30px 32px;">
+      <div style="font-size:12.5px; font-weight:800; color:#fff; margin-bottom:6px;">ورود به سامانه</div>
+      <div style="font-size:11.5px; color:#8fa1bb; margin-bottom:22px;">با نام کاربری و رمز عبوری که واحد فناوری اطلاعات برای شما ایجاد کرده است وارد شوید.</div>
+
+      <div style="margin-bottom:14px;">
+        <label style="display:block; font-size:11.5px; color:#9fb0c7; margin-bottom:7px;">نام کاربری</label>
+        <input value="{{ username }}" onInput="{{ onUsername }}" placeholder="{{ userPlaceholder }}" dir="ltr" style="width:100%; box-sizing:border-box; height:46px; border:1px solid #28344c; border-radius:11px; background:#141d2e; color:#e7ecf3; font-size:13px; padding:0 13px; text-align:right; font-family:'Roboto Mono',monospace; outline:none;" />
+      </div>
+      <div style="margin-bottom:18px;">
+        <label style="display:block; font-size:11.5px; color:#9fb0c7; margin-bottom:7px;">رمز عبور</label>
+        <div style="position:relative;">
+          <input value="{{ password }}" onInput="{{ onPassword }}" type="{{ pwType }}" placeholder="••••••••" dir="ltr" style="width:100%; box-sizing:border-box; height:46px; border:1px solid #28344c; border-radius:11px; background:#141d2e; color:#e7ecf3; font-size:13px; padding:0 13px; text-align:right; font-family:inherit; outline:none;" />
+          <span onClick="{{ togglePw }}" style="position:absolute; inset-inline-start:12px; top:50%; transform:translateY(-50%); cursor:pointer; color:#6b7b94; font-size:11px; font-weight:700;">{{ pwToggleLabel }}</span>
+        </div>
+      </div>
+
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+        <label style="display:flex; align-items:center; gap:8px; font-size:11.5px; color:#9fb0c7; cursor:pointer;"><span onClick="{{ toggleRemember }}" style="width:18px; height:18px; border-radius:5px; border:1px solid {{ rememberBorder }}; background:{{ rememberBg }}; display:flex; align-items:center; justify-content:center; color:#fff; font-size:11px;">{{ rememberCheck }}</span>مرا به خاطر بسپار</label>
+        <span onClick="{{ forgotPw }}" style="font-size:11.5px; color:#60a5fa; cursor:pointer;">فراموشی رمز عبور؟</span>
+      </div>
+
+      <sc-if value="{{ hasError }}" hint-placeholder-val="{{false}}">
+        <div style="display:flex; align-items:center; gap:8px; background:rgba(248,113,113,.1); border:1px solid rgba(248,113,113,.35); border-radius:10px; padding:10px 12px; margin-bottom:16px; font-size:11.5px; color:#fca5a5;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>{{ errorMsg }}</div>
+      </sc-if>
+
+      <span onClick="{{ submit }}" style="display:flex; align-items:center; justify-content:center; gap:9px; height:48px; border-radius:12px; background:var(--accent,#3b82f6); color:#fff; font-size:13.5px; font-weight:800; cursor:pointer;">ورود به سامانه<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></span>
+
+      <div style="margin-top:20px; padding-top:16px; border-top:1px solid #1f2a3d; font-size:11px; color:#6b7b94; line-height:1.9;">
+        حساب کاربری ندارید؟ ایجاد حساب کارکنان تنها از طریق <span style="color:#93c5fd; font-weight:700;">واحد فناوری اطلاعات (مدیر IT)</span> انجام می‌شود.
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- TOAST -->
+<sc-if value="{{ hasToast }}" hint-placeholder-val="{{ false }}">
+  <div style="position:fixed; bottom:24px; left:50%; transform:translateX(-50%); z-index:9000; background:#141d2e; border:1px solid #2a3550; color:#e7ecf3; padding:12px 18px; border-radius:12px; font-size:12.5px; font-weight:700; box-shadow:0 14px 40px -10px rgba(0,0,0,.6); display:flex; align-items:center; gap:9px; max-width:90vw;"><span style="width:22px; height:22px; border-radius:50%; background:rgba(52,211,153,.18); color:#34d399; display:flex; align-items:center; justify-content:center; flex:none; font-size:12px;">✓</span><span>{{ toast }}</span></div>
+</sc-if>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { mode: "manager", role: "ceo", username: "", password: "", showPw: false, remember: true, error: "", toast: "" };
+  toast(t){ this.setState({ toast: t }); clearTimeout(this._toastT); this._toastT = setTimeout(() => this.setState({ toast: "" }), 2800); }
+
+  MANAGER_ROLES = [
+    { id: "ceo",        label: "مدیر عامل",     dot: "#e11d48", panel: "پنل مدیر عامل.dc.html" },
+    { id: "senior",     label: "مدیر ارشد",     dot: "#059669", panel: "پنل مدیر ارشد.dc.html" },
+    { id: "commercial", label: "مدیر بازرگانی", dot: "#2563eb", panel: "پنل مدیر بازرگانی.dc.html" },
+    { id: "finance",    label: "مدیر مالی",     dot: "#7c3aed", panel: "پنل مدیر مالی.dc.html" },
+    { id: "it",         label: "مدیر IT",       dot: "#0891b2", panel: "پنل مدیر IT.dc.html" },
+    { id: "chairman",   label: "رئیس هیئت مدیره", dot: "#f59e0b", panel: "پنل رئیس هیئت مدیره.dc.html" }
+  ];
+
+  _staffChips() {
+    const staff = (window.SiteData ? window.SiteData.getStaff() : []);
+    const cols = { commercial: "#2563eb", finance: "#7c3aed" };
+    return staff.map(s => ({ id: s.id, label: s.name.split(/\s+/)[0] + " · " + (s.dept === "finance" ? "مالی" : "بازرگانی"),
+      dot: cols[s.dept] || "#0891b2", username: s.username, panel: s.dept === "finance" ? "پنل مدیر مالی.dc.html" : "پنل مدیر بازرگانی.dc.html" }));
+  }
+
+  componentDidMount() { this._sdh = () => this.forceUpdate(); window.addEventListener("sitedata:change", this._sdh); window.addEventListener("storage", this._sdh); }
+  componentWillUnmount() { window.removeEventListener("sitedata:change", this._sdh); window.removeEventListener("storage", this._sdh); }
+
+  _current() {
+    if (this.state.mode === "manager") return this.MANAGER_ROLES.find(r => r.id === this.state.role) || this.MANAGER_ROLES[0];
+    return this._staffChips().find(r => r.id === this.state.role) || this._staffChips()[0] || null;
+  }
+
+  submit() {
+    if (!this.state.username.trim() || !this.state.password.trim()) { this.setState({ error: "نام کاربری و رمز عبور را وارد کنید." }); return; }
+    this.setState({ error: "" });
+    const cur = this._current();
+    const name = cur ? cur.label : "کاربر";
+    this.toast("ورود موفق بود ✓ در حال انتقال به پنل " + name + "…");
+    if (cur && cur.panel) { clearTimeout(this._navT); this._navT = setTimeout(() => { window.location.href = cur.panel; }, 1100); }
+  }
+
+  renderVals() {
+    return {
+      username: this.state.username, onUsername: (e) => this.setState({ username: e.target.value }),
+      userPlaceholder: "username",
+      password: this.state.password, onPassword: (e) => this.setState({ password: e.target.value }),
+      pwType: this.state.showPw ? "text" : "password",
+      togglePw: () => this.setState(s => ({ showPw: !s.showPw })),
+      pwToggleLabel: this.state.showPw ? "پنهان" : "نمایش",
+      remember: this.state.remember, toggleRemember: () => this.setState(s => ({ remember: !s.remember })),
+      rememberBorder: this.state.remember ? "var(--accent,#3b82f6)" : "#3a4a63",
+      rememberBg: this.state.remember ? "var(--accent,#3b82f6)" : "transparent",
+      rememberCheck: this.state.remember ? "✓" : "",
+      hasError: !!this.state.error, errorMsg: this.state.error,
+      toast: this.state.toast, hasToast: !!this.state.toast,
+      forgotPw: () => this.toast("برای بازیابی رمز عبور، با واحد فناوری اطلاعات (مدیر IT) تماس بگیرید"),
+      submit: () => this.submit()
+    };
+  }
+}
+</script>
+</body>
+</html>
