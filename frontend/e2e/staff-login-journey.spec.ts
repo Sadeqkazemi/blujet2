@@ -1,0 +1,102 @@
+import { expect, test } from '@playwright/test';
+
+const API_URL = process.env.E2E_API_URL ?? 'http://localhost:3000';
+const PASSWORD = 'Blujet@1404';
+
+async function getTwoFactorCode(username: string): Promise<string> {
+  const res = await fetch(`${API_URL}/auth/_test/last-code/${username}`);
+  const body = (await res.json()) as { success: boolean; data?: { code: string } };
+  if (!body.success || !body.data) throw new Error(`No 2FA code available for ${username}`);
+  return body.data.code;
+}
+
+async function loginAs(page: import('@playwright/test').Page, username: string) {
+  await page.goto('/login');
+  await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+  await page.fill('#username', username);
+  await page.fill('#password', PASSWORD);
+  await page.click('button[type=submit]');
+  await page.waitForURL('**/two-factor');
+  const code = await getTwoFactorCode(username);
+  await page.fill('#code', code);
+  await page.click('button[type=submit]');
+  await page.waitForURL('**/panel');
+}
+
+/** Strips the "به‌زودی" suffix NavLink appends for not-yet-implemented tabs. */
+function stripComingSoon(label: string): string {
+  return label.replace(/به‌زودی$/, '').trim();
+}
+
+const ROLE_CASES = [
+  {
+    username: 'finance.karimi',
+    roleLabel: 'مدیر مالی',
+    expectedTabs: ['داشبورد', 'آژانس‌ها', 'گزارش مسافران', 'گزارش کارمندان', 'مالی', 'استرداد بلیط', 'کارتابل'],
+    hasSalesDashboard: true,
+  },
+  {
+    username: 'ceo',
+    roleLabel: 'مدیر عامل',
+    expectedTabs: [
+      'داشبورد',
+      'مدیران',
+      'مالی',
+      'کارتابل',
+      'مشتریان VIP',
+      'گزارش مدیران',
+      'تعیین قیمت بلیط',
+      'دسترسی به پنل‌ها',
+      'امنیت و رمز عبور',
+      'لاگ و رویدادها',
+    ],
+    hasSalesDashboard: true,
+  },
+  {
+    username: 'itadmin',
+    roleLabel: 'مدیر فناوری اطلاعات',
+    expectedTabs: [
+      'داشبورد فنی',
+      'کاربران و دسترسی‌ها',
+      'رمزها و امنیت',
+      'سرویس‌های سایت',
+      'سامانه رزرواسیون',
+      'دسترسی به پنل‌ها',
+      'لاگ و رویدادها',
+      'پشتیبان‌گیری',
+      'تنظیمات سامانه',
+    ],
+    hasSalesDashboard: false,
+  },
+];
+
+for (const { username, roleLabel, expectedTabs, hasSalesDashboard } of ROLE_CASES) {
+  test(`full login journey for ${username} — lands on its own dashboard with only its permitted tabs`, async ({ page }) => {
+    await loginAs(page, username);
+
+    await expect(page.getByText(roleLabel)).toBeVisible();
+
+    const navLinks = page.locator('nav a');
+    await expect(navLinks).toHaveCount(expectedTabs.length);
+    const tabLabels = (await navLinks.allTextContents()).map(stripComingSoon);
+    expect(tabLabels).toEqual(expectedTabs);
+
+    if (hasSalesDashboard) {
+      await expect(page.getByText('کل درآمد')).toBeVisible();
+      await expect(page.getByText('نمودار فروش')).toBeVisible();
+    } else {
+      await expect(page.getByText('این بخش به‌زودی راه‌اندازی می‌شود')).toBeVisible();
+    }
+  });
+}
+
+test('a role-scoped "coming soon" tab renders without crashing', async ({ page }) => {
+  await loginAs(page, 'ceo');
+  await page.getByRole('link', { name: /^کارتابل/ }).click();
+  await expect(page.getByText('این بخش به‌زودی راه‌اندازی می‌شود')).toBeVisible();
+});
+
+test('an unauthenticated visitor is redirected to /login', async ({ page }) => {
+  await page.goto('/panel');
+  await page.waitForURL('**/login');
+});

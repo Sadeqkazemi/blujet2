@@ -1,19 +1,31 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-
-function Placeholder({ title }: { title: string }) {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-body font-sans text-ink">
-      <p className="text-lg font-semibold">{title}</p>
-    </div>
-  );
-}
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { AuthProvider } from './hooks/useAuth';
+import ProtectedRoute from './components/ProtectedRoute';
+import PanelShell from './components/PanelShell';
+import ComingSoonPage from './components/ComingSoonPage';
+import DashboardRouter from './components/DashboardRouter';
+import LoginPage from './features/auth/LoginPage';
+import TwoFactorPage from './features/auth/TwoFactorPage';
 
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Placeholder title="blujet" />} />
-      </Routes>
+      <AuthProvider>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/two-factor" element={<TwoFactorPage />} />
+
+          <Route element={<ProtectedRoute />}>
+            <Route path="/panel" element={<PanelShell />}>
+              <Route index element={<DashboardRouter />} />
+              <Route path=":tabKey" element={<ComingSoonPage />} />
+            </Route>
+          </Route>
+
+          <Route path="/" element={<Navigate to="/panel" replace />} />
+          <Route path="*" element={<Navigate to="/panel" replace />} />
+        </Routes>
+      </AuthProvider>
     </BrowserRouter>
   );
 }

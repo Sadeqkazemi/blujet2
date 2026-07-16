@@ -71,7 +71,10 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'cartable', labelFa: 'کارتابل', implemented: false },
   ],
   IT_MANAGER: [
-    { key: 'dashboard', labelFa: 'داشبورد فنی', implemented: true },
+    // Not the shared sales/KPI dashboard the other 5 roles get (IT's real
+    // "داشبورد فنی" is service-health widgets, no reporting endpoints back
+    // it yet — IT_MANAGER is deliberately excluded from REPORTING_ROLES).
+    { key: 'dashboard', labelFa: 'داشبورد فنی', implemented: false },
     { key: 'users', labelFa: 'کاربران و دسترسی‌ها', implemented: false },
     { key: 'security', labelFa: 'رمزها و امنیت', implemented: false },
     { key: 'services', labelFa: 'سرویس‌های سایت', implemented: false },

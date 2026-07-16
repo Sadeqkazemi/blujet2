@@ -11,4 +11,10 @@ export interface TwoFactorProvider {
     },
     code: string,
   ): Promise<void>;
+
+  /**
+   * Non-production-only escape hatch for E2E tests that can't receive a real
+   * SMS/email — see AuthService.getLastCodeForE2e. Real providers omit this.
+   */
+  getLastCode?(userId: string): string | undefined;
 }
