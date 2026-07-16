@@ -43,6 +43,10 @@ export function fetchAgencyRequests(status?: AgencyMembershipStatus) {
   return apiGet<AgencyMembershipRequest[]>(`/agencies/requests${status ? `?status=${status}` : ''}`);
 }
 
+export function fetchAgencyRequest(id: string) {
+  return apiGet<AgencyMembershipRequest & { history: unknown[] }>(`/agencies/requests/${id}`);
+}
+
 export function approveAgencyRequest(id: string) {
   return apiPatch<{ agencyId: string }>(`/agencies/requests/${id}/approve`);
 }
