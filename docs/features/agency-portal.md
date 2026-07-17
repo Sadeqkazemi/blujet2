@@ -54,20 +54,24 @@ Backend items proven by `backend/test/agency-portal.e2e-spec.ts` (16 tests,
 - [x] Agency A can never read or write Agency B's dashboard/credit/invoices/sales/inbox/profile/documents — every self-scoped endpoint derives the agency id from the JWT (`actor.id`), never from a client-supplied parameter — `'agency A cannot pay agency B invoice (404, ownership implicit via JWT)'` + no `/agency-portal/*` route accepts an `:id`/`:agencyId` param anywhere (verified by inspection of the controller)
 - [x] A staff JWT (any role) gets 401/403 on every `/agency-portal/*` endpoint — this portal is AGENCY-role only — `'a staff JWT gets 403 on /agency-portal/* (AGENCY-only)'`
 
+Frontend items proven by `frontend/src/features/agency-portal/*.test.tsx` (8
+tests, 67 total); E2E by `frontend/e2e/agency-portal-journey.spec.ts` (4
+journeys).
+
 ### Frontend
-- [ ] Agency login page (phone + password, no 2FA step), distinct from staff/customer login
-- [ ] Agency portal shell: sidebar with the 5 built tabs (dashboard, credit, sales, inbox, profile) — reads real data, RTL, Persian digits, Jalali dates, `faMoney` for every amount
-- [ ] Dashboard tab: KPI cards + 6-month bar chart + credit summary card
-- [ ] Credit tab: limit/used/remaining cards, invoice list with pay-from-credit action, credit-increase request form (not a direct mutation), recent ledger activity
-- [ ] Sales tab: ticket list + per-flight breakdown + summary KPIs
-- [ ] Inbox tab: message thread + reply box, agency-authored messages visually distinct from staff-authored ones
-- [ ] Profile tab: read-only profile fields + document upload/list
+- [x] Agency login page (phone + password, no 2FA step), distinct from staff/customer login — `AgencyLoginPage.test.tsx`: `'requires phone and password before submitting'` + `'calls agencyLogin with phone+password, no 2FA step'`
+- [x] Agency portal shell: sidebar with the 5 built tabs (dashboard, credit, sales, inbox, profile) — reads real data, RTL, Persian digits, Jalali dates, `faMoney` for every amount — exercised by every page test below (all render Persian-digit money via `faMoney`/`faDigits`) + the E2E journeys' nav clicks
+- [x] Dashboard tab: KPI cards + 6-month bar chart + credit summary card — `AgencyDashboardPage.test.tsx`: `'renders real KPI cards and the 6-month sales chart from the API, not fabricated data'`
+- [x] Credit tab: limit/used/remaining cards, invoice list with pay-from-credit action, credit-increase request form (not a direct mutation), recent ledger activity — `AgencyCreditPage.test.tsx`: `'shows limit/used/remaining and pays an unpaid invoice from credit'` + `'opens the credit-increase request modal and submits a toman amount converted to rial'`
+- [x] Sales tab: ticket list + per-flight breakdown + summary KPIs — `AgencySalesPage.test.tsx`: `"renders only this agency's tickets, per-flight breakdown, and real KPIs"`
+- [x] Inbox tab: message thread + reply box, agency-authored messages visually distinct from staff-authored ones — `AgencyInboxPage.test.tsx`: `'renders the thread and sends a new message'`
+- [x] Profile tab: read-only profile fields + document upload/list — `AgencyProfilePage.test.tsx`: `'renders read-only profile fields and the uploaded documents list'`
 
 ### E2E
-- [ ] Agency logs in (phone+password, no 2FA), sees its own dashboard KPIs
-- [ ] Agency pays an unpaid invoice from the credit tab, sees the invoice flip to paid and the ledger update
-- [ ] Agency sends an inbox message, sees it in the thread
-- [ ] Role isolation: a staff login never reaches `/agency-portal/*` routes; an agency login never reaches `/panel/*` routes
+- [x] Agency logs in (phone+password, no 2FA), sees its own dashboard KPIs — `'agency logs in with phone+password (no 2FA) and sees its own dashboard KPIs'`
+- [x] Agency pays an unpaid invoice from the credit tab, sees the invoice flip to paid and the ledger update — `'agency pays an unpaid invoice from the credit tab'` (invoice issued fresh per run via a direct staff API call, independent of the page's own agency session)
+- [x] Agency sends an inbox message, sees it in the thread — `'agency sends an inbox message and sees it in the thread'`
+- [x] Role isolation: a staff login never reaches `/agency-portal/*` routes; an agency login never reaches `/panel/*` routes — `'role isolation: a staff login never reaches /agency, an agency login never reaches /panel'`
 
 ## Deferred (scoped out with reasons, not silently dropped)
 - «صندلی‌های تخصیص‌یافته» (allocated seats tab) — no staff-side seat-allocation-to-agency workflow exists anywhere in the codebase to allocate seats in the first place; building the agency-facing read view first would mean fabricating data for a process that doesn't exist. Needs its own phase once/if that staff workflow is designed.
