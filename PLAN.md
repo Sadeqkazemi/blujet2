@@ -20,6 +20,9 @@ separate track, expected to merge with this one later — see
 - [ ] Phase 7 — Refunds (finance approval/payout)
 - [ ] Phase 8 — Employee management (IT Manager: accounts, permissions, services, security policy, logs, backups) — **assigned to a separate Claude Code session per the user (2026-07-17); this track must NOT implement the IT Manager panel.** Coordinate via docs/API.md + DB_SCHEMA.md Phase 8 sections before either side writes code touching shared tables (User/Permission).
 - [ ] Phase 9 — Reservation system (seat lock/PNR), embedded per-panel per the confirmed `role`/`lockOnly` contract
+- [ ] Phase 10 — Flight management (مدیریت پروازها — Senior/Commercial): routes, schedules (RRULE), instances, capacity — the largest unscheduled tab; docs must be drafted from the design before code, same gate as every phase
+- [ ] Phase 11 — Finance tab (مالی in 5 panels: income/expense chart, transactions) + گزارش مسافران + گزارش کارمندان
+- [ ] Phase 12 — Remaining shell tabs: مدیران و ادمین‌ها, امنیت و رمز عبور, تنظیمات سامانه, CEO's لاگ و رویدادها, plus the UI for the two Phase-1 backends that still render "به‌زودی" (گزارش مدیران, دسترسی به پنل‌ها)
 
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is
