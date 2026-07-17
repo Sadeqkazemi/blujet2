@@ -4,6 +4,24 @@ import { loginAs } from './helpers/login';
 // Generous timeout: the shared login helper may wait out the auth rate limit.
 test.setTimeout(240_000);
 
+const API_URL = process.env.E2E_API_URL ?? 'http://localhost:3000';
+
+// Reset the agency's derived debt to a known figure via the non-prod hook —
+// repeated runs against the long-lived dev DB settle the seed debt away
+// (net negative, clamped to ۰), which froze the «مصرف‌شده» figure.
+async function resetAgencyDebt(page: Page, agencyId: string): Promise<void> {
+  const token = await page.evaluate(async (api) => {
+    const res = await fetch(`${api}/auth/refresh`, { method: 'POST', credentials: 'include' });
+    const body = (await res.json()) as { data?: { accessToken?: string } };
+    return body.data?.accessToken ?? '';
+  }, API_URL);
+  const res = await fetch(`${API_URL}/agencies/${agencyId}/_test/debt`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('failed to reset agency debt');
+}
+
 async function openAgenciesTab(page: Page) {
   await page.getByRole('link', { name: /^آژانس‌ها/ }).click();
   await page.waitForURL('**/panel/agencies');
@@ -55,6 +73,9 @@ test('Commercial Manager: issue an invoice, pay it, and watch the credit-used fi
 
   await page.getByRole('button', { name: /آژانس blujet/ }).click();
   await page.waitForURL(/\/panel\/agencies\/[0-9a-f-]+$/);
+  const agencyId = /agencies\/([0-9a-f-]+)$/.exec(page.url())![1];
+  await resetAgencyDebt(page, agencyId);
+  await page.reload();
   await page.getByRole('button', { name: 'مالی', exact: true }).click();
   await expect(page.getByText('فاکتورهای صادرشده')).toBeVisible();
 

@@ -966,6 +966,30 @@
         ]
       }
     },
+    "/agencies/{id}/_test/debt": {
+      "post": {
+        "operationId": "AgenciesController_resetTestDebt",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "E2E only — بدهی مشتق‌شده آژانس را به رقم ثابت برمی‌گرداند؛ در production 404",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
     "/agencies/{id}/invoices/{invoiceId}/pay": {
       "patch": {
         "operationId": "AgenciesController_payInvoice",
