@@ -13,6 +13,7 @@ import RequestDetailPage from './features/agencies/RequestDetailPage';
 import CartablePage from './features/cartable/CartablePage';
 import ReferralsPage from './features/referrals/ReferralsPage';
 import ClubPage from './features/club/ClubPage';
+import PricingPage from './features/pricing/PricingPage';
 
 export default function App() {
   return (
@@ -41,6 +42,12 @@ export default function App() {
               </Route>
               <Route path="vip" element={<TabGate tabKey="vip" />}>
                 <Route index element={<ClubPage />} />
+              </Route>
+              <Route path="pricing" element={<TabGate tabKey="pricing" />}>
+                <Route index element={<PricingPage />} />
+              </Route>
+              <Route path="flights" element={<TabGate tabKey="flights" />}>
+                <Route index element={<PricingPage />} />
               </Route>
               <Route path=":tabKey" element={<ComingSoonPage />} />
             </Route>
