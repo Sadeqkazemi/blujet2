@@ -149,7 +149,13 @@ FINANCE_MANAGER, COMMERCIAL_MANAGER (the 5 panels with a کارتابل tab).
 ## Later phases (endpoints TBD — documented here before each phase's code is written)
 
 - **Phase 2** — none directly (reporting reads Phase-2 tables; no new endpoints of its own beyond what's above).
-- **Phase 5** — `/club/card-requests`, `/club/card-requests/:id/approve`.
+- **Phase 5 — VIP club** (`backend/src/modules/club/`; roles below are the 3 panels with the tab — CEO, BOARD_CHAIR, SENIOR_MANAGER):
+  - GET `/club/members` — `level?`, `q?` (name/email/cardNo, plus exact nationalId via hash); returns members + the KPI counts (کل اعضا، کارت‌های صادرشده، درخواست در انتظار، توزیع سطوح). All 3 roles.
+  - POST `/club/members` — «تعریف مشتری VIP جدید» — CEO+BOARD_CHAIR only (the form exists only in their panels); national-ID checksum validated, PII encrypted.
+  - PATCH `/club/members/:id/level` — tier segmented control — SENIOR_MANAGER only, audited.
+  - POST `/club/members/:id/issue-card` — «صدور کارت» direct issuance — all 3 roles; 409 if already issued; audited (⚑).
+  - GET `/club/card-requests` — the panels' queue (server filters to REFERRED/APPROVED/REJECTED — SUBMITTED lives in the site-admin track); includes history timeline. All 3 roles.
+  - PATCH `/club/card-requests/:id/approve` | `/reject` — «تأیید و صدور کارت» / «انصراف» — CEO/BOARD_CHAIR: any REFERRED; SENIOR_MANAGER: only `assignedTo=SENIOR` (⚑); transactional + audited; 409 on non-REFERRED.
 - **Phase 6** — `/pricing/proposals`, `/pricing/proposals/:id/approve`.
 - **Phase 7** — `/refunds`, `/refunds/:id/refer`, `/refunds/:id/pay`.
 - **Phase 8** — `/employees`, `/employees/:id/permissions`, `/employees/:id/reset-password`, `/it/services`, `/it/external-services`.

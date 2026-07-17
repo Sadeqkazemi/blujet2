@@ -1531,6 +1531,204 @@
           "files"
         ]
       }
+    },
+    "/club/members": {
+      "get": {
+        "operationId": "ClubController_listMembers",
+        "parameters": [
+          {
+            "name": "level",
+            "required": false,
+            "in": "query",
+            "description": "فیلتر سطح عضویت",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "SILVER",
+                "GOLD",
+                "PLATINUM"
+              ]
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "جستجو در نام، ایمیل، شماره کارت یا کد ملی (تطبیق دقیق)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "اعضای باشگاه + کارت‌های KPI (فیلتر سطح/جستجو)",
+        "tags": [
+          "club"
+        ]
+      },
+      "post": {
+        "operationId": "ClubController_createMember",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMemberDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "تعریف مشتری VIP جدید — فقط مدیر عامل/رئیس هیئت مدیره",
+        "tags": [
+          "club"
+        ]
+      }
+    },
+    "/club/members/{id}/level": {
+      "patch": {
+        "operationId": "ClubController_updateLevel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateLevelDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تغییر سطح عضویت — فقط مدیر ارشد، با ممیزی",
+        "tags": [
+          "club"
+        ]
+      }
+    },
+    "/club/members/{id}/issue-card": {
+      "post": {
+        "operationId": "ClubController_issueCard",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "صدور مستقیم کارت — بدون رکورد درخواست، با ممیزی",
+        "tags": [
+          "club"
+        ]
+      }
+    },
+    "/club/card-requests": {
+      "get": {
+        "operationId": "ClubController_listRequests",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "صف درخواست‌های کارت (فقط ارجاع‌شده/تأیید/رد) + تایم‌لاین",
+        "tags": [
+          "club"
+        ]
+      }
+    },
+    "/club/_test/card-request": {
+      "post": {
+        "operationId": "ClubController_createTestRequest",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "E2E only — creates a fresh REFERRED request; 404 in production",
+        "tags": [
+          "club"
+        ]
+      }
+    },
+    "/club/card-requests/{id}/approve": {
+      "patch": {
+        "operationId": "ClubController_approve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تأیید و صدور کارت — مدیر ارشد فقط ارجاع‌های خودش",
+        "tags": [
+          "club"
+        ]
+      }
+    },
+    "/club/card-requests/{id}/reject": {
+      "patch": {
+        "operationId": "ClubController_reject",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "رد درخواست (دکمه «انصراف» طراحی)",
+        "tags": [
+          "club"
+        ]
+      }
     }
   },
   "info": {
@@ -1839,6 +2037,61 @@
           "toDept",
           "subject",
           "body"
+        ]
+      },
+      "CreateMemberDto": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string",
+            "example": "نگار رضایی"
+          },
+          "email": {
+            "type": "string",
+            "example": "negar@email.example"
+          },
+          "birthDate": {
+            "type": "string",
+            "description": "تاریخ تولد (ISO — از تقویم شمسی تبدیل می‌شود)"
+          },
+          "nationalId": {
+            "type": "string",
+            "description": "کد ملی — با چک‌سام رسمی اعتبارسنجی می‌شود"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "SILVER",
+              "GOLD",
+              "PLATINUM"
+            ]
+          },
+          "points": {
+            "type": "number",
+            "example": 0
+          }
+        },
+        "required": [
+          "fullName",
+          "email",
+          "nationalId",
+          "level"
+        ]
+      },
+      "UpdateLevelDto": {
+        "type": "object",
+        "properties": {
+          "level": {
+            "type": "string",
+            "enum": [
+              "SILVER",
+              "GOLD",
+              "PLATINUM"
+            ]
+          }
+        },
+        "required": [
+          "level"
         ]
       }
     }

@@ -32,6 +32,10 @@ class EnvironmentVariables {
   @IsNotEmpty()
   ML_SERVICE_INTERNAL_TOKEN: string;
 
+  /** 32-byte hex key for AES-256-GCM PII encryption (national IDs etc.). */
+  @IsNotEmpty()
+  PII_ENCRYPTION_KEY: string;
+
   @IsOptional()
   SENTRY_DSN?: string;
 
