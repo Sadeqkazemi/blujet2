@@ -62,4 +62,31 @@ export class ReportingController {
     const data = await this.reporting.lowSalesAlerts();
     return { success: true, data };
   }
+
+  @Get('recent-transactions')
+  @Roles('FINANCE_MANAGER')
+  @ApiOperation({
+    summary: 'تراکنش‌های مالی اخیر — فقط پنل مدیر مالی (per design)',
+  })
+  async recentTransactions() {
+    const data = await this.reporting.recentTransactions();
+    return { success: true, data };
+  }
+
+  @Get('revenue-mix')
+  @ApiOperation({ summary: 'ترکیب درآمد بر اساس کانال فروش' })
+  async revenueMix(@Query() query: PeriodQueryDto) {
+    const data = await this.reporting.revenueMix(query.granularity, query);
+    return { success: true, data };
+  }
+
+  @Get('agency-settlements')
+  @Roles('FINANCE_MANAGER')
+  @ApiOperation({
+    summary: 'تسویه‌حساب آژانس‌های همکار — فقط پنل مدیر مالی (per design)',
+  })
+  async agencySettlements() {
+    const data = await this.reporting.agencySettlements();
+    return { success: true, data };
+  }
 }

@@ -25,6 +25,8 @@ import { RefundsModule } from './modules/refunds/refunds.module';
 import { ReservationModule } from './modules/reservation/reservation.module';
 import { AgencyPortalModule } from './modules/agency-portal/agency-portal.module';
 import { FlightsModule } from './modules/flights/flights.module';
+import { PassengerReportsModule } from './modules/passenger-reports/passenger-reports.module';
+import { StaffReportsModule } from './modules/staff-reports/staff-reports.module';
 
 @Module({
   imports: [
@@ -73,6 +75,8 @@ import { FlightsModule } from './modules/flights/flights.module';
     ReservationModule,
     AgencyPortalModule,
     FlightsModule,
+    PassengerReportsModule,
+    StaffReportsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
