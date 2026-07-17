@@ -2954,31 +2954,6 @@
           "agency-portal"
         ]
       }
-    },
-    "/agency-portal/_test/set-password": {
-      "post": {
-        "operationId": "AgencyPortalController_testSetPassword",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TestSetPasswordDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "summary": "E2E only — sets a known password for a seeded agency phone; 404 in production",
-        "tags": [
-          "agency-portal"
-        ]
-      }
     }
   },
   "info": {
@@ -3723,23 +3698,6 @@
         },
         "required": [
           "docType"
-        ]
-      },
-      "TestSetPasswordDto": {
-        "type": "object",
-        "properties": {
-          "phone": {
-            "type": "string",
-            "example": "+989120000002"
-          },
-          "password": {
-            "type": "string",
-            "example": "E2ePass@123"
-          }
-        },
-        "required": [
-          "phone",
-          "password"
         ]
       }
     }

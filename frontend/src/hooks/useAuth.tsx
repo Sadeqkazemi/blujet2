@@ -58,9 +58,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    await authApi.logout();
-    setUser(null);
-    setStatus('unauthenticated');
+    // Best-effort server-side revoke — a failed/rate-limited call must never
+    // trap the user in a session they clicked "sign out" on.
+    try {
+      await authApi.logout();
+    } finally {
+      setUser(null);
+      setStatus('unauthenticated');
+    }
   }, []);
 
   const value = useMemo(

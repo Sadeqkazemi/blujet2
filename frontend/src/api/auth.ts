@@ -31,8 +31,11 @@ export async function refreshSession() {
 }
 
 export async function logout() {
-  await apiPost('/auth/logout');
-  setAccessToken(null);
+  try {
+    await apiPost('/auth/logout');
+  } finally {
+    setAccessToken(null);
+  }
 }
 
 export function fetchMe() {
