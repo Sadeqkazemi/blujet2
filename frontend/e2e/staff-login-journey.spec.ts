@@ -70,10 +70,15 @@ for (const { username, roleLabel, expectedTabs, dashboardMarkers } of ROLE_CASES
   });
 }
 
-test('a role-scoped "coming soon" tab renders without crashing', async ({ page }) => {
+// Phase 12 closed the last «به‌زودی» tab — the same click now lands on the
+// real CEO security page instead of the placeholder.
+test('the last formerly-"coming soon" tab (امنیت و رمز عبور) now renders its real page', async ({
+  page,
+}) => {
   await loginAs(page, 'ceo');
   await page.getByRole('link', { name: /^امنیت و رمز عبور/ }).click();
-  await expect(page.getByText('این بخش به‌زودی راه‌اندازی می‌شود')).toBeVisible();
+  await expect(page.getByText('تغییر رمز عبور من')).toBeVisible();
+  await expect(page.getByText('این بخش به‌زودی راه‌اندازی می‌شود')).toHaveCount(0);
 });
 
 test('an unauthenticated visitor is redirected to /login', async ({ page }) => {
