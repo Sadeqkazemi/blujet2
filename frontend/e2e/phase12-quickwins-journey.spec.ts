@@ -30,10 +30,13 @@ test('Senior toggles a sibling panel off and back on in دسترسی به پنل
   await expect(toggle).toHaveAttribute('aria-checked', before ?? 'true');
 });
 
-test('IT Manager has no working دسترسی به پنل‌ها page (stays «به‌زودی» — no backend for its read-only variant)', async ({
+// Superseded by Phase 12 full: IT's tab is now a real read-only page (see
+// phase12-journey.spec.ts for the disabled-switch assertions).
+test('IT Manager reaches دسترسی به پنل‌ها as a real page (no «به‌زودی» placeholder)', async ({
   page,
 }) => {
   await loginAs(page, 'itadmin');
   await page.getByRole('link', { name: /دسترسی به پنل‌ها/ }).click();
-  await expect(page.getByText('به‌زودی').first()).toBeVisible();
+  await page.waitForURL('**/panel/panels');
+  await expect(page.getByText('این بخش به‌زودی راه‌اندازی می‌شود')).toHaveCount(0);
 });
