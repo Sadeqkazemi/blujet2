@@ -7,32 +7,36 @@ and passenger self-request stay in their own tracks.
 
 ## Acceptance checklist
 
+Backend items proven by `backend/test/club.e2e-spec.ts` (9 tests) +
+`backend/src/common/pii-crypto.spec.ts` (4 unit tests); frontend by
+`frontend/src/features/club/ClubPage.test.tsx` (4 tests); E2E by
+`frontend/e2e/club-journey.spec.ts` (4 journeys).
+
 ### Members
-- [ ] `GET /club/members` returns members + KPI counts (کل اعضای باشگاه، کارت‌های صادرشده، درخواست در انتظار، توزیع سطوح per tier) and they reconcile with the rows
-- [ ] `level=` filter and `q=` search (name/email/cardNo + exact national-ID via hash) work; national IDs are never returned in plaintext
-- [ ] `POST /club/members` as SENIOR_MANAGER → 403 (form exists only in CEO/Chair panels); invalid national-ID checksum → 400; the stored ID is encrypted (verified by reading the DB row)
-- [ ] `PATCH /club/members/:id/level` as CEO/BOARD_CHAIR → 403 (Senior-only control); writes `AuditLog(category=CLUB)`
-- [ ] `POST /club/members/:id/issue-card` issues with `issuedByLabelFa='<نقش> (صدور مستقیم)'`, 409 if already ISSUED, audited
-- [ ] A non-club role (FINANCE_MANAGER, IT_MANAGER) gets 403 on every endpoint
+- [x] `GET /club/members` returns members + reconciling KPI counts — `'GET /club/members returns members + reconciling KPI counts; non-club roles get 403'`
+- [x] `level=`/`q=` search incl. exact national-ID via hash; PII never returned or stored in plaintext — `'national-ID search matches exactly via the hash; plaintext never stored'` (+ the PII-column absence assertion in the list test; crypto round-trip in `pii-crypto.spec.ts`)
+- [x] `POST /club/members`: SENIOR 403, bad checksum 400, duplicate 409, stored encrypted — `'POST /club/members: SENIOR 403; bad checksum 400; duplicate 409; stored encrypted'` (checksum algorithm itself unit-tested incl. Persian digits)
+- [x] `PATCH level` Senior-only + audited — `'PATCH level is Senior-only and audited'`
+- [x] Direct issuance: label, 409 double-issue, audited — `'direct issuance sets the card + issuedBy label, 409 when already issued, audited'`
+- [x] Non-club role 403 — asserted in the list test (FINANCE_MANAGER)
 
 ### Card requests
-- [ ] `GET /club/card-requests` returns only REFERRED/APPROVED/REJECTED (never SUBMITTED) with history timelines
-- [ ] Approve as CEO or BOARD_CHAIR works on any REFERRED request regardless of `assignedTo` (design override, ⚑)
-- [ ] Approve as SENIOR_MANAGER on `assignedTo=CHAIR` → 403; on `assignedTo=SENIOR` → 200
-- [ ] Approval is transactional: request APPROVED + cardNo `TIER-####`, member `cardStatus=ISSUED` + issuedBy label, history row appended, audit row — a mid-way failure leaves none of it
-- [ ] Reject sets the member back to `cardStatus=NONE` and appends history
-- [ ] Approve/reject on an already-decided request → 409
+- [x] Never returns SUBMITTED — `'GET /club/card-requests never returns SUBMITTED rows'`
+- [x] CEO/Chair approve any REFERRED regardless of assignedTo (⚑) — `'CEO/Chair approve any REFERRED request regardless of assignedTo (⚑ design override)'`
+- [x] Senior scoped to senior-assigned (CHAIR→403, SENIOR→200) — `'Senior can approve only senior-assigned requests...'`
+- [x] Transactional approval (card, member state, history, audit) — asserted in the CEO-approve test
+- [x] Reject → member NONE + history; already-decided → 409 — `'reject sets the member back to NONE; deciding an already-decided request → 409'`
 
 ### Frontend
-- [ ] CEO/Chair tab: 4 KPI cards (verbatim labels), pending-requests list with status pills + request detail modal incl. «روند درخواست» timeline, member directory with tier filter chips + search + «صدور کارت», collapsible «تعریف مشتری VIP جدید» form
-- [ ] Senior tab: only the two cards — «درخواست‌های صدور کارت (ارجاع‌شده)» with inline تأیید و صدور کارت/انصراف (read-only note for chair-assigned rows) and the expandable member list with tier segmented control + issue button; NO KPI row/search/add-form
-- [ ] Tier badges use the design's three verbatim labels; points render with Persian digits + ٬ separator
-- [ ] FINANCE/COMMERCIAL/IT panels have no VIP nav entry
+- [x] CEO/Chair rich layout (4 KPI cards, requests + timeline modal, directory with filters/search/issue, add-VIP form) — `ClubPage.test.tsx: 'CEO sees the 4 KPI cards...'` + `'CEO request modal shows the روند درخواست timeline...'` + `'the add-VIP form validates required fields'`
+- [x] Senior simple layout (no KPIs/search/add-form; inline approve; chair-assigned read-only note) — `'Senior Manager sees the simple layout...'`
+- [x] Tier labels + Persian ٬-separated points — asserted in the CEO layout test
+- [x] Role isolation — `club-journey.spec.ts: 'Finance Manager has no مشتریان VIP nav entry (role isolation)'`
 
 ### E2E
-- [ ] Full loop: Senior approves a seeded senior-assigned request → member's card appears; Chair approves a chair-assigned one
-- [ ] Senior cannot act on a chair-assigned request (read-only note visible)
-- [ ] CEO adds a new VIP member → appears in the directory with the chosen tier
+- [x] Senior approves senior-assigned; Chair approves chair-assigned via modal+timeline — `'Senior approves a senior-assigned card request...'` + `'Chair approves a chair-assigned request via the modal...'`
+- [x] Senior sees chair-assigned read-only — asserted inside the Senior journey
+- [x] CEO adds a VIP member and finds them in the directory — `'CEO adds a new VIP member and finds them in the directory'`
 
 ---
 

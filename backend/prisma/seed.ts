@@ -2,6 +2,7 @@ import 'dotenv/config';
 import argon2 from 'argon2';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../generated/prisma/client';
+import { encryptPii, hashPii } from '../src/common/pii-crypto';
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
@@ -545,6 +546,113 @@ async function main() {
         }
       }
     }
+  }
+
+  // ── Phase 5: club members (one per tier/card state) + card requests ────
+  // National IDs below are valid per the official checksum but synthetic.
+  const existingClubCount = await prisma.clubMember.count();
+  if (existingClubCount === 0) {
+    const memberSeeds = [
+      {
+        fullName: 'نگار رضایی',
+        email: 'negar@email.example',
+        nationalId: '0012345679',
+        birthDate: new Date('1993-08-05'),
+        joinDate: new Date('2025-05-31'),
+        points: 12450,
+        level: 'GOLD' as const,
+        cardStatus: 'ISSUED' as const,
+        cardNo: 'GOLD-8842',
+        issuedByLabelFa: 'رئیس هیئت مدیره (تأیید درخواست)',
+      },
+      {
+        fullName: 'محمد کریمی',
+        email: 'mkarimi@email.example',
+        nationalId: '0023456787',
+        birthDate: new Date('1988-02-11'),
+        joinDate: new Date('2025-09-10'),
+        points: 6200,
+        level: 'GOLD' as const,
+        cardStatus: 'REVIEW' as const,
+      },
+      {
+        fullName: 'سارا احمدی',
+        email: 'sahmadi@email.example',
+        nationalId: '0034567895',
+        birthDate: new Date('1996-12-01'),
+        joinDate: new Date('2026-01-20'),
+        points: 2100,
+        level: 'SILVER' as const,
+        cardStatus: 'NONE' as const,
+      },
+      {
+        fullName: 'علی مرادی',
+        email: 'amoradi@email.example',
+        nationalId: '0045678901',
+        birthDate: new Date('1985-06-25'),
+        joinDate: new Date('2024-11-02'),
+        points: 18800,
+        level: 'PLATINUM' as const,
+        cardStatus: 'ISSUED' as const,
+        cardNo: 'PLAT-1290',
+        issuedByLabelFa: 'مدیر ارشد (صدور مستقیم)',
+      },
+    ];
+
+    const members: Record<string, string> = {};
+    for (const m of memberSeeds) {
+      const { nationalId, ...rest } = m;
+      const created = await prisma.clubMember.create({
+        data: {
+          ...rest,
+          nationalIdEnc: encryptPii(nationalId),
+          nationalIdHash: hashPii(nationalId),
+        },
+      });
+      members[m.fullName] = created.id;
+    }
+
+    await prisma.clubCardRequest.create({
+      data: {
+        memberId: members['محمد کریمی'],
+        level: 'GOLD',
+        points: 6200,
+        status: 'REFERRED',
+        assignedTo: 'SENIOR',
+        history: [
+          { step: 'submitted', labelFa: 'رسیدن به حد امتیاز و ثبت درخواست صدور کارت', at: '۱۴۰۵/۰۴/۰۲ - ۱۰:۱۲' },
+          { step: 'referred', labelFa: 'ارجاع به مدیر ارشد توسط ادمین سایت', at: '۱۴۰۵/۰۴/۰۲ - ۱۱:۳۰' },
+        ],
+      },
+    });
+    await prisma.clubCardRequest.create({
+      data: {
+        memberId: members['سارا احمدی'],
+        level: 'SILVER',
+        points: 5100,
+        status: 'REFERRED',
+        assignedTo: 'CHAIR',
+        history: [
+          { step: 'submitted', labelFa: 'رسیدن به حد امتیاز و ثبت درخواست صدور کارت', at: '۱۴۰۵/۰۴/۱۰ - ۰۹:۰۵' },
+          { step: 'referred', labelFa: 'ارجاع به رئیس هیئت مدیره توسط ادمین سایت', at: '۱۴۰۵/۰۴/۱۰ - ۱۰:۴۵' },
+        ],
+      },
+    });
+    await prisma.clubCardRequest.create({
+      data: {
+        memberId: members['نگار رضایی'],
+        level: 'GOLD',
+        points: 12450,
+        status: 'APPROVED',
+        assignedTo: 'CHAIR',
+        cardNo: 'GOLD-8842',
+        history: [
+          { step: 'submitted', labelFa: 'رسیدن به حد امتیاز و ثبت درخواست صدور کارت', at: '۱۴۰۴/۰۳/۱۲ - ۰۸:۲۰' },
+          { step: 'referred', labelFa: 'ارجاع به رئیس هیئت مدیره توسط ادمین سایت', at: '۱۴۰۴/۰۳/۱۲ - ۰۹:۱۵' },
+          { step: 'approved', labelFa: 'تأیید و صدور کارت طلایی', at: '۱۴۰۴/۰۳/۱۳ - ۱۲:۴۰' },
+        ],
+      },
+    });
   }
 
   console.log('Seed complete.');

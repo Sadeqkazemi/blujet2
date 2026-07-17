@@ -62,6 +62,9 @@ model User {
   chairPermDecisions  ChairReportPermission[]    @relation("ChairPermDecider")
   storedFiles         StoredFile[]               @relation("StoredFileOwner")
 
+  clubMembership    ClubMember?       @relation("ClubMemberUser")
+  clubCardDecisions ClubCardRequest[] @relation("ClubCardDecider")
+
   @@map("users")
 }
 
@@ -579,4 +582,80 @@ model StoredFile {
 
   @@index([ownerId])
   @@map("stored_files")
+}
+
+// ─── Phase 5: VIP club (manager-panel slice) ─────────────────────────────
+
+enum ClubTier {
+  SILVER
+  GOLD
+  PLATINUM
+}
+
+enum ClubCardStatus {
+  NONE
+  REVIEW
+  ISSUED
+}
+
+enum ClubCardRequestStatus {
+  SUBMITTED
+  REFERRED
+  APPROVED
+  REJECTED
+}
+
+// Design's assignedTo: 'senior' | 'super' — never the CEO (the site-admin
+// referral form only offers these two targets).
+enum ClubCardAssignee {
+  SENIOR
+  CHAIR
+}
+
+// Read-model slice of the customer club: the authoritative points ledger
+// belongs to the public-site track; `points` here is a display copy.
+// National ID is checksum-validated, AES-encrypted at rest, with a keyed
+// hash column for the design's exact-match search.
+model ClubMember {
+  id              String         @id @default(uuid())
+  userId          String?        @unique
+  user            User?          @relation("ClubMemberUser", fields: [userId], references: [id])
+  fullName        String
+  email           String
+  birthDate       DateTime?
+  nationalIdEnc   String
+  nationalIdHash  String
+  joinDate        DateTime       @default(now())
+  points          Int            @default(0)
+  level           ClubTier       @default(SILVER)
+  cardStatus      ClubCardStatus @default(NONE)
+  cardNo          String?
+  issuedByLabelFa String?
+  createdAt       DateTime       @default(now())
+
+  requests ClubCardRequest[]
+
+  @@index([nationalIdHash])
+  @@index([level])
+  @@map("club_members")
+}
+
+model ClubCardRequest {
+  id          String                @id @default(uuid())
+  memberId    String
+  member      ClubMember            @relation(fields: [memberId], references: [id])
+  level       ClubTier
+  points      Int
+  status      ClubCardRequestStatus @default(SUBMITTED)
+  assignedTo  ClubCardAssignee?
+  decidedById String?
+  decidedBy   User?                 @relation("ClubCardDecider", fields: [decidedById], references: [id])
+  decidedAt   DateTime?
+  cardNo      String?
+  // Presentational timeline of {step, labelFa, at} rows (design's روند درخواست).
+  history     Json
+  createdAt   DateTime              @default(now())
+
+  @@index([status])
+  @@map("club_card_requests")
 }
