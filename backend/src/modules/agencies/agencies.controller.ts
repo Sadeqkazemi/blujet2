@@ -252,8 +252,10 @@ export class AgenciesController {
     return { success: true, data };
   }
 
+  // FINANCE_MANAGER added in Phase 11 — its مالی tab's «تسویه‌حساب آژانس‌ها»
+  // rows carry an «ارسال یادآوری» action in the design.
   @Post(':id/invoices/:invoiceId/remind')
-  @Roles('COMMERCIAL_MANAGER')
+  @Roles('COMMERCIAL_MANAGER', 'FINANCE_MANAGER')
   @ApiOperation({ summary: 'یادآوری فاکتور معوق' })
   async remindInvoice(
     @CurrentUser() actor: AuthenticatedUser,

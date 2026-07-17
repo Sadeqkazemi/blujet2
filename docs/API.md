@@ -378,6 +378,56 @@ stays untouched on the same page).
 
 ---
 
+## Phase 11 — Finance tab (مالی), گزارش مسافران, گزارش کارمندان
+
+Grounded in the FINANCE / PASSENGER SEARCH / STAFF REPORTS markup of all 5
+panels that carry these tabs. Design findings that scope this phase:
+- The مالی tab has **two distinct layouts**: FINANCE_MANAGER gets the
+  finance-ops view (KPI row + low-sales alert + completed-flights box +
+  «تراکنش‌های مالی اخیر» + «ترکیب درآمد» donut + «تسویه‌حساب آژانس‌ها»);
+  CEO/BOARD_CHAIR/SENIOR_MANAGER/COMMERCIAL_MANAGER get the analytic view
+  (the full نمودار فروش with mode switcher روز/ماه/۳ماهه/۶ماهه/سال/پرواز +
+  channel sum tiles + completed-flights box + «ترکیب درآمد» donut) — this
+  matches CLAUDE.md's «تراکنش‌های اخیر و تسویه آژانس‌ها only in the finance
+  manager panel» rule verbatim.
+- The finance panel's `finMonths` income/expense bar chart is computed in
+  the mock's script but **never rendered anywhere in its markup** (orphaned,
+  same class as other confirmed orphans) — not built.
+- Excel/PDF export buttons on گزارش مسافران are mock-only (toast) — same
+  deferral as every prior phase.
+- Almost the whole analytic مالی view is powered by the EXISTING Phase 1
+  reporting endpoints (`/reporting/sales-chart` incl. `flight` granularity,
+  `/reporting/kpis`, `/reporting/completed-flights-summary`,
+  `/reporting/low-sales-alerts`) — the missing backend is only the four
+  endpoints below.
+
+### `backend/src/modules/reporting/` (additions)
+
+| Method | Path | Roles | Notes |
+|---|---|---|---|
+| GET | `/reporting/recent-transactions` | FINANCE_MANAGER | Latest 20 `LedgerEntry` rows joined with party context (agency name via `agencyId`, passenger via `booking`) → `{ type, titleFa, party, occurredAt, signedAmountIrr }[]` + total count. Real rows only — the mock's static `txDefs` are replaced by the ledger. |
+| GET | `/reporting/revenue-mix` | CEO, BOARD_CHAIR, SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | «ترکیب درآمد» donut: per-channel SALE sums + pct over the same optional `granularity`/`periodKey` window as the KPIs. |
+| GET | `/reporting/agency-settlements` | FINANCE_MANAGER | «تسویه‌حساب آژانس‌های همکار»: per-agency rows derived from Phase 3 invoices (`amount = SUM(invoices in period)`, `paidPct`, `due = earliest unpaid dueAt`, status تسویه شد/در انتظار/معوق + overdue days) + total outstanding. Remind action reuses Phase 3's `POST /agencies/:id/invoices/:invoiceId/remind` (no new write path). |
+
+### `backend/src/modules/passenger-reports/` (new)
+
+| Method | Path | Roles | Notes |
+|---|---|---|---|
+| GET | `/passenger-reports/search` | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | `q` (passenger full-name substring, or exact national ID via hash — reusing Phase 9's `Passenger.nationalIdHash`) → matching tickets `{ fullName, maskedNationalId, pnr, flightNo, route, departureAt, seatCode, cabin (derived from AircraftSeatMap row bands), priceIrr, status }[]`. PII rule: national ID always masked (`123******7` style) — this surface never decrypts. |
+
+### `backend/src/modules/staff-reports/` (new)
+
+| Method | Path | Roles | Notes |
+|---|---|---|---|
+| GET | `/staff-reports` | FINANCE_MANAGER, COMMERCIAL_MANAGER | «گزارش عملکرد کارمندان»: EMPLOYEE-role users whose `dept` maps to the caller (finance→FINANCE_MANAGER, sales/commercial→COMMERCIAL_MANAGER) + their `AuditLog` action feed (action, category, detail, at), `staffId?` filter for the per-employee tabs. Also returns the «کارمند جدید توسط مدیر IT اضافه شد» banner rows — real `AuditLog(category=ACCOUNT)` employee-creation events for the caller's dept, not a fabricated notification. |
+
+Deliberately not in scope (documented, not dropped): Excel/PDF exports
+(mock toast only); the finance mock's orphaned income/expense chart; the
+notification "mark as read" persistence (the design's dismiss is purely
+client-side state — kept client-side).
+
+---
+
 ## Later phases (endpoints TBD — documented here before each phase's code is written)
 
 - **Phase 2** — none directly (reporting reads Phase-2 tables; no new endpoints of its own beyond what's above).

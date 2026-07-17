@@ -28,7 +28,8 @@ describe('Agencies (e2e)', () => {
     const user = await prisma.user.create({
       data: {
         role: 'AGENCY',
-        phone: `+9891${suffix.replace(/\D/g, '0').padEnd(8, '0').slice(0, 8)}`,
+        // Hex→'0' mapping collided as test users accumulated (unique-phone flake) — use real random digits.
+        phone: `+9891${crypto.randomInt(10_000_000, 100_000_000)}`,
         fullName: `آژانس تست ${suffix}`,
         isActive: true,
       },
@@ -87,7 +88,7 @@ describe('Agencies (e2e)', () => {
         managerName: 'مدیر متقاضی',
         licenseNo: `AG-REQ-${suffix}`,
         city: 'شیراز',
-        phone: `+9892${suffix.replace(/\D/g, '0').padEnd(8, '0').slice(0, 8)}`,
+        phone: `+9892${crypto.randomInt(10_000_000, 100_000_000)}`,
         email: `${suffix}@applicant.example`,
         status,
       },
