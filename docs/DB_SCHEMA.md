@@ -405,6 +405,26 @@ modal, future-flight نرخ‌گذاری/allocation modal with the AI hint).
 
 ---
 
+## Phase 11 — Finance tab, passenger reports, staff reports
+
+**No new tables and no schema changes.** Every figure is derived from
+existing rows at query time, per CLAUDE.md's server-side-aggregates rule:
+- مالی analytic view (CEO/Chair/Senior/Commercial): Phase 1 reporting
+  queries over `LedgerEntry`/`Booking`/`FlightInstance` — reused unchanged.
+- «تراکنش‌های مالی اخیر»: `LedgerEntry` (SALE/SETTLEMENT/COMMISSION/REFUND)
+  joined to `AgencyProfile`/`Booking→Passenger` for the party label.
+- «ترکیب درآمد»: SALE sums grouped by `Booking.channel`.
+- «تسویه‌حساب آژانس‌ها»: `AgencyInvoice` per agency (paid ratio, earliest
+  unpaid due date, overdue days) — presentation over Phase 3 data; the only
+  write is the existing audited remind endpoint.
+- گزارش مسافران: `Passenger` (name substring, or exact national-ID via the
+  Phase 9 `nationalIdHash`) joined through `Booking` to flight/route; cabin
+  derived from the `AircraftSeatMap` row bands; national ID rendered MASKED
+  only (this surface never decrypts PII).
+- گزارش کارمندان: `User(role=EMPLOYEE, dept∈caller's depts)` +
+  `AuditLog(actorId∈those)` as the feed; the "new employee" banner rows are
+  real `AuditLog(category=ACCOUNT)` creation events, not synthetic.
+
 ## Open items to confirm with the public-site track before merging
 
 1. `Booking`/`Passenger`/`LedgerEntry` above are a **minimal, forward-compatible
