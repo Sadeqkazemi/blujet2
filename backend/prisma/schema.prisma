@@ -290,6 +290,9 @@ enum LedgerEntryType {
   REFUND
   SETTLEMENT
   COMMISSION
+  // Phase 11: seeded operating-cost rows — the mocks fabricate هزینه عملیاتی;
+  // the real KPI reads immutable ledger rows (finance-entered in a later phase).
+  OPERATING_COST
 }
 
 model LedgerEntry {

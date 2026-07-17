@@ -1,4 +1,5 @@
 import dayjs from 'dayjs';
+import 'dayjs/locale/fa';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import jalaliday from 'jalaliday';
@@ -7,6 +8,9 @@ import { faDigits } from './fa-format';
 dayjs.extend(utc);
 dayjs.extend(timezone);
 dayjs.extend(jalaliday);
+// Persian month names (e.g. «خرداد») for any `.format('MMMM ...')` call —
+// without this, jalaliday falls back to English month names.
+dayjs.locale('fa');
 
 export type JalaliDayjs = typeof dayjs;
 
@@ -25,6 +29,11 @@ export function formatJalaliDateTime(date: string | number | Date, timeZone?: st
 
 export function formatJalaliDate(date: string | number | Date) {
   return faDigits(dayjs(date).calendar('jalali').format('YYYY/MM/DD'));
+}
+
+/** Persian month name + Jalali year, e.g. «خرداد ۱۴۰۵» — for month chips/captions. */
+export function formatJalaliMonthYear(date: string | number | Date) {
+  return faDigits(dayjs(date).calendar('jalali').format('MMMM YYYY'));
 }
 
 /**

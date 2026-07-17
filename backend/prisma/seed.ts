@@ -1039,6 +1039,83 @@ async function main() {
     }
   }
 
+  // ── Phase 11: seeded monthly operating-cost ledger rows ───────────────
+  // Real KPI source for «هزینه عملیاتی» — the mocks' fabricated margins are
+  // replaced by immutable ledger rows (~35% of a typical month's sales).
+  const opCostCount = await prisma.ledgerEntry.count({
+    where: { type: 'OPERATING_COST' },
+  });
+  if (opCostCount === 0) {
+    const financeActor = staffByUsername.get('finance.karimi')!;
+    for (let monthsAgo = 0; monthsAgo < 6; monthsAgo++) {
+      const at = new Date();
+      at.setMonth(at.getMonth() - monthsAgo);
+      at.setDate(20);
+      await prisma.ledgerEntry.create({
+        data: {
+          type: 'OPERATING_COST',
+          signedAmountIrr: -(1_600_000_000 + monthsAgo * 37_000_000),
+          createdById: financeActor.id,
+          occurredAt: at,
+        },
+      });
+    }
+  }
+
+  // ── Phase 11: employee audit rows so گزارش کارمندان has real content ───
+  // The cartable/referral flows only ever log manager actors, so without
+  // this an EMPLOYEE would never accumulate a history in a fresh dev DB —
+  // CLAUDE.md requires realistic seed data per domain, not just an empty
+  // "می‌توانید بعداً امتحان کنید" tab.
+  const employeeAuditCount = await prisma.auditLog.count({
+    where: { actorRole: 'EMPLOYEE' },
+  });
+  if (employeeAuditCount === 0) {
+    const clerk = staffByUsername.get('com.ahmadi')!;
+    await prisma.auditLog.create({
+      data: {
+        actorId: clerk.id,
+        actorRole: 'EMPLOYEE',
+        category: 'AGENCY',
+        action: 'بررسی پرونده آژانس',
+        detail: 'پروندهٔ عضویت آژانس پرواز آسیا بررسی و مدارک تکمیل شد.',
+      },
+    });
+    await prisma.auditLog.create({
+      data: {
+        actorId: clerk.id,
+        actorRole: 'EMPLOYEE',
+        category: 'CLUB',
+        action: 'ثبت درخواست کارت VIP',
+        detail: 'درخواست صدور کارت باشگاه مشتریان برای یک مسافر ثبت شد.',
+      },
+    });
+    await prisma.auditLog.create({
+      data: {
+        actorId: commercialEmployee.id,
+        actorRole: 'EMPLOYEE',
+        category: 'PRICING',
+        action: 'پیگیری نرخ پرواز',
+        detail: 'وضعیت نرخ‌گذاری پرواز تهران ← دبی برای مدیر بازرگانی خلاصه شد.',
+      },
+    });
+  }
+
+  const itNoticeCount = await prisma.auditLog.count({
+    where: { category: 'ACCOUNT', actorRole: 'IT_MANAGER' },
+  });
+  if (itNoticeCount === 0) {
+    await prisma.auditLog.create({
+      data: {
+        actorId: itManager.id,
+        actorRole: 'IT_MANAGER',
+        category: 'ACCOUNT',
+        action: 'افزودن کارمند',
+        detail: 'کارمند جدید «یاسمن مرادی» (واحد بازرگانی) توسط مدیر IT اضافه شد.',
+      },
+    });
+  }
+
   console.log('Seed complete.');
   console.log(`Staff dev password (all roles): ${STAFF_PASSWORD}`);
 }

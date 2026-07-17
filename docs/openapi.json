@@ -2893,6 +2893,168 @@
           "flights"
         ]
       }
+    },
+    "/finance/summary": {
+      "get": {
+        "operationId": "FinanceController_summary",
+        "parameters": [
+          {
+            "name": "granularity",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "q6",
+              "type": "string",
+              "enum": [
+                "day",
+                "month",
+                "q3",
+                "q6",
+                "year",
+                "flight"
+              ]
+            }
+          },
+          {
+            "name": "periodStart",
+            "required": false,
+            "in": "query",
+            "description": "Required for granularity=month",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "description": "Required for granularity=day",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "flightNo",
+            "required": false,
+            "in": "query",
+            "description": "Required for granularity=flight",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "periodKey",
+            "required": false,
+            "in": "query",
+            "description": "A periodKey returned by /reporting/sales-chart — re-scopes KPIs to that bucket",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تب مالی در یک فراخوانی: KPI + خلاصه صندلی + دونات ترکیب درآمد",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/finance/transactions": {
+      "get": {
+        "operationId": "FinanceController_transactions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تراکنش‌های مالی اخیر — فقط پنل مدیر مالی (طبق طراحی)",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/finance/settlements": {
+      "get": {
+        "operationId": "FinanceController_settlements",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تسویه‌حساب آژانس‌های همکار — فقط پنل مدیر مالی",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/finance/settlements/{invoiceId}/remind": {
+      "post": {
+        "operationId": "FinanceController_remind",
+        "parameters": [
+          {
+            "name": "invoiceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ارسال یادآوری تسویه — از مسیر SmsProvider، audited",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/reports/passengers": {
+      "get": {
+        "operationId": "ReportsController_passengers",
+        "parameters": [
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "جستجوی مسافر — نام یا کد ملی (فقط از طریق hash) → کارت بلیط",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/reports/staff": {
+      "get": {
+        "operationId": "ReportsController_staff",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "گزارش عملکرد کارمندان — از AuditLog واقعی + اعلان کارمند جدید IT",
+        "tags": [
+          "reports"
+        ]
+      }
     }
   },
   "info": {

@@ -21,6 +21,9 @@ import BackupsPage from './features/it-manager/BackupsPage';
 import PricingPage from './features/pricing/PricingPage';
 import RefundsPage from './features/refunds/RefundsPage';
 import FlightsPage from './features/flights/FlightsPage';
+import FinancePage from './features/finance/FinancePage';
+import PassengerReportPage from './features/reports/PassengerReportPage';
+import StaffReportPage from './features/reports/StaffReportPage';
 import ReservationPage from './features/reservation/ReservationPage';
 
 export default function App() {
@@ -74,6 +77,15 @@ export default function App() {
               </Route>
               <Route path="refund" element={<TabGate tabKey="refund" />}>
                 <Route index element={<RefundsPage />} />
+              </Route>
+              <Route path="finance" element={<TabGate tabKey="finance" />}>
+                <Route index element={<FinancePage />} />
+              </Route>
+              <Route path="reports" element={<TabGate tabKey="reports" />}>
+                <Route index element={<PassengerReportPage />} />
+              </Route>
+              <Route path="staff" element={<TabGate tabKey="staff" />}>
+                <Route index element={<StaffReportPage />} />
               </Route>
               <Route path="reservation" element={<TabGate tabKey="reservation" />}>
                 <Route index element={<ReservationPage />} />

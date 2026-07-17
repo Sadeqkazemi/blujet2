@@ -303,16 +303,23 @@ COMMERCIAL_MANAGER; گزارش مسافران → SENIOR_MANAGER, FINANCE_MANAGE
 COMMERCIAL_MANAGER; گزارش کارمندان → FINANCE_MANAGER, COMMERCIAL_MANAGER
 (per each panel's confirmed nav).
 
-- GET `/finance/summary?period=` — the مالی tab in one call: KPI row
-  (کل درآمد / سود خالص + حاشیه / هزینه عملیاتی / مطالبات معوق آژانس‌ها —
-  all SQL over the ledger + derived agency debt), completed-flights seats
-  summary and the «ترکیب درآمد» channel donut, all re-scoped by `period`
-  (`year` | `YYYY-MM` | `YYYY-MM-DD`) — the design's KPI re-scope on
-  month selection.
-- GET `/reporting/sales-chart` gains `mode=year|month|day|flight` (+
-  `month=`, `day=`, `flightQ=`) completing the Phase 1 deferral: month
-  chips, the روز calendar + گزارش فروش روز box, and the per-flight
-  financial cards with search.
+- GET `/finance/summary` — the مالی تب in one call: KPI row (کل درآمد /
+  سود خالص + حاشیه / هزینه عملیاتی / مطالبات معوق آژانس‌ها — all SQL over
+  the ledger + derived agency debt), completed-flights seats summary and
+  the «ترکیب درآمد» channel donut. ⚑ Implementation note (deviates from
+  the originally drafted single `period=` param): reuses Phase 1's
+  existing `PeriodQueryDto` (`granularity=q6|month|day|flight` +
+  `periodStart=`/`date=`/`flightNo=`/`periodKey=`) instead of inventing a
+  parallel period-parsing scheme, since `/finance/summary` composes the
+  already-implemented `ReportingService.kpis/completedFlightsSummary/
+  salesChart` (which already supported month/day/flight granularity from
+  Phase 1 — only their frontend UI was deferred, per
+  `docs/features/panel-shell-dashboard.md`).
+- The frontend's مالی tab is the first UI to exercise سال(۶ماه)/ماه/روز/
+  پرواز chart modes end-to-end (month chips, the روز calendar + گزارش
+  فروش روز box, per-flight search) — completing that Phase 1 deferral
+  entirely through `GET /reporting/sales-chart` + `/reporting/kpis` +
+  `/reporting/completed-flights-summary`, unchanged from Phase 1.
 - GET `/finance/transactions` — FINANCE_MANAGER only («تراکنش‌های مالی
   اخیر», per CLAUDE.md role rule): recent ledger rows typed
   فروش/تسویه/کمیسیون/استرداد (+ عملیاتی) with party labels.

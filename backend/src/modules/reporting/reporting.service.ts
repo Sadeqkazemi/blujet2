@@ -211,18 +211,22 @@ export class ReportingService {
       select: { type: true, signedAmountIrr: true },
     });
 
+    // Phase 11 (⚑ approved): هزینه عملیاتی = OPERATING_COST ledger rows.
+    // SETTLEMENT rows are agency debt payments (cash in against receivables),
+    // not costs — the pre-Phase-11 lumping was corrected with the docs.
     let revenueIrr = 0;
     let refundIrr = 0;
+    let commissionIrr = 0;
     let operatingCostIrr = 0;
     for (const e of entries) {
       const amount = Math.abs(e.signedAmountIrr);
       if (e.type === 'SALE') revenueIrr += amount;
       else if (e.type === 'REFUND') refundIrr += amount;
-      else if (e.type === 'SETTLEMENT' || e.type === 'COMMISSION')
-        operatingCostIrr += amount;
+      else if (e.type === 'COMMISSION') commissionIrr += amount;
+      else if (e.type === 'OPERATING_COST') operatingCostIrr += amount;
     }
 
-    const profitIrr = revenueIrr - refundIrr - operatingCostIrr;
+    const profitIrr = revenueIrr - refundIrr - commissionIrr - operatingCostIrr;
     const marginPct =
       revenueIrr > 0 ? Math.round((profitIrr / revenueIrr) * 100) : 0;
 

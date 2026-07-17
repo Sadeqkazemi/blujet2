@@ -24,6 +24,8 @@ import { PricingModule } from './modules/pricing/pricing.module';
 import { RefundsModule } from './modules/refunds/refunds.module';
 import { ReservationModule } from './modules/reservation/reservation.module';
 import { FlightsModule } from './modules/flights/flights.module';
+import { FinanceModule } from './modules/finance/finance.module';
+import { ReportsModule } from './modules/reports/reports.module';
 
 @Module({
   imports: [
@@ -71,6 +73,8 @@ import { FlightsModule } from './modules/flights/flights.module';
     RefundsModule,
     ReservationModule,
     FlightsModule,
+    FinanceModule,
+    ReportsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

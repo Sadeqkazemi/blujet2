@@ -8,5 +8,6 @@ import { AgenciesModule } from '../agencies/agencies.module';
   imports: [PanelsModule, AgenciesModule],
   controllers: [ReportingController],
   providers: [ReportingService],
+  exports: [ReportingService],
 })
 export class ReportingModule {}
