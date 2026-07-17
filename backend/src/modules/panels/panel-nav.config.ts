@@ -34,7 +34,7 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'cartable', labelFa: 'کارتابل', implemented: true },
     { key: 'settings', labelFa: 'تنظیمات سامانه', implemented: false },
     { key: 'club', labelFa: 'مشتریان VIP', implemented: true },
-    { key: 'reservation', labelFa: 'هواپیما', implemented: false },
+    { key: 'reservation', labelFa: 'هواپیما', implemented: true },
     { key: 'mgrreports', labelFa: 'گزارش مدیران', implemented: false },
   ],
   SENIOR_MANAGER: [
@@ -50,7 +50,7 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'vip', labelFa: 'مشتریان VIP', implemented: true },
     { key: 'panels', labelFa: 'دسترسی به پنل‌ها', implemented: false },
     { key: 'security', labelFa: 'امنیت و رمز عبور', implemented: false },
-    { key: 'reservation', labelFa: 'سامانه رزرواسیون', implemented: false },
+    { key: 'reservation', labelFa: 'سامانه رزرواسیون', implemented: true },
   ],
   FINANCE_MANAGER: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
@@ -71,17 +71,18 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'cartable', labelFa: 'کارتابل', implemented: true },
   ],
   IT_MANAGER: [
-    // Not the shared sales/KPI dashboard the other 5 roles get (IT's real
-    // "داشبورد فنی" is service-health widgets, no reporting endpoints back
-    // it yet — IT_MANAGER is deliberately excluded from REPORTING_ROLES).
-    { key: 'dashboard', labelFa: 'داشبورد فنی', implemented: false },
-    { key: 'users', labelFa: 'کاربران و دسترسی‌ها', implemented: false },
-    { key: 'security', labelFa: 'رمزها و امنیت', implemented: false },
-    { key: 'services', labelFa: 'سرویس‌های سایت', implemented: false },
-    { key: 'reservation', labelFa: 'سامانه رزرواسیون', implemented: false },
+    // Phase 8: real service-health/os-metrics dashboard, not the shared
+    // sales/KPI one the other 5 roles get (IT_MANAGER stays excluded from
+    // REPORTING_ROLES). reservation/panels/settings stay deferred to
+    // Phase 9 / Phase 12 respectively — see docs/API.md's Phase 8 note.
+    { key: 'dashboard', labelFa: 'داشبورد فنی', implemented: true },
+    { key: 'users', labelFa: 'کاربران و دسترسی‌ها', implemented: true },
+    { key: 'security', labelFa: 'رمزها و امنیت', implemented: true },
+    { key: 'services', labelFa: 'سرویس‌های سایت', implemented: true },
+    { key: 'reservation', labelFa: 'سامانه رزرواسیون', implemented: true },
     { key: 'panels', labelFa: 'دسترسی به پنل‌ها', implemented: false },
-    { key: 'logs', labelFa: 'لاگ و رویدادها', implemented: false },
-    { key: 'backup', labelFa: 'پشتیبان‌گیری', implemented: false },
+    { key: 'logs', labelFa: 'لاگ و رویدادها', implemented: true },
+    { key: 'backup', labelFa: 'پشتیبان‌گیری', implemented: true },
     { key: 'settings', labelFa: 'تنظیمات سامانه', implemented: false },
   ],
 };

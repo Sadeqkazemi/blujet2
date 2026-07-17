@@ -19,8 +19,10 @@ import { ReferralsModule } from './modules/referrals/referrals.module';
 import { ManagerMessagesModule } from './modules/manager-messages/manager-messages.module';
 import { FilesModule } from './modules/files/files.module';
 import { ClubModule } from './modules/club/club.module';
+import { ItManagerModule } from './modules/it-manager/it-manager.module';
 import { PricingModule } from './modules/pricing/pricing.module';
 import { RefundsModule } from './modules/refunds/refunds.module';
+import { ReservationModule } from './modules/reservation/reservation.module';
 
 @Module({
   imports: [
@@ -63,8 +65,10 @@ import { RefundsModule } from './modules/refunds/refunds.module';
     ManagerMessagesModule,
     FilesModule,
     ClubModule,
+    ItManagerModule,
     PricingModule,
     RefundsModule,
+    ReservationModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

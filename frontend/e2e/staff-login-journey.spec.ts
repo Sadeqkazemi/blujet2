@@ -14,7 +14,7 @@ const ROLE_CASES = [
     username: 'finance.karimi',
     roleLabel: 'مدیر مالی',
     expectedTabs: ['داشبورد', 'آژانس‌ها', 'گزارش مسافران', 'گزارش کارمندان', 'مالی', 'استرداد بلیط', 'کارتابل'],
-    hasSalesDashboard: true,
+    dashboardMarkers: ['کل درآمد', 'نمودار فروش'],
   },
   {
     username: 'ceo',
@@ -31,7 +31,7 @@ const ROLE_CASES = [
       'امنیت و رمز عبور',
       'لاگ و رویدادها',
     ],
-    hasSalesDashboard: true,
+    dashboardMarkers: ['کل درآمد', 'نمودار فروش'],
   },
   {
     username: 'itadmin',
@@ -47,11 +47,13 @@ const ROLE_CASES = [
       'پشتیبان‌گیری',
       'تنظیمات سامانه',
     ],
-    hasSalesDashboard: false,
+    // Phase 8: IT's own real dashboard (service-health/os-metrics), not the
+    // shared sales/KPI one the other roles get.
+    dashboardMarkers: ['سلامت سرویس‌ها', 'استفاده از منابع سرور'],
   },
 ];
 
-for (const { username, roleLabel, expectedTabs, hasSalesDashboard } of ROLE_CASES) {
+for (const { username, roleLabel, expectedTabs, dashboardMarkers } of ROLE_CASES) {
   test(`full login journey for ${username} — lands on its own dashboard with only its permitted tabs`, async ({ page }) => {
     await loginAs(page, username);
 
@@ -62,11 +64,8 @@ for (const { username, roleLabel, expectedTabs, hasSalesDashboard } of ROLE_CASE
     const tabLabels = (await navLinks.allTextContents()).map(stripComingSoon);
     expect(tabLabels).toEqual(expectedTabs);
 
-    if (hasSalesDashboard) {
-      await expect(page.getByText('کل درآمد')).toBeVisible();
-      await expect(page.getByText('نمودار فروش')).toBeVisible();
-    } else {
-      await expect(page.getByText('این بخش به‌زودی راه‌اندازی می‌شود')).toBeVisible();
+    for (const marker of dashboardMarkers) {
+      await expect(page.getByText(marker)).toBeVisible();
     }
   });
 }

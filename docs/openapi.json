@@ -1754,6 +1754,474 @@
         ]
       }
     },
+    "/it/permissions": {
+      "get": {
+        "operationId": "EmployeesController_catalog",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "کاتالوگ دسترسی‌ها بر اساس واحد سازمانی",
+        "tags": [
+          "it-manager"
+        ]
+      }
+    },
+    "/it/employees": {
+      "get": {
+        "operationId": "EmployeesController_list",
+        "parameters": [
+          {
+            "name": "dept",
+            "required": false,
+            "in": "query",
+            "description": "فیلتر واحد سازمانی",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "جستجو در نام یا نام کاربری",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست کارمندان — فیلتر واحد/جستجو",
+        "tags": [
+          "it-manager"
+        ]
+      },
+      "post": {
+        "operationId": "EmployeesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEmployeeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ایجاد کارمند جدید و اعطای دسترسی‌های اولیه",
+        "tags": [
+          "it-manager"
+        ]
+      }
+    },
+    "/it/employees/{id}": {
+      "get": {
+        "operationId": "EmployeesController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "جزئیات کارمند + دسترسی‌های اعطاشده/قابل‌افزودن",
+        "tags": [
+          "it-manager"
+        ]
+      }
+    },
+    "/it/employees/{id}/status": {
+      "patch": {
+        "operationId": "EmployeesController_setStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetEmployeeStatusDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "مسدودسازی/فعال‌سازی حساب کارمند",
+        "tags": [
+          "it-manager"
+        ]
+      }
+    },
+    "/it/employees/{id}/permissions": {
+      "patch": {
+        "operationId": "EmployeesController_setPermission",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetEmployeePermissionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "افزودن/حذف یک دسترسی مشخص",
+        "tags": [
+          "it-manager"
+        ]
+      }
+    },
+    "/it/employees/{id}/reset-password": {
+      "post": {
+        "operationId": "EmployeesController_resetPassword",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "بازنشانی رمز عبور — رمز موقت فقط یک‌بار در پاسخ برگردانده می‌شود",
+        "tags": [
+          "it-manager"
+        ]
+      }
+    },
+    "/it/security/policy": {
+      "get": {
+        "operationId": "SecurityController_getPolicy",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "سیاست رمز عبور و امنیت فعلی",
+        "tags": [
+          "it-manager"
+        ]
+      },
+      "patch": {
+        "operationId": "SecurityController_updatePolicy",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSecurityPolicyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "به‌روزرسانی سیاست رمز عبور و امنیت",
+        "tags": [
+          "it-manager"
+        ]
+      }
+    },
+    "/it/security/sessions": {
+      "get": {
+        "operationId": "SecurityController_listSessions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "نشست‌های فعال (کاربر، دستگاه، آی‌پی)",
+        "tags": [
+          "it-manager"
+        ]
+      }
+    },
+    "/it/security/sessions/logout-all": {
+      "post": {
+        "operationId": "SecurityController_logoutAll",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "خروج اجباری همه نشست‌های فعال سایت",
+        "tags": [
+          "it-manager"
+        ]
+      }
+    },
+    "/it/services": {
+      "get": {
+        "operationId": "ItServicesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست سرویس‌های داخلی و خارجی",
+        "tags": [
+          "it-manager"
+        ]
+      }
+    },
+    "/it/services/internal/{key}": {
+      "patch": {
+        "operationId": "ItServicesController_toggleInternal",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToggleInternalServiceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "روشن/خاموش کردن سرویس داخلی",
+        "tags": [
+          "it-manager"
+        ]
+      }
+    },
+    "/it/services/external": {
+      "post": {
+        "operationId": "ItServicesController_createExternal",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateExternalServiceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "تعریف سرویس خارجی جدید",
+        "tags": [
+          "it-manager"
+        ]
+      }
+    },
+    "/it/services/external/{id}": {
+      "patch": {
+        "operationId": "ItServicesController_updateExternal",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateExternalServiceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "به‌روزرسانی سرویس خارجی",
+        "tags": [
+          "it-manager"
+        ]
+      },
+      "delete": {
+        "operationId": "ItServicesController_removeExternal",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "حذف سرویس خارجی",
+        "tags": [
+          "it-manager"
+        ]
+      }
+    },
+    "/it/services/external/{id}/test": {
+      "post": {
+        "operationId": "ItServicesController_testExternal",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "تست اتصال واقعی سرویس خارجی",
+        "tags": [
+          "it-manager"
+        ]
+      }
+    },
+    "/it/backups": {
+      "get": {
+        "operationId": "BackupsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست نسخه‌های پشتیبان",
+        "tags": [
+          "it-manager"
+        ]
+      },
+      "post": {
+        "operationId": "BackupsController_create",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ایجاد نسخه پشتیبان جدید (pg_dump واقعی)",
+        "tags": [
+          "it-manager"
+        ]
+      }
+    },
+    "/it/backups/schedule": {
+      "get": {
+        "operationId": "BackupsController_schedule",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "زمان‌بندی خودکار پشتیبان‌گیری",
+        "tags": [
+          "it-manager"
+        ]
+      }
+    },
+    "/it/dashboard": {
+      "get": {
+        "operationId": "ItDashboardController_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "داشبورد فنی — KPI، سلامت سرویس‌ها، منابع، رویدادها",
+        "tags": [
+          "it-manager"
+        ]
+      }
+    },
     "/pricing/proposals": {
       "get": {
         "operationId": "PricingController_list",
@@ -2010,6 +2478,291 @@
         "summary": "تأیید، واریز به شبا و بستن پرونده — برگشت تراکنشی در دفتر کل",
         "tags": [
           "refunds"
+        ]
+      }
+    },
+    "/reservation/seatmap/{flightInstanceId}": {
+      "get": {
+        "operationId": "SeatmapController_get",
+        "parameters": [
+          {
+            "name": "flightInstanceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "نقشهٔ صندلی — آزاد/بیزینس/فروخته‌شده/لاک‌شده",
+        "tags": [
+          "reservation"
+        ]
+      }
+    },
+    "/reservation/seatmap/{flightInstanceId}/lock": {
+      "post": {
+        "operationId": "SeatmapController_lock",
+        "parameters": [
+          {
+            "name": "flightInstanceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LockSeatDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "لاک مدیریتی صندلی — فقط نقش‌های مجاز",
+        "tags": [
+          "reservation"
+        ]
+      }
+    },
+    "/reservation/seatmap/locks/{id}/release": {
+      "patch": {
+        "operationId": "SeatmapController_release",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "آزادسازی لاک صندلی",
+        "tags": [
+          "reservation"
+        ]
+      }
+    },
+    "/reservation/pnr": {
+      "get": {
+        "operationId": "PnrController_list",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "جستجو در کد PNR یا نام مسافر",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست رزروها — گروه‌بندی‌شده بر اساس پرواز",
+        "tags": [
+          "reservation"
+        ]
+      },
+      "post": {
+        "operationId": "PnrController_issue",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssuePnrDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "صدور دستی PNR و بلیط (بدون درگاه پرداخت)",
+        "tags": [
+          "reservation"
+        ]
+      }
+    },
+    "/reservation/pnr/{pnr}": {
+      "get": {
+        "operationId": "PnrController_detail",
+        "parameters": [
+          {
+            "name": "pnr",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "جزئیات رزرو / بلیط",
+        "tags": [
+          "reservation"
+        ]
+      }
+    },
+    "/reservation/pnr/{pnr}/seat": {
+      "patch": {
+        "operationId": "PnrController_changeSeat",
+        "parameters": [
+          {
+            "name": "pnr",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeSeatDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تغییر صندلی رزرو",
+        "tags": [
+          "reservation"
+        ]
+      }
+    },
+    "/reservation/pnr/{pnr}/cancel": {
+      "patch": {
+        "operationId": "PnrController_cancel",
+        "parameters": [
+          {
+            "name": "pnr",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "لغو رزرو",
+        "tags": [
+          "reservation"
+        ]
+      }
+    },
+    "/reservation/search": {
+      "get": {
+        "operationId": "PnrController_search",
+        "parameters": [
+          {
+            "name": "origin",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "تهران",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dest",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "دبی",
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": true,
+            "in": "query",
+            "description": "ISO date",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "جستجوی پرواز برای صدور دستی رزرو",
+        "tags": [
+          "reservation"
+        ]
+      }
+    },
+    "/reservation/dashboard-stats": {
+      "get": {
+        "operationId": "PnrController_dashboardStats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "آمار واقعی رزروها — بدون داده جعلی سلامت سرویس",
+        "tags": [
+          "reservation"
+        ]
+      }
+    },
+    "/reservation/_test/flight-instance": {
+      "post": {
+        "operationId": "PnrController_createTestInstance",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "E2E only — fresh SCHEDULED instance; 404 in production",
+        "tags": [
+          "reservation"
         ]
       }
     }
@@ -2377,6 +3130,199 @@
           "level"
         ]
       },
+      "CreateEmployeeDto": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string",
+            "example": "رضا کاظمی"
+          },
+          "username": {
+            "type": "string",
+            "example": "reza.kazemi"
+          },
+          "password": {
+            "type": "string",
+            "description": "رمز عبور اولیه — حداقل ۶ کاراکتر"
+          },
+          "dept": {
+            "type": "string",
+            "example": "commercial",
+            "description": "واحد سازمانی — commercial|sales|finance|it یا نام سفارشی"
+          },
+          "rank": {
+            "type": "string",
+            "example": "کارشناس"
+          },
+          "referralScope": {
+            "type": "string",
+            "enum": [
+              "MANAGERS_ONLY",
+              "ALL_STAFF"
+            ]
+          },
+          "permissionKeys": {
+            "example": [
+              "ag_list",
+              "fl_view"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "fullName",
+          "username",
+          "password",
+          "dept"
+        ]
+      },
+      "SetEmployeeStatusDto": {
+        "type": "object",
+        "properties": {
+          "isActive": {
+            "type": "boolean",
+            "example": false
+          }
+        },
+        "required": [
+          "isActive"
+        ]
+      },
+      "SetEmployeePermissionDto": {
+        "type": "object",
+        "properties": {
+          "permissionKey": {
+            "type": "string",
+            "example": "ag_list"
+          },
+          "grant": {
+            "type": "boolean",
+            "example": true
+          }
+        },
+        "required": [
+          "permissionKey",
+          "grant"
+        ]
+      },
+      "UpdateSecurityPolicyDto": {
+        "type": "object",
+        "properties": {
+          "minLength": {
+            "type": "number",
+            "example": 10
+          },
+          "expiryDays": {
+            "type": "number",
+            "example": 90
+          },
+          "maxAttempts": {
+            "type": "number",
+            "example": 5
+          },
+          "requireUppercase": {
+            "type": "boolean"
+          },
+          "requireNumber": {
+            "type": "boolean"
+          },
+          "requireSymbol": {
+            "type": "boolean"
+          },
+          "blockReuse": {
+            "type": "boolean"
+          },
+          "staffTwoFactorMandatory": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ToggleInternalServiceDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "example": true
+          }
+        },
+        "required": [
+          "enabled"
+        ]
+      },
+      "CreateExternalServiceDto": {
+        "type": "object",
+        "properties": {
+          "nameFa": {
+            "type": "string",
+            "example": "درگاه پرداخت زرین‌پال"
+          },
+          "provider": {
+            "type": "string",
+            "example": "زرین‌پال"
+          },
+          "endpoint": {
+            "type": "string",
+            "example": "https://api.provider.com/v1/"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "GET",
+              "POST"
+            ],
+            "default": "POST"
+          },
+          "timeoutMs": {
+            "type": "number",
+            "example": 30000
+          },
+          "apiKey": {
+            "type": "string"
+          },
+          "sandbox": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "nameFa",
+          "provider",
+          "endpoint"
+        ]
+      },
+      "UpdateExternalServiceDto": {
+        "type": "object",
+        "properties": {
+          "nameFa": {
+            "type": "string"
+          },
+          "endpoint": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "GET",
+              "POST"
+            ]
+          },
+          "timeoutMs": {
+            "type": "number"
+          },
+          "apiKey": {
+            "type": "string"
+          },
+          "sandbox": {
+            "type": "boolean"
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        }
+      },
       "UpsertProposalDto": {
         "type": "object",
         "properties": {
@@ -2438,6 +3384,65 @@
         },
         "required": [
           "assigneeId"
+        ]
+      },
+      "LockSeatDto": {
+        "type": "object",
+        "properties": {
+          "seatCode": {
+            "type": "string",
+            "example": "12D"
+          },
+          "passengerName": {
+            "type": "string"
+          },
+          "passengerNationalId": {
+            "type": "string"
+          },
+          "passengerMobile": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "seatCode"
+        ]
+      },
+      "ChangeSeatDto": {
+        "type": "object",
+        "properties": {
+          "seatCode": {
+            "type": "string",
+            "example": "14A"
+          }
+        },
+        "required": [
+          "seatCode"
+        ]
+      },
+      "IssuePnrDto": {
+        "type": "object",
+        "properties": {
+          "flightInstanceId": {
+            "type": "string"
+          },
+          "seatCode": {
+            "type": "string",
+            "example": "12D"
+          },
+          "passengerName": {
+            "type": "string"
+          },
+          "passengerNationalId": {
+            "type": "string"
+          },
+          "passengerMobile": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "flightInstanceId",
+          "seatCode",
+          "passengerName"
         ]
       }
     }
