@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<template id="__bundler_thumbnail" data-bg-color="#0d2640">
+  <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+    <rect width="1200" height="800" fill="#0d2640"/>
+    <circle cx="600" cy="360" r="150" fill="#1668c4"/>
+    <text x="600" y="430" font-size="170" text-anchor="middle" fill="#fff" font-family="sans-serif">✈</text>
+    <text x="600" y="600" font-size="78" text-anchor="middle" fill="#fff" font-family="Vazirmatn,sans-serif" font-weight="900">مدیریت رزرو</text>
+  </svg>
+</template>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800;900&family=Roboto+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; }
+</style>
+<script>document.addEventListener("click",function(e){document.querySelectorAll("details[open]").forEach(function(d){if(!d.contains(e.target))d.removeAttribute("open");});});</script>
+</helmet>
+
+<div dir="rtl" style="font-family:Vazirmatn,sans-serif; background:#f6f8fb; color:#16202e; min-height:100vh; --accent:#1668c4;">
+
+  <!-- HEADER -->
+  <header style="position:sticky; top:0; z-index:50;">
+    <div style="background:#fff; border-bottom:1px solid #e6eaf0; box-shadow:0 2px 12px -8px rgba(13,38,102,.25);">
+      <div style="max-width:1320px; margin:0 auto; padding:0 26px; height:70px; display:flex; align-items:center; justify-content:space-between;">
+        <a href="صفحه اصلی.dc.html" style="display:flex; align-items:center; gap:9px; text-decoration:none; color:#16202e;">
+          <div style="width:38px; height:38px; border-radius:10px; background:var(--accent,#1668c4); display:flex; align-items:center; justify-content:center; color:#fff; font-size:18px;">✈</div>
+          <span style="font-weight:900; font-size:20px; letter-spacing:-.5px;">blujet</span>
+        </a>
+        <nav style="display:flex; gap:38px; font-size:17px; color:#3b4554; font-weight:600; height:100%; align-items:center;">
+          <a href="نتایج پرواز.dc.html" style="cursor:pointer; text-decoration:none; color:#3b4554;">پرواز</a>
+          <a href="مقاصد.dc.html" style="cursor:pointer; text-decoration:none; color:#3b4554;">مقاصد پروازی</a>
+          <a href="باشگاه مشتریان.dc.html" style="cursor:pointer; text-decoration:none; color:#3b4554;">باشگاه مشتریان</a>
+          <a href="قوانین و مقررات.dc.html" style="cursor:pointer; text-decoration:none; color:#3b4554;">اطلاعات سفر</a>
+          <a href="پشتیبانی.dc.html" style="cursor:pointer; text-decoration:none; color:#3b4554;">پشتیبانی</a>
+        </nav>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div style="display:flex; align-items:center; gap:6px; background:#eef4fb; border:1px solid #dce8f7; padding:7px 11px; border-radius:22px;"><span style="color:#caa53a; font-size:12.5px;">★</span><span style="font-size:11.5px; font-weight:800; color:var(--accent,#1668c4);">۱۲٬۴۵۰</span><span style="font-size:11px; color:#7a8696;">امتیاز</span></div>
+          <details style="position:relative;">
+              <summary style="list-style:none; display:flex; align-items:center; gap:8px; background:#fff; border:1px solid #e6eaf0; padding:4px 10px 4px 7px; border-radius:28px; cursor:pointer;"><div style="width:38px; height:38px; border-radius:50%; background:linear-gradient(135deg,var(--accent,#1668c4),#0d3b66); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:11.5px;">نر</div><div style="line-height:1.35; text-align:right;"><div style="font-size:12px; font-weight:700; color:#16202e;">نگار رضایی</div><div style="font-size:10px; color:#caa53a; font-weight:700;">★ عضو طلایی</div></div><span style="font-size:8px; color:#9aa4b2; margin-right:2px;">▼</span></summary>
+              <div style="position:absolute; top:54px; left:0; width:320px; background:#fff; border:1px solid #e6eaf0; border-radius:16px; box-shadow:0 20px 50px -16px rgba(13,38,64,.35); z-index:130; overflow:hidden;">
+                <div style="padding:15px; background:linear-gradient(135deg,#0d2640,#16406e); color:#fff;">
+                  <div style="display:flex; align-items:center; gap:10px;"><div style="width:46px; height:46px; border-radius:50%; background:rgba(255,255,255,.16); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13.5px;">نر</div><div style="line-height:1.5;"><div style="font-size:13.5px; font-weight:800;">نگار رضایی</div><div style="font-size:10.5px; color:#caa53a; font-weight:700;">★ عضو طلایی</div></div></div>
+                  <div style="display:flex; align-items:center; justify-content:space-between; margin-top:14px; background:rgba(255,255,255,.1); border-radius:10px; padding:7px 11px;"><span style="font-size:11px; color:#aac4e2;">امتیاز باشگاه</span><span style="font-size:12.5px; font-weight:800;">۱۲٬۴۵۰</span></div>
+                </div>
+                <div style="padding:5px;">
+                  <a href="مدیریت رزرو.dc.html" style="display:flex; align-items:center; gap:7px; padding:9px 11px; border-radius:9px; font-size:11.5px; color:#16202e; text-decoration:none; font-weight:600;"><span style="color:var(--accent,#1668c4);">🧳</span>سفرها و مدیریت رزرو</a>
+                  <a href="باشگاه مشتریان.dc.html" style="display:flex; align-items:center; gap:7px; padding:9px 11px; border-radius:9px; font-size:11.5px; color:#16202e; text-decoration:none; font-weight:600;"><span style="color:var(--accent,#1668c4);">★</span>باشگاه مشتریان</a>
+                  <a href="ورود و ثبتنام.dc.html" style="display:flex; align-items:center; gap:7px; padding:9px 11px; border-radius:9px; font-size:11.5px; color:#e5484d; font-weight:600; text-decoration:none;"><span>↩</span>خروج از حساب</a>
+                </div>
+              </div>
+            </details>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- HERO + TABS -->
+  <section style="background:linear-gradient(135deg,#0d2640,#16406e); color:#fff; padding:30px 22px 62px;">
+    <div style="max-width:880px; margin:0 auto; text-align:center;">
+      <h1 style="font-size:27px; font-weight:900; margin:0 0 8px;">{{ heroTitle }}</h1>
+      <p style="font-size:13px; color:#aac4e2; margin:0 0 4px;">{{ heroSub }}</p>
+    </div>
+  </section>
+
+  <!-- LOOKUP / RESULT -->
+  <section style="max-width:880px; margin:-56px auto 56px; padding:0 26px; position:relative;">
+
+    <sc-if value="{{ showLookup }}" hint-placeholder-val="{{true}}">
+    <div style="background:#fff; border:1px solid #eef1f5; border-radius:16px; padding:21px; box-shadow:0 18px 50px -28px rgba(13,38,102,.5);">
+      <div style="display:flex; gap:13px; flex-wrap:wrap;">
+        <div style="flex:1; min-width:220px;"><div style="font-size:11.5px; color:#8a96a6; margin-bottom:8px; font-weight:600;">کد رزرو</div><input value="{{ pnr }}" onInput="{{ onPnr }}" placeholder="مثلاً AS-88421" style="width:100%; height:52px; border:1.5px solid #e2e7ee; border-radius:12px; background:#fafbfd; padding:0 12px; font-family:inherit; font-size:13.5px; font-weight:700; color:#16202e; outline:none;" /></div>
+        <div style="flex:1; min-width:220px;"><div style="font-size:11.5px; color:#8a96a6; margin-bottom:8px; font-weight:600;">نام خانوادگی مسافر</div><input value="{{ lname }}" onInput="{{ onLname }}" placeholder="نام خانوادگی" style="width:100%; height:52px; border:1.5px solid #e2e7ee; border-radius:12px; background:#fafbfd; padding:0 12px; font-family:inherit; font-size:13.5px; font-weight:700; color:#16202e; outline:none;" /></div>
+      </div>
+      <div onClick="{{ doLookup }}" style="margin-top:20px; height:54px; border-radius:13px; background:var(--accent,#1668c4); color:#fff; display:flex; align-items:center; justify-content:center; gap:7px; font-size:14px; font-weight:800; cursor:pointer;">{{ lookupBtn }}</div>
+      <div style="margin-top:16px; font-size:11.5px; color:#9aa4b2; text-align:center;">کد رزرو در ایمیل/پیامک تأیید خرید برای شما ارسال شده است.</div>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ showResult }}" hint-placeholder-val="{{false}}">
+    <div style="display:flex; flex-direction:column; gap:15px;">
+
+      <!-- boarding-card style ticket -->
+      <div style="background:#fff; border:1px solid #eef1f5; border-radius:16px; overflow:hidden; box-shadow:0 18px 50px -30px rgba(13,38,102,.5);">
+        <div style="background:linear-gradient(135deg,#0d2640,#16406e); color:#fff; padding:12px 18px; display:flex; align-items:center; justify-content:space-between;">
+          <div style="display:flex; align-items:center; gap:8px;"><div style="width:30px; height:30px; border-radius:8px; background:rgba(255,255,255,.16); display:flex; align-items:center; justify-content:center; font-size:13.5px;">✈</div><span style="font-size:13.5px; font-weight:800;">{{ airline }}</span></div>
+          <div style="text-align:left;"><div style="font-size:10px; color:#aac4e2;">کد رزرو</div><div style="font-size:14.5px; font-weight:800; font-family:'Roboto Mono',monospace;" dir="ltr">{{ pnrShow }}</div></div>
+        </div>
+        <div style="padding:18px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+          <div style="text-align:center;"><div style="font-size:27px; font-weight:900; color:#16202e;" dir="ltr">{{ depCode }}</div><div style="font-size:11.5px; color:#8a96a6; margin-top:2px;">{{ depCity }}</div><div style="font-size:13.5px; font-weight:700; color:var(--accent,#1668c4); margin-top:6px;">{{ depTime }}</div></div>
+          <div style="flex:1; min-width:120px; display:flex; flex-direction:column; align-items:center; color:#c2cad6;"><div style="font-size:11px; color:#8a96a6;">{{ duration }}</div><div style="width:100%; height:2px; background:#e6eaf0; position:relative; margin:7px 0;"><span style="position:absolute; left:50%; top:-7px; font-size:12.5px; color:var(--accent,#1668c4);">✈</span></div><div style="font-size:10.5px; color:#9aa4b2;">{{ flightNo }}</div></div>
+          <div style="text-align:center;"><div style="font-size:27px; font-weight:900; color:#16202e;" dir="ltr">{{ arrCode }}</div><div style="font-size:11.5px; color:#8a96a6; margin-top:2px;">{{ arrCity }}</div><div style="font-size:13.5px; font-weight:700; color:var(--accent,#1668c4); margin-top:6px;">{{ arrTime }}</div></div>
+        </div>
+        <div style="border-top:1.5px dashed #e2e7ee; padding:12px 18px; display:grid; grid-template-columns:repeat(4,1fr); gap:11px;">
+          <div><div style="font-size:10.5px; color:#9aa4b2;">تاریخ</div><div style="font-size:12px; font-weight:700; margin-top:3px;">{{ date }}</div></div>
+          <div><div style="font-size:10.5px; color:#9aa4b2;">ترمینال</div><div style="font-size:12px; font-weight:700; margin-top:3px;">{{ terminal }}</div></div>
+          <div><div style="font-size:10.5px; color:#9aa4b2;">گیت</div><div style="font-size:12px; font-weight:700; margin-top:3px;">{{ gate }}</div></div>
+          <div><div style="font-size:10.5px; color:#9aa4b2;">کلاس</div><div style="font-size:12px; font-weight:700; margin-top:3px;">{{ cabin }}</div></div>
+        </div>
+      </div>
+
+      <!-- passengers -->
+      <div style="background:#fff; border:1px solid #eef1f5; border-radius:14px; padding:15px;">
+        <div style="font-size:13.5px; font-weight:800; margin-bottom:14px;">مسافران</div>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <sc-for list="{{ pax }}" as="p" hint-placeholder-count="2">
+            <div style="display:flex; align-items:center; justify-content:space-between; background:#f6f8fb; border-radius:11px; padding:11px 11px;">
+              <div style="display:flex; align-items:center; gap:10px;"><span style="width:38px; height:38px; border-radius:50%; background:#eef4fb; color:var(--accent,#1668c4); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:11.5px;">{{ p.initials }}</span><div><div style="font-size:12.5px; font-weight:700;">{{ p.name }}</div><div style="font-size:10.5px; color:#9aa4b2;">صندلی {{ p.seat }} · {{ p.checkinLabel }}</div></div></div>
+              <span style="font-size:10.5px; font-weight:700; color:{{ p.statusColor }}; background:{{ p.statusBg }}; padding:4px 10px; border-radius:14px;">{{ p.statusText }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <!-- actions -->
+      <sc-if value="{{ showActions }}" hint-placeholder-val="{{true}}">
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:11px;">
+        <div onClick="{{ changeSeat }}" style="background:#fff; border:1px solid #eef1f5; border-radius:14px; padding:14px 12px; text-align:center; cursor:pointer;" style-hover="border-color:#dbe7f6; box-shadow:0 14px 30px -20px rgba(13,38,102,.3);"><div style="width:40px; height:40px; margin:0 auto 9px; border-radius:11px; background:#eef4fb; color:var(--accent,#1668c4); display:flex; align-items:center; justify-content:center;"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="10" height="12" rx="2"/><path d="M6 8V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/><path d="M6 12h4M6 16h4"/><path d="M17 8v8M17 8l-2 2M17 8l2 2"/></svg></div><div style="font-size:12px; font-weight:700;">تغییر صندلی</div></div>
+        <div onClick="{{ openRefund }}" style="background:#fff; border:1px solid #eef1f5; border-radius:14px; padding:14px 12px; text-align:center; cursor:pointer;" style-hover="border-color:#f5c9c9; box-shadow:0 14px 30px -20px rgba(180,40,40,.3);"><div style="width:40px; height:40px; margin:0 auto 9px; border-radius:11px; background:#fdeeee; color:#d64545; display:flex; align-items:center; justify-content:center;"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 5 5v1"/></svg></div><div style="font-size:12px; font-weight:700;">استرداد بلیط</div></div>
+        <div onClick="{{ downloadTicket }}" style="background:#fff; border:1px solid #eef1f5; border-radius:14px; padding:14px 12px; text-align:center; cursor:pointer;" style-hover="border-color:#dbe7f6; box-shadow:0 14px 30px -20px rgba(13,38,102,.3);"><div style="width:40px; height:40px; margin:0 auto 9px; border-radius:11px; background:#eef4fb; color:var(--accent,#1668c4); display:flex; align-items:center; justify-content:center;"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M8 11l4 4 4-4"/><path d="M5 21h14"/></svg></div><div style="font-size:12px; font-weight:700;">دانلود بلیط</div></div>
+      </div>
+      </sc-if>
+
+      <!-- refund flow -->
+      <sc-if value="{{ showRefund }}" hint-placeholder-val="{{false}}">
+      <sc-if value="{{ refundDone }}" hint-placeholder-val="{{false}}">
+        <div style="background:#fff; border:1px solid #eef1f5; border-radius:14px; padding:24px 21px; text-align:center;">
+          <div style="width:64px; height:64px; border-radius:50%; background:#eef9f1; color:#1f8a5b; display:flex; align-items:center; justify-content:center; font-size:27px; margin:0 auto 14px;">✓</div>
+          <div style="font-size:16px; font-weight:900; margin-bottom:6px;">درخواست استرداد ثبت شد</div>
+          <div style="font-size:12px; color:#8a96a6; margin-bottom:18px; line-height:1.9;">مبلغ قابل استرداد پس از کسر جریمه، طی ۳ تا ۷ روز کاری به کارت پرداخت‌کننده بازگردانده می‌شود. کد پیگیری: <span style="font-weight:800; color:#16202e;" dir="ltr">RF-{{ pnrShow }}</span></div>
+          <div style="display:inline-flex; background:#f6f8fb; border-radius:12px; padding:13px 22px; gap:26px;">
+            <div style="text-align:center;"><div style="font-size:10.5px; color:#9aa4b2; margin-bottom:3px;">مبلغ بلیط</div><div style="font-size:13px; font-weight:800; color:#16202e;">{{ refFare }}</div></div>
+            <div style="text-align:center;"><div style="font-size:10.5px; color:#9aa4b2; margin-bottom:3px;">جریمه</div><div style="font-size:13px; font-weight:800; color:#d64545;">{{ refPenalty }}</div></div>
+            <div style="text-align:center;"><div style="font-size:10.5px; color:#9aa4b2; margin-bottom:3px;">بازگشتی</div><div style="font-size:13px; font-weight:800; color:#1f8a5b;">{{ refReturn }}</div></div>
+          </div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ refundPending }}" hint-placeholder-val="{{true}}">
+        <div style="background:#fff; border:1px solid #eef1f5; border-radius:14px; padding:16px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;"><span style="font-size:13.5px; font-weight:800;">استرداد بلیط</span><span style="font-size:11px; font-weight:700; color:#b06a00; background:#fcf3e6; padding:4px 10px; border-radius:14px;">مشمول جریمه {{ refPenaltyPct }}</span></div>
+          <div style="font-size:11.5px; color:#5a6678; line-height:1.9; margin-bottom:14px;">مسافرانی که می‌خواهید بلیط‌شان مسترد شود را انتخاب کنید. جریمه بر اساس قوانین نرخی بلیط و فاصله تا زمان پرواز محاسبه می‌شود.</div>
+          <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:16px;">
+            <sc-for list="{{ refundPax }}" as="p" hint-placeholder-count="2">
+              <label onClick="{{ p.toggle }}" style="display:flex; align-items:center; justify-content:space-between; background:#f6f8fb; border:1.5px solid {{ p.border }}; border-radius:11px; padding:11px 12px; cursor:pointer;">
+                <div style="display:flex; align-items:center; gap:10px;"><span style="width:22px; height:22px; flex:none; border-radius:6px; border:1.5px solid {{ p.border }}; background:{{ p.checkBg }}; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px;">{{ p.mark }}</span><div><div style="font-size:12.5px; font-weight:700;">{{ p.name }}</div><div style="font-size:10.5px; color:#9aa4b2;">صندلی {{ p.seat }}</div></div></div>
+                <span style="font-size:12px; font-weight:800; color:#16202e;">{{ p.fare }}</span>
+              </label>
+            </sc-for>
+          </div>
+          <div style="background:#f6f8fb; border-radius:12px; padding:13px 15px; margin-bottom:16px; display:flex; flex-direction:column; gap:9px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; font-size:12px; color:#5a6678;"><span>جمع مبلغ بلیط انتخابی</span><span style="font-weight:700; color:#16202e;">{{ refFare }}</span></div>
+            <div style="display:flex; align-items:center; justify-content:space-between; font-size:12px; color:#5a6678;"><span>جریمه استرداد ({{ refPenaltyPct }})</span><span style="font-weight:700; color:#d64545;">−{{ refPenalty }}</span></div>
+            <div style="border-top:1px dashed #dbe2ea; padding-top:9px; display:flex; align-items:center; justify-content:space-between; font-size:13px; font-weight:800; color:#16202e;"><span>مبلغ قابل بازگشت</span><span style="color:#1f8a5b;">{{ refReturn }}</span></div>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <div onClick="{{ confirmRefund }}" style="flex:1; height:52px; border-radius:12px; background:{{ refundBtnBg }}; color:#fff; display:flex; align-items:center; justify-content:center; font-size:13.5px; font-weight:800; cursor:{{ refundBtnCursor }};">تأیید و ثبت استرداد</div>
+            <div onClick="{{ cancelRefund }}" style="height:52px; padding:0 20px; border-radius:12px; border:1.5px solid #e2e7ee; color:#3b4554; display:flex; align-items:center; font-size:12.5px; font-weight:700; cursor:pointer;">انصراف</div>
+          </div>
+        </div>
+      </sc-if>
+      </sc-if>
+
+      <div onClick="{{ reset }}" style="text-align:center; font-size:11.5px; color:#8a96a6; cursor:pointer; font-weight:600;">‹ جستجوی رزرو دیگر</div>
+    </div>
+    </sc-if>
+
+  </section>
+
+  <!-- FOOTER -->
+  <footer style="background:#0d2640; color:#aebfd4;">
+    <div style="max-width:1320px; margin:0 auto; padding:39px 26px 20px; display:grid; grid-template-columns:1.6fr 1fr 1fr 1fr; gap:33px;">
+      <div>
+        <a href="صفحه اصلی.dc.html" style="display:flex; align-items:center; gap:9px; margin-bottom:16px; text-decoration:none;"><div style="width:36px; height:36px; border-radius:10px; background:var(--accent,#1668c4); display:flex; align-items:center; justify-content:center; color:#fff; font-size:16px;">✈</div><span style="font-weight:900; font-size:18px; color:#fff;">blujet</span></a>
+        <p style="font-size:13.5px; line-height:1.85; margin:0 0 20px; max-width:300px;">رزرو آنلاین بلیط پروازهای داخلی و بین‌المللی با بهترین قیمت و خدمات باشگاه مشتریان.</p>
+        <div style="display:grid; grid-template-columns:repeat(2, 66px); gap:10px;">
+          <span style="width:66px; height:66px; border-radius:12px; background:#ffffff10; border:1px solid #ffffff14; display:flex; align-items:center; justify-content:center; text-align:center; font-size:8.5px; color:#9fb2c9; line-height:1.5; padding:6px;">نماد اعتماد الکترونیکی</span>
+          <span style="width:66px; height:66px; border-radius:12px; background:#ffffff10; border:1px solid #ffffff14; display:flex; align-items:center; justify-content:center; text-align:center; font-size:8.5px; color:#9fb2c9; line-height:1.5; padding:6px;">انجمن صنفی دفاتر خدمات مسافرتی</span>
+          <span style="width:66px; height:66px; border-radius:12px; background:#ffffff10; border:1px solid #ffffff14; display:flex; align-items:center; justify-content:center; text-align:center; font-size:8.5px; color:#9fb2c9; line-height:1.5; padding:6px;">ساماندهی</span>
+          <span style="width:66px; height:66px; border-radius:12px; background:#ffffff10; border:1px solid #ffffff14; display:flex; align-items:center; justify-content:center; text-align:center; font-size:8.5px; color:#9fb2c9; line-height:1.5; padding:6px;">عضو IATA</span>
+        </div>
+      </div>
+      <div><div style="font-size:14.5px; font-weight:700; color:#fff; margin-bottom:16px;">خدمات</div><div style="display:flex; flex-direction:column; gap:11px; font-size:13.5px;"><a href="نتایج پرواز.dc.html" style="color:#aebfd4; text-decoration:none;">رزرو پرواز</a><a href="مدیریت رزرو.dc.html" style="color:#aebfd4; text-decoration:none;">مدیریت رزرو</a><a href="باشگاه مشتریان.dc.html" style="color:#aebfd4; text-decoration:none;">باشگاه مشتریان</a><a href="مدیریت رزرو.dc.html" style="color:#aebfd4; text-decoration:none;">استرداد بلیط</a></div></div>
+      <div><div style="font-size:14.5px; font-weight:700; color:#fff; margin-bottom:16px;">شرکت</div><div style="display:flex; flex-direction:column; gap:11px; font-size:13.5px;"><a href="درباره ما.dc.html" style="color:#aebfd4; text-decoration:none;">درباره ما</a><a href="تماس با ما.dc.html" style="color:#aebfd4; text-decoration:none;">تماس با ما</a><a href="قوانین و مقررات.dc.html" style="color:#aebfd4; text-decoration:none;">قوانین و مقررات</a></div></div>
+      <div><div style="font-size:14.5px; font-weight:700; color:#fff; margin-bottom:16px;">پشتیبانی</div><div style="display:flex; flex-direction:column; gap:11px; font-size:13.5px;"><a href="پشتیبانی.dc.html" style="color:#aebfd4; text-decoration:none;">مرکز راهنما</a><a href="پشتیبانی.dc.html" style="color:#aebfd4; text-decoration:none;">سوالات متداول</a><span dir="ltr" style="text-align:right;" data-site-phone>۰۲۱ — ۹۱۰۰۰۰۰۰</span></div></div>
+    </div>
+    <div style="border-top:1px solid #ffffff12;"><div style="max-width:1320px; margin:0 auto; padding:15px 26px; display:flex; justify-content:space-between; align-items:center; font-size:11.5px; color:#7d92ad;"><span>© ۱۴۰۵ blujet. تمامی حقوق محفوظ است.</span></div></div>
+  </footer>
+
+  <!-- TOAST -->
+  <sc-if value="{{ hasToast }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed; bottom:24px; left:50%; transform:translateX(-50%); z-index:9000; background:#0d2640; color:#fff; padding:12px 18px; border-radius:12px; font-size:12.5px; font-weight:700; box-shadow:0 14px 40px -10px rgba(13,38,64,.5); display:flex; align-items:center; gap:9px; max-width:90vw;"><span style="width:22px; height:22px; border-radius:50%; background:rgba(255,255,255,.16); display:flex; align-items:center; justify-content:center; flex:none; font-size:12px;">✓</span><span>{{ toast }}</span></div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { pnr: "", lname: "", found: false, view: "actions", refundSel: { p0: true, p1: false }, refundDone: false, toast: "" };
+  toast(t){ this.setState({ toast: t }); clearTimeout(this._toastT); this._toastT = setTimeout(() => this.setState({ toast: "" }), 2800); }
+  renderVals() {
+    const fa = (n) => String(n).replace(/[0-9]/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
+    const money = (n) => fa(n.toLocaleString("en-US")) + " تومان";
+    const paxData = [
+      { key: "p0", initials:"نر", name:"نگار رضایی", seat:"۱۴C", fareNum: 4200000 },
+      { key: "p1", initials:"مر", name:"مهدی رضایی", seat:"۱۴D", fareNum: 4200000 }
+    ];
+    const sel = this.state.refundSel;
+    const selected = paxData.filter(p => sel[p.key]);
+    const fareSum = selected.reduce((s, p) => s + p.fareNum, 0);
+    const penaltyPctNum = 30; // نرخ جریمه استرداد
+    const penalty = Math.round(fareSum * penaltyPctNum / 100);
+    const refundReturn = fareSum - penalty;
+    const canRefund = selected.length > 0;
+    return {
+      toast: this.state.toast, hasToast: !!this.state.toast,
+      changeSeat: () => this.toast("صفحهٔ تغییر صندلی باز شد"),
+      downloadTicket: () => this.toast("بلیط الکترونیکی در حال دانلود است…"),
+      heroTitle: "مدیریت رزرو",
+      heroSub: "رزرو خود را با کد رزرو مشاهده، تغییر صندلی، دانلود بلیط یا استرداد کنید.",
+
+      showLookup: !this.state.found,
+      showResult: this.state.found,
+      pnr: this.state.pnr, onPnr: (e) => this.setState({ pnr: e.target.value }),
+      lname: this.state.lname, onLname: (e) => this.setState({ lname: e.target.value }),
+      lookupBtn: "مشاهده رزرو",
+      doLookup: () => { if (!(this.state.pnr || "").trim() || !(this.state.lname || "").trim()) { this.toast("کد رزرو و نام خانوادگی را وارد کنید"); return; } this.setState({ found: true, view: "actions", refundDone: false }); this.toast("رزرو پیدا شد ✓"); },
+      reset: () => this.setState({ found: false, view: "actions", refundDone: false }),
+
+      airline: "ایران ایر", pnrShow: this.state.pnr || "AS-88421",
+      depCode: "THR", depCity: "تهران — مهرآباد", depTime: "۰۸:۳۰",
+      arrCode: "DXB", arrCity: "دبی", arrTime: "۱۰:۴۵",
+      duration: "۲ ساعت و ۱۵ دقیقه", flightNo: "IR-۶۵۱",
+      date: "شنبه، ۱۲ تیر ۱۴۰۵", terminal: "ترمینال ۲", gate: "B۱۲", cabin: "اکونومی",
+
+      pax: paxData.map(p => ({ initials:p.initials, name:p.name, seat:p.seat, checkinLabel:"صندلی " + p.seat + " تأییدشده", statusText:"صادرشده", statusColor:"#1f8a5b", statusBg:"#eef9f1" })),
+
+      // actions / refund view
+      showActions: this.state.view === "actions",
+      showRefund: this.state.view === "refund",
+      openRefund: () => this.setState({ view: "refund", refundDone: false }),
+      cancelRefund: () => this.setState({ view: "actions" }),
+      refundDone: this.state.refundDone,
+      refundPending: !this.state.refundDone,
+      refundPax: paxData.map(p => ({
+        name: p.name, seat: p.seat, fare: money(p.fareNum),
+        toggle: () => this.setState(s => ({ refundSel: { ...s.refundSel, [p.key]: !s.refundSel[p.key] } })),
+        mark: sel[p.key] ? "✓" : "",
+        checkBg: sel[p.key] ? "var(--accent,#1668c4)" : "#fff",
+        border: sel[p.key] ? "var(--accent,#1668c4)" : "#c9d3df"
+      })),
+      refFare: money(fareSum),
+      refPenalty: money(penalty),
+      refReturn: money(refundReturn),
+      refPenaltyPct: "٪" + fa(penaltyPctNum),
+      refundBtnBg: canRefund ? "#d64545" : "#dca9a9",
+      refundBtnCursor: canRefund ? "pointer" : "not-allowed",
+      confirmRefund: () => { if (canRefund) { this.setState({ refundDone: true }); this.toast("درخواست استرداد ثبت شد ✓"); } else { this.toast("حداقل یک مسافر را انتخاب کنید"); } }
+    };
+  }
+}
+</script>
+</body>
+</html>
