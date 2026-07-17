@@ -25,7 +25,12 @@ export class PanelsService {
   }
 
   async getAccessFlags(role: AuthenticatedUser['role']) {
-    const togglable = PANEL_ACCESS_TOGGLE_RIGHTS[role] ?? [];
+    // Phase 12: IT_MANAGER has no toggle rights but reads the full flag set
+    // for its informational tab; the PATCH route never allows it to write.
+    const togglable =
+      role === 'IT_MANAGER'
+        ? (PANEL_ACCESS_TOGGLE_RIGHTS.SENIOR_MANAGER ?? [])
+        : (PANEL_ACCESS_TOGGLE_RIGHTS[role] ?? []);
     const rows = await this.prisma.panelAccessFlag.findMany({
       where: { panelKey: { in: togglable } },
     });

@@ -8,6 +8,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
 import * as crypto from 'node:crypto';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
 import { TWO_FACTOR_PROVIDER } from './providers/two-factor-provider.interface';
 import type { TwoFactorProvider } from './providers/two-factor-provider.interface';
@@ -42,9 +43,49 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    private readonly audit: AuditService,
     @Inject(TWO_FACTOR_PROVIDER)
     private readonly twoFactorProvider: TwoFactorProvider,
   ) {}
+
+  /** Phase 12 «تغییر رمز عبور من» — the current password must verify before
+   * anything changes; no password material is ever logged. */
+  async changeOwnPassword(
+    actor: AuthenticatedUser,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void> {
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: actor.id },
+    });
+    if (
+      !user.passwordHash ||
+      !(await argon2.verify(user.passwordHash, currentPassword))
+    ) {
+      throw new UnauthorizedException({
+        code: ErrorCode.UNAUTHORIZED,
+        message: 'رمز عبور فعلی نادرست است.',
+      });
+    }
+
+    await this.prisma.user.update({
+      where: { id: actor.id },
+      data: {
+        passwordHash: await argon2.hash(newPassword),
+        mustChangePassword: false,
+      },
+    });
+
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'SECURITY',
+      action: 'تغییر رمز عبور حساب خود',
+      detail: `${actor.fullName} رمز عبور حساب خود را تغییر داد.`,
+      entityType: 'User',
+      entityId: actor.id,
+    });
+  }
 
   async staffLogin(
     username: string,
