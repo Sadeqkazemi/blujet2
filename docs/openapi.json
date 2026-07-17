@@ -2344,6 +2344,291 @@
           "pricing"
         ]
       }
+    },
+    "/reservation/seatmap/{flightInstanceId}": {
+      "get": {
+        "operationId": "SeatmapController_get",
+        "parameters": [
+          {
+            "name": "flightInstanceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "نقشهٔ صندلی — آزاد/بیزینس/فروخته‌شده/لاک‌شده",
+        "tags": [
+          "reservation"
+        ]
+      }
+    },
+    "/reservation/seatmap/{flightInstanceId}/lock": {
+      "post": {
+        "operationId": "SeatmapController_lock",
+        "parameters": [
+          {
+            "name": "flightInstanceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LockSeatDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "لاک مدیریتی صندلی — فقط نقش‌های مجاز",
+        "tags": [
+          "reservation"
+        ]
+      }
+    },
+    "/reservation/seatmap/locks/{id}/release": {
+      "patch": {
+        "operationId": "SeatmapController_release",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "آزادسازی لاک صندلی",
+        "tags": [
+          "reservation"
+        ]
+      }
+    },
+    "/reservation/pnr": {
+      "get": {
+        "operationId": "PnrController_list",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "جستجو در کد PNR یا نام مسافر",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست رزروها — گروه‌بندی‌شده بر اساس پرواز",
+        "tags": [
+          "reservation"
+        ]
+      },
+      "post": {
+        "operationId": "PnrController_issue",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssuePnrDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "صدور دستی PNR و بلیط (بدون درگاه پرداخت)",
+        "tags": [
+          "reservation"
+        ]
+      }
+    },
+    "/reservation/pnr/{pnr}": {
+      "get": {
+        "operationId": "PnrController_detail",
+        "parameters": [
+          {
+            "name": "pnr",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "جزئیات رزرو / بلیط",
+        "tags": [
+          "reservation"
+        ]
+      }
+    },
+    "/reservation/pnr/{pnr}/seat": {
+      "patch": {
+        "operationId": "PnrController_changeSeat",
+        "parameters": [
+          {
+            "name": "pnr",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeSeatDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تغییر صندلی رزرو",
+        "tags": [
+          "reservation"
+        ]
+      }
+    },
+    "/reservation/pnr/{pnr}/cancel": {
+      "patch": {
+        "operationId": "PnrController_cancel",
+        "parameters": [
+          {
+            "name": "pnr",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "لغو رزرو",
+        "tags": [
+          "reservation"
+        ]
+      }
+    },
+    "/reservation/search": {
+      "get": {
+        "operationId": "PnrController_search",
+        "parameters": [
+          {
+            "name": "origin",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "تهران",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dest",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "دبی",
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": true,
+            "in": "query",
+            "description": "ISO date",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "جستجوی پرواز برای صدور دستی رزرو",
+        "tags": [
+          "reservation"
+        ]
+      }
+    },
+    "/reservation/dashboard-stats": {
+      "get": {
+        "operationId": "PnrController_dashboardStats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "آمار واقعی رزروها — بدون داده جعلی سلامت سرویس",
+        "tags": [
+          "reservation"
+        ]
+      }
+    },
+    "/reservation/_test/flight-instance": {
+      "post": {
+        "operationId": "PnrController_createTestInstance",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "E2E only — fresh SCHEDULED instance; 404 in production",
+        "tags": [
+          "reservation"
+        ]
+      }
     }
   },
   "info": {
@@ -2951,6 +3236,65 @@
         },
         "required": [
           "source"
+        ]
+      },
+      "LockSeatDto": {
+        "type": "object",
+        "properties": {
+          "seatCode": {
+            "type": "string",
+            "example": "12D"
+          },
+          "passengerName": {
+            "type": "string"
+          },
+          "passengerNationalId": {
+            "type": "string"
+          },
+          "passengerMobile": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "seatCode"
+        ]
+      },
+      "ChangeSeatDto": {
+        "type": "object",
+        "properties": {
+          "seatCode": {
+            "type": "string",
+            "example": "14A"
+          }
+        },
+        "required": [
+          "seatCode"
+        ]
+      },
+      "IssuePnrDto": {
+        "type": "object",
+        "properties": {
+          "flightInstanceId": {
+            "type": "string"
+          },
+          "seatCode": {
+            "type": "string",
+            "example": "12D"
+          },
+          "passengerName": {
+            "type": "string"
+          },
+          "passengerNationalId": {
+            "type": "string"
+          },
+          "passengerMobile": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "flightInstanceId",
+          "seatCode",
+          "passengerName"
         ]
       }
     }

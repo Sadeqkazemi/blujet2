@@ -88,4 +88,13 @@ export class PnrController {
   async dashboardStats() {
     return { success: true, data: await this.pnr.dashboardStats() };
   }
+
+  @Post('_test/flight-instance')
+  @ApiOperation({
+    summary: 'E2E only — fresh SCHEDULED instance; 404 in production',
+  })
+  async createTestInstance() {
+    const data = await this.pnr.createTestInstance();
+    return { success: true, data };
+  }
 }
