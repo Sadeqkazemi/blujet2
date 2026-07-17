@@ -33,6 +33,8 @@ import ReservationPage from './features/reservation/ReservationPage';
 import FinancePage from './features/finance/FinancePage';
 import PassengerReportsPage from './features/passenger-reports/PassengerReportsPage';
 import StaffReportsPage from './features/staff-reports/StaffReportsPage';
+import ManagerReportsPage from './features/manager-reports/ManagerReportsPage';
+import PanelsAccessPage from './features/panels-access/PanelsAccessPage';
 
 export default function App() {
   return (
@@ -108,6 +110,12 @@ export default function App() {
               </Route>
               <Route path="staff" element={<TabGate tabKey="staff" />}>
                 <Route index element={<StaffReportsPage />} />
+              </Route>
+              <Route path="mgrreports" element={<TabGate tabKey="mgrreports" />}>
+                <Route index element={<ManagerReportsPage />} />
+              </Route>
+              <Route path="panels" element={<TabGate tabKey="panels" />}>
+                <Route index element={<PanelsAccessPage />} />
               </Route>
               <Route path=":tabKey" element={<ComingSoonPage />} />
             </Route>
