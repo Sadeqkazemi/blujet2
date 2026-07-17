@@ -1876,6 +1876,118 @@
           "pricing"
         ]
       }
+    },
+    "/refunds": {
+      "get": {
+        "operationId": "RefundsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست درخواست‌های استرداد + سه کارت KPI",
+        "tags": [
+          "refunds"
+        ]
+      }
+    },
+    "/refunds/_test/request": {
+      "post": {
+        "operationId": "RefundsController_createTestRequest",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "E2E only — درخواست FINANCE تازه؛ در production 404",
+        "tags": [
+          "refunds"
+        ]
+      }
+    },
+    "/refunds/{id}": {
+      "get": {
+        "operationId": "RefundsController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "جزئیات درخواست — تنها سطحی که شبا/PII رمزگشایی‌شده می‌گیرد",
+        "tags": [
+          "refunds"
+        ]
+      }
+    },
+    "/refunds/{id}/refer": {
+      "patch": {
+        "operationId": "RefundsController_refer",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReferRefundDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "ثبت و انتقال فرآیند ارجاع — بدون تغییر وضعیت (طبق طراحی)",
+        "tags": [
+          "refunds"
+        ]
+      }
+    },
+    "/refunds/{id}/pay": {
+      "patch": {
+        "operationId": "RefundsController_pay",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تأیید، واریز به شبا و بستن پرونده — برگشت تراکنشی در دفتر کل",
+        "tags": [
+          "refunds"
+        ]
+      }
     }
   },
   "info": {
@@ -2290,6 +2402,18 @@
         },
         "required": [
           "source"
+        ]
+      },
+      "ReferRefundDto": {
+        "type": "object",
+        "properties": {
+          "assigneeId": {
+            "type": "string",
+            "description": "شناسه کارمند مالی مقصد ارجاع"
+          }
+        },
+        "required": [
+          "assigneeId"
         ]
       }
     }

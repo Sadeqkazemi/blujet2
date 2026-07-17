@@ -68,6 +68,9 @@ model User {
   pricingProposalsMade     FarePricingProposal[] @relation("PricingProposedBy")
   pricingProposalsApproved FarePricingProposal[] @relation("PricingApprovedBy")
 
+  refundAssignments RefundRequest[] @relation("RefundAssignee")
+  refundsProcessed  RefundRequest[] @relation("RefundProcessedBy")
+
   @@map("users")
 }
 
@@ -223,8 +226,9 @@ model Booking {
   priceIrr         Int
   createdAt        DateTime       @default(now())
 
-  passengers    Passenger[]
-  ledgerEntries LedgerEntry[]
+  passengers     Passenger[]
+  ledgerEntries  LedgerEntry[]
+  refundRequests RefundRequest[]
 
   @@index([flightInstanceId, status])
   @@index([channel])
@@ -699,4 +703,52 @@ model FarePricingProposal {
 
   @@index([status])
   @@map("fare_pricing_proposals")
+}
+
+// ─── Phase 7: refunds (finance approval & payout) ────────────────────────
+
+enum RefundStatus {
+  SUBMITTED
+  REVIEW
+  FINANCE
+  PAID
+}
+
+// ⚑ The mocks shipped three inconsistent penalty schemes; the customer
+// panel's 4-bracket engine is the only executed one and is seeded here as
+// the server-side source of truth (see docs/DB_SCHEMA.md Phase 7).
+model RefundPenaltyRule {
+  id                      String @id @default(uuid())
+  minHoursBeforeDeparture Int
+  penaltyPct              Int
+  labelFa                 String
+
+  @@map("refund_penalty_rules")
+}
+
+model RefundRequest {
+  id               String       @id @default(uuid())
+  bookingId        String
+  booking          Booking      @relation(fields: [bookingId], references: [id])
+  passengerName    String
+  nidEnc           String?
+  mobileEnc        String?
+  // 24-digit شبا — encrypted at rest, decrypted only for the finance surface.
+  ibanEnc          String
+  totalPaidIrr     Int
+  penaltyPct       Int
+  penaltyAmountIrr Int
+  refundableIrr    Int
+  status           RefundStatus @default(SUBMITTED)
+  // Design: refer sets the assignee WITHOUT advancing status.
+  assigneeId       String?
+  assignee         User?        @relation("RefundAssignee", fields: [assigneeId], references: [id])
+  processedById    String?
+  processedBy      User?        @relation("RefundProcessedBy", fields: [processedById], references: [id])
+  paidAt           DateTime?
+  history          Json
+  createdAt        DateTime     @default(now())
+
+  @@index([status])
+  @@map("refund_requests")
 }
