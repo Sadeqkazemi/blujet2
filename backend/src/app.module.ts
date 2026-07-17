@@ -13,6 +13,11 @@ import { PanelsModule } from './modules/panels/panels.module';
 import { ReportingModule } from './modules/reporting/reporting.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AgenciesModule } from './modules/agencies/agencies.module';
+import { CartableModule } from './modules/cartable/cartable.module';
+import { StaffDirectoryModule } from './modules/staff-directory/staff-directory.module';
+import { ReferralsModule } from './modules/referrals/referrals.module';
+import { ManagerMessagesModule } from './modules/manager-messages/manager-messages.module';
+import { FilesModule } from './modules/files/files.module';
 
 @Module({
   imports: [
@@ -49,6 +54,11 @@ import { AgenciesModule } from './modules/agencies/agencies.module';
     ReportingModule,
     AuditModule,
     AgenciesModule,
+    CartableModule,
+    StaffDirectoryModule,
+    ReferralsModule,
+    ManagerMessagesModule,
+    FilesModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

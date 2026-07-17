@@ -18,7 +18,7 @@ separate track, expected to merge with this one later — see
 - [ ] Phase 5 — VIP club card-request approval
 - [ ] Phase 6 — Ticket pricing proposals (commercial → CEO approval)
 - [ ] Phase 7 — Refunds (finance approval/payout)
-- [ ] Phase 8 — Employee management (IT Manager: accounts, permissions, services, security policy, logs, backups)
+- [ ] Phase 8 — Employee management (IT Manager: accounts, permissions, services, security policy, logs, backups) — **assigned to a separate Claude Code session per the user (2026-07-17); this track must NOT implement the IT Manager panel.** Coordinate via docs/API.md + DB_SCHEMA.md Phase 8 sections before either side writes code touching shared tables (User/Permission).
 - [ ] Phase 9 — Reservation system (seat lock/PNR), embedded per-panel per the confirmed `role`/`lockOnly` contract
 
 Each phase = backend endpoints + tests + frontend page(s), fully working,

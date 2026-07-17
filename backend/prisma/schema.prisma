@@ -51,6 +51,17 @@ model User {
   agencyInvoicesIssued   AgencyInvoice[]           @relation("AgencyInvoiceIssuedBy")
   agencyMessagesSent     AgencyMessage[]           @relation("AgencyMessageSender")
 
+  cartableTasks       CartableTask[]             @relation("CartableAssignee")
+  cartableTasksSent   CartableTask[]             @relation("CartableSender")
+  cartableTransfersIn CartableTask[]             @relation("CartableTransferredTo")
+  referralsSent       ManagerReferral[]          @relation("ReferralFrom")
+  referralsReceived   ManagerReferralRecipient[] @relation("ReferralRecipient")
+  referralReports     ManagerReferralReport[]    @relation("ReferralReportFrom")
+  managerMessagesSent ManagerMessage[]           @relation("ManagerMessageFrom")
+  chairPermRequests   ChairReportPermission[]    @relation("ChairPermRequester")
+  chairPermDecisions  ChairReportPermission[]    @relation("ChairPermDecider")
+  storedFiles         StoredFile[]               @relation("StoredFileOwner")
+
   @@map("users")
 }
 
@@ -392,4 +403,180 @@ model AgencyMessage {
 
   @@index([agencyId, createdAt])
   @@map("agency_messages")
+}
+
+// ─── Phase 4: Cartable, referrals, manager messaging ────────────────────
+
+enum CartableCategory {
+  ADMIN
+  AGENCY
+  MANAGER
+}
+
+enum CartableSourceType {
+  MANAGER_MESSAGE
+  MANAGER_REFERRAL
+  AGENCY_REQUEST
+  CHAIR_PERMISSION
+}
+
+enum CartableStatus {
+  OPEN
+  APPROVED
+  REJECTED
+  TRANSFERRED
+}
+
+// Never authored directly — rows are materialized by real flows (manager
+// message, referral, agency-request referral, chair-permission request).
+// The design's review modal is تأیید/رد/انتقال with a REQUIRED note; there
+// is no generic "done" state and no due date (both confirmed absent from
+// all five panels). See docs/DB_SCHEMA.md Phase 4 ⚑ decisions.
+model CartableTask {
+  id              String              @id @default(uuid())
+  assigneeId      String
+  assignee        User                @relation("CartableAssignee", fields: [assigneeId], references: [id])
+  category        CartableCategory
+  title           String
+  description     String
+  senderId        String?
+  sender          User?               @relation("CartableSender", fields: [senderId], references: [id])
+  // Display fallback when no User row backs the sender (e.g. seed demo rows).
+  senderLabelFa   String?
+  sourceType      CartableSourceType?
+  sourceId        String?
+  status          CartableStatus      @default(OPEN)
+  resolutionNote  String?
+  transferredToId String?
+  transferredTo   User?               @relation("CartableTransferredTo", fields: [transferredToId], references: [id])
+  resolvedAt      DateTime?
+  createdAt       DateTime            @default(now())
+
+  @@index([assigneeId, status])
+  @@index([sourceType, sourceId])
+  @@map("cartable_tasks")
+}
+
+enum ReferralPriority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum ReferralStatus {
+  SENT
+  REVIEWING
+  REPORTED
+  CLOSED
+}
+
+model ManagerReferral {
+  id          String           @id @default(uuid())
+  fromId      String
+  from        User             @relation("ReferralFrom", fields: [fromId], references: [id])
+  title       String
+  body        String
+  priority    ReferralPriority @default(MEDIUM)
+  dueAt       DateTime?
+  status      ReferralStatus   @default(SENT)
+  // StoredFile ids — validated on write, resolved on read.
+  attachments Json?
+  createdAt   DateTime         @default(now())
+
+  recipients ManagerReferralRecipient[]
+  reports    ManagerReferralReport[]
+
+  @@index([fromId, status])
+  @@map("manager_referrals")
+}
+
+model ManagerReferralRecipient {
+  referralId  String
+  referral    ManagerReferral @relation(fields: [referralId], references: [id], onDelete: Cascade)
+  recipientId String
+  recipient   User            @relation("ReferralRecipient", fields: [recipientId], references: [id])
+
+  @@id([referralId, recipientId])
+  @@index([recipientId])
+  @@map("manager_referral_recipients")
+}
+
+model ManagerReferralReport {
+  id          String          @id @default(uuid())
+  referralId  String
+  referral    ManagerReferral @relation(fields: [referralId], references: [id], onDelete: Cascade)
+  fromId      String
+  from        User            @relation("ReferralReportFrom", fields: [fromId], references: [id])
+  body        String
+  attachments Json?
+  createdAt   DateTime        @default(now())
+
+  @@index([referralId])
+  @@map("manager_referral_reports")
+}
+
+enum ManagerMessageDept {
+  FINANCE
+  COMMERCIAL
+  SUPPORT
+  AGENCIES
+  CEO
+  ALL_MANAGERS
+}
+
+// Compose is the only authoring surface; delivery materializes as
+// CartableTask rows for the mapped recipients (the design has no inbox).
+// SUPPORT/AGENCIES are accepted but undeliverable until Phase 8's
+// employee/department model — documented PARTIAL_DELIVERY.
+model ManagerMessage {
+  id          String             @id @default(uuid())
+  fromId      String
+  from        User               @relation("ManagerMessageFrom", fields: [fromId], references: [id])
+  toDept      ManagerMessageDept
+  subject     String
+  body        String
+  attachments Json?
+  createdAt   DateTime           @default(now())
+
+  @@index([fromId, createdAt])
+  @@map("manager_messages")
+}
+
+enum ChairPermissionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// The Finance/Commercial cartable gate banner. The request creates a
+// BOARD_CHAIR cartable task; the chair's تأیید/رد on that task decides it.
+model ChairReportPermission {
+  id          String                @id @default(uuid())
+  requesterId String
+  requester   User                  @relation("ChairPermRequester", fields: [requesterId], references: [id])
+  status      ChairPermissionStatus @default(PENDING)
+  decidedById String?
+  decidedBy   User?                 @relation("ChairPermDecider", fields: [decidedById], references: [id])
+  decidedAt   DateTime?
+  createdAt   DateTime              @default(now())
+
+  @@index([requesterId, status])
+  @@map("chair_report_permissions")
+}
+
+// Minimal upload backing for the referral/message «بارگذاری مستندات» chips.
+// PDF/image only, size-capped; bytes live on local disk in dev behind an
+// interface (path column), never in the DB.
+model StoredFile {
+  id        String   @id @default(uuid())
+  ownerId   String
+  owner     User     @relation("StoredFileOwner", fields: [ownerId], references: [id])
+  fileName  String
+  mimeType  String
+  sizeBytes Int
+  path      String
+  createdAt DateTime @default(now())
+
+  @@index([ownerId])
+  @@map("stored_files")
 }
