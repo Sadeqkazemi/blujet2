@@ -326,7 +326,8 @@ not a real feature anywhere else in the codebase either).
 | GET | `/agency-portal/profile` | Own `AgencyProfile` fields — a dedicated lightweight query, NOT a reuse of the staff `detail()` method, since that method also returns internal `AuditLog` rows and an `activityScore` never meant for the agency's own eyes. |
 | GET | `/agency-portal/documents` | Own `AgencyDocument` list. |
 | POST | `/agency-portal/documents` | multipart `{ file, docType }` — reuses `FilesService.store` (PDF/PNG/JPG, ≤5MB), wraps the resulting `StoredFile` in an `AgencyDocument(status=PENDING)`. Staff review is deferred (see above) — status stays `PENDING` until that phase. |
-| POST | `/agency-portal/_test/set-password` | E2E only — sets a known password hash for a given agency phone so Playwright can log in deterministically without depending on the seed's shared dev password. Always 404s in production. |
+
+No `_test/*` seeding hook was needed for this feature (unlike club/pricing/reservation) — the seed already provisions two agencies (`+989120000002` gold, `+989120000003` silver, suspended) with the shared dev password, which is deterministic enough for Playwright. A `_test/set-password` endpoint was drafted and then removed: it would have lived under the same `@Roles('AGENCY')`-gated controller it was meant to bootstrap credentials for, which is unreachable before any credentials exist — a real chicken-and-egg gap, not a deliberate deferral.
 
 ---
 

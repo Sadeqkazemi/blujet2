@@ -14,7 +14,6 @@ import { AgencyPortalService } from './agency-portal.service';
 import {
   PostInboxMessageDto,
   RequestCreditIncreaseDto,
-  TestSetPasswordDto,
   UploadDocumentDto,
 } from './dto/agency-portal.dtos';
 import { MAX_FILE_BYTES } from '../files/files.service';
@@ -140,15 +139,5 @@ export class AgencyPortalController {
       success: true,
       data: await this.portal.uploadDocument(actor, file, dto),
     };
-  }
-
-  @Post('_test/set-password')
-  @ApiOperation({
-    summary:
-      'E2E only — sets a known password for a seeded agency phone; 404 in production',
-  })
-  async testSetPassword(@Body() dto: TestSetPasswordDto) {
-    const data = await this.portal.testSetPassword(dto.phone, dto.password);
-    return { success: true, data };
   }
 }

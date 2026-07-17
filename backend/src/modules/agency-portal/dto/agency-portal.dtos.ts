@@ -37,14 +37,3 @@ export class UploadDocumentDto {
   @IsIn(['LICENSE', 'CONTRACT', 'OTHER'])
   docType: 'LICENSE' | 'CONTRACT' | 'OTHER';
 }
-
-export class TestSetPasswordDto {
-  @ApiProperty({ example: '+989120000002' })
-  @IsString()
-  phone: string;
-
-  @ApiProperty({ example: 'E2ePass@123' })
-  @IsString()
-  @MinLength(6)
-  password: string;
-}
