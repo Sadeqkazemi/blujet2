@@ -142,7 +142,9 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
 
     const senior = await loginAs(app, 'senior.rahimi');
     const res = await request(app.getHttpServer())
-      .get(`/passenger-reports/search?q=${encodeURIComponent(`مسافر گزارش ${suffix}`)}`)
+      .get(
+        `/passenger-reports/search?q=${encodeURIComponent(`مسافر گزارش ${suffix}`)}`,
+      )
       .set('Authorization', auth(senior.accessToken));
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveLength(1);
