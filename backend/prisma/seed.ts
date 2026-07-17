@@ -3,6 +3,11 @@ import argon2 from 'argon2';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../generated/prisma/client';
 import { encryptPii, hashPii } from '../src/common/pii-crypto';
+import {
+  EXTERNAL_SERVICE_SEED,
+  INTERNAL_SERVICE_SEED,
+  PERMISSION_CATALOG,
+} from '../src/modules/it-manager/permission-catalog';
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
@@ -803,6 +808,165 @@ async function main() {
           });
         }
       }
+    }
+  }
+
+  // ─── Phase 9: Reservation system (seat lock / PNR) ─────────────────────
+  const chairUser = staffByUsername.get('chair')!;
+
+  await prisma.aircraftSeatMap.upsert({
+    where: { aircraftType: 'Airbus A320' },
+    update: {},
+    create: {
+      aircraftType: 'Airbus A320',
+      // Matches ReservationSystem.dc.html's MD-88 mock numbers verbatim:
+      // rows 3-6 business 2-2 (16 seats), rows 7-32 economy 2-3 (130 seats).
+      businessRowStart: 3,
+      businessRowEnd: 6,
+      businessColsLeft: ['A', 'B'],
+      businessColsRight: ['C', 'D'],
+      economyRowStart: 7,
+      economyRowEnd: 32,
+      economyColsLeft: ['A', 'B'],
+      economyColsRight: ['C', 'D', 'E'],
+    },
+  });
+
+  const demoInstance = await prisma.flightInstance.findFirst({
+    where: { flightId: flight.id, status: 'SCHEDULED' },
+    orderBy: { departureAt: 'asc' },
+  });
+  if (demoInstance) {
+    const existingPax = await prisma.passenger.count({
+      where: { booking: { flightInstanceId: demoInstance.id } },
+    });
+    if (existingPax === 0) {
+      const demoPassengers: { name: string; seat: string }[] = [
+        { name: 'نگار رضایی', seat: '3A' },
+        { name: 'سارا احمدی', seat: '3C' },
+        { name: 'کیوان حسینی', seat: '9A' },
+        { name: 'یاسمن مرادی', seat: '9D' },
+        { name: 'رضا احمدی', seat: '12B' },
+      ];
+      for (const p of demoPassengers) {
+        const booking = await prisma.booking.create({
+          data: {
+            pnr: `BJDEMO${p.seat}`,
+            flightInstanceId: demoInstance.id,
+            channel: 'SYSTEM',
+            status: 'TICKETED',
+            priceIrr: 38_000_000,
+          },
+        });
+        await prisma.passenger.create({
+          data: { bookingId: booking.id, fullName: p.name, seatCode: p.seat },
+        });
+        await prisma.ledgerEntry.create({
+          data: { bookingId: booking.id, type: 'SALE', signedAmountIrr: 38_000_000 },
+        });
+      }
+      // One demo managerial lock so the seat map/lock UI has real data.
+      await prisma.seatLock.create({
+        data: {
+          flightInstanceId: demoInstance.id,
+          seatCode: '4A',
+          lockedById: chairUser.id,
+          passengerName: 'رزرو مدیریتی — رئیس هیئت مدیره',
+        },
+      });
+    }
+  }
+
+  // ─── Phase 8: Employee management (IT Manager) ────────────────────────
+  const itManager = staffByUsername.get('itadmin')!;
+
+  for (const p of PERMISSION_CATALOG) {
+    await prisma.permission.upsert({
+      where: { dept_key: { dept: p.dept, key: p.key } },
+      update: { sectionLabelFa: p.sectionLabelFa, labelFa: p.labelFa },
+      create: p,
+    });
+  }
+
+  for (const s of INTERNAL_SERVICE_SEED) {
+    await prisma.internalService.upsert({
+      where: { key: s.key },
+      update: {},
+      create: { key: s.key, nameFa: s.nameFa, uptimePct: s.uptimePct, enabled: true },
+    });
+  }
+  // "استرداد آنلاین" starts disabled — matches the design mock's svcDefs.
+  await prisma.internalService.updateMany({
+    where: { key: 'refund' },
+    data: { enabled: false },
+  });
+
+  for (const s of EXTERNAL_SERVICE_SEED) {
+    await prisma.externalServiceConfig.upsert({
+      where: { key: s.key },
+      update: {},
+      create: {
+        key: s.key,
+        nameFa: s.nameFa,
+        provider: s.provider,
+        endpoint: s.endpoint,
+        enabled: true,
+      },
+    });
+  }
+  // "نقشه و مسیریابی نشان" starts disabled — matches the design mock's extDefs.
+  await prisma.externalServiceConfig.updateMany({
+    where: { key: 'ext_neshan' },
+    data: { enabled: false },
+  });
+
+  await prisma.securityPolicy.upsert({
+    where: { id: 1 },
+    update: {},
+    create: { id: 1 },
+  });
+
+  const commercialEmployee = await prisma.user.upsert({
+    where: { username: 'sales.moradi' },
+    update: {},
+    create: {
+      role: 'EMPLOYEE',
+      username: 'sales.moradi',
+      passwordHash,
+      fullName: 'یاسمن مرادی',
+      dept: 'commercial',
+      rank: 'کارشناس',
+      referralScope: 'MANAGERS_ONLY',
+      createdById: itManager.id,
+      isActive: true,
+    },
+  });
+  const financeEmployee = await prisma.user.upsert({
+    where: { username: 'fin.hosseini' },
+    update: {},
+    create: {
+      role: 'EMPLOYEE',
+      username: 'fin.hosseini',
+      passwordHash,
+      fullName: 'کیوان حسینی',
+      dept: 'finance',
+      rank: 'کارشناس ارشد',
+      referralScope: 'MANAGERS_ONLY',
+      createdById: itManager.id,
+      isActive: false,
+    },
+  });
+  for (const [employee, keys] of [
+    [commercialEmployee, ['ag_list', 'fl_view']],
+    [financeEmployee, ['rf_list']],
+  ] as const) {
+    const perms = await prisma.permission.findMany({ where: { key: { in: keys as unknown as string[] } } });
+    for (const perm of perms) {
+      await prisma.employeePermission.upsert({
+        where: { employeeId_permissionId: { employeeId: employee.id, permissionId: perm.id } },
+        update: {},
+        create: { employeeId: employee.id, permissionId: perm.id, grantedById: itManager.id },
+      });
     }
   }
 

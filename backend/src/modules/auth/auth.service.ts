@@ -147,6 +147,10 @@ export class AuthService {
       where: { id: challenge.id },
       data: { consumedAt: new Date() },
     });
+    await this.prisma.user.update({
+      where: { id: challenge.userId },
+      data: { lastLoginAt: new Date() },
+    });
 
     const user = challenge.user;
     const authUser: AuthenticatedUser = {

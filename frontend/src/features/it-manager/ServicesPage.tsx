@@ -1,0 +1,238 @@
+import { useCallback, useEffect, useState } from 'react';
+import {
+  createExternalService,
+  fetchItServices,
+  removeExternalService,
+  testExternalService,
+  toggleInternalService,
+} from '../../api/it-manager';
+import { faDigits, faPercent } from '../../lib/fa-format';
+import Modal from '../../components/Modal';
+import type { ExternalService, InternalService } from '../../types/it-manager';
+
+export default function ServicesPage() {
+  const [internal, setInternal] = useState<InternalService[]>([]);
+  const [external, setExternal] = useState<ExternalService[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<{ id: string; ok: boolean; message: string } | null>(null);
+
+  const [addOpen, setAddOpen] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+  const [form, setForm] = useState({ nameFa: '', provider: '', endpoint: '', apiKey: '' });
+
+  const load = useCallback(async () => {
+    try {
+      const data = await fetchItServices();
+      setInternal(data.internal);
+      setExternal(data.external);
+    } catch {
+      setError('خطا در دریافت سرویس‌ها.');
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function onToggleInternal(s: InternalService) {
+    try {
+      await toggleInternalService(s.key, !s.enabled);
+      await load();
+    } catch {
+      setError('خطا در تغییر وضعیت سرویس.');
+    }
+  }
+
+  async function onTest(s: ExternalService) {
+    try {
+      const result = await testExternalService(s.id);
+      setTestResult({ id: s.id, ok: result.ok, message: result.message });
+      await load();
+    } catch {
+      setError('خطا در تست اتصال.');
+    }
+  }
+
+  async function onRemove(s: ExternalService) {
+    try {
+      await removeExternalService(s.id);
+      await load();
+    } catch {
+      setError('خطا در حذف سرویس.');
+    }
+  }
+
+  async function onCreate() {
+    if (!form.nameFa.trim() || !form.endpoint.trim()) {
+      setAddError('نام سرویس و آدرس Endpoint الزامی است.');
+      return;
+    }
+    try {
+      await createExternalService({
+        nameFa: form.nameFa.trim(),
+        provider: form.provider.trim() || form.nameFa.trim(),
+        endpoint: form.endpoint.trim(),
+        apiKey: form.apiKey.trim() || undefined,
+      });
+      setAddOpen(false);
+      setForm({ nameFa: '', provider: '', endpoint: '', apiKey: '' });
+      await load();
+    } catch (e) {
+      setAddError(e instanceof Error ? e.message : 'خطا در ثبت سرویس خارجی.');
+    }
+  }
+
+  return (
+    <div className="p-8">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-black text-ink">سرویس‌های سایت</h1>
+          <p className="mt-1 text-sm text-muted">وضعیت و کنترل تمام سرویس‌های فعال در سایت</p>
+        </div>
+        <div className="flex items-center gap-4 text-xs">
+          <span>
+            <span className="font-num font-black text-[#059669]">
+              {faDigits(internal.filter((s) => s.enabled).length + external.filter((s) => s.enabled).length)}
+            </span>{' '}
+            <span className="text-muted">سرویس فعال</span>
+          </span>
+        </div>
+      </div>
+
+      {error && <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">{error}</p>}
+
+      <h2 className="mb-3 text-sm font-bold text-ink">سرویس‌های داخلی سایت</h2>
+      <div className="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {internal.map((s) => (
+          <div key={s.id} className="rounded-xl border border-border bg-white p-3">
+            <div className="mb-3 flex items-start justify-between gap-2">
+              <div>
+                <div className="text-xs font-bold text-ink">{s.nameFa}</div>
+                <div className="mt-0.5 text-[10px] text-muted">آپ‌تایم {faPercent(s.uptimePct)}</div>
+              </div>
+              <button
+                role="switch"
+                aria-checked={s.enabled}
+                aria-label={s.nameFa}
+                onClick={() => void onToggleInternal(s)}
+                className={`relative h-6 w-11 rounded-full transition ${s.enabled ? 'bg-accent' : 'bg-border'}`}
+              >
+                <span
+                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${
+                    s.enabled ? 'right-0.5' : 'right-[22px]'
+                  }`}
+                />
+              </button>
+            </div>
+            <span
+              className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                s.enabled ? 'bg-[#10b98124] text-[#059669]' : 'bg-danger/15 text-danger'
+              }`}
+            >
+              {s.enabled ? 'فعال' : 'غیرفعال'}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-sm font-bold text-ink">سرویس‌های خارجی (API)</h2>
+        <button
+          onClick={() => {
+            setAddError(null);
+            setAddOpen(true);
+          }}
+          className="rounded-lg bg-accent px-3 py-1.5 text-[11px] font-bold text-white transition hover:bg-accent/90"
+        >
+          افزودن سرویس خارجی
+        </button>
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {external.map((s) => (
+          <div key={s.id} className="rounded-xl border border-border bg-white p-3">
+            <div className="mb-2 flex items-start justify-between gap-2">
+              <div>
+                <div className="text-xs font-bold text-ink">{s.nameFa}</div>
+                <div className="mt-0.5 text-[10px] text-muted">{s.provider}</div>
+              </div>
+            </div>
+            <div className="ltr mb-2 truncate rounded-md bg-surface px-2 py-1 text-[10px] text-muted">{s.endpoint}</div>
+            {testResult?.id === s.id && (
+              <div className={`mb-2 rounded-md p-1.5 text-[10px] ${testResult.ok ? 'bg-[#10b98115] text-[#059669]' : 'bg-danger/10 text-danger'}`}>
+                {testResult.message}
+              </div>
+            )}
+            <div className="flex items-center justify-between">
+              <span
+                className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                  s.enabled ? 'bg-[#10b98124] text-[#059669]' : 'bg-danger/15 text-danger'
+                }`}
+              >
+                {s.enabled ? 'فعال' : 'غیرفعال'}
+              </span>
+              <div className="flex gap-2">
+                <button onClick={() => void onTest(s)} className="text-[10.5px] font-bold text-accent">
+                  تست اتصال
+                </button>
+                <button onClick={() => void onRemove(s)} className="text-[10.5px] font-bold text-danger">
+                  حذف
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {addOpen && (
+        <Modal title="تعریف سرویس خارجی جدید" onClose={() => setAddOpen(false)}>
+          <label className="mb-1 block text-xs font-bold text-ink" htmlFor="svc-name">
+            نام سرویس
+          </label>
+          <input
+            id="svc-name"
+            value={form.nameFa}
+            onChange={(e) => setForm({ ...form, nameFa: e.target.value })}
+            className="w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent"
+          />
+          <label className="mb-1 mt-3 block text-xs font-bold text-ink" htmlFor="svc-endpoint">
+            آدرس Endpoint
+          </label>
+          <input
+            id="svc-endpoint"
+            dir="ltr"
+            value={form.endpoint}
+            onChange={(e) => setForm({ ...form, endpoint: e.target.value })}
+            placeholder="https://api.provider.com/v1/"
+            className="ltr w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent"
+          />
+          <label className="mb-1 mt-3 block text-xs font-bold text-ink" htmlFor="svc-key">
+            کلید احراز (API Key)
+          </label>
+          <input
+            id="svc-key"
+            dir="ltr"
+            value={form.apiKey}
+            onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
+            className="ltr w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent"
+          />
+          {addError && (
+            <p role="alert" className="mt-2 text-xs text-danger">
+              {addError}
+            </p>
+          )}
+          <div className="mt-4 flex justify-end gap-2">
+            <button onClick={() => setAddOpen(false)} className="rounded-lg bg-surface px-4 py-2 text-xs font-bold text-text-2">
+              انصراف
+            </button>
+            <button
+              onClick={() => void onCreate()}
+              className="rounded-lg bg-accent px-4 py-2 text-xs font-bold text-white transition hover:bg-accent/90"
+            >
+              ثبت و اتصال سرویس
+            </button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
