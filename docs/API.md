@@ -92,10 +92,63 @@ the parent resource.
 
 ---
 
+## Phase 4 — Cartable, referrals, manager messaging
+
+See `docs/DB_SCHEMA.md` → Phase 4 for the wiring decisions (⚑) these
+endpoints implement — notably: cartable review = تأیید/رد/انتقال with a
+required «نظر مدیر» note; transfer routes a fresh task to the target;
+messages and referrals deliver INTO recipients' cartables (the design has
+no other inbox). `EXEC_ROLES` below = CEO, BOARD_CHAIR, SENIOR_MANAGER,
+FINANCE_MANAGER, COMMERCIAL_MANAGER (the 5 panels with a کارتابل tab).
+
+### `backend/src/modules/cartable/`
+
+| Method | Path | Roles | Notes |
+|---|---|---|---|
+| GET | `/cartable` | EXEC_ROLES | Caller's own tasks. Query: `category?` (ADMIN\|AGENCY\|MANAGER — the 3 KPI filter cards), `date?` (ISO day, the Jalali calendar popover filter), `status?` (default OPEN). Returns rows + per-category counts for the KPI cards + total for the badge. |
+| PATCH | `/cartable/:id/approve` | EXEC_ROLES (assignee only) | `{ note }` — required, per the design's «برای ثبت تصمیم، درج نظر مدیر الزامی است.». Resolving a task whose `sourceType` has side effects triggers them (e.g. chair-permission APPROVED). |
+| PATCH | `/cartable/:id/reject` | EXEC_ROLES (assignee only) | `{ note }` required. The design's red button is labeled «انصراف» but behaves as reject — kept as reject server-side. |
+| PATCH | `/cartable/:id/transfer` | EXEC_ROLES (assignee only) | `{ toId, note }` — creates a new OPEN task for `toId`, marks this one TRANSFERRED. 409 on already-resolved tasks (no double-resolution). |
+| POST | `/cartable/chair-permission` | FINANCE_MANAGER, COMMERCIAL_MANAGER | The gate banner's «درخواست مجوز از رئیس هیئت مدیره» — 409 if one is already PENDING/APPROVED; creates BOARD_CHAIR's cartable task. |
+| GET | `/cartable/chair-permission` | FINANCE_MANAGER, COMMERCIAL_MANAGER | Own latest request status — drives the banner's pending/approved state. |
+
+### `backend/src/modules/staff-directory/`
+
+| Method | Path | Roles | Notes |
+|---|---|---|---|
+| GET | `/staff-directory` | EXEC_ROLES | Active staff users `{ id, fullName, role, roleLabelFa }` for the transfer picker, referral recipient chips, and Phase 3's deferred agency-request refer UI (wired this phase). |
+
+### `backend/src/modules/referrals/`
+
+| Method | Path | Roles | Notes |
+|---|---|---|---|
+| GET | `/referrals` | SENIOR_MANAGER | Sent referrals («ارجاعات من به مدیران») + the 4 KPI counts (کل/در انتظار گزارش/گزارش دریافت‌شده/بسته‌شده). |
+| POST | `/referrals` | SENIOR_MANAGER | `{ title, body, recipientIds[] (≥1), priority, dueAt?, attachmentIds? }` — validation message per design: موضوع، شرح و حداقل یک مدیر مقصد الزامی است. Creates recipient cartable tasks. |
+| GET | `/referrals/:id` | SENIOR_MANAGER (sender) + recipients | Detail incl. recipients, attachments, reports thread. |
+| POST | `/referrals/:id/reports` | recipients only | `{ body, attachmentIds? }` — flips status to REPORTED. (No mock UI existed for this — see DB_SCHEMA ⚑.) |
+| PATCH | `/referrals/:id/close` | SENIOR_MANAGER (sender) | «تأیید دریافت گزارش و بستن» — only from REPORTED, else 409. |
+| PATCH | `/referrals/:id/request-revision` | SENIOR_MANAGER (sender) | «درخواست اصلاح گزارش» — REPORTED → REVIEWING. |
+| POST | `/referrals/:id/remind` | SENIOR_MANAGER (sender) | «ارسال یادآوری دریافت گزارش» — SENT/REVIEWING → REVIEWING, notifies recipients. |
+
+### `backend/src/modules/manager-messages/`
+
+| Method | Path | Roles | Notes |
+|---|---|---|---|
+| POST | `/manager-messages` | EXEC_ROLES | `{ toDept, subject, body, attachmentIds? }` — compose modal; delivery = recipient cartable tasks (SUPPORT/AGENCIES accepted but undeliverable until Phase 8, returns a documented `PARTIAL_DELIVERY` warning in data). |
+| GET | `/manager-messages/sent` | EXEC_ROLES | Sender's own history (the mocks discard sent messages; the real system keeps the record). |
+
+### `backend/src/modules/files/`
+
+| Method | Path | Roles | Notes |
+|---|---|---|---|
+| POST | `/files` | any staff role | multipart upload, PDF/image only, ≤ 5MB; returns `{ id, fileName }` for attaching. |
+| GET | `/files/:id` | owner + participants of the entity it's attached to | Streams the file; 403 otherwise. |
+
+---
+
 ## Later phases (endpoints TBD — documented here before each phase's code is written)
 
 - **Phase 2** — none directly (reporting reads Phase-2 tables; no new endpoints of its own beyond what's above).
-- **Phase 4** — `/cartable`, `/cartable/:id/review`, `/referrals`, `/manager-messages`.
 - **Phase 5** — `/club/card-requests`, `/club/card-requests/:id/approve`.
 - **Phase 6** — `/pricing/proposals`, `/pricing/proposals/:id/approve`.
 - **Phase 7** — `/refunds`, `/refunds/:id/refer`, `/refunds/:id/pay`.

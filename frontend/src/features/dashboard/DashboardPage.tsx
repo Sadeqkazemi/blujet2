@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { fetchCompletedFlightsSummary, fetchKpis, fetchSalesChart } from '../../api/reporting';
+import { fetchCartable } from '../../api/cartable';
+import type { CartableListResult } from '../../types/cartable';
 import { faDigits, faMoney, faPercent } from '../../lib/fa-format';
 import type {
   CompletedFlightsSummary,
@@ -30,6 +33,14 @@ export default function DashboardPage() {
   const [flights, setFlights] = useState<CompletedFlightsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [cartable, setCartable] = useState<CartableListResult | null>(null);
+
+  useEffect(() => {
+    // Widget only — a failure here never breaks the dashboard.
+    fetchCartable()
+      .then(setCartable)
+      .catch(() => setCartable(null));
+  }, []);
 
   useEffect(() => {
     setPeriodKey(null);
@@ -73,6 +84,38 @@ export default function DashboardPage() {
       </div>
 
       {error && <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">{error}</p>}
+
+      {cartable && (
+        <section className="mb-6 rounded-xl border border-border bg-white p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-bold text-ink">
+              کارتابل
+              {cartable.totalOpen > 0 && (
+                <span className="mr-2 rounded-full bg-danger/10 px-2.5 py-0.5 text-[11px] font-bold text-danger">
+                  {faDigits(cartable.totalOpen)}
+                </span>
+              )}
+            </h2>
+            <Link to="/panel/cartable" className="text-xs font-bold text-accent">
+              مشاهده‌ی همه‌ی کارها ←
+            </Link>
+          </div>
+          {cartable.tasks.length === 0 ? (
+            <p className="py-2 text-center text-xs text-muted">کارتابل خالی است ✓</p>
+          ) : (
+            <ul className="divide-y divide-border">
+              {cartable.tasks.slice(0, 3).map((t) => (
+                <li key={t.id} className="flex items-center justify-between gap-3 py-2.5 text-xs">
+                  <span className="font-bold text-ink">{t.title}</span>
+                  <span className="text-[10px] text-muted">
+                    {t.senderLabelFa ?? t.sender?.fullName ?? ''}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
 
       {kpis && (
         <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
