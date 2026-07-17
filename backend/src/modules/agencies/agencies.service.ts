@@ -727,6 +727,41 @@ export class AgenciesService {
     return created;
   }
 
+  /** E2E only (404 in production): resets the agency's derived debt to a
+   * fixed figure so the invoice-pay journey observes a change regardless of
+   * how much prior runs have settled against the long-lived dev DB. */
+  async resetTestDebt(actor: AuthenticatedUser, id: string) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'یافت نشد.',
+      });
+    }
+    const profile = await this.prisma.agencyProfile.findUnique({
+      where: { userId: id },
+    });
+    if (!profile) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'آژانس یافت نشد.',
+      });
+    }
+    const targetIrr = 100_000_000;
+    const usedIrr = (await this.computeUsedIrr([id])).get(id) ?? 0;
+    const deltaIrr = targetIrr - usedIrr;
+    if (deltaIrr !== 0) {
+      await this.prisma.ledgerEntry.create({
+        data: {
+          agencyId: id,
+          type: 'SALE',
+          signedAmountIrr: deltaIrr,
+          createdById: actor.id,
+        },
+      });
+    }
+    return { usedIrr: targetIrr };
+  }
+
   async payInvoice(actor: AuthenticatedUser, id: string, invoiceId: string) {
     const invoice = await this.prisma.agencyInvoice.findUnique({
       where: { id: invoiceId },
