@@ -425,6 +425,17 @@ existing rows at query time, per CLAUDE.md's server-side-aggregates rule:
   `AuditLog(actorId∈those)` as the feed; the "new employee" banner rows are
   real `AuditLog(category=ACCOUNT)` creation events, not synthetic.
 
+## Phase 12 — admins, security, settings, CEO logs, IT panels view
+
+One new table:
+
+- `SystemSetting { key String @id, value Json, updatedById?→User, updatedAt }` — key-value store for the تنظیمات سامانه tab (company info, gateway toggles, global site toggles, brand color). Server-side defaults fill missing keys; every write is audited (`category=SYSTEM`). ⚑ The chair mock's refund-rule inputs deliberately do NOT live here — they write the real Phase 7 `RefundPenaltyRule` rows so the refund engine and the settings screen can never disagree.
+
+Everything else reuses existing tables: admins list/add/block/reset run on
+`User` (+ `RefreshToken` for the real «آنلاین» derivation and the existing
+`mustChangePassword` flag); CEO logs and the audit trail run on `AuditLog`;
+the IT panels view reads `PanelAccessFlag` (read-only).
+
 ## Open items to confirm with the public-site track before merging
 
 1. `Booking`/`Passenger`/`LedgerEntry` above are a **minimal, forward-compatible

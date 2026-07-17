@@ -428,6 +428,77 @@ client-side state — kept client-side).
 
 ---
 
+## Phase 12 — مدیران و ادمین‌ها, امنیت و رمز عبور, تنظیمات سامانه, CEO logs, IT panels view
+
+Grounded in the ADMINS LIST / ADMIN PERMISSIONS / SECURITY-PASSWORD / LOGS /
+SETTINGS / PANELS ACCESS markup of the CEO, Board Chair, Senior and IT
+panels. Key ⚑ decisions:
+
+- **Per-admin permission toggles are NOT built** (the design's 10-key
+  toggle matrix on the admin detail screen). Authorization in this system
+  is enum-role-based and enforced server-side (`RolesGuard`); shipping a
+  stored-but-unenforced toggle matrix would violate CLAUDE.md's «never by
+  hiding UI alone» rule, and enforcing it means a full dynamic-authorization
+  redesign. Open item, documented — the admin detail keeps the real
+  actions: block/unblock login and password reset.
+- **«نقش سفارشی…» in add-admin is NOT supported** — roles are a seeded
+  enum; a free-text role would have no real authorization backing.
+- **Management hierarchy (server-enforced):** CEO and BOARD_CHAIR manage
+  {SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER, IT_MANAGER,
+  SITE_ADMIN}; SENIOR_MANAGER manages the same set minus SENIOR_MANAGER.
+  Nobody can block/reset CEO/BOARD_CHAIR accounts or block themselves.
+- **«آنلاین» state is real** — derived from unexpired, unrevoked
+  `RefreshToken` rows, not a fabricated presence flag.
+- The chair settings' «قوانین استرداد» inputs write the REAL Phase 7
+  `RefundPenaltyRule` brackets. The mock shows 2 inputs; the real engine
+  has 4 brackets — all 4 are shown (⚑ documented deviation: editing only
+  half the real engine would be misleading).
+- CEO «لاگ و رویدادها» level chips are a presentational mapping over real
+  `AuditLog` rows: SECURITY→هشدار, financial categories→موفق, else info.
+
+### `backend/src/modules/admins/` (new) — CEO, BOARD_CHAIR, SENIOR_MANAGER
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/admins` | Manager/admin accounts in the caller's managed set (+ hierarchy above): fullName, username, email, roleLabelFa, lastLoginAt, isActive, online (real session derivation), managedByCaller flag. |
+| POST | `/admins` | «افزودن مدیر / ادمین» `{ fullName, email, username, role (managed-set enum only), password (min 6), delivery: sms\|email }` — creates the staff `User` (argon2, `mustChangePassword`), audited; credentials delivery goes through the mocked provider path in dev. 409 on duplicate username/email. |
+| PATCH | `/admins/:id/block` / `/unblock` | Toggles `User.isActive` — really enforced (staff login already rejects inactive accounts). Only within the caller's managed set; never self, never CEO/BOARD_CHAIR. Audited. |
+| POST | `/admins/:id/reset-password` | `{ password?, delivery? }` — explicit password (min 6) or a generated temp password (returned exactly once); sets `mustChangePassword`; audited; managed-set only. |
+
+### `backend/src/modules/auth/` (addition)
+
+| Method | Path | Roles | Notes |
+|---|---|---|---|
+| POST | `/auth/change-password` | any authenticated staff | «تغییر رمز عبور من» `{ currentPassword, newPassword (min 6) }` — verifies the current password (argon2) before updating; 401 on mismatch; audited (SECURITY, no password material logged). |
+
+### `backend/src/modules/audit/` (addition)
+
+| Method | Path | Roles | Notes |
+|---|---|---|---|
+| GET | `/audit/system-events` | CEO | «لاگ‌ها و رویدادهای سامانه» — latest 100 real `AuditLog` rows (all actors incl. CEO itself, unlike `/audit/manager-reports`) with the presentational level mapping above. |
+
+### `backend/src/modules/settings/` (new) — BOARD_CHAIR, IT_MANAGER
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/settings` | All `SystemSetting` key-values with server defaults (companyName, supportEmail, supportPhone, gateway toggles mellat/saman/zarin, global toggles maintenance/registration/charterSale/apiPublic/sandbox, brandColor) + the real `RefundPenaltyRule` brackets. |
+| PATCH | `/settings` | Partial key-value update; validated per key; audited (SYSTEM). |
+| PATCH | `/settings/refund-rules` | BOARD_CHAIR only — updates the REAL Phase 7 `RefundPenaltyRule.penaltyPct` per bracket (0–100 validated); audited. The refund engine keeps reading these same rows. |
+
+### `backend/src/modules/panels/` (change)
+
+`GET /panels/access` gains IT_MANAGER as a READ-ONLY role (its دسترسی به
+پنل‌ها tab is informational per the design: «تعیین سطح دسترسی ورود در
+اختیار مدیر عامل است»); `PATCH` stays CEO/SENIOR_MANAGER only.
+
+Deferred (documented, not dropped): per-admin permission matrix (see ⚑
+above); site-logo upload in IT settings (the logo is a public-site asset —
+no public site exists in this track to render it); the chair panel's
+orphaned PROFILE & SECURITY section (no nav entry reaches it — confirmed
+orphan like prior phases' dead blocks).
+
+---
+
 ## Later phases (endpoints TBD — documented here before each phase's code is written)
 
 - **Phase 2** — none directly (reporting reads Phase-2 tables; no new endpoints of its own beyond what's above).
