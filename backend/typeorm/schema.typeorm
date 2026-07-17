@@ -174,6 +174,9 @@ model Route {
   id         String   @id @default(uuid())
   originCode String
   destCode   String
+  // Phase 10: seeded flight duration — the add-flight form has no arrival
+  // input (per design), so arrivalAt = departureAt + durationMin.
+  durationMin Int     @default(120)
   flights    Flight[]
 
   @@unique([originCode, destCode])
@@ -206,6 +209,14 @@ model FlightInstance {
   capacity     Int
   charterSeats Int                  @default(0)
   status       FlightInstanceStatus @default(SCHEDULED)
+  // Phase 10: display/plan figures from مدیریت پروازها. basePriceIrr is the
+  // design's «قیمت پایه/نرخ اصلی» and the completed-flights سود/ضرر baseline —
+  // NEVER the bookable price (that stays with Phase 6's registered proposal).
+  basePriceIrr         Int?
+  agencySeatsAllocated Int?
+  // Advisory ML suggestion for future flights that have no Phase 6 proposal
+  // yet (same PersistedAiSuggestion shape; includes modelVersion).
+  aiSuggestion         Json?
   bookings     Booking[]
   pricing      FarePricingProposal?
   seatLocks    SeatLock[]
@@ -949,4 +960,19 @@ model SeatLock {
 
   @@index([flightInstanceId])
   @@map("seat_locks")
+}
+
+// ─── Phase 10: flight management (مدیریت پروازها) ──────────────────────
+
+// ⚑ The mocks' add-flight modal takes free-text cities; the real form uses
+// selects fed by this seeded catalog (CLAUDE.md's 20 Iranian cities +
+// DXB/IST/NJF) so Route codes stay valid and airport-local rendering is
+// possible later (tz is IANA).
+model Airport {
+  id     String @id @default(uuid())
+  code   String @unique
+  cityFa String
+  tz     String
+
+  @@map("airports")
 }
