@@ -49,16 +49,21 @@ frontend work (tasks #15–16) hasn't started yet.
 - [x] `PATCH .../invoices/:id/pay` writes exactly one `LedgerEntry(type=SETTLEMENT)` and is idempotent (paying an already-`PAID` invoice → 409, not a double ledger entry) — `'paying an invoice writes exactly one SETTLEMENT ledger entry and is idempotent (double pay -> 409)'`
 - [x] `GET/POST /agencies/:id/messages` → 403 for SENIOR_MANAGER and FINANCE_MANAGER — `'GET/POST .../messages is 403 for SENIOR_MANAGER and FINANCE_MANAGER'`
 
-### Frontend (per-role UI differences)
-- [ ] Senior Manager's agency detail shows credit + API-key sections, no invoices/messages tabs
-- [ ] Finance Manager's agency detail shows credit + settlement, no API-key/invoices-issue/messages
-- [ ] Commercial Manager's agency detail shows all 3 sub-tabs (نمای کلی/مالی/مکاتبه‌ها) including invoice issuance and chat
-- [ ] Money fields render via `faMoney`; dates via the Jalali util — no raw Latin digits/ISO strings in the UI
+### Frontend (per-role UI differences) — `frontend/src/features/agencies/*.test.tsx` (Vitest+RTL)
+- [x] Senior Manager's agency detail shows credit + API-key sections, no invoices/messages tabs — `AgencyDetailPage.test.tsx: 'Senior Manager sees credit + API-key sections and no invoices/messages tabs or activity score'`
+- [x] Finance Manager's agency detail shows credit + settlement, no API-key/invoices-issue/messages — `AgencyDetailPage.test.tsx: 'Finance Manager sees credit + settle and no API-key/invoice-issue/messages'`
+- [x] Commercial Manager's agency detail shows all 3 sub-tabs (نمای کلی/مالی/مکاتبه‌ها) including invoice issuance and chat — `AgencyDetailPage.test.tsx: 'Commercial Manager sees the نمای کلی/مالی/مکاتبه‌ها sub-tabs with invoice issuance and chat'`
+- [x] Money fields render via `faMoney`; dates via the Jalali util — no raw Latin digits/ISO strings in the UI — asserted inline (Persian ٬-separated toman strings, absence of raw ISO dates) in `AgenciesListPage.test.tsx` + `AgencyDetailPage.test.tsx`; toman→rial input parsing proven by `'the credit modal parses a toman amount (Persian digits allowed) into rial'`
 
-### E2E
-- [ ] One journey per role: open آژانس‌ها → search → open an agency → change credit limit → see it reflected
-- [ ] Commercial Manager: issue an invoice → mark it paid → credit-used figure drops by that amount
-- [x] Concurrency: two simultaneous `PATCH .../credit` calls on the same agency — last-write-wins on `limitIrr`, no crash, both audited — `'two simultaneous PATCH .../credit calls do not crash, last write wins, and both are audited'` (backend-level; the frontend/Playwright version of this journey is still open above)
+### E2E — `frontend/e2e/agencies-journey.spec.ts` (Playwright, real stack)
+- [x] One journey per role: open آژانس‌ها → search → open an agency → change credit limit → see it reflected — `'agencies journey for <senior.rahimi|finance.karimi|comm.abbasi>: search, open detail, change credit limit'` (3 tests)
+- [x] Commercial Manager: issue an invoice → mark it paid → credit-used figure drops by that amount — `'Commercial Manager: issue an invoice, pay it, and watch the credit-used figure drop'`
+- [x] Concurrency: two simultaneous `PATCH .../credit` calls on the same agency — last-write-wins on `limitIrr`, no crash, both audited — `backend/test/agencies.e2e-spec.ts: 'two simultaneous PATCH .../credit calls do not crash, last write wins, and both are audited'`
+
+### Deferred (scoped out with reasons, not silently dropped)
+- The design's "خروجی Excel" export button (Senior/Finance list) and the invoice شرح (description) field — need product decisions (export format; an invoice-description column) that belong with the reporting/finance phases.
+- The "ارجاع درخواست" (refer) UI on the request-detail page — the backend endpoint is implemented and role-tested, but the design's searchable recipient picker needs a staff-directory endpoint that arrives with Phase 4 (referrals/cartable). Wired then.
+- A suspended agency's own booking/search rejection — needs the agency-portal track (unchanged from the checklist note above).
 
 ---
 
