@@ -716,6 +716,72 @@ async function main() {
     }
   }
 
+  // ─── Phase 9: Reservation system (seat lock / PNR) ─────────────────────
+  const chairUser = staffByUsername.get('chair')!;
+
+  await prisma.aircraftSeatMap.upsert({
+    where: { aircraftType: 'Airbus A320' },
+    update: {},
+    create: {
+      aircraftType: 'Airbus A320',
+      // Matches ReservationSystem.dc.html's MD-88 mock numbers verbatim:
+      // rows 3-6 business 2-2 (16 seats), rows 7-32 economy 2-3 (130 seats).
+      businessRowStart: 3,
+      businessRowEnd: 6,
+      businessColsLeft: ['A', 'B'],
+      businessColsRight: ['C', 'D'],
+      economyRowStart: 7,
+      economyRowEnd: 32,
+      economyColsLeft: ['A', 'B'],
+      economyColsRight: ['C', 'D', 'E'],
+    },
+  });
+
+  const demoInstance = await prisma.flightInstance.findFirst({
+    where: { flightId: flight.id, status: 'SCHEDULED' },
+    orderBy: { departureAt: 'asc' },
+  });
+  if (demoInstance) {
+    const existingPax = await prisma.passenger.count({
+      where: { booking: { flightInstanceId: demoInstance.id } },
+    });
+    if (existingPax === 0) {
+      const demoPassengers: { name: string; seat: string }[] = [
+        { name: 'نگار رضایی', seat: '3A' },
+        { name: 'سارا احمدی', seat: '3C' },
+        { name: 'کیوان حسینی', seat: '9A' },
+        { name: 'یاسمن مرادی', seat: '9D' },
+        { name: 'رضا احمدی', seat: '12B' },
+      ];
+      for (const p of demoPassengers) {
+        const booking = await prisma.booking.create({
+          data: {
+            pnr: `BJDEMO${p.seat}`,
+            flightInstanceId: demoInstance.id,
+            channel: 'SYSTEM',
+            status: 'TICKETED',
+            priceIrr: 38_000_000,
+          },
+        });
+        await prisma.passenger.create({
+          data: { bookingId: booking.id, fullName: p.name, seatCode: p.seat },
+        });
+        await prisma.ledgerEntry.create({
+          data: { bookingId: booking.id, type: 'SALE', signedAmountIrr: 38_000_000 },
+        });
+      }
+      // One demo managerial lock so the seat map/lock UI has real data.
+      await prisma.seatLock.create({
+        data: {
+          flightInstanceId: demoInstance.id,
+          seatCode: '4A',
+          lockedById: chairUser.id,
+          passengerName: 'رزرو مدیریتی — رئیس هیئت مدیره',
+        },
+      });
+    }
+  }
+
   // ─── Phase 8: Employee management (IT Manager) ────────────────────────
   const itManager = staffByUsername.get('itadmin')!;
 
