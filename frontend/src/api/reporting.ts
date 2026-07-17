@@ -1,10 +1,15 @@
 import { apiGet } from './http';
 import type {
+  AgencySettlementsResult,
   CompletedFlightsSummary,
   KpiResult,
   LowSalesAlert,
+  PassengerReportHit,
   PeriodQuery,
+  RecentTransactionsResult,
+  RevenueMixResult,
   SalesChartPeriod,
+  StaffReportsResult,
 } from '../types/reporting';
 
 function toQueryString(query: PeriodQuery): string {
@@ -31,4 +36,25 @@ export function fetchCompletedFlightsSummary(query: PeriodQuery) {
 
 export function fetchLowSalesAlerts() {
   return apiGet<LowSalesAlert[]>('/reporting/low-sales-alerts');
+}
+
+export function fetchRecentTransactions() {
+  return apiGet<RecentTransactionsResult>('/reporting/recent-transactions');
+}
+
+export function fetchRevenueMix(query: PeriodQuery) {
+  return apiGet<RevenueMixResult>(`/reporting/revenue-mix?${toQueryString(query)}`);
+}
+
+export function fetchAgencySettlements() {
+  return apiGet<AgencySettlementsResult>('/reporting/agency-settlements');
+}
+
+export function searchPassengers(q: string) {
+  return apiGet<PassengerReportHit[]>(`/passenger-reports/search?q=${encodeURIComponent(q)}`);
+}
+
+export function fetchStaffReports(staffId?: string) {
+  const qs = staffId ? `?staffId=${encodeURIComponent(staffId)}` : '';
+  return apiGet<StaffReportsResult>(`/staff-reports${qs}`);
 }
