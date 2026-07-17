@@ -997,6 +997,30 @@
         ]
       }
     },
+    "/agencies/{id}/_test/debt": {
+      "post": {
+        "operationId": "AgenciesController_resetTestDebt",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "E2E only — بدهی مشتق‌شده آژانس را به رقم ثابت برمی‌گرداند؛ در production 404",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
     "/agencies/{id}/invoices/{invoiceId}/pay": {
       "patch": {
         "operationId": "AgenciesController_payInvoice",
@@ -2442,6 +2466,118 @@
         ]
       }
     },
+    "/refunds": {
+      "get": {
+        "operationId": "RefundsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست درخواست‌های استرداد + سه کارت KPI",
+        "tags": [
+          "refunds"
+        ]
+      }
+    },
+    "/refunds/_test/request": {
+      "post": {
+        "operationId": "RefundsController_createTestRequest",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "E2E only — درخواست FINANCE تازه؛ در production 404",
+        "tags": [
+          "refunds"
+        ]
+      }
+    },
+    "/refunds/{id}": {
+      "get": {
+        "operationId": "RefundsController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "جزئیات درخواست — تنها سطحی که شبا/PII رمزگشایی‌شده می‌گیرد",
+        "tags": [
+          "refunds"
+        ]
+      }
+    },
+    "/refunds/{id}/refer": {
+      "patch": {
+        "operationId": "RefundsController_refer",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReferRefundDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "ثبت و انتقال فرآیند ارجاع — بدون تغییر وضعیت (طبق طراحی)",
+        "tags": [
+          "refunds"
+        ]
+      }
+    },
+    "/refunds/{id}/pay": {
+      "patch": {
+        "operationId": "RefundsController_pay",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تأیید، واریز به شبا و بستن پرونده — برگشت تراکنشی در دفتر کل",
+        "tags": [
+          "refunds"
+        ]
+      }
+    },
     "/reservation/seatmap/{flightInstanceId}": {
       "get": {
         "operationId": "SeatmapController_get",
@@ -2952,6 +3088,134 @@
         "summary": "آپلود مدرک — فقط PDF/تصویر، حداکثر ۵MB",
         "tags": [
           "agency-portal"
+        ]
+      }
+    },
+    "/flights/overview": {
+      "get": {
+        "operationId": "FlightsController_overview",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "کل تب مدیریت پروازها: KPI + فعال/انجام‌شده/آینده",
+        "tags": [
+          "flights"
+        ]
+      }
+    },
+    "/flights/airports": {
+      "get": {
+        "operationId": "FlightsController_airports",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "کاتالوگ فرودگاه‌ها برای فرم افزودن پرواز",
+        "tags": [
+          "flights"
+        ]
+      }
+    },
+    "/flights": {
+      "post": {
+        "operationId": "FlightsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFlightDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "افزودن پرواز جدید (مودال طراحی)",
+        "tags": [
+          "flights"
+        ]
+      }
+    },
+    "/flights/ai-analysis": {
+      "post": {
+        "operationId": "FlightsController_aiAnalysis",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "تحلیل قیمت‌گذاری پروازهای آینده با هوش مصنوعی — advisory، با degrade امن",
+        "tags": [
+          "flights"
+        ]
+      }
+    },
+    "/flights/{instanceId}": {
+      "get": {
+        "operationId": "FlightsController_detail",
+        "parameters": [
+          {
+            "name": "instanceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "مودال جزئیات پرواز: تفکیک واقعی کانال فروش + مجموع درآمد",
+        "tags": [
+          "flights"
+        ]
+      }
+    },
+    "/flights/{instanceId}/plan": {
+      "patch": {
+        "operationId": "FlightsController_plan",
+        "parameters": [
+          {
+            "name": "instanceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanFlightDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "نرخ‌گذاری و تخصیص پرواز آینده — نرخ قابل فروش همچنان با تأیید مدیر عامل (فاز ۶)",
+        "tags": [
+          "flights"
         ]
       }
     }
@@ -3595,6 +3859,18 @@
           "source"
         ]
       },
+      "ReferRefundDto": {
+        "type": "object",
+        "properties": {
+          "assigneeId": {
+            "type": "string",
+            "description": "شناسه کارمند مالی مقصد ارجاع"
+          }
+        },
+        "required": [
+          "assigneeId"
+        ]
+      },
       "LockSeatDto": {
         "type": "object",
         "properties": {
@@ -3698,6 +3974,67 @@
         },
         "required": [
           "docType"
+        ]
+      },
+      "CreateFlightDto": {
+        "type": "object",
+        "properties": {
+          "originCode": {
+            "type": "string",
+            "description": "کد فرودگاه مبدأ",
+            "example": "THR"
+          },
+          "destCode": {
+            "type": "string",
+            "description": "کد فرودگاه مقصد",
+            "example": "DXB"
+          },
+          "flightNo": {
+            "type": "string",
+            "description": "شماره پرواز",
+            "example": "EP-901"
+          },
+          "departureAt": {
+            "type": "string",
+            "description": "زمان پرواز (UTC ISO — تبدیل جلالی در فرانت)"
+          },
+          "capacity": {
+            "type": "number",
+            "description": "ظرفیت صندلی",
+            "example": 180
+          },
+          "basePriceIrr": {
+            "type": "number",
+            "description": "قیمت پایه (ریال)",
+            "example": 38000000
+          }
+        },
+        "required": [
+          "originCode",
+          "destCode",
+          "flightNo",
+          "departureAt",
+          "capacity",
+          "basePriceIrr"
+        ]
+      },
+      "PlanFlightDto": {
+        "type": "object",
+        "properties": {
+          "priceIrr": {
+            "type": "number",
+            "description": "نرخ برنامه‌ریزی (ریال)",
+            "example": 39000000
+          },
+          "agencySeats": {
+            "type": "number",
+            "description": "تخصیص صندلی آژانس",
+            "example": 60
+          }
+        },
+        "required": [
+          "priceIrr",
+          "agencySeats"
         ]
       }
     }

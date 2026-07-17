@@ -229,7 +229,10 @@ describe('Flights (e2e)', () => {
     const pastDate = await request(app.getHttpServer())
       .post('/flights')
       .set('Authorization', `Bearer ${accessToken}`)
-      .send({ ...base, departureAt: new Date(Date.now() - 3_600_000).toISOString() });
+      .send({
+        ...base,
+        departureAt: new Date(Date.now() - 3_600_000).toISOString(),
+      });
     expect(pastDate.status).toBe(400);
 
     // EP-821 belongs to the seeded THR→DXB route — reusing it on THR→MHD → 409.
@@ -385,7 +388,10 @@ describe('Flights (e2e)', () => {
     const row = await prisma.flightInstance.findUniqueOrThrow({
       where: { id: future.id },
     });
-    const suggestion = row.aiSuggestion as { priceIrr: number; modelVersion: string };
+    const suggestion = row.aiSuggestion as {
+      priceIrr: number;
+      modelVersion: string;
+    };
     expect(suggestion.priceIrr).toBe(41_000_000);
     expect(suggestion.modelVersion).toBe('heuristic-v1.0.0');
   });
