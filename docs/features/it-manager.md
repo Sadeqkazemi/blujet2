@@ -16,7 +16,7 @@ Backend items proven by `backend/test/it-manager.e2e-spec.ts`; frontend by
 ### Permission catalog & employees
 - [ ] `GET /it/permissions` returns the 3-dept/12-key catalog verbatim from `PERM_CATALOG`; non-IT role → 403
 - [ ] `GET /it/employees` lists only `role=EMPLOYEE` rows, `dept=`/`q=` filters work
-- [ ] `POST /it/employees`: creates account (argon2 hash), grants `dashboard`+`cartable` implicitly + selected permissions, duplicate username → 409, password &lt;6 chars → 400, audited (ACCOUNT)
+- [ ] `POST /it/employees`: creates account (argon2 hash), grants the selected catalog permissions (design's implicit `dashboard`/`cartable` tags intentionally not carried over — see docs/API.md note), duplicate username → 409, password &lt;6 chars → 400, audited (ACCOUNT)
 - [ ] `GET /it/employees/:id` returns granted + available permissions; non-EMPLOYEE id → 404
 - [ ] `PATCH /it/employees/:id/status` suspends/reactivates, audited (ACCOUNT)
 - [ ] `PATCH /it/employees/:id/permissions` grants/revokes one key idempotently, audited (ACCESS)
