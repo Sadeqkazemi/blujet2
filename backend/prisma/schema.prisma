@@ -87,6 +87,9 @@ model User {
   pricingProposalsMade     FarePricingProposal[] @relation("PricingProposedBy")
   pricingProposalsApproved FarePricingProposal[] @relation("PricingApprovedBy")
 
+  refundAssignments RefundRequest[] @relation("RefundAssignee")
+  refundsProcessed  RefundRequest[] @relation("RefundProcessedBy")
+
   @@map("users")
 }
 
@@ -172,6 +175,9 @@ model Route {
   id         String   @id @default(uuid())
   originCode String
   destCode   String
+  // Phase 10: seeded flight duration — the add-flight form has no arrival
+  // input (per design), so arrivalAt = departureAt + durationMin.
+  durationMin Int     @default(120)
   flights    Flight[]
 
   @@unique([originCode, destCode])
@@ -204,6 +210,14 @@ model FlightInstance {
   capacity     Int
   charterSeats Int                  @default(0)
   status       FlightInstanceStatus @default(SCHEDULED)
+  // Phase 10: display/plan figures from مدیریت پروازها. basePriceIrr is the
+  // design's «قیمت پایه/نرخ اصلی» and the completed-flights سود/ضرر baseline —
+  // NEVER the bookable price (that stays with Phase 6's registered proposal).
+  basePriceIrr         Int?
+  agencySeatsAllocated Int?
+  // Advisory ML suggestion for future flights that have no Phase 6 proposal
+  // yet (same PersistedAiSuggestion shape; includes modelVersion).
+  aiSuggestion         Json?
   bookings     Booking[]
   pricing      FarePricingProposal?
   seatLocks    SeatLock[]
@@ -243,8 +257,9 @@ model Booking {
   priceIrr         Int
   createdAt        DateTime       @default(now())
 
-  passengers    Passenger[]
-  ledgerEntries LedgerEntry[]
+  passengers     Passenger[]
+  ledgerEntries  LedgerEntry[]
+  refundRequests RefundRequest[]
 
   @@index([flightInstanceId, status])
   @@index([channel])
@@ -790,6 +805,54 @@ model FarePricingProposal {
   @@map("fare_pricing_proposals")
 }
 
+// ─── Phase 7: refunds (finance approval & payout) ────────────────────────
+
+enum RefundStatus {
+  SUBMITTED
+  REVIEW
+  FINANCE
+  PAID
+}
+
+// ⚑ The mocks shipped three inconsistent penalty schemes; the customer
+// panel's 4-bracket engine is the only executed one and is seeded here as
+// the server-side source of truth (see docs/DB_SCHEMA.md Phase 7).
+model RefundPenaltyRule {
+  id                      String @id @default(uuid())
+  minHoursBeforeDeparture Int
+  penaltyPct              Int
+  labelFa                 String
+
+  @@map("refund_penalty_rules")
+}
+
+model RefundRequest {
+  id               String       @id @default(uuid())
+  bookingId        String
+  booking          Booking      @relation(fields: [bookingId], references: [id])
+  passengerName    String
+  nidEnc           String?
+  mobileEnc        String?
+  // 24-digit شبا — encrypted at rest, decrypted only for the finance surface.
+  ibanEnc          String
+  totalPaidIrr     Int
+  penaltyPct       Int
+  penaltyAmountIrr Int
+  refundableIrr    Int
+  status           RefundStatus @default(SUBMITTED)
+  // Design: refer sets the assignee WITHOUT advancing status.
+  assigneeId       String?
+  assignee         User?        @relation("RefundAssignee", fields: [assigneeId], references: [id])
+  processedById    String?
+  processedBy      User?        @relation("RefundProcessedBy", fields: [processedById], references: [id])
+  paidAt           DateTime?
+  history          Json
+  createdAt        DateTime     @default(now())
+
+  @@index([status])
+  @@map("refund_requests")
+}
+
 // ─── Phase 8: Employee management (IT Manager) ─────────────────────────
 
 enum EmployeeReferralScope {
@@ -959,4 +1022,19 @@ model SeatLock {
 
   @@index([flightInstanceId])
   @@map("seat_locks")
+}
+
+// ─── Phase 10: flight management (مدیریت پروازها) ──────────────────────
+
+// ⚑ The mocks' add-flight modal takes free-text cities; the real form uses
+// selects fed by this seeded catalog (CLAUDE.md's 20 Iranian cities +
+// DXB/IST/NJF) so Route codes stay valid and airport-local rendering is
+// possible later (tz is IANA).
+model Airport {
+  id     String @id @default(uuid())
+  code   String @unique
+  cityFa String
+  tz     String
+
+  @@map("airports")
 }

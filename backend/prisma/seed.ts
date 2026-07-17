@@ -716,6 +716,101 @@ async function main() {
     }
   }
 
+  // ── Phase 7: penalty rules (design's 4-bracket engine) + refund seeds ──
+  if ((await prisma.refundPenaltyRule.count()) === 0) {
+    await prisma.refundPenaltyRule.createMany({
+      data: [
+        { minHoursBeforeDeparture: 72, penaltyPct: 30, labelFa: 'بیش از ۷۲ ساعت مانده به پرواز' },
+        { minHoursBeforeDeparture: 24, penaltyPct: 50, labelFa: 'بین ۲۴ تا ۷۲ ساعت مانده' },
+        { minHoursBeforeDeparture: 3, penaltyPct: 70, labelFa: 'بین ۳ تا ۲۴ ساعت مانده' },
+        { minHoursBeforeDeparture: 0, penaltyPct: 100, labelFa: 'کمتر از ۳ ساعت / پس از پرواز' },
+      ],
+    });
+  }
+
+  if ((await prisma.refundRequest.count()) === 0) {
+    const someBooking = await prisma.booking.findFirst({ where: { status: 'TICKETED' } });
+    if (someBooking) {
+      const financeStaffName = 'مریم کاظمی';
+      const refundSeeds = [
+        {
+          passengerName: 'رضا کریمی',
+          status: 'SUBMITTED' as const,
+          totalPaidIrr: 25_000_000,
+          penaltyPct: 30,
+          history: [
+            { step: 'submitted', labelFa: 'ثبت درخواست کنسلی توسط مشتری — جریمه ٪۳۰', at: 'امروز · ۰۹:۱۵' },
+          ],
+        },
+        {
+          passengerName: 'مهدی صادقی',
+          status: 'REVIEW' as const,
+          totalPaidIrr: 31_000_000,
+          penaltyPct: 30,
+          history: [
+            { step: 'submitted', labelFa: 'ثبت درخواست کنسلی توسط مشتری — جریمه ٪۳۰', at: 'دیروز · ۱۶:۰۲' },
+            { step: 'review', labelFa: 'بررسی توسط ادمین سایت', at: 'امروز · ۰۸:۴۰' },
+          ],
+        },
+        {
+          passengerName: 'سارا محمدی',
+          status: 'FINANCE' as const,
+          totalPaidIrr: 42_000_000,
+          penaltyPct: 50,
+          assigneeLabel: financeStaffName,
+          history: [
+            { step: 'submitted', labelFa: 'ثبت درخواست کنسلی توسط مشتری — جریمه ٪۵۰', at: '۲ روز پیش · ۱۱:۲۰' },
+            { step: 'review', labelFa: 'بررسی توسط ادمین سایت', at: '۲ روز پیش · ۱۴:۰۵' },
+            { step: 'finance', labelFa: `ارجاع به ${financeStaffName} (کارشناس مالی) توسط ادمین سایت`, at: 'دیروز · ۰۹:۳۰' },
+          ],
+        },
+        {
+          passengerName: 'نگار رضایی',
+          status: 'PAID' as const,
+          totalPaidIrr: 41_000_000,
+          penaltyPct: 30,
+          history: [
+            { step: 'submitted', labelFa: 'ثبت درخواست کنسلی توسط مشتری — جریمه ٪۳۰', at: 'هفته پیش' },
+            { step: 'review', labelFa: 'بررسی توسط ادمین سایت', at: 'هفته پیش' },
+            { step: 'finance', labelFa: 'ارجاع به مدیر مالی توسط ادمین سایت', at: '۶ روز پیش' },
+            { step: 'paid', labelFa: 'تأیید، واریز وجه و بستن پرونده توسط مدیر مالی', at: '۵ روز پیش' },
+          ],
+        },
+      ];
+      for (const r of refundSeeds) {
+        const penaltyAmountIrr = Math.round((r.totalPaidIrr * r.penaltyPct) / 100);
+        const created = await prisma.refundRequest.create({
+          data: {
+            bookingId: someBooking.id,
+            passengerName: r.passengerName,
+            nidEnc: encryptPii('0012345679'),
+            mobileEnc: encryptPii('09121112233'),
+            ibanEnc: encryptPii('IR820170000000332211009900'),
+            totalPaidIrr: r.totalPaidIrr,
+            penaltyPct: r.penaltyPct,
+            penaltyAmountIrr,
+            refundableIrr: r.totalPaidIrr - penaltyAmountIrr,
+            status: r.status,
+            paidAt: r.status === 'PAID' ? new Date() : undefined,
+            processedById: r.status === 'PAID' ? financeManager.id : undefined,
+            history: r.history,
+          },
+        });
+        // The PAID seed keeps the ledger consistent with its state.
+        if (r.status === 'PAID') {
+          await prisma.ledgerEntry.create({
+            data: {
+              bookingId: someBooking.id,
+              type: 'REFUND',
+              signedAmountIrr: -created.refundableIrr,
+              createdById: financeManager.id,
+            },
+          });
+        }
+      }
+    }
+  }
+
   // ─── Phase 9: Reservation system (seat lock / PNR) ─────────────────────
   const chairUser = staffByUsername.get('chair')!;
 
@@ -871,6 +966,75 @@ async function main() {
         where: { employeeId_permissionId: { employeeId: employee.id, permissionId: perm.id } },
         update: {},
         create: { employeeId: employee.id, permissionId: perm.id, grantedById: itManager.id },
+      });
+    }
+  }
+
+  // ── Phase 10: airport catalog + flight-management seed ────────────────
+  const AIRPORTS: Array<[string, string, string]> = [
+    ['THR', 'تهران', 'Asia/Tehran'],
+    ['MHD', 'مشهد', 'Asia/Tehran'],
+    ['SYZ', 'شیراز', 'Asia/Tehran'],
+    ['IFN', 'اصفهان', 'Asia/Tehran'],
+    ['TBZ', 'تبریز', 'Asia/Tehran'],
+    ['KIH', 'کیش', 'Asia/Tehran'],
+    ['GSM', 'قشم', 'Asia/Tehran'],
+    ['BND', 'بندرعباس', 'Asia/Tehran'],
+    ['AWZ', 'اهواز', 'Asia/Tehran'],
+    ['RAS', 'رشت', 'Asia/Tehran'],
+    ['SRY', 'ساری', 'Asia/Tehran'],
+    ['GBT', 'گرگان', 'Asia/Tehran'],
+    ['KER', 'کرمان', 'Asia/Tehran'],
+    ['KSH', 'کرمانشاه', 'Asia/Tehran'],
+    ['OMH', 'ارومیه', 'Asia/Tehran'],
+    ['ADU', 'اردبیل', 'Asia/Tehran'],
+    ['ZAH', 'زاهدان', 'Asia/Tehran'],
+    ['BUZ', 'بوشهر', 'Asia/Tehran'],
+    ['AZD', 'یزد', 'Asia/Tehran'],
+    ['PGU', 'عسلویه', 'Asia/Tehran'],
+    ['DXB', 'دبی', 'Asia/Dubai'],
+    ['IST', 'استانبول', 'Europe/Istanbul'],
+    ['NJF', 'نجف', 'Asia/Baghdad'],
+  ];
+  for (const [code, cityFa, tz] of AIRPORTS) {
+    await prisma.airport.upsert({
+      where: { code },
+      update: { cityFa, tz },
+      create: { code, cityFa, tz },
+    });
+  }
+
+  // Seeded per-route durations (the add-flight form has no arrival input).
+  await prisma.route.updateMany({
+    where: { originCode: 'THR', destCode: 'DXB' },
+    data: { durationMin: 180 },
+  });
+
+  // Base prices for existing instances so the active/completed tables have
+  // the design's «قیمت پایه/نرخ اصلی» figures without fabricating margins.
+  await prisma.flightInstance.updateMany({
+    where: { basePriceIrr: null },
+    data: { basePriceIrr: 38_000_000 },
+  });
+
+  // A couple of future SCHEDULED instances for the پروازهای آینده sub-tab
+  // (charter commitment set, plan/AI left empty for the E2E to exercise).
+  const futureCount = await prisma.flightInstance.count({
+    where: { departureAt: { gt: new Date(Date.now() + 8 * 24 * 3_600_000) } },
+  });
+  if (futureCount === 0) {
+    for (const daysAhead of [12, 16]) {
+      const dep = new Date(Date.now() + daysAhead * 24 * 3_600_000);
+      await prisma.flightInstance.create({
+        data: {
+          flightId: flight.id,
+          departureAt: dep,
+          arrivalAt: new Date(dep.getTime() + 3 * 3_600_000),
+          capacity: 180,
+          charterSeats: 60,
+          status: 'SCHEDULED',
+          basePriceIrr: 38_000_000,
+        },
       });
     }
   }
