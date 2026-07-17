@@ -1,0 +1,45 @@
+@import "tailwindcss";
+@import "@fontsource-variable/vazirmatn";
+
+@theme {
+  --font-sans: 'Vazirmatn Variable', Vazirmatn, sans-serif;
+  --font-mono: 'Roboto Mono', monospace;
+
+  --color-accent: #1668c4;
+  --color-navy: #0d2640;
+  --color-navy-2: #0d3b66;
+  --color-ink: #16202e;
+  --color-body: #f6f8fb;
+  --color-muted: #9aa4b2;
+  --color-muted-2: #6b7585;
+  --color-text-2: #3b4554;
+  --color-text-3: #5a6678;
+  --color-border: #e6eaf0;
+  --color-border-2: #e2e7ee;
+  --color-surface: #eef1f5;
+  --color-surface-2: #eef4fb;
+  --color-danger: #e5484d;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background: var(--color-body);
+  color: var(--color-ink);
+}
+
+/* Isolated LTR spans for flight/airport codes, Latin names, emails. */
+.ltr {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+.font-num {
+  font-family: var(--font-mono);
+}

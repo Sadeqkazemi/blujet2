@@ -1,0 +1,1272 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/auth/staff/login": {
+      "post": {
+        "operationId": "AuthController_staffLogin",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffLoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Challenge issued"
+          },
+          "401": {
+            "description": "Invalid credentials"
+          },
+          "403": {
+            "description": "Account suspended"
+          }
+        },
+        "summary": "Step 1 of staff login: verify username/password, issue a 2FA challenge",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/staff/login/verify": {
+      "post": {
+        "operationId": "AuthController_verifyTwoFactor",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyTwoFactorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login complete"
+          },
+          "401": {
+            "description": "Invalid/expired code"
+          }
+        },
+        "summary": "Step 2 of staff login: verify the 2FA code, issue tokens",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "operationId": "AuthController_refresh",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Rotate the refresh token and issue a new access token",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "operationId": "AuthController_logout",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Revoke the current refresh token",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "operationId": "AuthController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Current authenticated user's identity and role",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/_test/last-code/{username}": {
+      "get": {
+        "operationId": "AuthController_testLastCode",
+        "parameters": [
+          {
+            "name": "username",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "E2E-test only: reads back the mock 2FA code. 404s in production.",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/panels/nav": {
+      "get": {
+        "operationId": "PanelsController_getNav",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Caller's role-scoped sidebar — server-computed, never client-decided",
+        "tags": [
+          "panels"
+        ]
+      }
+    },
+    "/panels/access": {
+      "get": {
+        "operationId": "PanelsController_getAccess",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Sibling panels this role may enable/disable",
+        "tags": [
+          "panels"
+        ]
+      }
+    },
+    "/panels/access/{panelKey}": {
+      "patch": {
+        "operationId": "PanelsController_setAccess",
+        "parameters": [
+          {
+            "name": "panelKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePanelAccessDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Toggle a sibling panel on/off",
+        "tags": [
+          "panels"
+        ]
+      }
+    },
+    "/audit/manager-reports": {
+      "get": {
+        "operationId": "AuditController_managerReports",
+        "parameters": [
+          {
+            "name": "category",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "actorRole",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Cross-manager oversight feed — role-scoped exclusions applied server-side",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
+    "/audit/logs": {
+      "get": {
+        "operationId": "AuditController_systemLogs",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "IT Manager's system event log",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
+    "/reporting/sales-chart": {
+      "get": {
+        "operationId": "ReportingController_salesChart",
+        "parameters": [
+          {
+            "name": "granularity",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "q6",
+              "type": "string",
+              "enum": [
+                "day",
+                "month",
+                "q3",
+                "q6",
+                "year",
+                "flight"
+              ]
+            }
+          },
+          {
+            "name": "periodStart",
+            "required": false,
+            "in": "query",
+            "description": "Required for granularity=month — ISO date of the 1st of that month (UTC)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "description": "Required for granularity=day — ISO date (UTC)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "flightNo",
+            "required": false,
+            "in": "query",
+            "description": "Required for granularity=flight",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Channel-split sales bars, shared identically by all 6 panels dashboards",
+        "tags": [
+          "reporting"
+        ]
+      }
+    },
+    "/reporting/kpis": {
+      "get": {
+        "operationId": "ReportingController_kpis",
+        "parameters": [
+          {
+            "name": "granularity",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "q6",
+              "type": "string",
+              "enum": [
+                "day",
+                "month",
+                "q3",
+                "q6",
+                "year",
+                "flight"
+              ]
+            }
+          },
+          {
+            "name": "periodStart",
+            "required": false,
+            "in": "query",
+            "description": "Required for granularity=month",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "description": "Required for granularity=day",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "flightNo",
+            "required": false,
+            "in": "query",
+            "description": "Required for granularity=flight",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "periodKey",
+            "required": false,
+            "in": "query",
+            "description": "A periodKey returned by /reporting/sales-chart — re-scopes KPIs to that bucket",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Revenue/profit/cost KPI boxes — re-scopes to periodKey when provided",
+        "tags": [
+          "reporting"
+        ]
+      }
+    },
+    "/reporting/completed-flights-summary": {
+      "get": {
+        "operationId": "ReportingController_completedFlightsSummary",
+        "parameters": [
+          {
+            "name": "granularity",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "q6",
+              "type": "string",
+              "enum": [
+                "day",
+                "month",
+                "q3",
+                "q6",
+                "year",
+                "flight"
+              ]
+            }
+          },
+          {
+            "name": "periodStart",
+            "required": false,
+            "in": "query",
+            "description": "Required for granularity=month",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "description": "Required for granularity=day",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "flightNo",
+            "required": false,
+            "in": "query",
+            "description": "Required for granularity=flight",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "periodKey",
+            "required": false,
+            "in": "query",
+            "description": "A periodKey returned by /reporting/sales-chart — re-scopes KPIs to that bucket",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Completed-flight seat stats, synced to the same period as the sales chart",
+        "tags": [
+          "reporting"
+        ]
+      }
+    },
+    "/reporting/low-sales-alerts": {
+      "get": {
+        "operationId": "ReportingController_lowSalesAlerts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Flights <72h out with occupancy below threshold",
+        "tags": [
+          "reporting"
+        ]
+      }
+    },
+    "/agencies": {
+      "get": {
+        "operationId": "AgenciesController_list",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "جستجو در نام، شماره مجوز، مدیر، شهر",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "debtorsOnly",
+            "required": false,
+            "in": "query",
+            "description": "فقط آژانس‌های دارای بدهی (پنل مدیر بازرگانی)",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "لیست آژانس‌ها + کارت‌های KPI",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/requests": {
+      "get": {
+        "operationId": "AgenciesController_listRequests",
+        "parameters": [
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "لیست درخواست‌های عضویت آژانس",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/requests/{id}": {
+      "get": {
+        "operationId": "AgenciesController_getRequest",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "جزئیات درخواست عضویت + تاریخچه ارجاع",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/requests/{id}/approve": {
+      "patch": {
+        "operationId": "AgenciesController_approveRequest",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تأیید درخواست — ایجاد User+AgencyProfile تراکنشی",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/requests/{id}/reject": {
+      "patch": {
+        "operationId": "AgenciesController_rejectRequest",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "رد درخواست عضویت",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/requests/{id}/refer": {
+      "patch": {
+        "operationId": "AgenciesController_referRequest",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReferRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "ارجاع درخواست — فقط مدیر ارشد/بازرگانی",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/debtors/notify-all": {
+      "post": {
+        "operationId": "AgenciesController_notifyAllDebtors",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ارسال اعلان به همه آژانس‌های بدهکار",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/{id}": {
+      "get": {
+        "operationId": "AgenciesController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "جزئیات آژانس — پروفایل، اعتبار، آمار، فعالیت اخیر",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/{id}/suspend": {
+      "patch": {
+        "operationId": "AgenciesController_suspend",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuspendAgencyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تعلیق آژانس",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/{id}/reactivate": {
+      "patch": {
+        "operationId": "AgenciesController_reactivate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "رفع تعلیق آژانس",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/{id}/credit": {
+      "get": {
+        "operationId": "AgenciesController_getCredit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "سقف/مصرف/باقیمانده اعتبار (مصرف همیشه مشتق‌شده)",
+        "tags": [
+          "agencies"
+        ]
+      },
+      "patch": {
+        "operationId": "AgenciesController_updateCredit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCreditDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تغییر سقف اعتبار",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/{id}/settle": {
+      "post": {
+        "operationId": "AgenciesController_settle",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ثبت تسویه دستی — غیرفعال برای مدیر بازرگانی",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/{id}/api-key": {
+      "get": {
+        "operationId": "AgenciesController_listApiKeys",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "لیست کلیدهای API — فقط مدیر ارشد",
+        "tags": [
+          "agencies"
+        ]
+      },
+      "post": {
+        "operationId": "AgenciesController_issueApiKey",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateApiKeyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "صدور کلید API — فقط مدیر ارشد",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/{id}/api-key/{keyId}": {
+      "patch": {
+        "operationId": "AgenciesController_updateApiKey",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "keyId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateApiKeyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تعلیق/فعال‌سازی/صدور مجدد کلید API",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/{id}/invoices": {
+      "get": {
+        "operationId": "AgenciesController_listInvoices",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "لیست فاکتورها — همه ۳ نقش (خواندنی)",
+        "tags": [
+          "agencies"
+        ]
+      },
+      "post": {
+        "operationId": "AgenciesController_issueInvoice",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueInvoiceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "صدور فاکتور — فقط مدیر بازرگانی",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/{id}/invoices/{invoiceId}/pay": {
+      "patch": {
+        "operationId": "AgenciesController_payInvoice",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "invoiceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تسویه فاکتور — ثبت LedgerEntry(SETTLEMENT)، ایدمپوتنت",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/{id}/invoices/{invoiceId}/remind": {
+      "post": {
+        "operationId": "AgenciesController_remindInvoice",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "invoiceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "یادآوری فاکتور معوق",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/{id}/messages": {
+      "get": {
+        "operationId": "AgenciesController_listMessages",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "مکاتبه‌ها — فقط مدیر بازرگانی",
+        "tags": [
+          "agencies"
+        ]
+      },
+      "post": {
+        "operationId": "AgenciesController_postMessage",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMessageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ارسال پیام در مکاتبه‌ها — فقط مدیر بازرگانی",
+        "tags": [
+          "agencies"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "blujet API",
+    "description": "blujet airline platform — internal API",
+    "version": "1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
+    "schemas": {
+      "StaffLoginDto": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "example": "finance.karimi",
+            "description": "Staff username"
+          },
+          "password": {
+            "type": "string",
+            "example": "Blujet@1404",
+            "description": "Staff password"
+          }
+        },
+        "required": [
+          "username",
+          "password"
+        ]
+      },
+      "VerifyTwoFactorDto": {
+        "type": "object",
+        "properties": {
+          "challengeId": {
+            "type": "string",
+            "example": "a1b2c3d4-...",
+            "description": "Challenge id returned by /auth/staff/login"
+          },
+          "code": {
+            "type": "string",
+            "example": "482913",
+            "description": "6-digit one-time code"
+          }
+        },
+        "required": [
+          "challengeId",
+          "code"
+        ]
+      },
+      "UpdatePanelAccessDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "example": false
+          }
+        },
+        "required": [
+          "enabled"
+        ]
+      },
+      "RejectRequestDto": {
+        "type": "object",
+        "properties": {
+          "reviewNote": {
+            "type": "string",
+            "example": "مدارک مجوز فعالیت ناقص بود."
+          }
+        }
+      },
+      "ReferRequestDto": {
+        "type": "object",
+        "properties": {
+          "referredToId": {
+            "type": "string",
+            "description": "شناسه کاربر (کارمند/مدیر) مقصد ارجاع"
+          },
+          "note": {
+            "type": "string",
+            "example": "لطفاً وضعیت اعتباری متقاضی بررسی شود."
+          }
+        },
+        "required": [
+          "referredToId"
+        ]
+      },
+      "SuspendAgencyDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "example": "عدم تسویه بدهی معوق بیش از ۳۰ روز"
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "UpdateCreditDto": {
+        "type": "object",
+        "properties": {
+          "limitIrr": {
+            "type": "number",
+            "example": 1800000000,
+            "description": "سقف اعتبار به ریال"
+          }
+        },
+        "required": [
+          "limitIrr"
+        ]
+      },
+      "CreateApiKeyDto": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string",
+            "enum": [
+              "FULL",
+              "SEARCH_BOOK",
+              "SEARCH_ONLY"
+            ],
+            "example": "SEARCH_BOOK"
+          }
+        },
+        "required": [
+          "scope"
+        ]
+      },
+      "UpdateApiKeyDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "SUSPENDED"
+            ]
+          },
+          "regenerate": {
+            "type": "boolean",
+            "description": "true برای صدور مجدد کلید — کلید قبلی بلافاصله باطل می‌شود"
+          }
+        }
+      },
+      "IssueInvoiceDto": {
+        "type": "object",
+        "properties": {
+          "amountIrr": {
+            "type": "number",
+            "example": 800000000,
+            "description": "مبلغ فاکتور به ریال"
+          },
+          "dueAt": {
+            "type": "string",
+            "example": "2026-08-05T00:00:00.000Z"
+          }
+        },
+        "required": [
+          "amountIrr",
+          "dueAt"
+        ]
+      },
+      "CreateMessageDto": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "example": "سلام، لطفاً فاکتور را تسویه بفرمایید."
+          }
+        },
+        "required": [
+          "body"
+        ]
+      }
+    }
+  }
+}
