@@ -18,3 +18,5 @@ ml-service/*.egg-info/
 !.vscode/extensions.json
 .idea
 .DS_Store
+__pycache__/
+*.pyc

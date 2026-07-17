@@ -2197,6 +2197,153 @@
           "it-manager"
         ]
       }
+    },
+    "/pricing/proposals": {
+      "get": {
+        "operationId": "PricingController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "CEO: لیست در انتظار/ثبت‌شده — بازرگانی: پروازهای برنامه‌ریزی‌شده + پیشنهادشان",
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
+    "/pricing/flights/{flightInstanceId}/proposal": {
+      "put": {
+        "operationId": "PricingController_upsertProposal",
+        "parameters": [
+          {
+            "name": "flightInstanceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertProposalDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "ارسال/ویرایش نرخ پیشنهادی — تا قبل از تأیید قابل ویرایش",
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
+    "/pricing/proposals/{id}/legal-rate": {
+      "patch": {
+        "operationId": "PricingController_setLegalRate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetLegalRateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "ثبت نرخ قانونی (مصوب سازمان هواپیمایی)",
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
+    "/pricing/proposals/{id}/register": {
+      "patch": {
+        "operationId": "PricingController_register",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterProposalDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تأیید و ثبت قیمت — «تأیید بازرگانی» یا «ثبت با AI»",
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
+    "/pricing/_test/flight-instance": {
+      "post": {
+        "operationId": "PricingController_createTestInstance",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "E2E only — fresh SCHEDULED instance; 404 in production",
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
+    "/pricing/proposals/ai-analysis": {
+      "post": {
+        "operationId": "PricingController_runAiAnalysis",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "تحلیل و پیشنهاد قیمت هوش مصنوعی — مشورتی، با degradation امن",
+        "tags": [
+          "pricing"
+        ]
+      }
     }
   },
   "info": {
@@ -2754,6 +2901,57 @@
             "type": "boolean"
           }
         }
+      },
+      "UpsertProposalDto": {
+        "type": "object",
+        "properties": {
+          "proposedPriceIrr": {
+            "type": "number",
+            "example": 38500000,
+            "description": "نرخ پیشنهادی به ریال"
+          },
+          "legalRateIrr": {
+            "type": "number",
+            "example": 42000000,
+            "description": "نرخ قانونی/مصوب به ریال"
+          },
+          "note": {
+            "type": "string",
+            "description": "یادداشت برای مدیر عامل (اختیاری)"
+          }
+        },
+        "required": [
+          "proposedPriceIrr"
+        ]
+      },
+      "SetLegalRateDto": {
+        "type": "object",
+        "properties": {
+          "legalRateIrr": {
+            "type": "number",
+            "example": 42000000,
+            "description": "نرخ قانونی (مصوب سازمان هواپیمایی) به ریال"
+          }
+        },
+        "required": [
+          "legalRateIrr"
+        ]
+      },
+      "RegisterProposalDto": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "PROPOSED",
+              "AI"
+            ],
+            "description": "منبع قیمت ثبتی: تأیید بازرگانی یا ثبت با AI"
+          }
+        },
+        "required": [
+          "source"
+        ]
       }
     }
   }

@@ -75,8 +75,9 @@ describe('IT Manager (e2e)', () => {
       .set(auth(accessToken))
       .send({
         fullName: 'تکراری',
-        username: (await prisma.user.findFirst({ where: { fullName: 'کارمند تست' } }))!
-          .username,
+        username: (await prisma.user.findFirst({
+          where: { fullName: 'کارمند تست' },
+        }))!.username,
         password: 'testpass1',
         dept: 'commercial',
       });
@@ -149,7 +150,9 @@ describe('IT Manager (e2e)', () => {
       .send({ permissionKey: 'fl_view', grant: true });
     expect(grant.status).toBe(200);
     expect(
-      grant.body.data.permissions.some((p: { key: string }) => p.key === 'fl_view'),
+      grant.body.data.permissions.some(
+        (p: { key: string }) => p.key === 'fl_view',
+      ),
     ).toBe(true);
 
     const revoke = await request(app.getHttpServer())
@@ -157,7 +160,9 @@ describe('IT Manager (e2e)', () => {
       .set(auth(accessToken))
       .send({ permissionKey: 'fl_view', grant: false });
     expect(
-      revoke.body.data.permissions.some((p: { key: string }) => p.key === 'fl_view'),
+      revoke.body.data.permissions.some(
+        (p: { key: string }) => p.key === 'fl_view',
+      ),
     ).toBe(false);
 
     // "rf_list" belongs to the finance catalog, not commercial (this employee's dept).
@@ -283,7 +288,11 @@ describe('IT Manager (e2e)', () => {
     expect(notFound.status).toBe(404);
 
     const audit = await prisma.auditLog.findFirst({
-      where: { category: 'SYSTEM', entityType: 'InternalService', entityId: 'search' },
+      where: {
+        category: 'SYSTEM',
+        entityType: 'InternalService',
+        entityId: 'search',
+      },
     });
     expect(audit).not.toBeNull();
   });
