@@ -9,6 +9,7 @@ interface AuthContextValue {
   user: AuthUser | null;
   requestLogin: (username: string, password: string) => Promise<string>;
   confirmTwoFactor: (challengeId: string, code: string) => Promise<AuthUser>;
+  agencyLogin: (phone: string, password: string) => Promise<AuthUser>;
   signOut: () => Promise<void>;
 }
 
@@ -49,6 +50,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return loggedInUser;
   }, []);
 
+  const agencyLogin = useCallback(async (phone: string, password: string) => {
+    const { user: loggedInUser } = await authApi.agencyLogin(phone, password);
+    setUser(loggedInUser);
+    setStatus('authenticated');
+    return loggedInUser;
+  }, []);
+
   const signOut = useCallback(async () => {
     await authApi.logout();
     setUser(null);
@@ -56,8 +64,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ status, user, requestLogin, confirmTwoFactor, signOut }),
-    [status, user, requestLogin, confirmTwoFactor, signOut],
+    () => ({ status, user, requestLogin, confirmTwoFactor, agencyLogin, signOut }),
+    [status, user, requestLogin, confirmTwoFactor, agencyLogin, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
