@@ -4,12 +4,14 @@ import ProtectedRoute from './components/ProtectedRoute';
 import PanelShell from './components/PanelShell';
 import ComingSoonPage from './components/ComingSoonPage';
 import DashboardRouter from './components/DashboardRouter';
-import AgenciesTabGate from './components/AgenciesTabGate';
+import TabGate from './components/TabGate';
 import LoginPage from './features/auth/LoginPage';
 import TwoFactorPage from './features/auth/TwoFactorPage';
 import AgenciesListPage from './features/agencies/AgenciesListPage';
 import AgencyDetailPage from './features/agencies/AgencyDetailPage';
 import RequestDetailPage from './features/agencies/RequestDetailPage';
+import CartablePage from './features/cartable/CartablePage';
+import ReferralsPage from './features/referrals/ReferralsPage';
 
 export default function App() {
   return (
@@ -22,10 +24,16 @@ export default function App() {
           <Route element={<ProtectedRoute />}>
             <Route path="/panel" element={<PanelShell />}>
               <Route index element={<DashboardRouter />} />
-              <Route path="agencies" element={<AgenciesTabGate />}>
+              <Route path="agencies" element={<TabGate tabKey="agencies" />}>
                 <Route index element={<AgenciesListPage />} />
                 <Route path="requests/:requestId" element={<RequestDetailPage />} />
                 <Route path=":agencyId" element={<AgencyDetailPage />} />
+              </Route>
+              <Route path="cartable" element={<TabGate tabKey="cartable" />}>
+                <Route index element={<CartablePage />} />
+              </Route>
+              <Route path="referrals" element={<TabGate tabKey="referrals" />}>
+                <Route index element={<ReferralsPage />} />
               </Route>
               <Route path=":tabKey" element={<ComingSoonPage />} />
             </Route>
