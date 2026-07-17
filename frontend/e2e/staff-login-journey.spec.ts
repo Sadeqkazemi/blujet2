@@ -1,27 +1,8 @@
 import { expect, test } from '@playwright/test';
+import { loginAs } from './helpers/login';
 
-const API_URL = process.env.E2E_API_URL ?? 'http://localhost:3000';
-const PASSWORD = 'Blujet@1404';
-
-async function getTwoFactorCode(username: string): Promise<string> {
-  const res = await fetch(`${API_URL}/auth/_test/last-code/${username}`);
-  const body = (await res.json()) as { success: boolean; data?: { code: string } };
-  if (!body.success || !body.data) throw new Error(`No 2FA code available for ${username}`);
-  return body.data.code;
-}
-
-async function loginAs(page: import('@playwright/test').Page, username: string) {
-  await page.goto('/login');
-  await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
-  await page.fill('#username', username);
-  await page.fill('#password', PASSWORD);
-  await page.click('button[type=submit]');
-  await page.waitForURL('**/two-factor');
-  const code = await getTwoFactorCode(username);
-  await page.fill('#code', code);
-  await page.click('button[type=submit]');
-  await page.waitForURL('**/panel');
-}
+// Generous timeout: the shared login helper may wait out the auth rate limit.
+test.setTimeout(240_000);
 
 /** Strips the "به‌زودی" suffix NavLink appends for not-yet-implemented tabs. */
 function stripComingSoon(label: string): string {
@@ -99,4 +80,9 @@ test('a role-scoped "coming soon" tab renders without crashing', async ({ page }
 test('an unauthenticated visitor is redirected to /login', async ({ page }) => {
   await page.goto('/panel');
   await page.waitForURL('**/login');
+});
+
+test('the login page renders RTL', async ({ page }) => {
+  await page.goto('/login');
+  await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
 });

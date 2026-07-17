@@ -299,6 +299,17 @@ describe('Agencies (e2e)', () => {
     expect(sum._sum.signedAmountIrr).toBe(0);
   });
 
+  it('PATCH credit rejects a limit beyond the Int32 rial ceiling with 400, not a DB 500', async () => {
+    const agencyId = await createFreshAgency();
+    const { accessToken } = await loginAs(app, 'finance.karimi');
+    const res = await request(app.getHttpServer())
+      .patch(`/agencies/${agencyId}/credit`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ limitIrr: 3_000_000_000 });
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION_FAILED');
+  });
+
   it('POST /settle is 403 for COMMERCIAL_MANAGER', async () => {
     const agencyId = await createFreshAgency();
     const { accessToken } = await loginAs(app, 'comm.abbasi');
