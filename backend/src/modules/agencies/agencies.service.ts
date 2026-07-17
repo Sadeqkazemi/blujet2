@@ -7,6 +7,7 @@ import {
 import * as crypto from 'node:crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { CartableService } from '../cartable/cartable.service';
 import { ErrorCode } from '../../common/errors';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type {
@@ -34,6 +35,7 @@ export class AgenciesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly cartable: CartableService,
   ) {}
 
   /** SUM(SALE) + SUM(SETTLEMENT) per agency — SETTLEMENT rows are stored
@@ -551,6 +553,20 @@ export class AgenciesService {
         reviewedById: actor.id,
         reviewedAt: new Date(),
       },
+    });
+
+    // Phase 4 wiring (⚑): the referred-to manager receives the request in
+    // their cartable — that IS the delivery surface for referrals.
+    await this.cartable.createTask({
+      assigneeId: referredToId,
+      category: 'AGENCY',
+      title: `بررسی درخواست عضویت: ${request.applicantName}`,
+      description: note
+        ? `${note} (ارجاع از ${actor.fullName})`
+        : `درخواست عضویت «${request.applicantName}» برای بررسی به شما ارجاع شد.`,
+      senderId: actor.id,
+      sourceType: 'AGENCY_REQUEST',
+      sourceId: id,
     });
 
     await this.audit.record({

@@ -6,12 +6,12 @@ interface PanelShellContext {
   nav: PanelNavItem[] | null;
 }
 
-/** Mirrors DashboardRouter's pattern: only render the real Agencies pages
- * when this role's nav entry is implemented — otherwise the shared
- * coming-soon placeholder, never a broken fetch-and-error page. */
-export default function AgenciesTabGate() {
+/** Renders the tab's real pages only when this role's nav entry is
+ * implemented — otherwise the shared coming-soon placeholder, never a
+ * broken fetch-and-error page (same pattern as DashboardRouter). */
+export default function TabGate({ tabKey }: { tabKey: string }) {
   const { nav } = useOutletContext<PanelShellContext>();
-  const entry = nav?.find((item) => item.key === 'agencies');
+  const entry = nav?.find((item) => item.key === tabKey);
 
   if (nav !== null && (!entry || !entry.implemented)) {
     return <ComingSoonPage />;

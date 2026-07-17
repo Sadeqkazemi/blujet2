@@ -382,6 +382,171 @@ async function main() {
     }
   }
 
+  // ── Phase 4: cartable demo items + a referral in each state ────────────
+  // Mirrors the design mocks' taskDefs/referrals seeds so the panels open
+  // with realistic content. Only generated once (idempotent re-runs).
+  const ceo = staffByUsername.get('ceo')!;
+  const chair = staffByUsername.get('chair')!;
+
+  const existingCartableCount = await prisma.cartableTask.count();
+  if (existingCartableCount === 0) {
+    const cartableSeeds = [
+      {
+        assigneeId: ceo.id,
+        category: 'ADMIN' as const,
+        title: 'درخواست مرخصی تیم پشتیبانی',
+        description: 'درخواست هماهنگی مرخصی سه‌نفره تیم پشتیبانی برای هفته آینده.',
+        senderLabelFa: 'علی حسینی · پشتیبانی',
+        createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+      },
+      {
+        assigneeId: ceo.id,
+        category: 'AGENCY' as const,
+        title: 'درخواست افزایش سقف اعتبار آژانس blujet',
+        description: 'آژانس blujet درخواست افزایش سقف اعتبار برای فصل پیک سفر دارد.',
+        senderId: commercialManager.id,
+        senderLabelFa: 'رضا مرادی · مدیر بازرگانی',
+        createdAt: new Date(Date.now() - 26 * 60 * 60 * 1000),
+      },
+      {
+        assigneeId: ceo.id,
+        category: 'MANAGER' as const,
+        title: 'گزارش انحراف بودجه تبلیغات',
+        description: 'انحراف ۱۲٪ نسبت به بودجه مصوب تبلیغات — نیازمند تصمیم مدیریت.',
+        senderId: financeManager.id,
+        senderLabelFa: 'سحر کاظمی · مدیر مالی',
+        createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+      },
+      {
+        assigneeId: chair.id,
+        category: 'MANAGER' as const,
+        title: 'گزارش عملکرد فصلی هیئت مدیره',
+        description: 'پیش‌نویس گزارش عملکرد فصل برای بازبینی و تأیید نهایی.',
+        senderId: ceo.id,
+        senderLabelFa: 'محمد رحیمی · مدیر عامل',
+        createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
+      },
+      {
+        assigneeId: financeManager.id,
+        category: 'AGENCY' as const,
+        title: 'بررسی تسویه معوق آژانس پرواز آسیا',
+        description: 'بدهی معوق بیش از ۳۰ روز — نیازمند تصمیم درباره ادامه همکاری.',
+        senderId: commercialManager.id,
+        senderLabelFa: 'رضا مرادی · مدیر بازرگانی',
+        createdAt: new Date(Date.now() - 8 * 60 * 60 * 1000),
+      },
+      {
+        assigneeId: commercialManager.id,
+        category: 'ADMIN' as const,
+        title: 'به‌روزرسانی قرارداد همکاری آژانس‌ها',
+        description: 'نسخه جدید قرارداد استاندارد همکاری آماده بازبینی است.',
+        senderLabelFa: 'ادمین سایت',
+        createdAt: new Date(Date.now() - 30 * 60 * 60 * 1000),
+      },
+      {
+        assigneeId: seniorManager.id,
+        category: 'MANAGER' as const,
+        title: 'درخواست بازنگری دسترسی پنل مالی',
+        description: 'درخواست بازبینی سطوح دسترسی پنل مالی پس از تغییرات اخیر.',
+        senderId: financeManager.id,
+        senderLabelFa: 'سحر کاظمی · مدیر مالی',
+        createdAt: new Date(Date.now() - 20 * 60 * 60 * 1000),
+      },
+    ];
+    for (const t of cartableSeeds) {
+      await prisma.cartableTask.create({ data: t });
+    }
+
+    // One referral per status so the Senior Manager tab shows all 4 KPI states.
+    const referralSeeds: {
+      title: string;
+      body: string;
+      priority: 'HIGH' | 'MEDIUM' | 'LOW';
+      status: 'SENT' | 'REVIEWING' | 'REPORTED' | 'CLOSED';
+      recipientIds: string[];
+      dueAt?: Date;
+      report?: { fromId: string; body: string };
+    }[] = [
+      {
+        title: 'درخواست گزارش فروش سه‌ماهه',
+        body: 'گزارش تفکیکی فروش سه‌ماهه اخیر به تفکیک کانال فروش ارسال شود.',
+        priority: 'HIGH',
+        status: 'SENT',
+        recipientIds: [financeManager.id],
+        dueAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      },
+      {
+        title: 'بازنگری نرخ کمیسیون آژانس‌ها',
+        body: 'پیشنهاد نرخ کمیسیون جدید برای آژانس‌های سطح طلایی تهیه شود.',
+        priority: 'MEDIUM',
+        status: 'REVIEWING',
+        recipientIds: [commercialManager.id],
+        dueAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+      },
+      {
+        title: 'گزارش وضعیت مطالبات معوق',
+        body: 'فهرست کامل مطالبات معوق آژانس‌ها به همراه پیشنهاد اقدام ارائه شود.',
+        priority: 'HIGH',
+        status: 'REPORTED',
+        recipientIds: [financeManager.id],
+        report: {
+          fromId: financeManager.id,
+          body: 'گزارش مطالبات معوق پیوست شد؛ دو آژانس نیازمند پیگیری حقوقی هستند.',
+        },
+      },
+      {
+        title: 'جمع‌بندی کمپین تخفیف تابستان',
+        body: 'نتایج کمپین تخفیف تابستان جمع‌بندی و ارسال شود.',
+        priority: 'LOW',
+        status: 'CLOSED',
+        recipientIds: [commercialManager.id],
+        report: {
+          fromId: commercialManager.id,
+          body: 'گزارش کمپین پیوست است؛ نرخ تبدیل ۱۸٪ بالاتر از هدف بود.',
+        },
+      },
+    ];
+    for (const r of referralSeeds) {
+      const referral = await prisma.managerReferral.create({
+        data: {
+          fromId: seniorManager.id,
+          title: r.title,
+          body: r.body,
+          priority: r.priority,
+          status: r.status,
+          dueAt: r.dueAt,
+          recipients: { create: r.recipientIds.map((id) => ({ recipientId: id })) },
+        },
+      });
+      if (r.report) {
+        await prisma.managerReferralReport.create({
+          data: { referralId: referral.id, fromId: r.report.fromId, body: r.report.body },
+        });
+      }
+      // Delivery wiring (⚑): each recipient gets a cartable task, except for
+      // CLOSED seeds whose loop is already finished.
+      if (r.status !== 'CLOSED') {
+        for (const recipientId of r.recipientIds) {
+          await prisma.cartableTask.create({
+            data: {
+              assigneeId: recipientId,
+              category: 'MANAGER',
+              title: r.title,
+              description: r.body,
+              senderId: seniorManager.id,
+              senderLabelFa: 'محمد رحیمی · مدیر ارشد',
+              sourceType: 'MANAGER_REFERRAL',
+              sourceId: referral.id,
+              status: r.status === 'REPORTED' ? 'APPROVED' : 'OPEN',
+              resolutionNote: r.status === 'REPORTED' ? 'گزارش ثبت و ارسال شد.' : undefined,
+              resolvedAt: r.status === 'REPORTED' ? new Date() : undefined,
+            },
+          });
+        }
+      }
+    }
+  }
+
   console.log('Seed complete.');
   console.log(`Staff dev password (all roles): ${STAFF_PASSWORD}`);
 }

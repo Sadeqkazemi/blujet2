@@ -1085,6 +1085,452 @@
           "agencies"
         ]
       }
+    },
+    "/cartable": {
+      "get": {
+        "operationId": "CartableController_list",
+        "parameters": [
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "description": "فیلتر کارت‌های KPI",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ADMIN",
+                "AGENCY",
+                "MANAGER"
+              ]
+            }
+          },
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "description": "روز انتخابی تقویم شمسی، به ISO",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "OPEN",
+              "type": "string",
+              "enum": [
+                "OPEN",
+                "APPROVED",
+                "REJECTED",
+                "TRANSFERRED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "کارتابل من — فقط موارد خود کاربر + شمارنده کارت‌ها",
+        "tags": [
+          "cartable"
+        ]
+      }
+    },
+    "/cartable/chair-permission": {
+      "post": {
+        "operationId": "CartableController_requestChairPermission",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "درخواست مجوز از رئیس هیئت مدیره — بنر مالی/بازرگانی",
+        "tags": [
+          "cartable"
+        ]
+      },
+      "get": {
+        "operationId": "CartableController_getChairPermission",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "وضعیت آخرین درخواست مجوز کاربر",
+        "tags": [
+          "cartable"
+        ]
+      }
+    },
+    "/cartable/{id}/approve": {
+      "patch": {
+        "operationId": "CartableController_approve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveCartableDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تأیید — نظر مدیر الزامی",
+        "tags": [
+          "cartable"
+        ]
+      }
+    },
+    "/cartable/{id}/reject": {
+      "patch": {
+        "operationId": "CartableController_reject",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveCartableDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "رد (دکمه «انصراف» طراحی) — نظر مدیر الزامی",
+        "tags": [
+          "cartable"
+        ]
+      }
+    },
+    "/cartable/{id}/transfer": {
+      "patch": {
+        "operationId": "CartableController_transfer",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferCartableDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "انتقال به مدیر دیگر — مورد جدید برای مقصد ساخته می‌شود",
+        "tags": [
+          "cartable"
+        ]
+      }
+    },
+    "/staff-directory": {
+      "get": {
+        "operationId": "StaffDirectoryController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست کارکنان فعال برای انتخاب مقصد انتقال/ارجاع",
+        "tags": [
+          "staff-directory"
+        ]
+      }
+    },
+    "/referrals": {
+      "get": {
+        "operationId": "ReferralsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "ارجاعات من به مدیران + کارت‌های KPI",
+        "tags": [
+          "referrals"
+        ]
+      },
+      "post": {
+        "operationId": "ReferralsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateReferralDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ایجاد ارجاع جدید — برای هر مقصد یک مورد کارتابل ساخته می‌شود",
+        "tags": [
+          "referrals"
+        ]
+      }
+    },
+    "/referrals/{id}": {
+      "get": {
+        "operationId": "ReferralsController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "جزئیات ارجاع + گزارش‌های دریافتی",
+        "tags": [
+          "referrals"
+        ]
+      }
+    },
+    "/referrals/{id}/reports": {
+      "post": {
+        "operationId": "ReferralsController_submitReport",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateReportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ثبت گزارش توسط مدیر مقصد — وضعیت → گزارش دریافت‌شد",
+        "tags": [
+          "referrals"
+        ]
+      }
+    },
+    "/referrals/{id}/close": {
+      "patch": {
+        "operationId": "ReferralsController_close",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تأیید دریافت گزارش و بستن",
+        "tags": [
+          "referrals"
+        ]
+      }
+    },
+    "/referrals/{id}/request-revision": {
+      "patch": {
+        "operationId": "ReferralsController_requestRevision",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "درخواست اصلاح گزارش",
+        "tags": [
+          "referrals"
+        ]
+      }
+    },
+    "/referrals/{id}/remind": {
+      "post": {
+        "operationId": "ReferralsController_remind",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ارسال یادآوری دریافت گزارش",
+        "tags": [
+          "referrals"
+        ]
+      }
+    },
+    "/manager-messages": {
+      "post": {
+        "operationId": "ManagerMessagesController_send",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendMessageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ایجاد پیام — تحویل به‌صورت مورد کارتابل برای گیرندگان",
+        "tags": [
+          "manager-messages"
+        ]
+      }
+    },
+    "/manager-messages/sent": {
+      "get": {
+        "operationId": "ManagerMessagesController_sent",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "پیام‌های ارسالی خود کاربر",
+        "tags": [
+          "manager-messages"
+        ]
+      }
+    },
+    "/files": {
+      "post": {
+        "operationId": "FilesController_upload",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "آپلود پیوست — فقط PDF/تصویر، حداکثر ۵MB",
+        "tags": [
+          "files"
+        ]
+      }
+    },
+    "/files/{id}": {
+      "get": {
+        "operationId": "FilesController_read",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "دریافت فایل — مالک یا طرف‌های ارجاع/پیام مربوط",
+        "tags": [
+          "files"
+        ]
+      }
     }
   },
   "info": {
@@ -1264,6 +1710,134 @@
           }
         },
         "required": [
+          "body"
+        ]
+      },
+      "ResolveCartableDto": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "description": "نظر مدیر — الزامی، مطابق طراحی"
+          }
+        },
+        "required": [
+          "note"
+        ]
+      },
+      "TransferCartableDto": {
+        "type": "object",
+        "properties": {
+          "toId": {
+            "type": "string",
+            "description": "شناسه مدیر مقصد انتقال"
+          },
+          "note": {
+            "type": "string",
+            "description": "نظر مدیر — الزامی، مطابق طراحی"
+          }
+        },
+        "required": [
+          "toId",
+          "note"
+        ]
+      },
+      "CreateReferralDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "example": "درخواست گزارش فروش سه‌ماهه"
+          },
+          "body": {
+            "type": "string",
+            "description": "شرح درخواست"
+          },
+          "recipientIds": {
+            "description": "شناسه مدیر(ان) مقصد",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "HIGH",
+              "MEDIUM",
+              "LOW"
+            ],
+            "default": "MEDIUM"
+          },
+          "dueAt": {
+            "type": "string",
+            "description": "مهلت دریافت گزارش (ISO — از تقویم شمسی تبدیل می‌شود)"
+          },
+          "attachmentIds": {
+            "description": "شناسه فایل‌های پیوست",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "title",
+          "body",
+          "recipientIds"
+        ]
+      },
+      "CreateReportDto": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "description": "متن گزارش"
+          },
+          "attachmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "body"
+        ]
+      },
+      "SendMessageDto": {
+        "type": "object",
+        "properties": {
+          "toDept": {
+            "type": "string",
+            "enum": [
+              "FINANCE",
+              "COMMERCIAL",
+              "SUPPORT",
+              "AGENCIES",
+              "CEO",
+              "ALL_MANAGERS"
+            ],
+            "description": "گیرنده سازمانی"
+          },
+          "subject": {
+            "type": "string",
+            "example": "هماهنگی جلسه بودجه"
+          },
+          "body": {
+            "type": "string",
+            "description": "متن پیام"
+          },
+          "attachmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "toDept",
+          "subject",
           "body"
         ]
       }

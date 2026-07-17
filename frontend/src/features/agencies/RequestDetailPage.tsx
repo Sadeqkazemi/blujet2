@@ -1,8 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { fetchAgencyRequest, approveAgencyRequest, rejectAgencyRequest } from '../../api/agencies';
+import { useAuth } from '../../hooks/useAuth';
+import {
+  fetchAgencyRequest,
+  approveAgencyRequest,
+  rejectAgencyRequest,
+  referAgencyRequest,
+} from '../../api/agencies';
+import { fetchStaffDirectory } from '../../api/cartable';
 import { formatJalaliDate } from '../../lib/jalali';
 import type { AgencyMembershipRequest } from '../../types/agencies';
+import type { StaffDirectoryEntry } from '../../types/cartable';
 
 const STATUS_LABELS: Record<AgencyMembershipRequest['status'], string> = {
   PENDING: 'در انتظار بررسی',
@@ -14,11 +22,19 @@ const STATUS_LABELS: Record<AgencyMembershipRequest['status'], string> = {
 export default function RequestDetailPage() {
   const { requestId = '' } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  // The refer block appears only in the Senior/Commercial panels (design).
+  const canRefer = user?.role === 'SENIOR_MANAGER' || user?.role === 'COMMERCIAL_MANAGER';
 
   const [request, setRequest] = useState<AgencyMembershipRequest | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const [staff, setStaff] = useState<StaffDirectoryEntry[]>([]);
+  const [referTo, setReferTo] = useState('');
+  const [referNote, setReferNote] = useState('');
+  const [notice, setNotice] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -33,6 +49,29 @@ export default function RequestDetailPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!canRefer) return;
+    fetchStaffDirectory()
+      .then(setStaff)
+      .catch(() => setStaff([]));
+  }, [canRefer]);
+
+  async function onRefer() {
+    if (!referTo) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await referAgencyRequest(requestId, referTo, referNote.trim() || undefined);
+      const target = staff.find((s) => s.id === referTo);
+      setNotice(`این درخواست به ${target?.fullName ?? 'مدیر مقصد'} ارجاع شد.`);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'خطا در ثبت ارجاع.');
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function onApprove() {
     setBusy(true);
@@ -133,6 +172,56 @@ export default function RequestDetailPage() {
           </div>
         )}
       </section>
+
+      {notice && <p className="rounded-lg bg-[#10b98115] p-3 text-sm text-[#059669]">{notice}</p>}
+
+      {decidable && canRefer && (
+        <section className="rounded-xl border border-border bg-white p-5">
+          <h2 className="text-sm font-bold text-ink">ارجاع درخواست</h2>
+          <p className="mt-1 text-[11px] text-muted">
+            می‌توانید بررسی این درخواست را به مدیران دیگر ارجاع دهید.
+          </p>
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-bold text-ink" htmlFor="refer-to">
+                گیرندهٔ ارجاع را انتخاب کنید
+              </label>
+              <select
+                id="refer-to"
+                value={referTo}
+                onChange={(e) => setReferTo(e.target.value)}
+                className="w-full rounded-lg border border-border bg-white p-3 text-xs outline-none transition focus:border-accent"
+              >
+                <option value="">انتخاب گیرندهٔ ارجاع…</option>
+                {staff.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.fullName} — {s.roleLabelFa}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-bold text-ink" htmlFor="refer-note">
+                توضیح ارجاع (اختیاری)
+              </label>
+              <input
+                id="refer-note"
+                value={referNote}
+                onChange={(e) => setReferNote(e.target.value)}
+                placeholder="توضیح یا دستور خود را برای گیرندهٔ ارجاع بنویسید…"
+                className="w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent"
+              />
+            </div>
+          </div>
+          <button
+            disabled={!referTo || busy}
+            onClick={() => void onRefer()}
+            className="mt-3 rounded-lg bg-accent px-4 py-2 text-xs font-bold text-white transition hover:bg-accent/90 disabled:opacity-50"
+          >
+            ثبت و ارسال ارجاع
+          </button>
+        </section>
+      )}
 
       {decidable && (
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-white p-5">
