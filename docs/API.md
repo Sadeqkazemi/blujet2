@@ -146,6 +146,79 @@ FINANCE_MANAGER, COMMERCIAL_MANAGER (the 5 panels with a کارتابل tab).
 
 ---
 
+## Phase 8 — Employee management (IT Manager)
+
+Scope confirmed against `PLAN.md`'s Phase 8 bullet — **accounts, permissions,
+services, security policy, logs, backups** — exactly 6 of the design's 9 IT
+tabs. The other 3 (سامانه رزرواسیون, دسترسی به پنل‌ها, تنظیمات سامانه)
+stay `implemented: false`: the first depends on Phase 9's `ReservationSystem`
+build-out, the other two are explicitly re-scoped to Phase 12 in `PLAN.md`
+("plus the UI for the two Phase-1 backends..." / "تنظیمات سامانه" listed
+there, not here) — not silently dropped, just not this phase's job. All
+endpoints below: `@Roles('IT_MANAGER')` + `AuditLog` on every write, per
+CLAUDE.md's RBAC/observability rules. See `docs/DB_SCHEMA.md` → Phase 8 for
+the data model and the design's `PERM_CATALOG` reproduction.
+
+### `backend/src/modules/it-manager/` — employees ("کاربران و دسترسی‌ها")
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/it/permissions` | The seeded catalog (dept → sections → perms), grouped exactly like `PERM_CATALOG` in `site-data.js` — feeds the create-employee form and the detail modal's "افزودن دسترسی" list. |
+| GET | `/it/employees` | Query: `dept?`, `q?` (name/username). List with `role` label, `dept`, `username`, `lastLoginAt`, `isActive`. |
+| POST | `/it/employees` | `{ fullName, username, password (≥6), dept, customDeptLabel?, rank, referralScope, permissionKeys[] }` — creates `User(role=EMPLOYEE)`, hashes password (argon2), grants the listed permissions (`dashboard`+`cartable` implicitly included, matching the design's `createStaffUser`). 409 on duplicate username. `AuditLog(category=ACCOUNT)`. |
+| GET | `/it/employees/:id` | Detail: profile + last login + granted permissions + the catalog rows not yet granted ("available"). 404 for non-EMPLOYEE / non-existent ids. |
+| PATCH | `/it/employees/:id/status` | `{ isActive }` — suspend/reactivate. `AuditLog(category=ACCOUNT)`. |
+| PATCH | `/it/employees/:id/permissions` | `{ permissionKey, grant }` — single toggle (mirrors the design's per-row switch). `AuditLog(category=ACCESS)`. |
+| POST | `/it/employees/:id/reset-password` | Generates a temporary password, argon2-hashes it onto the account, sets `mustChangePassword=true`, records a `PasswordResetEvent`, `AuditLog(category=ACCOUNT)`. Returns the plaintext temp password **once** in this response only — never stored, never logged (per Security Rules' OTP/secret-at-rest pattern). |
+
+### `backend/src/modules/it-manager/` — security ("رمزها و امنیت")
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/it/security/policy` | The singleton `SecurityPolicy` row (auto-created with design's defaults on first read). |
+| PATCH | `/it/security/policy` | Any subset of the toggle/param fields. `AuditLog(category=SECURITY)`. |
+| GET | `/it/security/sessions` | Active (non-revoked, non-expired) `RefreshToken`s joined to their user — "۴۸ کاربر هم‌اکنون وارد سامانه هستند" + per-row device/IP. |
+| POST | `/it/security/sessions/logout-all` | Revokes every active `RefreshToken` site-wide — the design's «خروج همه». `AuditLog(category=SECURITY)`, high-severity by nature so confirmed as IT-only, not delegated. |
+
+### `backend/src/modules/it-manager/` — services ("سرویس‌های سایت")
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/it/services` | `{ internal: InternalService[], external: ExternalServiceConfig[] }` (seeded rows from `site-data.js`'s `svcDefs`/`extDefs`; `apiKeyEncrypted` never returned in plaintext — masked). |
+| PATCH | `/it/services/internal/:key` | `{ enabled }` — toggle, immediate (per design copy "بلافاصله روی سایت اعمال می‌شود"). `AuditLog(category=SYSTEM)`. |
+| POST | `/it/services/external` | Create — `{ nameFa, provider, endpoint, method, timeoutMs, apiKey?, sandbox }`; `apiKey` encrypted at rest (`pii-crypto` AES-256-GCM, reused generically — not a PII field but the same reversible-encryption primitive). |
+| PATCH | `/it/services/external/:id` | Update any field incl. `enabled` toggle. |
+| DELETE | `/it/services/external/:id` | Remove. |
+| POST | `/it/services/external/:id/test` | Real connectivity check — HTTP request to the stored endpoint with the configured method/timeout/key, hard-capped; records `lastTestAt/lastTestOk/lastTestMessage`. Never fakes a result. |
+
+### `backend/src/modules/it-manager/` — backups ("پشتیبان‌گیری")
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/it/backups` | `BackupRecord` list, newest first. |
+| POST | `/it/backups` | Triggers a real `pg_dump` (via `DATABASE_URL`) to the configured backup directory; creates a `RUNNING` row, updates to `SUCCESS`/`FAILED` with size/error when the process exits. Never simulated — a missing `pg_dump` binary is a real `FAILED` row, not a fabricated success. |
+| GET | `/it/backups/schedule` | Static config describing the server-side cron (`scripts/backup-db.sh`, already documented in `docs/RUNBOOK.md`) — informational only, this phase does not add a second, competing scheduler. |
+
+Restore is intentionally **not** a one-click endpoint: CLAUDE.md's own
+deployment rules treat restore as a manual, RUNBOOK-documented operation
+("once a month, restore the latest dump into a throwaway container") — wiring
+a database-overwriting action behind a panel button would contradict that,
+not implement it faster.
+
+### `backend/src/modules/it-manager/` — dashboard ("داشبورد فنی")
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/it/dashboard` | `{ kpis, serviceHealth, resources, recentEvents }`. `kpis`: active employees, active sessions, services up/total, last backup status+age. `serviceHealth`: from `InternalService`+`ExternalServiceConfig`. `resources`: **real** host memory (`os.totalmem/freemem`) + 1-minute load average (`os.loadavg`) — never synthetic/random numbers. `recentEvents`: latest `AuditLog` rows across SYSTEM/ACCOUNT/ACCESS/SECURITY. |
+
+### Logs ("لاگ و رویدادها") and Panels access ("دسترسی به پنل‌ها")
+
+Both already exist from Phase 1 — `GET /audit/logs` and `GET /panels/access`
+(see Phase 1 section above). This phase only wires the IT panel's frontend
+tabs to them; no new backend endpoints.
+
+---
+
 ## Later phases (endpoints TBD — documented here before each phase's code is written)
 
 - **Phase 2** — none directly (reporting reads Phase-2 tables; no new endpoints of its own beyond what's above).
@@ -158,5 +231,4 @@ FINANCE_MANAGER, COMMERCIAL_MANAGER (the 5 panels with a کارتابل tab).
   - PATCH `/club/card-requests/:id/approve` | `/reject` — «تأیید و صدور کارت» / «انصراف» — CEO/BOARD_CHAIR: any REFERRED; SENIOR_MANAGER: only `assignedTo=SENIOR` (⚑); transactional + audited; 409 on non-REFERRED.
 - **Phase 6** — `/pricing/proposals`, `/pricing/proposals/:id/approve`.
 - **Phase 7** — `/refunds`, `/refunds/:id/refer`, `/refunds/:id/pay`.
-- **Phase 8** — `/employees`, `/employees/:id/permissions`, `/employees/:id/reset-password`, `/it/services`, `/it/external-services`.
 - **Phase 9** — `/reservation/seats/:flightInstanceId`, `/reservation/seats/:id/lock`, `/reservation/seats/:id/release`, `/reservation/pnr/*`.
