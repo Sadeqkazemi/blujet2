@@ -9,14 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
-import {
-  IsInt,
-  IsISO8601,
-  IsString,
-  Matches,
-  Max,
-  Min,
-} from 'class-validator';
+import { IsInt, IsISO8601, IsString, Matches, Max, Min } from 'class-validator';
 import type { Request } from 'express';
 import { FlightsService } from './flights.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -113,7 +106,10 @@ export class FlightsController {
     summary:
       'تحلیل قیمت‌گذاری پروازهای آینده با هوش مصنوعی — advisory، با degrade امن',
   })
-  async aiAnalysis(@CurrentUser() actor: AuthenticatedUser, @Req() req: Request) {
+  async aiAnalysis(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Req() req: Request,
+  ) {
     const data = await this.flights.runAiAnalysis(
       actor,
       req.headers['x-request-id'] as string | undefined,

@@ -227,7 +227,8 @@ export class AgenciesController {
 
   @Post(':id/_test/debt')
   @ApiOperation({
-    summary: 'E2E only — بدهی مشتق‌شده آژانس را به رقم ثابت برمی‌گرداند؛ در production 404',
+    summary:
+      'E2E only — بدهی مشتق‌شده آژانس را به رقم ثابت برمی‌گرداند؛ در production 404',
   })
   async resetTestDebt(
     @CurrentUser() actor: AuthenticatedUser,
