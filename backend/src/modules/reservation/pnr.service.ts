@@ -425,4 +425,35 @@ export class PnrService {
       revenueIrr: revenue._sum.signedAmountIrr ?? 0,
     };
   }
+
+  /**
+   * Non-production only: a fresh, unambiguous SCHEDULED instance for E2E
+   * runs to search/lock/issue against, so tests never depend on which of
+   * the seed's historical/demo instances happens to sort first. Always
+   * 404s in production (enforced here AND by the controller).
+   */
+  async createTestInstance() {
+    if (process.env.NODE_ENV === 'production') {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'یافت نشد.',
+      });
+    }
+    const flight = await this.prisma.flight.findFirstOrThrow();
+    // Wide random jitter (25-125 days out) so repeated E2E runs practically
+    // never collide on the same calendar day and confuse the date search.
+    const daysAhead = 25 + Math.floor(Math.random() * 100);
+    const departureAt = new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000);
+    return this.prisma.flightInstance.create({
+      data: {
+        flightId: flight.id,
+        departureAt,
+        arrivalAt: new Date(departureAt.getTime() + 3 * 60 * 60 * 1000),
+        capacity: 180,
+        charterSeats: 60,
+        status: 'SCHEDULED',
+      },
+      include: { flight: { include: { route: true } } },
+    });
+  }
 }
