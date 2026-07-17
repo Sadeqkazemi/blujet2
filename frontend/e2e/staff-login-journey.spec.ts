@@ -73,7 +73,7 @@ for (const { username, roleLabel, expectedTabs, hasSalesDashboard } of ROLE_CASE
 
 test('a role-scoped "coming soon" tab renders without crashing', async ({ page }) => {
   await loginAs(page, 'ceo');
-  await page.getByRole('link', { name: /^کارتابل/ }).click();
+  await page.getByRole('link', { name: /^مشتریان VIP/ }).click();
   await expect(page.getByText('این بخش به‌زودی راه‌اندازی می‌شود')).toBeVisible();
 });
 
