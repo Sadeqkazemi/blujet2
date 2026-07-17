@@ -54,7 +54,10 @@ describe('Agency Portal (e2e)', () => {
       },
     });
     await prisma.agencyCreditLine.create({
-      data: { agencyId: user.id, limitIrr: overrides?.limitIrr ?? 1_000_000_000 },
+      data: {
+        agencyId: user.id,
+        limitIrr: overrides?.limitIrr ?? 1_000_000_000,
+      },
     });
     return { id: user.id, phone };
   }
@@ -63,7 +66,10 @@ describe('Agency Portal (e2e)', () => {
     const res = await request(app.getHttpServer())
       .post('/auth/agency/login')
       .send({ phone, password });
-    return { res, accessToken: res.body?.data?.accessToken as string | undefined };
+    return {
+      res,
+      accessToken: res.body?.data?.accessToken as string | undefined,
+    };
   }
 
   async function addAgencySale(agencyId: string, amountIrr: number) {
@@ -80,7 +86,12 @@ describe('Agency Portal (e2e)', () => {
       },
     });
     await prisma.ledgerEntry.create({
-      data: { bookingId: booking.id, agencyId, type: 'SALE', signedAmountIrr: amountIrr },
+      data: {
+        bookingId: booking.id,
+        agencyId,
+        type: 'SALE',
+        signedAmountIrr: amountIrr,
+      },
     });
     return booking;
   }
@@ -137,7 +148,10 @@ describe('Agency Portal (e2e)', () => {
     const tempPassword = approveRes.body.data.tempPassword as string;
     expect(tempPassword).toBeTruthy();
 
-    const { res, accessToken } = await loginAsAgency(reqRow.phone, tempPassword);
+    const { res, accessToken } = await loginAsAgency(
+      reqRow.phone,
+      tempPassword,
+    );
     expect(res.status).toBe(200);
     expect(accessToken).toBeTruthy();
   });
@@ -179,7 +193,9 @@ describe('Agency Portal (e2e)', () => {
       .get('/agency-portal/dashboard')
       .set('Authorization', auth(accessToken));
     expect(res.status).toBe(200);
-    expect(res.body.data.kpis.salesThisMonthIrr).toBeGreaterThanOrEqual(50_000_000);
+    expect(res.body.data.kpis.salesThisMonthIrr).toBeGreaterThanOrEqual(
+      50_000_000,
+    );
     expect(res.body.data.monthlySales).toHaveLength(6);
     expect(res.body.data.credit.limitIrr).toBe(1_000_000_000);
   });
@@ -272,7 +288,9 @@ describe('Agency Portal (e2e)', () => {
 
     const finance = await loginAs(app, 'finance.karimi');
     const rejectRes = await request(app.getHttpServer())
-      .patch(`/agencies/${agency.id}/credit-requests/${createRes.body.data.id}/decide`)
+      .patch(
+        `/agencies/${agency.id}/credit-requests/${createRes.body.data.id}/decide`,
+      )
       .set('Authorization', auth(finance.accessToken))
       .send({ approve: false });
     expect(rejectRes.status).toBe(200);
@@ -286,7 +304,7 @@ describe('Agency Portal (e2e)', () => {
 
   // ── Sales & inbox ─────────────────────────────────────────────────────
 
-  it('GET /agency-portal/sales: only this agency\'s bookings, real KPIs', async () => {
+  it("GET /agency-portal/sales: only this agency's bookings, real KPIs", async () => {
     const agency = await createFreshAgency();
     const other = await createFreshAgency();
     await addAgencySale(agency.id, 30_000_000);
@@ -315,9 +333,11 @@ describe('Agency Portal (e2e)', () => {
     const staffRes = await request(app.getHttpServer())
       .get(`/agencies/${agency.id}/messages`)
       .set('Authorization', auth(commercial.accessToken));
-    expect(staffRes.body.data.some((m: { senderIsAgency: boolean }) => m.senderIsAgency)).toBe(
-      true,
-    );
+    expect(
+      staffRes.body.data.some(
+        (m: { senderIsAgency: boolean }) => m.senderIsAgency,
+      ),
+    ).toBe(true);
   });
 
   // ── Profile ───────────────────────────────────────────────────────────

@@ -1,10 +1,8 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import * as argon2 from 'argon2';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CartableService } from '../cartable/cartable.service';
@@ -327,31 +325,5 @@ export class AgencyPortalService {
         file: { select: { fileName: true, sizeBytes: true, mimeType: true } },
       },
     });
-  }
-
-  // ── E2E-only ─────────────────────────────────────────────────────────
-
-  /** Non-production only: lets Playwright set a known password for a seeded
-   * agency phone without depending on the shared dev STAFF_PASSWORD. */
-  async testSetPassword(phone: string, password: string) {
-    if (process.env.NODE_ENV === 'production') {
-      throw new NotFoundException({
-        code: ErrorCode.NOT_FOUND,
-        message: 'یافت نشد.',
-      });
-    }
-    const user = await this.prisma.user.findUnique({ where: { phone } });
-    if (!user || user.role !== 'AGENCY') {
-      throw new ForbiddenException({
-        code: ErrorCode.FORBIDDEN,
-        message: 'شماره تماس آژانس معتبر نیست.',
-      });
-    }
-    const passwordHash = await argon2.hash(password);
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { passwordHash },
-    });
-    return { ok: true };
   }
 }
