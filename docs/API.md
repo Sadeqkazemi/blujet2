@@ -267,4 +267,9 @@ capacity creation (Phase 10's own scope).
   - PATCH `/pricing/proposals/:id/register` — CEO — `{ source: 'PROPOSED' | 'AI' }`; AI source requires a persisted suggestion; PENDING→REGISTERED, locked, audited; 409 on re-register.
   - POST `/pricing/proposals/ai-analysis` — CEO — «تحلیل و پیشنهاد قیمت هوش مصنوعی» for all PENDING proposals via the NestJS→ml-service client (2s timeout, graceful fallback, usage logged); persists suggestions with modelVersion. Advisory only.
   - ml-service: `POST /internal/v1/price-suggestion` (internal token; pydantic; versioned heuristic model; pytest) + `GET /health`.
-- **Phase 7** — `/refunds`, `/refunds/:id/refer`, `/refunds/:id/pay`.
+- **Phase 7 — Refunds** (`backend/src/modules/refunds/`; FINANCE_MANAGER only — the executives' panels have no live refund surface, confirmed):
+  - GET `/refunds` — request cards + the 3 KPI counts (در صف پرداخت / پرداخت‌شده / در انتظار بررسی ادمین).
+  - GET `/refunds/:id` — detail for the modal: passenger/account panel (شبا decrypted for this surface only), flight panel, amounts panel with the penalty breakdown (درصد جریمهٔ کنسلی → مبلغ نهایی قابل پرداخت).
+  - PATCH `/refunds/:id/refer` — `{ assigneeId }` (finance staff via /staff-directory) — sets assignee + history, status unchanged (per design), audited.
+  - PATCH `/refunds/:id/pay` — «تأیید، واریز به شبا و بستن پرونده» — only from FINANCE (else 409); transactional ledger reversal + booking REFUNDED + audit (see DB_SCHEMA ⚑).
+  - POST `/refunds/_test/request` — non-production E2E seed hook (creates a booking + FINANCE-status request), 404 in production.
