@@ -72,7 +72,7 @@ for (const { username, roleLabel, expectedTabs, dashboardMarkers } of ROLE_CASES
 
 test('a role-scoped "coming soon" tab renders without crashing', async ({ page }) => {
   await loginAs(page, 'ceo');
-  await page.getByRole('link', { name: /^تعیین قیمت بلیط/ }).click();
+  await page.getByRole('link', { name: /^امنیت و رمز عبور/ }).click();
   await expect(page.getByText('این بخش به‌زودی راه‌اندازی می‌شود')).toBeVisible();
 });
 

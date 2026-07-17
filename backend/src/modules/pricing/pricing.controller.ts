@@ -1,0 +1,114 @@
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
+import { PricingService } from './pricing.service';
+import {
+  RegisterProposalDto,
+  SetLegalRateDto,
+  UpsertProposalDto,
+} from './dto/pricing.dtos';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { PanelAccessGuard } from '../panels/panel-access.guard';
+import type { AuthenticatedUser } from '../../common/types/authenticated-user';
+
+@ApiTags('pricing')
+@Controller('pricing')
+@UseGuards(JwtAuthGuard, RolesGuard, PanelAccessGuard)
+export class PricingController {
+  constructor(private readonly pricing: PricingService) {}
+
+  @Get('proposals')
+  @Roles('CEO', 'COMMERCIAL_MANAGER')
+  @ApiOperation({
+    summary:
+      'CEO: لیست در انتظار/ثبت‌شده — بازرگانی: پروازهای برنامه‌ریزی‌شده + پیشنهادشان',
+  })
+  async list(@CurrentUser() actor: AuthenticatedUser) {
+    const data =
+      actor.role === 'CEO'
+        ? await this.pricing.listForCeo()
+        : await this.pricing.listForCommercial();
+    return { success: true, data };
+  }
+
+  @Put('flights/:flightInstanceId/proposal')
+  @Roles('COMMERCIAL_MANAGER')
+  @ApiOperation({
+    summary: 'ارسال/ویرایش نرخ پیشنهادی — تا قبل از تأیید قابل ویرایش',
+  })
+  async upsertProposal(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('flightInstanceId') flightInstanceId: string,
+    @Body() dto: UpsertProposalDto,
+  ) {
+    const data = await this.pricing.upsertProposal(
+      actor,
+      flightInstanceId,
+      dto,
+    );
+    return { success: true, data };
+  }
+
+  @Patch('proposals/:id/legal-rate')
+  @Roles('CEO')
+  @ApiOperation({ summary: 'ثبت نرخ قانونی (مصوب سازمان هواپیمایی)' })
+  async setLegalRate(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: SetLegalRateDto,
+  ) {
+    const data = await this.pricing.setLegalRate(actor, id, dto.legalRateIrr);
+    return { success: true, data };
+  }
+
+  @Patch('proposals/:id/register')
+  @Roles('CEO')
+  @ApiOperation({
+    summary: 'تأیید و ثبت قیمت — «تأیید بازرگانی» یا «ثبت با AI»',
+  })
+  async register(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: RegisterProposalDto,
+  ) {
+    const data = await this.pricing.register(actor, id, dto.source);
+    return { success: true, data };
+  }
+
+  @Post('_test/flight-instance')
+  @Roles('CEO', 'COMMERCIAL_MANAGER')
+  @ApiOperation({
+    summary: 'E2E only — fresh SCHEDULED instance; 404 in production',
+  })
+  async createTestInstance() {
+    const data = await this.pricing.createTestInstance();
+    return { success: true, data };
+  }
+
+  @Post('proposals/ai-analysis')
+  @Roles('CEO')
+  @ApiOperation({
+    summary: 'تحلیل و پیشنهاد قیمت هوش مصنوعی — مشورتی، با degradation امن',
+  })
+  async runAiAnalysis(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Req() req: Request,
+  ) {
+    const requestId = (req.headers['x-request-id'] as string) ?? undefined;
+    const data = await this.pricing.runAiAnalysis(actor, requestId);
+    return { success: true, data };
+  }
+}

@@ -212,7 +212,19 @@ kept forward-compatible the same way Phase 2's `Booking` was.
 
 ## Phase 6 — Pricing proposals & ticket approval
 
-- `FarePricingProposal { id, flightInstanceId→FlightInstance, competitorPriceIrr, proposedPriceIrr, legalRateIrr?, proposedById→User, status: PENDING|REGISTERED, registeredPriceIrr?, aiSuggestionIrr?, aiReasoning?, registeredAt? }` — commercial manager proposes, CEO approves/registers; matches CLAUDE.md's ML-service advisory-only rule (`aiSuggestionIrr` is never auto-applied).
+Grounded in extraction of the CEO «تعیین قیمت بلیط» tab and the Commercial
+Manager's pricing section (inside its flights tab — Commercial has no
+dedicated pricing tab). Confirmed 3-step flow, verbatim from the CEO
+banner: «۱ پیشنهاد مدیر بازرگانی → ۲ تحلیل هوش مصنوعی → ۳ تأیید و ثبت
+مدیر عامل».
+
+- `FarePricingProposal { id, flightInstanceId→FlightInstance @unique (one live proposal per flight — ⚑ fixes the mocks' broken id scheme where the two panels wrote the same array under incompatible `PP-####` vs `PP-{flightNo}` keys and seeded proposals never matched any flight row), basePriceIrr, competitorPriceIrr, proposedPriceIrr, legalRateIrr?, note?, proposedById→User, status: PENDING|REGISTERED, registeredPriceIrr?, approvedById→User?, approvedAt?, aiSuggestion Json? of { priceIrr, reason, factors[], season, occasion, confidence, modelVersion, generatedAt }, createdAt, updatedAt }`
+- ⚑ **AI suggestion is persisted on the proposal** (with the model version, per the ML-service traceability rule) — in the mocks it lives in component state and evaporates on reload, hiding the «ثبت با AI» button. Advisory-only stands: generation never mutates prices; registration is always an explicit CEO click.
+- **Registration** («تأیید بازرگانی» / «ثبت با AI»): CEO picks one of the two computed values — the design has no free-price input at approval. Transitions PENDING→REGISTERED with `registeredPriceIrr`, audited (`category=PRICING`). A REGISTERED proposal is locked forever («پس از تأیید مدیر عامل، قیمت ثبت و قفل می‌شود و قابل تغییر نخواهد بود») — re-edits → 409.
+- **Legal rate** (نرخ قانونی/مصوب سازمان هواپیمایی): Commercial sends it with the proposal AND the CEO can set/override it independently (both paths exist in the design; last write wins, both audited).
+- Money: the mocks' numbers are toman — stored as IRR integers as everywhere; toman conversion only in the shared utils. Ticket-price magnitudes fit the current Int32 columns.
+- ⚑ **ML service goes real this phase** (first ml-service implementation): FastAPI `POST /internal/v1/price-suggestion` per CLAUDE.md's ML rules — pydantic schemas, shared-token internal auth, structured logs with X-Request-Id, `GET /health`, versioned heuristic model (season/occasion/competitor factors mirroring the design's fallback logic), pytest. NestJS side: an `AiProvider`-style client in `backend/src/modules/ai/` with a 2s timeout and graceful fallback — if the service is down, pricing approval flows keep working, only the suggestion is unavailable. No PII is ever sent (route codes, dates, prices, capacity only).
+- Out of scope (other phases): the Commercial add-flight flow and plan-modal AI hint (Phase 10 flight management); the design's client-side `window.claude.complete` path is replaced entirely by the backend ML call (frontend never talks to AI vendors, per CLAUDE.md).
 
 ## Phase 7 — Refunds
 

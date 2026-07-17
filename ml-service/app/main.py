@@ -19,6 +19,6 @@ async def health() -> dict:
     return {"status": "ok"}
 
 
-# Feature routers (price-suggestion, recommendations) land here once
-# docs/API.md defines their request/response contracts — see CLAUDE.md
-# workflow rule 1 (no feature code before the API doc is approved).
+from .api.pricing import router as pricing_router  # noqa: E402
+
+app.include_router(pricing_router)
