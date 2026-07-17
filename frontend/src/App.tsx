@@ -13,6 +13,11 @@ import RequestDetailPage from './features/agencies/RequestDetailPage';
 import CartablePage from './features/cartable/CartablePage';
 import ReferralsPage from './features/referrals/ReferralsPage';
 import ClubPage from './features/club/ClubPage';
+import EmployeesPage from './features/it-manager/EmployeesPage';
+import SecurityPage from './features/it-manager/SecurityPage';
+import ServicesPage from './features/it-manager/ServicesPage';
+import LogsPage from './features/it-manager/LogsPage';
+import BackupsPage from './features/it-manager/BackupsPage';
 import PricingPage from './features/pricing/PricingPage';
 
 export default function App() {
@@ -42,6 +47,21 @@ export default function App() {
               </Route>
               <Route path="vip" element={<TabGate tabKey="vip" />}>
                 <Route index element={<ClubPage />} />
+              </Route>
+              <Route path="users" element={<TabGate tabKey="users" />}>
+                <Route index element={<EmployeesPage />} />
+              </Route>
+              <Route path="security" element={<TabGate tabKey="security" />}>
+                <Route index element={<SecurityPage />} />
+              </Route>
+              <Route path="services" element={<TabGate tabKey="services" />}>
+                <Route index element={<ServicesPage />} />
+              </Route>
+              <Route path="logs" element={<TabGate tabKey="logs" />}>
+                <Route index element={<LogsPage />} />
+              </Route>
+              <Route path="backup" element={<TabGate tabKey="backup" />}>
+                <Route index element={<BackupsPage />} />
               </Route>
               <Route path="pricing" element={<TabGate tabKey="pricing" />}>
                 <Route index element={<PricingPage />} />

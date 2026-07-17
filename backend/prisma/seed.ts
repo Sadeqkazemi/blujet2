@@ -3,6 +3,11 @@ import argon2 from 'argon2';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../generated/prisma/client';
 import { encryptPii, hashPii } from '../src/common/pii-crypto';
+import {
+  EXTERNAL_SERVICE_SEED,
+  INTERNAL_SERVICE_SEED,
+  PERMISSION_CATALOG,
+} from '../src/modules/it-manager/permission-catalog';
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
@@ -707,6 +712,99 @@ async function main() {
           approvedById: ceoUser.id,
           approvedAt: new Date(),
         },
+      });
+    }
+  }
+
+  // ─── Phase 8: Employee management (IT Manager) ────────────────────────
+  const itManager = staffByUsername.get('itadmin')!;
+
+  for (const p of PERMISSION_CATALOG) {
+    await prisma.permission.upsert({
+      where: { dept_key: { dept: p.dept, key: p.key } },
+      update: { sectionLabelFa: p.sectionLabelFa, labelFa: p.labelFa },
+      create: p,
+    });
+  }
+
+  for (const s of INTERNAL_SERVICE_SEED) {
+    await prisma.internalService.upsert({
+      where: { key: s.key },
+      update: {},
+      create: { key: s.key, nameFa: s.nameFa, uptimePct: s.uptimePct, enabled: true },
+    });
+  }
+  // "استرداد آنلاین" starts disabled — matches the design mock's svcDefs.
+  await prisma.internalService.updateMany({
+    where: { key: 'refund' },
+    data: { enabled: false },
+  });
+
+  for (const s of EXTERNAL_SERVICE_SEED) {
+    await prisma.externalServiceConfig.upsert({
+      where: { key: s.key },
+      update: {},
+      create: {
+        key: s.key,
+        nameFa: s.nameFa,
+        provider: s.provider,
+        endpoint: s.endpoint,
+        enabled: true,
+      },
+    });
+  }
+  // "نقشه و مسیریابی نشان" starts disabled — matches the design mock's extDefs.
+  await prisma.externalServiceConfig.updateMany({
+    where: { key: 'ext_neshan' },
+    data: { enabled: false },
+  });
+
+  await prisma.securityPolicy.upsert({
+    where: { id: 1 },
+    update: {},
+    create: { id: 1 },
+  });
+
+  const commercialEmployee = await prisma.user.upsert({
+    where: { username: 'sales.moradi' },
+    update: {},
+    create: {
+      role: 'EMPLOYEE',
+      username: 'sales.moradi',
+      passwordHash,
+      fullName: 'یاسمن مرادی',
+      dept: 'commercial',
+      rank: 'کارشناس',
+      referralScope: 'MANAGERS_ONLY',
+      createdById: itManager.id,
+      isActive: true,
+    },
+  });
+  const financeEmployee = await prisma.user.upsert({
+    where: { username: 'fin.hosseini' },
+    update: {},
+    create: {
+      role: 'EMPLOYEE',
+      username: 'fin.hosseini',
+      passwordHash,
+      fullName: 'کیوان حسینی',
+      dept: 'finance',
+      rank: 'کارشناس ارشد',
+      referralScope: 'MANAGERS_ONLY',
+      createdById: itManager.id,
+      isActive: false,
+    },
+  });
+  for (const [employee, keys] of [
+    [commercialEmployee, ['ag_list', 'fl_view']],
+    [financeEmployee, ['rf_list']],
+  ] as const) {
+    const perms = await prisma.permission.findMany({ where: { key: { in: keys as unknown as string[] } } });
+    for (const perm of perms) {
+      await prisma.employeePermission.upsert({
+        where: { employeeId_permissionId: { employeeId: employee.id, permissionId: perm.id } },
+        update: {},
+        create: { employeeId: employee.id, permissionId: perm.id, grantedById: itManager.id },
       });
     }
   }

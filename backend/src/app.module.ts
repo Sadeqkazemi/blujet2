@@ -19,6 +19,7 @@ import { ReferralsModule } from './modules/referrals/referrals.module';
 import { ManagerMessagesModule } from './modules/manager-messages/manager-messages.module';
 import { FilesModule } from './modules/files/files.module';
 import { ClubModule } from './modules/club/club.module';
+import { ItManagerModule } from './modules/it-manager/it-manager.module';
 import { PricingModule } from './modules/pricing/pricing.module';
 
 @Module({
@@ -62,6 +63,7 @@ import { PricingModule } from './modules/pricing/pricing.module';
     ManagerMessagesModule,
     FilesModule,
     ClubModule,
+    ItManagerModule,
     PricingModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
