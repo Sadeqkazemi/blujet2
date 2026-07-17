@@ -224,6 +224,18 @@ export class AgenciesController {
     return { success: true, data };
   }
 
+  @Post(':id/_test/debt')
+  @ApiOperation({
+    summary: 'E2E only — بدهی مشتق‌شده آژانس را به رقم ثابت برمی‌گرداند؛ در production 404',
+  })
+  async resetTestDebt(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    const data = await this.agencies.resetTestDebt(actor, id);
+    return { success: true, data };
+  }
+
   @Patch(':id/invoices/:invoiceId/pay')
   @Roles('FINANCE_MANAGER', 'COMMERCIAL_MANAGER')
   @ApiOperation({
