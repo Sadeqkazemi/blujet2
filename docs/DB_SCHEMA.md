@@ -153,10 +153,42 @@ share the same data but differ in which actions each role's UI exposes
 
 ## Phase 4 — Cartable, referrals, manager messaging
 
-- `CartableTask { id, assigneeId→User, category: ADMIN|AGENCY|MANAGER, title, description, senderId→User, dueAt?, status: OPEN|DONE, resolutionNote?, transferredTo→User?, createdAt }`
-- `ManagerReferral { id, fromId→User, toIds User[] (relation table), title, body, priority: HIGH|MEDIUM|LOW, dueAt?, status: SENT|REVIEWING|REPORTED|CLOSED, files Json?, createdAt }`
-- `ManagerReferralReport { id, referralId→ManagerReferral, fromId→User, body, files Json?, createdAt }`
-- `ManagerMessage { id, fromId→User, toDept: FINANCE|COMMERCIAL|SUPPORT|AGENCIES|CEO|ALL_MANAGERS, subject, body, attachment?, createdAt }`
+Grounded in a full extraction of the کارتابل tab (all 5 exec panels — CEO,
+Board Chair, Senior, Finance, Commercial), the ارجاعات tab (Senior Manager
+only) and the «ایجاد پیام» compose modal (all 5 panels). **Critical design
+finding:** in the mocks all three are demo-only — cartable items are static
+seeds, compose is send-only with no inbox anywhere, referral reports are
+pre-seeded with no recipient-side submission UI, and «انتقال» (transfer)
+never reaches the target's cartable. The schema below defines the real
+persistence and routing the mocks imply but don't implement. The wiring
+decisions (marked ⚑) are product decisions surfaced for approval, not
+silently invented.
+
+- `CartableTask { id, assigneeId→User, category: ADMIN|AGENCY|MANAGER, title, description, senderId→User?, senderLabelFa? (display fallback when no User row backs the sender), sourceType?: MANAGER_MESSAGE|MANAGER_REFERRAL|AGENCY_REQUEST|CHAIR_PERMISSION, sourceId?, status: OPEN|APPROVED|REJECTED|TRANSFERRED, resolutionNote?, transferredToId→User?, resolvedAt?, createdAt }`
+  - The design's review modal offers exactly three actions — تأیید /
+    انصراف(=رد) / انتقال — with a **required** «نظر مدیر» note; there is no
+    generic "done" state and no due-date on cartable rows (both confirmed
+    absent from all 5 panels).
+  - ⚑ Transfer creates a NEW `OPEN` task for the target (same source link)
+    and marks the original `TRANSFERRED` — the mocks toast and drop the item;
+    the real system routes it. Every resolution writes an
+    `AuditLog(category=SYSTEM or AGENCY per source)` row.
+  - ⚑ Cartable rows are never authored directly: they are materialized by
+    real flows (a manager message, a referral, an agency-request referral
+    from Phase 3, a chair-permission request). The static `taskDefs` demo
+    seeds are reproduced only in `seed.ts`.
+- `ManagerReferral { id, fromId→User (SENIOR_MANAGER only, per design), title, body, priority: HIGH|MEDIUM|LOW, dueAt? (DateTime — the mock's free-text «مثلاً: ۲۵ تیر» becomes a real Jalali date picker/parse), status: SENT|REVIEWING|REPORTED|CLOSED, attachments Json (StoredFile ids), createdAt }`
+- `ManagerReferralRecipient { referralId→ManagerReferral, recipientId→User }` — the design's multi-select chips (مدیر مالی، مدیر بازرگانی، ادمین سایت، سرپرست پشتیبانی، مدیر فنی) map to real staff users; ⚑ each recipient also gets a `CartableTask(category=MANAGER, «درخواست مدیر»)`, which is how the recipient — who has NO referrals tab in the design — receives it.
+- `ManagerReferralReport { id, referralId→ManagerReferral, fromId→User, body, attachments Json, createdAt }` — ⚑ recipient-side report submission has no UI in the mocks (reports are pre-seeded); the API defines it and the recipient's cartable review of the referral task doubles as the submission surface. First report flips referral status to `REPORTED`; sender actions per design: «تأیید دریافت گزارش و بستن» → CLOSED, «درخواست اصلاح گزارش» → REVIEWING, «ارسال یادآوری دریافت گزارش» → REVIEWING (+ notification).
+- `ManagerMessage { id, fromId→User, toDept: FINANCE|COMMERCIAL|SUPPORT|AGENCIES|CEO|ALL_MANAGERS, subject, body, attachments Json, createdAt }` — the «ایجاد پیام» compose (identical in all 5 panels). ⚑ Since the design has no inbox, delivery materializes as `CartableTask(category=ADMIN, sourceType=MANAGER_MESSAGE)` for the mapped recipient(s): FINANCE→FINANCE_MANAGER, COMMERCIAL→COMMERCIAL_MANAGER, CEO→CEO, ALL_MANAGERS→all 5 exec roles. SUPPORT/AGENCIES have no backing staff role yet — accepted by the enum but flagged undeliverable until Phase 8's employee/department model lands (open item).
+- `ChairReportPermission { id, requesterId→User (FINANCE_MANAGER|COMMERCIAL_MANAGER), status: PENDING|APPROVED|REJECTED, decidedById→User?, decidedAt?, createdAt }` — the gate banner shown only in Finance/Commercial cartables («ارسال گزارش به رئیس هیئت مدیره نیازمند مجوز ایشان است»). ⚑ The request creates a `CartableTask` for BOARD_CHAIR (the mock has no chair-side approval UI); chair's cartable تأیید/رد decides it.
+- `StoredFile { id, ownerId→User, fileName, mimeType, sizeBytes, path, createdAt }` — minimal upload backing for the referral/message «بارگذاری مستندات (PDF یا تصویر)» chips; PDF/image only, size-capped, local disk in dev behind an interface. Reused later by club-card docs (Phase 5) and refunds (Phase 7).
+
+Out of scope, confirmed dead/unreachable in the design (not built):
+- Senior Manager's «اولویت‌های راهبردی» directive list — not reachable from
+  the confirmed sidebar (orphaned tab), purely in-memory, never delivered.
+- A standalone received-messages inbox — the cartable IS the inbox
+  (decision ⚑ above).
 
 ## Phase 5 — VIP club (loyalty tie-in for manager panels)
 
