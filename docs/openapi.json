@@ -492,6 +492,105 @@
         ]
       }
     },
+    "/reporting/recent-transactions": {
+      "get": {
+        "operationId": "ReportingController_recentTransactions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تراکنش‌های مالی اخیر — فقط پنل مدیر مالی (per design)",
+        "tags": [
+          "reporting"
+        ]
+      }
+    },
+    "/reporting/revenue-mix": {
+      "get": {
+        "operationId": "ReportingController_revenueMix",
+        "parameters": [
+          {
+            "name": "granularity",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "q6",
+              "type": "string",
+              "enum": [
+                "day",
+                "month",
+                "q3",
+                "q6",
+                "year",
+                "flight"
+              ]
+            }
+          },
+          {
+            "name": "periodStart",
+            "required": false,
+            "in": "query",
+            "description": "Required for granularity=month",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": false,
+            "in": "query",
+            "description": "Required for granularity=day",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "flightNo",
+            "required": false,
+            "in": "query",
+            "description": "Required for granularity=flight",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "periodKey",
+            "required": false,
+            "in": "query",
+            "description": "A periodKey returned by /reporting/sales-chart — re-scopes KPIs to that bucket",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "ترکیب درآمد بر اساس کانال فروش",
+        "tags": [
+          "reporting"
+        ]
+      }
+    },
+    "/reporting/agency-settlements": {
+      "get": {
+        "operationId": "ReportingController_agencySettlements",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تسویه‌حساب آژانس‌های همکار — فقط پنل مدیر مالی (per design)",
+        "tags": [
+          "reporting"
+        ]
+      }
+    },
     "/agencies": {
       "get": {
         "operationId": "AgenciesController_list",
@@ -3216,6 +3315,57 @@
         "summary": "نرخ‌گذاری و تخصیص پرواز آینده — نرخ قابل فروش همچنان با تأیید مدیر عامل (فاز ۶)",
         "tags": [
           "flights"
+        ]
+      }
+    },
+    "/passenger-reports/search": {
+      "get": {
+        "operationId": "PassengerReportsController_search",
+        "parameters": [
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "description": "نام مسافر یا کد ملی",
+            "schema": {
+              "example": "نگار رضایی",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "گزارش مسافران — جستجو با نام یا کد ملی (کد ملی همیشه ماسک‌شده برمی‌گردد)",
+        "tags": [
+          "passenger-reports"
+        ]
+      }
+    },
+    "/staff-reports": {
+      "get": {
+        "operationId": "StaffReportsController_reports",
+        "parameters": [
+          {
+            "name": "staffId",
+            "required": false,
+            "in": "query",
+            "description": "فیلتر تب هر کارمند",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "گزارش عملکرد کارمندان واحد خود مدیر — فید واقعی از AuditLog، ایزوله per-dept",
+        "tags": [
+          "staff-reports"
         ]
       }
     }
