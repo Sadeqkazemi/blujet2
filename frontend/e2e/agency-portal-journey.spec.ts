@@ -8,18 +8,35 @@ const API_URL = process.env.E2E_API_URL ?? 'http://localhost:3000';
 
 /** Issues a fresh invoice for the seed's gold agency via direct API calls
  * (staff login + issue), independent of the page's own agency session —
- * avoids ever mixing two identities in one browser context. */
+ * avoids ever mixing two identities in one browser context. Retries on 429
+ * like the page-based `loginAs`/`loginAsAgency` helpers — the login rate
+ * limit is shared across the whole serial Playwright run. */
+async function staffLoginViaApi(request: import('@playwright/test').APIRequestContext) {
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const loginRes = await request.post(`${API_URL}/auth/staff/login`, {
+      data: { username: 'comm.abbasi', password: STAFF_PASSWORD },
+    });
+    if (loginRes.status() === 429) {
+      await new Promise((resolve) => setTimeout(resolve, 21_000));
+      continue;
+    }
+    const { challengeId } = (await loginRes.json()).data as { challengeId: string };
+    const codeRes = await request.get(`${API_URL}/auth/_test/last-code/comm.abbasi`);
+    const { code } = (await codeRes.json()).data as { code: string };
+    const verifyRes = await request.post(`${API_URL}/auth/staff/login/verify`, {
+      data: { challengeId, code },
+    });
+    if (verifyRes.status() === 429) {
+      await new Promise((resolve) => setTimeout(resolve, 21_000));
+      continue;
+    }
+    return ((await verifyRes.json()).data as { accessToken: string }).accessToken;
+  }
+  throw new Error('staff login via API kept hitting the rate limit');
+}
+
 async function issueFreshInvoiceForGoldAgency(request: import('@playwright/test').APIRequestContext) {
-  const loginRes = await request.post(`${API_URL}/auth/staff/login`, {
-    data: { username: 'comm.abbasi', password: STAFF_PASSWORD },
-  });
-  const { challengeId } = (await loginRes.json()).data as { challengeId: string };
-  const codeRes = await request.get(`${API_URL}/auth/_test/last-code/comm.abbasi`);
-  const { code } = (await codeRes.json()).data as { code: string };
-  const verifyRes = await request.post(`${API_URL}/auth/staff/login/verify`, {
-    data: { challengeId, code },
-  });
-  const { accessToken } = (await verifyRes.json()).data as { accessToken: string };
+  const accessToken = await staffLoginViaApi(request);
 
   const listRes = await request.get(`${API_URL}/agencies`, {
     headers: { Authorization: `Bearer ${accessToken}` },
