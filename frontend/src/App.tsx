@@ -22,9 +22,7 @@ import CartablePage from './features/cartable/CartablePage';
 import ReferralsPage from './features/referrals/ReferralsPage';
 import ClubPage from './features/club/ClubPage';
 import EmployeesPage from './features/it-manager/EmployeesPage';
-import SecurityPage from './features/it-manager/SecurityPage';
 import ServicesPage from './features/it-manager/ServicesPage';
-import LogsPage from './features/it-manager/LogsPage';
 import BackupsPage from './features/it-manager/BackupsPage';
 import PricingPage from './features/pricing/PricingPage';
 import RefundsPage from './features/refunds/RefundsPage';
@@ -34,6 +32,10 @@ import FinancePage from './features/finance/FinancePage';
 import PassengerReportsPage from './features/passenger-reports/PassengerReportsPage';
 import StaffReportsPage from './features/staff-reports/StaffReportsPage';
 import ManagerReportsPage from './features/manager-reports/ManagerReportsPage';
+import AdminsPage from './features/admins/AdminsPage';
+import SettingsPage from './features/settings/SettingsPage';
+import SecurityRouter from './components/SecurityRouter';
+import LogsRouter from './components/LogsRouter';
 import PanelsAccessPage from './features/panels-access/PanelsAccessPage';
 
 export default function App() {
@@ -79,13 +81,13 @@ export default function App() {
                 <Route index element={<EmployeesPage />} />
               </Route>
               <Route path="security" element={<TabGate tabKey="security" />}>
-                <Route index element={<SecurityPage />} />
+                <Route index element={<SecurityRouter />} />
               </Route>
               <Route path="services" element={<TabGate tabKey="services" />}>
                 <Route index element={<ServicesPage />} />
               </Route>
               <Route path="logs" element={<TabGate tabKey="logs" />}>
-                <Route index element={<LogsPage />} />
+                <Route index element={<LogsRouter />} />
               </Route>
               <Route path="backup" element={<TabGate tabKey="backup" />}>
                 <Route index element={<BackupsPage />} />
@@ -116,6 +118,12 @@ export default function App() {
               </Route>
               <Route path="panels" element={<TabGate tabKey="panels" />}>
                 <Route index element={<PanelsAccessPage />} />
+              </Route>
+              <Route path="admins" element={<TabGate tabKey="admins" />}>
+                <Route index element={<AdminsPage />} />
+              </Route>
+              <Route path="settings" element={<TabGate tabKey="settings" />}>
+                <Route index element={<SettingsPage />} />
               </Route>
               <Route path=":tabKey" element={<ComingSoonPage />} />
             </Route>

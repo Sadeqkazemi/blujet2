@@ -7,32 +7,35 @@ already had its own), `logs` (CEO — IT already had its own), `settings`
 
 ## Acceptance checklist
 
+Backend items proven by `backend/test/phase12.e2e-spec.ts` (9 tests, 178
+total); frontend by the new `*.test.tsx` files (7 tests, 95 total); E2E by
+`frontend/e2e/phase12-journey.spec.ts` (5 journeys).
+
 ### Backend — admins
-- [ ] `GET /admins`: managed-set scoping per role hierarchy (Senior never sees a SENIOR_MANAGER row as manageable), real online derivation from refresh tokens, 403 for roles without the tab
-- [ ] `POST /admins`: creates a real staff account (argon2, mustChangePassword), enum-role only, min-6 password, 409 duplicate username, audited
-- [ ] `PATCH /admins/:id/block|unblock`: really flips `User.isActive` (blocked admin cannot staff-login anymore); never self, never CEO/BOARD_CHAIR, managed-set enforced server-side; audited
-- [ ] `POST /admins/:id/reset-password`: explicit or generated temp password returned once; `mustChangePassword` set; audited
+- [x] `GET /admins`: hierarchy scoping + real online derivation + 403 — `'GET /admins: hierarchy scoping — Senior never gets a manageable SENIOR_MANAGER row; roles without the tab get 403'`
+- [x] `POST /admins`: real staff account that can actually log in; 409 duplicate — `'POST /admins creates a real staff account that can log in; duplicate username → 409'`
+- [x] `PATCH /admins/:id/block|unblock`: really flips `User.isActive` (blocked login 403s); never self/CEO — `'block really disables staff login; unblock restores it; blocking a CEO/self is forbidden'`
+- [x] `POST /admins/:id/reset-password`: temp password logs in; hierarchy enforced — `'POST /admins/:id/reset-password returns a temp password once that actually logs in; Senior cannot reset a SENIOR_MANAGER'`
 
 ### Backend — own password, CEO logs, settings
-- [ ] `POST /auth/change-password`: wrong current password → 401; success updates the hash (old password stops working, new one works); audited without password material
-- [ ] `GET /audit/system-events`: CEO only; real rows; level mapping (SECURITY→WARN, financial→OK, else INFO)
-- [ ] `GET /settings`: defaults + stored overrides + real refund brackets
-- [ ] `PATCH /settings`: persists key-values, audited; unknown keys rejected
-- [ ] `PATCH /settings/refund-rules`: BOARD_CHAIR only; updates the REAL `RefundPenaltyRule` rows (Phase 7 engine reads the same rows); 0–100 validated; audited
-- [ ] `GET /panels/access`: IT_MANAGER can now read; PATCH still 403 for IT
+- [x] `POST /auth/change-password` — `'POST /auth/change-password: wrong current password → 401; success rotates the hash both ways'`
+- [x] `GET /audit/system-events` — `'GET /audit/system-events: CEO gets real rows with the level mapping; others 403'`
+- [x] `GET /settings` + `PATCH /settings` round-trip, unknown keys rejected, finance 403 — `'settings round-trip: defaults come back, a patch persists, unknown keys are rejected; finance 403'`
+- [x] `PATCH /settings/refund-rules` writes the REAL Phase 7 rows (verified in the DB table the engine reads), chair-only — `'PATCH /settings/refund-rules writes the REAL Phase 7 engine rows (chair only, IT 403)'`
+- [x] `GET /panels/access` readable by IT, PATCH still 403 — `'IT_MANAGER can read /panels/access but PATCH stays 403'`
 
 ### Frontend
-- [ ] AdminsPage (CEO/Chair/Senior): list with role chips + real last-login/online, add-admin modal (role select — no custom role, password min 6, sms/email delivery pick), detail view with block/unblock + change-password + temp-password modal
-- [ ] SecurityRouter: IT keeps its Phase 8 SecurityPage; CEO/Senior get OwnSecurityPage (change own password with current/new/confirm + مدیریت رمز سایر مدیران with reset + block toggle)
-- [ ] LogsRouter: IT keeps its Phase 8 LogsPage; CEO gets CeoLogsPage (time/user/event/level table)
-- [ ] SettingsPage: chair sections (company info, gateways, refund rules → real brackets, brand color) + IT sections (global toggles); save persists via the real endpoints
-- [ ] PanelsAccessPage: IT sees the flags read-only (disabled switches + explanatory banner); CEO/Senior keep the working toggles
-- [ ] nav flags flipped: admins (3 roles), security (CEO/Senior), logs (CEO), settings (Chair/IT), panels (IT)
+- [x] AdminsPage: list + real status + detail with block/reset + validated add-admin modal — `AdminsPage.test.tsx` (2 tests)
+- [x] SecurityRouter → OwnSecurityPage: confirm-mismatch validation, real change call, managed reset with one-time temp password — `OwnSecurityPage.test.tsx` (2 tests); IT keeps its Phase 8 page (router branch)
+- [x] LogsRouter → CeoLogsPage: real rows + level chips — `CeoLogsPage.test.tsx`
+- [x] SettingsPage: chair vs IT sections, save persists — `SettingsPage.test.tsx` (2 tests)
+- [x] PanelsAccessPage read-only for IT — `'IT_MANAGER gets the read-only view: informational copy + disabled switches'`
+- [x] nav flags flipped — **every tab in every panel now reads `implemented: true`; the «به‌زودی» placeholder no longer appears anywhere in any sidebar**
 
 ### Tests
-- [ ] Backend e2e: hierarchy/authz cases, block-really-blocks-login, change-password flow, settings round-trip, refund-rule write visible to the Phase 7 engine's table, IT read-only panels access
-- [ ] Frontend unit tests per new page
-- [ ] Playwright: CEO admins journey (add → block → unblock), CEO own-password change + revert, chair settings save, IT read-only panels
+- [x] Backend e2e — the 9 tests above
+- [x] Frontend unit — the 7 tests above
+- [x] Playwright — `'CEO admins journey: list with real status → open detail → block → unblock'`, `'Senior changes their own password and reverts it'`, `'CEO opens لاگ و رویدادها…'`, `'Chair saves تنظیمات سامانه (toggle round-trip persists across reload)'`, `'IT opens دسترسی به پنل‌ها read-only'`
 
 ## Deferred (scoped out with reasons, not silently dropped)
 - Per-admin permission toggle matrix — would be stored-but-unenforced (violates «never by hiding UI alone») or requires a dynamic-authorization redesign; open item.
