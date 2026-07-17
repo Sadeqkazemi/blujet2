@@ -321,6 +321,56 @@ and has no UI entry point yet.
 
 ---
 
+## Phase 10 — Flight management (مدیریت پروازها)
+
+Extracted from the FLIGHTS MANAGEMENT sections of `پنل مدیر ارشد.dc.html`
+and `پنل مدیر بازرگانی.dc.html` (near-identical markup: KPI row, three
+sub-tabs پروازهای فعال / انجام‌شده / آینده, add-flight modal, flight detail
+modal, future-flight نرخ‌گذاری/allocation modal with the AI hint).
+
+- `Airport { id, code (unique, e.g. THR/DXB), cityFa, tz (IANA) }` — new,
+  seeded with the CLAUDE.md list (20 Iranian cities + DXB/IST/NJF).
+  ⚑ The mocks' add-flight modal uses free-text مبدأ/مقصد; the real form
+  uses selects fed by this table so `Route.originCode/destCode` stay
+  valid codes and departure times can render in airport-local time later.
+- `Route`/`Flight`/`FlightInstance` (Phase 2) are reused as-is for
+  creation: «افزودن پرواز» = find-or-create `Route`, find-or-create
+  `Flight` (unique `flightNo`, default `aircraftType "Airbus A320"` —
+  the one seat-mapped type), create one `FlightInstance` (Jalali
+  date+time → UTC `departureAt`; ⚑ `arrivalAt` = departure + a
+  per-route seeded duration since the design has no arrival input).
+- `FlightInstance` gains:
+  - `basePriceIrr Int?` — the modal's «قیمت بلیط (تومان)» (stored rial).
+    ⚑ This is the design's «قیمت پایه/نرخ اصلی» display figure AND the
+    denominator for the completed-flights سود/ضرر comparison; it does NOT
+    bypass Phase 6 — the bookable price remains the registered
+    `FarePricingProposal` (per CLAUDE.md, pricing separate from
+    availability).
+  - `agencySeatsAllocated Int?` — the future-flight تخصیص modal's آژانس
+    figure; مستقیم is always derived (`capacity − charterSeats −
+    agencySeatsAllocated`), never stored.
+- ⚑ Statuses: the mocks show فعال / در حال فروش / تکمیل / لغو شده as
+  hardcoded strings. Real mapping is derived server-side from
+  `FlightInstanceStatus` + sales: `CANCELLED`→لغو شده; `DEPARTED` rows
+  belong to پروازهای انجام‌شده; `SCHEDULED` with sold==capacity→تکمیل,
+  with sold>0→در حال فروش, else فعال. No new enum values.
+- ⚑ Completed-flights financials: the mocks fabricate an 18٪ profit
+  margin and fixed channel ratios (`sysR/charR`). Real figures are
+  aggregated from `Booking` (channel, priceIrr) per DEPARTED instance:
+  سیستمی/چارتری/آژانس sums, متوسط نرخ = revenue/tickets, and سود/ضرر
+  relative to the base rate (`(avg − base) × tickets`, split into the
+  green/red columns). No fabricated margins (CLAUDE.md forbids invented
+  figures); the design's column set is kept verbatim.
+- ⚑ RRULE recurring schedules (`Schedule` entity from CLAUDE.md's domain
+  model) have **no UI anywhere in the design** — every mock creates
+  single instances. Per workflow rule 4 (design wins), Phase 10 ships
+  single-instance creation only; the `Schedule` table is deferred until a
+  design exists for it (noted as an open item, not silently dropped).
+- Future-flight AI suggestions reuse Phase 6's `AiPriceSuggestion`
+  persistence + ml-service path unchanged (advisory only).
+
+---
+
 ## Open items to confirm with the public-site track before merging
 
 1. `Booking`/`Passenger`/`LedgerEntry` above are a **minimal, forward-compatible
