@@ -970,6 +970,75 @@ async function main() {
     }
   }
 
+  // ── Phase 10: airport catalog + flight-management seed ────────────────
+  const AIRPORTS: Array<[string, string, string]> = [
+    ['THR', 'تهران', 'Asia/Tehran'],
+    ['MHD', 'مشهد', 'Asia/Tehran'],
+    ['SYZ', 'شیراز', 'Asia/Tehran'],
+    ['IFN', 'اصفهان', 'Asia/Tehran'],
+    ['TBZ', 'تبریز', 'Asia/Tehran'],
+    ['KIH', 'کیش', 'Asia/Tehran'],
+    ['GSM', 'قشم', 'Asia/Tehran'],
+    ['BND', 'بندرعباس', 'Asia/Tehran'],
+    ['AWZ', 'اهواز', 'Asia/Tehran'],
+    ['RAS', 'رشت', 'Asia/Tehran'],
+    ['SRY', 'ساری', 'Asia/Tehran'],
+    ['GBT', 'گرگان', 'Asia/Tehran'],
+    ['KER', 'کرمان', 'Asia/Tehran'],
+    ['KSH', 'کرمانشاه', 'Asia/Tehran'],
+    ['OMH', 'ارومیه', 'Asia/Tehran'],
+    ['ADU', 'اردبیل', 'Asia/Tehran'],
+    ['ZAH', 'زاهدان', 'Asia/Tehran'],
+    ['BUZ', 'بوشهر', 'Asia/Tehran'],
+    ['AZD', 'یزد', 'Asia/Tehran'],
+    ['PGU', 'عسلویه', 'Asia/Tehran'],
+    ['DXB', 'دبی', 'Asia/Dubai'],
+    ['IST', 'استانبول', 'Europe/Istanbul'],
+    ['NJF', 'نجف', 'Asia/Baghdad'],
+  ];
+  for (const [code, cityFa, tz] of AIRPORTS) {
+    await prisma.airport.upsert({
+      where: { code },
+      update: { cityFa, tz },
+      create: { code, cityFa, tz },
+    });
+  }
+
+  // Seeded per-route durations (the add-flight form has no arrival input).
+  await prisma.route.updateMany({
+    where: { originCode: 'THR', destCode: 'DXB' },
+    data: { durationMin: 180 },
+  });
+
+  // Base prices for existing instances so the active/completed tables have
+  // the design's «قیمت پایه/نرخ اصلی» figures without fabricating margins.
+  await prisma.flightInstance.updateMany({
+    where: { basePriceIrr: null },
+    data: { basePriceIrr: 38_000_000 },
+  });
+
+  // A couple of future SCHEDULED instances for the پروازهای آینده sub-tab
+  // (charter commitment set, plan/AI left empty for the E2E to exercise).
+  const futureCount = await prisma.flightInstance.count({
+    where: { departureAt: { gt: new Date(Date.now() + 8 * 24 * 3_600_000) } },
+  });
+  if (futureCount === 0) {
+    for (const daysAhead of [12, 16]) {
+      const dep = new Date(Date.now() + daysAhead * 24 * 3_600_000);
+      await prisma.flightInstance.create({
+        data: {
+          flightId: flight.id,
+          departureAt: dep,
+          arrivalAt: new Date(dep.getTime() + 3 * 3_600_000),
+          capacity: 180,
+          charterSeats: 60,
+          status: 'SCHEDULED',
+          basePriceIrr: 38_000_000,
+        },
+      });
+    }
+  }
+
   console.log('Seed complete.');
   console.log(`Staff dev password (all roles): ${STAFF_PASSWORD}`);
 }
