@@ -310,6 +310,40 @@ and has no UI entry point yet.
 
 ---
 
+## Agency Portal (self-service, پنل آژانس) — separate track, reassigned into this session
+
+Explicitly authorized by the user (2026-07-17). Reuses Phase 3's
+`AgencyProfile`/`AgencyCreditLine`/`AgencyInvoice`/`AgencyMessage`/
+`Booking`/`LedgerEntry` — this feature is a self-service VIEW and a small
+set of self-scoped WRITES over those same rows, not a new data model.
+Two new tables only:
+
+- `AgencyCreditRequest { id, agencyId→AgencyProfile, requestedLimitIrr Int, note String?, status: PENDING|APPROVED|REJECTED, decidedById?→User, decidedAt?, createdAt }` — ⚑ replaces the design's client-side «افزایش اعتبار» mutation (`_limitN = _baseLimit + _topupTotal`, applied with no approval) with an auditable request; only `AgenciesService.updateCredit` (Phase 3, unchanged) can ever actually change `AgencyCreditLine.limitIrr`, called from a dedicated staff decide endpoint, never from this table's row directly.
+- `AgencyDocument { id, agencyId→AgencyProfile, fileId→StoredFile, docType: LICENSE|CONTRACT|OTHER, status: PENDING|APPROVED|REJECTED @default(PENDING), createdAt }` — wraps Phase 4's `StoredFile` (same PDF/image/≤5MB upload backing already used for referral/message attachments and club-card docs). Staff-side review is out of scope this phase (see `docs/API.md`) — every row stays `PENDING` until that workflow is built; the status enum exists now so it's forward-compatible rather than needing a later migration.
+
+`User` gains no new columns — `phone`/`passwordHash`/`mustChangePassword`
+(Phase 8) are reused as-is for AGENCY logins. `AgenciesService.approveRequest`
+(Phase 3) is extended to also generate a one-time temp password (identical
+pattern to `EmployeesService.resetPassword`'s `generateTempPassword`, now
+lifted into a shared `backend/src/common/temp-password.ts` since two modules
+need it) and set `mustChangePassword: true` — without this, an approved
+agency's `User` row had `passwordHash: null` and could never log in; this
+was a real gap in Phase 3, not a deliberate deferral, and this phase closes
+it. `AgenciesService.postMessage` gains a `senderIsAgency` parameter
+(default `false`, preserving the existing staff-side call site) so this
+phase's inbox POST can pass `true` — `AgencyMessage.senderIsAgency` already
+existed in the Phase 3 schema in anticipation of exactly this.
+
+Out of scope this phase (see `docs/API.md`'s reasoning): «صندلی‌های
+تخصیص‌یافته» (no staff-side seat-allocation workflow exists to allocate
+seats to an agency in the first place — would require inventing one);
+«وب‌سرویس» self-service purchase+approval (no staff-side purchase-approval
+counterpart exists; `AgencyApiKey` issuance stays Senior-Manager-initiated
+per Phase 3, and its `keyHash` is one-way — a self-service tab could only
+ever show key STATUS, never the value, so it was judged not worth a
+half-feature this phase); staff-side `AgencyDocument` review; Excel export
+(mock-only everywhere else in the codebase too).
+
 ## Open items to confirm with the public-site track before merging
 
 1. `Booking`/`Passenger`/`LedgerEntry` above are a **minimal, forward-compatible
