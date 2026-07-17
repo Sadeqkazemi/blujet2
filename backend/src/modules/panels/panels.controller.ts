@@ -23,9 +23,12 @@ export class PanelsController {
     return { success: true, data: this.panels.getNav(user.role) };
   }
 
+  // Phase 12: IT_MANAGER reads the flags for its informational دسترسی به
+  // پنل‌ها tab («تعیین سطح دسترسی ورود در اختیار مدیر عامل است») — PATCH
+  // below stays CEO/SENIOR_MANAGER only.
   @Get('access')
   @UseGuards(RolesGuard)
-  @Roles('CEO', 'SENIOR_MANAGER')
+  @Roles('CEO', 'SENIOR_MANAGER', 'IT_MANAGER')
   @ApiOperation({ summary: 'Sibling panels this role may enable/disable' })
   async getAccess(@CurrentUser() user: AuthenticatedUser) {
     return { success: true, data: await this.panels.getAccessFlags(user.role) };

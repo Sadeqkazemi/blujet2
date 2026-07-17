@@ -27,6 +27,8 @@ import { AgencyPortalModule } from './modules/agency-portal/agency-portal.module
 import { FlightsModule } from './modules/flights/flights.module';
 import { PassengerReportsModule } from './modules/passenger-reports/passenger-reports.module';
 import { StaffReportsModule } from './modules/staff-reports/staff-reports.module';
+import { AdminsModule } from './modules/admins/admins.module';
+import { SettingsModule } from './modules/settings/settings.module';
 
 @Module({
   imports: [
@@ -77,6 +79,8 @@ import { StaffReportsModule } from './modules/staff-reports/staff-reports.module
     FlightsModule,
     PassengerReportsModule,
     StaffReportsModule,
+    AdminsModule,
+    SettingsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

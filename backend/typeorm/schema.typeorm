@@ -60,6 +60,7 @@ model User {
   twoFactorChallenges TwoFactorChallenge[]
   auditLogs           AuditLog[]           @relation("AuditActor")
   panelAccessUpdates  PanelAccessFlag[]    @relation("PanelAccessUpdatedBy")
+  systemSettingUpdates SystemSetting[]     @relation("SystemSettingUpdatedBy")
   ledgerEntries       LedgerEntry[]        @relation("LedgerCreatedBy")
 
   agencyProfile          AgencyProfile?            @relation("AgencyUser")
@@ -157,6 +158,19 @@ model AuditLog {
 
   @@index([actorRole, category, createdAt])
   @@map("audit_logs")
+}
+
+// Phase 12: key-value store for تنظیمات سامانه. The chair mock's refund-rule
+// inputs deliberately do NOT live here — they write the real Phase 7
+// RefundPenaltyRule rows so the engine and the settings screen never disagree.
+model SystemSetting {
+  key         String   @id
+  value       Json
+  updatedById String?
+  updatedBy   User?    @relation("SystemSettingUpdatedBy", fields: [updatedById], references: [id])
+  updatedAt   DateTime @updatedAt
+
+  @@map("system_settings")
 }
 
 model PanelAccessFlag {

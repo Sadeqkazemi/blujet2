@@ -41,4 +41,15 @@ export class AuditController {
     const data = await this.audit.systemLogs();
     return { success: true, data };
   }
+
+  @Get('system-events')
+  @Roles('CEO')
+  @ApiOperation({
+    summary:
+      'CEO لاگ و رویدادها — ردیف‌های واقعی AuditLog با سطح presentational',
+  })
+  async ceoSystemEvents() {
+    const data = await this.audit.ceoSystemEvents();
+    return { success: true, data };
+  }
 }
