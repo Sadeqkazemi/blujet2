@@ -371,6 +371,40 @@ modal, future-flight نرخ‌گذاری/allocation modal with the AI hint).
 
 ---
 
+## Phase 11 — Finance tab + passenger & staff reports
+
+Extracted from the FINANCE / showReports / showStaff sections of all five
+panels with the مالی tab. Confirmed against CLAUDE.md's role rule: the
+«تراکنش‌های مالی اخیر» and «تسویه‌حساب آژانس‌های همکار» blocks exist ONLY in
+the finance manager panel's markup; the four executive panels' مالی tab is
+the sales chart (سال/ماه/روز/پرواز modes) + the 4 KPI boxes + completed-
+flights seats summary + the «ترکیب درآمد» channel donut.
+
+- `LedgerEntryType` gains `OPERATING_COST` — ⚑ the mocks fabricate هزینه
+  عملیاتی and an 18–35٪ margin; the real KPI needs a cost source, so
+  operating costs become seeded, immutable ledger rows (same double-entry
+  discipline; entered by finance in a later phase, seeded samples for
+  every month now). سود خالص = SALE − REFUND − COMMISSION − OPERATING_COST,
+  computed in SQL. مطالبات معوق = the Phase 3 derived agency debt (no new
+  storage).
+- No other schema changes: transactions list = recent `LedgerEntry` rows
+  joined to booking/agency; channel donut = SALE sums grouped by
+  `Booking.channel`; settlements block reuses `AgencyInvoice` (period =
+  invoice, paid % from PAID/UNPAID/OVERDUE state); passenger report reads
+  `Passenger` (nationalIdHash exact search + name contains) joined to
+  booking/instance; staff report reads `AuditLog` rows whose actor is an
+  EMPLOYEE (Phase 8's dept/rank data provides the tabs) — the «کارمند
+  جدید توسط مدیر IT اضافه شد» banner derives from recent ACCOUNT-category
+  audit rows, per-user dismissal kept client-side (⚑ no read-receipts
+  table for a notice banner).
+- ⚑ KPI re-scoping: selecting a month (or day/flight) in the chart
+  re-scopes the KPI row server-side via a `period` query param — the
+  design's `kPeriod` caption. All aggregates SQL-side per CLAUDE.md.
+- Chart modes ماه/روز/پرواز complete the Phase 1 deferral note
+  (`docs/features/panel-shell-dashboard.md`) — سال mode already ships.
+
+---
+
 ## Open items to confirm with the public-site track before merging
 
 1. `Booking`/`Passenger`/`LedgerEntry` above are a **minimal, forward-compatible

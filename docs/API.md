@@ -295,6 +295,39 @@ stays untouched on the same page).
 - Deferred (explicit): خروجی Excel buttons (same deferral as Phase 3's,
   toast-only in mocks); RRULE schedules (no design UI — see DB_SCHEMA).
 
+## Phase 11 — Finance tab + passenger & staff reports
+
+Module `backend/src/modules/finance/` + extensions to `reporting`.
+Roles: مالی tab → CEO, BOARD_CHAIR, SENIOR_MANAGER, FINANCE_MANAGER,
+COMMERCIAL_MANAGER; گزارش مسافران → SENIOR_MANAGER, FINANCE_MANAGER,
+COMMERCIAL_MANAGER; گزارش کارمندان → FINANCE_MANAGER, COMMERCIAL_MANAGER
+(per each panel's confirmed nav).
+
+- GET `/finance/summary?period=` — the مالی tab in one call: KPI row
+  (کل درآمد / سود خالص + حاشیه / هزینه عملیاتی / مطالبات معوق آژانس‌ها —
+  all SQL over the ledger + derived agency debt), completed-flights seats
+  summary and the «ترکیب درآمد» channel donut, all re-scoped by `period`
+  (`year` | `YYYY-MM` | `YYYY-MM-DD`) — the design's KPI re-scope on
+  month selection.
+- GET `/reporting/sales-chart` gains `mode=year|month|day|flight` (+
+  `month=`, `day=`, `flightQ=`) completing the Phase 1 deferral: month
+  chips, the روز calendar + گزارش فروش روز box, and the per-flight
+  financial cards with search.
+- GET `/finance/transactions` — FINANCE_MANAGER only («تراکنش‌های مالی
+  اخیر», per CLAUDE.md role rule): recent ledger rows typed
+  فروش/تسویه/کمیسیون/استرداد (+ عملیاتی) with party labels.
+- GET `/finance/settlements` — FINANCE_MANAGER only: the تسویه‌حساب block
+  from `AgencyInvoice` (period, due, paid %, تسویه شد/در انتظار/معوق) +
+  POST `/finance/settlements/:invoiceId/remind` («ارسال یادآوری», via the
+  SmsProvider interface, audited).
+- GET `/reports/passengers?q=` — the جستجوی مسافر surface: name contains
+  or exact national-ID (hash) match → ticket card (PNR, flightNo, route,
+  date/time, seat/class, amount, status) + quick-search names from real
+  data. Excel/PDF export buttons stay deferred (same as Phases 3/10).
+- GET `/reports/staff` — گزارش عملکرد کارمندان: AuditLog rows by EMPLOYEE
+  actors grouped per employee (tabs), category chips, plus the recent
+  «کارمند جدید توسط مدیر IT» notice derived from ACCOUNT audit rows.
+
 ## Later phases (endpoints TBD — documented here before each phase's code is written)
 
 - **Phase 2** — none directly (reporting reads Phase-2 tables; no new endpoints of its own beyond what's above).
