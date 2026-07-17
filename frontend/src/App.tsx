@@ -19,6 +19,7 @@ import ServicesPage from './features/it-manager/ServicesPage';
 import LogsPage from './features/it-manager/LogsPage';
 import BackupsPage from './features/it-manager/BackupsPage';
 import PricingPage from './features/pricing/PricingPage';
+import ReservationPage from './features/reservation/ReservationPage';
 
 export default function App() {
   return (
@@ -68,6 +69,9 @@ export default function App() {
               </Route>
               <Route path="flights" element={<TabGate tabKey="flights" />}>
                 <Route index element={<PricingPage />} />
+              </Route>
+              <Route path="reservation" element={<TabGate tabKey="reservation" />}>
+                <Route index element={<ReservationPage />} />
               </Route>
               <Route path=":tabKey" element={<ComingSoonPage />} />
             </Route>

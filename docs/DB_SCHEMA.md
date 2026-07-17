@@ -288,12 +288,25 @@ explicitly listed under Phase 12 in `PLAN.md` — not built, not stubbed.
 ## Phase 9 — Reservation system (seat lock / PNR)
 
 Shared `ReservationSystem` component contract, confirmed from
-`ReservationSystem.dc.html`: only `BOARD_CHAIR` may lock/release seats or
-create managerial reservations (`canLock`); `SENIOR_MANAGER` gets view-only
-access to the same seat map. This governs authorization on:
-- `SeatLock { id, flightInstanceId→FlightInstance, seatCode, lockedById→User, passengerName?, passengerNationalId?, releasedAt? }`
+`ReservationSystem.dc.html`'s script (`canLock = this.props.role === 'super'`)
+and its own copy ("لاک‌کردن صندلی فقط توسط مدیر عامل یا رئیس هیئت مدیره
+انجام می‌شود"). ⚑ **Product decision (open item resolved by the user,
+2026-07-17):** `canLock` = `CEO`, `BOARD_CHAIR`, `IT_MANAGER` (the design
+hardcodes `resRole:"super"` for the IT panel's mount, and CEO/Chair's own
+`state.role` resolves to `"super"` too); `SENIOR_MANAGER` gets view-only
+access to the same seat map, matching the design's confirmed behavior.
+Reachable nav entries (per `panel-nav.config.ts`, already confirmed in
+Phase 1's extraction): only `BOARD_CHAIR`, `SENIOR_MANAGER`, `IT_MANAGER`
+get a سامانه رزرواسیون/هواپیما sidebar tab — CEO's mount point is coded but
+unreachable from its sidebar, so CEO's `canLock` grant is API-level only
+(consistent with the design's own copy naming CEO as an authorized locker)
+and has no UI entry point yet.
 
-PNR issuance/change/cancel reuses `Booking`/`Passenger` from Phase 2.
+- `AircraftSeatMap { id, aircraftType (unique) →Flight.aircraftType, businessRowStart/End, businessColsLeft/Right, economyRowStart/End, economyColsLeft/Right }` — CLAUDE.md: "seat map config lives per aircraft type in the DB, not hardcoded." Seeded once for `"Airbus A320"` (the existing seed flight's type) matching the design's MD-88 mock numbers verbatim: rows 3–6 business 2-2 (16 seats), rows 7–32 economy 2-3 (130 seats) = 146 total.
+- `SeatLock { id, flightInstanceId→FlightInstance, seatCode, lockedById→User, passengerName?, passengerNationalIdEnc?, passengerNationalIdHash?, passengerMobileEnc?, releasedById?→User, releasedAt? }` — PII fields follow the same encrypt+hash pattern as `ClubMember`. A partial unique index (`WHERE releasedAt IS NULL`) enforces exactly one active lock per seat at the DB level, not just an app-side check — CLAUDE.md's seat-inventory concurrency rule.
+- `Passenger` gained `nationalIdHash` (same encrypt+hash pattern, needed for the design's «جستجوی مسافر» exact-match search) and `seatCode` (nullable — Phase 1–6 seed passengers predate seat selection).
+- PNR issuance/change/cancel reuses `Booking`/`Passenger` from Phase 2. "New booking" (منوی جستجوی پرواز + صدور PNR) in this component is a **staff-side manual/offline issuance path** (phone/counter bookings), not the public paid-checkout flow — it creates a `TICKETED` booking directly (no `HELD`/`PAID` steps, no payment gateway), clearly distinct from and not a substitute for the public-site booking-and-payment track. Price comes from `FarePricingProposal.registeredPriceIrr` when one exists for that `FlightInstance` (Phase 6), else a documented flat fallback — no ad-hoc dynamic pricing invented here.
+- Out of scope for Phase 9 (design tabs intentionally not built here): «دسترسی آژانس‌ها» duplicates Phase 3's `AgencyApiKey` feature already shipped; «پروازها» (flight/schedule/capacity creation) is Phase 10's own scope; the dashboard sub-tab's "microservices health" cards describe infrastructure that doesn't exist as separate services in this monolith — building it would mean fabricating status data, which CLAUDE.md forbids, so it's replaced by real booking/seat stats instead of ported verbatim.
 
 ---
 
