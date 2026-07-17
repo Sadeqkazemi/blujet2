@@ -34,7 +34,7 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'cartable', labelFa: 'کارتابل', implemented: true },
     { key: 'settings', labelFa: 'تنظیمات سامانه', implemented: false },
     { key: 'club', labelFa: 'مشتریان VIP', implemented: true },
-    { key: 'reservation', labelFa: 'هواپیما', implemented: false },
+    { key: 'reservation', labelFa: 'هواپیما', implemented: true },
     { key: 'mgrreports', labelFa: 'گزارش مدیران', implemented: false },
   ],
   SENIOR_MANAGER: [
@@ -50,7 +50,7 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'vip', labelFa: 'مشتریان VIP', implemented: true },
     { key: 'panels', labelFa: 'دسترسی به پنل‌ها', implemented: false },
     { key: 'security', labelFa: 'امنیت و رمز عبور', implemented: false },
-    { key: 'reservation', labelFa: 'سامانه رزرواسیون', implemented: false },
+    { key: 'reservation', labelFa: 'سامانه رزرواسیون', implemented: true },
   ],
   FINANCE_MANAGER: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
@@ -79,7 +79,7 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'users', labelFa: 'کاربران و دسترسی‌ها', implemented: true },
     { key: 'security', labelFa: 'رمزها و امنیت', implemented: true },
     { key: 'services', labelFa: 'سرویس‌های سایت', implemented: true },
-    { key: 'reservation', labelFa: 'سامانه رزرواسیون', implemented: false },
+    { key: 'reservation', labelFa: 'سامانه رزرواسیون', implemented: true },
     { key: 'panels', labelFa: 'دسترسی به پنل‌ها', implemented: false },
     { key: 'logs', labelFa: 'لاگ و رویدادها', implemented: true },
     { key: 'backup', labelFa: 'پشتیبان‌گیری', implemented: true },
