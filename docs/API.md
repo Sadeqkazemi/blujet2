@@ -250,6 +250,51 @@ capacity creation (Phase 10's own scope).
 
 ---
 
+## Phase 10 — Flight management (مدیریت پروازها)
+
+Module `backend/src/modules/flights/`. Roles: `SENIOR_MANAGER` +
+`COMMERCIAL_MANAGER` (the two panels with the tab; nav keys `flights` in
+both — Commercial's tab already hosts Phase 6's pricing section, which
+stays untouched on the same page).
+
+- GET `/flights/overview` — the tab's data in one call: KPI row (پرواز
+  فعال / صندلی فروخته‌شده / میانگین ضریب اشغال) + the three lists:
+  - `active`: SCHEDULED instances — route label, flightNo, Jalali
+    date/time, sold/capacity (+ derived status فعال/در حال فروش/تکمیل/لغو
+    شده), basePriceIrr.
+  - `completed`: DEPARTED instances — per-channel revenue sums from real
+    bookings (سیستمی/چارتری/آژانس), tickets, نرخ اصلی, متوسط نرخ, سود/ضرر
+    vs base rate + the 4 KPI totals.
+  - `future`: SCHEDULED instances with `departureAt` beyond the active
+    window — capacity, charterSeats, agencySeatsAllocated, persisted AI
+    suggestion (if any), and the Jalali day list for the calendar filter.
+- GET `/flights/airports` — seeded airport catalog for the add-flight
+  selects.
+- POST `/flights` — «افزودن پرواز» modal `{ originCode, destCode,
+  flightNo, departureDate (Jalali), departureTime, capacity,
+  basePriceToman }` — find-or-create Route/Flight, create instance;
+  validation per design («لطفاً همه فیلدها را تکمیل کنید.») plus server
+  rules (origin≠dest, future date, capacity/price bounds); audited.
+- GET `/flights/:instanceId` — flight detail modal: sold/cap, ضریب اشغال,
+  قیمت پایه, real channel breakdown (seats + revenue per سیستمی/چارتری/
+  آژانس) and مجموع درآمد from bookings.
+- PATCH `/flights/:instanceId/plan` — the future-flight نرخ‌گذاری modal
+  `{ priceToman, agencySeats }` — agencySeats capped at capacity −
+  charterSeats (مستقیم derived); sets `basePriceIrr` +
+  `agencySeatsAllocated`; audited. ⚑ price registration authority: in the
+  mocks BOTH Senior and Commercial set the final rate directly here,
+  which conflicts with Phase 6's approved CEO-approval flow — proposed
+  resolution: this endpoint stores the plan figures, and for COMMERCIAL
+  it also upserts the Phase 6 proposal (still requiring CEO registration
+  to become the bookable price); SENIOR_MANAGER's save is allowed as-is
+  for the plan figures only. The bookable price NEVER comes from this
+  endpoint.
+- POST `/flights/ai-analysis` — «تحلیل قیمت‌گذاری با هوش مصنوعی» over the
+  future list, reusing Phase 6's ml-service client verbatim (2s timeout,
+  graceful degradation, advisory only, persisted with modelVersion).
+- Deferred (explicit): خروجی Excel buttons (same deferral as Phase 3's,
+  toast-only in mocks); RRULE schedules (no design UI — see DB_SCHEMA).
+
 ## Later phases (endpoints TBD — documented here before each phase's code is written)
 
 - **Phase 2** — none directly (reporting reads Phase-2 tables; no new endpoints of its own beyond what's above).

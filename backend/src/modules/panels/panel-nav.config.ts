@@ -40,7 +40,7 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
   SENIOR_MANAGER: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
     { key: 'agencies', labelFa: 'آژانس‌ها', implemented: true },
-    { key: 'flights', labelFa: 'مدیریت پروازها', implemented: false },
+    { key: 'flights', labelFa: 'مدیریت پروازها', implemented: true },
     { key: 'admins', labelFa: 'مدیران و ادمین‌ها', implemented: false },
     { key: 'reports', labelFa: 'گزارش مسافران', implemented: false },
     { key: 'finance', labelFa: 'مالی', implemented: false },

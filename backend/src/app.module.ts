@@ -23,6 +23,7 @@ import { ItManagerModule } from './modules/it-manager/it-manager.module';
 import { PricingModule } from './modules/pricing/pricing.module';
 import { RefundsModule } from './modules/refunds/refunds.module';
 import { ReservationModule } from './modules/reservation/reservation.module';
+import { FlightsModule } from './modules/flights/flights.module';
 
 @Module({
   imports: [
@@ -69,6 +70,7 @@ import { ReservationModule } from './modules/reservation/reservation.module';
     PricingModule,
     RefundsModule,
     ReservationModule,
+    FlightsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
