@@ -235,7 +235,7 @@ describe('Cartable + referrals + messages (e2e)', () => {
     const status = await request(app.getHttpServer())
       .get('/cartable/chair-permission')
       .set('Authorization', `Bearer ${comm.accessToken}`);
-    expect(status.body.data.status).toBe('APPROVED');
+    expect(status.body.data.latest.status).toBe('APPROVED');
   });
 
   it('chair-permission request as SENIOR_MANAGER → 403 (gate exists only in Finance/Commercial)', async () => {

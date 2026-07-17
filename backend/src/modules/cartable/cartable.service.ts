@@ -312,7 +312,9 @@ export class CartableService {
       where: { requesterId: actor.id },
       orderBy: { createdAt: 'desc' },
     });
-    return latest ?? null;
+    // Wrapped: the shared response envelope treats a bare null data as an
+    // error, and "no request yet" is a perfectly valid state.
+    return { latest };
   }
 
   // ── Internal API for sibling modules (referrals/messages/agencies) ─────
