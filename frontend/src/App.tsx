@@ -14,6 +14,7 @@ import CartablePage from './features/cartable/CartablePage';
 import ReferralsPage from './features/referrals/ReferralsPage';
 import ClubPage from './features/club/ClubPage';
 import PricingPage from './features/pricing/PricingPage';
+import RefundsPage from './features/refunds/RefundsPage';
 
 export default function App() {
   return (
@@ -48,6 +49,9 @@ export default function App() {
               </Route>
               <Route path="flights" element={<TabGate tabKey="flights" />}>
                 <Route index element={<PricingPage />} />
+              </Route>
+              <Route path="refund" element={<TabGate tabKey="refund" />}>
+                <Route index element={<RefundsPage />} />
               </Route>
               <Route path=":tabKey" element={<ComingSoonPage />} />
             </Route>

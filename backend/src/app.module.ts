@@ -20,6 +20,7 @@ import { ManagerMessagesModule } from './modules/manager-messages/manager-messag
 import { FilesModule } from './modules/files/files.module';
 import { ClubModule } from './modules/club/club.module';
 import { PricingModule } from './modules/pricing/pricing.module';
+import { RefundsModule } from './modules/refunds/refunds.module';
 
 @Module({
   imports: [
@@ -63,6 +64,7 @@ import { PricingModule } from './modules/pricing/pricing.module';
     FilesModule,
     ClubModule,
     PricingModule,
+    RefundsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
