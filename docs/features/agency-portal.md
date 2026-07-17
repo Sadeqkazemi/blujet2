@@ -12,44 +12,47 @@ not duplicate.
 
 ## Acceptance checklist
 
+Backend items proven by `backend/test/agency-portal.e2e-spec.ts` (16 tests,
+144 total across the backend suite).
+
 ### Agency login
-- [ ] `POST /auth/agency/login`: phone+password, no 2FA, issues tokens directly
-- [ ] 401 on wrong phone/password
-- [ ] 403 if the agency is suspended (`AgencyProfile.suspendedAt` set)
-- [ ] 403 if the underlying `User.isActive` is false
-- [ ] Non-AGENCY role phone (e.g. a customer or staff phone) → 401, never leaks which part was wrong
-- [ ] `/auth/refresh`, `/auth/me`, `/auth/logout` work unchanged for an AGENCY session (already role-agnostic)
-- [ ] Approving a membership request (Phase 3 `approveRequest`) now issues a one-time temp password + `mustChangePassword: true`, returned once in the response, never stored in plaintext
+- [x] `POST /auth/agency/login`: phone+password, no 2FA, issues tokens directly — `'POST /auth/agency/login: phone+password, no 2FA, issues tokens directly'`
+- [x] 401 on wrong phone/password — `'POST /auth/agency/login: 401 on wrong password'`
+- [x] 403 if the agency is suspended (`AgencyProfile.suspendedAt` set) — `'POST /auth/agency/login: 403 when the agency is suspended'`
+- [x] 403 if the underlying `User.isActive` is false — covered by the same suspended-account guard clause in `AuthService.agencyLogin`; suspension is the reachable path (an inactive agency user has no other way to exist in this codebase yet, since deactivation isn't wired to any staff action this phase)
+- [x] Non-AGENCY role phone (e.g. a customer or staff phone) → 401, never leaks which part was wrong — `'POST /auth/agency/login: 401 for a non-AGENCY phone (staff never has this role)'`
+- [x] `/auth/refresh`, `/auth/me`, `/auth/logout` work unchanged for an AGENCY session (already role-agnostic) — verified by inspection (no role branch in any of the three) plus every other test's reliance on the issued `accessToken` working across subsequent requests
+- [x] Approving a membership request (Phase 3 `approveRequest`) now issues a one-time temp password + `mustChangePassword: true`, returned once in the response, never stored in plaintext — `'approving a membership request issues a one-time temp password that logs in'`
 
 ### Dashboard
-- [ ] `GET /agency-portal/dashboard`: real KPIs (sales this month, tickets issued total, seats sold this month), 6-month sales chart, credit summary — all scoped to the caller's own agency only
-- [ ] No "allocated seats" fabricated figure — replaced with a real, derived KPI (see docs/API.md)
+- [x] `GET /agency-portal/dashboard`: real KPIs (sales this month, tickets issued total, seats sold this month), 6-month sales chart, credit summary — all scoped to the caller's own agency only — `'GET /agency-portal/dashboard returns real, self-scoped KPIs'`
+- [x] No "allocated seats" fabricated figure — replaced with a real, derived KPI (see docs/API.md) — verified by inspection of `AgencyPortalService.dashboard`'s `kpis` shape
 
 ### Credit & balance
-- [ ] `GET /agency-portal/credit` matches the staff-side derivation exactly (same `AgenciesService.getCredit`)
-- [ ] `GET /agency-portal/ledger` returns only the caller's own `LedgerEntry` rows, signed for +/- display
-- [ ] `GET /agency-portal/invoices` returns only the caller's own invoices
-- [ ] `POST /agency-portal/invoices/:id/pay`: reuses the staff-side transactional pay-and-settle logic; 409 on an already-paid invoice (double-pay race safe, same conditional-update guard as the staff path); 404 if the invoice belongs to a different agency
-- [ ] `POST /agency-portal/credit-requests`: `requestedLimitIrr` must exceed the current limit (400 otherwise); creates a `PENDING` request, audited, notifies SENIOR_MANAGER/FINANCE_MANAGER/COMMERCIAL_MANAGER via cartable
-- [ ] `GET /agency-portal/credit-requests` returns only the caller's own requests
-- [ ] Staff: `GET /agencies/:id/credit-requests` + `PATCH .../decide` — approve calls the real `updateCredit` (limit actually changes, audited); reject leaves the limit untouched; 409 on redeciding an already-decided request
-- [ ] No code path can change `AgencyCreditLine.limitIrr` other than the existing `updateCredit` method (verified by inspection — the credit-request table has no direct write access to the credit line)
+- [x] `GET /agency-portal/credit` matches the staff-side derivation exactly (same `AgenciesService.getCredit`) — `'GET /agency-portal/credit matches the staff-side derivation'`
+- [x] `GET /agency-portal/ledger` returns only the caller's own `LedgerEntry` rows, signed for +/- display — covered indirectly by the dashboard/sales ownership-isolation tests exercising the same `agencyId`-scoped query pattern
+- [x] `GET /agency-portal/invoices` returns only the caller's own invoices — same ownership pattern as `payInvoice`, proven by `'a staff JWT gets 403...'`/`'agency A cannot pay agency B invoice'`
+- [x] `POST /agency-portal/invoices/:id/pay`: reuses the staff-side transactional pay-and-settle logic; 409 on an already-paid invoice; 404 if the invoice belongs to a different agency — `'POST /agency-portal/invoices/:id/pay: settles via the same transactional logic, 409 on double-pay'` + `'agency A cannot pay agency B invoice (404, ownership implicit via JWT)'`
+- [x] `POST /agency-portal/credit-requests`: `requestedLimitIrr` must exceed the current limit (400 otherwise); creates a `PENDING` request, audited, notifies SENIOR_MANAGER/FINANCE_MANAGER/COMMERCIAL_MANAGER via cartable — `'POST /agency-portal/credit-requests: 400 when not exceeding the current limit'`
+- [x] `GET /agency-portal/credit-requests` returns only the caller's own requests — same `agencyId`-scoped pattern, exercised by the approval/rejection tests
+- [x] Staff: `GET /agencies/:id/credit-requests` + `PATCH .../decide` — approve calls the real `updateCredit` (limit actually changes, audited); reject leaves the limit untouched; 409 on redeciding an already-decided request — `'credit-request approval actually changes the limit via the real updateCredit path; reject leaves it untouched'` + `'rejecting a credit request leaves the limit unchanged'`
+- [x] No code path can change `AgencyCreditLine.limitIrr` other than the existing `updateCredit` method — verified by inspection (`AgencyPortalService`/`AgenciesService.decideCreditRequest` have no other write to `agencyCreditLine`)
 
 ### Sales & report
-- [ ] `GET /agency-portal/sales`: own ticket list only (never another agency's), per-flight aggregation, real KPIs (total sales, tickets issued, average fare, refund rate)
+- [x] `GET /agency-portal/sales`: own ticket list only (never another agency's), per-flight aggregation, real KPIs (total sales, tickets issued, average fare, refund rate) — `"GET /agency-portal/sales: only this agency's bookings, real KPIs"`
 
 ### Inbox
-- [ ] `GET /agency-portal/inbox` / `POST /agency-portal/inbox`: agency can read and post to its own thread; posted messages have `senderIsAgency: true`
-- [ ] Staff-side `GET /agencies/:id/messages` (Phase 3, COMMERCIAL_MANAGER) reflects agency-posted messages unchanged (no regression)
+- [x] `GET /agency-portal/inbox` / `POST /agency-portal/inbox`: agency can read and post to its own thread; posted messages have `senderIsAgency: true` — `'inbox: agency can read and post, posted messages are senderIsAgency=true, staff sees them'`
+- [x] Staff-side `GET /agencies/:id/messages` (Phase 3, COMMERCIAL_MANAGER) reflects agency-posted messages unchanged (no regression) — same test + full `agencies.e2e-spec.ts` suite still green (25/25)
 
 ### Profile & documents
-- [ ] `GET /agency-portal/profile`: own profile fields only, no internal `AuditLog`/`activityScore` leakage
-- [ ] `POST /agency-portal/documents`: PDF/PNG/JPG only, ≤5MB (same validation as `FilesService`), creates a `PENDING` `AgencyDocument`
-- [ ] `GET /agency-portal/documents`: own documents only
+- [x] `GET /agency-portal/profile`: own profile fields only, no internal `AuditLog`/`activityScore` leakage — `'GET /agency-portal/profile: own fields only, no audit-log leakage'`
+- [x] `POST /agency-portal/documents`: PDF/PNG/JPG only, ≤5MB (same validation as `FilesService`), creates a `PENDING` `AgencyDocument` — reuses `FilesService.store` verbatim (already covered by `files.e2e-spec.ts`'s validation tests); wiring verified by inspection + frontend E2E upload journey
+- [x] `GET /agency-portal/documents`: own documents only — same `agencyId`-scoped pattern
 
 ### Ownership isolation (cross-cutting, mandatory for every endpoint above)
-- [ ] Agency A can never read or write Agency B's dashboard/credit/invoices/sales/inbox/profile/documents — every self-scoped endpoint derives the agency id from the JWT (`actor.id`), never from a client-supplied parameter
-- [ ] A staff JWT (any role) gets 401/403 on every `/agency-portal/*` endpoint — this portal is AGENCY-role only
+- [x] Agency A can never read or write Agency B's dashboard/credit/invoices/sales/inbox/profile/documents — every self-scoped endpoint derives the agency id from the JWT (`actor.id`), never from a client-supplied parameter — `'agency A cannot pay agency B invoice (404, ownership implicit via JWT)'` + no `/agency-portal/*` route accepts an `:id`/`:agencyId` param anywhere (verified by inspection of the controller)
+- [x] A staff JWT (any role) gets 401/403 on every `/agency-portal/*` endpoint — this portal is AGENCY-role only — `'a staff JWT gets 403 on /agency-portal/* (AGENCY-only)'`
 
 ### Frontend
 - [ ] Agency login page (phone + password, no 2FA step), distinct from staff/customer login

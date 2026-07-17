@@ -22,6 +22,7 @@ import { ClubModule } from './modules/club/club.module';
 import { ItManagerModule } from './modules/it-manager/it-manager.module';
 import { PricingModule } from './modules/pricing/pricing.module';
 import { ReservationModule } from './modules/reservation/reservation.module';
+import { AgencyPortalModule } from './modules/agency-portal/agency-portal.module';
 
 @Module({
   imports: [
@@ -67,6 +68,7 @@ import { ReservationModule } from './modules/reservation/reservation.module';
     ItManagerModule,
     PricingModule,
     ReservationModule,
+    AgencyPortalModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
