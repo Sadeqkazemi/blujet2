@@ -18,6 +18,32 @@ export async function getTwoFactorCode(username: string): Promise<string> {
  * Specs using it should set a generous test timeout (240s covers the worst
  * case of several waits).
  */
+export const AGENCY_GOLD_PHONE = '+989120000002';
+
+/**
+ * Agency Portal login: phone+password, no 2FA step (unlike staff login).
+ * Uses the seed's gold agency by default, which carries the shared
+ * STAFF_PASSWORD dev password like every other seeded account.
+ */
+export async function loginAsAgency(page: Page, phone = AGENCY_GOLD_PHONE, password = STAFF_PASSWORD) {
+  for (let attempt = 0; attempt < 6; attempt++) {
+    await page.goto('/agency/login');
+    await page.fill('#phone', phone);
+    await page.fill('#password', password);
+    const [loginRes] = await Promise.all([
+      page.waitForResponse((r) => r.url().includes('/auth/agency/login') && r.request().method() === 'POST'),
+      page.click('button[type=submit]'),
+    ]);
+    if (loginRes.status() === 429) {
+      await page.waitForTimeout(21_000);
+      continue;
+    }
+    await page.waitForURL('**/agency');
+    return;
+  }
+  throw new Error(`agency login for ${phone} kept hitting the rate limit`);
+}
+
 export async function loginAs(page: Page, username: string) {
   for (let attempt = 0; attempt < 6; attempt++) {
     await page.goto('/login');

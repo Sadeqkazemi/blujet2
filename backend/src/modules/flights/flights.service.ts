@@ -124,7 +124,8 @@ export class FlightsService {
     const kpis = {
       activeCount: nonCancelled.length,
       soldSeats: soldTotal,
-      meanOccupancyPct: capTotal > 0 ? Math.round((soldTotal / capTotal) * 100) : 0,
+      meanOccupancyPct:
+        capTotal > 0 ? Math.round((soldTotal / capTotal) * 100) : 0,
     };
 
     return { kpis, active, completed, future };
@@ -314,11 +315,17 @@ export class FlightsService {
     const sold = channels.reduce((a, c) => a + c.seats, 0);
     return {
       ...this.baseRow(instance, sold),
-      derivedStatus: this.derivedStatus(instance.status, sold, instance.capacity),
+      derivedStatus: this.derivedStatus(
+        instance.status,
+        sold,
+        instance.capacity,
+      ),
       channels,
       totalRevenueIrr: channels.reduce((a, c) => a + c.revenueIrr, 0),
       occupancyPct:
-        instance.capacity > 0 ? Math.round((sold / instance.capacity) * 100) : 0,
+        instance.capacity > 0
+          ? Math.round((sold / instance.capacity) * 100)
+          : 0,
     };
   }
 

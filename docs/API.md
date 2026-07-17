@@ -250,6 +250,87 @@ capacity creation (Phase 10's own scope).
 
 ---
 
+## Agency Portal (self-service, پنل آژانس) — separate track, reassigned into this session
+
+Explicitly authorized by the user (2026-07-17, after confirming this feature
+did not exist anywhere despite `CLAUDE.md` scoping it to the public-site
+track). Grounded in a full extraction of `پنل آژانس.dc.html`'s 7 نav tabs
+(دشبورد/صندلی‌های تخصیص‌یافته/وب‌سرویس/اعتبار و مانده/فروش و گزارش/کارتابل و
+پیام‌ها/پروفایل و مدارک) and reuses Phase 3's `AgencyProfile`/
+`AgencyCreditLine`/`AgencyInvoice`/`AgencyMessage`/`AgencyApiKey` — this is
+the agency's own self-service view over the SAME rows the staff آژانس‌ها tab
+already manages, not a parallel data model.
+
+⚑ **Login mechanism (product decision, no design-confirmed spec existed —
+the design's «آژانس همکار» login tab labels the identifier «نام کاربری / کد
+آژانس», a concept with no backing field anywhere in the schema):** login is
+phone + password, no 2FA (`User.phone`, already populated for every AGENCY
+user since Phase 3's `approveRequest` sets it from the membership request) —
+reusing real data instead of inventing an "agency code" column. Frontend
+copy reads «شماره تماس آژانس» rather than copying the design's literal
+"کد آژانس" label, to stay honest about what's actually collected. 2FA is
+skipped because the design shows no 2FA step anywhere in the آژانس همکار
+tab (unlike staff login, which is 2FA-mandatory per `CLAUDE.md`).
+`approveRequest` (Phase 3) is extended to also issue a one-time temp
+password (same pattern as IT Manager's employee `resetPassword`) — before
+this, an approved agency had a `User` row with `passwordHash: null` and no
+way to ever log in.
+
+⚑ **Credit top-up reinterpreted as an audited request, not a mutation**
+(the design's «افزایش اعتبار» modal directly raises `_limitN` client-side —
+exactly the mutable-balance anti-pattern `CLAUDE.md`'s financial rules
+forbid carrying over). The agency submits an `AgencyCreditRequest`; a
+staff member with credit authority (`SENIOR_MANAGER`/`FINANCE_MANAGER`/
+`COMMERCIAL_MANAGER` — the same three roles already authorized on
+`PATCH /agencies/:id/credit`) decides it, and only that decision calls the
+existing `updateCredit` service method. No new code path can change a
+credit limit outside that one already-audited method.
+
+Deferred, not silently dropped (see `docs/features/agency-portal.md` for
+full reasoning): «صندلی‌های تخصیص‌یافته» (allocated seats) — no staff-side
+allocation workflow exists anywhere to allocate seats to an agency in the
+first place; «وب‌سرویس» self-service API purchase+approval — no staff-side
+purchase-approval counterpart exists (only issuance via Phase 3's Senior
+Manager-only `AgencyApiKey` flow, which stays staff-initiated); staff-side
+document review (uploaded docs stay `PENDING` — reviewing them is a new
+staff workflow, not part of this slice); Excel export (mock-only button,
+not a real feature anywhere else in the codebase either).
+
+### `backend/src/modules/auth/` (new agency login path)
+
+| Method | Path | Roles | Notes |
+|---|---|---|---|
+| POST | `/auth/agency/login` | public | `{ phone, password }` → `{ accessToken, user }` directly (no 2FA challenge step, unlike staff login). 401 on bad credentials, 403 if suspended (`AgencyProfile.suspendedAt` set) or inactive. Sets the same httpOnly refresh cookie as staff login; `/auth/refresh`, `/auth/me`, `/auth/logout` are already role-agnostic and work unchanged for AGENCY users. |
+
+### `backend/src/modules/agencies/` (staff-side additions)
+
+| Method | Path | Roles | Notes |
+|---|---|---|---|
+| GET | `/agencies/:id/credit-requests` | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | Pending + decided `AgencyCreditRequest` rows for one agency. |
+| PATCH | `/agencies/:id/credit-requests/:reqId/decide` | same as above | `{ approve: boolean }` — approve calls the existing `updateCredit` internally with the requested limit (single audited code path); reject just marks `REJECTED`. 409 on an already-decided request. |
+
+### `backend/src/modules/agency-portal/` — self-scoped to the caller (`actor.id` IS the `AgencyProfile.userId`; no `:id` param anywhere, ownership is implicit)
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/agency-portal/dashboard` | `{ credit, kpis: { salesThisMonthIrr, ticketsIssuedTotal, seatsSoldThisMonth }, monthlySales: [{month,salesIrr}] (last 6 months) }`. The design's «صندلی تخصیص‌یافته» KPI card is replaced with `ticketsIssuedTotal` (real, derived from `Booking`) — CLAUDE.md forbids fabricating a figure for a workflow (seat allocation) that doesn't exist yet, same reasoning as Phase 9's dashboard. |
+| GET | `/agency-portal/credit` | `{ limitIrr, usedIrr, remainingIrr }` — reuses `AgenciesService.getCredit(actor.id)` verbatim. |
+| GET | `/agency-portal/ledger` | Last 20 `LedgerEntry` rows for «گردش حساب اخیر» (recent activity), signed for +/- display. |
+| GET | `/agency-portal/invoices` | Own invoices — reuses `AgenciesService.listInvoices(actor.id)`. |
+| POST | `/agency-portal/invoices/:invoiceId/pay` | «پرداخت از اعتبار» — reuses `AgenciesService.payInvoice` verbatim (same transactional conditional-update + `SETTLEMENT` ledger row as the staff-side pay action); ownership is implicit since the agency can only ever pass its own id. |
+| POST | `/agency-portal/credit-requests` | `{ requestedLimitIrr, note? }` — must exceed the current limit; creates `AgencyCreditRequest(PENDING)`, audited, fans a `CartableTask` out to SENIOR_MANAGER/FINANCE_MANAGER/COMMERCIAL_MANAGER (no `sourceType` — informational only, the actual decision goes through the dedicated decide endpoint above, not generic cartable resolution). |
+| GET | `/agency-portal/credit-requests` | Own request history + status. |
+| GET | `/agency-portal/sales` | «فروش و گزارش»: own ticket list (`Booking` rows, PAID/TICKETED/REFUNDED) + per-flight aggregation + summary KPIs (کل فروش، بلیط صادرشده، میانگین نرخ، نرخ استرداد — all real, computed server-side per `CLAUDE.md`'s reporting rule). |
+| GET | `/agency-portal/inbox` | «کارتابل و پیام‌ها» — reuses `AgenciesService.listMessages(actor.id)`. |
+| POST | `/agency-portal/inbox` | `{ body }` — reuses a `senderIsAgency`-aware `AgenciesService.postMessage` (the staff-side controller keeps calling it with `senderIsAgency=false`; this path passes `true`). |
+| GET | `/agency-portal/profile` | Own `AgencyProfile` fields — a dedicated lightweight query, NOT a reuse of the staff `detail()` method, since that method also returns internal `AuditLog` rows and an `activityScore` never meant for the agency's own eyes. |
+| GET | `/agency-portal/documents` | Own `AgencyDocument` list. |
+| POST | `/agency-portal/documents` | multipart `{ file, docType }` — reuses `FilesService.store` (PDF/PNG/JPG, ≤5MB), wraps the resulting `StoredFile` in an `AgencyDocument(status=PENDING)`. Staff review is deferred (see above) — status stays `PENDING` until that phase. |
+
+No `_test/*` seeding hook was needed for this feature (unlike club/pricing/reservation) — the seed already provisions two agencies (`+989120000002` gold, `+989120000003` silver, suspended) with the shared dev password, which is deterministic enough for Playwright. A `_test/set-password` endpoint was drafted and then removed: it would have lived under the same `@Roles('AGENCY')`-gated controller it was meant to bootstrap credentials for, which is unreachable before any credentials exist — a real chicken-and-egg gap, not a deliberate deferral.
+
+---
+
 ## Phase 10 — Flight management (مدیریت پروازها)
 
 Module `backend/src/modules/flights/`. Roles: `SENIOR_MANAGER` +
@@ -294,6 +375,8 @@ stays untouched on the same page).
   graceful degradation, advisory only, persisted with modelVersion).
 - Deferred (explicit): خروجی Excel buttons (same deferral as Phase 3's,
   toast-only in mocks); RRULE schedules (no design UI — see DB_SCHEMA).
+
+---
 
 ## Later phases (endpoints TBD — documented here before each phase's code is written)
 

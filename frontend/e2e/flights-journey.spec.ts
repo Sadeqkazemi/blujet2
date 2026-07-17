@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { spawn, type ChildProcess } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { loginAs } from './helpers/login';
 
 // Generous timeout: the shared login helper may wait out the auth rate limit.
@@ -77,7 +78,10 @@ test.describe.serial('future flights with the real ml-service', () => {
   let ml: ChildProcess;
 
   test.beforeAll(async () => {
-    ml = spawn('python3', ['-m', 'uvicorn', 'app.main:app', '--port', '8000'], {
+    // The project venv (gitignored, pyproject requires Python >=3.12) wins
+    // over whatever `python3` happens to be on PATH.
+    const python = existsSync(`${ML_DIR}/.venv/bin/python`) ? `${ML_DIR}/.venv/bin/python` : 'python3';
+    ml = spawn(python, ['-m', 'uvicorn', 'app.main:app', '--port', '8000'], {
       cwd: ML_DIR,
       env: { ...process.env, INTERNAL_TOKEN: 'dev-internal-token' },
       stdio: 'ignore',

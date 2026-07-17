@@ -4,15 +4,18 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import * as argon2 from 'argon2';
 import * as crypto from 'node:crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CartableService } from '../cartable/cartable.service';
 import { ErrorCode } from '../../common/errors';
+import { generateTempPassword } from '../../common/temp-password';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type {
   AgencyApiScope,
   AgencyApiKeyStatus,
+  AgencyCreditRequestStatus,
   AgencyMembershipStatus,
 } from '../../../generated/prisma/enums';
 
@@ -432,6 +435,11 @@ export class AgenciesService {
       });
     }
 
+    // Agency Portal (self-service): without a password an approved agency's
+    // User row could never log in — issued once here, never stored plaintext.
+    const tempPassword = generateTempPassword();
+    const passwordHash = await argon2.hash(tempPassword);
+
     const { agencyUserId } = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
@@ -439,6 +447,8 @@ export class AgenciesService {
           phone: request.phone,
           email: request.email,
           fullName: request.applicantName,
+          passwordHash,
+          mustChangePassword: true,
           isActive: true,
         },
       });
@@ -481,7 +491,8 @@ export class AgenciesService {
       metadata: { agencyUserId },
     });
 
-    return { agencyId: agencyUserId };
+    // Plaintext temp password is returned exactly once and never stored.
+    return { agencyId: agencyUserId, tempPassword };
   }
 
   async rejectRequest(
@@ -843,10 +854,15 @@ export class AgenciesService {
     });
   }
 
-  async postMessage(actor: AuthenticatedUser, id: string, body: string) {
+  async postMessage(
+    actor: AuthenticatedUser,
+    id: string,
+    body: string,
+    senderIsAgency = false,
+  ) {
     await this.getProfileOrThrow(id);
     return this.prisma.agencyMessage.create({
-      data: { agencyId: id, senderId: actor.id, senderIsAgency: false, body },
+      data: { agencyId: id, senderId: actor.id, senderIsAgency, body },
     });
   }
 
@@ -862,5 +878,76 @@ export class AgenciesService {
     });
 
     return { notifiedCount: agencies.length };
+  }
+
+  // ── Agency Portal: credit-increase requests (staff-side review) ────────
+
+  async listCreditRequests(id: string) {
+    await this.getProfileOrThrow(id);
+    return this.prisma.agencyCreditRequest.findMany({
+      where: { agencyId: id },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async decideCreditRequest(
+    actor: AuthenticatedUser,
+    id: string,
+    requestId: string,
+    approve: boolean,
+  ) {
+    const request = await this.prisma.agencyCreditRequest.findUnique({
+      where: { id: requestId },
+    });
+    if (!request || request.agencyId !== id) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'درخواست افزایش اعتبار یافت نشد.',
+      });
+    }
+    if (request.status !== 'PENDING') {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'این درخواست قبلاً بررسی شده است.',
+      });
+    }
+
+    const decision: AgencyCreditRequestStatus = approve
+      ? 'APPROVED'
+      : 'REJECTED';
+
+    // Conditional update guards a concurrent double-decision race.
+    const updated = await this.prisma.agencyCreditRequest.updateMany({
+      where: { id: requestId, status: 'PENDING' },
+      data: { status: decision, decidedById: actor.id, decidedAt: new Date() },
+    });
+    if (updated.count === 0) {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'این درخواست قبلاً بررسی شده است.',
+      });
+    }
+
+    // The ONLY code path that actually changes AgencyCreditLine.limitIrr —
+    // reuses the already-audited updateCredit rather than writing a second one.
+    if (approve) {
+      await this.updateCredit(actor, id, request.requestedLimitIrr);
+    }
+
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'AGENCY',
+      action: approve
+        ? 'تأیید درخواست افزایش اعتبار آژانس'
+        : 'رد درخواست افزایش اعتبار آژانس',
+      detail: `درخواست افزایش اعتبار به ${request.requestedLimitIrr} ریال توسط ${actor.fullName} ${approve ? 'تأیید' : 'رد'} شد.`,
+      entityType: 'AgencyCreditRequest',
+      entityId: requestId,
+    });
+
+    return this.prisma.agencyCreditRequest.findUniqueOrThrow({
+      where: { id: requestId },
+    });
   }
 }

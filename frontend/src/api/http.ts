@@ -31,7 +31,10 @@ async function doFetch(path: string, init: RequestInit): Promise<Response> {
   const token = getAccessToken();
   const headers = new Headers(init.headers);
   if (token) headers.set('Authorization', `Bearer ${token}`);
-  if (init.body) headers.set('Content-Type', 'application/json');
+  // FormData sets its own multipart boundary — never override it.
+  if (init.body && !(init.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json');
+  }
 
   return fetch(`${BASE_URL}${path}`, { ...init, headers, credentials: 'include' });
 }
@@ -66,4 +69,10 @@ export function apiPatch<T>(path: string, body?: unknown): Promise<T> {
 
 export function apiDelete<T>(path: string): Promise<T> {
   return apiRequest<T>(path, { method: 'DELETE' });
+}
+
+/** Multipart uploads — omits the JSON Content-Type header so the browser
+ * sets its own multipart boundary. */
+export function apiPostForm<T>(path: string, form: FormData): Promise<T> {
+  return apiRequest<T>(path, { method: 'POST', body: form });
 }

@@ -68,6 +68,7 @@ model User {
   agencyRequestsReviewed AgencyMembershipRequest[] @relation("AgencyRequestReviewedBy")
   agencyInvoicesIssued   AgencyInvoice[]           @relation("AgencyInvoiceIssuedBy")
   agencyMessagesSent     AgencyMessage[]           @relation("AgencyMessageSender")
+  agencyCreditRequestsDecided AgencyCreditRequest[] @relation("AgencyCreditRequestDecidedBy")
 
   cartableTasks       CartableTask[]             @relation("CartableAssignee")
   cartableTasksSent   CartableTask[]             @relation("CartableSender")
@@ -337,12 +338,14 @@ model AgencyProfile {
   suspendReason String?
   joinedAt      DateTime   @default(now())
 
-  creditLine    AgencyCreditLine?
-  apiKeys       AgencyApiKey[]
-  invoices      AgencyInvoice[]
-  messages      AgencyMessage[]
-  bookings      Booking[]
-  ledgerEntries LedgerEntry[]     @relation("AgencyLedgerEntries")
+  creditLine     AgencyCreditLine?
+  apiKeys        AgencyApiKey[]
+  invoices       AgencyInvoice[]
+  messages       AgencyMessage[]
+  bookings       Booking[]
+  ledgerEntries  LedgerEntry[]         @relation("AgencyLedgerEntries")
+  creditRequests AgencyCreditRequest[]
+  documents      AgencyDocument[]
 
   @@map("agency_profiles")
 }
@@ -452,6 +455,63 @@ model AgencyMessage {
 
   @@index([agencyId, createdAt])
   @@map("agency_messages")
+}
+
+// ─── Agency Portal (self-service) ───────────────────────────────────────
+// Separate track, reassigned into this session by explicit user approval.
+// See docs/API.md / docs/DB_SCHEMA.md → "Agency Portal".
+
+enum AgencyCreditRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ⚑ Replaces the design's client-side "افزایش اعتبار" mutation with an
+// auditable request — only AgenciesService.updateCredit (Phase 3, unchanged)
+// can ever actually change AgencyCreditLine.limitIrr.
+model AgencyCreditRequest {
+  id                String                     @id @default(uuid())
+  agencyId          String
+  agency            AgencyProfile              @relation(fields: [agencyId], references: [userId])
+  requestedLimitIrr Int
+  note              String?
+  status            AgencyCreditRequestStatus  @default(PENDING)
+  decidedById       String?
+  decidedBy         User?                      @relation("AgencyCreditRequestDecidedBy", fields: [decidedById], references: [id])
+  decidedAt         DateTime?
+  createdAt         DateTime                   @default(now())
+
+  @@index([agencyId, status])
+  @@map("agency_credit_requests")
+}
+
+enum AgencyDocumentType {
+  LICENSE
+  CONTRACT
+  OTHER
+}
+
+enum AgencyDocumentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// Staff-side review is deferred (see docs) — every row stays PENDING until
+// that workflow is built; the status enum exists now to stay forward-compatible.
+model AgencyDocument {
+  id        String                @id @default(uuid())
+  agencyId  String
+  agency    AgencyProfile         @relation(fields: [agencyId], references: [userId])
+  fileId    String                @unique
+  file      StoredFile            @relation(fields: [fileId], references: [id])
+  docType   AgencyDocumentType
+  status    AgencyDocumentStatus  @default(PENDING)
+  createdAt DateTime              @default(now())
+
+  @@index([agencyId])
+  @@map("agency_documents")
 }
 
 // ─── Phase 4: Cartable, referrals, manager messaging ────────────────────
@@ -625,6 +685,8 @@ model StoredFile {
   sizeBytes Int
   path      String
   createdAt DateTime @default(now())
+
+  agencyDocument AgencyDocument?
 
   @@index([ownerId])
   @@map("stored_files")

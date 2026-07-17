@@ -5,10 +5,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as argon2 from 'argon2';
-import * as crypto from 'node:crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
+import { generateTempPassword } from '../../common/temp-password';
 import {
   CATALOG_DEPTS,
   PERMISSION_CATALOG,
@@ -19,13 +19,6 @@ import type {
   CreateEmployeeDto,
   ListEmployeesQueryDto,
 } from './dto/employees.dtos';
-
-function generateTempPassword(): string {
-  // Design shows a 3-segment human-readable temp password (e.g. Asx-7K29-tQ).
-  const seg = (n: number) =>
-    crypto.randomBytes(n).toString('base64url').slice(0, n);
-  return `${seg(3)}-${seg(4)}-${seg(2)}`;
-}
 
 @Injectable()
 export class EmployeesService {
