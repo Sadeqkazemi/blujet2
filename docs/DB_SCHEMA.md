@@ -220,11 +220,58 @@ kept forward-compatible the same way Phase 2's `Booking` was.
 
 ## Phase 8 — Employee management (IT Manager)
 
-- `Employee` is `User(role=EMPLOYEE)` + `{ dept: COMMERCIAL|FINANCE|IT|SALES|string(custom), rank, createdById→User }`.
-- `Permission { id, dept, sectionKey, key, labelFa }` — seeded catalog (commercial/finance/IT sections found in `site-data.js`'s `PERM_CATALOG`).
-- `EmployeePermission { employeeId→User, permissionId→Permission }` join table (replaces the mock's plain `permissions: string[]` with a real FK-checked grant).
-- `InternalService { id, key, nameFa, enabled, uptimePct }`, `ExternalServiceConfig { id, key, nameFa, endpoint, timeoutMs, apiKeyEncrypted, sandbox, enabled }` — service on/off toggles + external API config.
-- `PasswordResetEvent { id, employeeId→User, resetById→User, createdAt }` — audit-only; the actual new password is never stored/displayed after the one-time generation screen.
+Scope, confirmed against `PLAN.md`'s Phase 8 bullet: **accounts,
+permissions, services, security policy, logs, backups**. The IT panel's
+other 3 design tabs (سامانه رزرواسیون, دسترسی به پنل‌ها, تنظیمات سامانه)
+are out of scope here — first depends on Phase 9, the other two are
+explicitly listed under Phase 12 in `PLAN.md` — not built, not stubbed.
+
+- `User` gained Phase-8 columns directly (mirrors how Phase 3/4 extended
+  shared tables rather than a parallel `Employee` table): `dept` (free
+  string — design lets IT create custom departments beyond
+  commercial/finance/IT/sales, so this is intentionally not a Prisma enum),
+  `rank`, `referralScope: MANAGERS_ONLY|ALL_STAFF` (captured at creation
+  per the design's «دسترسی ارجاعات» picker; consumed by the referral system
+  once `EMPLOYEE` joins `EXEC_ROLES`, which it doesn't yet — captured
+  honestly now rather than added as a later migration), `mustChangePassword`,
+  `createdById→User` (self-relation, who provisioned the account),
+  `lastLoginAt` (set on every successful `staffLogin` verify, also backs the
+  employees list' "آخرین ورود" column).
+- `Permission { id, dept, sectionKey, sectionLabelFa, key, labelFa }` —
+  seeded **verbatim** from `design-reference/site-data.js`'s `PERM_CATALOG`
+  (commercial: agencies/flights/pricing/reports; finance:
+  refund/agencies/finance/reports; IT: users/services/security/logs — 12
+  permission rows total). Custom depts get no catalog rows until product
+  defines one — not fabricated.
+- `EmployeePermission { employeeId→User, permissionId→Permission, grantedById? }`
+  — replaces the mock's plain `permissions: string[]` with a real FK-checked
+  grant; `@@unique([employeeId, permissionId])` makes toggling idempotent.
+- `InternalService { id, key, nameFa, enabled, uptimePct }` — seeded from
+  the design's `svcDefs` (search/payment/api/sms/email/club/charter/refund/
+  checkin/cdn/dest/mobile).
+- `ExternalServiceConfig { id, key, nameFa, provider, endpoint, method,
+  timeoutMs, apiKeyEncrypted, sandbox, enabled, lastTestAt, lastTestOk,
+  lastTestMessage }` — seeded from the design's `extDefs`
+  (zarinpal/amadeus/kavenegar/neshan). `apiKeyEncrypted` reuses
+  `pii-crypto`'s AES-256-GCM (a generic reversible-encryption primitive
+  despite the file's name, needed here because the value must be sent back
+  out on real test-connection calls — a hash would be one-way and useless).
+- `PasswordResetEvent { id, employeeId→User, resetById→User, createdAt }` —
+  audit-only; the actual new password is never stored/displayed after the
+  one-time generation screen, same pattern as `TwoFactorChallenge`'s
+  hashed/single-use codes.
+- `SecurityPolicy` — singleton (`id=1`, upserted): `minLength`,
+  `expiryDays`, `maxAttempts`, `requireUppercase`, `requireNumber`,
+  `requireSymbol`, `blockReuse`, `staffTwoFactorMandatory`. The design shows
+  these as static numbers; made editable since a settings screen with
+  read-only toggles isn't a real feature.
+- Active sessions ("نشست‌های فعال") reuse the existing `RefreshToken` table
+  (`userAgent`, `ip`, `revokedAt`) from Phase 1 — no new table. «خروج همه»
+  revokes every non-revoked row.
+- `BackupRecord { id, fileName, sizeBytes, status: RUNNING|SUCCESS|FAILED,
+  triggeredById→User?, startedAt, completedAt, errorMessage }` — one row per
+  real `pg_dump` invocation. Restore stays a manual RUNBOOK step (see
+  `docs/API.md`'s note) — no destructive one-click endpoint.
 
 ## Phase 9 — Reservation system (seat lock / PNR)
 

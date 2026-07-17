@@ -34,9 +34,25 @@ model User {
   twoFactorEnabled Boolean   @default(false)
   twoFactorSecret  String?
   isActive         Boolean   @default(true)
+  lastLoginAt      DateTime?
   deletedAt        DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
+
+  // Phase 8 (Employee management) — only meaningful for role=EMPLOYEE.
+  dept               String?
+  rank               String?
+  referralScope      EmployeeReferralScope?
+  mustChangePassword Boolean                @default(false)
+  createdById        String?
+  createdBy          User?                  @relation("EmployeeCreatedBy", fields: [createdById], references: [id])
+  employeesCreated   User[]                 @relation("EmployeeCreatedBy")
+
+  employeePermissions      EmployeePermission[]  @relation("EmployeePermissionHolder")
+  passwordResetsReceived   PasswordResetEvent[]  @relation("PasswordResetTarget")
+  passwordResetsPerformed  PasswordResetEvent[]  @relation("PasswordResetActor")
+  securityPolicyUpdates    SecurityPolicy[]      @relation("SecurityPolicyUpdatedBy")
+  backupsTriggered         BackupRecord[]        @relation("BackupTriggeredBy")
 
   refreshTokens       RefreshToken[]
   twoFactorChallenges TwoFactorChallenge[]
@@ -658,4 +674,127 @@ model ClubCardRequest {
 
   @@index([status])
   @@map("club_card_requests")
+}
+
+// ─── Phase 8: Employee management (IT Manager) ─────────────────────────
+
+enum EmployeeReferralScope {
+  MANAGERS_ONLY
+  ALL_STAFF
+}
+
+/** Seeded catalog — mirrors design-reference's site-data.js PERM_CATALOG
+ * exactly (dept -> sections -> perms). No custom-dept rows: a custom dept
+ * has no catalog entries until product defines one. */
+model Permission {
+  id             String   @id @default(uuid())
+  dept           String
+  sectionKey     String
+  sectionLabelFa String
+  key            String
+  labelFa        String
+  createdAt      DateTime @default(now())
+
+  employeeGrants EmployeePermission[]
+
+  @@unique([dept, key])
+  @@map("permissions")
+}
+
+model EmployeePermission {
+  id           String     @id @default(uuid())
+  employeeId   String
+  employee     User       @relation("EmployeePermissionHolder", fields: [employeeId], references: [id], onDelete: Cascade)
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  grantedById  String?
+  createdAt    DateTime   @default(now())
+
+  @@unique([employeeId, permissionId])
+  @@map("employee_permissions")
+}
+
+model InternalService {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  nameFa    String
+  enabled   Boolean  @default(true)
+  uptimePct Float    @default(100)
+  updatedAt DateTime @updatedAt
+
+  @@map("internal_services")
+}
+
+enum ExternalServiceMethod {
+  GET
+  POST
+}
+
+model ExternalServiceConfig {
+  id              String                @id @default(uuid())
+  key             String                @unique
+  nameFa          String
+  provider        String
+  endpoint        String
+  method          ExternalServiceMethod @default(POST)
+  timeoutMs       Int                   @default(30000)
+  apiKeyEncrypted String?
+  sandbox         Boolean               @default(false)
+  enabled         Boolean               @default(true)
+  lastTestAt      DateTime?
+  lastTestOk      Boolean?
+  lastTestMessage String?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  @@map("external_service_configs")
+}
+
+model PasswordResetEvent {
+  id         String   @id @default(uuid())
+  employeeId String
+  employee   User     @relation("PasswordResetTarget", fields: [employeeId], references: [id], onDelete: Cascade)
+  resetById  String
+  resetBy    User     @relation("PasswordResetActor", fields: [resetById], references: [id])
+  createdAt  DateTime @default(now())
+
+  @@map("password_reset_events")
+}
+
+/** Singleton (id=1) — enforced in service layer via upsert-by-1. */
+model SecurityPolicy {
+  id                      Int      @id @default(1)
+  minLength               Int      @default(10)
+  expiryDays              Int      @default(90)
+  maxAttempts             Int      @default(5)
+  requireUppercase        Boolean  @default(true)
+  requireNumber           Boolean  @default(true)
+  requireSymbol           Boolean  @default(true)
+  blockReuse              Boolean  @default(true)
+  staffTwoFactorMandatory Boolean  @default(true)
+  updatedById             String?
+  updatedBy               User?    @relation("SecurityPolicyUpdatedBy", fields: [updatedById], references: [id])
+  updatedAt               DateTime @updatedAt
+
+  @@map("security_policy")
+}
+
+enum BackupStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+}
+
+model BackupRecord {
+  id            String       @id @default(uuid())
+  fileName      String
+  sizeBytes     Int?
+  status        BackupStatus @default(RUNNING)
+  triggeredById String?
+  triggeredBy   User?        @relation("BackupTriggeredBy", fields: [triggeredById], references: [id])
+  startedAt     DateTime     @default(now())
+  completedAt   DateTime?
+  errorMessage  String?
+
+  @@map("backup_records")
 }
