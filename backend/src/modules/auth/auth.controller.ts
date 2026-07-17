@@ -16,6 +16,7 @@ import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { StaffLoginDto } from './dto/staff-login.dto';
+import { AgencyLoginDto } from './dto/agency-login.dto';
 import { VerifyTwoFactorDto } from './dto/verify-two-factor.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -74,6 +75,30 @@ export class AuthController {
         userAgent: req.headers['user-agent'],
         ip: req.ip,
       },
+    );
+    setRefreshCookie(res, refreshToken);
+    return { success: true, data: { accessToken, user } };
+  }
+
+  @Post('agency/login')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({
+    summary:
+      'Agency Portal login: phone+password, issues tokens directly (no 2FA)',
+  })
+  @ApiResponse({ status: 200, description: 'Login complete' })
+  @ApiResponse({ status: 401, description: 'Invalid credentials' })
+  @ApiResponse({ status: 403, description: 'Account or agency suspended' })
+  async agencyLogin(
+    @Body() dto: AgencyLoginDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { accessToken, refreshToken, user } = await this.auth.agencyLogin(
+      dto.phone,
+      dto.password,
+      { userAgent: req.headers['user-agent'], ip: req.ip },
     );
     setRefreshCookie(res, refreshToken);
     return { success: true, data: { accessToken, user } };

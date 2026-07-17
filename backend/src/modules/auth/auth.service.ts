@@ -164,6 +164,62 @@ export class AuthService {
     return { accessToken, refreshToken, user: authUser };
   }
 
+  /** Agency Portal login: phone+password, no 2FA step (unlike staff login) —
+   * the design's آژانس همکار tab shows no 2FA anywhere. See docs/API.md ⚑. */
+  async agencyLogin(
+    phone: string,
+    password: string,
+    context: { userAgent?: string; ip?: string },
+  ): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    user: AuthenticatedUser;
+  }> {
+    const user = await this.prisma.user.findUnique({
+      where: { phone },
+      include: { agencyProfile: true },
+    });
+
+    if (
+      !user ||
+      user.role !== 'AGENCY' ||
+      !user.passwordHash ||
+      !(await argon2.verify(user.passwordHash, password))
+    ) {
+      throw new UnauthorizedException({
+        code: ErrorCode.UNAUTHORIZED,
+        message: 'شماره تماس یا رمز عبور نادرست است.',
+      });
+    }
+    if (!user.isActive) {
+      throw new ForbiddenException({
+        code: 'ACCOUNT_SUSPENDED',
+        message: 'این حساب غیرفعال شده است.',
+      });
+    }
+    if (user.agencyProfile?.suspendedAt) {
+      throw new ForbiddenException({
+        code: 'ACCOUNT_SUSPENDED',
+        message: 'حساب آژانس شما تعلیق شده است.',
+      });
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+
+    const authUser: AuthenticatedUser = {
+      id: user.id,
+      role: user.role,
+      fullName: user.fullName,
+    };
+    const accessToken = this.signAccessToken(authUser);
+    const refreshToken = await this.issueRefreshToken(user.id, context);
+
+    return { accessToken, refreshToken, user: authUser };
+  }
+
   async refresh(
     presentedToken: string,
     context: { userAgent?: string; ip?: string },
