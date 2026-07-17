@@ -70,13 +70,18 @@ test('IT Manager issues a manual PNR, finds it in PNR management, then cancels i
   await freeSeat.click();
   await page.fill('#seat-pname', 'مسافر تست E2E');
   await page.getByRole('button', { name: 'صدور PNR و بلیط' }).click();
-  await expect(page.getByText(/صادر شد/)).toBeVisible();
+  // Capture the freshly-issued PNR from the success notice — searching by
+  // passenger name matches CANCELLED leftovers from earlier runs, and a
+  // cancelled booking's modal has no لغو رزرو button.
+  const notice = await page.getByText(/صادر شد/).textContent();
+  const pnr = /رزرو (\S+) صادر شد/.exec(notice ?? '')?.[1];
+  if (!pnr) throw new Error(`could not extract the issued PNR from: ${notice}`);
 
   await page.getByRole('button', { name: 'مدیریت رزروها' }).click();
-  await page.fill('input[placeholder="جستجو با کد PNR یا نام مسافر…"]', 'مسافر تست E2E');
+  await page.fill('input[placeholder="جستجو با کد PNR یا نام مسافر…"]', pnr);
   await expect(page.getByText('مسافر تست E2E').first()).toBeVisible();
 
-  await page.getByRole('button', { name: /^BJ/ }).first().click();
+  await page.getByRole('button', { name: pnr, exact: true }).click();
   await page.getByRole('button', { name: 'لغو رزرو' }).click();
   // Cancelling closes the detail modal and shows a page-level notice.
   await expect(page.getByText('رزرو لغو شد.')).toBeVisible();
