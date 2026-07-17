@@ -6,6 +6,15 @@ export function staffLogin(username: string, password: string) {
   return apiPost<{ challengeId: string }>('/auth/staff/login', { username, password });
 }
 
+export async function agencyLogin(phone: string, password: string) {
+  const result = await apiPost<{ accessToken: string; user: AuthUser }>('/auth/agency/login', {
+    phone,
+    password,
+  });
+  setAccessToken(result.accessToken);
+  return result;
+}
+
 export async function verifyTwoFactor(challengeId: string, code: string) {
   const result = await apiPost<{ accessToken: string; user: AuthUser }>('/auth/staff/login/verify', {
     challengeId,

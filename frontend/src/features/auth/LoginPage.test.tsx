@@ -21,6 +21,7 @@ describe('LoginPage', () => {
       user: null,
       requestLogin: vi.fn(),
       confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
       signOut: vi.fn(),
     });
     renderLoginPage();
@@ -37,6 +38,7 @@ describe('LoginPage', () => {
       user: null,
       requestLogin: vi.fn(),
       confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
       signOut: vi.fn(),
     });
     renderLoginPage();
@@ -52,6 +54,7 @@ describe('LoginPage', () => {
       user: null,
       requestLogin,
       confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
       signOut: vi.fn(),
     });
     renderLoginPage();
