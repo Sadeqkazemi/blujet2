@@ -655,6 +655,62 @@ async function main() {
     });
   }
 
+  // ── Phase 6: pricing proposals (one pending, one registered) ───────────
+  const existingProposalCount = await prisma.farePricingProposal.count();
+  if (existingProposalCount === 0) {
+    // Two future SCHEDULED instances so the pricing list has fresh rows.
+    for (const daysAhead of [10, 20]) {
+      const departureAt = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
+      await prisma.flightInstance.create({
+        data: {
+          flightId: flight.id,
+          departureAt,
+          arrivalAt: new Date(departureAt.getTime() + 3 * 60 * 60 * 1000),
+          capacity: 180,
+          charterSeats: 60,
+          status: 'SCHEDULED',
+        },
+      });
+    }
+    const scheduled = await prisma.flightInstance.findMany({
+      where: { status: 'SCHEDULED', pricing: null },
+      take: 2,
+      orderBy: { departureAt: 'desc' },
+    });
+    const ceoUser = staffByUsername.get('ceo')!;
+    if (scheduled[0]) {
+      await prisma.farePricingProposal.create({
+        data: {
+          flightInstanceId: scheduled[0].id,
+          basePriceIrr: 38_000_000,
+          competitorPriceIrr: 39_000_000,
+          proposedPriceIrr: 38_500_000,
+          legalRateIrr: 42_000_000,
+          note: 'قیمت کمی پایین‌تر از رقبا برای پرکردن صندلی‌های آزاد.',
+          proposedById: commercialManager.id,
+          status: 'PENDING',
+        },
+      });
+    }
+    if (scheduled[1]) {
+      await prisma.farePricingProposal.create({
+        data: {
+          flightInstanceId: scheduled[1].id,
+          basePriceIrr: 40_000_000,
+          competitorPriceIrr: 42_000_000,
+          proposedPriceIrr: 41_000_000,
+          legalRateIrr: 45_000_000,
+          note: 'تعهد چارتری بالا؛ قیمت متعادل پیشنهاد شد.',
+          proposedById: commercialManager.id,
+          status: 'REGISTERED',
+          registeredPriceIrr: 41_000_000,
+          approvedById: ceoUser.id,
+          approvedAt: new Date(),
+        },
+      });
+    }
+  }
+
   console.log('Seed complete.');
   console.log(`Staff dev password (all roles): ${STAFF_PASSWORD}`);
 }

@@ -22,7 +22,7 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'cartable', labelFa: 'کارتابل', implemented: true },
     { key: 'club', labelFa: 'مشتریان VIP', implemented: true },
     { key: 'mgrreports', labelFa: 'گزارش مدیران', implemented: false },
-    { key: 'pricing', labelFa: 'تعیین قیمت بلیط', implemented: false },
+    { key: 'pricing', labelFa: 'تعیین قیمت بلیط', implemented: true },
     { key: 'panels', labelFa: 'دسترسی به پنل‌ها', implemented: false },
     { key: 'security', labelFa: 'امنیت و رمز عبور', implemented: false },
     { key: 'logs', labelFa: 'لاگ و رویدادها', implemented: false },
@@ -64,7 +64,7 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
   COMMERCIAL_MANAGER: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
     { key: 'agencies', labelFa: 'آژانس‌ها', implemented: true },
-    { key: 'flights', labelFa: 'مدیریت پروازها', implemented: false },
+    { key: 'flights', labelFa: 'مدیریت پروازها', implemented: true },
     { key: 'reports', labelFa: 'گزارش مسافران', implemented: false },
     { key: 'staff', labelFa: 'گزارش کارمندان', implemented: false },
     { key: 'finance', labelFa: 'مالی', implemented: false },
