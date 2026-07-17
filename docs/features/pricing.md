@@ -7,36 +7,43 @@ CEO «تعیین قیمت بلیط» tab, and the first real ml-service implemen
 
 ## Acceptance checklist
 
+Backend items proven by `backend/test/pricing.e2e-spec.ts` (8 tests, with a
+fake provider standing in for the ml-service); ml-service by
+`ml-service/tests/test_pricing.py` (11 pytest); frontend by
+`frontend/src/features/pricing/PricingPage.test.tsx` (5 tests); E2E by
+`frontend/e2e/pricing-journey.spec.ts` (3 journeys — the full-loop one runs
+against the REAL uvicorn ml-service, spawned/killed by the spec).
+
 ### Proposals (Commercial Manager)
-- [ ] `PUT /pricing/flights/:id/proposal` creates a PENDING proposal (required `proposedPriceIrr`, the design's «نرخ پیشنهادی را وارد کنید» validation) and re-PUT while PENDING edits it
-- [ ] PUT on a REGISTERED proposal → 409 («این قیمت دیگر قابل تغییر نیست»)
-- [ ] PUT as CEO/other roles → 403; unknown flightInstanceId → 404
-- [ ] Commercial's `GET /pricing/proposals` rows show the three states (no proposal / PENDING / REGISTERED) correctly joined to real flight instances
+- [x] PUT creates PENDING + re-PUT edits — `'Commercial proposes a price for a scheduled flight; re-PUT while PENDING edits it'`
+- [x] PUT on REGISTERED → 409 — `'CEO registers with source=PROPOSED; proposal locks; further edits/registers → 409'`
+- [x] PUT as CEO 403 / unknown flight 404 / missing price 400 — `'PUT as CEO → 403; unknown flight → 404; missing price → 400'`
+- [x] Commercial GET rows joined to real instances with the three states — `'role-shaped GET: CEO gets pending/registered lists, Commercial gets flight rows joined with proposals'` + UI states in `PricingPage.test.tsx: 'Commercial sees the three row states...'`
 
 ### Registration (CEO)
-- [ ] `register {source:PROPOSED}` sets `registeredPriceIrr = proposedPriceIrr`, status REGISTERED, `approvedById/At`, audit row (`category=PRICING`)
-- [ ] `register {source:AI}` uses the persisted suggestion price; 409 with a clear message when no suggestion was generated
-- [ ] Registering an already-REGISTERED proposal → 409; registering as COMMERCIAL_MANAGER → 403
-- [ ] `legal-rate` PATCH stores the CEO's value and is audited; Commercial's PUT can also carry `legalRateIrr` (last write wins, both audited)
+- [x] source=PROPOSED registers + locks + audits — `'CEO registers with source=PROPOSED...'`
+- [x] source=AI uses persisted suggestion; 409 without one — `'register with source=AI without a stored suggestion → 409...'` + the AI test below
+- [x] Re-register 409; Commercial register 403 — covered in the lock test + role test
+- [x] legal-rate PATCH stores + audits — `'CEO legal-rate PATCH stores + audits; Finance/Board Chair get 403 everywhere'`
 
 ### AI analysis (ML service + ai module)
-- [ ] `POST /pricing/proposals/ai-analysis` persists `aiSuggestion` (price, reason, factors, season, occasion, confidence, modelVersion) on every PENDING proposal
-- [ ] Generation NEVER mutates proposal prices or status (advisory-only assertion)
-- [ ] When the ml-service is unreachable, the endpoint degrades gracefully (documented partial/empty result, no 500) and register/propose flows keep working
-- [ ] NestJS→ml-service requests carry the internal token; the service rejects missing/wrong tokens (401)
-- [ ] ml-service pytest: schema validation, heuristic edge cases (no competitor price, extreme values), model version present in every response
-- [ ] Usage is logged (who ran analysis, proposals count) to the audit table
+- [x] Persists aiSuggestion with modelVersion on PENDING proposals — `'AI analysis persists suggestions with modelVersion, mutates nothing else, and register {source:AI} uses it'`
+- [x] Advisory-only (no price/status mutation on generation) — asserted in the same test
+- [x] Graceful degradation (available:false, no 500; flows keep working) — `'ml-service down: ai-analysis degrades gracefully...'` + Playwright outage journey
+- [x] Internal-token enforcement — `test_pricing.py: test_rejects_missing_or_wrong_token`
+- [x] pytest schema/edge/version coverage — `test_validation_rejects_bad_payloads`, `test_extreme_low_prices_stay_positive`, `test_never_more_than_5pct_above_competitors`, `test_suggestion_response_shape_and_model_version`, `test_deterministic_for_same_input`, `test_season_mapping`
+- [x] Usage audit-logged — asserted via the PRICING audit row in the analysis test
 
 ### Frontend
-- [ ] CEO tab: 3-step workflow banner, «تحلیل و پیشنهاد قیمت هوش مصنوعی» button with loading state, pending cards with رقبا/پیشنهاد بازرگانی/هوش مصنوعی columns + the vs-competitor delta line, «تأیید بازرگانی» + «ثبت با AI» buttons, legal-rate input row, AI analysis panel (season/occasion/confidence chips + expandable factors), «قیمت‌های ثبت‌شده» list with «قفل‌شده» badge
-- [ ] Commercial pricing list: per-row نرخ پیشنهادی/نرخ قانونی/قیمت قفل‌شده + status pill + «تعیین قیمت/ویرایش پیشنهاد/قفل‌شده» button; set-price modal with base/competitor tiles, the three states (editable / pending banner / locked), and the note textarea
-- [ ] All prices تومان with Persian digits via the shared money util; dates Jalali
-- [ ] Roles without the tab/section (Finance, Board Chair, IT) see nothing and get 403s
+- [x] CEO tab (banner, AI button + loading, three price columns + delta line, register buttons, legal-rate row, analysis panel with chips/factors, registered list with «قفل‌شده») — `'CEO sees the workflow banner, AI button, pending cards...'` + `'CEO registering with AI calls the API with source=AI'`
+- [x] Commercial list + modal (three states, base/competitor tiles, note, validation, toman→rial) — `'Commercial sees the three row states...'` + `'Commercial set-price modal validates the proposed price and submits toman→rial'`
+- [x] Persian money/Jalali dates — asserted in the CEO layout test (۳٬۸۵۰٬۰۰۰ تومان)
+- [x] Role isolation — Finance 403s in `pricing.e2e-spec.ts` + no nav links in `pricing-journey.spec.ts: 'Finance Manager gets no pricing surfaces (role isolation)'`
 
 ### E2E
-- [ ] Full loop: Commercial proposes a price for a scheduled flight → CEO sees it pending → runs AI analysis → registers with «ثبت با AI» → Commercial sees the locked price and cannot edit
-- [ ] CEO registers a second proposal with «تأیید بازرگانی» (no AI) — works without any AI suggestion
-- [ ] ml-service down: CEO's AI button surfaces the graceful failure message; registration by proposed price still works
+- [x] Full loop against the real ml-service — `'full loop: propose → AI analysis → «ثبت با AI» → Commercial sees the locked price'`
+- [x] Register without AI — inside the outage journey («تأیید بازرگانی» after degradation)
+- [x] ml-service down degradation — `'ml-service down: CEO AI button degrades gracefully; register-by-proposed still works'`
 
 ---
 
