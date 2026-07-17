@@ -219,6 +219,37 @@ tabs to them; no new backend endpoints.
 
 ---
 
+## Phase 9 — Reservation system (seat lock / PNR)
+
+Roles: `BOARD_CHAIR`, `SENIOR_MANAGER`, `IT_MANAGER` have the reachable
+سامانه رزرواسیون/هواپیما nav entry (per `panel-nav.config.ts`); `CEO` is
+authorized at the API level too (⚑ product decision, see `docs/DB_SCHEMA.md`
+→ Phase 9) but has no reachable nav entry, matching Phase 1's confirmed
+extraction. `canLock` = `CEO`/`BOARD_CHAIR`/`IT_MANAGER`; `SENIOR_MANAGER`
+is view-only on every endpoint below (403 on the write ones).
+
+### `backend/src/modules/reservation/`
+
+| Method | Path | Roles | Notes |
+|---|---|---|---|
+| GET | `/reservation/seatmap/:flightInstanceId` | BOARD_CHAIR, SENIOR_MANAGER, IT_MANAGER, CEO | Computed from `AircraftSeatMap` (by the instance's `Flight.aircraftType`) + sold seats (`Passenger.seatCode` on non-CANCELLED bookings) + active `SeatLock`s. Returns `{ rows[], soldCount, lockedCount, capacity, occupancyPct }`; PII never included. |
+| POST | `/reservation/seatmap/:flightInstanceId/lock` | canLock only | `{ seatCode, passengerName?, passengerNationalId?, passengerMobile? }` — 409 if the seat is already sold or actively locked (DB partial-unique-index-backed). PII encrypted+hashed like `ClubMember`. `AuditLog(category=RESERVATION)`. |
+| PATCH | `/reservation/seatmap/locks/:id/release` | canLock only | Any canLock role may release any active lock (the design's «×» chip shows no per-locker ownership filter). Sets `releasedAt`; 409 if already released. Audited. |
+| GET | `/reservation/pnr` | all 4 reservation roles | `q?` (PNR or passenger name). Grouped by flight instance, newest first — the design's «مدیریت رزروها» list. |
+| GET | `/reservation/pnr/:pnr` | all 4 | Full detail incl. passenger + boarding-pass fields. 404 if not found. |
+| PATCH | `/reservation/pnr/:pnr/seat` | canLock only | `{ seatCode }` — «تغییر رزرو»; 409 if the target seat is sold/locked by someone else; 409 if the booking is CANCELLED. Audited. |
+| PATCH | `/reservation/pnr/:pnr/cancel` | canLock only | «لغو رزرو» → `BookingStatus.CANCELLED`; releases the seat for resale; 409 if already CANCELLED. Audited. |
+| GET | `/reservation/search` | all 4 | `origin`, `dest`, `date` (Jalali, converted) → matching `SCHEDULED` `FlightInstance`s with a computed price (`FarePricingProposal.registeredPriceIrr` if REGISTERED, else a documented flat fallback — no invented dynamic pricing) and free-seat count. |
+| POST | `/reservation/pnr` | canLock only | «صدور PNR و بلیط» — staff-side **manual/offline** issuance (phone/counter booking): `{ flightInstanceId, seatCode, passengerName, passengerNationalId?, passengerMobile? }` → creates a `TICKETED` `Booking`+`Passenger` directly (no HELD/PAID steps — no payment gateway involved, distinct from the public paid-checkout track) + a `LedgerEntry(type=SALE)`. 409 if the seat is sold/locked. Audited. |
+| GET | `/reservation/dashboard-stats` | all 4 | Real counts only (today's bookings, active PNRs, seats sold, revenue) — the design's "microservices health" cards are **not** ported (they'd describe infrastructure that doesn't exist in this monolith; CLAUDE.md forbids fabricated status data). |
+| POST | `/reservation/_test/flight-instance` | all 4 | E2E only — creates a fresh SCHEDULED instance with a randomized far-future date (avoids collisions across repeated test runs); always 404s in production. Same pattern as `club`'s and `pricing`'s own `_test/*` seeding hooks. |
+
+Deliberately not built this phase (see `docs/DB_SCHEMA.md`'s Phase 9 note):
+agency API access (duplicates Phase 3's `AgencyApiKey`), flight/schedule/
+capacity creation (Phase 10's own scope).
+
+---
+
 ## Later phases (endpoints TBD — documented here before each phase's code is written)
 
 - **Phase 2** — none directly (reporting reads Phase-2 tables; no new endpoints of its own beyond what's above).
@@ -237,4 +268,3 @@ tabs to them; no new backend endpoints.
   - POST `/pricing/proposals/ai-analysis` — CEO — «تحلیل و پیشنهاد قیمت هوش مصنوعی» for all PENDING proposals via the NestJS→ml-service client (2s timeout, graceful fallback, usage logged); persists suggestions with modelVersion. Advisory only.
   - ml-service: `POST /internal/v1/price-suggestion` (internal token; pydantic; versioned heuristic model; pytest) + `GET /health`.
 - **Phase 7** — `/refunds`, `/refunds/:id/refer`, `/refunds/:id/pay`.
-- **Phase 9** — `/reservation/seats/:flightInstanceId`, `/reservation/seats/:id/lock`, `/reservation/seats/:id/release`, `/reservation/pnr/*`.
