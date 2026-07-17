@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchAccessFlags, setAccessFlag } from '../../api/panels';
+import { useAuth } from '../../hooks/useAuth';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import type { PanelAccessFlag } from '../../types/panels';
 
@@ -14,6 +15,10 @@ const PANEL_LABEL: Record<string, string> = {
 };
 
 export default function PanelsAccessPage() {
+  const { user } = useAuth();
+  // Phase 12: IT's tab is informational only — the backend rejects its PATCH
+  // anyway; the UI mirrors that instead of hiding-only.
+  const readOnly = user?.role === 'IT_MANAGER';
   const [flags, setFlags] = useState<PanelAccessFlag[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -47,8 +52,9 @@ export default function PanelsAccessPage() {
     <div className="p-8">
       <h1 className="mb-1 text-xl font-black text-ink">دسترسی به پنل‌ها</h1>
       <p className="mb-6 text-sm text-muted">
-        فعال/غیرفعال‌کردن پنل نقش‌های دیگر — هر تغییر در دفتر رویدادها ثبت می‌شود و سمت سرور نیز اعمال
-        می‌گردد.
+        {readOnly
+          ? 'نمای اطلاعاتی وضعیت پنل‌ها — تعیین سطح دسترسی ورود در اختیار مدیر عامل است.'
+          : 'فعال/غیرفعال‌کردن پنل نقش‌های دیگر — هر تغییر در دفتر رویدادها ثبت می‌شود و سمت سرور نیز اعمال می‌گردد.'}
       </p>
 
       <div className="max-w-2xl rounded-xl border border-border bg-white p-5">
@@ -67,7 +73,7 @@ export default function PanelsAccessPage() {
                 role="switch"
                 aria-checked={f.enabled}
                 aria-label={PANEL_LABEL[f.panelKey] ?? f.panelKey}
-                disabled={savingKey === f.panelKey}
+                disabled={readOnly || savingKey === f.panelKey}
                 onClick={() => void onToggle(f)}
                 className={`relative h-6.5 w-12 flex-none rounded-full transition disabled:opacity-60 ${
                   f.enabled ? 'bg-accent' : 'bg-border'

@@ -17,6 +17,7 @@ import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { StaffLoginDto } from './dto/staff-login.dto';
 import { AgencyLoginDto } from './dto/agency-login.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { VerifyTwoFactorDto } from './dto/verify-two-factor.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -148,6 +149,27 @@ export class AuthController {
   @ApiOperation({ summary: "Current authenticated user's identity and role" })
   me(@CurrentUser() user: AuthenticatedUser) {
     return { success: true, data: user };
+  }
+
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({
+    summary: 'تغییر رمز عبور خود — رمز فعلی باید تأیید شود',
+  })
+  @ApiResponse({ status: 200, description: 'Password changed' })
+  @ApiResponse({ status: 401, description: 'Current password incorrect' })
+  async changePassword(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: ChangePasswordDto,
+  ) {
+    await this.auth.changeOwnPassword(
+      user,
+      dto.currentPassword,
+      dto.newPassword,
+    );
+    return { success: true, data: { changed: true } };
   }
 
   @Get('_test/last-code/:username')

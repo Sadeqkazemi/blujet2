@@ -68,4 +68,31 @@ export class AuditService {
       take: 100,
     });
   }
+
+  /** CEO's «لاگ‌ها و رویدادهای سامانه» — real rows across every actor
+   * (unlike managerReports' exclusions). The level chip is a presentational
+   * mapping only: SECURITY→WARN, financial categories→OK, else INFO. */
+  async ceoSystemEvents() {
+    const rows = await this.prisma.auditLog.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      include: { actor: { select: { fullName: true } } },
+    });
+
+    const OK_CATEGORIES = new Set(['FINANCE', 'REFUND', 'PRICING', 'AGENCY']);
+    return rows.map((r) => ({
+      id: r.id,
+      at: r.createdAt.toISOString(),
+      user: r.actor?.fullName ?? '—',
+      actorRole: r.actorRole,
+      action: r.action,
+      detail: r.detail,
+      level:
+        r.category === 'SECURITY'
+          ? 'WARN'
+          : OK_CATEGORIES.has(r.category)
+            ? 'OK'
+            : 'INFO',
+    }));
+  }
 }

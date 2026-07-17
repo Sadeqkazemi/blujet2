@@ -136,6 +136,34 @@
         ]
       }
     },
+    "/auth/change-password": {
+      "post": {
+        "operationId": "AuthController_changePassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password changed"
+          },
+          "401": {
+            "description": "Current password incorrect"
+          }
+        },
+        "summary": "تغییر رمز عبور خود — رمز فعلی باید تأیید شود",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/auth/_test/last-code/{username}": {
       "get": {
         "operationId": "AuthController_testLastCode",
@@ -157,6 +185,76 @@
         "summary": "E2E-test only: reads back the mock 2FA code. 404s in production.",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/audit/manager-reports": {
+      "get": {
+        "operationId": "AuditController_managerReports",
+        "parameters": [
+          {
+            "name": "category",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "actorRole",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Cross-manager oversight feed — role-scoped exclusions applied server-side",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
+    "/audit/logs": {
+      "get": {
+        "operationId": "AuditController_systemLogs",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "IT Manager's system event log",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
+    "/audit/system-events": {
+      "get": {
+        "operationId": "AuditController_ceoSystemEvents",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "CEO لاگ و رویدادها — ردیف‌های واقعی AuditLog با سطح presentational",
+        "tags": [
+          "audit"
         ]
       }
     },
@@ -221,61 +319,6 @@
         "summary": "Toggle a sibling panel on/off",
         "tags": [
           "panels"
-        ]
-      }
-    },
-    "/audit/manager-reports": {
-      "get": {
-        "operationId": "AuditController_managerReports",
-        "parameters": [
-          {
-            "name": "category",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "actorRole",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "q",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "Cross-manager oversight feed — role-scoped exclusions applied server-side",
-        "tags": [
-          "audit"
-        ]
-      }
-    },
-    "/audit/logs": {
-      "get": {
-        "operationId": "AuditController_systemLogs",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "IT Manager's system event log",
-        "tags": [
-          "audit"
         ]
       }
     },
@@ -3368,6 +3411,189 @@
           "staff-reports"
         ]
       }
+    },
+    "/admins": {
+      "get": {
+        "operationId": "AdminsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست مدیران و ادمین‌ها — «آنلاین» از نشست‌های واقعی مشتق می‌شود",
+        "tags": [
+          "admins"
+        ]
+      },
+      "post": {
+        "operationId": "AdminsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAdminDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "افزودن مدیر / ادمین — فقط نقش‌های enum-backed",
+        "tags": [
+          "admins"
+        ]
+      }
+    },
+    "/admins/{id}/block": {
+      "patch": {
+        "operationId": "AdminsController_block",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "مسدودسازی ورود — واقعاً در login اعمال می‌شود",
+        "tags": [
+          "admins"
+        ]
+      }
+    },
+    "/admins/{id}/unblock": {
+      "patch": {
+        "operationId": "AdminsController_unblock",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "رفع مسدودی ورود",
+        "tags": [
+          "admins"
+        ]
+      }
+    },
+    "/admins/{id}/reset-password": {
+      "post": {
+        "operationId": "AdminsController_resetPassword",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetAdminPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "بازنشانی رمز مدیر — رمز موقت فقط یک بار برگردانده می‌شود",
+        "tags": [
+          "admins"
+        ]
+      }
+    },
+    "/settings": {
+      "get": {
+        "operationId": "SettingsController_getAll",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تنظیمات سامانه + بازه‌های واقعی جریمهٔ استرداد (فاز ۷)",
+        "tags": [
+          "settings"
+        ]
+      },
+      "patch": {
+        "operationId": "SettingsController_update",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "به‌روزرسانی تنظیمات — کلیدهای ناشناخته رد می‌شوند",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/settings/refund-rules": {
+      "patch": {
+        "operationId": "SettingsController_updateRefundRules",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRefundRulesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تغییر درصد جریمهٔ بازه‌های واقعی استرداد — همان جدولی که موتور فاز ۷ می‌خواند",
+        "tags": [
+          "settings"
+        ]
+      }
     }
   },
   "info": {
@@ -3442,6 +3668,24 @@
         "required": [
           "phone",
           "password"
+        ]
+      },
+      "ChangePasswordDto": {
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "description": "رمز عبور فعلی"
+          },
+          "newPassword": {
+            "type": "string",
+            "description": "رمز عبور جدید — حداقل ۶ کاراکتر",
+            "minLength": 6
+          }
+        },
+        "required": [
+          "currentPassword",
+          "newPassword"
         ]
       },
       "UpdatePanelAccessDto": {
@@ -4185,6 +4429,115 @@
         "required": [
           "priceIrr",
           "agencySeats"
+        ]
+      },
+      "CreateAdminDto": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string",
+            "example": "زهرا کریمی"
+          },
+          "email": {
+            "type": "string",
+            "example": "z.karimi@blujet.example"
+          },
+          "username": {
+            "type": "string",
+            "example": "z.karimi"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "SENIOR_MANAGER",
+              "FINANCE_MANAGER",
+              "COMMERCIAL_MANAGER",
+              "IT_MANAGER",
+              "SITE_ADMIN"
+            ]
+          },
+          "password": {
+            "type": "string",
+            "example": "Blujet@1404",
+            "minLength": 6
+          },
+          "delivery": {
+            "type": "string",
+            "enum": [
+              "sms",
+              "email"
+            ]
+          }
+        },
+        "required": [
+          "fullName",
+          "email",
+          "username",
+          "role",
+          "password",
+          "delivery"
+        ]
+      },
+      "ResetAdminPasswordDto": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string",
+            "minLength": 6
+          },
+          "delivery": {
+            "type": "string",
+            "enum": [
+              "sms",
+              "email"
+            ]
+          }
+        }
+      },
+      "UpdateSettingsDto": {
+        "type": "object",
+        "properties": {
+          "patch": {
+            "type": "object",
+            "description": "Partial key-value patch — unknown keys are rejected",
+            "example": {
+              "maintenance": true
+            }
+          }
+        },
+        "required": [
+          "patch"
+        ]
+      },
+      "RefundRuleUpdate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "penaltyPct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "id",
+          "penaltyPct"
+        ]
+      },
+      "UpdateRefundRulesDto": {
+        "type": "object",
+        "properties": {
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RefundRuleUpdate"
+            }
+          }
+        },
+        "required": [
+          "rules"
         ]
       }
     }

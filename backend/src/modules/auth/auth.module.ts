@@ -6,6 +6,7 @@ import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { TWO_FACTOR_PROVIDER } from './providers/two-factor-provider.interface';
 import { MockTwoFactorProvider } from './providers/mock-two-factor.provider';
+import { AuditModule } from '../audit/audit.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { MockTwoFactorProvider } from './providers/mock-two-factor.provider';
       secret: process.env.JWT_ACCESS_SECRET,
       signOptions: { expiresIn: '15m' },
     }),
+    AuditModule,
   ],
   controllers: [AuthController],
   providers: [
