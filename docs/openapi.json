@@ -60,6 +60,37 @@
         ]
       }
     },
+    "/auth/agency/login": {
+      "post": {
+        "operationId": "AuthController_agencyLogin",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgencyLoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login complete"
+          },
+          "401": {
+            "description": "Invalid credentials"
+          },
+          "403": {
+            "description": "Account or agency suspended"
+          }
+        },
+        "summary": "Agency Portal login: phone+password, issues tokens directly (no 2FA)",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/auth/refresh": {
       "post": {
         "operationId": "AuthController_refresh",
@@ -1105,6 +1136,72 @@
           }
         },
         "summary": "ارسال پیام در مکاتبه‌ها — فقط مدیر بازرگانی",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/{id}/credit-requests": {
+      "get": {
+        "operationId": "AgenciesController_listCreditRequests",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "لیست درخواست‌های افزایش اعتبار آژانس",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/{id}/credit-requests/{reqId}/decide": {
+      "patch": {
+        "operationId": "AgenciesController_decideCreditRequest",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "reqId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecideCreditRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تأیید/رد درخواست افزایش اعتبار — تأیید سقف را واقعاً تغییر می‌دهد",
         "tags": [
           "agencies"
         ]
@@ -2766,6 +2863,234 @@
         ]
       }
     },
+    "/agency-portal/dashboard": {
+      "get": {
+        "operationId": "AgencyPortalController_dashboard",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "داشبورد خودِ آژانس — KPI + نمودار ۶ماهه + اعتبار",
+        "tags": [
+          "agency-portal"
+        ]
+      }
+    },
+    "/agency-portal/credit": {
+      "get": {
+        "operationId": "AgencyPortalController_credit",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "سقف/مصرف/باقیمانده اعتبار خودِ آژانس",
+        "tags": [
+          "agency-portal"
+        ]
+      }
+    },
+    "/agency-portal/ledger": {
+      "get": {
+        "operationId": "AgencyPortalController_ledger",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "گردش حساب اخیر",
+        "tags": [
+          "agency-portal"
+        ]
+      }
+    },
+    "/agency-portal/invoices": {
+      "get": {
+        "operationId": "AgencyPortalController_invoices",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فاکتورهای خودِ آژانس",
+        "tags": [
+          "agency-portal"
+        ]
+      }
+    },
+    "/agency-portal/invoices/{invoiceId}/pay": {
+      "post": {
+        "operationId": "AgencyPortalController_payInvoice",
+        "parameters": [
+          {
+            "name": "invoiceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "پرداخت فاکتور از اعتبار — همان مسیر تراکنشی سمت کارمند",
+        "tags": [
+          "agency-portal"
+        ]
+      }
+    },
+    "/agency-portal/credit-requests": {
+      "post": {
+        "operationId": "AgencyPortalController_requestCreditIncrease",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestCreditIncreaseDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "درخواست افزایش اعتبار — مستقیماً سقف را تغییر نمی‌دهد",
+        "tags": [
+          "agency-portal"
+        ]
+      },
+      "get": {
+        "operationId": "AgencyPortalController_myCreditRequests",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تاریخچه درخواست‌های افزایش اعتبار خودِ آژانس",
+        "tags": [
+          "agency-portal"
+        ]
+      }
+    },
+    "/agency-portal/sales": {
+      "get": {
+        "operationId": "AgencyPortalController_sales",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فروش و گزارش خودِ آژانس",
+        "tags": [
+          "agency-portal"
+        ]
+      }
+    },
+    "/agency-portal/inbox": {
+      "get": {
+        "operationId": "AgencyPortalController_inbox",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "کارتابل و پیام‌ها — خواندن",
+        "tags": [
+          "agency-portal"
+        ]
+      },
+      "post": {
+        "operationId": "AgencyPortalController_postInboxMessage",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostInboxMessageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ارسال پیام در کارتابل",
+        "tags": [
+          "agency-portal"
+        ]
+      }
+    },
+    "/agency-portal/profile": {
+      "get": {
+        "operationId": "AgencyPortalController_profile",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "پروفایل خودِ آژانس",
+        "tags": [
+          "agency-portal"
+        ]
+      }
+    },
+    "/agency-portal/documents": {
+      "get": {
+        "operationId": "AgencyPortalController_documents",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "مدارک آپلودشده خودِ آژانس",
+        "tags": [
+          "agency-portal"
+        ]
+      },
+      "post": {
+        "operationId": "AgencyPortalController_uploadDocument",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadDocumentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "آپلود مدرک — فقط PDF/تصویر، حداکثر ۵MB",
+        "tags": [
+          "agency-portal"
+        ]
+      }
+    },
     "/flights/overview": {
       "get": {
         "operationId": "FlightsController_overview",
@@ -2950,6 +3275,25 @@
           "code"
         ]
       },
+      "AgencyLoginDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "example": "+989120000002",
+            "description": "شماره تماس آژانس"
+          },
+          "password": {
+            "type": "string",
+            "example": "Blujet@1404",
+            "description": "رمز عبور"
+          }
+        },
+        "required": [
+          "phone",
+          "password"
+        ]
+      },
       "UpdatePanelAccessDto": {
         "type": "object",
         "properties": {
@@ -3073,6 +3417,19 @@
         },
         "required": [
           "body"
+        ]
+      },
+      "DecideCreditRequestDto": {
+        "type": "object",
+        "properties": {
+          "approve": {
+            "type": "boolean",
+            "example": true,
+            "description": "تأیید یا رد درخواست"
+          }
+        },
+        "required": [
+          "approve"
         ]
       },
       "ResolveCartableDto": {
@@ -3571,6 +3928,52 @@
           "flightInstanceId",
           "seatCode",
           "passengerName"
+        ]
+      },
+      "RequestCreditIncreaseDto": {
+        "type": "object",
+        "properties": {
+          "requestedLimitIrr": {
+            "type": "number",
+            "example": 2000000000,
+            "description": "سقف اعتبار درخواستی به ریال"
+          },
+          "note": {
+            "type": "string",
+            "example": "رشد فروش فصل تابستان"
+          }
+        },
+        "required": [
+          "requestedLimitIrr"
+        ]
+      },
+      "PostInboxMessageDto": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "example": "سلام، فردا تسویه انجام می‌شود."
+          }
+        },
+        "required": [
+          "body"
+        ]
+      },
+      "UploadDocumentDto": {
+        "type": "object",
+        "properties": {
+          "docType": {
+            "type": "string",
+            "enum": [
+              "LICENSE",
+              "CONTRACT",
+              "OTHER"
+            ],
+            "example": "LICENSE"
+          }
+        },
+        "required": [
+          "docType"
         ]
       },
       "CreateFlightDto": {

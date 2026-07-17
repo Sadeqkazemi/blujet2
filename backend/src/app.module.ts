@@ -23,6 +23,7 @@ import { ItManagerModule } from './modules/it-manager/it-manager.module';
 import { PricingModule } from './modules/pricing/pricing.module';
 import { RefundsModule } from './modules/refunds/refunds.module';
 import { ReservationModule } from './modules/reservation/reservation.module';
+import { AgencyPortalModule } from './modules/agency-portal/agency-portal.module';
 import { FlightsModule } from './modules/flights/flights.module';
 
 @Module({
@@ -70,6 +71,7 @@ import { FlightsModule } from './modules/flights/flights.module';
     PricingModule,
     RefundsModule,
     ReservationModule,
+    AgencyPortalModule,
     FlightsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

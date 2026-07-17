@@ -33,6 +33,7 @@ function mockRole(role: Role) {
     user: { id: 'u1', fullName: 'کاربر تست', role },
     requestLogin: vi.fn(),
     confirmTwoFactor: vi.fn(),
+    agencyLogin: vi.fn(),
     signOut: vi.fn(),
   });
 }

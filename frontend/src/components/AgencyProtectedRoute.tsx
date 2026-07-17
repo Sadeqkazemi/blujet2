@@ -1,7 +1,7 @@
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
-export default function ProtectedRoute() {
+export default function AgencyProtectedRoute() {
   const { status, user } = useAuth();
 
   if (status === 'loading') {
@@ -13,13 +13,12 @@ export default function ProtectedRoute() {
   }
 
   if (status === 'unauthenticated') {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/agency/login" replace />;
   }
 
-  // The management panels are staff-only — an AGENCY session belongs in its
-  // own self-service portal, not this shell (role isolation, both directions).
-  if (user?.role === 'AGENCY') {
-    return <Navigate to="/agency" replace />;
+  // Agency Portal is AGENCY-only — a staff session belongs in /panel, not here.
+  if (user?.role !== 'AGENCY') {
+    return <Navigate to="/panel" replace />;
   }
 
   return <Outlet />;

@@ -19,6 +19,7 @@ import { CreateApiKeyDto } from './dto/create-api-key.dto';
 import { UpdateApiKeyDto } from './dto/update-api-key.dto';
 import { IssueInvoiceDto } from './dto/issue-invoice.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
+import { DecideCreditRequestDto } from './dto/decide-credit-request.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -226,7 +227,8 @@ export class AgenciesController {
 
   @Post(':id/_test/debt')
   @ApiOperation({
-    summary: 'E2E only — بدهی مشتق‌شده آژانس را به رقم ثابت برمی‌گرداند؛ در production 404',
+    summary:
+      'E2E only — بدهی مشتق‌شده آژانس را به رقم ثابت برمی‌گرداند؛ در production 404',
   })
   async resetTestDebt(
     @CurrentUser() actor: AuthenticatedUser,
@@ -279,6 +281,33 @@ export class AgenciesController {
     @Body() dto: CreateMessageDto,
   ) {
     const data = await this.agencies.postMessage(actor, id, dto.body);
+    return { success: true, data };
+  }
+
+  @Get(':id/credit-requests')
+  @ApiOperation({ summary: 'لیست درخواست‌های افزایش اعتبار آژانس' })
+  async listCreditRequests(@Param('id') id: string) {
+    const data = await this.agencies.listCreditRequests(id);
+    return { success: true, data };
+  }
+
+  @Patch(':id/credit-requests/:reqId/decide')
+  @ApiOperation({
+    summary:
+      'تأیید/رد درخواست افزایش اعتبار — تأیید سقف را واقعاً تغییر می‌دهد',
+  })
+  async decideCreditRequest(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id') id: string,
+    @Param('reqId') reqId: string,
+    @Body() dto: DecideCreditRequestDto,
+  ) {
+    const data = await this.agencies.decideCreditRequest(
+      actor,
+      id,
+      reqId,
+      dto.approve,
+    );
     return { success: true, data };
   }
 }
