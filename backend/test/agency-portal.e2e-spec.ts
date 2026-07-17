@@ -30,7 +30,8 @@ describe('Agency Portal (e2e)', () => {
    * shared-dev-password agencies, so login tests don't depend on seed order. */
   async function createFreshAgency(overrides?: { limitIrr?: number }) {
     const suffix = crypto.randomUUID().slice(0, 8);
-    const phone = `+9891${suffix.replace(/\D/g, '0').padEnd(8, '0').slice(0, 8)}`;
+    // Real random digits — the hex→'0' mapping collided on the unique phone column.
+    const phone = `+9891${crypto.randomInt(10_000_000, 100_000_000)}`;
     const passwordHash = await argon2.hash(AGENCY_PASSWORD);
     const user = await prisma.user.create({
       data: {
@@ -136,7 +137,7 @@ describe('Agency Portal (e2e)', () => {
         managerName: 'مدیر جدید',
         licenseNo: `AG-NEW-${suffix}`,
         city: 'شیراز',
-        phone: `+9892${suffix.padEnd(8, '0').slice(0, 8)}`,
+        phone: `+9892${crypto.randomInt(10_000_000, 100_000_000)}`,
         email: `${suffix}@new.example`,
         status: 'PENDING',
       },
