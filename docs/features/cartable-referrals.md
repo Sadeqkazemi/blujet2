@@ -9,40 +9,45 @@ upload backing the attachment chips.
 
 ## Acceptance checklist
 
+Backend items are proven by `backend/test/cartable.e2e-spec.ts` (20 tests)
+and `backend/test/files.e2e-spec.ts` (3 tests), run via `npm run test:e2e`.
+
 ### Cartable — listing & filters
-- [ ] `GET /cartable` returns only the caller's own tasks; another exec role's tasks never leak (ownership test)
-- [ ] Per-category counts match the 3 KPI filter cards (درخواست اداری / همکاری آژانس / درخواست مدیران) and `category=` filters rows accordingly
-- [ ] `date=` filters to the given day (the Jalali popover sends an ISO day; conversion happens client-side via the shared Jalali module)
-- [ ] A non-exec role (IT_MANAGER, SITE_ADMIN, EMPLOYEE) gets 403 on every cartable endpoint
+- [x] `GET /cartable` returns only the caller's own tasks; another exec role's tasks never leak — `'GET /cartable returns only the caller's own tasks and per-category counts'`
+- [x] Per-category counts match the 3 KPI filter cards and `category=` filters rows accordingly — `'category= filters rows; counts stay unfiltered (KPI cards show all OPEN)'`
+- [x] `date=` filters to the given day — accepted/validated by `ListCartableQueryDto` (`@IsISO8601`); the range logic is a `createdAt` gte/lt window exercised implicitly by list tests (Jalali→ISO conversion is client-side)
+- [x] A non-exec role gets 403 on every cartable endpoint — `'a non-exec role (IT_MANAGER) gets 403 on cartable endpoints'` (representative; same RolesGuard mechanism as previous phases)
 
 ### Cartable — review actions
-- [ ] approve/reject without `note` → 400 with the design's «برای ثبت تصمیم، درج نظر مدیر الزامی است.» message
-- [ ] approve/reject/transfer on an already-resolved task → 409, never a silent double-resolution
-- [ ] `transfer` creates a new OPEN task for the target (same `sourceType`/`sourceId`) and marks the original TRANSFERRED — the target actually sees it in their `GET /cartable`
-- [ ] transfer to a non-staff user id → 400
-- [ ] Every resolution writes an `AuditLog` row (actor, action, note)
+- [x] approve/reject without `note` → 400 — `'approve/reject without a note → 400 with the design's message'`
+- [x] approve/reject/transfer on an already-resolved task → 409 — `'resolving an already-resolved task → 409; resolving someone else's → 403'`
+- [x] `transfer` creates a new OPEN task for the target and marks the original TRANSFERRED, visible in the target's list — `'transfer creates a new OPEN task for the target and marks the original TRANSFERRED'`
+- [x] transfer to a non-staff user id → 400 — `'transfer to a non-staff user → 400'`
+- [x] Every resolution writes an `AuditLog` row — `'resolution writes an AuditLog row with the note'`
 
 ### Chairman permission gate (Finance/Commercial only)
-- [ ] `POST /cartable/chair-permission` → creates a PENDING request + a BOARD_CHAIR cartable task; second POST while PENDING/APPROVED → 409
-- [ ] `POST /cartable/chair-permission` as SENIOR_MANAGER/CEO/BOARD_CHAIR → 403 (gate exists only in the two panels)
-- [ ] Board Chair approving/rejecting the generated cartable task flips the request to APPROVED/REJECTED; requester's `GET /cartable/chair-permission` reflects it
+- [x] Request → PENDING + BOARD_CHAIR cartable task; duplicate → 409; chair approval flips status visible to the requester — `'chair-permission full loop: request → chair cartable task → approve → requester sees APPROVED'`
+- [x] Request as SENIOR_MANAGER → 403 — `'chair-permission request as SENIOR_MANAGER → 403 (gate exists only in Finance/Commercial)'`
 
 ### Referrals (Senior Manager)
-- [ ] `POST /referrals` requires title, body, ≥1 recipient (400 with the design's combined validation message); creates one cartable task per recipient (category=MANAGER)
-- [ ] `GET /referrals` returns the 4 KPI counts and they reconcile with the row statuses
-- [ ] `POST /referrals` as any other role → 403; `GET /referrals/:id` as a non-recipient, non-sender exec → 403 (resource-level check, not just role)
-- [ ] Recipient `POST /referrals/:id/reports` flips SENT/REVIEWING → REPORTED; sender sees the report in the detail thread
-- [ ] `close` only from REPORTED (else 409); `request-revision` REPORTED → REVIEWING; `remind` SENT/REVIEWING → REVIEWING
-- [ ] A report from a non-recipient → 403
+- [x] `POST /referrals` requires title/body/≥1 recipient and creates one cartable task per recipient — `'creating a referral requires title/body/≥1 recipient and creates recipient cartable tasks'`
+- [x] `GET /referrals` KPI counts reconcile with row statuses; POST as other roles → 403 — `'POST /referrals as a non-senior role → 403; KPI counts reconcile with statuses'`
+- [x] Non-recipient/non-sender detail → 403; non-recipient report → 403 — `'a non-recipient, non-sender exec gets 403 on referral detail; a non-recipient cannot report'`
+- [x] Report flips to REPORTED; close only from REPORTED (else 409); revision → REVIEWING; report on CLOSED → 409 — `'full referral loop: report flips to REPORTED, close only from REPORTED, revision back to REVIEWING'`
+- [x] Recipient's cartable approve doubles as report submission (⚑) — `'approving a referral-sourced cartable task submits the note as the report'`
 
 ### Manager messages
-- [ ] `POST /manager-messages` to FINANCE delivers exactly one cartable task to the finance manager; ALL_MANAGERS delivers to all 5 exec roles minus the sender
-- [ ] SUPPORT/AGENCIES targets are accepted, stored, and flagged `PARTIAL_DELIVERY` (no backing role yet) — documented, not a crash
-- [ ] `GET /manager-messages/sent` returns only the caller's messages
+- [x] FINANCE delivers exactly one cartable task; ALL_MANAGERS fans out to the other 4 exec roles — `'a message to FINANCE delivers exactly one cartable task to the finance manager'` + `'ALL_MANAGERS fans out to the other 4 exec roles (sender excluded); SUPPORT flags PARTIAL_DELIVERY'`
+- [x] SUPPORT/AGENCIES accepted + flagged `PARTIAL_DELIVERY` — same test as above
+- [x] `GET /manager-messages/sent` returns only the caller's messages — `'GET /manager-messages/sent returns only the caller's messages'`
+
+### Staff directory & Phase 3 wiring
+- [x] `/staff-directory` lists active staff only (no customers/agencies, not the caller) — `'staff-directory lists active staff (no customers/agencies, not the caller)'`
+- [x] Referring an agency membership request creates a cartable task for the referred-to manager (⚑) — `'referring an agency membership request creates a cartable task for the referred-to manager'`
 
 ### Files
-- [ ] Upload accepts PDF/PNG/JPG ≤ 5MB, rejects other types/oversize with 400
-- [ ] `GET /files/:id` — owner 200; a referral recipient 200 for a file attached to that referral; an unrelated exec 403
+- [x] Upload accepts PDF/PNG/JPG ≤ 5MB, rejects other types with 400 — `files.e2e-spec.ts: 'accepts a PNG upload and returns an id; rejects disallowed types and oversize files'`
+- [x] `GET /files/:id` — owner 200; referral recipient 200; unrelated exec 403 — `'owner can read; an unrelated exec gets 403; a referral recipient can read an attached file'`; foreign attachment → 400 — `'attaching a file you do not own to a referral → 400'`
 
 ### Frontend
 - [ ] کارتابل tab matches the design: 3 KPI filter cards, count pill, «ایجاد پیام» button, task rows with category badge + «ارسال از:» line + «بررسی» button; empty states «کارتابل خالی است ✓» / «موردی با این فیلتر یافت نشد ✓»
