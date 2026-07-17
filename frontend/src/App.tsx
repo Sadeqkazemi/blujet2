@@ -12,6 +12,7 @@ import AgencyDetailPage from './features/agencies/AgencyDetailPage';
 import RequestDetailPage from './features/agencies/RequestDetailPage';
 import CartablePage from './features/cartable/CartablePage';
 import ReferralsPage from './features/referrals/ReferralsPage';
+import ClubPage from './features/club/ClubPage';
 
 export default function App() {
   return (
@@ -34,6 +35,12 @@ export default function App() {
               </Route>
               <Route path="referrals" element={<TabGate tabKey="referrals" />}>
                 <Route index element={<ReferralsPage />} />
+              </Route>
+              <Route path="club" element={<TabGate tabKey="club" />}>
+                <Route index element={<ClubPage />} />
+              </Route>
+              <Route path="vip" element={<TabGate tabKey="vip" />}>
+                <Route index element={<ClubPage />} />
               </Route>
               <Route path=":tabKey" element={<ComingSoonPage />} />
             </Route>

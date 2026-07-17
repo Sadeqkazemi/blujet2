@@ -18,6 +18,7 @@ import { StaffDirectoryModule } from './modules/staff-directory/staff-directory.
 import { ReferralsModule } from './modules/referrals/referrals.module';
 import { ManagerMessagesModule } from './modules/manager-messages/manager-messages.module';
 import { FilesModule } from './modules/files/files.module';
+import { ClubModule } from './modules/club/club.module';
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { FilesModule } from './modules/files/files.module';
     ReferralsModule,
     ManagerMessagesModule,
     FilesModule,
+    ClubModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
