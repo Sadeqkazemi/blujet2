@@ -223,6 +223,106 @@ export class RefundsService {
     return toListRow(updated);
   }
 
+  /** Public purchase engine: the customer's own submission — CLAUDE.md's
+   * "fare-rule–driven penalty calculation, user-visible breakdown before
+   * confirmation." Booking must be TICKETED and owned by the caller; only
+   * one request per booking (RefundStatus has no REJECTED to resubmit
+   * against, so a second submission is always a conflict, not a retry). */
+  async submitFromCustomer(
+    actor: AuthenticatedUser,
+    dto: { bookingId: string; iban: string },
+  ) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: dto.bookingId },
+      include: { flightInstance: true, passengers: true, refundRequests: true },
+    });
+    if (!booking) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'رزرو یافت نشد.',
+      });
+    }
+    if (booking.userId !== actor.id) {
+      throw new BadRequestException({
+        code: ErrorCode.FORBIDDEN,
+        message: 'این رزرو متعلق به شما نیست.',
+      });
+    }
+    if (booking.status !== 'TICKETED' && booking.status !== 'PAID') {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'این رزرو واجد شرایط استرداد نیست.',
+      });
+    }
+    if (booking.refundRequests.length > 0) {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'برای این رزرو قبلاً درخواست استرداد ثبت شده است.',
+      });
+    }
+
+    const rules = await this.prisma.refundPenaltyRule.findMany();
+    const hoursLeft =
+      (booking.flightInstance.departureAt.getTime() - Date.now()) / 3_600_000;
+    const penalty = computePenalty(rules, hoursLeft, booking.priceIrr);
+    const passenger = booking.passengers[0];
+
+    const request = await this.prisma.refundRequest.create({
+      data: {
+        bookingId: booking.id,
+        passengerName: passenger?.fullName ?? actor.fullName,
+        nidEnc: passenger?.nationalIdEnc,
+        mobileEnc: passenger?.mobileEnc,
+        ibanEnc: encryptPii(dto.iban),
+        totalPaidIrr: booking.priceIrr,
+        penaltyPct: penalty.penaltyPct,
+        penaltyAmountIrr: penalty.penaltyAmountIrr,
+        refundableIrr: penalty.refundableIrr,
+        history: [
+          {
+            step: 'submitted',
+            labelFa: 'ثبت درخواست استرداد توسط مشتری',
+            at: new Date().toISOString(),
+          },
+        ],
+      },
+    });
+
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'REFUND',
+      action: 'ثبت درخواست استرداد',
+      detail: `درخواست استرداد رزرو ${booking.pnr} توسط مشتری ثبت شد.`,
+      entityType: 'RefundRequest',
+      entityId: request.id,
+    });
+
+    return toListRow(request);
+  }
+
+  async listMine(userId: string) {
+    const requests = await this.prisma.refundRequest.findMany({
+      where: { booking: { userId } },
+      orderBy: { createdAt: 'desc' },
+    });
+    return requests.map(toListRow);
+  }
+
+  async getMine(userId: string, id: string) {
+    const request = await this.prisma.refundRequest.findUnique({
+      where: { id },
+      include: { booking: true },
+    });
+    if (!request || request.booking.userId !== userId) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'درخواست استرداد یافت نشد.',
+      });
+    }
+    return toListRow(request);
+  }
+
   /**
    * Non-production only: creates a fresh TICKETED booking + FINANCE-status
    * request so Playwright always has a payable row (submission belongs to
