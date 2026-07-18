@@ -42,6 +42,10 @@ import ResultsPage from './features/public-site/ResultsPage';
 import BookPage from './features/public-site/BookPage';
 import CheckoutPage from './features/public-site/CheckoutPage';
 import TicketPage from './features/public-site/TicketPage';
+import DestinationsPage from './features/public-site/DestinationsPage';
+import PublicClubPage from './features/public-site/PublicClubPage';
+import SupportPage from './features/public-site/SupportPage';
+import TravelInfoPage from './features/public-site/TravelInfoPage';
 
 export default function App() {
   return (
@@ -53,6 +57,10 @@ export default function App() {
           <Route path="/book/:flightInstanceId" element={<BookPage />} />
           <Route path="/checkout/:bookingId" element={<CheckoutPage />} />
           <Route path="/ticket/:pnr" element={<TicketPage />} />
+          <Route path="/destinations" element={<DestinationsPage />} />
+          <Route path="/club" element={<PublicClubPage />} />
+          <Route path="/support" element={<SupportPage />} />
+          <Route path="/travel-info" element={<TravelInfoPage />} />
 
           <Route path="/login" element={<LoginPage />} />
           <Route path="/two-factor" element={<TwoFactorPage />} />
