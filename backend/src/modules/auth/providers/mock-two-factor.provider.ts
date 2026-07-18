@@ -12,7 +12,11 @@ export class MockTwoFactorProvider implements TwoFactorProvider {
     code: string,
   ): Promise<void> {
     this.lastCodeByUserId.set(user.id, code);
-    this.logger.debug(`2FA code for ${user.fullName} (${user.id}): ${code}`);
+    // Deliberately .log() (info), not .debug(): this mock provider is the
+    // ONLY delivery channel until a real SMS/2FA vendor is wired, and
+    // production log level is 'info' — a .debug() call here would make the
+    // code permanently unreadable on any production deployment.
+    this.logger.log(`2FA code for ${user.fullName} (${user.id}): ${code}`);
     return Promise.resolve();
   }
 
