@@ -57,10 +57,26 @@ describe('ResultsPage', () => {
     expect(buttons[1]).toBeDisabled();
   });
 
-  it('shows an empty state when no flights match', async () => {
+  it('walks forward to the nearest date with real flights when the requested date is empty', async () => {
+    const spy = vi
+      .spyOn(publicSiteApi, 'searchFlights')
+      .mockResolvedValueOnce([]) // requested date
+      .mockResolvedValueOnce([]) // +1 day
+      .mockResolvedValueOnce([RESULT]); // +2 days
+    renderPage();
+
+    expect(await screen.findByTestId('nearest-date-notice')).toBeInTheDocument();
+    expect(screen.getByTestId('result-card')).toBeInTheDocument();
+    expect(spy).toHaveBeenLastCalledWith('THR', 'MHD', '2026-08-03');
+  });
+
+  it('falls back to the display-only mock schedule when no date has flights', async () => {
     vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([]);
     renderPage();
 
-    expect(await screen.findByText('پروازی برای این مسیر و تاریخ یافت نشد.')).toBeInTheDocument();
+    const mockCards = await screen.findAllByTestId('mock-result-card', undefined, { timeout: 8000 });
+    expect(mockCards).toHaveLength(3);
+    expect(screen.getAllByText('تکمیل ظرفیت آنلاین')[0]).toBeInTheDocument();
+    expect(screen.queryByTestId('result-card')).not.toBeInTheDocument();
   });
 });
