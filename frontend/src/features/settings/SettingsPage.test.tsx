@@ -21,6 +21,11 @@ const DATA: SettingsResult = {
     apiPublic: false,
     sandbox: true,
     brandColor: '#1668c4',
+    homeHeroTitle: 'پرواز به هر کجا که دوست دارید',
+    homeHeroSubtitle: 'بهترین قیمت بلیط هواپیما را با blujet پیدا کنید',
+    aboutUsText: 'blujet یک پلتفرم آنلاین رزرو بلیط هواپیما است.',
+    contactAddress: 'تهران، ایران',
+    termsText: 'قوانین و مقررات استفاده از خدمات blujet.',
   },
   refundRules: [
     { id: 'r1', minHoursBeforeDeparture: 72, penaltyPct: 30, labelFa: 'بیش از ۷۲ ساعت مانده به پرواز' },

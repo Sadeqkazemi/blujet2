@@ -138,6 +138,37 @@ export default function SettingsPage() {
 
         {isChair && (
           <div className="rounded-xl border border-border bg-white p-5">
+            <div className="mb-1 text-sm font-bold text-ink">محتوای سایت</div>
+            <p className="mb-4 text-[11px] text-muted">متن صفحات عمومی — بدون نیاز به انتشار نسخهٔ جدید</p>
+            <div className="flex flex-col gap-3">
+              {(
+                [
+                  ['homeHeroTitle', 'عنوان صفحهٔ اصلی'],
+                  ['homeHeroSubtitle', 'زیرعنوان صفحهٔ اصلی'],
+                  ['aboutUsText', 'متن دربارهٔ ما'],
+                  ['contactAddress', 'آدرس تماس با ما'],
+                  ['termsText', 'متن قوانین و مقررات'],
+                ] as const
+              ).map(([key, label]) => (
+                <div key={key}>
+                  <label htmlFor={`set-${key}`} className="mb-1.5 block text-[11.5px] text-muted">
+                    {label}
+                  </label>
+                  <textarea
+                    id={`set-${key}`}
+                    value={strOf(key)}
+                    onChange={(e) => setKey(key, e.target.value)}
+                    rows={2}
+                    className="w-full resize-y rounded-lg border border-border px-3.5 py-2.5 text-sm outline-none focus:border-accent"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {isChair && (
+          <div className="rounded-xl border border-border bg-white p-5">
             <div className="mb-4 text-sm font-bold text-ink">درگاه پرداخت</div>
             <div className="flex flex-col divide-y divide-border/60">
               {GATEWAYS.map((g) => (
