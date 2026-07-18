@@ -44,7 +44,39 @@ below for what's landed from that port so far.
   - Public-site frontend: `frontend/src/features/public-site` (home search, results, seat+passenger booking with an inline OTP gate, checkout with promo/payment-method, e-ticket + inline refund submission) wired to the backend above, reusing the existing `AuthProvider`/`token-store`/api client infra (optional `requestOtp`/`verifyOtp` on `AuthContextValue` so no existing staff/agency test needed updating). 15 new component tests + a real-browser Playwright golden path (search → OTP login → seat/passenger → pay → e-ticket → refund submission) run against live dev servers, not just mocked. Styling is functional/clean, not yet pixel-matched to `design-reference/` — see deferred list below.
   - Promo codes / wallet / club points ledger / price lock: `PromoCode`/`PromoRedemption` (applied inside `pay()`, full route/cabin/date-window/maxRedemptions/maxPerUser validation), `WalletEntry` (balance always `SUM(signedAmountIrr)`, sandbox top-up + pay-with-wallet), `ClubPointsEntry` (the authoritative points ledger — `ClubMember.points` stays a synced display-copy; real-money payments earn, points payments redeem, no redeem-to-earn loophole), `PriceLock` (gold-tier+ only, 72h TTL, flat NestJS-computed fee — the AI-suggested variable fee is deferred with the rest of the AI wiring below; a booking made against an active lock prices at the locked rate and skips re-pricing entirely at payment). Wired into `CheckoutPage.tsx` (promo-code field + payment-method picker with live wallet balance, points option disabled for non-members). 11 + 2 new e2e tests.
   - GDPR: `GET /my/privacy/export` (full JSON of the customer's own bookings/passengers/refunds/wallet/points/locks) and `DELETE /my/privacy/account` (soft-deletes `User`, anonymizes passenger PII on their bookings, revokes all refresh tokens — booking/ledger rows survive as financial records, never hard-deleted). 3 new e2e tests.
-  - **Still not ported** (explicitly deferred, not silently dropped): the AI "buy-now-or-wait" advisory endpoint reusing the existing `PRICE_SUGGESTION_PROVIDER` (price-lock's fee is a flat rate instead, documented above); pixel-matching the public-site frontend to `design-reference/`'s exported HTML (current styling is clean/functional, built without re-reading the original design files given the time this port already took); a dedicated site-content-management UI beyond the `SettingsPage` text fields already added (no `MediaTab`/asset-library equivalent exists on this track's frontend). All backend surfaces above are fully tested via Supertest; the frontend covers only the golden path, not every edge state (price-lock UI, wallet top-up UI, and a GDPR export/delete UI screen don't exist yet — those endpoints are currently curl/Supertest-only).
+  - **Still not ported** (explicitly deferred, not silently dropped): the AI "buy-now-or-wait" advisory endpoint reusing the existing `PRICE_SUGGESTION_PROVIDER` (price-lock's fee is a flat rate instead, documented above); a dedicated site-content-management UI beyond the `SettingsPage` text fields already added (no `MediaTab`/asset-library equivalent exists on this track's frontend). All backend surfaces above are fully tested via Supertest; the frontend covers only the golden path, not every edge state (price-lock UI, wallet top-up UI, and a GDPR export/delete UI screen don't exist yet — those endpoints are currently curl/Supertest-only).
+
+- **Sentry error tracking (backend + frontend)**: wired per CLAUDE.md's
+  Observability rules. Backend: DSN-gated `Sentry.init()` in `main.ts`,
+  `Sentry.captureException` hooked into `AllExceptionsFilter` for 5xx
+  errors — no-op when `SENTRY_DSN` is unset. Frontend: DSN-gated init plus
+  a React `ErrorBoundary` (Persian fallback UI) wrapping the app and a
+  global `unhandledrejection` handler — no-op when `VITE_SENTRY_DSN` is
+  unset. Threaded through `docker-compose.prod.yml`, the frontend
+  Dockerfile build args, and `.env.production.example`.
+
+- **Public-site pixel-matching (partial, in progress)**: built
+  `PublicHeader`/`PublicFooter` (colors, spacing, layout copied verbatim
+  from `design-reference/صفحه اصلی.dc.html`'s inline styles, not
+  reinvented) wired to real auth/club-points state, applied across all 5
+  public pages via a shared `PublicPageShell`. Rebuilt `HomeSearchPage`
+  with the real hero banner, search card (origin/destination fields, swap
+  button, a real `JalaliDatePicker` — the previous native
+  `<input type="date">` was Gregorian, a CLAUDE.md violation), and
+  popular-route shortcuts sourced from real airport data (deliberately no
+  fabricated prices/offers, since the backend has no featured-routes/promo
+  API to source them from honestly). **Not yet done**: the body content of
+  Results/Book/Checkout/Ticket (price calendar, AI price radar, seat map
+  styling, boarding-pass ticket visual) is still the earlier
+  functional/clean styling, not pixel-matched — only header/footer wrap
+  them now. Also surfaced: `مقاصد`, `باشگاه مشتریان` (public marketing
+  page), `درباره ما`, `تماس با ما`, `پشتیبانی`, `قوانین و مقررات`, and a
+  real `مدیریت رزرو` (PNR lookup) page do not exist on this branch despite
+  earlier task-list entries claiming them complete — the header/footer nav
+  links point at these paths already (`/destinations`, `/club`, `/about`,
+  `/contact`, `/support`, `/travel-info`, `/manage-booking`) so no further
+  routing change is needed once the pages themselves are built; until
+  then they fall through to the catch-all redirect to `/`.
 
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is
