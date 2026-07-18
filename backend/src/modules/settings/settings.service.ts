@@ -19,6 +19,15 @@ export const SETTING_DEFAULTS: Record<string, unknown> = {
   apiPublic: false,
   sandbox: true,
   brandColor: '#1668c4',
+  // Site content (مدیریت محتوا) — plain text/HTML blocks the public-site
+  // track reads at render time; editable here so content never needs a
+  // deploy. Kept in the same generic SystemSetting KV store as the rest of
+  // this tab rather than a dedicated table, matching Phase 12's design.
+  homeHeroTitle: 'پرواز به هر کجا که دوست دارید',
+  homeHeroSubtitle: 'بهترین قیمت بلیط هواپیما را با blujet پیدا کنید',
+  aboutUsText: 'blujet یک پلتفرم آنلاین رزرو بلیط هواپیما است.',
+  contactAddress: 'تهران، ایران',
+  termsText: 'قوانین و مقررات استفاده از خدمات blujet.',
 };
 
 @Injectable()
