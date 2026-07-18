@@ -92,6 +92,9 @@ model User {
   refundsProcessed  RefundRequest[] @relation("RefundProcessedBy")
 
   bookings Booking[] @relation("BookingUser")
+  promoRedemptions PromoRedemption[] @relation("PromoRedeemedBy")
+  walletEntries    WalletEntry[]     @relation("WalletOwner")
+  priceLocks       PriceLock[]       @relation("PriceLockOwner")
 
   @@map("users")
 }
@@ -242,6 +245,7 @@ model FlightInstance {
   pricing      FarePricingProposal?
   seatLocks    SeatLock[]
   cabinFares   CabinFare[]
+  priceLocks   PriceLock[]
 
   @@index([departureAt])
   @@map("flight_instances")
@@ -322,6 +326,10 @@ model Booking {
   passengers     Passenger[]
   ledgerEntries  LedgerEntry[]
   refundRequests RefundRequest[]
+  promoRedemption   PromoRedemption?
+  walletEntries     WalletEntry[]
+  clubPointsEntries ClubPointsEntry[]
+  priceLock         PriceLock?
 
   @@index([flightInstanceId, status])
   @@index([channel])
@@ -805,6 +813,7 @@ model ClubMember {
   createdAt       DateTime       @default(now())
 
   requests ClubCardRequest[]
+  pointsEntries ClubPointsEntry[] @relation("ClubMemberPointsEntries")
 
   @@index([nationalIdHash])
   @@index([level])
@@ -1100,4 +1109,131 @@ model Airport {
   tz     String
 
   @@map("airports")
+}
+
+// ─── Phase 13 (cont'd): promo codes, wallet, club points ledger, price lock ──
+// Continues the public purchase engine port — see PLAN.md Phase 13.
+
+enum PromoType {
+  PERCENT
+  FIXED
+}
+
+// CLAUDE.md: entered on پرداخت (payment), not checkout — applied inside
+// BookingService.pay(), never at booking-creation time.
+model PromoCode {
+  id             String    @id @default(uuid())
+  code           String    @unique
+  type           PromoType
+  value          Int
+  originCode     String?
+  destCode       String?
+  cabin          CabinClass?
+  startsAt       DateTime?
+  endsAt         DateTime?
+  maxRedemptions Int?
+  maxPerUser     Int?
+  active         Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+
+  redemptions PromoRedemption[]
+
+  @@map("promo_codes")
+}
+
+// One redemption per booking (a booking is only ever paid once — see the
+// HELD-conditional-update guard in BookingService.pay).
+model PromoRedemption {
+  id          String    @id @default(uuid())
+  promoCodeId String
+  promoCode   PromoCode @relation(fields: [promoCodeId], references: [id])
+  bookingId   String    @unique
+  booking     Booking   @relation(fields: [bookingId], references: [id])
+  userId      String
+  user        User      @relation("PromoRedeemedBy", fields: [userId], references: [id])
+  discountIrr Int
+  createdAt   DateTime  @default(now())
+
+  @@index([promoCodeId])
+  @@index([userId])
+  @@map("promo_redemptions")
+}
+
+enum WalletEntryType {
+  TOPUP
+  PURCHASE
+  REFUND
+  ADJUST
+}
+
+// Balance is ALWAYS SUM(signedAmountIrr) — never a mutable column
+// (CLAUDE.md: "User wallet ... never a mutable balance column").
+model WalletEntry {
+  id              String          @id @default(uuid())
+  userId          String
+  user            User            @relation("WalletOwner", fields: [userId], references: [id])
+  type            WalletEntryType
+  signedAmountIrr Int
+  bookingId       String?
+  booking         Booking?        @relation(fields: [bookingId], references: [id])
+  createdAt       DateTime        @default(now())
+
+  @@index([userId])
+  @@map("wallet_entries")
+}
+
+enum ClubPointsEntryType {
+  EARN
+  REDEEM
+  ADJUST
+}
+
+// The authoritative points ledger for the public purchase engine —
+// ClubMember.points (Phase 5, staff track) is documented as a display-copy
+// read-model kept in sync by writes here, never the other way around.
+model ClubPointsEntry {
+  id           String              @id @default(uuid())
+  clubMemberId String
+  clubMember   ClubMember          @relation("ClubMemberPointsEntries", fields: [clubMemberId], references: [id])
+  type         ClubPointsEntryType
+  signedPoints Int
+  bookingId    String?
+  booking      Booking?            @relation(fields: [bookingId], references: [id])
+  createdAt    DateTime            @default(now())
+
+  @@index([clubMemberId])
+  @@map("club_points_entries")
+}
+
+enum PriceLockStatus {
+  ACTIVE
+  USED
+  EXPIRED
+  CANCELLED
+}
+
+// Gold-tier-and-above club members only (CLAUDE.md: "gold-tier members
+// only"). Fee is NestJS-computed (flat, documented rate) — the AI-suggested
+// variable fee/risk is deferred, same as the rest of Phase 13's AI wiring.
+model PriceLock {
+  id               String          @id @default(uuid())
+  userId           String
+  user             User            @relation("PriceLockOwner", fields: [userId], references: [id])
+  flightInstanceId String
+  flightInstance   FlightInstance  @relation(fields: [flightInstanceId], references: [id])
+  cabin            CabinClass
+  lockedPriceIrr   Int
+  feeIrr           Int
+  status           PriceLockStatus @default(ACTIVE)
+  expiresAt        DateTime
+  createdAt        DateTime        @default(now())
+  // Set when a booking is created against this lock — lets BookingService.pay
+  // skip re-pricing entirely for a locked booking (the whole point of a
+  // price lock is shielding the customer from a market price change).
+  bookingId        String?         @unique
+  booking          Booking?        @relation(fields: [bookingId], references: [id])
+
+  @@index([userId, status])
+  @@index([flightInstanceId, cabin, status])
+  @@map("price_locks")
 }

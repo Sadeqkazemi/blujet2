@@ -3949,6 +3949,123 @@
           "bookings"
         ]
       }
+    },
+    "/my/wallet": {
+      "get": {
+        "operationId": "WalletPointsLockController_getWallet",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "موجودی کیف پول",
+        "tags": [
+          "purchase-extras"
+        ]
+      }
+    },
+    "/my/wallet/topup": {
+      "post": {
+        "operationId": "WalletPointsLockController_topup",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TopupWalletDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "شارژ کیف پول (درگاه sandbox)",
+        "tags": [
+          "purchase-extras"
+        ]
+      }
+    },
+    "/my/club-points": {
+      "get": {
+        "operationId": "WalletPointsLockController_getPoints",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "موجودی امتیاز باشگاه مشتریان",
+        "tags": [
+          "purchase-extras"
+        ]
+      }
+    },
+    "/my/price-locks": {
+      "post": {
+        "operationId": "WalletPointsLockController_createPriceLock",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePriceLockDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "قفل قیمت هوشمند (فقط اعضای طلایی و بالاتر)",
+        "tags": [
+          "purchase-extras"
+        ]
+      },
+      "get": {
+        "operationId": "WalletPointsLockController_listPriceLocks",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست قفل‌های قیمت من",
+        "tags": [
+          "purchase-extras"
+        ]
+      }
+    },
+    "/my/price-locks/{id}": {
+      "delete": {
+        "operationId": "WalletPointsLockController_cancelPriceLock",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "لغو قفل قیمت فعال",
+        "tags": [
+          "purchase-extras"
+        ]
+      }
     }
   },
   "info": {
@@ -5002,8 +5119,51 @@
           "confirmedPriceIrr": {
             "type": "number",
             "description": "Client-confirmed price from the checkout screen. Required to complete payment when the price changed since booking creation (re-price guard) — CLAUDE.md: \"if the price changed, show the new price and require explicit user confirmation before charging.\""
+          },
+          "promoCode": {
+            "type": "string",
+            "description": "کد تخفیف — فقط در صفحه پرداخت"
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "GATEWAY",
+              "WALLET",
+              "POINTS"
+            ]
           }
         }
+      },
+      "TopupWalletDto": {
+        "type": "object",
+        "properties": {
+          "amountIrr": {
+            "type": "number",
+            "example": 5000000
+          }
+        },
+        "required": [
+          "amountIrr"
+        ]
+      },
+      "CreatePriceLockDto": {
+        "type": "object",
+        "properties": {
+          "flightInstanceId": {
+            "type": "string"
+          },
+          "cabin": {
+            "type": "string",
+            "enum": [
+              "ECONOMY",
+              "BUSINESS"
+            ]
+          }
+        },
+        "required": [
+          "flightInstanceId",
+          "cabin"
+        ]
       }
     }
   }

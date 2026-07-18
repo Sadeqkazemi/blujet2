@@ -72,7 +72,11 @@ export class BookingController {
     @Param('id') id: string,
     @Body() dto: PayBookingDto,
   ) {
-    const result = await this.bookings.pay(id, user, dto.confirmedPriceIrr);
+    const result = await this.bookings.pay(id, user, {
+      confirmedPriceIrr: dto.confirmedPriceIrr,
+      promoCode: dto.promoCode,
+      paymentMethod: dto.paymentMethod,
+    });
     return { success: true, data: result };
   }
 }

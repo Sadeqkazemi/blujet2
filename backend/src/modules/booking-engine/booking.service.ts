@@ -18,9 +18,15 @@ import {
 import { enumerateSeats } from '../reservation/seat-layout';
 import { getCabinPrice } from './pricing';
 import { SearchService } from './search.service';
+import { PriceLockService } from './price-lock.service';
+import { WalletService } from './wallet.service';
+import { ClubPointsService } from './club-points.service';
+import { applyPromoCode } from './promo.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { CreateBookingDto } from './dto/create-booking.dto';
 import type { Prisma } from '../../../generated/prisma/client';
+
+export type PaymentMethod = 'GATEWAY' | 'WALLET' | 'POINTS';
 
 /** CLAUDE.md: "HELD has a 10-minute TTL (matches the design's hold timer);
  * expiry releases inventory automatically." */
@@ -33,6 +39,7 @@ function generatePnr(): string {
 const BOOKING_INCLUDE = {
   passengers: true,
   flightInstance: { include: { flight: { include: { route: true } } } },
+  priceLock: true,
 } satisfies Prisma.BookingInclude;
 
 type BookingWithRelations = Prisma.BookingGetPayload<{
@@ -45,6 +52,9 @@ export class BookingService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly search: SearchService,
+    private readonly priceLocks: PriceLockService,
+    private readonly wallet: WalletService,
+    private readonly clubPoints: ClubPointsService,
   ) {}
 
   /** Lazily flips a past-TTL HELD booking to EXPIRED, releasing its seats
@@ -153,9 +163,18 @@ export class BookingService {
       }
     }
 
-    const priceIrr =
-      (await getCabinPrice(this.prisma, instance.id, dto.cabin)) *
-      dto.passengers.length;
+    // An active, unused price lock for this exact user/flight/cabin prices
+    // the whole booking at the locked rate instead of the live rate — the
+    // point of the feature is shielding the customer from a market move.
+    const usableLock = await this.priceLocks.findUsableLock(
+      user.id,
+      instance.id,
+      dto.cabin,
+    );
+    const unitPriceIrr = usableLock
+      ? usableLock.lockedPriceIrr
+      : await getCabinPrice(this.prisma, instance.id, dto.cabin);
+    const priceIrr = unitPriceIrr * dto.passengers.length;
     const contactUser = await this.prisma.user.findUniqueOrThrow({
       where: { id: user.id },
       select: { phone: true },
@@ -206,6 +225,16 @@ export class BookingService {
         },
         include: BOOKING_INCLUDE,
       });
+
+      if (usableLock) {
+        // Conditional update: guards against the same user's lock being
+        // consumed twice by a concurrent duplicate request.
+        await tx.priceLock.updateMany({
+          where: { id: usableLock.id, bookingId: null },
+          data: { bookingId: created.id },
+        });
+      }
+
       return created;
     });
 
@@ -272,11 +301,23 @@ export class BookingService {
   /**
    * Re-prices immediately before charging (CLAUDE.md: "ALWAYS re-price
    * immediately before payment; if the price changed, show the new price
-   * and require explicit user confirmation"), then transitions
-   * HELD → PAID → TICKETED and posts the SALE ledger entry — all inside one
-   * transaction (sandbox gateway: always succeeds once price is confirmed).
+   * and require explicit user confirmation") — UNLESS the booking was
+   * created against an active PriceLock, whose whole point is shielding the
+   * customer from exactly that. Applies an optional promo code, charges via
+   * the chosen payment method (sandbox gateway / wallet / club points),
+   * transitions HELD -> TICKETED, posts the SALE ledger entry for the
+   * actual net amount, and earns club points on real-money payments — all
+   * inside one transaction.
    */
-  async pay(id: string, user: AuthenticatedUser, confirmedPriceIrr?: number) {
+  async pay(
+    id: string,
+    user: AuthenticatedUser,
+    options: {
+      confirmedPriceIrr?: number;
+      promoCode?: string;
+      paymentMethod?: PaymentMethod;
+    } = {},
+  ) {
     const booking = await this.getOwnedBooking(id, user);
     if (booking.status === 'EXPIRED') {
       throw new ConflictException({
@@ -295,15 +336,18 @@ export class BookingService {
       });
     }
 
-    const currentPriceIrr =
-      (await getCabinPrice(
-        this.prisma,
-        booking.flightInstanceId,
-        booking.cabin,
-      )) * booking.passengers.length;
+    const isLocked =
+      !!booking.priceLock && booking.priceLock.status === 'ACTIVE';
+    const currentPriceIrr = isLocked
+      ? booking.priceIrr
+      : (await getCabinPrice(
+          this.prisma,
+          booking.flightInstanceId,
+          booking.cabin,
+        )) * booking.passengers.length;
 
-    if (currentPriceIrr !== booking.priceIrr) {
-      if (confirmedPriceIrr !== currentPriceIrr) {
+    if (!isLocked && currentPriceIrr !== booking.priceIrr) {
+      if (options.confirmedPriceIrr !== currentPriceIrr) {
         return {
           priceChanged: true as const,
           previousPriceIrr: booking.priceIrr,
@@ -312,10 +356,46 @@ export class BookingService {
       }
     }
 
+    const paymentMethod: PaymentMethod = options.paymentMethod ?? 'GATEWAY';
+    const member = await this.clubPoints.findMemberByUserId(user.id);
+
     const paid = await this.prisma.$transaction(async (tx) => {
+      let finalPriceIrr = currentPriceIrr;
+      let discountIrr = 0;
+      if (options.promoCode) {
+        const result = await applyPromoCode(tx, {
+          code: options.promoCode,
+          userId: user.id,
+          bookingId: id,
+          originCode: booking.flightInstance.flight.route.originCode,
+          destCode: booking.flightInstance.flight.route.destCode,
+          cabin: booking.cabin,
+          priceIrr: currentPriceIrr,
+        });
+        finalPriceIrr = result.finalPriceIrr;
+        discountIrr = result.discountIrr;
+      }
+
+      if (paymentMethod === 'WALLET') {
+        await this.wallet.charge(tx, user.id, finalPriceIrr, id);
+      } else if (paymentMethod === 'POINTS') {
+        if (!member) {
+          throw new BadRequestException({
+            code: ErrorCode.VALIDATION_FAILED,
+            message: 'پرداخت با امتیاز فقط برای اعضای باشگاه مشتریان است.',
+          });
+        }
+        await this.clubPoints.redeemForPayment(
+          tx,
+          member.id,
+          finalPriceIrr,
+          id,
+        );
+      }
+
       const flipped = await tx.booking.updateMany({
         where: { id, status: 'HELD' },
-        data: { status: 'TICKETED', priceIrr: currentPriceIrr },
+        data: { status: 'TICKETED', priceIrr: finalPriceIrr },
       });
       if (flipped.count === 0) {
         throw new ConflictException({
@@ -323,18 +403,36 @@ export class BookingService {
           message: 'این رزرو قبلاً پرداخت شده است.',
         });
       }
+
+      if (isLocked) {
+        await tx.priceLock.update({
+          where: { id: booking.priceLock!.id },
+          data: { status: 'USED' },
+        });
+      }
+
       await tx.ledgerEntry.create({
         data: {
           bookingId: id,
           type: 'SALE',
-          signedAmountIrr: currentPriceIrr,
+          signedAmountIrr: finalPriceIrr,
           createdById: user.id,
         },
       });
-      return tx.booking.findUniqueOrThrow({
-        where: { id },
-        include: BOOKING_INCLUDE,
-      });
+
+      // Real money spent (gateway/wallet) earns points; redeeming points to
+      // pay never earns points back (no redeem-to-earn loophole).
+      if (member && paymentMethod !== 'POINTS') {
+        await this.clubPoints.earnForPurchase(tx, member.id, finalPriceIrr, id);
+      }
+
+      return {
+        booking: await tx.booking.findUniqueOrThrow({
+          where: { id },
+          include: BOOKING_INCLUDE,
+        }),
+        discountIrr,
+      };
     });
 
     await this.audit.record({
@@ -342,12 +440,19 @@ export class BookingService {
       actorRole: user.role,
       category: 'RESERVATION',
       action: 'پرداخت و صدور بلیط',
-      detail: `رزرو ${paid.pnr} پرداخت و بلیط صادر شد.`,
+      detail: `رزرو ${paid.booking.pnr} پرداخت و بلیط صادر شد.`,
       entityType: 'Booking',
-      entityId: paid.id,
-      metadata: { priceIrr: currentPriceIrr },
+      entityId: paid.booking.id,
+      metadata: {
+        priceIrr: paid.booking.priceIrr,
+        paymentMethod,
+        discountIrr: paid.discountIrr,
+      },
     });
 
-    return { priceChanged: false as const, booking: this.toDetail(paid) };
+    return {
+      priceChanged: false as const,
+      booking: this.toDetail(paid.booking),
+    };
   }
 }

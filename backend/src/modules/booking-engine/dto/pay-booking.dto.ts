@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsInt, IsOptional } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString } from 'class-validator';
 
 export class PayBookingDto {
   @ApiProperty({
@@ -10,4 +10,17 @@ export class PayBookingDto {
   @IsOptional()
   @IsInt()
   confirmedPriceIrr?: number;
+
+  @ApiProperty({
+    required: false,
+    description: 'کد تخفیف — فقط در صفحه پرداخت',
+  })
+  @IsOptional()
+  @IsString()
+  promoCode?: string;
+
+  @ApiProperty({ required: false, enum: ['GATEWAY', 'WALLET', 'POINTS'] })
+  @IsOptional()
+  @IsIn(['GATEWAY', 'WALLET', 'POINTS'])
+  paymentMethod?: 'GATEWAY' | 'WALLET' | 'POINTS';
 }
