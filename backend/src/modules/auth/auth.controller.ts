@@ -19,6 +19,8 @@ import { StaffLoginDto } from './dto/staff-login.dto';
 import { AgencyLoginDto } from './dto/agency-login.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { VerifyTwoFactorDto } from './dto/verify-two-factor.dto';
+import { RequestOtpDto } from './dto/request-otp.dto';
+import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
@@ -103,6 +105,52 @@ export class AuthController {
     );
     setRefreshCookie(res, refreshToken);
     return { success: true, data: { accessToken, user } };
+  }
+
+  @Post('otp/request')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({
+    summary:
+      'Public purchase engine — step 1: request an OTP for a customer phone number',
+  })
+  @ApiResponse({ status: 200, description: 'Challenge issued' })
+  @ApiResponse({ status: 403, description: 'Account suspended' })
+  async requestOtp(@Body() dto: RequestOtpDto) {
+    const result = await this.auth.requestOtp(dto.phone);
+    return { success: true, data: result };
+  }
+
+  @Post('otp/verify')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({
+    summary: 'Public purchase engine — step 2: verify the OTP, issue tokens',
+  })
+  @ApiResponse({ status: 200, description: 'Login complete' })
+  @ApiResponse({ status: 401, description: 'Invalid/expired code' })
+  async verifyOtp(
+    @Body() dto: VerifyOtpDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { accessToken, refreshToken, user } = await this.auth.verifyOtp(
+      dto.challengeId,
+      dto.code,
+      { userAgent: req.headers['user-agent'], ip: req.ip },
+    );
+    setRefreshCookie(res, refreshToken);
+    return { success: true, data: { accessToken, user } };
+  }
+
+  @Get('_test/last-otp/:phone')
+  @ApiOperation({
+    summary: 'E2E-test only: reads back the mock OTP code. 404s in production.',
+  })
+  async testLastOtp(@Param('phone') phone: string) {
+    const code = await this.auth.getLastOtpForE2e(phone);
+    if (code === null) throw new NotFoundException();
+    return { success: true, data: { code } };
   }
 
   @Post('refresh')

@@ -232,4 +232,88 @@ describe('Auth (e2e)', () => {
     const refreshAfterLogout = await agent.post('/auth/refresh');
     expect(refreshAfterLogout.body.success).toBe(false);
   });
+
+  // ── Public purchase engine: customer OTP login ──────────────────────
+
+  it('OTP request creates a fresh USER on first login and reuses it on repeat requests', async () => {
+    const phone = '09120000001';
+    const first = await request(app.getHttpServer())
+      .post('/auth/otp/request')
+      .send({ phone });
+    expect(first.status).toBe(200);
+    expect(first.body.data.challengeId).toBeDefined();
+
+    const user1 = await prisma.user.findUniqueOrThrow({ where: { phone } });
+    expect(user1.role).toBe('USER');
+
+    const second = await request(app.getHttpServer())
+      .post('/auth/otp/request')
+      .send({ phone });
+    expect(second.status).toBe(200);
+    const user2 = await prisma.user.findUniqueOrThrow({ where: { phone } });
+    expect(user2.id).toBe(user1.id);
+  });
+
+  it('rejects a malformed phone number with 400', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/auth/otp/request')
+      .send({ phone: '12345' });
+    expect(res.status).toBe(400);
+  });
+
+  it('logs a customer in with the correct OTP code and issues USER-role tokens', async () => {
+    const phone = '09120000002';
+    const requestRes = await request(app.getHttpServer())
+      .post('/auth/otp/request')
+      .send({ phone });
+    const challengeId = requestRes.body.data.challengeId as string;
+
+    const code = await request(app.getHttpServer()).get(
+      `/auth/_test/last-otp/${phone}`,
+    );
+    expect(code.status).toBe(200);
+
+    const verifyRes = await request(app.getHttpServer())
+      .post('/auth/otp/verify')
+      .send({ challengeId, code: code.body.data.code });
+
+    expect(verifyRes.status).toBe(200);
+    expect(verifyRes.body.data.accessToken).toBeDefined();
+    expect(verifyRes.body.data.user.role).toBe('USER');
+    const setCookie = verifyRes.headers['set-cookie'];
+    expect(String(setCookie)).toContain('blujet_refresh=');
+  });
+
+  it('rejects a wrong OTP code without consuming the challenge', async () => {
+    const phone = '09120000003';
+    const requestRes = await request(app.getHttpServer())
+      .post('/auth/otp/request')
+      .send({ phone });
+    const challengeId = requestRes.body.data.challengeId as string;
+
+    const wrongRes = await request(app.getHttpServer())
+      .post('/auth/otp/verify')
+      .send({ challengeId, code: '000000' });
+    expect(wrongRes.status).toBe(401);
+    expect(wrongRes.body.error.code).toBe('TWO_FACTOR_INVALID');
+  });
+
+  it('a staff 2FA challenge cannot be replayed through the customer OTP verify endpoint', async () => {
+    const staffLoginRes = await request(app.getHttpServer())
+      .post('/auth/staff/login')
+      .send({ username: 'finance.karimi', password: 'Blujet@1404' });
+    const challengeId = staffLoginRes.body.data.challengeId as string;
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { username: 'finance.karimi' },
+    });
+    const code = app
+      .get<MockTwoFactorProvider>(TWO_FACTOR_PROVIDER)
+      .getLastCode(user.id)!;
+
+    const res = await request(app.getHttpServer())
+      .post('/auth/otp/verify')
+      .send({ challengeId, code });
+    expect(res.status).toBe(401);
+    expect(res.body.error.code).toBe('TWO_FACTOR_INVALID');
+  });
 });

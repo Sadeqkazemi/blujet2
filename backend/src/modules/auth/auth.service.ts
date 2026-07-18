@@ -261,6 +261,126 @@ export class AuthService {
     return { accessToken, refreshToken, user: authUser };
   }
 
+  /** Public purchase engine: customer phone+OTP login (design's ورود و
+   * ثبت‌نام — primary auth, no password). Find-or-create keeps this a
+   * single step for first-time buyers, matching the design's single phone
+   * field with no separate registration form. */
+  async requestOtp(phone: string): Promise<{ challengeId: string }> {
+    const user = await this.prisma.user.upsert({
+      where: { phone },
+      update: {},
+      create: { role: 'USER', phone, fullName: phone },
+    });
+    if (!user.isActive) {
+      throw new ForbiddenException({
+        code: 'ACCOUNT_SUSPENDED',
+        message: 'این حساب مسدود شده است.',
+      });
+    }
+
+    const code = generateSixDigitCode();
+    const challenge = await this.prisma.twoFactorChallenge.create({
+      data: {
+        userId: user.id,
+        purpose: 'CUSTOMER_OTP_LOGIN',
+        codeHash: await argon2.hash(code),
+        expiresAt: new Date(Date.now() + TWO_FACTOR_TTL_MS),
+      },
+    });
+
+    await this.twoFactorProvider.sendCode(user, code);
+
+    return { challengeId: challenge.id };
+  }
+
+  async verifyOtp(
+    challengeId: string,
+    code: string,
+    context: { userAgent?: string; ip?: string },
+  ): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    user: AuthenticatedUser;
+  }> {
+    const challenge = await this.prisma.twoFactorChallenge.findUnique({
+      where: { id: challengeId },
+      include: { user: true },
+    });
+
+    if (!challenge || challenge.purpose !== 'CUSTOMER_OTP_LOGIN') {
+      throw new UnauthorizedException({
+        code: 'TWO_FACTOR_INVALID',
+        message: 'کد نامعتبر است.',
+      });
+    }
+    if (challenge.consumedAt) {
+      throw new UnauthorizedException({
+        code: 'TWO_FACTOR_INVALID',
+        message: 'این کد قبلاً استفاده شده است.',
+      });
+    }
+    if (challenge.expiresAt < new Date()) {
+      throw new UnauthorizedException({
+        code: 'TWO_FACTOR_EXPIRED',
+        message: 'کد منقضی شده است.',
+      });
+    }
+    if (challenge.attempts >= TWO_FACTOR_MAX_ATTEMPTS) {
+      throw new UnauthorizedException({
+        code: 'TWO_FACTOR_INVALID',
+        message: 'تعداد تلاش‌های مجاز به پایان رسید.',
+      });
+    }
+
+    const codeValid = await argon2.verify(challenge.codeHash, code);
+    if (!codeValid) {
+      await this.prisma.twoFactorChallenge.update({
+        where: { id: challenge.id },
+        data: { attempts: { increment: 1 } },
+      });
+      throw new UnauthorizedException({
+        code: 'TWO_FACTOR_INVALID',
+        message: 'کد وارد شده نادرست است.',
+      });
+    }
+
+    await this.prisma.twoFactorChallenge.update({
+      where: { id: challenge.id },
+      data: { consumedAt: new Date() },
+    });
+    await this.prisma.user.update({
+      where: { id: challenge.userId },
+      data: { lastLoginAt: new Date() },
+    });
+
+    const user = challenge.user;
+    const authUser: AuthenticatedUser = {
+      id: user.id,
+      role: user.role,
+      fullName: user.fullName,
+    };
+    const accessToken = this.signAccessToken(authUser);
+    const refreshToken = await this.issueRefreshToken(user.id, context);
+
+    return { accessToken, refreshToken, user: authUser };
+  }
+
+  /**
+   * Non-production only: reads back the mock OTP code — same escape hatch
+   * as staff 2FA's getLastCodeForE2e, keyed by phone instead of username.
+   * Always 404s in production.
+   */
+  async getLastOtpForE2e(phone: string): Promise<string | null> {
+    if (
+      process.env.NODE_ENV === 'production' ||
+      !this.twoFactorProvider.getLastCode
+    )
+      return null;
+    const user = await this.prisma.user.findUnique({ where: { phone } });
+    if (!user) return null;
+    return this.twoFactorProvider.getLastCode(user.id) ?? null;
+  }
+
   async refresh(
     presentedToken: string,
     context: { userAgent?: string; ip?: string },
