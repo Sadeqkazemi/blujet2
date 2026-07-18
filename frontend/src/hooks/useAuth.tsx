@@ -11,6 +11,11 @@ interface AuthContextValue {
   confirmTwoFactor: (challengeId: string, code: string) => Promise<AuthUser>;
   agencyLogin: (phone: string, password: string) => Promise<AuthUser>;
   signOut: () => Promise<void>;
+  // Public purchase engine (customer phone+OTP login) — optional so every
+  // existing staff/agency test's mocked AuthContextValue literal (which
+  // predates the customer track) keeps type-checking without change.
+  requestOtp?: (phone: string) => Promise<string>;
+  verifyOtp?: (challengeId: string, code: string) => Promise<AuthUser>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -57,6 +62,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return loggedInUser;
   }, []);
 
+  const requestOtp = useCallback(async (phone: string) => {
+    const { challengeId } = await authApi.requestOtp(phone);
+    return challengeId;
+  }, []);
+
+  const verifyOtp = useCallback(async (challengeId: string, code: string) => {
+    const { user: loggedInUser } = await authApi.verifyOtp(challengeId, code);
+    setUser(loggedInUser);
+    setStatus('authenticated');
+    return loggedInUser;
+  }, []);
+
   const signOut = useCallback(async () => {
     // Best-effort server-side revoke — a failed/rate-limited call must never
     // trap the user in a session they clicked "sign out" on.
@@ -69,8 +86,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ status, user, requestLogin, confirmTwoFactor, agencyLogin, signOut }),
-    [status, user, requestLogin, confirmTwoFactor, agencyLogin, signOut],
+    () => ({
+      status,
+      user,
+      requestLogin,
+      confirmTwoFactor,
+      agencyLogin,
+      signOut,
+      requestOtp,
+      verifyOtp,
+    }),
+    [status, user, requestLogin, confirmTwoFactor, agencyLogin, signOut, requestOtp, verifyOtp],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
