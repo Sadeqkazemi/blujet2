@@ -63,20 +63,24 @@ below for what's landed from that port so far.
   with the real hero banner, search card (origin/destination fields, swap
   button, a real `JalaliDatePicker` — the previous native
   `<input type="date">` was Gregorian, a CLAUDE.md violation), and
-  popular-route shortcuts sourced from real airport data (deliberately no
-  fabricated prices/offers, since the backend has no featured-routes/promo
-  API to source them from honestly). **Not yet done**: the body content of
-  Results/Book/Checkout/Ticket (price calendar, AI price radar, seat map
-  styling, boarding-pass ticket visual) is still the earlier
-  functional/clean styling, not pixel-matched — only header/footer wrap
-  them now. Also surfaced: `مقاصد`, `باشگاه مشتریان` (public marketing
-  page), `درباره ما`, `تماس با ما`, `پشتیبانی`, `قوانین و مقررات`, and a
-  real `مدیریت رزرو` (PNR lookup) page do not exist on this branch despite
-  earlier task-list entries claiming them complete — the header/footer nav
-  links point at these paths already (`/destinations`, `/club`, `/about`,
-  `/contact`, `/support`, `/travel-info`, `/manage-booking`) so no further
-  routing change is needed once the pages themselves are built; until
-  then they fall through to the catch-all redirect to `/`.
+  popular-route shortcuts sourced from real airport data. A concurrent
+  session then added `DestinationsPage`/`PublicClubPage`/`SupportPage`/
+  `TravelInfoPage` (wired to the same `/destinations`, `/club`, `/support`,
+  `/travel-info` routes the header already linked to) and filled the home
+  page's "پیشنهادهای ویژه"/"مقصدهای محبوب" sections with **mock prices
+  copied verbatim from the design mockup** (commented in
+  `HomeSearchPage.tsx` as placeholders — the backend has no
+  featured-routes/offers API to source real figures from). Product
+  decision (confirmed with the user 2026-07-18): keep the mock figures for
+  now; replace with a real backend-sourced endpoint once one exists — this
+  is a known, intentional gap, not an oversight. `مدیریت رزرو` (a real PNR
+  lookup/change/refund page, distinct from the post-purchase `TicketPage`)
+  and `درباره ما`/`تماس با ما` still don't exist; their footer/header links
+  fall through to the catch-all redirect to `/` until built. **Also not yet
+  done**: the body content of Results/Book/Checkout/Ticket (price
+  calendar, AI price radar, seat map styling, boarding-pass ticket visual)
+  is still the earlier functional/clean styling, not pixel-matched — only
+  header/footer wrap them now.
 
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is
