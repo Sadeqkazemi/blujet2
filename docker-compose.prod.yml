@@ -89,6 +89,7 @@ services:
         # same origin, so it never needs to know the server's IP at build
         # time (see frontend/nginx.conf).
         VITE_API_URL: ''
+        VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
     restart: unless-stopped
     depends_on:
       backend:
