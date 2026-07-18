@@ -7,6 +7,8 @@ import { WalletPointsLockController } from './wallet-points-lock.controller';
 import { WalletService } from './wallet.service';
 import { ClubPointsService } from './club-points.service';
 import { PriceLockService } from './price-lock.service';
+import { PrivacyController } from './privacy.controller';
+import { PrivacyService } from './privacy.service';
 import { AuditModule } from '../audit/audit.module';
 
 @Module({
@@ -15,6 +17,7 @@ import { AuditModule } from '../audit/audit.module';
     SearchController,
     BookingController,
     WalletPointsLockController,
+    PrivacyController,
   ],
   providers: [
     SearchService,
@@ -22,6 +25,7 @@ import { AuditModule } from '../audit/audit.module';
     WalletService,
     ClubPointsService,
     PriceLockService,
+    PrivacyService,
   ],
   exports: [SearchService],
 })
