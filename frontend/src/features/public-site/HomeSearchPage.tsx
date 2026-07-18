@@ -50,7 +50,7 @@ export default function HomeSearchPage() {
   const popularRoutes = airports.length > 1 ? airports.slice(1, 6).map((a) => ({ from: airports[0], to: a })) : [];
 
   return (
-    <div dir="rtl" style={{ fontFamily: 'Vazirmatn, sans-serif', fontSize: '14.5px', background: '#f6f8fb', color: '#16202e', minHeight: '100vh' }}>
+    <div dir="rtl" style={{ fontFamily: "'Vazirmatn Variable', Vazirmatn, sans-serif", fontSize: '14.5px', background: '#f6f8fb', color: '#16202e', minHeight: '100vh' }}>
       <PublicHeader />
 
       <section style={{ background: '#f6f8fb' }}>
