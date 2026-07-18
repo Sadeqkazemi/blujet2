@@ -91,6 +91,86 @@
         ]
       }
     },
+    "/auth/otp/request": {
+      "post": {
+        "operationId": "AuthController_requestOtp",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestOtpDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Challenge issued"
+          },
+          "403": {
+            "description": "Account suspended"
+          }
+        },
+        "summary": "Public purchase engine — step 1: request an OTP for a customer phone number",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/otp/verify": {
+      "post": {
+        "operationId": "AuthController_verifyOtp",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyOtpDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login complete"
+          },
+          "401": {
+            "description": "Invalid/expired code"
+          }
+        },
+        "summary": "Public purchase engine — step 2: verify the OTP, issue tokens",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/_test/last-otp/{phone}": {
+      "get": {
+        "operationId": "AuthController_testLastOtp",
+        "parameters": [
+          {
+            "name": "phone",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "E2E-test only: reads back the mock OTP code. 404s in production.",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/auth/refresh": {
       "post": {
         "operationId": "AuthController_refresh",
@@ -2720,6 +2800,68 @@
         ]
       }
     },
+    "/my/refunds": {
+      "post": {
+        "operationId": "RefundsCustomerController_submit",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitRefundDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ثبت درخواست استرداد بلیط با ریز جریمه/مبلغ قابل استرداد",
+        "tags": [
+          "refunds"
+        ]
+      },
+      "get": {
+        "operationId": "RefundsCustomerController_listMine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست درخواست‌های استرداد مشتری جاری",
+        "tags": [
+          "refunds"
+        ]
+      }
+    },
+    "/my/refunds/{id}": {
+      "get": {
+        "operationId": "RefundsCustomerController_getMine",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "جزئیات یک درخواست استرداد مشتری",
+        "tags": [
+          "refunds"
+        ]
+      }
+    },
     "/reservation/seatmap/{flightInstanceId}": {
       "get": {
         "operationId": "SeatmapController_get",
@@ -3594,6 +3736,219 @@
           "settings"
         ]
       }
+    },
+    "/search/airports": {
+      "get": {
+        "operationId": "SearchController_airports",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست فرودگاه‌ها برای جعبه جستجو",
+        "tags": [
+          "search"
+        ]
+      }
+    },
+    "/search/flights": {
+      "get": {
+        "operationId": "SearchController_flights",
+        "parameters": [
+          {
+            "name": "origin",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "THR",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dest",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "MHD",
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-08-01",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "جستجوی پرواز بین دو فرودگاه در یک روز مشخص",
+        "tags": [
+          "search"
+        ]
+      }
+    },
+    "/search/flights/{id}/seatmap": {
+      "get": {
+        "operationId": "SearchController_seatMap",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "نقشه صندلی برای انتخاب صندلی هنگام خرید",
+        "tags": [
+          "search"
+        ]
+      }
+    },
+    "/bookings": {
+      "post": {
+        "operationId": "BookingController_create",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBookingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "رزرو صندلی و شروع نگهداری ۱۰ دقیقه‌ای (HELD)",
+        "tags": [
+          "bookings"
+        ]
+      }
+    },
+    "/bookings/me": {
+      "get": {
+        "operationId": "BookingController_listMine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست رزروهای مشتری جاری",
+        "tags": [
+          "bookings"
+        ]
+      }
+    },
+    "/bookings/{id}": {
+      "get": {
+        "operationId": "BookingController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "جزئیات یک رزرو با شناسه",
+        "tags": [
+          "bookings"
+        ]
+      }
+    },
+    "/bookings/pnr/{pnr}": {
+      "get": {
+        "operationId": "BookingController_getByPnr",
+        "parameters": [
+          {
+            "name": "pnr",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "جزئیات یک رزرو با کد PNR",
+        "tags": [
+          "bookings"
+        ]
+      }
+    },
+    "/bookings/{id}/pay": {
+      "post": {
+        "operationId": "BookingController_pay",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayBookingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "پرداخت درگاه sandbox، صدور بلیط — قیمت بلافاصله پیش از پرداخت بازبینی می‌شود",
+        "tags": [
+          "bookings"
+        ]
+      }
     }
   },
   "info": {
@@ -3668,6 +4023,38 @@
         "required": [
           "phone",
           "password"
+        ]
+      },
+      "RequestOtpDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "example": "09121234567",
+            "description": "شماره موبایل مشتری"
+          }
+        },
+        "required": [
+          "phone"
+        ]
+      },
+      "VerifyOtpDto": {
+        "type": "object",
+        "properties": {
+          "challengeId": {
+            "type": "string",
+            "example": "a1b2c3d4-...",
+            "description": "Challenge id returned by /auth/otp/request"
+          },
+          "code": {
+            "type": "string",
+            "example": "482913",
+            "description": "6-digit one-time code"
+          }
+        },
+        "required": [
+          "challengeId",
+          "code"
         ]
       },
       "ChangePasswordDto": {
@@ -4265,6 +4652,23 @@
           "assigneeId"
         ]
       },
+      "SubmitRefundDto": {
+        "type": "object",
+        "properties": {
+          "bookingId": {
+            "type": "string"
+          },
+          "iban": {
+            "type": "string",
+            "example": "IR820170000000332211009900",
+            "description": "۲۴ رقم شبا"
+          }
+        },
+        "required": [
+          "bookingId",
+          "iban"
+        ]
+      },
       "LockSeatDto": {
         "type": "object",
         "properties": {
@@ -4539,6 +4943,67 @@
         "required": [
           "rules"
         ]
+      },
+      "BookingPassengerDto": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string",
+            "example": "علی رضایی"
+          },
+          "nationalId": {
+            "type": "string",
+            "example": "0012345678"
+          },
+          "mobile": {
+            "type": "string",
+            "example": "09121234567"
+          },
+          "seatCode": {
+            "type": "string",
+            "example": "4A",
+            "description": "صندلی انتخابی این مسافر"
+          }
+        },
+        "required": [
+          "fullName",
+          "seatCode"
+        ]
+      },
+      "CreateBookingDto": {
+        "type": "object",
+        "properties": {
+          "flightInstanceId": {
+            "type": "string"
+          },
+          "cabin": {
+            "type": "string",
+            "enum": [
+              "ECONOMY",
+              "BUSINESS"
+            ]
+          },
+          "passengers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BookingPassengerDto"
+            }
+          }
+        },
+        "required": [
+          "flightInstanceId",
+          "cabin",
+          "passengers"
+        ]
+      },
+      "PayBookingDto": {
+        "type": "object",
+        "properties": {
+          "confirmedPriceIrr": {
+            "type": "number",
+            "description": "Client-confirmed price from the checkout screen. Required to complete payment when the price changed since booking creation (re-price guard) — CLAUDE.md: \"if the price changed, show the new price and require explicit user confirmation before charging.\""
+          }
+        }
       }
     }
   }

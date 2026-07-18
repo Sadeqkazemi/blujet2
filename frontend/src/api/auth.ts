@@ -41,3 +41,16 @@ export async function logout() {
 export function fetchMe() {
   return apiGet<AuthUser>('/auth/me');
 }
+
+export function requestOtp(phone: string) {
+  return apiPost<{ challengeId: string }>('/auth/otp/request', { phone });
+}
+
+export async function verifyOtp(challengeId: string, code: string) {
+  const result = await apiPost<{ accessToken: string; user: AuthUser }>('/auth/otp/verify', {
+    challengeId,
+    code,
+  });
+  setAccessToken(result.accessToken);
+  return result;
+}

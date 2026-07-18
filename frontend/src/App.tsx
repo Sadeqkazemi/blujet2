@@ -37,12 +37,23 @@ import SettingsPage from './features/settings/SettingsPage';
 import SecurityRouter from './components/SecurityRouter';
 import LogsRouter from './components/LogsRouter';
 import PanelsAccessPage from './features/panels-access/PanelsAccessPage';
+import HomeSearchPage from './features/public-site/HomeSearchPage';
+import ResultsPage from './features/public-site/ResultsPage';
+import BookPage from './features/public-site/BookPage';
+import CheckoutPage from './features/public-site/CheckoutPage';
+import TicketPage from './features/public-site/TicketPage';
 
 export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
         <Routes>
+          <Route path="/" element={<HomeSearchPage />} />
+          <Route path="/results" element={<ResultsPage />} />
+          <Route path="/book/:flightInstanceId" element={<BookPage />} />
+          <Route path="/checkout/:bookingId" element={<CheckoutPage />} />
+          <Route path="/ticket/:pnr" element={<TicketPage />} />
+
           <Route path="/login" element={<LoginPage />} />
           <Route path="/two-factor" element={<TwoFactorPage />} />
           <Route path="/agency/login" element={<AgencyLoginPage />} />
@@ -129,8 +140,7 @@ export default function App() {
             </Route>
           </Route>
 
-          <Route path="/" element={<Navigate to="/panel" replace />} />
-          <Route path="*" element={<Navigate to="/panel" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>
