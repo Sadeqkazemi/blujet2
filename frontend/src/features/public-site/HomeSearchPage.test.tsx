@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import HomeSearchPage from './HomeSearchPage';
 import * as publicSiteApi from '../../api/publicSite';
+import * as useAuthModule from '../../hooks/useAuth';
 
 const AIRPORTS = [
   { id: 'a1', code: 'THR', cityFa: 'تهران', tz: 'Asia/Tehran' },
@@ -11,11 +12,24 @@ const AIRPORTS = [
 ];
 
 function renderPage() {
+  vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+    status: 'unauthenticated',
+    user: null,
+    requestLogin: vi.fn(),
+    confirmTwoFactor: vi.fn(),
+    agencyLogin: vi.fn(),
+    signOut: vi.fn(),
+  });
   return render(
     <MemoryRouter>
       <HomeSearchPage />
     </MemoryRouter>,
   );
+}
+
+async function pickToday() {
+  await userEvent.click(screen.getByTestId('home-date'));
+  await userEvent.click(screen.getByTestId('home-date-today'));
 }
 
 describe('HomeSearchPage', () => {
@@ -43,7 +57,7 @@ describe('HomeSearchPage', () => {
 
     await userEvent.selectOptions(screen.getByTestId('home-origin'), 'THR');
     await userEvent.selectOptions(screen.getByTestId('home-dest'), 'THR');
-    await userEvent.type(screen.getByTestId('home-date'), '2026-08-01');
+    await pickToday();
     await userEvent.click(screen.getByTestId('home-search-submit'));
 
     expect(screen.getByText('مبدأ و مقصد نمی‌توانند یکسان باشند.')).toBeInTheDocument();

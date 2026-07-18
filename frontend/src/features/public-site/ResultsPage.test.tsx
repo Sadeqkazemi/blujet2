@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import ResultsPage from './ResultsPage';
 import * as publicSiteApi from '../../api/publicSite';
+import * as useAuthModule from '../../hooks/useAuth';
 import type { SearchFlightResult } from '../../types/public-site';
 
 const RESULT: SearchFlightResult = {
@@ -20,6 +21,14 @@ const RESULT: SearchFlightResult = {
 };
 
 function renderPage() {
+  vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+    status: 'unauthenticated',
+    user: null,
+    requestLogin: vi.fn(),
+    confirmTwoFactor: vi.fn(),
+    agencyLogin: vi.fn(),
+    signOut: vi.fn(),
+  });
   return render(
     <MemoryRouter initialEntries={['/results?origin=THR&dest=MHD&date=2026-08-01']}>
       <Routes>

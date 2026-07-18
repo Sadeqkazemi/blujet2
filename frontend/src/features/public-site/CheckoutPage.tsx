@@ -5,6 +5,7 @@ import { ApiRequestError } from '../../api/envelope';
 import { faMoney } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import type { BookingDetail } from '../../types/public-site';
+import PublicPageShell from '../../components/public/PublicPageShell';
 
 type PaymentMethod = 'GATEWAY' | 'WALLET' | 'POINTS';
 
@@ -55,17 +56,31 @@ export default function CheckoutPage() {
     }
   }
 
-  if (error) return <p className="p-8 text-sm text-red-600">{error}</p>;
-  if (!booking) return <p className="p-8 text-sm text-[#6b7b94]">در حال بارگذاری…</p>;
+  if (error) {
+    return (
+      <PublicPageShell>
+        <p className="p-8 text-sm text-red-600">{error}</p>
+      </PublicPageShell>
+    );
+  }
+  if (!booking) {
+    return (
+      <PublicPageShell>
+        <p className="p-8 text-sm text-[#6b7b94]">در حال بارگذاری…</p>
+      </PublicPageShell>
+    );
+  }
 
   if (booking.status === 'EXPIRED') {
     return (
-      <div className="mx-auto max-w-md p-8 text-center">
-        <p className="mb-4 text-sm text-red-600">مهلت نگهداری این رزرو به پایان رسیده است.</p>
-        <button onClick={() => navigate('/')} className="rounded-lg bg-[#1668c4] px-6 py-2.5 text-sm font-bold text-white">
-          جستجوی مجدد
-        </button>
-      </div>
+      <PublicPageShell>
+        <div className="mx-auto max-w-md p-8 text-center">
+          <p className="mb-4 text-sm text-red-600">مهلت نگهداری این رزرو به پایان رسیده است.</p>
+          <button onClick={() => navigate('/')} className="rounded-lg bg-[#1668c4] px-6 py-2.5 text-sm font-bold text-white">
+            جستجوی مجدد
+          </button>
+        </div>
+      </PublicPageShell>
     );
   }
 
@@ -76,6 +91,7 @@ export default function CheckoutPage() {
   ];
 
   return (
+    <PublicPageShell>
     <div className="mx-auto max-w-lg p-6">
       <h1 className="mb-4 text-lg font-extrabold text-[#0d2640]">تکمیل خرید</h1>
       <div className="mb-4 rounded-2xl border border-[#e5e9f0] bg-white p-5">
@@ -168,5 +184,6 @@ export default function CheckoutPage() {
         </div>
       )}
     </div>
+    </PublicPageShell>
   );
 }
