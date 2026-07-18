@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { STAFF_PASSWORD } from './helpers/login';
 
-test.setTimeout(300_000);
+test.setTimeout(90_000);
 
 const API_URL = process.env.E2E_API_URL ?? 'http://localhost:3000';
 
@@ -67,7 +67,6 @@ async function createFreshInstance(page: Page) {
 test('golden path: search -> results -> OTP login -> seat+passenger -> pay -> e-ticket -> refund submission', async ({
   page,
 }) => {
-  page.on('console', (msg) => console.log(`[browser:${msg.type()}] ${msg.text()}`));
   page.on('pageerror', (err) => console.log(`[pageerror] ${err.message}`));
 
   // Navigate first so the page has a real origin — page.evaluate fetch calls
@@ -99,7 +98,7 @@ test('golden path: search -> results -> OTP login -> seat+passenger -> pay -> e-
   await page.getByTestId('otp-code').fill(otpCode!);
   await page.getByRole('button', { name: 'تأیید و ورود' }).click();
 
-  const freeSeat = page.locator('[data-testid^="seat-"]:not([disabled])').first();
+  const freeSeat = page.locator('button[data-testid^="seat-"]:not([disabled])').first();
   await expect(freeSeat).toBeVisible();
   await freeSeat.click();
   await page.getByTestId('pax-name-0').fill('مسافر تست پلی‌رایت');
