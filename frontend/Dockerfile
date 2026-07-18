@@ -12,6 +12,10 @@ ENV VITE_SENTRY_DSN=${VITE_SENTRY_DSN}
 RUN npm run build
 
 FROM nginx:1.27-alpine AS production
+# Explicit dependency for the docker-compose healthcheck — nginx's alpine
+# image doesn't reliably ship wget/curl across versions, so the healthcheck
+# silently failed with "unhealthy" even though nginx itself was fine.
+RUN apk add --no-cache curl
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
