@@ -28,10 +28,21 @@ import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 const REFRESH_COOKIE = 'blujet_refresh';
 const REFRESH_COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
+/** `Secure` cookies are silently dropped by browsers over plain HTTP —
+ * defaults to the NODE_ENV heuristic (matches every existing deployment
+ * assumption) but stays overridable via COOKIE_SECURE for an interim
+ * IP-only/no-TLS deployment (see docs/DEPLOY_IP.md), which would otherwise
+ * break session refresh with no visible error. */
+function isCookieSecure(): boolean {
+  if (process.env.COOKIE_SECURE === 'false') return false;
+  if (process.env.COOKIE_SECURE === 'true') return true;
+  return process.env.NODE_ENV === 'production';
+}
+
 function setRefreshCookie(res: Response, token: string) {
   res.cookie(REFRESH_COOKIE, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: isCookieSecure(),
     sameSite: 'strict',
     maxAge: REFRESH_COOKIE_MAX_AGE_MS,
     path: '/auth',
