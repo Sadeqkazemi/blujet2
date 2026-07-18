@@ -1,0 +1,108 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: blujet
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: blujet
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U blujet']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # Internal only — never published to the host (CLAUDE.md deployment rules).
+    expose:
+      - '5432'
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    expose:
+      - '6379'
+
+  ml-service:
+    build: ./ml-service
+    restart: unless-stopped
+    environment:
+      INTERNAL_TOKEN: ${ML_SERVICE_INTERNAL_TOKEN}
+      LOG_LEVEL: info
+    # Internal only — reachable exclusively by the backend, never the
+    # internet or the frontend (CLAUDE.md ML Service Rules).
+    expose:
+      - '8000'
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://blujet:${POSTGRES_PASSWORD}@db:5432/blujet?schema=public
+      REDIS_URL: redis://redis:6379
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      ML_SERVICE_URL: http://ml-service:8000
+      ML_SERVICE_INTERNAL_TOKEN: ${ML_SERVICE_INTERNAL_TOKEN}
+      SMS_PROVIDER: mock
+      PAYMENT_GATEWAY: sandbox
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      CORS_ORIGINS: http://${SERVER_IP}
+      PII_ENCRYPTION_KEY: ${PII_ENCRYPTION_KEY}
+      SEED_ON_START: ${SEED_ON_START:-false}
+      # Frontend and backend share one origin behind the frontend's nginx
+      # proxy (port 80) — no TLS yet on a bare IP, so a Secure cookie would
+      # be silently dropped by the browser. Flip to "true" once a real
+      # domain + HTTPS is in front of this (see docs/DEPLOY_IP.md).
+      COOKIE_SECURE: 'false'
+    # Exposed directly too (Swagger/health debugging) — normal traffic goes
+    # through the frontend's nginx proxy on :80, not this port.
+    ports:
+      - '3000:3000'
+    volumes:
+      - backend_uploads:/app/uploads
+      - backend_backups:/app/backups
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', r => process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Empty/relative — the frontend's nginx proxies API routes on the
+        # same origin, so it never needs to know the server's IP at build
+        # time (see frontend/nginx.conf).
+        VITE_API_URL: ''
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - '80:80'
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  db_data:
+  backend_uploads:
+  backend_backups:
