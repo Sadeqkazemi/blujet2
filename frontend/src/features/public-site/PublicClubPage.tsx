@@ -77,14 +77,14 @@ export default function PublicClubPage() {
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
             {!loggedIn && (
               <Link
-                to="/login"
+                to="/signin"
                 style={{ background: '#fff', color: '#1668c4', padding: '11px 24px', borderRadius: 12, fontSize: '13.5px', fontWeight: 800, textDecoration: 'none' }}
               >
                 عضویت رایگان
               </Link>
             )}
             <Link
-              to={loggedIn ? '/manage-booking' : '/login'}
+              to={loggedIn ? '/manage-booking' : '/signin'}
               style={{ textDecoration: 'none', background: '#ffffff22', border: '1px solid #ffffff55', color: '#fff', padding: '11px 21px', borderRadius: 12, fontSize: '13.5px', fontWeight: 700 }}
             >
               حساب من

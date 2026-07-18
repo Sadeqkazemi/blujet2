@@ -65,9 +65,9 @@ describe('PublicClubPage', () => {
     expect(screen.getByText('کش‌بک در هر خرید')).toBeInTheDocument();
   });
 
-  it('points the join button at login when logged out', () => {
+  it('points the join button at the customer sign-in page when logged out', () => {
     renderWithRouter(<PublicClubPage />);
-    expect(screen.getByText('عضویت رایگان')).toHaveAttribute('href', '/login');
+    expect(screen.getByText('عضویت رایگان')).toHaveAttribute('href', '/signin');
   });
 });
 

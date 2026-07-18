@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './hooks/useAuth';
 import ProtectedRoute from './components/ProtectedRoute';
 import AgencyProtectedRoute from './components/AgencyProtectedRoute';
@@ -46,6 +46,11 @@ import DestinationsPage from './features/public-site/DestinationsPage';
 import PublicClubPage from './features/public-site/PublicClubPage';
 import SupportPage from './features/public-site/SupportPage';
 import TravelInfoPage from './features/public-site/TravelInfoPage';
+import CustomerLoginPage from './features/public-site/CustomerLoginPage';
+import ManageBookingPage from './features/public-site/ManageBookingPage';
+import AboutPage from './features/public-site/AboutPage';
+import ContactPage from './features/public-site/ContactPage';
+import NotFoundPage from './features/public-site/NotFoundPage';
 
 export default function App() {
   return (
@@ -61,6 +66,10 @@ export default function App() {
           <Route path="/club" element={<PublicClubPage />} />
           <Route path="/support" element={<SupportPage />} />
           <Route path="/travel-info" element={<TravelInfoPage />} />
+          <Route path="/signin" element={<CustomerLoginPage />} />
+          <Route path="/manage-booking" element={<ManageBookingPage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/contact" element={<ContactPage />} />
 
           <Route path="/login" element={<LoginPage />} />
           <Route path="/two-factor" element={<TwoFactorPage />} />
@@ -148,7 +157,7 @@ export default function App() {
             </Route>
           </Route>
 
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

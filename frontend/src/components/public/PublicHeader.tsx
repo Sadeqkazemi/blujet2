@@ -95,7 +95,7 @@ export default function PublicHeader() {
             {!loggedIn && (
               <>
                 <Link
-                  to="/login"
+                  to="/signin"
                   style={{
                     display: 'flex',
                     alignItems: 'center',
