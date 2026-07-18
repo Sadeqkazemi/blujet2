@@ -4066,6 +4066,36 @@
           "purchase-extras"
         ]
       }
+    },
+    "/my/privacy/export": {
+      "get": {
+        "operationId": "PrivacyController_export",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "خروجی کامل داده‌های شخصی من (GDPR)",
+        "tags": [
+          "privacy"
+        ]
+      }
+    },
+    "/my/privacy/account": {
+      "delete": {
+        "operationId": "PrivacyController_delete",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "حذف حساب و اطلاعات شخصی من (GDPR)",
+        "tags": [
+          "privacy"
+        ]
+      }
     }
   },
   "info": {
