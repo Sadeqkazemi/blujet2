@@ -67,6 +67,9 @@ async function createFreshInstance(page: Page) {
 test('golden path: search -> results -> OTP login -> seat+passenger -> pay -> e-ticket -> refund submission', async ({
   page,
 }) => {
+  page.on('console', (msg) => console.log(`[browser:${msg.type()}] ${msg.text()}`));
+  page.on('pageerror', (err) => console.log(`[pageerror] ${err.message}`));
+
   // Navigate first so the page has a real origin — page.evaluate fetch calls
   // from about:blank fail with no CORS origin to send.
   await page.goto('/');
