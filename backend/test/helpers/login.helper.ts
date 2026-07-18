@@ -36,3 +36,30 @@ export async function loginAs(
     accessToken: verifyRes.body?.data?.accessToken as string | undefined,
   };
 }
+
+/** Drives the full phone+OTP flow for a customer (find-or-create on
+ * first call), returning a ready-to-use access token. */
+export async function loginAsCustomer(
+  app: INestApplication<App>,
+  phone: string,
+) {
+  const requestRes = await request(app.getHttpServer())
+    .post('/auth/otp/request')
+    .send({ phone });
+  if (requestRes.status !== 200) {
+    throw new Error(`OTP request failed for ${phone}: ${requestRes.status}`);
+  }
+  const codeRes = await request(app.getHttpServer()).get(
+    `/auth/_test/last-otp/${phone}`,
+  );
+  const verifyRes = await request(app.getHttpServer())
+    .post('/auth/otp/verify')
+    .send({
+      challengeId: requestRes.body.data.challengeId,
+      code: codeRes.body.data.code,
+    });
+  return {
+    accessToken: verifyRes.body?.data?.accessToken as string | undefined,
+    userId: verifyRes.body?.data?.user?.id as string | undefined,
+  };
+}
