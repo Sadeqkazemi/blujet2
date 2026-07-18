@@ -50,6 +50,21 @@ describe('HomeSearchPage', () => {
     expect(screen.getByText('مبدأ، مقصد و تاریخ را انتخاب کنید.')).toBeInTheDocument();
   });
 
+  it('renders the mock marketing sections (offers, destinations, club, app)', async () => {
+    vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
+    renderPage();
+    await screen.findAllByText('تهران (THR)');
+
+    expect(screen.getByText('پیشنهادهای ویژه')).toBeInTheDocument();
+    expect(screen.getByTestId('offer-THR-IST')).toBeInTheDocument();
+    expect(screen.getByText('تا ۴۰٪ تخفیف روی پروازهای خارجی')).toBeInTheDocument();
+    expect(screen.getByText('مقصدهای محبوب')).toBeInTheDocument();
+    expect(screen.getByTestId('popular-dest-DXB')).toBeInTheDocument();
+    expect(screen.getByTestId('popular-route-MHD')).toBeInTheDocument();
+    expect(screen.getByText('با رسیدن به حد امتیاز، کارت عضویت بگیر')).toBeInTheDocument();
+    expect(screen.getByText('سفرت را همراه خودت ببر')).toBeInTheDocument();
+  });
+
   it('rejects identical origin and destination', async () => {
     vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
     renderPage();
