@@ -57,26 +57,28 @@ describe('ResultsPage', () => {
     expect(buttons[1]).toBeDisabled();
   });
 
-  it('walks forward to the nearest date with real flights when the requested date is empty', async () => {
-    const spy = vi
-      .spyOn(publicSiteApi, 'searchFlights')
-      .mockResolvedValueOnce([]) // requested date
-      .mockResolvedValueOnce([]) // +1 day
-      .mockResolvedValueOnce([RESULT]); // +2 days
+  it('immediately shows the mock schedule when the search comes back empty', async () => {
+    const spy = vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([]);
     renderPage();
 
-    expect(await screen.findByTestId('nearest-date-notice')).toBeInTheDocument();
-    expect(screen.getByTestId('result-card')).toBeInTheDocument();
-    expect(spy).toHaveBeenLastCalledWith('THR', 'MHD', '2026-08-03');
+    const mockCards = await screen.findAllByTestId('mock-result-card');
+    expect(mockCards).toHaveLength(3);
+    expect(screen.queryByTestId('result-card')).not.toBeInTheDocument();
+    // only the requested date is ever queried — multi-day probing would
+    // trip the backend rate limiter (StrictMode may re-run the effect)
+    for (const call of spy.mock.calls) {
+      expect(call).toEqual(['THR', 'MHD', '2026-08-01']);
+    }
   });
 
-  it('falls back to the display-only mock schedule when no date has flights', async () => {
-    vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([]);
-    renderPage();
+  it('shows the mock schedule on search error and explains on select', async () => {
+    vi.spyOn(publicSiteApi, 'searchFlights').mockRejectedValue(new Error('429'));
+    const { container } = renderPage();
 
-    const mockCards = await screen.findAllByTestId('mock-result-card', undefined, { timeout: 8000 });
-    expect(mockCards).toHaveLength(3);
-    expect(screen.getAllByText('تکمیل ظرفیت آنلاین')[0]).toBeInTheDocument();
-    expect(screen.queryByTestId('result-card')).not.toBeInTheDocument();
+    await screen.findAllByTestId('mock-result-card');
+    const firstSelect = container.querySelectorAll('button');
+    (Array.from(firstSelect).find((b) => b.textContent === 'انتخاب') as HTMLButtonElement).click();
+
+    expect(await screen.findByTestId('mock-notice')).toBeInTheDocument();
   });
 });
