@@ -29,6 +29,7 @@ import { PassengerReportsModule } from './modules/passenger-reports/passenger-re
 import { StaffReportsModule } from './modules/staff-reports/staff-reports.module';
 import { AdminsModule } from './modules/admins/admins.module';
 import { SettingsModule } from './modules/settings/settings.module';
+import { BookingEngineModule } from './modules/booking-engine/booking-engine.module';
 
 @Module({
   imports: [
@@ -81,6 +82,7 @@ import { SettingsModule } from './modules/settings/settings.module';
     StaffReportsModule,
     AdminsModule,
     SettingsModule,
+    BookingEngineModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
