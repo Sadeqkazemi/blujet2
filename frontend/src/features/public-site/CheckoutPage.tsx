@@ -1,24 +1,36 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { fetchMyBooking, payBooking } from '../../api/publicSite';
+import { fetchClubPoints, fetchMyBooking, fetchWallet, payBooking } from '../../api/publicSite';
 import { ApiRequestError } from '../../api/envelope';
 import { faMoney } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import type { BookingDetail } from '../../types/public-site';
 
+type PaymentMethod = 'GATEWAY' | 'WALLET' | 'POINTS';
+
 export default function CheckoutPage() {
   const { bookingId } = useParams<{ bookingId: string }>();
   const navigate = useNavigate();
   const [booking, setBooking] = useState<BookingDetail | null>(null);
+  const [walletBalanceIrr, setWalletBalanceIrr] = useState<number | null>(null);
+  const [isClubMember, setIsClubMember] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [priceChange, setPriceChange] = useState<{ previousPriceIrr: number; currentPriceIrr: number } | null>(null);
   const [paying, setPaying] = useState(false);
+  const [promoCode, setPromoCode] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('GATEWAY');
 
   useEffect(() => {
     if (!bookingId) return;
     fetchMyBooking(bookingId)
       .then(setBooking)
       .catch(() => setError('رزرو یافت نشد.'));
+    fetchWallet()
+      .then((w) => setWalletBalanceIrr(w.balanceIrr))
+      .catch(() => undefined);
+    fetchClubPoints()
+      .then((p) => setIsClubMember(p.isMember))
+      .catch(() => undefined);
   }, [bookingId]);
 
   async function onPay(confirmedPriceIrr?: number) {
@@ -26,7 +38,11 @@ export default function CheckoutPage() {
     setError(null);
     setPaying(true);
     try {
-      const result = await payBooking(bookingId, confirmedPriceIrr);
+      const result = await payBooking(bookingId, {
+        confirmedPriceIrr,
+        promoCode: promoCode.trim() || undefined,
+        paymentMethod,
+      });
       if (result.priceChanged) {
         setPriceChange(result);
         return;
@@ -52,6 +68,12 @@ export default function CheckoutPage() {
       </div>
     );
   }
+
+  const methods: { key: PaymentMethod; label: string; disabled?: boolean }[] = [
+    { key: 'GATEWAY', label: 'درگاه پرداخت' },
+    { key: 'WALLET', label: `کیف پول${walletBalanceIrr !== null ? ` (${faMoney(walletBalanceIrr)} تومان)` : ''}` },
+    { key: 'POINTS', label: 'امتیاز باشگاه مشتریان', disabled: !isClubMember },
+  ];
 
   return (
     <div className="mx-auto max-w-lg p-6">
@@ -93,6 +115,44 @@ export default function CheckoutPage() {
         </div>
       ) : (
         <div className="rounded-2xl border border-[#e5e9f0] bg-white p-5">
+          <div className="mb-4">
+            <label htmlFor="promo-code" className="mb-1.5 block text-xs text-[#6b7b94]">
+              کد تخفیف
+            </label>
+            <input
+              id="promo-code"
+              data-testid="promo-code-input"
+              value={promoCode}
+              onChange={(e) => setPromoCode(e.target.value)}
+              placeholder="مثال: BLUE20"
+              className="w-full rounded-lg border border-[#e5e9f0] px-3.5 py-2.5 text-sm outline-none focus:border-[#1668c4]"
+            />
+          </div>
+
+          <div className="mb-4">
+            <div className="mb-1.5 text-xs text-[#6b7b94]">روش پرداخت</div>
+            <div className="flex flex-col gap-2">
+              {methods.map((m) => (
+                <label
+                  key={m.key}
+                  className={`flex items-center gap-2 rounded-lg border px-3.5 py-2.5 text-xs ${
+                    m.disabled ? 'cursor-not-allowed border-[#e5e9f0] text-[#9fb0c7]' : 'cursor-pointer border-[#e5e9f0]'
+                  } ${paymentMethod === m.key && !m.disabled ? 'border-[#1668c4]' : ''}`}
+                >
+                  <input
+                    type="radio"
+                    name="payment-method"
+                    disabled={m.disabled}
+                    checked={paymentMethod === m.key}
+                    onChange={() => setPaymentMethod(m.key)}
+                    data-testid={`payment-method-${m.key}`}
+                  />
+                  {m.label}
+                </label>
+              ))}
+            </div>
+          </div>
+
           <div className="mb-4 flex items-center justify-between">
             <span className="text-xs text-[#6b7b94]">مبلغ قابل پرداخت</span>
             <span className="font-num text-lg font-black text-[#1668c4]">{faMoney(booking.priceIrr)} تومان</span>
