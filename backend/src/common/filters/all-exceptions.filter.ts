@@ -8,6 +8,7 @@ import {
 import { Response } from 'express';
 import { Logger } from 'nestjs-pino';
 import { ErrorCode } from '../errors';
+import { Sentry } from '../sentry';
 
 const FALLBACK_MESSAGE = 'خطای غیرمنتظره‌ای رخ داد. لطفاً دوباره تلاش کنید.';
 
@@ -33,6 +34,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
         trace,
         AllExceptionsFilter.name,
       );
+      // No-op when SENTRY_DSN is unset — Sentry.init() was never called.
+      Sentry.captureException(exception);
     } else {
       this.logger.warn(`Handled exception: ${code}`, AllExceptionsFilter.name);
     }

@@ -4,9 +4,11 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
 # Baked in at build time — Vite env vars are compile-time, not runtime.
-# Passed as a build-arg from docker-compose.prod.yml (VITE_API_URL).
+# Passed as build-args from docker-compose.prod.yml.
 ARG VITE_API_URL
+ARG VITE_SENTRY_DSN
 ENV VITE_API_URL=${VITE_API_URL}
+ENV VITE_SENTRY_DSN=${VITE_SENTRY_DSN}
 RUN npm run build
 
 FROM nginx:1.27-alpine AS production
