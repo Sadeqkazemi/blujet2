@@ -91,6 +91,8 @@ model User {
   refundAssignments RefundRequest[] @relation("RefundAssignee")
   refundsProcessed  RefundRequest[] @relation("RefundProcessedBy")
 
+  bookings Booking[] @relation("BookingUser")
+
   @@map("users")
 }
 
@@ -111,6 +113,10 @@ model RefreshToken {
 
 enum TwoFactorPurpose {
   STAFF_LOGIN_2FA
+  // Customer-facing phone+OTP login (public purchase engine) — reuses the
+  // same challenge/code/attempts machinery as staff 2FA instead of a
+  // parallel table.
+  CUSTOMER_OTP_LOGIN
 }
 
 model TwoFactorChallenge {
@@ -235,9 +241,37 @@ model FlightInstance {
   bookings     Booking[]
   pricing      FarePricingProposal?
   seatLocks    SeatLock[]
+  cabinFares   CabinFare[]
 
   @@index([departureAt])
   @@map("flight_instances")
+}
+
+enum CabinClass {
+  ECONOMY
+  BUSINESS
+}
+
+// ─── Public purchase engine (customer track) ────────────────────────────
+// Reconciles DB_SCHEMA.md's "Open items" note: Booking/Passenger/LedgerEntry
+// above were a forward-compatible guess for this track. Everything below is
+// additive — no existing column/model from Phases 1-12 is changed in a
+// backward-incompatible way.
+
+// Per-cabin bookable price (CLAUDE.md: Economy + Business, priced
+// independently). Falls back to FarePricingProposal.registeredPriceIrr (or
+// the reservation module's flat fallback) for ECONOMY, and a fixed
+// multiplier for BUSINESS, when no row exists yet — see pricing.ts.
+model CabinFare {
+  id               String         @id @default(uuid())
+  flightInstanceId String
+  flightInstance   FlightInstance @relation(fields: [flightInstanceId], references: [id])
+  cabin            CabinClass
+  priceIrr         Int
+  updatedAt        DateTime       @updatedAt
+
+  @@unique([flightInstanceId, cabin])
+  @@map("cabin_fares")
 }
 
 // Matches the finance/sales-chart channel split used identically across all
@@ -271,6 +305,20 @@ model Booking {
   priceIrr         Int
   createdAt        DateTime       @default(now())
 
+  // Public purchase engine (customer track) additions — nullable/optional
+  // because staff-issued (channel=SYSTEM via reservation.pnr.service) and
+  // agency bookings never set them.
+  userId          String?
+  user            User?     @relation("BookingUser", fields: [userId], references: [id])
+  contactPhone    String?
+  cabin           CabinClass @default(ECONOMY)
+  // HELD bookings expire 10 minutes after creation (CLAUDE.md's hold TTL);
+  // checked lazily on read (expireIfDue) rather than via a cron job.
+  holdExpiresAt   DateTime?
+  // Guards double-submit on booking-creation and payment-confirmation
+  // endpoints — a client retry with the same key returns the same booking.
+  idempotencyKey  String?   @unique
+
   passengers     Passenger[]
   ledgerEntries  LedgerEntry[]
   refundRequests RefundRequest[]
@@ -278,6 +326,7 @@ model Booking {
   @@index([flightInstanceId, status])
   @@index([channel])
   @@index([agencyId])
+  @@index([userId])
   @@map("bookings")
 }
 
