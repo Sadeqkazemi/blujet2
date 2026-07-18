@@ -6,6 +6,7 @@ import * as argon2 from 'argon2';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { loginAs } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
+import type { Role } from '../generated/prisma/enums';
 
 describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', () => {
   let app: INestApplication<App>;
@@ -24,7 +25,7 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
     return `Bearer ${token}`;
   }
 
-  async function createManagedAdmin(role = 'IT_MANAGER' as const) {
+  async function createManagedAdmin(role: Role = 'IT_MANAGER') {
     const suffix = crypto.randomUUID().slice(0, 8);
     return prisma.user.create({
       data: {
