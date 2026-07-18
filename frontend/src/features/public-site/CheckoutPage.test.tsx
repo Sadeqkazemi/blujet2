@@ -51,7 +51,45 @@ describe('CheckoutPage', () => {
     await screen.findByTestId('pay-submit');
 
     await userEvent.click(screen.getByTestId('pay-submit'));
-    expect(payBooking).toHaveBeenCalledWith('b1', undefined);
+    expect(payBooking).toHaveBeenCalledWith('b1', {
+      confirmedPriceIrr: undefined,
+      promoCode: undefined,
+      paymentMethod: 'GATEWAY',
+    });
+  });
+
+  it('sends the entered promo code and selected payment method', async () => {
+    vi.spyOn(publicSiteApi, 'fetchMyBooking').mockResolvedValue(BOOKING);
+    vi.spyOn(publicSiteApi, 'fetchWallet').mockResolvedValue({ balanceIrr: 1_000_000_000 });
+    const payBooking = vi.spyOn(publicSiteApi, 'payBooking').mockResolvedValue({
+      priceChanged: false,
+      booking: { ...BOOKING, status: 'TICKETED' },
+    });
+    renderPage();
+    await screen.findByTestId('pay-submit');
+
+    await userEvent.type(screen.getByTestId('promo-code-input'), 'BLUE20');
+    await userEvent.click(screen.getByTestId('payment-method-WALLET'));
+    await userEvent.click(screen.getByTestId('pay-submit'));
+
+    expect(payBooking).toHaveBeenCalledWith('b1', {
+      confirmedPriceIrr: undefined,
+      promoCode: 'BLUE20',
+      paymentMethod: 'WALLET',
+    });
+  });
+
+  it('disables the pay-with-points option for a non-club-member', async () => {
+    vi.spyOn(publicSiteApi, 'fetchMyBooking').mockResolvedValue(BOOKING);
+    vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({
+      isMember: false,
+      level: null,
+      balance: 0,
+    });
+    renderPage();
+    await screen.findByTestId('pay-submit');
+
+    expect(screen.getByTestId('payment-method-POINTS')).toBeDisabled();
   });
 
   it('shows the re-price confirmation UI when the price changed', async () => {

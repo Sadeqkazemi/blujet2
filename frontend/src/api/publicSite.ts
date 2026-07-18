@@ -44,8 +44,14 @@ export function fetchBookingByPnr(pnr: string) {
   return apiGet<BookingDetail>(`/bookings/pnr/${pnr}`);
 }
 
-export function payBooking(id: string, confirmedPriceIrr?: number) {
-  return apiPost<PayResult>(`/bookings/${id}/pay`, confirmedPriceIrr ? { confirmedPriceIrr } : {});
+export interface PayOptions {
+  confirmedPriceIrr?: number;
+  promoCode?: string;
+  paymentMethod?: 'GATEWAY' | 'WALLET' | 'POINTS';
+}
+
+export function payBooking(id: string, options: PayOptions = {}) {
+  return apiPost<PayResult>(`/bookings/${id}/pay`, options);
 }
 
 export function submitRefund(bookingId: string, iban: string) {
@@ -54,4 +60,16 @@ export function submitRefund(bookingId: string, iban: string) {
 
 export function fetchMyRefunds() {
   return apiGet<RefundRequestView[]>('/my/refunds');
+}
+
+export function fetchWallet() {
+  return apiGet<{ balanceIrr: number }>('/my/wallet');
+}
+
+export function topupWallet(amountIrr: number) {
+  return apiPost<{ balanceIrr: number }>('/my/wallet/topup', { amountIrr });
+}
+
+export function fetchClubPoints() {
+  return apiGet<{ isMember: boolean; level: string | null; balance: number }>('/my/club-points');
 }
