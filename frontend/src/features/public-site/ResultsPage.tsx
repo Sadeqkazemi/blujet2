@@ -4,6 +4,7 @@ import { searchFlights } from '../../api/publicSite';
 import { faDigits, faMoney } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import type { SearchFlightResult } from '../../types/public-site';
+import PublicPageShell from '../../components/public/PublicPageShell';
 
 const CABIN_LABEL: Record<string, string> = { ECONOMY: 'اکونومی', BUSINESS: 'بیزینس' };
 
@@ -26,6 +27,7 @@ export default function ResultsPage() {
   }, [origin, dest, date]);
 
   return (
+    <PublicPageShell>
     <div className="mx-auto max-w-3xl p-6">
       <h1 className="mb-1 text-xl font-black text-[#0d2640]">
         {origin} ← {dest}
@@ -74,5 +76,6 @@ export default function ResultsPage() {
         ))}
       </div>
     </div>
+    </PublicPageShell>
   );
 }

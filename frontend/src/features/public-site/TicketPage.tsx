@@ -5,6 +5,7 @@ import { ApiRequestError } from '../../api/envelope';
 import { faDigits, faMoney } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import type { BookingDetail } from '../../types/public-site';
+import PublicPageShell from '../../components/public/PublicPageShell';
 
 export default function TicketPage() {
   const { pnr } = useParams<{ pnr: string }>();
@@ -36,10 +37,23 @@ export default function TicketPage() {
     }
   }
 
-  if (error) return <p className="p-8 text-sm text-red-600">{error}</p>;
-  if (!booking) return <p className="p-8 text-sm text-[#6b7b94]">در حال بارگذاری…</p>;
+  if (error) {
+    return (
+      <PublicPageShell>
+        <p className="p-8 text-sm text-red-600">{error}</p>
+      </PublicPageShell>
+    );
+  }
+  if (!booking) {
+    return (
+      <PublicPageShell>
+        <p className="p-8 text-sm text-[#6b7b94]">در حال بارگذاری…</p>
+      </PublicPageShell>
+    );
+  }
 
   return (
+    <PublicPageShell>
     <div className="mx-auto max-w-lg p-6">
       <h1 className="mb-4 text-lg font-extrabold text-[#0d2640]">بلیط الکترونیکی</h1>
       <div className="rounded-2xl border-2 border-dashed border-[#1668c4] bg-white p-6">
@@ -101,5 +115,6 @@ export default function TicketPage() {
         </div>
       )}
     </div>
+    </PublicPageShell>
   );
 }

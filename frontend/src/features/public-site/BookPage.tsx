@@ -4,6 +4,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { createBooking, fetchSeatMap } from '../../api/publicSite';
 import { ApiRequestError } from '../../api/envelope';
 import type { CabinClass, SeatMapCell } from '../../types/public-site';
+import PublicPageShell from '../../components/public/PublicPageShell';
 
 function OtpLoginInline() {
   const { requestOtp, verifyOtp } = useAuth();
@@ -139,16 +140,25 @@ export default function BookPage() {
     }
   }
 
-  if (status === 'loading') return <p className="p-8 text-sm text-[#6b7b94]">در حال بارگذاری…</p>;
+  if (status === 'loading') {
+    return (
+      <PublicPageShell>
+        <p className="p-8 text-sm text-[#6b7b94]">در حال بارگذاری…</p>
+      </PublicPageShell>
+    );
+  }
   if (status === 'unauthenticated') {
     return (
-      <div className="p-6">
-        <OtpLoginInline />
-      </div>
+      <PublicPageShell>
+        <div className="p-6">
+          <OtpLoginInline />
+        </div>
+      </PublicPageShell>
     );
   }
 
   return (
+    <PublicPageShell>
     <div className="mx-auto max-w-2xl p-6">
       <h1 className="mb-4 text-lg font-extrabold text-[#0d2640]">انتخاب صندلی و اطلاعات مسافران</h1>
       {error && <p className="mb-4 rounded-lg bg-red-50 p-3 text-xs text-red-600">{error}</p>}
@@ -223,5 +233,6 @@ export default function BookPage() {
         </form>
       )}
     </div>
+    </PublicPageShell>
   );
 }

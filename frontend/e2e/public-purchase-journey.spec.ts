@@ -1,9 +1,49 @@
 import { expect, test, type Page } from '@playwright/test';
 import { STAFF_PASSWORD } from './helpers/login';
+import dayjsBase from 'dayjs';
+import jalaliday from 'jalaliday';
+import { faDigits } from '../src/lib/fa-format';
+
+// Playwright's Node ESM loader (unlike Vite's bundler resolution used by the
+// app itself) can't resolve dayjs's extensionless plugin subpaths, so this
+// duplicates jalali.ts's tiny bit of setup rather than importing it.
+dayjsBase.extend(jalaliday);
+const dayjs = dayjsBase;
 
 test.setTimeout(90_000);
 
 const API_URL = process.env.E2E_API_URL ?? 'http://localhost:3000';
+
+const MONTH_NAMES = [
+  'فروردین',
+  'اردیبهشت',
+  'خرداد',
+  'تیر',
+  'مرداد',
+  'شهریور',
+  'مهر',
+  'آبان',
+  'آذر',
+  'دی',
+  'بهمن',
+  'اسفند',
+];
+
+/** Opens the home page's Jalali date picker and clicks the target ISO date,
+ * paging forward through months (the search date can be up to ~4 months
+ * out — see reservation/pnr.service.ts's _test/flight-instance hook). */
+async function pickJalaliDate(page: Page, iso: string) {
+  const target = dayjs(iso).calendar('jalali');
+  const targetLabel = `${MONTH_NAMES[target.month()]} ${faDigits(target.year())}`;
+
+  await page.getByTestId('home-date').click();
+  for (let i = 0; i < 12; i++) {
+    const label = await page.getByTestId('home-date-month-label').innerText();
+    if (label === targetLabel) break;
+    await page.getByTestId('home-date-next-month').click();
+  }
+  await page.getByTestId(`home-date-day-${target.date()}`).click();
+}
 
 /** Fresh SCHEDULED instance (real seeded aircraft/seat map) so the search
  * date is unambiguous and every seat starts free — reuses the reservation
@@ -77,7 +117,7 @@ test('golden path: search -> results -> OTP login -> seat+passenger -> pay -> e-
 
   await page.selectOption('#origin', originCode);
   await page.selectOption('#dest', destCode);
-  await page.fill('#date', date);
+  await pickJalaliDate(page, date);
   await page.getByTestId('home-search-submit').click();
 
   await page.waitForURL('**/results**');

@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import TicketPage from './TicketPage';
 import * as publicSiteApi from '../../api/publicSite';
+import * as useAuthModule from '../../hooks/useAuth';
 import type { BookingDetail } from '../../types/public-site';
 
 const TICKETED: BookingDetail = {
@@ -23,6 +24,14 @@ const TICKETED: BookingDetail = {
 };
 
 function renderPage() {
+  vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+    status: 'unauthenticated',
+    user: null,
+    requestLogin: vi.fn(),
+    confirmTwoFactor: vi.fn(),
+    agencyLogin: vi.fn(),
+    signOut: vi.fn(),
+  });
   return render(
     <MemoryRouter initialEntries={['/ticket/BJABC123']}>
       <Routes>
