@@ -73,13 +73,26 @@ below for what's landed from that port so far.
   featured-routes/offers API to source real figures from). Product
   decision (confirmed with the user 2026-07-18): keep the mock figures for
   now; replace with a real backend-sourced endpoint once one exists — this
-  is a known, intentional gap, not an oversight. `مدیریت رزرو` (a real PNR
-  lookup/change/refund page, distinct from the post-purchase `TicketPage`)
-  and `درباره ما`/`تماس با ما` still don't exist; their footer/header links
-  fall through to the catch-all redirect to `/` until built. **Also not yet
-  done**: the body content of Results/Book/Checkout/Ticket (price
-  calendar, AI price radar, seat map styling, boarding-pass ticket visual)
-  is still the earlier functional/clean styling, not pixel-matched — only
+  is a known, intentional gap, not an oversight. A later commit added
+  `CustomerLoginPage` (`/signin`, real phone+OTP flow — also fixed a bug
+  where the header's "ورود / ثبت‌نام" link pointed at the *staff* login
+  route), `ManageBookingPage`, `AboutPage`, `ContactPage`, `NotFoundPage`.
+
+  **Known, accepted gap — not wired to any backend (confirmed with the
+  user 2026-07-18, deploying to a controlled/internal test server only,
+  not real customers yet):** `ManageBookingPage` (`/manage-booking`) is
+  entirely mock — any PNR + last name resolves to a hardcoded sample
+  booking, and its refund button shows a fake "درخواست استرداد ثبت شد"
+  success message with **zero calls to the real, already-tested
+  `/my/refunds` endpoint**. `ContactPage`'s "ارسال پیام" button similarly
+  just flips local state, no message is actually sent anywhere. **Must be
+  wired to the real backend (or removed/gated) before this branch is ever
+  exposed to real customers** — a fake refund confirmation is a trust/
+  financial-integrity issue, not a cosmetic one.
+
+  **Also not yet done**: the body content of Results/Book/Checkout/Ticket
+  (price calendar, AI price radar, seat map styling, boarding-pass ticket
+  visual) is still the earlier functional/clean styling, not pixel-matched — only
   header/footer wrap them now.
 
 Each phase = backend endpoints + tests + frontend page(s), fully working,
