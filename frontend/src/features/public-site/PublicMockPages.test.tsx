@@ -70,17 +70,33 @@ describe('ManageBookingPage (mock)', () => {
 });
 
 describe('CustomerLoginPage', () => {
-  it('walks through the two OTP steps', async () => {
+  it('walks through the two OTP steps with a resend countdown', async () => {
     renderWithRouter(<CustomerLoginPage />);
-    expect(screen.getByRole('heading', { name: 'ورود / ثبت‌نام' })).toBeInTheDocument();
+    expect(screen.getByTestId('signin-tab-login')).toBeInTheDocument();
+    expect(screen.getByTestId('signin-acct-agency')).toBeInTheDocument();
 
     await userEvent.type(screen.getByTestId('signin-phone'), '09121234567');
     await userEvent.click(screen.getByTestId('signin-request'));
     expect(requestOtp).toHaveBeenCalledWith('09121234567');
 
-    await userEvent.type(await screen.findByTestId('signin-code'), '123456');
+    expect(await screen.findByTestId('signin-resend-timer')).toHaveTextContent('ارسال مجدد کد');
+    await userEvent.type(screen.getByTestId('signin-code'), '123456');
     await userEvent.click(screen.getByTestId('signin-verify'));
     expect(verifyOtp).toHaveBeenCalledWith('challenge-1', '123456');
+  });
+
+  it('signup tab requires name and terms; agency signup submits the mock request', async () => {
+    renderWithRouter(<CustomerLoginPage />);
+
+    await userEvent.click(screen.getByTestId('signin-tab-signup'));
+    expect(screen.getByTestId('signup-name')).toBeInTheDocument();
+    expect(screen.getByTestId('signin-request')).toBeDisabled();
+
+    await userEvent.click(screen.getByTestId('signin-acct-agency'));
+    await userEvent.type(screen.getByTestId('agency-name'), 'آژانس سفر آبی');
+    await userEvent.type(screen.getByTestId('agency-license'), '1234-5678');
+    await userEvent.click(screen.getByTestId('agency-signup-btn'));
+    expect(screen.getByTestId('agency-signup-done')).toBeInTheDocument();
   });
 });
 
