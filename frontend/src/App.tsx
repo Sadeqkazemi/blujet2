@@ -54,6 +54,7 @@ import ManageBookingPage from './features/public-site/ManageBookingPage';
 import AboutPage from './features/public-site/AboutPage';
 import ContactPage from './features/public-site/ContactPage';
 import NotFoundPage from './features/public-site/NotFoundPage';
+import MaintenancePage from './features/public-site/MaintenancePage';
 
 export default function App() {
   return (
@@ -73,6 +74,7 @@ export default function App() {
           <Route path="/manage-booking" element={<ManageBookingPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/contact" element={<ContactPage />} />
+          <Route path="/maintenance" element={<MaintenancePage />} />
 
           <Route path="/login" element={<LoginPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
