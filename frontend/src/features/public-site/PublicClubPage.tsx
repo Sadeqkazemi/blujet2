@@ -1,6 +1,11 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import { useAuth } from '../../hooks/useAuth';
+import { fetchClubPoints } from '../../api/publicSite';
+import { faDigits } from '../../lib/fa-format';
+
+const TIER_LABEL: Record<string, string> = { SILVER: 'نقره‌ای', GOLD: 'طلایی', PLATINUM: 'پلاتین' };
 
 // Public marketing page for the customer club — content matches
 // design-reference/باشگاه مشتریان.dc.html. The design's client-side "join"
@@ -61,9 +66,30 @@ const SERVICES = [
 export default function PublicClubPage() {
   const { status, user } = useAuth();
   const loggedIn = status === 'authenticated' && user?.role === 'USER';
+  const [club, setClub] = useState<{ isMember: boolean; level: string | null; balance: number } | null>(null);
+
+  useEffect(() => {
+    if (!loggedIn) return;
+    fetchClubPoints()
+      .then(setClub)
+      .catch(() => setClub(null));
+  }, [loggedIn]);
 
   return (
     <PublicPageShell>
+      {/* Logged-in member status (design's member state) */}
+      {loggedIn && club?.isMember && (
+        <div data-testid="club-member-banner" style={{ background: '#0d2640' }}>
+          <div style={{ maxWidth: 980, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 22px', flexWrap: 'wrap' }}>
+            <span style={{ color: '#fff', fontSize: 13, fontWeight: 800 }}>
+              {user?.fullName} — <span style={{ color: '#e7c66b' }}>★ عضو {TIER_LABEL[club.level ?? ''] ?? club.level}</span>
+            </span>
+            <span style={{ color: '#c9dcf3', fontSize: 12.5 }}>
+              امتیاز باشگاه: <b style={{ color: '#fff' }}>{faDigits(club.balance)}</b>
+            </span>
+          </div>
+        </div>
+      )}
       {/* HERO */}
       <section style={{ background: 'linear-gradient(150deg,#0d2640,#1668c4)', color: '#fff', padding: '41px 22px 37px', textAlign: 'center' }}>
         <div style={{ maxWidth: 760, margin: '0 auto' }}>
