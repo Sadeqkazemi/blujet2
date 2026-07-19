@@ -11,6 +11,8 @@ import TwoFactorPage from './features/auth/TwoFactorPage';
 import AgencyLoginPage from './features/agency-portal/AgencyLoginPage';
 import AgencyPortalShell from './features/agency-portal/AgencyPortalShell';
 import AgencyDashboardPage from './features/agency-portal/AgencyDashboardPage';
+import AgencySeatsPage from './features/agency-portal/AgencySeatsPage';
+import AgencyWebservicePage from './features/agency-portal/AgencyWebservicePage';
 import AgencyCreditPage from './features/agency-portal/AgencyCreditPage';
 import AgencySalesPage from './features/agency-portal/AgencySalesPage';
 import AgencyInboxPage from './features/agency-portal/AgencyInboxPage';
@@ -78,7 +80,9 @@ export default function App() {
           <Route element={<AgencyProtectedRoute />}>
             <Route path="/agency" element={<AgencyPortalShell />}>
               <Route index element={<AgencyDashboardPage />} />
+              <Route path="seats" element={<AgencySeatsPage />} />
               <Route path="credit" element={<AgencyCreditPage />} />
+              <Route path="webservice" element={<AgencyWebservicePage />} />
               <Route path="sales" element={<AgencySalesPage />} />
               <Route path="inbox" element={<AgencyInboxPage />} />
               <Route path="profile" element={<AgencyProfilePage />} />
