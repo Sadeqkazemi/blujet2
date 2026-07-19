@@ -3,8 +3,10 @@ import { useAuth } from '../../hooks/useAuth';
 
 const NAV_ITEMS = [
   { key: '', label: 'داشبورد' },
+  { key: 'seats', label: 'صندلی‌های تخصیص‌یافته' },
   { key: 'credit', label: 'اعتبار و مانده' },
   { key: 'sales', label: 'فروش و گزارش' },
+  { key: 'webservice', label: 'وب‌سرویس (API)' },
   { key: 'inbox', label: 'کارتابل و پیام‌ها' },
   { key: 'profile', label: 'پروفایل و مدارک' },
 ];
