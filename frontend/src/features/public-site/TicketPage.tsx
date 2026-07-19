@@ -56,30 +56,78 @@ export default function TicketPage() {
     <PublicPageShell>
     <div className="mx-auto max-w-lg p-6">
       <h1 className="mb-4 text-lg font-extrabold text-[#0d2640]">بلیط الکترونیکی</h1>
-      <div className="rounded-2xl border-2 border-dashed border-[#1668c4] bg-white p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <span className="text-xs text-[#6b7b94]">کد رزرو (PNR)</span>
-          <span className="font-num text-lg font-black tracking-widest text-[#1668c4]">{booking.pnr}</span>
-        </div>
-        <div className="mb-4 flex items-center justify-between text-sm">
-          <span className="font-bold text-[#0d2640]">{booking.flightNo}</span>
-          <span className="text-[#6b7b94]">
-            {booking.originCode} ← {booking.destCode}
+
+      {/* Boarding-pass card per the design's ticket visual */}
+      <div className="overflow-hidden rounded-2xl bg-white shadow-[0_24px_54px_-28px_rgba(13,38,102,.35)]">
+        <div className="flex items-center justify-between px-6 py-4" style={{ background: 'linear-gradient(120deg,#1668c4,#0d3b66)' }}>
+          <span className="flex items-center gap-2 text-sm font-black text-white">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/20">✈</span> blujet
+          </span>
+          <span className="rounded-full bg-white/15 px-3 py-1 text-[10.5px] font-bold text-white">
+            {booking.status === 'TICKETED' ? 'کارت پرواز · صادر شده' : booking.status}
           </span>
         </div>
-        <div className="mb-4 text-xs text-[#6b7b94]">{formatJalaliDateTime(booking.departureAt)}</div>
-        <div className="mb-4 flex flex-col gap-1">
-          {booking.passengers.map((p) => (
-            <div key={p.seatCode} className="flex justify-between text-xs text-[#6b7b94]">
-              <span>{p.fullName}</span>
-              <span className="font-num">{p.seatCode}</span>
+
+        <div className="flex items-center justify-between gap-4 px-6 py-5">
+          <div className="text-center">
+            <div className="font-num text-2xl font-black text-[#0d2640]" dir="ltr">{booking.originCode}</div>
+            <div className="mt-1 text-[10.5px] text-[#8a96a6]">مبدأ</div>
+          </div>
+          <div className="flex-1 text-center text-[10.5px] text-[#8a96a6]">
+            <div className="font-num mb-1 font-bold text-[#1668c4]" dir="ltr">{booking.flightNo}</div>
+            <div className="relative border-t-2 border-dashed border-[#d5e1f0]">
+              <span className="absolute -top-2.5 right-1/2 translate-x-1/2 bg-white px-1.5 text-sm text-[#1668c4]">✈</span>
             </div>
-          ))}
+            <div className="mt-1.5">{formatJalaliDateTime(booking.departureAt)}</div>
+          </div>
+          <div className="text-center">
+            <div className="font-num text-2xl font-black text-[#0d2640]" dir="ltr">{booking.destCode}</div>
+            <div className="mt-1 text-[10.5px] text-[#8a96a6]">مقصد</div>
+          </div>
         </div>
-        <div className="rounded-full bg-[#10b98124] px-3 py-1 text-center text-xs font-bold text-[#059669]">
-          {booking.status === 'TICKETED' ? 'صادر شده' : booking.status}
+
+        {/* perforation */}
+        <div className="relative border-t-2 border-dashed border-[#e3e9f1]">
+          <span className="absolute -top-3 -right-3 h-6 w-6 rounded-full bg-[#f6f8fb]" />
+          <span className="absolute -top-3 -left-3 h-6 w-6 rounded-full bg-[#f6f8fb]" />
+        </div>
+
+        <div className="grid grid-cols-2 gap-x-6 gap-y-3 px-6 py-4">
+          <div>
+            <div className="text-[10px] text-[#8a96a6]">کد رزرو (PNR)</div>
+            <div className="font-num text-base font-black tracking-widest text-[#1668c4]" dir="ltr">{booking.pnr}</div>
+          </div>
+          <div>
+            <div className="text-[10px] text-[#8a96a6]">کلاس پروازی</div>
+            <div className="text-xs font-extrabold text-[#0d2640]">{booking.cabin === 'BUSINESS' ? 'بیزینس' : 'اکونومی'}</div>
+          </div>
+        </div>
+
+        <div className="border-t border-[#f2f4f7] px-6 py-4">
+          <div className="mb-2 text-[11px] font-black text-[#0d2640]">مسافران</div>
+          <div className="flex flex-col gap-2">
+            {booking.passengers.map((p) => (
+              <div key={p.seatCode} className="flex items-center justify-between rounded-xl bg-[#fafbfd] px-3.5 py-2.5 text-xs">
+                <span className="font-bold text-[#16202e]">{p.fullName}</span>
+                <span className="font-num rounded-lg bg-[#eef4fb] px-2.5 py-1 font-extrabold text-[#1668c4]" dir="ltr">
+                  {p.seatCode}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between border-t border-[#f2f4f7] bg-[#fafbfd] px-6 py-3.5">
+          <span className="text-[10px] text-[#8a96a6]">این کارت را هنگام پذیرش نشان دهید</span>
+          <span className="font-num text-lg tracking-[3px] text-[#0d2640]" aria-hidden>
+            ▮▯▮▮▯▮▯▮▮▯▮▮
+          </span>
         </div>
       </div>
+
+      <button onClick={() => window.print()} className="mt-4 w-full rounded-xl border border-[#d5e1f0] bg-white py-2.5 text-xs font-bold text-[#1668c4]">
+        دانلود / چاپ بلیط
+      </button>
 
       {booking.status === 'TICKETED' && (
         <div className="mt-6">
