@@ -62,7 +62,7 @@ describe('ResultsPage', () => {
     renderPage();
 
     const mockCards = await screen.findAllByTestId('mock-result-card');
-    expect(mockCards).toHaveLength(3);
+    expect(mockCards).toHaveLength(6);
     expect(screen.queryByTestId('result-card')).not.toBeInTheDocument();
     // only the requested date is ever queried — multi-day probing would
     // trip the backend rate limiter (StrictMode may re-run the effect)
