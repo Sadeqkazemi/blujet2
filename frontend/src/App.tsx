@@ -8,6 +8,7 @@ import DashboardRouter from './components/DashboardRouter';
 import TabGate from './components/TabGate';
 import LoginPage from './features/auth/LoginPage';
 import TwoFactorPage from './features/auth/TwoFactorPage';
+import ForgotPasswordPage from './features/auth/ForgotPasswordPage';
 import AgencyLoginPage from './features/agency-portal/AgencyLoginPage';
 import AgencyPortalShell from './features/agency-portal/AgencyPortalShell';
 import AgencyDashboardPage from './features/agency-portal/AgencyDashboardPage';
@@ -74,6 +75,7 @@ export default function App() {
           <Route path="/contact" element={<ContactPage />} />
 
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/two-factor" element={<TwoFactorPage />} />
           <Route path="/agency/login" element={<AgencyLoginPage />} />
 

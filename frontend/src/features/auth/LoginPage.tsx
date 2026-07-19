@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { ApiRequestError } from '../../api/envelope';
 import { StaffLoginLayout } from './StaffLoginLayout';
@@ -62,6 +62,16 @@ export default function LoginPage() {
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
           />
+        </div>
+
+        <div className="flex items-center justify-between text-[11.5px]">
+          <label className="flex cursor-pointer items-center gap-2 text-[#9fb0c7]">
+            <input type="checkbox" />
+            مرا به خاطر بسپار
+          </label>
+          <Link to="/forgot-password" className="font-bold text-accent">
+            فراموشی رمز عبور؟
+          </Link>
         </div>
 
         {error && (
