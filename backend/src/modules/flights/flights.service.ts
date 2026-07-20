@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { RRule } from 'rrule';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
 import {
@@ -467,5 +468,171 @@ export class FlightsService {
     });
 
     return { analyzed: result.suggestions.length, available: true };
+  }
+
+  // ─── Recurring schedules (CLAUDE.md: Schedule via RRULE) ───────────────
+
+  async createSchedule(
+    actor: AuthenticatedUser,
+    dto: {
+      originCode: string;
+      destCode: string;
+      flightNo: string;
+      rrule: string;
+      depTime: string;
+      capacity: number;
+      daysAhead?: number;
+    },
+  ) {
+    if (dto.originCode === dto.destCode) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'مبدأ و مقصد نمی‌توانند یکسان باشند.',
+      });
+    }
+    const airports = await this.prisma.airport.findMany({
+      where: { code: { in: [dto.originCode, dto.destCode] } },
+    });
+    if (airports.length !== 2) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'فرودگاه انتخاب‌شده معتبر نیست.',
+      });
+    }
+    try {
+      RRule.parseString(dto.rrule);
+    } catch {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'الگوی تکرار (RRULE) معتبر نیست.',
+      });
+    }
+    const [depHour, depMinute] = dto.depTime.split(':').map(Number);
+
+    const route = await this.prisma.route.upsert({
+      where: {
+        originCode_destCode: {
+          originCode: dto.originCode,
+          destCode: dto.destCode,
+        },
+      },
+      update: {},
+      create: { originCode: dto.originCode, destCode: dto.destCode },
+    });
+    const existingFlight = await this.prisma.flight.findUnique({
+      where: { flightNo: dto.flightNo },
+    });
+    if (existingFlight && existingFlight.routeId !== route.id) {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'این شماره پرواز قبلاً برای مسیر دیگری ثبت شده است.',
+      });
+    }
+    const flight =
+      existingFlight ??
+      (await this.prisma.flight.create({
+        data: {
+          flightNo: dto.flightNo,
+          routeId: route.id,
+          aircraftType: 'Airbus A320',
+        },
+      }));
+
+    const schedule = await this.prisma.schedule.create({
+      data: {
+        flightId: flight.id,
+        rrule: dto.rrule,
+        depHour,
+        depMinute,
+        durationMin: route.durationMin,
+        capacity: dto.capacity,
+      },
+    });
+    const materialized = await this.materializeSchedule(
+      schedule.id,
+      dto.daysAhead ?? 30,
+    );
+
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'SYSTEM',
+      action: 'ثبت برنامه تکرارشونده پرواز',
+      detail: `برنامه ${dto.flightNo} (${dto.rrule}) با ${materialized} پرواز آینده ثبت شد.`,
+      entityType: 'Schedule',
+      entityId: schedule.id,
+      metadata: { rrule: dto.rrule, materialized },
+    });
+
+    return { scheduleId: schedule.id, materialized };
+  }
+
+  /**
+   * Materializes FlightInstances for the next `daysAhead` days from the
+   * schedule's RRULE. Idempotent: @@unique([scheduleId, departureAt]) +
+   * skipDuplicates means re-running never doubles instances. depHour/
+   * depMinute are UTC (storage is UTC per CLAUDE.md; rendering converts to
+   * the airport's IANA tz at the edge).
+   */
+  async materializeSchedule(scheduleId: string, daysAhead: number) {
+    const schedule = await this.prisma.schedule.findUniqueOrThrow({
+      where: { id: scheduleId },
+    });
+    if (!schedule.active) return 0;
+
+    const parsed = RRule.parseString(schedule.rrule);
+    const start = new Date();
+    const until = new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000);
+    const rule = new RRule({ ...parsed, dtstart: start });
+    const dates = rule.between(start, until, true);
+
+    const rows = dates.map((d) => {
+      const departureAt = new Date(
+        Date.UTC(
+          d.getUTCFullYear(),
+          d.getUTCMonth(),
+          d.getUTCDate(),
+          schedule.depHour,
+          schedule.depMinute,
+        ),
+      );
+      return {
+        flightId: schedule.flightId,
+        scheduleId: schedule.id,
+        departureAt,
+        arrivalAt: new Date(
+          departureAt.getTime() + schedule.durationMin * 60_000,
+        ),
+        capacity: schedule.capacity,
+        charterSeats: 0,
+        status: 'SCHEDULED' as const,
+      };
+    });
+    const created = await this.prisma.flightInstance.createMany({
+      data: rows,
+      skipDuplicates: true,
+    });
+    return created.count;
+  }
+
+  async listSchedules() {
+    const schedules = await this.prisma.schedule.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: {
+        flight: { include: { route: true } },
+        _count: { select: { instances: true } },
+      },
+    });
+    return schedules.map((s) => ({
+      id: s.id,
+      flightNo: s.flight.flightNo,
+      originCode: s.flight.route.originCode,
+      destCode: s.flight.route.destCode,
+      rrule: s.rrule,
+      depTime: `${String(s.depHour).padStart(2, '0')}:${String(s.depMinute).padStart(2, '0')}`,
+      capacity: s.capacity,
+      active: s.active,
+      instanceCount: s._count.instances,
+    }));
   }
 }

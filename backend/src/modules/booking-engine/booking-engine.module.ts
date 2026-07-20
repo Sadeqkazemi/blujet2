@@ -10,6 +10,7 @@ import { PriceLockService } from './price-lock.service';
 import { PrivacyController } from './privacy.controller';
 import { PrivacyService } from './privacy.service';
 import { AuditModule } from '../audit/audit.module';
+import { PAYMENT_GATEWAY, SandboxPaymentGateway } from './payment-gateway';
 
 @Module({
   imports: [AuditModule],
@@ -26,6 +27,9 @@ import { AuditModule } from '../audit/audit.module';
     ClubPointsService,
     PriceLockService,
     PrivacyService,
+    // PAYMENT_GATEWAY env var selects the driver; sandbox is the only one
+    // until a real Shetab/PSP contract exists — the interface is final.
+    { provide: PAYMENT_GATEWAY, useClass: SandboxPaymentGateway },
   ],
   exports: [SearchService],
 })

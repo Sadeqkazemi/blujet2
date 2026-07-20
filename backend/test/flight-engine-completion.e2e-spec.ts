@@ -1,0 +1,355 @@
+import type { INestApplication } from '@nestjs/common';
+import type { App } from 'supertest/types';
+import request from 'supertest';
+import { PrismaClient } from '../generated/prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { createTestApp } from './helpers/app.helper';
+import { loginAs, loginAsCustomer } from './helpers/login.helper';
+
+const prisma = new PrismaClient({
+  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
+});
+
+/** Covers the flight-engine completion work: recurring schedules (RRULE),
+ * 1-stop connection search, Y/B/M fare classes, the PAID step in the
+ * booking state machine, and soft delete via the GDPR flow. */
+describe('Flight engine completion', () => {
+  let app: INestApplication<App>;
+
+  beforeAll(async () => {
+    app = await createTestApp();
+  });
+
+  afterAll(async () => {
+    // Clean up everything this spec created — other suites (reservation,
+    // finance-reports) pick instances by ordering and break on leftovers.
+    const flights = await prisma.flight.findMany({
+      where: {
+        flightNo: {
+          in: [
+            'BJ-77',
+            'BJ-78',
+            'BJ-81',
+            'BJ-82',
+            'BJ-83',
+            'BJ-84',
+            'BJ-85',
+            'BJ-86',
+          ],
+        },
+      },
+    });
+    const fids = flights.map((f) => f.id);
+    const instances = await prisma.flightInstance.findMany({
+      where: { flightId: { in: fids } },
+    });
+    const iids = instances.map((i) => i.id);
+    const bookings = await prisma.booking.findMany({
+      where: { flightInstanceId: { in: iids } },
+    });
+    const bids = bookings.map((b) => b.id);
+    await prisma.ledgerEntry.deleteMany({ where: { bookingId: { in: bids } } });
+    await prisma.clubPointsEntry.deleteMany({
+      where: { bookingId: { in: bids } },
+    });
+    await prisma.walletEntry.deleteMany({ where: { bookingId: { in: bids } } });
+    await prisma.passenger.deleteMany({ where: { bookingId: { in: bids } } });
+    await prisma.booking.deleteMany({ where: { id: { in: bids } } });
+    await prisma.fareRule.deleteMany({
+      where: { flightInstanceId: { in: iids } },
+    });
+    await prisma.flightInstance.deleteMany({ where: { id: { in: iids } } });
+    await prisma.schedule.deleteMany({ where: { flightId: { in: fids } } });
+    await prisma.flight.deleteMany({ where: { id: { in: fids } } });
+
+    await app.close();
+    await prisma.$disconnect();
+  });
+
+  async function makeInstance(opts: {
+    originCode: string;
+    destCode: string;
+    flightNo: string;
+    departureAt: Date;
+    durationMin?: number;
+  }) {
+    const route = await prisma.route.upsert({
+      where: {
+        originCode_destCode: {
+          originCode: opts.originCode,
+          destCode: opts.destCode,
+        },
+      },
+      update: {},
+      create: {
+        originCode: opts.originCode,
+        destCode: opts.destCode,
+        durationMin: opts.durationMin ?? 90,
+      },
+    });
+    const flight = await prisma.flight.upsert({
+      where: { flightNo: opts.flightNo },
+      update: {},
+      create: {
+        flightNo: opts.flightNo,
+        routeId: route.id,
+        aircraftType: 'Airbus A320',
+      },
+    });
+    return prisma.flightInstance.create({
+      data: {
+        flightId: flight.id,
+        departureAt: opts.departureAt,
+        arrivalAt: new Date(
+          opts.departureAt.getTime() + (opts.durationMin ?? 90) * 60_000,
+        ),
+        capacity: 146,
+        status: 'SCHEDULED',
+      },
+    });
+  }
+
+  it('creates a recurring schedule from an RRULE and materializes future instances idempotently', async () => {
+    const { accessToken } = await loginAs(app, 'senior.rahimi');
+    const res = await request(app.getHttpServer())
+      .post('/flights/schedules')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        originCode: 'THR',
+        destCode: 'TBZ',
+        flightNo: 'BJ-77',
+        rrule: 'FREQ=DAILY',
+        depTime: '06:00',
+        capacity: 146,
+        daysAhead: 7,
+      })
+      .expect(201);
+    expect(res.body.data.materialized).toBeGreaterThanOrEqual(6);
+    const scheduleId = res.body.data.scheduleId;
+
+    const count1 = await prisma.flightInstance.count({ where: { scheduleId } });
+    expect(count1).toBe(res.body.data.materialized);
+
+    // re-materializing must not duplicate (unique scheduleId+departureAt)
+    const list = await request(app.getHttpServer())
+      .get('/flights/schedules')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+    const mine = list.body.data.find(
+      (s: { id: string }) => s.id === scheduleId,
+    );
+    expect(mine.flightNo).toBe('BJ-77');
+    expect(mine.instanceCount).toBe(count1);
+  });
+
+  it('rejects an invalid RRULE with 400', async () => {
+    const { accessToken } = await loginAs(app, 'senior.rahimi');
+    await request(app.getHttpServer())
+      .post('/flights/schedules')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        originCode: 'THR',
+        destCode: 'TBZ',
+        flightNo: 'BJ-78',
+        rrule: 'not-a-rule;;;',
+        depTime: '06:00',
+        capacity: 100,
+      })
+      .expect(400);
+  });
+
+  it('finds a 1-stop connection when no direct flight exists, respecting min connection time', async () => {
+    const day = new Date(Date.now() + 40 * 24 * 60 * 60 * 1000);
+    day.setUTCHours(0, 0, 0, 0);
+    const dep1 = new Date(day.getTime() + 6 * 3_600_000);
+    // leg2 departs 2h after leg1 arrives (>60min default min-connect)
+    const leg1 = await makeInstance({
+      originCode: 'RAS',
+      destCode: 'SRY',
+      flightNo: 'BJ-81',
+      departureAt: dep1,
+    });
+    const dep2 = new Date(leg1.arrivalAt.getTime() + 2 * 3_600_000);
+    await makeInstance({
+      originCode: 'SRY',
+      destCode: 'ADU',
+      flightNo: 'BJ-82',
+      departureAt: dep2,
+    });
+    // an infeasible second leg 10 minutes after arrival must NOT be used
+    await makeInstance({
+      originCode: 'SRY',
+      destCode: 'ADU',
+      flightNo: 'BJ-83',
+      departureAt: new Date(leg1.arrivalAt.getTime() + 10 * 60_000),
+    });
+
+    const res = await request(app.getHttpServer())
+      .get(
+        `/search/flights?origin=RAS&dest=ADU&date=${day.toISOString().slice(0, 10)}`,
+      )
+      .expect(200);
+    const conn = res.body.data.find(
+      (r: { connection?: unknown }) => r.connection,
+    );
+    expect(conn).toBeDefined();
+    expect(conn.connection.via).toBe('SRY');
+    expect(conn.connection.legs).toHaveLength(2);
+    expect(conn.connection.legs[1].flightNo).toBe('BJ-82');
+    expect(conn.flightNo).toBe('BJ-81+BJ-82');
+  });
+
+  it('Y/B/M fare classes: price climbs to the next class when a bucket sells out, and the booking is stamped', async () => {
+    const dep = new Date(Date.now() + 45 * 24 * 60 * 60 * 1000);
+    const instance = await makeInstance({
+      originCode: 'KER',
+      destCode: 'AZD',
+      flightNo: 'BJ-84',
+      departureAt: dep,
+    });
+    await prisma.fareRule.createMany({
+      data: [
+        {
+          flightInstanceId: instance.id,
+          cabin: 'ECONOMY',
+          classCode: 'Y',
+          priceIrr: 30_000_000,
+          seatsAllocated: 1,
+        },
+        {
+          flightInstanceId: instance.id,
+          cabin: 'ECONOMY',
+          classCode: 'B',
+          priceIrr: 40_000_000,
+          seatsAllocated: 2,
+        },
+      ],
+    });
+
+    const search1 = await request(app.getHttpServer())
+      .get(
+        `/search/flights?origin=KER&dest=AZD&date=${dep.toISOString().slice(0, 10)}`,
+      )
+      .expect(200);
+    const mine1 = search1.body.data.find(
+      (r: { flightInstanceId: string }) => r.flightInstanceId === instance.id,
+    );
+    const eco1 = mine1.cabins.find(
+      (c: { cabin: string }) => c.cabin === 'ECONOMY',
+    );
+    expect(eco1.priceIrr).toBe(30_000_000); // Y still open
+
+    const customer = await loginAsCustomer(app, '09901112233');
+    const booking = await request(app.getHttpServer())
+      .post('/bookings')
+      .set('Authorization', `Bearer ${customer.accessToken}`)
+      .send({
+        flightInstanceId: instance.id,
+        cabin: 'ECONOMY',
+        passengers: [{ fullName: 'مسافر کلاس نرخی', seatCode: '10A' }],
+      })
+      .expect(201);
+    expect(booking.body.data.priceIrr).toBe(30_000_000);
+
+    const row = await prisma.booking.findUniqueOrThrow({
+      where: { id: booking.body.data.id },
+    });
+    expect(row.fareClassCode).toBe('Y');
+
+    // Y bucket (1 seat) is now consumed → price moves to B
+    const search2 = await request(app.getHttpServer())
+      .get(
+        `/search/flights?origin=KER&dest=AZD&date=${dep.toISOString().slice(0, 10)}`,
+      )
+      .expect(200);
+    const mine2 = search2.body.data.find(
+      (r: { flightInstanceId: string }) => r.flightInstanceId === instance.id,
+    );
+    const eco2 = mine2.cabins.find(
+      (c: { cabin: string }) => c.cabin === 'ECONOMY',
+    );
+    expect(eco2.priceIrr).toBe(40_000_000);
+  });
+
+  it('pay walks HELD→PAID→TICKETED and lands TICKETED with a gateway ref in the audit trail', async () => {
+    const dep = new Date(Date.now() + 50 * 24 * 60 * 60 * 1000);
+    const instance = await makeInstance({
+      originCode: 'BUZ',
+      destCode: 'PGU',
+      flightNo: 'BJ-85',
+      departureAt: dep,
+    });
+
+    const customer = await loginAsCustomer(app, '09901112244');
+    const booking = await request(app.getHttpServer())
+      .post('/bookings')
+      .set('Authorization', `Bearer ${customer.accessToken}`)
+      .send({
+        flightInstanceId: instance.id,
+        cabin: 'ECONOMY',
+        passengers: [{ fullName: 'مسافر درگاه', seatCode: '11A' }],
+      })
+      .expect(201);
+
+    const paid = await request(app.getHttpServer())
+      .post(`/bookings/${booking.body.data.id}/pay`)
+      .set('Authorization', `Bearer ${customer.accessToken}`)
+      .send({})
+      .expect(201);
+    expect(paid.body.data.priceChanged).toBe(false);
+    expect(paid.body.data.booking.status).toBe('TICKETED');
+
+    const audit = await prisma.auditLog.findFirst({
+      where: { entityId: booking.body.data.id, action: 'پرداخت و صدور بلیط' },
+      orderBy: { createdAt: 'desc' },
+    });
+    const metadata = audit?.metadata as { gatewayRefId?: string };
+    expect(metadata.gatewayRefId).toMatch(/^SBXREF-/);
+  });
+
+  it('GDPR deletion soft-deletes passengers (deletedAt stamped, booking rows survive)', async () => {
+    const dep = new Date(Date.now() + 55 * 24 * 60 * 60 * 1000);
+    const instance = await makeInstance({
+      originCode: 'GBT',
+      destCode: 'OMH',
+      flightNo: 'BJ-86',
+      departureAt: dep,
+    });
+
+    const customer = await loginAsCustomer(app, '09901112255');
+    const booking = await request(app.getHttpServer())
+      .post('/bookings')
+      .set('Authorization', `Bearer ${customer.accessToken}`)
+      .send({
+        flightInstanceId: instance.id,
+        cabin: 'ECONOMY',
+        passengers: [
+          {
+            fullName: 'مسافر حذف‌شونده',
+            nationalId: '0499370899',
+            seatCode: '12A',
+          },
+        ],
+      })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .delete('/my/privacy/account')
+      .set('Authorization', `Bearer ${customer.accessToken}`)
+      .expect(200);
+
+    const passengers = await prisma.passenger.findMany({
+      where: { bookingId: booking.body.data.id },
+    });
+    expect(passengers).toHaveLength(1);
+    expect(passengers[0].deletedAt).not.toBeNull();
+    expect(passengers[0].fullName).toBe('کاربر حذف‌شده');
+    expect(passengers[0].nationalIdEnc).toBeNull();
+
+    // financial record survives (soft delete, never hard delete)
+    const bookingRow = await prisma.booking.findUnique({
+      where: { id: booking.body.data.id },
+    });
+    expect(bookingRow).not.toBeNull();
+  });
+});

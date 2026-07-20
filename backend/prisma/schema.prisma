@@ -48,28 +48,28 @@ model User {
   createdBy          User?                  @relation("EmployeeCreatedBy", fields: [createdById], references: [id])
   employeesCreated   User[]                 @relation("EmployeeCreatedBy")
 
-  employeePermissions      EmployeePermission[]  @relation("EmployeePermissionHolder")
-  passwordResetsReceived   PasswordResetEvent[]  @relation("PasswordResetTarget")
-  passwordResetsPerformed  PasswordResetEvent[]  @relation("PasswordResetActor")
-  securityPolicyUpdates    SecurityPolicy[]      @relation("SecurityPolicyUpdatedBy")
-  backupsTriggered         BackupRecord[]        @relation("BackupTriggeredBy")
-  seatLocksCreated         SeatLock[]            @relation("SeatLockedBy")
-  seatLocksReleased        SeatLock[]            @relation("SeatLockReleasedBy")
+  employeePermissions     EmployeePermission[] @relation("EmployeePermissionHolder")
+  passwordResetsReceived  PasswordResetEvent[] @relation("PasswordResetTarget")
+  passwordResetsPerformed PasswordResetEvent[] @relation("PasswordResetActor")
+  securityPolicyUpdates   SecurityPolicy[]     @relation("SecurityPolicyUpdatedBy")
+  backupsTriggered        BackupRecord[]       @relation("BackupTriggeredBy")
+  seatLocksCreated        SeatLock[]           @relation("SeatLockedBy")
+  seatLocksReleased       SeatLock[]           @relation("SeatLockReleasedBy")
 
-  refreshTokens       RefreshToken[]
-  twoFactorChallenges TwoFactorChallenge[]
-  auditLogs           AuditLog[]           @relation("AuditActor")
-  panelAccessUpdates  PanelAccessFlag[]    @relation("PanelAccessUpdatedBy")
-  systemSettingUpdates SystemSetting[]     @relation("SystemSettingUpdatedBy")
-  ledgerEntries       LedgerEntry[]        @relation("LedgerCreatedBy")
+  refreshTokens        RefreshToken[]
+  twoFactorChallenges  TwoFactorChallenge[]
+  auditLogs            AuditLog[]           @relation("AuditActor")
+  panelAccessUpdates   PanelAccessFlag[]    @relation("PanelAccessUpdatedBy")
+  systemSettingUpdates SystemSetting[]      @relation("SystemSettingUpdatedBy")
+  ledgerEntries        LedgerEntry[]        @relation("LedgerCreatedBy")
 
-  agencyProfile          AgencyProfile?            @relation("AgencyUser")
-  agencyCreditUpdates    AgencyCreditLine[]        @relation("AgencyCreditUpdatedBy")
-  agencyRequestsReferred AgencyMembershipRequest[] @relation("AgencyRequestReferredTo")
-  agencyRequestsReviewed AgencyMembershipRequest[] @relation("AgencyRequestReviewedBy")
-  agencyInvoicesIssued   AgencyInvoice[]           @relation("AgencyInvoiceIssuedBy")
-  agencyMessagesSent     AgencyMessage[]           @relation("AgencyMessageSender")
-  agencyCreditRequestsDecided AgencyCreditRequest[] @relation("AgencyCreditRequestDecidedBy")
+  agencyProfile               AgencyProfile?            @relation("AgencyUser")
+  agencyCreditUpdates         AgencyCreditLine[]        @relation("AgencyCreditUpdatedBy")
+  agencyRequestsReferred      AgencyMembershipRequest[] @relation("AgencyRequestReferredTo")
+  agencyRequestsReviewed      AgencyMembershipRequest[] @relation("AgencyRequestReviewedBy")
+  agencyInvoicesIssued        AgencyInvoice[]           @relation("AgencyInvoiceIssuedBy")
+  agencyMessagesSent          AgencyMessage[]           @relation("AgencyMessageSender")
+  agencyCreditRequestsDecided AgencyCreditRequest[]     @relation("AgencyCreditRequestDecidedBy")
 
   cartableTasks       CartableTask[]             @relation("CartableAssignee")
   cartableTasksSent   CartableTask[]             @relation("CartableSender")
@@ -91,7 +91,7 @@ model User {
   refundAssignments RefundRequest[] @relation("RefundAssignee")
   refundsProcessed  RefundRequest[] @relation("RefundProcessedBy")
 
-  bookings Booking[] @relation("BookingUser")
+  bookings         Booking[]         @relation("BookingUser")
   promoRedemptions PromoRedemption[] @relation("PromoRedeemedBy")
   walletEntries    WalletEntry[]     @relation("WalletOwner")
   priceLocks       PriceLock[]       @relation("PriceLockOwner")
@@ -195,13 +195,13 @@ model PanelAccessFlag {
 // ─── Phase 2 (minimal slice): flight/booking core for reporting ────────
 
 model Route {
-  id         String   @id @default(uuid())
-  originCode String
-  destCode   String
+  id          String   @id @default(uuid())
+  originCode  String
+  destCode    String
   // Phase 10: seeded flight duration — the add-flight form has no arrival
   // input (per design), so arrivalAt = departureAt + durationMin.
-  durationMin Int     @default(120)
-  flights    Flight[]
+  durationMin Int      @default(120)
+  flights     Flight[]
 
   @@unique([originCode, destCode])
   @@map("routes")
@@ -214,8 +214,29 @@ model Flight {
   route        Route            @relation(fields: [routeId], references: [id])
   aircraftType String
   instances    FlightInstance[]
+  schedules    Schedule[]
 
   @@map("flights")
+}
+
+// Recurring flight definition (CLAUDE.md: Schedule via RRULE). Instances
+// are materialized ahead of time by FlightsService.materializeSchedule —
+// the RRULE string is parsed with the maintained `rrule` package, never
+// hand-rolled.
+model Schedule {
+  id          String           @id @default(uuid())
+  flightId    String
+  flight      Flight           @relation(fields: [flightId], references: [id])
+  rrule       String
+  depHour     Int
+  depMinute   Int
+  durationMin Int
+  capacity    Int
+  active      Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  instances   FlightInstance[]
+
+  @@map("schedules")
 }
 
 enum FlightInstanceStatus {
@@ -225,14 +246,14 @@ enum FlightInstanceStatus {
 }
 
 model FlightInstance {
-  id           String               @id @default(uuid())
-  flightId     String
-  flight       Flight               @relation(fields: [flightId], references: [id])
-  departureAt  DateTime
-  arrivalAt    DateTime
-  capacity     Int
-  charterSeats Int                  @default(0)
-  status       FlightInstanceStatus @default(SCHEDULED)
+  id                   String               @id @default(uuid())
+  flightId             String
+  flight               Flight               @relation(fields: [flightId], references: [id])
+  departureAt          DateTime
+  arrivalAt            DateTime
+  capacity             Int
+  charterSeats         Int                  @default(0)
+  status               FlightInstanceStatus @default(SCHEDULED)
   // Phase 10: display/plan figures from مدیریت پروازها. basePriceIrr is the
   // design's «قیمت پایه/نرخ اصلی» and the completed-flights سود/ضرر baseline —
   // NEVER the bookable price (that stays with Phase 6's registered proposal).
@@ -241,12 +262,18 @@ model FlightInstance {
   // Advisory ML suggestion for future flights that have no Phase 6 proposal
   // yet (same PersistedAiSuggestion shape; includes modelVersion).
   aiSuggestion         Json?
-  bookings     Booking[]
-  pricing      FarePricingProposal?
-  seatLocks    SeatLock[]
-  cabinFares   CabinFare[]
-  priceLocks   PriceLock[]
+  // Set when this instance was materialized from a recurring Schedule;
+  // @@unique below makes re-materialization idempotent.
+  scheduleId           String?
+  schedule             Schedule?            @relation(fields: [scheduleId], references: [id])
+  bookings             Booking[]
+  pricing              FarePricingProposal?
+  seatLocks            SeatLock[]
+  cabinFares           CabinFare[]
+  priceLocks           PriceLock[]
+  fareRules            FareRule[]
 
+  @@unique([scheduleId, departureAt])
   @@index([departureAt])
   @@map("flight_instances")
 }
@@ -276,6 +303,24 @@ model CabinFare {
 
   @@unique([flightInstanceId, cabin])
   @@map("cabin_fares")
+}
+
+// IATA-style fare-class buckets (Y/B/M …) inside a cabin. When rows exist
+// for an instance+cabin, the bookable price is the CHEAPEST class that
+// still has allocation left (sold count = bookings holding that class);
+// when none exist, pricing falls back to CabinFare — see pricing.ts.
+model FareRule {
+  id               String         @id @default(uuid())
+  flightInstanceId String
+  flightInstance   FlightInstance @relation(fields: [flightInstanceId], references: [id])
+  cabin            CabinClass
+  classCode        String
+  priceIrr         Int
+  seatsAllocated   Int
+  refundable       Boolean        @default(true)
+
+  @@unique([flightInstanceId, cabin, classCode])
+  @@map("fare_rules")
 }
 
 // Matches the finance/sales-chart channel split used identically across all
@@ -312,24 +357,30 @@ model Booking {
   // Public purchase engine (customer track) additions — nullable/optional
   // because staff-issued (channel=SYSTEM via reservation.pnr.service) and
   // agency bookings never set them.
-  userId          String?
-  user            User?     @relation("BookingUser", fields: [userId], references: [id])
-  contactPhone    String?
-  cabin           CabinClass @default(ECONOMY)
+  userId         String?
+  user           User?      @relation("BookingUser", fields: [userId], references: [id])
+  contactPhone   String?
+  cabin          CabinClass @default(ECONOMY)
   // HELD bookings expire 10 minutes after creation (CLAUDE.md's hold TTL);
   // checked lazily on read (expireIfDue) rather than via a cron job.
-  holdExpiresAt   DateTime?
+  holdExpiresAt  DateTime?
   // Guards double-submit on booking-creation and payment-confirmation
   // endpoints — a client retry with the same key returns the same booking.
-  idempotencyKey  String?   @unique
+  idempotencyKey String?    @unique
 
-  passengers     Passenger[]
-  ledgerEntries  LedgerEntry[]
-  refundRequests RefundRequest[]
+  passengers        Passenger[]
+  ledgerEntries     LedgerEntry[]
+  refundRequests    RefundRequest[]
   promoRedemption   PromoRedemption?
   walletEntries     WalletEntry[]
   clubPointsEntries ClubPointsEntry[]
   priceLock         PriceLock?
+
+  // Fare-class bucket (Y/B/M) this booking consumed, when FareRule
+  // pricing was in effect; null under flat CabinFare pricing.
+  fareClassCode String?
+  // CLAUDE.md: soft delete for bookings — hard deletes only via GDPR flow.
+  deletedAt     DateTime?
 
   @@index([flightInstanceId, status])
   @@index([channel])
@@ -339,9 +390,9 @@ model Booking {
 }
 
 model Passenger {
-  id             String  @id @default(uuid())
+  id             String    @id @default(uuid())
   bookingId      String
-  booking        Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  booking        Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   fullName       String
   nationalIdEnc  String?
   // Deterministic hash alongside the existing encrypted column — added in
@@ -352,6 +403,7 @@ model Passenger {
   // Phase 9: seat assignment for a TICKETED booking — nullable because
   // Phase 1-6 seed passengers predate seat selection.
   seatCode       String?
+  deletedAt      DateTime?
 
   @@index([nationalIdHash])
   @@map("passengers")
@@ -542,16 +594,16 @@ enum AgencyCreditRequestStatus {
 // auditable request — only AgenciesService.updateCredit (Phase 3, unchanged)
 // can ever actually change AgencyCreditLine.limitIrr.
 model AgencyCreditRequest {
-  id                String                     @id @default(uuid())
+  id                String                    @id @default(uuid())
   agencyId          String
-  agency            AgencyProfile              @relation(fields: [agencyId], references: [userId])
+  agency            AgencyProfile             @relation(fields: [agencyId], references: [userId])
   requestedLimitIrr Int
   note              String?
-  status            AgencyCreditRequestStatus  @default(PENDING)
+  status            AgencyCreditRequestStatus @default(PENDING)
   decidedById       String?
-  decidedBy         User?                      @relation("AgencyCreditRequestDecidedBy", fields: [decidedById], references: [id])
+  decidedBy         User?                     @relation("AgencyCreditRequestDecidedBy", fields: [decidedById], references: [id])
   decidedAt         DateTime?
-  createdAt         DateTime                   @default(now())
+  createdAt         DateTime                  @default(now())
 
   @@index([agencyId, status])
   @@map("agency_credit_requests")
@@ -572,14 +624,14 @@ enum AgencyDocumentStatus {
 // Staff-side review is deferred (see docs) — every row stays PENDING until
 // that workflow is built; the status enum exists now to stay forward-compatible.
 model AgencyDocument {
-  id        String                @id @default(uuid())
+  id        String               @id @default(uuid())
   agencyId  String
-  agency    AgencyProfile         @relation(fields: [agencyId], references: [userId])
-  fileId    String                @unique
-  file      StoredFile            @relation(fields: [fileId], references: [id])
+  agency    AgencyProfile        @relation(fields: [agencyId], references: [userId])
+  fileId    String               @unique
+  file      StoredFile           @relation(fields: [fileId], references: [id])
   docType   AgencyDocumentType
-  status    AgencyDocumentStatus  @default(PENDING)
-  createdAt DateTime              @default(now())
+  status    AgencyDocumentStatus @default(PENDING)
+  createdAt DateTime             @default(now())
 
   @@index([agencyId])
   @@map("agency_documents")
@@ -812,7 +864,7 @@ model ClubMember {
   issuedByLabelFa String?
   createdAt       DateTime       @default(now())
 
-  requests ClubCardRequest[]
+  requests      ClubCardRequest[]
   pointsEntries ClubPointsEntry[] @relation("ClubMemberPointsEntries")
 
   @@index([nationalIdHash])
@@ -932,9 +984,11 @@ enum EmployeeReferralScope {
   ALL_STAFF
 }
 
-/** Seeded catalog — mirrors design-reference's site-data.js PERM_CATALOG
+/**
+ * Seeded catalog — mirrors design-reference's site-data.js PERM_CATALOG
  * exactly (dept -> sections -> perms). No custom-dept rows: a custom dept
- * has no catalog entries until product defines one. */
+ * has no catalog entries until product defines one.
+ */
 model Permission {
   id             String   @id @default(uuid())
   dept           String
@@ -1010,7 +1064,9 @@ model PasswordResetEvent {
   @@map("password_reset_events")
 }
 
-/** Singleton (id=1) — enforced in service layer via upsert-by-1. */
+/**
+ * Singleton (id=1) — enforced in service layer via upsert-by-1.
+ */
 model SecurityPolicy {
   id                      Int      @id @default(1)
   minLength               Int      @default(10)
@@ -1050,11 +1106,13 @@ model BackupRecord {
 
 // ─── Phase 9: Reservation system (seat lock / PNR) ──────────────────────
 
-/** Seat layout config per aircraft type — CLAUDE.md: "seat map config lives
+/**
+ * Seat layout config per aircraft type — CLAUDE.md: "seat map config lives
  * per aircraft type in the DB, not hardcoded." Column letters are ordered
  * left-to-right within the row; the aisle is implied between the two
  * groups (e.g. business ["A","C"]+["D","F"] = 2-2, economy 3+3 = 2-3 per
- * the design's actual row groups, confirmed from ReservationSystem.dc.html). */
+ * the design's actual row groups, confirmed from ReservationSystem.dc.html).
+ */
 model AircraftSeatMap {
   id                String   @id @default(uuid())
   aircraftType      String   @unique
@@ -1071,26 +1129,28 @@ model AircraftSeatMap {
   @@map("aircraft_seat_maps")
 }
 
-/** Managerial seat lock/reservation — prevents sale of that seat without
+/**
+ * Managerial seat lock/reservation — prevents sale of that seat without
  * going through a Booking. Only `canLock` roles (see reservation module)
  * may create/release one. `releasedAt=null` = currently active; enforced
  * unique per (flightInstanceId, seatCode) via a partial index (migration
- * SQL) so two active locks can never coexist on the same seat. */
+ * SQL) so two active locks can never coexist on the same seat.
+ */
 model SeatLock {
-  id                       String    @id @default(uuid())
-  flightInstanceId         String
-  flightInstance           FlightInstance @relation(fields: [flightInstanceId], references: [id])
-  seatCode                 String
-  lockedById               String
-  lockedBy                 User      @relation("SeatLockedBy", fields: [lockedById], references: [id])
-  passengerName            String?
-  passengerNationalIdEnc   String?
-  passengerNationalIdHash  String?
-  passengerMobileEnc       String?
-  releasedById             String?
-  releasedBy               User?     @relation("SeatLockReleasedBy", fields: [releasedById], references: [id])
-  releasedAt               DateTime?
-  createdAt                DateTime  @default(now())
+  id                      String         @id @default(uuid())
+  flightInstanceId        String
+  flightInstance          FlightInstance @relation(fields: [flightInstanceId], references: [id])
+  seatCode                String
+  lockedById              String
+  lockedBy                User           @relation("SeatLockedBy", fields: [lockedById], references: [id])
+  passengerName           String?
+  passengerNationalIdEnc  String?
+  passengerNationalIdHash String?
+  passengerMobileEnc      String?
+  releasedById            String?
+  releasedBy              User?          @relation("SeatLockReleasedBy", fields: [releasedById], references: [id])
+  releasedAt              DateTime?
+  createdAt               DateTime       @default(now())
 
   @@index([flightInstanceId])
   @@map("seat_locks")
@@ -1103,10 +1163,12 @@ model SeatLock {
 // DXB/IST/NJF) so Route codes stay valid and airport-local rendering is
 // possible later (tz is IANA).
 model Airport {
-  id     String @id @default(uuid())
-  code   String @unique
-  cityFa String
-  tz     String
+  id            String @id @default(uuid())
+  code          String @unique
+  cityFa        String
+  tz            String
+  // Minimum connection time (minutes) for the 1-stop connection builder.
+  minConnectMin Int    @default(60)
 
   @@map("airports")
 }
@@ -1122,8 +1184,8 @@ enum PromoType {
 // CLAUDE.md: entered on پرداخت (payment), not checkout — applied inside
 // BookingService.pay(), never at booking-creation time.
 model PromoCode {
-  id             String    @id @default(uuid())
-  code           String    @unique
+  id             String      @id @default(uuid())
+  code           String      @unique
   type           PromoType
   value          Int
   originCode     String?
@@ -1133,8 +1195,8 @@ model PromoCode {
   endsAt         DateTime?
   maxRedemptions Int?
   maxPerUser     Int?
-  active         Boolean   @default(true)
-  createdAt      DateTime  @default(now())
+  active         Boolean     @default(true)
+  createdAt      DateTime    @default(now())
 
   redemptions PromoRedemption[]
 

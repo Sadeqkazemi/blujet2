@@ -9,7 +9,15 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
-import { IsInt, IsISO8601, IsString, Matches, Max, Min } from 'class-validator';
+import {
+  IsInt,
+  IsISO8601,
+  IsOptional,
+  IsString,
+  Matches,
+  Max,
+  Min,
+} from 'class-validator';
 import type { Request } from 'express';
 import { FlightsService } from './flights.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -52,6 +60,48 @@ class CreateFlightDto {
   @Min(1)
   @Max(MAX_INT32)
   basePriceIrr: number;
+}
+
+class CreateScheduleDto {
+  @ApiProperty({ description: 'کد فرودگاه مبدأ', example: 'THR' })
+  @IsString()
+  originCode!: string;
+
+  @ApiProperty({ description: 'کد فرودگاه مقصد', example: 'MHD' })
+  @IsString()
+  destCode!: string;
+
+  @ApiProperty({ description: 'شماره پرواز', example: 'BJ-410' })
+  @Matches(/^[A-Z]{2}-\d{2,4}$/)
+  flightNo!: string;
+
+  @ApiProperty({
+    description: 'الگوی تکرار RRULE (RFC 5545)',
+    example: 'FREQ=WEEKLY;BYDAY=SA,MO,WE',
+  })
+  @IsString()
+  rrule!: string;
+
+  @ApiProperty({ description: 'ساعت حرکت (UTC)', example: '07:30' })
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/)
+  depTime!: string;
+
+  @ApiProperty({ description: 'ظرفیت هر پرواز', example: 146 })
+  @IsInt()
+  @Min(1)
+  @Max(500)
+  capacity!: number;
+
+  @ApiProperty({
+    description: 'چند روز آینده از حالا ساخته شود (پیش‌فرض ۳۰)',
+    example: 30,
+    required: false,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(90)
+  daysAhead?: number;
 }
 
 class PlanFlightDto {
@@ -99,6 +149,26 @@ export class FlightsController {
   ) {
     const data = await this.flights.create(actor, dto);
     return { success: true, data };
+  }
+
+  @Post('schedules')
+  @ApiOperation({
+    summary: 'ثبت برنامه تکرارشونده پرواز (RRULE) و ساخت پروازهای آینده',
+  })
+  async createSchedule(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateScheduleDto,
+  ) {
+    return {
+      success: true,
+      data: await this.flights.createSchedule(user, dto),
+    };
+  }
+
+  @Get('schedules')
+  @ApiOperation({ summary: 'فهرست برنامه‌های تکرارشونده پرواز' })
+  async listSchedules() {
+    return { success: true, data: await this.flights.listSchedules() };
   }
 
   @Post('ai-analysis')

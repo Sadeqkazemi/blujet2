@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -16,7 +17,8 @@ import {
   normalizeNationalId,
 } from '../../common/pii-crypto';
 import { enumerateSeats } from '../reservation/seat-layout';
-import { getCabinPrice } from './pricing';
+import { getCabinPrice, resolveFareClass } from './pricing';
+import { PAYMENT_GATEWAY, type PaymentGateway } from './payment-gateway';
 import { SearchService } from './search.service';
 import { PriceLockService } from './price-lock.service';
 import { WalletService } from './wallet.service';
@@ -55,6 +57,8 @@ export class BookingService {
     private readonly priceLocks: PriceLockService,
     private readonly wallet: WalletService,
     private readonly clubPoints: ClubPointsService,
+    @Inject(PAYMENT_GATEWAY)
+    private readonly gateway: PaymentGateway,
   ) {}
 
   /** Lazily flips a past-TTL HELD booking to EXPIRED, releasing its seats
@@ -174,6 +178,11 @@ export class BookingService {
     const unitPriceIrr = usableLock
       ? usableLock.lockedPriceIrr
       : await getCabinPrice(this.prisma, instance.id, dto.cabin);
+    // Fare-class bucket (Y/B/M) this booking consumes, when class-based
+    // pricing is active for the instance; null under flat pricing.
+    const fareClass = usableLock
+      ? null
+      : await resolveFareClass(this.prisma, instance.id, dto.cabin);
     const priceIrr = unitPriceIrr * dto.passengers.length;
     const contactUser = await this.prisma.user.findUniqueOrThrow({
       where: { id: user.id },
@@ -203,6 +212,7 @@ export class BookingService {
           channel: 'SYSTEM',
           status: 'HELD',
           cabin: dto.cabin,
+          fareClassCode: fareClass?.classCode ?? null,
           priceIrr,
           userId: user.id,
           contactPhone: contactUser.phone ?? undefined,
@@ -359,6 +369,22 @@ export class BookingService {
     const paymentMethod: PaymentMethod = options.paymentMethod ?? 'GATEWAY';
     const member = await this.clubPoints.findMemberByUserId(user.id);
 
+    // Shetab/IPG handshake happens BEFORE the DB transaction (a real driver
+    // is a network call; sandbox approves synchronously). Wallet/points pay
+    // internally, so no gateway round-trip for them.
+    let gatewayRefId: string | null = null;
+    if (paymentMethod === 'GATEWAY') {
+      const { authority } = await this.gateway.request(currentPriceIrr, id);
+      const verified = await this.gateway.verify(authority, currentPriceIrr);
+      if (!verified.ok) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'پرداخت از سوی درگاه تأیید نشد. مبلغی کسر نشده است.',
+        });
+      }
+      gatewayRefId = verified.refId;
+    }
+
     const paid = await this.prisma.$transaction(async (tx) => {
       let finalPriceIrr = currentPriceIrr;
       let discountIrr = 0;
@@ -393,14 +419,27 @@ export class BookingService {
         );
       }
 
-      const flipped = await tx.booking.updateMany({
+      // Explicit state machine: payment capture flips HELD→PAID, ticket
+      // issuance then flips PAID→TICKETED — both inside this transaction,
+      // each guarded so a concurrent double-pay hits count===0 and 409s.
+      const captured = await tx.booking.updateMany({
         where: { id, status: 'HELD' },
-        data: { status: 'TICKETED', priceIrr: finalPriceIrr },
+        data: { status: 'PAID', priceIrr: finalPriceIrr },
       });
-      if (flipped.count === 0) {
+      if (captured.count === 0) {
         throw new ConflictException({
           code: ErrorCode.CONFLICT,
           message: 'این رزرو قبلاً پرداخت شده است.',
+        });
+      }
+      const issued = await tx.booking.updateMany({
+        where: { id, status: 'PAID' },
+        data: { status: 'TICKETED' },
+      });
+      if (issued.count === 0) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'صدور بلیط ناموفق بود.',
         });
       }
 
@@ -447,6 +486,7 @@ export class BookingService {
         priceIrr: paid.booking.priceIrr,
         paymentMethod,
         discountIrr: paid.discountIrr,
+        gatewayRefId,
       },
     });
 

@@ -119,6 +119,7 @@ export class PrivacyService {
           nationalIdEnc: null,
           nationalIdHash: null,
           mobileEnc: null,
+          deletedAt: new Date(),
         },
       }),
       this.prisma.booking.updateMany({
