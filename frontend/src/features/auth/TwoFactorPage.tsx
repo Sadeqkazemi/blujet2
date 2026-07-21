@@ -43,19 +43,20 @@ export default function TwoFactorPage() {
 
   return (
     <StaffLoginLayout>
-      <div className="mb-1.5 text-[12.5px] font-extrabold text-white">تأیید هویت دومرحله‌ای</div>
-      <div className="mb-5 text-[11.5px] text-[#8fa1bb]">کد ۶ رقمی ارسال‌شده را وارد کنید.</div>
+      <div className="mb-1.5 text-[19px] font-black text-[#0f172a]">تأیید هویت دومرحله‌ای</div>
+      <div className="mb-5 text-[11.5px] leading-[1.9] text-[#64748b]">کد ۶ رقمی ارسال‌شده را وارد کنید.</div>
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
         <div>
-          <label htmlFor="code" className="mb-1.5 block text-[11.5px] text-[#9fb0c7]">
+          <label htmlFor="code" className="mb-1.5 block text-[11px] font-bold text-[#334155]">
             کد تأیید
           </label>
           <input
             id="code"
+            dir="ltr"
             inputMode="numeric"
             maxLength={6}
-            className="ltr w-full rounded-lg border border-[#263248] bg-[#0b1220] px-3.5 py-2.5 text-center text-lg font-num tracking-[0.4em] text-white outline-none focus:border-accent"
+            className="font-num h-[46px] w-full rounded-xl border border-[#e2e8f0] bg-[#f8fafc] px-3.5 text-center text-lg tracking-[0.4em] text-[#0f172a] outline-none focus:border-accent"
             value={code}
             onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
             autoComplete="one-time-code"
@@ -63,7 +64,7 @@ export default function TwoFactorPage() {
         </div>
 
         {error && (
-          <p role="alert" className="text-xs text-danger">
+          <p role="alert" className="rounded-[10px] border border-red-200 bg-red-50 px-3 py-2.5 text-[11.5px] text-red-600">
             {error}
           </p>
         )}
@@ -71,7 +72,7 @@ export default function TwoFactorPage() {
         <button
           type="submit"
           disabled={submitting}
-          className="mt-2 rounded-lg bg-accent py-2.5 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-60"
+          className="mt-2 flex h-12 items-center justify-center rounded-xl bg-gradient-to-br from-accent to-navy-2 text-[13.5px] font-extrabold text-white shadow-lg transition hover:brightness-110 disabled:opacity-60"
         >
           {submitting ? 'در حال بررسی…' : 'تأیید و ورود'}
         </button>
