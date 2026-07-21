@@ -1,23 +1,82 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { RedisService } from '../../redis/redis.service';
 import { getCabinPrice } from './pricing';
 import { enumerateSeats } from '../reservation/seat-layout';
 import type { CabinClass } from '../../../generated/prisma/enums';
 
 const ACTIVE_BOOKING_STATUSES = ['DRAFT', 'HELD', 'PAID', 'TICKETED'] as const;
 
+// CLAUDE.md: search-result cache TTL 5-10 min; Redis is never the source of
+// truth for seats/bookings — availability is still re-checked (takenSeatCodes
+// queries Postgres directly) at seat-map/booking time, never from this cache.
+const AIRPORTS_TTL_SECONDS = 600;
+const SEARCH_TTL_SECONDS = 300;
+
 @Injectable()
 export class SearchService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly redis: RedisService,
+  ) {}
 
   async airports() {
-    return this.prisma.airport.findMany({ orderBy: { cityFa: 'asc' } });
+    const cacheKey = 'search:airports';
+    const cached = await this.redis.get<unknown>(cacheKey);
+    if (cached) return cached;
+
+    const airports = await this.prisma.airport.findMany({
+      orderBy: { cityFa: 'asc' },
+    });
+    await this.redis.set(cacheKey, airports, AIRPORTS_TTL_SECONDS);
+    return airports;
   }
 
   /** Public flight search — same SCHEDULED/day-window semantics as the
    * staff reservation search, but unauthenticated and cabin/price-aware
-   * (design's نتایج پرواز needs both cabins' price + seatsLeft per card). */
+   * (design's نتایج پرواز needs both cabins' price + seatsLeft per card).
+   * Cached briefly (SEARCH_TTL_SECONDS): a cache hit can serve a slightly
+   * stale seatsLeft count, which is fine since the buy flow always
+   * re-validates the seat map / re-prices against Postgres directly. */
   async search(origin: string, dest: string, date: string) {
+    const cacheKey = `search:flights:${origin.toUpperCase()}:${dest.toUpperCase()}:${date}`;
+    const cached = await this.redis.get<unknown[]>(cacheKey);
+    if (cached) return cached;
+
+    const results = await this.searchUncached(origin, dest, date);
+    await this.redis.set(cacheKey, results, SEARCH_TTL_SECONDS);
+    return results;
+  }
+
+  private searchCacheKey(
+    originCode: string,
+    destCode: string,
+    departureAt: Date,
+  ): string {
+    const date = departureAt.toISOString().slice(0, 10);
+    return `search:flights:${originCode.toUpperCase()}:${destCode.toUpperCase()}:${date}`;
+  }
+
+  /** Called right after a booking mutates seat availability/pricing for an
+   * instance, so a customer never sees a stale seatsLeft/price for the rest
+   * of the TTL window after someone else just booked the seat they're
+   * looking at. */
+  async invalidateForInstance(flightInstanceId: string): Promise<void> {
+    const instance = await this.prisma.flightInstance.findUnique({
+      where: { id: flightInstanceId },
+      include: { flight: { include: { route: true } } },
+    });
+    if (!instance) return;
+    await this.redis.del(
+      this.searchCacheKey(
+        instance.flight.route.originCode,
+        instance.flight.route.destCode,
+        instance.departureAt,
+      ),
+    );
+  }
+
+  private async searchUncached(origin: string, dest: string, date: string) {
     const dayStart = new Date(date);
     dayStart.setUTCHours(0, 0, 0, 0);
     const dayEnd = new Date(dayStart);

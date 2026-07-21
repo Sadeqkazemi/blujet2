@@ -67,10 +67,16 @@ services:
       # be silently dropped by the browser. Flip to "true" once a real
       # domain + HTTPS is in front of this (see docs/DEPLOY_IP.md).
       COOKIE_SECURE: 'false'
-    # Exposed directly too (Swagger/health debugging) — normal traffic goes
-    # through the frontend's nginx proxy on :80, not this port.
-    ports:
-      - '3000:3000'
+    # No published port here — Phase 2 (traffic hardening): the backend is
+    # reachable ONLY through the frontend's nginx proxy on :80. Publishing
+    # :3000 directly meant anyone could bypass nginx (and its future
+    # rate-limiting/WAF layer) and hit the API straight from the internet.
+    # For Swagger/health debugging from the host, use
+    # `docker compose -f docker-compose.prod.yml exec backend curl localhost:3000/health`
+    # or a temporary `docker compose port backend 3000` instead of a
+    # permanent published port.
+    expose:
+      - '3000'
     volumes:
       - backend_uploads:/app/uploads
       - backend_backups:/app/backups

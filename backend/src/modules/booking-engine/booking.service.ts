@@ -248,6 +248,10 @@ export class BookingService {
       return created;
     });
 
+    // The just-consumed seat/fare-bucket must not keep showing as available
+    // on a cached search result for the rest of the cache TTL.
+    await this.search.invalidateForInstance(instance.id);
+
     await this.audit.record({
       actorId: user.id,
       actorRole: user.role,

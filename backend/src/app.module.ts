@@ -6,6 +6,7 @@ import { LoggerModule } from 'nestjs-pino';
 import { randomUUID } from 'node:crypto';
 import { validateEnv } from './config/env.validation';
 import { PrismaModule } from './prisma/prisma.module';
+import { RedisModule } from './redis/redis.module';
 import { HealthModule } from './health/health.module';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 import { AuthModule } from './modules/auth/auth.module';
@@ -56,10 +57,17 @@ import { BookingEngineModule } from './modules/booking-engine/booking-engine.mod
         ],
       },
     }),
+    // Global default covers read-mostly endpoints (search, panels, reporting).
+    // Iranian mobile carriers commonly CGNAT many real users behind one IP,
+    // so this is deliberately generous — the endpoints that actually need a
+    // tight per-account/per-IP limit (auth, OTP, booking creation, payment)
+    // already carry their own stricter @Throttle() override and are
+    // unaffected by this default.
     ThrottlerModule.forRoot({
-      throttlers: [{ ttl: 60_000, limit: 60 }],
+      throttlers: [{ ttl: 60_000, limit: 600 }],
     }),
     PrismaModule,
+    RedisModule,
     HealthModule,
     AuthModule,
     PanelsModule,
