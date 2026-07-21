@@ -40,6 +40,9 @@ const POPULAR_DESTS = [
   { name: 'کیش', code: 'KIH', country: 'ایران', dur: '۱.۵ ساعت پرواز', price: '۲٬۱۰۰٬۰۰۰', grad: 'linear-gradient(160deg,#cdd9ec,#eaeff7)' },
 ];
 
+const ANNOUNCEMENT_TEXT =
+  'اطلاعیه مهم: برخی پروازهای امروز به‌دلیل شرایط جوی با تأخیر انجام می‌شوند — آخرین وضعیت پروازها را بررسی کنید';
+
 export default function HomeSearchPage() {
   const navigate = useNavigate();
   const [airports, setAirports] = useState<Airport[]>([]);
@@ -47,6 +50,7 @@ export default function HomeSearchPage() {
   const [dest, setDest] = useState('');
   const [dateIso, setDateIso] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [annClosed, setAnnClosed] = useState(false);
 
   useEffect(() => {
     fetchAirports()
@@ -76,6 +80,47 @@ export default function HomeSearchPage() {
   return (
     <div dir="rtl" style={{ fontFamily: "'Vazirmatn Variable', Vazirmatn, sans-serif", fontSize: '14.5px', background: '#f6f8fb', color: '#16202e', minHeight: '100vh' }}>
       <PublicHeader />
+
+      {!annClosed && (
+        <div style={{ background: 'linear-gradient(90deg,#0a1f36,#0d2640 40%,#123457)', color: '#fff', position: 'relative', zIndex: 40 }}>
+          <div style={{ maxWidth: 1320, margin: '0 auto', padding: '11px 26px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '13.5px', fontWeight: 800, textAlign: 'center' }}>{ANNOUNCEMENT_TEXT}</span>
+            <button
+              type="button"
+              onClick={() => navigate('/flight-status')}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#f2c94c', color: '#0d2640', padding: '6px 16px', borderRadius: 20, fontSize: 12, fontWeight: 800, border: 'none', cursor: 'pointer', flex: 'none', fontFamily: 'inherit' }}
+            >
+              مشاهده <span style={{ fontSize: 12 }}>←</span>
+            </button>
+            <button
+              type="button"
+              data-testid="ann-close"
+              onClick={() => setAnnClosed(true)}
+              aria-label="بستن"
+              style={{
+                position: 'absolute',
+                left: 14,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                width: 26,
+                height: 26,
+                borderRadius: '50%',
+                background: 'rgba(255,255,255,.12)',
+                color: '#cfe0f2',
+                border: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 14,
+                cursor: 'pointer',
+                lineHeight: 1,
+              }}
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
 
       <section style={{ background: '#f6f8fb' }}>
         <div style={{ position: 'relative', height: 420, overflow: 'hidden', background: 'linear-gradient(110deg,#0d2640 0%,#123a63 50%,#1668c4 100%)' }}>

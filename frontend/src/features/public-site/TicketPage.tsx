@@ -54,7 +54,7 @@ export default function TicketPage() {
 
   return (
     <PublicPageShell>
-    <div className="mx-auto max-w-lg p-6">
+    <div className="mx-auto max-w-[640px] p-6">
       <h1 className="mb-4 text-lg font-extrabold text-[#0d2640]">بلیط الکترونیکی</h1>
 
       {/* Boarding-pass card per the design's ticket visual */}

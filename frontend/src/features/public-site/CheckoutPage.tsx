@@ -6,6 +6,7 @@ import { faMoney } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import type { BookingDetail } from '../../types/public-site';
 import PublicPageShell from '../../components/public/PublicPageShell';
+import FlowStepper from '../../components/public/FlowStepper';
 
 type PaymentMethod = 'GATEWAY' | 'WALLET' | 'POINTS';
 
@@ -92,6 +93,7 @@ export default function CheckoutPage() {
 
   return (
     <PublicPageShell>
+    <FlowStepper current="checkout" onBack={() => navigate(-1)} />
     <div className="mx-auto max-w-lg p-6">
       <h1 className="mb-4 text-lg font-extrabold text-[#0d2640]">تکمیل خرید</h1>
       <div className="mb-4 rounded-2xl border border-[#e5e9f0] bg-white p-5">

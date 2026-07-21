@@ -111,4 +111,28 @@ describe('BookPage', () => {
       passengers: [{ fullName: 'علی رضایی', nationalId: undefined, mobile: undefined, seatCode: '2A' }],
     });
   });
+
+  it('locks business-cabin seat selection below the 15,000-point club threshold', async () => {
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      status: 'authenticated',
+      user: { id: 'u1', fullName: '09121234567', role: 'USER' },
+      requestLogin: vi.fn(),
+      confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
+      signOut: vi.fn(),
+    });
+    vi.spyOn(publicSiteApi, 'fetchSeatMap').mockResolvedValue(SEATMAP);
+    vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({ isMember: true, level: 'GOLD', balance: 8000 });
+
+    render(
+      <MemoryRouter initialEntries={['/book/fi-1?cabin=BUSINESS']}>
+        <Routes>
+          <Route path="/book/:flightInstanceId" element={<BookPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByTestId('business-seat-lock')).toBeInTheDocument();
+    expect(screen.getByTestId('seat-1A')).toBeDisabled();
+  });
 });
