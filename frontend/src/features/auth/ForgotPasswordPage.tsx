@@ -124,7 +124,7 @@ export default function ForgotPasswordPage() {
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5 }}>
                 <span style={{ color: '#8a96a6' }}>کد را دریافت نکردید؟</span>
                 {left > 0 ? (
-                  <span style={{ color: '#9aa4b2' }}>ارسال مجدد ({timer})</span>
+                  <span style={{ color: '#6b7787' }}>ارسال مجدد ({timer})</span>
                 ) : (
                   <span onClick={() => setLeft(RESEND_SECONDS)} style={{ color: '#1668c4', fontWeight: 700, cursor: 'pointer' }}>
                     ارسال مجدد

@@ -10,6 +10,14 @@ const TIER_LABEL: Record<string, string> = {
   PLATINUM: 'پلاتین',
 };
 
+// Sample notification feed — the design's own placeholder content; no
+// backend notifications endpoint exists yet, so this stays presentational.
+const NOTIFICATIONS = [
+  { icon: '✈', title: 'یادآوری سفر', body: 'پرواز تهران → دبی شما فرداست. آنلاین چک‌این باز است.', time: '۱ ساعت پیش' },
+  { icon: '★', title: 'امتیاز باشگاه', body: '۴۵۰ امتیاز از خرید قبلی به حساب شما اضافه شد.', time: 'دیروز' },
+  { icon: '🏷', title: 'کد تخفیف', body: 'کد BLUE20 برای پروازهای داخلی تا پایان هفته فعال است.', time: '۲ روز پیش' },
+];
+
 function initials(fullName: string) {
   const parts = fullName.trim().split(/\s+/);
   return parts.slice(0, 2).map((p) => p[0] ?? '').join('') || 'کا';
@@ -19,6 +27,7 @@ function initials(fullName: string) {
 export default function PublicHeader() {
   const { status, user, signOut } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
   const [club, setClub] = useState<{ isMember: boolean; level: string | null; balance: number } | null>(null);
 
   const loggedIn = status === 'authenticated' && user?.role === 'USER';
@@ -134,23 +143,66 @@ export default function PublicHeader() {
 
             {loggedIn && user && (
               <>
-                {club?.isMember && (
+                <div style={{ position: 'relative' }}>
                   <div
+                    data-testid="public-notif-toggle"
+                    onClick={() => setNotifOpen((v) => !v)}
                     style={{
+                      width: 42,
+                      height: 42,
+                      borderRadius: '50%',
+                      background: '#f3f5f8',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: 6,
-                      background: '#eef4fb',
-                      border: '1px solid #dce8f7',
-                      padding: '7px 11px',
-                      borderRadius: 24,
+                      justifyContent: 'center',
+                      color: '#5a6678',
+                      fontSize: '15.5px',
+                      position: 'relative',
+                      cursor: 'pointer',
                     }}
                   >
-                    <span style={{ color: '#caa53a', fontSize: '12.5px' }}>★</span>
-                    <span style={{ fontSize: '11.5px', fontWeight: 800, color: '#1668c4' }}>{faDigits(club.balance)}</span>
-                    <span style={{ fontSize: 11, color: '#7a8696' }}>امتیاز</span>
+                    🔔
+                    <span style={{ position: 'absolute', top: 9, left: 12, width: 8, height: 8, borderRadius: '50%', background: '#e5484d', border: '1.5px solid #fff' }} />
                   </div>
-                )}
+                  {notifOpen && (
+                    <>
+                      <div onClick={() => setNotifOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 120 }} />
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: 52,
+                          left: 0,
+                          width: 340,
+                          background: '#fff',
+                          border: '1px solid #e6eaf0',
+                          borderRadius: 14,
+                          boxShadow: '0 20px 50px -16px rgba(13,38,64,.35)',
+                          zIndex: 130,
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <div style={{ padding: '11px 12px', borderBottom: '1px solid #eef1f5', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span style={{ fontSize: '12.5px', fontWeight: 800, color: '#0d2640' }}>اعلان‌ها</span>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: '#1668c4', background: '#eef4fb', padding: '2px 7px', borderRadius: 12 }}>
+                            {faDigits(NOTIFICATIONS.length)} جدید
+                          </span>
+                        </div>
+                        {NOTIFICATIONS.map((n) => (
+                          <div key={n.title + n.time} style={{ display: 'flex', gap: 9, padding: '11px 12px', borderBottom: '1px solid #f4f6fa' }}>
+                            <span style={{ width: 34, height: 34, borderRadius: 10, background: '#f3f5f8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14.5px', flex: 'none' }}>
+                              {n.icon}
+                            </span>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#16202e' }}>{n.title}</div>
+                              <div style={{ fontSize: 11, color: '#6b7787', marginTop: 2, lineHeight: 1.7 }}>{n.body}</div>
+                              <div style={{ fontSize: '9.5px', color: '#6b7787', marginTop: 4 }}>{n.time}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
                 <div style={{ position: 'relative' }}>
                   <div
                     data-testid="public-user-menu-toggle"
@@ -188,7 +240,7 @@ export default function PublicHeader() {
                         <div style={{ fontSize: 10, color: '#caa53a', fontWeight: 700 }}>★ عضو {TIER_LABEL[club.level] ?? club.level}</div>
                       )}
                     </div>
-                    <span style={{ fontSize: 8, color: '#9aa4b2', marginRight: 2 }}>▼</span>
+                    <span style={{ fontSize: 8, color: '#6b7787', marginRight: 2 }}>▼</span>
                   </div>
 
                   {menuOpen && (
@@ -199,7 +251,7 @@ export default function PublicHeader() {
                           position: 'absolute',
                           top: 54,
                           left: 0,
-                          width: 260,
+                          width: 320,
                           background: '#fff',
                           border: '1px solid #e6eaf0',
                           borderRadius: 16,
@@ -208,13 +260,46 @@ export default function PublicHeader() {
                           overflow: 'hidden',
                         }}
                       >
+                        <div style={{ padding: 15, background: 'linear-gradient(135deg,#0d2640,#16406e)', color: '#fff' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'rgba(255,255,255,.16)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '13.5px' }}>
+                              {initials(user.fullName)}
+                            </div>
+                            <div style={{ lineHeight: 1.5 }}>
+                              <div style={{ fontSize: '13.5px', fontWeight: 800 }}>{user.fullName}</div>
+                              {club?.isMember && club.level && (
+                                <div style={{ fontSize: '10.5px', color: '#caa53a', fontWeight: 700 }}>★ عضو {TIER_LABEL[club.level] ?? club.level}</div>
+                              )}
+                            </div>
+                          </div>
+                          {club?.isMember && (
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, background: 'rgba(255,255,255,.1)', borderRadius: 10, padding: '7px 11px' }}>
+                              <span style={{ fontSize: 11, color: '#aac4e2' }}>امتیاز باشگاه</span>
+                              <span style={{ fontSize: '12.5px', fontWeight: 800 }}>{faDigits(club.balance)}</span>
+                            </div>
+                          )}
+                        </div>
                         <div style={{ padding: 5 }}>
+                          <Link
+                            to="/account"
+                            style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: '11.5px', color: '#16202e', textDecoration: 'none', fontWeight: 600 }}
+                          >
+                            <span style={{ color: '#1668c4' }}>👤</span>
+                            مشاهده پروفایل
+                          </Link>
                           <Link
                             to="/manage-booking"
                             style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: '11.5px', color: '#16202e', textDecoration: 'none', fontWeight: 600 }}
                           >
                             <span style={{ color: '#1668c4' }}>🧳</span>
                             سفرها و مدیریت رزرو
+                          </Link>
+                          <Link
+                            to="/manage-booking"
+                            style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: '11.5px', color: '#16202e', textDecoration: 'none', fontWeight: 600 }}
+                          >
+                            <span style={{ color: '#1668c4' }}>↺</span>
+                            استرداد
                           </Link>
                           <Link
                             to="/club"

@@ -12,7 +12,7 @@ const QUICK_LINKS = [
   { label: 'انتخاب صندلی', href: '/results' },
   { label: 'خرید بار اضافه', href: '/results' },
   { label: 'تغییر و استرداد بلیط', href: '/ticket' },
-  { label: 'استعلام وضعیت پرواز', href: '/results' },
+  { label: 'استعلام وضعیت پرواز', href: '/flight-status' },
 ];
 
 // Marketing mock content matching design-reference/صفحه اصلی.dc.html — the
@@ -146,7 +146,7 @@ export default function HomeSearchPage() {
 
               <div style={{ display: 'flex', alignItems: 'stretch', position: 'relative', border: '1.5px solid #e3e9f1', borderRadius: 14, background: '#fff', flexWrap: 'wrap' }}>
                 <div style={{ flex: '1.5 1 165px', minWidth: 165, padding: '5px 20px 5px 13px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#9aa4b2', fontWeight: 600, marginBottom: 3 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#6b7787', fontWeight: 600, marginBottom: 3 }}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M12 21s-6-5.3-6-10a6 6 0 0 1 12 0c0 4.7-6 10-6 10z" />
                       <circle cx="12" cy="11" r="2" />
@@ -158,7 +158,7 @@ export default function HomeSearchPage() {
                     data-testid="home-origin"
                     value={origin}
                     onChange={(e) => setOrigin(e.target.value)}
-                    style={{ width: '100%', border: 'none', outline: 'none', fontSize: '14.5px', fontWeight: 800, color: origin ? '#0d2640' : '#9aa4b2', background: 'transparent', fontFamily: 'inherit' }}
+                    style={{ width: '100%', border: 'none', outline: 'none', fontSize: '14.5px', fontWeight: 800, color: origin ? '#0d2640' : '#6b7787', background: 'transparent', fontFamily: 'inherit' }}
                   >
                     <option value="">انتخاب کنید</option>
                     {airports.map((a) => (
@@ -194,7 +194,7 @@ export default function HomeSearchPage() {
                 </div>
 
                 <div style={{ flex: '1.5 1 165px', minWidth: 165, padding: '5px 20px', borderRight: '1px solid #eef1f5' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#9aa4b2', fontWeight: 600, marginBottom: 3 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#6b7787', fontWeight: 600, marginBottom: 3 }}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M12 21s-6-5.3-6-10a6 6 0 0 1 12 0c0 4.7-6 10-6 10z" />
                       <circle cx="12" cy="11" r="2" />
@@ -206,7 +206,7 @@ export default function HomeSearchPage() {
                     data-testid="home-dest"
                     value={dest}
                     onChange={(e) => setDest(e.target.value)}
-                    style={{ width: '100%', border: 'none', outline: 'none', fontSize: '14.5px', fontWeight: 800, color: dest ? '#0d2640' : '#9aa4b2', background: 'transparent', fontFamily: 'inherit' }}
+                    style={{ width: '100%', border: 'none', outline: 'none', fontSize: '14.5px', fontWeight: 800, color: dest ? '#0d2640' : '#6b7787', background: 'transparent', fontFamily: 'inherit' }}
                   >
                     <option value="">انتخاب کنید</option>
                     {airports.map((a) => (
@@ -345,7 +345,7 @@ export default function HomeSearchPage() {
                   {o.from} <span style={{ color: '#b9c2cf', fontWeight: 600 }}>←</span> {o.to}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, marginBottom: 13 }}>
-                  <span style={{ fontSize: '11.5px', color: '#9aa4b2', textDecoration: 'line-through' }}>{o.was}</span>
+                  <span style={{ fontSize: '11.5px', color: '#6b7787', textDecoration: 'line-through' }}>{o.was}</span>
                   <span style={{ fontSize: '14.5px', fontWeight: 900, color: '#1668c4' }}>{o.now}</span>
                   <span style={{ fontSize: 11, color: '#6b7585' }}>تومان</span>
                 </div>
@@ -417,7 +417,7 @@ export default function HomeSearchPage() {
               <div style={{ padding: '11px 12px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                   <span style={{ fontSize: '13.5px', fontWeight: 800, color: '#16202e' }}>{d.name}</span>
-                  <span style={{ fontSize: 11, color: '#9aa4b2' }}>{d.country}</span>
+                  <span style={{ fontSize: 11, color: '#6b7787' }}>{d.country}</span>
                 </div>
                 <div style={{ fontSize: '11.5px', color: '#6b7585' }}>
                   از <span style={{ fontSize: '12.5px', fontWeight: 800, color: '#1668c4' }}>{d.price}</span> تومان
