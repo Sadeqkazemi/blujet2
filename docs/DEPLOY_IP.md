@@ -41,7 +41,7 @@ apt-get install -y docker-compose-plugin   # اگر با اسکریپت بالا
 
 4. **بررسی سلامت:**
    ```bash
-   curl http://SERVER_IP:3000/health
+   curl http://SERVER_IP/health
    ```
    باید `{"status":"ok", ...}` برگرداند.
 
@@ -56,8 +56,8 @@ apt-get install -y docker-compose-plugin   # اگر با اسکریپت بالا
 | پنل مدیریتی (بعد از ورود، بر اساس نقش) | `http://SERVER_IP/panel` |
 | ورود پنل آژانس | `http://SERVER_IP/agency/login` |
 | پنل آژانس | `http://SERVER_IP/agency` |
-| مستندات API (Swagger) | `http://SERVER_IP:3000/docs` |
-| بررسی سلامت بک‌اند | `http://SERVER_IP:3000/health` |
+| مستندات API (Swagger) | `http://SERVER_IP/docs` |
+| بررسی سلامت بک‌اند | `http://SERVER_IP/health` |
 
 پنل مدیریتی یک shell واحد است — بعد از ورود با هر نقش (مدیر عامل، رئیس
 هیئت مدیره، مدیر ارشد، مدیر مالی، مدیر بازرگانی، مدیر IT، کارمند، ادمین
@@ -82,8 +82,12 @@ proxy می‌کند و بقیه مسیرها را به‌عنوان صفحات R
 cross-origin کار می‌کند) و فرانت‌اند حتی نیازی به دانستن IP سرور در زمان
 بیلد ندارد.
 
-پورت ۳۰۰۰ (بک‌اند) هم مستقیماً باز است — فقط برای دیباگ/دسترسی مستقیم به
-Swagger؛ مسیر اصلی و توصیه‌شده همیشه پورت ۸۰ است.
+پورت ۳۰۰۰ بک‌اند دیگر مستقیماً به بیرون باز نیست (فقط `expose` داخل شبکه
+Docker) — همه ترافیک، از جمله Swagger و health، باید از پورت ۸۰ (nginx)
+عبور کند. برای دیباگ مستقیم روی سرور:
+```bash
+docker compose -f docker-compose.prod.yml exec backend curl -s localhost:3000/health
+```
 
 ## نکات امنیتی مهم
 
@@ -114,3 +118,23 @@ docker compose -f docker-compose.prod.yml exec db pg_dump -U blujet blujet > bac
 # توقف کامل
 docker compose -f docker-compose.prod.yml down
 ```
+
+## مقیاس‌پذیری بک‌اند (فاز ۲ — ترافیک)
+
+وقتی ترافیک سایت بالا رفت، بک‌اند را می‌توان به چند نمونه (replica) بدون
+تغییر nginx یا فرانت‌اند مقیاس داد — nginx با DNS داخلی داکر
+(`resolver 127.0.0.11`) خودش درخواست‌ها را بین نمونه‌ها پخش می‌کند:
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build --scale backend=3
+```
+
+نکات:
+- بک‌اند stateless است (نشست‌ها JWT هستند، نه session داخل حافظه)، پس
+  چند نمونه بدون sticky-session مشکلی ندارد.
+- منابع مشترک (Redis برای کش جستجو، Postgres برای seat lock) بین همه
+  نمونه‌ها یکسان است — قفل صندلی (`SELECT ... FOR UPDATE`) در دیتابیس
+  انجام می‌شود، نه در حافظه یک نمونه، پس دوبار فروخته‌شدن یک صندلی روی
+  چند نمونه هم رخ نمی‌دهد.
+- تعداد نمونه را متناسب با CPU/RAM سرور تنظیم کنید — روی یک VPS تک‌هسته‌ای
+  مقیاس‌دهی بک‌اند سودی ندارد؛ ابتدا مطمئن شوید سرور واقعاً چند هسته دارد.
