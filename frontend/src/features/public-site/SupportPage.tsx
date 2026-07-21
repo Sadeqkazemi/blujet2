@@ -58,7 +58,7 @@ export default function SupportPage() {
             پاسخ پرسش‌های متداول را پیدا کنید یا با تیم پشتیبانی ۲۴ ساعته در ارتباط باشید.
           </p>
           <div style={{ maxWidth: 560, margin: '0 auto', background: '#fff', borderRadius: 14, boxShadow: '0 22px 50px -18px rgba(0,0,0,.4)', padding: 7, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9aa4b2" strokeWidth="2.2" strokeLinecap="round" style={{ marginRight: 9, flex: 'none' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6b7787" strokeWidth="2.2" strokeLinecap="round" style={{ marginRight: 9, flex: 'none' }}>
               <circle cx="11" cy="11" r="7" />
               <path d="M21 21l-4-4" />
             </svg>

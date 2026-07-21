@@ -40,6 +40,10 @@ export function fetchMyBooking(id: string) {
   return apiGet<BookingDetail>(`/bookings/${id}`);
 }
 
+export function fetchMyBookings() {
+  return apiGet<BookingDetail[]>('/bookings/me');
+}
+
 export function fetchBookingByPnr(pnr: string) {
   return apiGet<BookingDetail>(`/bookings/pnr/${pnr}`);
 }

@@ -34,6 +34,9 @@ export default function PublicFooter() {
             <Link to="/manage-booking" style={{ color: '#aebfd4', textDecoration: 'none' }}>
               مدیریت رزرو
             </Link>
+            <Link to="/flight-status" style={{ color: '#aebfd4', textDecoration: 'none' }}>
+              وضعیت پرواز
+            </Link>
             <Link to="/club" style={{ color: '#aebfd4', textDecoration: 'none' }}>
               باشگاه مشتریان
             </Link>

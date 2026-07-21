@@ -183,7 +183,7 @@ export default function CustomerLoginPage() {
                   fontSize: 14,
                   fontWeight: 800,
                   cursor: 'pointer',
-                  color: mode === m ? '#1668c4' : '#9aa4b2',
+                  color: mode === m ? '#1668c4' : '#6b7787',
                   borderBottom: mode === m ? '2.5px solid #1668c4' : '2.5px solid transparent',
                   marginBottom: -1.5,
                 }}
@@ -273,7 +273,7 @@ export default function CustomerLoginPage() {
               </button>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 {timer.left > 0 ? (
-                  <span data-testid="signin-resend-timer" style={{ fontSize: 11.5, color: '#9aa4b2' }}>
+                  <span data-testid="signin-resend-timer" style={{ fontSize: 11.5, color: '#6b7787' }}>
                     ارسال مجدد کد ({fmtTimer(timer.left)})
                   </span>
                 ) : (

@@ -54,6 +54,8 @@ import ManageBookingPage from './features/public-site/ManageBookingPage';
 import AboutPage from './features/public-site/AboutPage';
 import ContactPage from './features/public-site/ContactPage';
 import NotFoundPage from './features/public-site/NotFoundPage';
+import FlightStatusPage from './features/public-site/FlightStatusPage';
+import AccountPage from './features/public-site/AccountPage';
 import MaintenancePage from './features/public-site/MaintenancePage';
 
 export default function App() {
@@ -72,6 +74,8 @@ export default function App() {
           <Route path="/travel-info" element={<TravelInfoPage />} />
           <Route path="/signin" element={<CustomerLoginPage />} />
           <Route path="/manage-booking" element={<ManageBookingPage />} />
+          <Route path="/flight-status" element={<FlightStatusPage />} />
+          <Route path="/account" element={<AccountPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/maintenance" element={<MaintenancePage />} />
