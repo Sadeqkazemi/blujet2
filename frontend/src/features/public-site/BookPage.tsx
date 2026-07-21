@@ -1,10 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { createBooking, fetchSeatMap } from '../../api/publicSite';
+import { createBooking, fetchClubPoints, fetchSeatMap } from '../../api/publicSite';
 import { ApiRequestError } from '../../api/envelope';
 import type { CabinClass, SeatMapCell } from '../../types/public-site';
 import PublicPageShell from '../../components/public/PublicPageShell';
+import FlowStepper from '../../components/public/FlowStepper';
+
+// Business seat selection is a design-confirmed perk gate: at least 15,000
+// club points (the پلاتین threshold) are required, matching the design's
+// «انتخاب صندلی بیزینس نیازمند حداقل ۱۵٬۰۰۰ امتیاز باشگاه است» note.
+const BUSINESS_SEAT_MIN_POINTS = 15_000;
 
 function OtpLoginInline() {
   const { requestOtp, verifyOtp } = useAuth();
@@ -88,6 +94,7 @@ export default function BookPage() {
   const [passengers, setPassengers] = useState<PassengerDraft[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [clubBalance, setClubBalance] = useState<number | null>(null);
 
   useEffect(() => {
     if (!flightInstanceId) return;
@@ -95,6 +102,15 @@ export default function BookPage() {
       .then((m) => setSeats(m.seats.filter((s) => s.cabin === cabin)))
       .catch(() => setError('خطا در دریافت نقشه صندلی.'));
   }, [flightInstanceId, cabin]);
+
+  useEffect(() => {
+    if (status !== 'authenticated' || cabin !== 'BUSINESS') return;
+    fetchClubPoints()
+      .then((c) => setClubBalance(c.balance))
+      .catch(() => setClubBalance(0));
+  }, [status, cabin]);
+
+  const businessLocked = cabin === 'BUSINESS' && (clubBalance ?? 0) < BUSINESS_SEAT_MIN_POINTS;
 
   function toggleSeat(seatCode: string) {
     setSelectedSeats((prev) => {
@@ -159,8 +175,14 @@ export default function BookPage() {
 
   return (
     <PublicPageShell>
+    <FlowStepper current="seat" onBack={() => navigate(-1)} />
     <div className="mx-auto max-w-2xl p-6">
-      <h1 className="mb-4 text-lg font-extrabold text-[#0d2640]">انتخاب صندلی و اطلاعات مسافران</h1>
+      <h1 className="mb-1 text-lg font-extrabold text-[#0d2640]">انتخاب صندلی و اطلاعات مسافران</h1>
+      {cabin === 'BUSINESS' && businessLocked && (
+        <p data-testid="business-seat-lock" className="mb-4 text-[10.5px] font-semibold text-[#96701a]">
+          🔒 انتخاب صندلی بیزینس نیازمند حداقل ۱۵٬۰۰۰ امتیاز باشگاه است
+        </p>
+      )}
       {error && <p className="mb-4 rounded-lg bg-red-50 p-3 text-xs text-red-600">{error}</p>}
 
       {seats === null ? (
@@ -171,7 +193,7 @@ export default function BookPage() {
             <button
               key={s.seatCode}
               type="button"
-              disabled={s.status === 'TAKEN'}
+              disabled={s.status === 'TAKEN' || businessLocked}
               onClick={() => toggleSeat(s.seatCode)}
               data-testid={`seat-${s.seatCode}`}
               className={`font-num h-10 w-10 rounded-lg text-xs font-bold ${

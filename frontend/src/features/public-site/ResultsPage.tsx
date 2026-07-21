@@ -5,6 +5,7 @@ import { faDigits, faMoney } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
 import type { SearchFlightResult } from '../../types/public-site';
 import PublicPageShell from '../../components/public/PublicPageShell';
+import FlowStepper from '../../components/public/FlowStepper';
 
 // نتایج پرواز — rebuilt to follow design-reference/نتایج پرواز.dc.html:
 // search summary bar, 7-day Jalali price calendar, stops/time/airline
@@ -147,6 +148,8 @@ export default function ResultsPage() {
           </button>
         </div>
       </div>
+
+      <FlowStepper current="results" onBack={() => navigate('/')} />
 
       {/* PRICE CALENDAR STRIP */}
       <div className="border-b border-[#e8eef6] bg-white">
