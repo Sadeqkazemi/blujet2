@@ -438,13 +438,117 @@ the IT panels view reads `PanelAccessFlag` (read-only).
 
 ## Open items to confirm with the public-site track before merging
 
-1. `Booking`/`Passenger`/`LedgerEntry` above are a **minimal, forward-compatible
-   guess** at what the public-site track will build for search/checkout/
-   payment. Reconcile field names before both migration histories merge.
-2. `ReservationSystem`'s `role="super"` string literal — several panels pass
-   `"super"` (not `"ceo"`) as the prop even when logged in as CEO/Senior
-   Manager, and one panel (CEO's) never mounts the component at all (dead
-   nav). Confirm intended mapping: does `BOARD_CHAIR` alone get lock rights,
-   or should `CEO` too? The design copy says "CEO or Board Chair" but the
-   code only checks `role === 'super'`. **Needs a product decision, not an
-   inferred one** — CLAUDE.md workflow rule 4.
+**Resolved 2026-07-22 (branches unified into `main`):**
+
+1. ~~`Booking`/`Passenger`/`LedgerEntry` above are a minimal, forward-compatible
+   guess...~~ Reconciled — see Phase 13 below. The public-site track's actual
+   schema (`BookingStatus: DRAFT|HELD|PAID|TICKETED|CANCELLED|EXPIRED|REFUNDED`,
+   `BookingChannel: SYSTEM|CHARTER|AGENCY`, `CabinClass`, `FareRule`) is the
+   real one merged into `main` — this section's `DIRECT|AGENCY|VIP|MANAGERIAL`
+   guess was never implemented and is superseded; no migration needed, just
+   a doc correction (Phase 2's channel list above is historical/inaccurate,
+   kept as-is for the historical record rather than silently rewritten).
+2. ~~`ReservationSystem`'s `role="super"` string literal...~~ Already resolved
+   per Phase 9 above (`CAN_LOCK_ROLES = [CEO, BOARD_CHAIR, IT_MANAGER]`,
+   `SENIOR_MANAGER` view-only) — this open item was left unchecked after the
+   decision shipped; marking it done here.
+
+---
+
+## Phase 13 — Reservation engine completion, Part A: sale window, aircraft registration, real inventory pools
+
+Follow-up audit (2026-07-22) against a from-scratch reservation-engine spec
+the user provided, checked line-by-line against the actual merged code (not
+the mocks — none of this is grounded in a `.dc.html` design file, since no
+design shows these controls; see the "not built here" list at the end for
+the parts of that spec deliberately deferred pending a product decision,
+per workflow rule 4 — design/product intent wins, this file doesn't invent
+UI that was never specified anywhere).
+
+- `FlightInstance` gains:
+  - `saleStartsAt DateTime?`, `saleEndsAt DateTime?` — optional sale window.
+    `NULL` on either end means "no restriction" (today's behavior, so every
+    existing seeded/tested instance keeps working unchanged). When set,
+    `SearchService.search`/`searchUncached` excludes instances where
+    `now < saleStartsAt` or `now > saleEndsAt`, and `BookingService.createBooking`
+    re-checks the same window server-side (never trust that a client that
+    fetched search results a while ago is still inside the window) — 409
+    `SALE_WINDOW_CLOSED` if not.
+  - `aircraftRegistration String?` — the physical tail number assigned to
+    this specific flown instance (a recurring `Flight`/`Schedule` keeps the
+    same `aircraftType` across dates, but the actual airframe varies
+    per-departure in reality) — display-only, no booking logic reads it.
+  - ⚑ **Aircraft-type change is NOT a free-text field flip.** Changing the
+    instance's effective `aircraftType`-derived capacity (i.e. re-pointing it
+    at a different `AircraftSeatMap`) goes through a new
+    `FlightsService.changeAircraftType(instanceId, newAircraftType)` that:
+    1. Loads the new `AircraftSeatMap`'s total seat count.
+    2. Counts currently CONFIRMED-or-later seats (`Booking.status IN
+       (PAID, TICKETED)` for this instance, plus active `SeatLock` rows).
+    3. If the new capacity is `<` that count, **rejects with 409
+       `CAPACITY_BELOW_CONFIRMED`** — the response includes the shortfall
+       count so staff can see how many passengers would need manual
+       rebooking/cancellation first. The engine does **not** auto-cancel or
+       auto-rebook paying customers — that's a business/legal decision
+       (refund policy, compensation, rebooking priority) with no design or
+       product guidance anywhere, so it's surfaced as a blocked action for a
+       human to resolve deliberately, not automated.
+    4. Otherwise updates `capacity` (from the new seat map's total) and a
+       new `Flight.aircraftType` pointer *for this instance only* — this is
+       genuinely an instance-level override, so `FlightInstance` gains its
+       own nullable `aircraftTypeOverride String?` (falls back to
+       `Flight.aircraftType` when null) rather than mutating the shared
+       `Flight` row, which would silently change every other instance of
+       the same recurring schedule.
+
+- **Real inventory pools** (currently `charterSeats`/`agencySeatsAllocated`
+  are informational-only integers — nothing actually stops a `SYSTEM`-channel
+  booking from consuming a seat that was supposed to be reserved for charter
+  or an agency's quota). `SearchService.takenSeatCodes` today returns one
+  undifferentiated set of taken seat codes; this phase makes the channel
+  pools real without introducing a per-seat-code pool assignment (matching
+  the user's own inventory-vs-seat-map distinction — a pool is a *count*,
+  the seat map is *which physical seat*, and they're deliberately kept
+  separate):
+  - New `SearchService.takenSeatCodesByChannel(flightInstanceId)` — same
+    query as today's `takenSeatCodes` but grouped by `Booking.channel`
+    (`SeatLock` rows count toward a new virtual `MANAGERIAL` bucket, not
+    `SYSTEM`, so a managerial lock can never silently eat into the public
+    pool's count).
+  - `BookingService.createBooking`'s existing `FOR UPDATE`-guarded
+    transaction gains a pool check alongside the existing per-seat-code
+    conflict check: `AGENCY`-channel bookings 409 once
+    `takenByChannel.AGENCY >= flightInstance.agencySeatsAllocated`;
+    `CHARTER`-channel bookings 409 once `takenByChannel.CHARTER >=
+    flightInstance.charterSeats`; `SYSTEM`-channel (public/direct)
+    bookings 409 once `takenByChannel.SYSTEM >= capacity − charterSeats −
+    agencySeatsAllocated − takenByChannel.MANAGERIAL` (managerial locks
+    still physically occupy a seat, so they still count against the public
+    pool's remaining count — only the agency/charter split is separated
+    out). Error code `POOL_EXHAUSTED`, includes which pool.
+  - ⚑ **Scope cut for this phase:** `SearchService.search`'s per-cabin
+    `seatsLeft` stays "physically unoccupied seats in that cabin" (unchanged)
+    rather than being reworked into a per-pool number — the pool split
+    (charter/agency/managerial) is currently instance-wide, not per-cabin,
+    so an accurate per-cabin-per-pool display number needs the cabin-level
+    allotment model Phase C is scoped to build; doing it here risked a
+    display figure that quietly disagreed with the cabin-level fare-class
+    math (Phase 6/booking-engine's `pricing.ts`). What ships THIS phase is
+    the hard guarantee that matters most — `createBooking` rejects a
+    booking that would exceed its channel's pool even while the display
+    still shows physical vacancy — not the softer, cosmetic display
+    number. Revisit once Phase C lands.
+
+- **Not built in this phase (needs a product decision first, not invented):**
+  - `DRAFT` / `PENDING_APPROVAL` flight-instance statuses (from the user's
+    spec) — no design file or existing panel shows a flight-approval queue,
+    and today every `Flight`/`FlightInstance` created via Phase 10's «افزودن
+    پرواز» goes live immediately. Adding a mandatory approval gate would be
+    a real workflow change (who approves? does it block search
+    immediately or only for a still-configuring flight?) with no grounding
+    to build against — flagged here rather than guessed.
+  - Full 6-status IATA-style flight lifecycle beyond `SCHEDULED → CLOSED
+    (derived from the sale window, not a stored status) → DEPARTED /
+    CANCELLED` — same reasoning; the user's spec's "بسته" state is covered
+    by the sale-window fields above without inventing a separate manual
+    toggle no design asks for.

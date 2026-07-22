@@ -116,6 +116,28 @@ class PlanFlightDto {
   @Min(0)
   @Max(1000)
   agencySeats: number;
+
+  @ApiProperty({
+    description: 'شروع بازه فروش (UTC ISO) — خالی/حذف یعنی بدون محدودیت',
+    required: false,
+  })
+  @IsOptional()
+  @IsISO8601()
+  saleStartsAt?: string;
+
+  @ApiProperty({
+    description: 'پایان بازه فروش (UTC ISO) — خالی/حذف یعنی بدون محدودیت',
+    required: false,
+  })
+  @IsOptional()
+  @IsISO8601()
+  saleEndsAt?: string;
+}
+
+class ChangeAircraftTypeDto {
+  @ApiProperty({ description: 'نوع هواپیمای جدید', example: 'Boeing 737' })
+  @IsString()
+  aircraftType: string;
 }
 
 @ApiTags('flights')
@@ -207,6 +229,24 @@ export class FlightsController {
     @Body() dto: PlanFlightDto,
   ) {
     const data = await this.flights.plan(actor, instanceId, dto);
+    return { success: true, data };
+  }
+
+  @Patch(':instanceId/aircraft')
+  @ApiOperation({
+    summary:
+      'تغییر نوع هواپیمای پرواز — رد با ۴۰۹ اگر ظرفیت جدید کمتر از رزروهای قطعی/لاک‌شده باشد',
+  })
+  async changeAircraft(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('instanceId') instanceId: string,
+    @Body() dto: ChangeAircraftTypeDto,
+  ) {
+    const data = await this.flights.changeAircraftType(
+      actor,
+      instanceId,
+      dto.aircraftType,
+    );
     return { success: true, data };
   }
 }

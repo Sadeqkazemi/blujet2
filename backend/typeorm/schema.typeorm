@@ -259,6 +259,20 @@ model FlightInstance {
   // NEVER the bookable price (that stays with Phase 6's registered proposal).
   basePriceIrr         Int?
   agencySeatsAllocated Int?
+  // Phase 13: optional sale window — NULL on either end means "no
+  // restriction" (every pre-existing instance keeps working unchanged).
+  saleStartsAt         DateTime?
+  saleEndsAt           DateTime?
+  // Phase 13: the physical tail number for this specific departure
+  // (display-only — no booking logic reads it; a recurring Flight/Schedule
+  // keeps one aircraftType across dates, but the actual airframe varies
+  // per-departure in reality).
+  aircraftRegistration String?
+  // Phase 13: per-instance override of Flight.aircraftType, set only by
+  // FlightsService.changeAircraftType — falls back to Flight.aircraftType
+  // when null. Deliberately NOT a mutation of the shared Flight row, which
+  // would silently change every other instance of the same schedule.
+  aircraftTypeOverride String?
   // Advisory ML suggestion for future flights that have no Phase 6 proposal
   // yet (same PersistedAiSuggestion shape; includes modelVersion).
   aiSuggestion         Json?
