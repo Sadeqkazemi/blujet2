@@ -352,7 +352,11 @@ export class SearchService {
         select: { seatCode: true },
       }),
       this.prisma.seatLock.findMany({
-        where: { flightInstanceId, releasedAt: null },
+        where: {
+          flightInstanceId,
+          releasedAt: null,
+          expiresAt: { gt: new Date() },
+        },
         select: { seatCode: true },
       }),
     ]);
@@ -391,7 +395,11 @@ export class SearchService {
         select: { booking: { select: { channel: true } } },
       }),
       this.prisma.seatLock.count({
-        where: { flightInstanceId, releasedAt: null },
+        where: {
+          flightInstanceId,
+          releasedAt: null,
+          expiresAt: { gt: new Date() },
+        },
       }),
     ]);
     const counts = { SYSTEM: 0, CHARTER: 0, AGENCY: 0, MANAGERIAL: lockCount };

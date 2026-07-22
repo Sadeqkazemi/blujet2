@@ -8,13 +8,39 @@ import { createTestApp } from './helpers/app.helper';
 describe('Reservation (e2e)', () => {
   let app: INestApplication<App>;
   let prisma: PrismaService;
+  // Phase 13D: a global per-requester active-lock cap now means leftover
+  // SeatLock rows from repeated manual runs against a persistent dev DB
+  // can spuriously trip the cap in later runs — clean up what each test
+  // creates instead of leaving it to accumulate.
+  let createdInstanceIds: string[] = [];
 
   beforeEach(async () => {
     app = await createTestApp();
     prisma = app.get(PrismaService);
+    createdInstanceIds = [];
   });
 
   afterEach(async () => {
+    if (createdInstanceIds.length) {
+      await prisma.seatLock.deleteMany({
+        where: { flightInstanceId: { in: createdInstanceIds } },
+      });
+      const passengers = await prisma.passenger.findMany({
+        where: { booking: { flightInstanceId: { in: createdInstanceIds } } },
+        select: { bookingId: true },
+      });
+      const bookingIds = passengers.map((p) => p.bookingId);
+      await prisma.ledgerEntry.deleteMany({
+        where: { bookingId: { in: bookingIds } },
+      });
+      await prisma.passenger.deleteMany({
+        where: { bookingId: { in: bookingIds } },
+      });
+      await prisma.booking.deleteMany({ where: { id: { in: bookingIds } } });
+      await prisma.flightInstance.deleteMany({
+        where: { id: { in: createdInstanceIds } },
+      });
+    }
     await app.close();
   });
 
@@ -25,7 +51,7 @@ describe('Reservation (e2e)', () => {
   async function createScheduledInstance() {
     const flight = await prisma.flight.findFirstOrThrow();
     const departureAt = new Date(Date.now() + 20 * 24 * 60 * 60 * 1000);
-    return prisma.flightInstance.create({
+    const instance = await prisma.flightInstance.create({
       data: {
         flightId: flight.id,
         departureAt,
@@ -35,6 +61,8 @@ describe('Reservation (e2e)', () => {
         status: 'SCHEDULED',
       },
     });
+    createdInstanceIds.push(instance.id);
+    return instance;
   }
 
   // ── Seat map & locking ──────────────────────────────────────────────
@@ -61,6 +89,8 @@ describe('Reservation (e2e)', () => {
       .set(auth(senior.accessToken))
       .send({
         seatCode: '3A',
+        reason: 'بازدید هیئت مدیره',
+        classification: 'PAYABLE',
         passengerName: 'تست',
         passengerNationalId: '0499370899',
       });
@@ -71,6 +101,8 @@ describe('Reservation (e2e)', () => {
       .set(auth(chair.accessToken))
       .send({
         seatCode: '3A',
+        reason: 'بازدید هیئت مدیره',
+        classification: 'PAYABLE',
         passengerName: 'تست',
         passengerNationalId: '0499370899',
       });
@@ -81,7 +113,11 @@ describe('Reservation (e2e)', () => {
     const dup = await request(app.getHttpServer())
       .post(`/reservation/seatmap/${instance.id}/lock`)
       .set(auth(chair.accessToken))
-      .send({ seatCode: '3A' });
+      .send({
+        seatCode: '3A',
+        reason: 'تست تکراری',
+        classification: 'PAYABLE',
+      });
     expect(dup.status).toBe(409);
 
     const audit = await prisma.auditLog.findFirst({
@@ -103,7 +139,11 @@ describe('Reservation (e2e)', () => {
         request(app.getHttpServer())
           .post(`/reservation/seatmap/${instance.id}/lock`)
           .set(auth(it.accessToken))
-          .send({ seatCode: '5B' }),
+          .send({
+            seatCode: '5B',
+            reason: 'تست هم‌زمانی',
+            classification: 'PAYABLE',
+          }),
       ),
     );
     const succeeded = attempts.filter((r) => r.status === 201);
@@ -120,7 +160,11 @@ describe('Reservation (e2e)', () => {
     const locked = await request(app.getHttpServer())
       .post(`/reservation/seatmap/${instance.id}/lock`)
       .set(auth(it.accessToken))
-      .send({ seatCode: '6D' });
+      .send({
+        seatCode: '6D',
+        reason: 'تست آزادسازی',
+        classification: 'PAYABLE',
+      });
     const lockId = locked.body.data.id;
 
     const forbidden = await request(app.getHttpServer())
@@ -142,7 +186,7 @@ describe('Reservation (e2e)', () => {
     const relock = await request(app.getHttpServer())
       .post(`/reservation/seatmap/${instance.id}/lock`)
       .set(auth(it.accessToken))
-      .send({ seatCode: '6D' });
+      .send({ seatCode: '6D', reason: 'رزرو مجدد', classification: 'PAYABLE' });
     expect(relock.status).toBe(201);
   });
 

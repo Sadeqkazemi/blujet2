@@ -1,5 +1,17 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsISO8601, IsOptional, IsString, MinLength } from 'class-validator';
+import {
+  IsIn,
+  IsISO8601,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+  MinLength,
+  ValidateIf,
+} from 'class-validator';
+
+const LOCK_CLASSIFICATIONS = ['FREE', 'DISCOUNTED', 'PAYABLE'] as const;
 
 export class LockSeatDto {
   @ApiProperty({ example: '12D' })
@@ -7,10 +19,52 @@ export class LockSeatDto {
   @MinLength(2)
   seatCode: string;
 
+  @ApiProperty({ description: 'دلیل درخواست لاک مدیریتی' })
+  @IsString()
+  @MinLength(3)
+  reason: string;
+
+  @ApiProperty({ enum: LOCK_CLASSIFICATIONS })
+  @IsIn(LOCK_CLASSIFICATIONS)
+  classification: (typeof LOCK_CLASSIFICATIONS)[number];
+
+  @ApiPropertyOptional({
+    description: 'فقط وقتی classification برابر DISCOUNTED است',
+  })
+  @ValidateIf((o: LockSeatDto) => o.classification === 'DISCOUNTED')
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  discountPct?: number;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   passengerName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  passengerNationalId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  passengerMobile?: string;
+}
+
+export class RejectLockDto {
+  @ApiProperty()
+  @IsString()
+  @MinLength(3)
+  rejectionReason: string;
+}
+
+export class FinalizeLockDto {
+  @ApiProperty()
+  @IsString()
+  @MinLength(1)
+  passengerName: string;
 
   @ApiPropertyOptional()
   @IsOptional()

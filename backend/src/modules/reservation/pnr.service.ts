@@ -19,6 +19,7 @@ import { resolveAircraftType } from '../flights/aircraft-type.util';
 import { SearchService } from '../booking-engine/search.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type {
+  FinalizeLockDto,
   IssuePnrDto,
   ListPnrQueryDto,
   SearchFlightsQueryDto,
@@ -170,6 +171,7 @@ export class PnrService {
           flightInstanceId: booking.flightInstanceId,
           seatCode,
           releasedAt: null,
+          expiresAt: { gt: new Date() },
         },
       }),
     ]);
@@ -339,6 +341,7 @@ export class PnrService {
           flightInstanceId: dto.flightInstanceId,
           seatCode: dto.seatCode,
           releasedAt: null,
+          expiresAt: { gt: new Date() },
         },
       }),
       this.prisma.farePricingProposal.findUnique({
@@ -420,6 +423,133 @@ export class PnrService {
       category: 'RESERVATION',
       action: 'صدور دستی PNR',
       detail: `رزرو ${booking.pnr} برای «${dto.passengerName}» توسط ${actor.fullName} صادر شد.`,
+      entityType: 'Booking',
+      entityId: booking.id,
+    });
+
+    return this.detail(booking.pnr);
+  }
+
+  /** Phase 13 Part D — turns an APPROVED, not-yet-expired managerial
+   * SeatLock into a real TICKETED booking, priced per the lock's
+   * classification (FREE/DISCOUNTED/PAYABLE). Reuses this service's own
+   * manual-issuance pricing fallback and PII handling; taxIrr is left at
+   * 0 like every other manual-issuance path (see docs/DB_SCHEMA.md). */
+  async finalizeLock(
+    actor: AuthenticatedUser,
+    lockId: string,
+    dto: FinalizeLockDto,
+  ) {
+    const lock = await this.prisma.seatLock.findUnique({
+      where: { id: lockId },
+    });
+    if (!lock) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'لاک صندلی یافت نشد.',
+      });
+    }
+    if (lock.releasedAt || lock.expiresAt <= new Date()) {
+      // Self-heal an expired-but-not-yet-released lock, same as the
+      // seatmap request path — see docs/DB_SCHEMA.md Phase 13 Part D.
+      await this.prisma.seatLock.updateMany({
+        where: { id: lockId, releasedAt: null, expiresAt: { lte: new Date() } },
+        data: { releasedAt: new Date() },
+      });
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'این لاک آزاد شده یا منقضی شده و قابل صدور بلیط نیست.',
+      });
+    }
+    if (lock.approvalStatus !== 'APPROVED') {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'این درخواست هنوز تأیید نشده است.',
+      });
+    }
+
+    const sold = await this.prisma.passenger.findFirst({
+      where: {
+        seatCode: lock.seatCode,
+        booking: {
+          flightInstanceId: lock.flightInstanceId,
+          status: { not: 'CANCELLED' },
+        },
+      },
+    });
+    if (sold) {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'این صندلی در دسترس نیست.',
+      });
+    }
+
+    const pricing = await this.prisma.farePricingProposal.findUnique({
+      where: { flightInstanceId: lock.flightInstanceId },
+    });
+    const basePriceIrr =
+      pricing?.status === 'REGISTERED'
+        ? pricing.registeredPriceIrr!
+        : FALLBACK_PRICE_IRR;
+    const priceIrr =
+      lock.classification === 'FREE'
+        ? 0
+        : lock.classification === 'DISCOUNTED'
+          ? basePriceIrr -
+            Math.round((basePriceIrr * (lock.discountPct ?? 0)) / 100)
+          : basePriceIrr;
+
+    const nationalId = dto.passengerNationalId
+      ? normalizeNationalId(dto.passengerNationalId)
+      : undefined;
+    if (nationalId && !isValidIranianNationalId(nationalId)) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'کد ملی واردشده معتبر نیست.',
+      });
+    }
+
+    const booking = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.booking.create({
+        data: {
+          pnr: generatePnr(),
+          flightInstanceId: lock.flightInstanceId,
+          channel: 'SYSTEM',
+          status: 'TICKETED',
+          priceIrr,
+          passengers: {
+            create: {
+              fullName: dto.passengerName,
+              seatCode: lock.seatCode,
+              nationalIdEnc: nationalId ? encryptPii(nationalId) : undefined,
+              nationalIdHash: nationalId ? hashPii(nationalId) : undefined,
+              mobileEnc: dto.passengerMobile
+                ? encryptPii(dto.passengerMobile)
+                : undefined,
+            },
+          },
+        },
+      });
+      await tx.ledgerEntry.create({
+        data: {
+          bookingId: created.id,
+          type: 'SALE',
+          signedAmountIrr: priceIrr,
+        },
+      });
+      await tx.seatLock.update({
+        where: { id: lockId },
+        data: { releasedAt: new Date(), bookingId: created.id },
+      });
+      return created;
+    });
+
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'RESERVATION',
+      action: 'صدور بلیط از لاک مدیریتی',
+      detail: `رزرو ${booking.pnr} از لاک صندلی ${lock.seatCode} توسط ${actor.fullName} صادر شد.`,
       entityType: 'Booking',
       entityId: booking.id,
     });

@@ -462,6 +462,48 @@ only this phase; an agency actually booking against one is a follow-up
   DB_SCHEMA.md — so this guard is a no-op today and becomes real once
   agency booking creation lands).
 
+## Phase 13 — Reservation engine completion, Part D
+
+See DB_SCHEMA.md's Phase 13 Part D — backend-only governance layered onto
+Phase 9's `SeatLock`; no design screen exists for a request/approval queue.
+All endpoints live in `backend/src/modules/reservation/`, gated
+`CAN_LOCK_ROLES` (`CEO`, `BOARD_CHAIR`, `IT_MANAGER`) unless noted.
+
+- `POST /reservation/seatmap/:flightInstanceId/lock` (existing endpoint,
+  changed body/behavior) — now `{ seatCode, reason, classification,
+  discountPct?, passengerName?, passengerNationalId?, passengerMobile? }`.
+  400 `VALIDATION_FAILED` if `discountPct` is given without
+  `classification: 'DISCOUNTED'` (or vice versa) or is outside 0–100.
+  409 `LOCK_CAP_EXCEEDED` if the requester already has
+  `MAX_ACTIVE_MANAGERIAL_LOCKS_PER_REQUESTER` (5) active locks anywhere.
+  Creates the lock `PENDING_APPROVAL` with `expiresAt = now + 24h` — it no
+  longer immediately behaves like an active managerial hold; it must be
+  approved first.
+- `PATCH /reservation/seatmap/locks/:id/approve` (new) — no body. 409
+  `CONFLICT` if not `PENDING_APPROVAL`, expired, or the caller is the
+  original requester (self-approval blocked). Sets
+  `approvalStatus: APPROVED`, `approvedById/At`, `expiresAt = now + 48h`.
+- `PATCH /reservation/seatmap/locks/:id/reject` (new) — `{ rejectionReason }`.
+  409 `CONFLICT` if not `PENDING_APPROVAL` or already expired. Unlike
+  approve, self-rejection IS allowed (a requester withdrawing their own
+  pending request isn't the segregation-of-duties gap approval guards
+  against). Sets `approvalStatus: REJECTED`, `rejectedById/At`,
+  `rejectionReason`, and `releasedAt` immediately (frees the seat).
+- `PATCH /reservation/seatmap/locks/:id/release` (existing) — unchanged;
+  still works on any not-yet-released lock regardless of approval state
+  (a requester or another authorized manager can always stand down early).
+- `POST /reservation/pnr/from-lock/:lockId` (new) — `{ passengerName,
+  passengerNationalId?, passengerMobile? }`. 409 `CONFLICT` if the lock
+  isn't `APPROVED` or has expired. Finalizes into a `TICKETED` booking
+  priced per the lock's `classification` (see DB_SCHEMA.md), stamps the
+  lock `releasedAt`/`bookingId`, records the same `LedgerEntry`+`AuditLog`
+  pattern as the existing `POST /reservation/pnr` manual-issuance path.
+- `GET /reservation/seatmap/:flightInstanceId` (existing) — response is
+  unchanged in shape; a `LOCKED` seat now only reflects a currently-active
+  lock (`releasedAt: null AND expiresAt > now`), so an expired
+  never-approved request or an expired never-finalized hold shows as
+  `FREE` again automatically.
+
 ---
 
 ## Phase 11 — Finance tab (مالی), گزارش مسافران, گزارش کارمندان

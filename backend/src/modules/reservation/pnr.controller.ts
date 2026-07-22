@@ -12,6 +12,7 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PnrService } from './pnr.service';
 import {
   ChangeSeatDto,
+  FinalizeLockDto,
   IssuePnrDto,
   ListPnrQueryDto,
   SearchFlightsQueryDto,
@@ -81,6 +82,22 @@ export class PnrController {
     @Body() dto: IssuePnrDto,
   ) {
     return { success: true, data: await this.pnr.issue(actor, dto) };
+  }
+
+  @Post('pnr/from-lock/:lockId')
+  @Roles(...CAN_LOCK_ROLES)
+  @ApiOperation({
+    summary: 'صدور بلیط از لاک مدیریتیِ تأییدشده — قیمت بر اساس طبقه‌بندی لاک',
+  })
+  async finalizeLock(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('lockId') lockId: string,
+    @Body() dto: FinalizeLockDto,
+  ) {
+    return {
+      success: true,
+      data: await this.pnr.finalizeLock(actor, lockId, dto),
+    };
   }
 
   @Get('dashboard-stats')

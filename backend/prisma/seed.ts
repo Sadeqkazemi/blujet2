@@ -865,13 +865,22 @@ async function main() {
           data: { bookingId: booking.id, type: 'SALE', signedAmountIrr: 38_000_000 },
         });
       }
-      // One demo managerial lock so the seat map/lock UI has real data.
+      // One demo managerial lock so the seat map/lock UI has real data —
+      // already APPROVED (Phase 13D) with a real future hold-to-ticket
+      // deadline, not the schema's placeholder migration defaults.
       await prisma.seatLock.create({
         data: {
           flightInstanceId: demoInstance.id,
           seatCode: '4A',
           lockedById: chairUser.id,
           passengerName: 'رزرو مدیریتی — رئیس هیئت مدیره',
+          reason: 'بازدید رسمی هیئت مدیره',
+          classification: 'PAYABLE',
+          requesterRank: 'BOARD_CHAIR',
+          approvalStatus: 'APPROVED',
+          approvedById: staffByUsername.get('ceo')!.id,
+          approvedAt: new Date(),
+          expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
         },
       });
     }

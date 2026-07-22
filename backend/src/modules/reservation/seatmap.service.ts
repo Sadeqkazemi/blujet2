@@ -17,7 +17,21 @@ import { enumerateSeats, isKnownSeat } from './seat-layout';
 import { resolveAircraftType } from '../flights/aircraft-type.util';
 import { Prisma } from '../../../generated/prisma/client';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import type { LockSeatDto } from './dto/reservation.dtos';
+import type { LockSeatDto, RejectLockDto } from './dto/reservation.dtos';
+
+/** Phase 13 Part D — request-decision deadline (createdAt+this) and
+ * hold-to-ticket deadline (approvedAt+this), see docs/DB_SCHEMA.md. Fixed
+ * code constants, not configurable settings — no design/spec value exists
+ * for either. */
+const LOCK_REQUEST_TTL_HOURS = 24;
+const LOCK_HOLD_TTL_HOURS = 48;
+/** Fixed cap on how many seats a single requester may hold locked at once,
+ * across every flight instance (⚑ global, not per-flight — see docs). */
+const MAX_ACTIVE_MANAGERIAL_LOCKS_PER_REQUESTER = 5;
+
+function hoursFromNow(hours: number): Date {
+  return new Date(Date.now() + hours * 60 * 60 * 1000);
+}
 
 @Injectable()
 export class SeatmapService {
@@ -25,6 +39,31 @@ export class SeatmapService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
   ) {}
+
+  /** "Currently active" for a managerial lock — mirrors the Booking
+   * HELD/holdExpiresAt lazy-exclusion pattern: still un-released AND not
+   * past its request-decision/hold-to-ticket deadline. */
+  private activeLockWhere() {
+    return { releasedAt: null, expiresAt: { gt: new Date() } };
+  }
+
+  /** The DB's partial unique index only knows `releasedAt IS NULL`, not
+   * `expiresAt` — it can't (a partial index predicate can't call now()).
+   * So the write paths that actually contend for a seat (a new request,
+   * finalizing one into a booking) must release an expired-but-not-yet-
+   * released lock themselves before proceeding. A conditional update
+   * guards a concurrent double-release. */
+  private async releaseIfExpired(flightInstanceId: string, seatCode: string) {
+    await this.prisma.seatLock.updateMany({
+      where: {
+        flightInstanceId,
+        seatCode,
+        releasedAt: null,
+        expiresAt: { lte: new Date() },
+      },
+      data: { releasedAt: new Date() },
+    });
+  }
 
   private async getFlightInstanceOrThrow(id: string) {
     const instance = await this.prisma.flightInstance.findUnique({
@@ -69,7 +108,7 @@ export class SeatmapService {
         select: { seatCode: true },
       }),
       this.prisma.seatLock.findMany({
-        where: { flightInstanceId, releasedAt: null },
+        where: { flightInstanceId, ...this.activeLockWhere() },
       }),
     ]);
     const soldCodes = new Set(soldPassengers.map((p) => p.seatCode!));
@@ -141,6 +180,23 @@ export class SeatmapService {
       });
     }
 
+    if (dto.discountPct !== undefined && dto.classification !== 'DISCOUNTED') {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'درصد تخفیف فقط برای طبقه‌بندی «تخفیف‌دار» معتبر است.',
+      });
+    }
+
+    const activeRequesterLocks = await this.prisma.seatLock.count({
+      where: { lockedById: actor.id, ...this.activeLockWhere() },
+    });
+    if (activeRequesterLocks >= MAX_ACTIVE_MANAGERIAL_LOCKS_PER_REQUESTER) {
+      throw new ConflictException({
+        code: ErrorCode.LOCK_CAP_EXCEEDED,
+        message: `شما در حال حاضر به سقف ${MAX_ACTIVE_MANAGERIAL_LOCKS_PER_REQUESTER} صندلی لاک‌شدهٔ فعال رسیده‌اید.`,
+      });
+    }
+
     const nationalId = dto.passengerNationalId
       ? normalizeNationalId(dto.passengerNationalId)
       : undefined;
@@ -151,12 +207,20 @@ export class SeatmapService {
       });
     }
 
+    await this.releaseIfExpired(flightInstanceId, dto.seatCode);
+
     try {
       const lock = await this.prisma.seatLock.create({
         data: {
           flightInstanceId,
           seatCode: dto.seatCode,
           lockedById: actor.id,
+          reason: dto.reason,
+          classification: dto.classification,
+          discountPct: dto.discountPct,
+          requesterRank: actor.role,
+          approvalStatus: 'PENDING_APPROVAL',
+          expiresAt: hoursFromNow(LOCK_REQUEST_TTL_HOURS),
           passengerName: dto.passengerName,
           passengerNationalIdEnc: nationalId
             ? encryptPii(nationalId)
@@ -172,8 +236,8 @@ export class SeatmapService {
         actorId: actor.id,
         actorRole: actor.role,
         category: 'RESERVATION',
-        action: 'لاک مدیریتی صندلی',
-        detail: `صندلی ${dto.seatCode} توسط ${actor.fullName} برای پرواز رزرو مدیریتی شد.`,
+        action: 'درخواست لاک مدیریتی صندلی',
+        detail: `صندلی ${dto.seatCode} توسط ${actor.fullName} برای رزرو مدیریتی درخواست شد (${dto.reason}).`,
         entityType: 'SeatLock',
         entityId: lock.id,
       });
@@ -191,6 +255,95 @@ export class SeatmapService {
       }
       throw err;
     }
+  }
+
+  private async getPendingLockOrThrow(lockId: string) {
+    const lock = await this.prisma.seatLock.findUnique({
+      where: { id: lockId },
+    });
+    if (!lock) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'لاک صندلی یافت نشد.',
+      });
+    }
+    if (
+      lock.approvalStatus !== 'PENDING_APPROVAL' ||
+      lock.releasedAt ||
+      lock.expiresAt <= new Date()
+    ) {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'این درخواست دیگر در وضعیت در انتظار تأیید نیست.',
+      });
+    }
+    return lock;
+  }
+
+  /** Two-step approval: requesting and approving both stay within
+   * CAN_LOCK_ROLES, but a requester can never approve their own request —
+   * a real control between the governance roles, not a rubber stamp. */
+  async approveLock(actor: AuthenticatedUser, lockId: string) {
+    const lock = await this.getPendingLockOrThrow(lockId);
+    if (lock.lockedById === actor.id) {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'شما نمی‌توانید درخواست خودتان را تأیید کنید.',
+      });
+    }
+
+    const updated = await this.prisma.seatLock.update({
+      where: { id: lockId },
+      data: {
+        approvalStatus: 'APPROVED',
+        approvedById: actor.id,
+        approvedAt: new Date(),
+        expiresAt: hoursFromNow(LOCK_HOLD_TTL_HOURS),
+      },
+    });
+
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'RESERVATION',
+      action: 'تأیید درخواست لاک مدیریتی',
+      detail: `درخواست لاک صندلی ${lock.seatCode} توسط ${actor.fullName} تأیید شد.`,
+      entityType: 'SeatLock',
+      entityId: lockId,
+    });
+
+    return this.toLockView(updated);
+  }
+
+  async rejectLock(
+    actor: AuthenticatedUser,
+    lockId: string,
+    dto: RejectLockDto,
+  ) {
+    const lock = await this.getPendingLockOrThrow(lockId);
+
+    const updated = await this.prisma.seatLock.update({
+      where: { id: lockId },
+      data: {
+        approvalStatus: 'REJECTED',
+        rejectedById: actor.id,
+        rejectedAt: new Date(),
+        rejectionReason: dto.rejectionReason,
+        releasedAt: new Date(),
+      },
+    });
+
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'RESERVATION',
+      action: 'رد درخواست لاک مدیریتی',
+      detail: `درخواست لاک صندلی ${lock.seatCode} توسط ${actor.fullName} رد شد (${dto.rejectionReason}).`,
+      entityType: 'SeatLock',
+      entityId: lockId,
+    });
+
+    return this.toLockView(updated);
   }
 
   async releaseLock(actor: AuthenticatedUser, lockId: string) {
@@ -238,6 +391,9 @@ export class SeatmapService {
     void passengerNationalIdEnc;
     void passengerNationalIdHash;
     void passengerMobileEnc;
-    return rest;
+    return {
+      ...rest,
+      active: rest.releasedAt === null && rest.expiresAt > new Date(),
+    };
   }
 }

@@ -470,7 +470,11 @@ export class FlightsService {
         },
       }),
       this.prisma.seatLock.count({
-        where: { flightInstanceId: id, releasedAt: null },
+        where: {
+          flightInstanceId: id,
+          releasedAt: null,
+          expiresAt: { gt: new Date() },
+        },
       }),
     ]);
     const confirmedOrLocked = confirmedCount + lockCount;
