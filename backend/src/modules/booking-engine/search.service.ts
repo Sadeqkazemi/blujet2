@@ -3,9 +3,20 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { RedisService } from '../../redis/redis.service';
 import { getCabinPrice } from './pricing';
 import { enumerateSeats } from '../reservation/seat-layout';
+import { resolveAircraftType } from '../flights/aircraft-type.util';
 import type { CabinClass } from '../../../generated/prisma/enums';
+import type { Prisma } from '../../../generated/prisma/client';
 
 const ACTIVE_BOOKING_STATUSES = ['DRAFT', 'HELD', 'PAID', 'TICKETED'] as const;
+
+/** Phase 13: an instance with a sale window is excluded from search once
+ * outside it; NULL on either end means "no restriction" (existing
+ * instances keep working unchanged). Reused by createBooking's own
+ * re-check so a stale search result can't be booked past the window. */
+const SALE_WINDOW_OPEN_WHERE = {
+  OR: [{ saleStartsAt: null }, { saleStartsAt: { lte: new Date() } }],
+  AND: [{ OR: [{ saleEndsAt: null }, { saleEndsAt: { gte: new Date() } }] }],
+} satisfies Prisma.FlightInstanceWhereInput;
 
 // CLAUDE.md: search-result cache TTL 5-10 min; Redis is never the source of
 // truth for seats/bookings — availability is still re-checked (takenSeatCodes
@@ -92,6 +103,7 @@ export class SearchService {
             destCode: { equals: dest, mode: 'insensitive' },
           },
         },
+        ...SALE_WINDOW_OPEN_WHERE,
       },
       include: { flight: { include: { route: true } } },
       orderBy: { departureAt: 'asc' },
@@ -109,7 +121,7 @@ export class SearchService {
     }[] = [];
     for (const instance of instances) {
       const map = await this.prisma.aircraftSeatMap.findUnique({
-        where: { aircraftType: instance.flight.aircraftType },
+        where: { aircraftType: resolveAircraftType(instance) },
       });
       const seats = map ? enumerateSeats(map) : [];
       const taken = await this.takenSeatCodes(instance.id);
@@ -135,7 +147,7 @@ export class SearchService {
       results.push({
         flightInstanceId: instance.id,
         flightNo: instance.flight.flightNo,
-        aircraftType: instance.flight.aircraftType,
+        aircraftType: resolveAircraftType(instance),
         originCode: instance.flight.route.originCode,
         destCode: instance.flight.route.destCode,
         departureAt: instance.departureAt,
@@ -174,6 +186,7 @@ export class SearchService {
           flight: {
             route: { originCode: { equals: origin, mode: 'insensitive' } },
           },
+          ...SALE_WINDOW_OPEN_WHERE,
         },
         include: { flight: { include: { route: true } } },
       }),
@@ -184,6 +197,7 @@ export class SearchService {
           flight: {
             route: { destCode: { equals: dest, mode: 'insensitive' } },
           },
+          ...SALE_WINDOW_OPEN_WHERE,
         },
         include: { flight: { include: { route: true } } },
       }),
@@ -252,7 +266,7 @@ export class SearchService {
         let ok = true;
         for (const leg of legs) {
           const map = await this.prisma.aircraftSeatMap.findUnique({
-            where: { aircraftType: leg.flight.aircraftType },
+            where: { aircraftType: resolveAircraftType(leg) },
           });
           const seats = (map ? enumerateSeats(map) : []).filter(
             (s) => s.cabin === cabin,
@@ -273,7 +287,7 @@ export class SearchService {
       out.push({
         flightInstanceId: a.id,
         flightNo: `${a.flight.flightNo}+${b.flight.flightNo}`,
-        aircraftType: a.flight.aircraftType,
+        aircraftType: resolveAircraftType(a),
         originCode: a.flight.route.originCode,
         destCode: b.flight.route.destCode,
         departureAt: a.departureAt,
@@ -301,7 +315,7 @@ export class SearchService {
       include: { flight: true },
     });
     const map = await this.prisma.aircraftSeatMap.findUniqueOrThrow({
-      where: { aircraftType: instance.flight.aircraftType },
+      where: { aircraftType: resolveAircraftType(instance) },
     });
     const seats = enumerateSeats(map);
     const taken = await this.takenSeatCodes(flightInstanceId);
@@ -346,5 +360,42 @@ export class SearchService {
       ...passengers.map((p) => p.seatCode!),
       ...locks.map((l) => l.seatCode),
     ]);
+  }
+
+  /** Phase 13: per-channel taken-seat counts for the real inventory pools
+   * (agency quota / charter allotment / public). A managerial `SeatLock`
+   * physically occupies a seat but isn't a `Booking`, so it's tallied
+   * under a virtual `MANAGERIAL` bucket rather than `SYSTEM` — it still
+   * counts against the public pool's remaining count at the call site
+   * (see `BookingService.createBooking`), just not conflated with genuine
+   * public-channel sales. */
+  async takenCountsByChannel(flightInstanceId: string): Promise<{
+    SYSTEM: number;
+    CHARTER: number;
+    AGENCY: number;
+    MANAGERIAL: number;
+  }> {
+    const [passengers, lockCount] = await Promise.all([
+      this.prisma.passenger.findMany({
+        where: {
+          seatCode: { not: null },
+          booking: {
+            flightInstanceId,
+            status: { in: [...ACTIVE_BOOKING_STATUSES] },
+            OR: [
+              { status: { not: 'HELD' } },
+              { holdExpiresAt: { gt: new Date() } },
+            ],
+          },
+        },
+        select: { booking: { select: { channel: true } } },
+      }),
+      this.prisma.seatLock.count({
+        where: { flightInstanceId, releasedAt: null },
+      }),
+    ]);
+    const counts = { SYSTEM: 0, CHARTER: 0, AGENCY: 0, MANAGERIAL: lockCount };
+    for (const p of passengers) counts[p.booking.channel] += 1;
+    return counts;
   }
 }

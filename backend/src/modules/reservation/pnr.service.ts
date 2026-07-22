@@ -15,6 +15,8 @@ import {
   normalizeNationalId,
 } from '../../common/pii-crypto';
 import { enumerateSeats, isKnownSeat } from './seat-layout';
+import { resolveAircraftType } from '../flights/aircraft-type.util';
+import { SearchService } from '../booking-engine/search.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type {
   IssuePnrDto,
@@ -36,6 +38,7 @@ export class PnrService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly searchService: SearchService,
   ) {}
 
   private async getBookingOrThrow(pnr: string) {
@@ -142,7 +145,7 @@ export class PnrService {
       });
     }
     const map = await this.prisma.aircraftSeatMap.findUnique({
-      where: { aircraftType: booking.flightInstance.flight.aircraftType },
+      where: { aircraftType: resolveAircraftType(booking.flightInstance) },
     });
     if (!map || !isKnownSeat(map, seatCode)) {
       throw new BadRequestException({
@@ -268,14 +271,14 @@ export class PnrService {
           },
         }),
         this.prisma.aircraftSeatMap.findUnique({
-          where: { aircraftType: instance.flight.aircraftType },
+          where: { aircraftType: resolveAircraftType(instance) },
         }),
       ]);
       const capacity = map ? enumerateSeats(map).length : instance.capacity;
       results.push({
         flightInstanceId: instance.id,
         flightNo: instance.flight.flightNo,
-        aircraftType: instance.flight.aircraftType,
+        aircraftType: resolveAircraftType(instance),
         originCode: instance.flight.route.originCode,
         destCode: instance.flight.route.destCode,
         departureAt: instance.departureAt,
@@ -301,8 +304,18 @@ export class PnrService {
         message: 'پرواز یافت نشد.',
       });
     }
+    const now = new Date();
+    if (
+      (instance.saleStartsAt && instance.saleStartsAt > now) ||
+      (instance.saleEndsAt && instance.saleEndsAt < now)
+    ) {
+      throw new ConflictException({
+        code: ErrorCode.SALE_WINDOW_CLOSED,
+        message: 'مهلت فروش این پرواز به پایان رسیده یا هنوز آغاز نشده است.',
+      });
+    }
     const map = await this.prisma.aircraftSeatMap.findUnique({
-      where: { aircraftType: instance.flight.aircraftType },
+      where: { aircraftType: resolveAircraftType(instance) },
     });
     if (!map || !isKnownSeat(map, dto.seatCode)) {
       throw new BadRequestException({
@@ -336,6 +349,23 @@ export class PnrService {
       throw new ConflictException({
         code: ErrorCode.CONFLICT,
         message: 'این صندلی در دسترس نیست.',
+      });
+    }
+
+    // Staff-issued PNRs are channel SYSTEM, same public pool as the online
+    // booking engine — must not oversell past what's reserved for agencies/
+    // charter (Phase 13).
+    const counts = await this.searchService.takenCountsByChannel(
+      dto.flightInstanceId,
+    );
+    const publicPoolLimit =
+      instance.capacity -
+      instance.charterSeats -
+      (instance.agencySeatsAllocated ?? 0);
+    if (counts.SYSTEM + counts.MANAGERIAL + 1 > publicPoolLimit) {
+      throw new ConflictException({
+        code: ErrorCode.POOL_EXHAUSTED,
+        message: 'ظرفیت فروش عمومی این پرواز تکمیل شده است.',
       });
     }
 

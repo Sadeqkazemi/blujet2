@@ -9,6 +9,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { RRule } from 'rrule';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
+import { enumerateSeats } from '../reservation/seat-layout';
+import { resolveAircraftType } from './aircraft-type.util';
 import {
   PRICE_SUGGESTION_PROVIDER,
   type PriceSuggestionProvider,
@@ -337,7 +339,12 @@ export class FlightsService {
   async plan(
     actor: AuthenticatedUser,
     id: string,
-    dto: { priceIrr: number; agencySeats: number },
+    dto: {
+      priceIrr: number;
+      agencySeats: number;
+      saleStartsAt?: string;
+      saleEndsAt?: string;
+    },
   ) {
     const instance = await this.prisma.flightInstance.findUnique({
       where: { id },
@@ -369,6 +376,16 @@ export class FlightsService {
       data: {
         basePriceIrr: dto.priceIrr,
         agencySeatsAllocated: dto.agencySeats,
+        ...(dto.saleStartsAt !== undefined
+          ? {
+              saleStartsAt: dto.saleStartsAt
+                ? new Date(dto.saleStartsAt)
+                : null,
+            }
+          : {}),
+        ...(dto.saleEndsAt !== undefined
+          ? { saleEndsAt: dto.saleEndsAt ? new Date(dto.saleEndsAt) : null }
+          : {}),
       },
     });
 
@@ -406,6 +423,89 @@ export class FlightsService {
         0,
       ),
       proposalPending: actor.role === 'COMMERCIAL_MANAGER',
+    };
+  }
+
+  /** Phase 13: re-points this instance at a different aircraft type/seat
+   * map without touching the shared `Flight` row (which would silently
+   * change every other instance of the same recurring schedule) — sets
+   * `aircraftTypeOverride` instead. Rejects with a shortfall count rather
+   * than auto-cancelling/rebooking paying customers, which is a business
+   * decision with no design/product guidance anywhere (see DB_SCHEMA.md
+   * Phase 13). */
+  async changeAircraftType(
+    actor: AuthenticatedUser,
+    id: string,
+    newAircraftType: string,
+  ) {
+    const instance = await this.prisma.flightInstance.findUnique({
+      where: { id },
+      include: { flight: true },
+    });
+    if (!instance) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'پرواز یافت نشد.',
+      });
+    }
+    const newMap = await this.prisma.aircraftSeatMap.findUnique({
+      where: { aircraftType: newAircraftType },
+    });
+    if (!newMap) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: `نقشهٔ صندلی برای «${newAircraftType}» تعریف نشده است.`,
+      });
+    }
+    const newCapacity = enumerateSeats(newMap).length;
+
+    const [confirmedCount, lockCount] = await Promise.all([
+      this.prisma.passenger.count({
+        where: {
+          seatCode: { not: null },
+          booking: {
+            flightInstanceId: id,
+            status: { in: ['PAID', 'TICKETED'] },
+          },
+        },
+      }),
+      this.prisma.seatLock.count({
+        where: { flightInstanceId: id, releasedAt: null },
+      }),
+    ]);
+    const confirmedOrLocked = confirmedCount + lockCount;
+    if (newCapacity < confirmedOrLocked) {
+      const shortfall = confirmedOrLocked - newCapacity;
+      throw new ConflictException({
+        code: ErrorCode.CAPACITY_BELOW_CONFIRMED,
+        message: `ظرفیت هواپیمای جدید (${newCapacity}) کمتر از تعداد رزروهای قطعی/لاک‌شدهٔ فعلی (${confirmedOrLocked}) است — ${shortfall} مسافر مازاد باید ابتدا جابه‌جا یا لغو شود.`,
+      });
+    }
+
+    const updated = await this.prisma.flightInstance.update({
+      where: { id },
+      data: { aircraftTypeOverride: newAircraftType, capacity: newCapacity },
+    });
+
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'SYSTEM',
+      action: 'تغییر نوع هواپیمای پرواز',
+      detail: `نوع هواپیمای پرواز ${instance.flight.flightNo} از «${resolveAircraftType(instance)}» به «${newAircraftType}» توسط ${actor.fullName} تغییر کرد.`,
+      entityType: 'FlightInstance',
+      entityId: id,
+      metadata: {
+        previousAircraftType: resolveAircraftType(instance),
+        newAircraftType,
+        newCapacity,
+      },
+    });
+
+    return {
+      id: updated.id,
+      aircraftType: newAircraftType,
+      capacity: updated.capacity,
     };
   }
 

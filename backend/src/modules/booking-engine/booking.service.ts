@@ -17,6 +17,7 @@ import {
   normalizeNationalId,
 } from '../../common/pii-crypto';
 import { enumerateSeats } from '../reservation/seat-layout';
+import { resolveAircraftType } from '../flights/aircraft-type.util';
 import { getCabinPrice, resolveFareClass } from './pricing';
 import { PAYMENT_GATEWAY, type PaymentGateway } from './payment-gateway';
 import { SearchService } from './search.service';
@@ -125,9 +126,19 @@ export class BookingService {
         message: 'پرواز یافت نشد یا دیگر قابل رزرو نیست.',
       });
     }
+    const now = new Date();
+    if (
+      (instance.saleStartsAt && instance.saleStartsAt > now) ||
+      (instance.saleEndsAt && instance.saleEndsAt < now)
+    ) {
+      throw new ConflictException({
+        code: ErrorCode.SALE_WINDOW_CLOSED,
+        message: 'مهلت فروش این پرواز به پایان رسیده یا هنوز آغاز نشده است.',
+      });
+    }
 
     const map = await this.prisma.aircraftSeatMap.findUnique({
-      where: { aircraftType: instance.flight.aircraftType },
+      where: { aircraftType: resolveAircraftType(instance) },
     });
     if (!map) {
       throw new NotFoundException({
@@ -202,6 +213,24 @@ export class BookingService {
         throw new ConflictException({
           code: ErrorCode.CONFLICT,
           message: `صندلی ${conflict} هم‌اکنون در دسترس نیست.`,
+        });
+      }
+
+      // This booking is always channel SYSTEM (public/direct sale) — must
+      // not eat into seats reserved for the agency/charter pools even
+      // though physical seats remain (CLAUDE.md pools: they belong to a
+      // different pool). Managerial locks still count against this pool
+      // (they physically occupy a public-pool seat).
+      const counts = await this.search.takenCountsByChannel(instance.id);
+      const publicPoolLimit =
+        instance.capacity -
+        instance.charterSeats -
+        (instance.agencySeatsAllocated ?? 0);
+      const publicPoolUsed = counts.SYSTEM + counts.MANAGERIAL;
+      if (publicPoolUsed + dto.passengers.length > publicPoolLimit) {
+        throw new ConflictException({
+          code: ErrorCode.POOL_EXHAUSTED,
+          message: 'ظرفیت فروش عمومی این پرواز تکمیل شده است.',
         });
       }
 

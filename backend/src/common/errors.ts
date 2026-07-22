@@ -11,6 +11,10 @@ export enum ErrorCode {
   CONFLICT = 'CONFLICT',
   RATE_LIMITED = 'RATE_LIMITED',
   INTERNAL_ERROR = 'INTERNAL_ERROR',
+  // Phase 13 — reservation engine completion
+  SALE_WINDOW_CLOSED = 'SALE_WINDOW_CLOSED',
+  POOL_EXHAUSTED = 'POOL_EXHAUSTED',
+  CAPACITY_BELOW_CONFIRMED = 'CAPACITY_BELOW_CONFIRMED',
 }
 
 export interface ApiErrorBody {

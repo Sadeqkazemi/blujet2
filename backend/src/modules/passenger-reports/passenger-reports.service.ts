@@ -5,6 +5,7 @@ import {
   hashPii,
   normalizeNationalId,
 } from '../../common/pii-crypto';
+import { resolveAircraftType } from '../flights/aircraft-type.util';
 import type { AircraftSeatMap } from '../../../generated/prisma/client';
 
 /** «123******7»-style mask — this surface never returns a full national ID. */
@@ -52,7 +53,7 @@ export class PassengerReportsService {
 
     const aircraftTypes = [
       ...new Set(
-        passengers.map((p) => p.booking.flightInstance.flight.aircraftType),
+        passengers.map((p) => resolveAircraftType(p.booking.flightInstance)),
       ),
     ];
     const seatMaps = await this.prisma.aircraftSeatMap.findMany({
@@ -75,7 +76,7 @@ export class PassengerReportsService {
         departureAt: instance.departureAt.toISOString(),
         seatCode: p.seatCode,
         cabin: cabinFor(
-          mapByType.get(instance.flight.aircraftType) ?? null,
+          mapByType.get(resolveAircraftType(instance)) ?? null,
           p.seatCode,
         ),
         priceIrr: p.booking.priceIrr,

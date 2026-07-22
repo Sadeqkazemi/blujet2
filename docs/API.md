@@ -378,6 +378,44 @@ stays untouched on the same page).
 
 ---
 
+## Phase 13 — Reservation engine completion, Part A
+
+See `docs/DB_SCHEMA.md`'s Phase 13 for the full reasoning. Note: the
+public booking engine's own endpoints (`backend/src/modules/booking-engine/`
+— `GET /search/flights`, `GET /search/flights/:id/seatmap`, `POST
+/bookings`, `PATCH /bookings/:id/pay`, etc.) were built on the public-site
+track and were never added to this file before the branches merged into
+`main` — that's pre-existing doc debt from before this phase, not
+something this phase caused; backfilling their full documentation here is
+a separate task, not bundled into this one so this phase's diff stays
+reviewable. Only what Phase 13 actually changes is documented below.
+
+- `GET /search/flights` and `POST /bookings` (`booking-engine` module):
+  - Both now respect `FlightInstance.saleStartsAt/saleEndsAt` — an instance
+    outside its window is excluded from search results, and `POST /bookings`
+    against one 409s `SALE_WINDOW_CLOSED`.
+  - `POST /bookings` gains a channel-pool check alongside the existing
+    per-seat conflict check — 409 `POOL_EXHAUSTED` (with which pool:
+    `AGENCY` | `CHARTER` | `SYSTEM`) when the requested channel's pool is
+    full, even if physical seats remain (they belong to a different pool).
+  - `seatsLeft` in search results is unchanged (still physical vacancy per
+    cabin) — see DB_SCHEMA's ⚑ scope-cut note; the enforced guarantee is the
+    409 above, not the display number.
+- PATCH `/flights/:instanceId/aircraft` (new, `backend/src/modules/flights/`,
+  `SENIOR_MANAGER` + `COMMERCIAL_MANAGER`, matching Phase 10's existing
+  role gate) — `{ aircraftType }`. Re-points the instance at a different
+  `AircraftSeatMap`; 409 `CAPACITY_BELOW_CONFIRMED` (with the shortfall
+  count) if the new type's capacity is less than the instance's current
+  confirmed-or-later booking + active-lock count. No design mock shows
+  this control (aircraft type is create-only in every existing panel), so
+  it's a new form field on the flight-detail view — not a redesign of an
+  existing one.
+- `PATCH /flights/:instanceId/plan` (existing, Phase 10) gains optional
+  `saleStartsAt`/`saleEndsAt` (Jalali in the request, stored UTC) —
+  additive, no change to its existing `priceToman`/`agencySeats` behavior.
+
+---
+
 ## Phase 11 — Finance tab (مالی), گزارش مسافران, گزارش کارمندان
 
 Grounded in the FINANCE / PASSENGER SEARCH / STAFF REPORTS markup of all 5

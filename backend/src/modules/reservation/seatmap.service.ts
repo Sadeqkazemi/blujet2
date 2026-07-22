@@ -14,6 +14,7 @@ import {
   normalizeNationalId,
 } from '../../common/pii-crypto';
 import { enumerateSeats, isKnownSeat } from './seat-layout';
+import { resolveAircraftType } from '../flights/aircraft-type.util';
 import { Prisma } from '../../../generated/prisma/client';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { LockSeatDto } from './dto/reservation.dtos';
@@ -55,7 +56,7 @@ export class SeatmapService {
   async getSeatMap(flightInstanceId: string) {
     const instance = await this.getFlightInstanceOrThrow(flightInstanceId);
     const map = await this.getSeatMapConfigOrThrow(
-      instance.flight.aircraftType,
+      resolveAircraftType(instance),
     );
     const seats = enumerateSeats(map);
 
@@ -97,7 +98,7 @@ export class SeatmapService {
 
     return {
       flightInstanceId,
-      aircraftType: instance.flight.aircraftType,
+      aircraftType: resolveAircraftType(instance),
       rows: Array.from(rowsMap.values()).sort((a, b) => a.row - b.row),
       capacity: seats.length,
       soldCount: soldCodes.size,
@@ -118,7 +119,7 @@ export class SeatmapService {
   ) {
     const instance = await this.getFlightInstanceOrThrow(flightInstanceId);
     const map = await this.getSeatMapConfigOrThrow(
-      instance.flight.aircraftType,
+      resolveAircraftType(instance),
     );
     if (!isKnownSeat(map, dto.seatCode)) {
       throw new BadRequestException({
