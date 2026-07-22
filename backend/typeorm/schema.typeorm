@@ -95,6 +95,7 @@ model User {
   promoRedemptions PromoRedemption[] @relation("PromoRedeemedBy")
   walletEntries    WalletEntry[]     @relation("WalletOwner")
   priceLocks       PriceLock[]       @relation("PriceLockOwner")
+  agencyAllotmentsCreated AgencyAllotment[]
 
   @@map("users")
 }
@@ -286,6 +287,7 @@ model FlightInstance {
   cabinFares           CabinFare[]
   priceLocks           PriceLock[]
   fareRules            FareRule[]
+  agencyAllotments     AgencyAllotment[]
 
   @@unique([scheduleId, departureAt])
   @@index([departureAt])
@@ -500,8 +502,37 @@ model AgencyProfile {
   ledgerEntries  LedgerEntry[]         @relation("AgencyLedgerEntries")
   creditRequests AgencyCreditRequest[]
   documents      AgencyDocument[]
+  allotments     AgencyAllotment[]
 
   @@map("agency_profiles")
+}
+
+enum AllotmentType {
+  SOFT
+  HARD
+}
+
+// Phase 13 Part C: per-agency subdivision of FlightInstance.agencySeatsAllocated
+// (Phase 10's coarse instance-wide quota) — see docs/DB_SCHEMA.md.
+model AgencyAllotment {
+  id               String         @id @default(uuid())
+  agencyId         String
+  agency           AgencyProfile  @relation(fields: [agencyId], references: [userId])
+  flightInstanceId String
+  flightInstance   FlightInstance @relation(fields: [flightInstanceId], references: [id])
+  seatsAllocated   Int
+  type             AllotmentType  @default(HARD)
+  // Only meaningful for SOFT: once passed, this allotment is excluded from
+  // the active-allotment sum (lazy, like Booking's HELD→EXPIRED) — its
+  // seats return to the general agency pool without deleting the row.
+  releaseAt        DateTime?
+  // This agency's contracted per-seat rate; null = normal price resolution.
+  contractPriceIrr Int?
+  createdById      String
+  createdBy        User           @relation(fields: [createdById], references: [id])
+  createdAt        DateTime       @default(now())
+
+  @@map("agency_allotments")
 }
 
 // Only the limit is stored — "used" is always derived from LedgerEntry

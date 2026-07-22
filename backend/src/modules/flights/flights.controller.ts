@@ -275,6 +275,41 @@ class UpdateFareRuleDto {
   allowedChannels?: ('SYSTEM' | 'CHARTER' | 'AGENCY')[];
 }
 
+class CreateAllotmentDto {
+  @ApiProperty({ description: 'شناسه کاربری آژانس' })
+  @IsString()
+  agencyId: string;
+
+  @ApiProperty({ description: 'تعداد صندلی تخصیص‌یافته', example: 10 })
+  @IsInt()
+  @Min(1)
+  @Max(1000)
+  seatsAllocated: number;
+
+  @ApiProperty({ enum: ['SOFT', 'HARD'], required: false, default: 'HARD' })
+  @IsOptional()
+  @IsIn(['SOFT', 'HARD'])
+  type?: 'SOFT' | 'HARD';
+
+  @ApiProperty({
+    required: false,
+    description: 'موعد آزادسازی خودکار (فقط برای نوع SOFT، UTC ISO)',
+  })
+  @IsOptional()
+  @IsISO8601()
+  releaseAt?: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'نرخ قراردادی این آژانس (ریال)',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(MAX_INT32)
+  contractPriceIrr?: number;
+}
+
 @ApiTags('flights')
 @Controller('flights')
 @UseGuards(JwtAuthGuard, RolesGuard, PanelAccessGuard)
@@ -433,6 +468,44 @@ export class FlightsController {
     @Param('ruleId') ruleId: string,
   ) {
     const data = await this.flights.deleteFareRule(actor, instanceId, ruleId);
+    return { success: true, data };
+  }
+
+  @Get(':instanceId/allotments')
+  @ApiOperation({ summary: 'فهرست سهمیه‌های آژانس این پرواز' })
+  async listAllotments(@Param('instanceId') instanceId: string) {
+    const data = await this.flights.listAllotments(instanceId);
+    return { success: true, data };
+  }
+
+  @Post(':instanceId/allotments')
+  @ApiOperation({
+    summary:
+      'تخصیص سهمیه به آژانس — رد با ۴۰۰ اگر مجموع سهمیه‌ها از سقف کلی آژانس‌های پرواز بیشتر شود',
+  })
+  async createAllotment(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('instanceId') instanceId: string,
+    @Body() dto: CreateAllotmentDto,
+  ) {
+    const data = await this.flights.createAllotment(actor, instanceId, dto);
+    return { success: true, data };
+  }
+
+  @Delete(':instanceId/allotments/:allotmentId')
+  @ApiOperation({
+    summary: 'حذف سهمیه آژانس — رد با ۴۰۹ اگر آژانس رزرو فعالی داشته باشد',
+  })
+  async deleteAllotment(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('instanceId') instanceId: string,
+    @Param('allotmentId') allotmentId: string,
+  ) {
+    const data = await this.flights.deleteAllotment(
+      actor,
+      instanceId,
+      allotmentId,
+    );
     return { success: true, data };
   }
 }

@@ -440,6 +440,28 @@ screen exists for this yet, so these are backend-only for now.
   resolved price didn't come from a `FareRule`) alongside the existing
   `priceIrr`, which now includes the tax total.
 
+## Phase 13 — Reservation engine completion, Part C
+
+See DB_SCHEMA.md's Phase 13 Part C — staff-side allotment bookkeeping
+only this phase; an agency actually booking against one is a follow-up
+(no payment-path design exists for it yet).
+
+- `GET /flights/:instanceId/allotments` — `SENIOR_MANAGER` +
+  `COMMERCIAL_MANAGER`. Lists the instance's allotments (agency name,
+  seats, type, releaseAt, contractPriceIrr), each flagged `active: boolean`
+  (false once a SOFT row's `releaseAt` has passed).
+- `POST /flights/:instanceId/allotments` — same roles —
+  `{ agencyId, seatsAllocated, type?, releaseAt?, contractPriceIrr? }`.
+  400 `VALIDATION_FAILED` if the sum of every active allotment's
+  `seatsAllocated` for this instance (including this new one) would
+  exceed `FlightInstance.agencySeatsAllocated`, or if that field is unset.
+  `releaseAt` is only meaningful (and only accepted) when `type: 'SOFT'`.
+- `DELETE /flights/:instanceId/allotments/:id` — same roles — 409
+  `CONFLICT` if that agency already has an active booking on this
+  instance (there is currently no path that creates one — see
+  DB_SCHEMA.md — so this guard is a no-op today and becomes real once
+  agency booking creation lands).
+
 ---
 
 ## Phase 11 — Finance tab (مالی), گزارش مسافران, گزارش کارمندان
