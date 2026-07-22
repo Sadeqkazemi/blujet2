@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { SeatmapService } from './seatmap.service';
-import { LockSeatDto } from './dto/reservation.dtos';
+import { LockSeatDto, RejectLockDto } from './dto/reservation.dtos';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -36,7 +36,9 @@ export class SeatmapController {
 
   @Post(':flightInstanceId/lock')
   @Roles(...CAN_LOCK_ROLES)
-  @ApiOperation({ summary: 'لاک مدیریتی صندلی — فقط نقش‌های مجاز' })
+  @ApiOperation({
+    summary: 'درخواست لاک مدیریتی صندلی — در انتظار تأیید یک نقش دیگر',
+  })
   async lock(
     @CurrentUser() actor: AuthenticatedUser,
     @Param('flightInstanceId') flightInstanceId: string,
@@ -45,6 +47,32 @@ export class SeatmapController {
     return {
       success: true,
       data: await this.seatmap.lockSeat(actor, flightInstanceId, dto),
+    };
+  }
+
+  @Patch('locks/:id/approve')
+  @Roles(...CAN_LOCK_ROLES)
+  @ApiOperation({
+    summary: 'تأیید درخواست لاک مدیریتی — نه توسط درخواست‌کننده',
+  })
+  async approve(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    return { success: true, data: await this.seatmap.approveLock(actor, id) };
+  }
+
+  @Patch('locks/:id/reject')
+  @Roles(...CAN_LOCK_ROLES)
+  @ApiOperation({ summary: 'رد درخواست لاک مدیریتی' })
+  async reject(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: RejectLockDto,
+  ) {
+    return {
+      success: true,
+      data: await this.seatmap.rejectLock(actor, id, dto),
     };
   }
 

@@ -708,3 +708,109 @@ across price classes — additive, not a replacement.
     phase ships the allotment bookkeeping (so staff can plan/contract
     agency capacity today); consuming it from an actual agency booking is
     the next phase.
+
+---
+
+## Phase 13 — Reservation engine completion, Part D: managerial reservation governance
+
+Phase 9's `SeatLock` is a single-step control today: any `CAN_LOCK_ROLES`
+member (`CEO`, `BOARD_CHAIR`, `IT_MANAGER`) locks a seat directly, with no
+reason on record, no spending classification, no cap on how many seats one
+person can hold, and no expiry — a lock sits active forever until someone
+remembers to release it. The user's spec asks for real governance around
+this: a reason, a free/discounted/payable classification, the requester's
+rank on record, a per-requester seat cap, a hold-to-ticket deadline with
+auto-release, and a genuine two-step request→approval flow before a lock
+can be turned into a ticket. This phase adds all of that directly onto
+`SeatLock` — it's still the same table Phase 9 built, not a new model,
+because every new field describes that same row's lifecycle.
+
+- `SeatLock` gains:
+  - `reason String` — required free-text justification for the request
+    (⚑ migration default `""` for the handful of pre-existing dev/test
+    rows only; the DTO makes it mandatory for every new request — no real
+    production lock exists yet, the platform hasn't launched).
+  - New enum `LockClassification { FREE, DISCOUNTED, PAYABLE }` — the
+    seat's eventual charge basis, decided at request time.
+    `classification LockClassification @default(PAYABLE)`.
+  - `discountPct Int?` — 0–100, required by the DTO only when
+    `classification: DISCOUNTED`; ignored otherwise.
+  - `requesterRank Role` — a snapshot of the requester's `User.role` at
+    request time, not a live join. ⚑ Deliberate: if a requester's role
+    ever changes later (promotion/demotion), the audit trail must keep
+    showing what rank actually authorized the original request, the same
+    reasoning `AgencyAllotment.contractPriceIrr` and other historical
+    snapshot fields already use elsewhere in this schema.
+  - New enum `LockApprovalStatus { PENDING_APPROVAL, APPROVED, REJECTED }`,
+    `approvalStatus LockApprovalStatus @default(APPROVED)` (⚑ default only
+    backfills pre-existing rows as already-decided; every new lock is
+    always created `PENDING_APPROVAL` — the default never applies to a
+    request going through the real flow).
+  - `approvedById String?` / `approvedAt DateTime?` → `User` (`"SeatLockApprovedBy"`),
+    `rejectedById String?` / `rejectedAt DateTime?` → `User` (`"SeatLockRejectedBy"`),
+    `rejectionReason String?`.
+  - `expiresAt DateTime` — a single deadline field reused across both
+    phases of the lock's life instead of two separate TTL columns: set to
+    `createdAt + 24h` at request time (**request-decision deadline** — a
+    `PENDING_APPROVAL` lock nobody acts on stops blocking the seat after a
+    day) and overwritten to `approvedAt + 48h` at approval time
+    (**hold-to-ticket deadline** — an approved-but-never-finalized lock
+    stops blocking the seat after two days). ⚑ Both windows are fixed
+    constants (`LOCK_REQUEST_TTL_HOURS = 24`, `LOCK_HOLD_TTL_HOURS = 48`)
+    rather than configurable — no design or spec value exists for either,
+    and CLAUDE.md forbids inventing numbers presented as configurable
+    product settings; these are documented code constants, changeable by
+    a future phase if a real requirement shows up.
+  - `bookingId String?` → `Booking` (`"SeatLockFinalizedBooking"`) — set
+    when the lock is finalized into a real ticketed PNR, for traceability
+    from the lock's audit trail to the booking it produced.
+  - Auto-release mirrors `Booking`'s `HELD`→`EXPIRED` materialization
+    exactly (no cron): reads (seat map, pool counts) filter on
+    `releasedAt: null AND expiresAt > now`, and the two write paths that
+    actually contend for a seat — creating a new lock, and finalizing one
+    into a booking — first run a conditional `updateMany` that stamps
+    `releasedAt: now` (system release, `releasedById` stays null so it's
+    distinguishable from a human release) on any lock for that seat whose
+    `expiresAt` has already passed. This has to be a real write rather
+    than a purely-lazy read-time exclusion, unlike Part C's SOFT
+    allotments: the DB-level partial unique index (`WHERE releasedAt IS
+    NULL`) that guarantees one active lock per seat can't itself express
+    "and not expired" (`now()` isn't allowed in a partial-index
+    predicate), so an expired row has to actually be released before a
+    new lock on the same seat can be inserted. `approvalStatus`,
+    `reason`, and every other governance field are untouched — the row
+    stays queryable for audit with its true history.
+- **Two-step approval, segregation of duties (⚑ product decision — the
+  user's spec says "authorized unit finalizes" without naming a distinct
+  role, and broadening `CAN_LOCK_ROLES` would be inventing a new role):**
+  requesting and approving both stay within the existing
+  `CEO`/`BOARD_CHAIR`/`IT_MANAGER` set, but **a requester can never approve
+  or reject their own request** (409 if attempted) — a real two-step
+  control between the three governance roles rather than a single person
+  rubber-stamping themselves. Rejection immediately sets `releasedAt`
+  (frees the seat right away, no need to wait out `expiresAt`).
+- **Per-requester seat cap (⚑ scoped globally, not per-flight — a cap
+  meant to bound how many seats one manager can hold locked across the
+  whole airline at once, not per route):** a fixed constant
+  (`MAX_ACTIVE_MANAGERIAL_LOCKS_PER_REQUESTER = 5`, same "documented code
+  constant, not a fabricated configurable setting" reasoning as the TTLs
+  above) counted against the requester's own currently-active
+  (`releasedAt: null AND expiresAt > now`) locks across every flight
+  instance; 409 `LOCK_CAP_EXCEEDED` past the cap.
+- **Finalize** — turning an `APPROVED`, not-yet-expired lock into a real
+  `TICKETED` booking: reuses `PnrService`'s existing manual-issuance path
+  (same pricing fallback, same PII handling), but the price is now derived
+  from the lock's `classification`: `FREE` → `priceIrr: 0`; `DISCOUNTED` →
+  base price minus `Math.round(base * discountPct / 100)` (same rounding
+  convention as Phase 7's `penalty.ts`); `PAYABLE` → unchanged base price.
+  `taxIrr` is not computed for this manual path — matches Part A/B's
+  existing `issue()` behavior, which never applied `FareRule.taxIrr`
+  either; extending that is out of scope here. On success the lock is
+  stamped `releasedAt`/`bookingId` (finalized, no longer "active" — the
+  seat is now held by the real `Passenger` row instead).
+- **Explicitly not built this phase:** a UI for any of this (no design
+  screen shows a request/approval queue — Phase 9's own screen already
+  ships single-step locking only; this is backend governance ahead of a
+  design that doesn't exist yet, same situation Part B was in); email/SMS
+  notification to the approver when a request is pending (no notification
+  design exists here either — `AuditLog` is the only trail for now).

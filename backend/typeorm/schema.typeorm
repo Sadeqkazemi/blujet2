@@ -55,6 +55,8 @@ model User {
   backupsTriggered        BackupRecord[]       @relation("BackupTriggeredBy")
   seatLocksCreated        SeatLock[]           @relation("SeatLockedBy")
   seatLocksReleased       SeatLock[]           @relation("SeatLockReleasedBy")
+  seatLocksApproved       SeatLock[]           @relation("SeatLockApprovedBy")
+  seatLocksRejected       SeatLock[]           @relation("SeatLockRejectedBy")
 
   refreshTokens        RefreshToken[]
   twoFactorChallenges  TwoFactorChallenge[]
@@ -91,10 +93,10 @@ model User {
   refundAssignments RefundRequest[] @relation("RefundAssignee")
   refundsProcessed  RefundRequest[] @relation("RefundProcessedBy")
 
-  bookings         Booking[]         @relation("BookingUser")
-  promoRedemptions PromoRedemption[] @relation("PromoRedeemedBy")
-  walletEntries    WalletEntry[]     @relation("WalletOwner")
-  priceLocks       PriceLock[]       @relation("PriceLockOwner")
+  bookings                Booking[]         @relation("BookingUser")
+  promoRedemptions        PromoRedemption[] @relation("PromoRedeemedBy")
+  walletEntries           WalletEntry[]     @relation("WalletOwner")
+  priceLocks              PriceLock[]       @relation("PriceLockOwner")
   agencyAllotmentsCreated AgencyAllotment[]
 
   @@map("users")
@@ -326,25 +328,25 @@ model CabinFare {
 // still has allocation left (sold count = bookings holding that class);
 // when none exist, pricing falls back to CabinFare — see pricing.ts.
 model FareRule {
-  id               String         @id @default(uuid())
-  flightInstanceId String
-  flightInstance   FlightInstance @relation(fields: [flightInstanceId], references: [id])
-  cabin            CabinClass
-  classCode        String
-  priceIrr         Int
-  seatsAllocated   Int
-  refundable       Boolean        @default(true)
+  id                 String           @id @default(uuid())
+  flightInstanceId   String
+  flightInstance     FlightInstance   @relation(fields: [flightInstanceId], references: [id])
+  cabin              CabinClass
+  classCode          String
+  priceIrr           Int
+  seatsAllocated     Int
+  refundable         Boolean          @default(true)
   // Phase 13 Part B — see docs/DB_SCHEMA.md for the full reasoning behind
   // each field, and what's deliberately NOT here (ticketing deadline, a
   // separate per-class cancellation-penalty schedule, min sale capacity).
-  changeable         Boolean            @default(true)
-  taxIrr             Int                @default(0)
+  changeable         Boolean          @default(true)
+  taxIrr             Int              @default(0)
   baggageAllowanceKg Int?
   validFrom          DateTime?
   validUntil         DateTime?
   // Empty = all channels allowed (matches the NULL-means-unrestricted
   // convention of validFrom/validUntil and Part A's sale window).
-  allowedChannels    BookingChannel[]   @default([])
+  allowedChannels    BookingChannel[] @default([])
 
   @@unique([flightInstanceId, cabin, classCode])
   @@map("fare_rules")
@@ -408,6 +410,9 @@ model Booking {
   walletEntries     WalletEntry[]
   clubPointsEntries ClubPointsEntry[]
   priceLock         PriceLock?
+  // Set when this booking was created by finalizing a Phase 13D managerial
+  // SeatLock — the FK itself lives on SeatLock.bookingId (unique).
+  seatLock          SeatLock?         @relation("SeatLockFinalizedBooking")
 
   // Fare-class bucket (Y/B/M) this booking consumed, when FareRule
   // pricing was in effect; null under flat CabinFare pricing.
@@ -1197,6 +1202,11 @@ model AircraftSeatMap {
  * may create/release one. `releasedAt=null` = currently active; enforced
  * unique per (flightInstanceId, seatCode) via a partial index (migration
  * SQL) so two active locks can never coexist on the same seat.
+ * Phase 13 Part D: two-step governance layered onto the same row (see
+ * docs/DB_SCHEMA.md) — reason, classification, requester rank, a single
+ * `expiresAt` reused as both the request-decision deadline and (after
+ * approval) the hold-to-ticket deadline, and a link to the booking a
+ * lock gets finalized into.
  */
 model SeatLock {
   id                      String         @id @default(uuid())
@@ -1214,8 +1224,42 @@ model SeatLock {
   releasedAt              DateTime?
   createdAt               DateTime       @default(now())
 
+  reason          String             @default("")
+  classification  LockClassification @default(PAYABLE)
+  discountPct     Int?
+  // Snapshot of lockedBy.role at request time — deliberately not a live
+  // join, so the audit trail keeps showing what rank actually authorized
+  // the request even if the user's role later changes.
+  requesterRank   Role               @default(IT_MANAGER)
+  approvalStatus  LockApprovalStatus @default(APPROVED)
+  approvedById    String?
+  approvedBy      User?              @relation("SeatLockApprovedBy", fields: [approvedById], references: [id])
+  approvedAt      DateTime?
+  rejectedById    String?
+  rejectedBy      User?              @relation("SeatLockRejectedBy", fields: [rejectedById], references: [id])
+  rejectedAt      DateTime?
+  rejectionReason String?
+  // Request-decision deadline (createdAt + 24h) until approved, then
+  // overwritten to the hold-to-ticket deadline (approvedAt + 48h). See
+  // docs/DB_SCHEMA.md Phase 13 Part D.
+  expiresAt       DateTime           @default(now())
+  bookingId       String?            @unique
+  booking         Booking?           @relation("SeatLockFinalizedBooking", fields: [bookingId], references: [id])
+
   @@index([flightInstanceId])
   @@map("seat_locks")
+}
+
+enum LockClassification {
+  FREE
+  DISCOUNTED
+  PAYABLE
+}
+
+enum LockApprovalStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
 }
 
 // ─── Phase 10: flight management (مدیریت پروازها) ──────────────────────
