@@ -504,6 +504,24 @@ All endpoints live in `backend/src/modules/reservation/`, gated
   never-approved request or an expired never-finalized hold shows as
   `FREE` again automatically.
 
+## Phase 14 — real SmsProvider + management log
+
+See DB_SCHEMA.md's Phase 14 for full reasoning. Endpoints live in
+`backend/src/modules/it-manager/` alongside the existing services tab
+(`IT_MANAGER` only, matching that tab's existing role gate).
+
+- `GET /it/services/sms-log` (new) — `{ enabled, todaySuccessCount,
+  todayFailedCount, recent: [{ id, phoneMasked, messageType, status,
+  failureReason, createdAt }] }` (latest 50). `enabled` is read straight
+  from the existing `InternalService(key:"sms")` row — same value the
+  existing `PATCH /it/services/internal/:key` toggle already writes; no
+  new toggle endpoint needed. No uptime figure of any kind is returned.
+- No other endpoint changes — `POST /admins` and `POST /admins/:id/reset-password`
+  keep their existing request/response shape; they now genuinely send
+  (or genuinely fail to send, if no phone is on file — see DB_SCHEMA.md)
+  behind the same `delivery` flag, instead of only writing an audit-log
+  sentence claiming they did.
+
 ---
 
 ## Phase 11 — Finance tab (مالی), گزارش مسافران, گزارش کارمندان

@@ -1095,6 +1095,31 @@ model InternalService {
   @@map("internal_services")
 }
 
+// Phase 14: real send log behind the "sms" InternalService row above —
+// see docs/DB_SCHEMA.md. phone is nullable for the one genuine failure
+// case this phase handles: a delivery attempt with no phone on file.
+enum SmsMessageType {
+  OTP
+  TEMP_PASSWORD
+}
+
+enum SmsStatus {
+  SUCCESS
+  FAILED
+}
+
+model SmsLog {
+  id            String         @id @default(uuid())
+  phone         String?
+  messageType   SmsMessageType
+  status        SmsStatus
+  failureReason String?
+  createdAt     DateTime       @default(now())
+
+  @@index([createdAt])
+  @@map("sms_logs")
+}
+
 enum ExternalServiceMethod {
   GET
   POST

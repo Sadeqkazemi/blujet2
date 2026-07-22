@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { TwoFactorProvider } from './two-factor-provider.interface';
+import { SmsService } from '../../sms/sms.service';
 
 /** Dev/test provider — logs the code instead of sending SMS/email. Never used in production. */
 @Injectable()
@@ -7,8 +8,10 @@ export class MockTwoFactorProvider implements TwoFactorProvider {
   private readonly logger = new Logger(MockTwoFactorProvider.name);
   private readonly lastCodeByUserId = new Map<string, string>();
 
-  sendCode(
-    user: { id: string; fullName: string },
+  constructor(private readonly sms: SmsService) {}
+
+  async sendCode(
+    user: { id: string; fullName: string; phone: string | null },
     code: string,
   ): Promise<void> {
     this.lastCodeByUserId.set(user.id, code);
@@ -17,7 +20,11 @@ export class MockTwoFactorProvider implements TwoFactorProvider {
     // production log level is 'info' — a .debug() call here would make the
     // code permanently unreadable on any production deployment.
     this.logger.log(`2FA code for ${user.fullName} (${user.id}): ${code}`);
-    return Promise.resolve();
+    // Phase 14: real send log — only when this challenge is phone-bound
+    // (the interface also serves email-delivered 2FA, which isn't an SMS).
+    if (user.phone) {
+      await this.sms.send(user.phone, `کد ورود بلوجت: ${code}`, 'OTP');
+    }
   }
 
   /** Test-only helper to read back the last code sent to a user. */

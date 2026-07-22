@@ -7,6 +7,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { TWO_FACTOR_PROVIDER } from './providers/two-factor-provider.interface';
 import { MockTwoFactorProvider } from './providers/mock-two-factor.provider';
 import { AuditModule } from '../audit/audit.module';
+import { SmsModule } from '../sms/sms.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { AuditModule } from '../audit/audit.module';
       signOptions: { expiresIn: '15m' },
     }),
     AuditModule,
+    SmsModule,
   ],
   controllers: [AuthController],
   providers: [

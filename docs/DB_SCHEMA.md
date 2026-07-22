@@ -814,3 +814,72 @@ because every new field describes that same row's lifecycle.
   design that doesn't exist yet, same situation Part B was in); email/SMS
   notification to the approver when a request is pending (no notification
   design exists here either — `AuditLog` is the only trail for now).
+
+---
+
+## Phase 14 — real SmsProvider + management log
+
+CLAUDE.md specifies a `SmsProvider` interface (OTP, ticket issuance,
+refund notifications; mock in dev). It was never actually built: OTP/2FA
+delivery goes through the generic `TwoFactorProvider` (mock, just logs
+the code — see Phase 1), and two other call sites *claim* SMS delivery in
+their audit-log text with no send behind it at all —
+`AdminsService.create`/`resetPassword`'s own comment says so explicitly
+("nothing is fabricated as 'sent' beyond the audit note"). Phase 12's IT
+panel already has an `InternalService(key:"sms")` row (enable/disable
+toggle, ported from the design mock including its `uptimePct: 99.8` —
+itself a pre-existing minor deviation from CLAUDE.md's no-fabricated-data
+rule, not introduced here) and an `ExternalServiceConfig(key:"ext_kavenegar")`
+row for the vendor. This phase adds the missing piece: a real interface +
+mock provider, a real send log, and a management tab over that log — per
+the user's explicit scope (2026-07-22): **management panel only**
+(settings + a real log), not a redesign, and **no fabricated uptime**.
+
+- New `SmsProvider` interface (`backend/src/common/sms/`), same pattern
+  as `PaymentGateway`/`AiProvider`: `send(phone, message, messageType):
+  Promise<{ success, failureReason? }>`. `MockSmsProvider` logs the
+  message at `info` level (same reasoning as `MockTwoFactorProvider`:
+  it's the only delivery channel until a real vendor is wired) and always
+  reports success — it never fabricates a random failure rate.
+- New `SmsLog { id, phone, messageType: SmsMessageType (OTP|TEMP_PASSWORD),
+  status: SmsStatus (SUCCESS|FAILED), failureReason?, createdAt }`. Stores
+  the phone number in plaintext (same treatment `User.phone` already gets
+  elsewhere in this schema — it isn't encrypted-PII like national ID),
+  masked only at the IT panel's read layer (`0912***5678`), never the
+  message body/OTP code/password itself (CLAUDE.md: never log secrets).
+- `SmsService` (new, wraps the provider): checks
+  `InternalService(key:"sms").enabled` for **display purposes only** — it
+  does NOT gate whether a real send is attempted. ⚑ Deliberate: today
+  that toggle has zero functional effect (it's decorative, per its
+  existing Phase 12 code); making it newly load-bearing for actual OTP/
+  login delivery would mean a wrong click in the IT panel could break
+  customer login — a real product-safety change nobody asked for. The
+  toggle stays exactly as informational as it already was; this phase
+  only adds a genuine log under it.
+- The only genuine (non-fabricated) failure mode this phase introduces:
+  **no phone on file**. `AdminsService.create`/`resetPassword` accept a
+  `delivery: 'sms'|'email'` flag but their DTOs never collect a phone
+  number for the new/target account — so an `sms` delivery on an account
+  with `phone: null` logs a real `FAILED` row (`این حساب شماره موبایل
+  ثبت‌شده ندارد`) instead of a fabricated success. This is an honest
+  reflection of a pre-existing gap (delivery was never real before), not
+  a new bug — ⚑ flagged here rather than silently worked around by
+  inventing a phone-collection field on the admin-create form, which
+  would be its own product decision outside this phase's scope.
+- Three real send sites wired through `SmsService` (matching the user's
+  own scope wording, "OTP/رمز موقت"):
+  1. `MockTwoFactorProvider.sendCode` — logs `OTP` when the user has a
+     phone (2FA/OTP can also go by email under the same interface; only
+     the phone-bound case is an SMS send, so only that case gets a
+     `SmsLog` row).
+  2. `AdminsService.create` — logs `TEMP_PASSWORD` when `delivery: 'sms'`.
+  3. `AdminsService.resetPassword` — logs `TEMP_PASSWORD` when
+     `delivery !== 'email'` (matches its existing ternary's own default).
+  Employees' own reset-password (`EmployeesService.resetPassword`) makes
+  no delivery claim at all today (returns the plaintext password once,
+  no audit text asserting it was sent) — left untouched, out of scope.
+  Agencies' invoice reminder (`AgenciesService.remindInvoice`) similarly
+  only *comments* that it's "queued via SmsProvider" with no delivery
+  claim in its audit text or DTO — also left untouched; wiring it would
+  mean inventing what an invoice-reminder SMS says, which nothing in the
+  design specifies.

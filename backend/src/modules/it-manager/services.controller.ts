@@ -96,4 +96,12 @@ export class ItServicesController {
       data: await this.services.testExternal(actor, id),
     };
   }
+
+  @Get('sms-log')
+  @ApiOperation({
+    summary: 'سامانه پیامک — وضعیت، شمارنده امروز و آخرین ارسال‌ها',
+  })
+  async smsLog() {
+    return { success: true, data: await this.services.smsLog() };
+  }
 }
