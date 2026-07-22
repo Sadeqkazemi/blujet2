@@ -735,4 +735,245 @@ export class FlightsService {
       instanceCount: s._count.instances,
     }));
   }
+
+  // ── Phase 13 Part B: manageable fare classes ──────────────────────────
+
+  async listFareRules(instanceId: string) {
+    const rules = await this.prisma.fareRule.findMany({
+      where: { flightInstanceId: instanceId },
+      orderBy: [{ cabin: 'asc' }, { priceIrr: 'asc' }],
+    });
+    return rules;
+  }
+
+  /** Physical seat count for one cabin of this instance's (possibly
+   * overridden, Phase 13 Part A) aircraft type — the ceiling that
+   * seatsAllocated across every fare rule sharing this cabin must never
+   * exceed (the user spec's explicit anti-oversell rule for fare classes
+   * sharing one physical cabin). */
+  private async cabinSeatCount(
+    instance: {
+      flight: { aircraftType: string };
+      aircraftTypeOverride: string | null;
+    },
+    cabin: 'ECONOMY' | 'BUSINESS',
+  ): Promise<number> {
+    const map = await this.prisma.aircraftSeatMap.findUnique({
+      where: { aircraftType: resolveAircraftType(instance) },
+    });
+    if (!map) return 0;
+    return enumerateSeats(map).filter((s) => s.cabin === cabin).length;
+  }
+
+  private validateFareRuleWindow(dto: {
+    validFrom?: string;
+    validUntil?: string;
+  }) {
+    if (
+      dto.validFrom &&
+      dto.validUntil &&
+      new Date(dto.validUntil) <= new Date(dto.validFrom)
+    ) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'پایان بازه اعتبار باید بعد از شروع آن باشد.',
+      });
+    }
+  }
+
+  async createFareRule(
+    actor: AuthenticatedUser,
+    instanceId: string,
+    dto: {
+      cabin: 'ECONOMY' | 'BUSINESS';
+      classCode: string;
+      priceIrr: number;
+      seatsAllocated: number;
+      taxIrr?: number;
+      refundable?: boolean;
+      changeable?: boolean;
+      baggageAllowanceKg?: number;
+      validFrom?: string;
+      validUntil?: string;
+      allowedChannels?: ('SYSTEM' | 'CHARTER' | 'AGENCY')[];
+    },
+  ) {
+    const instance = await this.prisma.flightInstance.findUnique({
+      where: { id: instanceId },
+      include: { flight: true },
+    });
+    if (!instance) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'پرواز یافت نشد.',
+      });
+    }
+    this.validateFareRuleWindow(dto);
+
+    const cabinSeats = await this.cabinSeatCount(instance, dto.cabin);
+    const existing = await this.prisma.fareRule.findMany({
+      where: { flightInstanceId: instanceId, cabin: dto.cabin },
+    });
+    const existingTotal = existing.reduce((a, r) => a + r.seatsAllocated, 0);
+    if (existingTotal + dto.seatsAllocated > cabinSeats) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: `مجموع صندلی تخصیص‌یافته کلاس‌های نرخی (${existingTotal + dto.seatsAllocated}) از ظرفیت کابین ${dto.cabin === 'BUSINESS' ? 'بیزینس' : 'اکونومی'} (${cabinSeats}) بیشتر است.`,
+      });
+    }
+
+    const created = await this.prisma.fareRule.create({
+      data: {
+        flightInstanceId: instanceId,
+        cabin: dto.cabin,
+        classCode: dto.classCode,
+        priceIrr: dto.priceIrr,
+        seatsAllocated: dto.seatsAllocated,
+        taxIrr: dto.taxIrr ?? 0,
+        refundable: dto.refundable ?? true,
+        changeable: dto.changeable ?? true,
+        baggageAllowanceKg: dto.baggageAllowanceKg,
+        validFrom: dto.validFrom ? new Date(dto.validFrom) : undefined,
+        validUntil: dto.validUntil ? new Date(dto.validUntil) : undefined,
+        allowedChannels: dto.allowedChannels ?? [],
+      },
+    });
+
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'PRICING',
+      action: 'ایجاد کلاس نرخی',
+      detail: `کلاس نرخی «${dto.classCode}» برای پرواز ${instance.flight.flightNo} توسط ${actor.fullName} ایجاد شد.`,
+      entityType: 'FareRule',
+      entityId: created.id,
+    });
+
+    return created;
+  }
+
+  async updateFareRule(
+    actor: AuthenticatedUser,
+    instanceId: string,
+    ruleId: string,
+    dto: {
+      priceIrr?: number;
+      seatsAllocated?: number;
+      taxIrr?: number;
+      refundable?: boolean;
+      changeable?: boolean;
+      baggageAllowanceKg?: number;
+      validFrom?: string;
+      validUntil?: string;
+      allowedChannels?: ('SYSTEM' | 'CHARTER' | 'AGENCY')[];
+    },
+  ) {
+    const rule = await this.prisma.fareRule.findUnique({
+      where: { id: ruleId },
+      include: { flightInstance: { include: { flight: true } } },
+    });
+    if (!rule || rule.flightInstanceId !== instanceId) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'کلاس نرخی یافت نشد.',
+      });
+    }
+    this.validateFareRuleWindow({
+      validFrom: dto.validFrom ?? rule.validFrom?.toISOString(),
+      validUntil: dto.validUntil ?? rule.validUntil?.toISOString(),
+    });
+
+    if (dto.seatsAllocated !== undefined) {
+      const cabinSeats = await this.cabinSeatCount(
+        rule.flightInstance,
+        rule.cabin,
+      );
+      const others = await this.prisma.fareRule.findMany({
+        where: {
+          flightInstanceId: instanceId,
+          cabin: rule.cabin,
+          id: { not: ruleId },
+        },
+      });
+      const othersTotal = others.reduce((a, r) => a + r.seatsAllocated, 0);
+      if (othersTotal + dto.seatsAllocated > cabinSeats) {
+        throw new BadRequestException({
+          code: ErrorCode.VALIDATION_FAILED,
+          message: `مجموع صندلی تخصیص‌یافته کلاس‌های نرخی (${othersTotal + dto.seatsAllocated}) از ظرفیت کابین ${rule.cabin === 'BUSINESS' ? 'بیزینس' : 'اکونومی'} (${cabinSeats}) بیشتر است.`,
+        });
+      }
+    }
+
+    const updated = await this.prisma.fareRule.update({
+      where: { id: ruleId },
+      data: {
+        priceIrr: dto.priceIrr,
+        seatsAllocated: dto.seatsAllocated,
+        taxIrr: dto.taxIrr,
+        refundable: dto.refundable,
+        changeable: dto.changeable,
+        baggageAllowanceKg: dto.baggageAllowanceKg,
+        validFrom: dto.validFrom ? new Date(dto.validFrom) : undefined,
+        validUntil: dto.validUntil ? new Date(dto.validUntil) : undefined,
+        allowedChannels: dto.allowedChannels,
+      },
+    });
+
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'PRICING',
+      action: 'ویرایش کلاس نرخی',
+      detail: `کلاس نرخی «${rule.classCode}» پرواز ${rule.flightInstance.flight.flightNo} توسط ${actor.fullName} ویرایش شد.`,
+      entityType: 'FareRule',
+      entityId: rule.id,
+    });
+
+    return updated;
+  }
+
+  async deleteFareRule(
+    actor: AuthenticatedUser,
+    instanceId: string,
+    ruleId: string,
+  ) {
+    const rule = await this.prisma.fareRule.findUnique({
+      where: { id: ruleId },
+      include: { flightInstance: { include: { flight: true } } },
+    });
+    if (!rule || rule.flightInstanceId !== instanceId) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'کلاس نرخی یافت نشد.',
+      });
+    }
+    const activeBooking = await this.prisma.booking.findFirst({
+      where: {
+        flightInstanceId: instanceId,
+        cabin: rule.cabin,
+        fareClassCode: rule.classCode,
+        status: { in: ['DRAFT', 'HELD', 'PAID', 'TICKETED'] },
+      },
+    });
+    if (activeBooking) {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'این کلاس نرخی توسط رزروهای فعال استفاده شده و قابل حذف نیست.',
+      });
+    }
+
+    await this.prisma.fareRule.delete({ where: { id: ruleId } });
+
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'PRICING',
+      action: 'حذف کلاس نرخی',
+      detail: `کلاس نرخی «${rule.classCode}» پرواز ${rule.flightInstance.flight.flightNo} توسط ${actor.fullName} حذف شد.`,
+      entityType: 'FareRule',
+      entityId: rule.id,
+    });
+
+    return { success: true };
+  }
 }

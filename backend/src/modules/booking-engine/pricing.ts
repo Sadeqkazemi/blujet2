@@ -1,5 +1,8 @@
 import { PrismaService } from '../../prisma/prisma.service';
-import type { CabinClass } from '../../../generated/prisma/enums';
+import type {
+  BookingChannel,
+  CabinClass,
+} from '../../../generated/prisma/enums';
 
 /** Same documented flat fallback as reservation/pnr.service.ts — no
  * canonical public-site fare exists for a flight with neither a Phase 6
@@ -18,8 +21,14 @@ export async function getCabinPrice(
   prisma: PrismaService,
   flightInstanceId: string,
   cabin: CabinClass,
+  channel: BookingChannel = 'SYSTEM',
 ): Promise<number> {
-  const byClass = await resolveFareClass(prisma, flightInstanceId, cabin);
+  const byClass = await resolveFareClass(
+    prisma,
+    flightInstanceId,
+    cabin,
+    channel,
+  );
   if (byClass) return byClass.priceIrr;
 
   const fare = await prisma.cabinFare.findUnique({
@@ -46,18 +55,32 @@ export async function getCabinPrice(
  * instance+cabin, the bookable price is the CHEAPEST class that still has
  * allocation left. A class's consumption = active bookings stamped with its
  * classCode (EXPIRED/CANCELLED bookings release the bucket automatically).
- * Returns null when the instance has no fare-class rows — flat CabinFare /
- * Phase 6 pricing applies then.
+ * Returns null when the instance has no fare-class rows (or none are
+ * currently valid/channel-eligible — see below) — flat CabinFare / Phase 6
+ * pricing applies then.
+ *
+ * Phase 13 Part B: a rule outside its validFrom/validUntil window "now", or
+ * whose allowedChannels doesn't include the requesting channel (empty list
+ * = all channels), is treated as if it didn't exist for this call — not
+ * merely unavailable to buy, invisible to pricing entirely.
  */
 export async function resolveFareClass(
   prisma: PrismaService,
   flightInstanceId: string,
   cabin: CabinClass,
-): Promise<{ classCode: string; priceIrr: number } | null> {
-  const rules = await prisma.fareRule.findMany({
+  channel: BookingChannel = 'SYSTEM',
+): Promise<{ classCode: string; priceIrr: number; taxIrr: number } | null> {
+  const now = new Date();
+  const allRules = await prisma.fareRule.findMany({
     where: { flightInstanceId, cabin },
     orderBy: { priceIrr: 'asc' },
   });
+  const rules = allRules.filter(
+    (r) =>
+      (!r.validFrom || r.validFrom <= now) &&
+      (!r.validUntil || r.validUntil >= now) &&
+      (r.allowedChannels.length === 0 || r.allowedChannels.includes(channel)),
+  );
   if (rules.length === 0) return null;
 
   const usage = await prisma.booking.groupBy({
@@ -76,11 +99,20 @@ export async function resolveFareClass(
 
   for (const rule of rules) {
     if ((used.get(rule.classCode) ?? 0) < rule.seatsAllocated) {
-      return { classCode: rule.classCode, priceIrr: rule.priceIrr };
+      return {
+        classCode: rule.classCode,
+        priceIrr: rule.priceIrr,
+        taxIrr: rule.taxIrr,
+      };
     }
   }
-  // every bucket exhausted → most expensive class keeps selling while
-  // physical seats remain (availability itself is the seat map's job).
+  // every bucket exhausted → most expensive (still-valid/eligible) class
+  // keeps selling while physical seats remain (availability itself is the
+  // seat map's job).
   const last = rules[rules.length - 1];
-  return { classCode: last.classCode, priceIrr: last.priceIrr };
+  return {
+    classCode: last.classCode,
+    priceIrr: last.priceIrr,
+    taxIrr: last.taxIrr,
+  };
 }

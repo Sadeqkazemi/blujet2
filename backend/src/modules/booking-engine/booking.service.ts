@@ -89,6 +89,7 @@ export class BookingService {
       status: b.status,
       cabin: b.cabin,
       priceIrr: b.priceIrr,
+      taxIrr: b.taxIrr,
       holdExpiresAt: b.holdExpiresAt,
       flightInstanceId: b.flightInstanceId,
       flightNo: b.flightInstance.flight.flightNo,
@@ -194,7 +195,12 @@ export class BookingService {
     const fareClass = usableLock
       ? null
       : await resolveFareClass(this.prisma, instance.id, dto.cabin);
-    const priceIrr = unitPriceIrr * dto.passengers.length;
+    // Tax/fee is per-fare-class (Phase 13 Part B) and included in the
+    // stored total so ledger/refunds/reporting — which all read
+    // priceIrr as-is — never need to know tax exists; taxIrr is stored
+    // alongside purely for receipt display.
+    const taxIrr = (fareClass?.taxIrr ?? 0) * dto.passengers.length;
+    const priceIrr = unitPriceIrr * dto.passengers.length + taxIrr;
     const contactUser = await this.prisma.user.findUniqueOrThrow({
       where: { id: user.id },
       select: { phone: true },
@@ -243,6 +249,7 @@ export class BookingService {
           cabin: dto.cabin,
           fareClassCode: fareClass?.classCode ?? null,
           priceIrr,
+          taxIrr,
           userId: user.id,
           contactPhone: contactUser.phone ?? undefined,
           holdExpiresAt: new Date(Date.now() + HOLD_TTL_MS),
@@ -381,13 +388,27 @@ export class BookingService {
 
     const isLocked =
       !!booking.priceLock && booking.priceLock.status === 'ACTIVE';
+    // Re-pricing must include the current tax the same way it was included
+    // at creation, or every taxed booking would spuriously look
+    // price-changed (untaxed re-quote vs. the tax-inclusive stored total).
+    const currentFareClass = isLocked
+      ? null
+      : await resolveFareClass(
+          this.prisma,
+          booking.flightInstanceId,
+          booking.cabin,
+        );
+    const currentTaxIrr =
+      (currentFareClass?.taxIrr ?? 0) * booking.passengers.length;
     const currentPriceIrr = isLocked
       ? booking.priceIrr
       : (await getCabinPrice(
           this.prisma,
           booking.flightInstanceId,
           booking.cabin,
-        )) * booking.passengers.length;
+        )) *
+          booking.passengers.length +
+        currentTaxIrr;
 
     if (!isLocked && currentPriceIrr !== booking.priceIrr) {
       if (options.confirmedPriceIrr !== currentPriceIrr) {

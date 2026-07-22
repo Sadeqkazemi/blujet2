@@ -552,3 +552,93 @@ UI that was never specified anywhere).
     CANCELLED` — same reasoning; the user's spec's "بسته" state is covered
     by the sale-window fields above without inventing a separate manual
     toggle no design asks for.
+
+---
+
+## Phase 13 — Reservation engine completion, Part B: manageable fare classes + rate rules
+
+No design file shows a fare-class management screen anywhere (none of the
+six executive panels' diffs from the design refresh mention Y/B/M class
+editing) — this phase is backend-only (endpoints + validation + tests),
+same posture as Phase 6 before its UI existed. A frontend for this waits
+for an actual design.
+
+- `FareRule` (existing, previously seed-only — this phase adds the first
+  way to create/edit/delete rows outside `seed.ts`) gains:
+  - `validFrom DateTime?`, `validUntil DateTime?` — NULL on either end
+    means unrestricted (existing seeded rows keep working unchanged).
+    `resolveFareClass` (booking-engine/pricing.ts) now filters out a rule
+    whose window doesn't cover "now" before picking the cheapest
+    available bucket — an expired/not-yet-active class is invisible to
+    pricing, not merely unavailable to buy.
+  - `allowedChannels BookingChannel[]` — empty array (the default) means
+    "all channels", matching the sale-window NULL convention above. A
+    class scoped to e.g. `[AGENCY]` is invisible to a `SYSTEM`-channel
+    booking's price resolution. (No channel actually creates AGENCY/
+    CHARTER bookings yet — Phase C's job — so this is currently only
+    exercised by SYSTEM-channel bookings seeing an empty/wildcard list;
+    the filter is there so Phase C doesn't need a second migration.)
+  - `taxIrr Int @default(0)` — per-passenger tax/fee, added on top of
+    `priceIrr` at booking time (`getCabinPrice` returns the pre-tax fare
+    unchanged for backward compatibility with every existing caller;
+    `BookingService.createBooking` adds `taxIrr × passengers.length` to
+    the stored `priceIrr` total when the resolved fare came from a
+    `FareRule`, and the booking-detail response breaks out `taxIrr` so a
+    receipt can show it separately — see docs/API.md). Flat/no-fare-class
+    pricing (`CabinFare`/`FarePricingProposal`) is untouched — it was
+    never in the multi-class scope this phase is fixing.
+  - `changeable Boolean @default(true)` — mirrors the existing
+    `refundable` flag's pattern (a same-shape yes/no gate, not a new
+    concept). ⚑ Deliberately NOT wired to any enforcement yet: no
+    "change reservation date" endpoint exists anywhere in the codebase to
+    gate — adding the flag now (like `refundable` did originally) means
+    that endpoint won't need a migration when it's eventually built.
+  - `baggageAllowanceKg Int?` — informational only (shown alongside the
+    fare, never validated against anything — there's no check-in/weigh-in
+    flow in this codebase to enforce it against).
+
+- **New endpoints** (`backend/src/modules/flights/`, same
+  `SENIOR_MANAGER`/`COMMERCIAL_MANAGER` role gate as Phase 10's existing
+  flight-management endpoints — fare classes are a flight-configuration
+  concern, not a new domain):
+  - `GET /flights/:instanceId/fare-rules` — list, ordered by `priceIrr`.
+  - `POST /flights/:instanceId/fare-rules` — create. ⚑ **Capacity-sum
+    validation** (the user spec's explicit "انجین باید مانع شود مجموع فروش
+    کلاس‌ها از ظرفیت کابین بیشتر شود"): the sum of `seatsAllocated` across
+    every rule sharing `(flightInstanceId, cabin)`, including the new one,
+    must not exceed that cabin's physical seat count (from
+    `AircraftSeatMap` via `enumerateSeats`, filtered to the cabin) — 400
+    if it would. Also 400 if `validUntil <= validFrom` when both are set.
+  - `PATCH /flights/:instanceId/fare-rules/:id` — same capacity-sum and
+    date-window validation, re-checked against the OTHER existing rules
+    (excluding the one being edited).
+  - `DELETE /flights/:instanceId/fare-rules/:id` — 409 if any active
+    (`DRAFT|HELD|PAID|TICKETED`) booking is already stamped with that
+    `classCode` for the instance (mirrors the "REGISTERED proposal is
+    locked" pattern from Phase 6 — never orphan a sold booking's price
+    basis).
+
+- **Explicitly not built this phase (spec items with no clear operational
+  meaning in the current architecture — flagged per workflow rule 4, not
+  guessed):**
+  - «مهلت صدور» (ticketing deadline) — the current booking state machine
+    collapses `PAID → TICKETED` atomically inside one `pay()` call (see
+    Phase 2/booking-engine); there is no window where a booking sits PAID-
+    but-not-yet-ticketed for a deadline to apply to. Adding this field
+    would be inventing a gap in the pipeline that doesn't otherwise exist,
+    purely to give the field somewhere to matter — needs a real product
+    decision on whether/why payment and ticketing should ever be separate
+    steps before this is worth building.
+  - «حداقل ظرفیت فروش» (minimum sale capacity) — unclear what this means
+    operationally for a single fare-class row (a floor the class refuses
+    to sell below? a minimum guaranteed allocation regardless of demand?
+    something else?) — flagged rather than guessed at.
+  - Per-fare-class cancellation-penalty override — Phase 7's
+    `RefundPenaltyRule` is already a global hours-before-departure
+    schedule (30/50/70/100٪ tiers) that's the seeded, actually-executed
+    source of truth for every refund today. A per-class override would
+    mean two competing penalty systems disagreeing with each other for
+    the same booking; `changeable`/`refundable` booleans (gates, not
+    amounts) avoid that conflict, but a genuine per-class fee schedule
+    needs a product decision on how it interacts with Phase 7's existing
+    global rule before it's built.
