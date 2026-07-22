@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -10,6 +11,9 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
 import {
+  IsArray,
+  IsBoolean,
+  IsIn,
   IsInt,
   IsISO8601,
   IsOptional,
@@ -140,6 +144,137 @@ class ChangeAircraftTypeDto {
   aircraftType: string;
 }
 
+class CreateFareRuleDto {
+  @ApiProperty({ enum: ['ECONOMY', 'BUSINESS'] })
+  @IsIn(['ECONOMY', 'BUSINESS'])
+  cabin: 'ECONOMY' | 'BUSINESS';
+
+  @ApiProperty({ description: 'کد کلاس نرخی', example: 'Y' })
+  @IsString()
+  classCode: string;
+
+  @ApiProperty({ description: 'قیمت (ریال)', example: 30_000_000 })
+  @IsInt()
+  @Min(1)
+  @Max(MAX_INT32)
+  priceIrr: number;
+
+  @ApiProperty({ description: 'تعداد صندلی تخصیص‌یافته', example: 20 })
+  @IsInt()
+  @Min(1)
+  @Max(1000)
+  seatsAllocated: number;
+
+  @ApiProperty({
+    description: 'مالیات/عوارض (ریال)',
+    required: false,
+    example: 0,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(MAX_INT32)
+  taxIrr?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  refundable?: boolean;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  changeable?: boolean;
+
+  @ApiProperty({ required: false, example: 20 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(200)
+  baggageAllowanceKg?: number;
+
+  @ApiProperty({ required: false, description: 'شروع بازه اعتبار (UTC ISO)' })
+  @IsOptional()
+  @IsISO8601()
+  validFrom?: string;
+
+  @ApiProperty({ required: false, description: 'پایان بازه اعتبار (UTC ISO)' })
+  @IsOptional()
+  @IsISO8601()
+  validUntil?: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'کانال‌های مجاز — خالی یعنی همه کانال‌ها',
+    isArray: true,
+    enum: ['SYSTEM', 'CHARTER', 'AGENCY'],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsIn(['SYSTEM', 'CHARTER', 'AGENCY'], { each: true })
+  allowedChannels?: ('SYSTEM' | 'CHARTER' | 'AGENCY')[];
+}
+
+class UpdateFareRuleDto {
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(MAX_INT32)
+  priceIrr?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(1000)
+  seatsAllocated?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(MAX_INT32)
+  taxIrr?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  refundable?: boolean;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  changeable?: boolean;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(200)
+  baggageAllowanceKg?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsISO8601()
+  validFrom?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsISO8601()
+  validUntil?: string;
+
+  @ApiProperty({
+    required: false,
+    isArray: true,
+    enum: ['SYSTEM', 'CHARTER', 'AGENCY'],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsIn(['SYSTEM', 'CHARTER', 'AGENCY'], { each: true })
+  allowedChannels?: ('SYSTEM' | 'CHARTER' | 'AGENCY')[];
+}
+
 @ApiTags('flights')
 @Controller('flights')
 @UseGuards(JwtAuthGuard, RolesGuard, PanelAccessGuard)
@@ -247,6 +382,57 @@ export class FlightsController {
       instanceId,
       dto.aircraftType,
     );
+    return { success: true, data };
+  }
+
+  @Get(':instanceId/fare-rules')
+  @ApiOperation({ summary: 'فهرست کلاس‌های نرخی این پرواز' })
+  async listFareRules(@Param('instanceId') instanceId: string) {
+    const data = await this.flights.listFareRules(instanceId);
+    return { success: true, data };
+  }
+
+  @Post(':instanceId/fare-rules')
+  @ApiOperation({
+    summary:
+      'ایجاد کلاس نرخی — رد با ۴۰۰ اگر مجموع صندلی تخصیص‌یافته از ظرفیت کابین بیشتر شود',
+  })
+  async createFareRule(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('instanceId') instanceId: string,
+    @Body() dto: CreateFareRuleDto,
+  ) {
+    const data = await this.flights.createFareRule(actor, instanceId, dto);
+    return { success: true, data };
+  }
+
+  @Patch(':instanceId/fare-rules/:ruleId')
+  @ApiOperation({ summary: 'ویرایش کلاس نرخی' })
+  async updateFareRule(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('instanceId') instanceId: string,
+    @Param('ruleId') ruleId: string,
+    @Body() dto: UpdateFareRuleDto,
+  ) {
+    const data = await this.flights.updateFareRule(
+      actor,
+      instanceId,
+      ruleId,
+      dto,
+    );
+    return { success: true, data };
+  }
+
+  @Delete(':instanceId/fare-rules/:ruleId')
+  @ApiOperation({
+    summary: 'حذف کلاس نرخی — رد با ۴۰۹ اگر رزرو فعالی از آن استفاده کند',
+  })
+  async deleteFareRule(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('instanceId') instanceId: string,
+    @Param('ruleId') ruleId: string,
+  ) {
+    const data = await this.flights.deleteFareRule(actor, instanceId, ruleId);
     return { success: true, data };
   }
 }

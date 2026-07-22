@@ -332,6 +332,17 @@ model FareRule {
   priceIrr         Int
   seatsAllocated   Int
   refundable       Boolean        @default(true)
+  // Phase 13 Part B — see docs/DB_SCHEMA.md for the full reasoning behind
+  // each field, and what's deliberately NOT here (ticketing deadline, a
+  // separate per-class cancellation-penalty schedule, min sale capacity).
+  changeable         Boolean            @default(true)
+  taxIrr             Int                @default(0)
+  baggageAllowanceKg Int?
+  validFrom          DateTime?
+  validUntil         DateTime?
+  // Empty = all channels allowed (matches the NULL-means-unrestricted
+  // convention of validFrom/validUntil and Part A's sale window).
+  allowedChannels    BookingChannel[]   @default([])
 
   @@unique([flightInstanceId, cabin, classCode])
   @@map("fare_rules")
@@ -366,6 +377,12 @@ model Booking {
   agency           AgencyProfile? @relation(fields: [agencyId], references: [userId])
   status           BookingStatus  @default(DRAFT)
   priceIrr         Int
+  // Phase 13 Part B: tax/fee portion already included in priceIrr above,
+  // broken out here purely for receipt display — set once at creation
+  // from the resolved FareRule.taxIrr (0 under flat/no-fare-class
+  // pricing). Never re-derived later so a receipt stays accurate even if
+  // the originating FareRule is edited/deleted afterward.
+  taxIrr           Int            @default(0)
   createdAt        DateTime       @default(now())
 
   // Public purchase engine (customer track) additions — nullable/optional

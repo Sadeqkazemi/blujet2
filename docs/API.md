@@ -414,6 +414,32 @@ reviewable. Only what Phase 13 actually changes is documented below.
   `saleStartsAt`/`saleEndsAt` (Jalali in the request, stored UTC) —
   additive, no change to its existing `priceToman`/`agencySeats` behavior.
 
+## Phase 13 — Reservation engine completion, Part B
+
+See DB_SCHEMA.md's Phase 13 Part B for the full reasoning — no design
+screen exists for this yet, so these are backend-only for now.
+
+- `GET /flights/:instanceId/fare-rules` — `SENIOR_MANAGER` +
+  `COMMERCIAL_MANAGER`. Lists the instance's fare-class rows ordered by
+  price.
+- `POST /flights/:instanceId/fare-rules` — same roles —
+  `{ cabin, classCode, priceIrr, seatsAllocated, taxIrr?, refundable?,
+  changeable?, baggageAllowanceKg?, validFrom?, validUntil?,
+  allowedChannels? }`. 400 `VALIDATION_FAILED` if this rule would push the
+  cabin's total `seatsAllocated` past its physical seat count, or if
+  `validUntil <= validFrom`.
+- `PATCH /flights/:instanceId/fare-rules/:id` — same roles, same body
+  (partial) and validations, re-checked against the instance's OTHER
+  existing rules.
+- `DELETE /flights/:instanceId/fare-rules/:id` — same roles — 409
+  `CONFLICT` if any active booking (`DRAFT|HELD|PAID|TICKETED`) is already
+  stamped with this rule's `classCode` for the instance.
+- `getCabinPrice`'s return shape is unchanged (still just the per-seat
+  `priceIrr`, pre-tax) for backward compatibility with every existing
+  caller; `POST /bookings`'s response gains a `taxIrr` field (0 when the
+  resolved price didn't come from a `FareRule`) alongside the existing
+  `priceIrr`, which now includes the tax total.
+
 ---
 
 ## Phase 11 — Finance tab (مالی), گزارش مسافران, گزارش کارمندان
