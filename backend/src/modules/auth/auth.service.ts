@@ -391,7 +391,40 @@ export class AuthService {
       include: { user: true },
     });
 
-    if (!stored || stored.revokedAt || stored.expiresAt < new Date()) {
+    if (!stored) {
+      throw new UnauthorizedException({
+        code: ErrorCode.UNAUTHORIZED,
+        message: 'نشست شما منقضی شده است.',
+      });
+    }
+
+    // A REVOKED token being presented again — as opposed to one that simply
+    // expired — means the token was already rotated away by a legitimate
+    // refresh (or logout) and is now being replayed by someone else who
+    // captured it. That is a theft signal, not routine expiry: revoke the
+    // user's entire refresh-token family so a stolen token can't keep
+    // rotating forever, and force a real re-login everywhere.
+    if (stored.revokedAt) {
+      await this.prisma.refreshToken.updateMany({
+        where: { userId: stored.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      await this.audit.record({
+        actorId: stored.userId,
+        actorRole: stored.user.role,
+        category: 'SECURITY',
+        action: 'شناسایی سرقت نشست (refresh token reuse)',
+        detail: `یک refresh token باطل‌شده دوباره ارسال شد؛ همه نشست‌های فعال این کاربر باطل شدند.${context.ip ? ` IP: ${context.ip}` : ''}`,
+        entityType: 'User',
+        entityId: stored.userId,
+      });
+      throw new UnauthorizedException({
+        code: ErrorCode.UNAUTHORIZED,
+        message: 'نشست شما به دلایل امنیتی باطل شد. دوباره وارد شوید.',
+      });
+    }
+
+    if (stored.expiresAt < new Date()) {
       throw new UnauthorizedException({
         code: ErrorCode.UNAUTHORIZED,
         message: 'نشست شما منقضی شده است.',

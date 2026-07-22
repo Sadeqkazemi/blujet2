@@ -207,6 +207,47 @@ describe('Auth (e2e)', () => {
     expect(replay.body.success).toBe(false);
   });
 
+  it('reuse of a revoked refresh token revokes the whole session family, not just itself', async () => {
+    const agent = request.agent(app.getHttpServer());
+    const loginRes = await agent
+      .post('/auth/staff/login')
+      .send({ username: 'ceo', password: 'Blujet@1404' });
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { username: 'ceo' },
+    });
+    const code = app
+      .get<MockTwoFactorProvider>(TWO_FACTOR_PROVIDER)
+      .getLastCode(user.id)!;
+    const verifyRes = await agent
+      .post('/auth/staff/login/verify')
+      .send({ challengeId: loginRes.body.data.challengeId, code });
+    const stolenOldCookie = verifyRes.headers['set-cookie'];
+
+    // Legitimate rotation — the agent's cookie jar now holds a fresh,
+    // still-valid refresh token.
+    const legitRefresh = await agent.post('/auth/refresh');
+    expect(legitRefresh.status).toBe(200);
+
+    // An attacker replays the OLD (now-revoked) token — this must not just
+    // fail for them, it must kill every other active session too.
+    const attackerReplay = await request(app.getHttpServer())
+      .post('/auth/refresh')
+      .set('Cookie', stolenOldCookie);
+    expect(attackerReplay.status).toBe(401);
+
+    // The legitimate user's freshly-rotated (otherwise still-valid) token
+    // must now be dead as well.
+    const legitFollowUp = await agent.post('/auth/refresh');
+    expect(legitFollowUp.status).toBe(401);
+    expect(legitFollowUp.body.success).toBe(false);
+
+    const securityLog = await prisma.auditLog.findFirst({
+      where: { actorId: user.id, category: 'SECURITY' },
+      orderBy: { createdAt: 'desc' },
+    });
+    expect(securityLog).not.toBeNull();
+  });
+
   it('/auth/logout revokes the refresh token; a subsequent refresh fails', async () => {
     const agent = request.agent(app.getHttpServer());
     const loginRes = await agent
