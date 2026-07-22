@@ -15,6 +15,13 @@ function toExternalView(s: ExternalServiceConfig) {
   return { ...rest, hasApiKey: !!apiKeyEncrypted };
 }
 
+/** «0912***5678»-style mask — this surface never returns a full phone. */
+function maskPhone(phone: string | null): string | null {
+  if (!phone) return null;
+  if (phone.length < 7) return '*'.repeat(phone.length);
+  return `${phone.slice(0, 4)}***${phone.slice(-4)}`;
+}
+
 @Injectable()
 export class ItServicesService {
   constructor(
@@ -200,5 +207,41 @@ export class ItServicesService {
     });
 
     return { ok, message, service: toExternalView(updated) };
+  }
+
+  /** Phase 14: real send counters + recent-log rows — no fabricated
+   * uptime figure anywhere in this response (see docs/DB_SCHEMA.md). */
+  async smsLog() {
+    const dayStart = new Date();
+    dayStart.setHours(0, 0, 0, 0);
+
+    const [service, todaySuccessCount, todayFailedCount, recent] =
+      await Promise.all([
+        this.prisma.internalService.findUnique({ where: { key: 'sms' } }),
+        this.prisma.smsLog.count({
+          where: { status: 'SUCCESS', createdAt: { gte: dayStart } },
+        }),
+        this.prisma.smsLog.count({
+          where: { status: 'FAILED', createdAt: { gte: dayStart } },
+        }),
+        this.prisma.smsLog.findMany({
+          orderBy: { createdAt: 'desc' },
+          take: 50,
+        }),
+      ]);
+
+    return {
+      enabled: service?.enabled ?? false,
+      todaySuccessCount,
+      todayFailedCount,
+      recent: recent.map((r) => ({
+        id: r.id,
+        phoneMasked: maskPhone(r.phone),
+        messageType: r.messageType,
+        status: r.status,
+        failureReason: r.failureReason,
+        createdAt: r.createdAt,
+      })),
+    };
   }
 }

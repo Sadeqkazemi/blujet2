@@ -10,6 +10,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
 import { generateTempPassword } from '../../common/temp-password';
+import { SmsService } from '../sms/sms.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { Role } from '../../../generated/prisma/enums';
 
@@ -52,6 +53,7 @@ export class AdminsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly sms: SmsService,
   ) {}
 
   private managedRolesFor(actor: AuthenticatedUser): Role[] {
@@ -164,8 +166,17 @@ export class AdminsService {
       },
     });
 
-    // Credential delivery goes through the mocked provider path in dev —
-    // same as OTP; nothing is fabricated as "sent" beyond the audit note.
+    // Phase 14: a real send now backs this claim — SmsService logs a
+    // genuine FAILED row when the account has no phone on file (create
+    // never collects one), rather than the audit note alone asserting delivery.
+    if (dto.delivery === 'sms') {
+      await this.sms.send(
+        user.phone,
+        `رمز عبور موقت شما در بلوجت: ${dto.password}`,
+        'TEMP_PASSWORD',
+      );
+    }
+
     await this.audit.record({
       actorId: actor.id,
       actorRole: actor.role,
@@ -225,6 +236,16 @@ export class AdminsService {
       where: { id },
       data: { passwordHash, mustChangePassword: true },
     });
+
+    // Phase 14: same real-send treatment as create() — matches this
+    // method's own default (anything not 'email' is sms).
+    if (dto.delivery !== 'email') {
+      await this.sms.send(
+        target.phone,
+        `رمز عبور موقت جدید شما در بلوجت: ${tempPassword}`,
+        'TEMP_PASSWORD',
+      );
+    }
 
     await this.audit.record({
       actorId: actor.id,
