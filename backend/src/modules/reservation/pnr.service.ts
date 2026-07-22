@@ -16,6 +16,7 @@ import {
 } from '../../common/pii-crypto';
 import { enumerateSeats, isKnownSeat } from './seat-layout';
 import { resolveAircraftType } from '../flights/aircraft-type.util';
+import { materializeFlownBookings } from '../flights/flight-lifecycle.util';
 import { SearchService } from '../booking-engine/search.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type {
@@ -60,6 +61,7 @@ export class PnrService {
   }
 
   async list(query: ListPnrQueryDto) {
+    await materializeFlownBookings(this.prisma);
     const bookings = await this.prisma.booking.findMany({
       where: query.q
         ? {
@@ -118,6 +120,7 @@ export class PnrService {
   }
 
   async detail(pnr: string) {
+    await materializeFlownBookings(this.prisma);
     const b = await this.getBookingOrThrow(pnr);
     const passenger = b.passengers[0];
     return {
@@ -220,6 +223,46 @@ export class PnrService {
       category: 'RESERVATION',
       action: 'لغو رزرو',
       detail: `رزرو ${pnr} توسط ${actor.fullName} لغو شد.`,
+      entityType: 'Booking',
+      entityId: booking.id,
+    });
+
+    return this.detail(pnr);
+  }
+
+  /** Phase 13 Part E — manual no-show override. Only legal once the
+   * flight has actually departed (materialized here, not assumed); a
+   * TICKETED booking that hasn't been lazily flipped to FLOWN yet is
+   * still handled correctly since we flip it first. */
+  async markNoShow(actor: AuthenticatedUser, pnr: string) {
+    const booking = await this.getBookingOrThrow(pnr);
+    await materializeFlownBookings(this.prisma);
+    const refreshed = await this.getBookingOrThrow(pnr);
+
+    if (refreshed.flightInstance.status !== 'DEPARTED') {
+      throw new ConflictException({
+        code: ErrorCode.FLIGHT_NOT_DEPARTED,
+        message: 'این پرواز هنوز انجام نشده است.',
+      });
+    }
+    if (!['TICKETED', 'FLOWN'].includes(refreshed.status)) {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'این رزرو در وضعیتی نیست که بتوان آن را «عدم حضور» ثبت کرد.',
+      });
+    }
+
+    await this.prisma.booking.update({
+      where: { id: booking.id },
+      data: { status: 'NO_SHOW' },
+    });
+
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'RESERVATION',
+      action: 'ثبت عدم حضور مسافر',
+      detail: `رزرو ${pnr} توسط ${actor.fullName} «عدم حضور» ثبت شد.`,
       entityType: 'Booking',
       entityId: booking.id,
     });

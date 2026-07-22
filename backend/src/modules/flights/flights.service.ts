@@ -11,6 +11,7 @@ import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
 import { enumerateSeats } from '../reservation/seat-layout';
 import { resolveAircraftType } from './aircraft-type.util';
+import { materializeDepartedInstances } from './flight-lifecycle.util';
 import {
   PRICE_SUGGESTION_PROVIDER,
   type PriceSuggestionProvider,
@@ -137,6 +138,7 @@ export class FlightsService {
   /** ⚑ Real per-channel figures from bookings — no fabricated margins.
    * سود/ضرر compare the achieved average rate to the base rate. */
   private async completedReport() {
+    await materializeDepartedInstances(this.prisma);
     const departed = await this.prisma.flightInstance.findMany({
       where: { status: 'DEPARTED' },
       include: { flight: { include: { route: true } } },

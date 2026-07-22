@@ -48,6 +48,9 @@ describe('Flight engine completion', () => {
       where: { flightInstanceId: { in: iids } },
     });
     const bids = bookings.map((b) => b.id);
+    await prisma.paymentReconciliation.deleteMany({
+      where: { bookingId: { in: bids } },
+    });
     await prisma.ledgerEntry.deleteMany({ where: { bookingId: { in: bids } } });
     await prisma.clubPointsEntry.deleteMany({
       where: { bookingId: { in: bids } },

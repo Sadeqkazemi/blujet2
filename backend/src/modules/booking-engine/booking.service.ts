@@ -427,6 +427,12 @@ export class BookingService {
     // is a network call; sandbox approves synchronously). Wallet/points pay
     // internally, so no gateway round-trip for them.
     let gatewayRefId: string | null = null;
+    // Phase 13 Part E: written the instant the gateway confirms capture,
+    // before the ticketing transaction below even starts — if that
+    // transaction later fails for any reason (bad promo, DB hiccup, crash),
+    // this PENDING row is the only durable proof the money was taken. See
+    // docs/DB_SCHEMA.md.
+    let reconciliationId: string | null = null;
     if (paymentMethod === 'GATEWAY') {
       const { authority } = await this.gateway.request(currentPriceIrr, id);
       const verified = await this.gateway.verify(authority, currentPriceIrr);
@@ -437,6 +443,14 @@ export class BookingService {
         });
       }
       gatewayRefId = verified.refId;
+      const reconciliation = await this.prisma.paymentReconciliation.create({
+        data: {
+          bookingId: id,
+          gatewayRefId: verified.refId,
+          amountIrr: currentPriceIrr,
+        },
+      });
+      reconciliationId = reconciliation.id;
     }
 
     const paid = await this.prisma.$transaction(async (tx) => {
@@ -501,6 +515,13 @@ export class BookingService {
         await tx.priceLock.update({
           where: { id: booking.priceLock!.id },
           data: { status: 'USED' },
+        });
+      }
+
+      if (reconciliationId) {
+        await tx.paymentReconciliation.update({
+          where: { id: reconciliationId },
+          data: { status: 'RESOLVED', resolvedAt: new Date() },
         });
       }
 

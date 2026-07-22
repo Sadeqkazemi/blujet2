@@ -89,6 +89,9 @@ describe('Phase 13 — reservation engine completion', () => {
     // — must be cleaned up too, or their revenue lingers in reporting's
     // aggregates (which sum LedgerEntry directly) even after the Booking
     // row itself is gone.
+    await prisma.paymentReconciliation.deleteMany({
+      where: { bookingId: { in: bids } },
+    });
     await prisma.ledgerEntry.deleteMany({ where: { bookingId: { in: bids } } });
     await prisma.clubPointsEntry.deleteMany({
       where: { bookingId: { in: bids } },

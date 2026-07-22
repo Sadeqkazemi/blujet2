@@ -83,6 +83,9 @@ describe('Phase 13 Part D — managerial lock governance', () => {
       select: { bookingId: true },
     });
     const bookingIds = passengers.map((p) => p.bookingId);
+    await prisma.paymentReconciliation.deleteMany({
+      where: { bookingId: { in: bookingIds } },
+    });
     await prisma.ledgerEntry.deleteMany({
       where: { bookingId: { in: bookingIds } },
     });
