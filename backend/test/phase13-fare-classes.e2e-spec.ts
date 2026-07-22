@@ -66,6 +66,9 @@ describe('Phase 13 Part B — fare-class management', () => {
       where: { flightInstanceId: { in: iids } },
     });
     const bids = bookings.map((b) => b.id);
+    await typeorm.paymentReconciliation.deleteMany({
+      where: { bookingId: { in: bids } },
+    });
     await typeorm.ledgerEntry.deleteMany({ where: { bookingId: { in: bids } } });
     await typeorm.clubPointsEntry.deleteMany({
       where: { bookingId: { in: bids } },

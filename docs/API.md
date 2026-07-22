@@ -504,6 +504,42 @@ All endpoints live in `backend/src/modules/reservation/`, gated
   never-approved request or an expired never-finalized hold shows as
   `FREE` again automatically.
 
+## Phase 13 — Reservation engine completion, Part E
+
+See DB_SCHEMA.md's Phase 13 Part E for full reasoning — a real bug fix
+(payment reconciliation) plus a real-but-unwired flight-lifecycle gap
+(`DEPARTED` was never written), not new UI-driven scope.
+
+- `GET /reservation/pnr` / `GET /flights` completed-flights list
+  (existing) — both now call `materializeDepartedInstances()` first, so
+  «پروازهای انجام‌شده» reflects flights that have actually departed
+  instead of only seed-backdated rows.
+- `PATCH /reservation/pnr/:pnr/no-show` (new, `backend/src/modules/reservation/`,
+  `CAN_LOCK_ROLES`) — marks a `TICKETED`/`FLOWN` booking `NO_SHOW`. 409
+  `FLIGHT_NOT_DEPARTED` if the instance hasn't departed yet; 409
+  `CONFLICT` if the booking is `CANCELLED`/`REFUNDED`/already `NO_SHOW`.
+  Materializes departed instances + flown bookings first, so a booking
+  that's technically still `TICKETED` in the DB (lazy flip hasn't run
+  yet) is still handled correctly.
+- New `backend/src/modules/reconciliation/` (`FINANCE_MANAGER` only,
+  same gate as Phase 7 refunds):
+  - `GET /reconciliation` — every `PENDING` `PaymentReconciliation` row
+    (booking/PNR, gatewayRefId, amountIrr, age) — the actual "payment
+    succeeded, ticket not issued" queue.
+  - `PATCH /reconciliation/:id/resolve` — `{ resolutionNote }`. 409
+    `CONFLICT` if already `RESOLVED`. Marks `RESOLVED`, audited (FINANCE
+    category). Does not itself re-issue a ticket or reverse a charge —
+    those remain separate, already-existing actions (manual PNR issuance,
+    `PaymentGateway.reverse`) a finance user takes alongside resolving
+    the queue entry; see DB_SCHEMA.md's reasoning for not automating this.
+- `POST /bookings/:id/pay` (existing, `booking-engine` module) — behavior
+  for `WALLET`/`POINTS` is unchanged. For `GATEWAY`, a `PaymentReconciliation`
+  row is now created the moment the gateway confirms payment, before the
+  ticketing transaction runs — invisible to the client (response shape
+  unchanged), but real e2e evidence for anyone that a since-fixed bug (a
+  transaction failure after gateway capture silently lost track of the
+  money) can no longer happen unnoticed.
+
 ## Phase 14 — real SmsProvider + management log
 
 See DB_SCHEMA.md's Phase 14 for full reasoning. Endpoints live in

@@ -68,6 +68,16 @@ export class PnrController {
     return { success: true, data: await this.pnr.cancel(actor, pnr) };
   }
 
+  @Patch('pnr/:pnr/no-show')
+  @Roles(...CAN_LOCK_ROLES)
+  @ApiOperation({ summary: 'ثبت عدم حضور مسافر — فقط پس از انجام پرواز' })
+  async markNoShow(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('pnr') pnr: string,
+  ) {
+    return { success: true, data: await this.pnr.markNoShow(actor, pnr) };
+  }
+
   @Get('search')
   @ApiOperation({ summary: 'جستجوی پرواز برای صدور دستی رزرو' })
   async search(@Query() query: SearchFlightsQueryDto) {

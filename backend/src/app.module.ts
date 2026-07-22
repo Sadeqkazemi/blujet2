@@ -31,6 +31,7 @@ import { StaffReportsModule } from './modules/staff-reports/staff-reports.module
 import { AdminsModule } from './modules/admins/admins.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { BookingEngineModule } from './modules/booking-engine/booking-engine.module';
+import { ReconciliationModule } from './modules/reconciliation/reconciliation.module';
 
 @Module({
   imports: [
@@ -91,6 +92,7 @@ import { BookingEngineModule } from './modules/booking-engine/booking-engine.mod
     AdminsModule,
     SettingsModule,
     BookingEngineModule,
+    ReconciliationModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { TypeORMService } from '../../typeorm/typeorm.service';
 import { AgenciesService } from '../agencies/agencies.service';
 import { ErrorCode } from '../../common/errors';
+import { materializeDepartedInstances } from '../flights/flight-lifecycle.util';
 import {
   Bucket,
   CompletedFlightsSummary,
@@ -253,6 +254,7 @@ export class ReportingService {
       params,
     );
 
+    await materializeDepartedInstances(this.typeorm);
     const instances = await this.typeorm.flightInstance.findMany({
       where: {
         status: 'DEPARTED',

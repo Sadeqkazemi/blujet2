@@ -93,11 +93,12 @@ model User {
   refundAssignments RefundRequest[] @relation("RefundAssignee")
   refundsProcessed  RefundRequest[] @relation("RefundProcessedBy")
 
-  bookings                Booking[]         @relation("BookingUser")
-  promoRedemptions        PromoRedemption[] @relation("PromoRedeemedBy")
-  walletEntries           WalletEntry[]     @relation("WalletOwner")
-  priceLocks              PriceLock[]       @relation("PriceLockOwner")
-  agencyAllotmentsCreated AgencyAllotment[]
+  bookings                       Booking[]               @relation("BookingUser")
+  promoRedemptions               PromoRedemption[]       @relation("PromoRedeemedBy")
+  walletEntries                  WalletEntry[]           @relation("WalletOwner")
+  priceLocks                     PriceLock[]             @relation("PriceLockOwner")
+  agencyAllotmentsCreated        AgencyAllotment[]
+  paymentReconciliationsResolved PaymentReconciliation[]
 
   @@map("users")
 }
@@ -369,6 +370,12 @@ enum BookingStatus {
   CANCELLED
   EXPIRED
   REFUNDED
+  // Phase 13 Part E: lazily materialized once the flight instance departs
+  // (TICKETED -> FLOWN by default); NO_SHOW is a manual staff override —
+  // see docs/DB_SCHEMA.md (no boarding/check-in signal exists to derive
+  // this automatically).
+  FLOWN
+  NO_SHOW
 }
 
 model Booking {
@@ -412,7 +419,8 @@ model Booking {
   priceLock         PriceLock?
   // Set when this booking was created by finalizing a Phase 13D managerial
   // SeatLock — the FK itself lives on SeatLock.bookingId (unique).
-  seatLock          SeatLock?         @relation("SeatLockFinalizedBooking")
+  seatLock          SeatLock?               @relation("SeatLockFinalizedBooking")
+  reconciliations   PaymentReconciliation[]
 
   // Fare-class bucket (Y/B/M) this booking consumed, when FareRule
   // pricing was in effect; null under flat CabinFare pricing.
@@ -425,6 +433,33 @@ model Booking {
   @@index([agencyId])
   @@index([userId])
   @@map("bookings")
+}
+
+enum PaymentReconciliationStatus {
+  PENDING
+  RESOLVED
+}
+
+// Phase 13 Part E: written the moment a GATEWAY payment is confirmed by
+// the PSP, before the HELD->PAID->TICKETED transaction runs — so a
+// transaction failure after the money was already captured leaves a
+// durable PENDING row instead of losing track of the payment entirely.
+// See docs/DB_SCHEMA.md.
+model PaymentReconciliation {
+  id             String                      @id @default(uuid())
+  bookingId      String
+  booking        Booking                     @relation(fields: [bookingId], references: [id])
+  gatewayRefId   String
+  amountIrr      Int
+  status         PaymentReconciliationStatus @default(PENDING)
+  resolvedById   String?
+  resolvedBy     User?                       @relation(fields: [resolvedById], references: [id])
+  resolutionNote String?
+  resolvedAt     DateTime?
+  createdAt      DateTime                    @default(now())
+
+  @@index([status])
+  @@map("payment_reconciliations")
 }
 
 model Passenger {

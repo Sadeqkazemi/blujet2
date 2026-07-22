@@ -83,6 +83,9 @@ describe('Phase 13 Part D — managerial lock governance', () => {
       select: { bookingId: true },
     });
     const bookingIds = passengers.map((p) => p.bookingId);
+    await typeorm.paymentReconciliation.deleteMany({
+      where: { bookingId: { in: bookingIds } },
+    });
     await typeorm.ledgerEntry.deleteMany({
       where: { bookingId: { in: bookingIds } },
     });

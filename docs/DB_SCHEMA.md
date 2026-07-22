@@ -883,3 +883,93 @@ the user's explicit scope (2026-07-22): **management panel only**
   claim in its audit text or DTO — also left untouched; wiring it would
   mean inventing what an invoice-reminder SMS says, which nothing in the
   design specifies.
+
+---
+
+## Phase 13 — Reservation engine completion, Part E: PNR lifecycle completion + payment reconciliation
+
+Two real gaps found while auditing the booking/payment path for this
+phase, both fixed the same way as everywhere else this session: real
+data, computed lazily, no fabrication, no invented signals.
+
+**1. `FlightInstance.status: DEPARTED` was never written anywhere.** It's
+read by `reporting.service.ts`'s completed-flights query and
+`flights.service.ts`'s پروازهای انجام‌شده list, but no code path — no
+cron, no endpoint — ever transitions an instance from `SCHEDULED` to
+`DEPARTED` once its `departureAt` passes. Only `typeorm/seed.ts` sets it
+by hand for historical demo rows. So every "completed flights" report has
+been running against whatever the seed happened to backdate, never a
+real flight that actually departed during a live session. Fixed with the
+same lazy/computed pattern used for `HELD`→`EXPIRED` bookings and Part
+C/D's expiry filters — no cron:
+- `materializeDepartedInstances(typeorm)` (new shared util,
+  `backend/src/modules/flights/flight-lifecycle.util.ts`): one bulk
+  `updateMany({ where: { status: 'SCHEDULED', departureAt: { lte: now } },
+  data: { status: 'DEPARTED' } })`. Called at the top of every place that
+  reads `DEPARTED` for real decisions: the reporting completed-flights
+  query, the flight-management پروازهای انجام‌شده list, and the new
+  no-show endpoint below.
+
+**2. No `NO_SHOW`/`FLOWN` distinction, and no signal to base one on.**
+`Booking` has no boarding/check-in concept anywhere — no gate scan, no
+check-in endpoint, nothing in the design shows one either (confirmed: no
+design-reference screen mentions «عدم حضور» or no-show). Building an
+automatic FLOWN-vs-NO_SHOW split would mean fabricating a boarding
+signal that doesn't exist. ⚑ Product decision: **default every
+`TICKETED` booking on a `DEPARTED` instance to `FLOWN`** (lazily, same
+bulk-materialize pattern — a booking is presumed flown unless someone
+says otherwise, matching how a real airline's default assumption works
+before check-in data exists); **staff can override to `NO_SHOW`** via a
+new manual action once the flight has actually departed — this is a real
+operational action (ops reviewing the manifest after departure), not a
+fabricated automatic flag.
+- New enum values: `BookingStatus` gains `NO_SHOW`, `FLOWN`.
+- `materializeFlownBookings(typeorm)` (same util file): after
+  materializing departed instances, bulk-flips every `TICKETED` booking
+  whose instance is now `DEPARTED` to `FLOWN`.
+- `PnrService.markNoShow` (new) — only from `TICKETED` or `FLOWN`
+  (already lazily flipped) on an actually-`DEPARTED` instance; 409
+  `FLIGHT_NOT_DEPARTED` if the flight hasn't departed yet, 409 `CONFLICT`
+  if the booking is `CANCELLED`/`REFUNDED`/already `NO_SHOW`. No refund-
+  penalty interaction is built here — whether a no-show forfeits a refund
+  is Phase 7's `RefundPenaltyRule` engine's own decision to make later;
+  this phase only adds the state and its legal transitions.
+
+**3. Payment reconciliation — the real gap in `BookingService.pay()`.**
+For `paymentMethod: 'GATEWAY'`, `gateway.request()`/`gateway.verify()`
+run and can return `ok: true` (money genuinely captured by the PSP)
+**before** the `$transaction` that flips `HELD`→`PAID`→`TICKETED` even
+starts. If that transaction throws for ANY reason afterward — a promo
+code that turns out to be already-redeemed, a DB hiccup, a process
+crash — the whole transaction rolls back and the booking silently stays
+`HELD` (or later expires), while the customer's money has already been
+taken. Today there is **no record anywhere** that this happened; this is
+a real, latent bug this phase closes, not a new feature bolted on for its
+own sake.
+- New `PaymentReconciliation { id, bookingId→Booking, gatewayRefId,
+  amountIrr, status: PaymentReconciliationStatus (PENDING|RESOLVED)
+  @default(PENDING), resolvedById?→User, resolvedAt?, resolutionNote?,
+  createdAt }`.
+- `BookingService.pay()`: right after `gateway.verify()` returns
+  `ok: true` (GATEWAY method only — WALLET/POINTS are synchronous
+  internal ledger moves fully inside the one transaction, nothing
+  external to reconcile against), creates a `PENDING` reconciliation row
+  **before** entering `$transaction`. Inside that same transaction, once
+  ticket issuance (`PAID`→`TICKETED`) succeeds, the row is flipped to
+  `RESOLVED` in the same atomic unit. If the transaction throws for any
+  reason, the row is simply never flipped — it stays `PENDING`, and its
+  mere existence past that point IS the mismatch signal. No separate
+  catch-block bookkeeping needed.
+- New `backend/src/modules/reconciliation/` module (`FINANCE_MANAGER`
+  only, matching Phase 7 refunds' own role gate — this is the same
+  finance-ops surface): lists `PENDING` rows (money captured, no matching
+  ticketed booking) for staff to manually resolve (re-run issuance, or
+  reverse the gateway charge via the existing `PaymentGateway.reverse`),
+  and a resolve action that stamps `resolvedById/At` + a free-text note.
+- **Explicitly not built this phase:** automatic resolution (e.g., a
+  background job that retries ticket issuance on its own) — a `PENDING`
+  row means something already went wrong once; auto-retrying blind risks
+  double-charging or double-issuing, exactly the kind of thing CLAUDE.md's
+  idempotency-key rule exists to prevent elsewhere but shouldn't be
+  re-invented ad hoc here. Staff review is the safer default until a real
+  auto-resolution policy is designed.
