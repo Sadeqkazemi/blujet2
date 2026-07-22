@@ -976,4 +976,161 @@ export class FlightsService {
 
     return { success: true };
   }
+
+  // ── Phase 13 Part C: per-agency allotments ────────────────────────────
+
+  async listAllotments(instanceId: string) {
+    const rows = await this.prisma.agencyAllotment.findMany({
+      where: { flightInstanceId: instanceId },
+      include: { agency: { include: { user: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    const now = new Date();
+    return rows.map((r) => ({
+      id: r.id,
+      agencyId: r.agencyId,
+      agencyName: r.agency.user.fullName,
+      seatsAllocated: r.seatsAllocated,
+      type: r.type,
+      releaseAt: r.releaseAt,
+      contractPriceIrr: r.contractPriceIrr,
+      createdAt: r.createdAt,
+      active: r.type === 'HARD' || !r.releaseAt || r.releaseAt > now,
+    }));
+  }
+
+  /** Active = counts toward the agencySeatsAllocated cap right now: HARD
+   * always counts; SOFT counts only until its releaseAt passes (lazy,
+   * same pattern as Booking's HELD→EXPIRED — no cron job). */
+  private async activeAllotmentsTotal(
+    instanceId: string,
+    excludeId?: string,
+  ): Promise<number> {
+    const now = new Date();
+    const rows = await this.prisma.agencyAllotment.findMany({
+      where: {
+        flightInstanceId: instanceId,
+        id: excludeId ? { not: excludeId } : undefined,
+        OR: [{ type: 'HARD' }, { releaseAt: null }, { releaseAt: { gt: now } }],
+      },
+    });
+    return rows.reduce((a, r) => a + r.seatsAllocated, 0);
+  }
+
+  async createAllotment(
+    actor: AuthenticatedUser,
+    instanceId: string,
+    dto: {
+      agencyId: string;
+      seatsAllocated: number;
+      type?: 'SOFT' | 'HARD';
+      releaseAt?: string;
+      contractPriceIrr?: number;
+    },
+  ) {
+    const instance = await this.prisma.flightInstance.findUnique({
+      where: { id: instanceId },
+    });
+    if (!instance) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'پرواز یافت نشد.',
+      });
+    }
+    const agency = await this.prisma.agencyProfile.findUnique({
+      where: { userId: dto.agencyId },
+    });
+    if (!agency) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'آژانس یافت نشد.',
+      });
+    }
+    if (!instance.agencySeatsAllocated) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message:
+          'ابتدا سهمیه کلی آژانس‌ها برای این پرواز را از بخش نرخ‌گذاری تعیین کنید.',
+      });
+    }
+
+    const existingTotal = await this.activeAllotmentsTotal(instanceId);
+    if (existingTotal + dto.seatsAllocated > instance.agencySeatsAllocated) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: `مجموع سهمیه‌های تخصیص‌یافته به آژانس‌ها (${existingTotal + dto.seatsAllocated}) از سقف کلی این پرواز (${instance.agencySeatsAllocated}) بیشتر است.`,
+      });
+    }
+
+    const created = await this.prisma.agencyAllotment.create({
+      data: {
+        agencyId: dto.agencyId,
+        flightInstanceId: instanceId,
+        seatsAllocated: dto.seatsAllocated,
+        type: dto.type ?? 'HARD',
+        releaseAt:
+          dto.type === 'SOFT' && dto.releaseAt
+            ? new Date(dto.releaseAt)
+            : undefined,
+        contractPriceIrr: dto.contractPriceIrr,
+        createdById: actor.id,
+      },
+    });
+
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'AGENCY',
+      action: 'تخصیص سهمیه پرواز به آژانس',
+      detail: `${dto.seatsAllocated} صندلی برای این پرواز به آژانس تخصیص یافت (نوع: ${dto.type ?? 'HARD'}) توسط ${actor.fullName}.`,
+      entityType: 'AgencyAllotment',
+      entityId: created.id,
+    });
+
+    return created;
+  }
+
+  async deleteAllotment(
+    actor: AuthenticatedUser,
+    instanceId: string,
+    allotmentId: string,
+  ) {
+    const allotment = await this.prisma.agencyAllotment.findUnique({
+      where: { id: allotmentId },
+    });
+    if (!allotment || allotment.flightInstanceId !== instanceId) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'سهمیه یافت نشد.',
+      });
+    }
+    const activeBooking = await this.prisma.booking.findFirst({
+      where: {
+        flightInstanceId: instanceId,
+        agencyId: allotment.agencyId,
+        status: { in: ['DRAFT', 'HELD', 'PAID', 'TICKETED'] },
+      },
+    });
+    if (activeBooking) {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message:
+          'این آژانس رزرو فعالی روی این پرواز دارد و سهمیه قابل حذف نیست.',
+      });
+    }
+
+    await this.prisma.agencyAllotment.delete({ where: { id: allotmentId } });
+
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'AGENCY',
+      action: 'حذف سهمیه آژانس',
+      detail: `سهمیه آژانس روی این پرواز توسط ${actor.fullName} حذف شد.`,
+      entityType: 'AgencyAllotment',
+      entityId: allotmentId,
+    });
+
+    return { success: true };
+  }
 }

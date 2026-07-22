@@ -642,3 +642,69 @@ for an actual design.
     amounts) avoid that conflict, but a genuine per-class fee schedule
     needs a product decision on how it interacts with Phase 7's existing
     global rule before it's built.
+
+---
+
+## Phase 13 — Reservation engine completion, Part C: real per-agency allotments
+
+`FlightInstance.agencySeatsAllocated` (Phase 10) is a single instance-wide
+number with no link to which agency it's for, no contract terms, and no
+soft/hard distinction — the user spec's "سهمیه آژانس" section asks for a
+real per-agency breakdown of that quota (contract party, seat count,
+firm-vs-refundable, release deadline, contract price). This phase adds
+that breakdown; it does NOT touch `agencySeatsAllocated` itself or Phase
+10's existing `PATCH /flights/:instanceId/plan` endpoint that writes it —
+that field stays the coarse "how many seats total are reserved for
+agencies" cap Phase A's public-pool formula already reads. Allotments
+subdivide that same cap across specific agencies, the same way Phase
+13B's fare-class capacity-sum check subdivides a cabin's physical seats
+across price classes — additive, not a replacement.
+
+- New `AgencyAllotment { id, agencyId→AgencyProfile, flightInstanceId→FlightInstance, seatsAllocated Int, type: AllotmentType (SOFT|HARD) @default(HARD), releaseAt DateTime?, contractPriceIrr Int?, createdById→User, createdAt }`.
+  - `type: HARD` — "آژانس یا چارترکننده نسبت به ظرفیت تخصیصی متعهد است، حتی
+    اگر آن را نفروشد" (the user spec's exact wording) — no `releaseAt`
+    needed; the seats stay reserved for this agency until staff explicitly
+    deletes the allotment.
+  - `type: SOFT` + `releaseAt` — "صندلی‌های فروش‌نرفته در موعد مشخص به
+    فروش عمومی بازمی‌گردند." Once `releaseAt` has passed, this row is
+    excluded from the active-allotment sum (lazy, computed at read/
+    validation time — same pattern as `Booking`'s `HELD`→`EXPIRED`
+    materialization, no cron job) — its seats become available to the
+    general agency pool again without deleting the historical row.
+  - `contractPriceIrr` — this specific agency's contracted per-seat rate,
+    nullable (falls back to normal price resolution when unset). Kept
+    separate from Phase 13B's `FareRule.allowedChannels` because a fare
+    rule scoped to `[AGENCY]` would be shared by every agency — an
+    allotment's contract price is deliberately one specific agency's deal.
+  - ⚑ No per-allotment credit cap: `AgencyCreditLine` (Phase 3) already
+    owns the agency's overall financial credit limit. A second,
+    allotment-level credit cap would be a competing figure with no clear
+    reconciliation rule — same reasoning as Phase 7's refund-penalty
+    conflict above.
+- **Capacity-sum validation** (mirrors Phase 13B's fare-class check): the
+  sum of `seatsAllocated` across every *active* allotment (HARD, or SOFT
+  with `releaseAt` still in the future or unset) for an instance, including
+  the one being created, must not exceed `FlightInstance.agencySeatsAllocated`
+  — 400 if it would, and 400 if `agencySeatsAllocated` is unset (staff must
+  set the coarse quota via Phase 10's `plan` endpoint first).
+- New endpoints (`backend/src/modules/flights/`, same `SENIOR_MANAGER`/
+  `COMMERCIAL_MANAGER` role gate): `GET/POST /flights/:instanceId/allotments`,
+  `DELETE /flights/:instanceId/allotments/:id` (409 if any active booking
+  already exists for that agency on this instance — mirrors Phase 13B's
+  delete-guard for fare rules).
+
+- **Explicitly not built this phase (needs its own dedicated design, not
+  guessed at here):**
+  - An agency actually BOOKING against its own allotment. Today literally
+    nothing in the codebase ever creates an `AGENCY`-channel `Booking` row
+    (confirmed while auditing Phase 13A — `channel: 'AGENCY'` only appears
+    in reporting's group-by queries, never in a create call). Building
+    this properly means an agency-side payment path that draws down
+    `AgencyCreditLine` (Phase 3) instead of the Shetab/IPG gateway or
+    wallet/points — a genuinely different payment method from every path
+    `BookingService.pay()` currently supports, not a small addition to it.
+    That deserves its own phase once the credit-billing flow is designed,
+    rather than a rushed half-integration bolted onto this one. This
+    phase ships the allotment bookkeeping (so staff can plan/contract
+    agency capacity today); consuming it from an actual agency booking is
+    the next phase.
