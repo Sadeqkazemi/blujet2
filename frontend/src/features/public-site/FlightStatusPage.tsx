@@ -1,52 +1,78 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PublicPageShell from '../../components/public/PublicPageShell';
+import JalaliDatePicker from '../../components/JalaliDatePicker';
+import { fetchAirports } from '../../api/publicSite';
+import { lookupFlightStatus } from '../../api/flight-status';
 import { faDigits } from '../../lib/fa-format';
+import { formatJalaliDate, dayjs } from '../../lib/jalali';
+import { ApiRequestError } from '../../api/envelope';
+import type { Airport } from '../../types/public-site';
+import type { FlightStatusResult } from '../../types/flight-status';
 
-// وضعیت پرواز — mock-only page matching design-reference/وضعیت پرواز.dc.html:
-// search by flight number OR route+date, shows a status card with the
-// design's own sample flight. No dedicated backend lookup exists for
-// arbitrary flight-number status (distinct from the PNR-based booking
-// lookup on مدیریت رزرو), so this stays mock like that page.
+// وضعیت پرواز — matches design-reference/وضعیت پرواز.dc.html's layout, now
+// backed by the real FlightInstance data (Phase 22). The design's status
+// card also shows گیت/تحویل بار/تأخیر/ترمینال — none of those are modeled
+// anywhere in this codebase (no gate-assignment/baggage-belt/delay-minutes
+// operational system exists yet), so this real version shows only what's
+// real (route, times, aircraft, status) and drops the fabricated fields —
+// see docs/API.md's Phase 22 section for the explicit deferral.
 
-const MOCK_STATUS = {
-  airline: 'blujet',
-  flightNo: 'BJ-410',
-  date: '۲۵ تیر ۱۴۰۵',
-  statusLabel: 'به‌موقع',
-  depCode: 'THR',
-  depCity: 'تهران',
-  depTime: '۱۸:۲۰',
-  depTerminal: '۲',
-  duration: '۱ ساعت و ۲۵ دقیقه',
-  distance: '۶۵۰ کیلومتر',
-  arrCode: 'MHD',
-  arrCity: 'مشهد',
-  arrTime: '۱۹:۵۰',
-  arrTerminal: '۱',
-  aircraft: 'ایرباس A320',
-  gate: 'B12',
-  belt: '۳',
-  delayLabel: 'بدون تأخیر',
+const STATUS_META: Record<FlightStatusResult['status'], { color: string; bg: string }> = {
+  SCHEDULED: { color: '#1f8a5b', bg: '#1f8a5b' },
+  DEPARTED: { color: '#1668c4', bg: '#1668c4' },
+  CANCELLED: { color: '#d64545', bg: '#d64545' },
 };
+
+function todayIso() {
+  return dayjs().toDate().toISOString();
+}
 
 export default function FlightStatusPage() {
   const [mode, setMode] = useState<'flightNo' | 'route'>('flightNo');
   const [flightNo, setFlightNo] = useState('');
   const [origin, setOrigin] = useState('');
   const [dest, setDest] = useState('');
-  const [date, setDate] = useState('');
-  const [result, setResult] = useState<'idle' | 'found' | 'not-found'>('idle');
+  const [dateIso, setDateIso] = useState<string | null>(todayIso());
+  const [airports, setAirports] = useState<Airport[]>([]);
+  const [result, setResult] = useState<FlightStatusResult | null>(null);
+  const [notFound, setNotFound] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [smsOn, setSmsOn] = useState(false);
+  const [searching, setSearching] = useState(false);
 
-  function search(e: React.FormEvent) {
+  useEffect(() => {
+    fetchAirports()
+      .then(setAirports)
+      .catch(() => setAirports([]));
+  }, []);
+
+  async function search(e: React.FormEvent) {
     e.preventDefault();
-    if (mode === 'flightNo') {
-      setResult(flightNo.trim().toUpperCase() === 'BJ-410' ? 'found' : 'not-found');
-    } else {
-      setResult(origin.trim() && dest.trim() && date.trim() ? 'found' : 'not-found');
+    setError(null);
+    setNotFound(false);
+    setResult(null);
+    if (!dateIso) return;
+    setSearching(true);
+    try {
+      const date = dateIso.slice(0, 10);
+      const data =
+        mode === 'flightNo'
+          ? await lookupFlightStatus({ flightNo: flightNo.trim(), date })
+          : await lookupFlightStatus({ origin, dest, date });
+      setResult(data);
+    } catch (err) {
+      if (err instanceof ApiRequestError && err.code === 'NOT_FOUND') {
+        setNotFound(true);
+      } else {
+        setError(err instanceof ApiRequestError ? err.message : 'خطا در جستجوی وضعیت پرواز.');
+      }
+    } finally {
+      setSearching(false);
     }
   }
+
+  const canSearch = mode === 'flightNo' ? !!flightNo.trim() && !!dateIso : !!origin && !!dest && !!dateIso;
 
   return (
     <PublicPageShell>
@@ -69,7 +95,9 @@ export default function FlightStatusPage() {
                 data-testid={`fs-mode-${m}`}
                 onClick={() => {
                   setMode(m);
-                  setResult('idle');
+                  setResult(null);
+                  setNotFound(false);
+                  setError(null);
                 }}
                 style={{
                   flex: 1,
@@ -89,7 +117,7 @@ export default function FlightStatusPage() {
             ))}
           </div>
 
-          <form onSubmit={search} style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <form onSubmit={(e) => void search(e)} style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
             {mode === 'flightNo' ? (
               <div style={{ flex: '1 1 200px' }}>
                 <label htmlFor="fs-flightno" style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#5a6678', marginBottom: 6 }}>
@@ -108,48 +136,64 @@ export default function FlightStatusPage() {
             ) : (
               <>
                 <div style={{ flex: '1 1 130px' }}>
-                  <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#5a6678', marginBottom: 6 }}>مبدأ</label>
-                  <input
+                  <label htmlFor="fs-origin" style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#5a6678', marginBottom: 6 }}>
+                    مبدأ
+                  </label>
+                  <select
+                    id="fs-origin"
                     data-testid="fs-origin"
                     value={origin}
                     onChange={(e) => setOrigin(e.target.value)}
-                    placeholder="تهران"
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '11px 13px', border: '1.5px solid #e3e9f1', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none' }}
-                  />
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '11px 13px', border: '1.5px solid #e3e9f1', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff' }}
+                  >
+                    <option value="">انتخاب کنید</option>
+                    {airports.map((a) => (
+                      <option key={a.id} value={a.code}>
+                        {a.cityFa} ({a.code})
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div style={{ flex: '1 1 130px' }}>
-                  <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#5a6678', marginBottom: 6 }}>مقصد</label>
-                  <input
+                  <label htmlFor="fs-dest" style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#5a6678', marginBottom: 6 }}>
+                    مقصد
+                  </label>
+                  <select
+                    id="fs-dest"
                     data-testid="fs-dest"
                     value={dest}
                     onChange={(e) => setDest(e.target.value)}
-                    placeholder="مشهد"
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '11px 13px', border: '1.5px solid #e3e9f1', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none' }}
-                  />
-                </div>
-                <div style={{ flex: '1 1 130px' }}>
-                  <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#5a6678', marginBottom: 6 }}>تاریخ</label>
-                  <input
-                    data-testid="fs-date"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    placeholder="۲۵ تیر ۱۴۰۵"
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '11px 13px', border: '1.5px solid #e3e9f1', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none' }}
-                  />
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '11px 13px', border: '1.5px solid #e3e9f1', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff' }}
+                  >
+                    <option value="">انتخاب کنید</option>
+                    {airports.map((a) => (
+                      <option key={a.id} value={a.code}>
+                        {a.cityFa} ({a.code})
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </>
             )}
+            <div style={{ flex: '1 1 150px', border: '1.5px solid #e3e9f1', borderRadius: 11 }}>
+              <JalaliDatePicker label="تاریخ" value={dateIso} onChange={setDateIso} testId="fs-date" />
+            </div>
             <button
               type="submit"
               data-testid="fs-search"
-              style={{ flex: 'none', border: 'none', borderRadius: 11, background: '#1668c4', color: '#fff', padding: '12px 26px', fontSize: 13.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
+              disabled={!canSearch || searching}
+              style={{ flex: 'none', border: 'none', borderRadius: 11, background: canSearch && !searching ? '#1668c4' : '#aab8c8', color: '#fff', padding: '12px 26px', fontSize: 13.5, fontWeight: 800, cursor: canSearch && !searching ? 'pointer' : 'not-allowed', fontFamily: 'inherit' }}
             >
-              جستجو
+              {searching ? 'در حال جستجو…' : 'جستجو'}
             </button>
           </form>
         </div>
 
-        {result === 'not-found' && (
+        {error && (
+          <p style={{ marginTop: 16, borderRadius: 10, background: '#fef2f2', padding: 12, fontSize: 12.5, color: '#e5484d' }}>{error}</p>
+        )}
+
+        {notFound && (
           <div data-testid="fs-not-found" style={{ marginTop: 22, background: '#fff', border: '1px solid #eef1f5', borderRadius: 18, padding: '48px 24px', textAlign: 'center' }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>🔍</div>
             <div style={{ fontSize: 15, fontWeight: 900, color: '#0d2640', marginBottom: 8 }}>پروازی یافت نشد</div>
@@ -157,65 +201,64 @@ export default function FlightStatusPage() {
           </div>
         )}
 
-        {result === 'found' && (
+        {result && (
           <div style={{ marginTop: 22 }}>
             <div data-testid="fs-result" style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 18, overflow: 'hidden', boxShadow: '0 18px 44px -28px rgba(13,38,102,.3)' }}>
-              <div style={{ background: 'linear-gradient(120deg,#1668c4,#0d3b66)', color: '#fff', padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ background: 'linear-gradient(120deg,#1668c4,#0d3b66)', color: '#fff', padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 800, fontSize: 14 }}>
-                  <span>✈</span> {MOCK_STATUS.airline}
+                  <span>✈</span> blujet
                 </span>
                 <span style={{ fontSize: 12 }}>
-                  <span dir="ltr">{MOCK_STATUS.flightNo}</span> · {MOCK_STATUS.date}
+                  <span dir="ltr">{result.flightNo}</span> · {formatJalaliDate(result.departureAt)}
                 </span>
-                <span style={{ background: '#1f8a5b', fontSize: 10.5, fontWeight: 800, padding: '4px 10px', borderRadius: 14 }}>{MOCK_STATUS.statusLabel}</span>
+                <span
+                  data-testid="fs-status-pill"
+                  style={{ background: STATUS_META[result.status].bg, fontSize: 10.5, fontWeight: 800, padding: '4px 10px', borderRadius: 14 }}
+                >
+                  {result.statusLabelFa}
+                </span>
               </div>
 
               <div style={{ padding: '20px 22px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: 21, fontWeight: 900, color: '#0d2640' }} dir="ltr">
-                    {MOCK_STATUS.depCode}
+                    {result.originCode}
                   </div>
-                  <div style={{ fontSize: 12, color: '#6b7787' }}>{MOCK_STATUS.depCity}</div>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: '#1668c4', marginTop: 4 }}>{MOCK_STATUS.depTime}</div>
-                  <div style={{ fontSize: 10.5, color: '#8a96a6', marginTop: 2 }}>ترمینال {faDigits(MOCK_STATUS.depTerminal)}</div>
+                  <div style={{ fontSize: 12, color: '#6b7787' }}>{result.originCityFa}</div>
+                  <div className="font-num" style={{ fontSize: 15, fontWeight: 800, color: '#1668c4', marginTop: 4 }}>
+                    {faDigits(dayjs(result.departureAt).calendar('jalali').format('HH:mm'))}
+                  </div>
                 </div>
                 <div style={{ flex: 1, textAlign: 'center', color: '#8a96a6', fontSize: 11 }}>
-                  <div>{MOCK_STATUS.duration}</div>
                   <div style={{ borderTop: '2px dashed #d5e1f0', margin: '8px 20px', position: 'relative' }}>
                     <span style={{ position: 'absolute', top: -10, right: '50%', transform: 'translateX(50%)', background: '#fff', padding: '0 8px', color: '#1668c4' }}>✈</span>
                   </div>
-                  <div>{MOCK_STATUS.distance}</div>
                 </div>
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: 21, fontWeight: 900, color: '#0d2640' }} dir="ltr">
-                    {MOCK_STATUS.arrCode}
+                    {result.destCode}
                   </div>
-                  <div style={{ fontSize: 12, color: '#6b7787' }}>{MOCK_STATUS.arrCity}</div>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: '#1668c4', marginTop: 4 }}>{MOCK_STATUS.arrTime}</div>
-                  <div style={{ fontSize: 10.5, color: '#8a96a6', marginTop: 2 }}>ترمینال {faDigits(MOCK_STATUS.arrTerminal)}</div>
+                  <div style={{ fontSize: 12, color: '#6b7787' }}>{result.destCityFa}</div>
+                  <div className="font-num" style={{ fontSize: 15, fontWeight: 800, color: '#1668c4', marginTop: 4 }}>
+                    {faDigits(dayjs(result.arrivalAt).calendar('jalali').format('HH:mm'))}
+                  </div>
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', borderTop: '1px solid #f2f4f7' }}>
-                {[
-                  ['هواپیما', MOCK_STATUS.aircraft],
-                  ['گیت', MOCK_STATUS.gate],
-                  ['تحویل بار', MOCK_STATUS.belt],
-                  ['تأخیر', MOCK_STATUS.delayLabel],
-                ].map(([k, v]) => (
-                  <div key={k} style={{ padding: '11px 14px', textAlign: 'center', borderLeft: '1px solid #f2f4f7' }}>
-                    <div style={{ fontSize: 10.5, color: '#8a96a6', marginBottom: 3 }}>{k}</div>
-                    <div style={{ fontSize: 12.5, fontWeight: 800, color: '#0d2640' }}>{v}</div>
-                  </div>
-                ))}
+              <div style={{ borderTop: '1px solid #f2f4f7', padding: '11px 14px', textAlign: 'center' }}>
+                <div style={{ fontSize: 10.5, color: '#8a96a6', marginBottom: 3 }}>هواپیما</div>
+                <div style={{ fontSize: 12.5, fontWeight: 800, color: '#0d2640' }}>{result.aircraftType}</div>
               </div>
             </div>
 
             <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
-              <label style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 14, padding: '14px 16px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label
+                title="به‌زودی"
+                style={{ background: '#f6f8fb', border: '1px solid #e8eef6', borderRadius: 14, padding: '14px 16px', cursor: 'not-allowed', display: 'flex', flexDirection: 'column', gap: 6, opacity: 0.7 }}
+              >
                 <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: 12.5, fontWeight: 800, color: '#0d2640' }}>اطلاع‌رسانی تأخیر</span>
-                  <input type="checkbox" data-testid="fs-sms-toggle" checked={smsOn} onChange={(e) => setSmsOn(e.target.checked)} />
+                  <span style={{ fontSize: 12.5, fontWeight: 800, color: '#0d2640' }}>اطلاع‌رسانی تأخیر (به‌زودی)</span>
+                  <input type="checkbox" data-testid="fs-sms-toggle" checked={smsOn} onChange={(e) => setSmsOn(e.target.checked)} disabled />
                 </span>
                 <span style={{ fontSize: 11, color: '#8a96a6' }}>فعال‌سازی پیامک تغییر وضعیت پرواز</span>
               </label>
