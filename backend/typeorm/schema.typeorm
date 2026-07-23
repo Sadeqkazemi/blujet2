@@ -81,6 +81,7 @@ model User {
   agencyInvoicesIssued        AgencyInvoice[]           @relation("AgencyInvoiceIssuedBy")
   agencyMessagesSent          AgencyMessage[]           @relation("AgencyMessageSender")
   agencyCreditRequestsDecided AgencyCreditRequest[]     @relation("AgencyCreditRequestDecidedBy")
+  agencyWebserviceRequestsDecided AgencyWebserviceRequest[] @relation("AgencyWebserviceRequestDecidedBy")
 
   cartableTasks       CartableTask[]             @relation("CartableAssignee")
   cartableTasksSent   CartableTask[]             @relation("CartableSender")
@@ -574,6 +575,7 @@ model AgencyProfile {
   creditRequests AgencyCreditRequest[]
   documents      AgencyDocument[]
   allotments     AgencyAllotment[]
+  webserviceRequests AgencyWebserviceRequest[]
 
   @@map("agency_profiles")
 }
@@ -755,6 +757,36 @@ model AgencyCreditRequest {
 
   @@index([agencyId, status])
   @@map("agency_credit_requests")
+}
+
+enum AgencyWebserviceRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// Phase 23: وب‌سرویس (B2B API) purchase request — same shape as
+// AgencyCreditRequest above (agency requests, an AGENCY_TAB_ROLES staff
+// member decides). Approval reuses AgenciesService.issueApiKey verbatim
+// (step-up required) to actually create the AgencyApiKey; this row never
+// grants access by itself. priceIrr is a server-computed snapshot from
+// the fixed plan catalog at request time — never client-supplied.
+model AgencyWebserviceRequest {
+  id          String                         @id @default(uuid())
+  agencyId    String
+  agency      AgencyProfile                  @relation(fields: [agencyId], references: [userId])
+  scope       AgencyApiScope
+  months      Int
+  priceIrr    Int
+  note        String?
+  status      AgencyWebserviceRequestStatus  @default(PENDING)
+  decidedById String?
+  decidedBy   User?                          @relation("AgencyWebserviceRequestDecidedBy", fields: [decidedById], references: [id])
+  decidedAt   DateTime?
+  createdAt   DateTime                       @default(now())
+
+  @@index([agencyId, status])
+  @@map("agency_webservice_requests")
 }
 
 enum AgencyDocumentType {

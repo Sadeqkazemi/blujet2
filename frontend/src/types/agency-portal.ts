@@ -119,3 +119,27 @@ export interface AgencyDocument {
   createdAt: string;
   file: { fileName: string; sizeBytes: number; mimeType: string };
 }
+
+export type AgencyApiScope = 'FULL' | 'SEARCH_BOOK';
+export type AgencyWebserviceRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface AgencyWebserviceRequest {
+  id: string;
+  scope: AgencyApiScope;
+  months: 1 | 3 | 12;
+  priceIrr: number;
+  note: string | null;
+  status: AgencyWebserviceRequestStatus;
+  decidedAt: string | null;
+  createdAt: string;
+}
+
+export interface AgencyApiKeySummary {
+  id: string;
+  scope: AgencyApiScope | 'SEARCH_ONLY';
+  status: 'ACTIVE' | 'SUSPENDED';
+  activatedAt: string;
+  expiresAt: string | null;
+  lastUsedAt: string | null;
+  callCount: number;
+}
