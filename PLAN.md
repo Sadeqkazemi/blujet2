@@ -248,6 +248,25 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   the delete endpoint, then signs out and returns home. 2 new frontend
   tests (backend already had 3, re-verified green, unchanged). See
   `docs/API.md`/`docs/DB_SCHEMA.md`/`docs/features/privacy-gdpr.md`.
+- [x] **Phase 26 — ارجاعات (EMPLOYEE recipient-side referral listing)** —
+  closes another Phase 18 `PANEL_NAV` gap: پنل کارمند.dc.html always
+  appends `referrals` to EMPLOYEE's nav, but `GET /referrals` was
+  sender-scoped (`SENIOR_MANAGER` only) and no recipient-side listing
+  existed — worse, NO role's recipient side had any frontend at all (only
+  detail/report-submission endpoints existed since Phase 4, unused by any
+  UI). New `GET /referrals/mine` (same guard set as the existing
+  detail/report endpoints — any `STAFF_ROLES` recipient) with a
+  per-actor `hasMyReport` flag; `PANEL_NAV.EMPLOYEE` now always includes
+  `referrals`. New `ReferralsRouter` (role-conditional, same pattern as
+  `SecurityRouter`) renders the existing sender-side `ReferralsPage` for
+  `SENIOR_MANAGER` and a new `MyReferralsPage` for `EMPLOYEE` (list +
+  detail + a real report-submission form — the first frontend usage
+  anywhere of `POST /referrals/:id/reports`). Explicitly deferred: other
+  recipient roles (CEO/BOARD_CHAIR/finance/commercial) still have no
+  frontend for this — backend already supports them, follow-up is
+  frontend-only. 3 new backend e2e tests, 7 new frontend tests. See
+  `docs/API.md`/`docs/DB_SCHEMA.md`/`docs/features/cartable-referrals.md`'s
+  Phase 26 addition.
 
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is

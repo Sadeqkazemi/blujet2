@@ -1284,3 +1284,48 @@ only; no backend/schema changes.
   `window.confirm`, for testability and to show the real consequences
   before the irreversible action) before calling the endpoint; on success,
   signs the session out and returns to the home page.
+
+## Phase 26 — ارجاعات (EMPLOYEE recipient-side referral listing)
+
+Closes the `referrals` nav gap flagged deferred since Phase 18 (`PANEL_NAV`
+notes): پنل کارمند.dc.html's `navKeys` formula always appends `referrals`
+(unconditional — not gated by any permission key), but the only listing
+endpoint (`GET /referrals`) was sender-scoped (`referrals.service.ts`'s
+`list` — "ارجاعات من به مدیران", `SENIOR_MANAGER` only). Recipients of any
+role (`STAFF_ROLES` — any staff member can be a referral recipient, see
+`referrals.service.ts`'s `create`) had detail (`GET /referrals/:id`) and
+report-submission (`POST /referrals/:id/reports`) access since Phase 4,
+but no discovery listing and, until this phase, **no frontend at all**
+for the recipient side — not just for EMPLOYEE.
+
+- `GET /referrals/mine` (new; same access set as `:id`/`:id/reports` —
+  `EXEC_ROLES` + `SITE_ADMIN` + `IT_MANAGER` + `EMPLOYEE`) — referrals
+  where the caller is a recipient, each with a `hasMyReport` flag (true
+  once THIS actor has submitted at least one report on that referral —
+  independent of the referral's overall `status`, since multiple
+  recipients can each report separately) and `counts.awaitingMyReport`
+  (not yet reported by me, and not `CLOSED`).
+- `PANEL_NAV.EMPLOYEE` now always includes `{ key: 'referrals', labelFa:
+  'ارجاعات' }`, matching the design's unconditional formula — no longer
+  gated behind a wired permission key (referrals are personally
+  addressed, not section-based access).
+- Frontend: the `referrals` panel tab now renders per-role via a new
+  `ReferralsRouter` (same "one tab key, two designs" pattern as
+  `SecurityRouter`/Phase 8) — `SENIOR_MANAGER` keeps the existing
+  sender-side `ReferralsPage`; `EMPLOYEE` gets a new `MyReferralsPage`
+  (list + detail + a real report-submission form calling
+  `POST /referrals/:id/reports`, the first frontend surface anywhere in
+  this codebase for that endpoint).
+- **Explicit scope narrowing (documented, not an oversight)**: this phase
+  only wires the EMPLOYEE frontend (the specific gap flagged in Phase 18).
+  Other potential recipient roles (e.g. a CEO/BOARD_CHAIR/FINANCE_MANAGER/
+  COMMERCIAL_MANAGER referral, sent by a different manager) still have no
+  frontend for `GET /referrals/mine`/report submission — the backend
+  endpoint is already generically available to them (same guard set), so
+  a future phase can add that UI without any backend change. The design's
+  mock `getStaffReferrals` also shows an "accept"/"forward to a colleague"
+  flow with no real backing model — not built; the real, already-tested
+  `ManagerReferral`/`submitReport` workflow (accept implicitly by
+  reporting; no forwarding) is used instead, matching this codebase's
+  "never invent parallel logic the real backend doesn't support"
+  convention.
