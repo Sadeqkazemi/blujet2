@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import PublicPageShell from '../../components/public/PublicPageShell';
+import { submitContactMessage } from '../../api/contact';
 
-// تماس با ما — content matching design-reference/تماس با ما.dc.html; the
-// message form mirrors the design's client-side mock behavior.
+// تماس با ما — content matching design-reference/تماس با ما.dc.html.
+// The design's own form requires name+phone+subject+msg (see its onSend
+// validation) — the earlier build of this page was missing the subject
+// field; Phase 20 adds it back and wires the form to a real backend.
 
 const CHANNELS = [
   { icon: '☎', bg: '#eef4fb', color: '#1668c4', title: 'تلفن پشتیبانی ۲۴ ساعته', value: '۰۲۱ — ۹۱۰۰۰۰۰۰', ltr: true },
@@ -14,10 +17,32 @@ const CHANNELS = [
 export default function ContactPage() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [subject, setSubject] = useState('');
   const [msg, setMsg] = useState('');
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const canSubmit = name.trim() && msg.trim();
+  const canSubmit = name.trim() && phone.trim() && subject.trim() && msg.trim();
+
+  async function onSubmit() {
+    if (!canSubmit) return;
+    setError(null);
+    setSubmitting(true);
+    try {
+      await submitContactMessage({
+        name: name.trim(),
+        phone: phone.trim(),
+        subject: subject.trim(),
+        body: msg.trim(),
+      });
+      setSent(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'خطا در ارسال پیام.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <PublicPageShell>
@@ -72,6 +97,13 @@ export default function ContactPage() {
                   style={{ padding: '11px 13px', border: '1.5px solid #e3e9f1', borderRadius: 11, fontFamily: 'inherit', fontSize: 12.5, outline: 'none' }}
                 />
               </div>
+              <input
+                data-testid="contact-subject"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                placeholder="موضوع"
+                style={{ padding: '11px 13px', border: '1.5px solid #e3e9f1', borderRadius: 11, fontFamily: 'inherit', fontSize: 12.5, outline: 'none' }}
+              />
               <textarea
                 data-testid="contact-msg"
                 value={msg}
@@ -80,12 +112,13 @@ export default function ContactPage() {
                 rows={5}
                 style={{ padding: '11px 13px', border: '1.5px solid #e3e9f1', borderRadius: 11, fontFamily: 'inherit', fontSize: 12.5, outline: 'none', resize: 'vertical' }}
               />
+              {error && <p style={{ margin: 0, fontSize: 11.5, color: '#d64545' }}>{error}</p>}
               <button
                 type="button"
                 data-testid="contact-submit"
-                disabled={!canSubmit}
-                onClick={() => setSent(true)}
-                style={{ alignSelf: 'flex-start', border: 'none', borderRadius: 11, background: canSubmit ? '#1668c4' : '#aab8c8', color: '#fff', padding: '11px 26px', fontSize: 13, fontWeight: 800, cursor: canSubmit ? 'pointer' : 'not-allowed', fontFamily: 'inherit' }}
+                disabled={!canSubmit || submitting}
+                onClick={() => void onSubmit()}
+                style={{ alignSelf: 'flex-start', border: 'none', borderRadius: 11, background: canSubmit && !submitting ? '#1668c4' : '#aab8c8', color: '#fff', padding: '11px 26px', fontSize: 13, fontWeight: 800, cursor: canSubmit && !submitting ? 'pointer' : 'not-allowed', fontFamily: 'inherit' }}
               >
                 ارسال پیام
               </button>

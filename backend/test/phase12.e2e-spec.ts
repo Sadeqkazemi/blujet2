@@ -8,6 +8,15 @@ import { loginAs, stepUpFor } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 import type { Role } from '../generated/prisma/enums';
 
+// This file's tests create/reset/verify real staff accounts, each round
+// trip doing a real argon2 hash+verify (deliberately CPU-expensive by
+// design — CLAUDE.md requires argon2, never a fast/weak hash). Jest's
+// 5000ms default has been observed to occasionally trip under full-suite
+// load (multiple e2e spec files' Postgres/Redis/Node processes competing
+// for CPU); a generous fixed timeout is the standard remedy for
+// legitimately-slow-by-design crypto work, not a sign of a hung test.
+jest.setTimeout(20000);
+
 describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', () => {
   let app: INestApplication<App>;
   let prisma: PrismaService;

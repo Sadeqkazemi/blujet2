@@ -934,3 +934,89 @@ logic. No schema change.
   instead of inventing per-passenger refund support keeps this phase's
   scope real rather than adding a parallel, untested money-handling path;
   the rebuilt page drops the per-passenger checkboxes accordingly.
+
+## Phase 20 — تماس با ما + پشتیبانی (contact + support tickets)
+
+Second item from the post-Phase-18 "dead forms" punch list.
+`ContactPage.tsx` and `SupportPage.tsx`'s ticket form were both pure
+client-side mocks (`setSent(true)`, a hardcoded `TK-8842` tracking code,
+zero backend calls). Built as **two separate models** — a plain inbox
+(`ContactMessage`) and a tracked workflow (`SupportTicket`) — rather than
+one unified table, since they are conceptually different (pre-sale
+inquiry vs. an active support issue needing dept/priority/status/forward)
+and the design's own ticket dept field (`tkDepts = ["سایت","آژانس‌ها"]`,
+confirmed from `پنل ادمین سایت.dc.html`) has no equivalent on the contact
+side anyway.
+
+### تماس با ما — `ContactMessage`
+- `POST /contact` (new, public, `@Throttle` 10/min per IP) —
+  `{ name, phone, subject, body }`. The design's own form
+  (`design-reference/تماس با ما.dc.html`) requires all four fields
+  (`onSend` validates `name`/`phone`/`subject`/`msg` all non-empty) — the
+  earlier build of `ContactPage.tsx` was missing the `subject` input
+  entirely; this phase adds it back as part of making the form real.
+- `GET /contact` (new, `SITE_ADMIN` only) — the 20 most recent messages.
+  No dedicated review/reply UI this phase (no design admin tab exists
+  specifically for "تماس با ما" — `پنل ادمین سایت.dc.html`'s own access
+  list has no such key); this endpoint's only consumer is a new third
+  section on `SiteAdminDashboardPage.tsx` ("آخرین پیام‌های تماس با ما").
+  A full inbox/reply workflow stays a deferred polish item, same category
+  as Phase 18/19's other explicitly-flagged deferrals.
+
+### پشتیبانی — `SupportTicket`
+- `POST /support-tickets` (new, public, `@Throttle` 10/min per IP) —
+  `{ requesterName, requesterPhone, subject, body }`. The design's ticket
+  form (`design-reference/پشتیبانی.dc.html`) has **no** name/phone input
+  at all — but a real ticket system needs a way to contact the submitter
+  back, so both fields were added to the rebuilt form (a deliberate,
+  bounded scope decision made after the user declined further clarifying
+  questions on this feature and said to continue using judgment). Returns
+  `{ id, trackingCode }`; the frontend replaces the old fake `TK-8842`
+  constant with this real code. `dept` always defaults to `SITE` at
+  submission — there is no "which department" picker on the public form,
+  matching the design (which also has no such picker on its ticket form).
+- `GET /support-tickets` (new, `SITE_ADMIN` only, optional
+  `?status=`/`?dept=` filters) — list.
+- `GET /support-tickets/:id` (new, `SITE_ADMIN` only) — detail.
+- `GET /support-tickets/forward-targets` (new, `SITE_ADMIN` only) — the
+  active-staff picker for the forward action. Reuses
+  `StaffDirectoryService.list()` (Phase 4) **via dependency injection**
+  rather than widening `StaffDirectoryController`'s own endpoint, which is
+  gated to `EXEC_ROLES` (CEO/BOARD_CHAIR/SENIOR_MANAGER/FINANCE_MANAGER/
+  COMMERCIAL_MANAGER — notably not `SITE_ADMIN`). Exposing a
+  ticket-scoped endpoint instead of widening that shared role gate follows
+  the same conservative-widening principle established in Phase 18.
+- `PATCH /support-tickets/:id/forward` (new, `SITE_ADMIN` only) —
+  `{ targetUserId }`. Validates the target against the same staff list,
+  advances `OPEN` → `IN_PROGRESS` (leaves any other status as-is), and
+  appends a `history` entry — same `history: Json` append pattern already
+  used by `RefundRequest`/`AgencyMembershipRequest`, not a separate
+  message-thread table.
+- `PATCH /support-tickets/:id/status` (new, `SITE_ADMIN` only) —
+  `{ status }` ∈ `OPEN | IN_PROGRESS | ANSWERED | CLOSED`. Appends a
+  `history` entry.
+- Both forward and status-change actions are audit-logged
+  (`category: 'SYSTEM'` — no new `AuditCategory` enum value was added for
+  a scoped-down v1 feature). No audit row on the anonymous submission
+  path, same precedent as Phase 16/19's anonymous flows.
+- New `PANEL_NAV.SITE_ADMIN` tab: `tickets` (`تیکت‌های پشتیبانی`) — this
+  closes the gap Phase 18 explicitly flagged: `پنل ادمین سایت.dc.html`'s
+  `roleDefs.siteAdmin.access` list includes `"tickets"`, which Phase 18
+  left out because no backend existed anywhere in the codebase yet.
+  `flightops`/`blog`/`media` remain deferred (still no backend for any
+  role).
+
+### Explicit deferrals (flagged, not oversights)
+- **File attachments and multi-message reply threads** — the design's
+  admin ticket system (`پنل ادمین سایت.dc.html`) shows both (`messages[]`
+  carrying attachments per message). This phase ships a single
+  subject+body per ticket with a `history` log of status/forward events
+  only, matching the scope of every other "referral/status" workflow
+  already built (refunds, agency requests) rather than building a new
+  file-upload + threaded-messaging subsystem.
+- **Public ticket status lookup ("track my ticket")** — the design has no
+  such UI (only a post-submission tracking-code display); not built this
+  phase.
+- **A dedicated تماس با ما admin review/reply UI** — see above; the
+  dashboard's new summary section is this phase's only admin surface for
+  it.

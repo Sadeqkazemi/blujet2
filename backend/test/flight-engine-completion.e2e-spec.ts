@@ -5,6 +5,7 @@ import { PrismaClient } from '../generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { createTestApp } from './helpers/app.helper';
 import { loginAs, loginAsCustomer } from './helpers/login.helper';
+import { RedisService } from '../src/redis/redis.service';
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
@@ -187,6 +188,14 @@ describe('Flight engine completion', () => {
       departureAt: new Date(leg1.arrivalAt.getTime() + 10 * 60_000),
     });
 
+    // See the fare-class test below for why this bust is needed: the
+    // search cache key is route+date only, so a re-run within the TTL
+    // window for the same "N days from now" date would otherwise serve a
+    // stale list from a previous run's (now-deleted) instances.
+    await app
+      .get(RedisService)
+      .del(`search:flights:RAS:ADU:${day.toISOString().slice(0, 10)}`);
+
     const res = await request(app.getHttpServer())
       .get(
         `/search/flights?origin=RAS&dest=ADU&date=${day.toISOString().slice(0, 10)}`,
@@ -228,6 +237,15 @@ describe('Flight engine completion', () => {
         },
       ],
     });
+
+    // Search results are cached by route+date (SEARCH_TTL_SECONDS = 5min),
+    // not by instance id — re-running this suite within that window for the
+    // same "N days from now" date would otherwise serve a stale cached list
+    // pointing at a previous run's (now-deleted) instance. Bust it so this
+    // test always sees the instance it just created.
+    await app
+      .get(RedisService)
+      .del(`search:flights:KER:AZD:${dep.toISOString().slice(0, 10)}`);
 
     const search1 = await request(app.getHttpServer())
       .get(

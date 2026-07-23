@@ -1,17 +1,88 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { loginAs } from './helpers/login.helper';
+import { loginAs, loginAsCustomer } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
+import { PrismaService } from '../src/prisma/prisma.service';
 
 describe('Reporting (e2e)', () => {
   let app: INestApplication<App>;
   let ceoToken: string;
+  let ownFlightNo: string;
 
   beforeAll(async () => {
     app = await createTestApp();
     const { accessToken } = await loginAs(app, 'ceo');
     ceoToken = accessToken!;
+
+    // These endpoints aggregate over the ENTIRE shared e2e test database —
+    // `blujet_test` is never reset between spec files, so how much SALE
+    // ledger data (if any) exists in the current q6 window depends entirely
+    // on suite run order, not on anything this file controls (the same
+    // class of flakiness already fixed once for finance-reports.e2e-spec.ts
+    // — commit 159c6d7). Rather than assume ambient revenue exists, this
+    // file creates and pays its own dedicated booking so both the org-wide
+    // q6 totals and the by-flightNo query always have a real, deterministic
+    // SALE entry to find, regardless of what else has run.
+    const prisma = app.get(PrismaService);
+    const AIRCRAFT_TYPE = 'RP-TestJet';
+    await prisma.aircraftSeatMap.upsert({
+      where: { aircraftType: AIRCRAFT_TYPE },
+      update: {},
+      create: {
+        aircraftType: AIRCRAFT_TYPE,
+        businessRowStart: 1,
+        businessRowEnd: 0,
+        businessColsLeft: [],
+        businessColsRight: [],
+        economyRowStart: 1,
+        economyRowEnd: 3,
+        economyColsLeft: ['A'],
+        economyColsRight: ['C'],
+      },
+    });
+    const route = await prisma.route.upsert({
+      where: { originCode_destCode: { originCode: 'THR', destCode: 'IFN' } },
+      update: {},
+      create: { originCode: 'THR', destCode: 'IFN', durationMin: 70 },
+    });
+    ownFlightNo = `RP-${Date.now().toString(36).toUpperCase().slice(-6)}`;
+    const flight = await prisma.flight.create({
+      data: {
+        flightNo: ownFlightNo,
+        routeId: route.id,
+        aircraftType: AIRCRAFT_TYPE,
+      },
+    });
+    const departureAt = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
+    const instance = await prisma.flightInstance.create({
+      data: {
+        flightId: flight.id,
+        departureAt,
+        arrivalAt: new Date(departureAt.getTime() + 70 * 60 * 1000),
+        capacity: 4,
+        status: 'SCHEDULED',
+      },
+    });
+
+    const { accessToken: customerToken } = await loginAsCustomer(
+      app,
+      '09150009000',
+    );
+    const createRes = await request(app.getHttpServer())
+      .post('/bookings')
+      .set('Authorization', `Bearer ${customerToken}`)
+      .send({
+        flightInstanceId: instance.id,
+        cabin: 'ECONOMY',
+        passengers: [
+          { fullName: 'گزارش تست', nationalId: '0012345679', seatCode: '1A' },
+        ],
+      });
+    await request(app.getHttpServer())
+      .post(`/bookings/${createRes.body.data.id}/pay`)
+      .set('Authorization', `Bearer ${customerToken}`)
+      .send({});
   });
 
   afterAll(async () => {
@@ -103,7 +174,7 @@ describe('Reporting (e2e)', () => {
 
   it('sales-chart by flightNo returns only that flight’s sales', async () => {
     const res = await request(app.getHttpServer())
-      .get('/reporting/sales-chart?granularity=flight&flightNo=EP-821')
+      .get(`/reporting/sales-chart?granularity=flight&flightNo=${ownFlightNo}`)
       .set('Authorization', `Bearer ${ceoToken}`);
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveLength(1);
