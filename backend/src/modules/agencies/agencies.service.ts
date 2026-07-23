@@ -23,6 +23,7 @@ import type {
   AgencyApiKeyStatus,
   AgencyCreditRequestStatus,
   AgencyMembershipStatus,
+  AgencyWebserviceRequestStatus,
 } from '../../../generated/prisma/enums';
 
 function hashSecret(raw: string): string {
@@ -1094,6 +1095,98 @@ export class AgenciesService {
     });
 
     return this.prisma.agencyCreditRequest.findUniqueOrThrow({
+      where: { id: requestId },
+    });
+  }
+
+  // ── Agency Portal: webservice purchase requests (staff-side review) ────
+
+  async listWebserviceRequests(id: string) {
+    await this.getProfileOrThrow(id);
+    return this.prisma.agencyWebserviceRequest.findMany({
+      where: { agencyId: id },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async decideWebserviceRequest(
+    actor: AuthenticatedUser,
+    id: string,
+    requestId: string,
+    approve: boolean,
+    stepUpChallengeId?: string,
+    stepUpCode?: string,
+  ) {
+    const request = await this.prisma.agencyWebserviceRequest.findUnique({
+      where: { id: requestId },
+    });
+    if (!request || request.agencyId !== id) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'درخواست وب‌سرویس یافت نشد.',
+      });
+    }
+    if (request.status !== 'PENDING') {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'این درخواست قبلاً بررسی شده است.',
+      });
+    }
+
+    const decision: AgencyWebserviceRequestStatus = approve
+      ? 'APPROVED'
+      : 'REJECTED';
+
+    if (approve) {
+      // Issued BEFORE the status flip below: if step-up verification fails
+      // here, the request is untouched and stays PENDING for a retry —
+      // never left APPROVED with no key actually issued. Reuses the
+      // existing, already-audited, step-up-gated key issuance path
+      // verbatim rather than duplicating it.
+      const { rawKey } = await this.issueApiKey(
+        actor,
+        id,
+        request.scope,
+        stepUpChallengeId ?? '',
+        stepUpCode ?? '',
+      );
+      // AgencyApiKey only ever stores keyHash, so the raw key is
+      // deliverable exactly once — through the agency's own message
+      // thread, already visible via GET .../messages and the agency
+      // portal's GET inbox.
+      await this.postMessage(
+        actor,
+        id,
+        `درخواست وب‌سرویس شما تأیید شد. کلید دسترسی API شما: ${rawKey}\nاین کلید فقط همین یک‌بار نمایش داده می‌شود؛ لطفاً آن را در جای امنی ذخیره کنید.`,
+      );
+    }
+
+    // Conditional update guards a concurrent double-decision race — same
+    // pattern as decideCreditRequest above.
+    const updated = await this.prisma.agencyWebserviceRequest.updateMany({
+      where: { id: requestId, status: 'PENDING' },
+      data: { status: decision, decidedById: actor.id, decidedAt: new Date() },
+    });
+    if (updated.count === 0) {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'این درخواست قبلاً بررسی شده است.',
+      });
+    }
+
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'AGENCY',
+      action: approve
+        ? 'تأیید درخواست وب‌سرویس آژانس'
+        : 'رد درخواست وب‌سرویس آژانس',
+      detail: `درخواست وب‌سرویس (${request.scope}, ${request.months} ماهه) توسط ${actor.fullName} ${approve ? 'تأیید' : 'رد'} شد.`,
+      entityType: 'AgencyWebserviceRequest',
+      entityId: requestId,
+    });
+
+    return this.prisma.agencyWebserviceRequest.findUniqueOrThrow({
       where: { id: requestId },
     });
   }

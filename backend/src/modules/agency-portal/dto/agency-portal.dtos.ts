@@ -37,3 +37,29 @@ export class UploadDocumentDto {
   @IsIn(['LICENSE', 'CONTRACT', 'OTHER'])
   docType: 'LICENSE' | 'CONTRACT' | 'OTHER';
 }
+
+const WEBSERVICE_SCOPES = ['FULL', 'SEARCH_BOOK'] as const;
+const WEBSERVICE_MONTHS = [1, 3, 12] as const;
+
+export class RequestWebserviceDto {
+  @ApiProperty({
+    enum: WEBSERVICE_SCOPES,
+    example: 'SEARCH_BOOK',
+    description: 'جستجو و رزرو یا فروش کامل (صدور بلیط)',
+  })
+  @IsIn(WEBSERVICE_SCOPES)
+  scope: (typeof WEBSERVICE_SCOPES)[number];
+
+  @ApiProperty({
+    enum: WEBSERVICE_MONTHS,
+    example: 1,
+    description: 'مدت اشتراک به ماه',
+  })
+  @IsIn(WEBSERVICE_MONTHS)
+  months: (typeof WEBSERVICE_MONTHS)[number];
+
+  @ApiPropertyOptional({ example: 'برای اتصال سیستم رزرواسیون داخلی' })
+  @IsOptional()
+  @IsString()
+  note?: string;
+}

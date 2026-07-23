@@ -10,7 +10,10 @@ import { AgenciesService } from '../agencies/agencies.service';
 import { FilesService } from '../files/files.service';
 import { ErrorCode } from '../../common/errors';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import type { UploadDocumentDto } from './dto/agency-portal.dtos';
+import type {
+  RequestWebserviceDto,
+  UploadDocumentDto,
+} from './dto/agency-portal.dtos';
 
 const CREDIT_REVIEW_ROLES = [
   'SENIOR_MANAGER',
@@ -19,6 +22,14 @@ const CREDIT_REVIEW_ROLES = [
 ] as const;
 
 const SOLD_STATUSES = ['PAID', 'TICKETED'] as const;
+
+// Phase 23: server-computed prices from the design's own plan catalog
+// (تومان × 10 → ریال). Never accept a client-supplied price.
+const WEBSERVICE_PLAN_PRICES_IRR: Record<number, number> = {
+  1: 45_000_000,
+  3: 120_000_000,
+  12: 420_000_000,
+};
 
 @Injectable()
 export class AgencyPortalService {
@@ -369,5 +380,69 @@ export class AgencyPortalService {
         };
       }),
     );
+  }
+
+  // ── Phase 23: real webservice (B2B API) purchase requests ──────────────
+  // (replaces AgencyWebservicePage mock's local-only "requested"/"keyShown")
+
+  async requestWebservice(actor: AuthenticatedUser, dto: RequestWebserviceDto) {
+    await this.getOwnProfileOrThrow(actor);
+    const priceIrr = WEBSERVICE_PLAN_PRICES_IRR[dto.months];
+
+    const request = await this.prisma.agencyWebserviceRequest.create({
+      data: {
+        agencyId: actor.id,
+        scope: dto.scope,
+        months: dto.months,
+        priceIrr,
+        note: dto.note,
+      },
+    });
+
+    const scopeFa =
+      dto.scope === 'FULL' ? 'فروش کامل (صدور بلیط)' : 'جستجو و رزرو';
+    await this.cartable.createTasksForRoles([...CREDIT_REVIEW_ROLES], {
+      category: 'AGENCY',
+      title: `درخواست خرید وب‌سرویس: ${actor.fullName}`,
+      description: `آژانس «${actor.fullName}» درخواست خرید وب‌سرویس (${scopeFa}، ${dto.months} ماهه) داده است.${dto.note ? ` یادداشت: ${dto.note}` : ''}`,
+      senderId: actor.id,
+    });
+
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'AGENCY',
+      action: 'درخواست خرید وب‌سرویس آژانس',
+      detail: `آژانس «${actor.fullName}» درخواست وب‌سرویس با دامنه ${dto.scope} به مدت ${dto.months} ماه به مبلغ ${priceIrr} ریال ثبت کرد.`,
+      entityType: 'AgencyWebserviceRequest',
+      entityId: request.id,
+    });
+
+    return request;
+  }
+
+  async myWebserviceRequests(actor: AuthenticatedUser) {
+    await this.getOwnProfileOrThrow(actor);
+    return this.prisma.agencyWebserviceRequest.findMany({
+      where: { agencyId: actor.id },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async apiKeys(actor: AuthenticatedUser) {
+    await this.getOwnProfileOrThrow(actor);
+    const keys = await this.agencies.listApiKeys(actor.id);
+    // The raw key is retrievable exactly once, at approval time, and is
+    // delivered via the agency's own message thread (see
+    // AgenciesService.decideWebserviceRequest) — never re-exposed here.
+    return keys.map((k) => ({
+      id: k.id,
+      scope: k.scope,
+      status: k.status,
+      activatedAt: k.activatedAt,
+      expiresAt: k.expiresAt,
+      lastUsedAt: k.lastUsedAt,
+      callCount: k.callCount,
+    }));
   }
 }

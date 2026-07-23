@@ -1,6 +1,8 @@
 import { apiGet, apiPost, apiPostForm } from './http';
 import type {
   AgencyAllotmentRow,
+  AgencyApiKeySummary,
+  AgencyApiScope,
   AgencyCredit,
   AgencyCreditRequest,
   AgencyDashboard,
@@ -11,6 +13,7 @@ import type {
   AgencyMessage,
   AgencyProfile,
   AgencySalesReport,
+  AgencyWebserviceRequest,
 } from '../types/agency-portal';
 
 export function fetchDashboard() {
@@ -70,4 +73,16 @@ export function uploadDocument(file: File, docType: AgencyDocumentType) {
 
 export function fetchAllotments() {
   return apiGet<AgencyAllotmentRow[]>('/agency-portal/allotments');
+}
+
+export function requestWebservice(scope: AgencyApiScope, months: 1 | 3 | 12, note?: string) {
+  return apiPost<AgencyWebserviceRequest>('/agency-portal/webservice-requests', { scope, months, note });
+}
+
+export function fetchMyWebserviceRequests() {
+  return apiGet<AgencyWebserviceRequest[]>('/agency-portal/webservice-requests');
+}
+
+export function fetchApiKeys() {
+  return apiGet<AgencyApiKeySummary[]>('/agency-portal/api-keys');
 }

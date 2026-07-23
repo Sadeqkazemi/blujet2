@@ -1490,3 +1490,46 @@ is no gate/baggage-belt/delay-minutes/terminal column anywhere, which is
 why the real `GET /flight-status` response (see docs/API.md's Phase 22
 section) omits those four fields the design shows rather than inventing
 values for them.
+
+## Phase 23 — وب‌سرویس آژانس (Agency B2B webservice purchase)
+
+New table only — `AgencyApiKey`/`AgencyApiScope`/`AgencyApiKeyStatus`
+already existed (Phase 3) and are unchanged.
+
+```prisma
+enum AgencyWebserviceRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model AgencyWebserviceRequest {
+  id          String                         @id @default(uuid())
+  agencyId    String
+  agency      AgencyProfile                  @relation(fields: [agencyId], references: [userId])
+  scope       AgencyApiScope
+  months      Int
+  priceIrr    Int
+  note        String?
+  status      AgencyWebserviceRequestStatus  @default(PENDING)
+  decidedById String?
+  decidedBy   User?                          @relation("AgencyWebserviceRequestDecidedBy", fields: [decidedById], references: [id])
+  decidedAt   DateTime?
+  createdAt   DateTime                       @default(now())
+
+  @@index([agencyId, status])
+  @@map("agency_webservice_requests")
+}
+```
+
+- Mirrors `AgencyCreditRequest`'s shape exactly (Phase 16) — same
+  "agency requests, an `AGENCY_TAB_ROLES` staff member decides"
+  lifecycle, same conditional-`updateMany` race-guard on decide.
+- `priceIrr` is a snapshot computed server-side from a fixed plan catalog
+  at request time (see docs/API.md's Phase 23 section) — never
+  client-supplied, and never recomputed later even if the catalog price
+  were to change, so an already-PENDING request's price stays stable.
+- No FK from this table to the `AgencyApiKey` row that approval produces
+  — deliberately deferred, see docs/API.md's Phase 23 "Explicit
+  deferrals".
+- Migration: `20260723160000_phase23_agency_webservice_requests`.
