@@ -1566,3 +1566,15 @@ model FlightInstance {
   `@@index([departureAt])` already serves the "soonest departure first"
   ordering `GET /flightops` needs.
 - Migration: `<timestamp>_phase24_flightops_nira_submitted_at`.
+
+## Phase 25 — حریم خصوصی و داده‌های من (GDPR export/delete UI)
+
+No schema change. Reuses the `User.deletedAt`/`isActive` and
+`Passenger.deletedAt`/`nationalIdEnc`/`nationalIdHash`/`mobileEnc` columns
+that already existed for this exact purpose (see `deletedAt | DateTime? |
+soft delete (GDPR hard-delete flow is separate)` in this file's User
+table notes) — `PrivacyService.deleteMyAccount` (unchanged this phase) is
+that "separate" flow. This phase only adds a frontend surface for the
+already-real `GET /my/privacy/export` / `DELETE /my/privacy/account`
+endpoints; see docs/API.md's Phase 25 section for the full read/delete
+shape.

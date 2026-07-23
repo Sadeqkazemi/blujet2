@@ -3,10 +3,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import { useAuth } from '../../hooks/useAuth';
 import {
+  deleteMyAccount,
   fetchClubPoints,
   fetchMyBookings,
   fetchMyProfile,
   fetchMyRefunds,
+  fetchPrivacyExport,
   fetchWallet,
   requestEmailVerify,
   topupWallet,
@@ -53,7 +55,7 @@ const TABS: { key: TabKey; label: string; icon: string }[] = [
 ];
 
 export default function AccountPage() {
-  const { status, user } = useAuth();
+  const { status, user, signOut } = useAuth();
   const navigate = useNavigate();
   const [tab, setTab] = useState<TabKey>('trips');
   const [bookings, setBookings] = useState<BookingDetail[] | null>(null);
@@ -77,6 +79,12 @@ export default function AccountPage() {
   const [emailChallengeId, setEmailChallengeId] = useState<string | null>(null);
   const [emailCode, setEmailCode] = useState('');
   const [bannerDismissed, setBannerDismissed] = useState(false);
+
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -150,6 +158,38 @@ export default function AccountPage() {
       setProfileNotice('ایمیل شما تأیید شد ✓');
     } catch (err) {
       setProfileError(err instanceof ApiRequestError ? err.message : 'کد وارد شده نادرست است.');
+    }
+  }
+
+  async function onExportData() {
+    setExportError(null);
+    setExportBusy(true);
+    try {
+      const data = await fetchPrivacyExport();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'blujet-my-data.json';
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setExportError(err instanceof ApiRequestError ? err.message : 'خطا در دریافت اطلاعات.');
+    } finally {
+      setExportBusy(false);
+    }
+  }
+
+  async function onConfirmDelete() {
+    setDeleteError(null);
+    setDeleteBusy(true);
+    try {
+      await deleteMyAccount();
+      await signOut();
+      navigate('/', { replace: true });
+    } catch (err) {
+      setDeleteError(err instanceof ApiRequestError ? err.message : 'خطا در حذف حساب کاربری.');
+      setDeleteBusy(false);
     }
   }
 
@@ -376,6 +416,66 @@ export default function AccountPage() {
                   )}
                 </>
               )}
+            </div>
+
+            <div style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 16, padding: '18px 20px' }}>
+              <h3 style={{ fontSize: 14, fontWeight: 800, margin: '0 0 12px' }}>حریم خصوصی و داده‌های من</h3>
+              {exportError && <p role="alert" style={{ fontSize: 12, color: '#e5484d', marginBottom: 10 }}>{exportError}</p>}
+              <p style={{ fontSize: 12, color: '#5a6678', marginBottom: 12 }}>
+                می‌توانید خروجی کامل اطلاعات شخصی خود (سفرها، مسافران، کیف پول، استرداد‌ها) را دریافت کنید یا حساب
+                کاربری خود را برای همیشه حذف کنید.
+              </p>
+              <button
+                type="button"
+                data-testid="privacy-export-button"
+                disabled={exportBusy}
+                onClick={() => void onExportData()}
+                style={{ border: '1px solid #1668c4', borderRadius: 10, background: 'transparent', color: '#1668c4', padding: '9px 18px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 18 }}
+              >
+                {exportBusy ? 'در حال آماده‌سازی…' : 'دانلود اطلاعات من'}
+              </button>
+
+              <div style={{ borderTop: '1px solid #f1f4f8', paddingTop: 16 }}>
+                <h4 style={{ fontSize: 12.5, fontWeight: 800, color: '#e5484d', margin: '0 0 8px' }}>حذف حساب کاربری</h4>
+                {!deleteConfirmOpen ? (
+                  <button
+                    type="button"
+                    data-testid="privacy-delete-open"
+                    onClick={() => setDeleteConfirmOpen(true)}
+                    style={{ border: '1px solid #e5484d', borderRadius: 10, background: 'transparent', color: '#e5484d', padding: '9px 18px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+                  >
+                    حذف حساب کاربری
+                  </button>
+                ) : (
+                  <div style={{ background: '#fef2f2', border: '1px solid #fbd0d0', borderRadius: 12, padding: '14px 16px' }}>
+                    <p style={{ fontSize: 12, color: '#8a2c2c', marginBottom: 12 }}>
+                      این عملیات غیرقابل بازگشت است. حساب شما غیرفعال می‌شود، اطلاعات هویتی مسافران شما حذف/ناشناس
+                      می‌شود و تمام نشست‌های فعال شما بسته خواهد شد.
+                    </p>
+                    {deleteError && <p role="alert" style={{ fontSize: 12, color: '#e5484d', marginBottom: 10 }}>{deleteError}</p>}
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      <button
+                        type="button"
+                        data-testid="privacy-delete-confirm"
+                        disabled={deleteBusy}
+                        onClick={() => void onConfirmDelete()}
+                        style={{ border: 'none', borderRadius: 10, background: '#e5484d', color: '#fff', padding: '9px 18px', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
+                      >
+                        {deleteBusy ? 'در حال حذف…' : 'بله، حساب من حذف شود'}
+                      </button>
+                      <button
+                        type="button"
+                        data-testid="privacy-delete-cancel"
+                        disabled={deleteBusy}
+                        onClick={() => setDeleteConfirmOpen(false)}
+                        style={{ border: '1px solid #e3e9f1', borderRadius: 10, background: '#fff', color: '#5a6678', padding: '9px 18px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+                      >
+                        انصراف
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}

@@ -44,14 +44,14 @@ const PROFILE: UserProfile = {
   completionPct: 20,
 };
 
-function mockAuth(status: 'authenticated' | 'unauthenticated') {
+function mockAuth(status: 'authenticated' | 'unauthenticated', signOut = vi.fn()) {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status,
     user: status === 'authenticated' ? { id: 'u1', fullName: 'نگار رضایی', role: 'USER' } : null,
     requestLogin: vi.fn(),
     confirmTwoFactor: vi.fn(),
     agencyLogin: vi.fn(),
-    signOut: vi.fn(),
+    signOut,
   });
 }
 
@@ -130,5 +130,46 @@ describe('AccountPage', () => {
       nationalId: '0012345679',
       passportNo: undefined,
     });
+  });
+
+  it('downloads a real data export as JSON', async () => {
+    mockAuth('authenticated');
+    const exportSpy = vi.spyOn(publicSiteApi, 'fetchPrivacyExport').mockResolvedValue({ user: PROFILE });
+    const createObjectURL = vi.fn().mockReturnValue('blob:mock-url');
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal('URL', { ...URL, createObjectURL, revokeObjectURL });
+
+    renderPage();
+    await userEvent.click(screen.getByTestId('account-tab-profile'));
+    await userEvent.click(screen.getByTestId('privacy-export-button'));
+
+    await vi.waitFor(() => expect(exportSpy).toHaveBeenCalled());
+    expect(createObjectURL).toHaveBeenCalled();
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:mock-url');
+
+    vi.unstubAllGlobals();
+  });
+
+  it('deletes the account only after explicit confirmation, then signs out', async () => {
+    const signOut = vi.fn().mockResolvedValue(undefined);
+    mockAuth('authenticated', signOut);
+    const deleteSpy = vi.spyOn(publicSiteApi, 'deleteMyAccount').mockResolvedValue({ deleted: true });
+
+    renderPage();
+    await userEvent.click(screen.getByTestId('account-tab-profile'));
+    await userEvent.click(screen.getByTestId('privacy-delete-open'));
+
+    expect(screen.getByTestId('privacy-delete-confirm')).toBeInTheDocument();
+    expect(deleteSpy).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByTestId('privacy-delete-cancel'));
+    expect(screen.queryByTestId('privacy-delete-confirm')).not.toBeInTheDocument();
+    expect(deleteSpy).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByTestId('privacy-delete-open'));
+    await userEvent.click(screen.getByTestId('privacy-delete-confirm'));
+
+    await vi.waitFor(() => expect(deleteSpy).toHaveBeenCalled());
+    expect(signOut).toHaveBeenCalled();
   });
 });
