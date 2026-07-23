@@ -14,6 +14,7 @@ import { AgencyPortalService } from './agency-portal.service';
 import {
   PostInboxMessageDto,
   RequestCreditIncreaseDto,
+  RequestWebserviceDto,
   UploadDocumentDto,
 } from './dto/agency-portal.dtos';
 import { MAX_FILE_BYTES } from '../files/files.service';
@@ -145,5 +146,37 @@ export class AgencyPortalController {
       success: true,
       data: await this.portal.uploadDocument(actor, file, dto),
     };
+  }
+
+  @Post('webservice-requests')
+  @ApiOperation({
+    summary: 'درخواست خرید وب‌سرویس B2B — مستقیماً کلید صادر نمی‌کند',
+  })
+  async requestWebservice(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Body() dto: RequestWebserviceDto,
+  ) {
+    return {
+      success: true,
+      data: await this.portal.requestWebservice(actor, dto),
+    };
+  }
+
+  @Get('webservice-requests')
+  @ApiOperation({ summary: 'تاریخچه درخواست‌های وب‌سرویس خودِ آژانس' })
+  async myWebserviceRequests(@CurrentUser() actor: AuthenticatedUser) {
+    return {
+      success: true,
+      data: await this.portal.myWebserviceRequests(actor),
+    };
+  }
+
+  @Get('api-keys')
+  @ApiOperation({
+    summary:
+      'کلیدهای API خودِ آژانس — فقط ابرداده؛ کلید خام فقط یک‌بار هنگام تأیید در پیام‌رسان ارسال می‌شود',
+  })
+  async apiKeys(@CurrentUser() actor: AuthenticatedUser) {
+    return { success: true, data: await this.portal.apiKeys(actor) };
   }
 }

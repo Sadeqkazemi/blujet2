@@ -187,6 +187,29 @@ below for what's landed from that port so far.
   inputs with the airport-code pickers the backend needs. 5 new backend
   e2e tests, 5 new frontend tests. See `docs/API.md`/`docs/DB_SCHEMA.md`'s
   Phase 22 sections.
+- [x] **Phase 23 — وب‌سرویس آژانس (Agency B2B webservice)** — fifth and
+  final "dead forms" item. `AgencyWebservicePage.tsx` was pure local mock
+  state including a fake sample API key. Replicates Phase 16's
+  `AgencyCreditRequest` request/decide pattern for a new
+  `AgencyWebserviceRequest` table (agency requests a plan, an
+  `AGENCY_TAB_ROLES` staff member decides), reusing Phase 3's already-real
+  `AgenciesService.issueApiKey` (step-up-gated) verbatim on approval
+  instead of duplicating key-issuance logic. Server-computed `priceIrr`
+  from a fixed plan catalog (client can't set it — whitelist DTO 400s
+  any extra field). Raw key delivery: since `AgencyApiKey` only ever
+  stores `keyHash` (unchanged Phase 3 design), the raw key is delivered
+  exactly once, on approval, via the agency's own message thread
+  (`AgenciesService.postMessage`) rather than inventing a new channel or
+  storing the secret retrievably — a bounded scope decision documented in
+  docs/API.md's Phase 23 section. The rewritten frontend page shows
+  request status (pending/rejected+retry) and, once approved, the active
+  key's scope/status/activation metadata — never a raw key. 7 new backend
+  e2e tests, 4 new frontend tests. See `docs/API.md`/`docs/DB_SCHEMA.md`'s
+  Phase 23 sections for full scope + explicit deferrals.
+
+This completes all five items from the post-Phase-18 "dead forms" punch
+list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموشی رمز, وضعیت پرواز,
+وب‌سرویس آژانس).
 
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is

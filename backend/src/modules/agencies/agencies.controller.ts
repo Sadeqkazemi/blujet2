@@ -20,6 +20,7 @@ import { UpdateApiKeyDto } from './dto/update-api-key.dto';
 import { IssueInvoiceDto } from './dto/issue-invoice.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { DecideCreditRequestDto } from './dto/decide-credit-request.dto';
+import { DecideWebserviceRequestDto } from './dto/decide-webservice-request.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -330,6 +331,35 @@ export class AgenciesController {
       id,
       reqId,
       dto.approve,
+    );
+    return { success: true, data };
+  }
+
+  @Get(':id/webservice-requests')
+  @ApiOperation({ summary: 'لیست درخواست‌های خرید وب‌سرویس آژانس' })
+  async listWebserviceRequests(@Param('id') id: string) {
+    const data = await this.agencies.listWebserviceRequests(id);
+    return { success: true, data };
+  }
+
+  @Patch(':id/webservice-requests/:reqId/decide')
+  @ApiOperation({
+    summary:
+      'تأیید/رد درخواست وب‌سرویس — تأیید کلید API واقعی صادر می‌کند (نیازمند تأیید دومرحله‌ای)',
+  })
+  async decideWebserviceRequest(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id') id: string,
+    @Param('reqId') reqId: string,
+    @Body() dto: DecideWebserviceRequestDto,
+  ) {
+    const data = await this.agencies.decideWebserviceRequest(
+      actor,
+      id,
+      reqId,
+      dto.approve,
+      dto.stepUpChallengeId,
+      dto.stepUpCode,
     );
     return { success: true, data };
   }
