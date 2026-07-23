@@ -9,6 +9,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
 import { decryptPii, encryptPii } from '../../common/pii-crypto';
+import { matchesLastName } from '../../common/passenger-name.util';
 import { computePenalty } from './penalty';
 import { StepUpService } from '../auth/step-up.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
@@ -241,6 +242,58 @@ export class RefundsService {
    * confirmation." Booking must be TICKETED and owned by the caller; only
    * one request per booking (RefundStatus has no REJECTED to resubmit
    * against, so a second submission is always a conflict, not a retry). */
+  /** Shared eligibility checks + penalty computation + row creation for
+   * every customer-facing refund entry point (authenticated `/my/refunds`
+   * and the anonymous مدیریت رزرو flow) — so a future penalty-rule change
+   * can never apply to only one of them. */
+  private async createRefundRequest(
+    booking: Prisma.BookingGetPayload<{
+      include: { flightInstance: true; passengers: true; refundRequests: true };
+    }>,
+    iban: string,
+    fallbackPassengerName: string,
+  ) {
+    if (booking.status !== 'TICKETED' && booking.status !== 'PAID') {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'این رزرو واجد شرایط استرداد نیست.',
+      });
+    }
+    if (booking.refundRequests.length > 0) {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'برای این رزرو قبلاً درخواست استرداد ثبت شده است.',
+      });
+    }
+
+    const rules = await this.prisma.refundPenaltyRule.findMany();
+    const hoursLeft =
+      (booking.flightInstance.departureAt.getTime() - Date.now()) / 3_600_000;
+    const penalty = computePenalty(rules, hoursLeft, booking.priceIrr);
+    const passenger = booking.passengers[0];
+
+    return this.prisma.refundRequest.create({
+      data: {
+        bookingId: booking.id,
+        passengerName: passenger?.fullName ?? fallbackPassengerName,
+        nidEnc: passenger?.nationalIdEnc,
+        mobileEnc: passenger?.mobileEnc,
+        ibanEnc: encryptPii(iban),
+        totalPaidIrr: booking.priceIrr,
+        penaltyPct: penalty.penaltyPct,
+        penaltyAmountIrr: penalty.penaltyAmountIrr,
+        refundableIrr: penalty.refundableIrr,
+        history: [
+          {
+            step: 'submitted',
+            labelFa: 'ثبت درخواست استرداد توسط مشتری',
+            at: new Date().toISOString(),
+          },
+        ],
+      },
+    });
+  }
+
   async submitFromCustomer(
     actor: AuthenticatedUser,
     dto: { bookingId: string; iban: string },
@@ -261,45 +314,12 @@ export class RefundsService {
         message: 'این رزرو متعلق به شما نیست.',
       });
     }
-    if (booking.status !== 'TICKETED' && booking.status !== 'PAID') {
-      throw new ConflictException({
-        code: ErrorCode.CONFLICT,
-        message: 'این رزرو واجد شرایط استرداد نیست.',
-      });
-    }
-    if (booking.refundRequests.length > 0) {
-      throw new ConflictException({
-        code: ErrorCode.CONFLICT,
-        message: 'برای این رزرو قبلاً درخواست استرداد ثبت شده است.',
-      });
-    }
 
-    const rules = await this.prisma.refundPenaltyRule.findMany();
-    const hoursLeft =
-      (booking.flightInstance.departureAt.getTime() - Date.now()) / 3_600_000;
-    const penalty = computePenalty(rules, hoursLeft, booking.priceIrr);
-    const passenger = booking.passengers[0];
-
-    const request = await this.prisma.refundRequest.create({
-      data: {
-        bookingId: booking.id,
-        passengerName: passenger?.fullName ?? actor.fullName,
-        nidEnc: passenger?.nationalIdEnc,
-        mobileEnc: passenger?.mobileEnc,
-        ibanEnc: encryptPii(dto.iban),
-        totalPaidIrr: booking.priceIrr,
-        penaltyPct: penalty.penaltyPct,
-        penaltyAmountIrr: penalty.penaltyAmountIrr,
-        refundableIrr: penalty.refundableIrr,
-        history: [
-          {
-            step: 'submitted',
-            labelFa: 'ثبت درخواست استرداد توسط مشتری',
-            at: new Date().toISOString(),
-          },
-        ],
-      },
-    });
+    const request = await this.createRefundRequest(
+      booking,
+      dto.iban,
+      actor.fullName,
+    );
 
     await this.audit.record({
       actorId: actor.id,
@@ -311,6 +331,29 @@ export class RefundsService {
       entityId: request.id,
     });
 
+    return toListRow(request);
+  }
+
+  /** Anonymous مدیریت رزرو self-service — same generic 404 whether the
+   * PNR doesn't exist or the last name doesn't match (no audit row: an
+   * anonymous caller has no real `actorId` — same precedent as Phase 16's
+   * anonymous agency pre-registration). */
+  async submitAnonymous(pnr: string, lastName: string, iban: string) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { pnr: pnr.trim().toUpperCase() },
+      include: { flightInstance: true, passengers: true, refundRequests: true },
+    });
+    if (
+      !booking ||
+      !booking.passengers.some((p) => matchesLastName(p.fullName, lastName))
+    ) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'رزرو یافت نشد.',
+      });
+    }
+
+    const request = await this.createRefundRequest(booking, iban, lastName);
     return toListRow(request);
   }
 
