@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import PublicPageShell from '../../components/public/PublicPageShell';
-import { faDigits } from '../../lib/fa-format';
+import { submitSupportTicket } from '../../api/support-tickets';
 
 // Support / help-center page — content matches design-reference/پشتیبانی.dc.html.
-// The ticket form mirrors the design's client-side behavior (no ticketing
-// backend exists yet); the FAQ and contact channels are static content.
+// Phase 20 wires the ticket form to a real backend; the design's form had
+// no name/phone input, but a real ticket system needs a way to contact the
+// submitter back, so those two fields were added (see docs/API.md's Phase
+// 20 notes). The FAQ and contact channels stay static content.
 
 const CATS = [
   { icon: '🎫', color: '#1668c4', bg: '#eef4fb', title: 'رزرو و خرید بلیط', desc: 'مراحل خرید، پرداخت و دریافت بلیط' },
@@ -41,12 +43,39 @@ const SUBJECTS = ['استرداد و تغییر بلیط', 'مشکل در پرد
 export default function SupportPage() {
   const [q, setQ] = useState('');
   const [openFaq, setOpenFaq] = useState(0);
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
   const [subject, setSubject] = useState(SUBJECTS[0]);
   const [msg, setMsg] = useState('');
   const [sent, setSent] = useState(false);
+  const [trackingCode, setTrackingCode] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const query = q.trim();
   const visibleFaqs = query ? FAQS.filter((f) => f.q.includes(query) || f.a.includes(query)) : FAQS;
+
+  const canSubmit = name.trim() && phone.trim() && msg.trim();
+
+  async function onSubmitTicket() {
+    if (!canSubmit) return;
+    setError(null);
+    setSubmitting(true);
+    try {
+      const res = await submitSupportTicket({
+        requesterName: name.trim(),
+        requesterPhone: phone.trim(),
+        subject,
+        body: msg.trim(),
+      });
+      setTrackingCode(res.trackingCode);
+      setSent(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'خطا در ثبت تیکت.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <PublicPageShell>
@@ -124,16 +153,34 @@ export default function SupportPage() {
               درخواست خود را ثبت کنید؛ کارشناسان ما حداکثر ظرف ۲ ساعت پاسخ می‌دهند.
             </p>
             {sent ? (
-              <div style={{ background: '#eef9f1', border: '1px solid #bfe6cc', borderRadius: 12, padding: '18px 16px', textAlign: 'center' }}>
+              <div data-testid="ticket-sent" style={{ background: '#eef9f1', border: '1px solid #bfe6cc', borderRadius: 12, padding: '18px 16px', textAlign: 'center' }}>
                 <div style={{ fontSize: 20, color: '#1f8a5b', marginBottom: 6 }}>✓</div>
                 <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0d2640', marginBottom: 4 }}>تیکت شما ثبت شد</div>
                 <div style={{ fontSize: 11.5, color: '#5a6678' }}>
-                  کد پیگیری: <span dir="ltr">TK-{faDigits(8842)}</span>
+                  کد پیگیری: <span data-testid="ticket-tracking-code" dir="ltr">{trackingCode}</span>
                 </div>
               </div>
             ) : (
               <>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                  <input
+                    data-testid="ticket-name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="نام و نام خانوادگی"
+                    style={{ padding: '10px 12px', border: '1.5px solid #e6eaf0', borderRadius: 10, fontFamily: 'inherit', fontSize: 12.5, color: '#16202e' }}
+                  />
+                  <input
+                    data-testid="ticket-phone"
+                    dir="ltr"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="شماره تماس"
+                    style={{ padding: '10px 12px', border: '1.5px solid #e6eaf0', borderRadius: 10, fontFamily: 'inherit', fontSize: 12.5, color: '#16202e' }}
+                  />
+                </div>
                 <select
+                  data-testid="ticket-subject"
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
                   style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #e6eaf0', borderRadius: 10, fontFamily: 'inherit', fontSize: 12.5, color: '#16202e', marginBottom: 10, background: '#fff' }}
@@ -145,19 +192,20 @@ export default function SupportPage() {
                   ))}
                 </select>
                 <textarea
+                  data-testid="ticket-msg"
                   value={msg}
                   onChange={(e) => setMsg(e.target.value)}
                   placeholder="توضیح درخواست خود را بنویسید…"
                   rows={4}
                   style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #e6eaf0', borderRadius: 10, fontFamily: 'inherit', fontSize: 12.5, color: '#16202e', marginBottom: 12, resize: 'vertical', boxSizing: 'border-box' }}
                 />
+                {error && <p style={{ margin: '0 0 10px', fontSize: 11.5, color: '#d64545' }}>{error}</p>}
                 <button
-                  onClick={() => {
-                    if (msg.trim()) setSent(true);
-                  }}
-                  disabled={!msg.trim()}
+                  data-testid="ticket-submit"
+                  onClick={() => void onSubmitTicket()}
+                  disabled={!canSubmit || submitting}
                   style={{
-                    background: msg.trim() ? '#1668c4' : '#aab8c8',
+                    background: canSubmit && !submitting ? '#1668c4' : '#aab8c8',
                     color: '#fff',
                     border: 'none',
                     padding: '11px 26px',
@@ -165,7 +213,7 @@ export default function SupportPage() {
                     fontSize: 13,
                     fontWeight: 800,
                     fontFamily: 'inherit',
-                    cursor: msg.trim() ? 'pointer' : 'not-allowed',
+                    cursor: canSubmit && !submitting ? 'pointer' : 'not-allowed',
                   }}
                 >
                   ارسال تیکت

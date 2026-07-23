@@ -96,6 +96,7 @@ describe('Panels (e2e)', () => {
       'cartable',
       'club',
       'refund',
+      'tickets',
     ]);
   });
 
