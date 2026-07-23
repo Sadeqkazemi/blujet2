@@ -1246,3 +1246,41 @@ auto-closes 5h before departure; the full passenger list auto-uploads to
   specified file format.
 
 ### `backend/src/modules/flightops/` (new)
+
+## Phase 25 — حریم خصوصی و داده‌های من (GDPR export/delete UI)
+
+The backend for this (`GET /my/privacy/export`, `DELETE /my/privacy/account`
+— `backend/src/modules/booking-engine/privacy.controller.ts`/
+`privacy.service.ts`, `@Roles('USER')`) already existed from the public-site
+track's port (see PLAN.md's Phase 13 merge note) and was already covered by
+`backend/test/privacy.e2e-spec.ts` (3 tests) — but was never documented
+here, and had no frontend surface at all (PLAN.md flagged this explicitly:
+"a GDPR export/delete UI screen don't exist yet — those endpoints are
+currently curl/Supertest-only"). This phase is documentation + frontend
+only; no backend/schema changes.
+
+- `GET /my/privacy/export` — full JSON of the customer's own data: account
+  fields, bookings (with passengers, national ID decrypted for this
+  surface only — same "narrow authorized decrypt surface" precedent as
+  refunds' شبا), refunds, wallet entries, club membership + points ledger,
+  price locks.
+- `DELETE /my/privacy/account` — soft-deletes the account (`isActive:
+  false`, `deletedAt`, phone/email/fullName scrubbed), anonymizes
+  passenger PII on the customer's own bookings (`fullName` → placeholder,
+  `nationalIdEnc`/`nationalIdHash`/`mobileEnc` cleared, `deletedAt` set),
+  clears `Booking.contactPhone`, and revokes every active `RefreshToken` —
+  all in one transaction. Booking/ledger rows themselves are kept (CLAUDE.md:
+  soft delete for bookings, financial audit trail) — only PII fields are
+  scrubbed, not the records.
+- Frontend: new "حریم خصوصی و داده‌های من" section on the customer پنل
+  کاربر's پروفایل من tab (`AccountPage.tsx` — no design-reference page
+  covers this; CLAUDE.md's GDPR requirement applies regardless of what the
+  mock shows, so this is the minimal addition needed to make the
+  already-real backend capability reachable, same reasoning as Phase 21's
+  password-login toggle). "دانلود اطلاعات من" downloads the export as a
+  JSON file client-side (`Blob` + `URL.createObjectURL`, no server-side
+  file generation). Delete requires an explicit two-step confirm (a warning
+  panel with "بله، حساب من حذف شود" / "انصراف" — never a bare
+  `window.confirm`, for testability and to show the real consequences
+  before the irreversible action) before calling the endpoint; on success,
+  signs the session out and returns to the home page.

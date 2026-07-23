@@ -1,4 +1,4 @@
-import { apiGet, apiPatch, apiPost } from './http';
+import { apiDelete, apiGet, apiPatch, apiPost } from './http';
 import type {
   Airport,
   BookingDetail,
@@ -112,4 +112,12 @@ export function requestEmailVerify() {
 
 export function verifyEmail(challengeId: string, code: string) {
   return apiPost<{ verified: true }>('/my/profile/email/verify', { challengeId, code });
+}
+
+export function fetchPrivacyExport() {
+  return apiGet<unknown>('/my/privacy/export');
+}
+
+export function deleteMyAccount() {
+  return apiDelete<{ deleted: true }>('/my/privacy/account');
 }
