@@ -33,6 +33,7 @@ import { SettingsModule } from './modules/settings/settings.module';
 import { BookingEngineModule } from './modules/booking-engine/booking-engine.module';
 import { ReconciliationModule } from './modules/reconciliation/reconciliation.module';
 import { ProfileModule } from './modules/profile/profile.module';
+import { ManageBookingModule } from './modules/manage-booking/manage-booking.module';
 
 @Module({
   imports: [
@@ -95,6 +96,7 @@ import { ProfileModule } from './modules/profile/profile.module';
     BookingEngineModule,
     ReconciliationModule,
     ProfileModule,
+    ManageBookingModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

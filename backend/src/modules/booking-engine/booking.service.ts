@@ -17,6 +17,7 @@ import {
   normalizeNationalId,
 } from '../../common/pii-crypto';
 import { enumerateSeats } from '../reservation/seat-layout';
+import { matchesLastName } from '../../common/passenger-name.util';
 import { resolveAircraftType } from '../flights/aircraft-type.util';
 import { getCabinPrice, resolveFareClass } from './pricing';
 import { PAYMENT_GATEWAY, type PaymentGateway } from './payment-gateway';
@@ -331,6 +332,26 @@ export class BookingService {
       include: BOOKING_INCLUDE,
     });
     if (!booking || booking.userId !== user.id) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'رزرو یافت نشد.',
+      });
+    }
+    return this.toDetail(await this.materializeExpiry(booking));
+  }
+
+  /** Anonymous مدیریت رزرو self-service — PNR + last name instead of a
+   * login session. Same generic 404 whether the PNR doesn't exist or the
+   * name doesn't match, so brute-forcing PNRs can't distinguish the two. */
+  async getByPnrAndLastName(pnr: string, lastName: string) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { pnr: pnr.trim().toUpperCase() },
+      include: BOOKING_INCLUDE,
+    });
+    if (
+      !booking ||
+      !booking.passengers.some((p) => matchesLastName(p.fullName, lastName))
+    ) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
         message: 'رزرو یافت نشد.',

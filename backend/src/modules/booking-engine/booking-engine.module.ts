@@ -31,6 +31,6 @@ import { PAYMENT_GATEWAY, SandboxPaymentGateway } from './payment-gateway';
     // until a real Shetab/PSP contract exists — the interface is final.
     { provide: PAYMENT_GATEWAY, useClass: SandboxPaymentGateway },
   ],
-  exports: [SearchService],
+  exports: [SearchService, BookingService],
 })
 export class BookingEngineModule {}

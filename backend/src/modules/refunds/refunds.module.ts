@@ -10,5 +10,6 @@ import { AuthModule } from '../auth/auth.module';
   imports: [PanelsModule, AuditModule, AuthModule],
   controllers: [RefundsController, RefundsCustomerController],
   providers: [RefundsService],
+  exports: [RefundsService],
 })
 export class RefundsModule {}

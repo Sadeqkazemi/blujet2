@@ -878,3 +878,59 @@ deferred). No schema change — reuses the existing `EmployeePermission`/
   agency requests + refunds awaiting review) rather than
   پنل ادمین سایت.dc.html's fuller multi-widget combined feed — both source
   lists are real (no mock data), just a simpler composition.
+
+## Phase 19 — مدیریت رزرو (anonymous PNR self-service)
+
+`ManageBookingPage.tsx` was entirely mock (PLAN.md's earlier note: "any PNR
++ last name resolves to a hardcoded sample booking... zero calls to the
+real `/my/refunds` endpoint"). Per user decision, the anonymous PNR+last-
+name lookup model wins over requiring login (matches
+مدیریت رزرو.dc.html and standard airline "manage my booking" UX) — the
+existing authenticated `GET /bookings/pnr/:pnr` stays as-is for logged-in
+customers (`AccountPage`/`TicketPage`); this phase adds a **separate,
+public, anonymous** surface reusing the same underlying booking/refund
+logic. No schema change.
+
+- `POST /manage-booking/lookup` (new, public, `@Throttle` 10/min per IP —
+  matches `POST /bookings`'s existing rate) — `{ pnr, lastName }`. Finds
+  the booking by PNR, matches `lastName` against the **last
+  whitespace-separated token** of any passenger's `fullName` on that
+  booking (case-sensitive-insensitive per Persian normalization already
+  used elsewhere, trimmed). Same generic 404 `NOT_FOUND` ("رزرو یافت
+  نشد") whether the PNR doesn't exist or the last name doesn't match —
+  no oracle for PNR enumeration. Response is the same shape
+  `BookingService.toDetail()` already returns for the authenticated
+  endpoint (passengers exposed as `{ fullName, seatCode }` only — no PII
+  decryption on this surface, same as today).
+- `POST /manage-booking/refund` (new, public, `@Throttle` 10/min per IP)
+  — `{ pnr, lastName, iban }`. Re-verifies the same PNR+lastName match,
+  then runs the *exact* penalty/eligibility logic `submitFromCustomer`
+  already uses (TICKETED/PAID only, one request per booking, `RefundPenaltyRule`-driven
+  penalty) — refactored into a shared private helper so the anonymous and
+  authenticated paths can never compute the penalty differently. Response
+  shape matches `/my/refunds`'s (`penaltyPct`, `penaltyAmountIrr`,
+  `refundableIrr`, ...) — the frontend shows these REAL figures only
+  after submission, mirroring `TicketPage.tsx`'s already-built
+  authenticated refund flow (enter شبا → submit → see the real computed
+  breakdown), not a pre-submission preview.
+- No `AuditService.record` call on the anonymous path (its `actorId` is a
+  required real `User.id`, which an anonymous caller doesn't have) — same
+  precedent as Phase 16's anonymous agency pre-registration.
+
+### Explicit deferrals (flagged, not oversights)
+- **تغییر صندلی (seat change)** and **دانلود بلیط (ticket download)** —
+  the mock's buttons for both already had no `onClick` handler at all
+  (pure decoration); left disabled with a "به‌زودی" hint this phase
+  rather than built. Seat change on an already-TICKETED booking is a
+  distinct feature (seat-availability check, no existing customer-facing
+  endpoint) deserving its own scoped review; ticket download/PDF was
+  already flagged deferred in PLAN.md's Phase 9 notes.
+- **Per-passenger partial refund selection** — the mock's refund modal
+  let the user check individual passengers to refund a subset of the
+  fare. The real `RefundRequest` model (Phase 7) is 1:1 with `Booking`,
+  not per-passenger, and every other refund surface in the app (customer
+  `/my/refunds`, staff `RefundsController`) already refunds the whole
+  booking as one unit. Matching that existing, already-tested model
+  instead of inventing per-passenger refund support keeps this phase's
+  scope real rather than adding a parallel, untested money-handling path;
+  the rebuilt page drops the per-passenger checkboxes accordingly.
