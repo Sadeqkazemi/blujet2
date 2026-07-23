@@ -524,5 +524,11 @@ function CommercialPricing() {
 
 export default function PricingPage() {
   const { user } = useAuth();
-  return user?.role === 'COMMERCIAL_MANAGER' ? <CommercialPricing /> : <CeoPricing />;
+  // EMPLOYEE (granted pr_propose) gets the same commercial-style
+  // proposal read/write view — see Phase 18 notes in docs/DB_SCHEMA.md.
+  return user?.role === 'COMMERCIAL_MANAGER' || user?.role === 'EMPLOYEE' ? (
+    <CommercialPricing />
+  ) : (
+    <CeoPricing />
+  );
 }

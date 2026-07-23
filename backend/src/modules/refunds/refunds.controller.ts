@@ -15,6 +15,8 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PanelAccessGuard } from '../panels/panel-access.guard';
+import { EmployeePermissionGuard } from '../../common/guards/employee-permission.guard';
+import { RequiresPermission } from '../../common/decorators/requires-permission.decorator';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 
 class ReferRefundDto {
@@ -37,12 +39,18 @@ class PayRefundDto {
 
 @ApiTags('refunds')
 @Controller('refunds')
-@UseGuards(JwtAuthGuard, RolesGuard, PanelAccessGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PanelAccessGuard, EmployeePermissionGuard)
 @Roles('FINANCE_MANAGER')
 export class RefundsController {
   constructor(private readonly refunds: RefundsService) {}
 
+  // SITE_ADMIN: "بررسی درخواست‌های استرداد و ارجاع به مدیر مالی یا کارمند
+  // مالی" — review + refer, never pay (پرداخت stays FINANCE_MANAGER-only,
+  // no method-level grant below). EMPLOYEE: PERMISSION_CATALOG's
+  // rf_list/rf_details/rf_process, same "never pay" boundary.
   @Get()
+  @Roles('FINANCE_MANAGER', 'SITE_ADMIN', 'EMPLOYEE')
+  @RequiresPermission('rf_list')
   @ApiOperation({ summary: 'فهرست درخواست‌های استرداد + سه کارت KPI' })
   async list() {
     const data = await this.refunds.list();
@@ -59,6 +67,8 @@ export class RefundsController {
   }
 
   @Get(':id')
+  @Roles('FINANCE_MANAGER', 'SITE_ADMIN', 'EMPLOYEE')
+  @RequiresPermission('rf_details')
   @ApiOperation({
     summary: 'جزئیات درخواست — تنها سطحی که شبا/PII رمزگشایی‌شده می‌گیرد',
   })
@@ -68,6 +78,8 @@ export class RefundsController {
   }
 
   @Patch(':id/refer')
+  @Roles('FINANCE_MANAGER', 'SITE_ADMIN', 'EMPLOYEE')
+  @RequiresPermission('rf_process')
   @ApiOperation({
     summary: 'ثبت و انتقال فرآیند ارجاع — بدون تغییر وضعیت (طبق طراحی)',
   })
