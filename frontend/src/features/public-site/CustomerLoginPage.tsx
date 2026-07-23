@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import { useAuth } from '../../hooks/useAuth';
 import { ApiRequestError } from '../../api/envelope';
@@ -56,11 +56,12 @@ function fmtTimer(s: number) {
 }
 
 export default function CustomerLoginPage() {
-  const { status, user, requestOtp, verifyOtp, agencyLogin } = useAuth();
+  const { status, user, requestOtp, verifyOtp, passwordLogin, agencyLogin } = useAuth();
   const navigate = useNavigate();
   const location = useLocation() as { state?: { from?: string } };
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [acct, setAcct] = useState<'user' | 'agency'>('user');
+  const [useOtp, setUseOtp] = useState(true);
 
   // user OTP flow (shared by login and signup tabs)
   const [phone, setPhone] = useState('');
@@ -69,6 +70,7 @@ export default function CustomerLoginPage() {
   const [terms, setTerms] = useState(false);
   const [challengeId, setChallengeId] = useState<string | null>(null);
   const [code, setCode] = useState('');
+  const [userPassword, setUserPassword] = useState('');
   // agency
   const [agencyId, setAgencyId] = useState('');
   const [agencyPass, setAgencyPass] = useState('');
@@ -115,6 +117,19 @@ export default function CustomerLoginPage() {
     }
   }
 
+  async function onPasswordLogin(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setBusy(true);
+    try {
+      await passwordLogin!(phone.trim(), userPassword);
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : 'ورود ناموفق بود.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function onAgencyLogin(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -146,6 +161,8 @@ export default function CustomerLoginPage() {
     setChallengeId(null);
     setCode('');
     setError(null);
+    setUseOtp(true);
+    setUserPassword('');
   }
 
   const subtitle = isLogin
@@ -206,8 +223,38 @@ export default function CustomerLoginPage() {
           <p style={{ fontSize: 12, color: '#6b7585', margin: '0 0 16px', lineHeight: 1.9 }}>{subtitle}</p>
           {error && <p style={{ marginBottom: 14, borderRadius: 10, background: '#fef2f2', padding: 10, fontSize: 12, color: '#e5484d' }}>{error}</p>}
 
+          {/* ---- USER LOGIN with password (alternative to OTP) ---- */}
+          {!isAgency && isLogin && !useOtp && (
+            <form onSubmit={(e) => void onPasswordLogin(e)} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={labelStyle}>شماره موبایل</label>
+                <input data-testid="signin-pw-phone" dir="ltr" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="09xxxxxxxxx" style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>رمز عبور</label>
+                <input type="password" data-testid="signin-pw-password" dir="ltr" value={userPassword} onChange={(e) => setUserPassword(e.target.value)} style={inputStyle} />
+              </div>
+              <button
+                type="submit"
+                data-testid="signin-pw-submit"
+                disabled={busy || !phone.trim() || !userPassword}
+                style={primaryBtn(!busy && !!phone.trim() && !!userPassword)}
+              >
+                ورود
+              </button>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5 }}>
+                <span data-testid="signin-use-otp" onClick={() => setUseOtp(true)} style={{ color: '#1668c4', fontWeight: 700, cursor: 'pointer' }}>
+                  ورود با کد پیامکی
+                </span>
+                <Link to="/forgot-password" style={{ color: '#1668c4', fontWeight: 700, textDecoration: 'none' }}>
+                  فراموشی رمز عبور؟
+                </Link>
+              </div>
+            </form>
+          )}
+
           {/* ---- USER LOGIN / SIGNUP (same OTP flow; signup adds profile fields) ---- */}
-          {!isAgency && !challengeId && (
+          {!isAgency && (useOtp || !isLogin) && !challengeId && (
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -248,9 +295,18 @@ export default function CustomerLoginPage() {
                 دریافت کد
               </button>
               {isLogin && (
-                <p style={{ fontSize: 11, color: '#8a96a6', margin: 0, lineHeight: 1.8, textAlign: 'center' }}>
-                  با ورود، قوانین و مقررات و حریم خصوصی blujet را می‌پذیرم.
-                </p>
+                <>
+                  <p style={{ fontSize: 11, color: '#8a96a6', margin: 0, lineHeight: 1.8, textAlign: 'center' }}>
+                    با ورود، قوانین و مقررات و حریم خصوصی blujet را می‌پذیرم.
+                  </p>
+                  <span
+                    data-testid="signin-use-password"
+                    onClick={() => setUseOtp(false)}
+                    style={{ fontSize: 11.5, color: '#1668c4', fontWeight: 700, cursor: 'pointer', textAlign: 'center' }}
+                  >
+                    ورود با رمز عبور
+                  </span>
+                </>
               )}
             </form>
           )}

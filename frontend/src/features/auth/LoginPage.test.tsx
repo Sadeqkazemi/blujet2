@@ -65,4 +65,21 @@ describe('LoginPage', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('نام کاربری یا رمز عبور نادرست است.');
   });
+
+  it('"فراموشی رمز عبور؟" shows the contact-IT notice, matching the design — staff has no self-service reset', async () => {
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      status: 'unauthenticated',
+      user: null,
+      requestLogin: vi.fn(),
+      confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
+      signOut: vi.fn(),
+    });
+    renderLoginPage();
+
+    await userEvent.click(screen.getByTestId('staff-forgot-password'));
+    expect(
+      await screen.findByText('برای بازیابی رمز عبور، با واحد فناوری اطلاعات (مدیر IT) تماس بگیرید'),
+    ).toBeInTheDocument();
+  });
 });

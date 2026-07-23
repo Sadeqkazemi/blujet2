@@ -65,3 +65,18 @@ export async function verifyOtp(challengeId: string, code: string) {
   setAccessToken(result.accessToken);
   return result;
 }
+
+/** فراموشی رمز — sets a new password once the caller is already
+ * authenticated via OTP; no current password required. */
+export function setPassword(newPassword: string) {
+  return apiPost<{ changed: boolean }>('/auth/set-password', { newPassword });
+}
+
+export async function customerPasswordLogin(phone: string, password: string) {
+  const result = await apiPost<{ accessToken: string; user: AuthUser }>('/auth/customer/login-password', {
+    phone,
+    password,
+  });
+  setAccessToken(result.accessToken);
+  return result;
+}
