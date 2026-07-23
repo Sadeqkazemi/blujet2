@@ -67,6 +67,20 @@ export function fetchMyRefunds() {
   return apiGet<RefundRequestView[]>('/my/refunds');
 }
 
+// مدیریت رزرو — anonymous PNR + last-name self-service (no login), a
+// separate public surface from the authenticated endpoints above.
+export function lookupBookingByPnrAndLastName(pnr: string, lastName: string) {
+  return apiPost<BookingDetail>('/manage-booking/lookup', { pnr, lastName });
+}
+
+export function submitAnonymousRefund(pnr: string, lastName: string, iban: string) {
+  return apiPost<RefundRequestView>('/manage-booking/refund', {
+    pnr,
+    lastName,
+    iban,
+  });
+}
+
 export function fetchWallet() {
   return apiGet<{ balanceIrr: number }>('/my/wallet');
 }
