@@ -1480,3 +1480,13 @@ login and for reset.
 - `POST /auth/customer/login-password` reads `passwordHash` the same way
   `staffLogin`/`agencyLogin` do, but skips the 2FA challenge step (only
   staff logins require 2FA per CLAUDE.md).
+
+## Phase 22 — وضعیت پرواز (flight status lookup)
+
+No schema change. Reuses `FlightInstance`/`Flight`/`Route`/`Airport`
+exactly as they already exist. Confirmed during this phase:
+`FlightInstanceStatus` is only `SCHEDULED | DEPARTED | CANCELLED` — there
+is no gate/baggage-belt/delay-minutes/terminal column anywhere, which is
+why the real `GET /flight-status` response (see docs/API.md's Phase 22
+section) omits those four fields the design shows rather than inventing
+values for them.

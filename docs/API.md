@@ -1070,3 +1070,41 @@ always meant to be customer-only.
   reachable, not a redesign; signup stays OTP-only.
 - No schema change — reuses `User.passwordHash`, already nullable and
   already populated for staff accounts.
+
+## Phase 22 — وضعیت پرواز (flight status lookup)
+
+Fourth "dead forms" item. `FlightStatusPage.tsx` was entirely mock (a
+single hardcoded `MOCK_STATUS` object returned for exactly one
+flight number, "BJ-410").
+
+- `GET /flight-status` (new, public, `@Throttle` 20/min) —
+  `?flightNo=BJ-410&date=YYYY-MM-DD` or `?origin=THR&dest=MHD&date=YYYY-MM-DD`
+  (exactly one of the two modes; 400 if neither is given). Finds the
+  matching `FlightInstance` for that calendar day and returns real data:
+  route (origin/dest codes + `Airport.cityFa`), scheduled departure/
+  arrival, `resolveAircraftType()` (Phase 13's override-aware helper,
+  reused verbatim), and a derived status label (`SCHEDULED` →
+  "برنامه‌ریزی‌شده", `CANCELLED` → "لغو شد", `DEPARTED` → "در حال پرواز" or
+  "فرود آمد" depending on whether `arrivalAt` has passed). 404 if no
+  instance matches.
+- **Explicitly NOT in the response: گیت (gate), تحویل بار (baggage belt),
+  تأخیر (delay minutes), ترمینال (terminal).** None of these exist
+  anywhere in this codebase's data model — `FlightInstanceStatus` is only
+  `SCHEDULED | DEPARTED | CANCELLED` (see docs/DB_SCHEMA.md), and there is
+  no gate-assignment/baggage-belt/real-time-delay operational system for
+  any role to populate them from. Inventing values for these fields would
+  violate CLAUDE.md's "never fabricate data" principle, so the rebuilt
+  page shows only what's real and drops the design's four operational
+  stat boxes rather than displaying placeholder/fake data. Building the
+  real version of this (a `flightops` capability — already flagged
+  deferred since Phase 18's `PANEL_NAV` notes) is a distinct, larger
+  future phase, not a gap in this one.
+- The design's «اطلاع‌رسانی تأخیر» SMS-subscribe checkbox is disabled
+  with a "(به‌زودی)" label — same reasoning: no delay-detection system
+  exists to actually trigger such a notification.
+- Frontend: reuses the existing `JalaliDatePicker` component (shared with
+  `HomeSearchPage.tsx`) for the date field in both search modes, and the
+  same `fetchAirports()` + `<select>` pattern for the route mode's origin/
+  destination pickers — the design's free-text city inputs are replaced
+  with the airport-code pickers the backend actually needs, matching
+  every other real search surface in this app (`HomeSearchPage.tsx`).

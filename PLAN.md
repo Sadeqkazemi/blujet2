@@ -172,6 +172,21 @@ below for what's landed from that port so far.
   the new capability reachable). No schema change — reuses
   `User.passwordHash`. 9 new backend e2e tests, 6 new frontend tests. See
   `docs/API.md`/`docs/DB_SCHEMA.md`'s Phase 21 sections.
+- [x] **Phase 22 — وضعیت پرواز (flight status lookup)** — fourth "dead
+  forms" item. New public `GET /flight-status` (by flightNo or by
+  origin+dest, both +date) using only real `FlightInstance`/`Route`/
+  `Airport` data — no schema change. Confirmed `FlightInstanceStatus` is
+  only `SCHEDULED | DEPARTED | CANCELLED`, with no gate/baggage-belt/
+  delay-minutes/terminal column anywhere in the codebase, so the design's
+  four operational stat boxes are explicitly NOT in the real response
+  (would be fabricated data) — the real page shows only route, scheduled
+  times, aircraft, and a derived status label; the delay-SMS checkbox is
+  disabled "(به‌زودی)" for the same reason. Frontend reuses the existing
+  `JalaliDatePicker` and `fetchAirports()`+`<select>` patterns already
+  used by `HomeSearchPage.tsx`, replacing the design's free-text city
+  inputs with the airport-code pickers the backend needs. 5 new backend
+  e2e tests, 5 new frontend tests. See `docs/API.md`/`docs/DB_SCHEMA.md`'s
+  Phase 22 sections.
 
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is
