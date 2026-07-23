@@ -1108,3 +1108,83 @@ flight number, "BJ-410").
   destination pickers — the design's free-text city inputs are replaced
   with the airport-code pickers the backend actually needs, matching
   every other real search surface in this app (`HomeSearchPage.tsx`).
+
+## Phase 23 — وب‌سرویس آژانس (Agency B2B webservice purchase)
+
+Fifth and final "dead forms" item. `AgencyWebservicePage.tsx` was entirely
+local mock state (`requested`/`keyShown` booleans, a fake sample API key
+`bj_live_4f8a2c91d7e3b5a6`) — no backend involved at all.
+
+Builds on Phase 3's pre-existing `AgencyApiKey`/`AgencyApiScope` schema
+and staff-side `POST/PATCH .../api-key` endpoints (already real since
+Phase 3), and replicates Phase 16's `AgencyCreditRequest`
+request/decide pattern exactly, for a new `AgencyWebserviceRequest`.
+
+### Agency-portal (self-service)
+
+- `POST /agency-portal/webservice-requests` — body
+  `{ scope: 'FULL' | 'SEARCH_BOOK', months: 1 | 3 | 12, note?: string }`
+  (whitelist DTO — `forbidNonWhitelisted` rejects any other field,
+  including a client-supplied price). Creates a `PENDING`
+  `AgencyWebserviceRequest` with `priceIrr` computed server-side from a
+  fixed plan catalog (the design's own toman prices ×10 → ریال:
+  ۱ ماهه=۴۵٬۰۰۰٬۰۰۰, ۳ ماهه=۱۲۰٬۰۰۰٬۰۰۰, ۱۲ ماهه=۴۲۰٬۰۰۰٬۰۰۰ ریال), fires a
+  cartable task to `SENIOR_MANAGER`/`FINANCE_MANAGER`/`COMMERCIAL_MANAGER`
+  (same review-role set as credit requests), and audit-logs.
+- `GET /agency-portal/webservice-requests` — this agency's own request
+  history.
+- `GET /agency-portal/api-keys` — this agency's own API keys, **metadata
+  only** (`id`, `scope`, `status`, `activatedAt`, `expiresAt`,
+  `lastUsedAt`, `callCount`) — `keyHash` is never returned, and there is
+  no raw-key field at all on this read path (see "raw key delivery"
+  below).
+
+### Agencies (staff-side review)
+
+- `GET /agencies/:id/webservice-requests` — list, same
+  `AGENCY_TAB_ROLES` guard as credit requests (no per-method narrowing).
+- `PATCH /agencies/:id/webservice-requests/:reqId/decide` — body
+  `{ approve: boolean, stepUpChallengeId?, stepUpCode? }` (step-up fields
+  required only when `approve: true`, enforced via `@ValidateIf`). On
+  approve, calls `AgenciesService.issueApiKey` **verbatim** (same
+  step-up-gated, already-audited key-issuance path Phase 3 built for the
+  staff-only `POST :id/api-key` endpoint — not duplicated). On reject,
+  just flips status. Ordering deliberately issues the key **before** the
+  conditional `updateMany` status-flip guard (unlike `decideCreditRequest`,
+  which updates first): if step-up verification fails, the request must
+  stay `PENDING` for a retry, never end up `APPROVED` with no key actually
+  issued.
+
+### Raw key delivery — a scope decision, documented here
+
+`AgencyApiKey` only ever stores `keyHash` (Phase 3 design, unchanged) —
+the raw key is retrievable exactly once, at the moment
+`issueApiKey`/`updateApiKey` creates or regenerates it. The design's
+webservice page shows the agency's own active key with a show/hide
+toggle, which would require a second retrieval — impossible under that
+storage model without either (a) storing the raw key in some retrievable
+form (rejected — contradicts the existing, already-shipped Phase 3
+architecture and CLAUDE.md's "never store secrets in retrievable form"
+posture), or (b) delivering it once through an already-existing
+notification channel. This phase takes (b): on approval,
+`decideWebserviceRequest` posts the raw key as a message via
+`AgenciesService.postMessage` into the agency's own message thread —
+already visible through `GET /agency-portal/inbox` and the staff-side
+`GET /agencies/:id/messages`, no new channel invented. The rebuilt
+frontend page therefore never shows a copyable raw key; it shows
+scope/status/activation metadata and a note pointing at the inbox
+message.
+
+### Explicit deferrals (flagged, not oversights)
+
+- No FK from `AgencyWebserviceRequest` to the `AgencyApiKey` it produces
+  on approval — the agency's key list is already fully visible via
+  `GET /agency-portal/api-keys`; tracing "which request produced which
+  key" isn't needed for this phase.
+- `AgencyApiScope.SEARCH_ONLY` has no design-mock equivalent (the design
+  only offers "جستجو و رزرو" and "فروش کامل") and is left unused by this
+  new request flow — it remains selectable only via the pre-existing
+  staff-only direct `POST :id/api-key` endpoint.
+- "مشاهده مستندات API" (API docs) button in the design's active-connection
+  card stays a static, non-functional element — no API docs page exists
+  yet in this codebase.
