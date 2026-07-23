@@ -1363,3 +1363,101 @@ for the full reasoning): real seat-change and ticket-download actions
 disabled rather than built); per-passenger partial refund selection (the
 mock's UI, but the real `RefundRequest` model — and every other refund
 surface in the app — is 1:1 with `Booking`, never per-passenger).
+
+## Phase 20 — تماس با ما + پشتیبانی (contact + support tickets)
+
+Two new tables, both intentionally kept separate rather than unified
+into one "message" model (see docs/API.md's Phase 20 section for the
+full reasoning):
+
+```prisma
+model ContactMessage {
+  id        String   @id @default(uuid())
+  name      String
+  phone     String
+  subject   String
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("contact_messages")
+}
+
+enum SupportTicketDept {
+  SITE
+  AGENCY
+}
+
+enum SupportTicketPriority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  ANSWERED
+  CLOSED
+}
+
+model SupportTicket {
+  id             String                @id @default(uuid())
+  trackingCode   String                @unique
+  subject        String
+  body           String
+  requesterName  String
+  requesterPhone String
+  userId         String?
+  user           User?                 @relation("SupportTicketRequester", fields: [userId], references: [id])
+  dept           SupportTicketDept     @default(SITE)
+  priority       SupportTicketPriority @default(MEDIUM)
+  status         SupportTicketStatus   @default(OPEN)
+  forwardedToId  String?
+  forwardedTo    User?                 @relation("SupportTicketForwardedTo", fields: [forwardedToId], references: [id])
+  history        Json                  @default("[]")
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("support_tickets")
+}
+```
+
+- `ContactMessage` — no `userId`/relation at all; it is a pure anonymous
+  inbox, never tied to an account even if the sender happens to be logged
+  in (the design's own form has no such concept).
+- `SupportTicket.userId` is optional and currently always `null` in
+  practice — the public submission endpoint is fully unauthenticated (no
+  `JwtAuthGuard`), so there is no request-context user to attach. The
+  column exists for a future logged-in-submission path, not wired this
+  phase.
+- `SupportTicket.trackingCode` — generated as `TK` + 8 uppercase hex
+  characters (`crypto.randomBytes(4)`), same "no collision-retry loop"
+  convention already used by `generatePnr()` (Phase 2/13) — a random
+  32-bit space is large enough in practice for this codebase's existing
+  precedent.
+- `SupportTicket.history: Json` — same append-only event-log pattern
+  already established by `RefundRequest.history` (Phase 7) and
+  `AgencyMembershipRequest.history` (Phase 16); no separate
+  message-thread table this phase (see docs/API.md's deferral list).
+- `SupportTicket.dept`/`priority` exist to match the design's admin
+  ticket-table columns (`پنل ادمین سایت.dc.html`'s `tkDepts`/
+  `tkPriorityOptions`) but are not user-settable on the public form this
+  phase — `dept` always defaults to `SITE`, `priority` always defaults to
+  `MEDIUM`. Only `status` and `forwardedToId` are mutated by the new
+  SITE_ADMIN endpoints.
+- `forwardedToId` references `User` (any active staff role via
+  `StaffDirectoryService.list()`), not a fixed department table — mirrors
+  `RefundRequest.assigneeId`'s existing pattern.
+- No new `AuditCategory` enum value — forward/status-change actions log
+  under the existing `SYSTEM` category rather than adding a `SUPPORT`
+  value for a scoped-down v1 feature.
+
+⚑ **Explicitly deferred this phase** (see docs/API.md's Phase 20 section
+for the full reasoning): file attachments and multi-message reply
+threads on tickets; a public "track my ticket" status lookup; a
+dedicated تماس با ما admin review/reply UI (the new
+`SiteAdminDashboardPage.tsx` section is this phase's only admin surface
+for it).

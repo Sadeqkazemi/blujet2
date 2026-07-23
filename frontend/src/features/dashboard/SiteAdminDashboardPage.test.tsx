@@ -4,8 +4,10 @@ import { describe, expect, it, vi } from 'vitest';
 import SiteAdminDashboardPage from './SiteAdminDashboardPage';
 import * as agenciesApi from '../../api/agencies';
 import * as refundsApi from '../../api/refunds';
+import * as supportTicketsApi from '../../api/support-tickets';
 import type { AgencyMembershipRequest } from '../../types/agencies';
 import type { RefundsResult } from '../../types/refunds';
+import type { ContactMessageRow } from '../../types/support-tickets';
 
 const REQUEST: AgencyMembershipRequest = {
   id: 'r1',
@@ -52,6 +54,17 @@ const REFUNDS: RefundsResult = {
   kpis: { payoutQueue: 0, paid: 0, awaitingAdmin: 1 },
 };
 
+const MESSAGES: ContactMessageRow[] = [
+  {
+    id: 'c1',
+    name: 'آرش کریمی',
+    phone: '09121110000',
+    subject: 'سوال دربارهٔ استرداد',
+    body: 'چطور می‌توانم بلیطم را استرداد کنم؟',
+    createdAt: '2026-07-03T00:00:00.000Z',
+  },
+];
+
 function renderPage() {
   return render(
     <MemoryRouter>
@@ -61,20 +74,23 @@ function renderPage() {
 }
 
 describe('SiteAdminDashboardPage', () => {
-  it('shows pending agency requests and refunds awaiting review from real endpoints', async () => {
+  it('shows pending agency requests, refunds awaiting review, and recent contact messages from real endpoints', async () => {
     vi.spyOn(agenciesApi, 'fetchAgencyRequests').mockResolvedValue([REQUEST]);
     vi.spyOn(refundsApi, 'fetchRefunds').mockResolvedValue(REFUNDS);
+    vi.spyOn(supportTicketsApi, 'fetchRecentContactMessages').mockResolvedValue(MESSAGES);
 
     renderPage();
 
     expect(await screen.findByText('آژانس تست')).toBeInTheDocument();
     expect(await screen.findByText('نگار رضایی')).toBeInTheDocument();
+    expect(await screen.findByText('آرش کریمی')).toBeInTheDocument();
     expect(agenciesApi.fetchAgencyRequests).toHaveBeenCalledWith('PENDING');
   });
 
   it('shows an error message when the endpoints fail', async () => {
     vi.spyOn(agenciesApi, 'fetchAgencyRequests').mockRejectedValue(new Error('x'));
     vi.spyOn(refundsApi, 'fetchRefunds').mockRejectedValue(new Error('x'));
+    vi.spyOn(supportTicketsApi, 'fetchRecentContactMessages').mockRejectedValue(new Error('x'));
 
     renderPage();
 

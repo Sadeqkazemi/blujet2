@@ -34,6 +34,8 @@ import { BookingEngineModule } from './modules/booking-engine/booking-engine.mod
 import { ReconciliationModule } from './modules/reconciliation/reconciliation.module';
 import { ProfileModule } from './modules/profile/profile.module';
 import { ManageBookingModule } from './modules/manage-booking/manage-booking.module';
+import { ContactModule } from './modules/contact/contact.module';
+import { SupportTicketsModule } from './modules/support-tickets/support-tickets.module';
 
 @Module({
   imports: [
@@ -97,6 +99,8 @@ import { ManageBookingModule } from './modules/manage-booking/manage-booking.mod
     ReconciliationModule,
     ProfileModule,
     ManageBookingModule,
+    ContactModule,
+    SupportTicketsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

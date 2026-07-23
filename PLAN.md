@@ -131,6 +131,30 @@ below for what's landed from that port so far.
   `docs/API.md`/`docs/DB_SCHEMA.md`'s Phase 18 sections for the full
   scope + explicit deferrals (`fl_manage`, `ag_settle`, `fn_invoices`, the
   IT dept's catalog keys, EMPLOYEE's `referrals` tab).
+- [x] **Phase 19 — مدیریت رزرو (anonymous PNR self-service)** — first item
+  from the post-Phase-18 "dead forms" punch list. Per explicit user
+  decision, real anonymous PNR+last-name lookup/refund (no login), reusing
+  the existing `BookingService`/`RefundsService` logic via new shared
+  private helpers (`toDetail()`, `createRefundRequest()`) so the anonymous
+  and authenticated paths can never compute results differently. No schema
+  change. 7 new backend e2e tests, 4 new frontend tests. See
+  `docs/API.md`/`docs/DB_SCHEMA.md`'s Phase 19 sections for full scope +
+  explicit deferrals (seat change, ticket download, per-passenger partial
+  refund).
+- [x] **Phase 20 — تماس با ما + پشتیبانی (contact + support tickets)** —
+  second "dead forms" item. Two new tables (`ContactMessage`, a plain
+  inbox; `SupportTicket`, a SITE_ADMIN-reviewed dept/priority/status/
+  forward workflow scoped down from the design's fuller attachment/thread
+  version). Public submission endpoints for both (no login); new
+  `PANEL_NAV.SITE_ADMIN` `tickets` tab (closes a gap Phase 18 explicitly
+  flagged); `SiteAdminDashboardPage` gains a third section for recent
+  contact messages; ticket-forward target picker reuses
+  `StaffDirectoryService` via DI rather than widening its EXEC_ROLES-only
+  endpoint. `ContactPage.tsx`'s form also gained the `subject` field the
+  design always required but the earlier build was missing. 11 new
+  backend e2e tests, 6 new frontend tests. See `docs/API.md`/
+  `docs/DB_SCHEMA.md`'s Phase 20 sections for full scope + explicit
+  deferrals (attachments, reply threads, public ticket-status lookup).
 
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is

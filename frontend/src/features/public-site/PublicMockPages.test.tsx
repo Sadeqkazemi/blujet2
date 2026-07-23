@@ -4,7 +4,6 @@ import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import CustomerLoginPage from './CustomerLoginPage';
 import AboutPage from './AboutPage';
-import ContactPage from './ContactPage';
 import NotFoundPage from './NotFoundPage';
 import * as useAuthModule from '../../hooks/useAuth';
 
@@ -68,22 +67,6 @@ describe('AboutPage', () => {
     expect(screen.getByText('چشم‌انداز')).toBeInTheDocument();
     expect(screen.getByText('شفافیت')).toBeInTheDocument();
     expect(screen.getByText('مسافر سالانه')).toBeInTheDocument();
-  });
-});
-
-describe('ContactPage', () => {
-  it('submits the mock contact form', async () => {
-    renderWithRouter(<ContactPage />);
-    expect(screen.getByText('تلفن پشتیبانی ۲۴ ساعته')).toBeInTheDocument();
-
-    const submit = screen.getByTestId('contact-submit');
-    expect(submit).toBeDisabled();
-    await userEvent.type(screen.getByTestId('contact-name'), 'نگار رضایی');
-    await userEvent.type(screen.getByTestId('contact-msg'), 'سلام، سوال داشتم.');
-    await userEvent.click(submit);
-
-    expect(screen.getByTestId('contact-sent')).toBeInTheDocument();
-    expect(screen.getByText('پیام شما ارسال شد')).toBeInTheDocument();
   });
 });
 

@@ -7,6 +7,7 @@ import PublicClubPage from './PublicClubPage';
 import SupportPage from './SupportPage';
 import TravelInfoPage from './TravelInfoPage';
 import * as useAuthModule from '../../hooks/useAuth';
+import * as supportTicketsApi from '../../api/support-tickets';
 
 beforeEach(() => {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
@@ -81,16 +82,28 @@ describe('SupportPage', () => {
     expect(screen.getByText(/در نرخ اکونومی ۲۰ کیلوگرم/)).toBeInTheDocument();
   });
 
-  it('submits the ticket form and shows the tracking code', async () => {
+  it('submits the real ticket form and shows the real tracking code', async () => {
+    const submit = vi.spyOn(supportTicketsApi, 'submitSupportTicket').mockResolvedValue({
+      id: 't1',
+      trackingCode: 'TK1A2B3C4D',
+    });
     renderWithRouter(<SupportPage />);
-    const submit = screen.getByText('ارسال تیکت');
-    expect(submit).toBeDisabled();
+    const submitBtn = screen.getByTestId('ticket-submit');
+    expect(submitBtn).toBeDisabled();
 
-    await userEvent.type(screen.getByPlaceholderText(/توضیح درخواست خود را بنویسید/), 'مشکل در پرداخت دارم');
-    await userEvent.click(submit);
+    await userEvent.type(screen.getByTestId('ticket-name'), 'نگار رضایی');
+    await userEvent.type(screen.getByTestId('ticket-phone'), '09121234567');
+    await userEvent.type(screen.getByTestId('ticket-msg'), 'مشکل در پرداخت دارم');
+    await userEvent.click(submitBtn);
 
-    expect(screen.getByText('تیکت شما ثبت شد')).toBeInTheDocument();
-    expect(screen.getByText(/TK-/)).toBeInTheDocument();
+    expect(await screen.findByText('تیکت شما ثبت شد')).toBeInTheDocument();
+    expect(screen.getByTestId('ticket-tracking-code')).toHaveTextContent('TK1A2B3C4D');
+    expect(submit).toHaveBeenCalledWith({
+      requesterName: 'نگار رضایی',
+      requesterPhone: '09121234567',
+      subject: 'استرداد و تغییر بلیط',
+      body: 'مشکل در پرداخت دارم',
+    });
   });
 });
 
