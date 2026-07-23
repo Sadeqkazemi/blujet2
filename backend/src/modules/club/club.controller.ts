@@ -31,7 +31,12 @@ const CLUB_ROLES = ['CEO', 'BOARD_CHAIR', 'SENIOR_MANAGER'] as const;
 export class ClubController {
   constructor(private readonly club: ClubService) {}
 
+  // SITE_ADMIN: پنل ادمین سایت.dc.html's "club" tab ("پروفایل اعضا، صدور
+  // کارت و ارجاع درخواست‌ها"). createMember/updateLevel/card-requests
+  // approve|reject stay untouched — those are CEO/BOARD_CHAIR/
+  // SENIOR_MANAGER-only per the existing design.
   @Get('members')
+  @Roles('CEO', 'BOARD_CHAIR', 'SENIOR_MANAGER', 'SITE_ADMIN')
   @ApiOperation({ summary: 'اعضای باشگاه + کارت‌های KPI (فیلتر سطح/جستجو)' })
   async listMembers(@Query() query: ListMembersQueryDto) {
     const data = await this.club.listMembers(query);
@@ -64,6 +69,7 @@ export class ClubController {
   }
 
   @Post('members/:id/issue-card')
+  @Roles('CEO', 'BOARD_CHAIR', 'SENIOR_MANAGER', 'SITE_ADMIN')
   @ApiOperation({ summary: 'صدور مستقیم کارت — بدون رکورد درخواست، با ممیزی' })
   async issueCard(
     @CurrentUser() actor: AuthenticatedUser,

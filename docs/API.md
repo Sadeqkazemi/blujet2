@@ -797,3 +797,84 @@ See DB_SCHEMA.md's Phase 17 for full reasoning and explicit scope cuts
 - No change to any booking/checkout endpoint's validation — national ID
   stays optional there, exactly as today; the checkout banner is a
   frontend-only read of `GET /users/me/profile`'s `completionPct`.
+
+## Phase 18 — SITE_ADMIN + EMPLOYEE panel access
+
+See DB_SCHEMA.md's Phase 18 for full reasoning (which design-listed
+SITE_ADMIN tabs stay deferred, why EMPLOYEE's nav is computed per-user
+instead of a static `PANEL_NAV` row, and the exact catalog keys wired vs
+deferred). No schema change — reuses the existing `EmployeePermission`/
+`Permission` tables from Phase 8.
+
+- `GET /panels/nav` — now `async`; for `role === 'EMPLOYEE'` the response
+  is computed per-user from that employee's real `EmployeePermission`
+  grants (`["dashboard", ...granted sections]`, matching پنل کارمند.dc.html's
+  `navKeys` formula) instead of a static table row. Every other role is
+  unchanged.
+- New `@RequiresPermission(...keys)` decorator +
+  `EmployeePermissionGuard` (`src/common/guards/employee-permission.guard.ts`)
+  — passes straight through for any non-EMPLOYEE actor; for EMPLOYEE it
+  403s unless the actor holds at least one of the decorated keys via
+  `EmployeePermission`. Added to `@UseGuards(...)` alongside the existing
+  `RolesGuard`/`PanelAccessGuard` on every controller touched below.
+- `GET /agencies`, `GET /agencies/:id` — role gate widened to add
+  `SITE_ADMIN` and `EMPLOYEE` (method-level, was previously class-default
+  `AGENCY_TAB_ROLES` only for these two). EMPLOYEE additionally requires
+  `ag_list` (list) / `ag_info` (detail).
+- `GET /agencies/requests`, `GET /agencies/requests/:id` — also widened to
+  `EMPLOYEE` + `RequiresPermission('ag_requests')` (SITE_ADMIN was already
+  granted in Phase 16).
+- `GET /passenger-reports/search` — role gate widened to add `SITE_ADMIN`
+  and `EMPLOYEE` (+ `RequiresPermission('rp_sales', 'rp_finance')` — same
+  "reports" tab for either catalog dept's report permission).
+- `GET /club/members`, `POST /club/members/:id/issue-card` — role gate
+  widened to add `SITE_ADMIN` only (method-level). `createMember`
+  (CEO/BOARD_CHAIR), `updateLevel` (SENIOR_MANAGER), and the
+  `card-requests` approve/reject flow stay untouched — SITE_ADMIN never
+  gets member creation, tier changes, or the referred-card decision.
+- Cartable (`GET/PATCH /cartable/*`) — `SITE_ADMIN` added directly to
+  `CartableController`'s class-level `@Roles(...)` (not to the shared
+  `EXEC_ROLES` constant, which also backs `manager-messages`/
+  `staff-directory` — those stay untouched, out of SITE_ADMIN's design
+  access list). Every cartable endpoint is already self-scoped to the
+  actor, so this is a safe "act on my own items" grant.
+- `GET /refunds`, `GET /refunds/:id`, `PATCH /refunds/:id/refer` — role
+  gate widened to add `SITE_ADMIN` and `EMPLOYEE` (+
+  `RequiresPermission('rf_list' | 'rf_details' | 'rf_process')`
+  respectively). `PATCH /refunds/:id/pay` is **never** widened — stays
+  `FINANCE_MANAGER`-only, matching the same "site admin/employee review +
+  refer, one specialist role executes" pattern used for agency requests
+  in Phase 16.
+- `GET /pricing/proposals`, `PUT /pricing/flights/:flightInstanceId/proposal`
+  — role gate widened to add `EMPLOYEE` (+ `RequiresPermission('pr_propose')`).
+  No SITE_ADMIN grant — pricing isn't in its design access list.
+  `legal-rate`/`register`/`ai-analysis` stay `CEO`-only.
+- `GET /flights/overview`, `GET /flights/airports`, `GET /flights/schedules`,
+  `GET /flights/:instanceId`, `GET /flights/:instanceId/fare-rules`,
+  `GET /flights/:instanceId/allotments` — role gate widened to add
+  `EMPLOYEE` (+ `RequiresPermission('fl_view')`). Every write endpoint on
+  this controller (create/schedule/plan/aircraft/fare-rule/allotment
+  mutations — the catalog's `fl_manage`) is **deliberately deferred**;
+  granting broad flight-write access needs individual per-endpoint review
+  this phase didn't have time for.
+
+### Explicit deferrals (flagged, not oversights)
+- `flightops`, `tickets`, `blog`, `media` — present in
+  پنل ادمین سایت.dc.html's `roleDefs.siteAdmin.access` but have **no**
+  backend anywhere in the codebase for any role; excluded from
+  `PANEL_NAV.SITE_ADMIN` rather than shipped as dead tabs.
+- EMPLOYEE's `referrals` tab — پنل کارمند.dc.html's `navKeys` formula
+  always appends it, but `GET /referrals` (the only listing endpoint) is
+  sender-scoped (`SENIOR_MANAGER`'s own referrals); there's no
+  recipient-side "referrals assigned to me" listing yet, only per-item
+  detail/report access. Left out of the computed nav until that listing
+  exists.
+- Catalog keys `fl_manage`, `ag_settle`, `fn_invoices`, and the entire IT
+  dept (`us_manage`, `sv_control`, `sc_manage`, `lg_view`) are **not**
+  wired to any controller this phase — an employee granted only these
+  gets no matching nav tab (no dead tabs), even though the permission row
+  itself exists and can be granted by IT_MANAGER today.
+- SITE_ADMIN's dashboard is a new, narrower `SiteAdminDashboardPage` (pending
+  agency requests + refunds awaiting review) rather than
+  پنل ادمین سایت.dc.html's fuller multi-widget combined feed — both source
+  lists are real (no mock data), just a simpler composition.

@@ -61,13 +61,42 @@ describe('Panels (e2e)', () => {
     ]);
   });
 
-  it('a role with no configured nav (e.g. EMPLOYEE, out of this scope) gets an empty list, not an error', async () => {
+  it('an EMPLOYEE with no granted permissions still gets a dashboard-only nav, not an error', async () => {
     const { accessToken } = await loginAs(app, 'com.ahmadi');
     const res = await request(app.getHttpServer())
       .get('/panels/nav')
       .set('Authorization', `Bearer ${accessToken}`);
     expect(res.status).toBe(200);
-    expect(res.body.data).toEqual([]);
+    expect(res.body.data).toEqual([
+      { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
+    ]);
+  });
+
+  it('EMPLOYEE nav is computed dynamically from real EmployeePermission grants (sales.moradi: ag_list + fl_view)', async () => {
+    const { accessToken } = await loginAs(app, 'sales.moradi');
+    const res = await request(app.getHttpServer())
+      .get('/panels/nav')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(res.status).toBe(200);
+    const keys = res.body.data.map((t: { key: string }) => t.key);
+    expect(keys).toEqual(['dashboard', 'agencies', 'flights']);
+  });
+
+  it('returns the confirmed tab set for SITE_ADMIN', async () => {
+    const { accessToken } = await loginAs(app, 'site.admin');
+    const res = await request(app.getHttpServer())
+      .get('/panels/nav')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(res.status).toBe(200);
+    const keys = res.body.data.map((t: { key: string }) => t.key);
+    expect(keys).toEqual([
+      'dashboard',
+      'agencies',
+      'reports',
+      'cartable',
+      'club',
+      'refund',
+    ]);
   });
 
   it('non-CEO/Senior roles get 403 on /panels/access', async () => {

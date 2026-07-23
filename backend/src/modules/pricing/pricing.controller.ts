@@ -22,16 +22,22 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PanelAccessGuard } from '../panels/panel-access.guard';
+import { EmployeePermissionGuard } from '../../common/guards/employee-permission.guard';
+import { RequiresPermission } from '../../common/decorators/requires-permission.decorator';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 
 @ApiTags('pricing')
 @Controller('pricing')
-@UseGuards(JwtAuthGuard, RolesGuard, PanelAccessGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PanelAccessGuard, EmployeePermissionGuard)
 export class PricingController {
   constructor(private readonly pricing: PricingService) {}
 
+  // EMPLOYEE: PERMISSION_CATALOG's pr_propose ("ثبت نرخ پیشنهادی") — reads
+  // the same commercial-style list COMMERCIAL_MANAGER gets (proposal
+  // read/write only, never CEO's legal-rate/register/ai-analysis powers).
   @Get('proposals')
-  @Roles('CEO', 'COMMERCIAL_MANAGER')
+  @Roles('CEO', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('pr_propose')
   @ApiOperation({
     summary:
       'CEO: لیست در انتظار/ثبت‌شده — بازرگانی: پروازهای برنامه‌ریزی‌شده + پیشنهادشان',
@@ -45,7 +51,8 @@ export class PricingController {
   }
 
   @Put('flights/:flightInstanceId/proposal')
-  @Roles('COMMERCIAL_MANAGER')
+  @Roles('COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('pr_propose')
   @ApiOperation({
     summary: 'ارسال/ویرایش نرخ پیشنهادی — تا قبل از تأیید قابل ویرایش',
   })

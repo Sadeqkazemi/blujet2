@@ -29,6 +29,8 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PanelAccessGuard } from '../panels/panel-access.guard';
+import { EmployeePermissionGuard } from '../../common/guards/employee-permission.guard';
+import { RequiresPermission } from '../../common/decorators/requires-permission.decorator';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 
 const MAX_INT32 = 2_147_483_647;
@@ -322,12 +324,19 @@ class CreateAllotmentDto {
 
 @ApiTags('flights')
 @Controller('flights')
-@UseGuards(JwtAuthGuard, RolesGuard, PanelAccessGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PanelAccessGuard, EmployeePermissionGuard)
 @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER')
 export class FlightsController {
   constructor(private readonly flights: FlightsService) {}
 
+  // EMPLOYEE: PERMISSION_CATALOG's fl_view only — read-only. fl_manage
+  // (create/schedule/plan/aircraft/fare-rule/allotment writes below) is
+  // deliberately deferred this phase; every write endpoint stays
+  // SENIOR_MANAGER/COMMERCIAL_MANAGER-only. See Phase 18 notes in
+  // docs/DB_SCHEMA.md.
   @Get('overview')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_view')
   @ApiOperation({
     summary: 'کل تب مدیریت پروازها: KPI + فعال/انجام‌شده/آینده',
   })
@@ -337,6 +346,8 @@ export class FlightsController {
   }
 
   @Get('airports')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_view')
   @ApiOperation({ summary: 'کاتالوگ فرودگاه‌ها برای فرم افزودن پرواز' })
   async airports() {
     const data = await this.flights.airports();
@@ -368,6 +379,8 @@ export class FlightsController {
   }
 
   @Get('schedules')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_view')
   @ApiOperation({ summary: 'فهرست برنامه‌های تکرارشونده پرواز' })
   async listSchedules() {
     return { success: true, data: await this.flights.listSchedules() };
@@ -390,6 +403,8 @@ export class FlightsController {
   }
 
   @Get(':instanceId')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_view')
   @ApiOperation({
     summary: 'مودال جزئیات پرواز: تفکیک واقعی کانال فروش + مجموع درآمد',
   })
@@ -433,6 +448,8 @@ export class FlightsController {
   }
 
   @Get(':instanceId/fare-rules')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_view')
   @ApiOperation({ summary: 'فهرست کلاس‌های نرخی این پرواز' })
   async listFareRules(@Param('instanceId') instanceId: string) {
     const data = await this.flights.listFareRules(instanceId);
@@ -484,6 +501,8 @@ export class FlightsController {
   }
 
   @Get(':instanceId/allotments')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_view')
   @ApiOperation({ summary: 'فهرست سهمیه‌های آژانس این پرواز' })
   async listAllotments(@Param('instanceId') instanceId: string) {
     const data = await this.flights.listAllotments(instanceId);

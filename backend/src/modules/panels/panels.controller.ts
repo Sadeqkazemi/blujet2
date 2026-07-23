@@ -19,8 +19,8 @@ export class PanelsController {
     summary:
       "Caller's role-scoped sidebar — server-computed, never client-decided",
   })
-  getNav(@CurrentUser() user: AuthenticatedUser) {
-    return { success: true, data: this.panels.getNav(user.role) };
+  async getNav(@CurrentUser() user: AuthenticatedUser) {
+    return { success: true, data: await this.panels.getNav(user) };
   }
 
   // Phase 12: IT_MANAGER reads the flags for its informational دسترسی به
