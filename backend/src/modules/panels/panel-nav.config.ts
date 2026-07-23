@@ -16,10 +16,11 @@ export interface PanelNavItem {
  */
 export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
   // Confirmed from پنل ادمین سایت.dc.html's roleDefs.siteAdmin.access.
-  // flightops/tickets/blog/media are in that same design list but have no
-  // backend anywhere in the codebase yet (not just for this role) — left
-  // out entirely rather than shipped as an unreachable tab; see Phase 18
-  // notes in docs/DB_SCHEMA.md.
+  // flightops/blog/media are in that same design list but have no backend
+  // anywhere in the codebase yet (not just for this role) — left out
+  // entirely rather than shipped as an unreachable tab; see Phase 18 notes
+  // in docs/DB_SCHEMA.md. `tickets` was in the same deferred list but now
+  // has a real (scoped-down) backend — see Phase 20 notes.
   SITE_ADMIN: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
     { key: 'agencies', labelFa: 'مدیریت آژانس‌ها', implemented: true },
@@ -27,6 +28,7 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'cartable', labelFa: 'کارتابل', implemented: true },
     { key: 'club', labelFa: 'باشگاه مشتریان', implemented: true },
     { key: 'refund', labelFa: 'استرداد بلیط', implemented: true },
+    { key: 'tickets', labelFa: 'تیکت‌های پشتیبانی', implemented: true },
   ],
   CEO: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
