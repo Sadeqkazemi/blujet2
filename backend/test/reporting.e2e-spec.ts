@@ -48,7 +48,11 @@ describe('Reporting (e2e)', () => {
     });
     ownFlightNo = `RP-${Date.now().toString(36).toUpperCase().slice(-6)}`;
     const flight = await prisma.flight.create({
-      data: { flightNo: ownFlightNo, routeId: route.id, aircraftType: AIRCRAFT_TYPE },
+      data: {
+        flightNo: ownFlightNo,
+        routeId: route.id,
+        aircraftType: AIRCRAFT_TYPE,
+      },
     });
     const departureAt = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
     const instance = await prisma.flightInstance.create({
@@ -61,14 +65,19 @@ describe('Reporting (e2e)', () => {
       },
     });
 
-    const { accessToken: customerToken } = await loginAsCustomer(app, '09150009000');
+    const { accessToken: customerToken } = await loginAsCustomer(
+      app,
+      '09150009000',
+    );
     const createRes = await request(app.getHttpServer())
       .post('/bookings')
       .set('Authorization', `Bearer ${customerToken}`)
       .send({
         flightInstanceId: instance.id,
         cabin: 'ECONOMY',
-        passengers: [{ fullName: 'گزارش تست', nationalId: '0012345679', seatCode: '1A' }],
+        passengers: [
+          { fullName: 'گزارش تست', nationalId: '0012345679', seatCode: '1A' },
+        ],
       });
     await request(app.getHttpServer())
       .post(`/bookings/${createRes.body.data.id}/pay`)
