@@ -95,6 +95,43 @@ below for what's landed from that port so far.
   visual) is still the earlier functional/clean styling, not pixel-matched — only
   header/footer wrap them now.
 
+- [x] **Phases 14–17 (merged to main, not previously logged here)**:
+  Phase 14 — real `SmsProvider` + IT management log. Phase 15 — step-up
+  2FA verification (`POST /auth/step-up/request` + code) gating high-risk
+  actions (admin role changes, API-key rotation, refund payout, price
+  capacity change, session revoke-all) across their respective controllers,
+  with matching frontend `useStepUp` hook wiring. Phase 16 — agency
+  self-registration (public OTP + pre-registration → SITE_ADMIN
+  review/refer → COMMERCIAL_MANAGER sole approval → real confirmation
+  SMS, explicit no-selfie decision) plus real agency seat-allotment
+  frontend (`FlightsPage`'s plan modal, `AgencySeatsPage`). Phase 17 —
+  customer profile fields (`/my/profile`, encrypted national ID/passport,
+  email verification) + an incomplete-profile banner on `AccountPage`.
+  See `docs/API.md`/`docs/DB_SCHEMA.md`'s Phase 14–17 sections for full
+  detail (this file lagged behind actual merged work — backfilled here for
+  accuracy, not re-litigated).
+- [x] **Phase 18 — SITE_ADMIN + EMPLOYEE panel access** — a design/mock
+  audit found both panels had an empty `PANEL_NAV` (no sidebar at all).
+  Per explicit user decision ("real and complete", not a narrow fix):
+  `SITE_ADMIN` gets real, conservatively-scoped access to six of its ten
+  design-listed tabs (`agencies`, `reports`, `cartable`, `club`, `refund`,
+  plus a new scoped `SiteAdminDashboardPage`) — `flightops`/`tickets`/
+  `blog`/`media` stay excluded since none has a backend for ANY role.
+  `EMPLOYEE`'s sidebar is now computed per-user from real
+  `EmployeePermission` grants (new `EmployeePermissionGuard` +
+  `@RequiresPermission(...)`, `PanelsService.getNav` now async), matching
+  `پنل کارمند.dc.html`'s dynamic `navKeys` formula — wired for
+  agencies/flights(view-only)/pricing(propose-only)/reports/refund
+  (review+refer, never pay). No schema change. 18 new backend e2e tests
+  (`phase18-panel-access.e2e-spec.ts` + 3 new cases in
+  `panels.e2e-spec.ts`), 4 new frontend unit tests (2 new dashboard
+  pages), plus a pre-existing frontend bug fixed along the way
+  (`RequestDetailPage`'s approve button showed for roles that can't
+  actually approve since Phase 16 narrowed that endpoint). See
+  `docs/API.md`/`docs/DB_SCHEMA.md`'s Phase 18 sections for the full
+  scope + explicit deferrals (`fl_manage`, `ag_settle`, `fn_invoices`, the
+  IT dept's catalog keys, EMPLOYEE's `referrals` tab).
+
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is
 "done" only when every checklist item in its `docs/features/<name>.md` has

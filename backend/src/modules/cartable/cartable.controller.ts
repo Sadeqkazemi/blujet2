@@ -24,7 +24,12 @@ import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 @ApiTags('cartable')
 @Controller('cartable')
 @UseGuards(JwtAuthGuard, RolesGuard, PanelAccessGuard)
-@Roles(...EXEC_ROLES)
+// SITE_ADMIN added here directly (not into the shared EXEC_ROLES constant,
+// which also backs manager-messages/staff-directory — widening those isn't
+// part of this design's siteAdmin.access list). "کارتابل من" is
+// self-scoped (actor.id-filtered), so this is a safe read/act-on-own-items
+// grant. See Phase 18 notes in docs/DB_SCHEMA.md.
+@Roles(...EXEC_ROLES, 'SITE_ADMIN')
 export class CartableController {
   constructor(private readonly cartable: CartableService) {}
 

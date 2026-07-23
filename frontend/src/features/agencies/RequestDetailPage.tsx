@@ -23,8 +23,13 @@ export default function RequestDetailPage() {
   const { requestId = '' } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  // The refer block appears only in the Senior/Commercial panels (design).
-  const canRefer = user?.role === 'SENIOR_MANAGER' || user?.role === 'COMMERCIAL_MANAGER';
+  // The refer block appears in Senior/Commercial + Site Admin (design).
+  const canRefer =
+    user?.role === 'SENIOR_MANAGER' ||
+    user?.role === 'COMMERCIAL_MANAGER' ||
+    user?.role === 'SITE_ADMIN';
+  // Final approval creates the User+AgencyProfile — COMMERCIAL_MANAGER only.
+  const canApprove = user?.role === 'COMMERCIAL_MANAGER';
 
   const [request, setRequest] = useState<AgencyMembershipRequest | null>(null);
   const [loading, setLoading] = useState(true);
@@ -234,13 +239,15 @@ export default function RequestDetailPage() {
             >
               انصراف
             </button>
-            <button
-              disabled={busy}
-              onClick={() => void onApprove()}
-              className="rounded-lg bg-[#059669] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#047857] disabled:opacity-60"
-            >
-              تأیید و ایجاد پروفایل
-            </button>
+            {canApprove && (
+              <button
+                disabled={busy}
+                onClick={() => void onApprove()}
+                className="rounded-lg bg-[#059669] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#047857] disabled:opacity-60"
+              >
+                تأیید و ایجاد پروفایل
+              </button>
+            )}
           </div>
         </section>
       )}

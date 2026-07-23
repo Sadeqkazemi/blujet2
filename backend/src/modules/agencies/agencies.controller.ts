@@ -25,6 +25,8 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PanelAccessGuard } from '../panels/panel-access.guard';
+import { EmployeePermissionGuard } from '../../common/guards/employee-permission.guard';
+import { RequiresPermission } from '../../common/decorators/requires-permission.decorator';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { AgencyMembershipStatus } from '../../../generated/prisma/enums';
 
@@ -36,7 +38,7 @@ const AGENCY_TAB_ROLES = [
 
 @ApiTags('agencies')
 @Controller('agencies')
-@UseGuards(JwtAuthGuard, RolesGuard, PanelAccessGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PanelAccessGuard, EmployeePermissionGuard)
 @Roles(...AGENCY_TAB_ROLES)
 export class AgenciesController {
   constructor(private readonly agencies: AgenciesService) {}
@@ -45,6 +47,8 @@ export class AgenciesController {
   // before ':id' so Nest/Express doesn't match them as an :id param first.
 
   @Get()
+  @Roles('SITE_ADMIN', 'EMPLOYEE', ...AGENCY_TAB_ROLES)
+  @RequiresPermission('ag_list')
   @ApiOperation({ summary: 'لیست آژانس‌ها + کارت‌های KPI' })
   async list(@Query() query: ListAgenciesQueryDto) {
     const data = await this.agencies.list(query);
@@ -52,7 +56,8 @@ export class AgenciesController {
   }
 
   @Get('requests')
-  @Roles('SITE_ADMIN', ...AGENCY_TAB_ROLES)
+  @Roles('SITE_ADMIN', 'EMPLOYEE', ...AGENCY_TAB_ROLES)
+  @RequiresPermission('ag_requests')
   @ApiOperation({ summary: 'لیست درخواست‌های عضویت آژانس' })
   async listRequests(@Query('status') status?: AgencyMembershipStatus) {
     const data = await this.agencies.listRequests(status);
@@ -60,7 +65,8 @@ export class AgenciesController {
   }
 
   @Get('requests/:id')
-  @Roles('SITE_ADMIN', ...AGENCY_TAB_ROLES)
+  @Roles('SITE_ADMIN', 'EMPLOYEE', ...AGENCY_TAB_ROLES)
+  @RequiresPermission('ag_requests')
   @ApiOperation({ summary: 'جزئیات درخواست عضویت + تاریخچه ارجاع' })
   async getRequest(@Param('id') id: string) {
     const data = await this.agencies.getRequest(id);
@@ -119,6 +125,8 @@ export class AgenciesController {
   }
 
   @Get(':id')
+  @Roles('SITE_ADMIN', 'EMPLOYEE', ...AGENCY_TAB_ROLES)
+  @RequiresPermission('ag_info')
   @ApiOperation({
     summary: 'جزئیات آژانس — پروفایل، اعتبار، آمار، فعالیت اخیر',
   })

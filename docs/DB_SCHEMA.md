@@ -1194,3 +1194,123 @@ step anywhere in the project.
   upload — all real sections of the same design page, all out of scope
   for a "notify when incomplete" feature. Flagged here so a future phase
   doesn't assume they were silently included.
+
+## Phase 18 — SITE_ADMIN + EMPLOYEE panel access
+
+A full audit found `PANEL_NAV` had no entry at all for `SITE_ADMIN` or
+`EMPLOYEE` — both panels rendered an empty sidebar (`getNav` fell through
+to `?? []`). User confirmed the "real and complete" fix over the
+"narrow/fast" option: widen backend authorization for SITE_ADMIN as
+designed (adding a refund review+refer capability), and build genuine
+per-employee permission enforcement for EMPLOYEE — not a shortcut that
+leaves either panel nearly empty. No schema change; this phase is pure
+authorization wiring on top of the `EmployeePermission`/`Permission`
+tables that have existed since Phase 8.
+
+**SITE_ADMIN** — `پنل ادمین سایت.dc.html`'s `roleDefs.siteAdmin.access` is
+`["dashboard","agencies","flightops","reports","cartable","tickets","blog",
+"media","club","refund"]`. Of these, `flightops` (close-flight +
+نیرا-manifest-upload), `tickets` (internal support queue), `blog`, and
+`media` have **no backend anywhere in the codebase for any role** — not a
+SITE_ADMIN-specific gap, so they're excluded from `PANEL_NAV.SITE_ADMIN`
+entirely (per this file's own "exclude coded-but-unreachable tabs"
+convention) rather than shipped as `implemented:false` dead entries. The
+remaining six get real, conservatively-scoped access:
+- `agencies` → existing `AgenciesListPage`/`AgencyDetailPage`/
+  `RequestDetailPage` (list/detail/requests/refer/reject — all already
+  read-only or review-only for this role; **not** suspend, credit,
+  settle, or api-key, which stay `SENIOR_MANAGER`/`FINANCE_MANAGER`-only).
+- `reports` → existing `PassengerReportsPage` (passenger search).
+- `cartable` → existing `CartablePage`, self-scoped to the actor; added
+  directly on `CartableController`'s `@Roles(...)` rather than to the
+  shared `EXEC_ROLES` constant, since that constant also gates
+  `manager-messages`/`staff-directory`, which are **not** in this design's
+  access list.
+- `club` → existing `ClubPage`, `listMembers` + `issueCard` only (no
+  `createMember`, `updateLevel`, or the card-request approve/reject
+  queue — those stay CEO/BOARD_CHAIR/SENIOR_MANAGER-only). `issueCard`
+  only flips a card-status flag + audits — no ledger/money movement, so
+  granting it doesn't cross the "no unjustified financial-write
+  expansion" line this phase held to elsewhere.
+- `refund` → **new** capability: `list`/`detail`/`refer` on
+  `RefundsController`, mirroring the exact "review + refer to a
+  specialist, never execute" pattern Phase 16 already established for
+  agency requests (`SITE_ADMIN` refers, `COMMERCIAL_MANAGER` alone
+  approves). `pay` (the actual payout + ledger reversal) is **never**
+  granted to `SITE_ADMIN` — stays `FINANCE_MANAGER`-only.
+- `dashboard` → **not** the shared sales/KPI `DashboardPage` (that reads
+  real revenue/profit data via `reporting.controller.ts`, which
+  `SITE_ADMIN` was deliberately not added to — no financial-data
+  expansion beyond what's justified above). Instead a new, narrower
+  `SiteAdminDashboardPage` combining the two lists `SITE_ADMIN` already
+  has real access to (pending agency requests, refunds awaiting review) —
+  a real but simplified v1 of the design's fuller combined-feed widget.
+
+**EMPLOYEE** — `پنل کارمند.dc.html` computes its sidebar per-user:
+`navKeys = ["dashboard"].concat(granted).concat(["referrals"])`, where
+`granted` is the distinct set of `PERMISSION_CATALOG` section keys the
+employee actually holds. This is fundamentally different from every other
+role's static `PANEL_NAV` array, so `PanelsService.getNav` is now `async`
+and takes the full actor (not just the role): for `role !== 'EMPLOYEE'` it
+behaves exactly as before; for `EMPLOYEE` it queries the caller's real
+`EmployeePermission` rows and computes the nav dynamically.
+
+A new `EMPLOYEE_SECTION_NAV` map (`panel-nav.config.ts`) pairs each nav
+section with the catalog key(s) actually wired to a real endpoint this
+phase — an employee only sees a tab if they hold at least one of its
+wired keys, so a granted-but-unwired permission never produces a dead
+tab:
+
+| section (nav key) | wired catalog keys | real endpoint(s) |
+|---|---|---|
+| `agencies` | `ag_list`, `ag_requests`, `ag_info` | `GET /agencies`, `GET /agencies/requests(/:id)`, `GET /agencies/:id` |
+| `flights` | `fl_view` | `GET /flights/{overview,airports,schedules,:id,:id/fare-rules,:id/allotments}` |
+| `pricing` | `pr_propose` | `GET /pricing/proposals`, `PUT /pricing/flights/:id/proposal` |
+| `reports` | `rp_sales`, `rp_finance` | `GET /passenger-reports/search` (same tab/endpoint for either dept's report key) |
+| `refund` | `rf_list`, `rf_details`, `rf_process` | `GET /refunds`, `GET /refunds/:id`, `PATCH /refunds/:id/refer` |
+
+Enforcement is a new `EmployeePermissionGuard` +
+`@RequiresPermission(...keys)` decorator (`src/common/`) — the guard
+passes straight through for any non-EMPLOYEE actor (RolesGuard already
+fully gates those), so it's safe to add to every widened controller's
+`@UseGuards(...)` uniformly. For an EMPLOYEE actor, it 403s unless
+`EmployeePermission` has a row matching one of the handler's declared
+keys. `refunds.controller.ts` needed per-key granularity rather than a
+single per-section check because its three catalog keys are genuinely
+different sensitivity levels (`rf_list` list-only, `rf_details` decrypted
+PII, `rf_process` refer-only, never `pay`).
+
+⚑ **Deferred, not wired this phase** (documented so a future phase
+doesn't assume silent inclusion):
+- `fl_manage` (flight create/schedule/plan/aircraft/fare-rule/allotment
+  writes) — blanket-granting write access across that many endpoints
+  needed more individual review than this phase had time for; only
+  `fl_view` (read) is wired.
+- `ag_settle` (agency settlement) and `fn_invoices` (invoice
+  view/issue/pay) — both real money-movement/financial-document actions;
+  left unwired for the same "no unjustified financial-write expansion"
+  reason `SITE_ADMIN` was held to.
+- The entire `it` dept (`us_manage`, `sv_control`, `sc_manage`, `lg_view`)
+  — these would touch `IT_MANAGER`-exclusive controllers (user
+  management, service control, security settings, logs) that deserve
+  their own dedicated review, not a blanket widen alongside the
+  commercial/finance keys above.
+- EMPLOYEE's `referrals` tab — `navKeys`'s formula always appends it, but
+  `GET /referrals` (`referrals.service.ts`'s `list`) is sender-scoped
+  (`SENIOR_MANAGER`'s own outgoing referrals); there's no recipient-side
+  "referrals assigned to me" listing, only per-item `detail`/`submitReport`
+  access (already granted to EMPLOYEE since referrals were first built).
+  Shipping the tab today would be a 403-on-load dead entry, so it's
+  omitted from the computed nav until that listing exists.
+
+**Tests**: `test/phase18-panel-access.e2e-spec.ts` (new) covers
+SITE_ADMIN's full real-access list + confirms it never gets
+suspend/credit/settle/api-key/create-member/update-level/pay; EMPLOYEE
+tests use the two permission combinations already in `prisma/seed.ts`
+(`sales.moradi`: `ag_list`+`fl_view`; a freshly IT_MANAGER-granted
+`rf_list`+`rf_details`+`rf_process` employee; a freshly granted
+`pr_propose` employee) to prove per-key granularity, plus one check that
+a non-EMPLOYEE role (`FINANCE_MANAGER`) is unaffected by the new guard.
+`test/panels.e2e-spec.ts` gained the SITE_ADMIN nav-shape test and the
+EMPLOYEE dynamic-nav test (replacing its now-obsolete "EMPLOYEE gets an
+empty nav" assertion).

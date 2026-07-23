@@ -7,8 +7,10 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import {
   ALL_PANEL_KEYS,
+  EMPLOYEE_SECTION_NAV,
   PANEL_ACCESS_TOGGLE_RIGHTS,
   PANEL_NAV,
+  PanelNavItem,
 } from './panel-nav.config';
 import { AuthenticatedUser } from '../../common/types/authenticated-user';
 import { ErrorCode } from '../../common/errors';
@@ -20,8 +22,36 @@ export class PanelsService {
     private readonly audit: AuditService,
   ) {}
 
-  getNav(role: AuthenticatedUser['role']) {
-    return PANEL_NAV[role] ?? [];
+  async getNav(user: AuthenticatedUser): Promise<PanelNavItem[]> {
+    if (user.role !== 'EMPLOYEE') return PANEL_NAV[user.role] ?? [];
+
+    const grants = await this.prisma.employeePermission.findMany({
+      where: { employeeId: user.id },
+      select: { permission: { select: { key: true } } },
+    });
+    const grantedKeys = new Set(grants.map((g) => g.permission.key));
+
+    const items: PanelNavItem[] = [
+      { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
+    ];
+    for (const [sectionKey, section] of Object.entries(EMPLOYEE_SECTION_NAV)) {
+      const hasAccess = section.wiredKeys.some((key) => grantedKeys.has(key));
+      if (hasAccess) {
+        items.push({
+          key: sectionKey,
+          labelFa: section.labelFa,
+          implemented: true,
+        });
+      }
+    }
+    // پنل کارمند.dc.html's navKeys formula always appends "referrals", but
+    // GET /referrals (referrals.service.ts's `list`) is sender-scoped
+    // ("ارجاعات من به مدیران" — SENIOR_MANAGER only); there is no
+    // recipient-side "referrals assigned to me" listing yet, only
+    // per-item detail/report access. Shipping the tab today would be a
+    // dead nav entry (403 on load), so it stays deferred until that
+    // listing exists — see Phase 18 notes in docs/DB_SCHEMA.md.
+    return items;
   }
 
   async getAccessFlags(role: AuthenticatedUser['role']) {
