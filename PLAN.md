@@ -211,6 +211,30 @@ This completes all five items from the post-Phase-18 "dead forms" punch
 list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموشی رمز, وضعیت پرواز,
 وب‌سرویس آژانس).
 
+- [x] **Phase 24 — پرواز (flightops: sale auto-close + نیرا manifest
+  submission)** — closes the `flightops` gap flagged deferred since Phase
+  18's `PANEL_NAV` notes (CEO/SITE_ADMIN/FINANCE_MANAGER/
+  COMMERCIAL_MANAGER — the only 4 roles the design's own `roleDefs`
+  grants it to). Read verbatim from the design: **not** gate/baggage/
+  delay tracking (that's a different, still-unbuilt customer-facing
+  concept, Phase 22's dropped stat boxes) — sale on each flight
+  auto-closes 5h before departure and the full passenger manifest
+  auto-uploads to سامانه نیرا (Iran's civil aviation manifest system) at
+  that same moment. One new nullable column
+  (`FlightInstance.niraSubmittedAt`, no new table); a `NiraProvider`
+  interface + `MockNiraProvider` (same swappable-provider pattern as
+  `SmsProvider`/`PaymentGateway`); lazy materialization on every
+  `flightops` read once an instance crosses the threshold — no cron job,
+  same "no cron job" pattern as `materializeDepartedInstances`/
+  `materializeExpiry`. Explicitly deferred (documented, not an
+  oversight): the 5h close does NOT block `POST /booking` — the design
+  has no manual "close" action either, this is a reporting/manifest
+  surface, not a new booking rule; a real نیرا HTTP integration; CSV/
+  Excel manifest export. 8 new backend e2e tests + 5 unit tests
+  (`sale-close.util.spec.ts` + `nira.service.spec.ts`), 3 new frontend
+  tests. See `docs/API.md`/`docs/DB_SCHEMA.md`/
+  `docs/features/flightops.md` for full scope + explicit deferrals.
+
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is
 "done" only when every checklist item in its `docs/features/<name>.md` has

@@ -312,6 +312,10 @@ model FlightInstance {
   // Advisory ML suggestion for future flights that have no Phase 6 proposal
   // yet (same PersistedAiSuggestion shape; includes modelVersion).
   aiSuggestion         Json?
+  // Phase 24: when the real passenger manifest was submitted to سامانه
+  // نیرا — set exactly once, lazily, by the first flightops read after
+  // departureAt − now ≤ 5h (see NiraService). NULL means not yet closed.
+  niraSubmittedAt      DateTime?
   // Set when this instance was materialized from a recurring Schedule;
   // @@unique below makes re-materialization idempotent.
   scheduleId           String?

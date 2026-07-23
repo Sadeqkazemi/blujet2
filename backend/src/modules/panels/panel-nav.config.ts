@@ -16,14 +16,16 @@ export interface PanelNavItem {
  */
 export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
   // Confirmed from پنل ادمین سایت.dc.html's roleDefs.siteAdmin.access.
-  // flightops/blog/media are in that same design list but have no backend
-  // anywhere in the codebase yet (not just for this role) — left out
-  // entirely rather than shipped as an unreachable tab; see Phase 18 notes
-  // in docs/DB_SCHEMA.md. `tickets` was in the same deferred list but now
-  // has a real (scoped-down) backend — see Phase 20 notes.
+  // blog/media are in that same design list but still have no backend
+  // anywhere in the codebase — left out entirely rather than shipped as an
+  // unreachable tab; see Phase 18 notes in docs/DB_SCHEMA.md. `tickets`
+  // was in the same deferred list but now has a real (scoped-down)
+  // backend (Phase 20); `flightops` likewise now has a real backend
+  // (Phase 24 — sale auto-close + نیرا manifest submission).
   SITE_ADMIN: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
     { key: 'agencies', labelFa: 'مدیریت آژانس‌ها', implemented: true },
+    { key: 'flightops', labelFa: 'پروازها', implemented: true },
     { key: 'reports', labelFa: 'گزارش مسافران', implemented: true },
     { key: 'cartable', labelFa: 'کارتابل', implemented: true },
     { key: 'club', labelFa: 'باشگاه مشتریان', implemented: true },
@@ -32,6 +34,7 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
   ],
   CEO: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
+    { key: 'flightops', labelFa: 'پروازها', implemented: true },
     { key: 'admins', labelFa: 'مدیران', implemented: true },
     { key: 'finance', labelFa: 'مالی', implemented: true },
     { key: 'cartable', labelFa: 'کارتابل', implemented: true },
@@ -70,6 +73,7 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
   FINANCE_MANAGER: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
     { key: 'agencies', labelFa: 'آژانس‌ها', implemented: true },
+    { key: 'flightops', labelFa: 'پروازها', implemented: true },
     { key: 'reports', labelFa: 'گزارش مسافران', implemented: true },
     { key: 'staff', labelFa: 'گزارش کارمندان', implemented: true },
     { key: 'finance', labelFa: 'مالی', implemented: true },
@@ -79,6 +83,7 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
   COMMERCIAL_MANAGER: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
     { key: 'agencies', labelFa: 'آژانس‌ها', implemented: true },
+    { key: 'flightops', labelFa: 'پروازها', implemented: true },
     { key: 'flights', labelFa: 'مدیریت پروازها', implemented: true },
     { key: 'reports', labelFa: 'گزارش مسافران', implemented: true },
     { key: 'staff', labelFa: 'گزارش کارمندان', implemented: true },
