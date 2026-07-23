@@ -1461,3 +1461,22 @@ threads on tickets; a public "track my ticket" status lookup; a
 dedicated تماس با ما admin review/reply UI (the new
 `SiteAdminDashboardPage.tsx` section is this phase's only admin surface
 for it).
+
+## Phase 21 — فراموشی رمز (customer forgot/set password)
+
+No schema change. Reuses `User.passwordHash` (already nullable, already
+populated for staff — see the Phase 1 schema) and the existing
+`TwoFactorChallenge` row with `purpose: 'CUSTOMER_OTP_LOGIN'` (Phase 2) as
+the identity proof for a password reset — no new challenge purpose was
+added since proving phone ownership is exactly the same trust level for
+login and for reset.
+
+- `POST /auth/set-password` writes `passwordHash` directly with no
+  current-password read/compare, unlike `changeOwnPassword` (Phase 12).
+  This is intentional and gated by `@Roles('USER')` at the controller —
+  see docs/API.md's Phase 21 section for why that role gate is
+  security-load-bearing here (it stops a staff/agency token from ever
+  reaching this no-current-password-check path).
+- `POST /auth/customer/login-password` reads `passwordHash` the same way
+  `staffLogin`/`agencyLogin` do, but skips the 2FA challenge step (only
+  staff logins require 2FA per CLAUDE.md).

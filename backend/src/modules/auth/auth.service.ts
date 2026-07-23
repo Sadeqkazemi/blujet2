@@ -87,6 +87,81 @@ export class AuthService {
     });
   }
 
+  /** فراموشی رمز — the caller already proved phone ownership via
+   * POST /auth/otp/verify (issuing the JWT this endpoint requires), so no
+   * current-password check applies here, unlike changeOwnPassword above.
+   * Also doubles as "set a password for the first time" for a customer who
+   * only ever logged in via OTP — CLAUDE.md's email+password is optional,
+   * bootstrapped through this same OTP-verified flow rather than a
+   * separate signup step. `@Roles('USER')` at the controller keeps this
+   * from ever being reachable for a staff/agency token. */
+  async setOwnPassword(
+    actor: AuthenticatedUser,
+    newPassword: string,
+  ): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: actor.id },
+      data: { passwordHash: await argon2.hash(newPassword) },
+    });
+
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'SECURITY',
+      action: 'تعیین/بازنشانی رمز عبور مشتری',
+      detail: `${actor.fullName} رمز عبور حساب خود را از طریق تأیید OTP تعیین کرد.`,
+      entityType: 'User',
+      entityId: actor.id,
+    });
+  }
+
+  /** ورود مشتری با موبایل+رمز — the optional secondary login method
+   * alongside phone+OTP; no 2FA (customers aren't staff). */
+  async customerPasswordLogin(
+    phone: string,
+    password: string,
+    context: { userAgent?: string; ip?: string },
+  ): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    user: AuthenticatedUser;
+  }> {
+    const user = await this.prisma.user.findUnique({ where: { phone } });
+    if (!user || user.role !== 'USER' || !user.passwordHash) {
+      throw new UnauthorizedException({
+        code: ErrorCode.UNAUTHORIZED,
+        message: 'شماره موبایل یا رمز عبور نادرست است.',
+      });
+    }
+    if (!user.isActive) {
+      throw new ForbiddenException({
+        code: 'ACCOUNT_SUSPENDED',
+        message: 'این حساب مسدود شده است.',
+      });
+    }
+    if (!(await argon2.verify(user.passwordHash, password))) {
+      throw new UnauthorizedException({
+        code: ErrorCode.UNAUTHORIZED,
+        message: 'شماره موبایل یا رمز عبور نادرست است.',
+      });
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+
+    const authUser: AuthenticatedUser = {
+      id: user.id,
+      role: user.role,
+      fullName: user.fullName,
+    };
+    const accessToken = this.signAccessToken(authUser);
+    const refreshToken = await this.issueRefreshToken(user.id, context);
+
+    return { accessToken, refreshToken, user: authUser };
+  }
+
   async staffLogin(
     username: string,
     password: string,

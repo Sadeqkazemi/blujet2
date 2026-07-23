@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { ApiRequestError } from '../../api/envelope';
 import { StaffLoginLayout } from './StaffLoginLayout';
@@ -12,6 +12,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   async function onSubmit(e: FormEvent) {
@@ -97,10 +98,20 @@ export default function LoginPage() {
             <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
             مرا به خاطر بسپار
           </label>
-          <Link to="/forgot-password" className="text-[11.5px] font-bold whitespace-nowrap text-accent">
+          <span
+            data-testid="staff-forgot-password"
+            onClick={() => setNotice('برای بازیابی رمز عبور، با واحد فناوری اطلاعات (مدیر IT) تماس بگیرید')}
+            className="cursor-pointer text-[11.5px] font-bold whitespace-nowrap text-accent"
+          >
             فراموشی رمز عبور؟
-          </Link>
+          </span>
         </div>
+
+        {notice && (
+          <p className="rounded-[10px] border border-accent/20 bg-accent/5 px-3 py-2.5 text-[11.5px] text-accent">
+            {notice}
+          </p>
+        )}
 
         {error && (
           <p role="alert" className="flex items-center gap-2 rounded-[10px] border border-red-200 bg-red-50 px-3 py-2.5 text-[11.5px] text-red-600">

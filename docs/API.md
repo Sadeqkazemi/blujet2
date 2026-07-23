@@ -1020,3 +1020,53 @@ side anyway.
 - **A dedicated تماس با ما admin review/reply UI** — see above; the
   dashboard's new summary section is this phase's only admin surface for
   it.
+
+## Phase 21 — فراموشی رمز (customer forgot/set password)
+
+Third "dead forms" item. `ForgotPasswordPage.tsx` was entirely client-side
+(three steps advancing on every submit, no backend call). A design check
+first surfaced a routing bug: `LoginPage.tsx` (staff username+password)
+linked its own "فراموشی رمز عبور؟" to this same page, but
+`design-reference/ورود مدیران و کارمندان.dc.html`'s own `forgotPw` handler
+is **not** a navigation — it shows a toast: "برای بازیابی رمز عبور، با
+واحد فناوری اطلاعات (مدیر IT) تماس بگیرید" (staff has no self-service
+reset; Phase 12 already gives admins a temp-password reset tool). Fixed
+to match: the link now shows that same notice instead of routing
+anywhere. `فراموشی رمز.dc.html`'s own "بازگشت/ورود به حساب" links point at
+`ورود و ثبت‌نام.dc.html` (customer login), confirming this page was
+always meant to be customer-only.
+
+- No new endpoints needed for identity verification — reuses the
+  existing `POST /auth/otp/request` + `POST /auth/otp/verify` (Phase 2)
+  verbatim to prove phone ownership. `verifyOtp` already logs the caller
+  in, so the frontend immediately calls the new set-password endpoint
+  with that token, then signs out so the customer logs back in fresh
+  (matching the design's explicit "ورود به حساب" step) rather than
+  silently staying authenticated.
+- `POST /auth/set-password` (new, `JwtAuthGuard` + `@Roles('USER')`,
+  `@Throttle` 5/min) — `{ newPassword }` (≥8 chars, matching the design's
+  own copy). Deliberately **no current-password check** — the caller just
+  proved phone ownership via OTP, and if they're here it's because they
+  don't know (or never set) a password. `@Roles('USER')` is a
+  security-relevant restriction: without it, a staff/agency access token
+  could bypass `POST /auth/change-password`'s current-password guard
+  entirely, silently overwriting that account's password with none of
+  the safeguards CLAUDE.md requires for privileged accounts.
+- This same endpoint doubles as first-time password setup — a customer
+  who has only ever used OTP login can go through this exact flow to gain
+  a password, giving real meaning to CLAUDE.md's "email+password
+  optional" line for customers (previously nothing implemented it).
+- `POST /auth/customer/login-password` (new, public, `@Throttle` 5/min)
+  — `{ phone, password }`. Issues tokens directly like `otp/verify` does
+  (no 2FA — customers aren't staff). Closes the loop: without this, a
+  password set via the reset flow would have nowhere to actually be used.
+  Wrong password and "phone was never given a password" both 401 with
+  the identical generic message — no account-existence oracle.
+- Frontend: `CustomerLoginPage.tsx`'s login tab gained a small "ورود با
+  رمز عبور" toggle (phone+password fields, same visual language as the
+  existing OTP form) plus a link to `/forgot-password`. The design's own
+  ورود و ثبت‌نام.dc.html has no password field for customers at all — this
+  is the minimal addition needed to make the new backend capability
+  reachable, not a redesign; signup stays OTP-only.
+- No schema change — reuses `User.passwordHash`, already nullable and
+  already populated for staff accounts.
