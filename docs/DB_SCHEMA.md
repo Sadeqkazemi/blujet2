@@ -1533,3 +1533,36 @@ model AgencyWebserviceRequest {
   — deliberately deferred, see docs/API.md's Phase 23 "Explicit
   deferrals".
 - Migration: `20260723160000_phase23_agency_webservice_requests`.
+
+## Phase 24 — پرواز (flightops: sale auto-close + نیرا manifest submission)
+
+One new nullable column — no new table. See docs/API.md's Phase 24
+section for the full feature scope and explicit deferrals.
+
+```prisma
+model FlightInstance {
+  // ...existing fields unchanged...
+
+  // Phase 24: when the real passenger manifest was submitted to سامانه
+  // نیرا. Set exactly once, lazily, by the first flightops read after
+  // departureAt − now ≤ 5h (see NiraService) — no cron job, same pattern
+  // as materializeDepartedInstances/materializeExpiry elsewhere. NULL
+  // means "not yet closed" for a SCHEDULED instance; a conditional
+  // updateMany on write makes the transition idempotent under concurrent
+  // reads.
+  niraSubmittedAt DateTime?
+}
+```
+
+- Deliberately NOT a new `NiraSubmission`/log table: `niraSubmittedAt`
+  alone captures the design's full displayed state (done + timestamp, or
+  pending) — the design shows no submission history, retry count, or
+  failure state to justify a separate table. Contrast with `SmsLog`
+  (Phase 14), which exists because SMS sends are frequent, per-message,
+  and have a real (if narrow) failure mode; a نیرا submission is
+  one-shot-per-flight and the mock provider never fails (see
+  `MockNiraProvider`), so a boolean-via-nullable-timestamp is enough.
+- No FK/relation change, no new enum, no index added — the existing
+  `@@index([departureAt])` already serves the "soonest departure first"
+  ordering `GET /flightops` needs.
+- Migration: `<timestamp>_phase24_flightops_nira_submitted_at`.
