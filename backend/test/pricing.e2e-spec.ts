@@ -13,7 +13,7 @@ import {
   type PriceSuggestionProvider,
   type PriceSuggestionResult,
 } from '../src/modules/ai/price-suggestion.provider';
-import { loginAs } from './helpers/login.helper';
+import { loginAs, stepUpFor } from './helpers/login.helper';
 
 /** Deterministic in-test stand-in for the ml-service — set `nextResult` to
  * null to simulate the service being down (graceful-degradation tests). */
@@ -139,10 +139,16 @@ describe('Pricing (e2e)', () => {
     const proposalId = created.body.data.id as string;
 
     const ceo = await loginAs(app, 'ceo');
+    const stepUp1 = await stepUpFor(
+      app,
+      ceo.accessToken!,
+      'ceo',
+      'PRICE_CAPACITY_CHANGE',
+    );
     const registered = await request(app.getHttpServer())
       .patch(`/pricing/proposals/${proposalId}/register`)
       .set('Authorization', `Bearer ${ceo.accessToken}`)
-      .send({ source: 'PROPOSED' });
+      .send({ source: 'PROPOSED', ...stepUp1 });
     expect(registered.status).toBe(200);
     expect(registered.body.data.status).toBe('REGISTERED');
     expect(registered.body.data.registeredPriceIrr).toBe(38_500_000);
@@ -154,10 +160,16 @@ describe('Pricing (e2e)', () => {
       .send({ proposedPriceIrr: 40_000_000 });
     expect(reEdit.status).toBe(409);
 
+    const stepUp2 = await stepUpFor(
+      app,
+      ceo.accessToken!,
+      'ceo',
+      'PRICE_CAPACITY_CHANGE',
+    );
     const reRegister = await request(app.getHttpServer())
       .patch(`/pricing/proposals/${proposalId}/register`)
       .set('Authorization', `Bearer ${ceo.accessToken}`)
-      .send({ source: 'PROPOSED' });
+      .send({ source: 'PROPOSED', ...stepUp2 });
     expect(reRegister.status).toBe(409);
   });
 
@@ -170,10 +182,16 @@ describe('Pricing (e2e)', () => {
       .send({ proposedPriceIrr: 38_500_000 });
 
     const ceo = await loginAs(app, 'ceo');
+    const stepUp = await stepUpFor(
+      app,
+      ceo.accessToken!,
+      'ceo',
+      'PRICE_CAPACITY_CHANGE',
+    );
     const res = await request(app.getHttpServer())
       .patch(`/pricing/proposals/${created.body.data.id}/register`)
       .set('Authorization', `Bearer ${ceo.accessToken}`)
-      .send({ source: 'AI' });
+      .send({ source: 'AI', ...stepUp });
     expect(res.status).toBe(409);
     expect(res.body.error.message).toContain('هوش مصنوعی');
   });
@@ -224,10 +242,16 @@ describe('Pricing (e2e)', () => {
     expect(stored.proposedPriceIrr).toBe(38_500_000);
     expect(stored.registeredPriceIrr).toBeNull();
 
+    const stepUp = await stepUpFor(
+      app,
+      ceo.accessToken!,
+      'ceo',
+      'PRICE_CAPACITY_CHANGE',
+    );
     const registered = await request(app.getHttpServer())
       .patch(`/pricing/proposals/${proposalId}/register`)
       .set('Authorization', `Bearer ${ceo.accessToken}`)
-      .send({ source: 'AI' });
+      .send({ source: 'AI', ...stepUp });
     expect(registered.status).toBe(200);
     expect(registered.body.data.registeredPriceIrr).toBe(39_200_000);
   });
@@ -248,10 +272,16 @@ describe('Pricing (e2e)', () => {
     expect(analysis.status).toBe(201);
     expect(analysis.body.data.available).toBe(false);
 
+    const stepUp = await stepUpFor(
+      app,
+      ceo.accessToken!,
+      'ceo',
+      'PRICE_CAPACITY_CHANGE',
+    );
     const registered = await request(app.getHttpServer())
       .patch(`/pricing/proposals/${created.body.data.id}/register`)
       .set('Authorization', `Bearer ${ceo.accessToken}`)
-      .send({ source: 'PROPOSED' });
+      .send({ source: 'PROPOSED', ...stepUp });
     expect(registered.status).toBe(200);
   });
 

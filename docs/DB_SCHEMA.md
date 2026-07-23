@@ -973,3 +973,50 @@ own sake.
   idempotency-key rule exists to prevent elsewhere but shouldn't be
   re-invented ad hoc here. Staff review is the safer default until a real
   auto-resolution policy is designed.
+
+---
+
+## Phase 15 — step-up verification for high-risk operations
+
+CLAUDE.md (updated 2026-07-22) requires step-up verification for sensitive
+agency account changes, and the original spec's §5.1 names five more:
+role change, API-key issuance/rotation, refund payout, price/capacity
+change, session revocation. Confirmed by audit: none of these had any
+re-authentication gate beyond the actor's existing session JWT — the same
+15-minute access token that authorized every OTHER request today could
+also authorize wiping every active session site-wide. This phase adds a
+real, reusable step-up mechanism and wires it into every high-risk
+operation that actually exists in the codebase today.
+
+- **Reuses `TwoFactorChallenge` rather than a new table** — same
+  codeHash/expiresAt/consumedAt/attempts machinery already proven at
+  login, just a new `purpose: STEP_UP_VERIFICATION` and a new nullable
+  `scope: StepUpScope?` column (only meaningful for that purpose) so a
+  challenge issued for one sensitive action can't be replayed against a
+  different one.
+- New enum `StepUpScope { ADMIN_ROLE_CHANGE, API_KEY_ROTATE,
+  REFUND_PAYOUT, PRICE_CAPACITY_CHANGE, SESSION_REVOKE }` — exactly the
+  five real call sites found (see API.md); no speculative scopes added.
+- `StepUpService` (new, `backend/src/modules/auth/step-up.service.ts`):
+  `request(actor, scope)` creates the challenge and sends the code
+  through the SAME `TwoFactorProvider.sendCode()` already used for staff
+  2FA login — not a separate delivery path. For AGENCY actors (who always
+  have a phone) this is a genuine SMS OTP end-to-end (logged in Phase 14's
+  `SmsLog`), satisfying CLAUDE.md's explicit "SMS OTP" wording for agency
+  account changes; for staff actors it uses whatever channel their 2FA
+  already uses. `verify(actor, challengeId, code, scope)` checks
+  ownership, purpose, scope match, expiry, attempt cap, and code — then
+  consumes the challenge. Every sensitive endpoint calls `verify()` as its
+  very first action, before touching any other state.
+- ⚑ **AGENCY_ACCOUNT_CHANGE was not wired to anything**: audited and
+  confirmed no endpoint exists anywhere (staff-side or agency self-
+  service) that changes an agency's username/phone/email/password/MFA
+  device today — `agencies.service.ts` only has suspend/credit/API-key
+  operations. Per CLAUDE.md workflow rule 4, this phase does not invent
+  that endpoint just to attach step-up to it; the requirement stays
+  documented here as a MUST for whichever future phase builds it.
+- One new endpoint (`POST /auth/step-up/request`) is enough for every
+  scope — no per-scope request endpoints. Verification itself is inline:
+  each sensitive endpoint's existing DTO gains `stepUpChallengeId` and
+  `stepUpCode` fields rather than requiring a separate "verify, get a
+  temp token, attach it" round trip.

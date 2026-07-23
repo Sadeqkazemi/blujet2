@@ -16,6 +16,7 @@ import {
   PRICE_SUGGESTION_PROVIDER,
   type PriceSuggestionProvider,
 } from '../ai/price-suggestion.provider';
+import { StepUpService } from '../auth/step-up.service';
 import type { PersistedAiSuggestion } from '../pricing/pricing.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { Prisma } from '../../../generated/prisma/client';
@@ -38,6 +39,7 @@ export class FlightsService {
     private readonly audit: AuditService,
     @Inject(PRICE_SUGGESTION_PROVIDER)
     private readonly priceSuggestions: PriceSuggestionProvider,
+    private readonly stepUp: StepUpService,
   ) {}
 
   private async soldByInstance(
@@ -439,7 +441,15 @@ export class FlightsService {
     actor: AuthenticatedUser,
     id: string,
     newAircraftType: string,
+    stepUpChallengeId: string,
+    stepUpCode: string,
   ) {
+    await this.stepUp.verify(
+      actor,
+      stepUpChallengeId,
+      stepUpCode,
+      'PRICE_CAPACITY_CHANGE',
+    );
     const instance = await this.prisma.flightInstance.findUnique({
       where: { id },
       include: { flight: true },

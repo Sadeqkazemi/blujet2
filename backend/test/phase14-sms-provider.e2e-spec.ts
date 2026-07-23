@@ -4,7 +4,7 @@ import request from 'supertest';
 import { PrismaClient } from '../generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { createTestApp } from './helpers/app.helper';
-import { loginAs, loginAsCustomer } from './helpers/login.helper';
+import { loginAs, loginAsCustomer, stepUpFor } from './helpers/login.helper';
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
@@ -49,6 +49,12 @@ describe('Phase 14 — SMS provider + management log', () => {
   it('POST /admins with delivery=sms logs a genuine FAILED row (create never collects a phone)', async () => {
     const ceo = await loginAs(app, 'ceo');
     const username = `p14.admin.${Date.now()}`;
+    const stepUp = await stepUpFor(
+      app,
+      ceo.accessToken!,
+      'ceo',
+      'ADMIN_ROLE_CHANGE',
+    );
     const created = await request(app.getHttpServer())
       .post('/admins')
       .set(auth(ceo.accessToken!))
@@ -59,6 +65,7 @@ describe('Phase 14 — SMS provider + management log', () => {
         role: 'IT_MANAGER',
         password: 'Blujet@1404',
         delivery: 'sms',
+        ...stepUp,
       });
     expect(created.status).toBe(201);
 
@@ -78,6 +85,12 @@ describe('Phase 14 — SMS provider + management log', () => {
     // password (mustChangePassword: true), which would break every other
     // test/dev session relying on that account's known seed password.
     const username = `p14.target.${Date.now()}`;
+    const stepUp = await stepUpFor(
+      app,
+      ceo.accessToken!,
+      'ceo',
+      'ADMIN_ROLE_CHANGE',
+    );
     const target = await request(app.getHttpServer())
       .post('/admins')
       .set(auth(ceo.accessToken!))
@@ -88,6 +101,7 @@ describe('Phase 14 — SMS provider + management log', () => {
         role: 'IT_MANAGER',
         password: 'Blujet@1404',
         delivery: 'email',
+        ...stepUp,
       });
     expect(target.status).toBe(201);
 

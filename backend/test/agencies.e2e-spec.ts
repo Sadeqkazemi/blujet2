@@ -3,7 +3,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import * as crypto from 'node:crypto';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { loginAs } from './helpers/login.helper';
+import { loginAs, stepUpFor } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
 describe('Agencies (e2e)', () => {
@@ -431,10 +431,16 @@ describe('Agencies (e2e)', () => {
   it('the raw API key is returned once at creation and the DB only stores a hash', async () => {
     const agencyId = await createFreshAgency();
     const { accessToken } = await loginAs(app, 'senior.rahimi');
+    const stepUp = await stepUpFor(
+      app,
+      accessToken!,
+      'senior.rahimi',
+      'API_KEY_ROTATE',
+    );
     const res = await request(app.getHttpServer())
       .post(`/agencies/${agencyId}/api-key`)
       .set('Authorization', `Bearer ${accessToken}`)
-      .send({ scope: 'FULL' });
+      .send({ scope: 'FULL', ...stepUp });
 
     expect(res.status).toBe(201);
     expect(typeof res.body.data.rawKey).toBe('string');
@@ -449,20 +455,32 @@ describe('Agencies (e2e)', () => {
   it('regenerating a key changes its stored hash (old key hash no longer matches)', async () => {
     const agencyId = await createFreshAgency();
     const { accessToken } = await loginAs(app, 'senior.rahimi');
+    const stepUp1 = await stepUpFor(
+      app,
+      accessToken!,
+      'senior.rahimi',
+      'API_KEY_ROTATE',
+    );
     const created = await request(app.getHttpServer())
       .post(`/agencies/${agencyId}/api-key`)
       .set('Authorization', `Bearer ${accessToken}`)
-      .send({ scope: 'FULL' });
+      .send({ scope: 'FULL', ...stepUp1 });
     const originalHash = (
       await prisma.agencyApiKey.findUnique({
         where: { id: created.body.data.id },
       })
     )?.keyHash;
 
+    const stepUp2 = await stepUpFor(
+      app,
+      accessToken!,
+      'senior.rahimi',
+      'API_KEY_ROTATE',
+    );
     const regenerated = await request(app.getHttpServer())
       .patch(`/agencies/${agencyId}/api-key/${created.body.data.id}`)
       .set('Authorization', `Bearer ${accessToken}`)
-      .send({ regenerate: true });
+      .send({ regenerate: true, ...stepUp2 });
 
     expect(regenerated.status).toBe(200);
     const newHash = (

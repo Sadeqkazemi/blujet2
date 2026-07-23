@@ -15,12 +15,14 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
+import { StepUpService } from './step-up.service';
 import { StaffLoginDto } from './dto/staff-login.dto';
 import { AgencyLoginDto } from './dto/agency-login.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { VerifyTwoFactorDto } from './dto/verify-two-factor.dto';
 import { RequestOtpDto } from './dto/request-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
+import { RequestStepUpDto } from './dto/step-up.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
@@ -52,7 +54,10 @@ function setRefreshCookie(res: Response, token: string) {
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(
+    private readonly auth: AuthService,
+    private readonly stepUp: StepUpService,
+  ) {}
 
   @Post('staff/login')
   @HttpCode(HttpStatus.OK)
@@ -229,6 +234,22 @@ export class AuthController {
       dto.newPassword,
     );
     return { success: true, data: { changed: true } };
+  }
+
+  @Post('step-up/request')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({
+    summary:
+      'درخواست کد تأیید مجدد پیش از عملیات پرریسک — تحویل از طریق کانال 2FA موجود',
+  })
+  async requestStepUp(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: RequestStepUpDto,
+  ) {
+    const data = await this.stepUp.request(user, dto.scope);
+    return { success: true, data };
   }
 
   @Get('_test/last-code/:username')

@@ -4,7 +4,7 @@ import { App } from 'supertest/types';
 import * as crypto from 'node:crypto';
 import * as argon2 from 'argon2';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { loginAs } from './helpers/login.helper';
+import { loginAs, stepUpFor } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 import type { Role } from '../generated/prisma/enums';
 
@@ -71,6 +71,12 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
   it('POST /admins creates a real staff account that can log in; duplicate username → 409', async () => {
     const ceo = await loginAs(app, 'ceo');
     const suffix = crypto.randomUUID().slice(0, 8);
+    const stepUp1 = await stepUpFor(
+      app,
+      ceo.accessToken!,
+      'ceo',
+      'ADMIN_ROLE_CHANGE',
+    );
     const createRes = await request(app.getHttpServer())
       .post('/admins')
       .set('Authorization', auth(ceo.accessToken))
@@ -81,6 +87,7 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
         role: 'SITE_ADMIN',
         password: 'Fresh@123456',
         delivery: 'sms',
+        ...stepUp1,
       });
     expect(createRes.status).toBe(201);
 
@@ -91,6 +98,12 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
     expect(loginRes.status).toBe(200);
     expect(loginRes.body.data.challengeId).toBeTruthy();
 
+    const stepUp2 = await stepUpFor(
+      app,
+      ceo.accessToken!,
+      'ceo',
+      'ADMIN_ROLE_CHANGE',
+    );
     const dupRes = await request(app.getHttpServer())
       .post('/admins')
       .set('Authorization', auth(ceo.accessToken))
@@ -101,6 +114,7 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
         role: 'SITE_ADMIN',
         password: 'Fresh@123456',
         delivery: 'email',
+        ...stepUp2,
       });
     expect(dupRes.status).toBe(409);
   });

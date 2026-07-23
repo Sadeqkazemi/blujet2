@@ -4,7 +4,7 @@ import { App } from 'supertest/types';
 import * as crypto from 'node:crypto';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { encryptPii } from '../src/common/pii-crypto';
-import { loginAs } from './helpers/login.helper';
+import { loginAs, stepUpFor } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 import type { RefundStatus } from '../generated/prisma/enums';
 
@@ -150,10 +150,17 @@ describe('Refunds (e2e)', () => {
   it('pay is transactional: ledger REFUND row + booking REFUNDED + PAID with processedBy; audited', async () => {
     const { booking, req } = await createRequest('FINANCE');
     const { accessToken } = await loginAs(app, 'finance.karimi');
+    const stepUp = await stepUpFor(
+      app,
+      accessToken!,
+      'finance.karimi',
+      'REFUND_PAYOUT',
+    );
 
     const res = await request(app.getHttpServer())
       .patch(`/refunds/${req.id}/pay`)
-      .set('Authorization', `Bearer ${accessToken}`);
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send(stepUp);
     expect(res.status).toBe(200);
     expect(res.body.data.status).toBe('PAID');
     expect(res.body.data.processedBy.role).toBe('FINANCE_MANAGER');
@@ -183,22 +190,43 @@ describe('Refunds (e2e)', () => {
   it('pay on SUBMITTED → 409 «در انتظار ادمین»; double-pay → 409 with exactly ONE ledger row', async () => {
     const submitted = await createRequest('SUBMITTED');
     const { accessToken } = await loginAs(app, 'finance.karimi');
+    const stepUp1 = await stepUpFor(
+      app,
+      accessToken!,
+      'finance.karimi',
+      'REFUND_PAYOUT',
+    );
 
     const early = await request(app.getHttpServer())
       .patch(`/refunds/${submitted.req.id}/pay`)
-      .set('Authorization', `Bearer ${accessToken}`);
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send(stepUp1);
     expect(early.status).toBe(409);
     expect(early.body.error.message).toBe('در انتظار ادمین');
 
     const payable = await createRequest('FINANCE');
+    const stepUp2 = await stepUpFor(
+      app,
+      accessToken!,
+      'finance.karimi',
+      'REFUND_PAYOUT',
+    );
     const first = await request(app.getHttpServer())
       .patch(`/refunds/${payable.req.id}/pay`)
-      .set('Authorization', `Bearer ${accessToken}`);
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send(stepUp2);
     expect(first.status).toBe(200);
 
+    const stepUp3 = await stepUpFor(
+      app,
+      accessToken!,
+      'finance.karimi',
+      'REFUND_PAYOUT',
+    );
     const replay = await request(app.getHttpServer())
       .patch(`/refunds/${payable.req.id}/pay`)
-      .set('Authorization', `Bearer ${accessToken}`);
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send(stepUp3);
     expect(replay.status).toBe(409);
 
     const ledger = await prisma.ledgerEntry.count({
@@ -213,9 +241,16 @@ describe('Refunds (e2e)', () => {
     const { accessToken } = await loginAs(app, 'finance.karimi');
 
     for (const { req } of [a, b]) {
+      const stepUp = await stepUpFor(
+        app,
+        accessToken!,
+        'finance.karimi',
+        'REFUND_PAYOUT',
+      );
       const res = await request(app.getHttpServer())
         .patch(`/refunds/${req.id}/pay`)
-        .set('Authorization', `Bearer ${accessToken}`);
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send(stepUp);
       expect(res.status).toBe(200);
     }
 

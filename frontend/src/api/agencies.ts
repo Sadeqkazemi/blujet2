@@ -63,14 +63,23 @@ export function fetchAgencyApiKeys(id: string) {
   return apiGet<AgencyApiKey[]>(`/agencies/${id}/api-key`);
 }
 
-export function issueAgencyApiKey(id: string, scope: AgencyApiScope) {
-  return apiPost<AgencyApiKey>(`/agencies/${id}/api-key`, { scope });
+export function issueAgencyApiKey(
+  id: string,
+  scope: AgencyApiScope,
+  stepUp: { stepUpChallengeId: string; stepUpCode: string },
+) {
+  return apiPost<AgencyApiKey>(`/agencies/${id}/api-key`, { scope, ...stepUp });
 }
 
 export function updateAgencyApiKey(
   id: string,
   keyId: string,
-  dto: { status?: 'ACTIVE' | 'SUSPENDED'; regenerate?: boolean },
+  dto: {
+    status?: 'ACTIVE' | 'SUSPENDED';
+    regenerate?: boolean;
+    stepUpChallengeId?: string;
+    stepUpCode?: string;
+  },
 ) {
   return apiPatch<AgencyApiKey>(`/agencies/${id}/api-key/${keyId}`, dto);
 }

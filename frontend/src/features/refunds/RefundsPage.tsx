@@ -3,6 +3,7 @@ import { fetchRefundDetail, fetchRefunds, payRefund, referRefund } from '../../a
 import { fetchStaffDirectory } from '../../api/cartable';
 import { faDigits, faMoney } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
+import { useStepUp } from '../../hooks/useStepUp';
 import Modal from '../../components/Modal';
 import type { RefundDetail, RefundListRow, RefundsResult, RefundStatus } from '../../types/refunds';
 import type { StaffDirectoryEntry } from '../../types/cartable';
@@ -27,6 +28,7 @@ export default function RefundsPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const stepUp = useStepUp('REFUND_PAYOUT');
 
   const load = useCallback(async () => {
     try {
@@ -71,11 +73,13 @@ export default function RefundsPage() {
   async function onPay(id: string) {
     setError(null);
     try {
-      await payRefund(id);
+      const fields = await stepUp.confirm();
+      await payRefund(id, fields);
       setNotice('تأیید، واریز وجه و بستن پرونده انجام شد ✓');
       setDetail(null);
       await load();
     } catch (e) {
+      if (e instanceof Error && e.message === 'CANCELLED') return;
       setError(e instanceof Error ? e.message : 'خطا در پرداخت.');
     }
   }
@@ -308,6 +312,7 @@ export default function RefundsPage() {
           )}
         </Modal>
       )}
+      {stepUp.modal}
     </div>
   );
 }

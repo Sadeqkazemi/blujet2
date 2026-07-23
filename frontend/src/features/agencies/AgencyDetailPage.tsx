@@ -19,6 +19,7 @@ import {
 } from '../../api/agencies';
 import { faDigits, faMoney, parseTomanToRial } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime, parseJalaliDateToIso } from '../../lib/jalali';
+import { useStepUp } from '../../hooks/useStepUp';
 import Modal from '../../components/Modal';
 import { INVOICE_STATUS, TIER_LABELS, statusBadge } from './agency-labels';
 import type {
@@ -83,6 +84,7 @@ export default function AgencyDetailPage() {
   const [apiKeys, setApiKeys] = useState<AgencyApiKey[]>([]);
   const [apiScope, setApiScope] = useState<AgencyApiScope>('FULL');
   const [freshRawKey, setFreshRawKey] = useState<string | null>(null);
+  const stepUp = useStepUp('API_KEY_ROTATE');
 
   const [invoices, setInvoices] = useState<AgencyInvoice[]>([]);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
@@ -175,10 +177,12 @@ export default function AgencyDetailPage() {
 
   async function onIssueApiKey() {
     try {
-      const created = await issueAgencyApiKey(agencyId, apiScope);
+      const fields = await stepUp.confirm();
+      const created = await issueAgencyApiKey(agencyId, apiScope, fields);
       setFreshRawKey(created.rawKey ?? null);
       setApiKeys(await fetchAgencyApiKeys(agencyId));
-    } catch {
+    } catch (err) {
+      if (err instanceof Error && err.message === 'CANCELLED') return;
       setError('خطا در تولید کلید API.');
     }
   }
@@ -186,7 +190,8 @@ export default function AgencyDetailPage() {
   async function onApiKeyAction(key: AgencyApiKey, action: 'toggle' | 'regenerate') {
     try {
       if (action === 'regenerate') {
-        const updated = await updateAgencyApiKey(agencyId, key.id, { regenerate: true });
+        const fields = await stepUp.confirm();
+        const updated = await updateAgencyApiKey(agencyId, key.id, { regenerate: true, ...fields });
         setFreshRawKey(updated.rawKey ?? null);
       } else {
         await updateAgencyApiKey(agencyId, key.id, {
@@ -194,7 +199,8 @@ export default function AgencyDetailPage() {
         });
       }
       setApiKeys(await fetchAgencyApiKeys(agencyId));
-    } catch {
+    } catch (err) {
+      if (err instanceof Error && err.message === 'CANCELLED') return;
       setError('خطا در به‌روزرسانی کلید API.');
     }
   }
@@ -820,6 +826,7 @@ export default function AgencyDetailPage() {
           </div>
         </Modal>
       )}
+      {stepUp.modal}
     </div>
   );
 }

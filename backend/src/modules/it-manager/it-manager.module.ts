@@ -11,9 +11,10 @@ import { ItDashboardController } from './dashboard.controller';
 import { ItDashboardService } from './dashboard.service';
 import { AuditModule } from '../audit/audit.module';
 import { PanelsModule } from '../panels/panels.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [AuditModule, PanelsModule],
+  imports: [AuditModule, PanelsModule, AuthModule],
   controllers: [
     EmployeesController,
     SecurityController,

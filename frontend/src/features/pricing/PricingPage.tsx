@@ -10,6 +10,7 @@ import {
 } from '../../api/pricing';
 import { faDigits, faMoney, parseTomanToRial } from '../../lib/fa-format';
 import { formatJalaliDate } from '../../lib/jalali';
+import { useStepUp } from '../../hooks/useStepUp';
 import Modal from '../../components/Modal';
 import type {
   CeoPricingResult,
@@ -37,6 +38,7 @@ function CeoPricing() {
   const [aiRunning, setAiRunning] = useState(false);
   const [legalInputs, setLegalInputs] = useState<Record<string, string>>({});
   const [factorsOpen, setFactorsOpen] = useState<Record<string, boolean>>({});
+  const stepUp = useStepUp('PRICE_CAPACITY_CHANGE');
 
   const load = useCallback(async () => {
     try {
@@ -72,10 +74,12 @@ function CeoPricing() {
   async function onRegister(p: PricingProposal, source: 'PROPOSED' | 'AI') {
     setError(null);
     try {
-      await registerProposal(p.id, source);
+      const fields = await stepUp.confirm();
+      await registerProposal(p.id, source, fields);
       setNotice('قیمت پرواز تأیید و ثبت شد ✓');
       await load();
     } catch (e) {
+      if (e instanceof Error && e.message === 'CANCELLED') return;
       setError(e instanceof Error ? e.message : 'خطا در ثبت قیمت.');
     }
   }
@@ -289,6 +293,7 @@ function CeoPricing() {
           </div>
         )}
       </section>
+      {stepUp.modal}
     </div>
   );
 }

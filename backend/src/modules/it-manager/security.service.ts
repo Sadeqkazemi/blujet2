@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { StepUpService } from '../auth/step-up.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { UpdateSecurityPolicyDto } from './dto/security.dtos';
 
@@ -9,6 +10,7 @@ export class SecurityService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly stepUp: StepUpService,
   ) {}
 
   /** Auto-creates the id=1 singleton with the design's defaults on first read. */
@@ -62,7 +64,17 @@ export class SecurityService {
   /** Revokes every active session site-wide. Only kills the refresh chain —
    * an already-issued 15-minute access token stays valid until it expires
    * naturally (stateless JWT; no blocklist), an accepted, documented limit. */
-  async logoutAll(actor: AuthenticatedUser) {
+  async logoutAll(
+    actor: AuthenticatedUser,
+    stepUpChallengeId: string,
+    stepUpCode: string,
+  ) {
+    await this.stepUp.verify(
+      actor,
+      stepUpChallengeId,
+      stepUpCode,
+      'SESSION_REVOKE',
+    );
     const result = await this.prisma.refreshToken.updateMany({
       where: { revokedAt: null },
       data: { revokedAt: new Date() },

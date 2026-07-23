@@ -37,6 +37,43 @@ export async function loginAs(
   };
 }
 
+/** Drives POST /auth/step-up/request for an already-logged-in actor and
+ * reads the code back from the mock provider, returning the two fields
+ * every step-up-gated endpoint expects on its body. */
+export async function stepUpFor(
+  app: INestApplication<App>,
+  accessToken: string,
+  username: string,
+  scope:
+    | 'ADMIN_ROLE_CHANGE'
+    | 'API_KEY_ROTATE'
+    | 'REFUND_PAYOUT'
+    | 'PRICE_CAPACITY_CHANGE'
+    | 'SESSION_REVOKE',
+) {
+  const prisma = app.get(PrismaService);
+  const twoFactor = app.get<MockTwoFactorProvider>(TWO_FACTOR_PROVIDER);
+
+  const requestRes = await request(app.getHttpServer())
+    .post('/auth/step-up/request')
+    .set('Authorization', `Bearer ${accessToken}`)
+    .send({ scope });
+  if (requestRes.status !== 200) {
+    throw new Error(
+      `step-up request failed for ${username}/${scope}: ${requestRes.status} ${JSON.stringify(requestRes.body)}`,
+    );
+  }
+
+  const user = await prisma.user.findUniqueOrThrow({ where: { username } });
+  const code = twoFactor.getLastCode(user.id);
+  if (!code) throw new Error(`No step-up code recorded for ${username}`);
+
+  return {
+    stepUpChallengeId: requestRes.body.data.challengeId as string,
+    stepUpCode: code,
+  };
+}
+
 /** Drives the full phone+OTP flow for a customer (find-or-create on
  * first call), returning a ready-to-use access token. */
 export async function loginAsCustomer(

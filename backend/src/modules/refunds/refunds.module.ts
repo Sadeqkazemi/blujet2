@@ -4,9 +4,10 @@ import { RefundsCustomerController } from './refunds-customer.controller';
 import { RefundsService } from './refunds.service';
 import { PanelsModule } from '../panels/panels.module';
 import { AuditModule } from '../audit/audit.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [PanelsModule, AuditModule],
+  imports: [PanelsModule, AuditModule, AuthModule],
   controllers: [RefundsController, RefundsCustomerController],
   providers: [RefundsService],
 })

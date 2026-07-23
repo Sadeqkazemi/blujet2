@@ -10,6 +10,7 @@ import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
 import { decryptPii, encryptPii } from '../../common/pii-crypto';
 import { computePenalty } from './penalty';
+import { StepUpService } from '../auth/step-up.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { Prisma, RefundRequest } from '../../../generated/prisma/client';
 
@@ -29,6 +30,7 @@ export class RefundsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly stepUp: StepUpService,
   ) {}
 
   private async getOrThrow(id: string) {
@@ -147,7 +149,18 @@ export class RefundsService {
     return toListRow(updated);
   }
 
-  async pay(actor: AuthenticatedUser, id: string) {
+  async pay(
+    actor: AuthenticatedUser,
+    id: string,
+    stepUpChallengeId: string,
+    stepUpCode: string,
+  ) {
+    await this.stepUp.verify(
+      actor,
+      stepUpChallengeId,
+      stepUpCode,
+      'REFUND_PAYOUT',
+    );
     const request = await this.getOrThrow(id);
     if (request.status !== 'FINANCE') {
       throw new ConflictException({

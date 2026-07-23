@@ -17,6 +17,8 @@ export function createAdmin(dto: {
   role: AdminCreatableRole;
   password: string;
   delivery: 'sms' | 'email';
+  stepUpChallengeId: string;
+  stepUpCode: string;
 }) {
   return apiPost<{ id: string }>('/admins', dto);
 }

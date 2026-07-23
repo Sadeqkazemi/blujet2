@@ -13,6 +13,6 @@ export function referRefund(id: string, assigneeId: string) {
   return apiPatch<RefundListRow>(`/refunds/${id}/refer`, { assigneeId });
 }
 
-export function payRefund(id: string) {
-  return apiPatch<RefundListRow>(`/refunds/${id}/pay`);
+export function payRefund(id: string, stepUp: { stepUpChallengeId: string; stepUpCode: string }) {
+  return apiPatch<RefundListRow>(`/refunds/${id}/pay`, stepUp);
 }

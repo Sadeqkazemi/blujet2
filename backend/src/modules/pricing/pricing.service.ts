@@ -11,6 +11,7 @@ import {
   PRICE_SUGGESTION_PROVIDER,
   type PriceSuggestionProvider,
 } from '../ai/price-suggestion.provider';
+import { StepUpService } from '../auth/step-up.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { Prisma } from '../../../generated/prisma/client';
 
@@ -35,6 +36,7 @@ export class PricingService {
     private readonly audit: AuditService,
     @Inject(PRICE_SUGGESTION_PROVIDER)
     private readonly priceSuggestions: PriceSuggestionProvider,
+    private readonly stepUp: StepUpService,
   ) {}
 
   private proposalInclude() {
@@ -189,7 +191,15 @@ export class PricingService {
     actor: AuthenticatedUser,
     id: string,
     source: 'PROPOSED' | 'AI',
+    stepUpChallengeId: string,
+    stepUpCode: string,
   ) {
+    await this.stepUp.verify(
+      actor,
+      stepUpChallengeId,
+      stepUpCode,
+      'PRICE_CAPACITY_CHANGE',
+    );
     const proposal = await this.prisma.farePricingProposal.findUnique({
       where: { id },
       include: this.proposalInclude(),

@@ -3,7 +3,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import * as crypto from 'node:crypto';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { loginAs } from './helpers/login.helper';
+import { loginAs, stepUpFor } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
 describe('IT Manager (e2e)', () => {
@@ -244,9 +244,16 @@ describe('IT Manager (e2e)', () => {
     expect(sessions.status).toBe(200);
     expect(sessions.body.data.length).toBeGreaterThanOrEqual(2);
 
+    const stepUp = await stepUpFor(
+      app,
+      it.accessToken!,
+      'itadmin',
+      'SESSION_REVOKE',
+    );
     const logoutAll = await request(app.getHttpServer())
       .post('/it/security/sessions/logout-all')
-      .set(auth(it.accessToken));
+      .set(auth(it.accessToken))
+      .send(stepUp);
     expect(logoutAll.status).toBe(201);
     expect(logoutAll.body.data.revokedCount).toBeGreaterThanOrEqual(2);
 

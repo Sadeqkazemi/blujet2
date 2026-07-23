@@ -46,6 +46,17 @@ export function requestOtp(phone: string) {
   return apiPost<{ challengeId: string }>('/auth/otp/request', { phone });
 }
 
+export type StepUpScope =
+  | 'ADMIN_ROLE_CHANGE'
+  | 'API_KEY_ROTATE'
+  | 'REFUND_PAYOUT'
+  | 'PRICE_CAPACITY_CHANGE'
+  | 'SESSION_REVOKE';
+
+export function requestStepUp(scope: StepUpScope) {
+  return apiPost<{ challengeId: string }>('/auth/step-up/request', { scope });
+}
+
 export async function verifyOtp(challengeId: string, code: string) {
   const result = await apiPost<{ accessToken: string; user: AuthUser }>('/auth/otp/verify', {
     challengeId,

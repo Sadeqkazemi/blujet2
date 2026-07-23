@@ -11,6 +11,7 @@ import { AuditService } from '../audit/audit.service';
 import { CartableService } from '../cartable/cartable.service';
 import { ErrorCode } from '../../common/errors';
 import { generateTempPassword } from '../../common/temp-password';
+import { StepUpService } from '../auth/step-up.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type {
   AgencyApiScope,
@@ -39,6 +40,7 @@ export class AgenciesService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly cartable: CartableService,
+    private readonly stepUp: StepUpService,
   ) {}
 
   /** SUM(SALE) + SUM(SETTLEMENT) per agency — SETTLEMENT rows are stored
@@ -607,7 +609,15 @@ export class AgenciesService {
     actor: AuthenticatedUser,
     id: string,
     scope: AgencyApiScope,
+    stepUpChallengeId: string,
+    stepUpCode: string,
   ) {
+    await this.stepUp.verify(
+      actor,
+      stepUpChallengeId,
+      stepUpCode,
+      'API_KEY_ROTATE',
+    );
     await this.getProfileOrThrow(id);
     const rawKey = generateApiKeySecret();
     const created = await this.prisma.agencyApiKey.create({
@@ -637,7 +647,12 @@ export class AgenciesService {
     actor: AuthenticatedUser,
     id: string,
     keyId: string,
-    dto: { status?: AgencyApiKeyStatus; regenerate?: boolean },
+    dto: {
+      status?: AgencyApiKeyStatus;
+      regenerate?: boolean;
+      stepUpChallengeId?: string;
+      stepUpCode?: string;
+    },
   ) {
     const key = await this.prisma.agencyApiKey.findUnique({
       where: { id: keyId },
@@ -650,6 +665,12 @@ export class AgenciesService {
     }
 
     if (dto.regenerate) {
+      await this.stepUp.verify(
+        actor,
+        dto.stepUpChallengeId ?? '',
+        dto.stepUpCode ?? '',
+        'API_KEY_ROTATE',
+      );
       const rawKey = generateApiKeySecret();
       const updated = await this.prisma.agencyApiKey.update({
         where: { id: keyId },

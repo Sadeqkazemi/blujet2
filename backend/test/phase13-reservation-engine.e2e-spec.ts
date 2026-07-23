@@ -4,7 +4,7 @@ import request from 'supertest';
 import { PrismaClient } from '../generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { createTestApp } from './helpers/app.helper';
-import { loginAs, loginAsCustomer } from './helpers/login.helper';
+import { loginAs, loginAsCustomer, stepUpFor } from './helpers/login.helper';
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
@@ -213,6 +213,9 @@ describe('Phase 13 — reservation engine completion', () => {
 
   it('rejects an aircraft-type change that would drop capacity below confirmed bookings, and accepts one that fits', async () => {
     const instance = await freshInstance({ capacity: 4 });
+    // Two full booking+pay flows plus two step-up request/verify round
+    // trips (each hashing a code with argon2) push this past Jest's
+    // default 5s test timeout.
 
     const booking = await request(app.getHttpServer())
       .post('/bookings')
@@ -230,10 +233,16 @@ describe('Phase 13 — reservation engine completion', () => {
       .expect(201);
 
     // A larger-capacity type always fits the 1 confirmed passenger.
+    const stepUp1 = await stepUpFor(
+      app,
+      staffToken,
+      'senior.rahimi',
+      'PRICE_CAPACITY_CHANGE',
+    );
     const okChange = await request(app.getHttpServer())
       .patch(`/flights/${instance.id}/aircraft`)
       .set('Authorization', `Bearer ${staffToken}`)
-      .send({ aircraftType: AIRCRAFT_LARGE });
+      .send({ aircraftType: AIRCRAFT_LARGE, ...stepUp1 });
     expect(okChange.status).toBe(200);
     expect(okChange.body.data.capacity).toBe(8);
 
@@ -271,15 +280,21 @@ describe('Phase 13 — reservation engine completion', () => {
         economyColsRight: [],
       },
     });
+    const stepUp2 = await stepUpFor(
+      app,
+      staffToken,
+      'senior.rahimi',
+      'PRICE_CAPACITY_CHANGE',
+    );
     const rejectedChange = await request(app.getHttpServer())
       .patch(`/flights/${tinyInstance.id}/aircraft`)
       .set('Authorization', `Bearer ${staffToken}`)
-      .send({ aircraftType: 'P13-EmptyJet' });
+      .send({ aircraftType: 'P13-EmptyJet', ...stepUp2 });
     expect(rejectedChange.status).toBe(409);
     expect(rejectedChange.body.error.code).toBe('CAPACITY_BELOW_CONFIRMED');
 
     await prisma.aircraftSeatMap.delete({
       where: { aircraftType: 'P13-EmptyJet' },
     });
-  });
+  }, 15000);
 });
