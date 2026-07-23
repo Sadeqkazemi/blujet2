@@ -119,7 +119,13 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
 
   it('GET /passenger-reports/search: name search returns ticket details; national ID always masked', async () => {
     const suffix = crypto.randomUUID().slice(0, 6);
-    const instance = await prisma.flightInstance.findFirstOrThrow();
+    // Pinned to the seeded Airbus A320 fleet — other e2e specs create their
+    // own throwaway flights/instances for unrelated aircraft types with no
+    // matching AircraftSeatMap row, so an unfiltered findFirst() can pick
+    // one of those and make `cabin` resolve to null non-deterministically.
+    const instance = await prisma.flightInstance.findFirstOrThrow({
+      where: { flight: { aircraftType: 'Airbus A320' } },
+    });
     const nationalId = '0499370899'; // valid checksum test ID
     const booking = await prisma.booking.create({
       data: {
@@ -157,7 +163,13 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
 
   it('GET /passenger-reports/search: a 10-digit query matches by national-ID hash exactly', async () => {
     const suffix = crypto.randomUUID().slice(0, 6);
-    const instance = await prisma.flightInstance.findFirstOrThrow();
+    // Pinned to the seeded Airbus A320 fleet — other e2e specs create their
+    // own throwaway flights/instances for unrelated aircraft types with no
+    // matching AircraftSeatMap row, so an unfiltered findFirst() can pick
+    // one of those and make `cabin` resolve to null non-deterministically.
+    const instance = await prisma.flightInstance.findFirstOrThrow({
+      where: { flight: { aircraftType: 'Airbus A320' } },
+    });
     const nationalId = '1287960649';
     const booking = await prisma.booking.create({
       data: {

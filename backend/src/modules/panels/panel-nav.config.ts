@@ -15,6 +15,19 @@ export interface PanelNavItem {
  * see docs/DB_SCHEMA.md's design-extraction notes and PLAN.md.
  */
 export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
+  // Confirmed from پنل ادمین سایت.dc.html's roleDefs.siteAdmin.access.
+  // flightops/tickets/blog/media are in that same design list but have no
+  // backend anywhere in the codebase yet (not just for this role) — left
+  // out entirely rather than shipped as an unreachable tab; see Phase 18
+  // notes in docs/DB_SCHEMA.md.
+  SITE_ADMIN: [
+    { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
+    { key: 'agencies', labelFa: 'مدیریت آژانس‌ها', implemented: true },
+    { key: 'reports', labelFa: 'گزارش مسافران', implemented: true },
+    { key: 'cartable', labelFa: 'کارتابل', implemented: true },
+    { key: 'club', labelFa: 'باشگاه مشتریان', implemented: true },
+    { key: 'refund', labelFa: 'استرداد بلیط', implemented: true },
+  ],
   CEO: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
     { key: 'admins', labelFa: 'مدیران', implemented: true },
@@ -91,6 +104,34 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
 export const PANEL_ACCESS_TOGGLE_RIGHTS: Partial<Record<Role, string[]>> = {
   CEO: ['FINANCE', 'COMMERCIAL', 'IT'],
   SENIOR_MANAGER: ['CEO', 'SITE_ADMIN', 'FINANCE', 'COMMERCIAL', 'IT'],
+};
+
+/**
+ * EMPLOYEE's sidebar is computed per-user (see پنل کارمند.dc.html's
+ * `navKeys = ["dashboard"].concat(granted).concat(["referrals"])`), not a
+ * static PANEL_NAV row. This maps each PERMISSION_CATALOG sectionKey to
+ * the nav tab it unlocks and the exact catalog key(s) actually wired to
+ * real backend access this phase — an employee only sees the tab if they
+ * hold one of its wired keys, so a section that's in the catalog but not
+ * yet wired (finance/fn_invoices, agencies/ag_settle, and the whole IT
+ * dept: users/services/security/logs) never renders as a dead tab. See
+ * Phase 18 notes in docs/DB_SCHEMA.md.
+ */
+export const EMPLOYEE_SECTION_NAV: Record<
+  string,
+  { labelFa: string; wiredKeys: string[] }
+> = {
+  agencies: {
+    labelFa: 'آژانس‌ها',
+    wiredKeys: ['ag_list', 'ag_requests', 'ag_info'],
+  },
+  flights: { labelFa: 'مدیریت پروازها', wiredKeys: ['fl_view'] },
+  pricing: { labelFa: 'تعیین قیمت بلیط', wiredKeys: ['pr_propose'] },
+  reports: { labelFa: 'گزارش مسافران', wiredKeys: ['rp_sales', 'rp_finance'] },
+  refund: {
+    labelFa: 'استرداد بلیط',
+    wiredKeys: ['rf_list', 'rf_details', 'rf_process'],
+  },
 };
 
 export const ALL_PANEL_KEYS = [
