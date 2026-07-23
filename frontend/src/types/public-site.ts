@@ -84,3 +84,13 @@ export interface RefundRequestView {
   totalPaidIrr: number;
   createdAt: string;
 }
+
+export interface UserProfile {
+  fullName: string;
+  nationalId: string | null;
+  birthDate: string | null;
+  passportNo: string | null;
+  email: string | null;
+  emailVerifiedAt: string | null;
+  completionPct: number;
+}

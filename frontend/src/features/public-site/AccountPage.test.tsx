@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AccountPage from './AccountPage';
 import * as useAuthModule from '../../hooks/useAuth';
 import * as publicSiteApi from '../../api/publicSite';
-import type { BookingDetail, RefundRequestView } from '../../types/public-site';
+import type { BookingDetail, RefundRequestView, UserProfile } from '../../types/public-site';
 
 const BOOKING: BookingDetail = {
   id: 'b1',
@@ -34,6 +34,16 @@ const REFUND: RefundRequestView = {
   createdAt: '2026-07-01T00:00:00.000Z',
 };
 
+const PROFILE: UserProfile = {
+  fullName: 'نگار رضایی',
+  nationalId: null,
+  birthDate: null,
+  passportNo: null,
+  email: null,
+  emailVerifiedAt: null,
+  completionPct: 20,
+};
+
 function mockAuth(status: 'authenticated' | 'unauthenticated') {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status,
@@ -58,6 +68,7 @@ beforeEach(() => {
   vi.spyOn(publicSiteApi, 'fetchWallet').mockResolvedValue({ balanceIrr: 250_000_0 });
   vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({ isMember: true, level: 'GOLD', balance: 12450 });
   vi.spyOn(publicSiteApi, 'fetchMyRefunds').mockResolvedValue([REFUND]);
+  vi.spyOn(publicSiteApi, 'fetchMyProfile').mockResolvedValue(PROFILE);
 });
 
 describe('AccountPage', () => {
@@ -95,5 +106,29 @@ describe('AccountPage', () => {
     renderPage();
     await userEvent.click(screen.getByTestId('account-tab-refunds'));
     expect(await screen.findByTestId('account-refund')).toHaveTextContent('در حال بررسی');
+  });
+
+  it('shows an incomplete-profile banner and saves identity fields from the profile tab', async () => {
+    mockAuth('authenticated');
+    const update = vi.spyOn(publicSiteApi, 'updateMyProfile').mockResolvedValue({
+      ...PROFILE,
+      nationalId: '0012345679',
+      completionPct: 40,
+    });
+    renderPage();
+
+    expect(await screen.findByTestId('profile-incomplete-banner')).toHaveTextContent('۲۰٪');
+
+    await userEvent.click(screen.getByTestId('account-tab-profile'));
+    const nationalIdInput = await screen.findByLabelText('کد ملی');
+    await userEvent.type(nationalIdInput, '0012345679');
+    await userEvent.click(screen.getByRole('button', { name: 'ذخیره اطلاعات' }));
+
+    await screen.findByText('اطلاعات پروفایل ذخیره شد ✓');
+    expect(update).toHaveBeenCalledWith({
+      fullName: 'نگار رضایی',
+      nationalId: '0012345679',
+      passportNo: undefined,
+    });
   });
 });

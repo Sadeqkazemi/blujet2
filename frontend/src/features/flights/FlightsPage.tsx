@@ -1,25 +1,31 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import {
+  createAllotment,
   createFlight,
+  deleteAllotment,
   fetchAirports,
+  fetchAllotments,
   fetchFlightDetail,
   fetchFlightsOverview,
   planFlight,
   runFlightsAiAnalysis,
 } from '../../api/flights';
+import { fetchAgencies } from '../../api/agencies';
 import { faDigits, faMoney, latinDigits, parseTomanToRial } from '../../lib/fa-format';
 import { dayjs, formatJalaliDateTime, parseJalaliDateToIso } from '../../lib/jalali';
 import Modal from '../../components/Modal';
 import PricingPage from '../pricing/PricingPage';
 import type {
   AirportEntry,
+  AllotmentRow,
   CompletedFlightRow,
   DerivedFlightStatus,
   FlightDetail,
   FlightsOverview,
   FutureFlightRow,
 } from '../../types/flights';
+import type { AgencyListRow } from '../../types/agencies';
 
 const STATUS_META: Record<DerivedFlightStatus, { label: string; className: string }> = {
   ACTIVE: { label: 'فعال', className: 'bg-[#10b98124] text-[#059669]' },
@@ -72,6 +78,12 @@ export default function FlightsPage() {
   const [plan, setPlan] = useState<FutureFlightRow | null>(null);
   const [planPrice, setPlanPrice] = useState('');
   const [planAgency, setPlanAgency] = useState('');
+
+  const [allotments, setAllotments] = useState<AllotmentRow[]>([]);
+  const [agencyOptions, setAgencyOptions] = useState<AgencyListRow[]>([]);
+  const [newAllotmentAgencyId, setNewAllotmentAgencyId] = useState('');
+  const [newAllotmentSeats, setNewAllotmentSeats] = useState('');
+  const [allotmentError, setAllotmentError] = useState<string | null>(null);
 
   const cityByCode = useMemo(
     () => new Map(airports.map((a) => [a.code, a.cityFa])),
@@ -157,6 +169,46 @@ export default function FlightsPage() {
           Math.round((row.capacity - row.charterSeats) / 2),
       ),
     );
+    setAllotmentError(null);
+    setNewAllotmentAgencyId('');
+    setNewAllotmentSeats('');
+    fetchAllotments(row.id)
+      .then(setAllotments)
+      .catch(() => setAllotments([]));
+    fetchAgencies({})
+      .then((r) => setAgencyOptions(r.agencies))
+      .catch(() => setAgencyOptions([]));
+  }
+
+  async function onAddAllotment() {
+    if (!plan) return;
+    setAllotmentError(null);
+    const seats = Number(latinDigits(newAllotmentSeats));
+    if (!newAllotmentAgencyId || !Number.isInteger(seats) || seats < 1) {
+      setAllotmentError('آژانس و تعداد صندلی معتبر را انتخاب کنید.');
+      return;
+    }
+    try {
+      await createAllotment(plan.id, {
+        agencyId: newAllotmentAgencyId,
+        seatsAllocated: seats,
+      });
+      setNewAllotmentAgencyId('');
+      setNewAllotmentSeats('');
+      setAllotments(await fetchAllotments(plan.id));
+    } catch (e) {
+      setAllotmentError(e instanceof Error ? e.message : 'خطا در ثبت سهمیه.');
+    }
+  }
+
+  async function onDeleteAllotment(allotmentId: string) {
+    if (!plan) return;
+    try {
+      await deleteAllotment(plan.id, allotmentId);
+      setAllotments(await fetchAllotments(plan.id));
+    } catch (e) {
+      setAllotmentError(e instanceof Error ? e.message : 'خطا در حذف سهمیه.');
+    }
   }
 
   async function onSubmitPlan() {
@@ -925,6 +977,61 @@ export default function FlightsPage() {
           >
             ثبت نرخ و تخصیص صندلی
           </button>
+
+          <div className="mt-5 border-t border-border pt-4">
+            <h3 className="mb-2 text-xs font-bold text-ink">سهمیه‌های صندلی آژانس‌ها</h3>
+            {allotments.length === 0 && (
+              <p className="mb-2 text-[11px] text-muted">هنوز سهمیه‌ای برای این پرواز ثبت نشده است.</p>
+            )}
+            <div className="mb-3 flex flex-col gap-1.5">
+              {allotments.map((a) => (
+                <div
+                  key={a.id}
+                  className="flex items-center justify-between rounded-lg bg-surface px-2.5 py-2 text-[11px]"
+                >
+                  <span className="font-bold text-ink">{a.agencyName}</span>
+                  <span className="font-num text-muted">{faDigits(a.seatsAllocated)} صندلی</span>
+                  <button
+                    onClick={() => void onDeleteAllotment(a.id)}
+                    className="text-danger"
+                    aria-label={`حذف سهمیه ${a.agencyName}`}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <select
+                aria-label="آژانس"
+                value={newAllotmentAgencyId}
+                onChange={(e) => setNewAllotmentAgencyId(e.target.value)}
+                className="h-10 flex-1 rounded-lg border border-border px-2 text-xs outline-none"
+              >
+                <option value="">انتخاب آژانس</option>
+                {agencyOptions.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.fullName}
+                  </option>
+                ))}
+              </select>
+              <input
+                aria-label="تعداد صندلی سهمیه"
+                dir="ltr"
+                value={newAllotmentSeats}
+                onChange={(e) => setNewAllotmentSeats(e.target.value)}
+                placeholder="تعداد"
+                className="font-num h-10 w-20 rounded-lg border border-border px-2 text-xs outline-none"
+              />
+              <button
+                onClick={() => void onAddAllotment()}
+                className="rounded-lg border border-accent px-3 text-[11px] font-bold text-accent"
+              >
+                + افزودن
+              </button>
+            </div>
+            {allotmentError && <p className="mt-2 text-[11px] text-danger">{allotmentError}</p>}
+          </div>
         </Modal>
       )}
     </div>

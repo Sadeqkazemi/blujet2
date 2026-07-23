@@ -118,6 +118,12 @@ export class AgencyPortalController {
     return { success: true, data: await this.portal.profile(actor) };
   }
 
+  @Get('allotments')
+  @ApiOperation({ summary: 'سهمیه‌های صندلی تخصیص‌یافته به خودِ آژانس' })
+  async allotments(@CurrentUser() actor: AuthenticatedUser) {
+    return { success: true, data: await this.portal.allotments(actor) };
+  }
+
   @Get('documents')
   @ApiOperation({ summary: 'مدارک آپلودشده خودِ آژانس' })
   async documents(@CurrentUser() actor: AuthenticatedUser) {

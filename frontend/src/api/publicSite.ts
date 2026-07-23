@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from './http';
+import { apiGet, apiPatch, apiPost } from './http';
 import type {
   Airport,
   BookingDetail,
@@ -6,6 +6,7 @@ import type {
   RefundRequestView,
   SearchFlightResult,
   SeatMapResult,
+  UserProfile,
 } from '../types/public-site';
 
 export function fetchAirports() {
@@ -76,4 +77,25 @@ export function topupWallet(amountIrr: number) {
 
 export function fetchClubPoints() {
   return apiGet<{ isMember: boolean; level: string | null; balance: number }>('/my/club-points');
+}
+
+export function fetchMyProfile() {
+  return apiGet<UserProfile>('/my/profile');
+}
+
+export function updateMyProfile(dto: {
+  fullName?: string;
+  nationalId?: string;
+  birthDate?: string;
+  passportNo?: string;
+}) {
+  return apiPatch<UserProfile>('/my/profile', dto);
+}
+
+export function requestEmailVerify() {
+  return apiPost<{ challengeId: string }>('/my/profile/email/verify-request');
+}
+
+export function verifyEmail(challengeId: string, code: string) {
+  return apiPost<{ verified: true }>('/my/profile/email/verify', { challengeId, code });
 }

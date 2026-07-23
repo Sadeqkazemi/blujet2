@@ -98,6 +98,20 @@ export interface AgencyProfile {
 export type AgencyDocumentType = 'LICENSE' | 'CONTRACT' | 'OTHER';
 export type AgencyDocumentStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
+export interface AgencyAllotmentRow {
+  id: string;
+  flightNo: string;
+  route: string;
+  departureAt: string;
+  aircraftType: string;
+  seatsAllocated: number;
+  seatsUsed: number;
+  type: 'SOFT' | 'HARD';
+  releaseAt: string | null;
+  contractPriceIrr: number | null;
+  active: boolean;
+}
+
 export interface AgencyDocument {
   id: string;
   docType: AgencyDocumentType;

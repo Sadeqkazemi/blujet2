@@ -1,5 +1,6 @@
 import { apiGet, apiPost, apiPostForm } from './http';
 import type {
+  AgencyAllotmentRow,
   AgencyCredit,
   AgencyCreditRequest,
   AgencyDashboard,
@@ -65,4 +66,8 @@ export function uploadDocument(file: File, docType: AgencyDocumentType) {
   form.append('file', file);
   form.append('docType', docType);
   return apiPostForm<AgencyDocument>('/agency-portal/documents', form);
+}
+
+export function fetchAllotments() {
+  return apiGet<AgencyAllotmentRow[]>('/agency-portal/allotments');
 }

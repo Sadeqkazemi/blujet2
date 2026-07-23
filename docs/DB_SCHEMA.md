@@ -1020,3 +1020,177 @@ operation that actually exists in the codebase today.
   each sensitive endpoint's existing DTO gains `stepUpChallengeId` and
   `stepUpCode` fields rather than requiring a separate "verify, get a
   temp token, attach it" round trip.
+
+---
+
+## Phase 16 — agency self-registration + real seat allotments
+
+Ground truth for this phase is the live `ورود و ثبتنام.dc.html` design
+(confirmed against a fresher Claude Design screenshot than the exported
+`design-reference/` snapshot — user-approved as authoritative): a single
+public auth page has an «آژانس همکار / کاربر عادی» account-type toggle and
+«ثبت‌نام / ورود» tabs. The agency signup tab collects: نام آژانس
+(agency name), شماره مجوز بند ب (license number), نام مدیر آژانس
+(manager name), شماره موبایل (mobile, with an inline format-valid
+checkmark), a terms checkbox, and a single submit button «ثبت درخواست و
+دریافت کد» (submit request AND receive code) — no email field, no
+separate "get code" step before submit.
+
+- **This is a new front door onto the EXISTING `AgencyMembershipRequest`
+  model** (`agencies.service.ts` `approveRequest`/`rejectRequest`/
+  `referRequest`, built in Phase 3) — audited and confirmed that workflow
+  already creates the `User(role: AGENCY)` row with a one-time temp
+  password on approval. This phase adds the public submission side (never
+  existed — staff could previously only view/decide on rows seeded or
+  manually inserted) AND corrects the review-chain role gates to match the
+  real process, per explicit user correction (not the original audit's
+  reading of "any of SENIOR_MANAGER/FINANCE_MANAGER/COMMERCIAL_MANAGER can
+  approve directly"): **پیش‌ثبت‌نام (this new public submission) → اول
+  ادمین سایت بررسی و ارجاع می‌دهد → مدیر بازرگانی تأیید نهایی می‌کند →
+  پیامک تأیید و دسترسی برای آژانس ارسال می‌شود.**
+  - `SITE_ADMIN` gets read+refer access to `GET /agencies/requests`,
+    `GET /agencies/requests/:id`, `PATCH /agencies/requests/:id/refer` —
+    added via an explicit method-level `@Roles(...)` override on those
+    three routes (the controller's class-level `@Roles(...AGENCY_TAB_ROLES)`
+    excludes `SITE_ADMIN` entirely today and stays as-is for every other
+    route — agency financial/credit data is NOT part of this grant).
+  - `PATCH /agencies/requests/:id/approve` **tightens** from
+    `SENIOR_MANAGER | FINANCE_MANAGER | COMMERCIAL_MANAGER` to
+    `COMMERCIAL_MANAGER` only — final approval is that role's call, not
+    three roles' shared call, per the corrected flow.
+  - `PATCH /agencies/requests/:id/reject` gets `SITE_ADMIN` added
+    alongside the existing gate — either the first-line reviewer or the
+    final approver can reject an obviously-invalid submission; approval
+    stays single-role.
+  - `approveRequest` now **sends a real SMS** (same `SmsProvider` +
+    `SmsLog(messageType: TEMP_PASSWORD)` pattern Phase 14 built for admin
+    account creation) instead of only returning `tempPassword` in the API
+    response for staff to relay by hand.
+- `AgencyMembershipRequest.email` and `.city` become **nullable** (were
+  `NOT NULL`) — the current design's public form collects neither; staff
+  can still fill them in during review (`reviewNote`/manual follow-up),
+  and the approval flow's `email` usage falls back to `null` (agency users
+  can add an email later from their portal, same as any other optional
+  contact field elsewhere in this schema).
+- ⚑ **No public document upload this phase**: the design's public form
+  (confirmed against the live screenshot) has no upload field — only
+  text fields. `AgencyMembershipRequest.documents` stays the existing
+  nullable `Json?` and is populated later by staff during review (they
+  already have file-upload access via the existing `/files` endpoint);
+  building a new *unauthenticated* multipart upload endpoint is a real
+  abuse-surface decision (anonymous file upload) that the design doesn't
+  call for and shouldn't be added speculatively.
+- ⚑ **No selfie step anywhere** (explicit user instruction) — not for
+  this phase's agency flow (which never had one) and not for Phase 17's
+  user identity fields below.
+- **New model `AgencyRequestOtp`** — phone-keyed OTP for verifying the
+  applicant actually controls the phone number, BEFORE any
+  `AgencyMembershipRequest` row is created:
+  ```
+  model AgencyRequestOtp {
+    id         String    @id @default(uuid())
+    phone      String
+    codeHash   String
+    expiresAt  DateTime
+    consumedAt DateTime?
+    attempts   Int       @default(0)
+    createdAt  DateTime  @default(now())
+    @@index([phone])
+  }
+  ```
+  ⚑ **Deliberately NOT reusing `TwoFactorChallenge`**: that table's
+  `userId` is a required FK to an existing `User`, and an anonymous
+  applicant has no account yet. The existing customer-OTP endpoint
+  (`AuthService.requestOtp`) sidesteps this by upserting a `User(role:
+  USER)` row before issuing the challenge — but doing the same here would
+  create a phone-linked `User` row (with what role? not yet AGENCY, since
+  approval is what creates that) before staff have reviewed anything,
+  which the existing approval flow doesn't expect and would collide with
+  (`approveRequest` creates a fresh `User` unconditionally). A small,
+  purpose-built, anonymous, phone-keyed table avoids both problems and
+  never touches the security-sensitive auth table.
+- Same shape/limits as every other OTP in this codebase: 6-digit code,
+  2-minute TTL, 5-attempt cap, single-use, hashed at rest, delivered
+  through the existing `TwoFactorProvider`/`SmsProvider` (so it lands in
+  Phase 14's `SmsLog` like every other outbound code).
+- Rate limiting: per-phone AND per-IP on both the OTP-send and the
+  request-submit endpoints (same posture as every other OTP endpoint —
+  `common/errors.ts` gets no new codes, this reuses the existing
+  throttler pattern).
+
+### Staff seat allotment — frontend only (backend already complete)
+
+- Audited and confirmed `AgencyAllotment` (schema) and its full CRUD
+  (`GET/POST /flights/:instanceId/allotments`,
+  `DELETE /flights/:instanceId/allotments/:allotmentId`, all
+  `SENIOR_MANAGER`/`COMMERCIAL_MANAGER`-gated, built in Phase C) have zero
+  frontend callers. This phase adds ONLY the frontend: a per-flight
+  allotment section in the existing flights panel (same role gate as the
+  rest of that panel — no new endpoint, no new guard).
+- **New endpoint** `GET /agency-portal/allotments` (agency's own token,
+  tenant-scoped to `actor.agencyId` server-side — never trusts a client-
+  supplied agency id) — the agency-portal side has no read of its own
+  allotments today; `AgencySeatsPage.tsx` currently renders hardcoded
+  sample numbers with a comment admitting it. Returns each allotment's
+  flight (route, date, aircraft), `seatsAllocated`, and seats already
+  consumed (derived the same way every other "used" figure in this
+  codebase is derived — `COUNT` over real `Booking` rows referencing that
+  allotment, never a mutated counter column).
+- ⚑ **Explicitly not built this phase**: an agency actually BOOKING a
+  customer against its own allotment (a "book on behalf of" flow). The
+  user's request was "give agencies API access and put seats at their
+  disposal" — read/issue-and-allocate, not a new booking-engine entry
+  point. `booking-engine` has zero `agencyId`/`AGENCY`-role awareness
+  today; wiring that in is a materially different, larger feature
+  (booking-engine changes, its own pricing/commission questions) that
+  needs its own docs pass and approval before any code, per workflow
+  rule 1 — not silently bundled into this phase.
+
+---
+
+## Phase 17 — customer profile fields + completeness notification
+
+`design-reference/پنل کاربر.dc.html`'s «پروفایل من» tab is a large page
+(identity KYC with document + selfie upload, saved bank cards, active
+sessions, invite-friends referral, saved passengers) — far bigger than
+the user's actual request (a notification when the profile is
+incomplete). Per user confirmation, this phase builds ONLY the part that
+notification needs to mean something: real identity fields a user can
+enter, a completion percentage, and a nudge — not the KYC
+document/selfie flow, not bank cards, not active-sessions, not
+invite-friends, not saved passengers. Explicit instruction: no selfie
+step anywhere in the project.
+
+- `User` gains nullable profile columns, same encrypted-PII pattern
+  already used for `ClubMember`/`Passenger` (`*Enc` AES column + `*Hash`
+  keyed hash for exact-match lookup, per CLAUDE.md's PII encryption
+  rule) — **not** stored on `ClubMember`, because `ClubMember.userId` is
+  optional (club membership is a separate, opt-in concept per Phase 5)
+  and the design's profile tab is for any logged-in customer, member or
+  not:
+  ```
+  nationalIdEnc    String?
+  nationalIdHash   String?
+  passportNoEnc    String?
+  birthDate        DateTime?
+  emailVerifiedAt  DateTime?
+  ```
+  (`fullName` and `email` already exist on `User`.)
+- **Profile completion** is computed server-side, never stored — a
+  simple weighted check over which of {fullName, nationalId, birthDate,
+  passportNo, emailVerifiedAt} are present, matching the design's
+  percentage bar and its "complete passport + verify email" hint text.
+- **Email verification**: reuses the existing OTP/2FA delivery
+  machinery — a short-lived code sent to the address, confirmed via a
+  new endpoint, stamps `emailVerifiedAt`. No new provider.
+- **Checkout nudge**: `CheckoutPage` shows a dismissible banner ("تکمیل
+  پروفایل" with the completion %) when the logged-in customer's profile
+  is incomplete — informational only, never blocks the purchase flow
+  (CLAUDE.md: booking/payment must keep working regardless of AI/profile
+  state; national ID stays optional at the DTO level exactly as it is
+  today — this phase does not make it required to book).
+- ⚑ **Explicitly not built this phase**: saved-passengers CRUD, bank
+  cards, active-sessions list, invite-friends, and any document/selfie
+  upload — all real sections of the same design page, all out of scope
+  for a "notify when incomplete" feature. Flagged here so a future phase
+  doesn't assume they were silently included.

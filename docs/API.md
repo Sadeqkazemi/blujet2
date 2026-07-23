@@ -734,3 +734,66 @@ then five existing endpoints gain two required body fields.
   spec's §5.1, not two separate scopes).
 - `POST /security/sessions/logout-all` (existing) — same two fields
   required; scope `SESSION_REVOKE`.
+
+## Phase 16 — agency self-registration + real seat allotments
+
+See DB_SCHEMA.md's Phase 16 for full reasoning (design source, why a new
+phone-keyed OTP table instead of reusing `TwoFactorChallenge`, and what's
+explicitly out of scope).
+
+- `POST /agencies/requests/otp` (new, public, `@Throttle` 5/min per-IP +
+  per-phone) — `{ phone }`. Upserts nothing; creates an `AgencyRequestOtp`
+  row and sends the code via the existing `TwoFactorProvider`. Returns
+  `{ challengeId }`.
+- `POST /agencies/requests` (new, public, `@Throttle` 5/min) — `{
+  applicantName, managerName, licenseNo, phone, challengeId, code }`.
+  Verifies the OTP (same 401 `TWO_FACTOR_INVALID`/`TWO_FACTOR_EXPIRED`
+  codes as every other OTP check in this codebase), then creates an
+  `AgencyMembershipRequest(status: PENDING, email: null, city: null,
+  documents: null)`.
+- `GET /agencies/requests`, `GET /agencies/requests/:id` (existing) — role
+  gate widened to also allow `SITE_ADMIN` (method-level override; every
+  other `/agencies/*` route keeps the original `AGENCY_TAB_ROLES` gate).
+- `PATCH /agencies/requests/:id/refer` (existing) — role gate widened to
+  `SITE_ADMIN | SENIOR_MANAGER | COMMERCIAL_MANAGER`.
+- `PATCH /agencies/requests/:id/approve` (existing) — role gate
+  **narrowed** to `COMMERCIAL_MANAGER` only (was
+  `SENIOR_MANAGER | FINANCE_MANAGER | COMMERCIAL_MANAGER`). On success now
+  also sends a real SMS with the temp password (Phase 14's `SmsProvider`/
+  `SmsLog`), matching `POST /admins`'s existing delivery pattern, instead
+  of only returning it in the response body.
+- `PATCH /agencies/requests/:id/reject` (existing) — role gate widened to
+  add `SITE_ADMIN` alongside the existing gate.
+- `GET /flights/:instanceId/allotments`, `POST
+  /flights/:instanceId/allotments`, `DELETE
+  /flights/:instanceId/allotments/:allotmentId` — **no change**; these
+  already exist (Phase C) and are only gaining a frontend caller this
+  phase (a new section in the existing flights panel, same
+  `SENIOR_MANAGER`/`COMMERCIAL_MANAGER` gate — no new endpoint).
+- `GET /agency-portal/allotments` (new, `AGENCY` role, tenant-scoped to
+  `actor.agencyId` server-side) — replaces `AgencySeatsPage.tsx`'s
+  hardcoded sample data with each allotment's flight info,
+  `seatsAllocated`, and seats consumed so far (derived via `COUNT` over
+  real bookings, never a stored counter).
+
+## Phase 17 — customer profile fields + completeness notification
+
+See DB_SCHEMA.md's Phase 17 for full reasoning and explicit scope cuts
+(no KYC/selfie, bank cards, sessions, invite-friends, saved passengers).
+
+- `GET /my/profile` (new, `USER` role — matches the existing `/my/wallet`,
+  `/my/refunds`, `/my/club-points` customer self-service convention) —
+  current values of `fullName`, `nationalId` (decrypted for the owner
+  only), `birthDate`, `passportNo` (decrypted), `emailVerifiedAt`, plus a
+  server-computed `completionPct`.
+- `PATCH /my/profile` (new, `USER` role) — partial update of the same
+  fields; national ID validated with the official checksum server-side
+  (CLAUDE.md security rule), encrypted at rest immediately.
+- `POST /my/profile/email/verify-request` (new, `USER` role, `@Throttle`
+  5/min) — sends a short-lived code to the account's current `email` via
+  the existing `TwoFactorProvider`. 400 if no email is set yet.
+- `POST /my/profile/email/verify` (new, `USER` role) — `{ challengeId,
+  code }`; on success stamps `emailVerifiedAt`.
+- No change to any booking/checkout endpoint's validation — national ID
+  stays optional there, exactly as today; the checkout banner is a
+  frontend-only read of `GET /users/me/profile`'s `completionPct`.

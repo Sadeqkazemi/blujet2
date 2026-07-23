@@ -354,7 +354,7 @@ describe('Agencies (e2e)', () => {
 
   it('approving a request creates both User(role=AGENCY) and AgencyProfile transactionally', async () => {
     const reqRow = await createFreshMembershipRequest('PENDING');
-    const { accessToken } = await loginAs(app, 'senior.rahimi');
+    const { accessToken } = await loginAs(app, 'comm.abbasi');
 
     const res = await request(app.getHttpServer())
       .patch(`/agencies/requests/${reqRow.id}/approve`)
@@ -403,7 +403,7 @@ describe('Agencies (e2e)', () => {
 
   it('approving an already-decided request -> 409, not a silent overwrite', async () => {
     const reqRow = await createFreshMembershipRequest('PENDING');
-    const { accessToken } = await loginAs(app, 'senior.rahimi');
+    const { accessToken } = await loginAs(app, 'comm.abbasi');
 
     const first = await request(app.getHttpServer())
       .patch(`/agencies/requests/${reqRow.id}/approve`)
