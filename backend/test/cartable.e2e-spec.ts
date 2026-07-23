@@ -383,6 +383,88 @@ describe('Cartable + referrals + messages (e2e)', () => {
     expect(late.status).toBe(409);
   });
 
+  // ── GET /referrals/mine (Phase 26 — recipient-side listing) ────────────
+
+  it('GET /referrals/mine returns only referrals where the caller is a recipient, not ones they sent', async () => {
+    const senior = await loginAs(app, 'senior.rahimi');
+    const employeeId = await userId('com.ahmadi');
+    const created = await request(app.getHttpServer())
+      .post('/referrals')
+      .set('Authorization', `Bearer ${senior.accessToken}`)
+      .send({
+        title: 'ارجاع به کارمند',
+        body: 'شرح',
+        recipientIds: [employeeId],
+      });
+    expect(created.status).toBe(201);
+
+    const employee = await loginAs(app, 'com.ahmadi');
+    const mine = await request(app.getHttpServer())
+      .get('/referrals/mine')
+      .set('Authorization', `Bearer ${employee.accessToken}`);
+    expect(mine.status).toBe(200);
+    const ids = (mine.body.data.referrals as { id: string }[]).map((r) => r.id);
+    expect(ids).toContain(created.body.data.id);
+
+    // The sender is not a recipient of their own referral.
+    const seniorMine = await request(app.getHttpServer())
+      .get('/referrals/mine')
+      .set('Authorization', `Bearer ${senior.accessToken}`);
+    const seniorIds = (seniorMine.body.data.referrals as { id: string }[]).map(
+      (r) => r.id,
+    );
+    expect(seniorIds).not.toContain(created.body.data.id);
+  });
+
+  it('GET /referrals/mine: hasMyReport flips true only after this recipient reports, and counts reconcile', async () => {
+    const senior = await loginAs(app, 'senior.rahimi');
+    const employeeId = await userId('com.ahmadi');
+    const created = await request(app.getHttpServer())
+      .post('/referrals')
+      .set('Authorization', `Bearer ${senior.accessToken}`)
+      .send({
+        title: 'گزارش من کجاست',
+        body: 'شرح',
+        recipientIds: [employeeId],
+      });
+    const referralId = created.body.data.id as string;
+
+    const employee = await loginAs(app, 'com.ahmadi');
+    const before = await request(app.getHttpServer())
+      .get('/referrals/mine')
+      .set('Authorization', `Bearer ${employee.accessToken}`);
+    const rowBefore = (
+      before.body.data.referrals as { id: string; hasMyReport: boolean }[]
+    ).find((r) => r.id === referralId)!;
+    expect(rowBefore.hasMyReport).toBe(false);
+    expect(before.body.data.counts.total).toBe(
+      before.body.data.referrals.length,
+    );
+    expect(before.body.data.counts.awaitingMyReport).toBe(
+      (
+        before.body.data.referrals as { hasMyReport: boolean; status: string }[]
+      ).filter((r) => !r.hasMyReport && r.status !== 'CLOSED').length,
+    );
+
+    await request(app.getHttpServer())
+      .post(`/referrals/${referralId}/reports`)
+      .set('Authorization', `Bearer ${employee.accessToken}`)
+      .send({ body: 'گزارش من' });
+
+    const after = await request(app.getHttpServer())
+      .get('/referrals/mine')
+      .set('Authorization', `Bearer ${employee.accessToken}`);
+    const rowAfter = (
+      after.body.data.referrals as { id: string; hasMyReport: boolean }[]
+    ).find((r) => r.id === referralId)!;
+    expect(rowAfter.hasMyReport).toBe(true);
+  });
+
+  it('GET /referrals/mine: 401 without login', async () => {
+    const res = await request(app.getHttpServer()).get('/referrals/mine');
+    expect(res.status).toBe(401);
+  });
+
   it('approving a referral-sourced cartable task submits the note as the report', async () => {
     const senior = await loginAs(app, 'senior.rahimi');
     const commId = await userId('comm.abbasi');

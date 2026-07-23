@@ -63,7 +63,7 @@ describe('Panels (e2e)', () => {
     ]);
   });
 
-  it('an EMPLOYEE with no granted permissions still gets a dashboard-only nav, not an error', async () => {
+  it('an EMPLOYEE with no granted permissions still gets dashboard + referrals, not an error', async () => {
     const { accessToken } = await loginAs(app, 'com.ahmadi');
     const res = await request(app.getHttpServer())
       .get('/panels/nav')
@@ -71,6 +71,7 @@ describe('Panels (e2e)', () => {
     expect(res.status).toBe(200);
     expect(res.body.data).toEqual([
       { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
+      { key: 'referrals', labelFa: 'ارجاعات', implemented: true },
     ]);
   });
 
@@ -81,7 +82,7 @@ describe('Panels (e2e)', () => {
       .set('Authorization', `Bearer ${accessToken}`);
     expect(res.status).toBe(200);
     const keys = res.body.data.map((t: { key: string }) => t.key);
-    expect(keys).toEqual(['dashboard', 'agencies', 'flights']);
+    expect(keys).toEqual(['dashboard', 'agencies', 'flights', 'referrals']);
   });
 
   it('returns the confirmed tab set for SITE_ADMIN', async () => {

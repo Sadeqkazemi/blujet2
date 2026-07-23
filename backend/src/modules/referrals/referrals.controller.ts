@@ -46,6 +46,16 @@ export class ReferralsController {
     return { success: true, data };
   }
 
+  @Get('mine')
+  // Declared before ':id' so Nest/Express doesn't match 'mine' as an :id
+  // param — same convention as agencies.controller.ts.
+  @Roles(...EXEC_ROLES, 'SITE_ADMIN', 'IT_MANAGER', 'EMPLOYEE')
+  @ApiOperation({ summary: 'ارجاعات محول‌شده به من (سمت گیرنده)' })
+  async mine(@CurrentUser() actor: AuthenticatedUser) {
+    const data = await this.referrals.myReferrals(actor);
+    return { success: true, data };
+  }
+
   @Get(':id')
   // Recipients (any exec/staff role) may read their own referral; the
   // service enforces sender-or-recipient at resource level.

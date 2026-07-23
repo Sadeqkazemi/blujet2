@@ -44,13 +44,14 @@ export class PanelsService {
         });
       }
     }
-    // پنل کارمند.dc.html's navKeys formula always appends "referrals", but
-    // GET /referrals (referrals.service.ts's `list`) is sender-scoped
-    // ("ارجاعات من به مدیران" — SENIOR_MANAGER only); there is no
-    // recipient-side "referrals assigned to me" listing yet, only
-    // per-item detail/report access. Shipping the tab today would be a
-    // dead nav entry (403 on load), so it stays deferred until that
-    // listing exists — see Phase 18 notes in docs/DB_SCHEMA.md.
+    // پنل کارمند.dc.html's navKeys formula always appends "referrals" —
+    // unconditional, not gated by any permission key (referrals are
+    // personally addressed regardless of section grants). This was
+    // deferred since Phase 18 (GET /referrals was sender-scoped, no
+    // recipient-side listing existed — see docs/DB_SCHEMA.md's Phase 18
+    // notes); GET /referrals/mine (Phase 26) closes that gap, so every
+    // EMPLOYEE gets the tab now.
+    items.push({ key: 'referrals', labelFa: 'ارجاعات', implemented: true });
     return items;
   }
 
