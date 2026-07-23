@@ -48,6 +48,15 @@ model User {
   createdBy          User?                  @relation("EmployeeCreatedBy", fields: [createdById], references: [id])
   employeesCreated   User[]                 @relation("EmployeeCreatedBy")
 
+  // Phase 17 (پروفایل من) — customer identity fields, all optional until
+  // the customer fills them in. Encrypted-at-rest like every other PII
+  // column in this schema (see ClubMember/Passenger for the same pattern).
+  nationalIdEnc   String?
+  nationalIdHash  String?
+  passportNoEnc   String?
+  birthDate       DateTime?
+  emailVerifiedAt DateTime?
+
   employeePermissions     EmployeePermission[] @relation("EmployeePermissionHolder")
   passwordResetsReceived  PasswordResetEvent[] @relation("PasswordResetTarget")
   passwordResetsPerformed PasswordResetEvent[] @relation("PasswordResetActor")
@@ -100,6 +109,7 @@ model User {
   agencyAllotmentsCreated        AgencyAllotment[]
   paymentReconciliationsResolved PaymentReconciliation[]
 
+  @@index([nationalIdHash])
   @@map("users")
 }
 
@@ -127,6 +137,8 @@ enum TwoFactorPurpose {
   // Phase 15: re-authentication immediately before a high-risk write —
   // same machinery again, see StepUpScope below.
   STEP_UP_VERIFICATION
+  // Phase 17: customer email verification for پروفایل من.
+  EMAIL_VERIFY
 }
 
 // Phase 15 — one scope per real high-risk call site found in the
@@ -617,9 +629,9 @@ model AgencyMembershipRequest {
   applicantName String
   managerName   String
   licenseNo     String
-  city          String
+  city          String?
   phone         String
-  email         String
+  email         String?
   documents     Json?
   status        AgencyMembershipStatus @default(PENDING)
   referredToId  String?
@@ -632,6 +644,21 @@ model AgencyMembershipRequest {
 
   @@index([status])
   @@map("agency_membership_requests")
+}
+
+/** Phase 16 — phone-keyed OTP for the public agency pre-registration
+ * form; NOT TwoFactorChallenge, which requires an existing User. */
+model AgencyRequestOtp {
+  id         String    @id @default(uuid())
+  phone      String
+  codeHash   String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  attempts   Int       @default(0)
+  createdAt  DateTime  @default(now())
+
+  @@index([phone])
+  @@map("agency_request_otps")
 }
 
 enum AgencyApiScope {

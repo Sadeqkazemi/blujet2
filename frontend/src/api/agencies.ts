@@ -11,6 +11,21 @@ import type {
   AgencyMessage,
 } from '../types/agencies';
 
+export function requestAgencySignupOtp(phone: string) {
+  return apiPost<{ challengeId: string }>('/agencies/requests/otp', { phone });
+}
+
+export function submitAgencyRequest(dto: {
+  applicantName: string;
+  managerName: string;
+  licenseNo: string;
+  phone: string;
+  challengeId: string;
+  code: string;
+}) {
+  return apiPost<{ id: string }>('/agencies/requests', dto);
+}
+
 export function fetchAgencies(query: { q?: string; debtorsOnly?: boolean }) {
   const params = new URLSearchParams();
   if (query.q) params.set('q', query.q);

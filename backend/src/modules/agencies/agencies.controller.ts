@@ -52,6 +52,7 @@ export class AgenciesController {
   }
 
   @Get('requests')
+  @Roles('SITE_ADMIN', ...AGENCY_TAB_ROLES)
   @ApiOperation({ summary: 'لیست درخواست‌های عضویت آژانس' })
   async listRequests(@Query('status') status?: AgencyMembershipStatus) {
     const data = await this.agencies.listRequests(status);
@@ -59,6 +60,7 @@ export class AgenciesController {
   }
 
   @Get('requests/:id')
+  @Roles('SITE_ADMIN', ...AGENCY_TAB_ROLES)
   @ApiOperation({ summary: 'جزئیات درخواست عضویت + تاریخچه ارجاع' })
   async getRequest(@Param('id') id: string) {
     const data = await this.agencies.getRequest(id);
@@ -66,7 +68,11 @@ export class AgenciesController {
   }
 
   @Patch('requests/:id/approve')
-  @ApiOperation({ summary: 'تأیید درخواست — ایجاد User+AgencyProfile تراکنشی' })
+  @Roles('COMMERCIAL_MANAGER')
+  @ApiOperation({
+    summary:
+      'تأیید نهایی درخواست — فقط مدیر بازرگانی؛ ایجاد User+AgencyProfile تراکنشی + پیامک تأیید',
+  })
   async approveRequest(
     @CurrentUser() actor: AuthenticatedUser,
     @Param('id') id: string,
@@ -76,6 +82,7 @@ export class AgenciesController {
   }
 
   @Patch('requests/:id/reject')
+  @Roles('SITE_ADMIN', ...AGENCY_TAB_ROLES)
   @ApiOperation({ summary: 'رد درخواست عضویت' })
   async rejectRequest(
     @CurrentUser() actor: AuthenticatedUser,
@@ -87,8 +94,8 @@ export class AgenciesController {
   }
 
   @Patch('requests/:id/refer')
-  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER')
-  @ApiOperation({ summary: 'ارجاع درخواست — فقط مدیر ارشد/بازرگانی' })
+  @Roles('SITE_ADMIN', 'SENIOR_MANAGER', 'COMMERCIAL_MANAGER')
+  @ApiOperation({ summary: 'ارجاع درخواست — ادمین سایت یا مدیر ارشد/بازرگانی' })
   async referRequest(
     @CurrentUser() actor: AuthenticatedUser,
     @Param('id') id: string,

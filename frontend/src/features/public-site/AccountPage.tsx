@@ -2,11 +2,21 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import { useAuth } from '../../hooks/useAuth';
-import { fetchClubPoints, fetchMyBookings, fetchMyRefunds, fetchWallet, topupWallet } from '../../api/publicSite';
+import {
+  fetchClubPoints,
+  fetchMyBookings,
+  fetchMyProfile,
+  fetchMyRefunds,
+  fetchWallet,
+  requestEmailVerify,
+  topupWallet,
+  updateMyProfile,
+  verifyEmail,
+} from '../../api/publicSite';
 import { ApiRequestError } from '../../api/envelope';
 import { faDigits, faMoney } from '../../lib/fa-format';
-import { formatJalaliDateTime } from '../../lib/jalali';
-import type { BookingDetail, RefundRequestView } from '../../types/public-site';
+import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
+import type { BookingDetail, RefundRequestView, UserProfile } from '../../types/public-site';
 
 // پنل کاربر — real data from the existing bookings/wallet/club-points/refunds
 // endpoints (none of this is mock). Matches design-reference/پنل کاربر.dc.html's
@@ -31,9 +41,10 @@ const REFUND_STATUS_LABEL: Record<string, string> = {
 
 const TIER_LABEL: Record<string, string> = { SILVER: 'نقره‌ای', GOLD: 'طلایی', PLATINUM: 'پلاتین' };
 
-type TabKey = 'trips' | 'wallet' | 'points' | 'passengers' | 'refunds';
+type TabKey = 'trips' | 'wallet' | 'points' | 'passengers' | 'refunds' | 'profile';
 
 const TABS: { key: TabKey; label: string; icon: string }[] = [
+  { key: 'profile', label: 'پروفایل من', icon: '🪪' },
   { key: 'trips', label: 'سفرها', icon: '🧳' },
   { key: 'wallet', label: 'کیف پول', icon: '💳' },
   { key: 'points', label: 'امتیاز باشگاه', icon: '★' },
@@ -53,6 +64,20 @@ export default function AccountPage() {
   const [topupBusy, setTopupBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profileForm, setProfileForm] = useState({
+    fullName: '',
+    nationalId: '',
+    birthDate: '',
+    passportNo: '',
+  });
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileNotice, setProfileNotice] = useState<string | null>(null);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [emailChallengeId, setEmailChallengeId] = useState<string | null>(null);
+  const [emailCode, setEmailCode] = useState('');
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+
   useEffect(() => {
     if (status === 'unauthenticated') {
       navigate('/signin', { replace: true, state: { from: '/account' } });
@@ -65,7 +90,68 @@ export default function AccountPage() {
     fetchWallet().then(setWallet).catch(() => setWallet({ balanceIrr: 0 }));
     fetchClubPoints().then(setClub).catch(() => setClub(null));
     fetchMyRefunds().then(setRefunds).catch(() => setRefunds([]));
+    fetchMyProfile()
+      .then((p) => {
+        setProfile(p);
+        setProfileForm({
+          fullName: p.fullName ?? '',
+          nationalId: p.nationalId ?? '',
+          birthDate: p.birthDate ? formatJalaliDate(p.birthDate) : '',
+          passportNo: p.passportNo ?? '',
+        });
+      })
+      .catch(() => setProfile(null));
   }, [status]);
+
+  async function onSaveProfile(e: React.FormEvent) {
+    e.preventDefault();
+    setProfileError(null);
+    setProfileNotice(null);
+    setProfileSaving(true);
+    try {
+      const updated = await updateMyProfile({
+        fullName: profileForm.fullName || undefined,
+        nationalId: profileForm.nationalId || undefined,
+        passportNo: profileForm.passportNo || undefined,
+      });
+      setProfile(updated);
+      setProfileNotice('اطلاعات پروفایل ذخیره شد ✓');
+    } catch (err) {
+      setProfileError(err instanceof ApiRequestError ? err.message : 'خطا در ذخیره اطلاعات.');
+    } finally {
+      setProfileSaving(false);
+    }
+  }
+
+  async function onRequestEmailVerify() {
+    setProfileError(null);
+    try {
+      const { challengeId } = await requestEmailVerify();
+      setEmailChallengeId(challengeId);
+      setProfileNotice('کد تأیید به ایمیل شما ارسال شد.');
+    } catch (err) {
+      setProfileError(err instanceof ApiRequestError ? err.message : 'خطا در ارسال کد تأیید.');
+    }
+  }
+
+  async function onVerifyEmail(e: React.FormEvent) {
+    e.preventDefault();
+    if (!emailChallengeId || emailCode.trim().length !== 6) {
+      setProfileError('کد ۶ رقمی را کامل وارد کنید.');
+      return;
+    }
+    setProfileError(null);
+    try {
+      await verifyEmail(emailChallengeId, emailCode.trim());
+      setEmailChallengeId(null);
+      setEmailCode('');
+      const updated = await fetchMyProfile();
+      setProfile(updated);
+      setProfileNotice('ایمیل شما تأیید شد ✓');
+    } catch (err) {
+      setProfileError(err instanceof ApiRequestError ? err.message : 'کد وارد شده نادرست است.');
+    }
+  }
 
   async function onTopup(e: React.FormEvent) {
     e.preventDefault();
@@ -138,6 +224,161 @@ export default function AccountPage() {
         </div>
 
         {error && <p style={{ marginBottom: 16, borderRadius: 10, background: '#fef2f2', padding: 10, fontSize: 12, color: '#e5484d' }}>{error}</p>}
+
+        {profile && profile.completionPct < 100 && !bannerDismissed && tab !== 'profile' && (
+          <div
+            data-testid="profile-incomplete-banner"
+            style={{
+              marginBottom: 16,
+              borderRadius: 12,
+              background: '#fff8ec',
+              border: '1px solid #f2e0b2',
+              padding: '12px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 10,
+              flexWrap: 'wrap',
+            }}
+          >
+            <span style={{ fontSize: 12.5, color: '#8a6a1f' }}>
+              پروفایل شما {faDigits(profile.completionPct)}٪ تکمیل شده است. برای تکمیل، اطلاعات هویتی خود
+              را وارد کنید.
+            </span>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => setTab('profile')}
+                style={{ border: 'none', borderRadius: 9, background: '#e7c66b', color: '#3b2f0e', padding: '7px 14px', fontSize: 11.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
+              >
+                تکمیل پروفایل
+              </button>
+              <button
+                type="button"
+                onClick={() => setBannerDismissed(true)}
+                style={{ border: 'none', background: 'transparent', color: '#8a6a1f', fontSize: 11.5, cursor: 'pointer', fontFamily: 'inherit' }}
+              >
+                بعداً
+              </button>
+            </div>
+          </div>
+        )}
+
+        {tab === 'profile' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ background: 'linear-gradient(135deg,#0d2640,#16406e)', color: '#fff', borderRadius: 18, padding: '18px 20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, marginBottom: 8 }}>
+                <span style={{ color: '#aac4e2' }}>تکمیل پروفایل</span>
+                <span style={{ fontWeight: 800, color: '#f2d98a' }}>
+                  {profile ? faDigits(profile.completionPct) : '—'}٪
+                </span>
+              </div>
+              <div style={{ height: 7, borderRadius: 6, background: '#ffffff1c', overflow: 'hidden' }}>
+                <div
+                  style={{
+                    height: '100%',
+                    width: `${profile?.completionPct ?? 0}%`,
+                    borderRadius: 6,
+                    background: 'linear-gradient(90deg,#f2d98a,#caa53a)',
+                  }}
+                />
+              </div>
+            </div>
+
+            {profileNotice && <p style={{ fontSize: 12, color: '#1f8a5b' }}>{profileNotice}</p>}
+            {profileError && <p role="alert" style={{ fontSize: 12, color: '#e5484d' }}>{profileError}</p>}
+
+            <form onSubmit={onSaveProfile} style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 16, padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 800, margin: 0 }}>اطلاعات حساب</h3>
+              <div>
+                <label htmlFor="profile-fullName" style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#5a6678', marginBottom: 6 }}>
+                  نام و نام خانوادگی
+                </label>
+                <input
+                  id="profile-fullName"
+                  value={profileForm.fullName}
+                  onChange={(e) => setProfileForm((f) => ({ ...f, fullName: e.target.value }))}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '10px 13px', border: '1.5px solid #e3e9f1', borderRadius: 10, fontFamily: 'inherit', fontSize: 13 }}
+                />
+              </div>
+              <div>
+                <label htmlFor="profile-nationalId" style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#5a6678', marginBottom: 6 }}>
+                  کد ملی
+                </label>
+                <input
+                  id="profile-nationalId"
+                  dir="ltr"
+                  value={profileForm.nationalId}
+                  onChange={(e) => setProfileForm((f) => ({ ...f, nationalId: e.target.value }))}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '10px 13px', border: '1.5px solid #e3e9f1', borderRadius: 10, fontFamily: 'inherit', fontSize: 13 }}
+                />
+              </div>
+              <div>
+                <label htmlFor="profile-passportNo" style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#5a6678', marginBottom: 6 }}>
+                  شماره گذرنامه
+                </label>
+                <input
+                  id="profile-passportNo"
+                  dir="ltr"
+                  value={profileForm.passportNo}
+                  onChange={(e) => setProfileForm((f) => ({ ...f, passportNo: e.target.value }))}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '10px 13px', border: '1.5px solid #e3e9f1', borderRadius: 10, fontFamily: 'inherit', fontSize: 13 }}
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={profileSaving}
+                style={{ border: 'none', borderRadius: 10, background: '#1668c4', color: '#fff', padding: '11px 22px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', alignSelf: 'flex-start' }}
+              >
+                {profileSaving ? 'در حال ذخیره…' : 'ذخیره اطلاعات'}
+              </button>
+            </form>
+
+            <div style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 16, padding: '18px 20px' }}>
+              <h3 style={{ fontSize: 14, fontWeight: 800, margin: '0 0 12px' }}>ایمیل</h3>
+              <p style={{ fontSize: 12, color: '#5a6678', marginBottom: 12 }}>
+                {profile?.email ?? 'ایمیلی ثبت نشده است.'}{' '}
+                {profile?.emailVerifiedAt && <span style={{ color: '#1f8a5b', fontWeight: 700 }}>· تأیید شده</span>}
+              </p>
+              {profile?.email && !profile.emailVerifiedAt && (
+                <>
+                  {!emailChallengeId ? (
+                    <button
+                      type="button"
+                      onClick={() => void onRequestEmailVerify()}
+                      style={{ border: '1px solid #1668c4', borderRadius: 10, background: 'transparent', color: '#1668c4', padding: '9px 18px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+                    >
+                      ارسال کد تأیید
+                    </button>
+                  ) : (
+                    <form onSubmit={onVerifyEmail} style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                      <div>
+                        <label htmlFor="email-code" style={{ display: 'block', fontSize: 11, color: '#5a6678', marginBottom: 6 }}>
+                          کد تأیید
+                        </label>
+                        <input
+                          id="email-code"
+                          dir="ltr"
+                          inputMode="numeric"
+                          maxLength={6}
+                          value={emailCode}
+                          onChange={(e) => setEmailCode(e.target.value.replace(/\D/g, ''))}
+                          style={{ width: 140, boxSizing: 'border-box', padding: '10px 13px', border: '1.5px solid #e3e9f1', borderRadius: 10, fontFamily: 'inherit', fontSize: 13, textAlign: 'center', letterSpacing: 4 }}
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        style={{ border: 'none', borderRadius: 10, background: '#1668c4', color: '#fff', padding: '11px 18px', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
+                      >
+                        تأیید
+                      </button>
+                    </form>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
 
         {tab === 'trips' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

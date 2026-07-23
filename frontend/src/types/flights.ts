@@ -79,3 +79,15 @@ export interface PlanResult {
   directSeats: number;
   proposalPending: boolean;
 }
+
+export interface AllotmentRow {
+  id: string;
+  agencyId: string;
+  agencyName: string;
+  seatsAllocated: number;
+  type: 'SOFT' | 'HARD';
+  releaseAt: string | null;
+  contractPriceIrr: number | null;
+  createdAt: string;
+  active: boolean;
+}

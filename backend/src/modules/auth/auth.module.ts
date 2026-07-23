@@ -27,6 +27,6 @@ import { SmsModule } from '../sms/sms.module';
     JwtStrategy,
     { provide: TWO_FACTOR_PROVIDER, useClass: MockTwoFactorProvider },
   ],
-  exports: [AuthService, StepUpService],
+  exports: [AuthService, StepUpService, TWO_FACTOR_PROVIDER],
 })
 export class AuthModule {}

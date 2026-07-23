@@ -326,4 +326,48 @@ export class AgencyPortalService {
       },
     });
   }
+
+  // ── Phase 16: real seat allotments (replaces AgencySeatsPage mock) ─────
+
+  async allotments(actor: AuthenticatedUser) {
+    await this.getOwnProfileOrThrow(actor);
+    const id = actor.id;
+
+    const rows = await this.prisma.agencyAllotment.findMany({
+      where: { agencyId: id },
+      include: {
+        flightInstance: { include: { flight: { include: { route: true } } } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const now = new Date();
+    return Promise.all(
+      rows.map(async (r) => {
+        // No allotmentId FK on Booking (see docs/DB_SCHEMA.md Phase 16 ⚑ —
+        // "book against own allotment" isn't built yet) — consumed is
+        // derived from this agency's real bookings on the same flight.
+        const usedSeats = await this.prisma.booking.count({
+          where: {
+            agencyId: id,
+            flightInstanceId: r.flightInstanceId,
+            status: { in: [...SOLD_STATUSES] },
+          },
+        });
+        return {
+          id: r.id,
+          flightNo: r.flightInstance.flight.flightNo,
+          route: `${r.flightInstance.flight.route.originCode} → ${r.flightInstance.flight.route.destCode}`,
+          departureAt: r.flightInstance.departureAt,
+          aircraftType: r.flightInstance.flight.aircraftType,
+          seatsAllocated: r.seatsAllocated,
+          seatsUsed: usedSeats,
+          type: r.type,
+          releaseAt: r.releaseAt,
+          contractPriceIrr: r.contractPriceIrr,
+          active: r.type === 'HARD' || !r.releaseAt || r.releaseAt > now,
+        };
+      }),
+    );
+  }
 }

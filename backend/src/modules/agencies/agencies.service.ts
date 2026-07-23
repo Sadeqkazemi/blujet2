@@ -1,8 +1,10 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import * as crypto from 'node:crypto';
@@ -12,6 +14,9 @@ import { CartableService } from '../cartable/cartable.service';
 import { ErrorCode } from '../../common/errors';
 import { generateTempPassword } from '../../common/temp-password';
 import { StepUpService } from '../auth/step-up.service';
+import { SmsService } from '../sms/sms.service';
+import { TWO_FACTOR_PROVIDER } from '../auth/providers/two-factor-provider.interface';
+import type { TwoFactorProvider } from '../auth/providers/two-factor-provider.interface';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type {
   AgencyApiScope,
@@ -32,7 +37,13 @@ function generateInvoiceNo(): string {
   return `INV-${Date.now().toString(36).toUpperCase()}${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
 }
 
+function generateSixDigitCode(): string {
+  return crypto.randomInt(0, 1_000_000).toString().padStart(6, '0');
+}
+
 const DECIDABLE_STATUSES: AgencyMembershipStatus[] = ['PENDING', 'REFERRED'];
+const REQUEST_OTP_TTL_MS = 2 * 60 * 1000;
+const REQUEST_OTP_MAX_ATTEMPTS = 5;
 
 @Injectable()
 export class AgenciesService {
@@ -41,7 +52,112 @@ export class AgenciesService {
     private readonly audit: AuditService,
     private readonly cartable: CartableService,
     private readonly stepUp: StepUpService,
+    private readonly sms: SmsService,
+    @Inject(TWO_FACTOR_PROVIDER)
+    private readonly twoFactorProvider: TwoFactorProvider,
   ) {}
+
+  // ── Phase 16: public pre-registration (no auth) ─────────────────────────
+
+  /** Sends an OTP to a prospective agency's phone before they can submit a
+   * membership request — proves phone ownership without creating a User
+   * (that only happens once staff approve). See docs/DB_SCHEMA.md Phase 16
+   * for why this doesn't reuse TwoFactorChallenge. */
+  async requestPublicOtp(phone: string): Promise<{ challengeId: string }> {
+    const code = generateSixDigitCode();
+    const challenge = await this.prisma.agencyRequestOtp.create({
+      data: {
+        phone,
+        codeHash: await argon2.hash(code),
+        expiresAt: new Date(Date.now() + REQUEST_OTP_TTL_MS),
+      },
+    });
+    await this.twoFactorProvider.sendCode(
+      { id: challenge.id, fullName: 'متقاضی همکاری آژانس', email: null, phone },
+      code,
+    );
+    return { challengeId: challenge.id };
+  }
+
+  /** Verifies the OTP and creates a PENDING AgencyMembershipRequest — the
+   * public front door onto the existing staff review workflow below. */
+  async createPublicRequest(dto: {
+    applicantName: string;
+    managerName: string;
+    licenseNo: string;
+    phone: string;
+    challengeId: string;
+    code: string;
+  }): Promise<{ id: string }> {
+    const challenge = await this.prisma.agencyRequestOtp.findUnique({
+      where: { id: dto.challengeId },
+    });
+    if (!challenge || challenge.phone !== dto.phone) {
+      throw new UnauthorizedException({
+        code: 'TWO_FACTOR_INVALID',
+        message: 'کد تأیید نامعتبر است.',
+      });
+    }
+    if (challenge.consumedAt) {
+      throw new UnauthorizedException({
+        code: 'TWO_FACTOR_INVALID',
+        message: 'این کد قبلاً استفاده شده است.',
+      });
+    }
+    if (challenge.expiresAt < new Date()) {
+      throw new UnauthorizedException({
+        code: 'TWO_FACTOR_EXPIRED',
+        message: 'کد منقضی شده است.',
+      });
+    }
+    if (challenge.attempts >= REQUEST_OTP_MAX_ATTEMPTS) {
+      throw new UnauthorizedException({
+        code: 'TWO_FACTOR_INVALID',
+        message: 'تعداد تلاش‌های مجاز به پایان رسید.',
+      });
+    }
+
+    const codeValid = await argon2.verify(challenge.codeHash, dto.code);
+    if (!codeValid) {
+      await this.prisma.agencyRequestOtp.update({
+        where: { id: challenge.id },
+        data: { attempts: { increment: 1 } },
+      });
+      throw new UnauthorizedException({
+        code: 'TWO_FACTOR_INVALID',
+        message: 'کد وارد شده نادرست است.',
+      });
+    }
+
+    await this.prisma.agencyRequestOtp.update({
+      where: { id: challenge.id },
+      data: { consumedAt: new Date() },
+    });
+
+    const request = await this.prisma.agencyMembershipRequest.create({
+      data: {
+        applicantName: dto.applicantName,
+        managerName: dto.managerName,
+        licenseNo: dto.licenseNo,
+        phone: dto.phone,
+        status: 'PENDING',
+      },
+    });
+
+    return { id: request.id };
+  }
+
+  /** E2E-test-only helper (mirrors AuthService.getLastCodeForE2e) — reads
+   * back the mock-delivered OTP code by challenge id, since an anonymous
+   * applicant has no phone/username to look up a User row by. */
+  getLastRequestOtpCode(challengeId: string): string | null {
+    if (
+      process.env.NODE_ENV === 'production' ||
+      !this.twoFactorProvider.getLastCode
+    )
+      return null;
+    return this.twoFactorProvider.getLastCode(challengeId) ?? null;
+  }
 
   /** SUM(SALE) + SUM(SETTLEMENT) per agency — SETTLEMENT rows are stored
    * signed-negative, so this single grouped sum is the derived "used" figure
@@ -460,8 +576,10 @@ export class AgenciesService {
           licenseNo: request.licenseNo,
           managerName: request.managerName,
           phone: request.phone,
-          email: request.email,
-          city: request.city,
+          // Public pre-registration (Phase 16) collects neither — staff
+          // fill these in during onboarding, same as the street address.
+          email: request.email ?? '',
+          city: request.city ?? '',
           // Full street address isn't captured on the request form — collected
           // during the agency's own onboarding once the agency-portal track exists.
           address: '',
@@ -481,6 +599,14 @@ export class AgenciesService {
       });
       return { agencyUserId: user.id };
     });
+
+    // Phase 16: a real SMS now confirms approval + delivers access instead
+    // of the temp password only ever appearing in the API response.
+    await this.sms.send(
+      request.phone,
+      `درخواست همکاری آژانس شما تأیید شد. رمز عبور موقت شما در بلوجت: ${tempPassword}`,
+      'TEMP_PASSWORD',
+    );
 
     await this.audit.record({
       actorId: actor.id,

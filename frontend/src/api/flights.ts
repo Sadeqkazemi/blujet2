@@ -1,6 +1,7 @@
-import { apiGet, apiPatch, apiPost } from './http';
+import { apiGet, apiPatch, apiPost, apiDelete } from './http';
 import type {
   AirportEntry,
+  AllotmentRow,
   FlightDetail,
   FlightRow,
   FlightsOverview,
@@ -38,4 +39,19 @@ export function planFlight(id: string, priceIrr: number, agencySeats: number) {
 
 export function runFlightsAiAnalysis() {
   return apiPost<{ analyzed: number; available: boolean }>('/flights/ai-analysis');
+}
+
+export function fetchAllotments(instanceId: string) {
+  return apiGet<AllotmentRow[]>(`/flights/${instanceId}/allotments`);
+}
+
+export function createAllotment(
+  instanceId: string,
+  dto: { agencyId: string; seatsAllocated: number },
+) {
+  return apiPost<AllotmentRow>(`/flights/${instanceId}/allotments`, dto);
+}
+
+export function deleteAllotment(instanceId: string, allotmentId: string) {
+  return apiDelete<{ id: string }>(`/flights/${instanceId}/allotments/${allotmentId}`);
 }
