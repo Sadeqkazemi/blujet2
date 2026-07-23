@@ -16,6 +16,8 @@ interface AuthContextValue {
   // predates the customer track) keeps type-checking without change.
   requestOtp?: (phone: string) => Promise<string>;
   verifyOtp?: (challengeId: string, code: string) => Promise<AuthUser>;
+  // Phase 21 — optional customer email/phone+password login, alongside OTP.
+  passwordLogin?: (phone: string, password: string) => Promise<AuthUser>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -74,6 +76,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return loggedInUser;
   }, []);
 
+  const passwordLogin = useCallback(async (phone: string, password: string) => {
+    const { user: loggedInUser } = await authApi.customerPasswordLogin(phone, password);
+    setUser(loggedInUser);
+    setStatus('authenticated');
+    return loggedInUser;
+  }, []);
+
   const signOut = useCallback(async () => {
     // Best-effort server-side revoke — a failed/rate-limited call must never
     // trap the user in a session they clicked "sign out" on.
@@ -95,8 +104,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signOut,
       requestOtp,
       verifyOtp,
+      passwordLogin,
     }),
-    [status, user, requestLogin, confirmTwoFactor, agencyLogin, signOut, requestOtp, verifyOtp],
+    [
+      status,
+      user,
+      requestLogin,
+      confirmTwoFactor,
+      agencyLogin,
+      signOut,
+      requestOtp,
+      verifyOtp,
+      passwordLogin,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

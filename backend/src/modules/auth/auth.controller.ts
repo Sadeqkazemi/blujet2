@@ -23,7 +23,11 @@ import { VerifyTwoFactorDto } from './dto/verify-two-factor.dto';
 import { RequestOtpDto } from './dto/request-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { RequestStepUpDto } from './dto/step-up.dto';
+import { SetPasswordDto } from './dto/set-password.dto';
+import { CustomerPasswordLoginDto } from './dto/customer-password-login.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 
@@ -234,6 +238,44 @@ export class AuthController {
       dto.newPassword,
     );
     return { success: true, data: { changed: true } };
+  }
+
+  @Post('set-password')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('USER')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({
+    summary:
+      'تعیین/بازنشانی رمز عبور مشتری پس از احراز هویت با OTP — بدون نیاز به رمز فعلی',
+  })
+  @ApiResponse({ status: 200, description: 'Password set' })
+  async setPassword(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: SetPasswordDto,
+  ) {
+    await this.auth.setOwnPassword(user, dto.newPassword);
+    return { success: true, data: { changed: true } };
+  }
+
+  @Post('customer/login-password')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({ summary: 'ورود مشتری با موبایل + رمز عبور' })
+  @ApiResponse({ status: 200, description: 'Login complete' })
+  @ApiResponse({ status: 401, description: 'Invalid credentials' })
+  async customerPasswordLogin(
+    @Body() dto: CustomerPasswordLoginDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { accessToken, refreshToken, user } =
+      await this.auth.customerPasswordLogin(dto.phone, dto.password, {
+        userAgent: req.headers['user-agent'],
+        ip: req.ip,
+      });
+    setRefreshCookie(res, refreshToken);
+    return { success: true, data: { accessToken, user } };
   }
 
   @Post('step-up/request')

@@ -74,6 +74,7 @@ export default function App() {
           <Route path="/support" element={<SupportPage />} />
           <Route path="/travel-info" element={<TravelInfoPage />} />
           <Route path="/signin" element={<CustomerLoginPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/manage-booking" element={<ManageBookingPage />} />
           <Route path="/flight-status" element={<FlightStatusPage />} />
           <Route path="/account" element={<AccountPage />} />
@@ -82,7 +83,6 @@ export default function App() {
           <Route path="/maintenance" element={<MaintenancePage />} />
 
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/two-factor" element={<TwoFactorPage />} />
           <Route path="/agency/login" element={<AgencyLoginPage />} />
 

@@ -155,6 +155,23 @@ below for what's landed from that port so far.
   backend e2e tests, 6 new frontend tests. See `docs/API.md`/
   `docs/DB_SCHEMA.md`'s Phase 20 sections for full scope + explicit
   deferrals (attachments, reply threads, public ticket-status lookup).
+- [x] **Phase 21 — فراموشی رمز (customer forgot/set password)** — third
+  "dead forms" item. Also fixed a real design-mismatch bug found along the
+  way: staff `LoginPage.tsx`'s "فراموشی رمز عبور؟" wrongly linked to a
+  self-service flow — the design's own handler just shows a "contact IT"
+  toast (staff has no self-service reset). Real flow reuses the existing
+  OTP challenge (`/auth/otp/request` + `/auth/otp/verify`) to prove phone
+  ownership, then a new `POST /auth/set-password` (`@Roles('USER')`, no
+  current-password check) sets the password; a new `POST
+  /auth/customer/login-password` closes the loop so that password is
+  actually usable, and doubles as first-time password setup — giving real
+  meaning to CLAUDE.md's "email+password optional" line for customers,
+  which nothing had implemented before. `CustomerLoginPage.tsx` gained a
+  small password-login toggle (the design itself has no password field
+  for customers at all, so this is the minimal addition needed to make
+  the new capability reachable). No schema change — reuses
+  `User.passwordHash`. 9 new backend e2e tests, 6 new frontend tests. See
+  `docs/API.md`/`docs/DB_SCHEMA.md`'s Phase 21 sections.
 
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is
