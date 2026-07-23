@@ -74,6 +74,17 @@ Management panels (one per role — shared shell, role-scoped tabs):
   `COMMERCIAL_MANAGER` (مدیر بازرگانی), `FINANCE_MANAGER` (مدیر مالی),
   `SENIOR_MANAGER` (مدیر ارشد), `CEO` (مدیر عامل), `BOARD_CHAIR`
   (رئیس هیئت مدیره), `SITE_ADMIN`.
+- Agency authentication model is **single-user per agency**:
+  - Every `Agency` has exactly one login account with role `AGENCY`.
+  - The agency account represents the agency itself, not an individual agent.
+  - Do NOT create `AgencyUser`, agency-member, invitation, team, sub-user,
+    agent-seat, or per-agent permission features.
+  - `Agency.user_id` is required and unique; one user cannot own more than
+    one agency, and one agency cannot have more than one login user.
+  - Changing the agency's username, phone, email, password, MFA device, or
+    authorized representative is an audited account-change operation.
+  - Agency password reset and account recovery require SMS OTP; sensitive
+    changes additionally require step-up verification.
 - Panel tabs/permissions are role-scoped exactly as in the design (e.g.
   finance tab visible to FINANCE_MANAGER, CEO, SENIOR_MANAGER, BOARD_CHAIR,
   COMMERCIAL_MANAGER; «تراکنش‌های اخیر» و «تسویه آژانس‌ها» only in the
@@ -183,10 +194,22 @@ Management panels (one per role — shared shell, role-scoped tabs):
 - **Discount codes (کد تخفیف)**: entered on the پرداخت page (NOT checkout —
   per final design). Promo engine: code, type (percent/fixed), constraints
   (route, cabin, dates, usage caps, per-user cap), full audit of redemptions.
-- **Agencies (پنل آژانس)**: agency accounts with credit line, agency
-  pricing/commission, booking on behalf of customers, periodic settlement
-  (تسویه‌حساب) visible in the finance manager panel, and an inbox/messages
-  thread with the airline as designed.
+- **Agencies (پنل آژانس)**: each agency is a tenant with exactly **one**
+  login account. It has a credit line, agency pricing/commission, booking
+  on behalf of customers, periodic settlement (تسویه‌حساب) visible in the
+  finance manager panel, and an inbox/messages thread with the airline.
+  - No agency can create, invite, or manage additional users or agents.
+  - All bookings, payments, refunds, credit entries, settlements, messages,
+    API clients, and reports are owned directly by `agency_id`.
+  - Server-side tenant isolation is mandatory on every agency query and
+    command; the agency must never access another agency's data.
+  - Suspending the single agency account blocks portal login and new sales.
+    Suspension of Partner API access is a separate status and must not be
+    inferred only from portal-login status.
+  - Agency API credentials, if enabled, are machine credentials attached
+    to the same `agency_id`; they are not extra human users.
+  - The database must enforce `Agency.user_id UNIQUE NOT NULL` and
+    `User.agency_id UNIQUE` (or an equivalent one-to-one relation).
 - **Reporting (پنل‌ها)**: sales chart with day/month/year filter;
   completed-flights stats box (flight count, total seats, sold, unsold)
   synced to the same filter; income/expense chart; KPI boxes (کل درآمد,
