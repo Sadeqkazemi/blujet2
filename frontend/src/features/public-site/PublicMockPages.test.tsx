@@ -2,7 +2,6 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import ManageBookingPage from './ManageBookingPage';
 import CustomerLoginPage from './CustomerLoginPage';
 import AboutPage from './AboutPage';
 import ContactPage from './ContactPage';
@@ -29,45 +28,6 @@ beforeEach(() => {
 function renderWithRouter(node: React.ReactNode) {
   return render(<MemoryRouter>{node}</MemoryRouter>);
 }
-
-describe('ManageBookingPage (mock)', () => {
-  it('validates the lookup form', async () => {
-    renderWithRouter(<ManageBookingPage />);
-    await userEvent.click(screen.getByTestId('mb-lookup'));
-    expect(screen.getByText('کد رزرو و نام خانوادگی مسافر را وارد کنید.')).toBeInTheDocument();
-  });
-
-  it('shows the mock booking after lookup and echoes the entered PNR', async () => {
-    renderWithRouter(<ManageBookingPage />);
-    await userEvent.type(screen.getByTestId('mb-pnr'), 'bj4x2k');
-    await userEvent.type(screen.getByTestId('mb-lastname'), 'رضایی');
-    await userEvent.click(screen.getByTestId('mb-lookup'));
-
-    expect(screen.getByTestId('mb-pnr-show')).toHaveTextContent('BJ4X2K');
-    expect(screen.getByText('نگار رضایی')).toBeInTheDocument();
-    expect(screen.getByText('آرش رضایی')).toBeInTheDocument();
-    expect(screen.getByText('مسافران')).toBeInTheDocument();
-  });
-
-  it('runs the mock refund flow with a 30% penalty', async () => {
-    renderWithRouter(<ManageBookingPage />);
-    await userEvent.type(screen.getByTestId('mb-pnr'), 'BJ4X2K');
-    await userEvent.type(screen.getByTestId('mb-lastname'), 'رضایی');
-    await userEvent.click(screen.getByTestId('mb-lookup'));
-
-    await userEvent.click(screen.getByTestId('mb-open-refund'));
-    const confirm = screen.getByTestId('mb-refund-confirm');
-    expect(confirm).toBeDisabled();
-
-    await userEvent.click(screen.getByTestId('mb-refund-pax-0'));
-    // 1,600,000 toman fare → 480,000 penalty → 1,120,000 refundable
-    expect(screen.getByTestId('mb-refundable')).toHaveTextContent('۱٬۱۲۰٬۰۰۰');
-    await userEvent.click(confirm);
-
-    expect(screen.getByText('درخواست استرداد ثبت شد')).toBeInTheDocument();
-    expect(screen.getByText(/RF-BJ4X2K/)).toBeInTheDocument();
-  });
-});
 
 describe('CustomerLoginPage', () => {
   it('walks through the two OTP steps with a resend countdown', async () => {

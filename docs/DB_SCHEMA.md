@@ -1314,3 +1314,52 @@ a non-EMPLOYEE role (`FINANCE_MANAGER`) is unaffected by the new guard.
 `test/panels.e2e-spec.ts` gained the SITE_ADMIN nav-shape test and the
 EMPLOYEE dynamic-nav test (replacing its now-obsolete "EMPLOYEE gets an
 empty nav" assertion).
+
+## Phase 19 — مدیریت رزرو (anonymous PNR self-service)
+
+No schema change — reuses `Booking`/`Passenger`/`RefundRequest`/
+`RefundPenaltyRule` exactly as Phase 2/7/13 defined them. First item from
+the post-Phase-18 "dead forms" punch list; user explicitly chose the
+anonymous PNR+last-name lookup model over requiring login, matching
+مدیریت رزرو.dc.html and standard airline self-service UX, over the
+alternative of reusing the existing authenticated `GET /bookings/pnr/:pnr`
+as-is (which would have forced customers to log in just to check a
+booking they may have made as a guest during checkout).
+
+- `BookingService` gains a public `getByPnrAndLastName(pnr, lastName)`
+  alongside the existing (unchanged) `getByPnr(pnr, user)` — both funnel
+  through the same private `toDetail()` shaping, so the anonymous and
+  authenticated views can never drift in what fields they expose.
+- `RefundsService.submitFromCustomer` (authenticated) and a new
+  `submitAnonymous(pnr, lastName, iban)` both call a new shared private
+  `createRefundRequest(booking, iban, passengerName)` — the exact same
+  `RefundPenaltyRule` lookup, `computePenalty()` call, and
+  one-request-per-booking/TICKETED-or-PAID-only guards apply to both
+  paths. This was a deliberate refactor (not a copy-paste) specifically
+  so a future penalty-rule change can't accidentally apply to only one of
+  the two customer-facing refund entry points.
+- New shared pure helper `matchesLastName(fullName, lastName)`
+  (`backend/src/common/passenger-name.util.ts`) — compares the input
+  against the last whitespace-separated token of a passenger's stored
+  `fullName`, trimmed. Used by both new anonymous endpoints. A
+  false/no-match and a nonexistent PNR return the identical
+  `NotFoundException` (message + code) — no timing/response-shape oracle
+  that would let an attacker distinguish "wrong last name" from "PNR
+  doesn't exist" while brute-forcing PNRs.
+- Both new endpoints are public (no `JwtAuthGuard`) and carry the same
+  `@Throttle({ limit: 10, ttl: 60_000 })` per-IP rate already used on
+  `POST /bookings` — a 6-character alphanumeric PNR (`generatePnr()`) is
+  guessable at scale without a rate limit, per CLAUDE.md's "rate limiting
+  on... booking and money endpoints" rule.
+- No audit-log row on the anonymous path — `AuditService.record`'s
+  `actorId` is a required real `User.id`; an anonymous caller has none.
+  Same precedent as Phase 16's anonymous agency pre-registration
+  (`createPublicRequest`), which also skips the audit call for the same
+  reason.
+
+⚑ **Explicitly deferred this phase** (see docs/API.md's Phase 19 section
+for the full reasoning): real seat-change and ticket-download actions
+(the mock's buttons already had no handler at all — left visibly
+disabled rather than built); per-passenger partial refund selection (the
+mock's UI, but the real `RefundRequest` model — and every other refund
+surface in the app — is 1:1 with `Booking`, never per-passenger).
