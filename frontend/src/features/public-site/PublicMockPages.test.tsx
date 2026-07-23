@@ -9,6 +9,7 @@ import * as useAuthModule from '../../hooks/useAuth';
 
 const requestOtp = vi.fn().mockResolvedValue('challenge-1');
 const verifyOtp = vi.fn().mockResolvedValue({ id: 'u1', fullName: 'نگار رضایی', role: 'USER' });
+const passwordLogin = vi.fn().mockResolvedValue({ id: 'u1', fullName: 'نگار رضایی', role: 'USER' });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -20,6 +21,7 @@ beforeEach(() => {
     agencyLogin: vi.fn(),
     requestOtp,
     verifyOtp,
+    passwordLogin,
     signOut: vi.fn(),
   });
 });
@@ -56,6 +58,19 @@ describe('CustomerLoginPage', () => {
     await userEvent.type(screen.getByTestId('agency-license'), '1234-5678');
     await userEvent.click(screen.getByTestId('agency-signup-btn'));
     expect(screen.getByTestId('agency-signup-done')).toBeInTheDocument();
+  });
+
+  it('toggles to real password login and links to forgot-password', async () => {
+    renderWithRouter(<CustomerLoginPage />);
+
+    await userEvent.click(screen.getByTestId('signin-use-password'));
+    expect(screen.getByText('فراموشی رمز عبور؟')).toHaveAttribute('href', '/forgot-password');
+
+    await userEvent.type(screen.getByTestId('signin-pw-phone'), '09121234567');
+    await userEvent.type(screen.getByTestId('signin-pw-password'), 'MyPass1234');
+    await userEvent.click(screen.getByTestId('signin-pw-submit'));
+
+    expect(passwordLogin).toHaveBeenCalledWith('09121234567', 'MyPass1234');
   });
 });
 
