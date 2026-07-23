@@ -66,6 +66,16 @@ export class CreateAdminDto {
   @ApiProperty({ enum: ['sms', 'email'] })
   @IsIn(['sms', 'email'])
   delivery: 'sms' | 'email';
+
+  @ApiProperty({
+    description: 'از POST /auth/step-up/request (scope: ADMIN_ROLE_CHANGE)',
+  })
+  @IsString()
+  stepUpChallengeId: string;
+
+  @ApiProperty({ example: '482913' })
+  @IsString()
+  stepUpCode: string;
 }
 
 export class ResetAdminPasswordDto {

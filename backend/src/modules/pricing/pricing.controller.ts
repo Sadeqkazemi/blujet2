@@ -84,7 +84,13 @@ export class PricingController {
     @Param('id') id: string,
     @Body() dto: RegisterProposalDto,
   ) {
-    const data = await this.pricing.register(actor, id, dto.source);
+    const data = await this.pricing.register(
+      actor,
+      id,
+      dto.source,
+      dto.stepUpChallengeId,
+      dto.stepUpCode,
+    );
     return { success: true, data };
   }
 

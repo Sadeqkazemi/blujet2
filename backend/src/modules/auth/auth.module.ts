@@ -3,6 +3,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { StepUpService } from './step-up.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { TWO_FACTOR_PROVIDER } from './providers/two-factor-provider.interface';
 import { MockTwoFactorProvider } from './providers/mock-two-factor.provider';
@@ -22,9 +23,10 @@ import { SmsModule } from '../sms/sms.module';
   controllers: [AuthController],
   providers: [
     AuthService,
+    StepUpService,
     JwtStrategy,
     { provide: TWO_FACTOR_PROVIDER, useClass: MockTwoFactorProvider },
   ],
-  exports: [AuthService],
+  exports: [AuthService, StepUpService],
 })
 export class AuthModule {}

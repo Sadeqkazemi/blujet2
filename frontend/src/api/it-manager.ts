@@ -69,8 +69,8 @@ export function fetchActiveSessions() {
   return apiGet<ActiveSession[]>('/it/security/sessions');
 }
 
-export function logoutAllSessions() {
-  return apiPost<{ revokedCount: number }>('/it/security/sessions/logout-all');
+export function logoutAllSessions(stepUp: { stepUpChallengeId: string; stepUpCode: string }) {
+  return apiPost<{ revokedCount: number }>('/it/security/sessions/logout-all', stepUp);
 }
 
 export function fetchItServices() {

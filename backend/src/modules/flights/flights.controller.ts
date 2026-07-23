@@ -142,6 +142,16 @@ class ChangeAircraftTypeDto {
   @ApiProperty({ description: 'نوع هواپیمای جدید', example: 'Boeing 737' })
   @IsString()
   aircraftType: string;
+
+  @ApiProperty({
+    description: 'از POST /auth/step-up/request (scope: PRICE_CAPACITY_CHANGE)',
+  })
+  @IsString()
+  stepUpChallengeId: string;
+
+  @ApiProperty({ example: '482913' })
+  @IsString()
+  stepUpCode: string;
 }
 
 class CreateFareRuleDto {
@@ -416,6 +426,8 @@ export class FlightsController {
       actor,
       instanceId,
       dto.aircraftType,
+      dto.stepUpChallengeId,
+      dto.stepUpCode,
     );
     return { success: true, data };
   }

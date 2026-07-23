@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Patch, Post, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
+import { IsString } from 'class-validator';
 import { SecurityService } from './security.service';
 import { UpdateSecurityPolicyDto } from './dto/security.dtos';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -8,6 +9,18 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PanelAccessGuard } from '../panels/panel-access.guard';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
+
+class LogoutAllDto {
+  @ApiProperty({
+    description: 'از POST /auth/step-up/request (scope: SESSION_REVOKE)',
+  })
+  @IsString()
+  stepUpChallengeId: string;
+
+  @ApiProperty({ example: '482913' })
+  @IsString()
+  stepUpCode: string;
+}
 
 @ApiTags('it-manager')
 @Controller('it/security')
@@ -42,7 +55,17 @@ export class SecurityController {
 
   @Post('sessions/logout-all')
   @ApiOperation({ summary: 'خروج اجباری همه نشست‌های فعال سایت' })
-  async logoutAll(@CurrentUser() actor: AuthenticatedUser) {
-    return { success: true, data: await this.security.logoutAll(actor) };
+  async logoutAll(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Body() dto: LogoutAllDto,
+  ) {
+    return {
+      success: true,
+      data: await this.security.logoutAll(
+        actor,
+        dto.stepUpChallengeId,
+        dto.stepUpCode,
+      ),
+    };
   }
 }

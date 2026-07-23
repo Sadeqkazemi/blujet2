@@ -9,6 +9,7 @@ import {
 import { ApiRequestError } from '../../api/envelope';
 import Modal from '../../components/Modal';
 import { formatJalaliDateTime } from '../../lib/jalali';
+import { useStepUp } from '../../hooks/useStepUp';
 import type { AdminCreatableRole, AdminRow } from '../../types/admins';
 
 const CREATABLE_ROLES: { value: AdminCreatableRole; label: string }[] = [
@@ -36,6 +37,7 @@ export default function AdminsPage() {
   const [addError, setAddError] = useState<string | null>(null);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
   const [newPass, setNewPass] = useState('');
+  const stepUp = useStepUp('ADMIN_ROLE_CHANGE');
 
   function reload() {
     fetchAdmins()
@@ -56,13 +58,15 @@ export default function AdminsPage() {
     }
     setAddError(null);
     try {
-      await createAdmin(addForm);
+      const fields = await stepUp.confirm();
+      await createAdmin({ ...addForm, ...fields });
       setAddOpen(false);
       setNotice(
         `مدیر جدید افزوده شد و رمز عبور از طریق ${addForm.delivery === 'sms' ? 'پیامک' : 'ایمیل سازمانی'} ارسال شد ✓`,
       );
       reload();
     } catch (err) {
+      if (err instanceof Error && err.message === 'CANCELLED') return;
       setAddError(err instanceof ApiRequestError ? err.message : 'خطا در ایجاد حساب.');
     }
   }
@@ -346,6 +350,7 @@ export default function AdminsPage() {
           </div>
         </Modal>
       )}
+      {stepUp.modal}
     </div>
   );
 }

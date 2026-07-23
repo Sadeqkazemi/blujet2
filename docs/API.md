@@ -704,3 +704,33 @@ orphan like prior phases' dead blocks).
   - PATCH `/refunds/:id/refer` — `{ assigneeId }` (finance staff via /staff-directory) — sets assignee + history, status unchanged (per design), audited.
   - PATCH `/refunds/:id/pay` — «تأیید، واریز به شبا و بستن پرونده» — only from FINANCE (else 409); transactional ledger reversal + booking REFUNDED + audit (see DB_SCHEMA ⚑).
   - POST `/refunds/_test/request` — non-production E2E seed hook (creates a booking + FINANCE-status request), 404 in production.
+
+## Phase 15 — step-up verification for high-risk operations
+
+See DB_SCHEMA.md's Phase 15 for full reasoning. One new shared endpoint,
+then five existing endpoints gain two required body fields.
+
+- `POST /auth/step-up/request` (new, any authenticated staff/agency
+  actor, `@Throttle` 5/min like OTP) — `{ scope }` where scope is one of
+  `ADMIN_ROLE_CHANGE | API_KEY_ROTATE | REFUND_PAYOUT |
+  PRICE_CAPACITY_CHANGE | SESSION_REVOKE`. Returns `{ challengeId }`; the
+  code is delivered through the actor's existing 2FA channel.
+- `POST /admins` (existing) — body gains `stepUpChallengeId`,
+  `stepUpCode`; scope `ADMIN_ROLE_CHANGE`. 401 `TWO_FACTOR_INVALID`/
+  `TWO_FACTOR_EXPIRED` if the challenge doesn't check out — same codes
+  the login 2FA flow already uses.
+- `POST /agencies/:id/api-key` (existing) — same two fields required;
+  scope `API_KEY_ROTATE`.
+- `PATCH /agencies/:id/api-key/:keyId` (existing) — same two fields
+  required **only when `regenerate: true`**; a plain `status` toggle
+  (suspend/activate an existing key) does not need step-up.
+- `PATCH /refunds/:id/pay` (existing) — same two fields required; scope
+  `REFUND_PAYOUT`.
+- `PATCH /pricing/proposals/:id/register` (existing) — same two fields
+  required; scope `PRICE_CAPACITY_CHANGE`.
+- `PATCH /flights/:instanceId/aircraft` (existing, capacity-affecting)
+  — same two fields required; scope `PRICE_CAPACITY_CHANGE` (shared with
+  price registration — both are the "price/capacity change" item in the
+  spec's §5.1, not two separate scopes).
+- `POST /security/sessions/logout-all` (existing) — same two fields
+  required; scope `SESSION_REVOKE`.

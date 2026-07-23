@@ -4,9 +4,10 @@ import { PricingService } from './pricing.service';
 import { AiModule } from '../ai/ai.module';
 import { PanelsModule } from '../panels/panels.module';
 import { AuditModule } from '../audit/audit.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [AiModule, PanelsModule, AuditModule],
+  imports: [AiModule, PanelsModule, AuditModule, AuthModule],
   controllers: [PricingController],
   providers: [PricingService],
 })

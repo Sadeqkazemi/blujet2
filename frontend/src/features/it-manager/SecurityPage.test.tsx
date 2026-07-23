@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import SecurityPage from './SecurityPage';
 import * as itApi from '../../api/it-manager';
+import * as authApi from '../../api/auth';
 import type { ActiveSession, SecurityPolicy } from '../../types/it-manager';
 
 const POLICY: SecurityPolicy = {
@@ -26,6 +27,7 @@ describe('SecurityPage', () => {
   it('renders policy toggles, params and active sessions; confirms before logging everyone out', async () => {
     vi.spyOn(itApi, 'fetchSecurityPolicy').mockResolvedValue(POLICY);
     vi.spyOn(itApi, 'fetchActiveSessions').mockResolvedValue(SESSIONS);
+    vi.spyOn(authApi, 'requestStepUp').mockResolvedValue({ challengeId: 'ch1' });
     const logoutAllSpy = vi.spyOn(itApi, 'logoutAllSessions').mockResolvedValue({ revokedCount: 1 });
 
     render(<SecurityPage />);
@@ -40,7 +42,14 @@ describe('SecurityPage', () => {
     expect(logoutAllSpy).not.toHaveBeenCalled();
 
     await user.click(within(dialog).getByRole('button', { name: 'خروج همه' }));
-    await waitFor(() => expect(logoutAllSpy).toHaveBeenCalled());
+
+    const stepUpDialog = await screen.findByRole('dialog', { name: 'تأیید مجدد هویت' });
+    await user.type(within(stepUpDialog).getByRole('textbox'), '482913');
+    await user.click(within(stepUpDialog).getByRole('button', { name: 'تأیید' }));
+
+    await waitFor(() =>
+      expect(logoutAllSpy).toHaveBeenCalledWith({ stepUpChallengeId: 'ch1', stepUpCode: '482913' }),
+    );
   });
 
   it('toggling a policy switch calls the update endpoint with the flipped value', async () => {

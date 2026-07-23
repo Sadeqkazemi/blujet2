@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import RefundsPage from './RefundsPage';
 import * as refundsApi from '../../api/refunds';
 import * as staffApi from '../../api/cartable';
+import * as authApi from '../../api/auth';
 import type { RefundDetail, RefundListRow, RefundsResult } from '../../types/refunds';
 import type { StaffDirectoryEntry } from '../../types/cartable';
 
@@ -150,6 +151,7 @@ describe('RefundsPage', () => {
   it('paying from the modal calls the API, closes the modal and shows the paid notice', async () => {
     mockList();
     vi.spyOn(refundsApi, 'fetchRefundDetail').mockResolvedValue(DETAIL);
+    vi.spyOn(authApi, 'requestStepUp').mockResolvedValue({ challengeId: 'ch1' });
     const pay = vi.spyOn(refundsApi, 'payRefund').mockResolvedValue({ ...FINANCE_ROW, status: 'PAID' });
 
     const { default: userEvent } = await import('@testing-library/user-event');
@@ -159,7 +161,14 @@ describe('RefundsPage', () => {
     const dialog = await screen.findByRole('dialog', { name: /BLJ4X2/ });
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'تأیید، واریز به شبا و بستن پرونده' }));
-    await waitFor(() => expect(pay).toHaveBeenCalledWith('r1'));
+
+    const stepUpDialog = await screen.findByRole('dialog', { name: 'تأیید مجدد هویت' });
+    await userEvent.type(within(stepUpDialog).getByRole('textbox'), '482913');
+    await userEvent.click(within(stepUpDialog).getByRole('button', { name: 'تأیید' }));
+
+    await waitFor(() =>
+      expect(pay).toHaveBeenCalledWith('r1', { stepUpChallengeId: 'ch1', stepUpCode: '482913' }),
+    );
     expect(await screen.findByText('تأیید، واریز وجه و بستن پرونده انجام شد ✓')).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });

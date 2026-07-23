@@ -23,8 +23,12 @@ export function setLegalRate(id: string, legalRateIrr: number) {
   return apiPatch<PricingProposal>(`/pricing/proposals/${id}/legal-rate`, { legalRateIrr });
 }
 
-export function registerProposal(id: string, source: 'PROPOSED' | 'AI') {
-  return apiPatch<PricingProposal>(`/pricing/proposals/${id}/register`, { source });
+export function registerProposal(
+  id: string,
+  source: 'PROPOSED' | 'AI',
+  stepUp: { stepUpChallengeId: string; stepUpCode: string },
+) {
+  return apiPatch<PricingProposal>(`/pricing/proposals/${id}/register`, { source, ...stepUp });
 }
 
 export function runAiAnalysis() {

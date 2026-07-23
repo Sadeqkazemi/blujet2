@@ -1,5 +1,11 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsIn, IsOptional } from 'class-validator';
+import {
+  IsBoolean,
+  IsIn,
+  IsOptional,
+  IsString,
+  ValidateIf,
+} from 'class-validator';
 
 const STATUSES = ['ACTIVE', 'SUSPENDED'] as const;
 
@@ -15,4 +21,16 @@ export class UpdateApiKeyDto {
   @IsOptional()
   @IsBoolean()
   regenerate?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'فقط وقتی regenerate=true — از POST /auth/step-up/request',
+  })
+  @ValidateIf((o: UpdateApiKeyDto) => o.regenerate === true)
+  @IsString()
+  stepUpChallengeId?: string;
+
+  @ApiPropertyOptional({ example: '482913' })
+  @ValidateIf((o: UpdateApiKeyDto) => o.regenerate === true)
+  @IsString()
+  stepUpCode?: string;
 }

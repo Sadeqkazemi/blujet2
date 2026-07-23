@@ -11,6 +11,7 @@ import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
 import { generateTempPassword } from '../../common/temp-password';
 import { SmsService } from '../sms/sms.service';
+import { StepUpService } from '../auth/step-up.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { Role } from '../../../generated/typeorm/enums';
 
@@ -54,6 +55,7 @@ export class AdminsService {
     private readonly typeorm: TypeORMService,
     private readonly audit: AuditService,
     private readonly sms: SmsService,
+    private readonly stepUp: StepUpService,
   ) {}
 
   private managedRolesFor(actor: AuthenticatedUser): Role[] {
@@ -133,8 +135,17 @@ export class AdminsService {
       role: Role;
       password: string;
       delivery: 'sms' | 'email';
+      stepUpChallengeId: string;
+      stepUpCode: string;
     },
   ) {
+    await this.stepUp.verify(
+      actor,
+      dto.stepUpChallengeId,
+      dto.stepUpCode,
+      'ADMIN_ROLE_CHANGE',
+    );
+
     if (!this.managedRolesFor(actor).includes(dto.role)) {
       throw new ForbiddenException({
         code: ErrorCode.FORBIDDEN,

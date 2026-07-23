@@ -189,7 +189,13 @@ export class AgenciesController {
     @Param('id') id: string,
     @Body() dto: CreateApiKeyDto,
   ) {
-    const data = await this.agencies.issueApiKey(actor, id, dto.scope);
+    const data = await this.agencies.issueApiKey(
+      actor,
+      id,
+      dto.scope,
+      dto.stepUpChallengeId,
+      dto.stepUpCode,
+    );
     return { success: true, data };
   }
 

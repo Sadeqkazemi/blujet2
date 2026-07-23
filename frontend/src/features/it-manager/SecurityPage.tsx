@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { fetchActiveSessions, fetchSecurityPolicy, logoutAllSessions, updateSecurityPolicy } from '../../api/it-manager';
 import { faDigits } from '../../lib/fa-format';
+import { useStepUp } from '../../hooks/useStepUp';
 import type { ActiveSession, SecurityPolicy } from '../../types/it-manager';
 
 const TOGGLES: { key: keyof SecurityPolicy; title: string; desc: string }[] = [
@@ -17,6 +18,7 @@ export default function SecurityPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmLogoutAll, setConfirmLogoutAll] = useState(false);
+  const stepUp = useStepUp('SESSION_REVOKE');
 
   const load = useCallback(async () => {
     try {
@@ -44,11 +46,13 @@ export default function SecurityPage() {
 
   async function onLogoutAll() {
     try {
-      const { revokedCount } = await logoutAllSessions();
+      const fields = await stepUp.confirm();
+      const { revokedCount } = await logoutAllSessions(fields);
       setNotice(`${faDigits(revokedCount)} نشست خاتمه یافت ✓`);
       setConfirmLogoutAll(false);
       await load();
-    } catch {
+    } catch (err) {
+      if (err instanceof Error && err.message === 'CANCELLED') return;
       setError('خطا در خروج از نشست‌ها.');
     }
   }
@@ -163,6 +167,7 @@ export default function SecurityPage() {
           </div>
         </div>
       )}
+      {stepUp.modal}
     </div>
   );
 }

@@ -124,6 +124,21 @@ enum TwoFactorPurpose {
   // same challenge/code/attempts machinery as staff 2FA instead of a
   // parallel table.
   CUSTOMER_OTP_LOGIN
+  // Phase 15: re-authentication immediately before a high-risk write —
+  // same machinery again, see StepUpScope below.
+  STEP_UP_VERIFICATION
+}
+
+// Phase 15 — one scope per real high-risk call site found in the
+// codebase (see docs/DB_SCHEMA.md); binds a STEP_UP_VERIFICATION
+// challenge to the specific action it authorizes so it can't be replayed
+// against a different one.
+enum StepUpScope {
+  ADMIN_ROLE_CHANGE
+  API_KEY_ROTATE
+  REFUND_PAYOUT
+  PRICE_CAPACITY_CHANGE
+  SESSION_REVOKE
 }
 
 model TwoFactorChallenge {
@@ -131,6 +146,8 @@ model TwoFactorChallenge {
   userId     String
   user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   purpose    TwoFactorPurpose
+  // Only set when purpose = STEP_UP_VERIFICATION.
+  scope      StepUpScope?
   codeHash   String
   expiresAt  DateTime
   consumedAt DateTime?

@@ -8,7 +8,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
-import { IsUUID } from 'class-validator';
+import { IsString, IsUUID } from 'class-validator';
 import { RefundsService } from './refunds.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -21,6 +21,18 @@ class ReferRefundDto {
   @ApiProperty({ description: 'شناسه کارمند مالی مقصد ارجاع' })
   @IsUUID()
   assigneeId: string;
+}
+
+class PayRefundDto {
+  @ApiProperty({
+    description: 'از POST /auth/step-up/request (scope: REFUND_PAYOUT)',
+  })
+  @IsString()
+  stepUpChallengeId: string;
+
+  @ApiProperty({ example: '482913' })
+  @IsString()
+  stepUpCode: string;
 }
 
 @ApiTags('refunds')
@@ -72,8 +84,17 @@ export class RefundsController {
   @ApiOperation({
     summary: 'تأیید، واریز به شبا و بستن پرونده — برگشت تراکنشی در دفتر کل',
   })
-  async pay(@CurrentUser() actor: AuthenticatedUser, @Param('id') id: string) {
-    const data = await this.refunds.pay(actor, id);
+  async pay(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: PayRefundDto,
+  ) {
+    const data = await this.refunds.pay(
+      actor,
+      id,
+      dto.stepUpChallengeId,
+      dto.stepUpCode,
+    );
     return { success: true, data };
   }
 }

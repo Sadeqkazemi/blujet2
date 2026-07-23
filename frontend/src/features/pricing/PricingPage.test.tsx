@@ -1,8 +1,9 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import PricingPage from './PricingPage';
 import * as pricingApi from '../../api/pricing';
+import * as authApi from '../../api/auth';
 import * as useAuthModule from '../../hooks/useAuth';
 import type { CeoPricingResult, CommercialPricingResult, PricingProposal } from '../../types/pricing';
 import type { Role } from '../../types/auth';
@@ -130,13 +131,21 @@ describe('PricingPage', () => {
   it('CEO registering with AI calls the API with source=AI', async () => {
     mockRole('CEO');
     vi.spyOn(pricingApi, 'fetchCeoPricing').mockResolvedValue(CEO_DATA);
+    vi.spyOn(authApi, 'requestStepUp').mockResolvedValue({ challengeId: 'ch1' });
     const register = vi.spyOn(pricingApi, 'registerProposal').mockResolvedValue(REGISTERED);
 
     const { default: userEvent } = await import('@testing-library/user-event');
     renderPage();
 
     await userEvent.click(await screen.findByRole('button', { name: 'ثبت با AI' }));
-    await waitFor(() => expect(register).toHaveBeenCalledWith('pp2', 'AI'));
+
+    const stepUpDialog = await screen.findByRole('dialog', { name: 'تأیید مجدد هویت' });
+    await userEvent.type(within(stepUpDialog).getByRole('textbox'), '482913');
+    await userEvent.click(within(stepUpDialog).getByRole('button', { name: 'تأیید' }));
+
+    await waitFor(() =>
+      expect(register).toHaveBeenCalledWith('pp2', 'AI', { stepUpChallengeId: 'ch1', stepUpCode: '482913' }),
+    );
     expect(await screen.findByText('قیمت پرواز تأیید و ثبت شد ✓')).toBeInTheDocument();
   });
 
