@@ -234,6 +234,20 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   (`sale-close.util.spec.ts` + `nira.service.spec.ts`), 3 new frontend
   tests. See `docs/API.md`/`docs/DB_SCHEMA.md`/
   `docs/features/flightops.md` for full scope + explicit deferrals.
+- [x] **Phase 25 — حریم خصوصی و داده‌های من (GDPR export/delete UI)** —
+  `GET /my/privacy/export`/`DELETE /my/privacy/account` already existed
+  and were already tested from the public-site track's port (see this
+  file's Phase 13 merge note) but had no frontend at all and were never
+  documented in `docs/API.md` — both gaps closed this phase, no backend/
+  schema changes. New "حریم خصوصی و داده‌های من" section on `AccountPage`'s
+  پروفایل من tab (no design-reference page covers this — CLAUDE.md's GDPR
+  requirement applies regardless, same reasoning as Phase 21's
+  password-login toggle): "دانلود اطلاعات من" downloads the real export as
+  a client-side JSON file; "حذف حساب کاربری" requires an explicit
+  two-step confirm panel (never a bare `window.confirm`) before calling
+  the delete endpoint, then signs out and returns home. 2 new frontend
+  tests (backend already had 3, re-verified green, unchanged). See
+  `docs/API.md`/`docs/DB_SCHEMA.md`/`docs/features/privacy-gdpr.md`.
 
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is
