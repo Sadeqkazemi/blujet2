@@ -1188,3 +1188,61 @@ message.
 - "مشاهده مستندات API" (API docs) button in the design's active-connection
   card stays a static, non-functional element — no API docs page exists
   yet in this codebase.
+
+## Phase 24 — پرواز (flightops: sale auto-close + نیرا manifest submission)
+
+Closes the `flightops` gap flagged deferred since Phase 18's `PANEL_NAV`
+notes and referenced again in Phase 22 (وضعیت پرواز's dropped operational
+stat boxes — those stay dropped; that's customer-facing gate/baggage/delay
+data with no backing model anywhere, a different, still-unbuilt concept
+from this one). Read verbatim from `پنل ادمین سایت.dc.html`'s flightops
+sc-if blocks: **not** gate/baggage/delay tracking — the design's own copy
+is "فروش هر پرواز ۵ ساعت مانده به زمان پرواز به‌صورت خودکار بسته می‌شود و
+لیست کامل مسافران به‌صورت اتومات در سامانه نیرا بارگذاری می‌گردد" (sale
+auto-closes 5h before departure; the full passenger list auto-uploads to
+سامانه نیرا, Iran's civil aviation manifest system). Only `super`(CEO)/
+`siteAdmin`/`finance`/`commercial` have `flightops` in that file's
+`roleDefs` — no other design file references the key at all.
+
+- `GET /flightops` (new; `CEO`, `SITE_ADMIN`, `FINANCE_MANAGER`,
+  `COMMERCIAL_MANAGER`) — KPI counts (کل پروازها / باز / بسته‌شده-در‌نیرا /
+  مجموع مسافران) + row list, scoped to `SCHEDULED` instances only, ordered
+  by soonest departure. Each read lazily materializes any instance that
+  has crossed the 5h-before-departure threshold (see below) — same
+  "no cron job" pattern as `materializeDepartedInstances`/
+  `materializeExpiry` elsewhere in this codebase.
+- `GET /flightops/:id` (same roles) — sold/free/capacity/occupancy +
+  نیرا submission status (done+timestamp, or pending) + the real passenger
+  manifest (`fullName`, decrypted `nationalId`, `seatCode`, `pnr`) for
+  `SOLD_STATUSES` (`PAID`/`TICKETED`) passengers only. 404 for a missing
+  or `CANCELLED` instance — a cancelled flight has no real manifest to
+  submit, so it's excluded rather than shown with a fabricated "pending"
+  state.
+- **Sale-close derivation**: `isSaleAutoClosed(departureAt)` — pure,
+  `departureAt − now ≤ 5h`. This is a NEW, fixed 5-hour rule, distinct
+  from the existing, unrelated, per-instance-configurable
+  `saleStartsAt`/`saleEndsAt` window (Phase 13) — the two are independent
+  and this phase does not touch the latter.
+- **نیرا submission**: a `NiraProvider` interface (`backend/src/common/
+  nira/`) with a `MockNiraProvider` (dev/test — logs the manifest and
+  always succeeds, never fabricates a failure rate, same convention as
+  `MockSmsProvider`), wrapped by `NiraService` (mirrors `SmsService`).
+  Once an instance crosses the 5h threshold, the next `flightops` read
+  submits the real manifest and persists `FlightInstance.niraSubmittedAt`
+  via a conditional `updateMany` (idempotency guard — a second read never
+  re-submits or moves the timestamp).
+- **Explicit scope narrowing (documented, not an oversight)**: this phase
+  does NOT make the 5h auto-close a booking-creation restriction. The
+  design itself has no manual "close" action and no visible link between
+  this admin report and the booking flow — it is a reporting/manifest-
+  submission surface. `POST /booking` (Phase 13) is unchanged; a seat can
+  still be booked within 5h of departure exactly as before. If a future
+  requirement needs the close to actually block sales, that's a distinct,
+  larger change (touches the booking-engine's hot path and its full
+  existing test suite) and should be its own phase, not bundled here. No
+  real نیرا HTTP integration exists or is planned — behind the provider
+  interface exactly like every other external system in this codebase.
+  No manifest export (CSV/Excel) — the design's `exportPax` button has no
+  specified file format.
+
+### `backend/src/modules/flightops/` (new)
