@@ -5,6 +5,7 @@ import type {
   CartableTask,
   ChairPermission,
   ManagerMessageDept,
+  MyReferralListResult,
   Referral,
   ReferralListResult,
   ReferralPriority,
@@ -74,6 +75,14 @@ export function requestReferralRevision(id: string) {
 
 export function remindReferral(id: string) {
   return apiPost<Referral>(`/referrals/${id}/remind`);
+}
+
+export function fetchMyReferrals() {
+  return apiGet<MyReferralListResult>('/referrals/mine');
+}
+
+export function submitReferralReport(id: string, body: string) {
+  return apiPost<Referral>(`/referrals/${id}/reports`, { body });
 }
 
 export function sendManagerMessage(dto: {

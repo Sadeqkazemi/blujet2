@@ -22,7 +22,6 @@ import AgenciesListPage from './features/agencies/AgenciesListPage';
 import AgencyDetailPage from './features/agencies/AgencyDetailPage';
 import RequestDetailPage from './features/agencies/RequestDetailPage';
 import CartablePage from './features/cartable/CartablePage';
-import ReferralsPage from './features/referrals/ReferralsPage';
 import ClubPage from './features/club/ClubPage';
 import EmployeesPage from './features/it-manager/EmployeesPage';
 import ServicesPage from './features/it-manager/ServicesPage';
@@ -41,6 +40,7 @@ import AdminsPage from './features/admins/AdminsPage';
 import SettingsPage from './features/settings/SettingsPage';
 import SecurityRouter from './components/SecurityRouter';
 import LogsRouter from './components/LogsRouter';
+import ReferralsRouter from './components/ReferralsRouter';
 import PanelsAccessPage from './features/panels-access/PanelsAccessPage';
 import HomeSearchPage from './features/public-site/HomeSearchPage';
 import ResultsPage from './features/public-site/ResultsPage';
@@ -111,7 +111,7 @@ export default function App() {
                 <Route index element={<CartablePage />} />
               </Route>
               <Route path="referrals" element={<TabGate tabKey="referrals" />}>
-                <Route index element={<ReferralsPage />} />
+                <Route index element={<ReferralsRouter />} />
               </Route>
               <Route path="club" element={<TabGate tabKey="club" />}>
                 <Route index element={<ClubPage />} />
