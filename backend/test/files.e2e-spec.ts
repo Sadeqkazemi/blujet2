@@ -47,6 +47,19 @@ describe('Files (e2e)', () => {
     expect(badType.status).toBe(400);
   });
 
+  it('preserves a Persian filename correctly instead of mojibake (multer/busboy decode multipart headers as latin1 by default)', async () => {
+    const { accessToken } = await loginAs(app, 'senior.rahimi');
+    const res = await request(app.getHttpServer())
+      .post('/files')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .attach('file', PNG_BYTES, {
+        filename: 'مدرک-هویتی.png',
+        contentType: 'image/png',
+      });
+    expect(res.status).toBe(201);
+    expect(res.body.data.fileName).toBe('مدرک-هویتی.png');
+  });
+
   it('owner can read; an unrelated exec gets 403; a referral recipient can read an attached file', async () => {
     const senior = await loginAs(app, 'senior.rahimi');
     const uploaded = await request(app.getHttpServer())

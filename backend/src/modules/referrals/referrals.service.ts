@@ -63,6 +63,22 @@ export class ReferralsService {
     }
   }
 
+  /** `attachments` is stored as a raw StoredFile-id JSON array (validated
+   * on write by assertOwnedAttachments) — resolves it into displayable
+   * metadata for read responses, preserving upload order. */
+  private async resolveAttachments(raw: unknown) {
+    const ids = Array.isArray(raw) ? (raw as string[]) : [];
+    if (ids.length === 0) return [];
+    const files = await this.prisma.storedFile.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, fileName: true, mimeType: true, sizeBytes: true },
+    });
+    const byId = new Map(files.map((f) => [f.id, f]));
+    return ids
+      .map((id) => byId.get(id))
+      .filter((f): f is NonNullable<typeof f> => !!f);
+  }
+
   async list(actor: AuthenticatedUser) {
     const referrals = await this.prisma.managerReferral.findMany({
       where: { fromId: actor.id },
@@ -90,9 +106,15 @@ export class ReferralsService {
       else if (r.status === 'REPORTED') counts.reported += 1;
       else counts.closed += 1;
     }
+    const withAttachments = await Promise.all(
+      referrals.map(async (r) => ({
+        ...r,
+        attachments: await this.resolveAttachments(r.attachments),
+      })),
+    );
     // The design's «در انتظار گزارش» card counts both sent and reviewing.
     return {
-      referrals,
+      referrals: withAttachments,
       kpis: {
         total: counts.total,
         awaitingReport: counts.sent + counts.reviewing,
@@ -121,17 +143,20 @@ export class ReferralsService {
       orderBy: { referral: { createdAt: 'desc' } },
     });
 
-    const referrals = rows.map((r) => ({
-      id: r.referral.id,
-      title: r.referral.title,
-      body: r.referral.body,
-      priority: r.referral.priority,
-      status: r.referral.status,
-      dueAt: r.referral.dueAt,
-      createdAt: r.referral.createdAt,
-      from: r.referral.from,
-      hasMyReport: r.referral.reports.length > 0,
-    }));
+    const referrals = await Promise.all(
+      rows.map(async (r) => ({
+        id: r.referral.id,
+        title: r.referral.title,
+        body: r.referral.body,
+        priority: r.referral.priority,
+        status: r.referral.status,
+        dueAt: r.referral.dueAt,
+        createdAt: r.referral.createdAt,
+        from: r.referral.from,
+        attachments: await this.resolveAttachments(r.referral.attachments),
+        hasMyReport: r.referral.reports.length > 0,
+      })),
+    );
 
     return {
       referrals,
@@ -258,7 +283,16 @@ export class ReferralsService {
         message: 'دسترسی به این ارجاع برای شما مجاز نیست.',
       });
     }
-    return referral;
+    const [attachments, reports] = await Promise.all([
+      this.resolveAttachments(referral.attachments),
+      Promise.all(
+        referral.reports.map(async (r) => ({
+          ...r,
+          attachments: await this.resolveAttachments(r.attachments),
+        })),
+      ),
+    ]);
+    return { ...referral, attachments, reports };
   }
 
   async submitReport(

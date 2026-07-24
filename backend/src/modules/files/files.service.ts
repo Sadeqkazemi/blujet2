@@ -56,10 +56,16 @@ export class FilesService {
     const diskPath = path.join(UPLOAD_DIR, diskName);
     fs.writeFileSync(diskPath, file.buffer);
 
+    // multer/busboy decode multipart header bytes as latin1 by default —
+    // browsers send the raw UTF-8 bytes for non-ASCII filenames (e.g.
+    // Persian), so re-decoding here is required or they come out as
+    // mojibake. A no-op for pure-ASCII names.
+    const fileName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+
     const stored = await this.prisma.storedFile.create({
       data: {
         ownerId: actor.id,
-        fileName: file.originalname,
+        fileName,
         mimeType: file.mimetype,
         sizeBytes: file.size,
         path: diskPath,

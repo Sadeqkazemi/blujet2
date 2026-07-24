@@ -1410,3 +1410,41 @@ is sent only if the operator types a new one, so an unedited save never
 overwrites an existing key with an empty string. Client-side validation
 mirrors the existing add-service modal (نام سرویس/Endpoint required,
 مهلت اتصال bounded 1000–120000ms, matching the DTO's own `@Min`/`@Max`).
+
+## Phase 29 — referral/report attachment upload + view UI
+
+Closes the "Attachment upload UI on the referral/compose modals" deferral
+from Phase 4 (`docs/features/cartable-referrals.md`). The files module
+(`POST /files`, `GET /files/:id`) and `CreateReferralDto`/`CreateReportDto`'s
+`attachmentIds` were already complete and tested since Phase 4 — attaching
+worked at the API level, but responses only ever returned the raw
+`StoredFile` id array, with no frontend surface to pick or view them.
+
+- `ReferralsService.list()`, `.detail()`, and `.myReferrals()` now resolve
+  each `attachments: string[]` (raw ids) into
+  `{id, fileName, mimeType, sizeBytes}[]` — `.detail()` resolves both the
+  referral's own attachments and each report's. `submitReport()`'s own
+  return value is left unresolved (unused by the frontend, which reloads
+  via `detail()`/`myReferrals()` after submitting).
+- No DTO change — `attachmentIds` was already accepted and ownership-
+  validated (`assertOwnedAttachments`) on both `POST /referrals` and
+  `POST /referrals/:id/reports`.
+- **Bug fix (pre-existing, not introduced this phase)**: `FilesService
+  .store()` used `file.originalname` directly. multer/busboy decode
+  multipart header bytes as latin1 by default; browsers send non-ASCII
+  filenames (Persian, in this platform's case) as raw UTF-8 bytes, so the
+  undecoded name came out as mojibake. Fixed by re-decoding
+  `Buffer.from(file.originalname, 'latin1').toString('utf8')` — a no-op
+  for ASCII names, so no behavior change for the existing ASCII-only
+  fixtures in `files.e2e-spec.ts`. Caught by this phase's own e2e test
+  using a Persian filename, which none of the pre-existing upload tests
+  did.
+- Frontend: new `frontend/src/api/files.ts` (`uploadFile`, `downloadFile`
+  — the latter via a new `apiGetBlob` in `http.ts`, since `GET /files/:id`
+  returns a raw file body on success, not the `{success,data}` envelope).
+  New reusable `AttachmentPicker` (upload control + removable chips,
+  matching the design's dashed "افزودن سند" control) and `AttachmentList`
+  (read-only, click-to-download chips) components, wired into both
+  `ReferralsPage.tsx` (creation modal, detail view's request body and
+  each report) and `MyReferralsPage.tsx` (report-submission form, detail
+  view's request body).

@@ -319,6 +319,27 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   `afterEach(() => vi.restoreAllMocks())`, same class of bug as Phase 26's
   `MyReferralsPage.test.tsx` fix). See `docs/API.md`/`docs/DB_SCHEMA.md`/
   `docs/features/it-manager.md`'s Phase 28 additions.
+- [x] **Phase 29 — referral/report attachment upload + view UI** — closes
+  the "Attachment upload UI on the referral/compose modals" deferral from
+  Phase 4. The files module (`POST /files`, `GET /files/:id`) and
+  `attachmentIds` on both referral-creation and report-submission DTOs
+  were already complete and tested — only the resolved-metadata read side
+  and the frontend were missing. `ReferralsService.list()`/`.detail()`/
+  `.myReferrals()` now resolve raw `StoredFile` id arrays into
+  `{id, fileName, mimeType, sizeBytes}[]`. New `AttachmentPicker` (upload
+  + removable chips) and `AttachmentList` (read-only, click-to-download)
+  components wired into `ReferralsPage.tsx`'s compose modal + detail view
+  and `MyReferralsPage.tsx`'s report form + detail view. Caught and fixed
+  a real pre-existing bug while writing this phase's own e2e test with a
+  Persian filename: `FilesService.store()` stored `file.originalname`
+  as-is, but multer/busboy decode multipart headers as latin1 by default,
+  so non-ASCII filenames came out as mojibake on a Persian-first
+  platform — fixed with a latin1→utf8 re-decode (a no-op for ASCII names,
+  so the phase's own existing ASCII-only fixtures were unaffected). 3 new
+  backend e2e tests, 9 new frontend tests (2 new reusable components + 4
+  wiring tests across the two referral pages). See `docs/API.md`/
+  `docs/DB_SCHEMA.md`/`docs/features/cartable-referrals.md`'s Phase 29
+  additions.
 
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is
