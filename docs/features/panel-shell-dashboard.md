@@ -69,7 +69,7 @@ UI — that UI work is deferred to the next pass, not silently dropped.
 - [x] Sales chart renders legend/bars, selection toggles, table-view fallback — `frontend/src/components/SalesBarChart.test.tsx`
 - [x] Dashboard loading/error states render — `DashboardPage.test.tsx` › the success and error-message cases
 - [x] Day/month/flight modes show the deferred-scope message rather than a broken fetch — `DashboardPage.test.tsx` › "disables the day/month/flight modes..."
-- [ ] 2FA step component test (renders after password submit, not before) — covered end-to-end by the Playwright journey below, but no isolated Vitest component test yet
+- [x] 2FA step component test (renders after password submit, not before) — `frontend/src/features/auth/TwoFactorPage.test.tsx` (Phase 32). Writing the "not before" case caught a real bug: `TwoFactorPage` called `navigate('/login')` during render instead of in a `useEffect`, so React Router's own guard silently dropped the navigation — visiting `/login/2fa` directly with no `challengeId` in location state rendered a blank page instead of redirecting. Fixed by moving the call into a `useEffect` keyed on `challengeId`; see PLAN.md's Phase 32 entry.
 
 ### E2E (Playwright)
 - [x] Full staff login journey (password → 2FA → dashboard) per role, landing on that role's dashboard with only its permitted tabs — `frontend/e2e/staff-login-journey.spec.ts`, parametrized over finance.karimi/ceo/itadmin
@@ -80,8 +80,7 @@ UI — that UI work is deferred to the next pass, not silently dropped.
 
 ---
 
-One frontend 2FA-page unit test and the pixel-level visual-regression check
-are the only items left unchecked — pick those up at the start of Phase 2
-rather than blocking on them here, since both are already exercised
-indirectly (2FA has full E2E coverage in the Playwright journey; the visual
-fidelity was manually screenshot-verified during development).
+The pixel-level visual-regression check is the only item left unchecked
+(the 2FA unit test above was closed in Phase 32) — no visual-regression
+tooling is wired up yet, and the visual fidelity was manually
+screenshot-verified during Phase 1 development.
