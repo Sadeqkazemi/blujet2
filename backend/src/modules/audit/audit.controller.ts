@@ -5,12 +5,14 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { EmployeePermissionGuard } from '../../common/guards/employee-permission.guard';
+import { RequiresPermission } from '../../common/decorators/requires-permission.decorator';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { AuditCategory, Role } from '../../../generated/prisma/enums';
 
 @ApiTags('audit')
 @Controller('audit')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, EmployeePermissionGuard)
 export class AuditController {
   constructor(private readonly audit: AuditService) {}
 
@@ -34,8 +36,12 @@ export class AuditController {
     return { success: true, data };
   }
 
+  // Phase 31: EMPLOYEE holding lg_view reaches this — it's already scoped
+  // to SYSTEM/ACCOUNT categories only (see AuditService.systemLogs), not
+  // the financial/strategic audit trail ceoSystemEvents() exposes.
   @Get('logs')
-  @Roles('IT_MANAGER')
+  @Roles('IT_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('lg_view')
   @ApiOperation({ summary: "IT Manager's system event log" })
   async systemLogs() {
     const data = await this.audit.systemLogs();
