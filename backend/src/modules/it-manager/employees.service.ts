@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -76,11 +77,30 @@ export class EmployeesService {
     return employee;
   }
 
-  async list(query: ListEmployeesQueryDto) {
+  /** Phase 31: an EMPLOYEE holding `us_manage` only ever reaches this
+   * module scoped to their own dept — never another dept's roster.
+   * `AuthenticatedUser` doesn't carry `dept` (it's not on the JWT), so
+   * it's looked up fresh here, same freshness guarantee as
+   * EmployeePermissionGuard's own live grant check. Returns `null` for
+   * every non-EMPLOYEE role (IT_MANAGER stays unscoped). */
+  private async deptScopeForEmployee(
+    actor: AuthenticatedUser,
+  ): Promise<string | null> {
+    if (actor.role !== 'EMPLOYEE') return null;
+    const self = await this.prisma.user.findUniqueOrThrow({
+      where: { id: actor.id },
+      select: { dept: true },
+    });
+    return self.dept;
+  }
+
+  async list(actor: AuthenticatedUser, query: ListEmployeesQueryDto) {
+    const employeeDept = await this.deptScopeForEmployee(actor);
+    const deptFilter = employeeDept ?? query.dept;
     const employees = await this.prisma.user.findMany({
       where: {
         role: 'EMPLOYEE',
-        ...(query.dept ? { dept: query.dept } : {}),
+        ...(deptFilter ? { dept: deptFilter } : {}),
         ...(query.q
           ? {
               OR: [
@@ -163,11 +183,18 @@ export class EmployeesService {
       entityId: employee.id,
     });
 
-    return this.get(employee.id);
+    return this.get(actor, employee.id);
   }
 
-  async get(id: string) {
+  async get(actor: AuthenticatedUser, id: string) {
+    const employeeDept = await this.deptScopeForEmployee(actor);
     const employee = await this.getEmployeeOrThrow(id);
+    if (employeeDept && employee.dept !== employeeDept) {
+      throw new ForbiddenException({
+        code: ErrorCode.FORBIDDEN,
+        message: 'دسترسی به کارمندان واحد دیگر برای شما مجاز نیست.',
+      });
+    }
     const granted = await this.prisma.employeePermission.findMany({
       where: { employeeId: id },
       include: { permission: true },
@@ -271,11 +298,24 @@ export class EmployeesService {
       entityId: id,
     });
 
-    return this.get(id);
+    return this.get(actor, id);
   }
 
   async resetPassword(actor: AuthenticatedUser, id: string) {
+    if (actor.role === 'EMPLOYEE' && actor.id === id) {
+      throw new ForbiddenException({
+        code: ErrorCode.FORBIDDEN,
+        message: 'امکان بازنشانی رمز عبور خودتان از این مسیر وجود ندارد.',
+      });
+    }
+    const employeeDept = await this.deptScopeForEmployee(actor);
     const employee = await this.getEmployeeOrThrow(id);
+    if (employeeDept && employee.dept !== employeeDept) {
+      throw new ForbiddenException({
+        code: ErrorCode.FORBIDDEN,
+        message: 'دسترسی به کارمندان واحد دیگر برای شما مجاز نیست.',
+      });
+    }
     const tempPassword = generateTempPassword();
     const passwordHash = await argon2.hash(tempPassword);
 

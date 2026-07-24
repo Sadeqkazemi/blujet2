@@ -60,6 +60,25 @@ journeys) + the updated `staff-login-journey.spec.ts` itadmin case.
 ### Phase 28 — external-service «تنظیمات» edit modal
 - [x] سرویس‌های سایت: each external service card's «تنظیمات» button opens a modal pre-filled with its current نام سرویس/Endpoint/متد/مهلت اتصال, editable and saved via the already-tested `PATCH /it/services/external/:id`; leaving کلید احراز blank keeps the existing key (never re-sent), typing a new one replaces it; empty نام سرویس/Endpoint is rejected client-side without calling the API — `ServicesPage.test.tsx: 'تنظیمات modal pre-fills current values and saves without an apiKey field when left blank'` + `'تنظیمات modal sends a new apiKey only when the operator typed one'` + `'تنظیمات modal rejects an empty required field without calling the API'`
 
+### Phase 31 — EMPLOYEE narrow access to the IT-dept permission keys
+
+Backend-only (no design page body exists for any of the 4 EMPLOYEE-facing
+IT tabs — see docs/API.md's Phase 31 section for the full reasoning and
+narrow-scope decisions). Proven by
+`backend/test/phase31-employee-it-dept-permissions.e2e-spec.ts` (11 tests).
+
+- [x] `us_manage`: EMPLOYEE can list/view employees of their OWN dept only (query-string dept spoofing is ignored server-side) — `'an employee freshly granted us_manage can list/view employees of their OWN dept only, and cannot list without it'`
+- [x] Without `us_manage`, `GET /it/employees` is 403 — `'without us_manage, GET /it/employees is 403'`
+- [x] `us_manage` never unlocks create/suspend/grant-permissions — those stay `IT_MANAGER`-only — `'us_manage never unlocks create/suspend/grant-permissions — only IT_MANAGER can'`
+- [x] `us_manage` can reset a same-dept colleague's password, but never their own, and never another dept's — `'us_manage can reset a same-dept colleague's password, but never their own, and never another dept's'`
+- [x] `sv_control`: EMPLOYEE can view `GET /it/services` but not toggle/create/delete/test — `'an employee freshly granted sv_control can view services but not toggle/create/delete/test them'`
+- [x] Without `sv_control`, `GET /it/services` is 403 — `'without sv_control, GET /it/services is 403'`
+- [x] `sc_manage`: EMPLOYEE can view `GET /it/security/policy` but not `/sessions`, cannot update the policy, cannot force-logout everyone — `'an employee freshly granted sc_manage can view the security policy but not sessions, update the policy, or force-logout everyone'`
+- [x] Without `sc_manage`, `GET /it/security/policy` is 403 — `'without sc_manage, GET /it/security/policy is 403'`
+- [x] `lg_view`: EMPLOYEE can read `GET /audit/logs` — `'an employee freshly granted lg_view can read the system event log'`
+- [x] Without `lg_view`, `GET /audit/logs` is 403 — `'without lg_view, GET /audit/logs is 403'`
+- [x] `IT_MANAGER` access is unaffected by these narrow EMPLOYEE grants — `"doesn't affect IT_MANAGER: still has full access despite EMPLOYEE now holding narrow grants"`
+
 ### Deferred (scoped out with reasons, not silently dropped)
 - Suspend/reactivate confirmation dialog (the design shows a generic confirm-notification pattern for every destructive action) — `EmployeesPage`'s suspend button acts immediately without a confirm step; low-risk (reversible via the same button) and consistent with `ClubPage`'s direct-action buttons, but flagged here rather than silently matching only part of the design.
 

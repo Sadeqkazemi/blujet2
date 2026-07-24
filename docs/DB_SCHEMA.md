@@ -1623,3 +1623,15 @@ config; this phase only exposes `businessColsLeft.length`/
 `economyColsLeft.length` in `GET /reservation/seatmap/:flightInstanceId`'s
 response (as `cabinLayout`) and makes the frontend seat grid consume it
 instead of a hardcoded seat index. See docs/API.md's Phase 30 section.
+
+## Phase 31 — EMPLOYEE narrow access to the IT-dept permission keys
+
+No schema change. `Permission` rows for `us_manage`/`sv_control`/
+`sc_manage`/`lg_view` were already seeded in Phase 8's
+`PERMISSION_CATALOG` — this phase only widens which methods' `@Roles`/
+`@RequiresPermission` decorators an `EMPLOYEE` holding one of those grants
+can reach, each scoped narrowly (dept-scoped for `us_manage`, read-only
+for `sv_control`/`sc_manage`/`lg_view`) — see docs/API.md's Phase 31
+section for the full reasoning, including why `GET /it/security/sessions`
+was deliberately excluded from `sc_manage` despite being part of the
+originally-proposed scope.
