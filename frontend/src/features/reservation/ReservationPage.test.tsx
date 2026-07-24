@@ -146,4 +146,37 @@ describe('ReservationPage', () => {
     const economyGap = screen.getByTestId('aisle-gap-10');
     expect(economyGap.parentElement!.querySelector('button')).toHaveAttribute('aria-label', '10C');
   });
+
+  it('a canLock role can mark a TICKETED booking as no-show, and the detail refreshes', async () => {
+    mockRole('BOARD_CHAIR');
+    vi.spyOn(reservationApi, 'fetchReservationDashboardStats').mockResolvedValue(STATS);
+    vi.spyOn(reservationApi, 'fetchPnrList').mockResolvedValue(GROUPS);
+    vi.spyOn(reservationApi, 'fetchPnrDetail').mockResolvedValue(DETAIL);
+    const noShowSpy = vi
+      .spyOn(reservationApi, 'markNoShow')
+      .mockResolvedValue({ ...DETAIL, status: 'NO_SHOW' });
+
+    render(<ReservationPage />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'BJDEMO1' }));
+
+    await user.click(await screen.findByRole('button', { name: 'ثبت عدم حضور مسافر' }));
+
+    await waitFor(() => expect(noShowSpy).toHaveBeenCalledWith('BJDEMO1'));
+    expect(await screen.findByText('عدم حضور مسافر ثبت شد.')).toBeInTheDocument();
+  });
+
+  it('no-show is not offered for a CANCELLED booking', async () => {
+    mockRole('BOARD_CHAIR');
+    vi.spyOn(reservationApi, 'fetchReservationDashboardStats').mockResolvedValue(STATS);
+    vi.spyOn(reservationApi, 'fetchPnrList').mockResolvedValue(GROUPS);
+    vi.spyOn(reservationApi, 'fetchPnrDetail').mockResolvedValue({ ...DETAIL, status: 'CANCELLED' });
+
+    render(<ReservationPage />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'BJDEMO1' }));
+
+    await waitFor(() => expect(screen.getByText('رزرو BJDEMO1')).toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: 'ثبت عدم حضور مسافر' })).not.toBeInTheDocument();
+  });
 });

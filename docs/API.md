@@ -1604,3 +1604,17 @@ non-internal gap. No backend change; `FinancePage.tsx`'s finance-ops view
 gained a «صف مغایرت‌های پرداخت» card (list + resolve-with-note action) —
 see `docs/features/finance-reports.md`'s Phase 35 section for the full
 checklist.
+
+## Phase 36 — عدم حضور مسافر: frontend closure (retroactive docs)
+
+`PATCH /reservation/pnr/:pnr/no-show` (Phase 13 Part E, `CAN_LOCK_ROLES` —
+see that section above for the endpoint's own behavior) had the same
+shape of gap as Phase 35: fully implemented, fully e2e-tested, no
+frontend control, found by the same audit. `ReservationPage.tsx`'s PNR
+detail modal gained a «ثبت عدم حضور مسافر» button (shown for `canLock`
+roles when the booking is `TICKETED`/`FLOWN`), and the frontend's
+`BookingStatus` type gained the `FLOWN`/`NO_SHOW` values it was missing.
+No backend change. See `docs/features/reservation.md`'s Phase 36 section
+for the full checklist, including why the seat-lock approval queue
+(`.../locks/:id/approve`/`reject`, `pnr/from-lock/:lockId`) — a different,
+larger gap the same audit turned up — stays deliberately un-built.

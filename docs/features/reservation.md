@@ -56,8 +56,40 @@ seed's ambiguous historical/demo instances).
 - [x] `GET /reservation/seatmap/:id` returns `cabinLayout.{BUSINESS,ECONOMY}.aisleAfterIndex`, computed from that flight's real `AircraftSeatMap.{business,economy}ColsLeft.length` (via `resolveAircraftType`, so an aircraft-type override is respected) instead of the frontend assuming a fixed seat position — proven against both the seeded 2-2/2-3 config AND a distinct custom aircraft type with a reversed 3-2 economy split, so the test can't pass by coincidence — `backend/test/reservation.e2e-spec.ts: 'GET /reservation/seatmap/:id returns cabinLayout.aisleAfterIndex reflecting the real per-aircraft column split, not a fixed assumption'`
 - [x] `ReservationPage.tsx`'s seat grid renders the aisle gap at `cabinLayout[row.cabin].aisleAfterIndex` per row instead of the previous hardcoded `idx === 1` — proven with a non-2/2-2/3 fixture that a fixed-index component would place wrong — `ReservationPage.test.tsx: 'renders the aisle gap from cabinLayout.aisleAfterIndex per row, not a fixed seat position'`
 
+### Phase 36 — عدم حضور مسافر (mark no-show)
+
+`PATCH /reservation/pnr/:pnr/no-show` (Phase 13 Part E, `CAN_LOCK_ROLES`)
+shipped fully implemented and e2e-tested but had no frontend control —
+found via the same endpoint-vs-frontend-caller audit as Phase 35's
+reconciliation-queue gap. No design-reference screen mentions «عدم
+حضور»/no-show at all (see `docs/DB_SCHEMA.md`'s Phase 13 Part E note —
+there's no boarding/check-in concept in the design to attach a control
+to), so this is a small, natural addition to the already-built PNR-detail
+modal (next to the existing «تغییر صندلی»/«لغو رزرو» actions) rather than
+a new screen.
+
+- [x] The PNR detail modal shows a «ثبت عدم حضور مسافر» button for a
+      `canLock` role when the booking is `TICKETED` or `FLOWN`, calling
+      the existing endpoint and refreshing the detail + list on success —
+      `ReservationPage.test.tsx: 'a canLock role can mark a TICKETED
+      booking as no-show, and the detail refreshes'`
+- [x] The button is not offered for a `CANCELLED` booking (the backend's
+      own 409 `CONFLICT` guard is not relied on to hide it) —
+      `ReservationPage.test.tsx: 'no-show is not offered for a CANCELLED
+      booking'`
+- [x] `FLOWN`/`NO_SHOW` added to the frontend's `BookingStatus` type and
+      status-badge map (`فروخته → پرواز شده`/`عدم حضور`) — same tests
+
 ### Deferred (scoped out with reasons, not silently dropped)
 - Ticket print/PDF generation — no «چاپ بلیط» button wired this phase; a real PDF pipeline needs the public-site track's e-ticket template.
 - Agency API access sub-tab — already covered by Phase 3's `AgencyApiKey`; not duplicated here.
 - Flight/schedule/capacity creation ("پروازها" sub-tab) — Phase 10's own scope.
 - The design's fabricated "microservices health" dashboard cards — replaced with real booking/seat/revenue stats instead (see `docs/DB_SCHEMA.md`'s Phase 9 note); not ported verbatim since no such infrastructure exists in this monolith.
+- Managerial seat-lock request/approval queue (`PATCH
+  /reservation/seatmap/locks/:id/approve`/`reject`, `POST
+  /reservation/pnr/from-lock/:lockId`) — still deliberately backend-only;
+  `docs/API.md`'s Phase 13 Part D note already documents "no design
+  screen exists for a request/approval queue," and building one now would
+  mean inventing a multi-step approval UI with no reference to build it
+  against — a larger, real product-design task, not a small wiring job
+  like this phase's no-show button.
