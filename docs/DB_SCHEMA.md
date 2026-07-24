@@ -1635,3 +1635,23 @@ for `sv_control`/`sc_manage`/`lg_view`) — see docs/API.md's Phase 31
 section for the full reasoning, including why `GET /it/security/sessions`
 was deliberately excluded from `sc_manage` despite being part of the
 originally-proposed scope.
+
+## Phase 34 — کیف پول + قفل قیمت هوشمند: retroactive docs + frontend closure
+
+No schema change. `WalletEntry` and `PriceLock` already existed (an
+earlier phase's merge, never given its own docs/DB_SCHEMA.md section —
+retroactively documented here). Two additive, non-breaking response-shape
+changes, both query/serialization only:
+
+- `PriceLockService.listMine()` now joins `FlightInstance → Flight →
+  Route` and includes `flight: { flightNo, originCode, destCode,
+  departureAt }` in each returned row (previously only the `PriceLock`
+  row's own columns).
+- `BookingService.toDetail()` now includes `isPriceLocked: boolean`
+  (`!!booking.priceLock`, correctly resolved from the already-known
+  `usableLock` at creation time rather than a stale pre-transaction
+  relation snapshot — see docs/API.md's Phase 34 section for the exact
+  bug found and fixed).
+
+See `docs/features/wallet-price-lock.md` for the full frontend-closure
+reasoning, including the deliberately-undecided fee-charging gap.

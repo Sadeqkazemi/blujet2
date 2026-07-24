@@ -58,7 +58,28 @@ export interface BookingDetail {
   destCode: string;
   departureAt: string;
   arrivalAt: string;
+  isPriceLocked: boolean;
   passengers: BookingPassengerView[];
+}
+
+export type PriceLockStatus = 'ACTIVE' | 'CANCELLED' | 'USED';
+
+export interface PriceLock {
+  id: string;
+  flightInstanceId: string;
+  cabin: CabinClass;
+  lockedPriceIrr: number;
+  feeIrr: number;
+  status: PriceLockStatus;
+  expiresAt: string;
+  createdAt: string;
+  bookingId: string | null;
+  flight: {
+    flightNo: string;
+    originCode: string;
+    destCode: string;
+    departureAt: string;
+  };
 }
 
 export interface PayResultOk {

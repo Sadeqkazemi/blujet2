@@ -2,7 +2,9 @@ import { apiDelete, apiGet, apiPatch, apiPost } from './http';
 import type {
   Airport,
   BookingDetail,
+  CabinClass,
   PayResult,
+  PriceLock,
   RefundRequestView,
   SearchFlightResult,
   SeatMapResult,
@@ -91,6 +93,18 @@ export function topupWallet(amountIrr: number) {
 
 export function fetchClubPoints() {
   return apiGet<{ isMember: boolean; level: string | null; balance: number }>('/my/club-points');
+}
+
+export function fetchMyPriceLocks() {
+  return apiGet<PriceLock[]>('/my/price-locks');
+}
+
+export function createPriceLock(flightInstanceId: string, cabin: CabinClass) {
+  return apiPost<PriceLock>('/my/price-locks', { flightInstanceId, cabin });
+}
+
+export function cancelPriceLock(id: string) {
+  return apiDelete<PriceLock>(`/my/price-locks/${id}`);
 }
 
 export function fetchMyProfile() {

@@ -3,9 +3,11 @@ import { Link, useNavigate } from 'react-router-dom';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import { useAuth } from '../../hooks/useAuth';
 import {
+  cancelPriceLock,
   deleteMyAccount,
   fetchClubPoints,
   fetchMyBookings,
+  fetchMyPriceLocks,
   fetchMyProfile,
   fetchMyRefunds,
   fetchPrivacyExport,
@@ -16,9 +18,9 @@ import {
   verifyEmail,
 } from '../../api/publicSite';
 import { ApiRequestError } from '../../api/envelope';
-import { faDigits, faMoney } from '../../lib/fa-format';
+import { faDigits, faMoney, parseTomanToRial } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
-import type { BookingDetail, RefundRequestView, UserProfile } from '../../types/public-site';
+import type { BookingDetail, PriceLock, RefundRequestView, UserProfile } from '../../types/public-site';
 
 // پنل کاربر — real data from the existing bookings/wallet/club-points/refunds
 // endpoints (none of this is mock). Matches design-reference/پنل کاربر.dc.html's
@@ -43,16 +45,25 @@ const REFUND_STATUS_LABEL: Record<string, string> = {
 
 const TIER_LABEL: Record<string, string> = { SILVER: 'نقره‌ای', GOLD: 'طلایی', PLATINUM: 'پلاتین' };
 
-type TabKey = 'trips' | 'wallet' | 'points' | 'passengers' | 'refunds' | 'profile';
+type TabKey = 'trips' | 'wallet' | 'points' | 'price-locks' | 'passengers' | 'refunds' | 'profile';
 
 const TABS: { key: TabKey; label: string; icon: string }[] = [
   { key: 'profile', label: 'پروفایل من', icon: '🪪' },
   { key: 'trips', label: 'سفرها', icon: '🧳' },
   { key: 'wallet', label: 'کیف پول', icon: '💳' },
   { key: 'points', label: 'امتیاز باشگاه', icon: '★' },
+  { key: 'price-locks', label: 'قفل قیمت', icon: '🔒' },
   { key: 'passengers', label: 'مسافران', icon: '👤' },
   { key: 'refunds', label: 'استرداد‌ها', icon: '↺' },
 ];
+
+const CABIN_LABEL_FA: Record<string, string> = { ECONOMY: 'اکونومی', BUSINESS: 'بیزینس' };
+
+const LOCK_STATUS_LABEL: Record<string, { label: string; bg: string; color: string }> = {
+  ACTIVE: { label: 'فعال', bg: '#e8f5ee', color: '#1f8a5b' },
+  USED: { label: 'استفاده‌شده', bg: '#eef4fb', color: '#1668c4' },
+  CANCELLED: { label: 'لغو شده', bg: '#f1f4f8', color: '#8a96a6' },
+};
 
 export default function AccountPage() {
   const { status, user, signOut } = useAuth();
@@ -65,6 +76,9 @@ export default function AccountPage() {
   const [topupAmount, setTopupAmount] = useState('');
   const [topupBusy, setTopupBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [priceLocks, setPriceLocks] = useState<PriceLock[] | null>(null);
+  const [lockActionBusy, setLockActionBusy] = useState<string | null>(null);
+  const [lockError, setLockError] = useState<string | null>(null);
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [profileForm, setProfileForm] = useState({
@@ -98,6 +112,7 @@ export default function AccountPage() {
     fetchWallet().then(setWallet).catch(() => setWallet({ balanceIrr: 0 }));
     fetchClubPoints().then(setClub).catch(() => setClub(null));
     fetchMyRefunds().then(setRefunds).catch(() => setRefunds([]));
+    fetchMyPriceLocks().then(setPriceLocks).catch(() => setPriceLocks([]));
     fetchMyProfile()
       .then((p) => {
         setProfile(p);
@@ -196,20 +211,33 @@ export default function AccountPage() {
   async function onTopup(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    const amountToman = Number(topupAmount);
-    if (!amountToman || amountToman <= 0) {
+    const amountRial = parseTomanToRial(topupAmount);
+    if (!amountRial || amountRial <= 0) {
       setError('مبلغ معتبر وارد کنید.');
       return;
     }
     setTopupBusy(true);
     try {
-      const result = await topupWallet(amountToman * 10);
+      const result = await topupWallet(amountRial);
       setWallet(result);
       setTopupAmount('');
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : 'خطا در شارژ کیف پول.');
     } finally {
       setTopupBusy(false);
+    }
+  }
+
+  async function onCancelLock(id: string) {
+    setLockError(null);
+    setLockActionBusy(id);
+    try {
+      const updated = await cancelPriceLock(id);
+      setPriceLocks((prev) => (prev ? prev.map((l) => (l.id === id ? updated : l)) : prev));
+    } catch (err) {
+      setLockError(err instanceof ApiRequestError ? err.message : 'خطا در لغو قفل قیمت.');
+    } finally {
+      setLockActionBusy(null);
     }
   }
 
@@ -504,6 +532,11 @@ export default function AccountPage() {
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    {b.isPriceLocked && (
+                      <span data-testid="trip-price-locked-badge" style={{ fontSize: 10.5, fontWeight: 800, background: '#fff7e6', color: '#9a7d22', padding: '5px 12px', borderRadius: 14 }}>
+                        🔒 قیمت قفل‌شده
+                      </span>
+                    )}
                     <span style={{ fontSize: 10.5, fontWeight: 800, background: st.bg, color: st.color, padding: '5px 12px', borderRadius: 14 }}>{st.label}</span>
                     <Link to={b.pnr ? `/ticket/${b.pnr}` : '#'} style={{ fontSize: 11.5, color: '#1668c4', fontWeight: 700, textDecoration: 'none' }}>
                       مشاهده بلیط
@@ -566,6 +599,55 @@ export default function AccountPage() {
                 </Link>
               </div>
             )}
+          </div>
+        )}
+
+        {tab === 'price-locks' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {lockError && <p role="alert" style={{ fontSize: 12, color: '#e5484d' }}>{lockError}</p>}
+            {priceLocks === null && <p style={{ fontSize: 13, color: '#6b7787' }}>در حال بارگذاری…</p>}
+            {priceLocks?.length === 0 && (
+              <div style={{ background: '#fff', border: '1px dashed #e5e9f0', borderRadius: 16, padding: 40, textAlign: 'center', color: '#8a96a6', fontSize: 13 }}>
+                هنوز قفل قیمتی ثبت نکرده‌اید. در نتایج جستجوی پرواز، روی «🔒 قفل قیمت» بزنید (ویژه اعضای طلایی و بالاتر باشگاه مشتریان).
+              </div>
+            )}
+            {priceLocks?.map((l) => {
+              const st = LOCK_STATUS_LABEL[l.status] ?? { label: l.status, bg: '#f1f4f8', color: '#5a6678' };
+              return (
+                <div key={l.id} data-testid="account-price-lock" style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 16, padding: '16px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: '#0d2640' }}>
+                      {l.flight.originCode} <span style={{ color: '#b9c2cf' }}>←</span> {l.flight.destCode}
+                    </div>
+                    <div style={{ fontSize: 11.5, color: '#8a96a6', marginTop: 4 }}>
+                      {l.flight.flightNo} · {formatJalaliDateTime(l.flight.departureAt)} · {CABIN_LABEL_FA[l.cabin]}
+                    </div>
+                    <div style={{ fontSize: 11.5, color: '#3f546b', marginTop: 4 }}>
+                      نرخ قفل‌شده: {faMoney(l.lockedPriceIrr)} تومان · کارمزد: {faMoney(l.feeIrr)} تومان
+                    </div>
+                    {l.status === 'ACTIVE' && (
+                      <div style={{ fontSize: 11, color: '#9a7d22', marginTop: 4 }}>
+                        تا {formatJalaliDateTime(l.expiresAt)} معتبر است
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 10.5, fontWeight: 800, background: st.bg, color: st.color, padding: '5px 12px', borderRadius: 14 }}>{st.label}</span>
+                    {l.status === 'ACTIVE' && (
+                      <button
+                        type="button"
+                        data-testid={`cancel-price-lock-${l.id}`}
+                        disabled={lockActionBusy === l.id}
+                        onClick={() => void onCancelLock(l.id)}
+                        style={{ border: '1px solid #e5484d', borderRadius: 10, background: 'transparent', color: '#e5484d', padding: '7px 14px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+                      >
+                        {lockActionBusy === l.id ? 'در حال لغو…' : 'لغو'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
 
