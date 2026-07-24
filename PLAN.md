@@ -481,6 +481,26 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   empty-state assertion added to the existing finance-ops test). See
   `docs/features/finance-reports.md`'s Phase 35 section,
   `docs/API.md`'s Phase 35 note.
+- [x] **Phase 36 — عدم حضور مسافر (mark no-show) frontend closure** —
+  continued the manual endpoint-vs-frontend-caller audit and found the
+  same shape of gap in the reservation module: `PATCH /reservation/pnr/
+  :pnr/no-show` (Phase 13 Part E, `CAN_LOCK_ROLES`) fully implemented and
+  e2e-tested, no frontend control. The frontend's own `BookingStatus`
+  type was also missing `FLOWN`/`NO_SHOW` entirely. Added a «ثبت عدم حضور
+  مسافر» button to `ReservationPage.tsx`'s existing PNR-detail modal
+  (next to «تغییر صندلی»/«لغو رزرو», shown for `canLock` roles on a
+  `TICKETED`/`FLOWN` booking) — a small addition to an already-built
+  screen, not a new one, since no design mock exists for this action at
+  all (confirmed in `docs/DB_SCHEMA.md`'s own Phase 13 Part E note). The
+  same audit also surfaced the seat-lock approval queue
+  (`PATCH .../locks/:id/approve`/`reject`, `POST .../pnr/from-lock/
+  :lockId`) as unwired — left that one alone: it's explicitly documented
+  since Phase 13 Part D as intentionally backend-only ("no design screen
+  exists for a request/approval queue"), and building a multi-step
+  approval UI from nothing is a real design task, not a small wiring job.
+  No backend change. 2 new frontend tests. See
+  `docs/features/reservation.md`'s Phase 36 section, `docs/API.md`'s
+  Phase 36 note.
 
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is
