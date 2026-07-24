@@ -9,6 +9,7 @@ import {
   fetchSeatMap,
   issuePnr,
   lockSeat,
+  markNoShow,
   releaseLock,
   searchFlights,
 } from '../../api/reservation';
@@ -33,6 +34,8 @@ const STATUS_LABEL: Record<string, { label: string; className: string }> = {
   PAID: { label: 'پرداخت‌شده', className: 'bg-[#3b82f624] text-[#1d4ed8]' },
   EXPIRED: { label: 'منقضی', className: 'bg-surface text-muted' },
   REFUNDED: { label: 'مستردشده', className: 'bg-surface text-muted' },
+  FLOWN: { label: 'پرواز شده', className: 'bg-[#3b82f624] text-[#1d4ed8]' },
+  NO_SHOW: { label: 'عدم حضور', className: 'bg-danger/15 text-danger' },
 };
 
 const SEAT_STATUS_STYLE: Record<string, string> = {
@@ -126,6 +129,18 @@ export default function ReservationPage() {
       setChangeSeatInput('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'خطا در تغییر صندلی.');
+    }
+  }
+
+  async function onMarkNoShow() {
+    if (!detailPnr) return;
+    try {
+      await markNoShow(detailPnr);
+      setNotice('عدم حضور مسافر ثبت شد.');
+      setDetail(await fetchPnrDetail(detailPnr));
+      await loadPnrList();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'خطا در ثبت عدم حضور.');
     }
   }
 
@@ -461,6 +476,14 @@ export default function ReservationPage() {
               <button onClick={() => void onCancel()} className="rounded-lg bg-danger/10 px-4 py-2 text-xs font-bold text-danger">
                 لغو رزرو
               </button>
+              {(detail.status === 'TICKETED' || detail.status === 'FLOWN') && (
+                <button
+                  onClick={() => void onMarkNoShow()}
+                  className="rounded-lg bg-surface px-4 py-2 text-xs font-bold text-text-2"
+                >
+                  ثبت عدم حضور مسافر
+                </button>
+              )}
             </div>
           )}
           {detail.status === 'CANCELLED' && (

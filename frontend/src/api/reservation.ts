@@ -40,6 +40,10 @@ export function cancelBooking(pnr: string) {
   return apiPatch<PnrDetail>(`/reservation/pnr/${pnr}/cancel`);
 }
 
+export function markNoShow(pnr: string) {
+  return apiPatch<PnrDetail>(`/reservation/pnr/${pnr}/no-show`);
+}
+
 export function searchFlights(origin: string, dest: string, date: string) {
   const params = new URLSearchParams({ origin, dest, date });
   return apiGet<FlightSearchResult[]>(`/reservation/search?${params.toString()}`);

@@ -34,7 +34,16 @@ export interface SeatLockView {
   createdAt: string;
 }
 
-export type BookingStatus = 'DRAFT' | 'HELD' | 'PAID' | 'TICKETED' | 'CANCELLED' | 'EXPIRED' | 'REFUNDED';
+export type BookingStatus =
+  | 'DRAFT'
+  | 'HELD'
+  | 'PAID'
+  | 'TICKETED'
+  | 'CANCELLED'
+  | 'EXPIRED'
+  | 'REFUNDED'
+  | 'FLOWN'
+  | 'NO_SHOW';
 
 export interface PnrGroup {
   flightInstanceId: string;
