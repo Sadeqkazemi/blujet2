@@ -359,6 +359,32 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   pre-existing hardcoding did. 1 new backend e2e test, 1 new frontend
   test. See `docs/API.md`/`docs/DB_SCHEMA.md`/
   `docs/features/reservation.md`'s Phase 30 additions.
+- [x] **Phase 31 — EMPLOYEE narrow access to the IT-dept permission
+  keys** — closes the last deferral from Phase 8/27:
+  `us_manage`/`sv_control`/`sc_manage`/`lg_view` were seeded in
+  `PERMISSION_CATALOG` since Phase 8 but never wired to any real access.
+  Unlike Phase 27's mechanical backlog, this one required **two rounds**
+  of `AskUserQuestion`: the first to pick this item off the remaining
+  decision-gated backlog, the second because investigation surfaced that
+  the raw literal interpretation was materially riskier than Phase 27's
+  precedent — the design has zero page body for any of the 4 relevant
+  EMPLOYEE tabs (`users`/`services`/`security`/`logs` list in the nav
+  generator but have no `sc-if` block or `titles{}`/`subs{}` entry), and
+  several underlying IT_MANAGER endpoints are self-permission-granting,
+  a site-wide service kill switch, company-wide session/IP data, or a
+  force-logout-everyone action. The user chose "all 4 keys, very narrow
+  scope" (Claude's proposal); implemented narrower than even that
+  proposal in one place — `sc_manage` excludes `GET /it/security/sessions`
+  entirely (no per-actor-scoped variant exists, and building one was out
+  of scope), rather than the originally-floated "policy + own sessions."
+  Backend-only, no frontend/nav changes this phase (wiring a nav entry to
+  a tab with no design body would only produce a dead/blank tab). Full
+  scope per key, plus the dept-scoping mechanism for `us_manage`
+  (`EmployeesService.deptScopeForEmployee`, a fresh DB lookup since
+  `AuthenticatedUser` doesn't carry `dept`), is in `docs/API.md`'s Phase
+  31 section. 11 new backend e2e tests
+  (`phase31-employee-it-dept-permissions.e2e-spec.ts`). See
+  `docs/DB_SCHEMA.md`/`docs/features/it-manager.md`'s Phase 31 additions.
 
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is

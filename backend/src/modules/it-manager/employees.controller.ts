@@ -21,11 +21,13 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PanelAccessGuard } from '../panels/panel-access.guard';
+import { EmployeePermissionGuard } from '../../common/guards/employee-permission.guard';
+import { RequiresPermission } from '../../common/decorators/requires-permission.decorator';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 
 @ApiTags('it-manager')
 @Controller('it')
-@UseGuards(JwtAuthGuard, RolesGuard, PanelAccessGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PanelAccessGuard, EmployeePermissionGuard)
 @Roles('IT_MANAGER')
 export class EmployeesController {
   constructor(private readonly employees: EmployeesService) {}
@@ -36,10 +38,20 @@ export class EmployeesController {
     return { success: true, data: await this.employees.catalog() };
   }
 
+  // Phase 31: EMPLOYEE holding us_manage reaches list/detail/reset-password
+  // only — always scoped server-side to their own dept (never another
+  // dept's roster, see EmployeesService.deptScopeForEmployee). Creating an
+  // account, suspending one, or granting/revoking permissions stays
+  // IT_MANAGER-only — deliberately not part of this narrow grant.
   @Get('employees')
+  @Roles('IT_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('us_manage')
   @ApiOperation({ summary: 'فهرست کارمندان — فیلتر واحد/جستجو' })
-  async list(@Query() query: ListEmployeesQueryDto) {
-    return { success: true, data: await this.employees.list(query) };
+  async list(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Query() query: ListEmployeesQueryDto,
+  ) {
+    return { success: true, data: await this.employees.list(actor, query) };
   }
 
   @Post('employees')
@@ -52,9 +64,11 @@ export class EmployeesController {
   }
 
   @Get('employees/:id')
+  @Roles('IT_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('us_manage')
   @ApiOperation({ summary: 'جزئیات کارمند + دسترسی‌های اعطاشده/قابل‌افزودن' })
-  async get(@Param('id') id: string) {
-    return { success: true, data: await this.employees.get(id) };
+  async get(@CurrentUser() actor: AuthenticatedUser, @Param('id') id: string) {
+    return { success: true, data: await this.employees.get(actor, id) };
   }
 
   @Patch('employees/:id/status')
@@ -89,6 +103,8 @@ export class EmployeesController {
   }
 
   @Post('employees/:id/reset-password')
+  @Roles('IT_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('us_manage')
   @ApiOperation({
     summary: 'بازنشانی رمز عبور — رمز موقت فقط یک‌بار در پاسخ برگردانده می‌شود',
   })

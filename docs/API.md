@@ -1471,3 +1471,72 @@ that fixed index by coincidence.
   cabin instead of the previous `idx === 1`.
 - No DTO/schema change — `AircraftSeatMap` already had the source data;
   this only exposes and consumes it.
+
+## Phase 31 — EMPLOYEE narrow access to the IT-dept permission keys
+
+Closes the last deferral from Phase 8/27: `us_manage`/`sv_control`/
+`sc_manage`/`lg_view` were seeded in `PERMISSION_CATALOG` since Phase 8
+but never wired to any real access. Unlike Phase 27's `fl_manage`/
+`ag_settle`/`fn_invoices` (which had a designed EMPLOYEE screen to wire
+against), the design has **zero page body** for any of the IT panel's
+four EMPLOYEE-relevant tab keys (`users`/`services`/`security`/`logs`) —
+`design-reference/پنل کارمند.dc.html`'s nav generator lists them by
+label/icon, but no `sc-if` block or `titles{}`/`subs{}` entry exists for
+any of the four, so wiring an `EMPLOYEE_SECTION_NAV` entry would only
+produce a dead/blank tab. This phase is therefore **backend-only**, and —
+because several of the underlying IT_MANAGER endpoints are genuinely
+sensitive (self-permission-granting, a site-wide service kill switch,
+company-wide session data, a force-logout-everyone action) — required a
+second, more specific round of product sign-off beyond the initial "which
+backlog item" decision, narrowing each key to a small, explicitly-approved
+slice of its module rather than the raw IT_MANAGER endpoint list:
+
+- **`us_manage`** — `GET /it/employees` (list) and `GET /it/employees/:id`
+  (detail) are now reachable by `EMPLOYEE`, but always scoped server-side
+  to the actor's **own dept** (`EmployeesService.deptScopeForEmployee`
+  looks up the actor's `dept` fresh from the DB — `AuthenticatedUser`
+  doesn't carry `dept`, same freshness pattern as
+  `EmployeePermissionGuard`'s own live grant check). A `?dept=` query
+  param from the client is silently overridden, not honored — it can't be
+  used to view another dept's roster. `GET /it/employees/:id` for a
+  different-dept id → 403. `POST /it/employees/:id/reset-password` is
+  also reachable, but only for a same-dept colleague — resetting one's
+  own password via this endpoint, or another dept's, → 403 (it's a
+  "help a colleague" tool, not self-service and not cross-dept).
+  `POST /it/employees` (create), `PATCH .../status` (suspend), and
+  `PATCH .../permissions` (grant/revoke any catalog key — the actual
+  privilege-escalation surface) stay strictly `IT_MANAGER`-only.
+- **`sv_control`** — only `GET /it/services` (view internal/external
+  service list + health) is reachable. Toggling an internal service
+  (site-wide kill switch for e.g. payment/search/SMS/CDN),
+  creating/updating/deleting an external service (including its
+  encrypted API key), and the live connection test stay
+  `IT_MANAGER`-only.
+- **`sc_manage`** — only `GET /it/security/policy` (view the current
+  password/security policy) is reachable. `GET /it/security/sessions`
+  is deliberately **excluded** — narrower than the scope originally
+  proposed ("policy + own sessions"), because `SecurityService
+  .listSessions()` has no per-actor filter (it returns every active
+  session company-wide: user, device, IP), and there is no "my sessions
+  only" endpoint to scope to. Building one was judged out of scope for
+  this narrow phase, so the safer choice was to exclude `/sessions`
+  entirely rather than expose company-wide session/IP data to a regular
+  employee. `PATCH policy` and `POST sessions/logout-all` (force-logs-out
+  every active session site-wide, already step-up gated) stay
+  `IT_MANAGER`-only.
+- **`lg_view`** — `GET /audit/logs` (`AuditService.systemLogs()`) is
+  reachable. Already narrower than the CEO's `system-events` endpoint —
+  scoped to `SYSTEM`/`ACCOUNT` categories only, not the financial/
+  strategic audit trail `ceoSystemEvents()` exposes — so it was wired
+  as-is with no additional narrowing needed.
+
+Mechanically: each newly-reachable `GET`/`POST` method gets
+`@Roles('IT_MANAGER', 'EMPLOYEE')` + `@RequiresPermission('<key>')` added
+at the method level (method-level `@Roles` fully replaces the
+class-level `@Roles('IT_MANAGER')` for `RolesGuard`, which reads via
+`getAllAndOverride` — so this doesn't loosen any other method on the same
+controller), and `EmployeePermissionGuard` is added to the guard chain of
+`EmployeesController`/`ItServicesController`/`SecurityController`/
+`AuditController` (only a no-op pass-through for non-`EMPLOYEE` actors,
+so `IT_MANAGER`/`CEO` behavior is unchanged — proven by this phase's own
+"doesn't affect IT_MANAGER" test). No new endpoints, no DTO changes.

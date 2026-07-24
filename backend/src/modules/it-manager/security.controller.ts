@@ -8,6 +8,8 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PanelAccessGuard } from '../panels/panel-access.guard';
+import { EmployeePermissionGuard } from '../../common/guards/employee-permission.guard';
+import { RequiresPermission } from '../../common/decorators/requires-permission.decorator';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 
 class LogoutAllDto {
@@ -24,12 +26,20 @@ class LogoutAllDto {
 
 @ApiTags('it-manager')
 @Controller('it/security')
-@UseGuards(JwtAuthGuard, RolesGuard, PanelAccessGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PanelAccessGuard, EmployeePermissionGuard)
 @Roles('IT_MANAGER')
 export class SecurityController {
   constructor(private readonly security: SecurityService) {}
 
+  // Phase 31: EMPLOYEE holding sc_manage may only view the policy text —
+  // deliberately narrower than the original proposal's "and their own
+  // active sessions," since /sessions has no per-actor scoping and would
+  // otherwise expose every user's IP/device across the whole company.
+  // Updating the policy and force-logging-out every session stay
+  // IT_MANAGER-only.
   @Get('policy')
+  @Roles('IT_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('sc_manage')
   @ApiOperation({ summary: 'سیاست رمز عبور و امنیت فعلی' })
   async getPolicy() {
     return { success: true, data: await this.security.getPolicy() };
