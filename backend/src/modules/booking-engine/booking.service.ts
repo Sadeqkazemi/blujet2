@@ -98,6 +98,7 @@ export class BookingService {
       destCode: b.flightInstance.flight.route.destCode,
       departureAt: b.flightInstance.departureAt,
       arrivalAt: b.flightInstance.arrivalAt,
+      isPriceLocked: !!b.priceLock,
       passengers: b.passengers.map((p) => ({
         fullName: p.fullName,
         seatCode: p.seatCode,
@@ -299,7 +300,12 @@ export class BookingService {
       entityId: booking.id,
     });
 
-    return this.toDetail(booking);
+    // `booking` was fetched (with BOOKING_INCLUDE) before the priceLock
+    // claim above ran in the same transaction, so its `priceLock` relation
+    // is a stale pre-claim snapshot — `usableLock` (resolved earlier) is
+    // the reliable signal that this booking actually consumed a lock.
+    const detail = this.toDetail(booking);
+    return usableLock ? { ...detail, isPriceLocked: true } : detail;
   }
 
   private async getOwnedBooking(id: string, user: AuthenticatedUser) {

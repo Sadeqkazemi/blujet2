@@ -89,10 +89,30 @@ export class PriceLockService {
   }
 
   async listMine(user: AuthenticatedUser) {
-    return this.prisma.priceLock.findMany({
+    const locks = await this.prisma.priceLock.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: 'desc' },
+      include: {
+        flightInstance: { include: { flight: { include: { route: true } } } },
+      },
     });
+    return locks.map((l) => ({
+      id: l.id,
+      flightInstanceId: l.flightInstanceId,
+      cabin: l.cabin,
+      lockedPriceIrr: l.lockedPriceIrr,
+      feeIrr: l.feeIrr,
+      status: l.status,
+      expiresAt: l.expiresAt,
+      createdAt: l.createdAt,
+      bookingId: l.bookingId,
+      flight: {
+        flightNo: l.flightInstance.flight.flightNo,
+        originCode: l.flightInstance.flight.route.originCode,
+        destCode: l.flightInstance.flight.route.destCode,
+        departureAt: l.flightInstance.departureAt,
+      },
+    }));
   }
 
   async cancel(user: AuthenticatedUser, id: string) {

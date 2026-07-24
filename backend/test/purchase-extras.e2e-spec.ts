@@ -403,4 +403,59 @@ describe('Purchase extras: promo codes, wallet, club points, price lock (e2e)', 
     expect(cancelRes.status).toBe(200);
     expect(cancelRes.body.data.status).toBe('CANCELLED');
   });
+
+  it('GET /my/price-locks includes the locked flight route/number/departure, not just raw ids', async () => {
+    const { accessToken, userId } = await loginAsCustomer(app, phoneFor(12));
+    await linkGoldMember(userId!);
+    const instance = await freshInstance(47);
+
+    await request(app.getHttpServer())
+      .post('/my/price-locks')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ flightInstanceId: instance.id, cabin: 'ECONOMY' });
+
+    const list = await request(app.getHttpServer())
+      .get('/my/price-locks')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(list.status).toBe(200);
+    const lock = list.body.data[0];
+    expect(lock.flight).toEqual({
+      flightNo: 'PE-300',
+      originCode: 'THR',
+      destCode: 'IFN',
+      departureAt: instance.departureAt.toISOString(),
+    });
+  });
+
+  it('a booking created against an active lock is flagged isPriceLocked; an ordinary booking is not', async () => {
+    const { accessToken, userId } = await loginAsCustomer(app, phoneFor(13));
+    await linkGoldMember(userId!);
+    const lockedInstance = await freshInstance(48);
+
+    await request(app.getHttpServer())
+      .post('/my/price-locks')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ flightInstanceId: lockedInstance.id, cabin: 'ECONOMY' });
+
+    const lockedBooking = await request(app.getHttpServer())
+      .post('/bookings')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        flightInstanceId: lockedInstance.id,
+        cabin: 'ECONOMY',
+        passengers: [{ fullName: 'قفل قیمت', seatCode: '7A' }],
+      });
+    expect(lockedBooking.body.data.isPriceLocked).toBe(true);
+
+    const otherInstance = await freshInstance(49);
+    const ordinaryBooking = await request(app.getHttpServer())
+      .post('/bookings')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        flightInstanceId: otherInstance.id,
+        cabin: 'ECONOMY',
+        passengers: [{ fullName: 'بدون قفل', seatCode: '7B' }],
+      });
+    expect(ordinaryBooking.body.data.isPriceLocked).toBe(false);
+  });
 });

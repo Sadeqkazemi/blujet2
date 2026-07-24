@@ -21,6 +21,7 @@ const BOOKING: BookingDetail = {
   destCode: 'MHD',
   departureAt: '2026-08-01T04:00:00.000Z',
   arrivalAt: '2026-08-01T05:25:00.000Z',
+  isPriceLocked: false,
   passengers: [
     { fullName: 'نگار رضایی', seatCode: '12A' },
     { fullName: 'آرش رضایی', seatCode: '12B' },

@@ -423,6 +423,46 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   `docs/features/*.md` is now either checked or explicitly decision-gated
   (only the Phase 1 visual-regression item remains, and it needs a
   tooling choice, not more test-writing).
+- [x] **Phase 34 — کیف پول (top-up) + قفل قیمت هوشمند: retroactive docs +
+  frontend closure** — picked up as a self-directed continuation once the
+  no-decision backlog ran dry a second time: the backend for both wallet
+  top-up and price-lock was already fully implemented and e2e-tested
+  (from an earlier public-site merge), so building their frontend UI was
+  judged the same low-risk category as Phases 28–30 (closing UI over
+  already-decided, already-tested business logic), not a fresh product
+  call. Investigation found wallet top-up UI already existed (a stale
+  `PLAN.md` note said otherwise); price-lock UI was genuinely missing —
+  `ResultsPage.tsx`'s only "🔒 قفل قیمت" button lived on the mock/demo
+  flight cards and never called a real endpoint. Built: `AccountPage.tsx`
+  gained a «قفل قیمت» tab (list/cancel, route+price+fee+expiry) and a
+  «🔒 قیمت قفل‌شده» trip badge; `ResultsPage.tsx`'s real result cards
+  gained a working per-cabin lock button (unauthenticated → redirect to
+  `/signin` remembering the search; authenticated non-gold → club-signup
+  notice; gold-tier → real `POST /my/price-locks` call with the actual
+  locked price/fee/expiry shown). Two small backend additions to support
+  this, both additive/non-breaking: `GET /my/price-locks` now joins
+  flight route/number/departure (previously raw ids only); every booking
+  response gained `isPriceLocked: boolean`. Found and fixed two real
+  bugs surfaced while wiring this (not invented, not pre-existing test
+  failures — genuinely new-found via building the UI against real data):
+  `AccountPage.tsx`'s wallet top-up used `Number(x)*10` instead of the
+  shared `parseTomanToRial` helper, so Persian-digit input (which the
+  field's own placeholder invites) silently produced `NaN`; and
+  `BookingService.createBooking()`'s `isPriceLocked` read a stale
+  pre-transaction snapshot of the `priceLock` relation (fetched before
+  the same transaction's claim-update ran), always false right after
+  creating a locked booking — fixed by deriving the flag from the
+  already-resolved `usableLock` variable instead. **Deliberately left
+  undecided, flagged not silently dropped**: the price-lock fee is
+  computed/stored but never actually charged anywhere in the backend —
+  this phase's UI shows the fee as a plain data field without asserting
+  it was billed, rather than inventing a wallet-debit/gateway-charge
+  mechanism unilaterally (a real financial-flow decision, not UI wiring).
+  6 new backend e2e tests total (2 new + all pre-existing price-lock
+  tests re-verified), 8 new frontend tests. See
+  `docs/features/wallet-price-lock.md` for full reasoning,
+  `docs/API.md`/`docs/DB_SCHEMA.md`'s Phase 34 sections for the exact
+  endpoint/schema notes.
 
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is

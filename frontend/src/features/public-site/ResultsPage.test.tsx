@@ -1,10 +1,12 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import ResultsPage from './ResultsPage';
 import * as publicSiteApi from '../../api/publicSite';
 import * as useAuthModule from '../../hooks/useAuth';
-import type { SearchFlightResult } from '../../types/public-site';
+import { ApiRequestError } from '../../api/envelope';
+import type { PriceLock, SearchFlightResult } from '../../types/public-site';
 
 const RESULT: SearchFlightResult = {
   flightInstanceId: 'fi-1',
@@ -20,10 +22,10 @@ const RESULT: SearchFlightResult = {
   ],
 };
 
-function renderPage() {
+function renderPage(status: 'unauthenticated' | 'authenticated' = 'unauthenticated') {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
-    status: 'unauthenticated',
-    user: null,
+    status,
+    user: status === 'authenticated' ? { id: 'u1', fullName: 'کاربر تست', role: 'USER' } : null,
     requestLogin: vi.fn(),
     confirmTwoFactor: vi.fn(),
     agencyLogin: vi.fn(),
@@ -33,6 +35,7 @@ function renderPage() {
     <MemoryRouter initialEntries={['/results?origin=THR&dest=MHD&date=2026-08-01']}>
       <Routes>
         <Route path="/results" element={<ResultsPage />} />
+        <Route path="/signin" element={<div>صفحه ورود</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -80,5 +83,73 @@ describe('ResultsPage', () => {
     (Array.from(firstSelect).find((b) => b.textContent === 'انتخاب') as HTMLButtonElement).click();
 
     expect(await screen.findByTestId('mock-notice')).toBeInTheDocument();
+  });
+
+  describe('real قفل قیمت (price lock)', () => {
+    it('redirects an unauthenticated visitor to /signin, remembering the search', async () => {
+      vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+      renderPage('unauthenticated');
+      await screen.findByTestId('result-card');
+
+      await userEvent.click(screen.getByTestId('real-lock-fi-1-ECONOMY'));
+
+      expect(await screen.findByText('صفحه ورود')).toBeInTheDocument();
+    });
+
+    it('shows the club-membership notice for an authenticated non-gold customer, without calling the API', async () => {
+      vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+      vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({ isMember: false, level: null, balance: 0 });
+      const createLock = vi.spyOn(publicSiteApi, 'createPriceLock');
+      renderPage('authenticated');
+      await screen.findByTestId('result-card');
+
+      await userEvent.click(screen.getByTestId('real-lock-fi-1-ECONOMY'));
+
+      expect(await screen.findByTestId('real-lock-modal')).toHaveTextContent(
+        'قفل قیمت تا ۷۲ ساعت مخصوص اعضای سطح طلایی و بالاتر باشگاه مشتریان است.',
+      );
+      expect(createLock).not.toHaveBeenCalled();
+    });
+
+    it('a gold-tier customer locking a real cabin sees the locked price, fee, and expiry', async () => {
+      vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+      vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({ isMember: true, level: 'GOLD', balance: 500 });
+      const lock: PriceLock = {
+        id: 'pl-1',
+        flightInstanceId: 'fi-1',
+        cabin: 'ECONOMY',
+        lockedPriceIrr: 380_000_000,
+        feeIrr: 1_140_000,
+        status: 'ACTIVE',
+        expiresAt: '2026-08-04T05:00:00.000Z',
+        createdAt: '2026-08-01T00:00:00.000Z',
+        bookingId: null,
+        flight: { flightNo: 'BJ-100', originCode: 'THR', destCode: 'MHD', departureAt: '2026-08-01T05:00:00.000Z' },
+      };
+      const createLock = vi.spyOn(publicSiteApi, 'createPriceLock').mockResolvedValue(lock);
+      renderPage('authenticated');
+      await screen.findByTestId('result-card');
+
+      await userEvent.click(screen.getByTestId('real-lock-fi-1-ECONOMY'));
+
+      expect(await screen.findByText('قیمت شما قفل شد')).toBeInTheDocument();
+      expect(createLock).toHaveBeenCalledWith('fi-1', 'ECONOMY');
+    });
+
+    it('shows the server error message when locking fails (e.g. an already-active lock)', async () => {
+      vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+      vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({ isMember: true, level: 'GOLD', balance: 500 });
+      vi.spyOn(publicSiteApi, 'createPriceLock').mockRejectedValue(
+        new ApiRequestError('CONFLICT', 'شما قبلاً برای این پرواز و کلاس، قیمت را قفل کرده‌اید.', 409),
+      );
+      renderPage('authenticated');
+      await screen.findByTestId('result-card');
+
+      await userEvent.click(screen.getByTestId('real-lock-fi-1-ECONOMY'));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'شما قبلاً برای این پرواز و کلاس، قیمت را قفل کرده‌اید.',
+      );
+    });
   });
 });

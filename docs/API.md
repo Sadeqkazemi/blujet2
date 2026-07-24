@@ -1540,3 +1540,51 @@ controller), and `EmployeePermissionGuard` is added to the guard chain of
 `AuditController` (only a no-op pass-through for non-`EMPLOYEE` actors,
 so `IT_MANAGER`/`CEO` behavior is unchanged — proven by this phase's own
 "doesn't affect IT_MANAGER" test). No new endpoints, no DTO changes.
+
+## Phase 34 — کیف پول (top-up) + قفل قیمت هوشمند: retroactive docs + frontend closure
+
+`backend/src/modules/booking-engine/wallet.service.ts`/`price-lock
+.service.ts`/`wallet-points-lock.controller.ts` shipped in an earlier
+phase's merge (see PLAN.md's public-site/"Promo codes / wallet / club
+points ledger / price lock" bullet) but never got a dedicated docs/API.md
+section — this section documents the endpoints retroactively, alongside
+the two additive response-shape changes this phase made. Full reasoning,
+the frontend UI closure, and the found-and-fixed bugs are in
+`docs/features/wallet-price-lock.md`.
+
+### `backend/src/modules/booking-engine/` — wallet ("کیف پول") — `@Roles('USER')`
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/my/wallet` | `{ balanceIrr }` — always `SUM(WalletEntry.signedAmountIrr)`, never a mutable column. |
+| POST | `/my/wallet/topup` | `{ amountIrr (min 10,000) }` — a sandbox "always succeeds" gateway (no redirect/callback, unlike `POST /bookings/:id/pay`'s `GATEWAY` method): inserts a `WalletEntry(type=TOPUP)` and returns the new `{ balanceIrr }` synchronously. |
+
+### `backend/src/modules/booking-engine/` — price lock ("قفل قیمت هوشمند") — `@Roles('USER')`
+
+| Method | Path | Notes |
+|---|---|---|
+| POST | `/my/price-locks` | `{ flightInstanceId, cabin }` — 403 if the caller isn't a `GOLD`/`PLATINUM` `ClubMember`; 404 if the flight is gone or no longer `SCHEDULED`; 409 if an active, unexpired lock already exists for that user+flight+cabin. Locks the live cabin price for 72h flat (`LOCK_TTL_MS`), fee = flat 3% of that price rounded to the nearest 10,000 IRR (`LOCK_FEE_PCT` — CLAUDE.md: "fee/risk suggested by the ML service but authorized and computed by NestJS"; the AI-suggested variable fee stays deferred). **The fee is computed and stored but never charged anywhere** — see the ⚑ note in `docs/features/wallet-price-lock.md`; this phase's frontend surfaces the fee as a plain data field without asserting it was billed. |
+| GET | `/my/price-locks` | Own locks, newest first. **Phase 34 addition**: each row now also includes `flight: { flightNo, originCode, destCode, departureAt }` (joined via `FlightInstance → Flight → Route`) — previously only raw fields, giving the frontend no way to show which flight a lock is for. |
+| DELETE | `/my/price-locks/:id` | Owner-only; 404 otherwise; 400 if not currently `ACTIVE` → `CANCELLED`. |
+
+Consumption at booking time is **implicit** — `POST /bookings` does not
+take a `priceLockId`. `BookingService.createBooking` looks up any active,
+unexpired, not-yet-consumed lock for the exact user+flight+cabin
+(`PriceLockService.findUsableLock`) and prices the booking at the locked
+rate automatically, atomically claiming the lock (`bookingId` set) inside
+the same transaction to guard against a concurrent duplicate request. At
+payment, an active lock skips price-change detection entirely, then
+flips to `USED`.
+
+**Phase 34 addition**: every `BookingDetail` response (`toDetail()` — `GET
+/bookings/:id`, `GET /bookings/me`, `POST /bookings`, the `booking` field
+inside `POST /bookings/:id/pay`'s response, `POST /manage-booking/lookup`)
+now includes `isPriceLocked: boolean`. Found and fixed a real staleness
+bug while adding this: `createBooking()`'s `booking` object is fetched
+(with the `priceLock` relation included) **before** the same
+transaction's `tx.priceLock.updateMany(...)` actually claims the lock, so
+a naive `!!booking.priceLock` read the pre-claim snapshot and was always
+`false` right after creating a locked booking. Fixed by deriving the flag
+from `usableLock` (already resolved earlier in the method, before the
+transaction starts) instead of trusting the post-transaction relation
+snapshot.

@@ -20,6 +20,7 @@ const TICKETED: BookingDetail = {
   destCode: 'MHD',
   departureAt: '2026-08-01T05:00:00.000Z',
   arrivalAt: '2026-08-01T06:30:00.000Z',
+  isPriceLocked: false,
   passengers: [{ fullName: 'علی رضایی', seatCode: '2A' }],
 };
 
