@@ -1618,3 +1618,12 @@ No backend change. See `docs/features/reservation.md`'s Phase 36 section
 for the full checklist, including why the seat-lock approval queue
 (`.../locks/:id/approve`/`reject`, `pnr/from-lock/:lockId`) — a different,
 larger gap the same audit turned up — stays deliberately un-built.
+
+## Phase 37 — سامانه پیامک (SMS) log: frontend closure (retroactive docs)
+
+`GET /it/services/sms-log` (Phase 14, `IT_MANAGER`) had the same shape of
+gap as Phases 35/36: fully implemented and e2e-tested, no frontend
+surface, found by the same audit. `ServicesPage.tsx` gained a «سامانه
+پیامک (SMS)» card (enabled state, today's success/fail counts, recent
+messages with masked phones) below the existing internal-services grid.
+No backend change. See `docs/features/it-manager.md`'s Phase 37 section.
