@@ -1396,3 +1396,17 @@ stay out of scope and unwired pending a separate decision.
   (permitted) page — the invoices section then just renders empty, and
   server-side authorization is still the real enforcement for any invoice
   action.
+
+## Phase 28 — IT Manager external-service «تنظیمات» edit modal
+
+No backend change — `PATCH /it/services/external/:id` (`UpdateExternalServiceDto`:
+`nameFa`/`endpoint`/`method`/`timeoutMs`/`apiKey`/`sandbox`/`enabled`, all
+optional) was already implemented and e2e-tested since Phase 8; only its
+frontend surface was deferred. Closes that deferral: `ServicesPage.tsx`'s
+external-service cards gain a «تنظیمات» button opening a modal pre-filled
+with نام سرویس/Endpoint/متد/مهلت اتصال; کلید احراز (API key) stays blank by
+default (the raw key is never returned by the API — only `hasApiKey`) and
+is sent only if the operator types a new one, so an unedited save never
+overwrites an existing key with an empty string. Client-side validation
+mirrors the existing add-service modal (نام سرویس/Endpoint required,
+مهلت اتصال bounded 1000–120000ms, matching the DTO's own `@Min`/`@Max`).

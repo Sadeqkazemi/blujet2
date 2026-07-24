@@ -5,6 +5,7 @@ import {
   removeExternalService,
   testExternalService,
   toggleInternalService,
+  updateExternalService,
 } from '../../api/it-manager';
 import { faDigits, faPercent } from '../../lib/fa-format';
 import Modal from '../../components/Modal';
@@ -19,6 +20,16 @@ export default function ServicesPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [form, setForm] = useState({ nameFa: '', provider: '', endpoint: '', apiKey: '' });
+
+  const [editTarget, setEditTarget] = useState<ExternalService | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({
+    nameFa: '',
+    endpoint: '',
+    method: 'POST' as 'GET' | 'POST',
+    timeoutMs: '',
+    apiKey: '',
+  });
 
   const load = useCallback(async () => {
     try {
@@ -50,6 +61,44 @@ export default function ServicesPage() {
       await load();
     } catch {
       setError('خطا در تست اتصال.');
+    }
+  }
+
+  function onOpenSettings(s: ExternalService) {
+    setEditTarget(s);
+    setEditError(null);
+    setEditForm({
+      nameFa: s.nameFa,
+      endpoint: s.endpoint,
+      method: s.method,
+      timeoutMs: String(s.timeoutMs),
+      apiKey: '',
+    });
+  }
+
+  async function onSaveSettings() {
+    if (!editTarget) return;
+    if (!editForm.nameFa.trim() || !editForm.endpoint.trim()) {
+      setEditError('نام سرویس و آدرس Endpoint الزامی است.');
+      return;
+    }
+    const timeoutMs = Number(editForm.timeoutMs);
+    if (!Number.isInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > 120000) {
+      setEditError('مهلت اتصال باید بین ۱۰۰۰ تا ۱۲۰۰۰۰ میلی‌ثانیه باشد.');
+      return;
+    }
+    try {
+      await updateExternalService(editTarget.id, {
+        nameFa: editForm.nameFa.trim(),
+        endpoint: editForm.endpoint.trim(),
+        method: editForm.method,
+        timeoutMs,
+        ...(editForm.apiKey.trim() ? { apiKey: editForm.apiKey.trim() } : {}),
+      });
+      setEditTarget(null);
+      await load();
+    } catch (e) {
+      setEditError(e instanceof Error ? e.message : 'خطا در ثبت تنظیمات سرویس.');
     }
   }
 
@@ -171,6 +220,9 @@ export default function ServicesPage() {
                 {s.enabled ? 'فعال' : 'غیرفعال'}
               </span>
               <div className="flex gap-2">
+                <button onClick={() => onOpenSettings(s)} className="text-[10.5px] font-bold text-accent">
+                  تنظیمات
+                </button>
                 <button onClick={() => void onTest(s)} className="text-[10.5px] font-bold text-accent">
                   تست اتصال
                 </button>
@@ -229,6 +281,87 @@ export default function ServicesPage() {
               className="rounded-lg bg-accent px-4 py-2 text-xs font-bold text-white transition hover:bg-accent/90"
             >
               ثبت و اتصال سرویس
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {editTarget && (
+        <Modal title="تنظیمات سرویس" onClose={() => setEditTarget(null)}>
+          <label className="mb-1 block text-xs font-bold text-ink" htmlFor="edit-svc-name">
+            نام سرویس
+          </label>
+          <input
+            id="edit-svc-name"
+            value={editForm.nameFa}
+            onChange={(e) => setEditForm({ ...editForm, nameFa: e.target.value })}
+            className="w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent"
+          />
+          <label className="mb-1 mt-3 block text-xs font-bold text-ink" htmlFor="edit-svc-endpoint">
+            آدرس Endpoint
+          </label>
+          <input
+            id="edit-svc-endpoint"
+            dir="ltr"
+            value={editForm.endpoint}
+            onChange={(e) => setEditForm({ ...editForm, endpoint: e.target.value })}
+            className="ltr w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent"
+          />
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-bold text-ink" htmlFor="edit-svc-method">
+                متد
+              </label>
+              <select
+                id="edit-svc-method"
+                dir="ltr"
+                value={editForm.method}
+                onChange={(e) => setEditForm({ ...editForm, method: e.target.value as 'GET' | 'POST' })}
+                className="ltr w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent"
+              >
+                <option value="POST">POST</option>
+                <option value="GET">GET</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-bold text-ink" htmlFor="edit-svc-timeout">
+                مهلت اتصال (میلی‌ثانیه)
+              </label>
+              <input
+                id="edit-svc-timeout"
+                dir="ltr"
+                inputMode="numeric"
+                value={editForm.timeoutMs}
+                onChange={(e) => setEditForm({ ...editForm, timeoutMs: e.target.value })}
+                className="ltr w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent"
+              />
+            </div>
+          </div>
+          <label className="mb-1 mt-3 block text-xs font-bold text-ink" htmlFor="edit-svc-key">
+            کلید احراز (API Key)
+          </label>
+          <input
+            id="edit-svc-key"
+            dir="ltr"
+            value={editForm.apiKey}
+            onChange={(e) => setEditForm({ ...editForm, apiKey: e.target.value })}
+            placeholder={editTarget.hasApiKey ? 'برای تغییر وارد کنید — خالی یعنی بدون تغییر' : '—'}
+            className="ltr w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent placeholder:text-[10px]"
+          />
+          {editError && (
+            <p role="alert" className="mt-2 text-xs text-danger">
+              {editError}
+            </p>
+          )}
+          <div className="mt-4 flex justify-end gap-2">
+            <button onClick={() => setEditTarget(null)} className="rounded-lg bg-surface px-4 py-2 text-xs font-bold text-text-2">
+              انصراف
+            </button>
+            <button
+              onClick={() => void onSaveSettings()}
+              className="rounded-lg bg-accent px-4 py-2 text-xs font-bold text-white transition hover:bg-accent/90"
+            >
+              ثبت تغییرات
             </button>
           </div>
         </Modal>
