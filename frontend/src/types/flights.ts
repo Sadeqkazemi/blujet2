@@ -70,6 +70,12 @@ export interface FlightDetail extends FlightRow {
   channels: { channel: 'SYSTEM' | 'CHARTER' | 'AGENCY'; seats: number; revenueIrr: number }[];
   totalRevenueIrr: number;
   occupancyPct: number;
+  aircraftType: string;
+}
+
+export interface AircraftTypeOption {
+  aircraftType: string;
+  capacity: number;
 }
 
 export interface PlanResult {

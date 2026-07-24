@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import {
+  changeFlightAircraft,
   createAllotment,
   createFlight,
   deleteAllotment,
+  fetchAircraftTypes,
   fetchAirports,
   fetchAllotments,
   fetchFlightDetail,
@@ -12,11 +14,13 @@ import {
   runFlightsAiAnalysis,
 } from '../../api/flights';
 import { fetchAgencies } from '../../api/agencies';
+import { useStepUp } from '../../hooks/useStepUp';
 import { faDigits, faMoney, latinDigits, parseTomanToRial } from '../../lib/fa-format';
 import { dayjs, formatJalaliDateTime, parseJalaliDateToIso } from '../../lib/jalali';
 import Modal from '../../components/Modal';
 import PricingPage from '../pricing/PricingPage';
 import type {
+  AircraftTypeOption,
   AirportEntry,
   AllotmentRow,
   CompletedFlightRow,
@@ -71,6 +75,13 @@ export default function FlightsPage() {
 
   const [detail, setDetail] = useState<FlightDetail | null>(null);
   const [expandedDone, setExpandedDone] = useState<string | null>(null);
+
+  const [aircraftTypes, setAircraftTypes] = useState<AircraftTypeOption[]>([]);
+  const [aircraftChangeOpen, setAircraftChangeOpen] = useState(false);
+  const [selectedAircraftType, setSelectedAircraftType] = useState('');
+  const [aircraftChangeError, setAircraftChangeError] = useState<string | null>(null);
+  const [aircraftChangeBusy, setAircraftChangeBusy] = useState(false);
+  const aircraftStepUp = useStepUp('PRICE_CAPACITY_CHANGE');
 
   const [futureDay, setFutureDay] = useState<string | null>(null);
   const [calOpen, setCalOpen] = useState(false);
@@ -152,10 +163,39 @@ export default function FlightsPage() {
 
   async function openDetail(id: string) {
     setError(null);
+    setAircraftChangeOpen(false);
+    setAircraftChangeError(null);
     try {
-      setDetail(await fetchFlightDetail(id));
+      const d = await fetchFlightDetail(id);
+      setDetail(d);
+      setSelectedAircraftType(d.aircraftType);
     } catch {
       setError('خطا در دریافت جزئیات پرواز.');
+    }
+    if (aircraftTypes.length === 0) {
+      try {
+        setAircraftTypes(await fetchAircraftTypes());
+      } catch {
+        // silently unavailable — the change control just won't render options
+      }
+    }
+  }
+
+  async function onChangeAircraft() {
+    if (!detail || !selectedAircraftType || selectedAircraftType === detail.aircraftType) return;
+    setAircraftChangeError(null);
+    setAircraftChangeBusy(true);
+    try {
+      const fields = await aircraftStepUp.confirm();
+      const result = await changeFlightAircraft(detail.id, selectedAircraftType, fields);
+      setDetail({ ...detail, aircraftType: result.aircraftType, capacity: result.capacity });
+      setAircraftChangeOpen(false);
+      await load();
+    } catch (err) {
+      if (err instanceof Error && err.message === 'CANCELLED') return;
+      setAircraftChangeError(err instanceof Error ? err.message : 'خطا در تغییر نوع هواپیما.');
+    } finally {
+      setAircraftChangeBusy(false);
     }
   }
 
@@ -908,8 +948,64 @@ export default function FlightsPage() {
               {faMoney(detail.totalRevenueIrr)} تومان
             </span>
           </div>
+
+          <div className="mt-3 rounded-lg border border-border p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-xs font-bold text-ink">نوع هواپیما</span>
+              {!aircraftChangeOpen && (
+                <button
+                  onClick={() => {
+                    setSelectedAircraftType(detail.aircraftType);
+                    setAircraftChangeError(null);
+                    setAircraftChangeOpen(true);
+                  }}
+                  className="text-[11px] font-bold text-accent"
+                >
+                  تغییر
+                </button>
+              )}
+            </div>
+            {!aircraftChangeOpen ? (
+              <div className="text-xs font-bold text-ink">{detail.aircraftType}</div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <select
+                  value={selectedAircraftType}
+                  onChange={(e) => setSelectedAircraftType(e.target.value)}
+                  className="rounded-lg border border-border p-2 text-xs"
+                >
+                  {aircraftTypes.map((t) => (
+                    <option key={t.aircraftType} value={t.aircraftType}>
+                      {t.aircraftType} (ظرفیت {faDigits(t.capacity)})
+                    </option>
+                  ))}
+                </select>
+                {aircraftChangeError && (
+                  <p role="alert" className="text-[11px] text-danger">
+                    {aircraftChangeError}
+                  </p>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    disabled={aircraftChangeBusy}
+                    onClick={() => void onChangeAircraft()}
+                    className="rounded-lg bg-accent px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50"
+                  >
+                    {aircraftChangeBusy ? 'در حال ثبت…' : 'ثبت تغییر'}
+                  </button>
+                  <button
+                    onClick={() => setAircraftChangeOpen(false)}
+                    className="rounded-lg bg-surface px-3 py-1.5 text-[11px] font-bold text-text-2"
+                  >
+                    انصراف
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </Modal>
       )}
+      {aircraftStepUp.modal}
 
       {plan && (
         <Modal

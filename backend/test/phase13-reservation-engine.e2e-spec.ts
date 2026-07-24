@@ -246,6 +246,13 @@ describe('Phase 13 — reservation engine completion', () => {
     expect(okChange.status).toBe(200);
     expect(okChange.body.data.capacity).toBe(8);
 
+    // GET /flights/:id detail must reflect the override — the whole point
+    // of resolveAircraftType() is that every reader sees the change.
+    const detailAfter = await request(app.getHttpServer())
+      .get(`/flights/${instance.id}`)
+      .set('Authorization', `Bearer ${staffToken}`);
+    expect(detailAfter.body.data.aircraftType).toBe(AIRCRAFT_LARGE);
+
     // Now exercise the rejection branch directly: a fresh instance with
     // its own confirmed booking, then a change to a 0-seat aircraft type
     // (enumerateSeats returns [] → capacity 0 < the 1 confirmed passenger).
@@ -297,4 +304,18 @@ describe('Phase 13 — reservation engine completion', () => {
       where: { aircraftType: 'P13-EmptyJet' },
     });
   }, 15000);
+
+  it('GET /flights/aircraft-types lists every seat-map type with its real computed capacity', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/flights/aircraft-types')
+      .set('Authorization', `Bearer ${staffToken}`);
+    expect(res.status).toBe(200);
+    const byType = Object.fromEntries(
+      (res.body.data as { aircraftType: string; capacity: number }[]).map(
+        (t) => [t.aircraftType, t.capacity],
+      ),
+    );
+    expect(byType[AIRCRAFT_SMALL]).toBe(4);
+    expect(byType[AIRCRAFT_LARGE]).toBe(8);
+  });
 });

@@ -352,6 +352,15 @@ export class FlightsController {
     return { success: true, data };
   }
 
+  @Get('aircraft-types')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_view')
+  @ApiOperation({ summary: 'کاتالوگ انواع هواپیما برای فرم تغییر نوع هواپیما' })
+  async aircraftTypes() {
+    const data = await this.flights.aircraftTypes();
+    return { success: true, data };
+  }
+
   @Post()
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
   @RequiresPermission('fl_manage')

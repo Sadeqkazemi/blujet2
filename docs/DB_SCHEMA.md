@@ -1655,3 +1655,22 @@ changes, both query/serialization only:
 
 See `docs/features/wallet-price-lock.md` for the full frontend-closure
 reasoning, including the deliberately-undecided fee-charging gap.
+
+## Phase 38 — تغییر نوع هواپیما: frontend closure
+
+No schema change. `AircraftSeatMap` and `FlightInstance.aircraftTypeOverride`
+already existed (Phase 13 Part A) with the write path (`changeAircraftType`)
+fully built; only additive, non-breaking read/serialization changes:
+
+- `FlightsService.aircraftTypes()` (new method) — lists every
+  `AircraftSeatMap` row `{ aircraftType, capacity }`, capacity via the
+  existing `enumerateSeats()` helper (same one `changeAircraftType()`
+  already uses for its own capacity check) — a pure read, no new table/
+  column.
+- `FlightsService.detail()`'s return object gains `aircraftType` via the
+  existing `resolveAircraftType()` util — no new query, the instance and
+  its `flight` relation were already loaded.
+
+See `docs/API.md`'s Phase 38 section for the endpoint shape and the
+deliberately-deferred fare-rules CRUD gap, `docs/features/flight-management.md`'s
+Phase 38 section for the full frontend checklist.

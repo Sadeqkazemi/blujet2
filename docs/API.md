@@ -1627,3 +1627,47 @@ surface, found by the same audit. `ServicesPage.tsx` gained a «سامانه
 پیامک (SMS)» card (enabled state, today's success/fail counts, recent
 messages with masked phones) below the existing internal-services grid.
 No backend change. See `docs/features/it-manager.md`'s Phase 37 section.
+
+## Phase 38 — تغییر نوع هواپیما (aircraft-type change): frontend closure
+
+`PATCH /flights/:instanceId/aircraft` shipped backend-only in Phase 13
+Part A (see that section above for its own request/response shape,
+`CAPACITY_BELOW_CONFIRMED` conflict, and role gate) — found by the same
+systematic controller-vs-frontend audit as Phases 35–37: fully
+implemented and e2e-tested, no frontend control anywhere. Two small,
+additive backend changes were needed to build a real (not free-text) form
+around it:
+- `GET /flights/aircraft-types` (new, `SENIOR_MANAGER` + `COMMERCIAL_MANAGER`
+  + `EMPLOYEE` with `fl_view`, matching the existing `airports` catalog
+  endpoint's role gate) — lists every seeded `AircraftSeatMap` row as
+  `{ aircraftType, capacity }`, capacity computed via the same
+  `enumerateSeats()` helper `changeAircraftType()` already uses for its
+  own capacity check. No such listing existed anywhere: every other
+  `AircraftSeatMap` reader already knows the exact type string it wants
+  (from `Flight.aircraftType` or a `changeAircraftType` override), so this
+  is the first caller that needs the full catalog — needed so the UI can
+  offer a real dropdown instead of an error-prone free-text field.
+- `GET /flights/:instanceId` (detail) response gains `aircraftType`
+  (resolved via the existing `resolveAircraftType()` util —
+  `instance.aircraftTypeOverride ?? instance.flight.aircraftType`) so the
+  detail modal can show the current type and pre-select it in the form.
+
+Frontend: the flight-detail modal in `FlightsPage.tsx` gained a «نوع
+هواپیما» box showing the current type, with a تغییر button that reveals a
+select (populated from `GET /flights/aircraft-types`, fetched once and
+cached) + ثبت تغییر/انصراف. Submitting requires step-up 2FA via the
+existing `useStepUp('PRICE_CAPACITY_CHANGE')` hook (same scope used by
+`PATCH /flights/:instanceId/plan`), then calls
+`changeFlightAircraft(id, aircraftType, stepUp)`; the
+`CAPACITY_BELOW_CONFIRMED` conflict is surfaced inline exactly like the
+plan modal's own conflict handling.
+
+**Deliberately deferred, not silently dropped**: `flights` also exposes
+fare-rules CRUD (`GET/POST/PATCH/DELETE
+/flights/:instanceId/fare-rules`) with the same shape of gap — backend
+complete, no frontend surface — but it's a materially bigger admin table
+(multi-field rows: fare class, channel restrictions, refund/exchange
+penalties) with no design-reference screen to build against, unlike this
+phase's single-field form over an existing pattern. Left for a future
+phase with explicit direction rather than inventing the table's UX
+unilaterally.

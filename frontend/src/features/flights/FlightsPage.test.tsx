@@ -3,9 +3,11 @@ import { describe, expect, it, vi } from 'vitest';
 import FlightsPage from './FlightsPage';
 import * as flightsApi from '../../api/flights';
 import * as pricingApi from '../../api/pricing';
+import * as authApi from '../../api/auth';
 import * as useAuthModule from '../../hooks/useAuth';
 import { parseJalaliDateToIso } from '../../lib/jalali';
 import type {
+  AircraftTypeOption,
   AirportEntry,
   FlightsOverview,
   FlightDetail,
@@ -106,6 +108,7 @@ const DETAIL: FlightDetail = {
   ],
   totalRevenueIrr: 5_776_000_000,
   occupancyPct: 84,
+  aircraftType: 'Airbus A320',
 };
 
 function mockRole(role: Role) {
@@ -281,5 +284,81 @@ describe('FlightsPage', () => {
     render(<FlightsPage />);
     await screen.findByText('مدیریت پروازها و موجودی');
     expect(screen.queryByText('تعیین قیمت پرواز و ارسال به مدیر عامل')).not.toBeInTheDocument();
+  });
+
+  describe('aircraft-type change', () => {
+    const AIRCRAFT_TYPES: AircraftTypeOption[] = [
+      { aircraftType: 'Airbus A320', capacity: 180 },
+      { aircraftType: 'Boeing 737', capacity: 189 },
+    ];
+
+    it('shows the current aircraft type, and a change with step-up succeeds and updates the shown type/capacity', async () => {
+      mockRole('SENIOR_MANAGER');
+      mockData();
+      vi.spyOn(flightsApi, 'fetchFlightDetail').mockResolvedValue(DETAIL);
+      vi.spyOn(flightsApi, 'fetchAircraftTypes').mockResolvedValue(AIRCRAFT_TYPES);
+      vi.spyOn(authApi, 'requestStepUp').mockResolvedValue({ challengeId: 'ch1' });
+      const changeSpy = vi.spyOn(flightsApi, 'changeFlightAircraft').mockResolvedValue({
+        id: 'fi1',
+        aircraftType: 'Boeing 737',
+        capacity: 189,
+      });
+
+      const { default: userEvent } = await import('@testing-library/user-event');
+      const user = userEvent.setup();
+      render(<FlightsPage />);
+
+      await user.click(await screen.findByText('تهران ← دبی'));
+      const dialog = await screen.findByRole('dialog', { name: /EP-821/ });
+      expect(within(dialog).getByText('Airbus A320')).toBeInTheDocument();
+
+      await user.click(within(dialog).getByRole('button', { name: 'تغییر' }));
+      const select = await within(dialog).findByRole('combobox');
+      await user.selectOptions(select, 'Boeing 737');
+      await user.click(within(dialog).getByRole('button', { name: 'ثبت تغییر' }));
+
+      const stepUpDialog = await screen.findByRole('dialog', { name: 'تأیید مجدد هویت' });
+      await user.type(within(stepUpDialog).getByRole('textbox'), '482913');
+      await user.click(within(stepUpDialog).getByRole('button', { name: 'تأیید' }));
+
+      await waitFor(() =>
+        expect(changeSpy).toHaveBeenCalledWith('fi1', 'Boeing 737', {
+          stepUpChallengeId: 'ch1',
+          stepUpCode: '482913',
+        }),
+      );
+      expect(await within(dialog).findByText('Boeing 737')).toBeInTheDocument();
+    });
+
+    it('shows the backend error (e.g. capacity below confirmed bookings) inline without closing the picker', async () => {
+      mockRole('SENIOR_MANAGER');
+      mockData();
+      vi.spyOn(flightsApi, 'fetchFlightDetail').mockResolvedValue(DETAIL);
+      vi.spyOn(flightsApi, 'fetchAircraftTypes').mockResolvedValue(AIRCRAFT_TYPES);
+      vi.spyOn(authApi, 'requestStepUp').mockResolvedValue({ challengeId: 'ch1' });
+      vi.spyOn(flightsApi, 'changeFlightAircraft').mockRejectedValue(
+        new Error('ظرفیت هواپیمای جدید کمتر از تعداد رزروهای قطعی/لاک‌شدهٔ فعلی است.'),
+      );
+
+      const { default: userEvent } = await import('@testing-library/user-event');
+      const user = userEvent.setup();
+      render(<FlightsPage />);
+
+      await user.click(await screen.findByText('تهران ← دبی'));
+      const dialog = await screen.findByRole('dialog', { name: /EP-821/ });
+      await user.click(within(dialog).getByRole('button', { name: 'تغییر' }));
+      const select = await within(dialog).findByRole('combobox');
+      await user.selectOptions(select, 'Boeing 737');
+      await user.click(within(dialog).getByRole('button', { name: 'ثبت تغییر' }));
+
+      const stepUpDialog = await screen.findByRole('dialog', { name: 'تأیید مجدد هویت' });
+      await user.type(within(stepUpDialog).getByRole('textbox'), '482913');
+      await user.click(within(stepUpDialog).getByRole('button', { name: 'تأیید' }));
+
+      expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+        'ظرفیت هواپیمای جدید کمتر از تعداد رزروهای قطعی/لاک‌شدهٔ فعلی است.',
+      );
+      expect(within(dialog).getByRole('combobox')).toBeInTheDocument();
+    });
   });
 });

@@ -1,5 +1,6 @@
 import { apiGet, apiPatch, apiPost, apiDelete } from './http';
 import type {
+  AircraftTypeOption,
   AirportEntry,
   AllotmentRow,
   FlightDetail,
@@ -14,6 +15,10 @@ export function fetchFlightsOverview() {
 
 export function fetchAirports() {
   return apiGet<AirportEntry[]>('/flights/airports');
+}
+
+export function fetchAircraftTypes() {
+  return apiGet<AircraftTypeOption[]>('/flights/aircraft-types');
 }
 
 export interface CreateFlightPayload {
@@ -35,6 +40,17 @@ export function fetchFlightDetail(id: string) {
 
 export function planFlight(id: string, priceIrr: number, agencySeats: number) {
   return apiPatch<PlanResult>(`/flights/${id}/plan`, { priceIrr, agencySeats });
+}
+
+export function changeFlightAircraft(
+  id: string,
+  aircraftType: string,
+  stepUp: { stepUpChallengeId: string; stepUpCode: string },
+) {
+  return apiPatch<{ id: string; aircraftType: string; capacity: number }>(
+    `/flights/${id}/aircraft`,
+    { aircraftType, ...stepUp },
+  );
 }
 
 export function runFlightsAiAnalysis() {
