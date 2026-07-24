@@ -82,6 +82,61 @@ describe('Reservation (e2e)', () => {
     expect(res.body.data.rows.length).toBe(30); // rows 3-6 + 7-32
   });
 
+  it('GET /reservation/seatmap/:id returns cabinLayout.aisleAfterIndex reflecting the real per-aircraft column split, not a fixed assumption', async () => {
+    const seeded = await createScheduledInstance();
+    const seededRes = await request(app.getHttpServer())
+      .get(`/reservation/seatmap/${seeded.id}`)
+      .set(auth((await loginAs(app, 'chair')).accessToken));
+    expect(seededRes.body.data.cabinLayout).toEqual({
+      BUSINESS: { aisleAfterIndex: 2 }, // seed: businessColsLeft ['A','B']
+      ECONOMY: { aisleAfterIndex: 2 }, // seed: economyColsLeft ['A','B']
+    });
+
+    // A distinct aircraft type with a reversed 3-2 economy split (instead
+    // of the seed's 2-3) proves the endpoint reads the real config per
+    // aircraft rather than always returning the same fixed number.
+    const customType = `WIDE-${Date.now()}`;
+    await prisma.aircraftSeatMap.create({
+      data: {
+        aircraftType: customType,
+        businessRowStart: 1,
+        businessRowEnd: 1,
+        businessColsLeft: ['A'],
+        businessColsRight: ['B', 'C'],
+        economyRowStart: 2,
+        economyRowEnd: 2,
+        economyColsLeft: ['A', 'B', 'C'],
+        economyColsRight: ['D', 'E'],
+      },
+    });
+    const flight = await prisma.flight.findFirstOrThrow();
+    const departureAt = new Date(Date.now() + 21 * 24 * 60 * 60 * 1000);
+    const customInstance = await prisma.flightInstance.create({
+      data: {
+        flightId: flight.id,
+        departureAt,
+        arrivalAt: new Date(departureAt.getTime() + 3 * 60 * 60 * 1000),
+        capacity: 6,
+        charterSeats: 0,
+        status: 'SCHEDULED',
+        aircraftTypeOverride: customType,
+      },
+    });
+    createdInstanceIds.push(customInstance.id);
+
+    const customRes = await request(app.getHttpServer())
+      .get(`/reservation/seatmap/${customInstance.id}`)
+      .set(auth((await loginAs(app, 'chair')).accessToken));
+    expect(customRes.body.data.cabinLayout).toEqual({
+      BUSINESS: { aisleAfterIndex: 1 },
+      ECONOMY: { aisleAfterIndex: 3 },
+    });
+
+    await prisma.aircraftSeatMap.delete({
+      where: { aircraftType: customType },
+    });
+  });
+
   it('POST lock: canLock roles only, 409 on already-locked, encrypted PII never returned, audited', async () => {
     const instance = await createScheduledInstance();
     const chair = await loginAs(app, 'chair');
