@@ -303,6 +303,22 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   backend e2e tests, 2 new frontend tests. See `docs/API.md`/
   `docs/DB_SCHEMA.md`/`docs/features/agencies.md`/
   `docs/features/flight-management.md`'s Phase 27 additions.
+- [x] **Phase 28 — IT Manager external-service «تنظیمات» edit modal** —
+  closes the last remaining deferred-UI item flagged in
+  `docs/features/it-manager.md` (Phase 8): `PATCH /it/services/external/:id`
+  was already implemented and e2e-tested since Phase 8, just never wired
+  into `ServicesPage.tsx`. Each external service card's «تنظیمات» button
+  now opens a modal pre-filled with نام سرویس/Endpoint/متد/مهلت اتصال;
+  کلید احراز stays blank (the raw key is never returned by the API) and
+  is only sent if the operator types a replacement, so an unedited save
+  can never blank out an existing key. No backend change — pure frontend
+  wiring of an already-reviewed endpoint, so this shipped without a
+  fresh `AskUserQuestion` round (unlike Phase 27, this carried no
+  authorization-policy decision). 3 new frontend tests (also fixed a
+  test-isolation gap in `ServicesPage.test.tsx` — missing
+  `afterEach(() => vi.restoreAllMocks())`, same class of bug as Phase 26's
+  `MyReferralsPage.test.tsx` fix). See `docs/API.md`/`docs/DB_SCHEMA.md`/
+  `docs/features/it-manager.md`'s Phase 28 additions.
 
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is

@@ -57,8 +57,10 @@ journeys) + the updated `staff-login-journey.spec.ts` itadmin case.
 - [x] سرویس‌های سایت: internal toggle grid, external create/delete/test + result banner — `ServicesPage.test.tsx` (2 tests)
 - [x] Role isolation: no other role sees these nav entries; direct API calls from another role → 403 — `it-manager-journey.spec.ts: 'Non-IT role has no IT-panel nav entries'` + backend blanket-403 test
 
+### Phase 28 — external-service «تنظیمات» edit modal
+- [x] سرویس‌های سایت: each external service card's «تنظیمات» button opens a modal pre-filled with its current نام سرویس/Endpoint/متد/مهلت اتصال, editable and saved via the already-tested `PATCH /it/services/external/:id`; leaving کلید احراز blank keeps the existing key (never re-sent), typing a new one replaces it; empty نام سرویس/Endpoint is rejected client-side without calling the API — `ServicesPage.test.tsx: 'تنظیمات modal pre-fills current values and saves without an apiKey field when left blank'` + `'تنظیمات modal sends a new apiKey only when the operator typed one'` + `'تنظیمات modal rejects an empty required field without calling the API'`
+
 ### Deferred (scoped out with reasons, not silently dropped)
-- The design's dedicated "تنظیمات سرویس" modal for editing an existing external service's endpoint/method/timeout/API key inline — the `PATCH /it/services/external/:id` endpoint supports all of it and is tested, but the frontend only wires create + test-connection + delete this phase; a full edit modal is deferred to keep this phase's UI surface reviewable (same reasoning `cartable-referrals.md` used for its own deferred UI pieces).
 - Suspend/reactivate confirmation dialog (the design shows a generic confirm-notification pattern for every destructive action) — `EmployeesPage`'s suspend button acts immediately without a confirm step; low-risk (reversible via the same button) and consistent with `ClubPage`'s direct-action buttons, but flagged here rather than silently matching only part of the design.
 
 ---
