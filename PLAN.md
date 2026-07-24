@@ -463,6 +463,24 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   `docs/features/wallet-price-lock.md` for full reasoning,
   `docs/API.md`/`docs/DB_SCHEMA.md`'s Phase 34 sections for the exact
   endpoint/schema notes.
+- [x] **Phase 35 — صف مغایرت‌های پرداخت (payment-reconciliation queue)
+  frontend closure** — after Phase 34's wallet/price-lock gap, ran a
+  systematic audit cross-referencing every backend controller route
+  against every frontend `api/*.ts` caller to check for more of the same
+  shape of gap across the whole app (the audit agent itself hit the
+  session's usage limit partway through and had to be finished by hand);
+  this was the one confirmed genuine hit before that happened. `GET
+  /reconciliation`/`PATCH /reconciliation/:id/resolve` (FINANCE_MANAGER)
+  shipped in Phase 13 Part E, fully e2e-tested, but had no frontend page
+  and no docs/API.md section — not flagged deferred anywhere, just
+  missed. No design mock exists for it (a backend-only addition after the
+  original design extraction), so `FinancePage.tsx`'s finance-ops view
+  gained a new, functionally-styled «صف مغایرت‌های پرداخت» card (list +
+  resolve-with-note, matching the backend's own `@MinLength(3)`
+  validation client-side). No backend change. 1 new frontend test (+ an
+  empty-state assertion added to the existing finance-ops test). See
+  `docs/features/finance-reports.md`'s Phase 35 section,
+  `docs/API.md`'s Phase 35 note.
 
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is
