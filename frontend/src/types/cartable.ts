@@ -74,6 +74,23 @@ export interface ReferralListResult {
   kpis: { total: number; awaitingReport: number; reported: number; closed: number };
 }
 
+export interface MyReferral {
+  id: string;
+  title: string;
+  body: string;
+  priority: ReferralPriority;
+  status: ReferralStatus;
+  dueAt: string | null;
+  createdAt: string;
+  from: { id: string; fullName: string; role: string };
+  hasMyReport: boolean;
+}
+
+export interface MyReferralListResult {
+  referrals: MyReferral[];
+  counts: { total: number; awaitingMyReport: number };
+}
+
 export type ManagerMessageDept =
   | 'FINANCE'
   | 'COMMERCIAL'

@@ -102,6 +102,48 @@ export class ReferralsService {
     };
   }
 
+  /** Recipient-side "referrals assigned to me" — any STAFF_ROLES member can
+   * be a recipient (referrals.service.ts's `create`), but until now only
+   * per-item detail/report access existed, no discovery listing. Closes
+   * the gap flagged in Phase 18's PANEL_NAV notes (EMPLOYEE's referrals
+   * tab was left out of the computed nav for exactly this reason). */
+  async myReferrals(actor: AuthenticatedUser) {
+    const rows = await this.prisma.managerReferralRecipient.findMany({
+      where: { recipientId: actor.id },
+      include: {
+        referral: {
+          include: {
+            from: { select: { id: true, fullName: true, role: true } },
+            reports: { where: { fromId: actor.id }, select: { id: true } },
+          },
+        },
+      },
+      orderBy: { referral: { createdAt: 'desc' } },
+    });
+
+    const referrals = rows.map((r) => ({
+      id: r.referral.id,
+      title: r.referral.title,
+      body: r.referral.body,
+      priority: r.referral.priority,
+      status: r.referral.status,
+      dueAt: r.referral.dueAt,
+      createdAt: r.referral.createdAt,
+      from: r.referral.from,
+      hasMyReport: r.referral.reports.length > 0,
+    }));
+
+    return {
+      referrals,
+      counts: {
+        total: referrals.length,
+        awaitingMyReport: referrals.filter(
+          (r) => !r.hasMyReport && r.status !== 'CLOSED',
+        ).length,
+      },
+    };
+  }
+
   async create(
     actor: AuthenticatedUser,
     dto: {

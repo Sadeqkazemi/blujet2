@@ -1578,3 +1578,12 @@ that "separate" flow. This phase only adds a frontend surface for the
 already-real `GET /my/privacy/export` / `DELETE /my/privacy/account`
 endpoints; see docs/API.md's Phase 25 section for the full read/delete
 shape.
+
+## Phase 26 — ارجاعات (EMPLOYEE recipient-side referral listing)
+
+No schema change. `GET /referrals/mine` reads the existing
+`ManagerReferral`/`ManagerReferralRecipient`/`ManagerReferralReport`
+tables (Phase 4) via the already-indexed `ManagerReferralRecipient
+.recipientId` (`@@index([recipientId])`) — no new index needed. See
+docs/API.md's Phase 26 section for the full endpoint shape and explicit
+scope narrowing.

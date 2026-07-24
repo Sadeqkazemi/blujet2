@@ -66,6 +66,33 @@ and `backend/test/files.e2e-spec.ts` (3 tests), run via `npm run test:e2e`.
 - [x] Chair gate full loop — proven at backend level (`'chair-permission full loop: ...'`); banner states unit-tested + screenshot-verified
 - [x] Role isolation: IT Manager has no کارتابل/ارجاعات nav and 403s on the API — `'IT Manager has no کارتابل or ارجاعات nav entries (role isolation)'` + backend `'a non-exec role (IT_MANAGER) gets 403 on cartable endpoints'`
 
+### Phase 26 addition — EMPLOYEE recipient-side referral listing
+- [x] `GET /referrals/mine`: only referrals where the caller is a
+      recipient (not sent-by-me), `hasMyReport` flips true only after
+      this actor reports, `counts` reconcile; 401 without login
+      — `backend/test/cartable.e2e-spec.ts`: `'GET /referrals/mine returns only referrals where the caller is a recipient, not ones they sent'` + `'GET /referrals/mine: hasMyReport flips true only after this recipient reports, and counts reconcile'` + `'GET /referrals/mine: 401 without login'`
+- [x] `PANEL_NAV.EMPLOYEE` always includes `referrals`, independent of any
+      IT-granted permission
+      — `backend/test/panels.e2e-spec.ts`: `'an EMPLOYEE with no granted permissions still gets dashboard + referrals, not an error'` + `'EMPLOYEE nav is computed dynamically...'`
+- [x] `ReferralsRouter` renders `MyReferralsPage` for EMPLOYEE and the
+      existing sender-side `ReferralsPage` for everyone else (same "one
+      tab key, two designs" pattern as `SecurityRouter`)
+      — covered structurally by `MyReferralsPage.test.tsx` exercising the EMPLOYEE-side component directly; `ReferralsPage.test.tsx` (pre-existing) unchanged
+- [x] `MyReferralsPage`: empty state, list with KPI counts, detail view
+      with a real report-submission form (validates non-empty text,
+      calls `POST /referrals/:id/reports`), a `CLOSED` referral shows no
+      report form
+      — `frontend/src/features/referrals/MyReferralsPage.test.tsx` (5 tests)
+- [x] `EmployeeDashboardPage`'s "no IT permission granted yet" message
+      stays accurate (independent of the always-present referrals card)
+      — `frontend/src/features/dashboard/EmployeeDashboardPage.test.tsx` (2 new tests)
+
+Deferred (documented, not an oversight): other recipient roles
+(CEO/BOARD_CHAIR/FINANCE_MANAGER/COMMERCIAL_MANAGER) still have no
+frontend for `GET /referrals/mine` — the backend already serves them with
+the same guard set, so this is a frontend-only follow-up, not a backend
+gap. See docs/API.md's Phase 26 section.
+
 ### Deferred (scoped out with reasons, not silently dropped)
 - Attachment upload UI on the referral/compose modals — the backend files module is complete and fully tested (`files.e2e-spec.ts`), but the chip-based upload UI is postponed to the phase that first *requires* documents end-to-end (club-card docs, Phase 5) to keep this phase's UI surface reviewable.
 - The Jalali calendar popover date-filter on the cartable tab — the API `date=` filter exists and is validated; the popover UI arrives with the shared Jalali date-picker component (also needed by Phase 5/7 forms).

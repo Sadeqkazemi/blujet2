@@ -42,4 +42,33 @@ describe('EmployeeDashboardPage', () => {
       await screen.findByText('هنوز هیچ دسترسی برای شما توسط مدیر IT فعال نشده است.'),
     ).toBeInTheDocument();
   });
+
+  it('shows the always-present referrals card alongside the no-access message when no IT permission is granted yet', async () => {
+    renderWithNav([
+      { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
+      { key: 'referrals', labelFa: 'ارجاعات', implemented: true },
+    ]);
+
+    // "referrals" isn't an IT-granted permission (پنل کارمند.dc.html
+    // appends it unconditionally), so the two messages are independent:
+    // the employee sees both the real referrals link and the accurate
+    // "nothing granted by IT yet" notice.
+    expect(await screen.findByText('ارجاعات')).toBeInTheDocument();
+    expect(
+      screen.getByText('هنوز هیچ دسترسی برای شما توسط مدیر IT فعال نشده است.'),
+    ).toBeInTheDocument();
+  });
+
+  it('hides the no-access message once a real IT-granted section exists alongside referrals', async () => {
+    renderWithNav([
+      { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
+      { key: 'agencies', labelFa: 'آژانس‌ها', implemented: true },
+      { key: 'referrals', labelFa: 'ارجاعات', implemented: true },
+    ]);
+
+    expect(await screen.findByText('ارجاعات')).toBeInTheDocument();
+    expect(
+      screen.queryByText('هنوز هیچ دسترسی برای شما توسط مدیر IT فعال نشده است.'),
+    ).not.toBeInTheDocument();
+  });
 });

@@ -12,6 +12,7 @@ const TAB_DESCRIPTIONS: Record<string, string> = {
   pricing: 'ثبت نرخ پیشنهادی برای پروازهای آینده',
   reports: 'جستجوی مسافر و مشاهده جزئیات بلیط',
   refund: 'بررسی و ارجاع درخواست‌های استرداد بلیط',
+  referrals: 'درخواست‌های ارجاع‌شده به شما توسط مدیران',
 };
 
 /**
@@ -24,6 +25,11 @@ const TAB_DESCRIPTIONS: Record<string, string> = {
 export default function EmployeeDashboardPage() {
   const { nav } = useOutletContext<PanelShellContext>();
   const sections = (nav ?? []).filter((item) => item.key !== 'dashboard');
+  // "referrals" is always present regardless of IT-granted permissions
+  // (پنل کارمند.dc.html's navKeys formula appends it unconditionally) —
+  // excluded from this specific check so the "no access yet" message
+  // still shows correctly for an employee with zero permission grants.
+  const grantedSections = sections.filter((item) => item.key !== 'referrals');
 
   return (
     <div className="p-6">
@@ -31,7 +37,7 @@ export default function EmployeeDashboardPage() {
       <p className="mt-1 text-xs text-muted">نمای کلی دسترسی‌های فعال شما</p>
 
       {nav === null && <p className="mt-4 text-xs text-muted">در حال بارگذاری…</p>}
-      {nav !== null && sections.length === 0 && (
+      {nav !== null && grantedSections.length === 0 && (
         <p className="mt-4 text-xs text-muted">
           هنوز هیچ دسترسی برای شما توسط مدیر IT فعال نشده است.
         </p>
