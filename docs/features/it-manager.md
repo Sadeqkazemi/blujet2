@@ -79,6 +79,26 @@ narrow-scope decisions). Proven by
 - [x] Without `lg_view`, `GET /audit/logs` is 403 — `'without lg_view, GET /audit/logs is 403'`
 - [x] `IT_MANAGER` access is unaffected by these narrow EMPLOYEE grants — `"doesn't affect IT_MANAGER: still has full access despite EMPLOYEE now holding narrow grants"`
 
+### Phase 37 — سامانه پیامک (SMS) log frontend closure
+
+`GET /it/services/sms-log` (Phase 14, `IT_MANAGER`) shipped fully
+implemented and e2e-tested — `{ enabled, todaySuccessCount,
+todayFailedCount, recent: [...] }`, phone numbers already masked at the
+service layer — but `ServicesPage.tsx` never rendered it, found via the
+same endpoint-vs-frontend-caller audit as Phases 35/36. The design
+reference's IT panel only shows the "sms" row in the internal-services
+toggle grid (already built since Phase 8) — it has no separate delivery-
+log screen — so this is a new card below that grid, not a redesign.
+
+- [x] «سرویس‌های سایت» shows a «سامانه پیامک (SMS)» card: enabled state,
+      today's success/fail counts, and the 50 most recent messages
+      (masked phone, message-type label, status, failure reason when
+      failed, Jalali timestamp) — `ServicesPage.test.tsx: 'shows the real
+      SMS log: today counts, enabled state, and recent messages'`
+- [x] The section simply doesn't render if the fetch fails, rather than
+      breaking the rest of the page — `ServicesPage.test.tsx: 'does not
+      render the SMS log section when it fails to load'`
+
 ### Deferred (scoped out with reasons, not silently dropped)
 - Suspend/reactivate confirmation dialog (the design shows a generic confirm-notification pattern for every destructive action) — `EmployeesPage`'s suspend button acts immediately without a confirm step; low-risk (reversible via the same button) and consistent with `ClubPage`'s direct-action buttons, but flagged here rather than silently matching only part of the design.
 

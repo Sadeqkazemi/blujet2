@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ServicesPage from './ServicesPage';
 import * as itApi from '../../api/it-manager';
-import type { ExternalService, InternalService, ItServicesResult } from '../../types/it-manager';
+import type { ExternalService, InternalService, ItServicesResult, SmsLogResult } from '../../types/it-manager';
 
 const INTERNAL: InternalService[] = [
   { id: 'i1', key: 'search', nameFa: 'موتور جستجوی پرواز', enabled: true, uptimePct: 99.99 },
@@ -118,5 +118,53 @@ describe('ServicesPage', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('نام سرویس و آدرس Endpoint الزامی است.');
     expect(updateSpy).not.toHaveBeenCalled();
+  });
+
+  it('shows the real SMS log: today counts, enabled state, and recent messages', async () => {
+    vi.spyOn(itApi, 'fetchItServices').mockResolvedValue(RESULT);
+    const smsLog: SmsLogResult = {
+      enabled: true,
+      todaySuccessCount: 42,
+      todayFailedCount: 3,
+      recent: [
+        {
+          id: 's1',
+          phoneMasked: '0912***4567',
+          messageType: 'OTP',
+          status: 'SUCCESS',
+          failureReason: null,
+          createdAt: '2026-07-20T09:00:00.000Z',
+        },
+        {
+          id: 's2',
+          phoneMasked: '0935***1122',
+          messageType: 'TEMP_PASSWORD',
+          status: 'FAILED',
+          failureReason: 'ارسال ناموفق: سرویس در دسترس نبود',
+          createdAt: '2026-07-20T08:00:00.000Z',
+        },
+      ],
+    };
+    vi.spyOn(itApi, 'fetchSmsLog').mockResolvedValue(smsLog);
+
+    render(<ServicesPage />);
+    expect(await screen.findByText('سامانه پیامک (SMS)')).toBeInTheDocument();
+    expect(screen.getByText('۴۲')).toBeInTheDocument();
+    expect(screen.getByText('۳')).toBeInTheDocument();
+
+    const rows = screen.getAllByTestId('sms-log-row');
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveTextContent('0912***4567');
+    expect(rows[0]).toHaveTextContent('کد یکبار مصرف');
+    expect(rows[1]).toHaveTextContent('ارسال ناموفق: سرویس در دسترس نبود');
+  });
+
+  it('does not render the SMS log section when it fails to load', async () => {
+    vi.spyOn(itApi, 'fetchItServices').mockResolvedValue(RESULT);
+    vi.spyOn(itApi, 'fetchSmsLog').mockRejectedValue(new Error('network'));
+
+    render(<ServicesPage />);
+    await screen.findByText('موتور جستجوی پرواز');
+    expect(screen.queryByText('سامانه پیامک (SMS)')).not.toBeInTheDocument();
   });
 });
