@@ -29,7 +29,7 @@ frontend work (tasks #15–16) hasn't started yet.
 
 ### Suspension
 - [x] `PATCH /agencies/:id/suspend` without a `reason` → 400 — `'PATCH suspend without a reason -> 400'`
-- [ ] A suspended agency's own booking/search endpoints (once the agency-portal track exists) would reject — out of scope to test here, but `suspendedAt` is set correctly and visible in the detail response
+- [x] A suspended agency's own booking/search endpoints (once the agency-portal track exists) would reject — closed now that the agency-portal track has landed: `backend/test/agency-portal.e2e-spec.ts: 'POST /auth/agency/login: 403 when the agency is suspended'`. Enforcement is at login/refresh (a suspended agency can never obtain a new access token), the same point every other role's `isActive`/`suspendedAt` check is enforced at (`JwtStrategy.validate()` only decodes the token, it never re-queries the DB per request) — consistent with the rest of the system's session model, not a gap specific to agencies.
 - [x] `PATCH /agencies/:id/reactivate` clears `suspendedAt`/`suspendReason` — `'PATCH reactivate clears suspendedAt/suspendReason'`
 
 ### Membership requests

@@ -406,6 +406,23 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   submits successfully and navigates to `/panel`, and surfaces a rejected-
   code server error inline. No backend/schema change. See
   `docs/features/panel-shell-dashboard.md`'s updated checklist.
+- [x] **Phase 33 — close a stale Phase 3 checklist item (agencies.md)** —
+  documentation-only, no code change. `docs/features/agencies.md` had one
+  item unchecked since Phase 3: "a suspended agency's own booking/search
+  endpoints (once the agency-portal track exists) would reject." That
+  condition is now met — the Agency Portal track landed later in this
+  session — and the behavior is already implemented and already proven:
+  `backend/test/agency-portal.e2e-spec.ts`'s `'POST /auth/agency/login:
+  403 when the agency is suspended'` test. Checked off with a note on
+  where enforcement actually sits: login/refresh time (a suspended agency
+  can never obtain a new access token), the same point every role's
+  active-status check is enforced at — `JwtStrategy.validate()` only
+  decodes the token and never re-queries the DB per request, so this
+  matches the rest of the system's session model rather than being an
+  agency-specific gap. With this, every unchecked item across
+  `docs/features/*.md` is now either checked or explicitly decision-gated
+  (only the Phase 1 visual-regression item remains, and it needs a
+  tooling choice, not more test-writing).
 
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is
