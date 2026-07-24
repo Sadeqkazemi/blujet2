@@ -1597,3 +1597,9 @@ and existing `EmployeePermission` grants (`Permission` rows for
 docs/API.md's Phase 27 section for the full endpoint list, the
 reachability fix, and the explicit `fn_invoices`/`FinancePage.tsx` scope
 decision.
+
+## Phase 28 — IT Manager external-service «تنظیمات» edit modal
+
+No schema change. Frontend-only: wires an already-implemented, already
+e2e-tested backend endpoint (`PATCH /it/services/external/:id`) into
+`ServicesPage.tsx` — see docs/API.md's Phase 28 section.
