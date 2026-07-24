@@ -383,6 +383,128 @@ describe('Cartable + referrals + messages (e2e)', () => {
     expect(late.status).toBe(409);
   });
 
+  // ── Attachments (Phase 29 — resolve raw StoredFile ids into metadata) ──
+  const PNG_BYTES = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+    'base64',
+  );
+
+  it('a referral created with attachmentIds resolves real fileName/mimeType/sizeBytes in list() and detail(); myReferrals() resolves it for the recipient too', async () => {
+    const senior = await loginAs(app, 'senior.rahimi');
+    const financeId = await userId('finance.karimi');
+
+    const uploaded = await request(app.getHttpServer())
+      .post('/files')
+      .set('Authorization', `Bearer ${senior.accessToken}`)
+      .attach('file', PNG_BYTES, {
+        filename: 'مدرک.png',
+        contentType: 'image/png',
+      });
+    const fileId = uploaded.body.data.id as string;
+
+    const created = await request(app.getHttpServer())
+      .post('/referrals')
+      .set('Authorization', `Bearer ${senior.accessToken}`)
+      .send({
+        title: 'با پیوست',
+        body: 'شرح',
+        recipientIds: [financeId],
+        attachmentIds: [fileId],
+      });
+    expect(created.status).toBe(201);
+    const referralId = created.body.data.id as string;
+
+    const list = await request(app.getHttpServer())
+      .get('/referrals')
+      .set('Authorization', `Bearer ${senior.accessToken}`);
+    const listed = (
+      list.body.data.referrals as {
+        id: string;
+        attachments: { id: string; fileName: string }[];
+      }[]
+    ).find((r) => r.id === referralId)!;
+    expect(listed.attachments).toEqual([
+      expect.objectContaining({
+        id: fileId,
+        fileName: 'مدرک.png',
+        mimeType: 'image/png',
+        sizeBytes: expect.any(Number),
+      }),
+    ]);
+
+    const detail = await request(app.getHttpServer())
+      .get(`/referrals/${referralId}`)
+      .set('Authorization', `Bearer ${senior.accessToken}`);
+    expect(detail.body.data.attachments).toEqual([
+      expect.objectContaining({ id: fileId, fileName: 'مدرک.png' }),
+    ]);
+
+    const finance = await loginAs(app, 'finance.karimi');
+    const mine = await request(app.getHttpServer())
+      .get('/referrals/mine')
+      .set('Authorization', `Bearer ${finance.accessToken}`);
+    const mineRow = (
+      mine.body.data.referrals as {
+        id: string;
+        attachments: { id: string; fileName: string }[];
+      }[]
+    ).find((r) => r.id === referralId)!;
+    expect(mineRow.attachments).toEqual([
+      expect.objectContaining({ id: fileId, fileName: 'مدرک.png' }),
+    ]);
+  });
+
+  it('a report submitted with attachmentIds resolves real metadata inside detail().reports', async () => {
+    const senior = await loginAs(app, 'senior.rahimi');
+    const financeId = await userId('finance.karimi');
+    const created = await request(app.getHttpServer())
+      .post('/referrals')
+      .set('Authorization', `Bearer ${senior.accessToken}`)
+      .send({
+        title: 'گزارش با پیوست',
+        body: 'شرح',
+        recipientIds: [financeId],
+      });
+    const referralId = created.body.data.id as string;
+
+    const finance = await loginAs(app, 'finance.karimi');
+    const uploaded = await request(app.getHttpServer())
+      .post('/files')
+      .set('Authorization', `Bearer ${finance.accessToken}`)
+      .attach('file', PNG_BYTES, {
+        filename: 'گزارش.png',
+        contentType: 'image/png',
+      });
+    const fileId = uploaded.body.data.id as string;
+
+    await request(app.getHttpServer())
+      .post(`/referrals/${referralId}/reports`)
+      .set('Authorization', `Bearer ${finance.accessToken}`)
+      .send({ body: 'گزارش آماده است', attachmentIds: [fileId] });
+
+    const detail = await request(app.getHttpServer())
+      .get(`/referrals/${referralId}`)
+      .set('Authorization', `Bearer ${senior.accessToken}`);
+    expect(detail.body.data.reports[0].attachments).toEqual([
+      expect.objectContaining({ id: fileId, fileName: 'گزارش.png' }),
+    ]);
+  });
+
+  it('a referral with no attachments resolves to an empty array, not null/undefined', async () => {
+    const senior = await loginAs(app, 'senior.rahimi');
+    const financeId = await userId('finance.karimi');
+    const created = await request(app.getHttpServer())
+      .post('/referrals')
+      .set('Authorization', `Bearer ${senior.accessToken}`)
+      .send({ title: 'بدون پیوست', body: 'شرح', recipientIds: [financeId] });
+    const referralId = created.body.data.id as string;
+
+    const detail = await request(app.getHttpServer())
+      .get(`/referrals/${referralId}`)
+      .set('Authorization', `Bearer ${senior.accessToken}`);
+    expect(detail.body.data.attachments).toEqual([]);
+  });
+
   // ── GET /referrals/mine (Phase 26 — recipient-side listing) ────────────
 
   it('GET /referrals/mine returns only referrals where the caller is a recipient, not ones they sent', async () => {

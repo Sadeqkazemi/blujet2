@@ -12,8 +12,11 @@ import { faDigits } from '../../lib/fa-format';
 import { formatJalaliDate } from '../../lib/jalali';
 import { parseJalaliDateToIso } from '../../lib/jalali';
 import Modal from '../../components/Modal';
+import AttachmentPicker from '../../components/AttachmentPicker';
+import AttachmentList from '../../components/AttachmentList';
 import type {
   Referral,
+  ReferralAttachment,
   ReferralListResult,
   ReferralPriority,
   ReferralReport,
@@ -45,6 +48,7 @@ export default function ReferralsPage() {
   const [priority, setPriority] = useState<ReferralPriority>('MEDIUM');
   const [due, setDue] = useState('');
   const [createError, setCreateError] = useState<string | null>(null);
+  const [createAttachments, setCreateAttachments] = useState<ReferralAttachment[]>([]);
 
   const load = useCallback(async () => {
     setError(null);
@@ -91,7 +95,14 @@ export default function ReferralsPage() {
       dueAt = iso;
     }
     try {
-      await createReferral({ title: title.trim(), body: body.trim(), recipientIds: recipients, priority, dueAt });
+      await createReferral({
+        title: title.trim(),
+        body: body.trim(),
+        recipientIds: recipients,
+        priority,
+        dueAt,
+        attachmentIds: createAttachments.map((a) => a.id),
+      });
       const names = staff.filter((s) => recipients.includes(s.id)).map((s) => s.fullName).join('، ');
       setNotice(`ارجاع به «${names}» ارسال شد ✓`);
       setCreateOpen(false);
@@ -99,6 +110,7 @@ export default function ReferralsPage() {
       setBody('');
       setRecipients([]);
       setDue('');
+      setCreateAttachments([]);
       await load();
     } catch (e) {
       setCreateError(e instanceof Error ? e.message : 'خطا در ایجاد ارجاع.');
@@ -157,6 +169,7 @@ export default function ReferralsPage() {
         <section className="rounded-xl border border-border bg-white p-5">
           <h2 className="mb-2 text-sm font-bold text-ink">شرح درخواست</h2>
           <p className="text-xs leading-relaxed text-text-2">{detail.body}</p>
+          <AttachmentList attachments={detail.attachments} variant="neutral" />
         </section>
 
         <section className="rounded-xl border border-border bg-white p-5">
@@ -174,6 +187,7 @@ export default function ReferralsPage() {
                     <span className="font-num text-muted-2">{formatJalaliDate(r.createdAt)}</span>
                   </div>
                   <p className="mt-1.5 text-xs leading-relaxed text-text-2">{r.body}</p>
+                  <AttachmentList attachments={r.attachments} variant="success" />
                 </li>
               ))}
             </ul>
@@ -225,6 +239,7 @@ export default function ReferralsPage() {
         <button
           onClick={() => {
             setCreateError(null);
+            setCreateAttachments([]);
             setCreateOpen(true);
           }}
           className="rounded-lg bg-accent px-4 py-2 text-xs font-bold text-white transition hover:bg-accent/90"
@@ -370,6 +385,9 @@ export default function ReferralsPage() {
               />
             </div>
           </div>
+
+          <label className="mb-1 mt-3 block text-xs font-bold text-ink">بارگذاری مستندات (PDF یا تصویر)</label>
+          <AttachmentPicker value={createAttachments} onChange={setCreateAttachments} />
 
           {createError && (
             <p role="alert" className="mt-2 text-xs text-danger">
