@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AccountPage from './AccountPage';
 import * as useAuthModule from '../../hooks/useAuth';
 import * as publicSiteApi from '../../api/publicSite';
-import type { BookingDetail, RefundRequestView, UserProfile } from '../../types/public-site';
+import type { BookingDetail, PriceLock, RefundRequestView, UserProfile } from '../../types/public-site';
 
 const BOOKING: BookingDetail = {
   id: 'b1',
@@ -20,6 +20,7 @@ const BOOKING: BookingDetail = {
   destCode: 'MHD',
   departureAt: '2026-08-01T05:00:00.000Z',
   arrivalAt: '2026-08-01T06:30:00.000Z',
+  isPriceLocked: false,
   passengers: [{ fullName: 'نگار رضایی', seatCode: '12A' }],
 };
 
@@ -32,6 +33,19 @@ const REFUND: RefundRequestView = {
   refundableIrr: 11_200_000,
   totalPaidIrr: 16_000_000,
   createdAt: '2026-07-01T00:00:00.000Z',
+};
+
+const LOCK: PriceLock = {
+  id: 'pl-1',
+  flightInstanceId: 'fi-2',
+  cabin: 'BUSINESS',
+  lockedPriceIrr: 680_000_000,
+  feeIrr: 2_040_000,
+  status: 'ACTIVE',
+  expiresAt: '2026-08-04T05:00:00.000Z',
+  createdAt: '2026-08-01T00:00:00.000Z',
+  bookingId: null,
+  flight: { flightNo: 'BJ-200', originCode: 'THR', destCode: 'IFN', departureAt: '2026-08-01T09:00:00.000Z' },
 };
 
 const PROFILE: UserProfile = {
@@ -69,6 +83,7 @@ beforeEach(() => {
   vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({ isMember: true, level: 'GOLD', balance: 12450 });
   vi.spyOn(publicSiteApi, 'fetchMyRefunds').mockResolvedValue([REFUND]);
   vi.spyOn(publicSiteApi, 'fetchMyProfile').mockResolvedValue(PROFILE);
+  vi.spyOn(publicSiteApi, 'fetchMyPriceLocks').mockResolvedValue([]);
 });
 
 describe('AccountPage', () => {
@@ -171,5 +186,53 @@ describe('AccountPage', () => {
 
     await vi.waitFor(() => expect(deleteSpy).toHaveBeenCalled());
     expect(signOut).toHaveBeenCalled();
+  });
+
+  it('shows the price-locked badge on a trip whose booking used a lock', async () => {
+    mockAuth('authenticated');
+    vi.spyOn(publicSiteApi, 'fetchMyBookings').mockResolvedValue([{ ...BOOKING, isPriceLocked: true }]);
+    renderPage();
+    expect(await screen.findByTestId('trip-price-locked-badge')).toBeInTheDocument();
+  });
+
+  it('switches to the price-locks tab and lists a real lock with its route, price, fee, and cancel action', async () => {
+    mockAuth('authenticated');
+    vi.spyOn(publicSiteApi, 'fetchMyPriceLocks').mockResolvedValue([LOCK]);
+    renderPage();
+    await userEvent.click(screen.getByTestId('account-tab-price-locks'));
+
+    const row = await screen.findByTestId('account-price-lock');
+    expect(row).toHaveTextContent('THR');
+    expect(row).toHaveTextContent('IFN');
+    expect(row).toHaveTextContent('۶۸٬۰۰۰٬۰۰۰');
+    expect(row).toHaveTextContent('۲۰۴٬۰۰۰');
+    expect(screen.getByTestId('cancel-price-lock-pl-1')).toBeInTheDocument();
+  });
+
+  it('cancelling an active price lock updates its status in place', async () => {
+    mockAuth('authenticated');
+    vi.spyOn(publicSiteApi, 'fetchMyPriceLocks').mockResolvedValue([LOCK]);
+    const cancel = vi.spyOn(publicSiteApi, 'cancelPriceLock').mockResolvedValue({ ...LOCK, status: 'CANCELLED' });
+    renderPage();
+    await userEvent.click(screen.getByTestId('account-tab-price-locks'));
+    await screen.findByTestId('account-price-lock');
+
+    await userEvent.click(screen.getByTestId('cancel-price-lock-pl-1'));
+
+    expect(cancel).toHaveBeenCalledWith('pl-1');
+    await vi.waitFor(() => expect(screen.getByTestId('account-price-lock')).toHaveTextContent('لغو شده'));
+    expect(screen.queryByTestId('cancel-price-lock-pl-1')).not.toBeInTheDocument();
+  });
+
+  it('tops up the wallet using Persian-digit input, converting toman to rial correctly (regression: raw Number()*10 silently produced NaN)', async () => {
+    mockAuth('authenticated');
+    const topup = vi.spyOn(publicSiteApi, 'topupWallet').mockResolvedValue({ balanceIrr: 5_000_000 });
+    renderPage();
+    await userEvent.click(screen.getByTestId('account-tab-wallet'));
+
+    await userEvent.type(screen.getByTestId('wallet-topup-amount'), '۵۰۰٬۰۰۰');
+    await userEvent.click(screen.getByTestId('wallet-topup-submit'));
+
+    await vi.waitFor(() => expect(topup).toHaveBeenCalledWith(5_000_000));
   });
 });
