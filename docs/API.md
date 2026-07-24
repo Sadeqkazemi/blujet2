@@ -1588,3 +1588,19 @@ a naive `!!booking.priceLock` read the pre-claim snapshot and was always
 from `usableLock` (already resolved earlier in the method, before the
 transaction starts) instead of trusting the post-transaction relation
 snapshot.
+
+## Phase 35 — صف مغایرت‌های پرداخت: frontend closure (retroactive docs)
+
+`GET /reconciliation` / `PATCH /reconciliation/:id/resolve`
+(`backend/src/modules/reconciliation/`, `FINANCE_MANAGER` only) shipped in
+Phase 13 Part E — see that section above for the endpoints' own request/
+response shapes and reasoning — but never got a frontend surface or a
+dedicated docs/API.md mention of its own until now. Found via a systematic
+audit cross-referencing every backend controller route against every
+frontend `api/*.ts` caller (prompted after Phase 34 turned up a similar
+gap for wallet/price-lock) — of everything that audit could check before
+it was interrupted, this was the one confirmed genuine, non-deferred,
+non-internal gap. No backend change; `FinancePage.tsx`'s finance-ops view
+gained a «صف مغایرت‌های پرداخت» card (list + resolve-with-note action) —
+see `docs/features/finance-reports.md`'s Phase 35 section for the full
+checklist.

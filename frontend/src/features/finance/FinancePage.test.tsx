@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import FinancePage from './FinancePage';
 import * as reportingApi from '../../api/reporting';
 import * as agenciesApi from '../../api/agencies';
+import * as reconciliationApi from '../../api/reconciliation';
 import * as useAuthModule from '../../hooks/useAuth';
 import type { Role } from '../../types/auth';
 import type {
@@ -13,6 +14,7 @@ import type {
   RecentTransactionsResult,
   RevenueMixResult,
 } from '../../types/reporting';
+import type { ReconciliationItem } from '../../types/reconciliation';
 
 const KPIS: KpiResult = {
   revenueIrr: 5_000_000_000,
@@ -70,6 +72,15 @@ const SETTLEMENTS: AgencySettlementsResult = {
   ],
 };
 
+const RECONCILIATION_ITEM: ReconciliationItem = {
+  id: 'rc1',
+  pnr: 'BJ9K2L',
+  bookingStatus: 'HELD',
+  gatewayRefId: 'GW-88213',
+  amountIrr: 420_000_000,
+  createdAt: '2026-07-12T09:00:00.000Z',
+};
+
 function mockRole(role: Role) {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status: 'authenticated',
@@ -90,6 +101,7 @@ describe('FinancePage', () => {
     vi.spyOn(reportingApi, 'fetchRecentTransactions').mockResolvedValue(TX);
     vi.spyOn(reportingApi, 'fetchRevenueMix').mockResolvedValue(MIX);
     vi.spyOn(reportingApi, 'fetchAgencySettlements').mockResolvedValue(SETTLEMENTS);
+    vi.spyOn(reconciliationApi, 'fetchReconciliationQueue').mockResolvedValue([]);
     const remindSpy = vi.spyOn(agenciesApi, 'remindAgencyInvoice').mockResolvedValue({ queued: true });
 
     render(<FinancePage />);
@@ -97,10 +109,43 @@ describe('FinancePage', () => {
     expect(screen.getByText('تسویه حساب')).toBeInTheDocument();
     expect(screen.getByText('تسویه‌حساب آژانس‌های همکار')).toBeInTheDocument();
     expect(screen.getByText(/معوق — ۴۲ روز/)).toBeInTheDocument();
+    expect(screen.getByText('موردی برای بررسی وجود ندارد.')).toBeInTheDocument();
 
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'ارسال یادآوری' }));
     await waitFor(() => expect(remindSpy).toHaveBeenCalledWith('ag1', 'inv3'));
+  });
+
+  it('shows the payment-reconciliation queue and resolves an item with a required note', async () => {
+    mockRole('FINANCE_MANAGER');
+    vi.spyOn(reportingApi, 'fetchKpis').mockResolvedValue(KPIS);
+    vi.spyOn(reportingApi, 'fetchLowSalesAlerts').mockResolvedValue([]);
+    vi.spyOn(reportingApi, 'fetchCompletedFlightsSummary').mockResolvedValue(FLIGHTS);
+    vi.spyOn(reportingApi, 'fetchRecentTransactions').mockResolvedValue(TX);
+    vi.spyOn(reportingApi, 'fetchRevenueMix').mockResolvedValue(MIX);
+    vi.spyOn(reportingApi, 'fetchAgencySettlements').mockResolvedValue(SETTLEMENTS);
+    vi.spyOn(reconciliationApi, 'fetchReconciliationQueue').mockResolvedValue([RECONCILIATION_ITEM]);
+    const resolveSpy = vi
+      .spyOn(reconciliationApi, 'resolveReconciliation')
+      .mockResolvedValue({ ...RECONCILIATION_ITEM, bookingStatus: 'TICKETED' });
+
+    render(<FinancePage />);
+    expect(await screen.findByTestId('reconciliation-item')).toHaveTextContent('BJ9K2L');
+    expect(screen.getByTestId('reconciliation-item')).toHaveTextContent('GW-88213');
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'رفع مغایرت' }));
+
+    // an empty/too-short note is rejected client-side, without calling the API
+    await user.click(screen.getByRole('button', { name: 'ثبت رفع مغایرت' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('حداقل ۳ نویسه');
+    expect(resolveSpy).not.toHaveBeenCalled();
+
+    await user.type(screen.getByTestId('reconciliation-note'), 'بلیط دستی صادر شد.');
+    await user.click(screen.getByRole('button', { name: 'ثبت رفع مغایرت' }));
+
+    await waitFor(() => expect(resolveSpy).toHaveBeenCalledWith('rc1', 'بلیط دستی صادر شد.'));
+    await waitFor(() => expect(screen.queryByTestId('reconciliation-item')).not.toBeInTheDocument());
   });
 
   it('CEO gets the analytic view: sales chart + revenue mix, no transactions/settlements', async () => {
