@@ -139,6 +139,14 @@ export class SeatmapService {
       flightInstanceId,
       aircraftType: resolveAircraftType(instance),
       rows: Array.from(rowsMap.values()).sort((a, b) => a.row - b.row),
+      // CLAUDE.md: "seat map config lives per aircraft type in the DB, not
+      // hardcoded" — the aisle gap position varies by cabin layout (e.g.
+      // business 2-2 vs economy 2-3), so the frontend renders it from
+      // this instead of assuming a fixed seat index.
+      cabinLayout: {
+        BUSINESS: { aisleAfterIndex: map.businessColsLeft.length },
+        ECONOMY: { aisleAfterIndex: map.economyColsLeft.length },
+      },
       capacity: seats.length,
       soldCount: soldCodes.size,
       lockedCount: activeLocks.length,

@@ -16,6 +16,7 @@ export interface SeatMap {
   flightInstanceId: string;
   aircraftType: string;
   rows: SeatRow[];
+  cabinLayout: Record<'BUSINESS' | 'ECONOMY', { aisleAfterIndex: number }>;
   capacity: number;
   soldCount: number;
   lockedCount: number;
