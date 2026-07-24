@@ -1329,3 +1329,70 @@ for the recipient side — not just for EMPLOYEE.
   reporting; no forwarding) is used instead, matching this codebase's
   "never invent parallel logic the real backend doesn't support"
   convention.
+
+## Phase 27 — EMPLOYEE write/financial access: fl_manage + ag_settle + fn_invoices
+
+Prior phases (18, 26) left EMPLOYEE with only read-only or personally-
+addressed access (`fl_view`, `ag_list`/`ag_info`/`ag_requests`, referrals).
+The remaining unwired `PERMISSION_CATALOG` keys were left unwired
+deliberately as a security decision ("no unjustified financial-write
+expansion" — see prior `PANEL_NAV`/`EMPLOYEE_SECTION_NAV` notes), not an
+oversight. This phase widens exactly the three keys the product owner
+explicitly authorized (`fl_manage` + `ag_settle` + `fn_invoices`); the
+remaining IT-dept keys (`us_manage`, `sv_control`, `sc_manage`, `lg_view`)
+stay out of scope and unwired pending a separate decision.
+
+- **`fl_manage`** (catalog dept `commercial`) — `@RequiresPermission('fl_manage')`
+  added (alongside the existing `SENIOR_MANAGER`/`COMMERCIAL_MANAGER` roles,
+  now also `EMPLOYEE`) to every flights write endpoint: `POST /flights`,
+  `POST /flights/schedules`, `POST /flights/ai-analysis`,
+  `PATCH /flights/:instanceId/plan`, `PATCH /flights/:instanceId/aircraft`
+  (step-up unaffected), `POST/PATCH/DELETE /flights/:instanceId/fare-rules[/:ruleId]`,
+  `POST /flights/:instanceId/allotments`. Read endpoints stay on `fl_view`
+  as before.
+- **`ag_settle`** (catalog dept `finance`) — `POST /agencies/:id/settle` now
+  also accepts `EMPLOYEE` + `RequiresPermission('ag_settle')`.
+- **`fn_invoices`** (catalog dept `finance`) — `GET /agencies/:id/invoices`,
+  `PATCH /agencies/:id/invoices/:invoiceId/pay`,
+  `POST /agencies/:id/invoices/:invoiceId/remind` now also accept
+  `EMPLOYEE` + `RequiresPermission('fn_invoices')`. `POST /agencies/:id/invoices`
+  (issuing) deliberately stays `COMMERCIAL_MANAGER`-only — issuing is not
+  part of `fn_invoices`'s catalog label ("مشاهده و مدیریت فاکتورها" scopes
+  to viewing/settling existing invoices, not creating new ones).
+- **Reachability fix**: `GET /agencies` and `GET /agencies/:id` widened to
+  `@RequiresPermission('ag_list'|'ag_info', 'ag_settle', 'fn_invoices')` (any
+  one). Without this, an EMPLOYEE granted only `ag_settle` or only
+  `fn_invoices` (no `ag_list`/`ag_info`) could never load the list or a
+  specific agency's detail page to reach the action they were granted —
+  a "permission granted but functionally unreachable" bug caught during
+  this phase's own design review.
+- **`fl_manage`/`ag_settle` per-employee dept constraint**: `fl_manage` is
+  a `commercial`-dept catalog key while `ag_settle`/`fn_invoices` are
+  `finance`-dept; `EmployeesService.setPermission`/`.create` both resolve
+  grantable keys via `catalogDeptFor(employee.dept)`, which never changes
+  after creation — so a single EMPLOYEE can only ever hold keys from ONE
+  dept. This mirrors real org structure (a commercial-dept employee isn't
+  independently grantable finance permissions) and is not a bug; Phase 27's
+  e2e tests use two separate fixture employees accordingly.
+- `EMPLOYEE_SECTION_NAV.flights.wiredKeys` gains `fl_manage`;
+  `EMPLOYEE_SECTION_NAV.agencies.wiredKeys` gains `ag_settle` + `fn_invoices`.
+  `fn_invoices`'s real UI surface is the per-agency invoice table on
+  `AgencyDetailPage` (reached via the `agencies` tab, same as `ag_settle`)
+  — **not** `FinancePage.tsx`'s `FINANCE_MANAGER`-only company-wide
+  revenue/profit/all-transactions dashboard, which was deliberately never
+  widened: that page's real UI surface is far broader than "view/manage
+  invoices," and granting it would be a genuine over-broad-access risk,
+  not a mechanical nav wiring.
+- Frontend: `AgencyDetailPage.tsx` gains an `isEmployee` branch — the
+  settle button (previously `isSenior || isFinance`) now also includes
+  `isEmployee`; the invoices table (previously rendered only inside the
+  `COMMERCIAL_MANAGER`-only tabbed layout) now also renders in the
+  non-tabbed overview branch EMPLOYEE uses, with the «صدور فاکتور» button
+  omitted (`action={isCommercial ? <button>… : undefined}`) since
+  `fn_invoices` never grants issuing. The invoices fetch for EMPLOYEE is
+  wrapped in its own try/catch: an EMPLOYEE reaching the page via
+  `ag_settle` alone (no `fn_invoices`) gets a real 403 on that fetch,
+  which is swallowed locally so it doesn't block the rest of the
+  (permitted) page — the invoices section then just renders empty, and
+  server-side authorization is still the real enforcement for any invoice
+  action.

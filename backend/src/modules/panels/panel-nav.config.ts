@@ -120,9 +120,17 @@ export const PANEL_ACCESS_TOGGLE_RIGHTS: Partial<Record<Role, string[]>> = {
  * the nav tab it unlocks and the exact catalog key(s) actually wired to
  * real backend access this phase — an employee only sees the tab if they
  * hold one of its wired keys, so a section that's in the catalog but not
- * yet wired (finance/fn_invoices, agencies/ag_settle, and the whole IT
- * dept: users/services/security/logs) never renders as a dead tab. See
- * Phase 18 notes in docs/DB_SCHEMA.md.
+ * yet wired (the whole IT dept: users/services/security/logs) never
+ * renders as a dead tab. See Phase 18 notes in docs/DB_SCHEMA.md;
+ * fl_manage/ag_settle/fn_invoices wired in Phase 27.
+ *
+ * fn_invoices' real UI surface is the per-agency invoice list on
+ * AgencyDetailPage (reached via the `agencies` tab, same as ag_settle) —
+ * NOT FinancePage.tsx's FINANCE_MANAGER-only company-wide financial
+ * dashboard (revenue/profit/all-transactions), which stays unwidened:
+ * fn_invoices's catalog label ("مشاهده و مدیریت فاکتورها") is scoped to
+ * invoices, and granting that full dashboard would be a real
+ * over-broad-access risk, not a mechanical nav wiring.
  */
 export const EMPLOYEE_SECTION_NAV: Record<
   string,
@@ -130,9 +138,15 @@ export const EMPLOYEE_SECTION_NAV: Record<
 > = {
   agencies: {
     labelFa: 'آژانس‌ها',
-    wiredKeys: ['ag_list', 'ag_requests', 'ag_info'],
+    wiredKeys: [
+      'ag_list',
+      'ag_requests',
+      'ag_info',
+      'ag_settle',
+      'fn_invoices',
+    ],
   },
-  flights: { labelFa: 'مدیریت پروازها', wiredKeys: ['fl_view'] },
+  flights: { labelFa: 'مدیریت پروازها', wiredKeys: ['fl_view', 'fl_manage'] },
   pricing: { labelFa: 'تعیین قیمت بلیط', wiredKeys: ['pr_propose'] },
   reports: { labelFa: 'گزارش مسافران', wiredKeys: ['rp_sales', 'rp_finance'] },
   refund: {
