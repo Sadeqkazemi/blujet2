@@ -232,7 +232,7 @@ is view-only on every endpoint below (403 on the write ones).
 
 | Method | Path | Roles | Notes |
 |---|---|---|---|
-| GET | `/reservation/seatmap/:flightInstanceId` | BOARD_CHAIR, SENIOR_MANAGER, IT_MANAGER, CEO | Computed from `AircraftSeatMap` (by the instance's `Flight.aircraftType`) + sold seats (`Passenger.seatCode` on non-CANCELLED bookings) + active `SeatLock`s. Returns `{ rows[], soldCount, lockedCount, capacity, occupancyPct }`; PII never included. |
+| GET | `/reservation/seatmap/:flightInstanceId` | BOARD_CHAIR, SENIOR_MANAGER, IT_MANAGER, CEO | Computed from `AircraftSeatMap` (by the instance's `Flight.aircraftType`) + sold seats (`Passenger.seatCode` on non-CANCELLED bookings) + active `SeatLock`s. Returns `{ rows[], cabinLayout, soldCount, lockedCount, capacity, occupancyPct }` (`cabinLayout` added Phase 30); PII never included. |
 | POST | `/reservation/seatmap/:flightInstanceId/lock` | canLock only | `{ seatCode, passengerName?, passengerNationalId?, passengerMobile? }` — 409 if the seat is already sold or actively locked (DB partial-unique-index-backed). PII encrypted+hashed like `ClubMember`. `AuditLog(category=RESERVATION)`. |
 | PATCH | `/reservation/seatmap/locks/:id/release` | canLock only | Any canLock role may release any active lock (the design's «×» chip shows no per-locker ownership filter). Sets `releasedAt`; 409 if already released. Audited. |
 | GET | `/reservation/pnr` | all 4 reservation roles | `q?` (PNR or passenger name). Grouped by flight instance, newest first — the design's «مدیریت رزروها» list. |
@@ -1448,3 +1448,26 @@ worked at the API level, but responses only ever returned the raw
   `ReferralsPage.tsx` (creation modal, detail view's request body and
   each report) and `MyReferralsPage.tsx` (report-submission form, detail
   view's request body).
+
+## Phase 30 — data-driven seat-map aisle gap rendering
+
+Closes the "seat map's exact aisle-gap rendering" deferral from Phase 9
+(`docs/features/reservation.md`). `AircraftSeatMap.{business,economy}
+ColsLeft/ColsRight` were already the real per-aircraft-type column-group
+config (CLAUDE.md: "seat map config lives per aircraft type in the DB,
+not hardcoded"), but `GET /reservation/seatmap/:flightInstanceId` never
+exposed it, and the frontend seat grid instead hardcoded the aisle gap
+at a fixed seat index — invisible only because the single seeded
+aircraft type happens to be business 2-2 / economy 2-3, which matches
+that fixed index by coincidence.
+
+- `SeatmapService.getSeatMap()` now returns `cabinLayout:
+  { BUSINESS: { aisleAfterIndex }, ECONOMY: { aisleAfterIndex } }`,
+  computed from `map.businessColsLeft.length` /
+  `map.economyColsLeft.length` for that flight instance's real aircraft
+  type (`resolveAircraftType`, so a `changeAircraftType` override is
+  respected same as everywhere else that reads aircraft type).
+- `ReservationPage.tsx`'s seat grid reads `aisleAfterIndex` per row's
+  cabin instead of the previous `idx === 1`.
+- No DTO/schema change — `AircraftSeatMap` already had the source data;
+  this only exposes and consumes it.

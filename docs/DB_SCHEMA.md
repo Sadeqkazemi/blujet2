@@ -1614,3 +1614,12 @@ fixes a pre-existing bug in `FilesService.store()` (non-ASCII filenames
 were stored as mojibake due to multer/busboy's default latin1 header
 decoding) — no schema impact, just a corrected `fileName` value on future
 uploads. See docs/API.md's Phase 29 section.
+
+## Phase 30 — data-driven seat-map aisle gap rendering
+
+No schema change. `AircraftSeatMap.{business,economy}ColsLeft/ColsRight`
+already existed since Phase 9 as the real per-aircraft-type column-group
+config; this phase only exposes `businessColsLeft.length`/
+`economyColsLeft.length` in `GET /reservation/seatmap/:flightInstanceId`'s
+response (as `cabinLayout`) and makes the frontend seat grid consume it
+instead of a hardcoded seat index. See docs/API.md's Phase 30 section.

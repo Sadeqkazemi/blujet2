@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import ReservationPage from './ReservationPage';
 import * as reservationApi from '../../api/reservation';
 import * as useAuthModule from '../../hooks/useAuth';
-import type { PnrDetail, PnrGroup, ReservationDashboardStats } from '../../types/reservation';
+import type { PnrDetail, PnrGroup, ReservationDashboardStats, SeatMap } from '../../types/reservation';
 import type { Role } from '../../types/auth';
 
 const GROUPS: PnrGroup[] = [
@@ -93,5 +93,57 @@ describe('ReservationPage', () => {
     await user.type(screen.getByPlaceholderText('جستجو با کد PNR یا نام مسافر…'), 'نگار');
 
     await waitFor(() => expect(listSpy).toHaveBeenCalledWith('نگار'));
+  });
+
+  it('renders the aisle gap from cabinLayout.aisleAfterIndex per row, not a fixed seat position', async () => {
+    mockRole('BOARD_CHAIR');
+    vi.spyOn(reservationApi, 'fetchReservationDashboardStats').mockResolvedValue(STATS);
+    vi.spyOn(reservationApi, 'fetchPnrList').mockResolvedValue(GROUPS);
+    // Deliberately non-2/2 splits — a component still assuming a fixed
+    // "gap after the 2nd seat" would place these wrong.
+    const seatMap: SeatMap = {
+      flightInstanceId: 'fi1',
+      aircraftType: 'CUSTOM',
+      cabinLayout: { BUSINESS: { aisleAfterIndex: 1 }, ECONOMY: { aisleAfterIndex: 3 } },
+      capacity: 9,
+      soldCount: 0,
+      lockedCount: 0,
+      occupancyPct: 0,
+      rows: [
+        {
+          row: 3,
+          cabin: 'BUSINESS',
+          seats: [
+            { seatCode: '3A', status: 'FREE', lockId: null },
+            { seatCode: '3B', status: 'FREE', lockId: null },
+            { seatCode: '3C', status: 'FREE', lockId: null },
+            { seatCode: '3D', status: 'FREE', lockId: null },
+          ],
+        },
+        {
+          row: 10,
+          cabin: 'ECONOMY',
+          seats: [
+            { seatCode: '10A', status: 'FREE', lockId: null },
+            { seatCode: '10B', status: 'FREE', lockId: null },
+            { seatCode: '10C', status: 'FREE', lockId: null },
+            { seatCode: '10D', status: 'FREE', lockId: null },
+            { seatCode: '10E', status: 'FREE', lockId: null },
+          ],
+        },
+      ],
+    };
+    vi.spyOn(reservationApi, 'fetchSeatMap').mockResolvedValue(seatMap);
+
+    render(<ReservationPage />);
+    await screen.findByText('نگار رضایی');
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'نقشهٔ صندلی EP-821' }));
+
+    const businessGap = await screen.findByTestId('aisle-gap-3');
+    expect(businessGap.parentElement!.querySelector('button')).toHaveAttribute('aria-label', '3A');
+
+    const economyGap = screen.getByTestId('aisle-gap-10');
+    expect(economyGap.parentElement!.querySelector('button')).toHaveAttribute('aria-label', '10C');
   });
 });
