@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { ApiRequestError } from '../../api/envelope';
@@ -18,8 +18,11 @@ export default function TwoFactorPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  useEffect(() => {
+    if (!challengeId) navigate('/login', { replace: true });
+  }, [challengeId, navigate]);
+
   if (!challengeId) {
-    navigate('/login', { replace: true });
     return null;
   }
 

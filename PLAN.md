@@ -385,6 +385,27 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   31 section. 11 new backend e2e tests
   (`phase31-employee-it-dept-permissions.e2e-spec.ts`). See
   `docs/DB_SCHEMA.md`/`docs/features/it-manager.md`'s Phase 31 additions.
+- [x] **Phase 32 — 2FA step component test + a real navigate-during-render
+  bug fix** — closes the one remaining no-decision mechanical item:
+  `docs/features/panel-shell-dashboard.md` had flagged since Phase 1 that
+  the staff 2FA step had E2E coverage (Playwright) but no isolated Vitest
+  component test. Writing the "not reachable before a password submit"
+  case (visiting the 2FA route directly, with no `challengeId` in location
+  state) surfaced a real bug per CLAUDE.md's debugging workflow ("reproduce
+  with a failing test first, then fix"): `TwoFactorPage.tsx` called
+  `navigate('/login')` directly during render instead of inside a
+  `useEffect`. React Router's own dev-mode guard ("You should call
+  navigate() in a React.useEffect()") silently drops such a call — so
+  in production, hitting `/login/2fa` directly (browser back/forward,
+  refresh, a stale bookmark) rendered a blank page instead of redirecting
+  to `/login`. Fixed by moving the guard into a `useEffect` keyed on
+  `challengeId`; functionally identical on the happy path (challengeId
+  present → renders exactly as before). 5 new frontend tests
+  (`TwoFactorPage.test.tsx`): renders with a challenge present, redirects
+  when absent, validates an incomplete code without calling the API,
+  submits successfully and navigates to `/panel`, and surfaces a rejected-
+  code server error inline. No backend/schema change. See
+  `docs/features/panel-shell-dashboard.md`'s updated checklist.
 
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is
