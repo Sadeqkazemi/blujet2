@@ -41,6 +41,30 @@ journeys).
 - [x] Frontend: unit tests per new page — 5 tests above
 - [x] Playwright: `'Finance Manager opens مالی and sees real transactions, revenue mix, and agency settlements'`, `'CEO opens مالی and gets the analytic view (no finance-ops sections)'`, `'Senior searches گزارش مسافران and sees the ticket card with a masked national ID'`, `'Finance Manager sees گزارش کارمندان with only its own dept employees'`, `'Role isolation: CEO has no گزارش مسافران/گزارش کارمندان nav entries'`
 
+### Phase 35 — صف مغایرت‌های پرداخت (payment-reconciliation queue)
+
+`GET /reconciliation` / `PATCH /reconciliation/:id/resolve` (`FINANCE_MANAGER`
+only) were built and e2e-tested in Phase 13 Part E but never got a
+frontend surface or a docs/API.md section of their own — found via an
+endpoint-vs-frontend-caller audit, not flagged in any prior phase's
+deferred list. No design mock exists for this screen either (it's a
+backend-only addition from a later phase, after the original design
+extraction) — a new, functionally-styled card, not a redesign of an
+existing one, same approach as other un-mocked backend-only controls
+added earlier in this project (e.g. Phase 13 Part A's aircraft-type
+change field).
+
+- [x] FINANCE_MANAGER's مالی tab shows a «صف مغایرت‌های پرداخت» card
+      listing every `PENDING` row (PNR, gateway ref, amount, date), with
+      an empty state when there are none — `FinancePage.test.tsx:
+      'FINANCE_MANAGER gets the finance-ops view...'` (empty-state
+      assertion) + `'shows the payment-reconciliation queue and resolves
+      an item with a required note'`
+- [x] Resolving requires a note (client-side validated to match the
+      backend's own `@MinLength(3)`, without a wasted API call for an
+      empty/too-short one) and removes the row from the list on success —
+      same test, both assertions
+
 ## Deferred (scoped out with reasons, not silently dropped)
 - Excel/PDF export buttons — mock-only toasts in the design, consistent with every prior phase's deferral.
 - The finance mock's `finMonths` income/expense chart — computed in the mock script but never rendered in any panel's markup (orphaned).
