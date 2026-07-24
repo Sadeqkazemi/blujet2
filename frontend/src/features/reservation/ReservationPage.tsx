@@ -497,26 +497,32 @@ function SeatMapView({
       </div>
 
       <div className="flex max-h-[480px] flex-col gap-2 overflow-auto">
-        {seatMap.rows.map((row) => (
-          <div key={row.row} className="flex items-center justify-center gap-1.5">
-            <span className="font-num w-6 text-center text-[10px] font-bold text-muted">{faDigits(row.row)}</span>
-            {row.seats.map((s, idx) => (
-              <span key={s.seatCode} className="flex items-center gap-1.5">
-                <button
-                  onClick={() => onSeatClick(s.seatCode, s.status)}
-                  disabled={s.status === 'SOLD' || !canLock}
-                  aria-label={s.seatCode}
-                  className={`ltr font-num flex h-7 w-7 items-center justify-center rounded border text-[9px] font-bold transition ${
-                    SEAT_STATUS_STYLE[s.status]
-                  } ${canLock && s.status !== 'SOLD' ? 'cursor-pointer' : 'cursor-default'}`}
-                >
-                  {s.seatCode.replace(String(row.row), '')}
-                </button>
-                {idx === 1 && <span className="w-3" />}
-              </span>
-            ))}
-          </div>
-        ))}
+        {seatMap.rows.map((row) => {
+          // Aisle position varies by cabin layout (e.g. business 2-2 vs
+          // economy 2-3) — read from the aircraft's real seat map config
+          // instead of assuming a fixed seat index.
+          const aisleAfterIndex = seatMap.cabinLayout[row.cabin].aisleAfterIndex;
+          return (
+            <div key={row.row} className="flex items-center justify-center gap-1.5">
+              <span className="font-num w-6 text-center text-[10px] font-bold text-muted">{faDigits(row.row)}</span>
+              {row.seats.map((s, idx) => (
+                <span key={s.seatCode} className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => onSeatClick(s.seatCode, s.status)}
+                    disabled={s.status === 'SOLD' || !canLock}
+                    aria-label={s.seatCode}
+                    className={`ltr font-num flex h-7 w-7 items-center justify-center rounded border text-[9px] font-bold transition ${
+                      SEAT_STATUS_STYLE[s.status]
+                    } ${canLock && s.status !== 'SOLD' ? 'cursor-pointer' : 'cursor-default'}`}
+                  >
+                    {s.seatCode.replace(String(row.row), '')}
+                  </button>
+                  {idx === aisleAfterIndex - 1 && <span data-testid={`aisle-gap-${row.row}`} className="w-3" />}
+                </span>
+              ))}
+            </div>
+          );
+        })}
       </div>
 
       {canLock && lockedChips.length > 0 && (

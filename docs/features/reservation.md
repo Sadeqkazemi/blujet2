@@ -52,9 +52,12 @@ seed's ambiguous historical/demo instances).
 - [x] SENIOR_MANAGER sees the seat map but has no lock/issue controls (view-only) — `'SENIOR_MANAGER sees the seat map read-only — no lock or issue controls'`
 - [x] Non-reservation role has no reservation nav entry — `'Non-reservation role has no reservation nav entry (role isolation)'`
 
+### Phase 30 — data-driven seat-map aisle gap
+- [x] `GET /reservation/seatmap/:id` returns `cabinLayout.{BUSINESS,ECONOMY}.aisleAfterIndex`, computed from that flight's real `AircraftSeatMap.{business,economy}ColsLeft.length` (via `resolveAircraftType`, so an aircraft-type override is respected) instead of the frontend assuming a fixed seat position — proven against both the seeded 2-2/2-3 config AND a distinct custom aircraft type with a reversed 3-2 economy split, so the test can't pass by coincidence — `backend/test/reservation.e2e-spec.ts: 'GET /reservation/seatmap/:id returns cabinLayout.aisleAfterIndex reflecting the real per-aircraft column split, not a fixed assumption'`
+- [x] `ReservationPage.tsx`'s seat grid renders the aisle gap at `cabinLayout[row.cabin].aisleAfterIndex` per row instead of the previous hardcoded `idx === 1` — proven with a non-2/2-2/3 fixture that a fixed-index component would place wrong — `ReservationPage.test.tsx: 'renders the aisle gap from cabinLayout.aisleAfterIndex per row, not a fixed seat position'`
+
 ### Deferred (scoped out with reasons, not silently dropped)
 - Ticket print/PDF generation — no «چاپ بلیط» button wired this phase; a real PDF pipeline needs the public-site track's e-ticket template.
-- Seat map's exact aisle-gap rendering (design shows a precise business-2-2/economy-2-3 gap position) — approximated as "gap after the 2nd seat" rather than reading the exact column-group split from the API response, to keep the seat grid component simple; visually close but not pixel-identical to the design.
 - Agency API access sub-tab — already covered by Phase 3's `AgencyApiKey`; not duplicated here.
 - Flight/schedule/capacity creation ("پروازها" sub-tab) — Phase 10's own scope.
 - The design's fabricated "microservices health" dashboard cards — replaced with real booking/seat/revenue stats instead (see `docs/DB_SCHEMA.md`'s Phase 9 note); not ported verbatim since no such infrastructure exists in this monolith.

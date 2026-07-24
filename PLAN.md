@@ -340,6 +340,25 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   wiring tests across the two referral pages). See `docs/API.md`/
   `docs/DB_SCHEMA.md`/`docs/features/cartable-referrals.md`'s Phase 29
   additions.
+- [x] **Phase 30 — data-driven seat-map aisle gap rendering** — closes
+  the last remaining low-risk deferral: `docs/features/reservation.md`
+  had flagged the seat grid's aisle gap as hardcoded at a fixed seat
+  index ("gap after the 2nd seat") rather than reading the exact
+  column-group split from the API. This directly contradicted CLAUDE.md's
+  own "seat map config lives per aircraft type in the DB, not hardcoded"
+  rule — `AircraftSeatMap.{business,economy}ColsLeft/ColsRight` already
+  held the real per-aircraft config since Phase 9, but
+  `GET /reservation/seatmap/:flightInstanceId` never exposed it, and the
+  bug was invisible only because the single seeded aircraft type (business
+  2-2, economy 2-3) happens to match the hardcoded assumption by
+  coincidence. Now the endpoint returns `cabinLayout.{BUSINESS,ECONOMY}
+  .aisleAfterIndex` and `ReservationPage.tsx`'s seat grid reads it per
+  row's cabin. Both new tests deliberately use a non-2/2-2/3 split (a
+  reversed 3-2 economy config in the backend test; a synthetic fixture in
+  the frontend test) so they can't pass by coincidence the way the
+  pre-existing hardcoding did. 1 new backend e2e test, 1 new frontend
+  test. See `docs/API.md`/`docs/DB_SCHEMA.md`/
+  `docs/features/reservation.md`'s Phase 30 additions.
 
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is
