@@ -10,6 +10,7 @@ import {
   fetchSalesChart,
 } from '../../api/reporting';
 import { remindAgencyInvoice } from '../../api/agencies';
+import { fetchReconciliationQueue, resolveReconciliation } from '../../api/reconciliation';
 import { faDigits, faMoney, faPercent } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
 import SalesBarChart from '../../components/SalesBarChart';
@@ -24,6 +25,7 @@ import type {
   SalesGranularity,
   SettlementStatus,
 } from '../../types/reporting';
+import type { ReconciliationItem } from '../../types/reconciliation';
 
 const CHART_MODES: { key: SalesGranularity; label: string }[] = [
   { key: 'q3', label: '۳ ماهه' },
@@ -130,6 +132,117 @@ function LowSalesBanner({ alerts }: { alerts: LowSalesAlert[] }) {
   );
 }
 
+/** صف مغایرت‌های پرداخت — no design mock exists for this (it's a Phase 13
+ * backend-only addition: a real "payment succeeded, ticket not issued"
+ * queue), so this is a new, functionally-styled card rather than a
+ * redesign of an existing one — same approach as other un-mocked
+ * backend-only controls added later in this project. */
+function ReconciliationQueueCard({
+  items,
+  onResolve,
+}: {
+  items: ReconciliationItem[];
+  onResolve: (id: string, note: string) => Promise<void>;
+}) {
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(id: string) {
+    if (note.trim().length < 3) {
+      setError('توضیح رفع مغایرت باید حداقل ۳ نویسه باشد.');
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    try {
+      await onResolve(id, note.trim());
+      setOpenId(null);
+      setNote('');
+    } catch {
+      setError('خطا در رفع مغایرت.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mb-6 rounded-xl border border-border bg-white p-5">
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <div className="text-sm font-bold text-ink">صف مغایرت‌های پرداخت</div>
+        <span className="rounded-full bg-danger/10 px-3 py-1 text-[11px] font-extrabold text-danger">
+          {faDigits(items.length)} مورد
+        </span>
+      </div>
+      <div className="mb-4 text-[11px] text-muted">
+        پرداخت‌هایی که با موفقیت انجام شده‌اند اما صدور بلیط آن‌ها کامل نشده است
+      </div>
+      {items.length === 0 && (
+        <p className="text-xs text-muted">موردی برای بررسی وجود ندارد.</p>
+      )}
+      <div className="flex flex-col gap-3">
+        {items.map((item) => (
+          <div
+            key={item.id}
+            data-testid="reconciliation-item"
+            className="rounded-xl border border-border/70 bg-body/50 px-4 py-3"
+          >
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="min-w-[110px] text-xs">
+                <div className="text-[9px] text-muted">کد رزرو</div>
+                <div className="font-num font-extrabold text-ink">{item.pnr}</div>
+              </div>
+              <div className="min-w-[110px] text-xs">
+                <div className="text-[9px] text-muted">شناسه درگاه</div>
+                <div className="font-num font-bold">{item.gatewayRefId}</div>
+              </div>
+              <div className="min-w-[110px] text-xs">
+                <div className="text-[9px] text-muted">مبلغ</div>
+                <div className="font-num font-bold">{faMoney(item.amountIrr)} تومان</div>
+              </div>
+              <div className="min-w-[110px] text-xs">
+                <div className="text-[9px] text-muted">تاریخ</div>
+                <div>{formatJalaliDateTime(item.createdAt)}</div>
+              </div>
+              <button
+                onClick={() => {
+                  setOpenId(openId === item.id ? null : item.id);
+                  setError(null);
+                  setNote('');
+                }}
+                className="mr-auto rounded-lg border border-accent/30 bg-accent/10 px-3 py-1.5 text-[11px] font-extrabold text-accent transition hover:bg-accent/20"
+              >
+                رفع مغایرت
+              </button>
+            </div>
+            {openId === item.id && (
+              <div className="mt-3 flex flex-col gap-2 border-t border-border/60 pt-3">
+                {error && <p role="alert" className="text-[11px] text-danger">{error}</p>}
+                <textarea
+                  data-testid="reconciliation-note"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="توضیح رفع مغایرت (مثلاً: بلیط دستی صادر و مغایرت رفع شد.)"
+                  className="w-full rounded-lg border border-border p-2 text-xs"
+                  rows={2}
+                />
+                <button
+                  disabled={busy}
+                  onClick={() => void submit(item.id)}
+                  className="self-start rounded-lg bg-accent px-4 py-1.5 text-[11px] font-extrabold text-white disabled:opacity-50"
+                >
+                  {busy ? 'در حال ثبت…' : 'ثبت رفع مغایرت'}
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** FINANCE_MANAGER's finance-ops layout — the only panel with transactions
  * and agency settlements, per the design. */
 function FinanceOpsView() {
@@ -139,6 +252,7 @@ function FinanceOpsView() {
   const [tx, setTx] = useState<RecentTransactionsResult | null>(null);
   const [mix, setMix] = useState<RevenueMixResult | null>(null);
   const [settlements, setSettlements] = useState<AgencySettlementsResult | null>(null);
+  const [reconciliation, setReconciliation] = useState<ReconciliationItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -150,19 +264,26 @@ function FinanceOpsView() {
       fetchRecentTransactions(),
       fetchRevenueMix({ granularity: 'year' }),
       fetchAgencySettlements(),
+      fetchReconciliationQueue(),
     ])
-      .then(([k, a, f, t, m, s]) => {
+      .then(([k, a, f, t, m, s, r]) => {
         setKpis(k);
         setAlerts(a);
         setFlights(f);
         setTx(t);
         setMix(m);
         setSettlements(s);
+        setReconciliation(r);
       })
       .catch(() => setError('خطا در دریافت اطلاعات مالی.'));
   }
 
   useEffect(reload, []);
+
+  async function onResolveReconciliation(id: string, note: string) {
+    await resolveReconciliation(id, note);
+    setReconciliation((prev) => (prev ? prev.filter((r) => r.id !== id) : prev));
+  }
 
   async function onRemind(agencyId: string, invoiceId: string, agencyName: string) {
     try {
@@ -174,7 +295,7 @@ function FinanceOpsView() {
   }
 
   if (error) return <p className="p-8 text-sm text-danger">{error}</p>;
-  if (!kpis || !flights || !tx || !mix || !settlements)
+  if (!kpis || !flights || !tx || !mix || !settlements || !reconciliation)
     return <p className="p-8 text-sm text-muted">در حال بارگذاری…</p>;
 
   const kpiCards = [
@@ -202,6 +323,8 @@ function FinanceOpsView() {
       </div>
 
       <LowSalesBanner alerts={alerts} />
+
+      <ReconciliationQueueCard items={reconciliation} onResolve={onResolveReconciliation} />
 
       <div className="mb-6">
         <CompletedFlightsCard flights={flights} />
