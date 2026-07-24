@@ -1603,3 +1603,14 @@ decision.
 No schema change. Frontend-only: wires an already-implemented, already
 e2e-tested backend endpoint (`PATCH /it/services/external/:id`) into
 `ServicesPage.tsx` — see docs/API.md's Phase 28 section.
+
+## Phase 29 — referral/report attachment upload + view UI
+
+No schema change. `ManagerReferral.attachments`/`ManagerReferralReport
+.attachments` (`Json?`, raw `StoredFile` id arrays) and `StoredFile` itself
+already existed since Phase 4 — this phase only resolves those ids into
+displayable metadata in read responses and adds the frontend surface. Also
+fixes a pre-existing bug in `FilesService.store()` (non-ASCII filenames
+were stored as mojibake due to multer/busboy's default latin1 header
+decoding) — no schema impact, just a corrected `fileName` value on future
+uploads. See docs/API.md's Phase 29 section.

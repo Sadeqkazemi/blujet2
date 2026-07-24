@@ -59,6 +59,23 @@ export function apiGet<T>(path: string): Promise<T> {
   return apiRequest<T>(path, { method: 'GET' });
 }
 
+/** For endpoints that return a raw file body (not the {success,data} JSON
+ * envelope) on success — errors still come back as the JSON envelope. */
+export async function apiGetBlob(path: string, retry = true): Promise<Blob> {
+  const res = await doFetch(path, { method: 'GET' });
+
+  if (res.status === 401 && retry) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) return apiGetBlob(path, false);
+  }
+
+  if (!res.ok) {
+    const body = (await res.json()) as ApiEnvelope<never>;
+    throw new ApiRequestError(body.error?.code ?? 'UNKNOWN', body.error?.message ?? 'خطای ناشناخته', res.status);
+  }
+  return res.blob();
+}
+
 export function apiPost<T>(path: string, body?: unknown): Promise<T> {
   return apiRequest<T>(path, { method: 'POST', body: body ? JSON.stringify(body) : undefined });
 }

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import MyReferralsPage from './MyReferralsPage';
 import * as cartableApi from '../../api/cartable';
+import * as filesApi from '../../api/files';
 import type { MyReferral, MyReferralListResult } from '../../types/cartable';
 
 afterEach(() => {
@@ -18,6 +19,7 @@ const REFERRAL: MyReferral = {
   dueAt: null,
   createdAt: '2026-07-01T00:00:00.000Z',
   from: { id: 'sm1', fullName: 'محمد رحیمی', role: 'SENIOR_MANAGER' },
+  attachments: [],
   hasMyReport: false,
 };
 
@@ -60,6 +62,7 @@ describe('MyReferralsPage', () => {
       dueAt: null,
       createdAt: REFERRAL.createdAt,
       recipients: [],
+      attachments: [],
     });
 
     render(<MyReferralsPage />);
@@ -69,7 +72,7 @@ describe('MyReferralsPage', () => {
     await userEvent.type(screen.getByTestId('referral-report-body'), 'گزارش من آماده است.');
     await userEvent.click(screen.getByRole('button', { name: 'ثبت گزارش' }));
 
-    expect(submitSpy).toHaveBeenCalledWith('r1', 'گزارش من آماده است.');
+    expect(submitSpy).toHaveBeenCalledWith('r1', 'گزارش من آماده است.', []);
     expect(await screen.findByText('گزارش شما ثبت شد ✓')).toBeInTheDocument();
   });
 
@@ -92,5 +95,48 @@ describe('MyReferralsPage', () => {
     await userEvent.click(await screen.findByTestId('my-referral-r1'));
     expect(await screen.findByText('این ارجاع بسته شده است.')).toBeInTheDocument();
     expect(screen.queryByTestId('referral-report-body')).not.toBeInTheDocument();
+  });
+
+  it('shows the sender’s attachments on the request as clickable download chips', async () => {
+    mockList([
+      {
+        ...REFERRAL,
+        attachments: [{ id: 'a1', fileName: 'اصل-درخواست.pdf', mimeType: 'application/pdf', sizeBytes: 2048 }],
+      },
+    ]);
+    const downloadSpy = vi.spyOn(filesApi, 'downloadFile').mockResolvedValue(undefined);
+
+    render(<MyReferralsPage />);
+    await userEvent.click(await screen.findByTestId('my-referral-r1'));
+
+    await userEvent.click(await screen.findByRole('button', { name: 'اصل-درخواست.pdf' }));
+    expect(downloadSpy).toHaveBeenCalledWith('a1', 'اصل-درخواست.pdf');
+  });
+
+  it('uploading a document in the report form sends its id as attachmentIds', async () => {
+    mockList([REFERRAL]);
+    vi.spyOn(filesApi, 'uploadFile').mockResolvedValue({ id: 'f1', fileName: 'گزارش.png', sizeBytes: 256 });
+    const submitSpy = vi.spyOn(cartableApi, 'submitReferralReport').mockResolvedValue({
+      id: 'r1',
+      title: REFERRAL.title,
+      body: REFERRAL.body,
+      priority: 'HIGH',
+      status: 'REPORTED',
+      dueAt: null,
+      createdAt: REFERRAL.createdAt,
+      recipients: [],
+      attachments: [],
+    });
+
+    render(<MyReferralsPage />);
+    await userEvent.click(await screen.findByTestId('my-referral-r1'));
+    await userEvent.type(screen.getByTestId('referral-report-body'), 'گزارش من آماده است.');
+
+    const input = screen.getByLabelText('افزودن سند', { selector: 'input' }) as HTMLInputElement;
+    await userEvent.upload(input, new File(['x'], 'گزارش.png', { type: 'image/png' }));
+    expect(await screen.findByText('گزارش.png')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'ثبت گزارش' }));
+    expect(submitSpy).toHaveBeenCalledWith('r1', 'گزارش من آماده است.', ['f1']);
   });
 });
