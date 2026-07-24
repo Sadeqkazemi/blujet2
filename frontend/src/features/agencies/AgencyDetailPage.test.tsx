@@ -135,6 +135,50 @@ describe('AgencyDetailPage', () => {
     expect(screen.getByRole('button', { name: 'ارسال' })).toBeInTheDocument();
   });
 
+  it('EMPLOYEE with fn_invoices sees credit/settle + the invoices table (no صدور فاکتور button, no API-key/messages)', async () => {
+    mockRole('EMPLOYEE');
+    vi.spyOn(agenciesApi, 'fetchAgencyDetail').mockResolvedValue(DETAIL);
+    vi.spyOn(agenciesApi, 'fetchAgencyInvoices').mockResolvedValue([
+      {
+        id: 'inv1',
+        agencyId: 'a1',
+        invoiceNo: 'INV-1002',
+        issuedById: 'u9',
+        issuedAt: '2026-06-20T00:00:00.000Z',
+        dueAt: '2026-07-05T00:00:00.000Z',
+        amountIrr: 800_000_000,
+        status: 'UNPAID',
+        paidAt: null,
+      },
+    ]);
+
+    renderPage();
+
+    expect(await screen.findByText('اعتبار آژانس')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'ثبت تسویه' })).toBeInTheDocument();
+    expect(await screen.findByText('فاکتورهای صادرشده')).toBeInTheDocument();
+    expect(screen.getByText('INV-1002')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'یادآوری' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'ثبت پرداخت این فاکتور' })).toBeInTheDocument();
+
+    expect(screen.queryByRole('button', { name: 'صدور فاکتور' })).not.toBeInTheDocument();
+    expect(screen.queryByText('دسترسی API رزرواسیون')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'مکاتبه‌ها' })).not.toBeInTheDocument();
+  });
+
+  it('EMPLOYEE without fn_invoices (403 on the invoices fetch) still sees the rest of the page, with an empty invoices table', async () => {
+    mockRole('EMPLOYEE');
+    vi.spyOn(agenciesApi, 'fetchAgencyDetail').mockResolvedValue(DETAIL);
+    vi.spyOn(agenciesApi, 'fetchAgencyInvoices').mockRejectedValue(new Error('دسترسی غیرمجاز'));
+
+    renderPage();
+
+    expect(await screen.findByText('اعتبار آژانس')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'ثبت تسویه' })).toBeInTheDocument();
+    expect(await screen.findByText('فاکتورهای صادرشده')).toBeInTheDocument();
+    expect(screen.getByText('فاکتوری صادر نشده است.')).toBeInTheDocument();
+  });
+
   it('suspending requires a reason and submits it', async () => {
     mockRole('SENIOR_MANAGER');
     vi.spyOn(agenciesApi, 'fetchAgencyDetail').mockResolvedValue(DETAIL);

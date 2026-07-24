@@ -49,7 +49,11 @@ export class AgenciesController {
 
   @Get()
   @Roles('SITE_ADMIN', 'EMPLOYEE', ...AGENCY_TAB_ROLES)
-  @RequiresPermission('ag_list')
+  // ag_settle/fn_invoices act on a specific agency (settle/pay/remind
+  // below), which is only reachable by first loading this list — an
+  // EMPLOYEE holding only one of those two keys would otherwise have a
+  // granted-but-unreachable permission.
+  @RequiresPermission('ag_list', 'ag_settle', 'fn_invoices')
   @ApiOperation({ summary: 'لیست آژانس‌ها + کارت‌های KPI' })
   async list(@Query() query: ListAgenciesQueryDto) {
     const data = await this.agencies.list(query);
@@ -127,7 +131,8 @@ export class AgenciesController {
 
   @Get(':id')
   @Roles('SITE_ADMIN', 'EMPLOYEE', ...AGENCY_TAB_ROLES)
-  @RequiresPermission('ag_info')
+  // Same reachability reasoning as the list endpoint above.
+  @RequiresPermission('ag_info', 'ag_settle', 'fn_invoices')
   @ApiOperation({
     summary: 'جزئیات آژانس — پروفایل، اعتبار، آمار، فعالیت اخیر',
   })
@@ -179,7 +184,8 @@ export class AgenciesController {
   }
 
   @Post(':id/settle')
-  @Roles('SENIOR_MANAGER', 'FINANCE_MANAGER')
+  @Roles('SENIOR_MANAGER', 'FINANCE_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('ag_settle')
   @ApiOperation({ summary: 'ثبت تسویه دستی — غیرفعال برای مدیر بازرگانی' })
   async settle(
     @CurrentUser() actor: AuthenticatedUser,
@@ -229,6 +235,8 @@ export class AgenciesController {
   }
 
   @Get(':id/invoices')
+  @Roles('EMPLOYEE', ...AGENCY_TAB_ROLES)
+  @RequiresPermission('fn_invoices')
   @ApiOperation({ summary: 'لیست فاکتورها — همه ۳ نقش (خواندنی)' })
   async listInvoices(@Param('id') id: string) {
     const data = await this.agencies.listInvoices(id);
@@ -261,7 +269,8 @@ export class AgenciesController {
   }
 
   @Patch(':id/invoices/:invoiceId/pay')
-  @Roles('FINANCE_MANAGER', 'COMMERCIAL_MANAGER')
+  @Roles('FINANCE_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fn_invoices')
   @ApiOperation({
     summary: 'تسویه فاکتور — ثبت LedgerEntry(SETTLEMENT)، ایدمپوتنت',
   })
@@ -277,7 +286,8 @@ export class AgenciesController {
   // FINANCE_MANAGER added in Phase 11 — its مالی tab's «تسویه‌حساب آژانس‌ها»
   // rows carry an «ارسال یادآوری» action in the design.
   @Post(':id/invoices/:invoiceId/remind')
-  @Roles('COMMERCIAL_MANAGER', 'FINANCE_MANAGER')
+  @Roles('COMMERCIAL_MANAGER', 'FINANCE_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fn_invoices')
   @ApiOperation({ summary: 'یادآوری فاکتور معوق' })
   async remindInvoice(
     @CurrentUser() actor: AuthenticatedUser,

@@ -1587,3 +1587,13 @@ tables (Phase 4) via the already-indexed `ManagerReferralRecipient
 .recipientId` (`@@index([recipientId])`) — no new index needed. See
 docs/API.md's Phase 26 section for the full endpoint shape and explicit
 scope narrowing.
+
+## Phase 27 — EMPLOYEE write/financial access: fl_manage + ag_settle + fn_invoices
+
+No schema change. Widens which roles can reach existing write endpoints
+and existing `EmployeePermission` grants (`Permission` rows for
+`fl_manage`/`ag_settle`/`fn_invoices` were already seeded in Phase 8's
+`PERMISSION_CATALOG`, just unwired to any real access until now) — see
+docs/API.md's Phase 27 section for the full endpoint list, the
+reachability fix, and the explicit `fn_invoices`/`FinancePage.tsx` scope
+decision.

@@ -66,6 +66,12 @@ export default function AgencyDetailPage() {
   const isSenior = role === 'SENIOR_MANAGER';
   const isFinance = role === 'FINANCE_MANAGER';
   const isCommercial = role === 'COMMERCIAL_MANAGER';
+  // Phase 27: an EMPLOYEE granted ag_settle/fn_invoices reaches this page
+  // via the real server-side permission check on each action below — the
+  // settle button and the invoice list/pay/remind actions widen to
+  // include them; «صدور فاکتور» (issue) stays COMMERCIAL_MANAGER-only,
+  // matching the backend (fn_invoices never grants issuing).
+  const isEmployee = role === 'EMPLOYEE';
 
   const [detail, setDetail] = useState<AgencyDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -105,6 +111,18 @@ export default function AgencyDetailPage() {
         const [inv, msgs] = await Promise.all([fetchAgencyInvoices(agencyId), fetchAgencyMessages(agencyId)]);
         setInvoices(inv);
         setMessages(msgs);
+      }
+      // EMPLOYEE holding fn_invoices reaches the same invoices table as
+      // COMMERCIAL_MANAGER (via the non-tabbed overview branch below) but
+      // never messages. Some EMPLOYEE visitors here hold ag_settle only
+      // (no fn_invoices) — that fetch 403s server-side; swallow it in its
+      // own try so it never blocks the rest of the (permitted) page.
+      if (role === 'EMPLOYEE') {
+        try {
+          setInvoices(await fetchAgencyInvoices(agencyId));
+        } catch {
+          setInvoices([]);
+        }
       }
     } catch {
       setError('خطا در دریافت اطلاعات آژانس.');
@@ -280,7 +298,7 @@ export default function AgencyDetailPage() {
       title="اعتبار آژانس"
       action={
         <div className="flex gap-2">
-          {(isSenior || isFinance) && detail.credit.usedIrr > 0 && (
+          {(isSenior || isFinance || isEmployee) && detail.credit.usedIrr > 0 && (
             <button
               onClick={() => void onSettle()}
               className="rounded-lg bg-[#059669] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-[#047857]"
@@ -502,19 +520,21 @@ export default function AgencyDetailPage() {
     </SectionCard>
   );
 
-  const invoicesSection = isCommercial && (
+  const invoicesSection = (isCommercial || isEmployee) && (
     <SectionCard
       title="فاکتورهای صادرشده"
       action={
-        <button
-          onClick={() => {
-            setInvoiceError(null);
-            setInvoiceOpen(true);
-          }}
-          className="rounded-lg bg-accent px-3 py-1.5 text-xs font-bold text-white transition hover:bg-accent/90"
-        >
-          صدور فاکتور
-        </button>
+        isCommercial ? (
+          <button
+            onClick={() => {
+              setInvoiceError(null);
+              setInvoiceOpen(true);
+            }}
+            className="rounded-lg bg-accent px-3 py-1.5 text-xs font-bold text-white transition hover:bg-accent/90"
+          >
+            صدور فاکتور
+          </button>
+        ) : undefined
       }
     >
       {invoices.length === 0 ? (
@@ -626,6 +646,9 @@ export default function AgencyDetailPage() {
       {creditCard}
       {scoreCard}
       {apiKeyCard}
+      {/* isCommercial is always false in this non-tabbed branch, so this
+         only ever renders for an EMPLOYEE holding fn_invoices. */}
+      {invoicesSection}
       {infoAndActivity}
     </div>
   );

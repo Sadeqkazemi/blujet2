@@ -267,6 +267,42 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   frontend-only. 3 new backend e2e tests, 7 new frontend tests. See
   `docs/API.md`/`docs/DB_SCHEMA.md`/`docs/features/cartable-referrals.md`'s
   Phase 26 addition.
+- [x] **Phase 27 — EMPLOYEE write/financial access: fl_manage + ag_settle +
+  fn_invoices** — the remaining `PERMISSION_CATALOG` keys were left
+  unwired on purpose as a security decision, not an oversight; asked the
+  product owner how far to widen it (via `AskUserQuestion`, since this
+  crossed from mechanical backlog work into a real authorization-policy
+  call) and got an explicit answer: wire these three, leave the IT-dept
+  keys (`us_manage`/`sv_control`/`sc_manage`/`lg_view`) out of scope.
+  `fl_manage` now unlocks every flights write endpoint for EMPLOYEE
+  (create/schedule/ai-analysis/plan/aircraft/fare-rule/allotment);
+  `ag_settle` unlocks `POST /agencies/:id/settle`; `fn_invoices` unlocks
+  the agencies invoices list/pay/remind (never issuing — stays
+  `COMMERCIAL_MANAGER`-only). Caught and fixed two bugs during this
+  phase's own design review before they shipped: (1) an EMPLOYEE granted
+  only `ag_settle`/`fn_invoices` (no `ag_list`/`ag_info`) would have had a
+  granted-but-unreachable permission, since only the list/detail endpoints
+  lead to the action endpoints — fixed by widening those two endpoints'
+  `@RequiresPermission` to accept the dependent keys as alternatives; (2)
+  the frontend `invoicesSection` was correctly gated for EMPLOYEE but
+  never actually rendered (EMPLOYEE takes `AgencyDetailPage`'s non-tabbed
+  branch, which didn't include it) and the invoices fetch was still
+  `COMMERCIAL_MANAGER`-only, so an EMPLOYEE with `fn_invoices` would have
+  seen an empty invoices section, and one with `ag_settle` only would have
+  had a 403 there break the whole page — both fixed (wired the section
+  into the render tree; the EMPLOYEE-only fetch swallows its own 403).
+  Deliberately declined to route `fn_invoices` through `FinancePage.tsx`
+  (its `FINANCE_MANAGER`-only view exposes company-wide revenue/profit/
+  all-transactions data, far broader than "view/manage invoices") — routed
+  through the already-correctly-scoped per-agency invoices table on
+  `AgencyDetailPage` instead. `fl_manage`/`ag_settle`/`fn_invoices` also
+  can't be granted to a single EMPLOYEE together (an employee's `dept` is
+  fixed at creation and permanently resolves to one `PERMISSION_CATALOG`
+  dept — `fl_manage` is `commercial`, `ag_settle`/`fn_invoices` are
+  `finance`), which mirrors real org structure and isn't a bug. 9 new
+  backend e2e tests, 2 new frontend tests. See `docs/API.md`/
+  `docs/DB_SCHEMA.md`/`docs/features/agencies.md`/
+  `docs/features/flight-management.md`'s Phase 27 additions.
 
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is
