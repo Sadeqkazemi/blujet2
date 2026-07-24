@@ -60,6 +60,10 @@ untouched). Design source: FLIGHTS MANAGEMENT sections of
 - [x] Role isolation: FINANCE_MANAGER has no مدیریت پروازها nav entry
       — frontend/e2e/pricing-journey.spec.ts › "Finance Manager gets no pricing surfaces (role isolation)"
 
+### Phase 27 — EMPLOYEE fl_manage
+- [x] An EMPLOYEE granted `fl_manage` (with `fl_view`) can `POST /flights` and `PATCH /flights/:instanceId/plan`; an EMPLOYEE with only `fl_view` gets 403 on the same write endpoints — `backend/test/phase27-employee-fl-manage-ag-settle-fn-invoices.e2e-spec.ts: 'an employee freshly granted fl_manage can create a flight and plan an instance; fl_view alone (no fl_manage) is denied'`
+- [x] `fl_manage` unlocks the `flights` nav tab — `phase27-....e2e-spec.ts: 'fl_manage unlocks the "flights" nav tab'`
+
 ### Deferred (explicit, per docs)
 - خروجی Excel (both sub-tabs) — same deferral as Phase 3
 - RRULE recurring schedules — no design UI exists; single-instance creation only

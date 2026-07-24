@@ -329,11 +329,9 @@ class CreateAllotmentDto {
 export class FlightsController {
   constructor(private readonly flights: FlightsService) {}
 
-  // EMPLOYEE: PERMISSION_CATALOG's fl_view only — read-only. fl_manage
-  // (create/schedule/plan/aircraft/fare-rule/allotment writes below) is
-  // deliberately deferred this phase; every write endpoint stays
-  // SENIOR_MANAGER/COMMERCIAL_MANAGER-only. See Phase 18 notes in
-  // docs/DB_SCHEMA.md.
+  // EMPLOYEE: PERMISSION_CATALOG's fl_view for the GET endpoints below;
+  // fl_manage (Phase 27) additionally unlocks every write endpoint —
+  // create/schedule/ai-analysis/plan/aircraft/fare-rule/allotment.
   @Get('overview')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
   @RequiresPermission('fl_view')
@@ -355,6 +353,8 @@ export class FlightsController {
   }
 
   @Post()
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_manage')
   @ApiOperation({ summary: 'افزودن پرواز جدید (مودال طراحی)' })
   async create(
     @CurrentUser() actor: AuthenticatedUser,
@@ -365,6 +365,8 @@ export class FlightsController {
   }
 
   @Post('schedules')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_manage')
   @ApiOperation({
     summary: 'ثبت برنامه تکرارشونده پرواز (RRULE) و ساخت پروازهای آینده',
   })
@@ -387,6 +389,8 @@ export class FlightsController {
   }
 
   @Post('ai-analysis')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_manage')
   @ApiOperation({
     summary:
       'تحلیل قیمت‌گذاری پروازهای آینده با هوش مصنوعی — advisory، با degrade امن',
@@ -414,6 +418,8 @@ export class FlightsController {
   }
 
   @Patch(':instanceId/plan')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_manage')
   @ApiOperation({
     summary:
       'نرخ‌گذاری و تخصیص پرواز آینده — نرخ قابل فروش همچنان با تأیید مدیر عامل (فاز ۶)',
@@ -428,6 +434,8 @@ export class FlightsController {
   }
 
   @Patch(':instanceId/aircraft')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_manage')
   @ApiOperation({
     summary:
       'تغییر نوع هواپیمای پرواز — رد با ۴۰۹ اگر ظرفیت جدید کمتر از رزروهای قطعی/لاک‌شده باشد',
@@ -457,6 +465,8 @@ export class FlightsController {
   }
 
   @Post(':instanceId/fare-rules')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_manage')
   @ApiOperation({
     summary:
       'ایجاد کلاس نرخی — رد با ۴۰۰ اگر مجموع صندلی تخصیص‌یافته از ظرفیت کابین بیشتر شود',
@@ -471,6 +481,8 @@ export class FlightsController {
   }
 
   @Patch(':instanceId/fare-rules/:ruleId')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_manage')
   @ApiOperation({ summary: 'ویرایش کلاس نرخی' })
   async updateFareRule(
     @CurrentUser() actor: AuthenticatedUser,
@@ -488,6 +500,8 @@ export class FlightsController {
   }
 
   @Delete(':instanceId/fare-rules/:ruleId')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_manage')
   @ApiOperation({
     summary: 'حذف کلاس نرخی — رد با ۴۰۹ اگر رزرو فعالی از آن استفاده کند',
   })
@@ -510,6 +524,8 @@ export class FlightsController {
   }
 
   @Post(':instanceId/allotments')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_manage')
   @ApiOperation({
     summary:
       'تخصیص سهمیه به آژانس — رد با ۴۰۰ اگر مجموع سهمیه‌ها از سقف کلی آژانس‌های پرواز بیشتر شود',
