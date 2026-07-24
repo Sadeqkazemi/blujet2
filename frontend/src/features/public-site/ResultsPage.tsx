@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { searchFlights } from '../../api/publicSite';
+import { createPriceLock, fetchClubPoints, searchFlights } from '../../api/publicSite';
+import { ApiRequestError } from '../../api/envelope';
+import { useAuth } from '../../hooks/useAuth';
 import { faDigits, faMoney } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
-import type { SearchFlightResult } from '../../types/public-site';
+import type { CabinClass, PriceLock, SearchFlightResult } from '../../types/public-site';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import FlowStepper from '../../components/public/FlowStepper';
 
@@ -54,9 +56,17 @@ function depHourBucket(dep: string): 'morning' | 'noon' | 'evening' {
   return 'evening';
 }
 
+const GOLD_TIER_LEVELS = ['GOLD', 'PLATINUM'];
+
+type RealLockResult =
+  | { kind: 'success'; lock: PriceLock }
+  | { kind: 'not-gold' }
+  | { kind: 'error'; message: string };
+
 export default function ResultsPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  const { status } = useAuth();
   const origin = params.get('origin') ?? '';
   const dest = params.get('dest') ?? '';
   const date = params.get('date') ?? '';
@@ -72,6 +82,45 @@ export default function ResultsPage() {
   const [sort, setSort] = useState<'cheap' | 'early'>('cheap');
   const [aiState, setAiState] = useState<'idle' | 'loading' | 'done'>('idle');
   const [lockFor, setLockFor] = useState<MockFlight | null>(null);
+
+  // real قفل قیمت (real bookable results only — see docs/features/wallet-price-lock.md)
+  const [club, setClub] = useState<{ isMember: boolean; level: string | null } | null>(null);
+  const [lockBusyKey, setLockBusyKey] = useState<string | null>(null);
+  const [realLockResult, setRealLockResult] = useState<RealLockResult | null>(null);
+
+  useEffect(() => {
+    if (status !== 'authenticated') {
+      setClub(null);
+      return;
+    }
+    fetchClubPoints()
+      .then((c) => setClub({ isMember: c.isMember, level: c.level }))
+      .catch(() => setClub(null));
+  }, [status]);
+
+  async function onRealLockClick(flightInstanceId: string, cabin: CabinClass) {
+    if (status !== 'authenticated') {
+      navigate('/signin', { state: { from: `/results?${params.toString()}` } });
+      return;
+    }
+    if (!club?.isMember || !GOLD_TIER_LEVELS.includes(club.level ?? '')) {
+      setRealLockResult({ kind: 'not-gold' });
+      return;
+    }
+    const key = `${flightInstanceId}:${cabin}`;
+    setLockBusyKey(key);
+    try {
+      const lock = await createPriceLock(flightInstanceId, cabin);
+      setRealLockResult({ kind: 'success', lock });
+    } catch (err) {
+      setRealLockResult({
+        kind: 'error',
+        message: err instanceof ApiRequestError ? err.message : 'خطا در ثبت قفل قیمت.',
+      });
+    } finally {
+      setLockBusyKey(null);
+    }
+  }
 
   useEffect(() => {
     if (!origin || !dest || !date) return;
@@ -337,13 +386,23 @@ export default function ResultsPage() {
                         <div className="font-num text-sm font-extrabold text-[#1668c4]">{faMoney(c.priceIrr)} تومان</div>
                         <div className="text-[10px] text-[#6b7b94]">{faDigits(c.seatsLeft)} صندلی باقی‌مانده</div>
                       </div>
-                      <button
-                        disabled={c.seatsLeft === 0}
-                        onClick={() => navigate(`/book/${r.flightInstanceId}?cabin=${c.cabin}`)}
-                        className="rounded-lg bg-[#1668c4] px-4 py-2 text-xs font-bold text-white disabled:opacity-40"
-                      >
-                        انتخاب
-                      </button>
+                      <div className="flex flex-col items-end gap-1.5">
+                        <button
+                          disabled={c.seatsLeft === 0}
+                          onClick={() => navigate(`/book/${r.flightInstanceId}?cabin=${c.cabin}`)}
+                          className="rounded-lg bg-[#1668c4] px-4 py-2 text-xs font-bold text-white disabled:opacity-40"
+                        >
+                          انتخاب
+                        </button>
+                        <button
+                          disabled={lockBusyKey === `${r.flightInstanceId}:${c.cabin}`}
+                          onClick={() => void onRealLockClick(r.flightInstanceId, c.cabin)}
+                          data-testid={`real-lock-${r.flightInstanceId}-${c.cabin}`}
+                          className="rounded-lg border border-[#d5e1f0] px-3 py-1 text-[10.5px] font-bold text-[#1668c4] disabled:opacity-40"
+                        >
+                          {lockBusyKey === `${r.flightInstanceId}:${c.cabin}` ? 'در حال ثبت…' : '🔒 قفل قیمت'}
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -370,6 +429,56 @@ export default function ResultsPage() {
                 بستن
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* REAL PRICE LOCK RESULT MODAL */}
+      {realLockResult && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[#0d2640]/55 p-5" onClick={() => setRealLockResult(null)}>
+          <div onClick={(e) => e.stopPropagation()} data-testid="real-lock-modal" className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-2xl">
+            {realLockResult.kind === 'not-gold' && (
+              <>
+                <div className="mb-2 text-2xl">🔒</div>
+                <h2 className="mb-1 text-sm font-black text-[#0d2640]">قفل هوشمند قیمت</h2>
+                <p className="mb-3 text-[11.5px] leading-6 text-[#5a6678]">
+                  قفل قیمت تا ۷۲ ساعت مخصوص اعضای سطح طلایی و بالاتر باشگاه مشتریان است.
+                </p>
+                <div className="flex gap-2">
+                  <button onClick={() => navigate('/club')} className="flex-1 rounded-lg bg-[#1668c4] py-2.5 text-xs font-bold text-white">
+                    آشنایی با باشگاه
+                  </button>
+                  <button onClick={() => setRealLockResult(null)} className="flex-none rounded-lg border border-[#d5e1f0] px-5 py-2.5 text-xs font-bold text-[#5a6678]">
+                    بستن
+                  </button>
+                </div>
+              </>
+            )}
+            {realLockResult.kind === 'success' && (
+              <>
+                <div className="mb-2 text-2xl">✓</div>
+                <h2 className="mb-1 text-sm font-black text-[#0d2640]">قیمت شما قفل شد</h2>
+                <p className="mb-1 text-[11.5px] leading-6 text-[#5a6678]">
+                  نرخ {faMoney(realLockResult.lock.lockedPriceIrr)} تومان تا {formatJalaliDateTime(realLockResult.lock.expiresAt)} برای شما ثابت می‌ماند.
+                </p>
+                <p className="mb-3 text-[11px] leading-6 text-[#8a96a6]">کارمزد: {faMoney(realLockResult.lock.feeIrr)} تومان</p>
+                <button onClick={() => setRealLockResult(null)} className="w-full rounded-lg bg-[#1668c4] py-2.5 text-xs font-bold text-white">
+                  متوجه شدم
+                </button>
+              </>
+            )}
+            {realLockResult.kind === 'error' && (
+              <>
+                <div className="mb-2 text-2xl">⚠</div>
+                <h2 className="mb-1 text-sm font-black text-[#0d2640]">قفل قیمت ثبت نشد</h2>
+                <p role="alert" className="mb-3 text-[11.5px] leading-6 text-[#5a6678]">
+                  {realLockResult.message}
+                </p>
+                <button onClick={() => setRealLockResult(null)} className="w-full rounded-lg border border-[#d5e1f0] py-2.5 text-xs font-bold text-[#5a6678]">
+                  بستن
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
