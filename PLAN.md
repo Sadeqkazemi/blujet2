@@ -501,6 +501,29 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   No backend change. 2 new frontend tests. See
   `docs/features/reservation.md`'s Phase 36 section, `docs/API.md`'s
   Phase 36 note.
+- [x] **Phase 37 — سامانه پیامک (SMS) log frontend closure** — third hit
+  from the same manual endpoint-vs-frontend-caller audit: `GET
+  /it/services/sms-log` (Phase 14, `IT_MANAGER`) fully implemented and
+  e2e-tested (phone numbers already masked server-side), no frontend
+  surface. Added a «سامانه پیامک (SMS)» card to `ServicesPage.tsx` below
+  the existing internal-services grid — enabled state, today's success/
+  fail counts, recent messages. The design reference only shows the
+  "sms" row in that internal-services toggle grid (already built since
+  Phase 8), no separate delivery-log screen, so this is a new card, not
+  a redesign. No backend change. 2 new frontend tests. See
+  `docs/features/it-manager.md`'s Phase 37 section, `docs/API.md`'s
+  Phase 37 note.
+- [x] With Phases 35–37, the manual endpoint audit has now covered
+  `reconciliation`, `reservation`, and `it-manager`'s `services` module;
+  every other controller checked so far (`pricing`, `flightops`,
+  `it-manager`'s `security`/`backups`/`employees`/`dashboard`, `club`,
+  `booking-engine`'s `search`/`booking`/`privacy`/`wallet-points-lock`,
+  `refunds`, `referrals`/`manager-messages` via `cartable.ts`,
+  `staff-reports`/`passenger-reports` via `reporting.ts`, `settings` via
+  `admins.ts`) came back fully wired. Remaining unchecked: `files`,
+  `panels`, `flights`, `agency-portal`, `agencies`, `audit`, `contact`,
+  `support-tickets`, `auth`, `health`, `flight-status`, `manage-booking`,
+  `profile`.
 
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is

@@ -76,6 +76,22 @@ export interface ItServicesResult {
   external: ExternalService[];
 }
 
+export interface SmsLogEntry {
+  id: string;
+  phoneMasked: string;
+  messageType: 'OTP' | 'TEMP_PASSWORD';
+  status: 'SUCCESS' | 'FAILED';
+  failureReason: string | null;
+  createdAt: string;
+}
+
+export interface SmsLogResult {
+  enabled: boolean;
+  todaySuccessCount: number;
+  todayFailedCount: number;
+  recent: SmsLogEntry[];
+}
+
 export interface BackupRecord {
   id: string;
   fileName: string;
