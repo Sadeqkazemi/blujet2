@@ -49,11 +49,19 @@ export interface ReferralRecipient {
   recipient: { id: string; fullName: string; role: string };
 }
 
+export interface ReferralAttachment {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+}
+
 export interface ReferralReport {
   id: string;
   body: string;
   createdAt: string;
   from: { id: string; fullName: string; role: string };
+  attachments: ReferralAttachment[];
 }
 
 export interface Referral {
@@ -65,6 +73,7 @@ export interface Referral {
   status: ReferralStatus;
   createdAt: string;
   recipients: ReferralRecipient[];
+  attachments: ReferralAttachment[];
   reports?: ReferralReport[];
   _count?: { reports: number };
 }
@@ -83,6 +92,7 @@ export interface MyReferral {
   dueAt: string | null;
   createdAt: string;
   from: { id: string; fullName: string; role: string };
+  attachments: ReferralAttachment[];
   hasMyReport: boolean;
 }
 

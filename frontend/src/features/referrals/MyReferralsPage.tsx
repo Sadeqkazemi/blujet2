@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { fetchMyReferrals, submitReferralReport } from '../../api/cartable';
 import { faDigits } from '../../lib/fa-format';
 import { formatJalaliDate } from '../../lib/jalali';
-import type { MyReferral, MyReferralListResult, ReferralStatus } from '../../types/cartable';
+import AttachmentPicker from '../../components/AttachmentPicker';
+import AttachmentList from '../../components/AttachmentList';
+import type { MyReferral, MyReferralListResult, ReferralAttachment, ReferralStatus } from '../../types/cartable';
 
 const STATUS_META: Record<ReferralStatus, { label: string; className: string }> = {
   SENT: { label: 'در انتظار اقدام', className: 'bg-[#f59e0b24] text-[#b45309]' },
@@ -21,6 +23,7 @@ export default function MyReferralsPage() {
   const [reportBody, setReportBody] = useState('');
   const [reportError, setReportError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [reportAttachments, setReportAttachments] = useState<ReferralAttachment[]>([]);
 
   const load = useCallback(async () => {
     setError(null);
@@ -47,8 +50,13 @@ export default function MyReferralsPage() {
     setReportError(null);
     setSubmitting(true);
     try {
-      await submitReferralReport(selected.id, reportBody.trim());
+      await submitReferralReport(
+        selected.id,
+        reportBody.trim(),
+        reportAttachments.map((a) => a.id),
+      );
       setReportBody('');
+      setReportAttachments([]);
       setNotice('گزارش شما ثبت شد ✓');
       const data = await load();
       if (data) {
@@ -78,6 +86,7 @@ export default function MyReferralsPage() {
             setSelected(null);
             setReportBody('');
             setReportError(null);
+            setReportAttachments([]);
           }}
           className="text-xs font-bold text-accent"
         >
@@ -103,6 +112,7 @@ export default function MyReferralsPage() {
         <section className="rounded-xl border border-border bg-white p-5">
           <h2 className="mb-2 text-sm font-bold text-ink">شرح درخواست</h2>
           <p className="text-xs leading-relaxed text-text-2">{selected.body}</p>
+          <AttachmentList attachments={selected.attachments} variant="neutral" />
         </section>
 
         <section className="rounded-xl border border-border bg-white p-5">
@@ -124,6 +134,10 @@ export default function MyReferralsPage() {
                 rows={4}
                 className="w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent"
               />
+              <div className="mt-3">
+                <label className="mb-1 block text-xs font-bold text-ink">بارگذاری مستندات (PDF یا تصویر)</label>
+                <AttachmentPicker value={reportAttachments} onChange={setReportAttachments} />
+              </div>
               {reportError && (
                 <p role="alert" className="mt-2 text-xs text-danger">
                   {reportError}

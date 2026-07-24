@@ -1,9 +1,15 @@
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import ReferralsPage from './ReferralsPage';
 import * as cartableApi from '../../api/cartable';
+import * as filesApi from '../../api/files';
 import type { Referral, ReferralListResult } from '../../types/cartable';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 const REFERRAL: Referral = {
   id: 'r1',
@@ -14,6 +20,7 @@ const REFERRAL: Referral = {
   status: 'REPORTED',
   createdAt: '2026-07-16T08:00:00.000Z',
   recipients: [{ recipientId: 'u2', recipient: { id: 'u2', fullName: 'سحر کاظمی', role: 'FINANCE_MANAGER' } }],
+  attachments: [],
 };
 
 const LIST: ReferralListResult = {
@@ -89,6 +96,7 @@ describe('ReferralsPage', () => {
           body: 'گزارش پیوست شد.',
           createdAt: '2026-07-17T09:00:00.000Z',
           from: { id: 'u2', fullName: 'سحر کاظمی', role: 'FINANCE_MANAGER' },
+          attachments: [],
         },
       ],
     });
@@ -103,5 +111,57 @@ describe('ReferralsPage', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'تأیید دریافت گزارش و بستن' }));
     await waitFor(() => expect(close).toHaveBeenCalledWith('r1'));
+  });
+
+  it('uploading a document in the creation modal sends its id as attachmentIds', async () => {
+    vi.spyOn(cartableApi, 'fetchReferrals').mockResolvedValue(LIST);
+    vi.spyOn(cartableApi, 'fetchStaffDirectory').mockResolvedValue([
+      { id: 's1', fullName: 'سحر کاظمی', role: 'FINANCE_MANAGER', roleLabelFa: 'مدیر مالی' },
+    ]);
+    vi.spyOn(filesApi, 'uploadFile').mockResolvedValue({ id: 'f1', fileName: 'سند.png', sizeBytes: 512 });
+    const create = vi.spyOn(cartableApi, 'createReferral').mockResolvedValue(REFERRAL);
+
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'ایجاد ارجاع جدید' }));
+    await userEvent.type(screen.getByLabelText('موضوع ارجاع *'), 'موضوع تست');
+    await userEvent.type(screen.getByLabelText('شرح درخواست *'), 'شرح تست');
+    await userEvent.click(screen.getByRole('button', { name: 'سحر کاظمی — مدیر مالی' }));
+
+    const input = screen.getByLabelText('افزودن سند', { selector: 'input' }) as HTMLInputElement;
+    await userEvent.upload(input, new File(['x'], 'سند.png', { type: 'image/png' }));
+    expect(await screen.findByText('سند.png')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'ارسال ارجاع' }));
+    await waitFor(() =>
+      expect(create).toHaveBeenCalledWith(expect.objectContaining({ attachmentIds: ['f1'] })),
+    );
+  });
+
+  it('the detail view shows the request’s own attachments and a report’s attachments as clickable download chips', async () => {
+    vi.spyOn(cartableApi, 'fetchReferrals').mockResolvedValue(LIST);
+    vi.spyOn(cartableApi, 'fetchStaffDirectory').mockResolvedValue([]);
+    vi.spyOn(cartableApi, 'fetchReferralDetail').mockResolvedValue({
+      ...REFERRAL,
+      attachments: [{ id: 'a1', fileName: 'اصل-درخواست.pdf', mimeType: 'application/pdf', sizeBytes: 2048 }],
+      reports: [
+        {
+          id: 'rep1',
+          body: 'گزارش پیوست شد.',
+          createdAt: '2026-07-17T09:00:00.000Z',
+          from: { id: 'u2', fullName: 'سحر کاظمی', role: 'FINANCE_MANAGER' },
+          attachments: [{ id: 'a2', fileName: 'گزارش-فروش.pdf', mimeType: 'application/pdf', sizeBytes: 4096 }],
+        },
+      ],
+    });
+    const downloadSpy = vi.spyOn(filesApi, 'downloadFile').mockResolvedValue(undefined);
+
+    renderPage();
+    await userEvent.click(await screen.findByText('درخواست گزارش فروش سه‌ماهه'));
+
+    expect(await screen.findByRole('button', { name: 'اصل-درخواست.pdf' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'گزارش-فروش.pdf' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'اصل-درخواست.pdf' }));
+    await waitFor(() => expect(downloadSpy).toHaveBeenCalledWith('a1', 'اصل-درخواست.pdf'));
   });
 });

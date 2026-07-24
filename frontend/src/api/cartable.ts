@@ -57,6 +57,7 @@ export function createReferral(dto: {
   recipientIds: string[];
   priority?: ReferralPriority;
   dueAt?: string;
+  attachmentIds?: string[];
 }) {
   return apiPost<Referral>('/referrals', dto);
 }
@@ -81,8 +82,8 @@ export function fetchMyReferrals() {
   return apiGet<MyReferralListResult>('/referrals/mine');
 }
 
-export function submitReferralReport(id: string, body: string) {
-  return apiPost<Referral>(`/referrals/${id}/reports`, { body });
+export function submitReferralReport(id: string, body: string, attachmentIds?: string[]) {
+  return apiPost<Referral>(`/referrals/${id}/reports`, { body, attachmentIds });
 }
 
 export function sendManagerMessage(dto: {

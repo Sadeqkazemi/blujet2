@@ -53,7 +53,7 @@ and `backend/test/files.e2e-spec.ts` (3 tests), run via `npm run test:e2e`.
 - [x] کارتابل tab: 3 KPI filter cards, count pill, «ایجاد پیام» button, task rows with category badge + «ارسال از:» line + «بررسی»; empty state «کارتابل خالی است ✓» — `CartablePage.test.tsx: 'renders KPI filter cards, count pill, task rows and the compose button'` + `'shows the empty state when the cartable is empty'`
 - [x] Review modal: required «نظر مدیر», staff-directory transfer select, تأیید/انصراف/انتقال with انتقال disabled until a target is picked — `'the review modal requires a manager note before deciding'` + `'the transfer button stays disabled until a target manager is picked'`
 - [x] Finance/Commercial-only chairman-gate banner with request/pending/approved states — `'Finance Manager sees the chairman-permission gate with the request button'` (+ CEO-absence asserted in the first test); state transitions covered by backend loop test + live verification
-- [x] ارجاعات tab: KPI cards, table with the 4 status badges + priority + Jalali dates, creation modal (recipient chips, priority, Jalali due), detail with reports thread + sender actions — `ReferralsPage.test.tsx` (all 3 tests). Attachments UI deferred (see below).
+- [x] ارجاعات tab: KPI cards, table with the 4 status badges + priority + Jalali dates, creation modal (recipient chips, priority, Jalali due), detail with reports thread + sender actions — `ReferralsPage.test.tsx` (5 tests, incl. the Phase 29 attachment tests below).
 - [x] Compose modal: the 6 گیرنده سازمانی options, validation «گیرنده، موضوع و متن پیام الزامی است.» — `'the compose modal validates required fields with the design message'`
 - [x] Phase 3's request-detail «ارجاع درخواست» block wired to `/staff-directory` + refer endpoint — implemented; exercised by the backend wiring test + live verification
 - [x] Dashboard cartable widget with live count + «مشاهده‌ی همه‌ی کارها ←» link — implemented (screenshot-verified); fails silent when the role lacks cartable access
@@ -93,8 +93,30 @@ frontend for `GET /referrals/mine` — the backend already serves them with
 the same guard set, so this is a frontend-only follow-up, not a backend
 gap. See docs/API.md's Phase 26 section.
 
+### Phase 29 addition — referral/report attachment upload + view
+- [x] Backend: `attachments` (raw `StoredFile` id arrays) resolved into
+      `{id, fileName, mimeType, sizeBytes}[]` in `GET /referrals`,
+      `GET /referrals/:id` (both the referral's own attachments and each
+      report's), and `GET /referrals/mine`; empty when none —
+      `backend/test/cartable.e2e-spec.ts`: `'a referral created with attachmentIds resolves real fileName/mimeType/sizeBytes in list() and detail(); myReferrals() resolves it for the recipient too'` + `'a report submitted with attachmentIds resolves real metadata inside detail().reports'` + `'a referral with no attachments resolves to an empty array, not null/undefined'`
+- [x] Fixed a latent bug caught while writing the above (not new — present
+      since Phase 4): `FilesService.store()` used `file.originalname`
+      directly, but multer/busboy decode multipart header bytes as latin1
+      by default, corrupting non-ASCII (e.g. Persian) filenames into
+      mojibake; re-decoded latin1→utf8 (a no-op for ASCII names) —
+      `backend/test/files.e2e-spec.ts`: `'preserves a Persian filename correctly instead of mojibake...'`
+- [x] Frontend: new `AttachmentPicker` (dashed "افزودن سند" control,
+      uploads immediately via `POST /files`, removable green chips) and
+      `AttachmentList` (read-only chips — neutral for a referral's own
+      attachments, green for a report's, matching the design's two
+      stylings — click downloads via a blob link using the caller's auth
+      header) — `AttachmentPicker.test.tsx` (3 tests) + `AttachmentList.test.tsx` (2 tests)
+- [x] Wired into `ReferralsPage.tsx`'s creation modal + detail view (own
+      attachments and each report's) and `MyReferralsPage.tsx`'s report
+      form + detail view (the sender's attachments) —
+      `ReferralsPage.test.tsx`: `'uploading a document in the creation modal sends its id as attachmentIds'` + `'the detail view shows the request's own attachments and a report's attachments as clickable download chips'`; `MyReferralsPage.test.tsx`: `'shows the sender's attachments on the request as clickable download chips'` + `'uploading a document in the report form sends its id as attachmentIds'`
+
 ### Deferred (scoped out with reasons, not silently dropped)
-- Attachment upload UI on the referral/compose modals — the backend files module is complete and fully tested (`files.e2e-spec.ts`), but the chip-based upload UI is postponed to the phase that first *requires* documents end-to-end (club-card docs, Phase 5) to keep this phase's UI surface reviewable.
 - The Jalali calendar popover date-filter on the cartable tab — the API `date=` filter exists and is validated; the popover UI arrives with the shared Jalali date-picker component (also needed by Phase 5/7 forms).
 
 ---
