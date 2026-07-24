@@ -2,18 +2,26 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   createExternalService,
   fetchItServices,
+  fetchSmsLog,
   removeExternalService,
   testExternalService,
   toggleInternalService,
   updateExternalService,
 } from '../../api/it-manager';
 import { faDigits, faPercent } from '../../lib/fa-format';
+import { formatJalaliDateTime } from '../../lib/jalali';
 import Modal from '../../components/Modal';
-import type { ExternalService, InternalService } from '../../types/it-manager';
+import type { ExternalService, InternalService, SmsLogResult } from '../../types/it-manager';
+
+const SMS_MESSAGE_TYPE_LABEL: Record<string, string> = {
+  OTP: 'کد یکبار مصرف',
+  TEMP_PASSWORD: 'رمز موقت',
+};
 
 export default function ServicesPage() {
   const [internal, setInternal] = useState<InternalService[]>([]);
   const [external, setExternal] = useState<ExternalService[]>([]);
+  const [smsLog, setSmsLog] = useState<SmsLogResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<{ id: string; ok: boolean; message: string } | null>(null);
 
@@ -38,6 +46,11 @@ export default function ServicesPage() {
       setExternal(data.external);
     } catch {
       setError('خطا در دریافت سرویس‌ها.');
+    }
+    try {
+      setSmsLog(await fetchSmsLog());
+    } catch {
+      setSmsLog(null);
     }
   }, []);
 
@@ -183,6 +196,51 @@ export default function ServicesPage() {
           </div>
         ))}
       </div>
+
+      {smsLog && (
+        <div className="mb-8 rounded-xl border border-border bg-white p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-bold text-ink">سامانه پیامک (SMS)</h2>
+            <span
+              className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                smsLog.enabled ? 'bg-[#10b98124] text-[#059669]' : 'bg-danger/15 text-danger'
+              }`}
+            >
+              {smsLog.enabled ? 'فعال' : 'غیرفعال'}
+            </span>
+          </div>
+          <div className="mb-4 flex gap-6 text-xs">
+            <div>
+              <span className="font-num font-black text-[#059669]">{faDigits(smsLog.todaySuccessCount)}</span>{' '}
+              <span className="text-muted">ارسال موفق امروز</span>
+            </div>
+            <div>
+              <span className="font-num font-black text-danger">{faDigits(smsLog.todayFailedCount)}</span>{' '}
+              <span className="text-muted">ارسال ناموفق امروز</span>
+            </div>
+          </div>
+          <div className="flex flex-col divide-y divide-border/60">
+            {smsLog.recent.length === 0 && (
+              <p className="py-2 text-xs text-muted">پیامکی ثبت نشده است.</p>
+            )}
+            {smsLog.recent.map((r) => (
+              <div key={r.id} data-testid="sms-log-row" className="flex items-center gap-3 py-2 text-xs">
+                <div className="ltr font-num min-w-[110px] text-muted">{r.phoneMasked}</div>
+                <div className="min-w-[110px] text-ink">{SMS_MESSAGE_TYPE_LABEL[r.messageType] ?? r.messageType}</div>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                    r.status === 'SUCCESS' ? 'bg-[#10b98124] text-[#059669]' : 'bg-danger/15 text-danger'
+                  }`}
+                >
+                  {r.status === 'SUCCESS' ? 'موفق' : 'ناموفق'}
+                </span>
+                {r.failureReason && <span className="text-[10.5px] text-danger">{r.failureReason}</span>}
+                <span className="mr-auto text-[10.5px] text-muted">{formatJalaliDateTime(r.createdAt)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-sm font-bold text-ink">سرویس‌های خارجی (API)</h2>

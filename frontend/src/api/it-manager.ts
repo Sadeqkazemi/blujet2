@@ -11,6 +11,7 @@ import type {
   ItServicesResult,
   PermissionCatalog,
   SecurityPolicy,
+  SmsLogResult,
 } from '../types/it-manager';
 
 export function fetchItDashboard() {
@@ -79,6 +80,10 @@ export function fetchItServices() {
 
 export function toggleInternalService(key: string, enabled: boolean) {
   return apiPatch(`/it/services/internal/${key}`, { enabled });
+}
+
+export function fetchSmsLog() {
+  return apiGet<SmsLogResult>('/it/services/sms-log');
 }
 
 export function createExternalService(dto: {
