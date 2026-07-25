@@ -513,17 +513,55 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   a redesign. No backend change. 2 new frontend tests. See
   `docs/features/it-manager.md`'s Phase 37 section, `docs/API.md`'s
   Phase 37 note.
-- [x] With Phases 35–37, the manual endpoint audit has now covered
+- [x] **Phase 38 — تغییر نوع هواپیما (aircraft-type change) frontend
+  closure** — the audit's final finding: `PATCH
+  /flights/:instanceId/aircraft` (Phase 13 Part A, `SENIOR_MANAGER` +
+  `COMMERCIAL_MANAGER`) fully implemented and e2e-tested, no frontend
+  control anywhere. Unlike Phases 35–37, this one needed two small
+  additive backend changes, not just frontend wiring, because no
+  reference-data endpoint existed to populate a real dropdown: new `GET
+  /flights/aircraft-types` (lists every seeded `AircraftSeatMap` type
+  with its real computed capacity via the existing `enumerateSeats()`
+  helper) and `GET /flights/:instanceId` detail gaining an `aircraftType`
+  field (via the existing `resolveAircraftType()` util) so the form can
+  show/pre-select the current type. Both are pure reads over
+  already-existing data — no new business logic or schema change.
+  `FlightsPage.tsx`'s flight-detail modal gained a «نوع هواپیما» box with
+  a تغییر button revealing the real dropdown, gated behind the existing
+  `useStepUp('PRICE_CAPACITY_CHANGE')` step-up flow (same scope as
+  نرخ‌گذاری), surfacing the backend's `CAPACITY_BELOW_CONFIRMED` conflict
+  inline. 3 new/modified backend e2e assertions, 2 new frontend tests (a
+  test-fixture-id bug — copied the wrong row id from an unrelated
+  fixture — was found and fixed while writing them, not a product bug).
+  While verifying regressions, found a second pre-existing test failure
+  unrelated to this phase: `flights.e2e-spec.ts`'s completed-report test
+  throws `TypeError: Cannot read properties of undefined (reading
+  'tickets')`; confirmed via `git stash` that it fails identically on
+  unmodified `main` — a second flake alongside the long-standing
+  `reporting.e2e-spec.ts` one, not caused by this phase. Full backend
+  e2e suite: 340/342 passing, exactly those two known-pre-existing
+  failures. See `docs/features/flight-management.md`'s Phase 38 section,
+  `docs/API.md`/`docs/DB_SCHEMA.md`'s Phase 38 notes.
+- [x] With Phases 35–37, the manual endpoint audit had covered
   `reconciliation`, `reservation`, and `it-manager`'s `services` module;
   every other controller checked so far (`pricing`, `flightops`,
   `it-manager`'s `security`/`backups`/`employees`/`dashboard`, `club`,
   `booking-engine`'s `search`/`booking`/`privacy`/`wallet-points-lock`,
   `refunds`, `referrals`/`manager-messages` via `cartable.ts`,
   `staff-reports`/`passenger-reports` via `reporting.ts`, `settings` via
-  `admins.ts`) came back fully wired. Remaining unchecked: `files`,
-  `panels`, `flights`, `agency-portal`, `agencies`, `audit`, `contact`,
-  `support-tickets`, `auth`, `health`, `flight-status`, `manage-booking`,
-  `profile`.
+  `admins.ts`) came back fully wired. The audit was then finished across
+  every remaining controller (`files`, `panels`, `agency-portal`,
+  `agencies`, `audit`, `contact`, `support-tickets`, `auth`, `health`,
+  `flight-status`, `manage-booking`, `profile`) — all confirmed fully
+  wired (audit's endpoints turned out to be split across
+  `it-manager.ts`/`admins.ts` frontend callers, not a real gap). The only
+  module with real remaining gaps was `flights`: aircraft-type-change
+  (`PATCH /flights/:instanceId/aircraft`, needing a step-up form and a
+  missing aircraft-types listing endpoint) and fare-rules CRUD (a bigger,
+  undesigned admin table). Reported both to the user; picked
+  aircraft-type-change to build now (Phase 38 below) as the smaller,
+  better-specified, lower-invention-risk option, leaving fare-rules CRUD
+  deferred for explicit direction.
 
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is
