@@ -203,6 +203,21 @@ export class FlightsService {
     return this.prisma.airport.findMany({ orderBy: { cityFa: 'asc' } });
   }
 
+  /** Reference data for the aircraft-type-change form — no such listing
+   * existed anywhere; every other caller of `AircraftSeatMap` already
+   * knows the exact type string it wants (e.g. from `Flight.aircraftType`
+   * or a `changeAircraftType` override), so this is the first place that
+   * needs the full catalog. */
+  async aircraftTypes() {
+    const maps = await this.prisma.aircraftSeatMap.findMany({
+      orderBy: { aircraftType: 'asc' },
+    });
+    return maps.map((m) => ({
+      aircraftType: m.aircraftType,
+      capacity: enumerateSeats(m).length,
+    }));
+  }
+
   async create(
     actor: AuthenticatedUser,
     dto: {
@@ -333,6 +348,7 @@ export class FlightsService {
         instance.capacity > 0
           ? Math.round((sold / instance.capacity) * 100)
           : 0,
+      aircraftType: resolveAircraftType(instance),
     };
   }
 

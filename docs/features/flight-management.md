@@ -64,9 +64,16 @@ untouched). Design source: FLIGHTS MANAGEMENT sections of
 - [x] An EMPLOYEE granted `fl_manage` (with `fl_view`) can `POST /flights` and `PATCH /flights/:instanceId/plan`; an EMPLOYEE with only `fl_view` gets 403 on the same write endpoints — `backend/test/phase27-employee-fl-manage-ag-settle-fn-invoices.e2e-spec.ts: 'an employee freshly granted fl_manage can create a flight and plan an instance; fl_view alone (no fl_manage) is denied'`
 - [x] `fl_manage` unlocks the `flights` nav tab — `phase27-....e2e-spec.ts: 'fl_manage unlocks the "flights" nav tab'`
 
+### Phase 38 — تغییر نوع هواپیما (aircraft-type change) frontend closure
+- [x] `GET /flights/aircraft-types` lists every seeded `AircraftSeatMap` type with its real computed capacity — `backend/test/phase13-reservation-engine.e2e-spec.ts: 'GET /flights/aircraft-types lists every seat-map type with its real computed capacity'`
+- [x] `GET /flights/:instanceId` detail response includes `aircraftType` reflecting any per-instance override — `backend/test/phase13-reservation-engine.e2e-spec.ts` (assertion added after the existing successful aircraft-change test)
+- [x] Flight-detail modal shows current نوع هواپیما, تغییر reveals a real dropdown (not free text) sourced from the catalog endpoint, requires step-up 2FA (`PRICE_CAPACITY_CHANGE` scope, same as نرخ‌گذاری), and calls `PATCH /flights/:instanceId/aircraft` on submit — `frontend/src/features/flights/FlightsPage.test.tsx › "aircraft-type change" › "success flow with step-up"`
+- [x] `CAPACITY_BELOW_CONFIRMED` conflict from the backend is surfaced inline in the same modal — `FlightsPage.test.tsx › "aircraft-type change" › "error-display flow"`
+
 ### Deferred (explicit, per docs)
 - خروجی Excel (both sub-tabs) — same deferral as Phase 3
 - RRULE recurring schedules — no design UI exists; single-instance creation only
+- فرم‌های نرخ (fare-rules CRUD, `GET/POST/PATCH/DELETE /flights/:instanceId/fare-rules`, Phase 13 Part B) — backend complete and e2e-tested, but a materially bigger admin table (fare class, channel restrictions, refund/exchange penalties) with no design-reference screen; deferred for explicit direction rather than inventing its UX unilaterally.
 
 ---
 
