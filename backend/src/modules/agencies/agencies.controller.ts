@@ -21,6 +21,7 @@ import { IssueInvoiceDto } from './dto/issue-invoice.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { DecideCreditRequestDto } from './dto/decide-credit-request.dto';
 import { DecideWebserviceRequestDto } from './dto/decide-webservice-request.dto';
+import { DecideDocumentDto } from './dto/decide-document.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -370,6 +371,30 @@ export class AgenciesController {
       dto.approve,
       dto.stepUpChallengeId,
       dto.stepUpCode,
+    );
+    return { success: true, data };
+  }
+
+  @Get(':id/documents')
+  @ApiOperation({ summary: 'مدارک آپلودشده آژانس (مجوز/قرارداد) برای بازبینی' })
+  async listDocuments(@Param('id') id: string) {
+    const data = await this.agencies.listDocuments(id);
+    return { success: true, data };
+  }
+
+  @Patch(':id/documents/:docId/decide')
+  @ApiOperation({ summary: 'تأیید/رد مدرک آپلودشدهٔ آژانس' })
+  async decideDocument(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id') id: string,
+    @Param('docId') docId: string,
+    @Body() dto: DecideDocumentDto,
+  ) {
+    const data = await this.agencies.decideDocument(
+      actor,
+      id,
+      docId,
+      dto.approve,
     );
     return { success: true, data };
   }

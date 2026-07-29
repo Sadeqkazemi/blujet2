@@ -532,4 +532,78 @@ describe('Agency Portal (e2e)', () => {
       .set('Authorization', auth(employee.accessToken));
     expect(res.status).toBe(403);
   });
+
+  // ── Document review (staff-side) ────────────────────────────────────────
+
+  async function seedDocument(agencyId: string) {
+    const stored = await prisma.storedFile.create({
+      data: {
+        ownerId: agencyId,
+        fileName: 'مجوز-فعالیت.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 12_345,
+        path: `/tmp/test-${crypto.randomUUID()}.pdf`,
+      },
+    });
+    return prisma.agencyDocument.create({
+      data: { agencyId, fileId: stored.id, docType: 'LICENSE' },
+    });
+  }
+
+  it('GET /agencies/:id/documents lists uploaded documents PENDING by default', async () => {
+    const agency = await createFreshAgency();
+    const doc = await seedDocument(agency.id);
+    const senior = await loginAs(app, 'senior.rahimi');
+    const res = await request(app.getHttpServer())
+      .get(`/agencies/${agency.id}/documents`)
+      .set('Authorization', auth(senior.accessToken));
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+    expect(res.body.data[0].id).toBe(doc.id);
+    expect(res.body.data[0].status).toBe('PENDING');
+    expect(res.body.data[0].file.fileName).toBe('مجوز-فعالیت.pdf');
+  });
+
+  it('PATCH /agencies/:id/documents/:docId/decide approves/rejects; re-deciding 409s; wrong agency 404s', async () => {
+    const agency = await createFreshAgency();
+    const otherAgency = await createFreshAgency();
+    const doc = await seedDocument(agency.id);
+    const senior = await loginAs(app, 'senior.rahimi');
+
+    const wrongAgencyRes = await request(app.getHttpServer())
+      .patch(`/agencies/${otherAgency.id}/documents/${doc.id}/decide`)
+      .set('Authorization', auth(senior.accessToken))
+      .send({ approve: true });
+    expect(wrongAgencyRes.status).toBe(404);
+
+    const approveRes = await request(app.getHttpServer())
+      .patch(`/agencies/${agency.id}/documents/${doc.id}/decide`)
+      .set('Authorization', auth(senior.accessToken))
+      .send({ approve: true });
+    expect(approveRes.status).toBe(200);
+    expect(approveRes.body.data.status).toBe('APPROVED');
+
+    const redecideRes = await request(app.getHttpServer())
+      .patch(`/agencies/${agency.id}/documents/${doc.id}/decide`)
+      .set('Authorization', auth(senior.accessToken))
+      .send({ approve: false });
+    expect(redecideRes.status).toBe(409);
+  });
+
+  it('GET .../documents and decide are 403 for a non-AGENCY_TAB staff role', async () => {
+    const agency = await createFreshAgency();
+    const doc = await seedDocument(agency.id);
+    const employee = await loginAs(app, 'com.ahmadi');
+
+    const listRes = await request(app.getHttpServer())
+      .get(`/agencies/${agency.id}/documents`)
+      .set('Authorization', auth(employee.accessToken));
+    expect(listRes.status).toBe(403);
+
+    const decideRes = await request(app.getHttpServer())
+      .patch(`/agencies/${agency.id}/documents/${doc.id}/decide`)
+      .set('Authorization', auth(employee.accessToken))
+      .send({ approve: true });
+    expect(decideRes.status).toBe(403);
+  });
 });

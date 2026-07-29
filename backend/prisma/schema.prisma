@@ -805,8 +805,8 @@ enum AgencyDocumentStatus {
   REJECTED
 }
 
-// Staff-side review is deferred (see docs) — every row stays PENDING until
-// that workflow is built; the status enum exists now to stay forward-compatible.
+// Staff-side review (approve/reject) lives in AgenciesService.decideDocument
+// — see docs/API.md's Phase 39 section.
 model AgencyDocument {
   id        String               @id @default(uuid())
   agencyId  String

@@ -2,8 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import {
+  decideAgencyDocument,
   fetchAgencyApiKeys,
   fetchAgencyDetail,
+  fetchAgencyDocuments,
   fetchAgencyInvoices,
   fetchAgencyMessages,
   issueAgencyApiKey,
@@ -21,11 +23,12 @@ import { faDigits, faMoney, parseTomanToRial } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime, parseJalaliDateToIso } from '../../lib/jalali';
 import { useStepUp } from '../../hooks/useStepUp';
 import Modal from '../../components/Modal';
-import { INVOICE_STATUS, TIER_LABELS, statusBadge } from './agency-labels';
+import { DOCUMENT_STATUS, DOCUMENT_TYPE_LABELS, INVOICE_STATUS, TIER_LABELS, statusBadge } from './agency-labels';
 import type {
   AgencyApiKey,
   AgencyApiScope,
   AgencyDetail,
+  AgencyDocument,
   AgencyInvoice,
   AgencyMessage,
 } from '../../types/agencies';
@@ -101,6 +104,9 @@ export default function AgencyDetailPage() {
   const [messages, setMessages] = useState<AgencyMessage[]>([]);
   const [messageDraft, setMessageDraft] = useState('');
 
+  const [documents, setDocuments] = useState<AgencyDocument[]>([]);
+  const [documentError, setDocumentError] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     setError(null);
     try {
@@ -111,6 +117,9 @@ export default function AgencyDetailPage() {
         const [inv, msgs] = await Promise.all([fetchAgencyInvoices(agencyId), fetchAgencyMessages(agencyId)]);
         setInvoices(inv);
         setMessages(msgs);
+      }
+      if (role === 'SENIOR_MANAGER' || role === 'FINANCE_MANAGER' || role === 'COMMERCIAL_MANAGER') {
+        setDocuments(await fetchAgencyDocuments(agencyId));
       }
       // EMPLOYEE holding fn_invoices reaches the same invoices table as
       // COMMERCIAL_MANAGER (via the non-tabbed overview branch below) but
@@ -267,6 +276,17 @@ export default function AgencyDetailPage() {
     }
   }
 
+  async function onDecideDocument(doc: AgencyDocument, approve: boolean) {
+    setDocumentError(null);
+    try {
+      await decideAgencyDocument(agencyId, doc.id, approve);
+      setNotice(approve ? 'مدرک تأیید شد ✓' : 'مدرک رد شد.');
+      setDocuments(await fetchAgencyDocuments(agencyId));
+    } catch {
+      setDocumentError('خطا در ثبت تصمیم روی مدرک.');
+    }
+  }
+
   async function onSendMessage() {
     const body = messageDraft.trim();
     if (!body) return;
@@ -346,6 +366,49 @@ export default function AgencyDetailPage() {
       <StatBox label="بلیط صادرشده" value={faDigits(detail.stats.ticketsIssued)} />
       <StatBox label="مسافران" value={faDigits(detail.stats.passengers)} />
     </div>
+  );
+
+  const documentsCard = (isSenior || isFinance || isCommercial) && (
+    <SectionCard title="مدارک آپلودشده">
+      {documentError && <p className="mb-3 rounded-lg bg-danger/10 p-2 text-xs text-danger">{documentError}</p>}
+      {documents.length === 0 ? (
+        <p className="text-xs text-muted">این آژانس هنوز مدرکی آپلود نکرده است.</p>
+      ) : (
+        <div className="space-y-2">
+          {documents.map((doc) => {
+            const status = DOCUMENT_STATUS[doc.status];
+            return (
+              <div key={doc.id} className="flex items-center justify-between rounded-lg bg-surface p-3">
+                <div className="min-w-0">
+                  <div className="text-xs font-bold text-ink">{DOCUMENT_TYPE_LABELS[doc.docType]}</div>
+                  <div className="ltr truncate text-[11px] text-muted">{doc.file.fileName}</div>
+                  <div className="mt-0.5 text-[10px] text-muted">{formatJalaliDateTime(doc.createdAt)}</div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${status.className}`}>{status.label}</span>
+                  {doc.status === 'PENDING' && (
+                    <>
+                      <button
+                        onClick={() => void onDecideDocument(doc, true)}
+                        className="rounded-lg bg-[#059669] px-2.5 py-1 text-[11px] font-bold text-white transition hover:bg-[#047857]"
+                      >
+                        تأیید
+                      </button>
+                      <button
+                        onClick={() => void onDecideDocument(doc, false)}
+                        className="rounded-lg bg-danger px-2.5 py-1 text-[11px] font-bold text-white transition hover:bg-danger/90"
+                      >
+                        رد
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </SectionCard>
   );
 
   const scoreCard = detail.activityScore && (
@@ -649,6 +712,7 @@ export default function AgencyDetailPage() {
       {/* isCommercial is always false in this non-tabbed branch, so this
          only ever renders for an EMPLOYEE holding fn_invoices. */}
       {invoicesSection}
+      {documentsCard}
       {infoAndActivity}
     </div>
   );
@@ -725,6 +789,7 @@ export default function AgencyDetailPage() {
             <div className="space-y-4">
               {creditCard}
               {invoicesSection}
+              {documentsCard}
             </div>
           )}
           {tab === 'messages' && messagesSection}

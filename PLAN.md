@@ -542,6 +542,32 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   e2e suite: 340/342 passing, exactly those two known-pre-existing
   failures. See `docs/features/flight-management.md`'s Phase 38 section,
   `docs/API.md`/`docs/DB_SCHEMA.md`'s Phase 38 notes.
+- [x] **Phase 39 — بازبینی مدارک آژانس (staff-side agency document
+  review)** — triggered when the user asked for an explanation of the
+  agency-portal deferred list; investigating it found two of the three
+  named items were actually stale (already built by later phases without
+  this file being updated) and one was real: `AgencyDocument.status`
+  had existed since the model shipped but no staff endpoint could ever
+  see or decide on an upload, so every document sat `PENDING` forever
+  (the Prisma model's own comment said as much). Built the same
+  request/decide pattern already used twice in this codebase (credit-
+  requests, webservice-requests): `GET /agencies/:id/documents` +
+  `PATCH .../documents/:docId/decide` (`AGENCY_TAB_ROLES`, no step-up —
+  approving a document changes no money/capacity/access), and a «مدارک
+  آپلودشده» card in `AgencyDetailPage.tsx`. Corrected
+  `docs/features/agency-portal.md`'s deferred list: allocated-seats
+  (Phase 13 Part C) and webservice self-service (Phase 23) were already
+  built; documents is now built too; forgot-password is now scoped down
+  to AGENCY-only (customer/staff were resolved in Phase 21, discovered
+  while re-checking that bullet). **Found but deliberately not fixed,
+  flagged instead**: the credit-requests/webservice-requests endpoints
+  this phase's code mirrors have no staff-side frontend either — same
+  shape of gap, kept out of this phase's diff for reviewability. 3 new
+  backend e2e tests, 2 new frontend tests (plus `fetchAgencyDocuments`
+  mocked into the 6 existing role tests that now also call it, to avoid
+  an unmocked-fetch regression). See `docs/API.md`/`docs/DB_SCHEMA.md`'s
+  Phase 39 sections, `docs/features/agency-portal.md`'s corrected
+  checklist + deferred list.
 - [x] With Phases 35–37, the manual endpoint audit had covered
   `reconciliation`, `reservation`, and `it-manager`'s `services` module;
   every other controller checked so far (`pricing`, `flightops`,

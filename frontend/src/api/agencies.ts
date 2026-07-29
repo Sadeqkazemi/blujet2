@@ -4,6 +4,7 @@ import type {
   AgencyApiScope,
   AgencyCredit,
   AgencyDetail,
+  AgencyDocument,
   AgencyInvoice,
   AgencyListResult,
   AgencyMembershipRequest,
@@ -121,6 +122,14 @@ export function fetchAgencyMessages(id: string) {
 
 export function postAgencyMessage(id: string, body: string) {
   return apiPost<AgencyMessage>(`/agencies/${id}/messages`, { body });
+}
+
+export function fetchAgencyDocuments(id: string) {
+  return apiGet<AgencyDocument[]>(`/agencies/${id}/documents`);
+}
+
+export function decideAgencyDocument(id: string, docId: string, approve: boolean) {
+  return apiPatch<AgencyDocument>(`/agencies/${id}/documents/${docId}/decide`, { approve });
 }
 
 export function notifyAllDebtors() {
