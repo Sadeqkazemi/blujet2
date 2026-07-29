@@ -57,6 +57,7 @@ describe('AgencyDetailPage', () => {
     mockRole('SENIOR_MANAGER');
     vi.spyOn(agenciesApi, 'fetchAgencyDetail').mockResolvedValue(DETAIL);
     vi.spyOn(agenciesApi, 'fetchAgencyApiKeys').mockResolvedValue([]);
+    vi.spyOn(agenciesApi, 'fetchAgencyDocuments').mockResolvedValue([]);
 
     renderPage();
 
@@ -73,6 +74,7 @@ describe('AgencyDetailPage', () => {
   it('Finance Manager sees credit + settle and no API-key/invoice-issue/messages', async () => {
     mockRole('FINANCE_MANAGER');
     vi.spyOn(agenciesApi, 'fetchAgencyDetail').mockResolvedValue(DETAIL_WITH_SCORE);
+    vi.spyOn(agenciesApi, 'fetchAgencyDocuments').mockResolvedValue([]);
 
     renderPage();
 
@@ -88,6 +90,7 @@ describe('AgencyDetailPage', () => {
   it('Commercial Manager sees the نمای کلی/مالی/مکاتبه‌ها sub-tabs with invoice issuance and chat', async () => {
     mockRole('COMMERCIAL_MANAGER');
     vi.spyOn(agenciesApi, 'fetchAgencyDetail').mockResolvedValue(DETAIL_WITH_SCORE);
+    vi.spyOn(agenciesApi, 'fetchAgencyDocuments').mockResolvedValue([]);
     vi.spyOn(agenciesApi, 'fetchAgencyInvoices').mockResolvedValue([
       {
         id: 'inv1',
@@ -183,6 +186,7 @@ describe('AgencyDetailPage', () => {
     mockRole('SENIOR_MANAGER');
     vi.spyOn(agenciesApi, 'fetchAgencyDetail').mockResolvedValue(DETAIL);
     vi.spyOn(agenciesApi, 'fetchAgencyApiKeys').mockResolvedValue([]);
+    vi.spyOn(agenciesApi, 'fetchAgencyDocuments').mockResolvedValue([]);
     const suspend = vi.spyOn(agenciesApi, 'suspendAgency').mockResolvedValue(DETAIL);
 
     const { default: userEvent } = await import('@testing-library/user-event');
@@ -202,6 +206,7 @@ describe('AgencyDetailPage', () => {
   it('the credit modal parses a toman amount (Persian digits allowed) into rial', async () => {
     mockRole('FINANCE_MANAGER');
     vi.spyOn(agenciesApi, 'fetchAgencyDetail').mockResolvedValue(DETAIL);
+    vi.spyOn(agenciesApi, 'fetchAgencyDocuments').mockResolvedValue([]);
     const update = vi
       .spyOn(agenciesApi, 'updateAgencyCredit')
       .mockResolvedValue({ limitIrr: 2_000_000_000, usedIrr: 310_000_000, remainingIrr: 1_690_000_000 });
@@ -216,5 +221,51 @@ describe('AgencyDetailPage', () => {
 
     // 200,000,000 toman -> 2,000,000,000 rial
     await waitFor(() => expect(update).toHaveBeenCalledWith('a1', 2_000_000_000));
+  });
+
+  it('Finance Manager can review an uploaded document and approve it', async () => {
+    mockRole('FINANCE_MANAGER');
+    vi.spyOn(agenciesApi, 'fetchAgencyDetail').mockResolvedValue(DETAIL);
+    vi.spyOn(agenciesApi, 'fetchAgencyDocuments').mockResolvedValue([
+      {
+        id: 'doc1',
+        agencyId: 'a1',
+        docType: 'LICENSE',
+        status: 'PENDING',
+        createdAt: '2026-07-01T10:00:00.000Z',
+        file: { fileName: 'مجوز.pdf', sizeBytes: 1024, mimeType: 'application/pdf' },
+      },
+    ]);
+    const decide = vi.spyOn(agenciesApi, 'decideAgencyDocument').mockResolvedValue({
+      id: 'doc1',
+      agencyId: 'a1',
+      docType: 'LICENSE',
+      status: 'APPROVED',
+      createdAt: '2026-07-01T10:00:00.000Z',
+      file: { fileName: 'مجوز.pdf', sizeBytes: 1024, mimeType: 'application/pdf' },
+    });
+
+    const { default: userEvent } = await import('@testing-library/user-event');
+    renderPage();
+
+    expect(await screen.findByText('مدارک آپلودشده')).toBeInTheDocument();
+    expect(screen.getByText('مجوز فعالیت')).toBeInTheDocument();
+    expect(screen.getByText('مجوز.pdf')).toBeInTheDocument();
+    expect(screen.getByText('در انتظار بررسی')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'تأیید' }));
+    await waitFor(() => expect(decide).toHaveBeenCalledWith('a1', 'doc1', true));
+    expect(await screen.findByText('مدرک تأیید شد ✓')).toBeInTheDocument();
+  });
+
+  it('EMPLOYEE never sees the documents card (not fetched for that role)', async () => {
+    mockRole('EMPLOYEE');
+    vi.spyOn(agenciesApi, 'fetchAgencyDetail').mockResolvedValue(DETAIL);
+    vi.spyOn(agenciesApi, 'fetchAgencyInvoices').mockResolvedValue([]);
+
+    renderPage();
+
+    expect(await screen.findByText('اعتبار آژانس')).toBeInTheDocument();
+    expect(screen.queryByText('مدارک آپلودشده')).not.toBeInTheDocument();
   });
 });

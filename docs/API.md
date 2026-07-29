@@ -1671,3 +1671,58 @@ penalties) with no design-reference screen to build against, unlike this
 phase's single-field form over an existing pattern. Left for a future
 phase with explicit direction rather than inventing the table's UX
 unilaterally.
+
+## Phase 39 — بازبینی مدارک آژانس (staff-side agency document review)
+
+`AgencyDocument` (Agency Portal track, self-service upload) has had a
+real `status` enum (`PENDING`/`APPROVED`/`REJECTED`) since it shipped,
+and its own TypeORM comment said so explicitly: *"Staff-side review is
+deferred... every row stays PENDING until that workflow is built."*
+`POST /agency-portal/documents` (agency uploads a license/contract) has
+always worked, but no staff endpoint could see or decide on the result —
+every uploaded document sat `PENDING` forever. Found while explaining the
+audit's agency-portal findings to the user; correcting two other items on
+that same list that turned out to be **already built** (not gaps): the
+«صندلی‌های تخصیص‌یافته» allocated-seats tab (`GET
+/agency-portal/allotments`, wired since Phase 13 Part C /
+`AgencySeatsPage.tsx`) and the «وب‌سرویس» self-service purchase flow
+(Phase 23, above) — `docs/features/agency-portal.md`'s deferred list
+still named both as unbuilt; that's now corrected there.
+
+New endpoints, `backend/src/modules/agencies/` — same `AGENCY_TAB_ROLES`
+guard as every other staff-side request-review pair here (credit-requests,
+webservice-requests), no per-method narrowing:
+
+- `GET /agencies/:id/documents` — this agency's uploaded documents,
+  newest first, with the same `file: { fileName, sizeBytes, mimeType }`
+  shape `GET /agency-portal/documents` already returns.
+- `PATCH /agencies/:id/documents/:docId/decide` — `{ approve: boolean }`.
+  404 if the document doesn't belong to `:id`; 409 if already decided
+  (conditional `updateMany` guards a concurrent double-decision race,
+  same pattern as `decideCreditRequest`/`decideWebserviceRequest`). No
+  step-up required — unlike credit-limit changes or API-key issuance,
+  approving/rejecting a document changes no money, capacity, or access;
+  it only unblocks a human reading the file. `AgencyDocument` has no
+  `decidedById`/`decidedAt` columns (unlike the other two request
+  models), so only `status` is written — a schema gap, not a bug: adding
+  those columns is a trivial follow-up if audit trail granularity beyond
+  the existing `AuditLog(category=AGENCY)` row is ever needed.
+
+Frontend: `AgencyDetailPage.tsx` (Senior/Finance panels' overview tab,
+Commercial panel's مالی sub-tab — matching where creditCard/invoicesSection
+already live for Commercial) gained a «مدارک آپلودشده» card: doc-type
+label, file name, Jalali upload date, status pill, تأیید/رد buttons on
+`PENDING` rows only. `EMPLOYEE` never fetches or sees this card (matches
+the endpoint's role gate — no `EmployeePermission` key currently grants
+document review).
+
+**Not corrected this phase, flagged instead**: while building this,
+discovered that the credit-requests and webservice-requests staff-decide
+endpoints this phase's code directly mirrors have **no frontend UI of
+their own either** — `AgencyDetailPage.tsx` never called
+`GET/PATCH .../credit-requests` or `GET/PATCH .../webservice-requests`
+before this phase, and still doesn't. Every credit-increase and
+webservice-purchase request submitted by an agency is currently
+decidable only via curl/Supertest. This is a real, parallel gap of the
+same shape as documents — reported to the user, deliberately left
+out of this phase's diff so it stays reviewable, not silently bundled in.

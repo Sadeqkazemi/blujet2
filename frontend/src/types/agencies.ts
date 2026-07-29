@@ -3,6 +3,8 @@ export type AgencyMembershipStatus = 'PENDING' | 'REFERRED' | 'APPROVED' | 'REJE
 export type AgencyApiScope = 'FULL' | 'SEARCH_BOOK' | 'SEARCH_ONLY';
 export type AgencyApiKeyStatus = 'ACTIVE' | 'SUSPENDED';
 export type AgencyInvoiceStatus = 'UNPAID' | 'PAID' | 'OVERDUE';
+export type AgencyDocumentType = 'LICENSE' | 'CONTRACT' | 'OTHER';
+export type AgencyDocumentStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
 export interface AgencyListRow {
   id: string;
@@ -108,6 +110,15 @@ export interface AgencyInvoice {
   amountIrr: number;
   status: AgencyInvoiceStatus;
   paidAt: string | null;
+}
+
+export interface AgencyDocument {
+  id: string;
+  agencyId: string;
+  docType: AgencyDocumentType;
+  status: AgencyDocumentStatus;
+  createdAt: string;
+  file: { fileName: string; sizeBytes: number; mimeType: string };
 }
 
 export interface AgencyMessage {
