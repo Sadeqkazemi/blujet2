@@ -1,12 +1,21 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import ManageBookingPage from './ManageBookingPage';
 import * as publicSiteApi from '../../api/publicSite';
 import * as useAuthModule from '../../hooks/useAuth';
+import * as useLocaleModule from '../../hooks/useLocale';
 import { ApiRequestError } from '../../api/envelope';
 import type { BookingDetail, RefundRequestView } from '../../types/public-site';
+
+function mockLocale(locale: 'fa' | 'en' | 'ar') {
+  vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale, setLocale: vi.fn() });
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 const BOOKING: BookingDetail = {
   id: 'b1',
@@ -111,5 +120,55 @@ describe('ManageBookingPage', () => {
 
     expect(screen.getByRole('button', { name: /تغییر صندلی/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: /دانلود بلیط/ })).toBeDisabled();
+  });
+
+  it('renders translated heading, labels, and result in English', async () => {
+    mockLocale('en');
+    vi.spyOn(publicSiteApi, 'lookupBookingByPnrAndLastName').mockResolvedValue(BOOKING);
+    const submit = vi.spyOn(publicSiteApi, 'submitAnonymousRefund').mockResolvedValue({
+      id: 'r1',
+      bookingId: 'b1',
+      status: 'SUBMITTED',
+      penaltyPct: 30,
+      penaltyAmountIrr: 4_800_000,
+      refundableIrr: 11_200_000,
+      totalPaidIrr: 16_000_000,
+      createdAt: new Date().toISOString(),
+    } satisfies RefundRequestView);
+    renderPage();
+
+    expect(screen.getByRole('heading', { name: 'Manage Your Booking' })).toBeInTheDocument();
+    expect(screen.getByText('Booking code')).toBeInTheDocument();
+
+    await userEvent.type(screen.getByTestId('mb-pnr'), 'BJ4X2K');
+    await userEvent.type(screen.getByTestId('mb-lastname'), 'رضایی');
+    await userEvent.click(screen.getByTestId('mb-lookup'));
+    await screen.findByTestId('mb-pnr-show');
+
+    expect(screen.getByText('Economy')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Refund Ticket/ })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId('mb-open-refund'));
+    await userEvent.type(screen.getByTestId('mb-iban'), 'IR820170000000332211009900');
+    await userEvent.click(screen.getByTestId('mb-refund-confirm'));
+
+    expect(await screen.findByText('Refund request submitted')).toBeInTheDocument();
+    expect(submit).toHaveBeenCalledWith('BJ4X2K', 'رضایی', 'IR820170000000332211009900');
+  });
+
+  it('renders translated heading and lookup-error message in Arabic', async () => {
+    mockLocale('ar');
+    vi.spyOn(publicSiteApi, 'lookupBookingByPnrAndLastName').mockRejectedValue(
+      new ApiRequestError('NOT_FOUND', 'لم يتم العثور على الحجز.', 404),
+    );
+    renderPage();
+
+    expect(screen.getByRole('heading', { name: 'إدارة الحجز' })).toBeInTheDocument();
+
+    await userEvent.type(screen.getByTestId('mb-pnr'), 'ZZZZZZ');
+    await userEvent.type(screen.getByTestId('mb-lastname'), 'ناشناس');
+    await userEvent.click(screen.getByTestId('mb-lookup'));
+
+    expect(await screen.findByTestId('mb-lookup-error')).toHaveTextContent('لم يتم العثور على الحجز.');
   });
 });
