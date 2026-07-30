@@ -5,9 +5,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ContactPage from './ContactPage';
 import * as contactApi from '../../api/contact';
 import * as useAuthModule from '../../hooks/useAuth';
+import * as useLocaleModule from '../../hooks/useLocale';
 import { ApiRequestError } from '../../api/envelope';
 
+function mockLocale(locale: 'fa' | 'en' | 'ar') {
+  vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale, setLocale: vi.fn() });
+}
+
 beforeEach(() => {
+  vi.restoreAllMocks();
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status: 'unauthenticated',
     user: null,
@@ -79,5 +85,43 @@ describe('ContactPage', () => {
     await userEvent.click(screen.getByTestId('contact-submit'));
 
     expect(await screen.findByText('خطا در ارسال پیام.')).toBeInTheDocument();
+  });
+
+  it('renders translated hero, channels, and form in English', async () => {
+    mockLocale('en');
+    const submit = vi.spyOn(contactApi, 'submitContactMessage').mockResolvedValue({
+      id: 'c2',
+      name: 'Negar Rezaei',
+      phone: '09121234567',
+      subject: 'Payment issue',
+      body: 'Hello, I had a question.',
+      createdAt: new Date().toISOString(),
+    });
+    renderPage();
+    expect(screen.getByRole('heading', { name: 'Contact Us' })).toBeInTheDocument();
+    expect(screen.getByText('24-Hour Support Line')).toBeInTheDocument();
+    expect(screen.getByText('Head Office')).toBeInTheDocument();
+
+    await userEvent.type(screen.getByTestId('contact-name'), 'Negar Rezaei');
+    await userEvent.type(screen.getByTestId('contact-phone'), '09121234567');
+    await userEvent.type(screen.getByTestId('contact-subject'), 'Payment issue');
+    await userEvent.type(screen.getByTestId('contact-msg'), 'Hello, I had a question.');
+    await userEvent.click(screen.getByTestId('contact-submit'));
+
+    expect(await screen.findByText('Your message has been sent')).toBeInTheDocument();
+    expect(submit).toHaveBeenCalledWith({
+      name: 'Negar Rezaei',
+      phone: '09121234567',
+      subject: 'Payment issue',
+      body: 'Hello, I had a question.',
+    });
+  });
+
+  it('renders translated hero and channels in Arabic', () => {
+    mockLocale('ar');
+    renderPage();
+    expect(screen.getByRole('heading', { name: 'اتصل بنا' })).toBeInTheDocument();
+    expect(screen.getByText('خط الدعم على مدار الساعة')).toBeInTheDocument();
+    expect(screen.getByText('المكتب الرئيسي')).toBeInTheDocument();
   });
 });
