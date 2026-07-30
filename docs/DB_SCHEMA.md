@@ -1775,3 +1775,130 @@ model ClubTierRule {
 - No new enum: reuses the existing `ClubTier` enum (`SILVER | GOLD |
   PLATINUM`) from Phase 5.
 - Migration: `20260730162159_phase65_club_tier_rules`.
+
+## Phase 66 — نظرسنجی مسافران (Passenger Satisfaction Survey)
+
+See `docs/API.md`'s Phase 66 section for the full design-source reasoning
+and the scope decisions (SMS-only delivery, one rating not per-question,
+lazy materialization via the survey module's own reads, new
+non-ml-service AI provider, real token-based usage logging). New
+`survey` module. Five new models:
+
+```prisma
+model SurveySettings {
+  id            String   @id @default(uuid())
+  enabled       Boolean  @default(true)
+  title         String   @default("نظرسنجی رضایت مسافران")
+  updatedById   String?
+  updatedBy     User?    @relation("SurveySettingsUpdatedBy", fields: [updatedById], references: [id])
+  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now())
+
+  @@map("survey_settings")
+}
+
+model SurveyQuestion {
+  id        String   @id @default(uuid())
+  label     String
+  order     Int
+  createdAt DateTime @default(now())
+
+  @@map("survey_questions")
+}
+
+model SurveyInvite {
+  id               String          @id @default(uuid())
+  bookingId        String          @unique
+  booking          Booking         @relation(fields: [bookingId], references: [id])
+  flightInstanceId String
+  flightInstance   FlightInstance  @relation(fields: [flightInstanceId], references: [id])
+  token            String          @unique @default(uuid())
+  smsSentAt        DateTime?
+  respondedAt      DateTime?
+  createdAt        DateTime        @default(now())
+  response         SurveyResponse?
+
+  @@map("survey_invites")
+}
+
+model SurveyResponse {
+  id        String       @id @default(uuid())
+  inviteId  String       @unique
+  invite    SurveyInvite @relation(fields: [inviteId], references: [id])
+  rating    Int
+  comment   String?
+  createdAt DateTime     @default(now())
+
+  @@map("survey_responses")
+}
+
+model AiUsageLog {
+  id           String   @id @default(uuid())
+  provider     String
+  userId       String
+  user         User     @relation("AiUsageLogUser", fields: [userId], references: [id])
+  contextId    String?
+  inputTokens  Int
+  outputTokens Int
+  costIrr      Int?
+  createdAt    DateTime @default(now())
+
+  @@map("ai_usage_logs")
+}
+```
+
+Plus, on the `User` model: `surveySettingsEdits SurveySettings[]
+@relation("SurveySettingsUpdatedBy")` and `aiUsageLogs AiUsageLog[]
+@relation("AiUsageLogUser")`, following the same named-relation pattern
+as `clubTierRuleEdits` (Phase 65).
+
+- `SurveySettings` — singleton (application-enforced, same pattern as
+  Phase 65's `ClubTierRule`); `prisma/seed.ts` creates the one default
+  row (`enabled: true`, design's default title).
+- `SurveyQuestion` — not a singleton; IT manager CRUDs a flat list.
+  `prisma/seed.ts` seeds the same 5 default questions the design ships
+  with (`رضایت کلی از سفر` / `برخورد و کیفیت خدمه پروازی` / `دقت در
+  زمان پرواز` / `راحتی صندلی و کابین` / `سرعت پذیرش و چک‌این`), in that
+  order. Deleting one is a hard delete (this is configuration, not
+  passenger data — no soft-delete requirement applies).
+- `SurveyInvite.bookingId` is `@unique` — at most one invite per booking,
+  created lazily by `materializeSurveyInvites` (new,
+  `survey-lifecycle.util.ts` — calls the existing
+  `materializeFlownBookings` first) the first time a booking is observed
+  `FLOWN` while `SurveySettings.enabled` is true. `flightInstanceId` is
+  denormalized from the booking purely so `GET /survey/results` can
+  group by flight instance without an extra join hop through `Booking`
+  on every read of what's meant to be a lightweight, frequently-polled
+  exec dashboard query.
+- `SurveyInvite.token` is the public link's credential — a random UUID,
+  `@unique`, never derived from any guessable value (not the PNR, not
+  the booking id).
+- `SurveyResponse.inviteId` is `@unique` — enforces "one response per
+  invite" at the DB level, not just in application logic (matches the
+  API's 409-on-resubmit behavior).
+- `SurveyResponse.comment` is nullable — the design's own submission
+  form treats the free-text box as optional, only `rating` is required.
+- No `passengerId` FK on `SurveyInvite`/`SurveyResponse`: the survey is
+  scoped to the booking (whoever books the trip), not to each individual
+  passenger on a multi-passenger booking — matching the design's own
+  one-row-per-flight aggregation, which has no concept of "which
+  passenger" answered.
+- `AiUsageLog` is intentionally generic (`provider: string`, not an enum)
+  so a future third AI provider doesn't require a migration — first
+  value written will be `'survey-summary'`. `costIrr` stays nullable
+  (see API.md's scope-decision note: no per-token pricing table exists
+  to compute a real cost from yet).
+- No new `AuditCategory` enum value is needed for the exec-facing
+  read-only endpoints (nothing to audit — they never mutate data), but
+  `SurveySettings`/`SurveyQuestion` writes by `IT_MANAGER` do go through
+  the existing audit-log table under a new `AuditCategory.SURVEY` value
+  (added alongside the existing ten), matching how every other
+  manager-editable settings screen in this codebase is already audited.
+- `SmsMessageType` (the Prisma enum backing `SmsLog.messageType`, plus
+  the mirrored TS union in `sms-provider.interface.ts`) gained a new
+  `SURVEY_INVITE` value — this **does** require a migration (corrects an
+  earlier draft assumption that it was TS-only).
+- Migrations: `20260730190717_phase66_passenger_survey` (the five new
+  tables + `AuditCategory.SURVEY`) and
+  `20260730190905_phase66_survey_invite_sms_type`
+  (`SmsMessageType.SURVEY_INVITE`).

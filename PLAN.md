@@ -1195,6 +1195,71 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   better-specified, lower-invention-risk option, leaving fare-rules CRUD
   deferred for explicit direction.
 
+- [x] **Phase 66 — نظرسنجی مسافران (Passenger Satisfaction Survey)** —
+  found across three design files during a follow-up domain-scoping
+  discussion (`پنل مدیر IT.dc.html`'s create/configure `survey` tab, and
+  `پنل مدیر عامل.dc.html`/`پنل مدیر ارشد.dc.html`/`پنل رئیس هیئت
+  مدیره.dc.html`'s shared read-only results + AI-summary `survey` tab).
+  Docs (`docs/API.md`, `docs/DB_SCHEMA.md`,
+  `docs/features/passenger-survey.md`) were drafted and explicitly
+  approved by the user before any code was written, per CLAUDE.md
+  workflow rule 1. Five new tables (`SurveySettings`, `SurveyQuestion`,
+  `SurveyInvite`, `SurveyResponse`, `AiUsageLog`) across two migrations
+  (`20260730190717_phase66_passenger_survey` and
+  `20260730190905_phase66_survey_invite_sms_type`), plus a new
+  `AuditCategory.SURVEY` value and a new `SmsMessageType.SURVEY_INVITE`
+  value. Lazy, no-cron invite creation: a new
+  `materializeSurveyInvites` (in `survey/survey-lifecycle.util.ts`)
+  creates a `SurveyInvite` + sends an SMS (via the booking's plaintext
+  `contactPhone`, not decrypted `Passenger.mobileEnc`) for every booking
+  observed `FLOWN` while `SurveySettings.enabled` is true — triggered
+  from the survey module's own `GET /survey/stats`/`GET /survey/results`
+  reads rather than the three originally-drafted call sites (a
+  simplification made during implementation, documented in
+  `docs/API.md`). New `IT_MANAGER`-only config endpoints (settings
+  enable/title, question CRUD, stats), new public no-auth token
+  endpoints (`GET`/`POST /survey/:token`, rate-limited per-IP), and new
+  `CEO`/`SENIOR_MANAGER`/`BOARD_CHAIR`-only read-only results +
+  AI-analyze endpoints (`GET /survey/results`,
+  `POST /survey/results/:flightInstanceId/analyze` — keyed on
+  `flightInstanceId`, not `flightNo` as originally drafted, since a
+  recurring flight number isn't unique across departures). New
+  `SurveySummaryProvider` AI abstraction
+  (`backend/src/modules/ai/survey-summary.provider.ts`) calling the
+  Anthropic Messages API directly — a second, separate `AiProvider`
+  since CLAUDE.md scopes `ml-service` to exactly two unrelated
+  endpoints — gated by `ANTHROPIC_API_KEY`, graceful `null`-on-any-
+  failure fallback (design's own fallback string,
+  `"خلاصه‌ای از نظرات این پرواز در دسترس نیست."`), and a new
+  `AiUsageLog` row per successful call with the **real**
+  `input_tokens`/`output_tokens` from the Anthropic response — closing a
+  pre-existing CLAUDE.md-mandated gap (Phase 6's pricing-AI never
+  implemented usage logging at all). New frontend: public `SurveyPage.tsx`
+  (route `/survey/:token`, deliberately fa-only — no exported design
+  file exists for this brand-new page to extract en/ar vocabulary from,
+  unlike the retrofitted i18n-arc pages), `SurveyConfigPage.tsx`
+  (`IT_MANAGER`), `SurveyResultsPage.tsx` (`CEO`/`SENIOR_MANAGER`/
+  `BOARD_CHAIR`), and a `SurveyRouter.tsx` role-branching component (same
+  pattern as `LogsRouter.tsx`). Backend: 12 new e2e tests
+  (`survey.e2e-spec.ts`) + a new 5-case unit spec for
+  `SurveySummaryProvider` (`survey-summary.provider.spec.ts` — missing
+  key, empty comments, non-2xx, network failure, real success path, all
+  via a mocked `global.fetch`; closes the same "AI provider has no unit
+  test" gap `MlPriceSuggestionProvider` still has). Frontend: 10 new
+  Vitest/RTL tests across the three new pages. Fixed one pre-existing
+  e2e test (`panels.e2e-spec.ts`'s CEO tab-set assertion) to include the
+  new `survey` key, same pattern as Phase 65's `clubrules` addition.
+  Full backend e2e suite: 372/373 passing — the sole failure is the
+  same pre-existing `reporting.e2e-spec.ts` sales-chart reconciliation
+  flake already documented in Phase 51/65's entries (shared
+  `blujet_test` Postgres data drift across many e2e runs this session;
+  confirmed unrelated to this phase, which never touches
+  `Booking`/`LedgerEntry` revenue data). Full backend unit suite: 40/40
+  passing. Full frontend suite: 308/308 passing, 68/68 files. `tsc --noEmit` clean on both packages; lint
+  clean on both (no new warnings). No new Playwright E2E script this
+  phase — consistent with this session's cadence for Phases 51–65. See
+  `docs/features/passenger-survey.md`.
+
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is
 "done" only when every checklist item in its `docs/features/<name>.md` has

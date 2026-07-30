@@ -45,6 +45,7 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'panels', labelFa: 'دسترسی به پنل‌ها', implemented: true },
     { key: 'security', labelFa: 'امنیت و رمز عبور', implemented: true },
     { key: 'logs', labelFa: 'لاگ و رویدادها', implemented: true },
+    { key: 'survey', labelFa: 'نظرسنجی مسافران', implemented: true },
   ],
   BOARD_CHAIR: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
@@ -55,6 +56,7 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'club', labelFa: 'مشتریان VIP', implemented: true },
     { key: 'reservation', labelFa: 'هواپیما', implemented: true },
     { key: 'mgrreports', labelFa: 'گزارش مدیران', implemented: true },
+    { key: 'survey', labelFa: 'نظرسنجی مسافران', implemented: true },
   ],
   SENIOR_MANAGER: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
@@ -70,6 +72,7 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'panels', labelFa: 'دسترسی به پنل‌ها', implemented: true },
     { key: 'security', labelFa: 'امنیت و رمز عبور', implemented: true },
     { key: 'reservation', labelFa: 'سامانه رزرواسیون', implemented: true },
+    { key: 'survey', labelFa: 'نظرسنجی مسافران', implemented: true },
   ],
   FINANCE_MANAGER: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
@@ -106,6 +109,7 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'logs', labelFa: 'لاگ و رویدادها', implemented: true },
     { key: 'backup', labelFa: 'پشتیبان‌گیری', implemented: true },
     { key: 'settings', labelFa: 'تنظیمات سامانه', implemented: true },
+    { key: 'survey', labelFa: 'نظرسنجی مسافران', implemented: true },
   ],
 };
 

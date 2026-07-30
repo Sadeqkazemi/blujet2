@@ -666,6 +666,25 @@ async function main() {
     await prisma.clubTierRule.create({ data: {} });
   }
 
+  // ── Phase 66: passenger survey settings + default question list ────────
+  const existingSurveySettingsCount = await prisma.surveySettings.count();
+  if (existingSurveySettingsCount === 0) {
+    await prisma.surveySettings.create({ data: {} });
+  }
+  const existingSurveyQuestionCount = await prisma.surveyQuestion.count();
+  if (existingSurveyQuestionCount === 0) {
+    const defaultQuestions = [
+      'رضایت کلی از سفر',
+      'برخورد و کیفیت خدمه پروازی',
+      'دقت در زمان پرواز',
+      'راحتی صندلی و کابین',
+      'سرعت پذیرش و چک‌این',
+    ];
+    for (const [order, label] of defaultQuestions.entries()) {
+      await prisma.surveyQuestion.create({ data: { label, order } });
+    }
+  }
+
   // ── Phase 6: pricing proposals (one pending, one registered) ───────────
   const existingProposalCount = await prisma.farePricingProposal.count();
   if (existingProposalCount === 0) {
