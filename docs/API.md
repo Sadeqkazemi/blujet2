@@ -1881,3 +1881,14 @@ every prior page, this one needed zero hand-translation:
 matched the shipped app byte-for-byte. The TOC + section-body two-column
 layout collapses to a single column on mobile via the shared
 `useIsMobile()` hook. See `docs/features/travel-info-page-i18n-responsive.md`.
+
+## Phase 48 — درباره ما (About) real i18n + responsive body content
+
+Frontend-only, no new/changed endpoints. Eighth page translated.
+`AboutPage` translates its hero, stats strip, mission/vision cards, and
+the three values cards into fa/en/ar — extracted from `design-reference-v2/
+درباره ما.dc.html`'s own `isEN` ternaries and `site-data.js`'s `arDeep`
+dictionary, both complete for this page's fa content, so nothing needed
+hand-translation. Stats strip, mission/vision cards, and values cards
+collapse on mobile via the shared `useIsMobile()` hook. See
+`docs/features/about-page-i18n-responsive.md`.
