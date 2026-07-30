@@ -31,6 +31,16 @@ describe('SurveyConfigPage', () => {
     vi.restoreAllMocks();
   });
 
+  it('shows the error message instead of an infinite spinner when the initial fetch fails', async () => {
+    vi.spyOn(surveyApi, 'fetchSurveySettings').mockRejectedValue(new Error('network down'));
+    vi.spyOn(surveyApi, 'fetchSurveyQuestions').mockResolvedValue(QUESTIONS);
+    vi.spyOn(surveyApi, 'fetchSurveyStats').mockResolvedValue(STATS);
+    render(<SurveyConfigPage />);
+
+    expect(await screen.findByText('خطا در دریافت اطلاعات نظرسنجی.')).toBeInTheDocument();
+    expect(screen.queryByText('در حال بارگذاری…')).not.toBeInTheDocument();
+  });
+
   it('renders settings, stats, questions and recent responses', async () => {
     vi.spyOn(surveyApi, 'fetchSurveySettings').mockResolvedValue(SETTINGS);
     vi.spyOn(surveyApi, 'fetchSurveyQuestions').mockResolvedValue(QUESTIONS);

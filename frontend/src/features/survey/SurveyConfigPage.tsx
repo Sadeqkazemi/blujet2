@@ -71,6 +71,13 @@ export default function SurveyConfigPage() {
   }
 
   if (!settings) {
+    if (error) {
+      return (
+        <div className="p-8">
+          <p className="rounded-lg bg-danger/10 p-3 text-sm text-danger">{error}</p>
+        </div>
+      );
+    }
     return <div className="p-8 text-sm text-muted">در حال بارگذاری…</div>;
   }
 

@@ -2,15 +2,41 @@ import type { TypeORMService } from '../../typeorm/typeorm.service';
 import type { SmsService } from '../sms/sms.service';
 import { materializeFlownBookings } from '../flights/flight-lifecycle.util';
 
+function surveyInviteLink(token: string): string {
+  return `${process.env.FRONTEND_URL ?? 'http://localhost:5173'}/survey/${token}`;
+}
+
+async function sendInviteSms(
+  typeorm: TypeORMService,
+  sms: SmsService,
+  inviteId: string,
+  contactPhone: string | null,
+  token: string,
+): Promise<void> {
+  const result = await sms.send(
+    contactPhone,
+    `سفر خوبی داشتید؟ لطفاً نظر خود را با ما در میان بگذارید: ${surveyInviteLink(token)}`,
+    'SURVEY_INVITE',
+  );
+  if (result.success) {
+    await typeorm.surveyInvite.update({
+      where: { id: inviteId },
+      data: { smsSentAt: new Date() },
+    });
+  }
+}
+
 /**
- * Lazily creates a SurveyInvite (+ sends the SMS) for every booking that
- * has reached FLOWN but has none yet — no cron job, same "materialize on
- * read" principle as materializeDepartedInstances/materializeFlownBookings.
- * Called from SurveyService's own read endpoints (config stats + exec
- * results), which are the natural, frequently-polled places this data is
- * consumed — rather than reaching into the three unrelated existing
- * services that already call materializeFlownBookings for their own
- * purposes. See docs/DB_SCHEMA.md's Phase 66 section.
+ * Lazily creates a SurveyInvite for every booking that has reached FLOWN
+ * but has none yet, and retries the SMS for any existing invite whose
+ * first send attempt failed (`smsSentAt` still null) — no cron job, same
+ * "materialize on read" principle as
+ * materializeDepartedInstances/materializeFlownBookings. Called from
+ * SurveyService's own read endpoints (config stats + exec results),
+ * which are the natural, frequently-polled places this data is consumed
+ * — rather than reaching into the three unrelated existing services that
+ * already call materializeFlownBookings for their own purposes. See
+ * docs/DB_SCHEMA.md's Phase 66 section.
  */
 export async function materializeSurveyInvites(
   typeorm: TypeORMService,
@@ -39,21 +65,46 @@ export async function materializeSurveyInvites(
           flightInstanceId: booking.flightInstanceId,
         },
       });
-      const link = `${process.env.FRONTEND_URL ?? 'http://localhost:5173'}/survey/${invite.token}`;
-      const result = await sms.send(
+      await sendInviteSms(
+        typeorm,
+        sms,
+        invite.id,
         booking.contactPhone,
-        `سفر خوبی داشتید؟ لطفاً نظر خود را با ما در میان بگذارید: ${link}`,
-        'SURVEY_INVITE',
+        invite.token,
       );
-      if (result.success) {
-        await typeorm.surveyInvite.update({
-          where: { id: invite.id },
-          data: { smsSentAt: new Date() },
-        });
-      }
     } catch {
       // best-effort — the next materialize() call (next read) retries any
       // booking that still has no SurveyInvite row.
+    }
+  }
+
+  // Invites whose row exists but whose first SMS attempt failed (or was
+  // never confirmed) — the `pending` query above can never find these
+  // again since the booking now has a SurveyInvite, so without this pass
+  // a transient SMS failure would silently strand the passenger forever.
+  // Scoped to bookings that actually have a phone — a booking with none
+  // is permanently undeliverable (see `sendInviteSms`/`SmsService.send`),
+  // so retrying it every materialize() call would just pile up FAILED
+  // SmsLog rows for a case that can never succeed.
+  const unsent = await typeorm.surveyInvite.findMany({
+    where: { smsSentAt: null, booking: { contactPhone: { not: null } } },
+    select: {
+      id: true,
+      token: true,
+      booking: { select: { contactPhone: true } },
+    },
+  });
+  for (const invite of unsent) {
+    try {
+      await sendInviteSms(
+        typeorm,
+        sms,
+        invite.id,
+        invite.booking.contactPhone,
+        invite.token,
+      );
+    } catch {
+      // best-effort — retried again on the next materialize() call.
     }
   }
 }
