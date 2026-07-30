@@ -1,9 +1,18 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import AgencyInboxPage from './AgencyInboxPage';
 import * as portalApi from '../../api/agency-portal';
+import * as useLocaleModule from '../../hooks/useLocale';
 import type { AgencyMessage } from '../../types/agency-portal';
+
+function mockLocale(locale: 'fa' | 'en' | 'ar') {
+  vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale, setLocale: vi.fn() });
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 const MESSAGES: AgencyMessage[] = [
   {
@@ -34,5 +43,24 @@ describe('AgencyInboxPage', () => {
     await user.click(screen.getByRole('button', { name: 'ارسال' }));
 
     await waitFor(() => expect(postSpy).toHaveBeenCalledWith('حتماً تا پنجشنبه پرداخت می‌شود.'));
+  });
+
+  it('renders translated heading, placeholder, and send button in English', async () => {
+    mockLocale('en');
+    vi.spyOn(portalApi, 'fetchInbox').mockResolvedValue(MESSAGES);
+    render(<AgencyInboxPage />);
+
+    expect(await screen.findByText('Inbox & Messages')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Write your message…')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Send' })).toBeInTheDocument();
+  });
+
+  it('renders translated heading and empty state in Arabic', async () => {
+    mockLocale('ar');
+    vi.spyOn(portalApi, 'fetchInbox').mockResolvedValue([]);
+    render(<AgencyInboxPage />);
+
+    expect(await screen.findByText('الوارد والرسائل')).toBeInTheDocument();
+    expect(screen.getByText('لا توجد رسائل بعد.')).toBeInTheDocument();
   });
 });
