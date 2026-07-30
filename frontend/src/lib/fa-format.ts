@@ -43,6 +43,15 @@ export function faMoney(amountRial: number): string {
   return faDigits(grouped);
 }
 
+/**
+ * Locale-aware version of `faMoney`: converts a real IRR amount from the API
+ * to toman (rial ÷ 10 — still the only place that division happens) and
+ * formats it with the active locale's digits/separators via `formatToman`.
+ */
+export function localeMoney(amountRial: number, locale: DisplayLocale): string {
+  return formatToman(Math.round(amountRial / 10), locale);
+}
+
 /** Persian-digit percentage, e.g. faPercent(12.5) -> "۱۲.۵٪" */
 export function faPercent(value: number): string {
   return `${faDigits(value)}٪`;
