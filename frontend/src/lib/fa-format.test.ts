@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { faDigits, faMoney, faPercent } from './fa-format';
+import { arDigits, faDigits, faMoney, faPercent, formatLocalePercent, formatToman } from './fa-format';
 
 describe('faDigits', () => {
   it('converts Latin digits to Persian digits', () => {
@@ -28,5 +28,33 @@ describe('faMoney', () => {
 describe('faPercent', () => {
   it('appends the Persian percent sign with Persian digits', () => {
     expect(faPercent(42)).toBe('۴۲٪');
+  });
+});
+
+describe('arDigits', () => {
+  it('converts Latin digits to Eastern Arabic-Indic digits', () => {
+    expect(arDigits(12450)).toBe('١٢٤٥٠');
+  });
+});
+
+describe('formatToman', () => {
+  it('formats fa with Persian digits and ٬ separators', () => {
+    expect(formatToman(1_600_000, 'fa')).toBe('۱٬۶۰۰٬۰۰۰');
+  });
+
+  it('formats en with Latin digits and , separators', () => {
+    expect(formatToman(1_600_000, 'en')).toBe('1,600,000');
+  });
+
+  it('formats ar with Eastern Arabic-Indic digits and ٬ separators', () => {
+    expect(formatToman(1_600_000, 'ar')).toBe('١٬٦٠٠٬٠٠٠');
+  });
+});
+
+describe('formatLocalePercent', () => {
+  it('fa/ar use ٪ with locale digits, en uses %', () => {
+    expect(formatLocalePercent(19, 'fa')).toBe('۱۹٪');
+    expect(formatLocalePercent(19, 'ar')).toBe('١٩٪');
+    expect(formatLocalePercent(19, 'en')).toBe('19%');
   });
 });

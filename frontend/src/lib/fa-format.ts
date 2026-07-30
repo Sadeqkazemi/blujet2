@@ -1,8 +1,35 @@
 const FA_DIGITS = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+const AR_DIGITS = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
 
 /** Converts Latin digits in a string/number to Persian digits for display. */
 export function faDigits(value: string | number): string {
   return String(value).replace(/[0-9]/g, (d) => FA_DIGITS[Number(d)]);
+}
+
+/** Converts Latin digits in a string/number to Eastern Arabic-Indic digits. */
+export function arDigits(value: string | number): string {
+  return String(value).replace(/[0-9]/g, (d) => AR_DIGITS[Number(d)]);
+}
+
+export type DisplayLocale = 'fa' | 'en' | 'ar';
+
+/**
+ * Formats a plain toman amount (already converted from rial, e.g. page-local
+ * marketing mock figures) with locale-appropriate digits and ٬/, thousands
+ * separators. For a raw IRR amount straight from the API, use `faMoney`
+ * instead — that's the only place the rial→toman division happens.
+ */
+export function formatToman(tomanAmount: number, locale: DisplayLocale): string {
+  const grouped = Math.round(tomanAmount).toLocaleString('en-US');
+  if (locale === 'en') return grouped;
+  const withSeparator = grouped.replace(/,/g, '٬');
+  return locale === 'ar' ? arDigits(withSeparator) : faDigits(withSeparator);
+}
+
+/** Locale-aware percent, e.g. formatLocalePercent(19, 'en') -> "19%", ('fa') -> "۱۹٪". */
+export function formatLocalePercent(value: number, locale: DisplayLocale): string {
+  if (locale === 'en') return `${value}%`;
+  return `${locale === 'ar' ? arDigits(value) : faDigits(value)}٪`;
 }
 
 /**
