@@ -1055,6 +1055,27 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   with faDigits counts, fa empty state, en, ar). Full frontend suite:
   282/282 passing, 62/62 files. `tsc --noEmit` clean; `oxlint` clean (same
   pre-existing warnings). See `docs/features/agency-seats-page-i18n.md`.
+- [x] **Phase 60 — پنل آژانس: Web Service (B2B API) tab real i18n** —
+  eighth and final agency-portal page, completing the agency-portal
+  i18n arc (Phases 53–60: Shell+Login, Dashboard, Credit, Sales, Inbox,
+  Profile, Seats, Webservice). `AgencyWebservicePage.tsx` translates the
+  webservice purchase flow (info banner, scope/duration selection,
+  pending/rejected states, active-connection summary) into fa/en/ar; no
+  new backend work. Several labels match
+  `design-reference-v2/پنل آژانس.dc.html`'s own `isEN` vocabulary for
+  this exact tab (`wsInfoBanner`, `wsPendingTitle`, `wsPendingBadge`,
+  `wsNewPurchaseTitle`, `wsNewPurchaseSub`, `wsTypeLabel`,
+  `wsDurationLabel`, `wsPayableLabel`, `wsSubmitLabel`, `wsActiveTitle`,
+  `wsActiveBadge`, `wsBaseUrlLabel2`); the real scope names
+  (`SEARCH_BOOK`/`FULL`/`SEARCH_ONLY`), 1/3/12-month plans, and
+  correspondence-based key delivery wording have no design counterpart
+  and are hand-translated, as is all AR text. Toman amounts keep
+  Persian-digit formatting in every locale (only the currency word
+  changes), matching the established money convention. All 4
+  pre-existing tests pass unmodified; 2 new tests (en, ar). Full frontend
+  suite: 284/284 passing, 62/62 files. `tsc --noEmit` clean; `oxlint`
+  clean (same pre-existing warnings). See
+  `docs/features/agency-webservice-page-i18n.md`.
 - [x] With Phases 35–37, the manual endpoint audit had covered
   `reconciliation`, `reservation`, and `it-manager`'s `services` module;
   every other controller checked so far (`pricing`, `flightops`,
