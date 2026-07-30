@@ -966,6 +966,23 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   agency-portal pages (Dashboard, Credit, Sales, Inbox, Profile, Seats,
   Webservice) are separate follow-up phases. See
   `docs/features/agency-portal-shell-login-i18n.md`.
+- [x] **Phase 54 — پنل آژانس: Dashboard tab real i18n** — second
+  agency-portal page. `AgencyDashboardPage.tsx` translates its heading,
+  4 KPI cards, 6-month sales chart, and credit summary into fa/en/ar; all
+  backed by the real `GET /agency-portal/dashboard` endpoint from Phase 9
+  — no new backend work. Most strings are hand-translated (no usable
+  match in the design bundle's `isEN`/`isAR` ternaries for this page's
+  specific copy); the sales chart's Jalali month labels reuse
+  `design-reference-v2/وضعیت پرواز.dc.html`'s own established romanized
+  EN names (Farvardin, Ordibehesht, ...) and its AR names, which are
+  identical to the Persian names verbatim (no separate Arabic name for a
+  Jalali month exists, same reasoning as "تومان" staying unchanged in
+  Arabic). The pre-existing test passes unmodified — the byte-critical fa
+  heading `'داشبورد'` and chart aria-label
+  `'نمودار فروش ۶ ماه اخیر'` stay byte-identical; 2 new tests (en, ar).
+  Full frontend suite: 270/270 passing, 61/61 files. `tsc --noEmit`
+  clean; `oxlint` clean (same pre-existing warnings). See
+  `docs/features/agency-dashboard-page-i18n.md`.
 - [x] With Phases 35–37, the manual endpoint audit had covered
   `reconciliation`, `reservation`, and `it-manager`'s `services` module;
   every other controller checked so far (`pricing`, `flightops`,
