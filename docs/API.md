@@ -1958,3 +1958,23 @@ unchanged. `useAuth()` gains optional `requestPasswordResetEmail`/
 `verifyPasswordResetEmail`, mirroring `requestOtp`/`verifyOtp`. All 5
 pre-existing tests pass unmodified; 3 new tests (email happy path, en, ar).
 See `docs/features/forgot-password-email-reset-i18n.md`.
+
+## Phase 52 — پنل کاربر (AccountPage) real i18n
+
+Frontend-only, no new/changed endpoints — every tab already reads from
+real endpoints added in earlier phases (bookings, wallet, club points,
+price locks, refunds, profile, privacy export/delete). Twelfth page
+translated, and the largest so far: 7 tabs. EN strings extracted from
+`design-reference-v2/پنل کاربر.dc.html`'s own `isEN` ternaries (rich
+coverage); AR mixes the design's own partial `isAR` coverage with fresh
+hand-translation. The «قفل قیمت» (price lock) tab has no design
+counterpart at all — a real feature unique to this app — so its strings
+are hand-translated to match the actual implementation. Status badge maps
+(`STATUS_LABEL`, `REFUND_STATUS_LABEL`, `LOCK_STATUS_LABEL`) and
+`TIER_LABEL`/`CABIN_LABEL` were restructured from flat fa strings to
+`Record<StoredLocale, string>`; the toman currency word stays
+`'تومان'`/`'Toman'`/`'تومان'` in every locale (Arabic keeps the
+transliterated word), consistent with the pricing-honesty rule from
+earlier phases (real toman amounts, never a fake currency). All 12
+pre-existing tests pass unmodified; 2 new tests (en, ar). See
+`docs/features/account-page-i18n-responsive.md`.
