@@ -94,6 +94,10 @@ export class ReportingService {
     const entries = await this.typeorm.ledgerEntry.findMany({
       where: {
         type: 'SALE',
+        // Real ticket revenue only — excludes agency-debt-calibration
+        // rows (AgenciesService.resetTestDebt reuses type:'SALE' with no
+        // bookingId; see kpis()'s comment for the full explanation).
+        bookingId: { not: null },
         occurredAt: { gte: start, lt: end },
         ...(flightNo
           ? { booking: { flightInstance: { flight: { flightNo } } } }
@@ -209,7 +213,7 @@ export class ReportingService {
           ? { booking: { flightInstance: { flight: { flightNo } } } }
           : {}),
       },
-      select: { type: true, signedAmountIrr: true },
+      select: { type: true, signedAmountIrr: true, bookingId: true },
     });
 
     let revenueIrr = 0;
@@ -217,8 +221,14 @@ export class ReportingService {
     let operatingCostIrr = 0;
     for (const e of entries) {
       const amount = Math.abs(e.signedAmountIrr);
-      if (e.type === 'SALE') revenueIrr += amount;
-      else if (e.type === 'REFUND') refundIrr += amount;
+      // AgenciesService.resetTestDebt reuses type:'SALE' for agency
+      // debt-line calibration (agencyId set, bookingId null, amount can
+      // be negative) — that's not ticket revenue, so it's excluded here
+      // the same way sumByChannel() already excludes it via its
+      // booking-relation filter.
+      if (e.type === 'SALE') {
+        if (e.bookingId) revenueIrr += amount;
+      } else if (e.type === 'REFUND') refundIrr += amount;
       else if (e.type === 'SETTLEMENT' || e.type === 'COMMISSION')
         operatingCostIrr += amount;
     }
@@ -404,6 +414,9 @@ export class ReportingService {
     const entries = await this.typeorm.ledgerEntry.findMany({
       where: {
         type: 'SALE',
+        // Real ticket revenue only — see kpis()'s comment: excludes
+        // AgenciesService.resetTestDebt's bookingless debt-calibration rows.
+        bookingId: { not: null },
         occurredAt: { gte: start, lt: end },
         ...(flightNo
           ? { booking: { flightInstance: { flight: { flightNo } } } }
@@ -417,8 +430,8 @@ export class ReportingService {
 
     const sums = { SYSTEM: 0, CHARTER: 0, AGENCY: 0 };
     for (const e of entries) {
-      const channel = e.booking?.channel ?? 'SYSTEM';
-      sums[channel] += Math.abs(e.signedAmountIrr);
+      if (!e.booking) continue;
+      sums[e.booking.channel] += Math.abs(e.signedAmountIrr);
     }
     const totalIrr = sums.SYSTEM + sums.CHARTER + sums.AGENCY;
     const pct = (n: number) =>

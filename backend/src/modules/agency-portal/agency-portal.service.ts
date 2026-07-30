@@ -73,9 +73,13 @@ export class AgencyPortalService {
     ] = await Promise.all([
       this.agencies.getCredit(id),
       this.typeorm.ledgerEntry.aggregate({
+        // Real ticket sales only — excludes AgenciesService.resetTestDebt's
+        // bookingless debt-line calibration rows (see ReportingService's
+        // kpis() for the full explanation).
         where: {
           agencyId: id,
           type: 'SALE',
+          bookingId: { not: null },
           occurredAt: { gte: startOfMonth },
         },
         _sum: { signedAmountIrr: true },
@@ -96,6 +100,7 @@ export class AgencyPortalService {
         where: {
           agencyId: id,
           type: 'SALE',
+          bookingId: { not: null },
           occurredAt: { gte: sixMonthsAgo },
         },
         select: { signedAmountIrr: true, occurredAt: true },

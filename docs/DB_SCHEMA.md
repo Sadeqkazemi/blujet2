@@ -884,6 +884,19 @@ the user's explicit scope (2026-07-22): **management panel only**
   mean inventing what an invoice-reminder SMS says, which nothing in the
   design specifies.
 
+**Addendum (post-Phase-67): real `KavenegarSmsProvider`.** The
+`ext_kavenegar` row above was previously decorative (an
+`ExternalServiceConfig` entry with no code behind it). Added
+`backend/src/common/sms/kavenegar-sms.provider.ts` implementing the same
+`SmsProvider` interface, calling Kavenegar's real send API
+(`https://api.kavenegar.com/v1/{key}/sms/send.json`). `sms.module.ts` now
+factory-switches on `SMS_PROVIDER`: `"kavenegar"` (+ `KAVENEGAR_API_KEY`,
+optional `KAVENEGAR_SENDER_LINE`) uses the real driver; anything else —
+the dev/test default — keeps `MockSmsProvider`, so the existing test
+suite never makes a real network call. Failures (bad credit, invalid
+line, network error) are reported as real `SmsLog(status: FAILED)` rows
+via the existing `SmsService`, never fabricated as success.
+
 ---
 
 ## Phase 13 — Reservation engine completion, Part E: PNR lifecycle completion + payment reconciliation
@@ -1902,3 +1915,205 @@ as `clubTierRuleEdits` (Phase 65).
   tables + `AuditCategory.SURVEY`) and
   `20260730190905_phase66_survey_invite_sms_type`
   (`SmsMessageType.SURVEY_INVITE`).
+
+## Phase 67 — فرصت‌های شغلی (Careers)
+
+See `docs/API.md`'s Phase 67 section for the full design-source
+reasoning and scope decisions (incl. a correction: the public
+listing/application pages and the application-review UI have no design
+file — only the SITE_ADMIN posting-management card grid does). New
+`careers` module, three new models:
+
+```typeorm
+enum JobType {
+  FULL_TIME
+  REMOTE
+  PART_TIME
+}
+
+enum JobApplicantGender {
+  FEMALE
+  MALE
+}
+
+enum MaritalStatus {
+  SINGLE
+  MARRIED
+}
+
+enum MilitaryStatus {
+  CONSCRIPT
+  EXEMPT
+  WAIVED
+}
+
+enum JobApplicationStatus {
+  SUBMITTED
+  REFERRED
+  HIRED
+  REJECTED
+}
+
+model CareersSettings {
+  id        String   @id @default(uuid())
+  enabled   Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@map("careers_settings")
+}
+
+model JobPosting {
+  id           String           @id @default(uuid())
+  title        String
+  dept         String
+  city         String
+  type         JobType          @default(FULL_TIME)
+  generalReqs  String[]
+  specialReqs  String[]
+  active       Boolean          @default(true)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  applications JobApplication[]
+
+  @@map("job_postings")
+}
+
+model JobApplication {
+  id                String               @id @default(uuid())
+  jobPostingId      String?
+  jobPosting        JobPosting?          @relation(fields: [jobPostingId], references: [id])
+  jobTitleSnapshot  String
+  firstName         String
+  lastName          String
+  nationalIdEnc     String
+  nationalIdHash    String
+  fatherName        String?
+  birthDate         DateTime?
+  birthProvince     String?
+  birthCity         String?
+  gender            JobApplicantGender?
+  marital           MaritalStatus?
+  military          MilitaryStatus?
+  exemptionType     String?
+  phone             String
+  email             String?
+  residenceProvince String?
+  residenceAddress  String?
+  eduEntries        Json                 @default("[]")
+  workEntries       Json                 @default("[]")
+  langEntries       Json                 @default("[]")
+  skills            String?
+  otherLangs        String?
+  resumeFileName    String?
+  resumeMimeType    String?
+  resumeSizeBytes   Int?
+  resumePath        String?
+  status            JobApplicationStatus @default(SUBMITTED)
+  assigneeId        String?
+  assignee          User?                @relation("JobApplicationAssignee", fields: [assigneeId], references: [id])
+  history           Json                 @default("[]")
+  createdAt         DateTime             @default(now())
+
+  @@index([nationalIdHash])
+  @@index([status])
+  @@map("job_applications")
+}
+```
+
+Plus, on the `User` model: `jobApplicationsAssigned JobApplication[]
+@relation("JobApplicationAssignee")`.
+
+- `CareersSettings` — singleton (same pattern as `SurveySettings`);
+  `typeorm/seed.ts` creates the one default row (`enabled: true`).
+- `JobPosting.generalReqs`/`specialReqs` are native Postgres string
+  arrays (`String[]`) — the admin's newline-separated textarea is
+  split/joined at the API boundary, matching how the design itself
+  stores these as arrays (`generalReqs: [...]` in `site-data.js`).
+- `JobApplication.jobPostingId` is nullable; no delete path exists for
+  `JobPosting` per the scope decision (deactivate only), so the FK never
+  actually needs to survive a deletion in practice — nullable purely as
+  defense-in-depth. `jobTitleSnapshot` is what the admin UI actually
+  displays either way, so a later posting edit never changes what an
+  already-submitted application shows.
+- `JobApplication.nationalIdEnc`/`nationalIdHash` follow the exact same
+  encrypted-at-rest + deterministic-hash-for-search pattern as
+  `Passenger`/`ClubMember` (CLAUDE.md: PII encrypted at rest, national
+  ID validated server-side with the official checksum).
+- `JobApplication.resumeFileName`/`resumeMimeType`/`resumeSizeBytes`/
+  `resumePath` are a small, self-contained resume-storage slice — not a
+  `StoredFile` FK, since that model requires a `User` owner and a job
+  applicant is anonymous (see API.md's scope decision). All four stay
+  nullable: the design's own submission flow doesn't actually make the
+  resume mandatory at the state-machine level (only first name/last
+  name/national ID/phone are validated client-side before submit), so a
+  resume-less application is a legitimate, real state to support.
+- `JobApplication.eduEntries`/`workEntries`/`langEntries` are `Json`
+  arrays of `{ degree, field, institute }` / `{ company, role, years }` /
+  `{ lang, level }` respectively — free-form, never deeply queried, same
+  pattern as `SupportTicket.history`/`ClubCardRequest.history`; capped at
+  `MAX_JSON_ENTRIES = 20` server-side.
+- `JobApplication.assigneeId` points at a real `User` row (see API.md's
+  "referral target list is computed" scope decision) — display-only, no
+  access-grant semantics, matching `ClubCardRequest.assignedTo`'s
+  existing precedent in this codebase.
+- New `AuditCategory.CONTENT` value (added alongside the existing
+  eleven) — mirrors the design's own `_logReport("content", ...)` calls
+  for every job-posting/application mutation.
+- Migration applied: `20260730200910_phase67_careers`.
+
+**Phase 67 is implemented and merged.** Backend (module, DTOs, e2e +
+unit tests), frontend (public listing/apply pages, SITE_ADMIN review
+page, api client, types, tests), PANEL_NAV `jobapps` tab, and footer
+wiring are all complete — see `docs/features/careers.md` for the full
+checked-off acceptance checklist and `docs/API.md`'s Phase 67 section
+for the post-implementation design-source correction.
+
+---
+
+## Bug fix (post-Phase-67 senior review): revenue reporting polluted by agency debt-calibration ledger rows
+
+Found while investigating the long-standing `reporting.e2e-spec.ts`
+"sales-chart/kpis reconciliation" flake that had been repeatedly
+misdiagnosed across Phases 51/65/66/67 as "shared `blujet_test` data
+drift across e2e runs" — it wasn't drift, it was a real, deterministic
+bug:
+
+`AgenciesService.resetTestDebt()` (an e2e/dev-only helper, 404 in
+production, that recalibrates an agency's derived debt to a fixed
+figure) creates a `LedgerEntry{ type: 'SALE', agencyId, signedAmountIrr:
+targetIrr - usedIrr, bookingId: null }` row — `signedAmountIrr` can be
+**negative**, and the row has no associated booking, because it's a
+credit-line adjustment, not a ticket sale. `LedgerEntry.type: 'SALE'` is
+legitimately dual-purpose in this schema (`computeUsedIrr()` needs
+`SALE - SETTLEMENT` to include it for agency-debt math), but every
+company-wide *revenue* aggregate elsewhere in the app was treating
+**every** `type: 'SALE'` row as real ticket revenue:
+
+- `ReportingService.kpis()` summed `Math.abs(signedAmountIrr)` for every
+  SALE row with no `bookingId` filter — silently *adding* a negative
+  debt-adjustment as positive revenue.
+- `ReportingService.sumByChannel()` (used by `salesChart()`) happened to
+  exclude these rows, but only by accident — it drops any entry whose
+  `booking?.channel` is falsy, which is true for any bookingless row for
+  any reason, not a deliberate filter.
+- `ReportingService.revenueMix()` defaulted a bookingless row's channel
+  to `'SYSTEM'`, silently misattributing debt-adjustment noise into the
+  "فروش سیستمی" donut slice.
+- `PnrService.dashboardStats()` (کارتابل's ردیف آمار) and
+  `AgencyPortalService.dashboard()`/`AgenciesService.detail()`'s
+  `totalSalesIrr` had the same unfiltered `type: 'SALE'` aggregate.
+
+Fix: every revenue/sales aggregate that queries `type: 'SALE'` now also
+requires `bookingId: { not: null }` — real ticket revenue is always
+booking-scoped; agency debt-line calibration never is.
+`AgenciesService.computeUsedIrr()` (the one place that legitimately
+wants the debt-adjustment rows) is untouched. New regression test:
+`test/reporting.e2e-spec.ts` "a bookingless SALE ledger row
+(AgenciesService.resetTestDebt-style agency debt calibration) never
+pollutes revenue reporting" — inserts a synthetic bookingless SALE row
+and asserts `kpis().revenueIrr` is unchanged and still reconciles with
+`salesChart()`/`revenueMix()`. Full backend e2e suite re-run clean
+(391/391) after the fix — the sales-chart/kpis reconciliation test that
+had failed in every one of the last several full-suite runs this session
+now passes deterministically.
