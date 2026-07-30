@@ -27,6 +27,63 @@ analyze route keys on `flightInstanceId`, not `flightNo` (a recurring
 flight number is not unique across departures, and grouping by it would
 wrongly merge two different flights' passenger comments).
 
+## Post-merge senior review (same session, before the next phase)
+
+Immediately after merge, a full senior-level re-review of this phase's
+diff (not a fresh feature request) surfaced 5 real findings, all fixed
+in a follow-up commit before starting any new phase:
+
+1. **`SurveyConfigPage.tsx` — unreachable error state.** The
+   `if (!settings) return <loading>` guard also fired on a failed
+   initial fetch (since `settings` never gets set on that path), so the
+   `{error && ...}` JSX below it was dead code — a failed load looked
+   identical to a permanently-loading page. Fixed by checking `error`
+   inside that same guard. New test: `SurveyConfigPage.test.tsx` › "shows
+   the error message instead of an infinite spinner when the initial
+   fetch fails".
+2. **`materializeSurveyInvites` — no retry for a failed SMS send.**
+   Once a `SurveyInvite` row exists, the booking permanently stops
+   matching the "no invite yet" query — so a transient SMS-provider
+   failure (the row gets created, then `sms.send` fails) meant the
+   passenger would never receive the link, contradicting the function's
+   own comment claiming a retry would happen. Fixed by adding a second
+   pass in `materializeSurveyInvites` that retries any `SurveyInvite`
+   with `smsSentAt: null` whose booking has a phone number (a booking
+   with no phone is permanently undeliverable and is correctly excluded,
+   to avoid piling up redundant `SmsLog` rows forever). New test:
+   `survey.e2e-spec.ts` › "retries the SMS on the next materialize() for
+   an invite whose first send never confirmed".
+3. **`getResults()` — in-memory aggregation, not real SQL.** The
+   original implementation loaded every historical `SurveyResponse`-
+   bearing `SurveyInvite` row (with its full `flightInstance`/`flight`/
+   `route` join) on every call and grouped it with a JS `Map` — unbounded
+   by survey volume, and the docs' claim of "SQL aggregation" was simply
+   inaccurate. Replaced with a real `$queryRaw` `GROUP BY` (count + avg
+   computed by Postgres), followed by a bounded lookup of only the
+   distinct flight instances that actually have responses. Verified by
+   the existing `survey.e2e-spec.ts` results tests (same behavior, real
+   SQL now).
+4. **AI prompt — no defense against passenger-submitted prompt
+   injection.** Free-text comments were concatenated verbatim into the
+   Anthropic prompt with no framing distinguishing "data to summarize"
+   from "instructions to follow." Added an explicit instruction telling
+   the model the numbered comment list is untrusted passenger data and
+   must never be treated as instructions — a deliberate, documented
+   deviation from the design's literal prompt text (which the original
+   draft had described as matched exactly). Defense-in-depth, not a
+   complete fix (no framing fully eliminates prompt injection) — the
+   existing CLAUDE.md guarantee that AI output can never authorize an
+   action still holds regardless.
+5. **NO_SHOW override didn't revoke an already-issued invite.** A
+   booking marked `NO_SHOW` after its `SurveyInvite` was already created
+   left that invite fully live and answerable. Fixed by having
+   `findInviteByToken` (shared by both `getPublicInvite` and
+   `submitResponse`) also load the booking's `status` and treat
+   `NO_SHOW` identically to an unknown token (same generic 404, no
+   oracle on the internal booking state). New test: `survey.e2e-spec.ts`
+   › "a booking later marked NO_SHOW revokes its already-issued invite
+   (404, not answerable)".
+
 ## Acceptance checklist
 
 ### IT_MANAGER configuration
