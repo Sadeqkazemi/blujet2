@@ -172,7 +172,10 @@ describe('Auth (e2e)', () => {
     const { id } = await prisma.user.findUniqueOrThrow({
       where: { username: 'ceo' },
     });
-    await prisma.user.update({ where: { id }, data: { preferredLocale: 'FA' } });
+    await prisma.user.update({
+      where: { id },
+      data: { preferredLocale: 'FA' },
+    });
 
     const { accessToken } = await loginAs(app, 'ceo');
     const before = await request(app.getHttpServer())
@@ -194,7 +197,10 @@ describe('Auth (e2e)', () => {
 
     // Leave the shared seed account as we found it so other tests/runs that
     // touch 'ceo' never observe this test's mutation.
-    await prisma.user.update({ where: { id }, data: { preferredLocale: 'FA' } });
+    await prisma.user.update({
+      where: { id },
+      data: { preferredLocale: 'FA' },
+    });
   });
 
   it('PATCH /auth/me/locale: 401 without a token, 400 on an invalid locale', async () => {
