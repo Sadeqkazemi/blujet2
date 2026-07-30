@@ -1,8 +1,17 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import AgencyDashboardPage from './AgencyDashboardPage';
 import * as portalApi from '../../api/agency-portal';
+import * as useLocaleModule from '../../hooks/useLocale';
 import type { AgencyDashboard } from '../../types/agency-portal';
+
+function mockLocale(locale: 'fa' | 'en' | 'ar') {
+  vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale, setLocale: vi.fn() });
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 const DASHBOARD: AgencyDashboard = {
   credit: { limitIrr: 1_800_000_000, usedIrr: 500_000_000, remainingIrr: 1_300_000_000 },
@@ -26,5 +35,25 @@ describe('AgencyDashboardPage', () => {
     expect(screen.getByText('۳۸٬۴۰۰٬۰۰۰')).toBeInTheDocument();
     expect(screen.getByText('۱۳۰٬۰۰۰٬۰۰۰')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'نمودار فروش ۶ ماه اخیر' })).toBeInTheDocument();
+  });
+
+  it('renders translated headings and KPI labels in English', async () => {
+    mockLocale('en');
+    vi.spyOn(portalApi, 'fetchDashboard').mockResolvedValue(DASHBOARD);
+    render(<AgencyDashboardPage />);
+
+    expect(await screen.findByText('Dashboard')).toBeInTheDocument();
+    expect(screen.getByText("This Month's Sales (Toman)")).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Last 6 months sales chart' })).toBeInTheDocument();
+    expect(screen.getByText('Ordibehesht')).toBeInTheDocument();
+  });
+
+  it('renders translated headings and KPI labels in Arabic', async () => {
+    mockLocale('ar');
+    vi.spyOn(portalApi, 'fetchDashboard').mockResolvedValue(DASHBOARD);
+    render(<AgencyDashboardPage />);
+
+    expect(await screen.findByText('لوحة التحكم')).toBeInTheDocument();
+    expect(screen.getByText('ملخص الرصيد')).toBeInTheDocument();
   });
 });
