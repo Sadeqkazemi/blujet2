@@ -721,6 +721,36 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   frontend suite: 247/247 passing, 61/61 files. `tsc --noEmit` clean;
   `oxlint` clean (same pre-existing warnings). See
   `docs/features/results-page-i18n-responsive.md`.
+- [x] **Phase 44 — مقاصد (Destinations) real i18n + responsive body
+  content** — fourth page of the per-page translation arc. Skipped
+  تکمیل خرید this round: the real `CheckoutPage.tsx` (promo code +
+  payment-method selection + pay button) functionally overlaps with
+  پرداخت, which the user explicitly excluded from this refresh pending a
+  corrected upload ("پرداخت را وارد نکن") — translating it now risked
+  colliding with that exclusion, so مقاصد (unambiguously in scope) was
+  picked instead. `DestinationsPage` translates its hero/search box,
+  region tabs, destination mosaic (region + promo badges, duration, weekly
+  frequency, price), empty state, map band (stat boxes, city pins), and
+  popular-routes band into fa/en/ar. Extracted from `design-reference-v2/
+  مقاصد.dc.html`'s own `isEN`/`isAR` ternaries — this page's mock has by
+  far the most complete three-way translation coverage seen in the bundle
+  so far, nearly every label has a direct three-way ternary rather than
+  relying on the incomplete `arDeep` runtime dictionary; the handful of
+  EN-only ternaries (`noResultsTitle`/`noResultsSub`, plus durations/
+  frequencies with no design-provided AR at all) were hand-translated to
+  the same no-silent-fallback bar as every prior phase, using the same
+  digit/vocabulary conventions confirmed elsewhere in `site-data.js`'s
+  dictionary. Mock catalog/route/pin data restructured from Persian-only
+  pre-formatted strings to a locale-neutral shape (per-locale name objects
+  + a plain numeric toman price via the existing `formatToman`), which
+  also fixed the search filter to match against the active locale's city
+  name instead of always Persian. Destination mosaic (4→2 cols) and map
+  band (two columns → one) collapse on mobile via the shared
+  `useIsMobile()` hook. All 4 pre-existing `DestinationsPage` tests
+  untouched and passing (fa strings byte-identical); 2 new tests (en, ar).
+  Full frontend suite: 249/249 passing, 61/61 files. `tsc --noEmit` clean;
+  `oxlint` clean (same pre-existing warnings). See
+  `docs/features/destinations-page-i18n-responsive.md`.
 - [x] With Phases 35–37, the manual endpoint audit had covered
   `reconciliation`, `reservation`, and `it-manager`'s `services` module;
   every other controller checked so far (`pricing`, `flightops`,

@@ -1814,3 +1814,23 @@ messages (e.g. a 409 "already locked" response) are still passed through
 verbatim, never routed through the page dictionary. Layout stacks to a
 single column (filters above results) on mobile via the shared
 `useIsMobile()` hook. See `docs/features/results-page-i18n-responsive.md`.
+
+## Phase 44 — مقاصد (Destinations) real i18n + responsive body content
+
+Frontend-only, no new/changed endpoints. Fourth page translated. Skipped
+تکمیل خرید this round — the real `CheckoutPage.tsx` functionally overlaps
+with پرداخت, which the user explicitly excluded from this refresh pending
+a corrected upload, so مقاصد (unambiguously in scope) was picked instead.
+`DestinationsPage` translates its hero/search box, region tabs,
+destination mosaic (badges, duration, weekly frequency, price), empty
+state, map band (stats, city pins), and popular-routes band into
+fa/en/ar — extracted from `design-reference-v2/مقاصد.dc.html`'s own
+`isEN`/`isAR` ternaries (this page's mock has by far the most complete
+three-way translation coverage of any page seen so far) and `site-data.js`'s
+`arDeep` dictionary for the rest. Mock catalog/route/pin data restructured
+from Persian-only pre-formatted strings to locale-neutral shape (per-locale
+name objects + a plain numeric toman price), so the search filter also now
+matches against the active locale's city name rather than always Persian.
+Destination mosaic and map band collapse to a narrower layout on mobile via
+the shared `useIsMobile()` hook. See
+`docs/features/destinations-page-i18n-responsive.md`.
