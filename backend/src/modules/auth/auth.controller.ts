@@ -6,6 +6,7 @@ import {
   HttpStatus,
   NotFoundException,
   Param,
+  Patch,
   Post,
   Req,
   Res,
@@ -25,6 +26,7 @@ import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { RequestStepUpDto } from './dto/step-up.dto';
 import { SetPasswordDto } from './dto/set-password.dto';
 import { CustomerPasswordLoginDto } from './dto/customer-password-login.dto';
+import { UpdateLocaleDto } from './dto/update-locale.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -215,8 +217,23 @@ export class AuthController {
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: "Current authenticated user's identity and role" })
-  me(@CurrentUser() user: AuthenticatedUser) {
-    return { success: true, data: user };
+  async me(@CurrentUser() user: AuthenticatedUser) {
+    const data = await this.auth.getMe(user);
+    return { success: true, data };
+  }
+
+  @Patch('me/locale')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: 'ذخیرهٔ ترجیح زبان نمایش (fa/en/ar) — برای همگام‌سازی بین‌دستگاهی',
+  })
+  async updateLocale(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: UpdateLocaleDto,
+  ) {
+    const data = await this.auth.updateLocale(user, dto.locale);
+    return { success: true, data };
   }
 
   @Post('change-password')
