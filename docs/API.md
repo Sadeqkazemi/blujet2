@@ -2139,3 +2139,18 @@ backend's `DEPARTED` status covers two distinct fa strings
 itself is the identity fallback so fa output stays byte-identical. All 5
 pre-existing tests pass unmodified; 2 new tests (en, ar). See
 `docs/features/flight-status-page-i18n.md`.
+
+## Phase 64 — مدیریت رزرو real i18n
+
+Frontend-only, no new/changed endpoints. `ManageBookingPage.tsx` (real
+anonymous PNR + last-name self-service, Phase 19) translates its lookup
+form, booking-detail card, refund modal, and refund-done summary into
+fa/en/ar. Most labels reuse
+`design-reference-v2/مدیریت رزرو.dc.html`'s own `isEN` vocabulary for
+this exact page; that design file has no Arabic sample data at all, so
+all AR text is hand-translated. The cabin label reuses the `CABIN_LABEL`
+map convention from `ResultsPage.tsx` (Phase 43). The raw
+`booking.status` enum value is still displayed verbatim in every locale
+(pre-existing gap, unrelated to i18n scope). All 4 pre-existing tests
+pass unmodified; 2 new tests (en, ar). See
+`docs/features/manage-booking-page-i18n.md`.
