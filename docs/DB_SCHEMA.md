@@ -1674,3 +1674,39 @@ fully built; only additive, non-breaking read/serialization changes:
 See `docs/API.md`'s Phase 38 section for the endpoint shape and the
 deliberately-deferred fare-rules CRUD gap, `docs/features/flight-management.md`'s
 Phase 38 section for the full frontend checklist.
+
+## Phase 39 — بازبینی مدارک آژانس: staff-side document review
+
+No column change. `AgencyDocument.status` (`PENDING`/`APPROVED`/`REJECTED`)
+has existed since the model shipped — only its write path was missing.
+`AgenciesService.decideDocument()` is the first (and only) code path that
+ever transitions it out of `PENDING`. The model's own comment ("Staff-side
+review is deferred... every row stays PENDING until that workflow is
+built") is updated to point at that method instead. `AgencyDocument` has
+no `decidedById`/`decidedAt` columns, unlike `AgencyCreditRequest`/
+`AgencyWebserviceRequest` — intentionally not added this phase (no
+requirement surfaced for who-decided/when beyond the existing
+`AuditLog(category=AGENCY)` row); a trivial additive migration if ever
+needed.
+
+See `docs/API.md`'s Phase 39 section for the endpoint shape and the
+parallel credit-requests/webservice-requests frontend gap it surfaced
+(flagged, not fixed this phase), `docs/features/agency-portal.md` for the
+corrected deferred-list entries.
+
+## Phase 40 — ترجیح زبان نمایش: `User.preferredLocale`
+
+First step of the multi-language (fa/en/ar) + responsive redesign — see
+`docs/API.md`'s Phase 40 section for the full reasoning.
+
+- New enum `Locale { FA EN AR }`.
+- New column `User.preferredLocale Locale @default(FA)` — meaningful for
+  any role technically, but only `USER`/`AGENCY` frontends currently
+  expose a language switcher (the design bundle scopes fa/en/ar to the
+  public site + پنل کاربر + پنل آژانس only; staff/executive panels stay
+  Persian-only). Migration: `20260730100306_add_user_preferred_locale`,
+  additive-only, existing rows default to `FA` — no data migration
+  needed.
+- Deliberately no separate "locale preference" table: this is a single
+  scalar per user, same shape as any other profile field already on
+  `User` (e.g. `emailVerifiedAt`), not worth a join for.

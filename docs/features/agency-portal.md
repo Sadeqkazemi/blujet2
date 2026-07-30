@@ -49,6 +49,7 @@ Backend items proven by `backend/test/agency-portal.e2e-spec.ts` (16 tests,
 - [x] `GET /agency-portal/profile`: own profile fields only, no internal `AuditLog`/`activityScore` leakage — `'GET /agency-portal/profile: own fields only, no audit-log leakage'`
 - [x] `POST /agency-portal/documents`: PDF/PNG/JPG only, ≤5MB (same validation as `FilesService`), creates a `PENDING` `AgencyDocument` — reuses `FilesService.store` verbatim (already covered by `files.e2e-spec.ts`'s validation tests); wiring verified by inspection + frontend E2E upload journey
 - [x] `GET /agency-portal/documents`: own documents only — same `agencyId`-scoped pattern
+- [x] Staff-side review — `GET /agencies/:id/documents` + `PATCH .../documents/:docId/decide` (Phase 39): approve/reject a `PENDING` document; 409 on redeciding; 404 on cross-agency access; `AgencyDetailPage.tsx` gained a «مدارک آپلودشده» card (Senior/Finance overview tab, Commercial's مالی sub-tab) — `backend/test/agency-portal.e2e-spec.ts: 'GET /agencies/:id/documents lists uploaded documents PENDING by default'` + `'PATCH .../decide approves/rejects; re-deciding 409s; wrong agency 404s'` + `'GET .../documents and decide are 403 for a non-AGENCY_TAB staff role'`; `frontend/src/features/agencies/AgencyDetailPage.test.tsx: 'Finance Manager can review an uploaded document and approve it'`
 
 ### Ownership isolation (cross-cutting, mandatory for every endpoint above)
 - [x] Agency A can never read or write Agency B's dashboard/credit/invoices/sales/inbox/profile/documents — every self-scoped endpoint derives the agency id from the JWT (`actor.id`), never from a client-supplied parameter — `'agency A cannot pay agency B invoice (404, ownership implicit via JWT)'` + no `/agency-portal/*` route accepts an `:id`/`:agencyId` param anywhere (verified by inspection of the controller)
@@ -74,10 +75,26 @@ journeys).
 - [x] Role isolation: a staff login never reaches `/agency-portal/*` routes; an agency login never reaches `/panel/*` routes — `'role isolation: a staff login never reaches /agency, an agency login never reaches /panel'`
 
 ## Deferred (scoped out with reasons, not silently dropped)
-- «صندلی‌های تخصیص‌یافته» (allocated seats tab) — no staff-side seat-allocation-to-agency workflow exists anywhere in the codebase to allocate seats in the first place; building the agency-facing read view first would mean fabricating data for a process that doesn't exist. Needs its own phase once/if that staff workflow is designed.
-- «وب‌سرویس» self-service API purchase+approval flow — no staff-side purchase-approval counterpart exists (Phase 3's `AgencyApiKey` issuance is Senior-Manager-initiated only); and since `keyHash` is one-way, a self-service tab could only ever show key STATUS/metadata, never the key value — judged not worth a half-feature this phase.
-- Staff-side `AgencyDocument` review UI — uploads work, but every document stays `PENDING` forever until a reviewer workflow is built.
+
+**Corrected below, no longer accurate as of Phase 39** — this list
+originally named two items as unbuilt that later phases actually closed
+without this file being updated; both corrections were found and fixed
+while auditing the third item (document review) below:
+- ~~«صندلی‌های تخصیص‌یافته» (allocated seats tab)~~ — built in Phase 13
+  Part C (`AgencyAllotment` model, staff-side `POST/GET
+  /flights/:instanceId/allotments`) + this track's own
+  `GET /agency-portal/allotments` and `AgencySeatsPage.tsx`
+  (`/agency/seats`, wired in `App.tsx`).
+- ~~«وب‌سرویس» self-service API purchase+approval flow~~ — built in
+  Phase 23 (see `docs/API.md`'s Phase 23 section): full request→staff
+  decide→real key issuance cycle, `AgencyWebservicePage.tsx`
+  (`/agency/webservice`).
+- ~~Staff-side `AgencyDocument` review UI~~ — built in Phase 39 (see
+  checklist above).
+
+Still genuinely deferred:
 - Excel export — mock-only button in the design, not backed by a real export feature anywhere else in the codebase either.
 - Public agency self-registration form (the آژانس همکار tab's signup half) — already explicitly deferred in Phase 3's own docs; this phase doesn't touch it either. Login only works for agencies already approved through the existing staff-side membership-request flow.
 - Forced password-change enforcement on `mustChangePassword: true` — the flag is set and surfaced (same as Phase 8's employee resets) but no login-time enforcement exists for ANY role yet, staff included; not invented here as a one-off for agencies.
-- «فراموشی رمز» (forgot password) self-service flow — a whole separate unbuilt design page for every role, not agency-specific scope creep to solve here.
+- «فراموشی رمز» (forgot password) self-service flow for the AGENCY role — customers got a real OTP-based flow in Phase 21 and staff's is an intentional "contact IT" non-flow (also Phase 21), but `AgencyLoginPage.tsx` has no recovery link at all and no backend endpoint exists; a locked-out agency currently has no self-service path back into its account.
+- Staff-side UI for credit-requests/webservice-requests decisions (found while building Phase 39's document review, which mirrors these two endpoints' pattern) — `GET/PATCH /agencies/:id/credit-requests` and `.../webservice-requests` are fully built and e2e-tested, but `AgencyDetailPage.tsx` never calls either; every such request is currently decidable only via curl/Supertest, same shape of gap as documents were before Phase 39.
