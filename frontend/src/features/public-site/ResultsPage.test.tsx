@@ -5,8 +5,13 @@ import { describe, expect, it, vi } from 'vitest';
 import ResultsPage from './ResultsPage';
 import * as publicSiteApi from '../../api/publicSite';
 import * as useAuthModule from '../../hooks/useAuth';
+import * as useLocaleModule from '../../hooks/useLocale';
 import { ApiRequestError } from '../../api/envelope';
 import type { PriceLock, SearchFlightResult } from '../../types/public-site';
+
+function mockLocale(locale: 'fa' | 'en' | 'ar') {
+  vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale, setLocale: vi.fn() });
+}
 
 const RESULT: SearchFlightResult = {
   flightInstanceId: 'fi-1',
@@ -151,5 +156,30 @@ describe('ResultsPage', () => {
         'شما قبلاً برای این پرواز و کلاس، قیمت را قفل کرده‌اید.',
       );
     });
+  });
+
+  it('renders translated result cards with Latin-digit toman prices in English', async () => {
+    mockLocale('en');
+    vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+    renderPage();
+
+    expect(await screen.findByTestId('result-card')).toBeInTheDocument();
+    expect(screen.getByText('Economy')).toBeInTheDocument();
+    expect(screen.getByText('Business')).toBeInTheDocument();
+    expect(screen.getAllByText('Select')[0]).toBeInTheDocument();
+    expect(screen.getByText(/38,000,000/)).toBeInTheDocument();
+    expect(screen.getByText('Change search')).toBeInTheDocument();
+  });
+
+  it('renders translated mock schedule with Eastern Arabic-Indic digits in Arabic', async () => {
+    mockLocale('ar');
+    vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([]);
+    renderPage();
+
+    const mockCards = await screen.findAllByTestId('mock-result-card');
+    expect(mockCards).toHaveLength(6);
+    expect(screen.getByText('رادار الأسعار الذكي')).toBeInTheDocument();
+    expect(screen.getAllByText('اختيار')[0]).toBeInTheDocument();
+    expect(screen.getAllByText('٣٬٦٥٠٬٠٠٠')[0]).toBeInTheDocument();
   });
 });
