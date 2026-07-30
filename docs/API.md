@@ -2096,3 +2096,15 @@ plans, and correspondence-based key delivery wording have no design
 counterpart and are hand-translated, as is all AR text. All 4
 pre-existing tests pass unmodified; 2 new tests (en, ar). See
 `docs/features/agency-webservice-page-i18n.md`.
+
+## Phase 61 — صفحه 404 real i18n
+
+Frontend-only, no new/changed endpoints. First page of the post-agency-
+portal i18n continuation — a small, standalone static page unrelated to
+the excluded checkout/payment flow. `NotFoundPage.tsx` translates its
+heading, body copy, both links, and error-code footer into fa/en/ar; the
+wrapping `dir` attribute is now locale-aware. `design-reference/صفحه
+404.dc.html` has no `isEN`/`isAR` sample data at all, so all EN/AR text
+is hand-translated. This page had no test file before this phase;
+`NotFoundPage.test.tsx` was created from scratch with 3 tests (fa, en,
+ar). See `docs/features/not-found-page-i18n.md`.
