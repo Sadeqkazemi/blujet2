@@ -18,13 +18,60 @@ import {
 import { ROLE_LABELS_FA } from '../../common/exec-roles';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { ClubTier } from '../../../generated/prisma/enums';
-import type { ClubMember, Prisma } from '../../../generated/prisma/client';
+import type {
+  ClubMember,
+  ClubTierRule,
+  Prisma,
+} from '../../../generated/prisma/client';
 
 const CARD_PREFIX: Record<ClubTier, string> = {
   SILVER: 'SILV',
   GOLD: 'GOLD',
   PLATINUM: 'PLAT',
 };
+
+function tierRulePreview(rule: ClubTierRule) {
+  return [
+    {
+      tier: 'SILVER' as const,
+      minPoints: 0,
+      maxPoints: rule.goldMinPoints - 1,
+    },
+    {
+      tier: 'GOLD' as const,
+      minPoints: rule.goldMinPoints,
+      maxPoints: rule.platinumMinPoints - 1,
+    },
+    {
+      tier: 'PLATINUM' as const,
+      minPoints: rule.platinumMinPoints,
+      maxPoints: null,
+    },
+  ];
+}
+
+function toTierRuleView(rule: ClubTierRule, updatedByLabelFa: string | null) {
+  return {
+    goldMinPoints: rule.goldMinPoints,
+    platinumMinPoints: rule.platinumMinPoints,
+    cardRequestMinPoints: rule.cardRequestMinPoints,
+    updatedAt: rule.updatedAt,
+    updatedByLabelFa,
+    preview: tierRulePreview(rule),
+  };
+}
+
+/** Highest tier whose threshold the given points satisfy. Exported so
+ * ClubPointsService.syncCache can reuse the exact same logic when
+ * recomputing a member's level after a points change. */
+export function resolveTierForPoints(
+  points: number,
+  rule: Pick<ClubTierRule, 'goldMinPoints' | 'platinumMinPoints'>,
+): ClubTier {
+  if (points >= rule.platinumMinPoints) return 'PLATINUM';
+  if (points >= rule.goldMinPoints) return 'GOLD';
+  return 'SILVER';
+}
 
 function generateCardNo(tier: ClubTier): string {
   return `${CARD_PREFIX[tier]}-${crypto.randomInt(1000, 10000)}`;
@@ -44,6 +91,73 @@ export class ClubService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
   ) {}
+
+  // ── Phase 65: club tier rules (singleton config) ────────────────────────
+
+  private async getOrCreateTierRule(): Promise<ClubTierRule> {
+    const existing = await this.prisma.clubTierRule.findFirst({
+      orderBy: { createdAt: 'asc' },
+    });
+    if (existing) return existing;
+    // Defense in depth only — prisma/seed.ts creates this row normally.
+    return this.prisma.clubTierRule.create({ data: {} });
+  }
+
+  async getTierRules() {
+    const rule = await this.getOrCreateTierRule();
+    let updatedByLabelFa: string | null = null;
+    if (rule.updatedById) {
+      const updater = await this.prisma.user.findUnique({
+        where: { id: rule.updatedById },
+        select: { role: true },
+      });
+      updatedByLabelFa = updater ? ROLE_LABELS_FA[updater.role] : null;
+    }
+    return toTierRuleView(rule, updatedByLabelFa);
+  }
+
+  async updateTierRules(
+    actor: AuthenticatedUser,
+    dto: {
+      goldMinPoints: number;
+      platinumMinPoints: number;
+      cardRequestMinPoints: number;
+    },
+  ) {
+    if (dto.goldMinPoints >= dto.platinumMinPoints) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'حد نصاب طلایی باید کمتر از حد نصاب پلاتین باشد.',
+      });
+    }
+
+    const before = await this.getOrCreateTierRule();
+    const updated = await this.prisma.clubTierRule.update({
+      where: { id: before.id },
+      data: {
+        goldMinPoints: dto.goldMinPoints,
+        platinumMinPoints: dto.platinumMinPoints,
+        cardRequestMinPoints: dto.cardRequestMinPoints,
+        updatedById: actor.id,
+      },
+    });
+
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'CLUB',
+      action: 'تغییر قوانین باشگاه مشتریان',
+      detail:
+        `قوانین باشگاه مشتریان توسط ${actor.fullName} تغییر کرد: ` +
+        `حد نصاب طلایی از ${before.goldMinPoints} به ${updated.goldMinPoints}، ` +
+        `حد نصاب پلاتین از ${before.platinumMinPoints} به ${updated.platinumMinPoints}، ` +
+        `حد نصاب کارت از ${before.cardRequestMinPoints} به ${updated.cardRequestMinPoints}.`,
+      entityType: 'ClubTierRule',
+      entityId: updated.id,
+    });
+
+    return toTierRuleView(updated, ROLE_LABELS_FA[actor.role]);
+  }
 
   private async getMemberOrThrow(id: string): Promise<ClubMember> {
     const member = await this.prisma.clubMember.findUnique({ where: { id } });

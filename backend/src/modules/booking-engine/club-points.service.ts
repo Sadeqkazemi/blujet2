@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ErrorCode } from '../../common/errors';
+import { resolveTierForPoints } from '../club/club.service';
 import type { Prisma } from '../../../generated/prisma/client';
 
 /** Server-side config (CLAUDE.md: "conversion rate is server-side config")
@@ -76,15 +77,24 @@ export class ClubPointsService {
   }
 
   /** Keeps ClubMember.points (Phase 5's staff-facing display cache) in
-   * sync — write-only from here, never read as the source of truth. */
+   * sync — write-only from here, never read as the source of truth.
+   * Phase 65: also recomputes ClubMember.level from the manager-configured
+   * ClubTierRule thresholds every time points change, so tier promotion
+   * (and demotion, on a redemption) is real rather than a manual-only
+   * staff action. */
   private async syncCache(tx: Prisma.TransactionClient, clubMemberId: string) {
     const sum = await tx.clubPointsEntry.aggregate({
       where: { clubMemberId },
       _sum: { signedPoints: true },
     });
+    const points = sum._sum.signedPoints ?? 0;
+    const rule = await tx.clubTierRule.findFirst({
+      orderBy: { createdAt: 'asc' },
+    });
+    const level = rule ? resolveTierForPoints(points, rule) : undefined;
     await tx.clubMember.update({
       where: { id: clubMemberId },
-      data: { points: sum._sum.signedPoints ?? 0 },
+      data: { points, ...(level ? { level } : {}) },
     });
   }
 }

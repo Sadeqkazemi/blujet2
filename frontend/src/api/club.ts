@@ -1,5 +1,11 @@
 import { apiGet, apiPatch, apiPost } from './http';
-import type { ClubCardRequest, ClubMember, ClubMembersResult, ClubTier } from '../types/club';
+import type {
+  ClubCardRequest,
+  ClubMember,
+  ClubMembersResult,
+  ClubTier,
+  ClubTierRules,
+} from '../types/club';
 
 export function fetchClubMembers(query: { level?: ClubTier; q?: string } = {}) {
   const params = new URLSearchParams();
@@ -37,4 +43,16 @@ export function approveCardRequest(id: string) {
 
 export function rejectCardRequest(id: string) {
   return apiPatch<ClubCardRequest>(`/club/card-requests/${id}/reject`);
+}
+
+export function fetchClubTierRules() {
+  return apiGet<ClubTierRules>('/club/tier-rules');
+}
+
+export function updateClubTierRules(dto: {
+  goldMinPoints: number;
+  platinumMinPoints: number;
+  cardRequestMinPoints: number;
+}) {
+  return apiPatch<ClubTierRules>('/club/tier-rules', dto);
 }
