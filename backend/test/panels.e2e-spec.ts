@@ -103,6 +103,7 @@ describe('Panels (e2e)', () => {
       'club',
       'refund',
       'tickets',
+      'jobapps',
     ]);
   });
 

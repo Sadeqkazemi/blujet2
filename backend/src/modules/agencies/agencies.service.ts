@@ -345,7 +345,10 @@ export class AgenciesService {
         where: { booking: { agencyId: id } },
       }),
       this.typeorm.ledgerEntry.aggregate({
-        where: { agencyId: id, type: 'SALE' },
+        // Real ticket sales only — excludes this same service's own
+        // resetTestDebt() calibration rows (bookingId null; see
+        // ReportingService.kpis() for the full explanation).
+        where: { agencyId: id, type: 'SALE', bookingId: { not: null } },
         _sum: { signedAmountIrr: true },
       }),
       this.typeorm.agencyInvoice.count({

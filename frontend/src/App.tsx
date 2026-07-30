@@ -63,6 +63,9 @@ import AccountPage from './features/public-site/AccountPage';
 import MaintenancePage from './features/public-site/MaintenancePage';
 import SurveyPage from './features/survey/SurveyPage';
 import SurveyRouter from './components/SurveyRouter';
+import CareersPage from './features/public-site/CareersPage';
+import CareersApplyPage from './features/public-site/CareersApplyPage';
+import CareersAdminPage from './features/careers/CareersAdminPage';
 
 export default function App() {
   return (
@@ -88,6 +91,8 @@ export default function App() {
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/maintenance" element={<MaintenancePage />} />
           <Route path="/survey/:token" element={<SurveyPage />} />
+          <Route path="/careers" element={<CareersPage />} />
+          <Route path="/careers/:jobId/apply" element={<CareersApplyPage />} />
 
           <Route path="/login" element={<LoginPage />} />
           <Route path="/two-factor" element={<TwoFactorPage />} />
@@ -160,6 +165,9 @@ export default function App() {
               </Route>
               <Route path="tickets" element={<TabGate tabKey="tickets" />}>
                 <Route index element={<SupportTicketsPage />} />
+              </Route>
+              <Route path="jobapps" element={<TabGate tabKey="jobapps" />}>
+                <Route index element={<CareersAdminPage />} />
               </Route>
               <Route path="reservation" element={<TabGate tabKey="reservation" />}>
                 <Route index element={<ReservationPage />} />

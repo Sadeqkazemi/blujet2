@@ -2444,16 +2444,29 @@ existing Phase 6 `MlPriceSuggestionProvider` still has). Frontend: 10 new
 Vitest/RTL tests across the three new pages. No new Playwright E2E script
 this phase — same cadence as Phases 51–65.
 
-## Phase 67 (DRAFT — pending approval) — فرصت‌های شغلی (Careers)
+## Phase 67 — فرصت‌های شغلی (Careers)
 
-Two dedicated public design files (`فرصت‌های شغلی.dc.html`, the listing
-page, and `فرصت‌های شغلی-فرم درخواست.dc.html`, the per-job application
-form) plus a `jobapps` tab found inside `پنل ادمین سایت.dc.html`
-(SITE_ADMIN's own "تنظیمات سامانه" section) that manages job postings
-(create/edit/deactivate) and reviews submitted applications
-(list/detail/refer/hire/reject). Confirmed via grep across every other
-executive-panel design file: **no other role's design mentions job
-postings or applications at all** — this stays SITE_ADMIN-only.
+**Correction (post-implementation):** an earlier draft of this section
+claimed two dedicated public design files existed for the careers
+listing/application pages. Re-verified directly against
+`design-reference/` before finishing this phase: **no such files exist
+in the bundle.** The only real design source is a small "فرصت‌های شغلی"
+card grid inside `پنل ادمین سایت.dc.html` (job title/dept/city + type
+badge + "ویرایش" link, alongside the same panel's image-library section)
+— posting create/edit only, no delete, matching the design's own
+`onEdit` action. The design has **no application-review UI at all**
+(confirmed via grep for "متقاضی"/"رزومه" across every panel file — zero
+matches for job applicants). The public listing page, the public
+application form, and the entire SITE_ADMIN application-review flow
+(list/detail/refer/hire/reject) below were therefore built by extension
+— not lifted from a design file — using this codebase's existing visual
+language (same components/colors/RTL/Jalali conventions as every other
+public page and admin review screen, e.g. `SupportTicketsPage.tsx`'s
+list+detail+refer pattern) rather than inventing a new one. This was
+presented to and approved by the user before implementation began.
+Confirmed via grep across every other executive-panel design file: **no
+other role's design mentions job postings or applications at all** —
+this stays SITE_ADMIN-only.
 
 ### Scope decisions
 - **Job-posting CRUD folds into one new `jobapps` SITE_ADMIN tab**,
