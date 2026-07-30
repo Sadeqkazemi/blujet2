@@ -216,6 +216,31 @@
         ]
       }
     },
+    "/auth/me/locale": {
+      "patch": {
+        "operationId": "AuthController_updateLocale",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateLocaleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "ذخیرهٔ ترجیح زبان نمایش (fa/en/ar) — برای همگام‌سازی بین‌دستگاهی",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/auth/change-password": {
       "post": {
         "operationId": "AuthController_changePassword",
@@ -239,6 +264,167 @@
           }
         },
         "summary": "تغییر رمز عبور خود — رمز فعلی باید تأیید شود",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/set-password": {
+      "post": {
+        "operationId": "AuthController_setPassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password set"
+          }
+        },
+        "summary": "تعیین/بازنشانی رمز عبور مشتری پس از احراز هویت با OTP — بدون نیاز به رمز فعلی",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/customer/login-password": {
+      "post": {
+        "operationId": "AuthController_customerPasswordLogin",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerPasswordLoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login complete"
+          },
+          "401": {
+            "description": "Invalid credentials"
+          }
+        },
+        "summary": "ورود مشتری با موبایل + رمز عبور",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/password-reset/email/request": {
+      "post": {
+        "operationId": "AuthController_requestPasswordResetEmail",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestPasswordResetEmailDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Challenge issued"
+          },
+          "401": {
+            "description": "No account with a verified email matches"
+          },
+          "403": {
+            "description": "Account suspended"
+          }
+        },
+        "summary": "فراموشی رمز — مسیر ایمیل: ارسال کد به ایمیل تأییدشدهٔ حساب (جایگزین OTP پیامکی)",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/password-reset/email/verify": {
+      "post": {
+        "operationId": "AuthController_verifyPasswordResetEmail",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyPasswordResetEmailDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login complete"
+          },
+          "401": {
+            "description": "Invalid/expired code"
+          }
+        },
+        "summary": "فراموشی رمز — مسیر ایمیل: تأیید کد، صدور توکن‌ها",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/_test/last-password-reset-email-code/{email}": {
+      "get": {
+        "operationId": "AuthController_testLastPasswordResetEmailCode",
+        "parameters": [
+          {
+            "name": "email",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "E2E-test only: reads back the mock password-reset-email code. 404s in production.",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/step-up/request": {
+      "post": {
+        "operationId": "AuthController_requestStepUp",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestStepUpDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "درخواست کد تأیید مجدد پیش از عملیات پرریسک — تحویل از طریق کانال 2FA موجود",
         "tags": [
           "auth"
         ]
@@ -770,6 +956,29 @@
         "tags": [
           "agencies"
         ]
+      },
+      "post": {
+        "operationId": "AgencyRequestsPublicController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAgencyRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ثبت درخواست همکاری آژانس — ایجاد رکورد PENDING پس از تأیید کد",
+        "tags": [
+          "agencies"
+        ]
       }
     },
     "/agencies/requests/{id}": {
@@ -814,7 +1023,7 @@
             "description": ""
           }
         },
-        "summary": "تأیید درخواست — ایجاد User+AgencyProfile تراکنشی",
+        "summary": "تأیید نهایی درخواست — فقط مدیر بازرگانی؛ ایجاد User+AgencyProfile تراکنشی + پیامک تأیید",
         "tags": [
           "agencies"
         ]
@@ -882,7 +1091,7 @@
             "description": ""
           }
         },
-        "summary": "ارجاع درخواست — فقط مدیر ارشد/بازرگانی",
+        "summary": "ارجاع درخواست — ادمین سایت یا مدیر ارشد/بازرگانی",
         "tags": [
           "agencies"
         ]
@@ -1429,6 +1638,187 @@
         ]
       }
     },
+    "/agencies/{id}/webservice-requests": {
+      "get": {
+        "operationId": "AgenciesController_listWebserviceRequests",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "لیست درخواست‌های خرید وب‌سرویس آژانس",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/{id}/webservice-requests/{reqId}/decide": {
+      "patch": {
+        "operationId": "AgenciesController_decideWebserviceRequest",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "reqId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecideWebserviceRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تأیید/رد درخواست وب‌سرویس — تأیید کلید API واقعی صادر می‌کند (نیازمند تأیید دومرحله‌ای)",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/{id}/documents": {
+      "get": {
+        "operationId": "AgenciesController_listDocuments",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "مدارک آپلودشده آژانس (مجوز/قرارداد) برای بازبینی",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/{id}/documents/{docId}/decide": {
+      "patch": {
+        "operationId": "AgenciesController_decideDocument",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "docId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecideDocumentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تأیید/رد مدرک آپلودشدهٔ آژانس",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/requests/otp": {
+      "post": {
+        "operationId": "AgencyRequestsPublicController_requestOtp",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestAgencyOtpDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "پیش‌ثبت‌نام آژانس همکار — ارسال کد تأیید به شماره موبایل",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
+    "/agencies/requests/_test/last-code/{challengeId}": {
+      "get": {
+        "operationId": "AgencyRequestsPublicController_testLastCode",
+        "parameters": [
+          {
+            "name": "challengeId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "E2E-test only: reads back the mock OTP code. 404s in production.",
+        "tags": [
+          "agencies"
+        ]
+      }
+    },
     "/cartable": {
       "get": {
         "operationId": "CartableController_list",
@@ -1661,6 +2051,21 @@
           }
         },
         "summary": "ایجاد ارجاع جدید — برای هر مقصد یک مورد کارتابل ساخته می‌شود",
+        "tags": [
+          "referrals"
+        ]
+      }
+    },
+    "/referrals/mine": {
+      "get": {
+        "operationId": "ReferralsController_mine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "ارجاعات محول‌شده به من (سمت گیرنده)",
         "tags": [
           "referrals"
         ]
@@ -2073,6 +2478,44 @@
         ]
       }
     },
+    "/club/tier-rules": {
+      "get": {
+        "operationId": "ClubController_getTierRules",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "قوانین حد نصاب امتیاز سطوح باشگاه مشتریان",
+        "tags": [
+          "club"
+        ]
+      },
+      "patch": {
+        "operationId": "ClubController_updateTierRules",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTierRulesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تغییر قوانین حد نصاب امتیاز سطوح باشگاه مشتریان",
+        "tags": [
+          "club"
+        ]
+      }
+    },
     "/it/permissions": {
       "get": {
         "operationId": "EmployeesController_catalog",
@@ -2318,6 +2761,16 @@
       "post": {
         "operationId": "SecurityController_logoutAll",
         "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogoutAllDto"
+              }
+            }
+          }
+        },
         "responses": {
           "201": {
             "description": ""
@@ -2478,6 +2931,21 @@
           }
         },
         "summary": "تست اتصال واقعی سرویس خارجی",
+        "tags": [
+          "it-manager"
+        ]
+      }
+    },
+    "/it/services/sms-log": {
+      "get": {
+        "operationId": "ItServicesController_smsLog",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "سامانه پیامک — وضعیت، شمارنده امروز و آخرین ارسال‌ها",
         "tags": [
           "it-manager"
         ]
@@ -2789,6 +3257,16 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayRefundDto"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": ""
@@ -2914,7 +3392,65 @@
             "description": ""
           }
         },
-        "summary": "لاک مدیریتی صندلی — فقط نقش‌های مجاز",
+        "summary": "درخواست لاک مدیریتی صندلی — در انتظار تأیید یک نقش دیگر",
+        "tags": [
+          "reservation"
+        ]
+      }
+    },
+    "/reservation/seatmap/locks/{id}/approve": {
+      "patch": {
+        "operationId": "SeatmapController_approve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تأیید درخواست لاک مدیریتی — نه توسط درخواست‌کننده",
+        "tags": [
+          "reservation"
+        ]
+      }
+    },
+    "/reservation/seatmap/locks/{id}/reject": {
+      "patch": {
+        "operationId": "SeatmapController_reject",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectLockDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "رد درخواست لاک مدیریتی",
         "tags": [
           "reservation"
         ]
@@ -3074,6 +3610,30 @@
         ]
       }
     },
+    "/reservation/pnr/{pnr}/no-show": {
+      "patch": {
+        "operationId": "PnrController_markNoShow",
+        "parameters": [
+          {
+            "name": "pnr",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "ثبت عدم حضور مسافر — فقط پس از انجام پرواز",
+        "tags": [
+          "reservation"
+        ]
+      }
+    },
     "/reservation/search": {
       "get": {
         "operationId": "PnrController_search",
@@ -3117,6 +3677,40 @@
         ]
       }
     },
+    "/reservation/pnr/from-lock/{lockId}": {
+      "post": {
+        "operationId": "PnrController_finalizeLock",
+        "parameters": [
+          {
+            "name": "lockId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FinalizeLockDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "صدور بلیط از لاک مدیریتیِ تأییدشده — قیمت بر اساس طبقه‌بندی لاک",
+        "tags": [
+          "reservation"
+        ]
+      }
+    },
     "/reservation/dashboard-stats": {
       "get": {
         "operationId": "PnrController_dashboardStats",
@@ -3144,596 +3738,6 @@
         "summary": "E2E only — fresh SCHEDULED instance; 404 in production",
         "tags": [
           "reservation"
-        ]
-      }
-    },
-    "/agency-portal/dashboard": {
-      "get": {
-        "operationId": "AgencyPortalController_dashboard",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "داشبورد خودِ آژانس — KPI + نمودار ۶ماهه + اعتبار",
-        "tags": [
-          "agency-portal"
-        ]
-      }
-    },
-    "/agency-portal/credit": {
-      "get": {
-        "operationId": "AgencyPortalController_credit",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "سقف/مصرف/باقیمانده اعتبار خودِ آژانس",
-        "tags": [
-          "agency-portal"
-        ]
-      }
-    },
-    "/agency-portal/ledger": {
-      "get": {
-        "operationId": "AgencyPortalController_ledger",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "گردش حساب اخیر",
-        "tags": [
-          "agency-portal"
-        ]
-      }
-    },
-    "/agency-portal/invoices": {
-      "get": {
-        "operationId": "AgencyPortalController_invoices",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "فاکتورهای خودِ آژانس",
-        "tags": [
-          "agency-portal"
-        ]
-      }
-    },
-    "/agency-portal/invoices/{invoiceId}/pay": {
-      "post": {
-        "operationId": "AgencyPortalController_payInvoice",
-        "parameters": [
-          {
-            "name": "invoiceId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "summary": "پرداخت فاکتور از اعتبار — همان مسیر تراکنشی سمت کارمند",
-        "tags": [
-          "agency-portal"
-        ]
-      }
-    },
-    "/agency-portal/credit-requests": {
-      "post": {
-        "operationId": "AgencyPortalController_requestCreditIncrease",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RequestCreditIncreaseDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "summary": "درخواست افزایش اعتبار — مستقیماً سقف را تغییر نمی‌دهد",
-        "tags": [
-          "agency-portal"
-        ]
-      },
-      "get": {
-        "operationId": "AgencyPortalController_myCreditRequests",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "تاریخچه درخواست‌های افزایش اعتبار خودِ آژانس",
-        "tags": [
-          "agency-portal"
-        ]
-      }
-    },
-    "/agency-portal/sales": {
-      "get": {
-        "operationId": "AgencyPortalController_sales",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "فروش و گزارش خودِ آژانس",
-        "tags": [
-          "agency-portal"
-        ]
-      }
-    },
-    "/agency-portal/inbox": {
-      "get": {
-        "operationId": "AgencyPortalController_inbox",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "کارتابل و پیام‌ها — خواندن",
-        "tags": [
-          "agency-portal"
-        ]
-      },
-      "post": {
-        "operationId": "AgencyPortalController_postInboxMessage",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PostInboxMessageDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "summary": "ارسال پیام در کارتابل",
-        "tags": [
-          "agency-portal"
-        ]
-      }
-    },
-    "/agency-portal/profile": {
-      "get": {
-        "operationId": "AgencyPortalController_profile",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "پروفایل خودِ آژانس",
-        "tags": [
-          "agency-portal"
-        ]
-      }
-    },
-    "/agency-portal/documents": {
-      "get": {
-        "operationId": "AgencyPortalController_documents",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "مدارک آپلودشده خودِ آژانس",
-        "tags": [
-          "agency-portal"
-        ]
-      },
-      "post": {
-        "operationId": "AgencyPortalController_uploadDocument",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "$ref": "#/components/schemas/UploadDocumentDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "summary": "آپلود مدرک — فقط PDF/تصویر، حداکثر ۵MB",
-        "tags": [
-          "agency-portal"
-        ]
-      }
-    },
-    "/flights/overview": {
-      "get": {
-        "operationId": "FlightsController_overview",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "کل تب مدیریت پروازها: KPI + فعال/انجام‌شده/آینده",
-        "tags": [
-          "flights"
-        ]
-      }
-    },
-    "/flights/airports": {
-      "get": {
-        "operationId": "FlightsController_airports",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "کاتالوگ فرودگاه‌ها برای فرم افزودن پرواز",
-        "tags": [
-          "flights"
-        ]
-      }
-    },
-    "/flights": {
-      "post": {
-        "operationId": "FlightsController_create",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateFlightDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "summary": "افزودن پرواز جدید (مودال طراحی)",
-        "tags": [
-          "flights"
-        ]
-      }
-    },
-    "/flights/ai-analysis": {
-      "post": {
-        "operationId": "FlightsController_aiAnalysis",
-        "parameters": [],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "summary": "تحلیل قیمت‌گذاری پروازهای آینده با هوش مصنوعی — advisory، با degrade امن",
-        "tags": [
-          "flights"
-        ]
-      }
-    },
-    "/flights/{instanceId}": {
-      "get": {
-        "operationId": "FlightsController_detail",
-        "parameters": [
-          {
-            "name": "instanceId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "مودال جزئیات پرواز: تفکیک واقعی کانال فروش + مجموع درآمد",
-        "tags": [
-          "flights"
-        ]
-      }
-    },
-    "/flights/{instanceId}/plan": {
-      "patch": {
-        "operationId": "FlightsController_plan",
-        "parameters": [
-          {
-            "name": "instanceId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PlanFlightDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "نرخ‌گذاری و تخصیص پرواز آینده — نرخ قابل فروش همچنان با تأیید مدیر عامل (فاز ۶)",
-        "tags": [
-          "flights"
-        ]
-      }
-    },
-    "/passenger-reports/search": {
-      "get": {
-        "operationId": "PassengerReportsController_search",
-        "parameters": [
-          {
-            "name": "q",
-            "required": true,
-            "in": "query",
-            "description": "نام مسافر یا کد ملی",
-            "schema": {
-              "example": "نگار رضایی",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "گزارش مسافران — جستجو با نام یا کد ملی (کد ملی همیشه ماسک‌شده برمی‌گردد)",
-        "tags": [
-          "passenger-reports"
-        ]
-      }
-    },
-    "/staff-reports": {
-      "get": {
-        "operationId": "StaffReportsController_reports",
-        "parameters": [
-          {
-            "name": "staffId",
-            "required": false,
-            "in": "query",
-            "description": "فیلتر تب هر کارمند",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "گزارش عملکرد کارمندان واحد خود مدیر — فید واقعی از AuditLog، ایزوله per-dept",
-        "tags": [
-          "staff-reports"
-        ]
-      }
-    },
-    "/admins": {
-      "get": {
-        "operationId": "AdminsController_list",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "فهرست مدیران و ادمین‌ها — «آنلاین» از نشست‌های واقعی مشتق می‌شود",
-        "tags": [
-          "admins"
-        ]
-      },
-      "post": {
-        "operationId": "AdminsController_create",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateAdminDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "summary": "افزودن مدیر / ادمین — فقط نقش‌های enum-backed",
-        "tags": [
-          "admins"
-        ]
-      }
-    },
-    "/admins/{id}/block": {
-      "patch": {
-        "operationId": "AdminsController_block",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "مسدودسازی ورود — واقعاً در login اعمال می‌شود",
-        "tags": [
-          "admins"
-        ]
-      }
-    },
-    "/admins/{id}/unblock": {
-      "patch": {
-        "operationId": "AdminsController_unblock",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "رفع مسدودی ورود",
-        "tags": [
-          "admins"
-        ]
-      }
-    },
-    "/admins/{id}/reset-password": {
-      "post": {
-        "operationId": "AdminsController_resetPassword",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ResetAdminPasswordDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "summary": "بازنشانی رمز مدیر — رمز موقت فقط یک بار برگردانده می‌شود",
-        "tags": [
-          "admins"
-        ]
-      }
-    },
-    "/settings": {
-      "get": {
-        "operationId": "SettingsController_getAll",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "تنظیمات سامانه + بازه‌های واقعی جریمهٔ استرداد (فاز ۷)",
-        "tags": [
-          "settings"
-        ]
-      },
-      "patch": {
-        "operationId": "SettingsController_update",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateSettingsDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "به‌روزرسانی تنظیمات — کلیدهای ناشناخته رد می‌شوند",
-        "tags": [
-          "settings"
-        ]
-      }
-    },
-    "/settings/refund-rules": {
-      "patch": {
-        "operationId": "SettingsController_updateRefundRules",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateRefundRulesDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "تغییر درصد جریمهٔ بازه‌های واقعی استرداد — همان جدولی که موتور فاز ۷ می‌خواند",
-        "tags": [
-          "settings"
         ]
       }
     },
@@ -4096,6 +4100,1991 @@
           "privacy"
         ]
       }
+    },
+    "/agency-portal/dashboard": {
+      "get": {
+        "operationId": "AgencyPortalController_dashboard",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "داشبورد خودِ آژانس — KPI + نمودار ۶ماهه + اعتبار",
+        "tags": [
+          "agency-portal"
+        ]
+      }
+    },
+    "/agency-portal/credit": {
+      "get": {
+        "operationId": "AgencyPortalController_credit",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "سقف/مصرف/باقیمانده اعتبار خودِ آژانس",
+        "tags": [
+          "agency-portal"
+        ]
+      }
+    },
+    "/agency-portal/ledger": {
+      "get": {
+        "operationId": "AgencyPortalController_ledger",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "گردش حساب اخیر",
+        "tags": [
+          "agency-portal"
+        ]
+      }
+    },
+    "/agency-portal/invoices": {
+      "get": {
+        "operationId": "AgencyPortalController_invoices",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فاکتورهای خودِ آژانس",
+        "tags": [
+          "agency-portal"
+        ]
+      }
+    },
+    "/agency-portal/invoices/{invoiceId}/pay": {
+      "post": {
+        "operationId": "AgencyPortalController_payInvoice",
+        "parameters": [
+          {
+            "name": "invoiceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "پرداخت فاکتور از اعتبار — همان مسیر تراکنشی سمت کارمند",
+        "tags": [
+          "agency-portal"
+        ]
+      }
+    },
+    "/agency-portal/credit-requests": {
+      "post": {
+        "operationId": "AgencyPortalController_requestCreditIncrease",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestCreditIncreaseDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "درخواست افزایش اعتبار — مستقیماً سقف را تغییر نمی‌دهد",
+        "tags": [
+          "agency-portal"
+        ]
+      },
+      "get": {
+        "operationId": "AgencyPortalController_myCreditRequests",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تاریخچه درخواست‌های افزایش اعتبار خودِ آژانس",
+        "tags": [
+          "agency-portal"
+        ]
+      }
+    },
+    "/agency-portal/sales": {
+      "get": {
+        "operationId": "AgencyPortalController_sales",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فروش و گزارش خودِ آژانس",
+        "tags": [
+          "agency-portal"
+        ]
+      }
+    },
+    "/agency-portal/inbox": {
+      "get": {
+        "operationId": "AgencyPortalController_inbox",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "کارتابل و پیام‌ها — خواندن",
+        "tags": [
+          "agency-portal"
+        ]
+      },
+      "post": {
+        "operationId": "AgencyPortalController_postInboxMessage",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostInboxMessageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ارسال پیام در کارتابل",
+        "tags": [
+          "agency-portal"
+        ]
+      }
+    },
+    "/agency-portal/profile": {
+      "get": {
+        "operationId": "AgencyPortalController_profile",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "پروفایل خودِ آژانس",
+        "tags": [
+          "agency-portal"
+        ]
+      }
+    },
+    "/agency-portal/allotments": {
+      "get": {
+        "operationId": "AgencyPortalController_allotments",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "سهمیه‌های صندلی تخصیص‌یافته به خودِ آژانس",
+        "tags": [
+          "agency-portal"
+        ]
+      }
+    },
+    "/agency-portal/documents": {
+      "get": {
+        "operationId": "AgencyPortalController_documents",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "مدارک آپلودشده خودِ آژانس",
+        "tags": [
+          "agency-portal"
+        ]
+      },
+      "post": {
+        "operationId": "AgencyPortalController_uploadDocument",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadDocumentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "آپلود مدرک — فقط PDF/تصویر، حداکثر ۵MB",
+        "tags": [
+          "agency-portal"
+        ]
+      }
+    },
+    "/agency-portal/webservice-requests": {
+      "post": {
+        "operationId": "AgencyPortalController_requestWebservice",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestWebserviceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "درخواست خرید وب‌سرویس B2B — مستقیماً کلید صادر نمی‌کند",
+        "tags": [
+          "agency-portal"
+        ]
+      },
+      "get": {
+        "operationId": "AgencyPortalController_myWebserviceRequests",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تاریخچه درخواست‌های وب‌سرویس خودِ آژانس",
+        "tags": [
+          "agency-portal"
+        ]
+      }
+    },
+    "/agency-portal/api-keys": {
+      "get": {
+        "operationId": "AgencyPortalController_apiKeys",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "کلیدهای API خودِ آژانس — فقط ابرداده؛ کلید خام فقط یک‌بار هنگام تأیید در پیام‌رسان ارسال می‌شود",
+        "tags": [
+          "agency-portal"
+        ]
+      }
+    },
+    "/flights/overview": {
+      "get": {
+        "operationId": "FlightsController_overview",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "کل تب مدیریت پروازها: KPI + فعال/انجام‌شده/آینده",
+        "tags": [
+          "flights"
+        ]
+      }
+    },
+    "/flights/airports": {
+      "get": {
+        "operationId": "FlightsController_airports",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "کاتالوگ فرودگاه‌ها برای فرم افزودن پرواز",
+        "tags": [
+          "flights"
+        ]
+      }
+    },
+    "/flights/aircraft-types": {
+      "get": {
+        "operationId": "FlightsController_aircraftTypes",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "کاتالوگ انواع هواپیما برای فرم تغییر نوع هواپیما",
+        "tags": [
+          "flights"
+        ]
+      }
+    },
+    "/flights": {
+      "post": {
+        "operationId": "FlightsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFlightDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "افزودن پرواز جدید (مودال طراحی)",
+        "tags": [
+          "flights"
+        ]
+      }
+    },
+    "/flights/schedules": {
+      "post": {
+        "operationId": "FlightsController_createSchedule",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateScheduleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ثبت برنامه تکرارشونده پرواز (RRULE) و ساخت پروازهای آینده",
+        "tags": [
+          "flights"
+        ]
+      },
+      "get": {
+        "operationId": "FlightsController_listSchedules",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست برنامه‌های تکرارشونده پرواز",
+        "tags": [
+          "flights"
+        ]
+      }
+    },
+    "/flights/ai-analysis": {
+      "post": {
+        "operationId": "FlightsController_aiAnalysis",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "تحلیل قیمت‌گذاری پروازهای آینده با هوش مصنوعی — advisory، با degrade امن",
+        "tags": [
+          "flights"
+        ]
+      }
+    },
+    "/flights/{instanceId}": {
+      "get": {
+        "operationId": "FlightsController_detail",
+        "parameters": [
+          {
+            "name": "instanceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "مودال جزئیات پرواز: تفکیک واقعی کانال فروش + مجموع درآمد",
+        "tags": [
+          "flights"
+        ]
+      }
+    },
+    "/flights/{instanceId}/plan": {
+      "patch": {
+        "operationId": "FlightsController_plan",
+        "parameters": [
+          {
+            "name": "instanceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanFlightDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "نرخ‌گذاری و تخصیص پرواز آینده — نرخ قابل فروش همچنان با تأیید مدیر عامل (فاز ۶)",
+        "tags": [
+          "flights"
+        ]
+      }
+    },
+    "/flights/{instanceId}/aircraft": {
+      "patch": {
+        "operationId": "FlightsController_changeAircraft",
+        "parameters": [
+          {
+            "name": "instanceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeAircraftTypeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تغییر نوع هواپیمای پرواز — رد با ۴۰۹ اگر ظرفیت جدید کمتر از رزروهای قطعی/لاک‌شده باشد",
+        "tags": [
+          "flights"
+        ]
+      }
+    },
+    "/flights/{instanceId}/fare-rules": {
+      "get": {
+        "operationId": "FlightsController_listFareRules",
+        "parameters": [
+          {
+            "name": "instanceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست کلاس‌های نرخی این پرواز",
+        "tags": [
+          "flights"
+        ]
+      },
+      "post": {
+        "operationId": "FlightsController_createFareRule",
+        "parameters": [
+          {
+            "name": "instanceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFareRuleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ایجاد کلاس نرخی — رد با ۴۰۰ اگر مجموع صندلی تخصیص‌یافته از ظرفیت کابین بیشتر شود",
+        "tags": [
+          "flights"
+        ]
+      }
+    },
+    "/flights/{instanceId}/fare-rules/{ruleId}": {
+      "patch": {
+        "operationId": "FlightsController_updateFareRule",
+        "parameters": [
+          {
+            "name": "instanceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ruleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateFareRuleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "ویرایش کلاس نرخی",
+        "tags": [
+          "flights"
+        ]
+      },
+      "delete": {
+        "operationId": "FlightsController_deleteFareRule",
+        "parameters": [
+          {
+            "name": "instanceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ruleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "حذف کلاس نرخی — رد با ۴۰۹ اگر رزرو فعالی از آن استفاده کند",
+        "tags": [
+          "flights"
+        ]
+      }
+    },
+    "/flights/{instanceId}/allotments": {
+      "get": {
+        "operationId": "FlightsController_listAllotments",
+        "parameters": [
+          {
+            "name": "instanceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست سهمیه‌های آژانس این پرواز",
+        "tags": [
+          "flights"
+        ]
+      },
+      "post": {
+        "operationId": "FlightsController_createAllotment",
+        "parameters": [
+          {
+            "name": "instanceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAllotmentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "تخصیص سهمیه به آژانس — رد با ۴۰۰ اگر مجموع سهمیه‌ها از سقف کلی آژانس‌های پرواز بیشتر شود",
+        "tags": [
+          "flights"
+        ]
+      }
+    },
+    "/flights/{instanceId}/allotments/{allotmentId}": {
+      "delete": {
+        "operationId": "FlightsController_deleteAllotment",
+        "parameters": [
+          {
+            "name": "instanceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "allotmentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "حذف سهمیه آژانس — رد با ۴۰۹ اگر آژانس رزرو فعالی داشته باشد",
+        "tags": [
+          "flights"
+        ]
+      }
+    },
+    "/passenger-reports/search": {
+      "get": {
+        "operationId": "PassengerReportsController_search",
+        "parameters": [
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "description": "نام مسافر یا کد ملی",
+            "schema": {
+              "example": "نگار رضایی",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "گزارش مسافران — جستجو با نام یا کد ملی (کد ملی همیشه ماسک‌شده برمی‌گردد)",
+        "tags": [
+          "passenger-reports"
+        ]
+      }
+    },
+    "/staff-reports": {
+      "get": {
+        "operationId": "StaffReportsController_reports",
+        "parameters": [
+          {
+            "name": "staffId",
+            "required": false,
+            "in": "query",
+            "description": "فیلتر تب هر کارمند",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "گزارش عملکرد کارمندان واحد خود مدیر — فید واقعی از AuditLog، ایزوله per-dept",
+        "tags": [
+          "staff-reports"
+        ]
+      }
+    },
+    "/admins": {
+      "get": {
+        "operationId": "AdminsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست مدیران و ادمین‌ها — «آنلاین» از نشست‌های واقعی مشتق می‌شود",
+        "tags": [
+          "admins"
+        ]
+      },
+      "post": {
+        "operationId": "AdminsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAdminDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "افزودن مدیر / ادمین — فقط نقش‌های enum-backed",
+        "tags": [
+          "admins"
+        ]
+      }
+    },
+    "/admins/{id}/block": {
+      "patch": {
+        "operationId": "AdminsController_block",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "مسدودسازی ورود — واقعاً در login اعمال می‌شود",
+        "tags": [
+          "admins"
+        ]
+      }
+    },
+    "/admins/{id}/unblock": {
+      "patch": {
+        "operationId": "AdminsController_unblock",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "رفع مسدودی ورود",
+        "tags": [
+          "admins"
+        ]
+      }
+    },
+    "/admins/{id}/reset-password": {
+      "post": {
+        "operationId": "AdminsController_resetPassword",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetAdminPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "بازنشانی رمز مدیر — رمز موقت فقط یک بار برگردانده می‌شود",
+        "tags": [
+          "admins"
+        ]
+      }
+    },
+    "/settings": {
+      "get": {
+        "operationId": "SettingsController_getAll",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تنظیمات سامانه + بازه‌های واقعی جریمهٔ استرداد (فاز ۷)",
+        "tags": [
+          "settings"
+        ]
+      },
+      "patch": {
+        "operationId": "SettingsController_update",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "به‌روزرسانی تنظیمات — کلیدهای ناشناخته رد می‌شوند",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/settings/refund-rules": {
+      "patch": {
+        "operationId": "SettingsController_updateRefundRules",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRefundRulesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تغییر درصد جریمهٔ بازه‌های واقعی استرداد — همان جدولی که موتور فاز ۷ می‌خواند",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/reconciliation": {
+      "get": {
+        "operationId": "ReconciliationController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "صف مغایرت‌های پرداخت — پرداخت موفق، بلیط صادرنشده",
+        "tags": [
+          "reconciliation"
+        ]
+      }
+    },
+    "/reconciliation/{id}/resolve": {
+      "patch": {
+        "operationId": "ReconciliationController_resolve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveReconciliationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "رفع مغایرت پرداخت",
+        "tags": [
+          "reconciliation"
+        ]
+      }
+    },
+    "/my/profile": {
+      "get": {
+        "operationId": "ProfileController_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "اطلاعات پروفایل من + درصد تکمیل",
+        "tags": [
+          "profile"
+        ]
+      },
+      "patch": {
+        "operationId": "ProfileController_update",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "ویرایش اطلاعات هویتی پروفایل من",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/my/profile/email/verify-request": {
+      "post": {
+        "operationId": "ProfileController_requestEmailVerify",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "ارسال کد تأیید به ایمیل ثبت‌شده",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/my/profile/email/verify": {
+      "post": {
+        "operationId": "ProfileController_verifyEmail",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyEmailDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تأیید کد ایمیل",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/manage-booking/lookup": {
+      "post": {
+        "operationId": "ManageBookingController_lookup",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LookupBookingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "جستجوی رزرو با کد رزرو + نام خانوادگی مسافر",
+        "tags": [
+          "manage-booking"
+        ]
+      }
+    },
+    "/manage-booking/refund": {
+      "post": {
+        "operationId": "ManageBookingController_refund",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitAnonymousRefundDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ثبت درخواست استرداد بدون ورود به حساب",
+        "tags": [
+          "manage-booking"
+        ]
+      }
+    },
+    "/contact": {
+      "post": {
+        "operationId": "ContactController_submit",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitContactMessageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ارسال پیام از فرم تماس با ما",
+        "tags": [
+          "contact"
+        ]
+      },
+      "get": {
+        "operationId": "ContactController_listRecent",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست آخرین پیام‌های تماس با ما (برای داشبورد)",
+        "tags": [
+          "contact"
+        ]
+      }
+    },
+    "/support-tickets": {
+      "post": {
+        "operationId": "SupportTicketsController_submit",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitSupportTicketDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ثبت تیکت پشتیبانی (بدون ورود به حساب)",
+        "tags": [
+          "support-tickets"
+        ]
+      },
+      "get": {
+        "operationId": "SupportTicketsController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dept",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست تیکت‌های پشتیبانی",
+        "tags": [
+          "support-tickets"
+        ]
+      }
+    },
+    "/support-tickets/forward-targets": {
+      "get": {
+        "operationId": "SupportTicketsController_forwardTargets",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست کارکنان برای انتخاب مقصد ارجاع تیکت",
+        "tags": [
+          "support-tickets"
+        ]
+      }
+    },
+    "/support-tickets/{id}": {
+      "get": {
+        "operationId": "SupportTicketsController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "جزئیات تیکت پشتیبانی",
+        "tags": [
+          "support-tickets"
+        ]
+      }
+    },
+    "/support-tickets/{id}/forward": {
+      "patch": {
+        "operationId": "SupportTicketsController_forward",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForwardTicketDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "ارجاع تیکت به کارمند/مدیر",
+        "tags": [
+          "support-tickets"
+        ]
+      }
+    },
+    "/support-tickets/{id}/status": {
+      "patch": {
+        "operationId": "SupportTicketsController_updateStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTicketStatusDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تغییر وضعیت تیکت",
+        "tags": [
+          "support-tickets"
+        ]
+      }
+    },
+    "/flight-status": {
+      "get": {
+        "operationId": "FlightStatusController_lookup",
+        "parameters": [
+          {
+            "name": "flightNo",
+            "required": false,
+            "in": "query",
+            "description": "شماره پرواز",
+            "schema": {
+              "example": "BJ-410",
+              "type": "string"
+            }
+          },
+          {
+            "name": "origin",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "THR",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dest",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "MHD",
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-08-01",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "جستجوی وضعیت پرواز با شماره پرواز یا مبدأ/مقصد",
+        "tags": [
+          "flight-status"
+        ]
+      }
+    },
+    "/flightops": {
+      "get": {
+        "operationId": "FlightopsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "لیست پروازها + KPI — بستن خودکار فروش و بارگذاری نیرا هنگام مطالعه اعمال می‌شود",
+        "tags": [
+          "flightops"
+        ]
+      }
+    },
+    "/flightops/{id}": {
+      "get": {
+        "operationId": "FlightopsController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "جزئیات پرواز — وضعیت نیرا + لیست کامل مسافران",
+        "tags": [
+          "flightops"
+        ]
+      }
+    },
+    "/survey/settings": {
+      "get": {
+        "operationId": "SurveyController_getSettings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "وضعیت و عنوان نظرسنجی",
+        "tags": [
+          "survey"
+        ]
+      },
+      "patch": {
+        "operationId": "SurveyController_updateSettings",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSurveySettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فعال/غیرفعال یا تغییر عنوان نظرسنجی",
+        "tags": [
+          "survey"
+        ]
+      }
+    },
+    "/survey/questions": {
+      "get": {
+        "operationId": "SurveyController_listQuestions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست سؤالات نظرسنجی",
+        "tags": [
+          "survey"
+        ]
+      },
+      "post": {
+        "operationId": "SurveyController_addQuestion",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSurveyQuestionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "افزودن سؤال نظرسنجی",
+        "tags": [
+          "survey"
+        ]
+      }
+    },
+    "/survey/questions/{id}": {
+      "delete": {
+        "operationId": "SurveyController_removeQuestion",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "حذف سؤال نظرسنجی",
+        "tags": [
+          "survey"
+        ]
+      }
+    },
+    "/survey/stats": {
+      "get": {
+        "operationId": "SurveyController_getStats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "آمار کلی نظرسنجی و آخرین پاسخ‌ها",
+        "tags": [
+          "survey"
+        ]
+      }
+    },
+    "/survey/results": {
+      "get": {
+        "operationId": "SurveyController_getResults",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "نتایج نظرسنجی به تفکیک پرواز (فقط خواندنی)",
+        "tags": [
+          "survey"
+        ]
+      }
+    },
+    "/survey/results/{flightInstanceId}/analyze": {
+      "post": {
+        "operationId": "SurveyController_analyze",
+        "parameters": [
+          {
+            "name": "flightInstanceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "خلاصهٔ هوش مصنوعی نظرات یک پرواز",
+        "tags": [
+          "survey"
+        ]
+      }
+    },
+    "/survey/{token}": {
+      "get": {
+        "operationId": "SurveyPublicController_getInvite",
+        "parameters": [
+          {
+            "name": "token",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "مشاهدهٔ فرم نظرسنجی با توکن دعوت",
+        "tags": [
+          "survey"
+        ]
+      },
+      "post": {
+        "operationId": "SurveyPublicController_submit",
+        "parameters": [
+          {
+            "name": "token",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitSurveyResponseDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ثبت پاسخ نظرسنجی",
+        "tags": [
+          "survey"
+        ]
+      }
+    },
+    "/careers/settings": {
+      "patch": {
+        "operationId": "CareersController_updateSettings",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCareersSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فعال/غیرفعال کردن لینک فرصت‌های شغلی در فوتر",
+        "tags": [
+          "careers"
+        ]
+      },
+      "get": {
+        "operationId": "CareersPublicController_getSettings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "وضعیت انتشار لینک فرصت‌های شغلی",
+        "tags": [
+          "careers"
+        ]
+      }
+    },
+    "/careers/postings": {
+      "get": {
+        "operationId": "CareersController_listAllPostings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست همهٔ فرصت‌های شغلی (فعال و غیرفعال)",
+        "tags": [
+          "careers"
+        ]
+      },
+      "post": {
+        "operationId": "CareersController_createPosting",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateJobPostingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ایجاد فرصت شغلی جدید",
+        "tags": [
+          "careers"
+        ]
+      }
+    },
+    "/careers/postings/{id}": {
+      "patch": {
+        "operationId": "CareersController_updatePosting",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateJobPostingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "ویرایش یا فعال/غیرفعال‌سازی فرصت شغلی",
+        "tags": [
+          "careers"
+        ]
+      }
+    },
+    "/careers/applications": {
+      "get": {
+        "operationId": "CareersController_listApplications",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "jobTitle",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست درخواست‌های استخدام",
+        "tags": [
+          "careers"
+        ]
+      }
+    },
+    "/careers/applications/{id}": {
+      "get": {
+        "operationId": "CareersController_getApplicationDetail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "جزئیات یک درخواست استخدام",
+        "tags": [
+          "careers"
+        ]
+      }
+    },
+    "/careers/applications/{id}/resume": {
+      "get": {
+        "operationId": "CareersController_getResume",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "دریافت فایل رزومهٔ درخواست",
+        "tags": [
+          "careers"
+        ]
+      }
+    },
+    "/careers/applications/{id}/refer": {
+      "patch": {
+        "operationId": "CareersController_referApplication",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReferApplicationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "ارجاع درخواست استخدام به یکی از مدیران",
+        "tags": [
+          "careers"
+        ]
+      }
+    },
+    "/careers/applications/{id}/hire": {
+      "patch": {
+        "operationId": "CareersController_hireApplication",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "پذیرش (استخدام) متقاضی",
+        "tags": [
+          "careers"
+        ]
+      }
+    },
+    "/careers/applications/{id}/reject": {
+      "patch": {
+        "operationId": "CareersController_rejectApplication",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "رد درخواست متقاضی",
+        "tags": [
+          "careers"
+        ]
+      }
+    },
+    "/careers/jobs": {
+      "get": {
+        "operationId": "CareersPublicController_listActiveJobs",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست فرصت‌های شغلی فعال",
+        "tags": [
+          "careers"
+        ]
+      }
+    },
+    "/careers/jobs/{id}": {
+      "get": {
+        "operationId": "CareersPublicController_getPublicJob",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "جزئیات یک فرصت شغلی",
+        "tags": [
+          "careers"
+        ]
+      }
+    },
+    "/careers/jobs/{id}/apply": {
+      "post": {
+        "operationId": "CareersPublicController_apply",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyJobDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ثبت درخواست استخدام برای یک فرصت شغلی",
+        "tags": [
+          "careers"
+        ]
+      }
     }
   },
   "info": {
@@ -4204,6 +6193,23 @@
           "code"
         ]
       },
+      "UpdateLocaleDto": {
+        "type": "object",
+        "properties": {
+          "locale": {
+            "type": "string",
+            "enum": [
+              "FA",
+              "EN",
+              "AR"
+            ],
+            "example": "EN"
+          }
+        },
+        "required": [
+          "locale"
+        ]
+      },
       "ChangePasswordDto": {
         "type": "object",
         "properties": {
@@ -4220,6 +6226,87 @@
         "required": [
           "currentPassword",
           "newPassword"
+        ]
+      },
+      "SetPasswordDto": {
+        "type": "object",
+        "properties": {
+          "newPassword": {
+            "type": "string",
+            "description": "رمز عبور جدید — حداقل ۸ کاراکتر",
+            "minLength": 8
+          }
+        },
+        "required": [
+          "newPassword"
+        ]
+      },
+      "CustomerPasswordLoginDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "example": "09121234567",
+            "description": "شماره موبایل مشتری"
+          },
+          "password": {
+            "type": "string",
+            "description": "رمز عبور حساب"
+          }
+        },
+        "required": [
+          "phone",
+          "password"
+        ]
+      },
+      "RequestPasswordResetEmailDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "negar@example.com",
+            "description": "ایمیل تأییدشدهٔ حساب"
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "VerifyPasswordResetEmailDto": {
+        "type": "object",
+        "properties": {
+          "challengeId": {
+            "type": "string",
+            "example": "a1b2c3d4-...",
+            "description": "Challenge id returned by /auth/password-reset/email/request"
+          },
+          "code": {
+            "type": "string",
+            "example": "482913",
+            "description": "6-digit one-time code"
+          }
+        },
+        "required": [
+          "challengeId",
+          "code"
+        ]
+      },
+      "RequestStepUpDto": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string",
+            "enum": [
+              "ADMIN_ROLE_CHANGE",
+              "API_KEY_ROTATE",
+              "REFUND_PAYOUT",
+              "PRICE_CAPACITY_CHANGE",
+              "SESSION_REVOKE"
+            ]
+          }
+        },
+        "required": [
+          "scope"
         ]
       },
       "UpdatePanelAccessDto": {
@@ -4295,10 +6382,20 @@
               "SEARCH_ONLY"
             ],
             "example": "SEARCH_BOOK"
+          },
+          "stepUpChallengeId": {
+            "type": "string",
+            "description": "از POST /auth/step-up/request (scope: API_KEY_ROTATE)"
+          },
+          "stepUpCode": {
+            "type": "string",
+            "example": "482913"
           }
         },
         "required": [
-          "scope"
+          "scope",
+          "stepUpChallengeId",
+          "stepUpCode"
         ]
       },
       "UpdateApiKeyDto": {
@@ -4314,6 +6411,14 @@
           "regenerate": {
             "type": "boolean",
             "description": "true برای صدور مجدد کلید — کلید قبلی بلافاصله باطل می‌شود"
+          },
+          "stepUpChallengeId": {
+            "type": "string",
+            "description": "فقط وقتی regenerate=true — از POST /auth/step-up/request"
+          },
+          "stepUpCode": {
+            "type": "string",
+            "example": "482913"
           }
         }
       },
@@ -4358,6 +6463,92 @@
         },
         "required": [
           "approve"
+        ]
+      },
+      "DecideWebserviceRequestDto": {
+        "type": "object",
+        "properties": {
+          "approve": {
+            "type": "boolean",
+            "example": true,
+            "description": "تأیید یا رد درخواست"
+          },
+          "stepUpChallengeId": {
+            "type": "string",
+            "description": "الزامی فقط هنگام تأیید — از POST /auth/step-up/request (scope: API_KEY_ROTATE)"
+          },
+          "stepUpCode": {
+            "type": "string",
+            "example": "482913",
+            "description": "الزامی فقط هنگام تأیید"
+          }
+        },
+        "required": [
+          "approve"
+        ]
+      },
+      "DecideDocumentDto": {
+        "type": "object",
+        "properties": {
+          "approve": {
+            "type": "boolean",
+            "example": true,
+            "description": "تأیید یا رد مدرک"
+          }
+        },
+        "required": [
+          "approve"
+        ]
+      },
+      "RequestAgencyOtpDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "example": "09121234567",
+            "description": "شماره موبایل متقاضی"
+          }
+        },
+        "required": [
+          "phone"
+        ]
+      },
+      "CreateAgencyRequestDto": {
+        "type": "object",
+        "properties": {
+          "applicantName": {
+            "type": "string",
+            "example": "آژانس مسافرتی پرشین"
+          },
+          "managerName": {
+            "type": "string",
+            "example": "نگار رضایی"
+          },
+          "licenseNo": {
+            "type": "string",
+            "example": "XXXX-XXXX",
+            "description": "شماره مجوز بند ب"
+          },
+          "phone": {
+            "type": "string",
+            "example": "09121234567"
+          },
+          "challengeId": {
+            "type": "string",
+            "description": "از POST /agencies/requests/otp"
+          },
+          "code": {
+            "type": "string",
+            "example": "482913"
+          }
+        },
+        "required": [
+          "applicantName",
+          "managerName",
+          "licenseNo",
+          "phone",
+          "challengeId",
+          "code"
         ]
       },
       "ResolveCartableDto": {
@@ -4543,6 +6734,31 @@
           "level"
         ]
       },
+      "UpdateTierRulesDto": {
+        "type": "object",
+        "properties": {
+          "goldMinPoints": {
+            "type": "number",
+            "example": 5000,
+            "description": "حد نصاب امتیاز سطح طلایی"
+          },
+          "platinumMinPoints": {
+            "type": "number",
+            "example": 15000,
+            "description": "حد نصاب امتیاز سطح پلاتین"
+          },
+          "cardRequestMinPoints": {
+            "type": "number",
+            "example": 5000,
+            "description": "حد نصاب امتیاز برای درخواست صدور کارت عضویت"
+          }
+        },
+        "required": [
+          "goldMinPoints",
+          "platinumMinPoints",
+          "cardRequestMinPoints"
+        ]
+      },
       "CreateEmployeeDto": {
         "type": "object",
         "properties": {
@@ -4652,6 +6868,23 @@
             "type": "boolean"
           }
         }
+      },
+      "LogoutAllDto": {
+        "type": "object",
+        "properties": {
+          "stepUpChallengeId": {
+            "type": "string",
+            "description": "از POST /auth/step-up/request (scope: SESSION_REVOKE)"
+          },
+          "stepUpCode": {
+            "type": "string",
+            "example": "482913"
+          }
+        },
+        "required": [
+          "stepUpChallengeId",
+          "stepUpCode"
+        ]
       },
       "ToggleInternalServiceDto": {
         "type": "object",
@@ -4781,10 +7014,20 @@
               "AI"
             ],
             "description": "منبع قیمت ثبتی: تأیید بازرگانی یا ثبت با AI"
+          },
+          "stepUpChallengeId": {
+            "type": "string",
+            "description": "از POST /auth/step-up/request (scope: PRICE_CAPACITY_CHANGE)"
+          },
+          "stepUpCode": {
+            "type": "string",
+            "example": "482913"
           }
         },
         "required": [
-          "source"
+          "source",
+          "stepUpChallengeId",
+          "stepUpCode"
         ]
       },
       "ReferRefundDto": {
@@ -4797,6 +7040,23 @@
         },
         "required": [
           "assigneeId"
+        ]
+      },
+      "PayRefundDto": {
+        "type": "object",
+        "properties": {
+          "stepUpChallengeId": {
+            "type": "string",
+            "description": "از POST /auth/step-up/request (scope: REFUND_PAYOUT)"
+          },
+          "stepUpCode": {
+            "type": "string",
+            "example": "482913"
+          }
+        },
+        "required": [
+          "stepUpChallengeId",
+          "stepUpCode"
         ]
       },
       "SubmitRefundDto": {
@@ -4823,6 +7083,22 @@
             "type": "string",
             "example": "12D"
           },
+          "reason": {
+            "type": "string",
+            "description": "دلیل درخواست لاک مدیریتی"
+          },
+          "classification": {
+            "type": "string",
+            "enum": [
+              "FREE",
+              "DISCOUNTED",
+              "PAYABLE"
+            ]
+          },
+          "discountPct": {
+            "type": "number",
+            "description": "فقط وقتی classification برابر DISCOUNTED است"
+          },
           "passengerName": {
             "type": "string"
           },
@@ -4834,7 +7110,20 @@
           }
         },
         "required": [
-          "seatCode"
+          "seatCode",
+          "reason",
+          "classification"
+        ]
+      },
+      "RejectLockDto": {
+        "type": "object",
+        "properties": {
+          "rejectionReason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "rejectionReason"
         ]
       },
       "ChangeSeatDto": {
@@ -4875,220 +7164,21 @@
           "passengerName"
         ]
       },
-      "RequestCreditIncreaseDto": {
+      "FinalizeLockDto": {
         "type": "object",
         "properties": {
-          "requestedLimitIrr": {
-            "type": "number",
-            "example": 2000000000,
-            "description": "سقف اعتبار درخواستی به ریال"
-          },
-          "note": {
-            "type": "string",
-            "example": "رشد فروش فصل تابستان"
-          }
-        },
-        "required": [
-          "requestedLimitIrr"
-        ]
-      },
-      "PostInboxMessageDto": {
-        "type": "object",
-        "properties": {
-          "body": {
-            "type": "string",
-            "example": "سلام، فردا تسویه انجام می‌شود."
-          }
-        },
-        "required": [
-          "body"
-        ]
-      },
-      "UploadDocumentDto": {
-        "type": "object",
-        "properties": {
-          "docType": {
-            "type": "string",
-            "enum": [
-              "LICENSE",
-              "CONTRACT",
-              "OTHER"
-            ],
-            "example": "LICENSE"
-          }
-        },
-        "required": [
-          "docType"
-        ]
-      },
-      "CreateFlightDto": {
-        "type": "object",
-        "properties": {
-          "originCode": {
-            "type": "string",
-            "description": "کد فرودگاه مبدأ",
-            "example": "THR"
-          },
-          "destCode": {
-            "type": "string",
-            "description": "کد فرودگاه مقصد",
-            "example": "DXB"
-          },
-          "flightNo": {
-            "type": "string",
-            "description": "شماره پرواز",
-            "example": "EP-901"
-          },
-          "departureAt": {
-            "type": "string",
-            "description": "زمان پرواز (UTC ISO — تبدیل جلالی در فرانت)"
-          },
-          "capacity": {
-            "type": "number",
-            "description": "ظرفیت صندلی",
-            "example": 180
-          },
-          "basePriceIrr": {
-            "type": "number",
-            "description": "قیمت پایه (ریال)",
-            "example": 38000000
-          }
-        },
-        "required": [
-          "originCode",
-          "destCode",
-          "flightNo",
-          "departureAt",
-          "capacity",
-          "basePriceIrr"
-        ]
-      },
-      "PlanFlightDto": {
-        "type": "object",
-        "properties": {
-          "priceIrr": {
-            "type": "number",
-            "description": "نرخ برنامه‌ریزی (ریال)",
-            "example": 39000000
-          },
-          "agencySeats": {
-            "type": "number",
-            "description": "تخصیص صندلی آژانس",
-            "example": 60
-          }
-        },
-        "required": [
-          "priceIrr",
-          "agencySeats"
-        ]
-      },
-      "CreateAdminDto": {
-        "type": "object",
-        "properties": {
-          "fullName": {
-            "type": "string",
-            "example": "زهرا کریمی"
-          },
-          "email": {
-            "type": "string",
-            "example": "z.karimi@blujet.example"
-          },
-          "username": {
-            "type": "string",
-            "example": "z.karimi"
-          },
-          "role": {
-            "type": "string",
-            "enum": [
-              "SENIOR_MANAGER",
-              "FINANCE_MANAGER",
-              "COMMERCIAL_MANAGER",
-              "IT_MANAGER",
-              "SITE_ADMIN"
-            ]
-          },
-          "password": {
-            "type": "string",
-            "example": "Blujet@1404",
-            "minLength": 6
-          },
-          "delivery": {
-            "type": "string",
-            "enum": [
-              "sms",
-              "email"
-            ]
-          }
-        },
-        "required": [
-          "fullName",
-          "email",
-          "username",
-          "role",
-          "password",
-          "delivery"
-        ]
-      },
-      "ResetAdminPasswordDto": {
-        "type": "object",
-        "properties": {
-          "password": {
-            "type": "string",
-            "minLength": 6
-          },
-          "delivery": {
-            "type": "string",
-            "enum": [
-              "sms",
-              "email"
-            ]
-          }
-        }
-      },
-      "UpdateSettingsDto": {
-        "type": "object",
-        "properties": {
-          "patch": {
-            "type": "object",
-            "description": "Partial key-value patch — unknown keys are rejected",
-            "example": {
-              "maintenance": true
-            }
-          }
-        },
-        "required": [
-          "patch"
-        ]
-      },
-      "RefundRuleUpdate": {
-        "type": "object",
-        "properties": {
-          "id": {
+          "passengerName": {
             "type": "string"
           },
-          "penaltyPct": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 100
+          "passengerNationalId": {
+            "type": "string"
+          },
+          "passengerMobile": {
+            "type": "string"
           }
         },
         "required": [
-          "id",
-          "penaltyPct"
-        ]
-      },
-      "UpdateRefundRulesDto": {
-        "type": "object",
-        "properties": {
-          "rules": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/RefundRuleUpdate"
-            }
-          }
-        },
-        "required": [
-          "rules"
+          "passengerName"
         ]
       },
       "BookingPassengerDto": {
@@ -5193,6 +7283,909 @@
         "required": [
           "flightInstanceId",
           "cabin"
+        ]
+      },
+      "RequestCreditIncreaseDto": {
+        "type": "object",
+        "properties": {
+          "requestedLimitIrr": {
+            "type": "number",
+            "example": 2000000000,
+            "description": "سقف اعتبار درخواستی به ریال"
+          },
+          "note": {
+            "type": "string",
+            "example": "رشد فروش فصل تابستان"
+          }
+        },
+        "required": [
+          "requestedLimitIrr"
+        ]
+      },
+      "PostInboxMessageDto": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "example": "سلام، فردا تسویه انجام می‌شود."
+          }
+        },
+        "required": [
+          "body"
+        ]
+      },
+      "UploadDocumentDto": {
+        "type": "object",
+        "properties": {
+          "docType": {
+            "type": "string",
+            "enum": [
+              "LICENSE",
+              "CONTRACT",
+              "OTHER"
+            ],
+            "example": "LICENSE"
+          }
+        },
+        "required": [
+          "docType"
+        ]
+      },
+      "RequestWebserviceDto": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string",
+            "enum": [
+              "FULL",
+              "SEARCH_BOOK"
+            ],
+            "example": "SEARCH_BOOK",
+            "description": "جستجو و رزرو یا فروش کامل (صدور بلیط)"
+          },
+          "months": {
+            "type": "number",
+            "enum": [
+              1,
+              3,
+              12
+            ],
+            "example": 1,
+            "description": "مدت اشتراک به ماه"
+          },
+          "note": {
+            "type": "string",
+            "example": "برای اتصال سیستم رزرواسیون داخلی"
+          }
+        },
+        "required": [
+          "scope",
+          "months"
+        ]
+      },
+      "CreateFlightDto": {
+        "type": "object",
+        "properties": {
+          "originCode": {
+            "type": "string",
+            "description": "کد فرودگاه مبدأ",
+            "example": "THR"
+          },
+          "destCode": {
+            "type": "string",
+            "description": "کد فرودگاه مقصد",
+            "example": "DXB"
+          },
+          "flightNo": {
+            "type": "string",
+            "description": "شماره پرواز",
+            "example": "EP-901"
+          },
+          "departureAt": {
+            "type": "string",
+            "description": "زمان پرواز (UTC ISO — تبدیل جلالی در فرانت)"
+          },
+          "capacity": {
+            "type": "number",
+            "description": "ظرفیت صندلی",
+            "example": 180
+          },
+          "basePriceIrr": {
+            "type": "number",
+            "description": "قیمت پایه (ریال)",
+            "example": 38000000
+          }
+        },
+        "required": [
+          "originCode",
+          "destCode",
+          "flightNo",
+          "departureAt",
+          "capacity",
+          "basePriceIrr"
+        ]
+      },
+      "CreateScheduleDto": {
+        "type": "object",
+        "properties": {
+          "originCode": {
+            "type": "string",
+            "description": "کد فرودگاه مبدأ",
+            "example": "THR"
+          },
+          "destCode": {
+            "type": "string",
+            "description": "کد فرودگاه مقصد",
+            "example": "MHD"
+          },
+          "flightNo": {
+            "type": "string",
+            "description": "شماره پرواز",
+            "example": "BJ-410"
+          },
+          "rrule": {
+            "type": "string",
+            "description": "الگوی تکرار RRULE (RFC 5545)",
+            "example": "FREQ=WEEKLY;BYDAY=SA,MO,WE"
+          },
+          "depTime": {
+            "type": "string",
+            "description": "ساعت حرکت (UTC)",
+            "example": "07:30"
+          },
+          "capacity": {
+            "type": "number",
+            "description": "ظرفیت هر پرواز",
+            "example": 146
+          },
+          "daysAhead": {
+            "type": "number",
+            "description": "چند روز آینده از حالا ساخته شود (پیش‌فرض ۳۰)",
+            "example": 30
+          }
+        },
+        "required": [
+          "originCode",
+          "destCode",
+          "flightNo",
+          "rrule",
+          "depTime",
+          "capacity"
+        ]
+      },
+      "PlanFlightDto": {
+        "type": "object",
+        "properties": {
+          "priceIrr": {
+            "type": "number",
+            "description": "نرخ برنامه‌ریزی (ریال)",
+            "example": 39000000
+          },
+          "agencySeats": {
+            "type": "number",
+            "description": "تخصیص صندلی آژانس",
+            "example": 60
+          },
+          "saleStartsAt": {
+            "type": "string",
+            "description": "شروع بازه فروش (UTC ISO) — خالی/حذف یعنی بدون محدودیت"
+          },
+          "saleEndsAt": {
+            "type": "string",
+            "description": "پایان بازه فروش (UTC ISO) — خالی/حذف یعنی بدون محدودیت"
+          }
+        },
+        "required": [
+          "priceIrr",
+          "agencySeats"
+        ]
+      },
+      "ChangeAircraftTypeDto": {
+        "type": "object",
+        "properties": {
+          "aircraftType": {
+            "type": "string",
+            "description": "نوع هواپیمای جدید",
+            "example": "Boeing 737"
+          },
+          "stepUpChallengeId": {
+            "type": "string",
+            "description": "از POST /auth/step-up/request (scope: PRICE_CAPACITY_CHANGE)"
+          },
+          "stepUpCode": {
+            "type": "string",
+            "example": "482913"
+          }
+        },
+        "required": [
+          "aircraftType",
+          "stepUpChallengeId",
+          "stepUpCode"
+        ]
+      },
+      "CreateFareRuleDto": {
+        "type": "object",
+        "properties": {
+          "cabin": {
+            "type": "string",
+            "enum": [
+              "ECONOMY",
+              "BUSINESS"
+            ]
+          },
+          "classCode": {
+            "type": "string",
+            "description": "کد کلاس نرخی",
+            "example": "Y"
+          },
+          "priceIrr": {
+            "type": "number",
+            "description": "قیمت (ریال)",
+            "example": 30000000
+          },
+          "seatsAllocated": {
+            "type": "number",
+            "description": "تعداد صندلی تخصیص‌یافته",
+            "example": 20
+          },
+          "taxIrr": {
+            "type": "number",
+            "description": "مالیات/عوارض (ریال)",
+            "example": 0
+          },
+          "refundable": {
+            "type": "boolean"
+          },
+          "changeable": {
+            "type": "boolean"
+          },
+          "baggageAllowanceKg": {
+            "type": "number",
+            "example": 20
+          },
+          "validFrom": {
+            "type": "string",
+            "description": "شروع بازه اعتبار (UTC ISO)"
+          },
+          "validUntil": {
+            "type": "string",
+            "description": "پایان بازه اعتبار (UTC ISO)"
+          },
+          "allowedChannels": {
+            "type": "array",
+            "description": "کانال‌های مجاز — خالی یعنی همه کانال‌ها",
+            "items": {
+              "type": "string",
+              "enum": [
+                "SYSTEM",
+                "CHARTER",
+                "AGENCY"
+              ]
+            }
+          }
+        },
+        "required": [
+          "cabin",
+          "classCode",
+          "priceIrr",
+          "seatsAllocated"
+        ]
+      },
+      "UpdateFareRuleDto": {
+        "type": "object",
+        "properties": {
+          "priceIrr": {
+            "type": "number"
+          },
+          "seatsAllocated": {
+            "type": "number"
+          },
+          "taxIrr": {
+            "type": "number"
+          },
+          "refundable": {
+            "type": "boolean"
+          },
+          "changeable": {
+            "type": "boolean"
+          },
+          "baggageAllowanceKg": {
+            "type": "number"
+          },
+          "validFrom": {
+            "type": "string"
+          },
+          "validUntil": {
+            "type": "string"
+          },
+          "allowedChannels": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "SYSTEM",
+                "CHARTER",
+                "AGENCY"
+              ]
+            }
+          }
+        }
+      },
+      "CreateAllotmentDto": {
+        "type": "object",
+        "properties": {
+          "agencyId": {
+            "type": "string",
+            "description": "شناسه کاربری آژانس"
+          },
+          "seatsAllocated": {
+            "type": "number",
+            "description": "تعداد صندلی تخصیص‌یافته",
+            "example": 10
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "SOFT",
+              "HARD"
+            ],
+            "default": "HARD"
+          },
+          "releaseAt": {
+            "type": "string",
+            "description": "موعد آزادسازی خودکار (فقط برای نوع SOFT، UTC ISO)"
+          },
+          "contractPriceIrr": {
+            "type": "number",
+            "description": "نرخ قراردادی این آژانس (ریال)"
+          }
+        },
+        "required": [
+          "agencyId",
+          "seatsAllocated"
+        ]
+      },
+      "CreateAdminDto": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string",
+            "example": "زهرا کریمی"
+          },
+          "email": {
+            "type": "string",
+            "example": "z.karimi@blujet.example"
+          },
+          "username": {
+            "type": "string",
+            "example": "z.karimi"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "SENIOR_MANAGER",
+              "FINANCE_MANAGER",
+              "COMMERCIAL_MANAGER",
+              "IT_MANAGER",
+              "SITE_ADMIN"
+            ]
+          },
+          "password": {
+            "type": "string",
+            "example": "Blujet@1404",
+            "minLength": 6
+          },
+          "delivery": {
+            "type": "string",
+            "enum": [
+              "sms",
+              "email"
+            ]
+          },
+          "stepUpChallengeId": {
+            "type": "string",
+            "description": "از POST /auth/step-up/request (scope: ADMIN_ROLE_CHANGE)"
+          },
+          "stepUpCode": {
+            "type": "string",
+            "example": "482913"
+          }
+        },
+        "required": [
+          "fullName",
+          "email",
+          "username",
+          "role",
+          "password",
+          "delivery",
+          "stepUpChallengeId",
+          "stepUpCode"
+        ]
+      },
+      "ResetAdminPasswordDto": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string",
+            "minLength": 6
+          },
+          "delivery": {
+            "type": "string",
+            "enum": [
+              "sms",
+              "email"
+            ]
+          }
+        }
+      },
+      "UpdateSettingsDto": {
+        "type": "object",
+        "properties": {
+          "patch": {
+            "type": "object",
+            "description": "Partial key-value patch — unknown keys are rejected",
+            "example": {
+              "maintenance": true
+            }
+          }
+        },
+        "required": [
+          "patch"
+        ]
+      },
+      "RefundRuleUpdate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "penaltyPct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "id",
+          "penaltyPct"
+        ]
+      },
+      "UpdateRefundRulesDto": {
+        "type": "object",
+        "properties": {
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RefundRuleUpdate"
+            }
+          }
+        },
+        "required": [
+          "rules"
+        ]
+      },
+      "ResolveReconciliationDto": {
+        "type": "object",
+        "properties": {
+          "resolutionNote": {
+            "type": "string",
+            "example": "بلیط دستی صادر و مغایرت رفع شد."
+          }
+        },
+        "required": [
+          "resolutionNote"
+        ]
+      },
+      "UpdateProfileDto": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string",
+            "example": "نگار رضایی"
+          },
+          "nationalId": {
+            "type": "string",
+            "example": "0012345679"
+          },
+          "birthDate": {
+            "type": "string",
+            "example": "1370-05-12"
+          },
+          "passportNo": {
+            "type": "string",
+            "example": "A12345678"
+          }
+        }
+      },
+      "VerifyEmailDto": {
+        "type": "object",
+        "properties": {
+          "challengeId": {
+            "type": "string",
+            "description": "از POST /my/profile/email/verify-request"
+          },
+          "code": {
+            "type": "string",
+            "example": "482913"
+          }
+        },
+        "required": [
+          "challengeId",
+          "code"
+        ]
+      },
+      "LookupBookingDto": {
+        "type": "object",
+        "properties": {
+          "pnr": {
+            "type": "string",
+            "example": "BJ4X2K",
+            "description": "کد رزرو (PNR)"
+          },
+          "lastName": {
+            "type": "string",
+            "example": "رضایی",
+            "description": "نام خانوادگی مسافر"
+          }
+        },
+        "required": [
+          "pnr",
+          "lastName"
+        ]
+      },
+      "SubmitAnonymousRefundDto": {
+        "type": "object",
+        "properties": {
+          "pnr": {
+            "type": "string",
+            "example": "BJ4X2K",
+            "description": "کد رزرو (PNR)"
+          },
+          "lastName": {
+            "type": "string",
+            "example": "رضایی",
+            "description": "نام خانوادگی مسافر"
+          },
+          "iban": {
+            "type": "string",
+            "example": "IR820170000000332211009900",
+            "description": "۲۶ کاراکتر شبا"
+          }
+        },
+        "required": [
+          "pnr",
+          "lastName",
+          "iban"
+        ]
+      },
+      "SubmitContactMessageDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "نگار رضایی",
+            "description": "نام و نام خانوادگی"
+          },
+          "phone": {
+            "type": "string",
+            "example": "09121234567",
+            "description": "شماره تماس"
+          },
+          "subject": {
+            "type": "string",
+            "example": "مشکل در پرداخت",
+            "description": "موضوع پیام"
+          },
+          "body": {
+            "type": "string",
+            "example": "سلام، سوالی درباره...",
+            "description": "متن پیام"
+          }
+        },
+        "required": [
+          "name",
+          "phone",
+          "subject",
+          "body"
+        ]
+      },
+      "SubmitSupportTicketDto": {
+        "type": "object",
+        "properties": {
+          "requesterName": {
+            "type": "string",
+            "example": "نگار رضایی",
+            "description": "نام و نام خانوادگی"
+          },
+          "requesterPhone": {
+            "type": "string",
+            "example": "09121234567",
+            "description": "شماره تماس"
+          },
+          "subject": {
+            "type": "string",
+            "example": "مشکل در پرداخت",
+            "description": "موضوع تیکت"
+          },
+          "body": {
+            "type": "string",
+            "example": "توضیح مشکل...",
+            "description": "متن تیکت"
+          }
+        },
+        "required": [
+          "requesterName",
+          "requesterPhone",
+          "subject",
+          "body"
+        ]
+      },
+      "ForwardTicketDto": {
+        "type": "object",
+        "properties": {
+          "targetUserId": {
+            "type": "string",
+            "description": "شناسه کارمند/مدیر مقصد ارجاع"
+          }
+        },
+        "required": [
+          "targetUserId"
+        ]
+      },
+      "UpdateTicketStatusDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "IN_PROGRESS",
+              "ANSWERED",
+              "CLOSED"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "UpdateSurveySettingsDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "فعال/غیرفعال بودن نظرسنجی"
+          },
+          "title": {
+            "type": "string",
+            "example": "نظرسنجی رضایت مسافران"
+          }
+        }
+      },
+      "CreateSurveyQuestionDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "example": "راحتی صندلی و کابین"
+          }
+        },
+        "required": [
+          "label"
+        ]
+      },
+      "SubmitSurveyResponseDto": {
+        "type": "object",
+        "properties": {
+          "rating": {
+            "type": "number",
+            "example": 5,
+            "minimum": 1,
+            "maximum": 5
+          },
+          "comment": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "rating"
+        ]
+      },
+      "UpdateCareersSettingsDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ]
+      },
+      "CreateJobPostingDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "example": "کارشناس پشتیبانی مسافران"
+          },
+          "dept": {
+            "type": "string",
+            "example": "پشتیبانی"
+          },
+          "city": {
+            "type": "string",
+            "example": "تهران"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "FULL_TIME",
+              "REMOTE",
+              "PART_TIME"
+            ]
+          },
+          "generalReqs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "specialReqs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "title",
+          "dept",
+          "city",
+          "type",
+          "generalReqs",
+          "specialReqs"
+        ]
+      },
+      "UpdateJobPostingDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "dept": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "FULL_TIME",
+              "REMOTE",
+              "PART_TIME"
+            ]
+          },
+          "generalReqs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "specialReqs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "active": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ReferApplicationDto": {
+        "type": "object",
+        "properties": {
+          "assigneeId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "assigneeId"
+        ]
+      },
+      "ApplyJobDto": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "type": "string",
+            "example": "نگار"
+          },
+          "lastName": {
+            "type": "string",
+            "example": "رضایی"
+          },
+          "nationalId": {
+            "type": "string",
+            "description": "کد ملی — با چک‌سام رسمی اعتبارسنجی می‌شود"
+          },
+          "fatherName": {
+            "type": "string"
+          },
+          "birthDate": {
+            "type": "string",
+            "description": "تاریخ تولد (ISO — از تقویم شمسی در فرانت تبدیل می‌شود)"
+          },
+          "birthProvince": {
+            "type": "string"
+          },
+          "birthCity": {
+            "type": "string"
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "FEMALE",
+              "MALE"
+            ]
+          },
+          "marital": {
+            "type": "string",
+            "enum": [
+              "SINGLE",
+              "MARRIED"
+            ]
+          },
+          "military": {
+            "type": "string",
+            "enum": [
+              "CONSCRIPT",
+              "EXEMPT",
+              "WAIVED"
+            ]
+          },
+          "exemptionType": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "example": "09121234567"
+          },
+          "email": {
+            "type": "string"
+          },
+          "residenceProvince": {
+            "type": "string"
+          },
+          "residenceAddress": {
+            "type": "string"
+          },
+          "skills": {
+            "type": "string"
+          },
+          "otherLangs": {
+            "type": "string"
+          },
+          "eduEntries": {
+            "type": "string",
+            "description": "JSON-stringified array"
+          },
+          "workEntries": {
+            "type": "string",
+            "description": "JSON-stringified array"
+          },
+          "langEntries": {
+            "type": "string",
+            "description": "JSON-stringified array"
+          }
+        },
+        "required": [
+          "firstName",
+          "lastName",
+          "nationalId",
+          "phone"
         ]
       }
     }
