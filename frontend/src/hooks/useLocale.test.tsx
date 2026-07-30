@@ -73,9 +73,9 @@ describe('useLocale', () => {
     expect(localStorage.getItem('blujet_lang')).toBe('en');
   });
 
-  it('throws when used outside a LocaleProvider', () => {
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-    expect(() => renderHook(() => useLocale())).toThrow(/LocaleProvider/);
-    consoleError.mockRestore();
+  it('falls back to fa with a no-op setter when used outside a LocaleProvider', () => {
+    const { result } = renderHook(() => useLocale());
+    expect(result.current.locale).toBe('fa');
+    expect(() => result.current.setLocale('en')).not.toThrow();
   });
 });
