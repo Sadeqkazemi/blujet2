@@ -7,7 +7,12 @@ import PublicClubPage from './PublicClubPage';
 import SupportPage from './SupportPage';
 import TravelInfoPage from './TravelInfoPage';
 import * as useAuthModule from '../../hooks/useAuth';
+import * as useLocaleModule from '../../hooks/useLocale';
 import * as supportTicketsApi from '../../api/support-tickets';
+
+function mockLocale(locale: 'fa' | 'en' | 'ar') {
+  vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale, setLocale: vi.fn() });
+}
 
 beforeEach(() => {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
@@ -52,6 +57,26 @@ describe('DestinationsPage', () => {
     renderWithRouter(<DestinationsPage />);
     const card = screen.getByTestId('dest-card-KIH');
     expect(card).toHaveAttribute('href', expect.stringContaining('/results?origin=THR&dest=KIH'));
+  });
+
+  it('renders translated catalog with Latin-digit toman prices in English', () => {
+    mockLocale('en');
+    renderWithRouter(<DestinationsPage />);
+    expect(screen.getByText("Where's your next destination?")).toBeInTheDocument();
+    expect(screen.getAllByText('Kish').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Istanbul').length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Toman/).length).toBeGreaterThan(0);
+    expect(screen.getByText('Popular routes')).toBeInTheDocument();
+    expect(screen.getAllByText(/1,480,000/).length).toBeGreaterThan(0);
+  });
+
+  it('renders translated catalog with Eastern Arabic-Indic digits in Arabic', () => {
+    mockLocale('ar');
+    renderWithRouter(<DestinationsPage />);
+    expect(screen.getByText('ما هي وجهتك القادمة؟')).toBeInTheDocument();
+    expect(screen.getAllByText('كيش').length).toBeGreaterThan(0);
+    expect(screen.getByText('المسارات الأكثر طلبًا')).toBeInTheDocument();
+    expect(screen.getAllByText(/١٬٤٨٠٬٠٠٠/).length).toBeGreaterThan(0);
   });
 });
 
