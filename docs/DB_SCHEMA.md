@@ -1710,3 +1710,27 @@ First step of the multi-language (fa/en/ar) + responsive redesign — see
 - Deliberately no separate "locale preference" table: this is a single
   scalar per user, same shape as any other profile field already on
   `User` (e.g. `emailVerifiedAt`), not worth a join for.
+
+## Phase 51 — فراموشی رمز: email password-reset path
+
+See `docs/API.md`'s Phase 51 section for the full reasoning. Additive
+only, reuses the existing `TwoFactorChallenge` table exactly like Phase 2's
+`CUSTOMER_OTP_LOGIN` and Phase 17's `EMAIL_VERIFY` — no new table.
+
+- New `TwoFactorPurpose` enum value: `PASSWORD_RESET_EMAIL`. A dedicated
+  purpose rather than reusing `EMAIL_VERIFY` — "prove you own this inbox to
+  change your password" and "confirm this inbox for your profile" are
+  different trust decisions even though the delivery mechanics
+  (`TwoFactorProvider.sendCode` with `phone: null`) are identical; keeping
+  them distinct also means a leaked/replayed `EMAIL_VERIFY` challenge id
+  can never be used to reset a password, and vice versa.
+  Migration: `20260730140342_password_reset_email_purpose`.
+- Lookup for the request step is `User.findFirst({ email, role: 'USER',
+  emailVerifiedAt: { not: null } })` — deliberately NOT an upsert (unlike
+  `requestOtp`'s phone find-or-create). Phone OTP login/signup is a single
+  merged flow by product design (see Phase 2's docs); email-based password
+  reset is not a signup path, so inventing a `User` row for an arbitrary
+  submitted email would let anyone probe or squat an address that isn't
+  theirs. If no matching verified-email `USER` row exists, the endpoint
+  401s with a generic message — same non-oracle posture Phase 21's
+  `customer/login-password` already uses for phone+password.
