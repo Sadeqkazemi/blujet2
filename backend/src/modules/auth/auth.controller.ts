@@ -27,6 +27,8 @@ import { RequestStepUpDto } from './dto/step-up.dto';
 import { SetPasswordDto } from './dto/set-password.dto';
 import { CustomerPasswordLoginDto } from './dto/customer-password-login.dto';
 import { UpdateLocaleDto } from './dto/update-locale.dto';
+import { RequestPasswordResetEmailDto } from './dto/request-password-reset-email.dto';
+import { VerifyPasswordResetEmailDto } from './dto/verify-password-reset-email.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -293,6 +295,57 @@ export class AuthController {
       });
     setRefreshCookie(res, refreshToken);
     return { success: true, data: { accessToken, user } };
+  }
+
+  @Post('password-reset/email/request')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({
+    summary:
+      'فراموشی رمز — مسیر ایمیل: ارسال کد به ایمیل تأییدشدهٔ حساب (جایگزین OTP پیامکی)',
+  })
+  @ApiResponse({ status: 200, description: 'Challenge issued' })
+  @ApiResponse({
+    status: 401,
+    description: 'No account with a verified email matches',
+  })
+  @ApiResponse({ status: 403, description: 'Account suspended' })
+  async requestPasswordResetEmail(@Body() dto: RequestPasswordResetEmailDto) {
+    const result = await this.auth.requestPasswordResetEmail(dto.email);
+    return { success: true, data: result };
+  }
+
+  @Post('password-reset/email/verify')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({
+    summary: 'فراموشی رمز — مسیر ایمیل: تأیید کد، صدور توکن‌ها',
+  })
+  @ApiResponse({ status: 200, description: 'Login complete' })
+  @ApiResponse({ status: 401, description: 'Invalid/expired code' })
+  async verifyPasswordResetEmail(
+    @Body() dto: VerifyPasswordResetEmailDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { accessToken, refreshToken, user } =
+      await this.auth.verifyPasswordResetEmail(dto.challengeId, dto.code, {
+        userAgent: req.headers['user-agent'],
+        ip: req.ip,
+      });
+    setRefreshCookie(res, refreshToken);
+    return { success: true, data: { accessToken, user } };
+  }
+
+  @Get('_test/last-password-reset-email-code/:email')
+  @ApiOperation({
+    summary:
+      'E2E-test only: reads back the mock password-reset-email code. 404s in production.',
+  })
+  async testLastPasswordResetEmailCode(@Param('email') email: string) {
+    const code = await this.auth.getLastPasswordResetEmailCodeForE2e(email);
+    if (code === null) throw new NotFoundException();
+    return { success: true, data: { code } };
   }
 
   @Post('step-up/request')

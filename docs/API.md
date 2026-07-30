@@ -1927,3 +1927,34 @@ fa-only `AboutPage` test. Fixed with a targeted `afterEach` that restores
 only the `useLocale` spy (not the OTP mocks, which are plain `vi.fn()`s
 that would break under a blind `vi.restoreAllMocks()`). See
 `docs/features/customer-login-page-i18n-responsive.md`.
+
+## Phase 51 — فراموشی رمز: real email password-reset path + i18n
+
+Unlike Phases 42–50, this page needed real new backend work, not just
+translation — flagged earlier in `PLAN.md` as tangled with a decision to
+support a REAL email+code reset path alongside the existing phone+SMS OTP
+one, since a customer's account may only have a verified email (Phase 17)
+reachable at reset time. Offered in **every** locale, not gated to en/ar —
+restricting a security recovery method by the page's display language
+would be an arbitrary, fragile restriction unrelated to which identifier
+the account actually has verified.
+
+### `backend/src/modules/auth/` (additions)
+
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| POST | `/auth/password-reset/email/request` | public, `@Throttle` 5/min | `{ email }` (`@IsEmail`) → looks up a `USER`-role account with that **exact, verified** email (`emailVerifiedAt IS NOT NULL`); 401 `NOT_FOUND` if none matches, 403 `ACCOUNT_SUSPENDED` if inactive. Deliberately does **not** upsert/create an account the way `requestOtp` does for phone — inventing an account for an arbitrary submitted email would let anyone probe or claim an address that isn't theirs. Issues a `TwoFactorChallenge(purpose: PASSWORD_RESET_EMAIL)` and delivers the code via the existing `TwoFactorProvider.sendCode` (same interface Phase 17's email verification already uses with `phone: null`). |
+| POST | `/auth/password-reset/email/verify` | public, `@Throttle` 5/min | `{ challengeId, code }` → same challenge/attempts/expiry rules as `otp/verify`, scoped to `PASSWORD_RESET_EMAIL` only (a `CUSTOMER_OTP_LOGIN` or `EMAIL_VERIFY` challenge id is rejected here, and vice versa). On success, logs the customer in exactly like `otp/verify` does, so the frontend immediately calls the existing `POST /auth/set-password` (no current-password check) — same handoff Phase 21 established for the phone path. |
+| GET | `/auth/_test/last-password-reset-email-code/:email` | E2E only | Non-production escape hatch mirroring `_test/last-otp/:phone`; 404s in production. |
+
+### Frontend
+
+`ForgotPasswordPage.tsx` gains a phone/email identifier toggle at its
+first step (`fp-method-phone`/`fp-method-email` test ids) and a full
+fa/en/ar `STR` dictionary; every byte-critical fa string the existing
+tests assert (`'رمز عبور باید حداقل ۸ کاراکتر باشد.'`,
+`'تکرار رمز با رمز جدید یکسان نیست.'`, the `'ورود به حساب'` link) stays
+unchanged. `useAuth()` gains optional `requestPasswordResetEmail`/
+`verifyPasswordResetEmail`, mirroring `requestOtp`/`verifyOtp`. All 5
+pre-existing tests pass unmodified; 3 new tests (email happy path, en, ar).
+See `docs/features/forgot-password-email-reset-i18n.md`.
