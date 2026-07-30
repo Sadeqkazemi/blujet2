@@ -1,7 +1,13 @@
 import { Link } from 'react-router-dom';
+import { useIsMobile } from '../../hooks/useIsMobile';
+import { useT } from '../../lib/i18n';
 
-/** Public-site footer — matches design-reference/صفحه اصلی.dc.html exactly. */
+/** Public-site footer — matches design-reference-v2/صفحه اصلی.dc.html:
+ * fa/en/ar translated + a single-column mobile layout. */
 export default function PublicFooter() {
+  const t = useT();
+  const isMobile = useIsMobile();
+
   return (
     <footer style={{ background: '#0d2640', color: '#aebfd4', marginTop: 72 }}>
       <div
@@ -10,7 +16,7 @@ export default function PublicFooter() {
           margin: '0 auto',
           padding: '39px 26px 20px',
           display: 'grid',
-          gridTemplateColumns: '1.6fr 1fr 1fr 1fr',
+          gridTemplateColumns: isMobile ? '1fr' : '1.6fr 1fr 1fr 1fr',
           gap: 33,
         }}
       >
@@ -21,62 +27,60 @@ export default function PublicFooter() {
             </div>
             <span style={{ fontWeight: 900, fontSize: 18, color: '#fff' }}>blujet</span>
           </Link>
-          <p style={{ fontSize: '13.5px', lineHeight: 1.85, margin: '0 0 20px', maxWidth: 300 }}>
-            رزرو آنلاین بلیط پروازهای داخلی و بین‌المللی با بهترین قیمت و خدمات باشگاه مشتریان.
-          </p>
+          <p style={{ fontSize: '13.5px', lineHeight: 1.85, margin: '0 0 20px', maxWidth: 300 }}>{t('footerTagline')}</p>
         </div>
         <div>
-          <div style={{ fontSize: '14.5px', fontWeight: 700, color: '#fff', marginBottom: 16 }}>خدمات</div>
+          <div style={{ fontSize: '14.5px', fontWeight: 700, color: '#fff', marginBottom: 16 }}>{t('footerColServices')}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 11, fontSize: '13.5px' }}>
             <Link to="/results" style={{ color: '#aebfd4', textDecoration: 'none' }}>
-              رزرو پرواز
+              {t('footerBookFlight')}
             </Link>
             <Link to="/manage-booking" style={{ color: '#aebfd4', textDecoration: 'none' }}>
-              مدیریت رزرو
+              {t('footerManageBooking')}
             </Link>
             <Link to="/flight-status" style={{ color: '#aebfd4', textDecoration: 'none' }}>
-              وضعیت پرواز
+              {t('footerFlightStatus')}
             </Link>
             <Link to="/club" style={{ color: '#aebfd4', textDecoration: 'none' }}>
-              باشگاه مشتریان
+              {t('navLoyalty')}
             </Link>
             <Link to="/manage-booking" style={{ color: '#aebfd4', textDecoration: 'none' }}>
-              استرداد بلیط
+              {t('footerRefund')}
             </Link>
           </div>
         </div>
         <div>
-          <div style={{ fontSize: '14.5px', fontWeight: 700, color: '#fff', marginBottom: 16 }}>شرکت</div>
+          <div style={{ fontSize: '14.5px', fontWeight: 700, color: '#fff', marginBottom: 16 }}>{t('footerColCompany')}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 11, fontSize: '13.5px' }}>
             <Link to="/about" style={{ color: '#aebfd4', textDecoration: 'none' }}>
-              درباره ما
+              {t('footerAbout')}
             </Link>
             <Link to="/contact" style={{ color: '#aebfd4', textDecoration: 'none' }}>
-              تماس با ما
+              {t('footerContact')}
             </Link>
             <Link to="/travel-info" style={{ color: '#aebfd4', textDecoration: 'none' }}>
-              قوانین و مقررات
+              {t('footerTerms')}
             </Link>
           </div>
         </div>
         <div>
-          <div style={{ fontSize: '14.5px', fontWeight: 700, color: '#fff', marginBottom: 16 }}>پشتیبانی</div>
+          <div style={{ fontSize: '14.5px', fontWeight: 700, color: '#fff', marginBottom: 16 }}>{t('footerColSupport')}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 11, fontSize: '13.5px' }}>
             <Link to="/support" style={{ color: '#aebfd4', textDecoration: 'none' }}>
-              مرکز راهنما
+              {t('footerHelpCenter')}
             </Link>
             <Link to="/support" style={{ color: '#aebfd4', textDecoration: 'none' }}>
-              سوالات متداول
+              {t('footerFaq')}
             </Link>
             <span dir="ltr" style={{ textAlign: 'right' }}>
-              ۰۲۱ — ۹۱۰۰۰۰۰۰
+              {t('footerPhone')}
             </span>
           </div>
         </div>
       </div>
       <div style={{ borderTop: '1px solid #ffffff12' }}>
         <div style={{ maxWidth: 1180, margin: '0 auto', padding: '15px 26px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11.5px', color: '#7d92ad' }}>
-          <span>© ۱۴۰۵ blujet. تمامی حقوق محفوظ است.</span>
+          <span>{t('footerCopyright')}</span>
         </div>
       </div>
     </footer>
