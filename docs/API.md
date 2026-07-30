@@ -2011,3 +2011,20 @@ which are identical to the Persian names verbatim — there is no separate
 Arabic name for a Jalali month, same reasoning as "تومان" staying
 unchanged in Arabic elsewhere. The pre-existing test passes unmodified; 2
 new tests (en, ar). See `docs/features/agency-dashboard-page-i18n.md`.
+
+## Phase 55 — پنل آژانس: Credit & Balance tab real i18n
+
+Frontend-only, no new/changed endpoints. Third agency-portal page.
+`AgencyCreditPage.tsx` translates its credit KPIs, invoices table,
+credit-increase request list, ledger, and credit-increase request modal
+into fa/en/ar. EN strings mostly extracted from
+`design-reference-v2/پنل آژانس.dc.html`'s own rich `isEN` vocabulary for
+this exact tab (`creditBalanceTitle`, `creditLimitLabel`,
+`payFromCreditLabel`, `recentActivityTitle`, etc.); AR mixes the design's
+partial coverage with hand-translation. This page keeps its own local
+invoice/credit-request status label maps rather than translating the
+shared `frontend/src/features/agencies/agency-labels.ts` module, which
+the staff-side `AgencyDetailPage.tsx` depends on and which stays
+Persian-only (staff panels aren't locale-switchable per CLAUDE.md). Both
+pre-existing tests pass unmodified; 2 new tests (en, ar). See
+`docs/features/agency-credit-page-i18n.md`.
