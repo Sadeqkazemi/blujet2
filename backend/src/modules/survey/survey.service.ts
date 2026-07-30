@@ -180,9 +180,16 @@ export class SurveyService {
       include: {
         response: true,
         flightInstance: { include: { flight: { include: { route: true } } } },
+        booking: { select: { status: true } },
       },
     });
-    if (!invite) {
+    // A booking later marked NO_SHOW never actually flew — its invite is
+    // treated exactly like an unknown token (same generic message, no
+    // oracle on the booking's internal status) rather than a distinct
+    // error, so a no-show passenger (or anyone holding the link) can no
+    // longer submit — or even see — a rating for a flight they didn't
+    // take.
+    if (!invite || invite.booking.status === 'NO_SHOW') {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
         message: 'لینک نظرسنجی معتبر نیست.',
@@ -266,55 +273,60 @@ export class SurveyService {
       return { disabled: true as const, flights: [] };
     }
 
-    const invites = await this.prisma.surveyInvite.findMany({
-      where: { response: { isNot: null } },
-      include: {
-        response: true,
-        flightInstance: { include: { flight: { include: { route: true } } } },
-      },
-    });
-
-    const byInstance = new Map<string, typeof invites>();
-    for (const invite of invites) {
-      const list = byInstance.get(invite.flightInstanceId) ?? [];
-      list.push(invite);
-      byInstance.set(invite.flightInstanceId, list);
+    // Real DB-level aggregation (count/avg computed by Postgres, not by
+    // loading every historical response into Node) — this endpoint is
+    // hit on every load of three different exec panels, so it must stay
+    // bounded by the number of *surveyed flights*, not the number of
+    // responses ever submitted.
+    const grouped = await this.prisma.$queryRaw<
+      { flightInstanceId: string; count: number; avgRating: number }[]
+    >`
+      SELECT si."flightInstanceId" AS "flightInstanceId",
+             COUNT(*)::int AS "count",
+             AVG(sr.rating)::float8 AS "avgRating"
+      FROM survey_invites si
+      JOIN survey_responses sr ON sr."inviteId" = si.id
+      GROUP BY si."flightInstanceId"
+    `;
+    if (grouped.length === 0) {
+      return { disabled: false as const, flights: [] };
     }
 
+    const instances = await this.prisma.flightInstance.findMany({
+      where: { id: { in: grouped.map((g) => g.flightInstanceId) } },
+      include: { flight: { include: { route: true } } },
+    });
+    const instanceById = new Map(instances.map((i) => [i.id, i]));
+
     const airportCodes = new Set<string>();
-    for (const list of byInstance.values()) {
-      const route = list[0].flightInstance.flight.route;
-      airportCodes.add(route.originCode);
-      airportCodes.add(route.destCode);
+    for (const i of instances) {
+      airportCodes.add(i.flight.route.originCode);
+      airportCodes.add(i.flight.route.destCode);
     }
     const airports = await this.prisma.airport.findMany({
       where: { code: { in: [...airportCodes] } },
     });
     const cityFa = new Map(airports.map((a) => [a.code, a.cityFa]));
 
-    const flights = [...byInstance.entries()].map(
-      ([flightInstanceId, list]) => {
-        const first = list[0].flightInstance;
-        const ratings = list.map((i) => i.response!.rating);
-        const avgRating =
-          Math.round(
-            (ratings.reduce((a, b) => a + b, 0) / ratings.length) * 10,
-          ) / 10;
+    const flights = grouped
+      .map((g) => {
+        const instance = instanceById.get(g.flightInstanceId);
+        if (!instance) return null;
         return {
-          flightInstanceId,
-          flightNo: first.flight.flightNo,
+          flightInstanceId: g.flightInstanceId,
+          flightNo: instance.flight.flightNo,
           originCityFa:
-            cityFa.get(first.flight.route.originCode) ??
-            first.flight.route.originCode,
+            cityFa.get(instance.flight.route.originCode) ??
+            instance.flight.route.originCode,
           destCityFa:
-            cityFa.get(first.flight.route.destCode) ??
-            first.flight.route.destCode,
-          departureAt: first.departureAt,
-          count: list.length,
-          avgRating,
+            cityFa.get(instance.flight.route.destCode) ??
+            instance.flight.route.destCode,
+          departureAt: instance.departureAt,
+          count: g.count,
+          avgRating: Math.round(g.avgRating * 10) / 10,
         };
-      },
-    );
+      })
+      .filter((f): f is NonNullable<typeof f> => f !== null);
     flights.sort((a, b) => b.departureAt.getTime() - a.departureAt.getTime());
 
     return { disabled: false as const, flights };

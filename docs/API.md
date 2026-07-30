@@ -2387,9 +2387,11 @@ the same migration that added the new tables.
   reading of the design's own `getSurveyFlights()`, which only ever
   groups its flat demo data by `flightNo`) that has at least one
   response: `{ flightInstanceId, flightNo, originCityFa, destCityFa,
-  departureAt, count, avgRating }` — computed server-side (SQL
-  aggregation via a `Map` keyed by `flightInstanceId`), never in the
-  browser, per CLAUDE.md's reporting rule. No `airline` field: this is a
+  departureAt, count, avgRating }` — count/avgRating computed by a real
+  SQL `GROUP BY` (`$queryRaw`, corrected during the post-merge senior
+  review from an earlier version that loaded every response row and
+  grouped it in a JS `Map`), never in the browser, per CLAUDE.md's
+  reporting rule. No `airline` field: this is a
   single-tenant system (`Flight` has no airline column at all) — the
   design's demo data shows several airlines purely as illustrative mock
   content, not a real multi-airline concept. If `SurveySettings.enabled`
@@ -2398,9 +2400,15 @@ the same migration that added the new tables.
   است." banner instead of an empty-state.
 - `POST /survey/results/:flightInstanceId/analyze` → calls
   `SurveySummaryProvider.summarize(comments)` with that flight
-  instance's non-empty comments, using the **exact** prompt text from
-  the design's own `analyzeSurvey()` (two-sentence Persian summary for
-  senior managers). Returns `{ summary }` — `summary` is always a string
+  instance's non-empty comments, using the design's own `analyzeSurvey()`
+  prompt (two-sentence Persian summary for senior managers) **plus an
+  explicit prompt-injection guard added during a post-merge senior
+  review** — the comment list is framed as untrusted passenger data the
+  model must never treat as instructions, since it's attacker-
+  controlled free text concatenated straight into the prompt (see
+  `docs/features/passenger-survey.md`'s "Post-merge senior review"
+  section for the full list of review findings and fixes). Returns
+  `{ summary }` — `summary` is always a string
   (the provider's `null` on failure is mapped to the same fallback
   string the design itself uses client-side,
   `"خلاصه‌ای از نظرات این پرواز در دسترس نیست."`, computed server-side

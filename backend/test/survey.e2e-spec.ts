@@ -229,6 +229,28 @@ describe('Survey (e2e)', () => {
       expect(invite).not.toBeNull();
       expect(invite?.smsSentAt).toBeNull();
     });
+
+    it('retries the SMS on the next materialize() for an invite whose first send never confirmed', async () => {
+      const { booking } = await makeFlownBooking();
+      // Simulate a prior run where the invite row was created but the SMS
+      // send itself failed/crashed before smsSentAt could be set.
+      await prisma.surveyInvite.create({
+        data: {
+          bookingId: booking.id,
+          flightInstanceId: booking.flightInstanceId,
+        },
+      });
+      const it = await loginAs(app, 'itadmin');
+
+      await request(app.getHttpServer())
+        .get('/survey/stats')
+        .set(auth(it.accessToken));
+
+      const invite = await prisma.surveyInvite.findUniqueOrThrow({
+        where: { bookingId: booking.id },
+      });
+      expect(invite.smsSentAt).not.toBeNull();
+    });
   });
 
   describe('public token-based submission', () => {
@@ -237,6 +259,32 @@ describe('Survey (e2e)', () => {
         '/survey/00000000-0000-0000-0000-000000000000',
       );
       expect(res.status).toBe(404);
+    });
+
+    it('a booking later marked NO_SHOW revokes its already-issued invite (404, not answerable)', async () => {
+      const { booking } = await makeFlownBooking();
+      const it = await loginAs(app, 'itadmin');
+      await request(app.getHttpServer())
+        .get('/survey/stats')
+        .set(auth(it.accessToken));
+      const invite = await prisma.surveyInvite.findUniqueOrThrow({
+        where: { bookingId: booking.id },
+      });
+
+      await prisma.booking.update({
+        where: { id: booking.id },
+        data: { status: 'NO_SHOW' },
+      });
+
+      const getRes = await request(app.getHttpServer()).get(
+        `/survey/${invite.token}`,
+      );
+      expect(getRes.status).toBe(404);
+
+      const postRes = await request(app.getHttpServer())
+        .post(`/survey/${invite.token}`)
+        .send({ rating: 5 });
+      expect(postRes.status).toBe(404);
     });
 
     it('GET returns the question list + flight context; POST submits; a second POST 409s', async () => {
