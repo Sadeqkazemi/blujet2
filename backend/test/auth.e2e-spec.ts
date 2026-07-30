@@ -165,6 +165,52 @@ describe('Auth (e2e)', () => {
     expect(res.body.data.role).toBe('CEO');
   });
 
+  it('/auth/me defaults preferredLocale to FA; PATCH /auth/me/locale updates it and persists', async () => {
+    // ceo is a shared seed account reused across many tests/runs — reset it
+    // to the schema default explicitly rather than assuming no earlier test
+    // (or a previous run against this same persistent DB) left it mutated.
+    const { id } = await typeorm.user.findUniqueOrThrow({
+      where: { username: 'ceo' },
+    });
+    await typeorm.user.update({ where: { id }, data: { preferredLocale: 'FA' } });
+
+    const { accessToken } = await loginAs(app, 'ceo');
+    const before = await request(app.getHttpServer())
+      .get('/auth/me')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(before.body.data.preferredLocale).toBe('FA');
+
+    const patch = await request(app.getHttpServer())
+      .patch('/auth/me/locale')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ locale: 'EN' });
+    expect(patch.status).toBe(200);
+    expect(patch.body.data.preferredLocale).toBe('EN');
+
+    const after = await request(app.getHttpServer())
+      .get('/auth/me')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(after.body.data.preferredLocale).toBe('EN');
+
+    // Leave the shared seed account as we found it so other tests/runs that
+    // touch 'ceo' never observe this test's mutation.
+    await typeorm.user.update({ where: { id }, data: { preferredLocale: 'FA' } });
+  });
+
+  it('PATCH /auth/me/locale: 401 without a token, 400 on an invalid locale', async () => {
+    const noAuth = await request(app.getHttpServer())
+      .patch('/auth/me/locale')
+      .send({ locale: 'EN' });
+    expect(noAuth.status).toBe(401);
+
+    const { accessToken } = await loginAs(app, 'ceo');
+    const bad = await request(app.getHttpServer())
+      .patch('/auth/me/locale')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ locale: 'DE' });
+    expect(bad.status).toBe(400);
+  });
+
   it('rate-limits repeated login attempts', async () => {
     const attempts = await Promise.all(
       Array.from({ length: 8 }, () =>

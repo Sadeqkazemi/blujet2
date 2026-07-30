@@ -23,6 +23,15 @@ enum Role {
   SITE_ADMIN
 }
 
+// Display-language preference. Meaningful only for USER/AGENCY (the public
+// site + user panel + agency panel are the only surfaces with fa/en/ar
+// translations, per the design refresh); staff panels stay Persian-only.
+enum Locale {
+  FA
+  EN
+  AR
+}
+
 model User {
   id               String    @id @default(uuid())
   role             Role
@@ -56,6 +65,11 @@ model User {
   passportNoEnc   String?
   birthDate       DateTime?
   emailVerifiedAt DateTime?
+
+  // Display-language: the DB value is the cross-device sync point for a
+  // logged-in USER/AGENCY; an anonymous visitor's choice lives only in
+  // localStorage until they log in (see docs/API.md).
+  preferredLocale Locale @default(FA)
 
   employeePermissions     EmployeePermission[] @relation("EmployeePermissionHolder")
   passwordResetsReceived  PasswordResetEvent[] @relation("PasswordResetTarget")

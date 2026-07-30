@@ -1693,3 +1693,20 @@ See `docs/API.md`'s Phase 39 section for the endpoint shape and the
 parallel credit-requests/webservice-requests frontend gap it surfaced
 (flagged, not fixed this phase), `docs/features/agency-portal.md` for the
 corrected deferred-list entries.
+
+## Phase 40 — ترجیح زبان نمایش: `User.preferredLocale`
+
+First step of the multi-language (fa/en/ar) + responsive redesign — see
+`docs/API.md`'s Phase 40 section for the full reasoning.
+
+- New enum `Locale { FA EN AR }`.
+- New column `User.preferredLocale Locale @default(FA)` — meaningful for
+  any role technically, but only `USER`/`AGENCY` frontends currently
+  expose a language switcher (the design bundle scopes fa/en/ar to the
+  public site + پنل کاربر + پنل آژانس only; staff/executive panels stay
+  Persian-only). Migration: `20260730100306_add_user_preferred_locale`,
+  additive-only, existing rows default to `FA` — no data migration
+  needed.
+- Deliberately no separate "locale preference" table: this is a single
+  scalar per user, same shape as any other profile field already on
+  `User` (e.g. `emailVerifiedAt`), not worth a join for.

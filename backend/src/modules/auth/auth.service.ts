@@ -87,6 +87,35 @@ export class AuthService {
     });
   }
 
+  /** GET /auth/me does a fresh DB read (not a bare JWT-payload echo) so
+   * `preferredLocale` — which the user can change far more often than a
+   * short-lived access token gets refreshed — is never stale. */
+  async getMe(actor: AuthenticatedUser) {
+    const user = await this.typeorm.user.findUniqueOrThrow({
+      where: { id: actor.id },
+      select: { id: true, fullName: true, role: true, preferredLocale: true },
+    });
+    return user;
+  }
+
+  /** Display-language preference — the DB row is only the cross-device sync
+   * point for a logged-in USER/AGENCY; an anonymous visitor's choice lives
+   * in localStorage until they log in (see docs/API.md). Meaningful for any
+   * role technically, but only USER/AGENCY frontends expose the switcher —
+   * staff panels stay Persian-only, per the design refresh's scope. Not
+   * audited: a display preference isn't a security/financial/admin event. */
+  async updateLocale(
+    actor: AuthenticatedUser,
+    locale: 'FA' | 'EN' | 'AR',
+  ): Promise<{ preferredLocale: 'FA' | 'EN' | 'AR' }> {
+    const updated = await this.typeorm.user.update({
+      where: { id: actor.id },
+      data: { preferredLocale: locale },
+      select: { preferredLocale: true },
+    });
+    return updated;
+  }
+
   /** فراموشی رمز — the caller already proved phone ownership via
    * POST /auth/otp/verify (issuing the JWT this endpoint requires), so no
    * current-password check applies here, unlike changeOwnPassword above.

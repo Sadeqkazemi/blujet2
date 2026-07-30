@@ -11,8 +11,12 @@ export type Role =
   | 'BOARD_CHAIR'
   | 'SITE_ADMIN';
 
+/** Mirrors backend/typeorm Locale enum. */
+export type Locale = 'FA' | 'EN' | 'AR';
+
 export interface AuthUser {
   id: string;
   fullName: string;
   role: Role;
+  preferredLocale: Locale;
 }

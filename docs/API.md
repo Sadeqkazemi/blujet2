@@ -1726,3 +1726,45 @@ webservice-purchase request submitted by an agency is currently
 decidable only via curl/Supertest. This is a real, parallel gap of the
 same shape as documents — reported to the user, deliberately left
 out of this phase's diff so it stays reviewable, not silently bundled in.
+
+## Phase 40 — ترجیح زبان نمایش (display-language preference storage)
+
+First concrete step of the multi-language (fa/en/ar) + responsive redesign
+the user is bringing in (design bundle: public site + پنل کاربر + پنل
+آژانس only — staff/executive panels stay Persian-only, out of scope here
+and in every phase after). This phase builds ONLY the storage/sync
+plumbing for a language preference — no page has translated strings yet;
+that's separate, larger work. Explicitly NOT mock data: the value is a
+real DB column with a real endpoint, reachable from a real, tested
+frontend hook.
+
+- `User.preferredLocale` (new column, enum `Locale` = `FA`/`EN`/`AR`,
+  `@default(FA)`) — the DB row is only the **cross-device sync point for a
+  logged-in USER/AGENCY**. An anonymous visitor's choice has no `User` row
+  to attach to, so it lives in `localStorage` (`blujet_lang`, matching the
+  design bundle's own key) until they log in.
+- `GET /auth/me` (existing) now does a fresh DB read instead of echoing
+  the JWT payload verbatim, and includes `preferredLocale` — a locale
+  change happens far more often than a short-lived access token gets
+  refreshed, so baking it into the JWT would go stale.
+- `PATCH /auth/me/locale` (new, any authenticated role — harmless
+  self-scoped data, no need to gate to USER/AGENCY at the API level even
+  though only those two frontends currently expose a language switcher)
+  — `{ locale: 'FA'|'EN'|'AR' }`. Not audited: a display preference isn't
+  a security/financial/admin event per CLAUDE.md's audit-log rule scope.
+
+Frontend: `frontend/src/hooks/useLocale.tsx` (`LocaleProvider`/`useLocale`,
+mounted in `App.tsx` inside `AuthProvider`) — `localStorage` is always the
+first-read source (avoids a flash of the wrong language before any server
+round-trip); on login, if the DB's `preferredLocale` differs from the
+current `localStorage` value, the DB wins (the device now represents that
+account); `setLocale()` writes `localStorage` immediately and — only when
+authenticated — fires `PATCH /auth/me/locale` to sync the DB (fire-and-forget,
+a failed sync just retries on the next explicit change).
+
+**Deliberately deferred to later phases**: actual translated strings for
+any real page, the language switcher UI itself, RTL/LTR direction
+switching, the responsive breakpoint work, and the split forgot-password
+mechanism (email+code for EN vs. phone+OTP for FA/AR, confirmed from the
+design bundle) — this phase is the storage layer those all depend on, not
+the features themselves.
