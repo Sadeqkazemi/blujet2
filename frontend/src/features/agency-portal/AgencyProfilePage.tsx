@@ -2,22 +2,130 @@ import { useEffect, useRef, useState } from 'react';
 import { fetchDocuments, fetchProfile, uploadDocument } from '../../api/agency-portal';
 import { formatJalaliDate } from '../../lib/jalali';
 import { ApiRequestError } from '../../api/envelope';
-import { TIER_LABELS } from '../agencies/agency-labels';
+import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import type { AgencyDocument, AgencyDocumentType, AgencyProfile } from '../../types/agency-portal';
 
-const DOC_TYPE_LABEL: Record<AgencyDocumentType, string> = {
-  LICENSE: 'مجوز فعالیت',
-  CONTRACT: 'قرارداد همکاری',
-  OTHER: 'سایر',
+// پروفایل و مدارک — field labels and document status match
+// design-reference-v2/پنل آژانس.dc.html's own isEN `profileFields`/
+// `documents` sample data for this exact tab; AR has no counterpart
+// there and is hand-translated. This page keeps its own local
+// tier/document-type/status label maps rather than translating the
+// shared `frontend/src/features/agencies/agency-labels.ts` module — that
+// module backs the staff-side AgencyDetailPage.tsx, which stays
+// Persian-only per CLAUDE.md (staff panels aren't locale-switchable).
+interface Tr {
+  fa: string;
+  en: string;
+  ar: string;
+}
+
+const TIER_LABEL_LOCAL: Record<AgencyProfile['tier'], Tr> = {
+  GOLD: { fa: 'طلایی', en: 'Gold', ar: 'ذهبية' },
+  SILVER: { fa: 'نقره‌ای', en: 'Silver', ar: 'فضية' },
+  NORMAL: { fa: 'عادی', en: 'Standard', ar: 'عادية' },
 };
 
-const DOC_STATUS_LABEL: Record<AgencyDocument['status'], { label: string; className: string }> = {
-  PENDING: { label: 'در انتظار بررسی', className: 'bg-[#f59e0b24] text-[#b45309]' },
-  APPROVED: { label: 'تأیید شد', className: 'bg-[#10b98124] text-[#059669]' },
-  REJECTED: { label: 'رد شد', className: 'bg-danger/15 text-danger' },
+const DOC_TYPE_LABEL: Record<AgencyDocumentType, Tr> = {
+  LICENSE: { fa: 'مجوز فعالیت', en: 'Operating License', ar: 'ترخيص النشاط' },
+  CONTRACT: { fa: 'قرارداد همکاری', en: 'Partnership Contract', ar: 'عقد الشراكة' },
+  OTHER: { fa: 'سایر', en: 'Other', ar: 'أخرى' },
+};
+
+const DOC_STATUS_LABEL: Record<AgencyDocument['status'], { label: Tr; className: string }> = {
+  PENDING: { label: { fa: 'در انتظار بررسی', en: 'Pending', ar: 'قيد المراجعة' }, className: 'bg-[#f59e0b24] text-[#b45309]' },
+  APPROVED: { label: { fa: 'تأیید شد', en: 'Approved', ar: 'تمت الموافقة' }, className: 'bg-[#10b98124] text-[#059669]' },
+  REJECTED: { label: { fa: 'رد شد', en: 'Rejected', ar: 'مرفوض' }, className: 'bg-danger/15 text-danger' },
+};
+
+const STR: Record<StoredLocale, {
+  heading: string;
+  subtitle: string;
+  errorFallback: string;
+  loading: string;
+  agencyInfoHeading: string;
+  fieldManager: string;
+  fieldLicenseNo: string;
+  fieldCity: string;
+  fieldPhone: string;
+  fieldEmail: string;
+  fieldPartnershipType: string;
+  partnershipValue: (tier: string) => string;
+  uploadHeading: string;
+  noFileSelected: string;
+  uploadErrorFallback: string;
+  uploadBtn: string;
+  uploadingBtn: string;
+  documentsHeading: string;
+  documentsEmpty: string;
+}> = {
+  fa: {
+    heading: 'پروفایل و مدارک',
+    subtitle: 'اطلاعات ثبت‌شده آژانس شما و مدارک ارسالی',
+    errorFallback: 'خطا در دریافت پروفایل.',
+    loading: 'در حال بارگذاری…',
+    agencyInfoHeading: 'اطلاعات آژانس',
+    fieldManager: 'مدیر عامل',
+    fieldLicenseNo: 'شماره مجوز',
+    fieldCity: 'شهر',
+    fieldPhone: 'تلفن',
+    fieldEmail: 'ایمیل',
+    fieldPartnershipType: 'نوع همکاری',
+    partnershipValue: (tier) => `آژانس همکار ${tier}`,
+    uploadHeading: 'آپلود مدرک جدید',
+    noFileSelected: 'فایلی انتخاب نشده است.',
+    uploadErrorFallback: 'خطا در آپلود مدرک.',
+    uploadBtn: 'آپلود',
+    uploadingBtn: 'در حال آپلود…',
+    documentsHeading: 'مدارک ارسالی',
+    documentsEmpty: 'مدرکی آپلود نشده است.',
+  },
+  en: {
+    heading: 'Profile & Documents',
+    subtitle: "Your agency's registered information and submitted documents",
+    errorFallback: 'Error loading the profile.',
+    loading: 'Loading…',
+    agencyInfoHeading: 'Agency Information',
+    fieldManager: 'CEO',
+    fieldLicenseNo: 'License Number',
+    fieldCity: 'City',
+    fieldPhone: 'Phone',
+    fieldEmail: 'Email',
+    fieldPartnershipType: 'Partnership Type',
+    partnershipValue: (tier) => `${tier} Partner Agency`,
+    uploadHeading: 'Upload New Document',
+    noFileSelected: 'No file selected.',
+    uploadErrorFallback: 'Error uploading the document.',
+    uploadBtn: 'Upload',
+    uploadingBtn: 'Uploading…',
+    documentsHeading: 'Submitted Documents',
+    documentsEmpty: 'No documents uploaded yet.',
+  },
+  ar: {
+    heading: 'الملف الشخصي والمستندات',
+    subtitle: 'معلومات وكالتك المسجّلة والمستندات المُرسلة',
+    errorFallback: 'خطأ في تحميل الملف الشخصي.',
+    loading: 'جارٍ التحميل…',
+    agencyInfoHeading: 'معلومات الوكالة',
+    fieldManager: 'المدير العام',
+    fieldLicenseNo: 'رقم الترخيص',
+    fieldCity: 'المدينة',
+    fieldPhone: 'الهاتف',
+    fieldEmail: 'البريد الإلكتروني',
+    fieldPartnershipType: 'نوع الشراكة',
+    partnershipValue: (tier) => `وكالة شريكة ${tier}`,
+    uploadHeading: 'رفع مستند جديد',
+    noFileSelected: 'لم يتم اختيار ملف.',
+    uploadErrorFallback: 'خطأ في رفع المستند.',
+    uploadBtn: 'رفع',
+    uploadingBtn: 'جارٍ الرفع…',
+    documentsHeading: 'المستندات المُرسلة',
+    documentsEmpty: 'لم يتم رفع أي مستند بعد.',
+  },
 };
 
 export default function AgencyProfilePage() {
+  const { locale } = useLocale();
+  const t = STR[locale];
   const [profile, setProfile] = useState<AgencyProfile | null>(null);
   const [documents, setDocuments] = useState<AgencyDocument[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -32,15 +140,16 @@ export default function AgencyProfilePage() {
         setProfile(p);
         setDocuments(d);
       })
-      .catch(() => setError('خطا در دریافت پروفایل.'));
+      .catch(() => setError(t.errorFallback));
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(reload, []);
 
   async function onUpload() {
     const file = fileInputRef.current?.files?.[0];
     if (!file) {
-      setUploadError('فایلی انتخاب نشده است.');
+      setUploadError(t.noFileSelected);
       return;
     }
     setUploadError(null);
@@ -50,31 +159,31 @@ export default function AgencyProfilePage() {
       if (fileInputRef.current) fileInputRef.current.value = '';
       reload();
     } catch (err) {
-      setUploadError(err instanceof ApiRequestError ? err.message : 'خطا در آپلود مدرک.');
+      setUploadError(err instanceof ApiRequestError ? err.message : t.uploadErrorFallback);
     } finally {
       setUploading(false);
     }
   }
 
   if (error) return <p className="p-8 text-sm text-danger">{error}</p>;
-  if (!profile) return <p className="p-8 text-sm text-muted">در حال بارگذاری…</p>;
+  if (!profile) return <p className="p-8 text-sm text-muted">{t.loading}</p>;
 
   const fields: [string, string][] = [
-    ['مدیر عامل', profile.managerName],
-    ['شماره مجوز', profile.licenseNo],
-    ['شهر', profile.city],
-    ['تلفن', profile.phone],
-    ['ایمیل', profile.email],
-    ['نوع همکاری', `آژانس همکار ${TIER_LABELS[profile.tier]}`],
+    [t.fieldManager, profile.managerName],
+    [t.fieldLicenseNo, profile.licenseNo],
+    [t.fieldCity, profile.city],
+    [t.fieldPhone, profile.phone],
+    [t.fieldEmail, profile.email],
+    [t.fieldPartnershipType, t.partnershipValue(TIER_LABEL_LOCAL[profile.tier][locale])],
   ];
 
   return (
     <div className="p-8">
-      <h1 className="mb-1 text-xl font-black text-ink">پروفایل و مدارک</h1>
-      <p className="mb-6 text-sm text-muted">اطلاعات ثبت‌شده آژانس شما و مدارک ارسالی</p>
+      <h1 className="mb-1 text-xl font-black text-ink">{t.heading}</h1>
+      <p className="mb-6 text-sm text-muted">{t.subtitle}</p>
 
       <div className="mb-6 rounded-xl border border-border bg-white p-5">
-        <div className="mb-4 text-sm font-bold text-ink">اطلاعات آژانس</div>
+        <div className="mb-4 text-sm font-bold text-ink">{t.agencyInfoHeading}</div>
         <dl className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {fields.map(([label, value]) => (
             <div key={label}>
@@ -86,16 +195,16 @@ export default function AgencyProfilePage() {
       </div>
 
       <div className="mb-6 rounded-xl border border-border bg-white p-5">
-        <div className="mb-4 text-sm font-bold text-ink">آپلود مدرک جدید</div>
+        <div className="mb-4 text-sm font-bold text-ink">{t.uploadHeading}</div>
         <div className="flex flex-wrap items-center gap-3">
           <select
             value={docType}
             onChange={(e) => setDocType(e.target.value as AgencyDocumentType)}
             className="rounded-lg border border-border bg-white px-3 py-2 text-xs"
           >
-            {(Object.keys(DOC_TYPE_LABEL) as AgencyDocumentType[]).map((t) => (
-              <option key={t} value={t}>
-                {DOC_TYPE_LABEL[t]}
+            {(Object.keys(DOC_TYPE_LABEL) as AgencyDocumentType[]).map((dt) => (
+              <option key={dt} value={dt}>
+                {DOC_TYPE_LABEL[dt][locale]}
               </option>
             ))}
           </select>
@@ -105,7 +214,7 @@ export default function AgencyProfilePage() {
             onClick={() => void onUpload()}
             className="rounded-lg bg-accent px-4 py-2 text-xs font-bold text-white transition hover:brightness-110 disabled:opacity-60"
           >
-            {uploading ? 'در حال آپلود…' : 'آپلود'}
+            {uploading ? t.uploadingBtn : t.uploadBtn}
           </button>
         </div>
         {uploadError && (
@@ -116,9 +225,9 @@ export default function AgencyProfilePage() {
       </div>
 
       <div className="rounded-xl border border-border bg-white p-5">
-        <div className="mb-4 text-sm font-bold text-ink">مدارک ارسالی</div>
+        <div className="mb-4 text-sm font-bold text-ink">{t.documentsHeading}</div>
         {documents.length === 0 ? (
-          <p className="py-4 text-center text-xs text-muted">مدرکی آپلود نشده است.</p>
+          <p className="py-4 text-center text-xs text-muted">{t.documentsEmpty}</p>
         ) : (
           <div className="flex flex-col gap-2">
             {documents.map((d) => {
@@ -129,13 +238,13 @@ export default function AgencyProfilePage() {
                   className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2 text-xs"
                 >
                   <div>
-                    <div className="font-bold">{DOC_TYPE_LABEL[d.docType]}</div>
+                    <div className="font-bold">{DOC_TYPE_LABEL[d.docType][locale]}</div>
                     <div className="text-[10px] text-muted">
                       {d.file.fileName} — {formatJalaliDate(d.createdAt)}
                     </div>
                   </div>
                   <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${st.className}`}>
-                    {st.label}
+                    {st.label[locale]}
                   </span>
                 </div>
               );

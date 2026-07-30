@@ -1,8 +1,17 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import AgencyProfilePage from './AgencyProfilePage';
 import * as portalApi from '../../api/agency-portal';
+import * as useLocaleModule from '../../hooks/useLocale';
 import type { AgencyDocument, AgencyProfile } from '../../types/agency-portal';
+
+function mockLocale(locale: 'fa' | 'en' | 'ar') {
+  vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale, setLocale: vi.fn() });
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 const PROFILE: AgencyProfile = {
   fullName: 'آژانس blujet',
@@ -40,5 +49,27 @@ describe('AgencyProfilePage', () => {
     expect(screen.getByText('AG-10234')).toBeInTheDocument();
     expect(screen.getByText(/license\.pdf/)).toBeInTheDocument();
     expect(screen.getByText('در انتظار بررسی')).toBeInTheDocument();
+  });
+
+  it('renders translated headings, field labels, and document status in English', async () => {
+    mockLocale('en');
+    vi.spyOn(portalApi, 'fetchProfile').mockResolvedValue(PROFILE);
+    vi.spyOn(portalApi, 'fetchDocuments').mockResolvedValue(DOCUMENTS);
+    render(<AgencyProfilePage />);
+
+    expect(await screen.findByText('Profile & Documents')).toBeInTheDocument();
+    expect(screen.getByText('License Number')).toBeInTheDocument();
+    expect(screen.getByText('Gold Partner Agency')).toBeInTheDocument();
+    expect(screen.getByText('Pending')).toBeInTheDocument();
+  });
+
+  it('renders translated headings and document status in Arabic', async () => {
+    mockLocale('ar');
+    vi.spyOn(portalApi, 'fetchProfile').mockResolvedValue(PROFILE);
+    vi.spyOn(portalApi, 'fetchDocuments').mockResolvedValue(DOCUMENTS);
+    render(<AgencyProfilePage />);
+
+    expect(await screen.findByText('الملف الشخصي والمستندات')).toBeInTheDocument();
+    expect(screen.getByText('قيد المراجعة')).toBeInTheDocument();
   });
 });
