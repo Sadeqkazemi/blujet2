@@ -7,6 +7,7 @@ import { lookupFlightStatus } from '../../api/flight-status';
 import { faDigits } from '../../lib/fa-format';
 import { formatJalaliDate, dayjs } from '../../lib/jalali';
 import { ApiRequestError } from '../../api/envelope';
+import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import type { Airport } from '../../types/public-site';
 import type { FlightStatusResult } from '../../types/flight-status';
 
@@ -17,6 +18,23 @@ import type { FlightStatusResult } from '../../types/flight-status';
 // operational system exists yet), so this real version shows only what's
 // real (route, times, aircraft, status) and drops the fabricated fields —
 // see docs/API.md's Phase 22 section for the explicit deferral.
+//
+// Most labels below reuse design-reference-v2/وضعیت پرواز.dc.html's own
+// isEN/isAR vocabulary for this exact page (heroTitle, flightNoLabel,
+// dateLabel, searchLabel, notFoundTitle/notFoundMsg, aircraftLabel,
+// delayAlertSub, manageBookingTitle/Sub, support24Title/Sub). The status
+// pill can't use a simple 3-way status map — the backend's DEPARTED
+// status maps to two different Persian strings ("فرود آمد"/"در حال
+// پرواز") depending on arrival time (see
+// backend/src/modules/flight-status/flight-status.service.ts) — so it's
+// translated by looking up the exact fa string the backend returns,
+// with the fa string itself as the identity fallback.
+
+interface Tr {
+  fa: string;
+  en: string;
+  ar: string;
+}
 
 const STATUS_META: Record<FlightStatusResult['status'], { color: string; bg: string }> = {
   SCHEDULED: { color: '#1f8a5b', bg: '#1f8a5b' },
@@ -24,11 +42,142 @@ const STATUS_META: Record<FlightStatusResult['status'], { color: string; bg: str
   CANCELLED: { color: '#d64545', bg: '#d64545' },
 };
 
+const STATUS_LABEL_TR: Record<string, Tr> = {
+  'برنامه‌ریزی‌شده': { fa: 'برنامه‌ریزی‌شده', en: 'Scheduled', ar: 'مجدولة' },
+  'لغو شد': { fa: 'لغو شد', en: 'Cancelled', ar: 'ملغاة' },
+  'فرود آمد': { fa: 'فرود آمد', en: 'Landed', ar: 'هبطت' },
+  'در حال پرواز': { fa: 'در حال پرواز', en: 'In flight', ar: 'في الجو' },
+};
+
+function statusLabel(statusLabelFa: string, locale: StoredLocale): string {
+  return STATUS_LABEL_TR[statusLabelFa]?.[locale] ?? statusLabelFa;
+}
+
+const STR: Record<StoredLocale, {
+  title: string;
+  subtitle: string;
+  modeFlightNo: string;
+  modeRoute: string;
+  flightNoFieldLabel: string;
+  flightNoPlaceholder: string;
+  originFieldLabel: string;
+  destFieldLabel: string;
+  selectPlaceholder: string;
+  dateFieldLabel: string;
+  searchBtn: string;
+  searchingBtn: string;
+  errorFallback: string;
+  notFoundTitle: string;
+  notFoundMsg: string;
+  aircraftLabel: string;
+  delayAlertTitle: string;
+  delayAlertSub: string;
+  manageBookingTitle: string;
+  manageBookingSub: string;
+  support24Title: string;
+  support24Sub: string;
+  soonTooltip: string;
+}> = {
+  fa: {
+    title: 'وضعیت پرواز',
+    subtitle: 'با شماره پرواز یا مسیر و تاریخ، آخرین وضعیت پرواز را ببینید.',
+    modeFlightNo: 'شماره پرواز',
+    modeRoute: 'مبدأ و مقصد',
+    flightNoFieldLabel: 'شماره پرواز',
+    flightNoPlaceholder: 'مثلاً BJ-410',
+    originFieldLabel: 'مبدأ',
+    destFieldLabel: 'مقصد',
+    selectPlaceholder: 'انتخاب کنید',
+    dateFieldLabel: 'تاریخ',
+    searchBtn: 'جستجو',
+    searchingBtn: 'در حال جستجو…',
+    errorFallback: 'خطا در جستجوی وضعیت پرواز.',
+    notFoundTitle: 'پروازی یافت نشد',
+    notFoundMsg: 'اطلاعات وارد‌شده با هیچ پروازی مطابقت ندارد. شماره پرواز یا مسیر و تاریخ را بررسی کنید.',
+    aircraftLabel: 'هواپیما',
+    delayAlertTitle: 'اطلاع‌رسانی تأخیر (به‌زودی)',
+    delayAlertSub: 'فعال‌سازی پیامک تغییر وضعیت پرواز',
+    manageBookingTitle: 'مدیریت رزرو',
+    manageBookingSub: 'تغییر صندلی، دانلود بلیط یا استرداد',
+    support24Title: 'پشتیبانی ۲۴ ساعته',
+    support24Sub: 'در صورت هرگونه سؤال با ما تماس بگیرید',
+    soonTooltip: 'به‌زودی',
+  },
+  en: {
+    title: 'Flight Status',
+    subtitle: 'Check the latest status of your flight by flight number or route and date.',
+    modeFlightNo: 'Flight number',
+    modeRoute: 'Origin & Destination',
+    flightNoFieldLabel: 'Flight number',
+    flightNoPlaceholder: 'e.g. BJ-410',
+    originFieldLabel: 'From',
+    destFieldLabel: 'To',
+    selectPlaceholder: 'Select',
+    dateFieldLabel: 'Date',
+    searchBtn: 'Search',
+    searchingBtn: 'Searching…',
+    errorFallback: 'Error searching for flight status.',
+    notFoundTitle: 'Flight not found',
+    notFoundMsg: 'No flight matches the information entered. Please check the flight number or route and date.',
+    aircraftLabel: 'Aircraft',
+    delayAlertTitle: 'Delay notifications (coming soon)',
+    delayAlertSub: 'Enable SMS alerts for flight status changes',
+    manageBookingTitle: 'Manage booking',
+    manageBookingSub: 'Change seat, download ticket or refund',
+    support24Title: '24/7 support',
+    support24Sub: 'Contact us with any question',
+    soonTooltip: 'Coming soon',
+  },
+  ar: {
+    title: 'حالة الرحلة',
+    subtitle: 'تحقق من آخر حالة لرحلتك عبر رقم الرحلة أو المسار والتاريخ.',
+    modeFlightNo: 'رقم الرحلة',
+    modeRoute: 'المبدأ والوجهة',
+    flightNoFieldLabel: 'رقم الرحلة',
+    flightNoPlaceholder: 'مثلاً BJ-410',
+    originFieldLabel: 'من',
+    destFieldLabel: 'إلى',
+    selectPlaceholder: 'اختر',
+    dateFieldLabel: 'التاريخ',
+    searchBtn: 'بحث',
+    searchingBtn: 'جارٍ البحث…',
+    errorFallback: 'خطأ في البحث عن حالة الرحلة.',
+    notFoundTitle: 'لم يتم العثور على الرحلة',
+    notFoundMsg: 'لا توجد رحلة مطابقة للمعلومات المدخلة. تحقق من رقم الرحلة أو المسار والتاريخ.',
+    aircraftLabel: 'الطائرة',
+    delayAlertTitle: 'إشعارات التأخير (قريبًا)',
+    delayAlertSub: 'فعّل تنبيهات الرسائل عند تغيّر حالة الرحلة',
+    manageBookingTitle: 'إدارة الحجز',
+    manageBookingSub: 'تغيير المقعد أو تنزيل التذكرة أو الاسترداد',
+    support24Title: 'دعم على مدار الساعة',
+    support24Sub: 'تواصل معنا لأي استفسار',
+    soonTooltip: 'قريبًا',
+  },
+};
+
+// Same airport-city translation map/precedent as HomeSearchPage.tsx
+// (Phase 42): falls back to the airport's real cityFa when the code
+// isn't in this small known set, rather than inventing a translation.
+const CITY_NAMES: Record<string, Record<StoredLocale, string>> = {
+  THR: { fa: 'تهران', en: 'Tehran', ar: 'طهران' },
+  MHD: { fa: 'مشهد', en: 'Mashhad', ar: 'مشهد' },
+  IST: { fa: 'استانبول', en: 'Istanbul', ar: 'إسطنبول' },
+  DXB: { fa: 'دبی', en: 'Dubai', ar: 'دبي' },
+  KIH: { fa: 'کیش', en: 'Kish', ar: 'كيش' },
+  SYZ: { fa: 'شیراز', en: 'Shiraz', ar: 'شيراز' },
+};
+
+function cityName(code: string, fallbackFa: string, locale: StoredLocale): string {
+  return CITY_NAMES[code]?.[locale] ?? fallbackFa;
+}
+
 function todayIso() {
   return dayjs().toDate().toISOString();
 }
 
 export default function FlightStatusPage() {
+  const { locale } = useLocale();
+  const t = STR[locale];
   const [mode, setMode] = useState<'flightNo' | 'route'>('flightNo');
   const [flightNo, setFlightNo] = useState('');
   const [origin, setOrigin] = useState('');
@@ -65,7 +214,7 @@ export default function FlightStatusPage() {
       if (err instanceof ApiRequestError && err.code === 'NOT_FOUND') {
         setNotFound(true);
       } else {
-        setError(err instanceof ApiRequestError ? err.message : 'خطا در جستجوی وضعیت پرواز.');
+        setError(err instanceof ApiRequestError ? err.message : t.errorFallback);
       }
     } finally {
       setSearching(false);
@@ -77,8 +226,8 @@ export default function FlightStatusPage() {
   return (
     <PublicPageShell>
       <section style={{ background: 'linear-gradient(150deg,#0d2640,#124a86)', color: '#fff', padding: '41px 22px 65px', textAlign: 'center' }}>
-        <h1 style={{ fontSize: 30, fontWeight: 900, margin: '0 0 10px', letterSpacing: '-.5px' }}>وضعیت پرواز</h1>
-        <p style={{ fontSize: 13, color: '#c9dcf3', margin: 0 }}>با شماره پرواز یا مسیر و تاریخ، آخرین وضعیت پرواز را ببینید.</p>
+        <h1 style={{ fontSize: 30, fontWeight: 900, margin: '0 0 10px', letterSpacing: '-.5px' }}>{t.title}</h1>
+        <p style={{ fontSize: 13, color: '#c9dcf3', margin: 0 }}>{t.subtitle}</p>
       </section>
 
       <div style={{ maxWidth: 720, margin: '-34px auto 0', padding: '0 22px 60px', position: 'relative' }}>
@@ -86,8 +235,8 @@ export default function FlightStatusPage() {
           <div style={{ display: 'flex', background: '#eef1f5', borderRadius: 11, padding: 3, marginBottom: 16, maxWidth: 320 }}>
             {(
               [
-                ['flightNo', 'شماره پرواز'],
-                ['route', 'مبدأ و مقصد'],
+                ['flightNo', t.modeFlightNo],
+                ['route', t.modeRoute],
               ] as const
             ).map(([m, lbl]) => (
               <span
@@ -121,7 +270,7 @@ export default function FlightStatusPage() {
             {mode === 'flightNo' ? (
               <div style={{ flex: '1 1 200px' }}>
                 <label htmlFor="fs-flightno" style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#5a6678', marginBottom: 6 }}>
-                  شماره پرواز
+                  {t.flightNoFieldLabel}
                 </label>
                 <input
                   id="fs-flightno"
@@ -129,7 +278,7 @@ export default function FlightStatusPage() {
                   dir="ltr"
                   value={flightNo}
                   onChange={(e) => setFlightNo(e.target.value)}
-                  placeholder="مثلاً BJ-410"
+                  placeholder={t.flightNoPlaceholder}
                   style={{ width: '100%', boxSizing: 'border-box', padding: '11px 13px', border: '1.5px solid #e3e9f1', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none' }}
                 />
               </div>
@@ -137,7 +286,7 @@ export default function FlightStatusPage() {
               <>
                 <div style={{ flex: '1 1 130px' }}>
                   <label htmlFor="fs-origin" style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#5a6678', marginBottom: 6 }}>
-                    مبدأ
+                    {t.originFieldLabel}
                   </label>
                   <select
                     id="fs-origin"
@@ -146,17 +295,17 @@ export default function FlightStatusPage() {
                     onChange={(e) => setOrigin(e.target.value)}
                     style={{ width: '100%', boxSizing: 'border-box', padding: '11px 13px', border: '1.5px solid #e3e9f1', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff' }}
                   >
-                    <option value="">انتخاب کنید</option>
+                    <option value="">{t.selectPlaceholder}</option>
                     {airports.map((a) => (
                       <option key={a.id} value={a.code}>
-                        {a.cityFa} ({a.code})
+                        {cityName(a.code, a.cityFa, locale)} ({a.code})
                       </option>
                     ))}
                   </select>
                 </div>
                 <div style={{ flex: '1 1 130px' }}>
                   <label htmlFor="fs-dest" style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#5a6678', marginBottom: 6 }}>
-                    مقصد
+                    {t.destFieldLabel}
                   </label>
                   <select
                     id="fs-dest"
@@ -165,10 +314,10 @@ export default function FlightStatusPage() {
                     onChange={(e) => setDest(e.target.value)}
                     style={{ width: '100%', boxSizing: 'border-box', padding: '11px 13px', border: '1.5px solid #e3e9f1', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff' }}
                   >
-                    <option value="">انتخاب کنید</option>
+                    <option value="">{t.selectPlaceholder}</option>
                     {airports.map((a) => (
                       <option key={a.id} value={a.code}>
-                        {a.cityFa} ({a.code})
+                        {cityName(a.code, a.cityFa, locale)} ({a.code})
                       </option>
                     ))}
                   </select>
@@ -176,7 +325,7 @@ export default function FlightStatusPage() {
               </>
             )}
             <div style={{ flex: '1 1 150px', border: '1.5px solid #e3e9f1', borderRadius: 11 }}>
-              <JalaliDatePicker label="تاریخ" value={dateIso} onChange={setDateIso} testId="fs-date" />
+              <JalaliDatePicker label={t.dateFieldLabel} value={dateIso} onChange={setDateIso} testId="fs-date" />
             </div>
             <button
               type="submit"
@@ -184,7 +333,7 @@ export default function FlightStatusPage() {
               disabled={!canSearch || searching}
               style={{ flex: 'none', border: 'none', borderRadius: 11, background: canSearch && !searching ? '#1668c4' : '#aab8c8', color: '#fff', padding: '12px 26px', fontSize: 13.5, fontWeight: 800, cursor: canSearch && !searching ? 'pointer' : 'not-allowed', fontFamily: 'inherit' }}
             >
-              {searching ? 'در حال جستجو…' : 'جستجو'}
+              {searching ? t.searchingBtn : t.searchBtn}
             </button>
           </form>
         </div>
@@ -196,8 +345,8 @@ export default function FlightStatusPage() {
         {notFound && (
           <div data-testid="fs-not-found" style={{ marginTop: 22, background: '#fff', border: '1px solid #eef1f5', borderRadius: 18, padding: '48px 24px', textAlign: 'center' }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>🔍</div>
-            <div style={{ fontSize: 15, fontWeight: 900, color: '#0d2640', marginBottom: 8 }}>پروازی یافت نشد</div>
-            <p style={{ fontSize: 12, color: '#8a96a6', margin: 0 }}>اطلاعات وارد‌شده با هیچ پروازی مطابقت ندارد. شماره پرواز یا مسیر و تاریخ را بررسی کنید.</p>
+            <div style={{ fontSize: 15, fontWeight: 900, color: '#0d2640', marginBottom: 8 }}>{t.notFoundTitle}</div>
+            <p style={{ fontSize: 12, color: '#8a96a6', margin: 0 }}>{t.notFoundMsg}</p>
           </div>
         )}
 
@@ -215,7 +364,7 @@ export default function FlightStatusPage() {
                   data-testid="fs-status-pill"
                   style={{ background: STATUS_META[result.status].bg, fontSize: 10.5, fontWeight: 800, padding: '4px 10px', borderRadius: 14 }}
                 >
-                  {result.statusLabelFa}
+                  {statusLabel(result.statusLabelFa, locale)}
                 </span>
               </div>
 
@@ -224,7 +373,7 @@ export default function FlightStatusPage() {
                   <div style={{ fontSize: 21, fontWeight: 900, color: '#0d2640' }} dir="ltr">
                     {result.originCode}
                   </div>
-                  <div style={{ fontSize: 12, color: '#6b7787' }}>{result.originCityFa}</div>
+                  <div style={{ fontSize: 12, color: '#6b7787' }}>{cityName(result.originCode, result.originCityFa, locale)}</div>
                   <div className="font-num" style={{ fontSize: 15, fontWeight: 800, color: '#1668c4', marginTop: 4 }}>
                     {faDigits(dayjs(result.departureAt).calendar('jalali').format('HH:mm'))}
                   </div>
@@ -238,7 +387,7 @@ export default function FlightStatusPage() {
                   <div style={{ fontSize: 21, fontWeight: 900, color: '#0d2640' }} dir="ltr">
                     {result.destCode}
                   </div>
-                  <div style={{ fontSize: 12, color: '#6b7787' }}>{result.destCityFa}</div>
+                  <div style={{ fontSize: 12, color: '#6b7787' }}>{cityName(result.destCode, result.destCityFa, locale)}</div>
                   <div className="font-num" style={{ fontSize: 15, fontWeight: 800, color: '#1668c4', marginTop: 4 }}>
                     {faDigits(dayjs(result.arrivalAt).calendar('jalali').format('HH:mm'))}
                   </div>
@@ -246,29 +395,29 @@ export default function FlightStatusPage() {
               </div>
 
               <div style={{ borderTop: '1px solid #f2f4f7', padding: '11px 14px', textAlign: 'center' }}>
-                <div style={{ fontSize: 10.5, color: '#8a96a6', marginBottom: 3 }}>هواپیما</div>
+                <div style={{ fontSize: 10.5, color: '#8a96a6', marginBottom: 3 }}>{t.aircraftLabel}</div>
                 <div style={{ fontSize: 12.5, fontWeight: 800, color: '#0d2640' }}>{result.aircraftType}</div>
               </div>
             </div>
 
             <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
               <label
-                title="به‌زودی"
+                title={t.soonTooltip}
                 style={{ background: '#f6f8fb', border: '1px solid #e8eef6', borderRadius: 14, padding: '14px 16px', cursor: 'not-allowed', display: 'flex', flexDirection: 'column', gap: 6, opacity: 0.7 }}
               >
                 <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: 12.5, fontWeight: 800, color: '#0d2640' }}>اطلاع‌رسانی تأخیر (به‌زودی)</span>
+                  <span style={{ fontSize: 12.5, fontWeight: 800, color: '#0d2640' }}>{t.delayAlertTitle}</span>
                   <input type="checkbox" data-testid="fs-sms-toggle" checked={smsOn} onChange={(e) => setSmsOn(e.target.checked)} disabled />
                 </span>
-                <span style={{ fontSize: 11, color: '#8a96a6' }}>فعال‌سازی پیامک تغییر وضعیت پرواز</span>
+                <span style={{ fontSize: 11, color: '#8a96a6' }}>{t.delayAlertSub}</span>
               </label>
               <Link to="/manage-booking" style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 14, padding: '14px 16px', textDecoration: 'none' }}>
-                <div style={{ fontSize: 12.5, fontWeight: 800, color: '#0d2640', marginBottom: 6 }}>مدیریت رزرو</div>
-                <div style={{ fontSize: 11, color: '#8a96a6' }}>تغییر صندلی، دانلود بلیط یا استرداد</div>
+                <div style={{ fontSize: 12.5, fontWeight: 800, color: '#0d2640', marginBottom: 6 }}>{t.manageBookingTitle}</div>
+                <div style={{ fontSize: 11, color: '#8a96a6' }}>{t.manageBookingSub}</div>
               </Link>
               <Link to="/support" style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 14, padding: '14px 16px', textDecoration: 'none' }}>
-                <div style={{ fontSize: 12.5, fontWeight: 800, color: '#0d2640', marginBottom: 6 }}>پشتیبانی ۲۴ ساعته</div>
-                <div style={{ fontSize: 11, color: '#8a96a6' }}>در صورت هرگونه سؤال با ما تماس بگیرید</div>
+                <div style={{ fontSize: 12.5, fontWeight: 800, color: '#0d2640', marginBottom: 6 }}>{t.support24Title}</div>
+                <div style={{ fontSize: 11, color: '#8a96a6' }}>{t.support24Sub}</div>
               </Link>
             </div>
           </div>

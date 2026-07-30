@@ -2122,3 +2122,20 @@ number keeps its Persian-digit literal in every locale, matching the
 convention from `SupportPage.tsx` (Phase 46). This page had no test file
 before this phase; `MaintenancePage.test.tsx` was created from scratch
 with 3 tests (fa, en, ar). See `docs/features/maintenance-page-i18n.md`.
+
+## Phase 63 — وضعیت پرواز real i18n
+
+Frontend-only, no new/changed endpoints. `FlightStatusPage.tsx` (real
+flight-status lookup, Phase 22) translates its hero title/subtitle, mode
+toggle, field labels, result card, and status pill into fa/en/ar. Most
+labels reuse `design-reference-v2/وضعیت پرواز.dc.html`'s own
+`isEN`/`isAR` vocabulary for this exact page; origin/destination labels
+reuse the `lblOrigin`/`lblDestination` convention from
+`HomeSearchPage.tsx` (Phase 42), as does the `CITY_NAMES` airport-name
+map. The status pill required a `Record<string, Tr>` keyed by the exact
+fa string the backend returns (not a 3-way status-enum map), since the
+backend's `DEPARTED` status covers two distinct fa strings
+("فرود آمد"/"در حال پرواز") depending on arrival time — the fa string
+itself is the identity fallback so fa output stays byte-identical. All 5
+pre-existing tests pass unmodified; 2 new tests (en, ar). See
+`docs/features/flight-status-page-i18n.md`.
