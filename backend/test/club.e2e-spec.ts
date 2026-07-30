@@ -6,6 +6,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { loginAs } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 import { encryptPii, hashPii } from '../src/common/pii-crypto';
+import { ClubPointsService } from '../src/modules/booking-engine/club-points.service';
 
 /** Generates a checksum-valid, non-repeating synthetic national ID. */
 function validNationalId(): string {
@@ -297,5 +298,130 @@ describe('Club (e2e)', () => {
       .patch(`/club/card-requests/${req.id}/approve`)
       .set('Authorization', `Bearer ${chair.accessToken}`);
     expect(again.status).toBe(409);
+  });
+
+  describe('tier rules (Phase 65)', () => {
+    it('GET returns the seeded defaults + computed preview for CEO and COMMERCIAL_MANAGER; other roles get 403', async () => {
+      const ceo = await loginAs(app, 'ceo');
+      const ceoRes = await request(app.getHttpServer())
+        .get('/club/tier-rules')
+        .set('Authorization', `Bearer ${ceo.accessToken}`);
+      expect(ceoRes.status).toBe(200);
+      expect(ceoRes.body.data.goldMinPoints).toBe(5000);
+      expect(ceoRes.body.data.platinumMinPoints).toBe(15000);
+      expect(ceoRes.body.data.cardRequestMinPoints).toBe(5000);
+      expect(ceoRes.body.data.preview).toEqual([
+        { tier: 'SILVER', minPoints: 0, maxPoints: 4999 },
+        { tier: 'GOLD', minPoints: 5000, maxPoints: 14999 },
+        { tier: 'PLATINUM', minPoints: 15000, maxPoints: null },
+      ]);
+
+      const commercial = await loginAs(app, 'comm.abbasi');
+      const commercialRes = await request(app.getHttpServer())
+        .get('/club/tier-rules')
+        .set('Authorization', `Bearer ${commercial.accessToken}`);
+      expect(commercialRes.status).toBe(200);
+
+      for (const username of ['finance.karimi', 'senior.rahimi', 'chair']) {
+        const { accessToken } = await loginAs(app, username);
+        const res = await request(app.getHttpServer())
+          .get('/club/tier-rules')
+          .set('Authorization', `Bearer ${accessToken}`);
+        expect(res.status).toBe(403);
+      }
+    });
+
+    it('PATCH rejects goldMinPoints >= platinumMinPoints with VALIDATION_FAILED', async () => {
+      const { accessToken } = await loginAs(app, 'ceo');
+      const res = await request(app.getHttpServer())
+        .patch('/club/tier-rules')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          goldMinPoints: 15000,
+          platinumMinPoints: 15000,
+          cardRequestMinPoints: 5000,
+        });
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_FAILED');
+    });
+
+    it('PATCH updates the singleton row, is reflected on the next GET, and is audited', async () => {
+      const { accessToken } = await loginAs(app, 'comm.abbasi');
+      const patchRes = await request(app.getHttpServer())
+        .patch('/club/tier-rules')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          goldMinPoints: 4000,
+          platinumMinPoints: 12000,
+          cardRequestMinPoints: 4000,
+        });
+      expect(patchRes.status).toBe(200);
+      expect(patchRes.body.data.goldMinPoints).toBe(4000);
+      expect(patchRes.body.data.platinumMinPoints).toBe(12000);
+
+      const getRes = await request(app.getHttpServer())
+        .get('/club/tier-rules')
+        .set('Authorization', `Bearer ${accessToken}`);
+      expect(getRes.body.data.goldMinPoints).toBe(4000);
+      expect(getRes.body.data.platinumMinPoints).toBe(12000);
+
+      const rule = await prisma.clubTierRule.findFirstOrThrow();
+      const audit = await prisma.auditLog.findFirst({
+        where: {
+          category: 'CLUB',
+          entityType: 'ClubTierRule',
+          entityId: rule.id,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      expect(audit).not.toBeNull();
+
+      // Restore defaults so later tests in this file see the seeded values.
+      await request(app.getHttpServer())
+        .patch('/club/tier-rules')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          goldMinPoints: 5000,
+          platinumMinPoints: 15000,
+          cardRequestMinPoints: 5000,
+        });
+    });
+
+    it('a real points credit recomputes ClubMember.level from the current rules, with no separate action', async () => {
+      const suffix = crypto.randomUUID().slice(0, 6);
+      const member = await prisma.clubMember.create({
+        data: {
+          fullName: `عضو تست ${suffix}`,
+          email: `${crypto.randomUUID().slice(0, 8)}@club.example`,
+          nationalIdEnc: encryptPii(validNationalId()),
+          nationalIdHash: hashPii(crypto.randomUUID()),
+          points: 0,
+          level: 'SILVER',
+        },
+      });
+      const instance = await prisma.flightInstance.findFirstOrThrow();
+      const booking = await prisma.booking.create({
+        data: {
+          pnr: `TR${suffix.toUpperCase()}`,
+          flightInstanceId: instance.id,
+          channel: 'SYSTEM',
+          status: 'TICKETED',
+          priceIrr: 2_000_000_000,
+        },
+      });
+
+      const clubPoints = app.get(ClubPointsService);
+      // 2,000,000,000 IRR at 100,000 IRR/point = 20,000 points — comfortably
+      // past the seeded PLATINUM threshold (15,000).
+      await prisma.$transaction((tx) =>
+        clubPoints.earnForPurchase(tx, member.id, 2_000_000_000, booking.id),
+      );
+
+      const updated = await prisma.clubMember.findUniqueOrThrow({
+        where: { id: member.id },
+      });
+      expect(updated.points).toBe(20000);
+      expect(updated.level).toBe('PLATINUM');
+    });
   });
 });

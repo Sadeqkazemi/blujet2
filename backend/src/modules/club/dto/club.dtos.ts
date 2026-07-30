@@ -63,3 +63,23 @@ export class UpdateLevelDto {
   @IsIn(TIERS)
   level: (typeof TIERS)[number];
 }
+
+export class UpdateTierRulesDto {
+  @ApiProperty({ example: 5000, description: 'حد نصاب امتیاز سطح طلایی' })
+  @IsInt()
+  @Min(0)
+  goldMinPoints: number;
+
+  @ApiProperty({ example: 15000, description: 'حد نصاب امتیاز سطح پلاتین' })
+  @IsInt()
+  @Min(0)
+  platinumMinPoints: number;
+
+  @ApiProperty({
+    example: 5000,
+    description: 'حد نصاب امتیاز برای درخواست صدور کارت عضویت',
+  })
+  @IsInt()
+  @Min(0)
+  cardRequestMinPoints: number;
+}

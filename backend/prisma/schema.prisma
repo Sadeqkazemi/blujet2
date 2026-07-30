@@ -108,8 +108,9 @@ model User {
   chairPermDecisions  ChairReportPermission[]    @relation("ChairPermDecider")
   storedFiles         StoredFile[]               @relation("StoredFileOwner")
 
-  clubMembership    ClubMember?       @relation("ClubMemberUser")
-  clubCardDecisions ClubCardRequest[] @relation("ClubCardDecider")
+  clubMembership     ClubMember?       @relation("ClubMemberUser")
+  clubCardDecisions  ClubCardRequest[] @relation("ClubCardDecider")
+  clubTierRuleEdits  ClubTierRule[]    @relation("ClubTierRuleUpdatedBy")
 
   pricingProposalsMade     FarePricingProposal[] @relation("PricingProposedBy")
   pricingProposalsApproved FarePricingProposal[] @relation("PricingApprovedBy")
@@ -1095,6 +1096,23 @@ model ClubCardRequest {
 
   @@index([status])
   @@map("club_card_requests")
+}
+
+// Phase 65: manager-editable point thresholds for club tiers — singleton
+// table (exactly one row, enforced by ClubService, not a DB constraint).
+// Consumed by ClubPointsService.syncCache to recompute ClubMember.level
+// for real every time a member's points change.
+model ClubTierRule {
+  id                   String   @id @default(uuid())
+  goldMinPoints        Int      @default(5000)
+  platinumMinPoints    Int      @default(15000)
+  cardRequestMinPoints Int      @default(5000)
+  updatedById          String?
+  updatedBy            User?    @relation("ClubTierRuleUpdatedBy", fields: [updatedById], references: [id])
+  updatedAt            DateTime @updatedAt
+  createdAt            DateTime @default(now())
+
+  @@map("club_tier_rules")
 }
 
 // ─── Phase 6: ticket pricing proposals ───────────────────────────────────

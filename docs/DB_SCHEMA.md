@@ -1734,3 +1734,44 @@ only, reuses the existing `TwoFactorChallenge` table exactly like Phase 2's
   theirs. If no matching verified-email `USER` row exists, the endpoint
   401s with a generic message — same non-oracle posture Phase 21's
   `customer/login-password` already uses for phone+password.
+
+## Phase 65 — قوانین باشگاه مشتریان (Club Tier Rules)
+
+See `docs/API.md`'s Phase 65 section for the full reasoning and endpoint
+shapes. One new singleton-pattern table (`ClubTierRule`, always exactly
+one row) alongside the existing Phase 5 `ClubMember`/`ClubCardRequest`
+models — not a new module, extends the existing `club` module.
+
+```prisma
+model ClubTierRule {
+  id                   String   @id @default(uuid())
+  goldMinPoints        Int      @default(5000)
+  platinumMinPoints    Int      @default(15000)
+  cardRequestMinPoints Int      @default(5000)
+  updatedById          String?
+  updatedBy            User?    @relation(fields: [updatedById], references: [id])
+  updatedAt            DateTime @updatedAt
+  createdAt            DateTime @default(now())
+
+  @@map("club_tier_rules")
+}
+```
+
+- Singleton via application logic (service always reads/updates the
+  single existing row, or creates one with the defaults above if the
+  table is empty — no unique-constraint trick needed since only the
+  service ever touches this table).
+- Defaults (`5,000` / `15,000`) intentionally match the point ranges
+  already shown as marketing copy on `PublicClubPage.tsx`/
+  `HomeSearchPage.tsx` (Phases 42/45) — seeding any other default would
+  make the real, enforced thresholds inconsistent with what customers are
+  already told on day one.
+- `SILVER` has no column — its threshold is fixed at `0` in code (never
+  stored, never editable), matching the design's disabled `"۰"` input.
+- `prisma/seed.ts` creates the single default row so `GET
+  /club/tier-rules` never has to lazily create one in a normal dev/seed
+  environment (the lazy-create fallback exists only for defense in
+  depth, e.g. a fresh DB that skipped seeding).
+- No new enum: reuses the existing `ClubTier` enum (`SILVER | GOLD |
+  PLATINUM`) from Phase 5.
+- Migration: `20260730162159_phase65_club_tier_rules`.
