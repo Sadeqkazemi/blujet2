@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import CustomerLoginPage from './CustomerLoginPage';
 import AboutPage from './AboutPage';
 import NotFoundPage from './NotFoundPage';
@@ -29,6 +29,10 @@ beforeEach(() => {
     passwordLogin,
     signOut: vi.fn(),
   });
+});
+
+afterEach(() => {
+  vi.spyOn(useLocaleModule, 'useLocale').mockRestore();
 });
 
 function renderWithRouter(node: React.ReactNode) {
@@ -76,6 +80,25 @@ describe('CustomerLoginPage', () => {
     await userEvent.click(screen.getByTestId('signin-pw-submit'));
 
     expect(passwordLogin).toHaveBeenCalledWith('09121234567', 'MyPass1234');
+  });
+
+  it('renders translated tabs, labels, and forgot-password link in English', async () => {
+    mockLocale('en');
+    renderWithRouter(<CustomerLoginPage />);
+    expect(screen.getByTestId('signin-tab-login')).toHaveTextContent('Log in');
+    expect(screen.getByTestId('signin-tab-signup')).toHaveTextContent('Sign up');
+    expect(screen.getByTestId('signin-acct-agency')).toHaveTextContent('Agency');
+
+    await userEvent.click(screen.getByTestId('signin-use-password'));
+    expect(screen.getByText('Forgot password?')).toHaveAttribute('href', '/forgot-password');
+  });
+
+  it('renders translated tabs and labels in Arabic', () => {
+    mockLocale('ar');
+    renderWithRouter(<CustomerLoginPage />);
+    expect(screen.getByTestId('signin-tab-login')).toHaveTextContent('تسجيل الدخول');
+    expect(screen.getByTestId('signin-tab-signup')).toHaveTextContent('إنشاء حساب');
+    expect(screen.getByTestId('signin-acct-agency')).toHaveTextContent('وكالة');
   });
 });
 

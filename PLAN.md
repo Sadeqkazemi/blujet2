@@ -849,6 +849,32 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   `useIsMobile()` hook. Full frontend suite: 259/259 passing, 61/61
   files. `tsc --noEmit` clean; `oxlint` clean (same pre-existing
   warnings). See `docs/features/contact-page-i18n-responsive.md`.
+- [x] **Phase 50 — ورود و ثبت‌نام (CustomerLoginPage) real i18n +
+  responsive strings** — tenth page of the per-page translation arc.
+  Unlike every prior page, `design-reference-v2/ورود و ثبتنام.dc.html` has
+  a structurally different field layout from the real app: the design's
+  mock is email+password-first with a Google sign-in button and a 5-digit
+  OTP step, while the real `CustomerLoginPage.tsx` is phone+OTP-first
+  (6-digit OTP, no Google sign-in — out of scope) with a real-password
+  toggle and a real agency-login/agency-signup flow. Most strings were
+  hand-translated to match the real app's actual fields; concepts that do
+  line up 1:1 with the design (tab labels, the agency-account-activation
+  note, the resend label) reused the design bundle's own `isEN`/`arDeep`
+  wording. All 3 pre-existing tests pass unmodified — including the two
+  byte-critical fa strings asserted verbatim (`'فراموشی رمز عبور؟'`,
+  `'ارسال مجدد کد'`); 2 new tests (en, ar). Also fixes a test mock-leak
+  bug in `PublicMockPages.test.tsx` (bundles `CustomerLoginPage`/
+  `AboutPage`/`NotFoundPage`): the new `mockLocale('ar')` test's
+  unrestored `useLocale` spy leaked into the next describe block's
+  fa-only `AboutPage` test. Unlike Phase 45's fix (`vi.restoreAllMocks()`
+  in `beforeEach`), that blind approach would have broken this file's
+  `requestOtp`/`verifyOtp`/`passwordLogin` mocks (plain `vi.fn()`s
+  configured once at module scope, not per-test) — fixed instead with a
+  narrowly-targeted `afterEach(() => { vi.spyOn(useLocaleModule,
+  'useLocale').mockRestore(); })` that restores only the `useLocale` spy.
+  Full frontend suite: 261/261 passing, 61/61 files. `tsc --noEmit`
+  clean; `oxlint` clean (same pre-existing warnings). See
+  `docs/features/customer-login-page-i18n-responsive.md`.
 - [x] With Phases 35–37, the manual endpoint audit had covered
   `reconciliation`, `reservation`, and `it-manager`'s `services` module;
   every other controller checked so far (`pricing`, `flightops`,
