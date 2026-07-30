@@ -666,6 +666,25 @@ async function main() {
     await typeorm.clubTierRule.create({ data: {} });
   }
 
+  // ── Phase 66: passenger survey settings + default question list ────────
+  const existingSurveySettingsCount = await typeorm.surveySettings.count();
+  if (existingSurveySettingsCount === 0) {
+    await typeorm.surveySettings.create({ data: {} });
+  }
+  const existingSurveyQuestionCount = await typeorm.surveyQuestion.count();
+  if (existingSurveyQuestionCount === 0) {
+    const defaultQuestions = [
+      'رضایت کلی از سفر',
+      'برخورد و کیفیت خدمه پروازی',
+      'دقت در زمان پرواز',
+      'راحتی صندلی و کابین',
+      'سرعت پذیرش و چک‌این',
+    ];
+    for (const [order, label] of defaultQuestions.entries()) {
+      await typeorm.surveyQuestion.create({ data: { label, order } });
+    }
+  }
+
   // ── Phase 6: pricing proposals (one pending, one registered) ───────────
   const existingProposalCount = await typeorm.farePricingProposal.count();
   if (existingProposalCount === 0) {

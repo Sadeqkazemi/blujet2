@@ -1776,12 +1776,13 @@ model ClubTierRule {
   PLATINUM`) from Phase 5.
 - Migration: `20260730162159_phase65_club_tier_rules`.
 
-## Phase 66 (DRAFT — pending approval) — نظرسنجی مسافران (Passenger Satisfaction Survey)
+## Phase 66 — نظرسنجی مسافران (Passenger Satisfaction Survey)
 
-See `docs/API.md`'s Phase 66 (DRAFT) section for the full design-source
-reasoning and the scope decisions (SMS-only delivery, one rating not
-per-question, lazy materialization, new non-ml-service AI provider, real
-token-based usage logging). New `survey` module. Five new models:
+See `docs/API.md`'s Phase 66 section for the full design-source reasoning
+and the scope decisions (SMS-only delivery, one rating not per-question,
+lazy materialization via the survey module's own reads, new
+non-ml-service AI provider, real token-based usage logging). New
+`survey` module. Five new models:
 
 ```typeorm
 model SurveySettings {
@@ -1861,12 +1862,14 @@ as `clubTierRuleEdits` (Phase 65).
   order. Deleting one is a hard delete (this is configuration, not
   passenger data — no soft-delete requirement applies).
 - `SurveyInvite.bookingId` is `@unique` — at most one invite per booking,
-  created lazily by `materializeFlownBookings` (extended this phase) the
-  first time a booking is observed `FLOWN` while `SurveySettings.enabled`
-  is true. `flightInstanceId` is denormalized from the booking purely so
-  `GET /survey/results` can `GROUP BY` flight without an extra join hop
-  through `Booking` on every read of what's meant to be a lightweight,
-  frequently-polled exec dashboard query.
+  created lazily by `materializeSurveyInvites` (new,
+  `survey-lifecycle.util.ts` — calls the existing
+  `materializeFlownBookings` first) the first time a booking is observed
+  `FLOWN` while `SurveySettings.enabled` is true. `flightInstanceId` is
+  denormalized from the booking purely so `GET /survey/results` can
+  group by flight instance without an extra join hop through `Booking`
+  on every read of what's meant to be a lightweight, frequently-polled
+  exec dashboard query.
 - `SurveyInvite.token` is the public link's credential — a random UUID,
   `@unique`, never derived from any guessable value (not the PNR, not
   the booking id).
@@ -1891,10 +1894,11 @@ as `clubTierRuleEdits` (Phase 65).
   the existing audit-log table under a new `AuditCategory.SURVEY` value
   (added alongside the existing ten), matching how every other
   manager-editable settings screen in this codebase is already audited.
-- No new `SmsMessageType` enum needed at the TypeORM level — it's a plain
-  TypeScript union in `sms-provider.interface.ts`, not a DB enum; adding
-  `'SURVEY_INVITE'` there is a code change, not a migration.
-- Migration name (once approved): `phase66_passenger_survey`.
-
-**No code has been written for this phase yet — awaiting explicit user
-approval per CLAUDE.md workflow rule 1.**
+- `SmsMessageType` (the TypeORM enum backing `SmsLog.messageType`, plus
+  the mirrored TS union in `sms-provider.interface.ts`) gained a new
+  `SURVEY_INVITE` value — this **does** require a migration (corrects an
+  earlier draft assumption that it was TS-only).
+- Migrations: `20260730190717_phase66_passenger_survey` (the five new
+  tables + `AuditCategory.SURVEY`) and
+  `20260730190905_phase66_survey_invite_sms_type`
+  (`SmsMessageType.SURVEY_INVITE`).

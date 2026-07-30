@@ -61,6 +61,8 @@ import NotFoundPage from './features/public-site/NotFoundPage';
 import FlightStatusPage from './features/public-site/FlightStatusPage';
 import AccountPage from './features/public-site/AccountPage';
 import MaintenancePage from './features/public-site/MaintenancePage';
+import SurveyPage from './features/survey/SurveyPage';
+import SurveyRouter from './components/SurveyRouter';
 
 export default function App() {
   return (
@@ -85,6 +87,7 @@ export default function App() {
           <Route path="/about" element={<AboutPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/maintenance" element={<MaintenancePage />} />
+          <Route path="/survey/:token" element={<SurveyPage />} />
 
           <Route path="/login" element={<LoginPage />} />
           <Route path="/two-factor" element={<TwoFactorPage />} />
@@ -124,6 +127,9 @@ export default function App() {
               </Route>
               <Route path="clubrules" element={<TabGate tabKey="clubrules" />}>
                 <Route index element={<ClubTierRulesPage />} />
+              </Route>
+              <Route path="survey" element={<TabGate tabKey="survey" />}>
+                <Route index element={<SurveyRouter />} />
               </Route>
               <Route path="users" element={<TabGate tabKey="users" />}>
                 <Route index element={<EmployeesPage />} />
