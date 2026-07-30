@@ -2053,3 +2053,16 @@ exact tab (`inboxTitle`, `replyPlaceholder`, `sendReplyLabel`,
 `noMessagesLabel`); AR is hand-translated. The pre-existing test passes
 unmodified; 2 new tests (en, ar). See
 `docs/features/agency-inbox-page-i18n.md`.
+
+## Phase 58 — پنل آژانس: Profile & Documents tab real i18n
+
+Frontend-only, no new/changed endpoints. Sixth agency-portal page.
+`AgencyProfilePage.tsx` translates its agency-info fields,
+document-upload form, and submitted-documents list into fa/en/ar. Field
+labels and document-status wording match
+`design-reference-v2/پنل آژانس.dc.html`'s own `isEN` `profileFields`/
+`documents` sample data for this exact tab; AR is hand-translated. Keeps
+its own local tier/document-type/status label maps rather than
+translating the shared `agency-labels.ts` module (same reasoning as
+Phase 55). The pre-existing test passes unmodified; 2 new tests (en, ar).
+See `docs/features/agency-profile-page-i18n.md`.

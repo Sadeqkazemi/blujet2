@@ -1026,6 +1026,22 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   new tests (en, ar). Full frontend suite: 276/276 passing, 61/61 files.
   `tsc --noEmit` clean; `oxlint` clean (same pre-existing warnings). See
   `docs/features/agency-inbox-page-i18n.md`.
+- [x] **Phase 58 — پنل آژانس: Profile & Documents tab real i18n** —
+  sixth agency-portal page. `AgencyProfilePage.tsx` translates its
+  agency-info fields, document-upload form, and submitted-documents list
+  into fa/en/ar; backed by real `agency-portal` endpoints — no new
+  backend work. Field labels and document-status wording match
+  `design-reference-v2/پنل آژانس.dc.html`'s own `isEN` `profileFields`/
+  `documents` sample data for this exact tab (CEO, License Number, City,
+  Phone, Email, Partnership Type; Approved/Pending/Rejected); AR is
+  hand-translated. Keeps its own local tier/document-type/status label
+  maps rather than translating the shared `agency-labels.ts` module used
+  by the staff-side `AgencyDetailPage.tsx` (same reasoning as Phase 55).
+  The pre-existing test passes unmodified — the byte-critical fa status
+  string `'در انتظار بررسی'` stays byte-identical; 2 new tests (en, ar).
+  Full frontend suite: 278/278 passing, 61/61 files. `tsc --noEmit`
+  clean; `oxlint` clean (same pre-existing warnings). See
+  `docs/features/agency-profile-page-i18n.md`.
 - [x] With Phases 35–37, the manual endpoint audit had covered
   `reconciliation`, `reservation`, and `it-manager`'s `services` module;
   every other controller checked so far (`pricing`, `flightops`,
