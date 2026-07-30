@@ -1118,6 +1118,20 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   new tests (en, ar). Full frontend suite: 292/292 passing, 64/64 files.
   `tsc --noEmit` clean; `oxlint` clean (same pre-existing warnings). See
   `docs/features/flight-status-page-i18n.md`.
+- [x] **Phase 64 — مدیریت رزرو real i18n** — `ManageBookingPage.tsx` (real
+  anonymous PNR + last-name self-service, Phase 19) translates its lookup
+  form, booking-detail card, refund modal, and refund-done summary into
+  fa/en/ar; no new backend work. Most labels reuse
+  `design-reference-v2/مدیریت رزرو.dc.html`'s own `isEN` vocabulary for
+  this exact page; that design file has no Arabic sample data at all, so
+  all AR text is hand-translated. The cabin label reuses the
+  `CABIN_LABEL` map convention from `ResultsPage.tsx` (Phase 43). The raw
+  `booking.status` enum value is still displayed verbatim in every locale
+  (pre-existing gap, unrelated to i18n scope, unchanged from before). All
+  4 pre-existing tests pass unmodified; 2 new tests (en, ar). Full
+  frontend suite: 294/294 passing, 64/64 files. `tsc --noEmit` clean;
+  `oxlint` clean (same pre-existing warnings). See
+  `docs/features/manage-booking-page-i18n.md`.
 - [x] With Phases 35–37, the manual endpoint audit had covered
   `reconciliation`, `reservation`, and `it-manager`'s `services` module;
   every other controller checked so far (`pricing`, `flightops`,
