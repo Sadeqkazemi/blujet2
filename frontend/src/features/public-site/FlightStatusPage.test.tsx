@@ -1,14 +1,19 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import FlightStatusPage from './FlightStatusPage';
 import * as useAuthModule from '../../hooks/useAuth';
 import * as publicSiteApi from '../../api/publicSite';
 import * as flightStatusApi from '../../api/flight-status';
+import * as useLocaleModule from '../../hooks/useLocale';
 import { ApiRequestError } from '../../api/envelope';
 import type { Airport } from '../../types/public-site';
 import type { FlightStatusResult } from '../../types/flight-status';
+
+function mockLocale(locale: 'fa' | 'en' | 'ar') {
+  vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale, setLocale: vi.fn() });
+}
 
 const AIRPORTS: Airport[] = [
   { id: 'a1', code: 'THR', cityFa: 'تهران' } as Airport,
@@ -39,6 +44,10 @@ beforeEach(() => {
     signOut: vi.fn(),
   });
   vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 function renderPage() {
@@ -117,5 +126,38 @@ describe('FlightStatusPage', () => {
     await screen.findByTestId('fs-result');
 
     expect(screen.getByTestId('fs-sms-toggle')).toBeDisabled();
+  });
+
+  it('renders translated heading, labels, and a translated status pill in English', async () => {
+    mockLocale('en');
+    vi.spyOn(flightStatusApi, 'lookupFlightStatus').mockResolvedValue(RESULT);
+    renderPage();
+
+    expect(screen.getByRole('heading', { name: 'Flight Status' })).toBeInTheDocument();
+    expect(screen.getByTestId('fs-mode-flightNo')).toHaveTextContent('Flight number');
+
+    await userEvent.type(screen.getByTestId('fs-flightno'), 'BJ-410');
+    await userEvent.click(screen.getByTestId('fs-search'));
+
+    expect(await screen.findByTestId('fs-result')).toBeInTheDocument();
+    expect(screen.getByTestId('fs-status-pill')).toHaveTextContent('Scheduled');
+    expect(screen.getByText('Aircraft')).toBeInTheDocument();
+    expect(screen.getByText('Manage booking')).toBeInTheDocument();
+  });
+
+  it('renders translated heading and not-found message in Arabic', async () => {
+    mockLocale('ar');
+    vi.spyOn(flightStatusApi, 'lookupFlightStatus').mockRejectedValue(
+      new ApiRequestError('NOT_FOUND', 'لم يتم العثور على الرحلة', 404),
+    );
+    renderPage();
+
+    expect(screen.getByRole('heading', { name: 'حالة الرحلة' })).toBeInTheDocument();
+
+    await userEvent.type(screen.getByTestId('fs-flightno'), 'ZZ-999');
+    await userEvent.click(screen.getByTestId('fs-search'));
+
+    expect(await screen.findByTestId('fs-not-found')).toBeInTheDocument();
+    expect(screen.getByText('لم يتم العثور على الرحلة')).toBeInTheDocument();
   });
 });
