@@ -829,6 +829,26 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   the shared `useIsMobile()` hook. Full frontend suite: 257/257 passing,
   61/61 files. `tsc --noEmit` clean; `oxlint` clean (same pre-existing
   warnings). See `docs/features/about-page-i18n-responsive.md`.
+- [x] **Phase 49 — تماس با ما (Contact) real i18n + responsive body
+  content** — ninth page of the per-page translation arc. `ContactPage`
+  translates its hero, four contact-channel cards (24h phone, email, head
+  office address, office hours), and the message form into fa/en/ar. EN
+  strings extracted from `design-reference-v2/تماس با ما.dc.html`'s own
+  `isEN` ternaries, complete and matching the shipped app's fa content
+  exactly. Unlike every prior page, this one's design source has no
+  `isAR` branch at all for its content, and `site-data.js`'s `arDeep`
+  dictionary only covers a couple of generic words (`ارسال پیام`,
+  `موضوع`, `متن پیام`) — every Arabic string here was hand-translated
+  fresh to the same no-silent-fallback bar as every other phase, since the
+  mock's own Arabic mode would otherwise leave this page entirely in
+  Persian. Hero-title test assertions use `getByRole('heading', ...)`
+  rather than `getByText`, since the shared footer's translated "Contact
+  Us"/"اتصل بنا" link collides with the page's own `<h1>` text. All 3
+  pre-existing tests pass unmodified; 2 new tests (en, ar). Channels +
+  form layout collapses to a single column on mobile via the shared
+  `useIsMobile()` hook. Full frontend suite: 259/259 passing, 61/61
+  files. `tsc --noEmit` clean; `oxlint` clean (same pre-existing
+  warnings). See `docs/features/contact-page-i18n-responsive.md`.
 - [x] With Phases 35–37, the manual endpoint audit had covered
   `reconciliation`, `reservation`, and `it-manager`'s `services` module;
   every other controller checked so far (`pricing`, `flightops`,
