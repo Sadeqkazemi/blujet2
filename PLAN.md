@@ -983,6 +983,24 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   Full frontend suite: 270/270 passing, 61/61 files. `tsc --noEmit`
   clean; `oxlint` clean (same pre-existing warnings). See
   `docs/features/agency-dashboard-page-i18n.md`.
+- [x] **Phase 55 — پنل آژانس: Credit & Balance tab real i18n** — third
+  agency-portal page. `AgencyCreditPage.tsx` translates its credit KPIs,
+  invoices table, credit-increase request list, ledger, and
+  credit-increase request modal into fa/en/ar; all backed by real
+  `agency-portal` endpoints — no new backend work. EN strings mostly
+  extracted from `design-reference-v2/پنل آژانس.dc.html`'s own rich
+  `isEN` vocabulary for this exact tab; AR mixes the design's partial
+  coverage with hand-translation. Deliberately keeps its own local
+  invoice/credit-request status label maps rather than translating the
+  shared `agency-labels.ts` module, which the staff-side
+  `AgencyDetailPage.tsx` depends on and which stays Persian-only (staff
+  panels aren't locale-switchable). Both pre-existing tests pass
+  unmodified — the byte-critical fa strings they assert stay
+  byte-identical (`'پرداخت از اعتبار'`, `'افزایش اعتبار'`,
+  `'سقف درخواستی (تومان)'`, `'ارسال درخواست'`); 2 new tests (en, ar).
+  Full frontend suite: 272/272 passing, 61/61 files. `tsc --noEmit`
+  clean; `oxlint` clean (same pre-existing warnings). See
+  `docs/features/agency-credit-page-i18n.md`.
 - [x] With Phases 35–37, the manual endpoint audit had covered
   `reconciliation`, `reservation`, and `it-manager`'s `services` module;
   every other controller checked so far (`pricing`, `flightops`,
