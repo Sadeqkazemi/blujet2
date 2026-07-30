@@ -24,6 +24,7 @@ import AgencyDetailPage from './features/agencies/AgencyDetailPage';
 import RequestDetailPage from './features/agencies/RequestDetailPage';
 import CartablePage from './features/cartable/CartablePage';
 import ClubPage from './features/club/ClubPage';
+import ClubTierRulesPage from './features/club/ClubTierRulesPage';
 import EmployeesPage from './features/it-manager/EmployeesPage';
 import ServicesPage from './features/it-manager/ServicesPage';
 import BackupsPage from './features/it-manager/BackupsPage';
@@ -120,6 +121,9 @@ export default function App() {
               </Route>
               <Route path="vip" element={<TabGate tabKey="vip" />}>
                 <Route index element={<ClubPage />} />
+              </Route>
+              <Route path="clubrules" element={<TabGate tabKey="clubrules" />}>
+                <Route index element={<ClubTierRulesPage />} />
               </Route>
               <Route path="users" element={<TabGate tabKey="users" />}>
                 <Route index element={<EmployeesPage />} />

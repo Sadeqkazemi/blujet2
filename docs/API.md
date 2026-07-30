@@ -2154,3 +2154,92 @@ map convention from `ResultsPage.tsx` (Phase 43). The raw
 (pre-existing gap, unrelated to i18n scope). All 4 pre-existing tests
 pass unmodified; 2 new tests (en, ar). See
 `docs/features/manage-booking-page-i18n.md`.
+
+## Phase 65 — قوانین باشگاه مشتریان (Club Tier Rules)
+
+Found during the earlier design-bundle audit: `design-reference-v2/پنل
+مدیر بازرگانی.dc.html` has a `clubrules` tab
+("تعیین حد نصاب امتیاز برای هر سطح عضویت باشگاه مشتریان — برای همه اعضا
+یکسان اعمال می‌شود") that was never built. Per that same design file's
+own `roleDefs.access` arrays, only `super` (CEO) and `commercial`
+(COMMERCIAL_MANAGER) list `clubrules` — `finance` (FINANCE_MANAGER) and
+`siteAdmin` (SITE_ADMIN) do not, and no other executive-panel design file
+(`پنل مدیر ارشد.dc.html`, `پنل رئیس هیئت مدیره.dc.html`, etc.) mentions
+`clubrules` at all — so this stays CEO + COMMERCIAL_MANAGER only, not the
+broader access pattern some other tabs use.
+
+Today `ClubMember.level` (SILVER/GOLD/PLATINUM) is set once at creation
+and only ever changed by an explicit `PATCH /club/members/:id/level`
+staff action (Phase 5) — there is no threshold anywhere in the codebase
+that ties a member's accumulated `points` to their tier. The frontend's
+GOLD/PLATINUM point ranges shown as marketing copy on `PublicClubPage.tsx`
+and `HomeSearchPage.tsx` (`5,000–15,000` / `above 15,000`) are hardcoded
+display strings with no backend enforcement behind them at all.
+
+This phase makes that real: a manager-editable threshold config,
+consumed by `ClubPointsService.syncCache` (booking-engine) so a member's
+tier is recomputed from these exact thresholds every time their points
+balance changes (a real purchase earning points, or a redemption) — not
+just a passive settings screen.
+
+### New: `GET /club/tier-rules`, `PATCH /club/tier-rules`
+- Roles: `CEO`, `COMMERCIAL_MANAGER` only (see access-list note above).
+- `GET` returns the single `ClubTierRule` row (seeded once via
+  `typeorm/seed.ts`, lazily created on first read if somehow absent):
+  `{ goldMinPoints, platinumMinPoints, cardRequestMinPoints, updatedAt,
+  updatedByLabelFa }`.
+- `PATCH` body: `{ goldMinPoints, platinumMinPoints, cardRequestMinPoints }`
+  (all non-negative integers). Validation, matching the design's implicit
+  ordering constraint (`crGoldMin` must leave room below `crPlatMin`):
+  `0 <= goldMinPoints < platinumMinPoints`. `cardRequestMinPoints` has no
+  ordering constraint relative to the tier thresholds (the design shows
+  it as an independent field) — just `>= 0`.
+- On save: updates the singleton row, records an audit-log entry
+  (category `CLUB`, action `'تغییر قوانین باشگاه مشتریان'`, detail names
+  the actor + before/after values), matching `ClubService`'s existing
+  audit pattern (`updateLevel`, `issueCardDirect`).
+- `SILVER`'s threshold is always `0` and is never stored or editable —
+  matching the design's own disabled, hardcoded `"۰"` input for that
+  field.
+- The response also includes a computed `preview` array (3 rows:
+  `{ tier, minPoints, maxPoints | null }`) so the frontend doesn't have
+  to duplicate the range-computation logic — mirrors the design's own
+  read-only "پیش‌نمایش سطوح" (tier preview) table.
+
+### `ClubPointsService.syncCache` — real tier auto-recompute
+- After writing the new `points` cache value (unchanged from today), it
+  now also loads the current `ClubTierRule` row and sets
+  `ClubMember.level` to the highest tier whose `minPoints <= points`
+  (`PLATINUM` > `GOLD` > `SILVER`, `SILVER` always the floor). This runs
+  inside the same TypeORM transaction as the points-ledger write, so tier
+  and points always change atomically.
+- This only affects members going forward (a rules save does **not**
+  retroactively recompute every existing member's tier — the design's
+  own clubrules screen has no bulk-recompute action, so this stays
+  scoped to what's actually designed: the config is applied the next
+  time each member's points change).
+- `cardRequestMinPoints` is stored and returned by `GET`/`PATCH`, but has
+  **no real consumer yet** — the only place a `ClubCardRequest` is
+  created today is `POST /club/_test/card-request` (E2E-only, 404s in
+  prod) and the staff-only `issueCardDirect`/`decideRequest` flows; there
+  is no real, self-service "request a card" action anywhere in the
+  codebase for this threshold to gate. This is an explicit, documented
+  scope boundary (matching the design's own field, which the mock also
+  never wires to any real request-creation action) — not a fabricated
+  no-op field. Building the actual member-initiated card-request flow is
+  separate, larger, not-yet-approved work.
+
+See `docs/features/club-tier-rules.md` for the acceptance checklist.
+New frontend page `ClubTierRulesPage.tsx` (route `clubrules`, CEO +
+COMMERCIAL_MANAGER only) renders the threshold form and the read-only
+tier-preview table. Backend: 13 new/extended e2e tests in
+`club.e2e-spec.ts` (GET/PATCH access control, validation, audit log, and
+a real points-credit that recomputes `ClubMember.level` end-to-end) + an
+8-case unit spec (`club-tier.spec.ts`) for `resolveTierForPoints`'s
+boundary logic. Frontend: 4 new Vitest/RTL tests
+(`ClubTierRulesPage.test.tsx`) covering rendering, client-side
+validation, a real save, and a real server-error message. No new
+Playwright E2E script this phase — consistent with this session's recent
+phase cadence (Phases 51–64), which relies on the real-DB Jest e2e suite
+plus Vitest/RTL rather than a dedicated Playwright script per small
+feature.

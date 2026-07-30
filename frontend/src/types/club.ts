@@ -37,3 +37,18 @@ export interface ClubCardRequest {
   history: { step: string; labelFa: string; at: string }[];
   createdAt: string;
 }
+
+export interface ClubTierRulePreviewRow {
+  tier: ClubTier;
+  minPoints: number;
+  maxPoints: number | null;
+}
+
+export interface ClubTierRules {
+  goldMinPoints: number;
+  platinumMinPoints: number;
+  cardRequestMinPoints: number;
+  updatedAt: string;
+  updatedByLabelFa: string | null;
+  preview: ClubTierRulePreviewRow[];
+}
