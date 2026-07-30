@@ -1076,6 +1076,19 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   suite: 284/284 passing, 62/62 files. `tsc --noEmit` clean; `oxlint`
   clean (same pre-existing warnings). See
   `docs/features/agency-webservice-page-i18n.md`.
+- [x] **Phase 61 — صفحه 404 real i18n** — first page of the
+  post-agency-portal i18n continuation. `NotFoundPage.tsx` is a small,
+  standalone static page unrelated to the excluded checkout/payment
+  flow — translates its heading, body copy, both links, and error-code
+  footer into fa/en/ar; the wrapping `dir` attribute is now locale-aware
+  (matching the `AgencyPortalShell.tsx` pattern from Phase 53). No new
+  backend work. `design-reference/صفحه 404.dc.html` has no
+  `isEN`/`isAR` sample data at all, so all EN/AR text is hand-translated.
+  This page had no test file before this phase —
+  `NotFoundPage.test.tsx` was created from scratch with 3 tests (fa, en,
+  ar). Full frontend suite: 287/287 passing, 63/63 files. `tsc --noEmit`
+  clean; `oxlint` clean (same pre-existing warnings). See
+  `docs/features/not-found-page-i18n.md`.
 - [x] With Phases 35–37, the manual endpoint audit had covered
   `reconciliation`, `reservation`, and `it-manager`'s `services` module;
   every other controller checked so far (`pricing`, `flightops`,
