@@ -1851,3 +1851,21 @@ cards all matched exactly). Fixed a real cross-test-file mock-leak bug in
 fixed with `vi.restoreAllMocks()` in the shared `beforeEach`. Stats
 strip/card-steps/earn/services grids collapse on mobile via the shared
 `useIsMobile()` hook. See `docs/features/club-page-i18n-responsive.md`.
+
+## Phase 46 — پشتیبانی (Support) real i18n + responsive body content
+
+Frontend-only, no new/changed endpoints. Sixth page translated.
+`SupportPage` translates its hero, four category cards, all five FAQ
+question/answers, the ticket form, and the three direct-contact cards
+into fa/en/ar — extracted from `design-reference-v2/پشتیبانی.dc.html`'s
+own `isEN` ternaries (whose fa strings matched the shipped app's content
+exactly) and `site-data.js`'s `arDeep` dictionary, which had complete
+coverage for this page. The ticket `subject` submitted to the real backend
+always stays the canonical Persian string regardless of the active
+display locale — only the dropdown's visible label translates via a
+separate label map — since staff view tickets in the Persian-only admin
+queue and introducing translated subject text into stored tickets would be
+a real regression. FAQ search now matches the active locale's text.
+Category-card grid and the FAQ/contact two-column layout collapse on
+mobile via the shared `useIsMobile()` hook. See
+`docs/features/support-page-i18n-responsive.md`.

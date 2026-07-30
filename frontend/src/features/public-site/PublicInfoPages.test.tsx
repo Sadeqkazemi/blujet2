@@ -152,6 +152,37 @@ describe('SupportPage', () => {
       body: 'مشکل در پرداخت دارم',
     });
   });
+
+  it('renders translated FAQ and category cards in English, and submits the canonical Persian subject regardless of locale', async () => {
+    mockLocale('en');
+    const submit = vi.spyOn(supportTicketsApi, 'submitSupportTicket').mockResolvedValue({
+      id: 't2',
+      trackingCode: 'TK-EN-1',
+    });
+    renderWithRouter(<SupportPage />);
+    expect(screen.getByText('How can we help?')).toBeInTheDocument();
+    expect(screen.getByText('Booking & Purchase')).toBeInTheDocument();
+    await userEvent.click(screen.getByText('What is the baggage allowance per ticket?'));
+    expect(screen.getByText(/20kg free baggage is included in Economy fares/)).toBeInTheDocument();
+
+    await userEvent.type(screen.getByTestId('ticket-name'), 'Negar Rezaei');
+    await userEvent.type(screen.getByTestId('ticket-phone'), '09121234567');
+    await userEvent.type(screen.getByTestId('ticket-msg'), 'Payment issue');
+    await userEvent.click(screen.getByTestId('ticket-submit'));
+
+    expect(await screen.findByText('Your ticket has been submitted')).toBeInTheDocument();
+    expect(submit).toHaveBeenCalledWith(
+      expect.objectContaining({ subject: 'استرداد و تغییر بلیط' }),
+    );
+  });
+
+  it('renders translated FAQ and category cards in Arabic', () => {
+    mockLocale('ar');
+    renderWithRouter(<SupportPage />);
+    expect(screen.getByText('كيف يمكننا المساعدة؟')).toBeInTheDocument();
+    expect(screen.getByText('حجز وشراء التذكرة')).toBeInTheDocument();
+    expect(screen.getByText('اتصال مباشر')).toBeInTheDocument();
+  });
 });
 
 describe('TravelInfoPage', () => {
