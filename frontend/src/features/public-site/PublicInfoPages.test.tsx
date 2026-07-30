@@ -15,6 +15,7 @@ function mockLocale(locale: 'fa' | 'en' | 'ar') {
 }
 
 beforeEach(() => {
+  vi.restoreAllMocks();
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status: 'unauthenticated',
     user: null,
@@ -94,6 +95,27 @@ describe('PublicClubPage', () => {
   it('points the join button at the customer sign-in page when logged out', () => {
     renderWithRouter(<PublicClubPage />);
     expect(screen.getByText('عضویت رایگان')).toHaveAttribute('href', '/signin');
+  });
+
+  it('renders translated tiers and CTA in English', () => {
+    mockLocale('en');
+    renderWithRouter(<PublicClubPage />);
+    expect(screen.getByText('Every flight, one step closer to more rewards')).toBeInTheDocument();
+    expect(screen.getAllByText('Silver').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Gold').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Platinum').length).toBeGreaterThan(0);
+    expect(screen.getByText('Reach the point threshold, get your card')).toBeInTheDocument();
+    expect(screen.getByText('Join for Free')).toHaveAttribute('href', '/signin');
+  });
+
+  it('renders translated tiers in Arabic', () => {
+    mockLocale('ar');
+    renderWithRouter(<PublicClubPage />);
+    expect(screen.getByText('كل رحلة خطوة أقرب لمزايا أكبر')).toBeInTheDocument();
+    expect(screen.getAllByText('فضي').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('ذهبي').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('بلاتيني').length).toBeGreaterThan(0);
+    expect(screen.getByText('عند بلوغ حد النقاط، احصل على بطاقتك')).toBeInTheDocument();
   });
 });
 

@@ -751,6 +751,34 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   Full frontend suite: 249/249 passing, 61/61 files. `tsc --noEmit` clean;
   `oxlint` clean (same pre-existing warnings). See
   `docs/features/destinations-page-i18n-responsive.md`.
+- [x] **Phase 45 — باشگاه مشتریان (Club) real i18n + responsive body
+  content** — fifth page of the per-page translation arc. `PublicClubPage`
+  translates its hero, stats strip, three membership tiers (name/range/
+  perks), four card-issuance steps, four earn-points cards, three
+  member-services cards, and the logged-in member banner into fa/en/ar.
+  Extracted from `design-reference-v2/باشگاه مشتریان.dc.html`'s own `isEN`
+  ternaries and `site-data.js`'s `arDeep` dictionary, which had unusually
+  complete coverage for this page — tier perks, card-issuance steps, and
+  earn/services cards all had exact-match dictionary entries, a rarer find
+  than in earlier pages. A handful of this app's own fa strings (built
+  independently of the design bundle, since the real membership-card flow
+  predates it) were aligned to the design's exact wording where no tested
+  behavior depended on the old text — e.g. "چطور امتیاز جمع کنم؟" → "چطور
+  امتیاز بگیرم؟" — keeping the shipped Persian and its new translations
+  sourced from the same place. Found and fixed a real bug along the way:
+  `PublicInfoPages.test.tsx` bundles four pages' tests in one file, and
+  Phase 44's `mockLocale('ar')` spy on `useLocale()` in the last
+  `DestinationsPage` test was never restored, so it leaked into every
+  subsequent test in the file — invisible until this phase's `PublicClubPage`
+  also started calling `useLocale()`, at which point the leaked Arabic mock
+  broke both of `PublicClubPage`'s pre-existing (fa-only) tests. Fixed with
+  `vi.restoreAllMocks()` in the shared `beforeEach`, the durable fix rather
+  than a scoped workaround. Both pre-existing `PublicClubPage` tests pass
+  unmodified once fixed; 2 new tests (en, ar). Stats/card-steps/earn/
+  services grids collapse on mobile via the shared `useIsMobile()` hook.
+  Full frontend suite: 251/251 passing, 61/61 files. `tsc --noEmit` clean;
+  `oxlint` clean (same pre-existing warnings). See
+  `docs/features/club-page-i18n-responsive.md`.
 - [x] With Phases 35–37, the manual endpoint audit had covered
   `reconciliation`, `reservation`, and `it-manager`'s `services` module;
   every other controller checked so far (`pricing`, `flightops`,

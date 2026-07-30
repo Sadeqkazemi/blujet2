@@ -1834,3 +1834,20 @@ matches against the active locale's city name rather than always Persian.
 Destination mosaic and map band collapse to a narrower layout on mobile via
 the shared `useIsMobile()` hook. See
 `docs/features/destinations-page-i18n-responsive.md`.
+
+## Phase 45 — باشگاه مشتریان (Club) real i18n + responsive body content
+
+Frontend-only, no new/changed endpoints. Fifth page translated.
+`PublicClubPage` translates its hero, stats strip, three membership
+tiers, four card-issuance steps, four earn-points cards, three
+member-services cards, and the logged-in member banner into fa/en/ar —
+extracted from `design-reference-v2/باشگاه مشتریان.dc.html`'s own `isEN`
+ternaries and `site-data.js`'s `arDeep` dictionary, which had unusually
+complete coverage for this page (tier perks, card steps, earn/services
+cards all matched exactly). Fixed a real cross-test-file mock-leak bug in
+`PublicInfoPages.test.tsx`: a prior phase's `mockLocale('ar')` spy on
+`useLocale()` wasn't restored between tests, so it leaked from the last
+`DestinationsPage` test into every subsequent test in the shared file —
+fixed with `vi.restoreAllMocks()` in the shared `beforeEach`. Stats
+strip/card-steps/earn/services grids collapse on mobile via the shared
+`useIsMobile()` hook. See `docs/features/club-page-i18n-responsive.md`.
