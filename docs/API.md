@@ -1997,3 +1997,17 @@ reusing `CustomerLoginPage.tsx`'s exact wording for the concepts that
 overlap (license number, manager name, terms checkbox). All 3 pre-existing
 tests pass unmodified; 2 new tests (en, ar). See
 `docs/features/agency-portal-shell-login-i18n.md`.
+
+## Phase 54 — پنل آژانس: Dashboard tab real i18n
+
+Frontend-only, no new/changed endpoints — `AgencyDashboardPage.tsx`
+already reads real data from `GET /agency-portal/dashboard` (Phase 9).
+Second agency-portal page of the arc. Most strings are hand-translated
+(no usable match in the design bundle's `isEN`/`isAR` ternaries for this
+page's specific KPI/credit copy); the sales chart's Jalali month labels
+reuse `design-reference-v2/وضعیت پرواز.dc.html`'s own established
+romanized EN names (`Farvardin`, `Ordibehesht`, ...) and its AR names,
+which are identical to the Persian names verbatim — there is no separate
+Arabic name for a Jalali month, same reasoning as "تومان" staying
+unchanged in Arabic elsewhere. The pre-existing test passes unmodified; 2
+new tests (en, ar). See `docs/features/agency-dashboard-page-i18n.md`.
