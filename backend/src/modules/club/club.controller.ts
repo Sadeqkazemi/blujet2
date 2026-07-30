@@ -14,6 +14,7 @@ import {
   CreateMemberDto,
   ListMembersQueryDto,
   UpdateLevelDto,
+  UpdateTierRulesDto,
 } from './dto/club.dtos';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -122,6 +123,28 @@ export class ClubController {
     @Param('id') id: string,
   ) {
     const data = await this.club.decideRequest(actor, id, 'reject');
+    return { success: true, data };
+  }
+
+  // پنل مدیر بازرگانی.dc.html's "clubrules" tab — only CEO/COMMERCIAL_MANAGER
+  // list this key in that design's own roleDefs.access arrays; no other
+  // executive-panel design file mentions a clubrules tab at all.
+  @Get('tier-rules')
+  @Roles('CEO', 'COMMERCIAL_MANAGER')
+  @ApiOperation({ summary: 'قوانین حد نصاب امتیاز سطوح باشگاه مشتریان' })
+  async getTierRules() {
+    const data = await this.club.getTierRules();
+    return { success: true, data };
+  }
+
+  @Patch('tier-rules')
+  @Roles('CEO', 'COMMERCIAL_MANAGER')
+  @ApiOperation({ summary: 'تغییر قوانین حد نصاب امتیاز سطوح باشگاه مشتریان' })
+  async updateTierRules(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Body() dto: UpdateTierRulesDto,
+  ) {
+    const data = await this.club.updateTierRules(actor, dto);
     return { success: true, data };
   }
 }

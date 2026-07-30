@@ -660,6 +660,12 @@ async function main() {
     });
   }
 
+  // ── Phase 65: club tier rules (singleton row, seeded once) ─────────────
+  const existingTierRuleCount = await typeorm.clubTierRule.count();
+  if (existingTierRuleCount === 0) {
+    await typeorm.clubTierRule.create({ data: {} });
+  }
+
   // ── Phase 6: pricing proposals (one pending, one registered) ───────────
   const existingProposalCount = await typeorm.farePricingProposal.count();
   if (existingProposalCount === 0) {

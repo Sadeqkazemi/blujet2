@@ -1132,6 +1132,48 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   frontend suite: 294/294 passing, 64/64 files. `tsc --noEmit` clean;
   `oxlint` clean (same pre-existing warnings). See
   `docs/features/manage-booking-page-i18n.md`.
+- [x] **Phase 65 — قوانین باشگاه مشتریان (Club Tier Rules)** — found during
+  the earlier design-bundle audit: `پنل مدیر بازرگانی.dc.html`'s
+  `clubrules` tab was never built. Docs (`docs/API.md`, `docs/DB_SCHEMA.md`,
+  `docs/features/club-tier-rules.md`) were drafted and explicitly
+  approved by the user before any code was written, per CLAUDE.md
+  workflow rule 1. New singleton `ClubTierRule` table
+  (migration `20260730162159_phase65_club_tier_rules`), seeded with
+  defaults matching the point ranges already shown as marketing copy on
+  `PublicClubPage.tsx`/`HomeSearchPage.tsx` (GOLD ≥5,000, PLATINUM
+  ≥15,000). New `GET`/`PATCH /club/tier-rules` (CEO + COMMERCIAL_MANAGER
+  only, matching the design's own `roleDefs.access` arrays — no other
+  executive-panel design file has a `clubrules` tab at all), with
+  ordering validation (`goldMinPoints < platinumMinPoints`) and audit
+  logging. `ClubPointsService.syncCache` now recomputes `ClubMember.level`
+  for real from the configured thresholds every time a member's points
+  change (both earn and redeem paths, same transaction as the ledger
+  write) — replacing the previous manual-only
+  `PATCH /club/members/:id/level` staff action as the only way tiers ever
+  changed. The card-request point threshold (`cardRequestMinPoints`) is
+  stored and returned but intentionally not yet enforced anywhere, since
+  no real self-service card-request flow exists in the codebase to gate
+  (documented scope boundary, not a fabricated no-op field). New frontend
+  page `ClubTierRulesPage.tsx` (route/tab `clubrules`, wired into
+  `PANEL_NAV` for CEO + COMMERCIAL_MANAGER only) renders the threshold
+  form and a read-only tier-preview table. Backend: 9 new e2e tests in
+  `club.e2e-spec.ts` (13/13 passing with the 4 pre-existing tests
+  unmodified) + a new 8-case unit spec `club-tier.spec.ts` for
+  `resolveTierForPoints`'s boundary logic (all passing). Frontend: new
+  `ClubTierRulesPage.test.tsx`, 4/4 passing. Fixed one pre-existing e2e
+  test (`panels.e2e-spec.ts`'s CEO tab-set assertion) to include the new
+  `clubrules` key. Full backend e2e suite: 360/361 passing — the sole
+  failure is the same pre-existing `reporting.e2e-spec.ts` sales-chart
+  reconciliation flake already documented in Phase 51's entry (financial
+  data accumulated in the shared local `blujet_test` Postgres across many
+  e2e runs this session; confirmed by re-running in isolation and
+  observing the expected/received totals drift between runs — unrelated
+  to this phase's `ClubMember`/`ClubTierRule`-only changes). Full backend
+  unit suite: 35/35 passing. Full frontend suite: 298/298 passing, 65/65
+  files. `tsc --noEmit` clean on both packages; lint clean on both (same
+  pre-existing warnings). No new Playwright E2E script this phase —
+  consistent with this session's cadence for Phases 51–64. See
+  `docs/features/club-tier-rules.md`.
 - [x] With Phases 35–37, the manual endpoint audit had covered
   `reconciliation`, `reservation`, and `it-manager`'s `services` module;
   every other controller checked so far (`pricing`, `flightops`,
