@@ -2108,3 +2108,17 @@ wrapping `dir` attribute is now locale-aware. `design-reference/صفحه
 is hand-translated. This page had no test file before this phase;
 `NotFoundPage.test.tsx` was created from scratch with 3 tests (fa, en,
 ar). See `docs/features/not-found-page-i18n.md`.
+
+## Phase 62 — صفحه تعمیر و نگهداری real i18n
+
+Frontend-only, no new/changed endpoints. Another small, standalone
+static page (served manually during planned downtime), unrelated to the
+excluded checkout/payment flow. `MaintenancePage.tsx` translates its
+badge, heading, body copy, ETA notice, and support-contact footer into
+fa/en/ar; the wrapping `dir` attribute is now locale-aware.
+`design-reference/در حال تعمیر و نگهداری.dc.html` has no `isEN`/`isAR`
+sample data, so all EN/AR text is hand-translated. The support phone
+number keeps its Persian-digit literal in every locale, matching the
+convention from `SupportPage.tsx` (Phase 46). This page had no test file
+before this phase; `MaintenancePage.test.tsx` was created from scratch
+with 3 tests (fa, en, ar). See `docs/features/maintenance-page-i18n.md`.
