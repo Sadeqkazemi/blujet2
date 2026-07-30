@@ -1797,3 +1797,20 @@ since the backend only ever charges IRR. See
 the known limitation that the real airport dropdown has no `cityEn`/
 `cityAr` column yet and falls back to `cityFa` for any city not in the
 page's small hardcoded marketing-card city map.
+
+## Phase 43 — نتایج پرواز (Results) real i18n + responsive body content
+
+Frontend-only, no new/changed endpoints. Third page translated (after the
+shared shell in Phase 41 and صفحه اصلی in Phase 42): `ResultsPage`
+translates its search summary bar, price-calendar strip, filter sidebar,
+AI price radar, sort tabs, mock flight schedule, real bookable result
+cards, and both price-lock modals into fa/en/ar, extracted from
+`design-reference-v2/نتایج پرواز.dc.html` and `site-data.js`'s `arDeep`
+dictionary where available. Real cabin prices and price-lock amounts (raw
+IRR from the API) now render via a new `localeMoney(amountRial, locale)`
+helper in `frontend/src/lib/fa-format.ts` — same rial→toman division as
+`faMoney`, but locale-aware digit/separator output. Server-provided error
+messages (e.g. a 409 "already locked" response) are still passed through
+verbatim, never routed through the page dictionary. Layout stacks to a
+single column (filters above results) on mobile via the shared
+`useIsMobile()` hook. See `docs/features/results-page-i18n-responsive.md`.

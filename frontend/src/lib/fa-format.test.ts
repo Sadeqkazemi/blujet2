@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { arDigits, faDigits, faMoney, faPercent, formatLocalePercent, formatToman } from './fa-format';
+import { arDigits, faDigits, faMoney, faPercent, formatLocalePercent, formatToman, localeMoney } from './fa-format';
 
 describe('faDigits', () => {
   it('converts Latin digits to Persian digits', () => {
@@ -56,5 +56,14 @@ describe('formatLocalePercent', () => {
     expect(formatLocalePercent(19, 'fa')).toBe('۱۹٪');
     expect(formatLocalePercent(19, 'ar')).toBe('١٩٪');
     expect(formatLocalePercent(19, 'en')).toBe('19%');
+  });
+});
+
+describe('localeMoney', () => {
+  it('converts rial to toman (÷10) then formats per locale, matching faMoney for fa', () => {
+    expect(localeMoney(380_000_000, 'fa')).toBe(faMoney(380_000_000));
+    expect(localeMoney(380_000_000, 'fa')).toBe('۳۸٬۰۰۰٬۰۰۰');
+    expect(localeMoney(380_000_000, 'en')).toBe('38,000,000');
+    expect(localeMoney(380_000_000, 'ar')).toBe('٣٨٬٠٠٠٬٠٠٠');
   });
 });

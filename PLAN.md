@@ -694,6 +694,33 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   cases for the new helpers. Full frontend suite: 244/244 passing, 61/61
   files. `tsc --noEmit` clean; `oxlint` clean (same pre-existing warnings).
   See `docs/features/home-page-i18n-responsive.md`.
+- [x] **Phase 43 — نتایج پرواز (Results) real i18n + responsive body content**
+  — third page of the per-page translation arc. `ResultsPage` translates
+  its search summary bar, price-calendar strip, filter sidebar (stops/
+  time-of-day/airline), AI price radar, sort tabs, empty/searching/mock-
+  notice states, mock flight schedule, real bookable result cards, and
+  both price-lock modals (mock-gated + the real gold-tier flow's three
+  outcomes) into fa/en/ar. Strings extracted from `design-reference-v2/
+  نتایج پرواز.dc.html`'s own `isEN`/`isAR` ternaries and `site-data.js`'s
+  `arDeep` dictionary where the design's exact key/value matched (AI radar
+  copy, سورت labels, صندلی باقی‌مانده, یک توقف, time-of-day buckets); the
+  remainder (filter/sort labels the design implements differently, modal
+  copy, the AI-radar narrative sentence) hand-translated to the same
+  no-silent-fallback bar as Phase 42. New `localeMoney(amountRial, locale)`
+  helper in `frontend/src/lib/fa-format.ts` — same rial→toman division as
+  `faMoney`, formatted per active locale — used for the real per-cabin
+  prices and price-lock amounts (raw IRR from the API); mock schedule/
+  calendar numbers (page-local placeholders) use the existing `formatToman`.
+  Server-provided error messages (e.g. a 409 "already locked" response)
+  are still passed through verbatim, never routed through the page
+  dictionary — confirmed by leaving that exact test unchanged. Layout
+  stacks to a single column (filters above results) on mobile via the
+  shared `useIsMobile()` hook. All 8 pre-existing tests untouched and
+  still passing (fa strings byte-identical to before this phase); 2 new
+  tests (en, ar) + 1 new `fa-format.test.ts` case (`localeMoney`). Full
+  frontend suite: 247/247 passing, 61/61 files. `tsc --noEmit` clean;
+  `oxlint` clean (same pre-existing warnings). See
+  `docs/features/results-page-i18n-responsive.md`.
 - [x] With Phases 35–37, the manual endpoint audit had covered
   `reconciliation`, `reservation`, and `it-manager`'s `services` module;
   every other controller checked so far (`pricing`, `flightops`,
