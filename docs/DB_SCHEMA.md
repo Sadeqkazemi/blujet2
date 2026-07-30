@@ -1902,3 +1902,149 @@ as `clubTierRuleEdits` (Phase 65).
   tables + `AuditCategory.SURVEY`) and
   `20260730190905_phase66_survey_invite_sms_type`
   (`SmsMessageType.SURVEY_INVITE`).
+
+## Phase 67 (DRAFT — pending approval) — فرصت‌های شغلی (Careers)
+
+See `docs/API.md`'s Phase 67 (DRAFT) section for the full design-source
+reasoning and scope decisions. New `careers` module, three new models:
+
+```prisma
+enum JobType {
+  FULL_TIME
+  REMOTE
+  PART_TIME
+}
+
+enum JobApplicantGender {
+  FEMALE
+  MALE
+}
+
+enum MaritalStatus {
+  SINGLE
+  MARRIED
+}
+
+enum MilitaryStatus {
+  CONSCRIPT
+  EXEMPT
+  WAIVED
+}
+
+enum JobApplicationStatus {
+  SUBMITTED
+  REFERRED
+  HIRED
+  REJECTED
+}
+
+model CareersSettings {
+  id        String   @id @default(uuid())
+  enabled   Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@map("careers_settings")
+}
+
+model JobPosting {
+  id           String           @id @default(uuid())
+  title        String
+  dept         String
+  city         String
+  type         JobType          @default(FULL_TIME)
+  generalReqs  String[]
+  specialReqs  String[]
+  active       Boolean          @default(true)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  applications JobApplication[]
+
+  @@map("job_postings")
+}
+
+model JobApplication {
+  id                String               @id @default(uuid())
+  jobPostingId      String?
+  jobPosting        JobPosting?          @relation(fields: [jobPostingId], references: [id])
+  jobTitleSnapshot  String
+  firstName         String
+  lastName          String
+  nationalIdEnc     String
+  nationalIdHash    String
+  fatherName        String?
+  birthDate         DateTime?
+  birthProvince     String?
+  birthCity         String?
+  gender            JobApplicantGender?
+  marital           MaritalStatus?
+  military          MilitaryStatus?
+  exemptionType     String?
+  phone             String
+  email             String?
+  residenceProvince String?
+  residenceAddress  String?
+  eduEntries        Json                 @default("[]")
+  workEntries       Json                 @default("[]")
+  langEntries       Json                 @default("[]")
+  skills            String?
+  otherLangs        String?
+  resumeFileName    String?
+  resumeMimeType    String?
+  resumeSizeBytes   Int?
+  resumePath        String?
+  status            JobApplicationStatus @default(SUBMITTED)
+  assigneeId        String?
+  assignee          User?                @relation("JobApplicationAssignee", fields: [assigneeId], references: [id])
+  history           Json                 @default("[]")
+  createdAt         DateTime             @default(now())
+
+  @@index([nationalIdHash])
+  @@index([status])
+  @@map("job_applications")
+}
+```
+
+Plus, on the `User` model: `jobApplicationsAssigned JobApplication[]
+@relation("JobApplicationAssignee")`.
+
+- `CareersSettings` — singleton (same pattern as `SurveySettings`);
+  `prisma/seed.ts` creates the one default row (`enabled: true`).
+- `JobPosting.generalReqs`/`specialReqs` are native Postgres string
+  arrays (`String[]`) — the admin's newline-separated textarea is
+  split/joined at the API boundary, matching how the design itself
+  stores these as arrays (`generalReqs: [...]` in `site-data.js`).
+- `JobApplication.jobPostingId` is nullable; no delete path exists for
+  `JobPosting` per the scope decision (deactivate only), so the FK never
+  actually needs to survive a deletion in practice — nullable purely as
+  defense-in-depth. `jobTitleSnapshot` is what the admin UI actually
+  displays either way, so a later posting edit never changes what an
+  already-submitted application shows.
+- `JobApplication.nationalIdEnc`/`nationalIdHash` follow the exact same
+  encrypted-at-rest + deterministic-hash-for-search pattern as
+  `Passenger`/`ClubMember` (CLAUDE.md: PII encrypted at rest, national
+  ID validated server-side with the official checksum).
+- `JobApplication.resumeFileName`/`resumeMimeType`/`resumeSizeBytes`/
+  `resumePath` are a small, self-contained resume-storage slice — not a
+  `StoredFile` FK, since that model requires a `User` owner and a job
+  applicant is anonymous (see API.md's scope decision). All four stay
+  nullable: the design's own submission flow doesn't actually make the
+  resume mandatory at the state-machine level (only first name/last
+  name/national ID/phone are validated client-side before submit), so a
+  resume-less application is a legitimate, real state to support.
+- `JobApplication.eduEntries`/`workEntries`/`langEntries` are `Json`
+  arrays of `{ major, degree, courses, otherCourses }` /
+  `{ company, position, fromYear, toYear, reason }` /
+  `{ lang, level }` respectively — free-form, never deeply queried,
+  same pattern as `SupportTicket.history`/`ClubCardRequest.history`.
+- `JobApplication.assigneeId` points at a real `User` row (see API.md's
+  "referral target list is computed" scope decision) — display-only, no
+  access-grant semantics, matching `ClubCardRequest.assignedTo`'s
+  existing precedent in this codebase.
+- New `AuditCategory.CONTENT` value (added alongside the existing
+  eleven) — mirrors the design's own `_logReport("content", ...)` calls
+  for every job-posting/application mutation.
+- Migration name (once approved): `phase67_careers`.
+
+**No code has been written for this phase yet — awaiting explicit user
+approval per CLAUDE.md workflow rule 1.**

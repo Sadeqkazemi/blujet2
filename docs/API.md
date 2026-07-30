@@ -2443,3 +2443,151 @@ status, network failure, real success path — all via a mocked
 existing Phase 6 `MlPriceSuggestionProvider` still has). Frontend: 10 new
 Vitest/RTL tests across the three new pages. No new Playwright E2E script
 this phase — same cadence as Phases 51–65.
+
+## Phase 67 (DRAFT — pending approval) — فرصت‌های شغلی (Careers)
+
+Two dedicated public design files (`فرصت‌های شغلی.dc.html`, the listing
+page, and `فرصت‌های شغلی-فرم درخواست.dc.html`, the per-job application
+form) plus a `jobapps` tab found inside `پنل ادمین سایت.dc.html`
+(SITE_ADMIN's own "تنظیمات سامانه" section) that manages job postings
+(create/edit/deactivate) and reviews submitted applications
+(list/detail/refer/hire/reject). Confirmed via grep across every other
+executive-panel design file: **no other role's design mentions job
+postings or applications at all** — this stays SITE_ADMIN-only.
+
+### Scope decisions
+- **Job-posting CRUD folds into one new `jobapps` SITE_ADMIN tab**,
+  rather than waiting on the much larger, still-entirely-unbuilt
+  "تنظیمات سامانه" content tab the design physically places the
+  create/edit job modal inside (banner, blog, media, social links, app
+  download links, support contact display, announcement bar — none of
+  which have any backend anywhere in this codebase; Phase 18 explicitly
+  deferred all of it, "blog/media ... left out entirely"). Job postings
+  and job applications are a self-contained, fully-specified pair of
+  concerns with no real dependency on those other content-settings
+  widgets, so combining posting-management and application-review under
+  one dedicated tab is the correct scope boundary — not a reason to
+  build the entire unrelated settings tab, and not a reason to leave
+  careers unbuilt until that tab exists.
+- **Real resume upload/storage — closes a real gap in the mock.** The
+  design's own application-form component lets the applicant pick a PDF
+  file (`onFileChange` stores only `file.name` in local state for
+  display) but its `addJobApplication(...)` call never actually includes
+  the file at all — the mock's own resume upload is decorative and
+  never persisted anywhere, not even in the browser mock's own
+  in-memory store. Since resume upload is clearly the substantive point
+  of a job-application form (not decorative like the design's banner/
+  blog image slots), the real implementation stores the uploaded PDF for
+  real and lets SITE_ADMIN download it from the application detail view.
+- **Not reusing `FilesModule`/`StoredFile` for resumes.** That model's
+  `ownerId` is a required FK to `User`; a job applicant is anonymous (no
+  login anywhere in this flow, matching the design). Widening
+  `StoredFile.ownerId` to nullable to accommodate this would touch the
+  already-tested referrals/cartable/agency-document upload paths for a
+  case they were never designed for. Instead, `JobApplication` gets its
+  own small set of resume columns (`resumeFileName`, `resumeMimeType`,
+  `resumeSizeBytes`, `resumePath`) and a minimal, self-contained
+  disk-write helper — same on-disk storage mechanism, no shared-service
+  risk. 3 MB PDF-only limit, matching the design's own stated copy
+  ("حداکثر ۳ مگابایت") — stricter than `FilesService`'s general 5 MB
+  cap, deliberately, since this is a public, unauthenticated upload
+  surface.
+- **`getJob(id) || getActiveJobs()[0]` fallback is NOT replicated.** The
+  mock's own application-form component silently falls back to the
+  first active job when the `?job=` query param is missing or invalid —
+  meaning a stale/mistyped link would silently let someone apply to the
+  wrong posting. The real `GET /careers/jobs/:id` 404s on an unknown or
+  inactive job id instead; this is a correctness fix over a genuine
+  mock bug, not an invented behavior.
+- **Referral target list is computed, not hardcoded.** The design's own
+  referral dropdown lists real `COMMERCIAL_MANAGER`/`FINANCE_MANAGER`
+  staff by name plus two fixed labels, "مدیر ارشد" and "مدیر عامل" — both
+  of which map cleanly onto this codebase's existing singleton
+  `SENIOR_MANAGER`/`CEO` accounts (exactly one of each is ever seeded).
+  So the real referral-target list is `User.findMany` scoped to
+  `COMMERCIAL_MANAGER` + `FINANCE_MANAGER` (active) plus the singleton
+  `CEO`/`SENIOR_MANAGER` users — a real, queryable set, not an invented
+  free-text field. Referring an application is a display-only "who's
+  handling this" label (matches the design exactly: no other panel's
+  design file has any awareness of job applications, so there is no real
+  access grant or notification tied to the referral — same posture as
+  the already-shipped `ClubCardRequest.assignedTo` field).
+- **No delete action.** The design's admin job cards only ever show
+  "ویرایش" (edit) and an active/inactive toggle — never a delete button.
+  `DELETE` is not implemented; deactivating a posting is the only
+  removal path, matching the design 1:1.
+
+### New: `CareersSettings` — `GET /careers/settings` (public), `PATCH /careers/settings` (SITE_ADMIN)
+- Singleton (same pattern as `ClubTierRule`/`SurveySettings`):
+  `{ enabled: boolean }`. Controls only whether the public footer shows
+  the "فرصت‌های شغلی" link — matches the design exactly (the careers
+  listing page itself has no "disabled" state at all; direct navigation
+  always works regardless of this flag).
+- `PATCH` writes an audit-log entry under a new `AuditCategory.CONTENT`
+  value (mirrors the design's own `_logReport("content", ...)` calls).
+
+### New (public, no auth): `GET /careers/jobs`, `GET /careers/jobs/:id`, `POST /careers/jobs/:id/apply`
+- `GET /careers/jobs` → active postings only:
+  `{ id, title, dept, city, type }[]` (`type` is one of `FULL_TIME` |
+  `REMOTE` | `PART_TIME`, mapped to the design's `تمام‌وقت`/`دورکاری`/
+  `پاره‌وقت` labels on the frontend, same convention as `CabinClass`).
+- `GET /careers/jobs/:id` → full posting detail incl. `generalReqs`/
+  `specialReqs` string arrays (parsed from the admin's newline-separated
+  textarea, matching the design's own `.join("\n")`/split convention).
+  404 for an unknown or inactive job id (see scope decision above).
+- `POST /careers/jobs/:id/apply` — `multipart/form-data`: personal info
+  (name, national ID, father's name, birth date — parsed from a Jalali
+  string input to a real `DateTime` at the edge, same convention as
+  every other date field in this codebase; birth province/city,
+  residence province/address), `gender` (`FEMALE`|`MALE`), `marital`
+  (`SINGLE`|`MARRIED`), `military` (`CONSCRIPT`|`EXEMPT`|`WAIVED` +
+  optional `exemptionType` text), `phone`, `email`, `skills`,
+  `otherLangs`, repeatable `eduEntries`/`workEntries`/`langEntries`
+  (stored as `Json`, same pattern as `SupportTicket.history`/
+  `ClubCardRequest.history` for this kind of flexible, never-deeply-
+  queried structure), and a required PDF `resume` file (≤3 MB). Creates
+  a `JobApplication` with `status: SUBMITTED`, snapshotting the job's
+  current `title` (`jobTitleSnapshot`) so the applicant record still
+  shows a real title even if the posting is later edited or deactivated
+  — matches the design's own denormalized `a.jobTitle` field. Rate
+  limited per-IP (same posture as `manage-booking`/`contact`).
+  National ID is encrypted at rest (`nationalIdEnc` + `nationalIdHash`
+  for the admin search box), same pattern as `Passenger`/`ClubMember`.
+
+### New (SITE_ADMIN only): `GET/POST/PATCH /careers/postings`
+- `GET /careers/postings` → all postings (active + inactive).
+- `POST /careers/postings` body `{ title, dept, city, type,
+  generalReqs, specialReqs }` → creates, `active: true` by default.
+- `PATCH /careers/postings/:id` body: any subset of the create fields
+  plus `active?` (the design's per-card "غیرفعال کردن آگهی"/"فعال کردن
+  آگهی" toggle folds into this same endpoint rather than a separate
+  route, since it's just one more editable field).
+- Both write an audit-log entry (`AuditCategory.CONTENT`).
+
+### New (SITE_ADMIN only): `GET /careers/applications`, `GET /careers/applications/:id`, `GET /careers/applications/:id/resume`, `PATCH /careers/applications/:id/refer`, `PATCH /careers/applications/:id/hire`, `PATCH /careers/applications/:id/reject`
+- `GET /careers/applications` → list with `q` (matches design's search
+  across name/national-id/phone/email) and `jobTitle` filters, each row:
+  `{ id, name, jobTitle, nationalIdMasked, phone, email, at, status,
+  hasResume, eduCount, workCount, assigneeLabelFa }`.
+- `GET /careers/applications/:id` → full detail incl. decrypted-for-
+  display fields, `eduEntries`/`workEntries`/`langEntries`,
+  `history: { step, label, at }[]`, and the computed referral-target
+  list (see scope decision above).
+- `GET /careers/applications/:id/resume` → streams the stored PDF
+  (`Content-Disposition: attachment`), 404 if no resume was stored.
+- `PATCH /careers/applications/:id/refer` body `{ assigneeId }` →
+  `status: REFERRED`, appends a history entry
+  (`"ارجاع به {name} توسط ادمین سایت"`). Only legal from `SUBMITTED` or
+  `REFERRED` (matches the design's `canForward`/`canAct` guards) —
+  otherwise 409.
+- `PATCH /careers/applications/:id/hire` → `status: HIRED`, appends a
+  history entry. Same legality guard.
+- `PATCH /careers/applications/:id/reject` → `status: REJECTED`, same.
+- All four mutating endpoints write an audit-log entry
+  (`AuditCategory.CONTENT`).
+
+See `docs/DB_SCHEMA.md`'s Phase 67 (DRAFT) section for the new
+`CareersSettings` / `JobPosting` / `JobApplication` models, and
+`docs/features/careers.md` for the acceptance checklist. **No code has
+been written for this phase yet — awaiting explicit user approval per
+CLAUDE.md workflow rule 1.**
