@@ -1,14 +1,23 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import AgencyWebservicePage from './AgencyWebservicePage';
 import * as portalApi from '../../api/agency-portal';
+import * as useLocaleModule from '../../hooks/useLocale';
 import type { AgencyApiKeySummary, AgencyWebserviceRequest } from '../../types/agency-portal';
 
 function mockLoads(requests: AgencyWebserviceRequest[] = [], apiKeys: AgencyApiKeySummary[] = []) {
   vi.spyOn(portalApi, 'fetchMyWebserviceRequests').mockResolvedValue(requests);
   vi.spyOn(portalApi, 'fetchApiKeys').mockResolvedValue(apiKeys);
 }
+
+function mockLocale(locale: 'fa' | 'en' | 'ar') {
+  vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale, setLocale: vi.fn() });
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 const PENDING_REQUEST: AgencyWebserviceRequest = {
   id: 'wr1',
@@ -70,5 +79,24 @@ describe('AgencyWebservicePage', () => {
     render(<AgencyWebservicePage />);
     expect(await screen.findByText(/آخرین درخواست شما رد شد/)).toBeInTheDocument();
     expect(screen.getByTestId('ws-buy')).toBeInTheDocument();
+  });
+
+  it('renders translated headings, scope labels, and active connection info in English', async () => {
+    mockLocale('en');
+    mockLoads([], [ACTIVE_KEY]);
+    render(<AgencyWebservicePage />);
+
+    expect(await screen.findByText('Purchase a new web service')).toBeInTheDocument();
+    expect(screen.getByText('Active web service connection')).toBeInTheDocument();
+    expect(screen.getByTestId('ws-active-scope')).toHaveTextContent('Full Sale (Ticket Issuance)');
+    expect(screen.getByText('Purchase & submit request')).toBeInTheDocument();
+  });
+
+  it('renders translated pending state and rejected notice in Arabic', async () => {
+    mockLocale('ar');
+    mockLoads([PENDING_REQUEST]);
+    render(<AgencyWebservicePage />);
+    expect(await screen.findByText('طلب الشراء الخاص بك قيد المراجعة')).toBeInTheDocument();
+    expect(screen.getByText('بانتظار الموافقة')).toBeInTheDocument();
   });
 });
