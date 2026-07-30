@@ -1289,6 +1289,69 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   `tsc --noEmit` and lint clean on both packages. See
   `docs/features/passenger-survey.md`'s "Post-merge senior review"
   section for the full writeup.
+- [x] **Phase 67: فرصت‌های شغلی (Careers)** — public job listing/apply +
+  SITE_ADMIN posting CRUD and application review. Docs first (per
+  workflow rule 1), user-approved, then implemented: `CareersSettings`/
+  `JobPosting`/`JobApplication` models + migration; `CareersService`/
+  `CareersController` (SITE_ADMIN, guarded)/`CareersPublicController`
+  (no auth, throttled) with real resume upload (PDF-only, 3 MB, closes a
+  gap where the design's own mock never persisted the picked file);
+  national ID encrypted at rest (reuses `pii-crypto.ts`, no new PII
+  code); computed referral-target list (real `COMMERCIAL_MANAGER`/
+  `FINANCE_MANAGER` staff + singleton `CEO`/`SENIOR_MANAGER`, not
+  hardcoded); `jobapps` SITE_ADMIN panel tab. Frontend:
+  `CareersPage`/`CareersApplyPage` (public, `/careers`,
+  `/careers/:jobId/apply`) and `CareersAdminPage` (postings + application
+  review with refer/hire/reject), `api/careers.ts`, footer link gated by
+  `CareersSettings.enabled` via a new `useCareersEnabled` hook. **Post-
+  implementation correction** (caught before finalizing docs): the
+  earlier draft claimed two dedicated public design files existed for
+  the listing/apply pages — re-verified directly against
+  `design-reference/`, they don't; the design only has a small
+  posting-management card grid inside `پنل ادمین سایت.dc.html`, and has
+  **no application-review UI at all**. The public pages and the review
+  workflow were built by extension of this codebase's existing visual
+  language, not lifted from a design file — `docs/API.md`/`DB_SCHEMA.md`
+  corrected to say so plainly rather than leave an inaccurate design
+  citation standing. Real Kavenegar SMS driver also added in this window
+  (user provided the vendor, not part of Careers itself):
+  `KavenegarSmsProvider` behind the existing `SmsProvider` interface,
+  `sms.module.ts` factory-switches on `SMS_PROVIDER=kavenegar` +
+  `KAVENEGAR_API_KEY` (+ optional `KAVENEGAR_SENDER_LINE`), defaults to
+  `MockSmsProvider` everywhere else so the test suite never makes a real
+  network call — activation needs the user's real API key, not committed
+  anywhere. Backend: 16 e2e + 4 unit tests. Frontend: 12 page tests + 2
+  hook tests + 1 footer test = 15 new tests. Full backend e2e suite:
+  392/392 passing. Full backend unit suite: 48/48 passing. Full frontend
+  suite: 325/325 passing, 75 files. `tsc --noEmit` and lint clean on both
+  packages. See `docs/features/careers.md` for the full checked-off
+  acceptance checklist.
+- [x] **Bug fix (senior review, found while chasing the "pre-existing"
+  reporting flake): revenue reporting polluted by agency debt-calibration
+  ledger rows.** The `reporting.e2e-spec.ts` sales-chart/kpis
+  reconciliation failure that had been repeatedly logged across Phases
+  51/65/66/67 as "shared test-DB data drift" was never drift — it's a
+  real, deterministic bug. `AgenciesService.resetTestDebt()` (e2e/dev-only,
+  404 in production) reuses `LedgerEntry{type:'SALE'}` for agency
+  debt-line calibration (`agencyId` set, `bookingId` null,
+  `signedAmountIrr` can be **negative**) — a different concern from
+  ticket revenue, but every company-wide revenue aggregate
+  (`ReportingService.kpis()`/`revenueMix()`, `PnrService.dashboardStats()`,
+  `AgencyPortalService.dashboard()`, `AgenciesService.detail()`) summed
+  **every** `type:'SALE'` row with no `bookingId` filter, silently
+  folding negative debt adjustments into "revenue." `sumByChannel()`
+  (sales-chart) happened to exclude them, but only by an unrelated
+  accident (it drops rows with no `booking.channel`) — not a deliberate
+  filter, which is exactly why the two endpoints disagreed. Fixed: every
+  real-revenue aggregate now also requires `bookingId: { not: null }`;
+  `computeUsedIrr()` (the one place that legitimately wants the
+  debt-adjustment rows) is untouched. New regression test in
+  `test/reporting.e2e-spec.ts` inserts a synthetic bookingless SALE row
+  and asserts `kpis().revenueIrr` doesn't move and still reconciles with
+  `salesChart()`/`revenueMix()`. Full backend e2e suite re-run clean:
+  392/392 — the flake that failed in every prior full-suite run this
+  session is gone for real, not just quieted by DB timing. See
+  `docs/DB_SCHEMA.md`'s matching entry for the full technical writeup.
 
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is

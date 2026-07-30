@@ -1,12 +1,19 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import PublicFooter from './PublicFooter';
 import * as useLocaleModule from '../../hooks/useLocale';
+import * as useCareersEnabledModule from '../../hooks/useCareersEnabled';
 
 function mockLocale(locale: 'fa' | 'en' | 'ar' = 'fa') {
   vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale, setLocale: vi.fn() });
 }
+
+beforeEach(() => {
+  // Deterministic by default — real fetch behavior is covered by
+  // useCareersEnabled's own unit test, not here.
+  vi.spyOn(useCareersEnabledModule, 'useCareersEnabled').mockReturnValue(false);
+});
 
 function renderFooter() {
   return render(
@@ -38,5 +45,16 @@ describe('PublicFooter', () => {
     renderFooter();
     expect(screen.getByText('الخدمات')).toBeInTheDocument();
     expect(screen.getByText('حجز رحلة')).toHaveAttribute('href', '/results');
+  });
+
+  it('hides the careers link when disabled, shows it when enabled', () => {
+    mockLocale('fa');
+    const { unmount } = renderFooter();
+    expect(screen.queryByText('فرصت‌های شغلی')).not.toBeInTheDocument();
+    unmount();
+
+    vi.spyOn(useCareersEnabledModule, 'useCareersEnabled').mockReturnValue(true);
+    renderFooter();
+    expect(screen.getByText('فرصت‌های شغلی')).toHaveAttribute('href', '/careers');
   });
 });

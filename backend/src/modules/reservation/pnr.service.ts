@@ -616,7 +616,11 @@ export class PnrService {
         },
       }),
       this.prisma.ledgerEntry.aggregate({
-        where: { type: 'SALE' },
+        // Real ticket revenue only — AgenciesService.resetTestDebt
+        // reuses type:'SALE' for agency debt-line calibration
+        // (bookingId null, amount can be negative); excluded here the
+        // same way ReportingService's revenue aggregates exclude it.
+        where: { type: 'SALE', bookingId: { not: null } },
         _sum: { signedAmountIrr: true },
       }),
     ]);

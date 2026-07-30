@@ -1,12 +1,14 @@
 import { Link } from 'react-router-dom';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { useT } from '../../lib/i18n';
+import { useCareersEnabled } from '../../hooks/useCareersEnabled';
 
 /** Public-site footer — matches design-reference-v2/صفحه اصلی.dc.html:
  * fa/en/ar translated + a single-column mobile layout. */
 export default function PublicFooter() {
   const t = useT();
   const isMobile = useIsMobile();
+  const careersEnabled = useCareersEnabled();
 
   return (
     <footer style={{ background: '#0d2640', color: '#aebfd4', marginTop: 72 }}>
@@ -61,6 +63,11 @@ export default function PublicFooter() {
             <Link to="/travel-info" style={{ color: '#aebfd4', textDecoration: 'none' }}>
               {t('footerTerms')}
             </Link>
+            {careersEnabled && (
+              <Link to="/careers" style={{ color: '#aebfd4', textDecoration: 'none' }}>
+                {t('footerCareers')}
+              </Link>
+            )}
           </div>
         </div>
         <div>

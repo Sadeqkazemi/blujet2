@@ -115,6 +115,8 @@ model User {
   surveySettingsEdits SurveySettings[] @relation("SurveySettingsUpdatedBy")
   aiUsageLogs         AiUsageLog[]     @relation("AiUsageLogUser")
 
+  jobApplicationsAssigned JobApplication[] @relation("JobApplicationAssignee")
+
   pricingProposalsMade     FarePricingProposal[] @relation("PricingProposedBy")
   pricingProposalsApproved FarePricingProposal[] @relation("PricingApprovedBy")
 
@@ -211,6 +213,7 @@ enum AuditCategory {
   SECURITY
   RESERVATION
   SURVEY
+  CONTENT
 }
 
 model AuditLog {
@@ -1723,4 +1726,103 @@ model AiUsageLog {
 
   @@index([provider, createdAt])
   @@map("ai_usage_logs")
+}
+
+// ─── Phase 67: فرصت‌های شغلی (Careers) ───────────────────────────────────
+// SITE_ADMIN-only: manages job postings + reviews applications. See
+// docs/API.md + docs/DB_SCHEMA.md.
+
+enum JobType {
+  FULL_TIME
+  REMOTE
+  PART_TIME
+}
+
+enum JobApplicantGender {
+  FEMALE
+  MALE
+}
+
+enum MaritalStatus {
+  SINGLE
+  MARRIED
+}
+
+enum MilitaryStatus {
+  CONSCRIPT
+  EXEMPT
+  WAIVED
+}
+
+enum JobApplicationStatus {
+  SUBMITTED
+  REFERRED
+  HIRED
+  REJECTED
+}
+
+model CareersSettings {
+  id        String   @id @default(uuid())
+  enabled   Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@map("careers_settings")
+}
+
+model JobPosting {
+  id           String           @id @default(uuid())
+  title        String
+  dept         String
+  city         String
+  type         JobType          @default(FULL_TIME)
+  generalReqs  String[]
+  specialReqs  String[]
+  active       Boolean          @default(true)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  applications JobApplication[]
+
+  @@map("job_postings")
+}
+
+model JobApplication {
+  id                String               @id @default(uuid())
+  jobPostingId      String?
+  jobPosting        JobPosting?          @relation(fields: [jobPostingId], references: [id])
+  jobTitleSnapshot  String
+  firstName         String
+  lastName          String
+  nationalIdEnc     String
+  nationalIdHash    String
+  fatherName        String?
+  birthDate         DateTime?
+  birthProvince     String?
+  birthCity         String?
+  gender            JobApplicantGender?
+  marital           MaritalStatus?
+  military          MilitaryStatus?
+  exemptionType     String?
+  phone             String
+  email             String?
+  residenceProvince String?
+  residenceAddress  String?
+  eduEntries        Json                 @default("[]")
+  workEntries       Json                 @default("[]")
+  langEntries       Json                 @default("[]")
+  skills            String?
+  otherLangs        String?
+  resumeFileName    String?
+  resumeMimeType    String?
+  resumeSizeBytes   Int?
+  resumePath        String?
+  status            JobApplicationStatus @default(SUBMITTED)
+  assigneeId        String?
+  assignee          User?                @relation("JobApplicationAssignee", fields: [assigneeId], references: [id])
+  history           Json                 @default("[]")
+  createdAt         DateTime             @default(now())
+
+  @@index([nationalIdHash])
+  @@index([status])
+  @@map("job_applications")
 }

@@ -685,6 +685,54 @@ async function main() {
     }
   }
 
+  // ── Phase 67: careers settings + default job postings ──────────────────
+  const existingCareersSettingsCount = await prisma.careersSettings.count();
+  if (existingCareersSettingsCount === 0) {
+    await prisma.careersSettings.create({ data: {} });
+  }
+  const existingJobPostingCount = await prisma.jobPosting.count();
+  if (existingJobPostingCount === 0) {
+    await prisma.jobPosting.createMany({
+      data: [
+        {
+          title: 'کارشناس پشتیبانی مسافران',
+          dept: 'پشتیبانی',
+          city: 'تهران',
+          type: 'FULL_TIME',
+          generalReqs: [
+            'حداقل مدرک کارشناسی',
+            'روابط عمومی قوی',
+            'آشنایی با نرم‌افزارهای اداری',
+          ],
+          specialReqs: [
+            'سابقه کار در صنعت گردشگری یا هوانوردی',
+            'آمادگی کار شیفتی',
+          ],
+        },
+        {
+          title: 'توسعه‌دهنده فرانت‌اند',
+          dept: 'فناوری اطلاعات',
+          city: 'تهران',
+          type: 'REMOTE',
+          generalReqs: [
+            'تسلط به JavaScript و React',
+            'آشنایی با طراحی واکنش‌گرا',
+            'حداقل ۲ سال سابقه کار',
+          ],
+          specialReqs: ['آشنایی با سامانه‌های رزرواسیون مزیت محسوب می‌شود'],
+        },
+        {
+          title: 'کارشناس فروش و بازرگانی',
+          dept: 'بازرگانی',
+          city: 'مشهد',
+          type: 'PART_TIME',
+          generalReqs: ['مهارت مذاکره و فروش', 'آشنایی با اکسل و گزارش‌گیری'],
+          specialReqs: ['آشنایی با قراردادهای آژانسی'],
+        },
+      ],
+    });
+  }
+
   // ── Phase 6: pricing proposals (one pending, one registered) ───────────
   const existingProposalCount = await prisma.farePricingProposal.count();
   if (existingProposalCount === 0) {
