@@ -1906,3 +1906,24 @@ quality bar as every phase (no silent Persian fallback like the design
 mock's own Arabic mode would produce). Channels + form two-column layout
 collapses to a single column on mobile via the shared `useIsMobile()`
 hook. See `docs/features/contact-page-i18n-responsive.md`.
+
+## Phase 50 — ورود و ثبت‌نام (CustomerLoginPage) real i18n + responsive strings
+
+Frontend-only, no new/changed endpoints. Tenth page translated.
+`CustomerLoginPage` translates its login/signup tabs, user/agency toggle,
+subtitles, phone/password/OTP fields, resend-code countdown, agency-signup
+fields, and every error message into fa/en/ar. Unlike every prior page,
+`design-reference-v2/ورود و ثبتنام.dc.html` has a structurally different
+field layout from the real app (email+password-first with Google sign-in
+and a 5-digit OTP in the design, vs. the real app's phone+OTP-first
+6-digit flow with no Google sign-in) — so most strings were hand-translated
+to match the real app's actual fields, while concepts that do line up
+1:1 (tab labels, the agency-activation note, the resend label) reused the
+design bundle's own `isEN`/`arDeep` wording. Also fixes a test mock-leak
+bug: `PublicMockPages.test.tsx` bundles `CustomerLoginPage`/`AboutPage`/
+`NotFoundPage` in one file, and the new `mockLocale('ar')` test's
+unrestored `useLocale` spy was leaking into the next describe block's
+fa-only `AboutPage` test. Fixed with a targeted `afterEach` that restores
+only the `useLocale` spy (not the OTP mocks, which are plain `vi.fn()`s
+that would break under a blind `vi.restoreAllMocks()`). See
+`docs/features/customer-login-page-i18n-responsive.md`.
