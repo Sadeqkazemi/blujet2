@@ -2079,3 +2079,20 @@ tab; AR is hand-translated. This page had no test file before this phase;
 `AgencySeatsPage.test.tsx` was created from scratch with 4 tests (fa
 happy-path, fa empty state, en, ar). See
 `docs/features/agency-seats-page-i18n.md`.
+
+## Phase 60 — پنل آژانس: Web Service (B2B API) tab real i18n
+
+Frontend-only, no new/changed endpoints. Eighth and final agency-portal
+page, completing the agency-portal i18n arc (Phases 53–60).
+`AgencyWebservicePage.tsx` translates the webservice purchase flow (info
+banner, scope/duration selection, pending/rejected states, active-
+connection summary) into fa/en/ar. Several labels match
+`design-reference-v2/پنل آژانس.dc.html`'s own `isEN` vocabulary for this
+exact tab (`wsInfoBanner`, `wsPendingTitle`, `wsPendingBadge`,
+`wsNewPurchaseTitle`, `wsNewPurchaseSub`, `wsTypeLabel`,
+`wsDurationLabel`, `wsPayableLabel`, `wsSubmitLabel`, `wsActiveTitle`,
+`wsActiveBadge`, `wsBaseUrlLabel2`); the real scope names, 1/3/12-month
+plans, and correspondence-based key delivery wording have no design
+counterpart and are hand-translated, as is all AR text. All 4
+pre-existing tests pass unmodified; 2 new tests (en, ar). See
+`docs/features/agency-webservice-page-i18n.md`.
