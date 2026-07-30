@@ -1015,6 +1015,17 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   frontend suite: 274/274 passing, 61/61 files. `tsc --noEmit` clean;
   `oxlint` clean (same pre-existing warnings). See
   `docs/features/agency-sales-page-i18n.md`.
+- [x] **Phase 57 — پنل آژانس: Inbox & Messages tab real i18n** — fifth
+  agency-portal page. `AgencyInboxPage.tsx` translates its message thread
+  (sender labels, empty state) and compose form into fa/en/ar; backed by
+  real `agency-portal` inbox endpoints — no new backend work. Most
+  strings reuse `design-reference-v2/پنل آژانس.dc.html`'s own `isEN`
+  vocabulary for this exact tab; AR is hand-translated. The pre-existing
+  test passes unmodified — the byte-critical fa placeholder
+  `'پیام خود را بنویسید…'` and `'ارسال'` button stay byte-identical; 2
+  new tests (en, ar). Full frontend suite: 276/276 passing, 61/61 files.
+  `tsc --noEmit` clean; `oxlint` clean (same pre-existing warnings). See
+  `docs/features/agency-inbox-page-i18n.md`.
 - [x] With Phases 35–37, the manual endpoint audit had covered
   `reconciliation`, `reservation`, and `it-manager`'s `services` module;
   every other controller checked so far (`pricing`, `flightops`,

@@ -2042,3 +2042,14 @@ labels are this page's own local map, kept separate from
 vs. verbose) fa wording for the same statuses. The pre-existing test
 passes unmodified; 2 new tests (en, ar). See
 `docs/features/agency-sales-page-i18n.md`.
+
+## Phase 57 — پنل آژانس: Inbox & Messages tab real i18n
+
+Frontend-only, no new/changed endpoints — `AgencyInboxPage.tsx` already
+reads/writes real data via the `agency-portal` inbox endpoints. Fifth
+agency-portal page. Most strings reuse
+`design-reference-v2/پنل آژانس.dc.html`'s own `isEN` vocabulary for this
+exact tab (`inboxTitle`, `replyPlaceholder`, `sendReplyLabel`,
+`noMessagesLabel`); AR is hand-translated. The pre-existing test passes
+unmodified; 2 new tests (en, ar). See
+`docs/features/agency-inbox-page-i18n.md`.
