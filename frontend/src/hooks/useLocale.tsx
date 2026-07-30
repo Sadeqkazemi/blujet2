@@ -26,7 +26,13 @@ interface LocaleContextValue {
   setLocale: (next: StoredLocale) => void;
 }
 
-const LocaleContext = createContext<LocaleContextValue | null>(null);
+// Falls back to plain fa/no-op when rendered without a LocaleProvider (e.g.
+// a test that renders a shared component in isolation and doesn't care
+// about locale) rather than throwing — the real app always wraps routes in
+// LocaleProvider via App.tsx, so this default is never hit in production.
+const defaultContextValue: LocaleContextValue = { locale: 'fa', setLocale: () => {} };
+
+const LocaleContext = createContext<LocaleContextValue>(defaultContextValue);
 
 /** An anonymous visitor's choice lives only in localStorage — there's no
  * User row to attach it to yet. `preferredLocale` in the DB is purely the
@@ -64,7 +70,5 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
 }
 
 export function useLocale(): LocaleContextValue {
-  const ctx = useContext(LocaleContext);
-  if (!ctx) throw new Error('useLocale must be used within a LocaleProvider');
-  return ctx;
+  return useContext(LocaleContext);
 }
