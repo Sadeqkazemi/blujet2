@@ -1768,3 +1768,14 @@ switching, the responsive breakpoint work, and the split forgot-password
 mechanism (email+code for EN vs. phone+OTP for FA/AR, confirmed from the
 design bundle) — this phase is the storage layer those all depend on, not
 the features themselves.
+
+## Phase 41 — public i18n + responsive shared shell foundation
+
+Frontend-only phase, no new/changed endpoints. Builds the shared dictionary
+(`frontend/src/lib/i18n.ts`) and breakpoint hook (`frontend/src/hooks/
+useIsMobile.ts`) that `PublicPageShell`/`PublicHeader`/`PublicFooter` now
+use for locale-aware direction/font/strings and a real
+`matchMedia`-tracked mobile layout, plus the language switcher UI (desktop
+dropdown + mobile off-canvas cycle) wired to the existing `useLocale()`
+from Phase 40. See `docs/features/i18n-responsive-foundation.md` for the
+full checklist. Per-page body translation is out of scope for this phase.

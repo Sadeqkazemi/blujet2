@@ -3,19 +3,42 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { fetchClubPoints } from '../../api/publicSite';
 import { faDigits } from '../../lib/fa-format';
+import { useLocale, type StoredLocale } from '../../hooks/useLocale';
+import { useT } from '../../lib/i18n';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
-const TIER_LABEL: Record<string, string> = {
-  SILVER: 'نقره‌ای',
-  GOLD: 'طلایی',
-  PLATINUM: 'پلاتین',
+const TIER_KEY: Record<string, 'tierSilver' | 'tierGold' | 'tierPlatinum'> = {
+  SILVER: 'tierSilver',
+  GOLD: 'tierGold',
+  PLATINUM: 'tierPlatinum',
 };
 
 // Sample notification feed — the design's own placeholder content; no
 // backend notifications endpoint exists yet, so this stays presentational.
-const NOTIFICATIONS = [
-  { icon: '✈', title: 'یادآوری سفر', body: 'پرواز تهران → دبی شما فرداست. آنلاین چک‌این باز است.', time: '۱ ساعت پیش' },
-  { icon: '★', title: 'امتیاز باشگاه', body: '۴۵۰ امتیاز از خرید قبلی به حساب شما اضافه شد.', time: 'دیروز' },
-  { icon: '🏷', title: 'کد تخفیف', body: 'کد BLUE20 برای پروازهای داخلی تا پایان هفته فعال است.', time: '۲ روز پیش' },
+// Translated inline here (not lib/i18n.ts) since it's placeholder content
+// specific to this component, not a real shared-shell string.
+const NOTIFICATIONS: Record<StoredLocale, { icon: string; title: string; body: string; time: string }[]> = {
+  fa: [
+    { icon: '✈', title: 'یادآوری سفر', body: 'پرواز تهران → دبی شما فرداست. آنلاین چک‌این باز است.', time: '۱ ساعت پیش' },
+    { icon: '★', title: 'امتیاز باشگاه', body: '۴۵۰ امتیاز از خرید قبلی به حساب شما اضافه شد.', time: 'دیروز' },
+    { icon: '🏷', title: 'کد تخفیف', body: 'کد BLUE20 برای پروازهای داخلی تا پایان هفته فعال است.', time: '۲ روز پیش' },
+  ],
+  en: [
+    { icon: '✈', title: 'Trip reminder', body: 'Your Tehran → Dubai flight is tomorrow. Online check-in is open.', time: '1 hour ago' },
+    { icon: '★', title: 'Loyalty points', body: '450 points from your last purchase were added to your account.', time: 'Yesterday' },
+    { icon: '🏷', title: 'Discount code', body: 'Code BLUE20 is active for domestic flights until the end of the week.', time: '2 days ago' },
+  ],
+  ar: [
+    { icon: '✈', title: 'تذكير بالرحلة', body: 'رحلتك من طهران إلى دبي غدًا. تسجيل الوصول عبر الإنترنت متاح.', time: 'قبل ساعة' },
+    { icon: '★', title: 'نقاط النادي', body: 'تمت إضافة ٤٥٠ نقطة من عمليتك الأخيرة إلى حسابك.', time: 'أمس' },
+    { icon: '🏷', title: 'رمز الخصم', body: 'الرمز BLUE20 مفعّل للرحلات الداخلية حتى نهاية الأسبوع.', time: 'قبل يومين' },
+  ],
+};
+
+const LANG_OPTIONS: { value: StoredLocale; label: string }[] = [
+  { value: 'fa', label: 'فارسی' },
+  { value: 'en', label: 'English' },
+  { value: 'ar', label: 'العربية' },
 ];
 
 function initials(fullName: string) {
@@ -23,14 +46,22 @@ function initials(fullName: string) {
   return parts.slice(0, 2).map((p) => p[0] ?? '').join('') || 'کا';
 }
 
-/** Sticky public-site header — matches design-reference/صفحه اصلی.dc.html exactly. */
+/** Sticky public-site header — matches design-reference-v2/صفحه اصلی.dc.html:
+ * fa/en/ar language switcher + real matchMedia-driven mobile layout. */
 export default function PublicHeader() {
   const { status, user, signOut } = useAuth();
+  const { locale, setLocale } = useLocale();
+  const t = useT();
+  const isMobile = useIsMobile();
+  const isRTL = locale !== 'en';
   const [menuOpen, setMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [langOpen, setLangOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [club, setClub] = useState<{ isMember: boolean; level: string | null; balance: number } | null>(null);
 
   const loggedIn = status === 'authenticated' && user?.role === 'USER';
+  const notifications = NOTIFICATIONS[locale];
 
   useEffect(() => {
     if (!loggedIn) return;
@@ -39,31 +70,139 @@ export default function PublicHeader() {
       .catch(() => setClub(null));
   }, [loggedIn]);
 
+  const navLinks = [
+    { to: '/', label: t('navFlights'), active: true },
+    { to: '/destinations', label: t('navDestinations') },
+    { to: '/club', label: t('navLoyalty') },
+    { to: '/travel-info', label: t('navTravelInfo') },
+    { to: '/support', label: t('navSupport') },
+  ];
+
+  const tierLabel = club?.level ? t(TIER_KEY[club.level] ?? 'tierSilver') : null;
+
+  const langSwitcher = (
+    <div style={{ position: 'relative' }}>
+      <span
+        data-testid="public-lang-toggle"
+        onClick={() => setLangOpen((v) => !v)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          cursor: 'pointer',
+          color: '#5a6678',
+          border: '1.5px solid #e2e7ee',
+          borderRadius: 20,
+          padding: '6px 12px',
+          fontSize: '12.5px',
+          fontWeight: 700,
+        }}
+      >
+        🌐 {locale.toUpperCase()}
+      </span>
+      {langOpen && (
+        <>
+          <div onClick={() => setLangOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 120 }} />
+          <div
+            style={{
+              position: 'absolute',
+              top: 44,
+              [isRTL ? 'left' : 'right']: 0,
+              width: 150,
+              background: '#fff',
+              border: '1px solid #e6eaf0',
+              borderRadius: 14,
+              boxShadow: '0 20px 50px -16px rgba(13,38,64,.35)',
+              zIndex: 130,
+              overflow: 'hidden',
+              padding: 6,
+            }}
+          >
+            {LANG_OPTIONS.map((opt) => (
+              <div
+                key={opt.value}
+                data-testid={`public-lang-option-${opt.value}`}
+                onClick={() => {
+                  setLocale(opt.value);
+                  setLangOpen(false);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 8,
+                  padding: '9px 11px',
+                  borderRadius: 9,
+                  fontSize: '12.5px',
+                  fontWeight: 600,
+                  color: '#16202e',
+                  cursor: 'pointer',
+                }}
+              >
+                {opt.label}
+                {locale === opt.value && <span style={{ color: '#1668c4', fontWeight: 900 }}>✓</span>}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+
   return (
     <header style={{ position: 'sticky', top: 0, zIndex: 50 }}>
-      <div style={{ background: '#fff', borderBottom: '1px solid #e6eaf0', boxShadow: '0 2px 12px -8px rgba(13,38,102,.25)' }}>
+      <div
+        style={{
+          background: isMobile ? '#1668c4' : '#fff',
+          borderBottom: isMobile ? 'none' : '1px solid #e6eaf0',
+          boxShadow: '0 2px 12px -8px rgba(13,38,102,.25)',
+        }}
+      >
         <div
           style={{
             maxWidth: 1180,
             margin: '0 auto',
             padding: '0 26px',
-            height: 86,
+            height: isMobile ? 62 : 86,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
           }}
         >
-          <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none', color: 'inherit' }}>
+          {isMobile && (
+            <span
+              data-testid="public-mobile-menu-toggle"
+              onClick={() => setMobileMenuOpen((v) => !v)}
+              style={{
+                width: 38,
+                height: 38,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 10,
+                cursor: 'pointer',
+                fontSize: 17,
+                color: '#fff',
+              }}
+            >
+              ☰
+            </span>
+          )}
+
+          <Link
+            to="/"
+            style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none', color: isMobile ? '#fff' : 'inherit' }}
+          >
             <div
               style={{
                 width: 38,
                 height: 38,
                 borderRadius: 10,
-                background: '#1668c4',
+                background: isMobile ? '#fff' : '#1668c4',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#fff',
+                color: isMobile ? '#1668c4' : '#fff',
                 fontSize: 18,
               }}
             >
@@ -72,260 +211,372 @@ export default function PublicHeader() {
             <span style={{ fontWeight: 900, fontSize: 18, letterSpacing: '-.5px' }}>blujet</span>
           </Link>
 
-          <nav style={{ display: 'flex', gap: 30, fontSize: '14.5px', color: '#3b4554', fontWeight: 600, height: '100%', alignItems: 'center' }}>
-            <Link
-              to="/"
-              style={{
-                color: '#1668c4',
-                height: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                borderBottom: '3px solid #1668c4',
-                textDecoration: 'none',
-              }}
-            >
-              پرواز
-            </Link>
-            <Link to="/destinations" style={{ textDecoration: 'none', color: '#3b4554' }}>
-              مقاصد پروازی
-            </Link>
-            <Link to="/club" style={{ textDecoration: 'none', color: '#3b4554' }}>
-              باشگاه مشتریان
-            </Link>
-            <Link to="/travel-info" style={{ textDecoration: 'none', color: '#3b4554' }}>
-              اطلاعات سفر
-            </Link>
-            <Link to="/support" style={{ textDecoration: 'none', color: '#3b4554' }}>
-              پشتیبانی
-            </Link>
-          </nav>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {!loggedIn && (
-              <>
+          {!isMobile && (
+            <nav style={{ display: 'flex', gap: 30, fontSize: '14.5px', color: '#3b4554', fontWeight: 600, height: '100%', alignItems: 'center' }}>
+              {navLinks.map((link) => (
                 <Link
-                  to="/signin"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 7,
-                    padding: '7px 15px',
-                    border: '1.5px solid #d5e1f0',
-                    color: '#0d2640',
-                    borderRadius: 10,
-                    fontSize: '12.5px',
-                    fontWeight: 700,
-                    textDecoration: 'none',
-                  }}
+                  key={link.to}
+                  to={link.to}
+                  style={
+                    link.active
+                      ? { color: '#1668c4', height: '100%', display: 'flex', alignItems: 'center', borderBottom: '3px solid #1668c4', textDecoration: 'none' }
+                      : { textDecoration: 'none', color: '#3b4554' }
+                  }
                 >
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="8" r="4" />
-                    <path d="M4 21c0-4 4-6 8-6s8 2 8 6" />
-                  </svg>
-                  ورود / ثبت‌نام
+                  {link.label}
                 </Link>
-                <Link
-                  to="/club"
-                  style={{
-                    padding: '8px 18px',
-                    background: '#1668c4',
-                    color: '#fff',
-                    borderRadius: 10,
-                    fontSize: '12.5px',
-                    fontWeight: 700,
-                    textDecoration: 'none',
-                  }}
-                >
-                  عضویت باشگاه
-                </Link>
-              </>
-            )}
+              ))}
+            </nav>
+          )}
 
-            {loggedIn && user && (
-              <>
-                <div style={{ position: 'relative' }}>
-                  <div
-                    data-testid="public-notif-toggle"
-                    onClick={() => setNotifOpen((v) => !v)}
-                    style={{
-                      width: 42,
-                      height: 42,
-                      borderRadius: '50%',
-                      background: '#f3f5f8',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#5a6678',
-                      fontSize: '15.5px',
-                      position: 'relative',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    🔔
-                    <span style={{ position: 'absolute', top: 9, left: 12, width: 8, height: 8, borderRadius: '50%', background: '#e5484d', border: '1.5px solid #fff' }} />
-                  </div>
-                  {notifOpen && (
-                    <>
-                      <div onClick={() => setNotifOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 120 }} />
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: 52,
-                          left: 0,
-                          width: 340,
-                          background: '#fff',
-                          border: '1px solid #e6eaf0',
-                          borderRadius: 14,
-                          boxShadow: '0 20px 50px -16px rgba(13,38,64,.35)',
-                          zIndex: 130,
-                          overflow: 'hidden',
-                        }}
-                      >
-                        <div style={{ padding: '11px 12px', borderBottom: '1px solid #eef1f5', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <span style={{ fontSize: '12.5px', fontWeight: 800, color: '#0d2640' }}>اعلان‌ها</span>
-                          <span style={{ fontSize: 10, fontWeight: 700, color: '#1668c4', background: '#eef4fb', padding: '2px 7px', borderRadius: 12 }}>
-                            {faDigits(NOTIFICATIONS.length)} جدید
-                          </span>
-                        </div>
-                        {NOTIFICATIONS.map((n) => (
-                          <div key={n.title + n.time} style={{ display: 'flex', gap: 9, padding: '11px 12px', borderBottom: '1px solid #f4f6fa' }}>
-                            <span style={{ width: 34, height: 34, borderRadius: 10, background: '#f3f5f8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14.5px', flex: 'none' }}>
-                              {n.icon}
-                            </span>
-                            <div style={{ minWidth: 0 }}>
-                              <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#16202e' }}>{n.title}</div>
-                              <div style={{ fontSize: 11, color: '#6b7787', marginTop: 2, lineHeight: 1.7 }}>{n.body}</div>
-                              <div style={{ fontSize: '9.5px', color: '#6b7787', marginTop: 4 }}>{n.time}</div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-                <div style={{ position: 'relative' }}>
-                  <div
-                    data-testid="public-user-menu-toggle"
-                    onClick={() => setMenuOpen((v) => !v)}
+          {!isMobile && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {langSwitcher}
+              {!loggedIn && (
+                <>
+                  <Link
+                    to="/signin"
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: 8,
-                      background: '#fff',
-                      border: '1px solid #e6eaf0',
-                      padding: '4px 10px 4px 7px',
-                      borderRadius: 30,
-                      cursor: 'pointer',
+                      gap: 7,
+                      padding: '7px 15px',
+                      border: '1.5px solid #d5e1f0',
+                      color: '#0d2640',
+                      borderRadius: 10,
+                      fontSize: '12.5px',
+                      fontWeight: 700,
+                      textDecoration: 'none',
                     }}
                   >
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="8" r="4" />
+                      <path d="M4 21c0-4 4-6 8-6s8 2 8 6" />
+                    </svg>
+                    {t('btnLoginSignup')}
+                  </Link>
+                  <Link
+                    to="/club"
+                    style={{
+                      padding: '8px 18px',
+                      background: '#1668c4',
+                      color: '#fff',
+                      borderRadius: 10,
+                      fontSize: '12.5px',
+                      fontWeight: 700,
+                      textDecoration: 'none',
+                    }}
+                  >
+                    {t('btnJoinClub')}
+                  </Link>
+                </>
+              )}
+
+              {loggedIn && user && (
+                <>
+                  <div style={{ position: 'relative' }}>
                     <div
+                      data-testid="public-notif-toggle"
+                      onClick={() => setNotifOpen((v) => !v)}
                       style={{
-                        width: 38,
-                        height: 38,
+                        width: 42,
+                        height: 42,
                         borderRadius: '50%',
-                        background: 'linear-gradient(135deg,#1668c4,#0d3b66)',
-                        color: '#fff',
+                        background: '#f3f5f8',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        fontWeight: 700,
-                        fontSize: '11.5px',
+                        color: '#5a6678',
+                        fontSize: '15.5px',
+                        position: 'relative',
+                        cursor: 'pointer',
                       }}
                     >
-                      {initials(user.fullName)}
+                      🔔
+                      <span style={{ position: 'absolute', top: 9, [isRTL ? 'left' : 'right']: 12, width: 8, height: 8, borderRadius: '50%', background: '#e5484d', border: '1.5px solid #fff' }} />
                     </div>
-                    <div style={{ lineHeight: 1.35, textAlign: 'right' }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: '#16202e' }}>{user.fullName}</div>
-                      {club?.isMember && club.level && (
-                        <div style={{ fontSize: 10, color: '#caa53a', fontWeight: 700 }}>★ عضو {TIER_LABEL[club.level] ?? club.level}</div>
-                      )}
-                    </div>
-                    <span style={{ fontSize: 8, color: '#6b7787', marginRight: 2 }}>▼</span>
+                    {notifOpen && (
+                      <>
+                        <div onClick={() => setNotifOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 120 }} />
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: 52,
+                            [isRTL ? 'left' : 'right']: 0,
+                            width: 340,
+                            background: '#fff',
+                            border: '1px solid #e6eaf0',
+                            borderRadius: 14,
+                            boxShadow: '0 20px 50px -16px rgba(13,38,64,.35)',
+                            zIndex: 130,
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <div style={{ padding: '11px 12px', borderBottom: '1px solid #eef1f5', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '12.5px', fontWeight: 800, color: '#0d2640' }}>{t('notificationsTitle')}</span>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: '#1668c4', background: '#eef4fb', padding: '2px 7px', borderRadius: 12 }}>
+                              {locale === 'fa' ? faDigits(notifications.length) : notifications.length}
+                            </span>
+                          </div>
+                          {notifications.map((n) => (
+                            <div key={n.title + n.time} style={{ display: 'flex', gap: 9, padding: '11px 12px', borderBottom: '1px solid #f4f6fa' }}>
+                              <span style={{ width: 34, height: 34, borderRadius: 10, background: '#f3f5f8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14.5px', flex: 'none' }}>
+                                {n.icon}
+                              </span>
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#16202e' }}>{n.title}</div>
+                                <div style={{ fontSize: 11, color: '#6b7787', marginTop: 2, lineHeight: 1.7 }}>{n.body}</div>
+                                <div style={{ fontSize: '9.5px', color: '#6b7787', marginTop: 4 }}>{n.time}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </div>
-
-                  {menuOpen && (
-                    <>
-                      <div onClick={() => setMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 120 }} />
+                  <div style={{ position: 'relative' }}>
+                    <div
+                      data-testid="public-user-menu-toggle"
+                      onClick={() => setMenuOpen((v) => !v)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        background: '#fff',
+                        border: '1px solid #e6eaf0',
+                        padding: '4px 10px 4px 7px',
+                        borderRadius: 30,
+                        cursor: 'pointer',
+                      }}
+                    >
                       <div
                         style={{
-                          position: 'absolute',
-                          top: 54,
-                          left: 0,
-                          width: 320,
-                          background: '#fff',
-                          border: '1px solid #e6eaf0',
-                          borderRadius: 16,
-                          boxShadow: '0 20px 50px -16px rgba(13,38,64,.35)',
-                          zIndex: 130,
-                          overflow: 'hidden',
+                          width: 38,
+                          height: 38,
+                          borderRadius: '50%',
+                          background: 'linear-gradient(135deg,#1668c4,#0d3b66)',
+                          color: '#fff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 700,
+                          fontSize: '11.5px',
                         }}
                       >
-                        <div style={{ padding: 15, background: 'linear-gradient(135deg,#0d2640,#16406e)', color: '#fff' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'rgba(255,255,255,.16)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '13.5px' }}>
-                              {initials(user.fullName)}
-                            </div>
-                            <div style={{ lineHeight: 1.5 }}>
-                              <div style={{ fontSize: '13.5px', fontWeight: 800 }}>{user.fullName}</div>
-                              {club?.isMember && club.level && (
-                                <div style={{ fontSize: '10.5px', color: '#caa53a', fontWeight: 700 }}>★ عضو {TIER_LABEL[club.level] ?? club.level}</div>
-                              )}
-                            </div>
-                          </div>
-                          {club?.isMember && (
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, background: 'rgba(255,255,255,.1)', borderRadius: 10, padding: '7px 11px' }}>
-                              <span style={{ fontSize: 11, color: '#aac4e2' }}>امتیاز باشگاه</span>
-                              <span style={{ fontSize: '12.5px', fontWeight: 800 }}>{faDigits(club.balance)}</span>
-                            </div>
-                          )}
-                        </div>
-                        <div style={{ padding: 5 }}>
-                          <Link
-                            to="/account"
-                            style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: '11.5px', color: '#16202e', textDecoration: 'none', fontWeight: 600 }}
-                          >
-                            <span style={{ color: '#1668c4' }}>👤</span>
-                            مشاهده پروفایل
-                          </Link>
-                          <Link
-                            to="/manage-booking"
-                            style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: '11.5px', color: '#16202e', textDecoration: 'none', fontWeight: 600 }}
-                          >
-                            <span style={{ color: '#1668c4' }}>🧳</span>
-                            سفرها و مدیریت رزرو
-                          </Link>
-                          <Link
-                            to="/manage-booking"
-                            style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: '11.5px', color: '#16202e', textDecoration: 'none', fontWeight: 600 }}
-                          >
-                            <span style={{ color: '#1668c4' }}>↺</span>
-                            استرداد
-                          </Link>
-                          <Link
-                            to="/club"
-                            style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: '11.5px', color: '#16202e', textDecoration: 'none', fontWeight: 600 }}
-                          >
-                            <span style={{ color: '#1668c4' }}>★</span>
-                            باشگاه مشتریان
-                          </Link>
-                          <span
-                            data-testid="public-logout"
-                            onClick={() => void signOut()}
-                            style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: '11.5px', color: '#e5484d', fontWeight: 600, cursor: 'pointer' }}
-                          >
-                            <span>↩</span>
-                            خروج از حساب
-                          </span>
-                        </div>
+                        {initials(user.fullName)}
                       </div>
-                    </>
-                  )}
-                </div>
+                      <div style={{ lineHeight: 1.35, textAlign: isRTL ? 'right' : 'left' }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: '#16202e' }}>{user.fullName}</div>
+                        {club?.isMember && tierLabel && <div style={{ fontSize: 10, color: '#caa53a', fontWeight: 700 }}>★ {tierLabel}</div>}
+                      </div>
+                      <span style={{ fontSize: 8, color: '#6b7787', marginRight: 2 }}>▼</span>
+                    </div>
+
+                    {menuOpen && (
+                      <>
+                        <div onClick={() => setMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 120 }} />
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: 54,
+                            [isRTL ? 'left' : 'right']: 0,
+                            width: 320,
+                            background: '#fff',
+                            border: '1px solid #e6eaf0',
+                            borderRadius: 16,
+                            boxShadow: '0 20px 50px -16px rgba(13,38,64,.35)',
+                            zIndex: 130,
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <div style={{ padding: 15, background: 'linear-gradient(135deg,#0d2640,#16406e)', color: '#fff' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'rgba(255,255,255,.16)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '13.5px' }}>
+                                {initials(user.fullName)}
+                              </div>
+                              <div style={{ lineHeight: 1.5 }}>
+                                <div style={{ fontSize: '13.5px', fontWeight: 800 }}>{user.fullName}</div>
+                                {club?.isMember && tierLabel && <div style={{ fontSize: '10.5px', color: '#caa53a', fontWeight: 700 }}>★ {tierLabel}</div>}
+                              </div>
+                            </div>
+                            {club?.isMember && (
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, background: 'rgba(255,255,255,.1)', borderRadius: 10, padding: '7px 11px' }}>
+                                <span style={{ fontSize: 11, color: '#aac4e2' }}>{t('pointsLabel')}</span>
+                                <span style={{ fontSize: '12.5px', fontWeight: 800 }}>{locale === 'fa' ? faDigits(club.balance) : club.balance}</span>
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ padding: 5 }}>
+                            <Link
+                              to="/account"
+                              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: '11.5px', color: '#16202e', textDecoration: 'none', fontWeight: 600 }}
+                            >
+                              <span style={{ color: '#1668c4' }}>👤</span>
+                              {t('profileLabel')}
+                            </Link>
+                            <Link
+                              to="/manage-booking"
+                              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: '11.5px', color: '#16202e', textDecoration: 'none', fontWeight: 600 }}
+                            >
+                              <span style={{ color: '#1668c4' }}>🧳</span>
+                              {t('tripsLabel')}
+                            </Link>
+                            <Link
+                              to="/manage-booking"
+                              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: '11.5px', color: '#16202e', textDecoration: 'none', fontWeight: 600 }}
+                            >
+                              <span style={{ color: '#1668c4' }}>↺</span>
+                              {t('refundLabel')}
+                            </Link>
+                            <Link
+                              to="/club"
+                              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: '11.5px', color: '#16202e', textDecoration: 'none', fontWeight: 600 }}
+                            >
+                              <span style={{ color: '#1668c4' }}>★</span>
+                              {t('navLoyalty')}
+                            </Link>
+                            <span
+                              data-testid="public-logout"
+                              onClick={() => void signOut()}
+                              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: '11.5px', color: '#e5484d', fontWeight: 600, cursor: 'pointer' }}
+                            >
+                              <span>↩</span>
+                              {t('logoutLabel')}
+                            </span>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {isMobile && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span
+                data-testid="public-lang-toggle-mobile"
+                onClick={() => setLocale(locale === 'fa' ? 'en' : locale === 'en' ? 'ar' : 'fa')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  height: 36,
+                  padding: '0 9px',
+                  borderRadius: 20,
+                  background: 'rgba(255,255,255,.16)',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontSize: '11.5px',
+                  fontWeight: 800,
+                }}
+              >
+                🌐 {locale.toUpperCase()}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {isMobile && mobileMenuOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: '#fff', zIndex: 210, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', padding: '26px 20px 18px' }}>
+            <span style={{ fontSize: 22, fontWeight: 800, color: '#16202e' }}>{t('menuTitle')}</span>
+            <span
+              onClick={() => setMobileMenuOpen(false)}
+              style={{
+                position: 'absolute',
+                [isRTL ? 'left' : 'right']: 20,
+                top: 22,
+                width: 34,
+                height: 34,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 24,
+                color: '#16202e',
+                cursor: 'pointer',
+              }}
+            >
+              ×
+            </span>
+          </div>
+          <div style={{ padding: '4px 24px 0', display: 'flex', flexDirection: 'column' }}>
+            {navLinks.map((link, i) => (
+              <Link
+                key={link.to}
+                to={link.to}
+                onClick={() => setMobileMenuOpen(false)}
+                style={{ padding: '20px 0', textDecoration: 'none', color: '#16202e', fontSize: 17, fontWeight: 700, borderTop: i > 0 ? '1px solid #eef1f5' : undefined }}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
+          <div style={{ margin: '14px 24px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {LANG_OPTIONS.map((opt) => (
+              <span
+                key={opt.value}
+                data-testid={`public-mobile-lang-option-${opt.value}`}
+                onClick={() => setLocale(opt.value)}
+                style={{
+                  textAlign: 'center',
+                  padding: 11,
+                  border: '1.5px solid #e2e7ee',
+                  borderRadius: 10,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: locale === opt.value ? '#1668c4' : '#5a6678',
+                  cursor: 'pointer',
+                }}
+              >
+                {opt.label}
+              </span>
+            ))}
+          </div>
+          <div style={{ margin: '10px 24px 32px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {!loggedIn && (
+              <Link
+                to="/signin"
+                onClick={() => setMobileMenuOpen(false)}
+                style={{ textAlign: 'center', padding: 13, border: '1.5px solid #d5e1f0', color: '#0d2640', borderRadius: 10, fontSize: 14, fontWeight: 700, textDecoration: 'none' }}
+              >
+                {t('btnLoginSignup')}
+              </Link>
+            )}
+            {loggedIn && user && (
+              <>
+                <Link
+                  to="/account"
+                  onClick={() => setMobileMenuOpen(false)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0', textDecoration: 'none', color: '#16202e', fontSize: 14, fontWeight: 700 }}
+                >
+                  <span style={{ color: '#1668c4' }}>👤</span>
+                  {t('profileLabel')}
+                </Link>
+                <Link
+                  to="/manage-booking"
+                  onClick={() => setMobileMenuOpen(false)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0', textDecoration: 'none', color: '#16202e', fontSize: 14, fontWeight: 700 }}
+                >
+                  <span style={{ color: '#1668c4' }}>🧳</span>
+                  {t('tripsLabel')}
+                </Link>
+                <span
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    void signOut();
+                  }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0', color: '#e5484d', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+                >
+                  <span>↩</span>
+                  {t('logoutLabel')}
+                </span>
               </>
             )}
           </div>
         </div>
-      </div>
+      )}
     </header>
   );
 }

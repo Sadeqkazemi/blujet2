@@ -619,6 +619,52 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   the redesign (translated strings, the switcher UI, responsive layouts,
   the split forgot-password flow, fare-rules CRUD) is explicitly future
   work, not started this phase.
+- [x] **Phase 41 — public i18n + responsive shared shell foundation**
+  — first real page-facing step of the Phase 40 arc: cataloged the full
+  `design-reference-v2/` bundle first (33 files renamed to their true
+  Persian page names and diffed against the old `design-reference/`
+  counterparts, `docs/design-refresh-2026-07-30.md`), confirming
+  staff/executive panels carry zero i18n/responsive markers (scope
+  correctly excludes them) and that وضعیت پرواز's i18n coverage — initially
+  flagged as missing — was retracted once the user supplied the correct
+  file (verified via a 49-hit `isEN|isAR` grep). پرداخت stays excluded
+  per explicit user instruction pending a corrected upload. Built the
+  shared infra every subsequent per-page phase depends on:
+  `frontend/src/lib/i18n.ts` (`useT()` dictionary hook + `DIR`/`FONT` maps)
+  and `frontend/src/hooks/useIsMobile.ts` (real `window.matchMedia`
+  tracking, mirroring the design bundle's own JS-state-driven responsive
+  pattern rather than CSS-only breakpoints). Deliberately did NOT replicate
+  the design mock's `arDeep` runtime dictionary (silent fallback to
+  Persian for unmatched strings) — every dictionary key has a real,
+  hand-checked Arabic string, cross-referenced against `support.js`'s
+  `ARDict` where it existed and hand-translated fresh where it didn't
+  (e.g. footer strings). Rewired `PublicPageShell`/`PublicHeader`/
+  `PublicFooter` onto these hooks: language switcher (desktop dropdown +
+  mobile off-canvas cycle), RTL/LTR-aware dropdown positioning, mobile
+  hamburger menu, single-column footer on mobile.
+
+  Hit and fixed two bugs before landing: (1) wiring `useLocale()` into the
+  shared shell broke 12 pre-existing test files (62 tests) that render
+  `PublicPageShell`/`PublicHeader` without a `LocaleProvider` wrapper,
+  because `useLocale()` threw when used outside one — fixed by giving
+  `LocaleContext` a sensible default (`fa` + no-op setter) instead of
+  throwing, since the real app always wraps routes in `LocaleProvider` via
+  `App.tsx` and the throw was only ever a footgun for isolated component
+  tests, not a real safety net; updated `useLocale.test.tsx`'s "throws
+  outside a provider" test into a "falls back to fa" test accordingly.
+  (2) `useIsMobile`'s initial render read `window.innerWidth` instead of
+  `matchMedia(...).matches`, so it ignored the mocked initial state in
+  tests (and, in the same way, a real user's actual starting viewport)
+  until the first `change` event — fixed to read `matchMedia` directly on
+  first render too. Full frontend suite: 237/237 passing, 61/61 files,
+  after both fixes. `tsc --noEmit` clean; `oxlint` clean (pre-existing
+  fast-refresh warnings only, same pattern as `useAuth.tsx`). See
+  `docs/features/i18n-responsive-foundation.md` for the checklist. Explicit
+  future work, not started: translating each page's own body content,
+  the real email+code forgot-password flow for English, and the newly
+  discovered backend domains (Careers CRUD, passenger satisfaction survey,
+  commercial-manager city/route + club-tier + web-service pricing config)
+  — all need `docs/API.md`/`docs/DB_SCHEMA.md` coverage and approval first.
 - [x] With Phases 35–37, the manual endpoint audit had covered
   `reconciliation`, `reservation`, and `it-manager`'s `services` module;
   every other controller checked so far (`pricing`, `flightops`,
