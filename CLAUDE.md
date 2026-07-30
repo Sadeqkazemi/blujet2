@@ -10,19 +10,45 @@
   Match them exactly: colors, spacing, typography, components. Do NOT redesign.
 
 ## Locale & Direction (NON-NEGOTIABLE)
-- The entire UI is **Persian (fa-IR), RTL**. `dir="rtl"` at the root;
-  every layout mirrored. LTR only for isolated spans (flight codes,
-  airport codes, Latin passenger names, emails).
-- Font: **Vazirmatn** (weights 400–900); monospace numbers via Roboto Mono
-  where the design shows them.
-- Calendar: **Jalali (شمسی)** everywhere users see dates — search box,
-  price calendar, edit-search calendar, panels' day/month/year filters.
-  Store timestamps in UTC (ISO 8601 / Gregorian) in the DB; convert at the
-  edge. Use a maintained Jalali lib (e.g. dayjs + jalaliday); never
-  hand-roll conversion.
-- Digits: displayed as Persian digits (۰–۹) exactly as in the design;
-  stored and transmitted as Latin digits. One shared formatting utility
-  (`faDigits`, `faMoney` with ٬ thousands separator) — no ad-hoc formatting.
+- **Staff/executive management panels** (پنل ادمین سایت، مدیر عامل، رئیس
+  هیئت مدیره، مدیر ارشد، مدیر بازرگانی، مدیر مالی، مدیر IT، کارمند) are
+  **Persian-only, RTL, always** — no language switcher, no exception.
+- **Public site + پنل کاربر + پنل آژانس** (updated design bundle, 2026-07-30)
+  support three display languages: **فارسی (fa, RTL, default) / English
+  (en, LTR) / العربية (ar, RTL)**, switchable per-visitor via a header
+  control. `dir` follows the active language (`ltr` only for `en`).
+  - Fonts: **Vazirmatn** for fa/ar; **Inter** for en (weights 400–900
+    both); monospace numbers via Roboto Mono where the design shows them.
+  - Preference storage is hybrid, never DB-only: `localStorage`
+    (`blujet_lang`) is always the first-read source for every visitor,
+    anonymous or not (avoids a flash of the wrong language before any
+    server round-trip); `User.preferredLocale` is the **cross-device sync
+    point for a logged-in USER/AGENCY only** — an anonymous visitor has no
+    `User` row to attach a preference to. See `docs/API.md`'s Phase 40
+    section for the exact sync rules.
+  - Arabic coverage may be a maintained exact-match dictionary
+    (string → string) applied at render time for pages that don't hand-author
+    every string, falling back to Persian for anything unmatched — follow
+    the design bundle's own per-page approach, don't invent a different
+    i18n mechanism per page.
+  - Anywhere the three languages diverge in more than translation (e.g. a
+    different account-recovery mechanism per language, confirmed in the
+    design bundle: email+code for en vs. phone+OTP for fa/ar), build the
+    real underlying mechanism per language — never fake one language's
+    flow with another's data.
+- LTR only for isolated spans regardless of active language (flight
+  codes, airport codes, Latin passenger names, emails).
+- Calendar: **Jalali (شمسی)** for fa (and, unless a specific page's design
+  says otherwise, ar) everywhere users see dates — search box, price
+  calendar, edit-search calendar, panels' day/month/year filters. For en,
+  confirm per-page against the design bundle before assuming
+  Jalali-vs-Gregorian. Store timestamps in UTC (ISO 8601 / Gregorian) in
+  the DB; convert at the edge. Use a maintained Jalali lib (e.g. dayjs +
+  jalaliday); never hand-roll conversion.
+- Digits: Persian digits (۰–۹) for fa; Latin digits for en; follow the
+  design bundle for ar. Always stored and transmitted as Latin digits. One
+  shared formatting utility per locale (`faDigits`/`faMoney` with ٬
+  thousands separator today) — no ad-hoc formatting.
 - Primary brand color: `#1668c4` (accent), dark navy `#0d2640`; follow
   design-reference for the full palette.
 

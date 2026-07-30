@@ -22,6 +22,7 @@ import type {
   AgencyApiScope,
   AgencyApiKeyStatus,
   AgencyCreditRequestStatus,
+  AgencyDocumentStatus,
   AgencyMembershipStatus,
   AgencyWebserviceRequestStatus,
 } from '../../../generated/typeorm/enums';
@@ -1188,6 +1189,74 @@ export class AgenciesService {
 
     return this.typeorm.agencyWebserviceRequest.findUniqueOrThrow({
       where: { id: requestId },
+    });
+  }
+
+  // ── Agency Portal: uploaded document review (staff-side) ───────────────
+
+  async listDocuments(id: string) {
+    await this.getProfileOrThrow(id);
+    return this.typeorm.agencyDocument.findMany({
+      where: { agencyId: id },
+      include: {
+        file: { select: { fileName: true, sizeBytes: true, mimeType: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async decideDocument(
+    actor: AuthenticatedUser,
+    id: string,
+    documentId: string,
+    approve: boolean,
+  ) {
+    const document = await this.typeorm.agencyDocument.findUnique({
+      where: { id: documentId },
+    });
+    if (!document || document.agencyId !== id) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'مدرک یافت نشد.',
+      });
+    }
+    if (document.status !== 'PENDING') {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'این مدرک قبلاً بررسی شده است.',
+      });
+    }
+
+    const decision: AgencyDocumentStatus = approve ? 'APPROVED' : 'REJECTED';
+
+    // Conditional update guards a concurrent double-decision race — same
+    // pattern as decideCreditRequest/decideWebserviceRequest above.
+    const updated = await this.typeorm.agencyDocument.updateMany({
+      where: { id: documentId, status: 'PENDING' },
+      data: { status: decision },
+    });
+    if (updated.count === 0) {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'این مدرک قبلاً بررسی شده است.',
+      });
+    }
+
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'AGENCY',
+      action: approve ? 'تأیید مدرک آژانس' : 'رد مدرک آژانس',
+      detail: `مدرک (${document.docType}) توسط ${actor.fullName} ${approve ? 'تأیید' : 'رد'} شد.`,
+      entityType: 'AgencyDocument',
+      entityId: documentId,
+    });
+
+    return this.typeorm.agencyDocument.findUniqueOrThrow({
+      where: { id: documentId },
+      include: {
+        file: { select: { fileName: true, sizeBytes: true, mimeType: true } },
+      },
     });
   }
 }

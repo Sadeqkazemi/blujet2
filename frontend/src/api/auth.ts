@@ -1,6 +1,6 @@
-import { apiGet, apiPost } from './http';
+import { apiGet, apiPatch, apiPost } from './http';
 import { setAccessToken } from './token-store';
-import type { AuthUser } from '../types/auth';
+import type { AuthUser, Locale } from '../types/auth';
 
 export function staffLogin(username: string, password: string) {
   return apiPost<{ challengeId: string }>('/auth/staff/login', { username, password });
@@ -40,6 +40,10 @@ export async function logout() {
 
 export function fetchMe() {
   return apiGet<AuthUser>('/auth/me');
+}
+
+export function updateMyLocale(locale: Locale) {
+  return apiPatch<{ preferredLocale: Locale }>('/auth/me/locale', { locale });
 }
 
 export function requestOtp(phone: string) {

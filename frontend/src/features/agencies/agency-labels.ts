@@ -1,4 +1,4 @@
-import type { AgencyInvoiceStatus, AgencyTier } from '../../types/agencies';
+import type { AgencyDocumentStatus, AgencyDocumentType, AgencyInvoiceStatus, AgencyTier } from '../../types/agencies';
 
 /** Label/tone maps shared by the agencies pages — exact strings from the design. */
 
@@ -12,6 +12,18 @@ export const INVOICE_STATUS: Record<AgencyInvoiceStatus, { label: string; classN
   PAID: { label: 'تسویه شد', className: 'bg-[#10b98124] text-[#059669]' },
   UNPAID: { label: 'در انتظار پرداخت', className: 'bg-[#f59e0b24] text-[#b45309]' },
   OVERDUE: { label: 'معوق', className: 'bg-danger/15 text-danger' },
+};
+
+export const DOCUMENT_TYPE_LABELS: Record<AgencyDocumentType, string> = {
+  LICENSE: 'مجوز فعالیت',
+  CONTRACT: 'قرارداد',
+  OTHER: 'سایر',
+};
+
+export const DOCUMENT_STATUS: Record<AgencyDocumentStatus, { label: string; className: string }> = {
+  PENDING: { label: 'در انتظار بررسی', className: 'bg-[#f59e0b24] text-[#b45309]' },
+  APPROVED: { label: 'تأیید شد', className: 'bg-[#10b98124] text-[#059669]' },
+  REJECTED: { label: 'رد شد', className: 'bg-danger/15 text-danger' },
 };
 
 export const ACTIVE_BADGE = { label: 'فعال', className: 'bg-[#10b98124] text-[#059669]' };

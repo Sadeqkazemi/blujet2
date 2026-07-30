@@ -542,6 +542,83 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   e2e suite: 340/342 passing, exactly those two known-pre-existing
   failures. See `docs/features/flight-management.md`'s Phase 38 section,
   `docs/API.md`/`docs/DB_SCHEMA.md`'s Phase 38 notes.
+- [x] **Phase 39 — بازبینی مدارک آژانس (staff-side agency document
+  review)** — triggered when the user asked for an explanation of the
+  agency-portal deferred list; investigating it found two of the three
+  named items were actually stale (already built by later phases without
+  this file being updated) and one was real: `AgencyDocument.status`
+  had existed since the model shipped but no staff endpoint could ever
+  see or decide on an upload, so every document sat `PENDING` forever
+  (the TypeORM model's own comment said as much). Built the same
+  request/decide pattern already used twice in this codebase (credit-
+  requests, webservice-requests): `GET /agencies/:id/documents` +
+  `PATCH .../documents/:docId/decide` (`AGENCY_TAB_ROLES`, no step-up —
+  approving a document changes no money/capacity/access), and a «مدارک
+  آپلودشده» card in `AgencyDetailPage.tsx`. Corrected
+  `docs/features/agency-portal.md`'s deferred list: allocated-seats
+  (Phase 13 Part C) and webservice self-service (Phase 23) were already
+  built; documents is now built too; forgot-password is now scoped down
+  to AGENCY-only (customer/staff were resolved in Phase 21, discovered
+  while re-checking that bullet). **Found but deliberately not fixed,
+  flagged instead**: the credit-requests/webservice-requests endpoints
+  this phase's code mirrors have no staff-side frontend either — same
+  shape of gap, kept out of this phase's diff for reviewability. 3 new
+  backend e2e tests, 2 new frontend tests (plus `fetchAgencyDocuments`
+  mocked into the 6 existing role tests that now also call it, to avoid
+  an unmocked-fetch regression). See `docs/API.md`/`docs/DB_SCHEMA.md`'s
+  Phase 39 sections, `docs/features/agency-portal.md`'s corrected
+  checklist + deferred list.
+- [x] **Phase 40 — ترجیح زبان نمایش (display-language preference storage)**
+  — first concrete step of a new, larger arc: the user brought in an
+  updated design bundle (uploaded across ~9 messages, 33 `.dc.html` files
+  plus refreshed `site-data.js`/`support.js`/`image-slot.js`, staged into
+  `design-reference-v2/`) that adds fa/en/ar language support + real
+  responsive (JS `matchMedia`-driven, not just CSS) layouts — scoped by
+  the user explicitly to the public site + پنل کاربر + پنل آژانس only;
+  staff/executive panels stay Persian-only. Extraction turned up: a
+  three-language switcher backed by `localStorage` (`blujet_lang`), a
+  hand-authored English translation per string, an Arabic layer that's
+  partly a runtime exact-match dictionary (`window.arDeep`, in
+  `support.js`) and partly hand-authored per page; a genuinely new page
+  (فرصت‌های شغلی / Careers, with its own `site-data.js` job-posting
+  backend stub); a real design reference for the long-deferred fare-rules
+  CRUD gap (پنل مدیر بازرگانی now has a full «کلاس‌های نرخی پرواز» UI
+  matching our existing backend's exact business rules); and a
+  language-dependent (not just translated) forgot-password mechanism —
+  email+code for English vs. phone+OTP for Persian/Arabic (matching what
+  we already have). User decisions confirmed via `AskUserQuestion`:
+  formally amend CLAUDE.md's Persian-only rule (done, see its Locale &
+  Direction section) rather than treat the new design as out-of-policy;
+  scope confined to public+user+agency; build a REAL email+code reset
+  flow for English (not fake it with phone+OTP); persist locale
+  preference in the database. Refined that last point after the user
+  asked me to double-check it: DB-only would strand anonymous visitors
+  (no `User` row to write to) and always reset returning visitors to
+  Persian on refresh — the correct shape is hybrid, `localStorage` first
+  for everyone + `User.preferredLocale` as the logged-in cross-device sync
+  point, confirmed with the user before building.
+
+  Built (storage/plumbing only — no page has translated strings yet, and
+  the user was explicit: no mock data, a real column and a real,
+  reachable endpoint): `User.preferredLocale` (new `Locale` enum
+  FA/EN/AR, default FA); `GET /auth/me` now does a fresh DB read (was a
+  bare JWT-payload echo) so the value can't go stale between token
+  refreshes; new `PATCH /auth/me/locale`. Frontend:
+  `frontend/src/hooks/useLocale.tsx` (`LocaleProvider`/`useLocale`, mounted
+  in `App.tsx` inside `AuthProvider`) — reads `localStorage` first always,
+  adopts the DB value on login when it differs, writes `localStorage` +
+  fire-and-forget `PATCH`s the DB on every explicit change. 3 new backend
+  e2e tests (plus a self-contained fix: reset the shared `ceo` seed
+  account's `preferredLocale` at the start and end of its own test, since
+  it's reused across many tests/runs and a first pass left it polluted at
+  `EN` for a later full-suite run), 6 new frontend hook tests. Full
+  backend e2e suite: 345/347 passing, the same 2 known pre-existing
+  failures (flights.e2e-spec.ts completed-report, reporting.e2e-spec.ts
+  revenue-reconciliation) — this phase caused neither. Frontend: 225/225.
+  See `docs/API.md`/`docs/DB_SCHEMA.md`'s Phase 40 sections. The rest of
+  the redesign (translated strings, the switcher UI, responsive layouts,
+  the split forgot-password flow, fare-rules CRUD) is explicitly future
+  work, not started this phase.
 - [x] With Phases 35–37, the manual endpoint audit had covered
   `reconciliation`, `reservation`, and `it-manager`'s `services` module;
   every other controller checked so far (`pricing`, `flightops`,
