@@ -779,6 +779,28 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   Full frontend suite: 251/251 passing, 61/61 files. `tsc --noEmit` clean;
   `oxlint` clean (same pre-existing warnings). See
   `docs/features/club-page-i18n-responsive.md`.
+- [x] **Phase 46 — پشتیبانی (Support) real i18n + responsive body
+  content** — sixth page of the per-page translation arc. `SupportPage`
+  translates its hero, four category cards, all five FAQ question/
+  answers, the ticket form, and the three direct-contact cards into
+  fa/en/ar. Extracted from `design-reference-v2/پشتیبانی.dc.html`'s own
+  `isEN` ternaries — this page's mock fa strings matched the real app's
+  shipped content exactly, word for word, nothing needed realigning — and
+  `site-data.js`'s `arDeep` dictionary, which had complete coverage here
+  too. Deliberate decision: the ticket's `subject` value submitted to the
+  real backend always stays the canonical Persian string regardless of
+  the active display locale — only the dropdown's visible label
+  translates via a separate `SUBJECT_LABELS` map — since staff view
+  tickets in the Persian-only admin queue and letting translated subject
+  text leak into stored tickets would be a real regression, not just a
+  display nicety; proven by a test that renders the page in `en` and
+  asserts the submitted `subject` is still the Persian string. FAQ search
+  now matches the active locale's question/answer text. Both pre-existing
+  `SupportPage` tests pass unmodified; 2 new tests (en, ar). Category-card
+  grid and the FAQ/contact two-column layout collapse on mobile via the
+  shared `useIsMobile()` hook. Full frontend suite: 253/253 passing,
+  61/61 files. `tsc --noEmit` clean; `oxlint` clean (same pre-existing
+  warnings). See `docs/features/support-page-i18n-responsive.md`.
 - [x] With Phases 35–37, the manual endpoint audit had covered
   `reconciliation`, `reservation`, and `it-manager`'s `services` module;
   every other controller checked so far (`pricing`, `flightops`,
