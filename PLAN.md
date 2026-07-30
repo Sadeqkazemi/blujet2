@@ -1001,6 +1001,20 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   Full frontend suite: 272/272 passing, 61/61 files. `tsc --noEmit`
   clean; `oxlint` clean (same pre-existing warnings). See
   `docs/features/agency-credit-page-i18n.md`.
+- [x] **Phase 56 — پنل آژانس: Sales & Reports tab real i18n** — fourth
+  agency-portal page. `AgencySalesPage.tsx` translates its 4 KPIs,
+  per-flight sales table, and issued-tickets table into fa/en/ar; backed
+  by the real `GET /agency-portal/sales` endpoint — no new backend work.
+  Heading and KPI labels reuse `design-reference-v2/پنل آژانس.dc.html`'s
+  own `isEN` vocabulary for this exact tab (`reportKpis`'s KPI labels,
+  the "Sales per flight" section label); AR is hand-translated. The
+  tickets table's booking-status labels are a page-local map, kept
+  separate from `AccountPage.tsx`'s `STATUS_LABEL` since the two pages
+  use different (compact vs. verbose) fa wording for the same statuses.
+  The pre-existing test passes unmodified; 2 new tests (en, ar). Full
+  frontend suite: 274/274 passing, 61/61 files. `tsc --noEmit` clean;
+  `oxlint` clean (same pre-existing warnings). See
+  `docs/features/agency-sales-page-i18n.md`.
 - [x] With Phases 35–37, the manual endpoint audit had covered
   `reconciliation`, `reservation`, and `it-manager`'s `services` module;
   every other controller checked so far (`pricing`, `flightops`,

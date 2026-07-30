@@ -2,42 +2,150 @@ import { useEffect, useState } from 'react';
 import { fetchSales } from '../../api/agency-portal';
 import { faDigits, faMoney, faPercent } from '../../lib/fa-format';
 import { formatJalaliDate } from '../../lib/jalali';
+import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import type { AgencySalesReport } from '../../types/agency-portal';
 
-const BOOKING_STATUS_LABEL: Record<string, string> = {
-  DRAFT: 'پیش‌نویس',
-  HELD: 'رزرو موقت',
-  PAID: 'پرداخت‌شده',
-  TICKETED: 'صادرشده',
-  CANCELLED: 'لغوشده',
-  EXPIRED: 'منقضی‌شده',
-  REFUNDED: 'مستردشده',
+// فروش و گزارش — heading/section labels reuse
+// design-reference-v2/پنل آژانس.dc.html's own isEN vocabulary for this
+// exact tab ("Sales per flight", the reportKpis labels); AR has no
+// counterpart there and is hand-translated.
+interface Tr {
+  fa: string;
+  en: string;
+  ar: string;
+}
+
+const BOOKING_STATUS_LABEL: Record<string, Tr> = {
+  DRAFT: { fa: 'پیش‌نویس', en: 'Draft', ar: 'مسودة' },
+  HELD: { fa: 'رزرو موقت', en: 'Held', ar: 'محجوز مؤقتًا' },
+  PAID: { fa: 'پرداخت‌شده', en: 'Paid', ar: 'مدفوع' },
+  TICKETED: { fa: 'صادرشده', en: 'Ticketed', ar: 'تم إصدار التذكرة' },
+  CANCELLED: { fa: 'لغوشده', en: 'Cancelled', ar: 'ملغى' },
+  EXPIRED: { fa: 'منقضی‌شده', en: 'Expired', ar: 'منتهي الصلاحية' },
+  REFUNDED: { fa: 'مستردشده', en: 'Refunded', ar: 'تم الاسترداد' },
+};
+
+const STR: Record<StoredLocale, {
+  heading: string;
+  subtitle: string;
+  errorFallback: string;
+  loading: string;
+  kpiTotalSales: string;
+  kpiTicketsIssued: string;
+  kpiAvgFare: string;
+  kpiRefundRate: string;
+  perFlightHeading: string;
+  perFlightEmpty: string;
+  colFlight: string;
+  colRoute: string;
+  colTicketsCount: string;
+  colTotalSales: string;
+  ticketsHeading: string;
+  ticketsEmpty: string;
+  colPnr: string;
+  colDepartureDate: string;
+  colAmount: string;
+  colStatus: string;
+  toman: string;
+}> = {
+  fa: {
+    heading: 'فروش و گزارش',
+    subtitle: 'تفکیک فروش آژانس شما بر اساس پرواز و بلیط',
+    errorFallback: 'خطا در دریافت گزارش فروش.',
+    loading: 'در حال بارگذاری…',
+    kpiTotalSales: 'کل فروش (تومان)',
+    kpiTicketsIssued: 'بلیط صادرشده',
+    kpiAvgFare: 'میانگین نرخ (تومان)',
+    kpiRefundRate: 'نرخ استرداد',
+    perFlightHeading: 'فروش هر پرواز',
+    perFlightEmpty: 'فروشی ثبت نشده است.',
+    colFlight: 'پرواز',
+    colRoute: 'مسیر',
+    colTicketsCount: 'تعداد بلیط',
+    colTotalSales: 'جمع فروش',
+    ticketsHeading: 'بلیط‌های صادرشده',
+    ticketsEmpty: 'بلیطی ثبت نشده است.',
+    colPnr: 'PNR',
+    colDepartureDate: 'تاریخ پرواز',
+    colAmount: 'مبلغ',
+    colStatus: 'وضعیت',
+    toman: 'تومان',
+  },
+  en: {
+    heading: 'Sales & Reports',
+    subtitle: 'A breakdown of your agency sales by flight and ticket',
+    errorFallback: 'Error loading the sales report.',
+    loading: 'Loading…',
+    kpiTotalSales: 'Total Sales (Toman)',
+    kpiTicketsIssued: 'Tickets Issued',
+    kpiAvgFare: 'Average Fare (Toman)',
+    kpiRefundRate: 'Refund Rate',
+    perFlightHeading: 'Sales per Flight',
+    perFlightEmpty: 'No sales recorded yet.',
+    colFlight: 'Flight',
+    colRoute: 'Route',
+    colTicketsCount: 'Tickets',
+    colTotalSales: 'Total Sales',
+    ticketsHeading: 'Issued Tickets',
+    ticketsEmpty: 'No tickets recorded yet.',
+    colPnr: 'PNR',
+    colDepartureDate: 'Departure Date',
+    colAmount: 'Amount',
+    colStatus: 'Status',
+    toman: 'Toman',
+  },
+  ar: {
+    heading: 'المبيعات والتقارير',
+    subtitle: 'تفصيل مبيعات وكالتك حسب الرحلة والتذكرة',
+    errorFallback: 'خطأ في تحميل تقرير المبيعات.',
+    loading: 'جارٍ التحميل…',
+    kpiTotalSales: 'إجمالي المبيعات (تومان)',
+    kpiTicketsIssued: 'التذاكر الصادرة',
+    kpiAvgFare: 'متوسط السعر (تومان)',
+    kpiRefundRate: 'معدل الاسترداد',
+    perFlightHeading: 'المبيعات لكل رحلة',
+    perFlightEmpty: 'لا توجد مبيعات مسجّلة بعد.',
+    colFlight: 'الرحلة',
+    colRoute: 'المسار',
+    colTicketsCount: 'عدد التذاكر',
+    colTotalSales: 'إجمالي المبيعات',
+    ticketsHeading: 'التذاكر الصادرة',
+    ticketsEmpty: 'لا توجد تذاكر مسجّلة بعد.',
+    colPnr: 'رمز الحجز',
+    colDepartureDate: 'تاريخ الرحلة',
+    colAmount: 'المبلغ',
+    colStatus: 'الحالة',
+    toman: 'تومان',
+  },
 };
 
 export default function AgencySalesPage() {
+  const { locale } = useLocale();
+  const t = STR[locale];
   const [data, setData] = useState<AgencySalesReport | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchSales()
       .then(setData)
-      .catch(() => setError('خطا در دریافت گزارش فروش.'));
+      .catch(() => setError(t.errorFallback));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (error) return <p className="p-8 text-sm text-danger">{error}</p>;
-  if (!data) return <p className="p-8 text-sm text-muted">در حال بارگذاری…</p>;
+  if (!data) return <p className="p-8 text-sm text-muted">{t.loading}</p>;
 
   const kpis = [
-    { label: 'کل فروش (تومان)', value: faMoney(data.summary.totalSalesIrr) },
-    { label: 'بلیط صادرشده', value: faDigits(data.summary.ticketsIssued) },
-    { label: 'میانگین نرخ (تومان)', value: faMoney(data.summary.avgFareIrr) },
-    { label: 'نرخ استرداد', value: faPercent(data.summary.refundRatePct) },
+    { label: t.kpiTotalSales, value: faMoney(data.summary.totalSalesIrr) },
+    { label: t.kpiTicketsIssued, value: faDigits(data.summary.ticketsIssued) },
+    { label: t.kpiAvgFare, value: faMoney(data.summary.avgFareIrr) },
+    { label: t.kpiRefundRate, value: faPercent(data.summary.refundRatePct) },
   ];
 
   return (
     <div className="p-8">
-      <h1 className="mb-1 text-xl font-black text-ink">فروش و گزارش</h1>
-      <p className="mb-6 text-sm text-muted">تفکیک فروش آژانس شما بر اساس پرواز و بلیط</p>
+      <h1 className="mb-1 text-xl font-black text-ink">{t.heading}</h1>
+      <p className="mb-6 text-sm text-muted">{t.subtitle}</p>
 
       <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
         {kpis.map((k) => (
@@ -49,18 +157,18 @@ export default function AgencySalesPage() {
       </div>
 
       <div className="mb-6 rounded-xl border border-border bg-white p-5">
-        <div className="mb-4 text-sm font-bold text-ink">فروش هر پرواز</div>
+        <div className="mb-4 text-sm font-bold text-ink">{t.perFlightHeading}</div>
         {data.perFlight.length === 0 ? (
-          <p className="py-4 text-center text-xs text-muted">فروشی ثبت نشده است.</p>
+          <p className="py-4 text-center text-xs text-muted">{t.perFlightEmpty}</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-right text-xs">
               <thead>
                 <tr className="border-b border-border text-[10px] text-muted">
-                  <th className="py-2 font-bold">پرواز</th>
-                  <th className="py-2 font-bold">مسیر</th>
-                  <th className="py-2 font-bold">تعداد بلیط</th>
-                  <th className="py-2 font-bold">جمع فروش</th>
+                  <th className="py-2 font-bold">{t.colFlight}</th>
+                  <th className="py-2 font-bold">{t.colRoute}</th>
+                  <th className="py-2 font-bold">{t.colTicketsCount}</th>
+                  <th className="py-2 font-bold">{t.colTotalSales}</th>
                 </tr>
               </thead>
               <tbody>
@@ -69,7 +177,7 @@ export default function AgencySalesPage() {
                     <td className="ltr font-num py-2.5">{f.flightNo}</td>
                     <td className="ltr font-num py-2.5">{f.route}</td>
                     <td className="font-num py-2.5">{faDigits(f.ticketsCount)}</td>
-                    <td className="font-num py-2.5 font-bold">{faMoney(f.salesIrr)} تومان</td>
+                    <td className="font-num py-2.5 font-bold">{faMoney(f.salesIrr)} {t.toman}</td>
                   </tr>
                 ))}
               </tbody>
@@ -79,31 +187,31 @@ export default function AgencySalesPage() {
       </div>
 
       <div className="rounded-xl border border-border bg-white p-5">
-        <div className="mb-4 text-sm font-bold text-ink">بلیط‌های صادرشده</div>
+        <div className="mb-4 text-sm font-bold text-ink">{t.ticketsHeading}</div>
         {data.tickets.length === 0 ? (
-          <p className="py-4 text-center text-xs text-muted">بلیطی ثبت نشده است.</p>
+          <p className="py-4 text-center text-xs text-muted">{t.ticketsEmpty}</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-right text-xs">
               <thead>
                 <tr className="border-b border-border text-[10px] text-muted">
-                  <th className="py-2 font-bold">PNR</th>
-                  <th className="py-2 font-bold">پرواز</th>
-                  <th className="py-2 font-bold">تاریخ پرواز</th>
-                  <th className="py-2 font-bold">مبلغ</th>
-                  <th className="py-2 font-bold">وضعیت</th>
+                  <th className="py-2 font-bold">{t.colPnr}</th>
+                  <th className="py-2 font-bold">{t.colFlight}</th>
+                  <th className="py-2 font-bold">{t.colDepartureDate}</th>
+                  <th className="py-2 font-bold">{t.colAmount}</th>
+                  <th className="py-2 font-bold">{t.colStatus}</th>
                 </tr>
               </thead>
               <tbody>
-                {data.tickets.map((t) => (
-                  <tr key={t.pnr} className="border-b border-border/60">
-                    <td className="ltr font-num py-2.5">{t.pnr}</td>
+                {data.tickets.map((t2) => (
+                  <tr key={t2.pnr} className="border-b border-border/60">
+                    <td className="ltr font-num py-2.5">{t2.pnr}</td>
                     <td className="ltr font-num py-2.5">
-                      {t.flightNo} — {t.route}
+                      {t2.flightNo} — {t2.route}
                     </td>
-                    <td className="font-num py-2.5">{formatJalaliDate(t.departureAt)}</td>
-                    <td className="font-num py-2.5 font-bold">{faMoney(t.priceIrr)} تومان</td>
-                    <td className="py-2.5">{BOOKING_STATUS_LABEL[t.status] ?? t.status}</td>
+                    <td className="font-num py-2.5">{formatJalaliDate(t2.departureAt)}</td>
+                    <td className="font-num py-2.5 font-bold">{faMoney(t2.priceIrr)} {t.toman}</td>
+                    <td className="py-2.5">{BOOKING_STATUS_LABEL[t2.status]?.[locale] ?? t2.status}</td>
                   </tr>
                 ))}
               </tbody>
