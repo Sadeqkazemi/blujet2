@@ -1779,3 +1779,21 @@ use for locale-aware direction/font/strings and a real
 dropdown + mobile off-canvas cycle) wired to the existing `useLocale()`
 from Phase 40. See `docs/features/i18n-responsive-foundation.md` for the
 full checklist. Per-page body translation is out of scope for this phase.
+
+## Phase 42 — صفحه اصلی (Home) real i18n + responsive body content
+
+Frontend-only, no new/changed endpoints. First per-page translation built
+on Phase 41's shared shell: `HomeSearchPage` now renders through
+`PublicPageShell`, translates every marketing/search string into fa/en/ar
+(extracted from `design-reference-v2/صفحه اصلی.dc.html`, not invented),
+and collapses to the mobile layout via `useIsMobile()`. New shared money
+helpers in `frontend/src/lib/fa-format.ts`: `arDigits`, `formatToman`,
+`formatLocalePercent` — for locale-aware digit/separator display of a
+plain toman amount (distinct from `faMoney`, which is specifically the
+rial→toman API-value converter). Real prices stay in toman across all
+three locales — the design mock's EN-mode USD prices were NOT replicated,
+since the backend only ever charges IRR. See
+`docs/features/home-page-i18n-responsive.md` for the checklist, including
+the known limitation that the real airport dropdown has no `cityEn`/
+`cityAr` column yet and falls back to `cityFa` for any city not in the
+page's small hardcoded marketing-card city map.
