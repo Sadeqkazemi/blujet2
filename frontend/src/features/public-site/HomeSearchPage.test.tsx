@@ -5,11 +5,16 @@ import { describe, expect, it, vi } from 'vitest';
 import HomeSearchPage from './HomeSearchPage';
 import * as publicSiteApi from '../../api/publicSite';
 import * as useAuthModule from '../../hooks/useAuth';
+import * as useLocaleModule from '../../hooks/useLocale';
 
 const AIRPORTS = [
   { id: 'a1', code: 'THR', cityFa: 'تهران', tz: 'Asia/Tehran' },
   { id: 'a2', code: 'MHD', cityFa: 'مشهد', tz: 'Asia/Tehran' },
 ];
+
+function mockLocale(locale: 'fa' | 'en' | 'ar' = 'fa') {
+  vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale, setLocale: vi.fn() });
+}
 
 function renderPage() {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
@@ -76,5 +81,33 @@ describe('HomeSearchPage', () => {
     await userEvent.click(screen.getByTestId('home-search-submit'));
 
     expect(screen.getByText('مبدأ و مقصد نمی‌توانند یکسان باشند.')).toBeInTheDocument();
+  });
+
+  it('renders translated marketing sections and Latin-digit toman prices in English', async () => {
+    mockLocale('en');
+    vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
+    renderPage();
+    await screen.findAllByText('Tehran (THR)');
+
+    expect(screen.getByText('Book your next flight with blujet')).toBeInTheDocument();
+    expect(screen.getByText('Special Offers')).toBeInTheDocument();
+    expect(screen.getByText('Up to 40% off international flights')).toBeInTheDocument();
+    expect(screen.getByText('Popular Destinations')).toBeInTheDocument();
+    expect(screen.getByText('Take your trip with you')).toBeInTheDocument();
+    expect(screen.getByTestId('offer-THR-IST')).toHaveTextContent('19% OFF');
+    expect(screen.getByTestId('popular-route-MHD')).toHaveTextContent('1,600,000');
+  });
+
+  it('renders Arabic marketing sections with Eastern Arabic-Indic digits', async () => {
+    mockLocale('ar');
+    vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
+    renderPage();
+    await screen.findAllByText('طهران (THR)');
+
+    expect(screen.getByText('احجز رحلتك القادمة مع blujet')).toBeInTheDocument();
+    expect(screen.getByText('عروض خاصة')).toBeInTheDocument();
+    expect(screen.getByText('الوجهات الشائعة')).toBeInTheDocument();
+    expect(screen.getByTestId('offer-THR-IST')).toHaveTextContent('١٩٪ خصم');
+    expect(screen.getByTestId('popular-route-MHD')).toHaveTextContent('١٬٦٠٠٬٠٠٠');
   });
 });

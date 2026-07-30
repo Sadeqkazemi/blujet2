@@ -665,6 +665,35 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   discovered backend domains (Careers CRUD, passenger satisfaction survey,
   commercial-manager city/route + club-tier + web-service pricing config)
   — all need `docs/API.md`/`docs/DB_SCHEMA.md` coverage and approval first.
+- [x] **Phase 42 — صفحه اصلی (Home) real i18n + responsive body content**
+  — first page of the per-page translation arc Phase 41 explicitly
+  deferred. `HomeSearchPage` now renders through `PublicPageShell` (was its
+  own hardcoded `dir="rtl"` wrapper) and every string — announcement
+  banner, hero, trip-type radios, search fields, popular routes, quick
+  links, special offers, mid-banner sale, popular destinations, loyalty
+  band, app band — is translated into fa/en/ar. Every en/ar string was
+  extracted from `design-reference-v2/صفحه اصلی.dc.html`'s own `isEN`/
+  `isAR` ternaries and `site-data.js`'s `arDeep` dictionary, not invented.
+  One deliberate departure from the mock: its EN mode shows fake USD
+  prices; kept real toman pricing in all three locales instead (the
+  backend only ever charges IRR), formatted with new locale-aware helpers
+  in `frontend/src/lib/fa-format.ts` — `arDigits`, `formatToman`,
+  `formatLocalePercent` — alongside the existing `faMoney` (which stays
+  the one place rial→toman conversion happens for real API values; the
+  new helpers format already-in-toman or plain numeric display values).
+  Responsive: hero height/title size, search-field layout (row → 2-col
+  grid), the four content grids (5/4 cols → 2 cols), and the two banner
+  bands (row → column) all switch at the shared `useIsMobile()` breakpoint,
+  matching the design bundle's own `isMobile` style values. Flagged, not
+  silently patched over: the real airport `<select>` has no `cityEn`/
+  `cityAr` column yet, so it falls back to the API's `cityFa` for any city
+  outside the page's small marketing-card city map — future schema work,
+  needs `docs/DB_SCHEMA.md` coverage + approval like every new column.
+  4 pre-existing tests untouched and still passing (fa strings identical
+  to before this phase); 2 new tests (en, ar) + 4 new `fa-format.test.ts`
+  cases for the new helpers. Full frontend suite: 244/244 passing, 61/61
+  files. `tsc --noEmit` clean; `oxlint` clean (same pre-existing warnings).
+  See `docs/features/home-page-i18n-responsive.md`.
 - [x] With Phases 35–37, the manual endpoint audit had covered
   `reconciliation`, `reservation`, and `it-manager`'s `services` module;
   every other controller checked so far (`pricing`, `flightops`,
