@@ -1,8 +1,17 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import AgencySalesPage from './AgencySalesPage';
 import * as portalApi from '../../api/agency-portal';
+import * as useLocaleModule from '../../hooks/useLocale';
 import type { AgencySalesReport } from '../../types/agency-portal';
+
+function mockLocale(locale: 'fa' | 'en' | 'ar') {
+  vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale, setLocale: vi.fn() });
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 const REPORT: AgencySalesReport = {
   tickets: [
@@ -28,5 +37,25 @@ describe('AgencySalesPage', () => {
     expect(await screen.findByText('BJAG001')).toBeInTheDocument();
     expect(screen.getByText('EP-821 — THR → DXB')).toBeInTheDocument();
     expect(screen.getByText('۷۶٬۰۰۰٬۰۰۰')).toBeInTheDocument();
+  });
+
+  it('renders translated headings, KPI labels, and ticket status in English', async () => {
+    mockLocale('en');
+    vi.spyOn(portalApi, 'fetchSales').mockResolvedValue(REPORT);
+    render(<AgencySalesPage />);
+
+    expect(await screen.findByText('Sales & Reports')).toBeInTheDocument();
+    expect(screen.getByText('Total Sales (Toman)')).toBeInTheDocument();
+    expect(screen.getByText('Sales per Flight')).toBeInTheDocument();
+    expect(screen.getByText('Ticketed')).toBeInTheDocument();
+  });
+
+  it('renders translated headings and ticket status in Arabic', async () => {
+    mockLocale('ar');
+    vi.spyOn(portalApi, 'fetchSales').mockResolvedValue(REPORT);
+    render(<AgencySalesPage />);
+
+    expect(await screen.findByText('المبيعات والتقارير')).toBeInTheDocument();
+    expect(screen.getByText('تم إصدار التذكرة')).toBeInTheDocument();
   });
 });
