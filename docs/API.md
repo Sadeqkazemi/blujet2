@@ -1892,3 +1892,17 @@ dictionary, both complete for this page's fa content, so nothing needed
 hand-translation. Stats strip, mission/vision cards, and values cards
 collapse on mobile via the shared `useIsMobile()` hook. See
 `docs/features/about-page-i18n-responsive.md`.
+
+## Phase 49 — تماس با ما (Contact) real i18n + responsive body content
+
+Frontend-only, no new/changed endpoints. Ninth page translated.
+`ContactPage` translates its hero, four contact-channel cards, and the
+message form into fa/en/ar. EN strings came from `design-reference-v2/
+تماس با ما.dc.html`'s own `isEN` ternaries, complete and matching the
+shipped app's fa content. Unlike most prior pages, this page's design
+source has no `isAR` branch at all and `arDeep` only covers a couple of
+generic words — every Arabic string here was hand-translated fresh, same
+quality bar as every phase (no silent Persian fallback like the design
+mock's own Arabic mode would produce). Channels + form two-column layout
+collapses to a single column on mobile via the shared `useIsMobile()`
+hook. See `docs/features/contact-page-i18n-responsive.md`.
