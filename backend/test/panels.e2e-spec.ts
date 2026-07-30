@@ -61,6 +61,7 @@ describe('Panels (e2e)', () => {
       'panels',
       'security',
       'logs',
+      'survey',
     ]);
   });
 

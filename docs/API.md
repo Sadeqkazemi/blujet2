@@ -2244,7 +2244,7 @@ phase cadence (Phases 51–64), which relies on the real-DB Jest e2e suite
 plus Vitest/RTL rather than a dedicated Playwright script per small
 feature.
 
-## Phase 66 (DRAFT — pending approval) — نظرسنجی مسافران (Passenger Satisfaction Survey)
+## Phase 66 — نظرسنجی مسافران (Passenger Satisfaction Survey)
 
 Found across three design files: `پنل مدیر IT.dc.html` (a `survey` tab
 that **creates/configures** the survey — enable toggle, question list
@@ -2277,19 +2277,28 @@ manager's own file. No other role's design file mentions a `survey` tab.
   passenger, not as separately-scored dimensions. The schema matches
   what the design actually implements, not an invented per-question
   rating table.
-- **Lazy materialization, no cron.** This codebase has zero scheduler
-  infrastructure by design (see `flight-lifecycle.util.ts`'s own
-  comments) — every `SCHEDULED → DEPARTED` and `TICKETED → FLOWN`
-  transition is computed on-read. Survey-invite creation hooks into that
-  same `materializeFlownBookings` call, which already runs at every call
-  site that needs an up-to-date booking-status view
-  (`reporting.service.ts`, `flightops.service.ts`, `flights.service.ts`):
-  right after a booking flips to `FLOWN`, if `SurveySettings.enabled` is
-  true and no `SurveyInvite` exists yet for that booking, one is created
-  and an SMS is sent to the booking's primary passenger with a link
-  containing the invite's token. This is best-effort — a call site that
-  never runs simply means the invite is created the next time one does,
-  same tradeoff the existing FLOWN transition already accepts.
+- **Lazy materialization, no cron — implemented via the survey module's
+  own reads, not the three originally-drafted call sites.** This
+  codebase has zero scheduler infrastructure by design (see
+  `flight-lifecycle.util.ts`'s own comments) — every `SCHEDULED →
+  DEPARTED` and `TICKETED → FLOWN` transition is computed on-read. The
+  draft above proposed hooking into `materializeFlownBookings`'s three
+  existing call sites (`reporting.service.ts`, `flightops.service.ts`,
+  `flights.service.ts`); the actual implementation instead adds a new
+  `materializeSurveyInvites(prisma, sms)` (in
+  `backend/src/modules/survey/survey-lifecycle.util.ts`) that itself
+  calls `materializeFlownBookings` first, then creates a `SurveyInvite`
+  + sends the SMS for every `FLOWN` booking that doesn't have one yet
+  (skipped entirely while `SurveySettings.enabled` is false). This is
+  called from `SurveyService.getStats()` and `SurveyService.getResults()`
+  — the IT-manager stats screen and the exec results screen, i.e. the
+  two places this data is actually read — rather than reaching into
+  three unrelated existing services and adding a new `SmsModule`
+  dependency to each. Same lazy, no-cron principle; simpler blast
+  radius. A booking with no contact phone still gets its `SurveyInvite`
+  row (so the token exists), it just never receives the SMS
+  (`SmsInvite.smsSentAt` stays null) — `SmsService.send` already handles
+  a null phone gracefully (logs a `FAILED` `SmsLog` row, never throws).
 - **New AI provider, not ml-service.** CLAUDE.md's "ML Service Rules"
   scopes the FastAPI `ml-service` to exactly two endpoints
   (`price-suggestion`, `recommendations`) — "nothing else lives here."
@@ -2323,6 +2332,10 @@ SMS body is a short Persian message containing the survey link
 back to `http://localhost:5173` in dev if unset) — no existing var in
 `.env.example` served this purpose; needed to build a link inside an SMS
 body rather than just delivering a code, unlike existing OTP messages.
+Unlike the draft's assumption, `SmsMessageType` **is** also a Prisma
+enum (`SmsLog.messageType`), not just the TS union in
+`sms-provider.interface.ts` — both were extended with `SURVEY_INVITE` in
+the same migration that added the new tables.
 
 ### New (IT_MANAGER only): `GET /survey/settings`, `PATCH /survey/settings`
 ### New (IT_MANAGER only): `GET/POST/DELETE /survey/questions`, `/survey/questions/:id`
@@ -2346,12 +2359,13 @@ body rather than just delivering a code, unlike existing OTP messages.
 
 ### New (public, no auth): `GET /survey/:token`, `POST /survey/:token`
 - `GET` resolves a `SurveyInvite` by its opaque `token`; 404 if unknown,
-  409 (`ALREADY_SUBMITTED`) if a `SurveyResponse` already exists for it,
-  409 (`SURVEY_DISABLED`) if `SurveySettings.enabled` is false. On
-  success, returns the active question list (labels only, for display as
-  writing prompts) plus minimal flight context (`flightNo`, `route`,
-  `date`) — no PII, no booking/passenger detail beyond what's needed to
-  show "پرواز فلان به فلان".
+  409 (`SURVEY_ALREADY_SUBMITTED`) if a `SurveyResponse` already exists
+  for it, 409 (`SURVEY_DISABLED`) if `SurveySettings.enabled` is false
+  (two new `ErrorCode` values, `common/errors.ts`). On success, returns
+  the active question list (labels only, for display as writing
+  prompts) plus minimal flight context (`flightNo`, `originCityFa`,
+  `destCityFa`, `departureAt`) — no PII, no booking/passenger detail
+  beyond what's needed to show "پرواز فلان به فلان".
 - `POST` body: `{ rating: 1-5, comment?: string (max length enforced) }`.
   Creates the `SurveyResponse`, sets `SurveyInvite.respondedAt`.
   Idempotent on the token: a second `POST` to an already-answered invite
@@ -2362,36 +2376,62 @@ body rather than just delivering a code, unlike existing OTP messages.
 - Rate-limited per-IP (same posture as other public/anonymous endpoints
   per CLAUDE.md's Security Rules).
 
-### New (CEO / SENIOR_MANAGER / BOARD_CHAIR, read-only): `GET /survey/results`, `POST /survey/results/:flightNo/analyze`
+### New (CEO / SENIOR_MANAGER / BOARD_CHAIR, read-only): `GET /survey/results`, `POST /survey/results/:flightInstanceId/analyze`
 - Roles: `CEO`, `SENIOR_MANAGER`, `BOARD_CHAIR` only — read-only, no
   config access (matches the design: these three panels render the
   results table but never call anything resembling
   `saveSurveySettings`).
-- `GET /survey/results` → one row per flight instance that has at least
-  one response: `{ flightNo, route, airline, date, count, avgRating }`
-  (mirrors `site-data.js`'s `getSurveyFlights()` aggregation) — computed
-  server-side (SQL `GROUP BY`), never in the browser, per CLAUDE.md's
-  reporting rule. If `SurveySettings.enabled` is false, returns an empty
-  list with a `disabled: true` flag so the frontend can show the design's
-  own "نظرسنجی پس از پرواز توسط مدیر IT غیرفعال است." banner instead of
-  an empty-state.
-- `POST /survey/results/:flightNo/analyze` → calls
-  `SurveySummaryProvider.summarize(comments)` with that flight's
-  non-empty comments, using the **exact** prompt text from the design's
-  own `analyzeSurvey()` (two-sentence Persian summary for senior
-  managers). Returns `{ summary }` — `summary` is always a string (the
-  provider's `null` on failure is mapped to the same fallback string the
-  design itself uses client-side, `"خلاصه‌ای از نظرات این پرواز در
-  دسترس نیست."`, computed server-side this time instead of client-side).
-  Writes one `AiUsageLog` row per call. Per CLAUDE.md's AI rules: rate
-  limited per-user, input size capped (comments truncated to a max count
-  before being sent), the returned summary is treated as untrusted
-  display text on the frontend (rendered as plain text, never as HTML/
-  markdown), and it can never itself change any booking, price, or
-  survey data — advisory-only, same posture as the existing pricing AI.
+- `GET /survey/results` → one row per **flight instance** (not per
+  recurring `flightNo` — two different calendar-date departures of the
+  same `flightNo` must never be merged into one row, unlike a literal
+  reading of the design's own `getSurveyFlights()`, which only ever
+  groups its flat demo data by `flightNo`) that has at least one
+  response: `{ flightInstanceId, flightNo, originCityFa, destCityFa,
+  departureAt, count, avgRating }` — computed server-side (SQL
+  aggregation via a `Map` keyed by `flightInstanceId`), never in the
+  browser, per CLAUDE.md's reporting rule. No `airline` field: this is a
+  single-tenant system (`Flight` has no airline column at all) — the
+  design's demo data shows several airlines purely as illustrative mock
+  content, not a real multi-airline concept. If `SurveySettings.enabled`
+  is false, returns `{ disabled: true, flights: [] }` so the frontend
+  shows the design's own "نظرسنجی پس از پرواز توسط مدیر IT غیرفعال
+  است." banner instead of an empty-state.
+- `POST /survey/results/:flightInstanceId/analyze` → calls
+  `SurveySummaryProvider.summarize(comments)` with that flight
+  instance's non-empty comments, using the **exact** prompt text from
+  the design's own `analyzeSurvey()` (two-sentence Persian summary for
+  senior managers). Returns `{ summary }` — `summary` is always a string
+  (the provider's `null` on failure is mapped to the same fallback
+  string the design itself uses client-side,
+  `"خلاصه‌ای از نظرات این پرواز در دسترس نیست."`, computed server-side
+  this time instead of client-side, and no `AiUsageLog` row is written
+  for a fallback). Writes one `AiUsageLog` row per successful call, with
+  the **real** `input_tokens`/`output_tokens` from the Anthropic
+  response. Per CLAUDE.md's AI rules: rate limited (the app's global
+  `ThrottlerGuard`, same posture the existing Phase 6 pricing-AI
+  endpoint relies on — no extra per-endpoint throttle was added, for
+  consistency), input size capped (comments truncated to 30 before being
+  sent), the returned summary is treated as untrusted display text on
+  the frontend (rendered as plain text, never as HTML/markdown), and it
+  can never itself change any booking, price, or survey data —
+  advisory-only, same posture as the existing pricing AI.
 
-See `docs/DB_SCHEMA.md`'s Phase 66 (DRAFT) section for the new
-`SurveySettings` / `SurveyQuestion` / `SurveyInvite` / `SurveyResponse` /
-`AiUsageLog` models, and `docs/features/passenger-survey.md` for the
-acceptance checklist. **No code has been written for this phase yet —
-awaiting explicit user approval per CLAUDE.md workflow rule 1.**
+See `docs/DB_SCHEMA.md`'s Phase 66 section for the new `SurveySettings` /
+`SurveyQuestion` / `SurveyInvite` / `SurveyResponse` / `AiUsageLog`
+models, and `docs/features/passenger-survey.md` for the acceptance
+checklist (all items checked off with their proving test names).
+Frontend: new public `SurveyPage.tsx` (route `/survey/:token`,
+**fa-only** — unlike the retrofitted public pages from the i18n arc
+(Phases 41–64), this is a brand-new page with no exported design file to
+extract en/ar vocabulary from; a documented, bounded scope decision, not
+a silent gap), a new `SurveyRouter.tsx` behind the `survey` tab key that
+renders `SurveyConfigPage.tsx` for `IT_MANAGER` and `SurveyResultsPage.tsx`
+for `CEO`/`SENIOR_MANAGER`/`BOARD_CHAIR` (same role-branching pattern as
+the existing `LogsRouter.tsx`/`SecurityRouter.tsx`). Backend: 12 new e2e
+tests (`survey.e2e-spec.ts`) covering every endpoint above, plus a 5-case
+unit spec for `SurveySummaryProvider` (missing key, empty comments, non-2xx
+status, network failure, real success path — all via a mocked
+`global.fetch`, closing the same "AI provider has no unit test" gap the
+existing Phase 6 `MlPriceSuggestionProvider` still has). Frontend: 10 new
+Vitest/RTL tests across the three new pages. No new Playwright E2E script
+this phase — same cadence as Phases 51–65.

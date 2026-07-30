@@ -112,6 +112,9 @@ model User {
   clubCardDecisions  ClubCardRequest[] @relation("ClubCardDecider")
   clubTierRuleEdits  ClubTierRule[]    @relation("ClubTierRuleUpdatedBy")
 
+  surveySettingsEdits SurveySettings[] @relation("SurveySettingsUpdatedBy")
+  aiUsageLogs         AiUsageLog[]     @relation("AiUsageLogUser")
+
   pricingProposalsMade     FarePricingProposal[] @relation("PricingProposedBy")
   pricingProposalsApproved FarePricingProposal[] @relation("PricingApprovedBy")
 
@@ -207,6 +210,7 @@ enum AuditCategory {
   ACCESS
   SECURITY
   RESERVATION
+  SURVEY
 }
 
 model AuditLog {
@@ -349,6 +353,7 @@ model FlightInstance {
   priceLocks           PriceLock[]
   fareRules            FareRule[]
   agencyAllotments     AgencyAllotment[]
+  surveyInvites        SurveyInvite[]
 
   @@unique([scheduleId, departureAt])
   @@index([departureAt])
@@ -479,6 +484,7 @@ model Booking {
   // SeatLock — the FK itself lives on SeatLock.bookingId (unique).
   seatLock          SeatLock?               @relation("SeatLockFinalizedBooking")
   reconciliations   PaymentReconciliation[]
+  surveyInvite      SurveyInvite?
 
   // Fare-class bucket (Y/B/M) this booking consumed, when FareRule
   // pricing was in effect; null under flat CabinFare pricing.
@@ -1257,6 +1263,7 @@ model InternalService {
 enum SmsMessageType {
   OTP
   TEMP_PASSWORD
+  SURVEY_INVITE
 }
 
 enum SmsStatus {
@@ -1646,4 +1653,74 @@ model SupportTicket {
   @@index([status])
   @@index([createdAt])
   @@map("support_tickets")
+}
+
+// ─── Phase 66: نظرسنجی مسافران (Passenger Satisfaction Survey) ─────────────
+// Created/configured by IT_MANAGER; results read-only for CEO/SENIOR_MANAGER/
+// BOARD_CHAIR with an AI summary per flight. See docs/API.md + DB_SCHEMA.md.
+
+model SurveySettings {
+  id          String   @id @default(uuid())
+  enabled     Boolean  @default(true)
+  title       String   @default("نظرسنجی رضایت مسافران")
+  updatedById String?
+  updatedBy   User?    @relation("SurveySettingsUpdatedBy", fields: [updatedById], references: [id])
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@map("survey_settings")
+}
+
+model SurveyQuestion {
+  id        String   @id @default(uuid())
+  label     String
+  order     Int
+  createdAt DateTime @default(now())
+
+  @@map("survey_questions")
+}
+
+model SurveyInvite {
+  id               String          @id @default(uuid())
+  bookingId        String          @unique
+  booking          Booking         @relation(fields: [bookingId], references: [id])
+  flightInstanceId String
+  flightInstance   FlightInstance  @relation(fields: [flightInstanceId], references: [id])
+  token            String          @unique @default(uuid())
+  smsSentAt        DateTime?
+  respondedAt      DateTime?
+  createdAt        DateTime        @default(now())
+  response         SurveyResponse?
+
+  @@index([flightInstanceId])
+  @@map("survey_invites")
+}
+
+model SurveyResponse {
+  id        String       @id @default(uuid())
+  inviteId  String       @unique
+  invite    SurveyInvite @relation(fields: [inviteId], references: [id])
+  rating    Int
+  comment   String?
+  createdAt DateTime     @default(now())
+
+  @@map("survey_responses")
+}
+
+// Generic AI-call usage log (Phase 66 closes a pre-existing CLAUDE.md gap —
+// Phase 6's pricing-AI never wrote one). `provider` is a free string, not an
+// enum, so a future AI feature never needs a migration just to log itself.
+model AiUsageLog {
+  id           String   @id @default(uuid())
+  provider     String
+  userId       String
+  user         User     @relation("AiUsageLogUser", fields: [userId], references: [id])
+  contextId    String?
+  inputTokens  Int
+  outputTokens Int
+  costIrr      Int?
+  createdAt    DateTime @default(now())
+
+  @@index([provider, createdAt])
+  @@map("ai_usage_logs")
 }
