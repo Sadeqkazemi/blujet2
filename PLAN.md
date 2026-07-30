@@ -1089,6 +1089,19 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   ar). Full frontend suite: 287/287 passing, 63/63 files. `tsc --noEmit`
   clean; `oxlint` clean (same pre-existing warnings). See
   `docs/features/not-found-page-i18n.md`.
+- [x] **Phase 62 — صفحه تعمیر و نگهداری real i18n** — another small,
+  standalone static page (served manually during planned downtime),
+  unrelated to the excluded checkout/payment flow. `MaintenancePage.tsx`
+  translates its badge, heading, body copy, ETA notice, and
+  support-contact footer into fa/en/ar; `dir` is now locale-aware. No new
+  backend work. `design-reference/در حال تعمیر و نگهداری.dc.html` has no
+  `isEN`/`isAR` sample data, so all EN/AR text is hand-translated. The
+  support phone number keeps its Persian-digit literal in every locale,
+  matching `SupportPage.tsx`'s convention (Phase 46). This page had no
+  test file before this phase — `MaintenancePage.test.tsx` was created
+  from scratch with 3 tests (fa, en, ar). Full frontend suite: 290/290
+  passing, 64/64 files. `tsc --noEmit` clean; `oxlint` clean (same
+  pre-existing warnings). See `docs/features/maintenance-page-i18n.md`.
 - [x] With Phases 35–37, the manual endpoint audit had covered
   `reconciliation`, `reservation`, and `it-manager`'s `services` module;
   every other controller checked so far (`pricing`, `flightops`,
