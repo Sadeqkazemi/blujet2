@@ -2066,3 +2066,16 @@ its own local tier/document-type/status label maps rather than
 translating the shared `agency-labels.ts` module (same reasoning as
 Phase 55). The pre-existing test passes unmodified; 2 new tests (en, ar).
 See `docs/features/agency-profile-page-i18n.md`.
+
+## Phase 59 — پنل آژانس: Allocated Seats tab real i18n
+
+Frontend-only, no new/changed endpoints. Seventh agency-portal page.
+`AgencySeatsPage.tsx` translates its info banner, per-flight allotment
+cards (Allocated/Sold/Remaining labels, Active/Released badge), and empty
+state into fa/en/ar. The info banner and metric labels match
+`design-reference-v2/پنل آژانس.dc.html`'s own `isEN` `seatsInfoBanner`/
+`allocatedLabel`/`soldLabel`/`remainingLabel` vocabulary for this exact
+tab; AR is hand-translated. This page had no test file before this phase;
+`AgencySeatsPage.test.tsx` was created from scratch with 4 tests (fa
+happy-path, fa empty state, en, ar). See
+`docs/features/agency-seats-page-i18n.md`.

@@ -1042,6 +1042,19 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   Full frontend suite: 278/278 passing, 61/61 files. `tsc --noEmit`
   clean; `oxlint` clean (same pre-existing warnings). See
   `docs/features/agency-profile-page-i18n.md`.
+- [x] **Phase 59 — پنل آژانس: Allocated Seats tab real i18n** — seventh
+  agency-portal page. `AgencySeatsPage.tsx` translates its info banner,
+  per-flight allotment cards (Allocated/Sold/Remaining labels,
+  Active/Released badge), and empty state into fa/en/ar; backed by real
+  `GET /agency-portal/allotments` — no new backend work. The info banner
+  and metric labels match `design-reference-v2/پنل آژانس.dc.html`'s own
+  `isEN` `seatsInfoBanner`/`allocatedLabel`/`soldLabel`/`remainingLabel`
+  vocabulary for this exact tab; AR is hand-translated. This page had no
+  test file before this phase — `AgencySeatsPage.test.tsx` was created
+  from scratch with 4 tests (fa happy-path asserting real allotment cards
+  with faDigits counts, fa empty state, en, ar). Full frontend suite:
+  282/282 passing, 62/62 files. `tsc --noEmit` clean; `oxlint` clean (same
+  pre-existing warnings). See `docs/features/agency-seats-page-i18n.md`.
 - [x] With Phases 35–37, the manual endpoint audit had covered
   `reconciliation`, `reservation`, and `it-manager`'s `services` module;
   every other controller checked so far (`pricing`, `flightops`,
