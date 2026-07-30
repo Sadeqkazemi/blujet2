@@ -6,6 +6,11 @@ import CustomerLoginPage from './CustomerLoginPage';
 import AboutPage from './AboutPage';
 import NotFoundPage from './NotFoundPage';
 import * as useAuthModule from '../../hooks/useAuth';
+import * as useLocaleModule from '../../hooks/useLocale';
+
+function mockLocale(locale: 'fa' | 'en' | 'ar') {
+  vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale, setLocale: vi.fn() });
+}
 
 const requestOtp = vi.fn().mockResolvedValue('challenge-1');
 const verifyOtp = vi.fn().mockResolvedValue({ id: 'u1', fullName: 'نگار رضایی', role: 'USER' });
@@ -82,6 +87,25 @@ describe('AboutPage', () => {
     expect(screen.getByText('چشم‌انداز')).toBeInTheDocument();
     expect(screen.getByText('شفافیت')).toBeInTheDocument();
     expect(screen.getByText('مسافر سالانه')).toBeInTheDocument();
+  });
+
+  it('renders translated mission, vision, and values in English', () => {
+    mockLocale('en');
+    renderWithRouter(<AboutPage />);
+    expect(screen.getByText('Making air travel simple, reliable, and accessible')).toBeInTheDocument();
+    expect(screen.getByText('Our Mission')).toBeInTheDocument();
+    expect(screen.getByText('Our Vision')).toBeInTheDocument();
+    expect(screen.getByText('Transparency')).toBeInTheDocument();
+    expect(screen.getByText('Passengers per year')).toBeInTheDocument();
+  });
+
+  it('renders translated mission, vision, and values in Arabic', () => {
+    mockLocale('ar');
+    renderWithRouter(<AboutPage />);
+    expect(screen.getByText('نجعل السفر الجوي بسيطًا وموثوقًا ومتاحًا')).toBeInTheDocument();
+    expect(screen.getByText('مهمتنا')).toBeInTheDocument();
+    expect(screen.getByText('الرؤية')).toBeInTheDocument();
+    expect(screen.getByText('الشفافية')).toBeInTheDocument();
   });
 });
 

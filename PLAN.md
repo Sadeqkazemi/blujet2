@@ -817,6 +817,18 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   frontend suite: 255/255 passing, 61/61 files. `tsc --noEmit` clean;
   `oxlint` clean (same pre-existing warnings). See
   `docs/features/travel-info-page-i18n-responsive.md`.
+- [x] **Phase 48 — درباره ما (About) real i18n + responsive body
+  content** — eighth page of the per-page translation arc. `AboutPage`
+  translates its hero (eyebrow/title/description), stats strip,
+  mission/vision cards, and the three values cards into fa/en/ar.
+  Extracted from `design-reference-v2/درباره ما.dc.html`'s own `isEN`
+  ternaries and `site-data.js`'s `arDeep` dictionary, both complete for
+  every string on this page — no hand-translation needed. The
+  pre-existing test passes unmodified; 2 new tests (en, ar). Stats
+  strip, mission/vision cards, and values cards collapse on mobile via
+  the shared `useIsMobile()` hook. Full frontend suite: 257/257 passing,
+  61/61 files. `tsc --noEmit` clean; `oxlint` clean (same pre-existing
+  warnings). See `docs/features/about-page-i18n-responsive.md`.
 - [x] With Phases 35–37, the manual endpoint audit had covered
   `reconciliation`, `reservation`, and `it-manager`'s `services` module;
   every other controller checked so far (`pricing`, `flightops`,
