@@ -2028,3 +2028,17 @@ the staff-side `AgencyDetailPage.tsx` depends on and which stays
 Persian-only (staff panels aren't locale-switchable per CLAUDE.md). Both
 pre-existing tests pass unmodified; 2 new tests (en, ar). See
 `docs/features/agency-credit-page-i18n.md`.
+
+## Phase 56 — پنل آژانس: Sales & Reports tab real i18n
+
+Frontend-only, no new/changed endpoints — `AgencySalesPage.tsx` already
+reads real data from `GET /agency-portal/sales` (Phase 9). Fourth
+agency-portal page. Heading and KPI labels reuse
+`design-reference-v2/پنل آژانس.dc.html`'s own `isEN` vocabulary for this
+exact tab (`reportKpis`'s KPI labels, the "Sales per flight" section
+label); AR is hand-translated. The issued-tickets table's booking-status
+labels are this page's own local map, kept separate from
+`AccountPage.tsx`'s `STATUS_LABEL` since the two use different (compact
+vs. verbose) fa wording for the same statuses. The pre-existing test
+passes unmodified; 2 new tests (en, ar). See
+`docs/features/agency-sales-page-i18n.md`.
