@@ -1869,3 +1869,15 @@ a real regression. FAQ search now matches the active locale's text.
 Category-card grid and the FAQ/contact two-column layout collapse on
 mobile via the shared `useIsMobile()` hook. See
 `docs/features/support-page-i18n-responsive.md`.
+
+## Phase 47 — قوانین و مقررات (Terms/Travel Info) real i18n + responsive body content
+
+Frontend-only, no new/changed endpoints. Seventh page translated.
+`TravelInfoPage` translates its hero, all six rule sections (title +
+bullet items), and the refund-variance warning note into fa/en/ar. Unlike
+every prior page, this one needed zero hand-translation:
+`design-reference-v2/قوانین و مقررات.dc.html` defines complete `dataFA`/
+`dataEN`/`dataAR` arrays for every section and bullet, and the fa content
+matched the shipped app byte-for-byte. The TOC + section-body two-column
+layout collapses to a single column on mobile via the shared
+`useIsMobile()` hook. See `docs/features/travel-info-page-i18n-responsive.md`.

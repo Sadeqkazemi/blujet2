@@ -194,4 +194,22 @@ describe('TravelInfoPage', () => {
     expect(screen.getAllByText('حریم خصوصی و امنیت').length).toBe(2);
     expect(screen.getByText(/بار مجاز رایگان در نرخ اکونومی ۲۰/)).toBeInTheDocument();
   });
+
+  it('renders translated sections in English', () => {
+    mockLocale('en');
+    renderWithRouter(<TravelInfoPage />);
+    expect(screen.getAllByText('Terms & Conditions').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Purchase & Ticket Issuance').length).toBe(2);
+    expect(screen.getAllByText('Refunds & Cancellation').length).toBe(2);
+    expect(screen.getAllByText('Privacy & Security').length).toBe(2);
+    expect(screen.getByText(/The free baggage allowance is 20kg in Economy/)).toBeInTheDocument();
+  });
+
+  it('renders translated sections in Arabic', () => {
+    mockLocale('ar');
+    renderWithRouter(<TravelInfoPage />);
+    expect(screen.getAllByText('الشروط والأحكام').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('الشراء وإصدار التذكرة').length).toBe(2);
+    expect(screen.getByText(/الأمتعة المجانية المسموح بها ٢٠ كجم/)).toBeInTheDocument();
+  });
 });

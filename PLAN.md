@@ -801,6 +801,22 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   shared `useIsMobile()` hook. Full frontend suite: 253/253 passing,
   61/61 files. `tsc --noEmit` clean; `oxlint` clean (same pre-existing
   warnings). See `docs/features/support-page-i18n-responsive.md`.
+- [x] **Phase 47 — قوانین و مقررات (Terms/Travel Info) real i18n +
+  responsive body content** — seventh page of the per-page translation
+  arc. `TravelInfoPage` translates its hero, all six rule sections, and
+  the refund-variance warning note into fa/en/ar. Unlike every prior
+  page, this one needed zero hand-translation — `design-reference-v2/
+  قوانین و مقررات.dc.html` ships complete `dataFA`/`dataEN`/`dataAR`
+  arrays for every section title and bullet item, and the fa content
+  matched the shipped app byte-for-byte, so every string came straight
+  from the design source. Section-number badges use the existing
+  `formatToman` helper purely for its locale-digit formatting (not an
+  actual money value). The pre-existing test passes unmodified; 2 new
+  tests (en, ar). TOC + section-body two-column layout collapses to a
+  single column on mobile via the shared `useIsMobile()` hook. Full
+  frontend suite: 255/255 passing, 61/61 files. `tsc --noEmit` clean;
+  `oxlint` clean (same pre-existing warnings). See
+  `docs/features/travel-info-page-i18n-responsive.md`.
 - [x] With Phases 35–37, the manual endpoint audit had covered
   `reconciliation`, `reservation`, and `it-manager`'s `services` module;
   every other controller checked so far (`pricing`, `flightops`,
