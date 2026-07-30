@@ -18,6 +18,9 @@ interface AuthContextValue {
   verifyOtp?: (challengeId: string, code: string) => Promise<AuthUser>;
   // Phase 21 — optional customer email/phone+password login, alongside OTP.
   passwordLogin?: (phone: string, password: string) => Promise<AuthUser>;
+  // Phase 51 — فراموشی رمز email path, alongside the phone+OTP path above.
+  requestPasswordResetEmail?: (email: string) => Promise<string>;
+  verifyPasswordResetEmail?: (challengeId: string, code: string) => Promise<AuthUser>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -83,6 +86,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return loggedInUser;
   }, []);
 
+  const requestPasswordResetEmail = useCallback(async (email: string) => {
+    const { challengeId } = await authApi.requestPasswordResetEmail(email);
+    return challengeId;
+  }, []);
+
+  const verifyPasswordResetEmail = useCallback(async (challengeId: string, code: string) => {
+    const { user: loggedInUser } = await authApi.verifyPasswordResetEmail(challengeId, code);
+    setUser(loggedInUser);
+    setStatus('authenticated');
+    return loggedInUser;
+  }, []);
+
   const signOut = useCallback(async () => {
     // Best-effort server-side revoke — a failed/rate-limited call must never
     // trap the user in a session they clicked "sign out" on.
@@ -105,6 +120,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       requestOtp,
       verifyOtp,
       passwordLogin,
+      requestPasswordResetEmail,
+      verifyPasswordResetEmail,
     }),
     [
       status,
@@ -116,6 +133,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       requestOtp,
       verifyOtp,
       passwordLogin,
+      requestPasswordResetEmail,
+      verifyPasswordResetEmail,
     ],
   );
 

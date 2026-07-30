@@ -875,6 +875,49 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   Full frontend suite: 261/261 passing, 61/61 files. `tsc --noEmit`
   clean; `oxlint` clean (same pre-existing warnings). See
   `docs/features/customer-login-page-i18n-responsive.md`.
+- [x] **Phase 51 — فراموشی رمز: real email password-reset path + i18n** —
+  eleventh page of the arc, but unlike Phases 42–50 this one needed real
+  new backend work first (flagged since Phase 50's summary): a second
+  identity-proof path for password reset via a customer's VERIFIED email
+  (Phase 17), alongside the existing phone+SMS OTP path (Phase 21). New
+  `TwoFactorPurpose.PASSWORD_RESET_EMAIL` (its own purpose, not reused
+  from `EMAIL_VERIFY` — different trust decisions despite identical
+  delivery mechanics); `POST /auth/password-reset/email/request` (looks
+  up a verified-email `USER` row, deliberately does NOT upsert/create one
+  the way phone OTP does — inventing an account for an arbitrary
+  submitted email would let anyone probe/claim an address that isn't
+  theirs) and `POST /auth/password-reset/email/verify` (same challenge
+  machinery as `otp/verify`, purpose-scoped so an `EMAIL_VERIFY` or
+  `CUSTOMER_OTP_LOGIN` challenge id can't cross over), handing off into
+  the existing `POST /auth/set-password`. Offered in every locale, not
+  gated to en/ar — restricting a security recovery method by display
+  language would be arbitrary; the real gate is whether the account has a
+  verified email. `ForgotPasswordPage.tsx` gains a phone/email identifier
+  toggle plus a full fa/en/ar `STR` dictionary; all 4 pre-existing tests
+  pass unmodified (byte-critical fa strings untouched); 3 new tests (email
+  happy path, en, ar). New backend e2e spec:
+  `phase51-password-reset-email.e2e-spec.ts` (10 tests) — first pass used
+  fixed literal emails and hit real `Unique constraint failed` errors on
+  a second run against the persistent test DB (email `User.create` isn't
+  idempotent the way phone OTP's upsert is); fixed with the same
+  `crypto.randomUUID()`-suffixed email convention already used in
+  `club.e2e-spec.ts`/`cartable.e2e-spec.ts`. A full-suite run first showed
+  3 unrelated failures (`flights.e2e-spec.ts`, `reporting.e2e-spec.ts`,
+  `flight-engine-completion.e2e-spec.ts`) — traced to financial/booking
+  data accumulated in the shared local `blujet_test` Postgres across many
+  manual e2e runs this session (confirmed by re-running the same 3 files
+  in isolation and watching the expected revenue totals drift between
+  runs). With the user's explicit consent, reset the test DB
+  (`typeorm migrate reset --force` + reseed) and reran: `flights`/
+  `reporting` are clean on a fresh DB (confirming those were pollution,
+  not regressions); `flight-engine-completion`'s one test still times out
+  (20s) even in isolation on a clean DB — a genuine pre-existing flake
+  (already flagged in this file's earlier "Fix pre-existing flaky
+  failures" entry), unrelated to auth/Phase 51, out of scope to fix here.
+  Final backend e2e: 356/357 passing (1 pre-existing unrelated flake).
+  Full frontend suite: 264/264 passing, 61/61 files. `tsc --noEmit` clean
+  on both packages; lint clean on both (same pre-existing warnings). See
+  `docs/features/forgot-password-email-reset-i18n.md`.
 - [x] With Phases 35–37, the manual endpoint audit had covered
   `reconciliation`, `reservation`, and `it-manager`'s `services` module;
   every other controller checked so far (`pricing`, `flightops`,

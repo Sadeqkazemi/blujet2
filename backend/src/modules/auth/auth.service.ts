@@ -191,6 +191,129 @@ export class AuthService {
     return { accessToken, refreshToken, user: authUser };
   }
 
+  /**
+   * فراموشی رمز — email path (Phase 51). An alternative to phone+SMS OTP
+   * for customers whose account has a VERIFIED email (Phase 17's
+   * emailVerifiedAt) — real functionality, not gated by display locale,
+   * since restricting a security recovery path by UI language would be an
+   * arbitrary and fragile restriction; some fa-locale customers may also
+   * lack a reachable Iranian phone at reset time and some en/ar-locale
+   * customers may have one. Deliberately does NOT upsert/create an
+   * account the way requestOtp does — inventing an account for an
+   * arbitrary submitted email would let anyone probe/claim an address
+   * that isn't theirs.
+   */
+  async requestPasswordResetEmail(
+    email: string,
+  ): Promise<{ challengeId: string }> {
+    const user = await this.typeorm.user.findFirst({
+      where: { email, role: 'USER', emailVerifiedAt: { not: null } },
+    });
+    if (!user) {
+      throw new UnauthorizedException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'حساب کاربری با ایمیل تأییدشدهٔ داده‌شده یافت نشد.',
+      });
+    }
+    if (!user.isActive) {
+      throw new ForbiddenException({
+        code: 'ACCOUNT_SUSPENDED',
+        message: 'این حساب مسدود شده است.',
+      });
+    }
+
+    const code = generateSixDigitCode();
+    const challenge = await this.typeorm.twoFactorChallenge.create({
+      data: {
+        userId: user.id,
+        purpose: 'PASSWORD_RESET_EMAIL',
+        codeHash: await argon2.hash(code),
+        expiresAt: new Date(Date.now() + TWO_FACTOR_TTL_MS),
+      },
+    });
+    await this.twoFactorProvider.sendCode(
+      { id: user.id, fullName: user.fullName, email: user.email, phone: null },
+      code,
+    );
+
+    return { challengeId: challenge.id };
+  }
+
+  /** Verifies the emailed reset code and logs the customer in — same
+   * trust handoff as verifyOtp, so the frontend can immediately call the
+   * existing POST /auth/set-password with no current-password check. */
+  async verifyPasswordResetEmail(
+    challengeId: string,
+    code: string,
+    context: { userAgent?: string; ip?: string },
+  ): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    user: AuthenticatedUser;
+  }> {
+    const challenge = await this.typeorm.twoFactorChallenge.findUnique({
+      where: { id: challengeId },
+      include: { user: true },
+    });
+
+    if (!challenge || challenge.purpose !== 'PASSWORD_RESET_EMAIL') {
+      throw new UnauthorizedException({
+        code: 'TWO_FACTOR_INVALID',
+        message: 'کد نامعتبر است.',
+      });
+    }
+    if (challenge.consumedAt) {
+      throw new UnauthorizedException({
+        code: 'TWO_FACTOR_INVALID',
+        message: 'این کد قبلاً استفاده شده است.',
+      });
+    }
+    if (challenge.expiresAt < new Date()) {
+      throw new UnauthorizedException({
+        code: 'TWO_FACTOR_EXPIRED',
+        message: 'کد منقضی شده است.',
+      });
+    }
+    if (challenge.attempts >= TWO_FACTOR_MAX_ATTEMPTS) {
+      throw new UnauthorizedException({
+        code: 'TWO_FACTOR_INVALID',
+        message: 'تعداد تلاش‌های مجاز به پایان رسید.',
+      });
+    }
+
+    const codeValid = await argon2.verify(challenge.codeHash, code);
+    if (!codeValid) {
+      await this.typeorm.twoFactorChallenge.update({
+        where: { id: challenge.id },
+        data: { attempts: { increment: 1 } },
+      });
+      throw new UnauthorizedException({
+        code: 'TWO_FACTOR_INVALID',
+        message: 'کد وارد شده نادرست است.',
+      });
+    }
+
+    await this.typeorm.twoFactorChallenge.update({
+      where: { id: challenge.id },
+      data: { consumedAt: new Date() },
+    });
+    await this.typeorm.user.update({
+      where: { id: challenge.userId },
+      data: { lastLoginAt: new Date() },
+    });
+
+    const user = challenge.user;
+    const authUser: AuthenticatedUser = {
+      id: user.id,
+      role: user.role,
+      fullName: user.fullName,
+    };
+    const accessToken = this.signAccessToken(authUser);
+    const refreshToken = await this.issueRefreshToken(user.id, context);
+
+    return { accessToken, refreshToken, user: authUser };
+  }
+
   async staffLogin(
     username: string,
     password: string,
@@ -467,6 +590,23 @@ export class AuthService {
     const refreshToken = await this.issueRefreshToken(user.id, context);
 
     return { accessToken, refreshToken, user: authUser };
+  }
+
+  /**
+   * Non-production only: reads back the mock password-reset-email code —
+   * same escape hatch as getLastOtpForE2e, keyed by email. 404s in prod.
+   */
+  async getLastPasswordResetEmailCodeForE2e(
+    email: string,
+  ): Promise<string | null> {
+    if (
+      process.env.NODE_ENV === 'production' ||
+      !this.twoFactorProvider.getLastCode
+    )
+      return null;
+    const user = await this.typeorm.user.findFirst({ where: { email } });
+    if (!user) return null;
+    return this.twoFactorProvider.getLastCode(user.id) ?? null;
   }
 
   /**

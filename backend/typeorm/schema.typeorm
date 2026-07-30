@@ -156,6 +156,13 @@ enum TwoFactorPurpose {
   STEP_UP_VERIFICATION
   // Phase 17: customer email verification for پروفایل من.
   EMAIL_VERIFY
+  // Phase 51: password-reset identity proof via a VERIFIED email, as an
+  // alternative to phone+SMS OTP (see docs/API.md's Phase 51 section) —
+  // its own purpose rather than reusing EMAIL_VERIFY, since "prove you own
+  // this inbox to change your password" and "confirm this inbox for your
+  // profile" are different trust decisions even though the delivery
+  // mechanics are identical.
+  PASSWORD_RESET_EMAIL
 }
 
 // Phase 15 — one scope per real high-risk call site found in the

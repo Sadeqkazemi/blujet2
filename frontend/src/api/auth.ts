@@ -76,6 +76,21 @@ export function setPassword(newPassword: string) {
   return apiPost<{ changed: boolean }>('/auth/set-password', { newPassword });
 }
 
+/** فراموشی رمز — email path (Phase 51): an alternative to phone+SMS OTP for
+ * customers whose account has a verified email. */
+export function requestPasswordResetEmail(email: string) {
+  return apiPost<{ challengeId: string }>('/auth/password-reset/email/request', { email });
+}
+
+export async function verifyPasswordResetEmail(challengeId: string, code: string) {
+  const result = await apiPost<{ accessToken: string; user: AuthUser }>('/auth/password-reset/email/verify', {
+    challengeId,
+    code,
+  });
+  setAccessToken(result.accessToken);
+  return result;
+}
+
 export async function customerPasswordLogin(phone: string, password: string) {
   const result = await apiPost<{ accessToken: string; user: AuthUser }>('/auth/customer/login-password', {
     phone,
