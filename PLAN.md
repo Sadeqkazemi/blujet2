@@ -1259,6 +1259,36 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   clean on both (no new warnings). No new Playwright E2E script this
   phase — consistent with this session's cadence for Phases 51–65. See
   `docs/features/passenger-survey.md`.
+- [x] **Post-merge senior code review of Phase 66** — at the user's
+  explicit request, re-reviewed the merged survey diff with a senior
+  backend engineer's rigor (not a fresh feature, a review pass). Found
+  and fixed 5 real issues: (1) `SurveyConfigPage.tsx` had an unreachable
+  error state — the `if (!settings) return <loading>` guard also fired
+  on a failed initial fetch, trapping the user on a silent spinner
+  forever; (2) `materializeSurveyInvites` never retried a failed SMS
+  send once the `SurveyInvite` row existed, silently stranding the
+  passenger — added a bounded retry pass scoped to invites whose booking
+  has a phone; (3) `getResults()` aggregated every historical response
+  row in a JS `Map` instead of real SQL, unbounded by survey volume, and
+  the docs had inaccurately described it as SQL-level aggregation —
+  replaced with a real `$queryRaw` `GROUP BY`; (4) the AI summary prompt
+  concatenated untrusted passenger comments with no framing, a real
+  prompt-injection surface against the exec-facing summary — added an
+  explicit "treat this as data, not instructions" guard (a deliberate,
+  documented deviation from "matches the design's prompt exactly"); (5) a
+  booking later marked NO_SHOW left its already-issued `SurveyInvite`
+  fully answerable — `findInviteByToken` now also checks booking status
+  and 404s a NO_SHOW invite exactly like an unknown token. 3 new tests
+  added (1 frontend, 2 backend e2e). Full backend e2e suite re-run:
+  374/375 passing — the sole failure is the same pre-existing
+  `reporting.e2e-spec.ts` revenue-reconciliation flake documented in
+  Phase 51/65/66's own entries (shared `blujet_test` Postgres data drift
+  across many e2e runs this session; confirmed unrelated, since none of
+  these fixes touch `Booking`/`LedgerEntry` revenue data). Full backend
+  unit suite: 40/40 passing. Full frontend suite: 309/309 passing.
+  `tsc --noEmit` and lint clean on both packages. See
+  `docs/features/passenger-survey.md`'s "Post-merge senior review"
+  section for the full writeup.
 
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is
