@@ -1,9 +1,18 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import AgencyCreditPage from './AgencyCreditPage';
 import * as portalApi from '../../api/agency-portal';
+import * as useLocaleModule from '../../hooks/useLocale';
 import type { AgencyCredit, AgencyInvoice } from '../../types/agency-portal';
+
+function mockLocale(locale: 'fa' | 'en' | 'ar') {
+  vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale, setLocale: vi.fn() });
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 const CREDIT: AgencyCredit = { limitIrr: 1_800_000_000, usedIrr: 500_000_000, remainingIrr: 1_300_000_000 };
 const INVOICES: AgencyInvoice[] = [
@@ -59,5 +68,24 @@ describe('AgencyCreditPage', () => {
     await user.click(screen.getByRole('button', { name: 'ارسال درخواست' }));
 
     await waitFor(() => expect(requestSpy).toHaveBeenCalledWith(2_000_000_000, undefined));
+  });
+
+  it('renders translated headings and the pay button in English', async () => {
+    mockLocale('en');
+    mockLoads();
+    render(<AgencyCreditPage />);
+
+    expect(await screen.findByText('Credit & Balance')).toBeInTheDocument();
+    expect(screen.getByText('Credit Limit')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Pay from Credit' })).toBeInTheDocument();
+  });
+
+  it('renders translated headings and invoice status in Arabic', async () => {
+    mockLocale('ar');
+    mockLoads();
+    render(<AgencyCreditPage />);
+
+    expect(await screen.findByText('الرصيد والائتمان')).toBeInTheDocument();
+    expect(screen.getByText('بانتظار الدفع')).toBeInTheDocument();
   });
 });
