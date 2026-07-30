@@ -41,6 +41,17 @@ class EnvironmentVariables {
 
   @IsOptional()
   CORS_ORIGINS?: string;
+
+  /** Real Anthropic API key for SurveySummaryProvider (Phase 66) — absent
+   * in dev/tests, in which case the provider degrades to null (no crash,
+   * no summary). Never required, unlike ML_SERVICE_*. */
+  @IsOptional()
+  ANTHROPIC_API_KEY?: string;
+
+  /** Base URL used only to build the public survey link sent by SMS
+   * (Phase 66). Falls back to the local dev frontend origin when unset. */
+  @IsOptional()
+  FRONTEND_URL?: string;
 }
 
 export function validateEnv(config: Record<string, unknown>) {
