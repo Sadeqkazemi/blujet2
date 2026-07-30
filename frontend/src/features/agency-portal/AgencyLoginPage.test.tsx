@@ -1,9 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import AgencyLoginPage from './AgencyLoginPage';
 import * as useAuthModule from '../../hooks/useAuth';
+import * as useLocaleModule from '../../hooks/useLocale';
 import * as agenciesApi from '../../api/agencies';
 
 function mockAuth(agencyLogin = vi.fn()) {
@@ -16,6 +17,14 @@ function mockAuth(agencyLogin = vi.fn()) {
     signOut: vi.fn(),
   });
 }
+
+function mockLocale(locale: 'fa' | 'en' | 'ar') {
+  vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale, setLocale: vi.fn() });
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('AgencyLoginPage', () => {
   it('requires phone and password before submitting', async () => {
@@ -91,5 +100,34 @@ describe('AgencyLoginPage', () => {
       challengeId: 'ch1',
       code: '482913',
     });
+  });
+
+  it('renders translated tabs and labels in English', () => {
+    mockLocale('en');
+    mockAuth();
+    render(
+      <MemoryRouter>
+        <AgencyLoginPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('button', { name: 'Log in' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Agency Phone Number')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Log In to Agency Panel' })).toBeInTheDocument();
+  });
+
+  it('renders translated tabs and labels in Arabic', async () => {
+    mockLocale('ar');
+    mockAuth();
+    render(
+      <MemoryRouter>
+        <AgencyLoginPage />
+      </MemoryRouter>,
+    );
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'إنشاء حساب' }));
+    expect(screen.getByLabelText('اسم الوكالة')).toBeInTheDocument();
+    expect(screen.getByLabelText('رقم الترخيص (الفئة ب)')).toBeInTheDocument();
   });
 });
