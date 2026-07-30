@@ -1978,3 +1978,22 @@ transliterated word), consistent with the pricing-honesty rule from
 earlier phases (real toman amounts, never a fake currency). All 12
 pre-existing tests pass unmodified; 2 new tests (en, ar). See
 `docs/features/account-page-i18n-responsive.md`.
+
+## Phase 53 — پنل آژانس: shared shell + login/signup real i18n (foundation)
+
+Frontend-only, no new/changed endpoints. First agency-portal phase of the
+arc — a shared-shell foundation like Phase 41, covering
+`AgencyPortalShell.tsx` (sidebar nav + sign-out), `AgencyLoginLayout.tsx`
+(the B2B-partner login shell), and `AgencyLoginPage.tsx` (login form,
+signup form, OTP step, done state). Unlike every prior phase, **no
+design-mock counterpart exists for the login/signup screen** —
+`design-reference-v2/پنل آژانس.dc.html`'s `isEN`/`isAR` ternaries only
+cover the post-login dashboard content, since the design never specified
+an agency login mechanism (per the ⚑ product decision already recorded
+above in this file's Agency Portal section). The shell's nav labels reuse
+the design's own `navMeta` EN wording where the concept lines up 1:1; AR
+there and everything in the login/signup screen is hand-translated,
+reusing `CustomerLoginPage.tsx`'s exact wording for the concepts that
+overlap (license number, manager name, terms checkbox). All 3 pre-existing
+tests pass unmodified; 2 new tests (en, ar). See
+`docs/features/agency-portal-shell-login-i18n.md`.

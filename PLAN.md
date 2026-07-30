@@ -939,6 +939,33 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   tests (en, ar). Full frontend suite: 266/266 passing, 61/61 files. `tsc
   --noEmit` clean; `oxlint` clean (same pre-existing warnings). See
   `docs/features/account-page-i18n-responsive.md`.
+- [x] **Phase 53 — پنل آژانس: shared shell + login/signup real i18n
+  (foundation)** — first agency-portal phase of the arc, a shared-shell
+  foundation like Phase 41: `AgencyPortalShell.tsx` (sidebar nav +
+  sign-out), `AgencyLoginLayout.tsx` (B2B-partner login shell), and
+  `AgencyLoginPage.tsx` (login form, signup form, OTP step, done state).
+  Unlike every prior phase, no design-mock counterpart exists for the
+  login/signup screen at all — `design-reference-v2/پنل آژانس.dc.html`'s
+  `isEN`/`isAR` ternaries only cover the post-login dashboard content
+  (its own `navMeta` array, KPI labels, etc.), since the design never
+  specified an agency login mechanism (the same ⚑ product-decision gap
+  already recorded for this track). The shell's 7 nav labels reuse the
+  design's own `navMeta` EN wording where the concept lines up 1:1
+  (Dashboard, Credit & Balance, Sales & Reports, Inbox & Messages,
+  Profile & Documents); AR there and every login/signup string is
+  hand-translated, reusing `CustomerLoginPage.tsx`'s exact wording for
+  overlapping concepts (license number, manager name, terms checkbox).
+  `dir` on both the shell and login layout now derives from `useLocale()`
+  instead of a hardcoded `"rtl"`. All 3 pre-existing tests pass
+  unmodified — including the byte-critical fa strings they assert
+  exactly (the `'ورود به پنل آژانس'` button, the
+  `'شماره تماس و رمز عبور را وارد کنید.'` error, the signup field labels,
+  the `'درخواست همکاری شما ثبت شد'` done message); 2 new tests (en, ar).
+  Full frontend suite: 268/268 passing, 61/61 files. `tsc --noEmit`
+  clean; `oxlint` clean (same pre-existing warnings). Remaining
+  agency-portal pages (Dashboard, Credit, Sales, Inbox, Profile, Seats,
+  Webservice) are separate follow-up phases. See
+  `docs/features/agency-portal-shell-login-i18n.md`.
 - [x] With Phases 35–37, the manual endpoint audit had covered
   `reconciliation`, `reservation`, and `it-manager`'s `services` module;
   every other controller checked so far (`pricing`, `flightops`,
