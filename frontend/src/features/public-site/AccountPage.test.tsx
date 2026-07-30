@@ -1,11 +1,20 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AccountPage from './AccountPage';
 import * as useAuthModule from '../../hooks/useAuth';
+import * as useLocaleModule from '../../hooks/useLocale';
 import * as publicSiteApi from '../../api/publicSite';
 import type { BookingDetail, PriceLock, RefundRequestView, UserProfile } from '../../types/public-site';
+
+function mockLocale(locale: 'fa' | 'en' | 'ar') {
+  vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale, setLocale: vi.fn() });
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 const BOOKING: BookingDetail = {
   id: 'b1',
@@ -234,5 +243,25 @@ describe('AccountPage', () => {
     await userEvent.click(screen.getByTestId('wallet-topup-submit'));
 
     await vi.waitFor(() => expect(topup).toHaveBeenCalledWith(5_000_000));
+  });
+
+  it('renders translated tab labels and the points tier in English', async () => {
+    mockLocale('en');
+    mockAuth('authenticated');
+    renderPage();
+    expect(screen.getByTestId('account-tab-points')).toHaveTextContent('Loyalty Points');
+    expect(screen.getByTestId('account-tab-refunds')).toHaveTextContent('Refunds');
+    await userEvent.click(screen.getByTestId('account-tab-points'));
+    expect(await screen.findByText('★ Tier Gold')).toBeInTheDocument();
+  });
+
+  it('renders translated tab labels and the points tier in Arabic', async () => {
+    mockLocale('ar');
+    mockAuth('authenticated');
+    renderPage();
+    expect(screen.getByTestId('account-tab-points')).toHaveTextContent('نقاط الولاء');
+    expect(screen.getByTestId('account-tab-wallet')).toHaveTextContent('المحفظة');
+    await userEvent.click(screen.getByTestId('account-tab-points'));
+    expect(await screen.findByText('★ المستوى ذهبية')).toBeInTheDocument();
   });
 });

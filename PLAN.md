@@ -918,6 +918,27 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   Full frontend suite: 264/264 passing, 61/61 files. `tsc --noEmit` clean
   on both packages; lint clean on both (same pre-existing warnings). See
   `docs/features/forgot-password-email-reset-i18n.md`.
+- [x] **Phase 52 — پنل کاربر (AccountPage) real i18n** — twelfth page of
+  the arc and the largest so far: 7 tabs (پروفایل من, سفرها, کیف پول,
+  امتیاز باشگاه, قفل قیمت, مسافران, استرداد‌ها), all backed by real
+  endpoints from earlier phases — no new backend work needed. EN strings
+  extracted from `design-reference-v2/پنل کاربر.dc.html`'s own `isEN`
+  ternaries (rich coverage); AR mixes the design's own partial `isAR`
+  coverage with fresh hand-translation. The «قفل قیمت» tab has no design
+  counterpart at all — a real feature unique to this app — so its strings
+  were hand-translated to match the actual implementation. Status badge
+  maps (`STATUS_LABEL`, `REFUND_STATUS_LABEL`, `LOCK_STATUS_LABEL`) and
+  `TIER_LABEL`/`CABIN_LABEL` (the latter reusing `ResultsPage.tsx`'s exact
+  mapping) were restructured from flat fa strings to
+  `Record<StoredLocale, string>`; the toman currency word stays
+  `'تومان'`/`'Toman'`/`'تومان'` in every locale, consistent with the
+  pricing-honesty rule from earlier phases. All 12 pre-existing tests pass
+  unmodified — including the byte-critical fa strings they assert exactly
+  (`'در حال بررسی'`, `'★ سطح طلایی'`, `'اطلاعات پروفایل ذخیره شد ✓'`, the
+  `'کد ملی'` label, the `'ذخیره اطلاعات'` button, `'لغو شده'`); 2 new
+  tests (en, ar). Full frontend suite: 266/266 passing, 61/61 files. `tsc
+  --noEmit` clean; `oxlint` clean (same pre-existing warnings). See
+  `docs/features/account-page-i18n-responsive.md`.
 - [x] With Phases 35–37, the manual endpoint audit had covered
   `reconciliation`, `reservation`, and `it-manager`'s `services` module;
   every other controller checked so far (`pricing`, `flightops`,
