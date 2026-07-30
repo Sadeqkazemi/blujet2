@@ -39,6 +39,7 @@ import { SupportTicketsModule } from './modules/support-tickets/support-tickets.
 import { FlightStatusModule } from './modules/flight-status/flight-status.module';
 import { FlightopsModule } from './modules/flightops/flightops.module';
 import { SurveyModule } from './modules/survey/survey.module';
+import { CareersModule } from './modules/careers/careers.module';
 
 @Module({
   imports: [
@@ -107,6 +108,7 @@ import { SurveyModule } from './modules/survey/survey.module';
     FlightStatusModule,
     FlightopsModule,
     SurveyModule,
+    CareersModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

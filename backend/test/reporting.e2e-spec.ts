@@ -126,6 +126,55 @@ describe('Reporting (e2e)', () => {
     expect(kpis.body.data.revenueIrr).toBe(chartTotal);
   });
 
+  it('a bookingless SALE ledger row (AgenciesService.resetTestDebt-style agency debt calibration) never pollutes revenue reporting', async () => {
+    // Reproduces the real bug this file caught: resetTestDebt() reuses
+    // LedgerEntry{type:'SALE'} for agency debt-line calibration
+    // (agencyId set, bookingId null, amount can be negative) — a
+    // completely different concern from ticket revenue. Before the fix,
+    // kpis().revenueIrr (Math.abs-summed, no bookingId filter) diverged
+    // from sales-chart's total (which happened to skip these rows only
+    // because they have no booking.channel) whenever such a row existed.
+    const prisma = app.get(PrismaService);
+    const agency = await prisma.agencyProfile.findFirst({
+      select: { userId: true },
+    });
+    expect(agency).not.toBeNull();
+
+    const before = await request(app.getHttpServer())
+      .get('/reporting/kpis?granularity=q6')
+      .set('Authorization', `Bearer ${ceoToken}`);
+
+    await prisma.ledgerEntry.create({
+      data: {
+        agencyId: agency!.userId,
+        type: 'SALE',
+        signedAmountIrr: -390_000_000,
+      },
+    });
+
+    const chart = await request(app.getHttpServer())
+      .get('/reporting/sales-chart?granularity=q6')
+      .set('Authorization', `Bearer ${ceoToken}`);
+    const chartTotal = chart.body.data.reduce(
+      (
+        sum: number,
+        p: { systemIrr: number; charterIrr: number; agencyIrr: number },
+      ) => sum + p.systemIrr + p.charterIrr + p.agencyIrr,
+      0,
+    );
+    const after = await request(app.getHttpServer())
+      .get('/reporting/kpis?granularity=q6')
+      .set('Authorization', `Bearer ${ceoToken}`);
+
+    expect(after.body.data.revenueIrr).toBe(before.body.data.revenueIrr);
+    expect(after.body.data.revenueIrr).toBe(chartTotal);
+
+    const mix = await request(app.getHttpServer())
+      .get('/reporting/revenue-mix?granularity=q6')
+      .set('Authorization', `Bearer ${ceoToken}`);
+    expect(mix.body.data.totalIrr).toBe(chartTotal);
+  });
+
   it('kpis re-scope to a single periodKey — sum of all periodKeys equals the full-range total', async () => {
     const chart = await request(app.getHttpServer())
       .get('/reporting/sales-chart?granularity=q6')
