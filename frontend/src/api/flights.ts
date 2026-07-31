@@ -20,6 +20,10 @@ export function fetchAirports() {
   return apiGet<AirportEntry[]>('/flights/airports');
 }
 
+export function createAirport(payload: { cityFa: string; code: string; tz?: string }) {
+  return apiPost<AirportEntry>('/flights/airports', payload);
+}
+
 export function fetchAircraftTypes() {
   return apiGet<AircraftTypeOption[]>('/flights/aircraft-types');
 }
@@ -41,8 +45,16 @@ export function fetchFlightDetail(id: string) {
   return apiGet<FlightDetail>(`/flights/${id}`);
 }
 
-export function planFlight(id: string, priceIrr: number, agencySeats: number) {
-  return apiPatch<PlanResult>(`/flights/${id}/plan`, { priceIrr, agencySeats });
+export function planFlight(
+  id: string,
+  payload: {
+    priceIrr: number;
+    agencySeats: number;
+    saleStartsAt?: string;
+    saleEndsAt?: string;
+  },
+) {
+  return apiPatch<PlanResult>(`/flights/${id}/plan`, payload);
 }
 
 export function changeFlightAircraft(
@@ -66,7 +78,13 @@ export function fetchAllotments(instanceId: string) {
 
 export function createAllotment(
   instanceId: string,
-  dto: { agencyId: string; seatsAllocated: number },
+  dto: {
+    agencyId: string;
+    seatsAllocated: number;
+    type?: 'SOFT' | 'HARD';
+    releaseAt?: string;
+    contractPriceIrr?: number;
+  },
 ) {
   return apiPost<AllotmentRow>(`/flights/${instanceId}/allotments`, dto);
 }

@@ -5,10 +5,7 @@ import { fetchNav } from '../api/panels';
 import { fetchCartable } from '../api/cartable';
 import { fetchRefunds } from '../api/refunds';
 import { fetchStaffReports } from '../api/reporting';
-<<<<<<< HEAD
 import { fetchLogsBadgeCount } from '../api/audit';
-=======
->>>>>>> origin/cursor/panel-remaining-gaps-9b91
 import { faDigits } from '../lib/fa-format';
 import type { PanelNavItem } from '../types/panels';
 
@@ -43,10 +40,6 @@ export default function PanelShell() {
     if (!nav || nav.length === 0) return;
 
     const next: Record<string, NavBadge> = {};
-<<<<<<< HEAD
-=======
-
->>>>>>> origin/cursor/panel-remaining-gaps-9b91
     const tasks: Promise<void>[] = [];
 
     if (navKeys.has('cartable')) {
@@ -54,14 +47,10 @@ export default function PanelShell() {
         fetchCartable()
           .then((r) => {
             if (r.totalOpen > 0) {
-<<<<<<< HEAD
-              next.cartable = { count: r.totalOpen, className: 'bg-danger text-white' };
-=======
               next.cartable = {
                 count: r.totalOpen,
                 className: 'bg-danger text-white',
               };
->>>>>>> origin/cursor/panel-remaining-gaps-9b91
             }
           })
           .catch(() => undefined),
@@ -73,14 +62,10 @@ export default function PanelShell() {
         fetchRefunds()
           .then((r) => {
             if (r.kpis.payoutQueue > 0) {
-<<<<<<< HEAD
-              next.refund = { count: r.kpis.payoutQueue, className: 'bg-[#a855f7] text-white' };
-=======
               next.refund = {
                 count: r.kpis.payoutQueue,
                 className: 'bg-[#a855f7] text-white',
               };
->>>>>>> origin/cursor/panel-remaining-gaps-9b91
             }
           })
           .catch(() => undefined),
@@ -92,8 +77,10 @@ export default function PanelShell() {
         fetchStaffReports()
           .then((r) => {
             if (r.newEmployeeEvents.length > 0) {
-<<<<<<< HEAD
-              next.staff = { count: r.newEmployeeEvents.length, className: 'bg-danger text-white' };
+              next.staff = {
+                count: r.newEmployeeEvents.length,
+                className: 'bg-danger text-white',
+              };
             }
           })
           .catch(() => undefined),
@@ -106,12 +93,6 @@ export default function PanelShell() {
           .then((r) => {
             if (r.count > 0) {
               next.logs = { count: r.count, className: 'bg-danger text-white' };
-=======
-              next.staff = {
-                count: r.newEmployeeEvents.length,
-                className: 'bg-danger text-white',
-              };
->>>>>>> origin/cursor/panel-remaining-gaps-9b91
             }
           })
           .catch(() => undefined),
@@ -145,13 +126,9 @@ export default function PanelShell() {
 
         <nav className="mt-4 flex flex-1 flex-col gap-0.5 px-3">
           {nav === null && <div className="px-2 py-3 text-xs text-[#8fa1bb]">در حال بارگذاری…</div>}
-<<<<<<< HEAD
           {nav?.length === 0 && (
             <div className="px-2 py-3 text-xs text-[#8fa1bb]">تبی برای این نقش تعریف نشده است.</div>
           )}
-=======
-          {nav?.length === 0 && <div className="px-2 py-3 text-xs text-[#8fa1bb]">تبی برای این نقش تعریف نشده است.</div>}
->>>>>>> origin/cursor/panel-remaining-gaps-9b91
           {nav?.map((item) => {
             const badge = badges[item.key];
             return (

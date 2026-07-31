@@ -35,6 +35,22 @@ import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 
 const MAX_INT32 = 2_147_483_647;
 
+class CreateAirportDto {
+  @ApiProperty({ description: 'نام شهر', example: 'وان' })
+  @IsString()
+  cityFa: string;
+
+  @ApiProperty({ description: 'کد IATA فرودگاه', example: 'VAS' })
+  @IsString()
+  @Matches(/^[A-Za-z]{3}$/)
+  code: string;
+
+  @ApiProperty({ required: false, description: 'منطقه زمانی IANA', example: 'Asia/Tehran' })
+  @IsOptional()
+  @IsString()
+  tz?: string;
+}
+
 class CreateFlightDto {
   @ApiProperty({ description: 'کد فرودگاه مبدأ', example: 'THR' })
   @IsString()
@@ -349,6 +365,18 @@ export class FlightsController {
   @ApiOperation({ summary: 'کاتالوگ فرودگاه‌ها برای فرم افزودن پرواز' })
   async airports() {
     const data = await this.flights.airports();
+    return { success: true, data };
+  }
+
+  @Post('airports')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_manage')
+  @ApiOperation({ summary: 'افزودن شهر/فرودگاه جدید به کاتالوگ' })
+  async createAirport(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Body() dto: CreateAirportDto,
+  ) {
+    const data = await this.flights.createAirport(actor, dto);
     return { success: true, data };
   }
 
