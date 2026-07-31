@@ -52,15 +52,15 @@ describe('Panels (e2e)', () => {
     expect(keys).toEqual([
       'dashboard',
       'agencies',
-      'flightops',
       'flights',
       'reports',
       'staff',
-      'finance',
-      'cartable',
       'clubrules',
       'webservice',
+      'finance',
+      'cartable',
     ]);
+    expect(keys).not.toContain('flightops');
   });
 
   it('returns the confirmed tab set for CEO', async () => {

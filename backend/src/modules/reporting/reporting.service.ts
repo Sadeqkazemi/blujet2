@@ -675,4 +675,33 @@ export class ReportingService {
     );
     return { rows, outstandingIrr };
   }
+
+  /** Commercial Manager dashboard KPI row — per design-reference-v2/پنل مدیر بازرگانی.dc.html */
+  async commercialOverview(): Promise<{
+    activeAgencies: number;
+    passengersThisMonth: number;
+    pendingAgencyRequests: number;
+  }> {
+    const now = new Date();
+    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+
+    const [activeAgencies, passengersThisMonth, pendingAgencyRequests] =
+      await Promise.all([
+        this.typeorm.agencyProfile.count({ where: { suspendedAt: null } }),
+        this.typeorm.passenger.count({
+          where: {
+            booking: {
+              status: { in: ['PAID', 'TICKETED'] },
+              createdAt: { gte: monthStart, lt: monthEnd },
+            },
+          },
+        }),
+        this.typeorm.agencyMembershipRequest.count({
+          where: { status: { in: ['PENDING', 'REFERRED'] } },
+        }),
+      ]);
+
+    return { activeAgencies, passengersThisMonth, pendingAgencyRequests };
+  }
 }

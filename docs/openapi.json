@@ -509,6 +509,21 @@
         ]
       }
     },
+    "/audit/logs/badge-count": {
+      "get": {
+        "operationId": "AuditController_logsBadgeCount",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "شمارندهٔ badge سایدبار لاگ IT (۷ روز اخیر)",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
     "/audit/system-events": {
       "get": {
         "operationId": "AuditController_ceoSystemEvents",
@@ -796,6 +811,36 @@
           }
         },
         "summary": "Flights <72h out with occupancy below threshold",
+        "tags": [
+          "reporting"
+        ]
+      }
+    },
+    "/reporting/finance-dashboard-stats": {
+      "get": {
+        "operationId": "ReportingController_financeDashboardStats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "کارت‌های داشبورد مدیر مالی — آژانس/مسافر/بلیط/درآمد ماه جاری با روند",
+        "tags": [
+          "reporting"
+        ]
+      }
+    },
+    "/reporting/commercial-overview": {
+      "get": {
+        "operationId": "ReportingController_commercialOverview",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Commercial Manager dashboard KPI row — active agencies, passengers this month, pending cooperation requests",
         "tags": [
           "reporting"
         ]
@@ -4344,6 +4389,21 @@
         ]
       }
     },
+    "/agency-portal/webservice-plans": {
+      "get": {
+        "operationId": "AgencyPortalController_webservicePlans",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "قیمت‌های فعلی پلن‌های وب‌سرویس (ریال)",
+        "tags": [
+          "agency-portal"
+        ]
+      }
+    },
     "/agency-portal/webservice-requests": {
       "post": {
         "operationId": "AgencyPortalController_requestWebservice",
@@ -4394,6 +4454,44 @@
         "summary": "کلیدهای API خودِ آژانس — فقط ابرداده؛ کلید خام فقط یک‌بار هنگام تأیید در پیام‌رسان ارسال می‌شود",
         "tags": [
           "agency-portal"
+        ]
+      }
+    },
+    "/webservice/pricing": {
+      "get": {
+        "operationId": "WebservicePricingController_getPricing",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "قیمت پلن‌های وب‌سرویس B2B (ریال)",
+        "tags": [
+          "webservice-pricing"
+        ]
+      },
+      "patch": {
+        "operationId": "WebservicePricingController_updatePricing",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateWebservicePricingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "به‌روزرسانی قیمت پلن‌های ۱/۳/۱۲ ماهه — فقط مدیر بازرگانی",
+        "tags": [
+          "webservice-pricing"
         ]
       }
     },
@@ -7384,6 +7482,31 @@
         "required": [
           "scope",
           "months"
+        ]
+      },
+      "UpdateWebservicePricingDto": {
+        "type": "object",
+        "properties": {
+          "month1PriceIrr": {
+            "type": "number",
+            "description": "قیمت پلن ۱ ماهه (ریال)",
+            "example": 45000000
+          },
+          "month3PriceIrr": {
+            "type": "number",
+            "description": "قیمت پلن ۳ ماهه (ریال)",
+            "example": 120000000
+          },
+          "month12PriceIrr": {
+            "type": "number",
+            "description": "قیمت پلن ۱۲ ماهه (ریال)",
+            "example": 420000000
+          }
+        },
+        "required": [
+          "month1PriceIrr",
+          "month3PriceIrr",
+          "month12PriceIrr"
         ]
       },
       "CreateAirportDto": {

@@ -14,6 +14,8 @@ const STATUS_LABEL: Record<string, string> = {
   REFUNDED: 'مستردشده',
 };
 
+const QUICK_PASSENGER_NAMES = ['نگار رضایی', 'رضا کریمی', 'سارا محمدی'];
+
 export default function PassengerReportsPage() {
   const [query, setQuery] = useState('');
   const [hits, setHits] = useState<PassengerReportHit[] | null>(null);
@@ -59,6 +61,22 @@ export default function PassengerReportsPage() {
             {searching ? 'در حال جستجو…' : 'جستجو'}
           </button>
         </form>
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          {QUICK_PASSENGER_NAMES.map((name) => (
+            <button
+              key={name}
+              type="button"
+              onClick={() => {
+                setQuery(name);
+                void searchPassengers(name).then(setHits).catch(() => setError('خطا در جستجوی مسافر.'));
+              }}
+              className="rounded-full border border-border bg-body px-3 py-1 text-[11px] text-muted transition hover:border-accent/40 hover:text-ink"
+            >
+              {name}
+            </button>
+          ))}
+        </div>
 
         {error && (
           <p role="alert" className="mt-4 text-xs text-danger">
