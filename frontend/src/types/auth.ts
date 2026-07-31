@@ -19,4 +19,5 @@ export interface AuthUser {
   fullName: string;
   role: Role;
   preferredLocale: Locale;
+  mustChangePassword: boolean;
 }

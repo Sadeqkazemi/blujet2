@@ -6,6 +6,7 @@ export function mockAuthUser(overrides: Partial<AuthUser> = {}): AuthUser {
     fullName: 'کاربر تست',
     role: 'USER',
     preferredLocale: 'FA',
+    mustChangePassword: false,
     ...overrides,
   };
 }

@@ -15,6 +15,31 @@ import { TWO_FACTOR_PROVIDER } from './providers/two-factor-provider.interface';
 import type { TwoFactorProvider } from './providers/two-factor-provider.interface';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import { CustomerReferralsService } from '../customer-referrals/customer-referrals.service';
+import type { Locale, Role } from '../../../generated/typeorm/enums';
+
+export interface AuthUserView {
+  id: string;
+  fullName: string;
+  role: Role;
+  preferredLocale: Locale;
+  mustChangePassword: boolean;
+}
+
+function toAuthUserView(user: {
+  id: string;
+  fullName: string;
+  role: Role;
+  preferredLocale: Locale;
+  mustChangePassword: boolean;
+}): AuthUserView {
+  return {
+    id: user.id,
+    fullName: user.fullName,
+    role: user.role,
+    preferredLocale: user.preferredLocale,
+    mustChangePassword: user.mustChangePassword,
+  };
+}
 
 const TWO_FACTOR_TTL_MS = 2 * 60 * 1000;
 const TWO_FACTOR_MAX_ATTEMPTS = 5;
@@ -93,12 +118,18 @@ export class AuthService {
   /** GET /auth/me does a fresh DB read (not a bare JWT-payload echo) so
    * `preferredLocale` — which the user can change far more often than a
    * short-lived access token gets refreshed — is never stale. */
-  async getMe(actor: AuthenticatedUser) {
+  async getMe(actor: AuthenticatedUser): Promise<AuthUserView> {
     const user = await this.typeorm.user.findUniqueOrThrow({
       where: { id: actor.id },
-      select: { id: true, fullName: true, role: true, preferredLocale: true },
+      select: {
+        id: true,
+        fullName: true,
+        role: true,
+        preferredLocale: true,
+        mustChangePassword: true,
+      },
     });
-    return user;
+    return toAuthUserView(user);
   }
 
   /** Display-language preference — the DB row is only the cross-device sync
@@ -156,7 +187,7 @@ export class AuthService {
   ): Promise<{
     accessToken: string;
     refreshToken: string;
-    user: AuthenticatedUser;
+    user: AuthUserView;
   }> {
     const user = await this.typeorm.user.findUnique({ where: { phone } });
     if (!user || user.role !== 'USER' || !user.passwordHash) {
@@ -183,15 +214,15 @@ export class AuthService {
       data: { lastLoginAt: new Date() },
     });
 
-    const authUser: AuthenticatedUser = {
+    const jwtUser: AuthenticatedUser = {
       id: user.id,
       role: user.role,
       fullName: user.fullName,
     };
-    const accessToken = this.signAccessToken(authUser);
+    const accessToken = this.signAccessToken(jwtUser);
     const refreshToken = await this.issueRefreshToken(user.id, context);
 
-    return { accessToken, refreshToken, user: authUser };
+    return { accessToken, refreshToken, user: toAuthUserView(user) };
   }
 
   /**
@@ -252,7 +283,7 @@ export class AuthService {
   ): Promise<{
     accessToken: string;
     refreshToken: string;
-    user: AuthenticatedUser;
+    user: AuthUserView;
   }> {
     const challenge = await this.typeorm.twoFactorChallenge.findUnique({
       where: { id: challengeId },
@@ -306,15 +337,15 @@ export class AuthService {
     });
 
     const user = challenge.user;
-    const authUser: AuthenticatedUser = {
+    const jwtUser: AuthenticatedUser = {
       id: user.id,
       role: user.role,
       fullName: user.fullName,
     };
-    const accessToken = this.signAccessToken(authUser);
+    const accessToken = this.signAccessToken(jwtUser);
     const refreshToken = await this.issueRefreshToken(user.id, context);
 
-    return { accessToken, refreshToken, user: authUser };
+    return { accessToken, refreshToken, user: toAuthUserView(user) };
   }
 
   async staffLogin(
@@ -370,7 +401,7 @@ export class AuthService {
   ): Promise<{
     accessToken: string;
     refreshToken: string;
-    user: AuthenticatedUser;
+    user: AuthUserView;
   }> {
     const challenge = await this.typeorm.twoFactorChallenge.findUnique({
       where: { id: challengeId },
@@ -424,15 +455,15 @@ export class AuthService {
     });
 
     const user = challenge.user;
-    const authUser: AuthenticatedUser = {
+    const jwtUser: AuthenticatedUser = {
       id: user.id,
       role: user.role,
       fullName: user.fullName,
     };
-    const accessToken = this.signAccessToken(authUser);
+    const accessToken = this.signAccessToken(jwtUser);
     const refreshToken = await this.issueRefreshToken(user.id, context);
 
-    return { accessToken, refreshToken, user: authUser };
+    return { accessToken, refreshToken, user: toAuthUserView(user) };
   }
 
   /** Agency Portal login: phone+password, no 2FA step (unlike staff login) —
@@ -444,7 +475,7 @@ export class AuthService {
   ): Promise<{
     accessToken: string;
     refreshToken: string;
-    user: AuthenticatedUser;
+    user: AuthUserView;
   }> {
     const user = await this.typeorm.user.findUnique({
       where: { phone },
@@ -480,15 +511,15 @@ export class AuthService {
       data: { lastLoginAt: new Date() },
     });
 
-    const authUser: AuthenticatedUser = {
+    const jwtUser: AuthenticatedUser = {
       id: user.id,
       role: user.role,
       fullName: user.fullName,
     };
-    const accessToken = this.signAccessToken(authUser);
+    const accessToken = this.signAccessToken(jwtUser);
     const refreshToken = await this.issueRefreshToken(user.id, context);
 
-    return { accessToken, refreshToken, user: authUser };
+    return { accessToken, refreshToken, user: toAuthUserView(user) };
   }
 
   /** Public purchase engine: customer phone+OTP login (design's ورود و
@@ -537,7 +568,7 @@ export class AuthService {
   ): Promise<{
     accessToken: string;
     refreshToken: string;
-    user: AuthenticatedUser;
+    user: AuthUserView;
   }> {
     const challenge = await this.typeorm.twoFactorChallenge.findUnique({
       where: { id: challengeId },
@@ -591,15 +622,15 @@ export class AuthService {
     });
 
     const user = challenge.user;
-    const authUser: AuthenticatedUser = {
+    const jwtUser: AuthenticatedUser = {
       id: user.id,
       role: user.role,
       fullName: user.fullName,
     };
-    const accessToken = this.signAccessToken(authUser);
+    const accessToken = this.signAccessToken(jwtUser);
     const refreshToken = await this.issueRefreshToken(user.id, context);
 
-    return { accessToken, refreshToken, user: authUser };
+    return { accessToken, refreshToken, user: toAuthUserView(user) };
   }
 
   /**
