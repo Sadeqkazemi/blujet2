@@ -3,6 +3,7 @@ export type SiteContentFieldKey =
   | 'homeHeroSubtitle'
   | 'aboutUsText'
   | 'contactAddress'
+  | 'contactOfficeHours'
   | 'termsText';
 
 export type PublicSiteContent = Record<SiteContentFieldKey, string>;
@@ -69,5 +70,6 @@ export const SITE_CONTENT_FIELD_LABELS: Record<SiteContentFieldKey, string> = {
   homeHeroSubtitle: 'زیرعنوان صفحهٔ اصلی',
   aboutUsText: 'متن دربارهٔ ما',
   contactAddress: 'آدرس تماس با ما',
+  contactOfficeHours: 'ساعات کاری دفتر',
   termsText: 'متن مقدمهٔ قوانین',
 };

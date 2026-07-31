@@ -53,6 +53,60 @@ const BLOCK_DEFAULTS: Record<
   },
 };
 
+const BLOCK_LOCALE_DEFAULTS: Record<
+  'en' | 'ar',
+  Record<
+    SiteContentBlockKey,
+    Pick<
+      (typeof BLOCK_DEFAULTS)[SiteContentBlockKey],
+      'title' | 'subtitle' | 'buttonText' | 'badgeText'
+    >
+  >
+> = {
+  en: {
+    HERO_BANNER: {
+      title: 'Book your next flight with blujet',
+      subtitle: 'Over 200 destinations at the best prices',
+      buttonText: 'View special offers',
+      badgeText: '',
+    },
+    ANNOUNCEMENT_BAR: {
+      title:
+        'Important notice: some flights today are delayed due to weather — check the latest flight status',
+      subtitle: '',
+      buttonText: 'View',
+      badgeText: '',
+    },
+    PROMO_BANNER: {
+      title: 'Special discount on domestic flights',
+      subtitle: '',
+      buttonText: 'Book now',
+      badgeText: 'Special offer',
+    },
+  },
+  ar: {
+    HERO_BANNER: {
+      title: 'احجز رحلتك القادمة مع blujet',
+      subtitle: 'أكثر من 200 وجهة بأفضل الأسعار',
+      buttonText: 'عرض العروض الخاصة',
+      badgeText: '',
+    },
+    ANNOUNCEMENT_BAR: {
+      title:
+        'إشعار مهم: بعض الرحلات اليوم متأخرة بسبب الأحوال الجوية — تحقق من آخر حالة للرحلات',
+      subtitle: '',
+      buttonText: 'عرض',
+      badgeText: '',
+    },
+    PROMO_BANNER: {
+      title: 'خصم خاص على الرحلات الداخلية',
+      subtitle: '',
+      buttonText: 'احجز الآن',
+      badgeText: 'عرض خاص',
+    },
+  },
+};
+
 @Injectable()
 export class SiteContentService {
   constructor(
@@ -432,7 +486,7 @@ export class SiteContentService {
     return { id };
   }
 
-  async getPublicHome() {
+  async getPublicHome(locale: 'fa' | 'en' | 'ar' = 'fa') {
     const [blocks, destinations, routes, airports] = await Promise.all([
       this.listBlocks(),
       this.listDestinations(),
@@ -441,8 +495,20 @@ export class SiteContentService {
     ]);
     const airportMap = new Map(airports.map((a) => [a.code, a.cityFa]));
 
+    const localizedBlocks = blocks.map((block) => {
+      if (locale === 'fa') return block;
+      const tr = BLOCK_LOCALE_DEFAULTS[locale][block.key];
+      return {
+        ...block,
+        title: tr.title,
+        subtitle: tr.subtitle,
+        buttonText: tr.buttonText,
+        badgeText: tr.badgeText,
+      };
+    });
+
     return {
-      blocks,
+      blocks: localizedBlocks,
       destinations: destinations.map((d) => ({
         airportCode: d.airportCode,
         cityFa: airportMap.get(d.airportCode) ?? d.airportCode,

@@ -1,5 +1,5 @@
-import { Controller, Get, Param, Res } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Controller, Get, Param, Query, Res } from '@nestjs/common';
+import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { SiteContentService } from './site-content.service';
@@ -12,8 +12,11 @@ export class SiteContentPublicController {
   @Get('home')
   @Throttle({ default: { limit: 120, ttl: 60_000 } })
   @ApiOperation({ summary: 'محتوای CMS صفحهٔ اصلی' })
-  async home() {
-    return { success: true, data: await this.content.getPublicHome() };
+  @ApiQuery({ name: 'locale', required: false, enum: ['fa', 'en', 'ar'] })
+  async home(@Query('locale') locale?: string) {
+    const loc =
+      locale === 'en' || locale === 'ar' || locale === 'fa' ? locale : 'fa';
+    return { success: true, data: await this.content.getPublicHome(loc) };
   }
 
   @Get('media/:fileId')

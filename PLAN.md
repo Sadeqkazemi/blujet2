@@ -1563,6 +1563,17 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   Tests: `MediaAdminPage.test.tsx`, extended `phase12.e2e-spec.ts`.
   See `docs/features/site-admin-static-pages.md`.
 
+- [x] **Public gaps closure — i18n, visual, AI radar, CMS locale, agency recovery (2026-07-31)** —
+  Split purchase flow per design: `CheckoutPage` (review) → new `PaymentPage`
+  (promo + pay + hold timer, fa/en/ar, two-column layout). `BookPage`/`TicketPage`/
+  `FlowStepper` i18n. `ResultsPage`: removed mock flights; wired
+  `GET /search/advisory` + `GET /search/price-calendar`. CMS multilocale:
+  `GET /settings/site-content?locale=`, `GET /site-content/home?locale=`,
+  `contactOfficeHours` setting, block locale defaults. Agency:
+  `POST /auth/agency/password-reset/*`, `GET /agency-portal/sales/export` (CSV).
+  Backend e2e: `search-advisory.e2e-spec.ts`. Frontend: 413 tests green.
+  See branch `cursor/public-gaps-i18n-visual-9b91`.
+
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is
 "done" only when every checklist item in its `docs/features/<name>.md` has

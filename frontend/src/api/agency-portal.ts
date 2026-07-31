@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPostForm } from './http';
+import { apiGet, apiGetBlob, apiPost, apiPostForm } from './http';
 import type {
   AgencyAllotmentRow,
   AgencyApiKeySummary,
@@ -46,6 +46,10 @@ export function fetchMyCreditRequests() {
 
 export function fetchSales() {
   return apiGet<AgencySalesReport>('/agency-portal/sales');
+}
+
+export function downloadSalesExport() {
+  return apiGetBlob('/agency-portal/sales/export');
 }
 
 export function fetchInbox() {

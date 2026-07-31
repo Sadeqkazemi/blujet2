@@ -333,7 +333,7 @@ export default function HomeSearchPage() {
     fetchAirports()
       .then(setAirports)
       .catch(() => setError(e.airports));
-    fetchPublicHomeContent()
+    fetchPublicHomeContent(locale)
       .then(setHomeContent)
       .catch(() => {
         /* keep static fallbacks */

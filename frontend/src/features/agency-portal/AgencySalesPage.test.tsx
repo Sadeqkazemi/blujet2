@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AgencySalesPage from './AgencySalesPage';
 import * as portalApi from '../../api/agency-portal';
@@ -57,5 +58,19 @@ describe('AgencySalesPage', () => {
 
     expect(await screen.findByText('المبيعات والتقارير')).toBeInTheDocument();
     expect(screen.getByText('تم إصدار التذكرة')).toBeInTheDocument();
+  });
+
+  it('downloads sales export CSV when export button is clicked', async () => {
+    vi.spyOn(portalApi, 'fetchSales').mockResolvedValue(REPORT);
+    const exportSpy = vi.spyOn(portalApi, 'downloadSalesExport').mockResolvedValue(
+      new Blob(['PNR,Flight'], { type: 'text/csv' }),
+    );
+
+    render(<AgencySalesPage />);
+    await screen.findByText('BJAG001');
+
+    await userEvent.click(screen.getByTestId('sales-export'));
+
+    expect(exportSpy).toHaveBeenCalled();
   });
 });
