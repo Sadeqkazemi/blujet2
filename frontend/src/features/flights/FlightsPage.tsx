@@ -18,7 +18,9 @@ import { useStepUp } from '../../hooks/useStepUp';
 import { faDigits, faMoney, latinDigits, parseTomanToRial } from '../../lib/fa-format';
 import { dayjs, formatJalaliDateTime, parseJalaliDateToIso } from '../../lib/jalali';
 import Modal from '../../components/Modal';
+import JalaliDatePicker from '../../components/JalaliDatePicker';
 import PricingPage from '../pricing/PricingPage';
+import FlightCitiesTab from './FlightCitiesTab';
 import type {
   AircraftTypeOption,
   AirportEntry,
@@ -56,7 +58,7 @@ export default function FlightsPage() {
   const { user } = useAuth();
   const [data, setData] = useState<FlightsOverview | null>(null);
   const [airports, setAirports] = useState<AirportEntry[]>([]);
-  const [subTab, setSubTab] = useState<'active' | 'done' | 'future'>('active');
+  const [subTab, setSubTab] = useState<'active' | 'done' | 'future' | 'cities'>('active');
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -89,11 +91,16 @@ export default function FlightsPage() {
   const [plan, setPlan] = useState<FutureFlightRow | null>(null);
   const [planPrice, setPlanPrice] = useState('');
   const [planAgency, setPlanAgency] = useState('');
+  const [planSaleStart, setPlanSaleStart] = useState<string | null>(null);
+  const [planSaleEnd, setPlanSaleEnd] = useState<string | null>(null);
 
   const [allotments, setAllotments] = useState<AllotmentRow[]>([]);
   const [agencyOptions, setAgencyOptions] = useState<AgencyListRow[]>([]);
   const [newAllotmentAgencyId, setNewAllotmentAgencyId] = useState('');
   const [newAllotmentSeats, setNewAllotmentSeats] = useState('');
+  const [newAllotmentType, setNewAllotmentType] = useState<'HARD' | 'SOFT'>('HARD');
+  const [newAllotmentContractToman, setNewAllotmentContractToman] = useState('');
+  const [newAllotmentReleaseAt, setNewAllotmentReleaseAt] = useState<string | null>(null);
   const [allotmentError, setAllotmentError] = useState<string | null>(null);
 
   const cityByCode = useMemo(
@@ -212,6 +219,11 @@ export default function FlightsPage() {
     setAllotmentError(null);
     setNewAllotmentAgencyId('');
     setNewAllotmentSeats('');
+    setNewAllotmentType('HARD');
+    setNewAllotmentContractToman('');
+    setNewAllotmentReleaseAt(null);
+    setPlanSaleStart(null);
+    setPlanSaleEnd(null);
     fetchAllotments(row.id)
       .then(setAllotments)
       .catch(() => setAllotments([]));
@@ -229,12 +241,25 @@ export default function FlightsPage() {
       return;
     }
     try {
+      const contractPriceIrr = newAllotmentContractToman.trim()
+        ? parseTomanToRial(newAllotmentContractToman)
+        : undefined;
+      if (newAllotmentContractToman.trim() && contractPriceIrr == null) {
+        setAllotmentError('نرخ قراردادی معتبر وارد کنید.');
+        return;
+      }
       await createAllotment(plan.id, {
         agencyId: newAllotmentAgencyId,
         seatsAllocated: seats,
+        type: newAllotmentType,
+        contractPriceIrr: contractPriceIrr ?? undefined,
+        releaseAt: newAllotmentType === 'SOFT' ? newAllotmentReleaseAt ?? undefined : undefined,
       });
       setNewAllotmentAgencyId('');
       setNewAllotmentSeats('');
+      setNewAllotmentType('HARD');
+      setNewAllotmentContractToman('');
+      setNewAllotmentReleaseAt(null);
       setAllotments(await fetchAllotments(plan.id));
     } catch (e) {
       setAllotmentError(e instanceof Error ? e.message : 'خطا در ثبت سهمیه.');
@@ -260,7 +285,12 @@ export default function FlightsPage() {
       return;
     }
     try {
-      const result = await planFlight(plan.id, priceIrr, Number(latinDigits(planAgency)));
+      const result = await planFlight(plan.id, {
+        priceIrr,
+        agencySeats: Number(latinDigits(planAgency)),
+        saleStartsAt: planSaleStart ?? undefined,
+        saleEndsAt: planSaleEnd ?? undefined,
+      });
       setPlan(null);
       setNotice(
         result.proposalPending
@@ -319,6 +349,21 @@ export default function FlightsPage() {
 
   const kpis = data?.kpis;
   const isCommercial = user?.role === 'COMMERCIAL_MANAGER';
+  const showFuturePanel = subTab === 'future' || (isCommercial && subTab === 'active');
+  const subTabs = isCommercial
+    ? ([
+        ['active', 'پروازهای فعال'],
+        ['done', 'پروازهای انجام‌شده'],
+        ['cities', 'شهرهای پروازی'],
+      ] as const)
+    : ([
+        ['active', 'پروازهای فعال'],
+        ['done', 'پروازهای انجام‌شده'],
+        ['future', 'پروازهای آینده'],
+      ] as const);
+  const maxAgencySeats = plan ? plan.capacity - plan.charterSeats : 0;
+  const agencySeatsNum = plan ? Number(latinDigits(planAgency)) || 0 : 0;
+  const directSeats = plan ? Math.max(maxAgencySeats - agencySeatsNum, 0) : 0;
 
   return (
     <div className="p-8">
@@ -352,13 +397,7 @@ export default function FlightsPage() {
       )}
 
       <div className="mb-4 flex w-max gap-1 rounded-xl border border-border bg-white p-1">
-        {(
-          [
-            ['active', 'پروازهای فعال'],
-            ['done', 'پروازهای انجام‌شده'],
-            ['future', 'پروازهای آینده'],
-          ] as const
-        ).map(([key, label]) => (
+        {subTabs.map(([key, label]) => (
           <button
             key={key}
             onClick={() => setSubTab(key)}
@@ -454,6 +493,12 @@ export default function FlightsPage() {
                   )}
                 </div>
               </div>
+
+              {isCommercial && (
+                <div className="mt-4 rounded-xl border border-border bg-white p-5">
+                  <PricingPage embedded />
+                </div>
+              )}
             </section>
           )}
 
@@ -487,69 +532,133 @@ export default function FlightsPage() {
               </div>
 
               <section className="rounded-xl border border-border bg-white">
-                <div className="border-b border-border px-5 py-3">
+                <div className="flex items-center justify-between border-b border-border px-5 py-3">
                   <h2 className="text-sm font-bold text-ink">گزارش پروازهای انجام‌شده</h2>
+                  <button
+                    type="button"
+                    onClick={() => setNotice('خروجی Excel پروازهای انجام‌شده در حال آماده‌سازی…')}
+                    className="rounded-lg border border-[#059669]/40 bg-[#10b98115] px-3 py-1.5 text-[11px] font-bold text-[#059669]"
+                  >
+                    ↓ خروجی Excel
+                  </button>
                 </div>
                 <div className="overflow-x-auto">
-                  <div className="min-w-[900px]">
-                    <div className="grid grid-cols-[1.5fr_0.8fr_0.6fr_1fr_1fr_1fr_1fr_1fr_1fr] gap-2 border-b border-border px-5 py-2 text-[10px] font-bold text-muted">
-                      <span>مسیر</span>
-                      <span>پرواز</span>
-                      <span>بلیط</span>
-                      <span>نرخ اصلی</span>
-                      <span>متوسط نرخ</span>
-                      <span>سیستمی</span>
-                      <span>چارتری / آژانس</span>
-                      <span>سود حاصله</span>
-                      <span>ضرر</span>
-                    </div>
-                    {data.completed.rows.map((d: CompletedFlightRow) => (
-                      <div key={d.id}>
-                        <button
-                          onClick={() => setExpandedDone(expandedDone === d.id ? null : d.id)}
-                          className="grid w-full grid-cols-[1.5fr_0.8fr_0.6fr_1fr_1fr_1fr_1fr_1fr_1fr] items-center gap-2 border-b border-border px-5 py-3 text-right text-[11px] transition hover:bg-surface"
-                        >
-                          <span>
-                            <span className="block font-bold text-ink">
-                              {routeLabel(d.originCode, d.destCode)}
+                  <div className={isCommercial ? 'min-w-[920px]' : 'min-w-[900px]'}>
+                    {isCommercial ? (
+                      <>
+                        <div className="grid grid-cols-[1.5fr_0.9fr_0.8fr_1fr_1fr_1fr_1fr_1.1fr] gap-2 border-b border-border px-5 py-2 text-[10px] font-bold text-muted">
+                          <span>مسیر</span>
+                          <span>پرواز</span>
+                          <span>بلیط</span>
+                          <span>قیمت استاندارد</span>
+                          <span>فروش سیستمی</span>
+                          <span>فروش چارتری</span>
+                          <span>فروش آژانس</span>
+                          <span>سود حاصله</span>
+                        </div>
+                        {data.completed.rows.map((d: CompletedFlightRow) => (
+                          <div
+                            key={d.id}
+                            className="grid grid-cols-[1.5fr_0.9fr_0.8fr_1fr_1fr_1fr_1fr_1.1fr] items-center gap-2 border-b border-border px-5 py-3 text-[11px]"
+                          >
+                            <span>
+                              <span className="block font-bold text-ink">
+                                {routeLabel(d.originCode, d.destCode)}
+                              </span>
+                              <span className="font-num block text-[10px] text-muted">
+                                {formatJalaliDateTime(d.departureAt)}
+                              </span>
                             </span>
-                            <span className="font-num block text-[10px] text-muted">
-                              {formatJalaliDateTime(d.departureAt)}
+                            <span className="ltr font-num text-muted">{d.flightNo}</span>
+                            <span className="font-num font-bold text-ink">{faDigits(d.tickets)}</span>
+                            <span className="font-num text-muted">{faMoney(d.basePriceIrr)}</span>
+                            <span className="font-num text-accent">{faMoney(d.channelRevenueIrr.SYSTEM)}</span>
+                            <span className="font-num text-[#7c3aed]">{faMoney(d.channelRevenueIrr.CHARTER)}</span>
+                            <span className="font-num text-[#059669]">{faMoney(d.channelRevenueIrr.AGENCY)}</span>
+                            <span className="font-num font-black text-[#059669]">
+                              {d.profitIrr > 0 ? faMoney(d.profitIrr) : '—'}
                             </span>
-                          </span>
-                          <span className="ltr font-num text-muted">{d.flightNo}</span>
-                          <span className="font-num font-bold text-ink">{faDigits(d.tickets)}</span>
-                          <span className="font-num text-muted">{faMoney(d.basePriceIrr)}</span>
-                          <span className="font-num font-bold text-ink">{faMoney(d.avgPriceIrr)}</span>
-                          <span className="font-num text-accent">{faMoney(d.channelRevenueIrr.SYSTEM)}</span>
-                          <span className="font-num text-[#7c3aed]">
-                            {faMoney(d.channelRevenueIrr.CHARTER)} / {faMoney(d.channelRevenueIrr.AGENCY)}
-                          </span>
-                          <span className="font-num font-black text-[#059669]">
-                            {d.profitIrr > 0 ? `${faMoney(d.profitIrr)}` : '—'}
-                          </span>
-                          <span className={`font-num font-black ${d.lossIrr > 0 ? 'text-danger' : 'text-muted'}`}>
-                            {d.lossIrr > 0 ? faMoney(d.lossIrr) : '—'}
-                          </span>
-                        </button>
-                        {expandedDone === d.id && (
-                          <div className="grid grid-cols-3 gap-3 border-b border-border bg-surface px-5 py-3 text-[11px]">
-                            <div>
-                              <div className="text-[10px] text-muted">تعداد صندلی فروخته‌شده</div>
-                              <div className="font-num font-bold text-ink">{faDigits(d.tickets)} بلیط</div>
-                            </div>
-                            <div>
-                              <div className="text-[10px] text-muted">جمع فروش</div>
-                              <div className="font-num font-bold text-ink">{faMoney(d.revenueIrr)} تومان</div>
-                            </div>
-                            <div>
-                              <div className="text-[10px] text-muted">متوسط نرخ بلیط فروخته‌شده</div>
-                              <div className="font-num font-bold text-ink">{faMoney(d.avgPriceIrr)} تومان</div>
-                            </div>
                           </div>
-                        )}
-                      </div>
-                    ))}
+                        ))}
+                      </>
+                    ) : (
+                      <>
+                        <div className="grid grid-cols-[1.5fr_0.8fr_0.6fr_1fr_1fr_1fr_1fr_1fr_1fr] gap-2 border-b border-border px-5 py-2 text-[10px] font-bold text-muted">
+                          <span>مسیر</span>
+                          <span>پرواز</span>
+                          <span>بلیط</span>
+                          <span>نرخ اصلی</span>
+                          <span>متوسط نرخ</span>
+                          <span>سیستمی</span>
+                          <span>چارتری / آژانس</span>
+                          <span>سود حاصله</span>
+                          <span>ضرر</span>
+                        </div>
+                        {data.completed.rows.map((d: CompletedFlightRow) => (
+                          <div key={d.id}>
+                            <button
+                              onClick={() => setExpandedDone(expandedDone === d.id ? null : d.id)}
+                              className="grid w-full grid-cols-[1.5fr_0.8fr_0.6fr_1fr_1fr_1fr_1fr_1fr_1fr] items-center gap-2 border-b border-border px-5 py-3 text-right text-[11px] transition hover:bg-surface"
+                            >
+                              <span>
+                                <span className="block font-bold text-ink">
+                                  {routeLabel(d.originCode, d.destCode)}
+                                </span>
+                                <span className="font-num block text-[10px] text-muted">
+                                  {formatJalaliDateTime(d.departureAt)}
+                                </span>
+                              </span>
+                              <span className="ltr font-num text-muted">{d.flightNo}</span>
+                              <span className="font-num font-bold text-ink">{faDigits(d.tickets)}</span>
+                              <span className="font-num text-muted">{faMoney(d.basePriceIrr)}</span>
+                              <span className="font-num font-bold text-ink">{faMoney(d.avgPriceIrr)}</span>
+                              <span className="font-num text-accent">{faMoney(d.channelRevenueIrr.SYSTEM)}</span>
+                              <span className="font-num text-[#7c3aed]">
+                                {faMoney(d.channelRevenueIrr.CHARTER)} / {faMoney(d.channelRevenueIrr.AGENCY)}
+                              </span>
+                              <span className="font-num font-black text-[#059669]">
+                                {d.profitIrr > 0 ? `${faMoney(d.profitIrr)}` : '—'}
+                              </span>
+                              <span className={`font-num font-black ${d.lossIrr > 0 ? 'text-danger' : 'text-muted'}`}>
+                                {d.lossIrr > 0 ? faMoney(d.lossIrr) : '—'}
+                              </span>
+                            </button>
+                            {expandedDone === d.id && (
+                              <div className="grid grid-cols-2 gap-3 border-b border-border bg-surface px-5 py-3 text-[11px] md:grid-cols-3">
+                                <div>
+                                  <div className="text-[10px] text-muted">تعداد صندلی فروخته‌شده</div>
+                                  <div className="font-num font-bold text-ink">{faDigits(d.tickets)} بلیط</div>
+                                </div>
+                                <div>
+                                  <div className="text-[10px] text-muted">نرخ اصلی بلیط</div>
+                                  <div className="font-num font-bold text-ink">{faMoney(d.basePriceIrr)} تومان</div>
+                                </div>
+                                <div>
+                                  <div className="text-[10px] text-muted">جمع فروش</div>
+                                  <div className="font-num font-bold text-ink">{faMoney(d.revenueIrr)} تومان</div>
+                                </div>
+                                <div>
+                                  <div className="text-[10px] text-muted">متوسط نرخ بلیط فروخته‌شده</div>
+                                  <div className="font-num font-bold text-ink">{faMoney(d.avgPriceIrr)} تومان</div>
+                                </div>
+                                <div>
+                                  <div className="text-[10px] text-muted">سود حاصله</div>
+                                  <div className="font-num font-bold text-[#059669]">
+                                    {d.profitIrr > 0 ? `${faMoney(d.profitIrr)} تومان` : '—'}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="text-[10px] text-muted">ضرر</div>
+                                  <div className={`font-num font-bold ${d.lossIrr > 0 ? 'text-danger' : 'text-muted'}`}>
+                                    {d.lossIrr > 0 ? `${faMoney(d.lossIrr)} تومان` : '—'}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </>
+                    )}
                     {data.completed.rows.length === 0 && (
                       <p className="py-6 text-center text-xs text-muted">پرواز انجام‌شده‌ای ثبت نشده است.</p>
                     )}
@@ -559,7 +668,14 @@ export default function FlightsPage() {
             </div>
           )}
 
-          {subTab === 'future' && data && (
+          {subTab === 'cities' && isCommercial && (
+            <FlightCitiesTab
+              airports={airports}
+              onCreated={(a) => setAirports((prev) => [...prev, a].sort((x, y) => x.cityFa.localeCompare(y.cityFa, 'fa')))}
+            />
+          )}
+
+          {showFuturePanel && data && (
             <div className="flex flex-col gap-4">
               <p className="rounded-xl border border-accent/25 bg-accent/5 p-3 text-[11px] leading-6 text-muted">
                 برنامه‌ریزی پروازهای آینده: ظرفیت، تعهد چارتری و قیمت‌گذاری پیشنهادی هوش مصنوعی بر اساس تحلیل
@@ -756,13 +872,6 @@ export default function FlightsPage() {
             </div>
           )}
         </>
-      )}
-
-      {/* Phase 6's pricing section lives inside Commercial's مدیریت پروازها tab, per design. */}
-      {isCommercial && (
-        <div className="mt-8 border-t border-border pt-2">
-          <PricingPage />
-        </div>
       )}
 
       {addOpen && (
@@ -1045,27 +1154,65 @@ export default function FlightsPage() {
           </div>
 
           <label htmlFor="plan-agency" className="mb-1 block text-xs font-bold text-ink">
-            تخصیص صندلی آژانس (حداکثر {faDigits(plan.capacity - plan.charterSeats)})
+            تخصیص صندلی آژانس (حداکثر {faDigits(maxAgencySeats)})
           </label>
           <input
             id="plan-agency"
-            dir="ltr"
-            value={planAgency}
+            type="range"
+            min={0}
+            max={maxAgencySeats}
+            value={Math.min(agencySeatsNum, maxAgencySeats)}
             onChange={(e) => setPlanAgency(e.target.value)}
-            className="font-num mb-2 h-10 w-full rounded-lg border border-border px-2 text-xs outline-none"
+            className="mb-2 w-full accent-accent"
           />
-          <p className="mb-3 text-[11px] text-muted">
-            مستقیم:{' '}
-            <span className="font-num font-bold text-ink">
-              {faDigits(
-                Math.max(
-                  plan.capacity - plan.charterSeats - (Number(latinDigits(planAgency)) || 0),
-                  0,
-                ),
-              )}{' '}
-              صندلی
-            </span>
-          </p>
+          <div className="mb-3 grid grid-cols-3 gap-2 text-[11px]">
+            <div className="rounded-lg bg-surface p-2.5 text-center">
+              <div className="text-[10px] text-muted">چارتری</div>
+              <div className="font-num font-bold text-[#7c3aed]">{faDigits(plan.charterSeats)}</div>
+            </div>
+            <div className="rounded-lg bg-surface p-2.5 text-center">
+              <div className="text-[10px] text-muted">آژانس</div>
+              <div className="font-num font-bold text-[#059669]">{faDigits(agencySeatsNum)}</div>
+            </div>
+            <div className="rounded-lg bg-surface p-2.5 text-center">
+              <div className="text-[10px] text-muted">مستقیم</div>
+              <div className="font-num font-bold text-ink">{faDigits(directSeats)}</div>
+            </div>
+          </div>
+          <div className="mb-3 flex h-2 overflow-hidden rounded bg-surface-2">
+            <div
+              className="bg-[#7c3aed]"
+              style={{ width: `${plan.capacity > 0 ? (plan.charterSeats / plan.capacity) * 100 : 0}%` }}
+            />
+            <div
+              className="bg-[#059669]"
+              style={{ width: `${plan.capacity > 0 ? (agencySeatsNum / plan.capacity) * 100 : 0}%` }}
+            />
+            <div
+              className="bg-accent"
+              style={{ width: `${plan.capacity > 0 ? (directSeats / plan.capacity) * 100 : 0}%` }}
+            />
+          </div>
+
+          <div className="mb-3 grid grid-cols-2 gap-2">
+            <div className="rounded-lg border border-border">
+              <JalaliDatePicker
+                label="شروع فروش"
+                value={planSaleStart}
+                onChange={setPlanSaleStart}
+                testId="plan-sale-start"
+              />
+            </div>
+            <div className="rounded-lg border border-border">
+              <JalaliDatePicker
+                label="پایان فروش"
+                value={planSaleEnd}
+                onChange={setPlanSaleEnd}
+                minDate={planSaleStart ?? undefined}
+                testId="plan-sale-end"
+              />
+            </div>
+          </div>
 
           <button
             onClick={() => void onSubmitPlan()}
@@ -1087,6 +1234,7 @@ export default function FlightsPage() {
                 >
                   <span className="font-bold text-ink">{a.agencyName}</span>
                   <span className="font-num text-muted">{faDigits(a.seatsAllocated)} صندلی</span>
+                  <span className="text-[10px] text-muted">{a.type === 'SOFT' ? 'نرم' : 'سخت'}</span>
                   <button
                     onClick={() => void onDeleteAllotment(a.id)}
                     className="text-danger"
@@ -1097,12 +1245,12 @@ export default function FlightsPage() {
                 </div>
               ))}
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <select
                 aria-label="آژانس"
                 value={newAllotmentAgencyId}
                 onChange={(e) => setNewAllotmentAgencyId(e.target.value)}
-                className="h-10 flex-1 rounded-lg border border-border px-2 text-xs outline-none"
+                className="h-10 min-w-[120px] flex-1 rounded-lg border border-border px-2 text-xs outline-none"
               >
                 <option value="">انتخاب آژانس</option>
                 {agencyOptions.map((a) => (
@@ -1119,6 +1267,23 @@ export default function FlightsPage() {
                 placeholder="تعداد"
                 className="font-num h-10 w-20 rounded-lg border border-border px-2 text-xs outline-none"
               />
+              <select
+                aria-label="نوع سهمیه"
+                value={newAllotmentType}
+                onChange={(e) => setNewAllotmentType(e.target.value as 'HARD' | 'SOFT')}
+                className="h-10 rounded-lg border border-border px-2 text-xs outline-none"
+              >
+                <option value="HARD">سخت</option>
+                <option value="SOFT">نرم</option>
+              </select>
+              <input
+                aria-label="نرخ قراردادی تومان"
+                dir="ltr"
+                value={newAllotmentContractToman}
+                onChange={(e) => setNewAllotmentContractToman(e.target.value)}
+                placeholder="نرخ قرارداد"
+                className="font-num h-10 w-24 rounded-lg border border-border px-2 text-xs outline-none"
+              />
               <button
                 onClick={() => void onAddAllotment()}
                 className="rounded-lg border border-accent px-3 text-[11px] font-bold text-accent"
@@ -1126,6 +1291,16 @@ export default function FlightsPage() {
                 + افزودن
               </button>
             </div>
+            {newAllotmentType === 'SOFT' && (
+              <div className="mt-2 max-w-xs rounded-lg border border-border">
+                <JalaliDatePicker
+                  label="موعد آزادسازی"
+                  value={newAllotmentReleaseAt}
+                  onChange={setNewAllotmentReleaseAt}
+                  testId="allotment-release"
+                />
+              </div>
+            )}
             {allotmentError && <p className="mt-2 text-[11px] text-danger">{allotmentError}</p>}
           </div>
         </Modal>

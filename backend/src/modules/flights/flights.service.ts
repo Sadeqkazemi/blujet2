@@ -203,6 +203,53 @@ export class FlightsService {
     return this.prisma.airport.findMany({ orderBy: { cityFa: 'asc' } });
   }
 
+  async createAirport(
+    actor: AuthenticatedUser,
+    dto: { code: string; cityFa: string; tz?: string },
+  ) {
+    const code = dto.code.trim().toUpperCase();
+    const cityFa = dto.cityFa.trim();
+    if (!cityFa) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'نام شهر الزامی است.',
+      });
+    }
+    const existing = await this.prisma.airport.findUnique({ where: { code } });
+    if (existing) {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'فرودگاهی با این کد قبلاً ثبت شده است.',
+      });
+    }
+    const duplicateCity = await this.prisma.airport.findFirst({
+      where: { cityFa },
+    });
+    if (duplicateCity) {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'این شهر قبلاً ثبت شده است.',
+      });
+    }
+    const created = await this.prisma.airport.create({
+      data: {
+        code,
+        cityFa,
+        tz: dto.tz?.trim() || 'Asia/Tehran',
+      },
+    });
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'SYSTEM',
+      action: 'افزودن شهر پروازی',
+      detail: `شهر «${cityFa}» (${code}) توسط ${actor.fullName} ثبت شد.`,
+      entityType: 'Airport',
+      entityId: created.id,
+    });
+    return created;
+  }
+
   /** Reference data for the aircraft-type-change form — no such listing
    * existed anywhere; every other caller of `AircraftSeatMap` already
    * knows the exact type string it wants (e.g. from `Flight.aircraftType`

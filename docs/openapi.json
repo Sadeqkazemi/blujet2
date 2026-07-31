@@ -4425,6 +4425,29 @@
         "tags": [
           "flights"
         ]
+      },
+      "post": {
+        "operationId": "FlightsController_createAirport",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAirportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "افزودن شهر/فرودگاه جدید به کاتالوگ",
+        "tags": [
+          "flights"
+        ]
       }
     },
     "/flights/aircraft-types": {
@@ -7361,6 +7384,30 @@
         "required": [
           "scope",
           "months"
+        ]
+      },
+      "CreateAirportDto": {
+        "type": "object",
+        "properties": {
+          "cityFa": {
+            "type": "string",
+            "description": "نام شهر",
+            "example": "وان"
+          },
+          "code": {
+            "type": "string",
+            "description": "کد IATA فرودگاه",
+            "example": "VAS"
+          },
+          "tz": {
+            "type": "string",
+            "description": "منطقه زمانی IANA",
+            "example": "Asia/Tehran"
+          }
+        },
+        "required": [
+          "cityFa",
+          "code"
         ]
       },
       "CreateFlightDto": {
