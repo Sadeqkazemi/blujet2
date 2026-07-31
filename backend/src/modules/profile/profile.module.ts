@@ -7,16 +7,20 @@ import { BankAccountsService } from './bank-accounts.service';
 import { MyBankAccountsController } from './my-bank-accounts.controller';
 import { IdentityVerificationService } from './identity-verification.service';
 import { MyIdentityController } from './my-identity.controller';
+import { IdentityAdminController } from './identity-admin.controller';
 import { AuthModule } from '../auth/auth.module';
 import { FilesModule } from '../files/files.module';
+import { AuditModule } from '../audit/audit.module';
+import { PanelsModule } from '../panels/panels.module';
 
 @Module({
-  imports: [AuthModule, FilesModule],
+  imports: [AuthModule, FilesModule, AuditModule, PanelsModule],
   controllers: [
     ProfileController,
     MySavedPassengersController,
     MyBankAccountsController,
     MyIdentityController,
+    IdentityAdminController,
   ],
   providers: [
     ProfileService,

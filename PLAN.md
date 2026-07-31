@@ -1340,9 +1340,43 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   model + `GET/POST/PATCH/DELETE /my/saved-passengers`; `AccountPage`
   `passengers` tab CRUD + `BookPage` autofill chips + profile-tab preview block. See
   `docs/features/saved-passengers.md`.
-- [ ] **User panel — نشست‌های فعال (active sessions)** — `GET/DELETE /my/sessions`
-  over `RefreshToken`; `AccountSecuritySessions` on security tab. See
-  `docs/features/active-sessions.md`.
+- [x] **User panel — نشست‌های فعال (active sessions, merged PR #39)** —
+  `GET/DELETE /my/sessions` over `RefreshToken`; `AccountSecuritySessions`
+  on security tab. See `docs/features/active-sessions.md`.
+- [x] **User panel — حساب‌های بانکی (merged PR #40)** — `SavedBankAccount`
+  model (PAN/SHEBA encrypted at rest, masked in responses) +
+  `GET/POST/PATCH/DELETE /my/bank-accounts` with default-account toggle;
+  `AccountBankAccountsTab` on the `banks` tab. See
+  `docs/features/bank-accounts.md`.
+- [x] **User panel — معرفی دوستان (merged PR #41)** — `CustomerReferral`
+  model + `User.referralCode`; `GET /my/referral` dashboard; optional
+  `ref` code on OTP signup creates the `SIGNED_UP` link; first ticketed
+  booking by a referred user awards 500 club points to the referrer
+  (idempotent, points ledger). `AccountReferralTab` on the `referral`
+  tab. See `docs/features/customer-referral.md`.
+- [x] **User panel — احراز هویت (merged PR #42)** — `CustomerIdentityVerification`
+  model (`NOT_STARTED/SUBMITTED/APPROVED/REJECTED`); `GET /my/identity` +
+  `POST /my/identity/id-card` (upload via `FilesService`) + `POST
+  /my/identity/submit`. Explicit design cut per CLAUDE.md: **no selfie
+  step** — profile identity fields + national-ID-card upload only.
+  `AccountIdentityTab` on the `identity` tab. See
+  `docs/features/customer-identity.md`.
+- [x] **پنل ادمین سایت — احراز هویت مشتریان (merged PR #43)** — staff side
+  of the KYC flow (the `APPROVED`/`REJECTED` transitions must be
+  reachable; no design tab exists, so it follows the `jobapps`
+  review-queue pattern): new `kyc` tab in `PANEL_NAV.SITE_ADMIN`,
+  `GET /identity-verifications` (+ `/:id/id-card` streaming) and
+  `PATCH /:id/approve|reject` (reject reason required, shown to the
+  customer who can re-submit), audit-logged. `IdentityAdminPage` at
+  `/panel/kyc`. See `docs/features/customer-identity.md`.
+- [x] **Post-merge user-panel documentation/seed sync** — `PLAN.md` now
+  records merged PRs #39–#43 instead of leaving active sessions unchecked;
+  `docs/openapi.json` regenerated with all new user-panel/KYC routes;
+  development seed gains a real `SUBMITTED` KYC row + tiny PNG so the
+  admin review/download flow is immediately exercisable. The seed's old
+  demo-booking loop was also made idempotent (`Booking.upsert` plus
+  passenger/SALE existence checks): running the seed twice had previously
+  failed on globally unique demo PNRs after flight instances changed.
 - [x] **Bug fix (senior review, found while chasing the "pre-existing"
   reporting flake): revenue reporting polluted by agency debt-calibration
   ledger rows.** The `reporting.e2e-spec.ts` sales-chart/kpis

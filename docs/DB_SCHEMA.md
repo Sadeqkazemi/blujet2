@@ -1879,8 +1879,8 @@ points per successful first booking (server-side in
 ## پنل کاربر — احراز هویت (`CustomerIdentityVerification`)
 
 National-ID card KYC for refunds/high-value purchases. **No selfie**
-(CLAUDE.md). Staff approve/reject is a future admin gap — this phase
-ships customer submit + status read only.
+(CLAUDE.md). Customer submit/status and SITE_ADMIN approve/reject are
+both implemented; the admin queue is `/panel/kyc`.
 
 ```prisma
 enum CustomerIdentityStatus {
@@ -1908,6 +1908,9 @@ model CustomerIdentityVerification {
 
 Migration: `20260731160000_customer_identity`. Profile step is computed
 from `User.fullName` + `nationalIdEnc` + `birthDate` (not stored here).
+The development seed creates one `SUBMITTED` verification with a real
+tiny PNG `StoredFile`, so `/panel/kyc` and its protected file-streaming
+endpoint can be exercised immediately after seeding.
 
 ## پنل کاربر — نشست‌های فعال (reuse `RefreshToken`)
 
