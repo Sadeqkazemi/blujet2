@@ -854,6 +854,152 @@ export default function AgencyDetailPage() {
     </section>
   );
 
+  const extras = detail.commercialExtras;
+
+  const flightsSoldSection = extras && (
+    <SectionCard title="میزان پرواز فروخته‌شده">
+      {extras.flightsSold.length === 0 ? (
+        <p className="py-4 text-center text-xs text-muted">فروشی برای این آژانس ثبت نشده است.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-[560px] w-full text-right text-xs">
+            <thead>
+              <tr className="border-b border-border text-[10px] text-muted">
+                <th className="py-2 font-bold">مسیر</th>
+                <th className="py-2 font-bold">پرواز</th>
+                <th className="py-2 font-bold">تاریخ</th>
+                <th className="py-2 font-bold">صندلی</th>
+                <th className="py-2 font-bold">مبلغ فروش</th>
+              </tr>
+            </thead>
+            <tbody>
+              {extras.flightsSold.map((f, i) => (
+                <tr key={`${f.flightNo}-${i}`} className="border-b border-border/60">
+                  <td className="py-2.5 font-bold text-ink">{f.routeFa}</td>
+                  <td className="ltr font-num py-2.5 text-muted">{f.flightNo}</td>
+                  <td className="font-num py-2.5 text-muted">{formatJalaliDate(f.departAt)}</td>
+                  <td className="font-num py-2.5 font-bold">{faDigits(f.seatCount)}</td>
+                  <td className="font-num py-2.5 font-bold text-[#059669]">{faMoney(f.salesIrr)} تومان</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </SectionCard>
+  );
+
+  const purchasedServicesSection = extras && (
+    <SectionCard title="سرویس‌های خریداری‌شده">
+      {extras.purchasedServices.length === 0 ? (
+        <p className="py-4 text-center text-xs text-muted">سرویسی خریداری نشده است.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-[560px] w-full text-right text-xs">
+            <thead>
+              <tr className="border-b border-border text-[10px] text-muted">
+                <th className="py-2 font-bold">سرویس</th>
+                <th className="py-2 font-bold">تاریخ خرید</th>
+                <th className="py-2 font-bold">تاریخ انقضا</th>
+                <th className="py-2 font-bold">وضعیت</th>
+              </tr>
+            </thead>
+            <tbody>
+              {extras.purchasedServices.map((s, i) => (
+                <tr key={`${s.name}-${i}`} className="border-b border-border/60">
+                  <td className="py-2.5 font-bold text-ink">{s.name}</td>
+                  <td className="font-num py-2.5 text-muted">{formatJalaliDate(s.purchasedAt)}</td>
+                  <td className="font-num py-2.5 text-muted">
+                    {s.expiresAt ? formatJalaliDate(s.expiresAt) : '—'}
+                  </td>
+                  <td className="py-2.5">
+                    <span
+                      className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                        s.status === 'ACTIVE' ? 'bg-[#10b98124] text-[#059669]' : 'bg-surface text-muted'
+                      }`}
+                    >
+                      {s.statusLabel}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </SectionCard>
+  );
+
+  const unpaidInvoices = invoices.filter((inv) => inv.status !== 'PAID');
+
+  const financeKpiRow = extras && (
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <StatBox label="درآمد کل فروش" value={`${faMoney(detail.stats.totalSalesIrr)} تومان`} />
+      <StatBox label="مجموع پرداخت‌شده" value={`${faMoney(extras.financeSummary.paidTotalIrr)} تومان`} />
+      <StatBox label="مانده پرداخت‌نشده" value={`${faMoney(extras.financeSummary.unpaidTotalIrr)} تومان`} />
+      <StatBox label="مانده اعتبار" value={`${faMoney(detail.credit.remainingIrr)} تومان`} />
+    </div>
+  );
+
+  const unpaidInvoicesSection = isCommercial && unpaidInvoices.length > 0 && (
+    <SectionCard
+      title="فاکتورهای پرداخت‌نشده"
+      action={
+        <span className="font-num text-sm font-extrabold text-danger">
+          {faMoney(unpaidInvoices.reduce((s, i) => s + i.amountIrr, 0))} تومان
+        </span>
+      }
+    >
+      <div className="flex flex-col gap-2">
+        {unpaidInvoices.map((inv) => (
+          <div key={inv.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 py-2.5">
+            <div>
+              <div className="ltr font-num text-xs font-bold text-ink">{inv.invoiceNo}</div>
+              <div className="mt-0.5 text-[10.5px] text-muted">
+                صدور {formatJalaliDate(inv.issuedAt)} · سررسید {formatJalaliDate(inv.dueAt)}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="font-num text-xs font-extrabold text-danger">{faMoney(inv.amountIrr)} تومان</span>
+              <button
+                onClick={() => void onRemindInvoice(inv)}
+                className="rounded-md bg-[#f59e0b1a] px-2.5 py-1 text-[10px] font-bold text-[#b45309]"
+              >
+                یادآوری
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </SectionCard>
+  );
+
+  const transactionsSection = extras && extras.transactions.length > 0 && (
+    <SectionCard title="تراکنش‌ها">
+      <div className="flex flex-col gap-2">
+        {extras.transactions.map((t) => (
+          <div key={t.id} className="flex items-center justify-between gap-3 border-b border-border/60 py-2.5">
+            <div>
+              <div className="text-xs font-bold text-ink">{t.titleFa}</div>
+              <div className="mt-0.5 text-[10.5px] text-muted">
+                {formatJalaliDateTime(t.occurredAt)}
+                {t.ref ? ` · PNR ${t.ref}` : ''}
+              </div>
+            </div>
+            <span
+              className={`font-num text-xs font-extrabold ${
+                t.signedAmountIrr >= 0 ? 'text-[#059669]' : 'text-danger'
+              }`}
+            >
+              {t.signedAmountIrr >= 0 ? '+' : ''}
+              {faMoney(Math.abs(t.signedAmountIrr))} تومان
+            </span>
+          </div>
+        ))}
+      </div>
+    </SectionCard>
+  );
+
   const overviewContent = (
     <div className="space-y-4">
       {statsRow}
@@ -936,12 +1082,17 @@ export default function AgencyDetailPage() {
               {statsRow}
               {scoreCard}
               {infoAndActivity}
+              {flightsSoldSection}
+              {purchasedServicesSection}
             </div>
           )}
           {tab === 'finance' && (
             <div className="space-y-4">
+              {financeKpiRow}
               {creditCard}
               {invoicesSection}
+              {unpaidInvoicesSection}
+              {transactionsSection}
               {documentsCard}
               {creditRequestsCard}
               {webserviceRequestsCard}

@@ -149,8 +149,8 @@ describe('AgencyDetailPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'مالی' }));
     expect(await screen.findByText('فاکتورهای صادرشده')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'صدور فاکتور' })).toBeInTheDocument();
-    expect(screen.getByText('INV-1002')).toBeInTheDocument();
-    expect(screen.getByText('در انتظار پرداخت')).toBeInTheDocument();
+    expect(screen.getAllByText('INV-1002').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('در انتظار پرداخت').length).toBeGreaterThan(0);
     // Jalali due date rendered with Persian digits, not the raw ISO string
     expect(screen.queryByText('2026-07-05T00:00:00.000Z')).not.toBeInTheDocument();
     // Commercial settles via invoices — no manual settle button

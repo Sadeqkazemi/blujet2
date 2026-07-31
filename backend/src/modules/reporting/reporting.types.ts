@@ -52,3 +52,9 @@ export interface CompletedFlightsSummary {
   soldSeats: number;
   unsoldSeats: number;
 }
+
+export interface CommercialOverview {
+  activeAgencies: number;
+  passengersThisMonth: number;
+  pendingAgencyRequests: number;
+}
