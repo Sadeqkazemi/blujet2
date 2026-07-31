@@ -15,6 +15,7 @@ import {
   ListMembersQueryDto,
   UpdateLevelDto,
   UpdateTierRulesDto,
+  ReferCardRequestDto,
 } from './dto/club.dtos';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -86,6 +87,30 @@ export class ClubController {
   })
   async listRequests() {
     const data = await this.club.listRequests();
+    return { success: true, data };
+  }
+
+  @Get('submitted-card-requests')
+  @Roles('SITE_ADMIN')
+  @ApiOperation({
+    summary: 'درخواست‌های SUBMITTED در انتظار ارجاع — فقط ادمین سایت',
+  })
+  async listSubmittedRequests() {
+    const data = await this.club.listSubmittedRequests();
+    return { success: true, data };
+  }
+
+  @Patch('card-requests/:id/refer')
+  @Roles('SITE_ADMIN')
+  @ApiOperation({
+    summary: 'ارجاع درخواست SUBMITTED به مدیر ارشد یا رئیس هیئت مدیره',
+  })
+  async referRequest(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: ReferCardRequestDto,
+  ) {
+    const data = await this.club.referRequest(actor, id, dto.assignedTo);
     return { success: true, data };
   }
 
