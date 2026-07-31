@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ContactPage from './ContactPage';
 import * as contactApi from '../../api/contact';
+import * as settingsApi from '../../api/settings';
 import * as useAuthModule from '../../hooks/useAuth';
 import * as useLocaleModule from '../../hooks/useLocale';
 import { ApiRequestError } from '../../api/envelope';
@@ -14,6 +15,17 @@ function mockLocale(locale: 'fa' | 'en' | 'ar') {
 
 beforeEach(() => {
   vi.restoreAllMocks();
+  vi.spyOn(settingsApi, 'fetchPublicSupportContact').mockResolvedValue({
+    phone: '021 — 91000000',
+    email: 'support@blujet.ir',
+  });
+  vi.spyOn(settingsApi, 'fetchPublicSiteContent').mockResolvedValue({
+    homeHeroTitle: '',
+    homeHeroSubtitle: '',
+    aboutUsText: '',
+    contactAddress: 'تهران، ایران',
+    termsText: '',
+  });
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status: 'unauthenticated',
     user: null,
@@ -123,5 +135,16 @@ describe('ContactPage', () => {
     expect(screen.getByRole('heading', { name: 'اتصل بنا' })).toBeInTheDocument();
     expect(screen.getByText('خط الدعم على مدار الساعة')).toBeInTheDocument();
     expect(screen.getByText('المكتب الرئيسي')).toBeInTheDocument();
+  });
+
+  it('shows support phone and email from GET /settings/support-contact', async () => {
+    mockLocale('en');
+    vi.spyOn(settingsApi, 'fetchPublicSupportContact').mockResolvedValue({
+      phone: '021-48000',
+      email: 'help@blujet.example',
+    });
+    renderPage();
+    expect(await screen.findByTestId('contact-support-phone')).toHaveTextContent('021-48000');
+    expect(screen.getByTestId('contact-support-email')).toHaveTextContent('help@blujet.example');
   });
 });

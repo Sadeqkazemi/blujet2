@@ -6,6 +6,8 @@ import { faDigits, latinDigits } from '../../lib/fa-format';
 import type { RefundRuleRow, SettingsResult } from '../../types/admins';
 import type { SocialLinkEntry, SocialLinkId } from '../../types/social-links';
 import { SOCIAL_LINK_IDS } from '../../types/social-links';
+import type { AppDownloadLinkEntry, AppLinkId } from '../../types/app-links';
+import { APP_LINK_IDS } from '../../types/app-links';
 import { SocialIcon, socialBrandColor } from '../../components/public/SocialIcon';
 
 const GATEWAYS: { key: string; name: string; desc: string }[] = [
@@ -83,11 +85,31 @@ export default function SettingsPage() {
     );
   };
 
+  const appLinks = (): AppDownloadLinkEntry[] => {
+    const raw = draft.appDownloadLinks;
+    if (!Array.isArray(raw)) return [];
+    return raw as AppDownloadLinkEntry[];
+  };
+
+  const updateAppLink = (id: AppLinkId, patch: Partial<AppDownloadLinkEntry>) => {
+    setKey(
+      'appDownloadLinks',
+      appLinks().map((l) => (l.id === id ? { ...l, ...patch } : l)),
+    );
+  };
+
   async function onSave() {
     setSaving(true);
     setNotice(null);
     try {
-      const patch = isSiteAdmin ? { socialLinks: draft.socialLinks } : draft;
+      const patch = isSiteAdmin
+        ? {
+            socialLinks: draft.socialLinks,
+            supportEmail: draft.supportEmail,
+            supportPhone: draft.supportPhone,
+            appDownloadLinks: draft.appDownloadLinks,
+          }
+        : draft;
       const result = await updateSettings(patch);
 
       if (isChair && data && !isSiteAdmin) {
@@ -120,7 +142,7 @@ export default function SettingsPage() {
       <h1 className="mb-1 text-xl font-black text-ink">تنظیمات سامانه</h1>
       <p className="mb-6 text-sm text-muted">
         {isSiteAdmin
-          ? 'مدیریت لینک شبکه‌های اجتماعی نمایش‌داده‌شده در فوتر سایت'
+          ? 'مدیریت لینک‌های اجتماعی، تماس پشتیبانی و دانلود اپلیکیشن در سایت'
           : 'پیکربندی سراسری — هر تغییر در دفتر رویدادها ثبت می‌شود'}
       </p>
 
@@ -232,6 +254,70 @@ export default function SettingsPage() {
                   />
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {isSiteAdmin && (
+          <div className="rounded-xl border border-border bg-white p-5">
+            <div className="mb-1 text-sm font-bold text-ink">تماس پشتیبانی</div>
+            <p className="mb-4 text-[11px] text-muted">شماره تلفن و ایمیل نمایش‌داده‌شده در سایت</p>
+            <div className="flex flex-col gap-3">
+              <div>
+                <label htmlFor="set-support-phone" className="mb-1.5 block text-[11.5px] text-muted">
+                  شماره تلفن پشتیبانی
+                </label>
+                <input
+                  id="set-support-phone"
+                  dir="ltr"
+                  value={strOf('supportPhone')}
+                  onChange={(e) => setKey('supportPhone', e.target.value)}
+                  className="font-num w-full rounded-lg border border-border px-3.5 py-2.5 text-sm outline-none focus:border-accent"
+                />
+              </div>
+              <div>
+                <label htmlFor="set-support-email" className="mb-1.5 block text-[11.5px] text-muted">
+                  ایمیل پشتیبانی
+                </label>
+                <input
+                  id="set-support-email"
+                  dir="ltr"
+                  value={strOf('supportEmail')}
+                  onChange={(e) => setKey('supportEmail', e.target.value)}
+                  className="font-num w-full rounded-lg border border-border px-3.5 py-2.5 text-sm outline-none focus:border-accent"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isSiteAdmin && (
+          <div className="rounded-xl border border-border bg-white p-5">
+            <div className="mb-1 text-sm font-bold text-ink">لینک دانلود اپلیکیشن</div>
+            <p className="mb-4 text-[11px] text-muted">دکمه‌های بخش اپلیکیشن در صفحهٔ اصلی</p>
+            <div className="flex flex-col gap-3">
+              {APP_LINK_IDS.map((id) => {
+                const entry = appLinks().find((l) => l.id === id);
+                if (!entry) return null;
+                return (
+                  <div key={id} className="rounded-lg border border-border/70 p-3">
+                    <input
+                      aria-label={`نام ${entry.name}`}
+                      value={entry.name}
+                      onChange={(e) => updateAppLink(id, { name: e.target.value })}
+                      className="mb-1.5 w-full rounded-md border border-border px-2.5 py-1.5 text-xs font-bold text-ink outline-none focus:border-accent"
+                    />
+                    <input
+                      aria-label={`آدرس ${entry.name}`}
+                      dir="ltr"
+                      value={entry.url}
+                      onChange={(e) => updateAppLink(id, { url: e.target.value })}
+                      placeholder="apps.apple.com/..."
+                      className="font-num w-full rounded-md border border-border px-2.5 py-1.5 text-[11px] text-muted outline-none focus:border-accent"
+                    />
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

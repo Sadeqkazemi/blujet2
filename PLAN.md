@@ -1521,6 +1521,48 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   permission chips. Tests: 6 backend e2e + 4 EmployeeCartable Vitest + 5
   EmployeeDashboard Vitest. See `docs/features/employee-cartable.md`.
 
+- [x] **SITE_ADMIN blog CMS (Phase D)** — `BlogPost` table + admin CRUD
+  (`/blog/admin/*`) + public listing/detail (`/blog/posts*`, `/blog/covers/:id`);
+  `blog` tab in SITE_ADMIN nav; `BlogAdminPage` (KPI row, category chips,
+  editor, post list); public `/blog` + `/blog/:slug` pages with fa/en/ar.
+  Media tab deferred. Tests: 5 backend e2e + 5 admin Vitest + 4 public Vitest.
+  See `docs/features/site-admin-blog.md` + `docs/features/public-blog.md`.
+
+- [x] **SITE_ADMIN media CMS (Phase E)** — `SiteMediaAsset`, `SiteContentBlock`,
+  `SiteDestinationHighlight`, `SiteRouteHighlight` + admin CRUD
+  (`/site-content/admin/*`) + public home payload (`GET /site-content/home`,
+  `GET /site-content/media/:fileId`); `media` tab in SITE_ADMIN nav;
+  `MediaAdminPage` (library, banners, destinations, routes); `HomeSearchPage`
+  wired to CMS with static fallbacks. Social/app/support/jobs in media tab
+  deferred. Tests: 8 backend e2e + 4 MediaAdmin Vitest + updated HomeSearch Vitest.
+  See `docs/features/site-admin-media.md`.
+
+- [x] **SITE_ADMIN settings — app links + support contact (Phase F)** —
+  `appDownloadLinks` in `SystemSetting`; SITE_ADMIN can PATCH social +
+  contact + app links; public `GET /settings/app-links` and
+  `/settings/support-contact`; `SettingsPage` contact/app sections;
+  `HomeSearchPage` app band wired to store URLs. Tests: extended
+  `phase12.e2e-spec.ts` + SettingsPage + HomeSearchPage Vitest.
+  See `docs/features/site-admin-settings-links.md`.
+
+- [x] **Contact page — support contact wiring (Phase G)** —
+  `ContactPage` reads `GET /settings/support-contact` for phone/email
+  channel cards (static fallbacks on failure; address/hours unchanged).
+  Tests: extended `ContactPage.test.tsx`.
+  See `docs/features/contact-support-contact-wiring.md`.
+
+- [x] **Destinations page — CMS highlights wiring (Phase H)** —
+  `DestinationsPage` reads `GET /site-content/home` to override destination
+  prices/images and popular routes (static catalog metadata unchanged).
+  Tests: `DestinationsPage.test.tsx`.
+  See `docs/features/destinations-cms-wiring.md`.
+
+- [x] **SITE_ADMIN static site pages CMS (Phase I)** —
+  «صفحات سایت» list in `MediaAdminPage`; SITE_ADMIN PATCH for page text keys;
+  public `GET /settings/site-content`; About/Contact/TravelInfo wired (fa).
+  Tests: `MediaAdminPage.test.tsx`, extended `phase12.e2e-spec.ts`.
+  See `docs/features/site-admin-static-pages.md`.
+
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is
 "done" only when every checklist item in its `docs/features/<name>.md` has

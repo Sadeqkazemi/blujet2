@@ -8,6 +8,8 @@ import { mockAuthUserWithRole } from '../../test/mockAuthUser';
 import type { Role } from '../../types/auth';
 import type { SettingsResult } from '../../types/admins';
 import type { SocialLinkEntry } from '../../types/social-links';
+import type { AppDownloadLinkEntry } from '../../types/app-links';
+import { APP_LINK_IDS } from '../../types/app-links';
 
 const DEFAULT_SOCIAL_LINKS: SocialLinkEntry[] = [
   { id: 'instagram', name: 'اینستاگرام', url: '', enabled: false },
@@ -16,6 +18,12 @@ const DEFAULT_SOCIAL_LINKS: SocialLinkEntry[] = [
   { id: 'linkedin', name: 'لینکدین', url: '', enabled: false },
   { id: 'x', name: 'ایکس (توییتر)', url: '', enabled: false },
 ];
+
+const DEFAULT_APP_LINKS: AppDownloadLinkEntry[] = APP_LINK_IDS.map((id) => ({
+  id,
+  name: id === 'app_store' ? 'App Store' : id === 'google_play' ? 'Google Play' : 'بازار / مایکت',
+  url: '',
+}));
 
 const DATA: SettingsResult = {
   settings: {
@@ -37,6 +45,7 @@ const DATA: SettingsResult = {
     contactAddress: 'تهران، ایران',
     termsText: 'قوانین و مقررات استفاده از خدمات blujet.',
     socialLinks: DEFAULT_SOCIAL_LINKS,
+    appDownloadLinks: DEFAULT_APP_LINKS,
   },
   refundRules: [
     { id: 'r1', minHoursBeforeDeparture: 72, penaltyPct: 30, labelFa: 'بیش از ۷۲ ساعت مانده به پرواز' },
@@ -111,5 +120,16 @@ describe('SettingsPage', () => {
         }),
       ),
     );
+  });
+
+  it('SITE_ADMIN sees support contact and app link fields', async () => {
+    mockRole('SITE_ADMIN');
+    vi.spyOn(adminsApi, 'fetchSettings').mockResolvedValue(DATA);
+
+    render(<SettingsPage />);
+    expect(await screen.findByText('تماس پشتیبانی')).toBeInTheDocument();
+    expect(screen.getByText('لینک دانلود اپلیکیشن')).toBeInTheDocument();
+    expect(screen.getByLabelText('شماره تلفن پشتیبانی')).toHaveValue('021-48000');
+    expect(screen.queryByText('اطلاعات شرکت')).not.toBeInTheDocument();
   });
 });

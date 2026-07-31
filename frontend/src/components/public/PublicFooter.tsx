@@ -92,6 +92,9 @@ export default function PublicFooter() {
             <Link to="/travel-info" style={{ color: '#aebfd4', textDecoration: 'none' }}>
               {t('footerTerms')}
             </Link>
+            <Link to="/blog" style={{ color: '#aebfd4', textDecoration: 'none' }}>
+              {t('footerBlog')}
+            </Link>
             {careersEnabled && (
               <Link to="/careers" style={{ color: '#aebfd4', textDecoration: 'none' }}>
                 {t('footerCareers')}
