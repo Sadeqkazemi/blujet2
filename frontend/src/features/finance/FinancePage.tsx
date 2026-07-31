@@ -14,6 +14,8 @@ import { fetchReconciliationQueue, resolveReconciliation } from '../../api/recon
 import { faDigits, faMoney, faPercent } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
 import SalesBarChart from '../../components/SalesBarChart';
+import SalesChartControls from '../../components/SalesChartControls';
+import { useSalesChartQuery } from '../../hooks/useSalesChartQuery';
 import type {
   AgencySettlementsResult,
   CompletedFlightsSummary,
@@ -22,16 +24,9 @@ import type {
   RecentTransactionsResult,
   RevenueMixResult,
   SalesChartPeriod,
-  SalesGranularity,
   SettlementStatus,
 } from '../../types/reporting';
 import type { ReconciliationItem } from '../../types/reconciliation';
-
-const CHART_MODES: { key: SalesGranularity; label: string }[] = [
-  { key: 'q3', label: '۳ ماهه' },
-  { key: 'q6', label: '۶ ماهه' },
-  { key: 'year', label: 'سالانه' },
-];
 
 const SETTLEMENT_STATUS: Record<SettlementStatus, { label: string; className: string }> = {
   SETTLED: { label: 'تسویه شد', className: 'bg-[#10b98124] text-[#059669]' },
@@ -535,23 +530,20 @@ function FinanceOpsView() {
 
 /** Analytic مالی view for CEO / Board Chair / Senior / Commercial. */
 function FinanceAnalyticView() {
-  const [granularity, setGranularity] = useState<SalesGranularity>('q6');
-  const [periodKey, setPeriodKey] = useState<string | null>(null);
+  const chart = useSalesChartQuery({ includeFlightMode: false });
   const [periods, setPeriods] = useState<SalesChartPeriod[]>([]);
   const [flights, setFlights] = useState<CompletedFlightsSummary | null>(null);
   const [mix, setMix] = useState<RevenueMixResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setPeriodKey(null);
-  }, [granularity]);
+    if (!chart.isQueryReady) return;
 
-  useEffect(() => {
     let cancelled = false;
     Promise.all([
-      fetchSalesChart({ granularity }),
-      fetchCompletedFlightsSummary({ granularity, periodKey: periodKey ?? undefined }),
-      fetchRevenueMix({ granularity, periodKey: periodKey ?? undefined }),
+      fetchSalesChart(chart.query),
+      fetchCompletedFlightsSummary(chart.query),
+      fetchRevenueMix(chart.query),
     ])
       .then(([chartData, flightsData, mixData]) => {
         if (cancelled) return;
@@ -565,7 +557,7 @@ function FinanceAnalyticView() {
     return () => {
       cancelled = true;
     };
-  }, [granularity, periodKey]);
+  }, [chart.query, chart.isQueryReady]);
 
   if (error) return <p className="p-8 text-sm text-danger">{error}</p>;
   if (!flights || !mix) return <p className="p-8 text-sm text-muted">در حال بارگذاری…</p>;
@@ -584,19 +576,19 @@ function FinanceAnalyticView() {
             <div className="text-sm font-bold text-ink">نمودار فروش</div>
             <div className="mt-0.5 text-[11px] text-muted">به تفکیک کانال فروش · تومان</div>
           </div>
-          <div className="flex gap-1 rounded-lg border border-border bg-body p-1">
-            {CHART_MODES.map((m) => (
-              <button
-                key={m.key}
-                onClick={() => setGranularity(m.key)}
-                className={`rounded-md px-3 py-1.5 text-[11px] transition ${
-                  granularity === m.key ? 'bg-accent font-bold text-white' : 'text-muted hover:text-ink'
-                }`}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
+          <SalesChartControls
+            modes={chart.modes}
+            granularity={chart.granularity}
+            onGranularityChange={chart.setGranularity}
+            selectedDate={chart.selectedDate}
+            onSelectedDateChange={chart.setSelectedDate}
+            selectedMonthStart={chart.selectedMonthStart}
+            onSelectedMonthStartChange={chart.setSelectedMonthStart}
+            flightNo={chart.flightNo}
+            onFlightNoChange={chart.setFlightNo}
+            onApplyFlightNo={chart.applyFlightNo}
+            variant="segmented"
+          />
         </div>
 
         <div className="mb-4 grid grid-cols-3 gap-3">
@@ -623,7 +615,11 @@ function FinanceAnalyticView() {
           </div>
         </div>
 
-        <SalesBarChart periods={periods} selectedPeriodKey={periodKey} onSelectPeriod={setPeriodKey} />
+        <SalesBarChart
+          periods={periods}
+          selectedPeriodKey={chart.periodKey}
+          onSelectPeriod={chart.setPeriodKey}
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.7fr_1fr]">

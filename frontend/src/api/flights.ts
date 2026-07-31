@@ -3,10 +3,13 @@ import type {
   AircraftTypeOption,
   AirportEntry,
   AllotmentRow,
+  CreateFareRulePayload,
+  FareRuleRow,
   FlightDetail,
   FlightRow,
   FlightsOverview,
   PlanResult,
+  UpdateFareRulePayload,
 } from '../types/flights';
 
 export function fetchFlightsOverview() {
@@ -70,4 +73,20 @@ export function createAllotment(
 
 export function deleteAllotment(instanceId: string, allotmentId: string) {
   return apiDelete<{ id: string }>(`/flights/${instanceId}/allotments/${allotmentId}`);
+}
+
+export function fetchFareRules(instanceId: string) {
+  return apiGet<FareRuleRow[]>(`/flights/${instanceId}/fare-rules`);
+}
+
+export function createFareRule(instanceId: string, dto: CreateFareRulePayload) {
+  return apiPost<FareRuleRow>(`/flights/${instanceId}/fare-rules`, dto);
+}
+
+export function updateFareRule(instanceId: string, ruleId: string, dto: UpdateFareRulePayload) {
+  return apiPatch<FareRuleRow>(`/flights/${instanceId}/fare-rules/${ruleId}`, dto);
+}
+
+export function deleteFareRule(instanceId: string, ruleId: string) {
+  return apiDelete<{ success: boolean }>(`/flights/${instanceId}/fare-rules/${ruleId}`);
 }
