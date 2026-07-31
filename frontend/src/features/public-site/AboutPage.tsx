@@ -75,15 +75,14 @@ export default function AboutPage() {
   const [aboutText, setAboutText] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchPublicSiteContent()
+    fetchPublicSiteContent(locale)
       .then((res) => setAboutText(res.aboutUsText.trim() || null))
       .catch(() => {
         /* static fallback */
       });
-  }, []);
+  }, [locale]);
 
-  const heroDesc =
-    locale === 'fa' && aboutText ? aboutText : t.heroDesc;
+  const heroDesc = aboutText ?? t.heroDesc;
   const gridCols2 = isMobile ? '1fr' : '1fr 1fr';
   const gridCols3 = isMobile ? '1fr' : 'repeat(3,1fr)';
   const gridCols4 = isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)';

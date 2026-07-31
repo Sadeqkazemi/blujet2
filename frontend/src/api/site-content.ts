@@ -1,4 +1,5 @@
 import { apiDelete, apiGet, apiPatch, apiPost } from './http';
+import type { StoredLocale } from '../hooks/useLocale';
 import type {
   ContentBlockRow,
   CreateDestinationInput,
@@ -13,8 +14,9 @@ import type {
   UpdateRouteInput,
 } from '../types/site-content';
 
-export function fetchPublicHomeContent() {
-  return apiGet<PublicHomeContent>('/site-content/home');
+export function fetchPublicHomeContent(locale?: StoredLocale) {
+  const q = locale ? `?locale=${locale}` : '';
+  return apiGet<PublicHomeContent>(`/site-content/home${q}`);
 }
 
 export function fetchLibraryAssets() {

@@ -367,6 +367,52 @@ export class SearchService {
     ]);
   }
 
+  /** Seven-day (±3) min ECONOMY price strip for the results price calendar. */
+  async priceCalendar(
+    origin: string,
+    dest: string,
+    centerDate: string,
+    radiusDays = 3,
+  ): Promise<
+    {
+      date: string;
+      minPriceIrr: string;
+      dateLabelFa: string;
+      isCenter: boolean;
+    }[]
+  > {
+    const center = new Date(centerDate);
+    center.setUTCHours(0, 0, 0, 0);
+    const rows: {
+      date: string;
+      minPriceIrr: string;
+      dateLabelFa: string;
+      isCenter: boolean;
+    }[] = [];
+
+    for (let offset = -radiusDays; offset <= radiusDays; offset++) {
+      const day = new Date(center);
+      day.setUTCDate(day.getUTCDate() + offset);
+      const iso = day.toISOString().slice(0, 10);
+      const flights = (await this.search(origin, dest, iso)) as {
+        cabins: { cabin: CabinClass; priceIrr: Irr; seatsLeft: number }[];
+      }[];
+      let min: bigint | null = null;
+      for (const f of flights) {
+        const econ = f.cabins.find((c) => c.cabin === 'ECONOMY');
+        const price = BigInt(econ?.priceIrr ?? f.cabins[0]?.priceIrr ?? '0');
+        if (price > 0n && (min === null || price < min)) min = price;
+      }
+      rows.push({
+        date: iso,
+        minPriceIrr: min !== null ? String(min) : '0',
+        dateLabelFa: iso,
+        isCenter: offset === 0,
+      });
+    }
+    return rows;
+  }
+
   /** Phase 13: per-channel taken-seat counts for the real inventory pools
    * (agency quota / charter allotment / public). A managerial `SeatLock`
    * physically occupies a seat but isn't a `Booking`, so it's tallied

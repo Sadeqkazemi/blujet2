@@ -91,6 +91,56 @@
         ]
       }
     },
+    "/auth/agency/password-reset/request": {
+      "post": {
+        "operationId": "AuthController_agencyPasswordResetRequest",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgencyPasswordResetRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "بازیابی رمز آژانس — درخواست OTP پیامکی",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/agency/password-reset/verify": {
+      "post": {
+        "operationId": "AuthController_agencyPasswordResetVerify",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgencyPasswordResetVerifyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "بازیابی رمز آژانس — تأیید OTP و صدور توکن",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/auth/otp/request": {
       "post": {
         "operationId": "AuthController_requestOtp",
@@ -4126,6 +4176,92 @@
         ]
       }
     },
+    "/search/price-calendar": {
+      "get": {
+        "operationId": "SearchController_priceCalendar",
+        "parameters": [
+          {
+            "name": "origin",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "THR",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dest",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "MHD",
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-08-01",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تقویم قیمت ۷روزه برای نوار نتایج پرواز",
+        "tags": [
+          "search"
+        ]
+      }
+    },
+    "/search/advisory": {
+      "get": {
+        "operationId": "SearchController_getAdvisory",
+        "parameters": [
+          {
+            "name": "origin",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "THR",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dest",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "MHD",
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-08-01",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "رادار هوشمند قیمت — توصیه خرید/انتظار (advisory، degrade امن)",
+        "tags": [
+          "search"
+        ]
+      }
+    },
     "/bookings": {
       "post": {
         "operationId": "BookingController_create",
@@ -4598,6 +4734,21 @@
           }
         },
         "summary": "فروش و گزارش خودِ آژانس",
+        "tags": [
+          "agency-portal"
+        ]
+      }
+    },
+    "/agency-portal/sales/export": {
+      "get": {
+        "operationId": "AgencyPortalController_salesExport",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "خروجی CSV فروش آژانس برای Excel",
         "tags": [
           "agency-portal"
         ]
@@ -5551,7 +5702,21 @@
     "/settings/site-content": {
       "get": {
         "operationId": "SettingsPublicController_getSiteContent",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "fa",
+                "en",
+                "ar"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": ""
@@ -7506,7 +7671,21 @@
     "/site-content/home": {
       "get": {
         "operationId": "SiteContentPublicController_home",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "fa",
+                "en",
+                "ar"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": ""
@@ -7615,6 +7794,34 @@
         "required": [
           "phone",
           "password"
+        ]
+      },
+      "AgencyPasswordResetRequestDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "example": "+989120000002"
+          }
+        },
+        "required": [
+          "phone"
+        ]
+      },
+      "AgencyPasswordResetVerifyDto": {
+        "type": "object",
+        "properties": {
+          "challengeId": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "example": "123456"
+          }
+        },
+        "required": [
+          "challengeId",
+          "code"
         ]
       },
       "RequestOtpDto": {

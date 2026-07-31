@@ -28,6 +28,20 @@ const RESULT: SearchFlightResult = {
   ],
 };
 
+const CALENDAR = [
+  { date: '2026-07-29', minPriceIrr: '365000000', dateLabelFa: '2026-07-29', isCenter: false },
+  { date: '2026-07-30', minPriceIrr: '395000000', dateLabelFa: '2026-07-30', isCenter: false },
+  { date: '2026-07-31', minPriceIrr: '380000000', dateLabelFa: '2026-07-31', isCenter: false },
+  { date: '2026-08-01', minPriceIrr: '380000000', dateLabelFa: '2026-08-01', isCenter: true },
+  { date: '2026-08-02', minPriceIrr: '410000000', dateLabelFa: '2026-08-02', isCenter: false },
+  { date: '2026-08-03', minPriceIrr: '375000000', dateLabelFa: '2026-08-03', isCenter: false },
+  { date: '2026-08-04', minPriceIrr: '390000000', dateLabelFa: '2026-08-04', isCenter: false },
+];
+
+function mockSearchApis() {
+  vi.spyOn(publicSiteApi, 'fetchPriceCalendar').mockResolvedValue(CALENDAR);
+}
+
 function renderPage(status: 'unauthenticated' | 'authenticated' = 'unauthenticated') {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status,
@@ -49,6 +63,7 @@ function renderPage(status: 'unauthenticated' | 'authenticated' = 'unauthenticat
 
 describe('ResultsPage', () => {
   it('renders flight cards with per-cabin price and seatsLeft', async () => {
+    mockSearchApis();
     vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
     renderPage();
 
@@ -58,6 +73,7 @@ describe('ResultsPage', () => {
   });
 
   it('disables selecting a sold-out cabin', async () => {
+    mockSearchApis();
     vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
     renderPage();
     await screen.findByTestId('result-card');
@@ -66,33 +82,59 @@ describe('ResultsPage', () => {
     expect(buttons[1]).toBeDisabled();
   });
 
-  it('immediately shows the mock schedule when the search comes back empty', async () => {
+  it('shows empty state when search returns no flights', async () => {
+    mockSearchApis();
     const spy = vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([]);
     renderPage();
 
-    const mockCards = await screen.findAllByTestId('mock-result-card');
-    expect(mockCards).toHaveLength(6);
+    expect(await screen.findByTestId('empty-results')).toBeInTheDocument();
+    expect(screen.getByText('پروازی یافت نشد')).toBeInTheDocument();
     expect(screen.queryByTestId('result-card')).not.toBeInTheDocument();
-    // only the requested date is ever queried — multi-day probing would
-    // trip the backend rate limiter (StrictMode may re-run the effect)
     for (const call of spy.mock.calls) {
       expect(call).toEqual(['THR', 'MHD', '2026-08-01']);
     }
   });
 
-  it('shows the mock schedule on search error and explains on select', async () => {
+  it('shows search error banner on search failure', async () => {
+    mockSearchApis();
     vi.spyOn(publicSiteApi, 'searchFlights').mockRejectedValue(new Error('429'));
-    const { container } = renderPage();
+    renderPage();
 
-    await screen.findAllByTestId('mock-result-card');
-    const firstSelect = container.querySelectorAll('button');
-    (Array.from(firstSelect).find((b) => b.textContent === 'انتخاب') as HTMLButtonElement).click();
+    expect(await screen.findByTestId('search-error')).toBeInTheDocument();
+    expect(screen.queryByTestId('mock-result-card')).not.toBeInTheDocument();
+  });
 
-    expect(await screen.findByTestId('mock-notice')).toBeInTheDocument();
+  it('loads price calendar from API', async () => {
+    const calendarSpy = vi.spyOn(publicSiteApi, 'fetchPriceCalendar').mockResolvedValue(CALENDAR);
+    vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+    renderPage();
+    await screen.findByTestId('price-calendar');
+
+    expect(calendarSpy).toHaveBeenCalledWith('THR', 'MHD', '2026-08-01');
+    expect(screen.getByTestId('price-calendar').children).toHaveLength(7);
+  });
+
+  it('calls advisory API and shows buy recommendation', async () => {
+    mockSearchApis();
+    vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+    const advisorySpy = vi.spyOn(publicSiteApi, 'fetchSearchAdvisory').mockResolvedValue({
+      available: true,
+      recommendation: 'buy',
+      reasonFa: 'قیمت امروز در محدوده مناسب است — برای سفر قطعی همین حالا بخرید.',
+      predictedPriceIrr: '380000000',
+    });
+    renderPage();
+    await screen.findByTestId('result-card');
+
+    await userEvent.click(screen.getByTestId('ai-ask'));
+
+    expect(advisorySpy).toHaveBeenCalledWith('THR', 'MHD', '2026-08-01');
+    expect(await screen.findByTestId('ai-result')).toHaveTextContent('توصیه: همین حالا بخرید');
   });
 
   describe('real قفل قیمت (price lock)', () => {
     it('redirects an unauthenticated visitor to /signin, remembering the search', async () => {
+      mockSearchApis();
       vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
       renderPage('unauthenticated');
       await screen.findByTestId('result-card');
@@ -103,6 +145,7 @@ describe('ResultsPage', () => {
     });
 
     it('shows the club-membership notice for an authenticated non-gold customer, without calling the API', async () => {
+      mockSearchApis();
       vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
       vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({ isMember: false, level: null, balance: 0 });
       const createLock = vi.spyOn(publicSiteApi, 'createPriceLock');
@@ -118,6 +161,7 @@ describe('ResultsPage', () => {
     });
 
     it('a gold-tier customer locking a real cabin sees the locked price, fee, and expiry', async () => {
+      mockSearchApis();
       vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
       vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({ isMember: true, level: 'GOLD', balance: 500 });
       const lock: PriceLock = {
@@ -143,6 +187,7 @@ describe('ResultsPage', () => {
     });
 
     it('shows the server error message when locking fails (e.g. an already-active lock)', async () => {
+      mockSearchApis();
       vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
       vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({ isMember: true, level: 'GOLD', balance: 500 });
       vi.spyOn(publicSiteApi, 'createPriceLock').mockRejectedValue(
@@ -161,6 +206,7 @@ describe('ResultsPage', () => {
 
   describe('save flight bookmark', () => {
     it('redirects an unauthenticated visitor to /signin when saving', async () => {
+      mockSearchApis();
       vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
       renderPage('unauthenticated');
       await screen.findByTestId('result-card');
@@ -171,6 +217,7 @@ describe('ResultsPage', () => {
     });
 
     it('calls saveFlight for an authenticated user and marks the row saved', async () => {
+      mockSearchApis();
       vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
       vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({ isMember: false, level: null, balance: 0 });
       vi.spyOn(publicSiteApi, 'fetchSavedFlights').mockResolvedValue([]);
@@ -201,6 +248,7 @@ describe('ResultsPage', () => {
 
   it('renders translated result cards with Latin-digit toman prices in English', async () => {
     mockLocale('en');
+    mockSearchApis();
     vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
     renderPage();
 
@@ -208,19 +256,18 @@ describe('ResultsPage', () => {
     expect(screen.getByText('Economy')).toBeInTheDocument();
     expect(screen.getByText('Business')).toBeInTheDocument();
     expect(screen.getAllByText('Select')[0]).toBeInTheDocument();
-    expect(screen.getByText(/38,000,000/)).toBeInTheDocument();
+    expect(screen.getAllByText(/38,000,000/)[0]).toBeInTheDocument();
     expect(screen.getByText('Change search')).toBeInTheDocument();
   });
 
-  it('renders translated mock schedule with Eastern Arabic-Indic digits in Arabic', async () => {
+  it('shows empty state with translated strings in Arabic', async () => {
     mockLocale('ar');
+    mockSearchApis();
     vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([]);
     renderPage();
 
-    const mockCards = await screen.findAllByTestId('mock-result-card');
-    expect(mockCards).toHaveLength(6);
+    expect(await screen.findByTestId('empty-results')).toBeInTheDocument();
+    expect(screen.getByText('لم يتم العثور على رحلات')).toBeInTheDocument();
     expect(screen.getByText('رادار الأسعار الذكي')).toBeInTheDocument();
-    expect(screen.getAllByText('اختيار')[0]).toBeInTheDocument();
-    expect(screen.getAllByText('٣٬٦٥٠٬٠٠٠')[0]).toBeInTheDocument();
   });
 });

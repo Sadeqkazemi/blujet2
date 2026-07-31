@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fetchSales } from '../../api/agency-portal';
+import { downloadSalesExport, fetchSales } from '../../api/agency-portal';
 import { faDigits, faMoney, faPercent } from '../../lib/fa-format';
 import { formatJalaliDate } from '../../lib/jalali';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
@@ -47,6 +47,9 @@ const STR: Record<StoredLocale, {
   colAmount: string;
   colStatus: string;
   toman: string;
+  exportExcel: string;
+  exportBusy: string;
+  exportError: string;
 }> = {
   fa: {
     heading: 'فروش و گزارش',
@@ -70,6 +73,9 @@ const STR: Record<StoredLocale, {
     colAmount: 'مبلغ',
     colStatus: 'وضعیت',
     toman: 'تومان',
+    exportExcel: 'خروجی Excel',
+    exportBusy: 'در حال آماده‌سازی…',
+    exportError: 'خطا در دریافت خروجی.',
   },
   en: {
     heading: 'Sales & Reports',
@@ -93,6 +99,9 @@ const STR: Record<StoredLocale, {
     colAmount: 'Amount',
     colStatus: 'Status',
     toman: 'Toman',
+    exportExcel: 'Export Excel',
+    exportBusy: 'Preparing…',
+    exportError: 'Error downloading the export.',
   },
   ar: {
     heading: 'المبيعات والتقارير',
@@ -116,6 +125,9 @@ const STR: Record<StoredLocale, {
     colAmount: 'المبلغ',
     colStatus: 'الحالة',
     toman: 'تومان',
+    exportExcel: 'تصدير Excel',
+    exportBusy: 'جارٍ التحضير…',
+    exportError: 'خطأ في تنزيل التصدير.',
   },
 };
 
@@ -124,6 +136,8 @@ export default function AgencySalesPage() {
   const t = STR[locale];
   const [data, setData] = useState<AgencySalesReport | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchSales()
@@ -142,10 +156,42 @@ export default function AgencySalesPage() {
     { label: t.kpiRefundRate, value: faPercent(data.summary.refundRatePct) },
   ];
 
+  async function onExport() {
+    setExportError(null);
+    setExportBusy(true);
+    try {
+      const blob = await downloadSalesExport();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'agency-sales.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setExportError(t.exportError);
+    } finally {
+      setExportBusy(false);
+    }
+  }
+
   return (
     <div className="p-8">
-      <h1 className="mb-1 text-xl font-black text-ink">{t.heading}</h1>
-      <p className="mb-6 text-sm text-muted">{t.subtitle}</p>
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="mb-1 text-xl font-black text-ink">{t.heading}</h1>
+          <p className="text-sm text-muted">{t.subtitle}</p>
+        </div>
+        <button
+          type="button"
+          data-testid="sales-export"
+          disabled={exportBusy}
+          onClick={() => void onExport()}
+          className="rounded-lg border border-border bg-white px-4 py-2 text-xs font-bold text-accent disabled:opacity-60"
+        >
+          {exportBusy ? t.exportBusy : t.exportExcel}
+        </button>
+      </div>
+      {exportError && <p className="mb-4 text-xs text-danger">{exportError}</p>}
 
       <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
         {kpis.map((k) => (

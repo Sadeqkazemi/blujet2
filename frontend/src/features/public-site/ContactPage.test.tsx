@@ -24,6 +24,7 @@ beforeEach(() => {
     homeHeroSubtitle: '',
     aboutUsText: '',
     contactAddress: 'تهران، ایران',
+    contactOfficeHours: 'شنبه تا چهارشنبه، ۸ تا ۱۷',
     termsText: '',
   });
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
@@ -146,5 +147,20 @@ describe('ContactPage', () => {
     renderPage();
     expect(await screen.findByTestId('contact-support-phone')).toHaveTextContent('021-48000');
     expect(screen.getByTestId('contact-support-email')).toHaveTextContent('help@blujet.example');
+  });
+
+  it('shows office hours from CMS site content', async () => {
+    mockLocale('fa');
+    vi.spyOn(settingsApi, 'fetchPublicSiteContent').mockResolvedValue({
+      homeHeroTitle: '',
+      homeHeroSubtitle: '',
+      aboutUsText: '',
+      contactAddress: 'تهران، ایران',
+      contactOfficeHours: 'شنبه تا پنج‌شنبه ۸:۰۰ تا ۲۰:۰۰',
+      termsText: '',
+    });
+    renderPage();
+    expect(await screen.findByText('ساعات کاری دفتر')).toBeInTheDocument();
+    expect(screen.getByText('شنبه تا پنج‌شنبه ۸:۰۰ تا ۲۰:۰۰')).toBeInTheDocument();
   });
 });

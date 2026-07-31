@@ -633,6 +633,103 @@ export class AuthService {
     return { accessToken, refreshToken, user: toAuthUserView(user) };
   }
 
+  /** Agency forgot-password: SMS OTP to the agency account's registered phone. */
+  async requestAgencyPasswordReset(
+    phone: string,
+  ): Promise<{ challengeId: string }> {
+    const user = await this.typeorm.user.findUnique({
+      where: { phone },
+      include: { agencyProfile: true },
+    });
+    if (
+      !user ||
+      user.role !== 'AGENCY' ||
+      !user.isActive ||
+      user.agencyProfile?.suspendedAt
+    ) {
+      throw new UnauthorizedException({
+        code: ErrorCode.UNAUTHORIZED,
+        message: 'شماره تماس یافت نشد.',
+      });
+    }
+
+    const code = generateSixDigitCode();
+    const challenge = await this.typeorm.twoFactorChallenge.create({
+      data: {
+        userId: user.id,
+        purpose: 'AGENCY_PASSWORD_RESET',
+        codeHash: await argon2.hash(code),
+        expiresAt: new Date(Date.now() + TWO_FACTOR_TTL_MS),
+      },
+    });
+    await this.twoFactorProvider.sendCode(user, code);
+    return { challengeId: challenge.id };
+  }
+
+  async verifyAgencyPasswordResetOtp(
+    challengeId: string,
+    code: string,
+    context: { userAgent?: string; ip?: string },
+  ): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    user: AuthUserView;
+  }> {
+    const challenge = await this.typeorm.twoFactorChallenge.findUnique({
+      where: { id: challengeId },
+      include: { user: { include: { agencyProfile: true } } },
+    });
+    if (!challenge || challenge.purpose !== 'AGENCY_PASSWORD_RESET') {
+      throw new UnauthorizedException({
+        code: 'TWO_FACTOR_INVALID',
+        message: 'کد نامعتبر است.',
+      });
+    }
+    if (challenge.consumedAt) {
+      throw new UnauthorizedException({
+        code: 'TWO_FACTOR_INVALID',
+        message: 'این کد قبلاً استفاده شده است.',
+      });
+    }
+    if (challenge.expiresAt < new Date()) {
+      throw new UnauthorizedException({
+        code: 'TWO_FACTOR_EXPIRED',
+        message: 'کد منقضی شده است.',
+      });
+    }
+    if (challenge.attempts >= TWO_FACTOR_MAX_ATTEMPTS) {
+      throw new UnauthorizedException({
+        code: 'TWO_FACTOR_INVALID',
+        message: 'تعداد تلاش‌های مجاز به پایان رسید.',
+      });
+    }
+    const codeValid = await argon2.verify(challenge.codeHash, code);
+    if (!codeValid) {
+      await this.typeorm.twoFactorChallenge.update({
+        where: { id: challenge.id },
+        data: { attempts: { increment: 1 } },
+      });
+      throw new UnauthorizedException({
+        code: 'TWO_FACTOR_INVALID',
+        message: 'کد وارد شده نادرست است.',
+      });
+    }
+    await this.typeorm.twoFactorChallenge.update({
+      where: { id: challenge.id },
+      data: { consumedAt: new Date() },
+    });
+
+    const user = challenge.user;
+    const jwtUser: AuthenticatedUser = {
+      id: user.id,
+      role: user.role,
+      fullName: user.fullName,
+    };
+    const accessToken = this.signAccessToken(jwtUser);
+    const refreshToken = await this.issueRefreshToken(user.id, context);
+    return { accessToken, refreshToken, user: toAuthUserView(user) };
+  }
+
   /**
    * Non-production only: reads back the mock password-reset-email code —
    * same escape hatch as getLastOtpForE2e, keyed by email. 404s in prod.

@@ -1,7 +1,7 @@
-import { Controller, Get } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Controller, Get, Query } from '@nestjs/common';
+import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { SettingsService } from './settings.service';
+import { SettingsService, type PublicContentLocale } from './settings.service';
 
 /** Unauthenticated read endpoints for public-site chrome. */
 @ApiTags('settings')
@@ -38,7 +38,10 @@ export class SettingsPublicController {
   @Get('site-content')
   @Throttle({ default: { limit: 120, ttl: 60_000 } })
   @ApiOperation({ summary: 'متن صفحات عمومی ثابت (درباره ما، قوانین، …)' })
-  async getSiteContent() {
-    return { success: true, data: await this.settings.getPublicSiteContent() };
+  @ApiQuery({ name: 'locale', required: false, enum: ['fa', 'en', 'ar'] })
+  async getSiteContent(@Query('locale') locale?: PublicContentLocale) {
+    const loc =
+      locale === 'en' || locale === 'ar' || locale === 'fa' ? locale : 'fa';
+    return { success: true, data: await this.settings.getPublicSiteContent(loc) };
   }
 }
