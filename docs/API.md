@@ -3024,3 +3024,15 @@ Reuses `GET /site-content/home` (no new endpoints). Destination cards on
 uses CMS route highlights with static fallbacks.
 
 See `docs/features/destinations-cms-wiring.md`.
+
+## Phase I — SITE_ADMIN static site pages CMS
+
+Reuses `SystemSetting` keys (`aboutUsText`, `contactAddress`, `termsText`,
+`homeHeroTitle`, `homeHeroSubtitle`). SITE_ADMIN may PATCH these from the
+media tab «صفحات سایت» section.
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/settings/site-content` | public | Static page copy for public rendering. |
+
+See `docs/features/site-admin-static-pages.md`.

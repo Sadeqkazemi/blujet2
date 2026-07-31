@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import { submitContactMessage } from '../../api/contact';
-import { fetchPublicSupportContact } from '../../api/settings';
+import { fetchPublicSupportContact, fetchPublicSiteContent } from '../../api/settings';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { arDigits, faDigits } from '../../lib/fa-format';
@@ -32,9 +32,9 @@ function formatSupportPhone(phone: string, locale: StoredLocale): string {
   return faDigits(phone);
 }
 
-const STATIC_CHANNELS: { icon: string; bg: string; color: string; title: Tr; value: Tr; ltr: boolean }[] = [
-  { icon: '📍', bg: '#eef9f1', color: '#1f8a5b', title: { fa: 'دفتر مرکزی', en: 'Head Office', ar: 'المكتب الرئيسي' }, value: { fa: 'تهران، خیابان ولیعصر، برج blujet، طبقه ۱۲', en: 'Tehran, Valiasr St, blujet Tower, 12th Floor', ar: 'طهران، شارع ولي‌عصر، برج blujet، الطابق ١٢' }, ltr: false },
-  { icon: '🕑', bg: '#fbf0ef', color: '#d64545', title: { fa: 'ساعات کاری دفتر', en: 'Office Hours', ar: 'ساعات عمل المكتب' }, value: { fa: 'شنبه تا چهارشنبه، ۸ تا ۱۷', en: 'Saturday to Wednesday, 8 to 17', ar: 'من السبت إلى الأربعاء، من الساعة ٨ إلى ١٧' }, ltr: false },
+const STATIC_CHANNELS: { icon: string; bg: string; color: string; title: Tr; value: Tr; ltr: boolean; kind: 'address' | 'hours' }[] = [
+  { icon: '📍', bg: '#eef9f1', color: '#1f8a5b', title: { fa: 'دفتر مرکزی', en: 'Head Office', ar: 'المكتب الرئيسي' }, value: { fa: 'تهران، خیابان ولیعصر، برج blujet، طبقه ۱۲', en: 'Tehran, Valiasr St, blujet Tower, 12th Floor', ar: 'طهران، شارع ولي‌عصر، برج blujet، الطابق ١٢' }, ltr: false, kind: 'address' },
+  { icon: '🕑', bg: '#fbf0ef', color: '#d64545', title: { fa: 'ساعات کاری دفتر', en: 'Office Hours', ar: 'ساعات عمل المكتب' }, value: { fa: 'شنبه تا چهارشنبه، ۸ تا ۱۷', en: 'Saturday to Wednesday, 8 to 17', ar: 'من السبت إلى الأربعاء، من الساعة ٨ إلى ١٧' }, ltr: false, kind: 'hours' },
 ];
 
 const SUPPORT_CHANNEL_META = {
@@ -119,6 +119,7 @@ export default function ContactPage() {
   const isMobile = useIsMobile();
   const t = STR[locale];
   const [supportContact, setSupportContact] = useState(FALLBACK_SUPPORT);
+  const [officeAddress, setOfficeAddress] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [subject, setSubject] = useState('');
@@ -140,6 +141,11 @@ export default function ContactPage() {
       .catch(() => {
         /* keep static fallbacks */
       });
+    fetchPublicSiteContent()
+      .then((res) => setOfficeAddress(res.contactAddress.trim() || null))
+      .catch(() => {
+        /* keep static fallbacks */
+      });
   }, []);
 
   const channels = [
@@ -151,7 +157,13 @@ export default function ContactPage() {
       ...SUPPORT_CHANNEL_META.email,
       value: supportContact.email,
     },
-    ...STATIC_CHANNELS.map((c) => ({ ...c, value: c.value[locale] })),
+    ...STATIC_CHANNELS.map((c) => ({
+      ...c,
+      value:
+        c.kind === 'address' && locale === 'fa' && officeAddress
+          ? officeAddress
+          : c.value[locale],
+    })),
   ];
 
   async function onSubmit() {

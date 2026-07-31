@@ -19,6 +19,13 @@ beforeEach(() => {
     phone: '021 — 91000000',
     email: 'support@blujet.ir',
   });
+  vi.spyOn(settingsApi, 'fetchPublicSiteContent').mockResolvedValue({
+    homeHeroTitle: '',
+    homeHeroSubtitle: '',
+    aboutUsText: '',
+    contactAddress: 'تهران، ایران',
+    termsText: '',
+  });
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status: 'unauthenticated',
     user: null,

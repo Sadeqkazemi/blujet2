@@ -425,6 +425,25 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
     expect(publicContact.status).toBe(200);
     expect(publicContact.body.data.phone).toBe('021-91000000');
 
+    const patchContent = await request(app.getHttpServer())
+      .patch('/settings')
+      .set('Authorization', auth(siteAdmin.accessToken))
+      .send({
+        patch: {
+          aboutUsText: 'متن درباره ما از CMS',
+          contactAddress: 'اصفهان، ایران',
+        },
+      });
+    expect(patchContent.status).toBe(200);
+    expect(patchContent.body.data.settings.aboutUsText).toBe('متن درباره ما از CMS');
+
+    const publicContent = await request(app.getHttpServer()).get(
+      '/settings/site-content',
+    );
+    expect(publicContent.status).toBe(200);
+    expect(publicContent.body.data.aboutUsText).toBe('متن درباره ما از CMS');
+    expect(publicContent.body.data.contactAddress).toBe('اصفهان، ایران');
+
     const patchMaintenance = await request(app.getHttpServer())
       .patch('/settings')
       .set('Authorization', auth(siteAdmin.accessToken))

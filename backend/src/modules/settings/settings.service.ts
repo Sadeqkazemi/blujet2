@@ -23,6 +23,11 @@ const SITE_ADMIN_PATCH_KEYS = new Set([
   'supportEmail',
   'supportPhone',
   'appDownloadLinks',
+  'homeHeroTitle',
+  'homeHeroSubtitle',
+  'aboutUsText',
+  'contactAddress',
+  'termsText',
 ]);
 
 /** Every storable key with its server-side default. Unknown keys are
@@ -95,7 +100,7 @@ export class SettingsService {
         throw new ForbiddenException({
           code: ErrorCode.FORBIDDEN,
           message:
-            'ادمین سایت فقط می‌تواند لینک‌های اجتماعی، تماس پشتیبانی و لینک اپلیکیشن را ویرایش کند.',
+            'ادمین سایت فقط می‌تواند لینک‌های اجتماعی، تماس پشتیبانی، لینک اپلیکیشن و متن صفحات عمومی را ویرایش کند.',
         });
       }
     }
@@ -233,6 +238,24 @@ export class SettingsService {
     return {
       phone: String(all.settings.supportPhone ?? SETTING_DEFAULTS.supportPhone),
       email: String(all.settings.supportEmail ?? SETTING_DEFAULTS.supportEmail),
+    };
+  }
+
+  /** Public static page copy edited from the SITE_ADMIN media tab. */
+  async getPublicSiteContent() {
+    const all = await this.getAll();
+    return {
+      homeHeroTitle: String(
+        all.settings.homeHeroTitle ?? SETTING_DEFAULTS.homeHeroTitle,
+      ),
+      homeHeroSubtitle: String(
+        all.settings.homeHeroSubtitle ?? SETTING_DEFAULTS.homeHeroSubtitle,
+      ),
+      aboutUsText: String(all.settings.aboutUsText ?? SETTING_DEFAULTS.aboutUsText),
+      contactAddress: String(
+        all.settings.contactAddress ?? SETTING_DEFAULTS.contactAddress,
+      ),
+      termsText: String(all.settings.termsText ?? SETTING_DEFAULTS.termsText),
     };
   }
 }
