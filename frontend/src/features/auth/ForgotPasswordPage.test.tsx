@@ -28,8 +28,9 @@ function mockAuth(overrides: Partial<ReturnType<typeof useAuthModule.useAuth>> =
   });
 }
 
-function mockLocale(locale: 'fa' | 'en' | 'ar') {
-  vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale, setLocale: vi.fn() });
+function mockLocale(locale: 'fa' | 'en' | 'ar', setLocale = vi.fn()) {
+  vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale, setLocale });
+  return setLocale;
 }
 
 function renderPage() {
@@ -38,6 +39,12 @@ function renderPage() {
       <ForgotPasswordPage />
     </MemoryRouter>,
   );
+}
+
+async function typeOtp(code: string) {
+  for (let i = 0; i < code.length; i++) {
+    await userEvent.type(screen.getByTestId(`fp-code-cell-${i}`), code[i]!);
+  }
 }
 
 describe('ForgotPasswordPage', () => {
@@ -49,11 +56,14 @@ describe('ForgotPasswordPage', () => {
     const setPassword = vi.spyOn(authApi, 'setPassword').mockResolvedValue({ changed: true });
 
     renderPage();
+    expect(screen.getByTestId('fp-stepper')).toBeInTheDocument();
+    expect(screen.getByTestId('fp-visual-panel')).toBeInTheDocument();
+
     await userEvent.type(screen.getByTestId('fp-id'), '09121234567');
     await userEvent.click(screen.getByTestId('fp-send'));
     expect(requestOtp).toHaveBeenCalledWith('09121234567');
 
-    await userEvent.type(await screen.findByTestId('fp-code'), '482913');
+    await typeOtp('482913');
     await userEvent.click(screen.getByTestId('fp-verify'));
     expect(verifyOtp).toHaveBeenCalledWith('challenge-1', '482913');
 
@@ -74,14 +84,12 @@ describe('ForgotPasswordPage', () => {
 
     await userEvent.type(screen.getByTestId('fp-id'), '09121234567');
     await userEvent.click(screen.getByTestId('fp-send'));
-    await userEvent.type(await screen.findByTestId('fp-code'), '482913');
+    await typeOtp('482913');
     await userEvent.click(screen.getByTestId('fp-verify'));
 
     await userEvent.type(await screen.findByTestId('fp-pass1'), 'short1');
     await userEvent.type(screen.getByTestId('fp-pass2'), 'short1');
-    await userEvent.click(screen.getByTestId('fp-save'));
-
-    expect(screen.getByText('رمز عبور باید حداقل ۸ کاراکتر باشد.')).toBeInTheDocument();
+    expect(screen.getByTestId('fp-save')).toBeDisabled();
     expect(setPassword).not.toHaveBeenCalled();
   });
 
@@ -91,14 +99,13 @@ describe('ForgotPasswordPage', () => {
 
     await userEvent.type(screen.getByTestId('fp-id'), '09121234567');
     await userEvent.click(screen.getByTestId('fp-send'));
-    await userEvent.type(await screen.findByTestId('fp-code'), '482913');
+    await typeOtp('482913');
     await userEvent.click(screen.getByTestId('fp-verify'));
 
     await userEvent.type(await screen.findByTestId('fp-pass1'), 'FirstPass1');
     await userEvent.type(screen.getByTestId('fp-pass2'), 'OtherPass2');
-    await userEvent.click(screen.getByTestId('fp-save'));
-
-    expect(screen.getByText('تکرار رمز با رمز جدید یکسان نیست.')).toBeInTheDocument();
+    expect(screen.getByText('رمزها یکسان نیستند')).toBeInTheDocument();
+    expect(screen.getByTestId('fp-save')).toBeDisabled();
   });
 
   it('shows the real error message on a wrong OTP code', async () => {
@@ -108,7 +115,7 @@ describe('ForgotPasswordPage', () => {
 
     await userEvent.type(screen.getByTestId('fp-id'), '09121234567');
     await userEvent.click(screen.getByTestId('fp-send'));
-    await userEvent.type(await screen.findByTestId('fp-code'), '000000');
+    await typeOtp('000000');
     await userEvent.click(screen.getByTestId('fp-verify'));
 
     expect(await screen.findByText('کد وارد شده نادرست است.')).toBeInTheDocument();
@@ -127,7 +134,7 @@ describe('ForgotPasswordPage', () => {
     await userEvent.click(screen.getByTestId('fp-send'));
     expect(requestPasswordResetEmail).toHaveBeenCalledWith('negar@example.com');
 
-    await userEvent.type(await screen.findByTestId('fp-code'), '482913');
+    await typeOtp('482913');
     await userEvent.click(screen.getByTestId('fp-verify'));
     expect(verifyPasswordResetEmail).toHaveBeenCalledWith('email-challenge-1', '482913');
 
@@ -144,8 +151,9 @@ describe('ForgotPasswordPage', () => {
     mockLocale('en');
     mockAuth();
     renderPage();
-    expect(screen.getByText('Reset Password')).toBeInTheDocument();
+    expect(screen.getByText('Reset your password')).toBeInTheDocument();
     expect(screen.getByTestId('fp-method-email')).toHaveTextContent('Email');
+    expect(screen.getByTestId('fp-secure-note')).toHaveTextContent('Secure connection');
     await userEvent.click(screen.getByTestId('fp-method-email'));
     expect(screen.getByText("Enter your account's verified email to receive a recovery code by email.")).toBeInTheDocument();
   });
@@ -154,7 +162,39 @@ describe('ForgotPasswordPage', () => {
     mockLocale('ar');
     mockAuth();
     renderPage();
-    expect(screen.getByText('استعادة كلمة المرور')).toBeInTheDocument();
+    expect(screen.getByText('استعادة تعيين كلمة المرور')).toBeInTheDocument();
     expect(screen.getByTestId('fp-method-phone')).toHaveTextContent('الجوال');
+  });
+
+  it('cycles locale via the header switcher', async () => {
+    const setLocale = mockLocale('fa');
+    mockAuth();
+    renderPage();
+    await userEvent.click(screen.getByTestId('fp-lang-switch'));
+    expect(setLocale).toHaveBeenCalledWith('en');
+  });
+
+  it('shows password strength meter bars as the user types', async () => {
+    mockAuth();
+    renderPage();
+
+    await userEvent.type(screen.getByTestId('fp-id'), '09121234567');
+    await userEvent.click(screen.getByTestId('fp-send'));
+    await typeOtp('482913');
+    await userEvent.click(screen.getByTestId('fp-verify'));
+
+    const pass1 = await screen.findByTestId('fp-pass1');
+    await userEvent.type(pass1, 'Abcd1234!');
+    expect(screen.getByTestId('fp-strength-label')).not.toHaveTextContent('قدرت رمز');
+  });
+
+  it('disables send until phone number is valid', async () => {
+    mockAuth();
+    renderPage();
+    expect(screen.getByTestId('fp-send')).toBeDisabled();
+    await userEvent.type(screen.getByTestId('fp-id'), '0912');
+    expect(screen.getByTestId('fp-send')).toBeDisabled();
+    await userEvent.type(screen.getByTestId('fp-id'), '1234567');
+    expect(screen.getByTestId('fp-send')).not.toBeDisabled();
   });
 });
