@@ -1,6 +1,6 @@
 export type ClubTier = 'SILVER' | 'GOLD' | 'PLATINUM';
 export type ClubCardStatus = 'NONE' | 'REVIEW' | 'ISSUED';
-export type ClubCardRequestStatus = 'REFERRED' | 'APPROVED' | 'REJECTED';
+export type ClubCardRequestStatus = 'SUBMITTED' | 'REFERRED' | 'APPROVED' | 'REJECTED';
 
 export interface ClubMember {
   id: string;
@@ -21,7 +21,17 @@ export interface ClubMembersResult {
     totalMembers: number;
     issuedCards: number;
     pendingRequests: number;
+    submittedRequests: number;
     tierCounts: Record<ClubTier, number>;
+  };
+}
+
+export interface ClubSubmittedCardRequest extends ClubCardRequest {
+  status: 'SUBMITTED';
+  member: ClubCardRequest['member'] & {
+    birthDate: string | null;
+    joinDate: string;
+    nationalId: string;
   };
 }
 

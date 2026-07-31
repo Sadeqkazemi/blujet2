@@ -5,7 +5,7 @@ import ClubPage from './ClubPage';
 import * as clubApi from '../../api/club';
 import * as useAuthModule from '../../hooks/useAuth';
 import { mockAuthUserWithRole } from '../../test/mockAuthUser';
-import type { ClubCardRequest, ClubMembersResult } from '../../types/club';
+import type { ClubCardRequest, ClubMembersResult, ClubSubmittedCardRequest } from '../../types/club';
 import type { Role } from '../../types/auth';
 
 const MEMBERS: ClubMembersResult = {
@@ -39,6 +39,7 @@ const MEMBERS: ClubMembersResult = {
     totalMembers: 2,
     issuedCards: 1,
     pendingRequests: 1,
+    submittedRequests: 1,
     tierCounts: { SILVER: 1, GOLD: 1, PLATINUM: 0 },
   },
 };
@@ -60,6 +61,28 @@ const CHAIR_REQ: ClubCardRequest = {
   ...SENIOR_REQ,
   id: 'r2',
   assignedTo: 'CHAIR',
+};
+
+const SUBMITTED_REQ: ClubSubmittedCardRequest = {
+  id: 's1',
+  memberId: 'm2',
+  member: {
+    id: 'm2',
+    fullName: 'سارا احمدی',
+    email: 'sahmadi@email.example',
+    points: 5100,
+    level: 'SILVER',
+    birthDate: null,
+    joinDate: '2026-01-20T00:00:00.000Z',
+    nationalId: '0012345678',
+  },
+  level: 'SILVER',
+  points: 5100,
+  status: 'SUBMITTED',
+  assignedTo: null,
+  cardNo: null,
+  history: [{ step: 'submitted', labelFa: 'ثبت درخواست صدور کارت', at: '۱۴۰۵/۰۴/۰۱' }],
+  createdAt: '2026-07-01T00:00:00.000Z',
 };
 
 function mockRole(role: Role) {
@@ -141,6 +164,37 @@ describe('ClubPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'تأیید و صدور کارت' }));
     await waitFor(() => expect(approve).toHaveBeenCalledWith('r1'));
     expect(await screen.findByText(/کارت نقره‌ای برای «سارا احمدی» صادر شد ✓/)).toBeInTheDocument();
+  });
+
+  it('SITE_ADMIN sees submitted queue KPIs, refer modal and calls refer API', async () => {
+    mockRole('SITE_ADMIN');
+    vi.spyOn(clubApi, 'fetchClubMembers').mockResolvedValue(MEMBERS);
+    vi.spyOn(clubApi, 'fetchSubmittedCardRequests').mockResolvedValue([SUBMITTED_REQ]);
+    const refer = vi.spyOn(clubApi, 'referCardRequest').mockResolvedValue({
+      ...SUBMITTED_REQ,
+      status: 'REFERRED',
+      assignedTo: 'SENIOR',
+      history: [
+        ...SUBMITTED_REQ.history,
+        { step: 'referred', labelFa: 'ارجاع به مدیر ارشد توسط ادمین سایت', at: '۱۴۰۵/۰۴/۰۲' },
+      ],
+    });
+
+    const { default: userEvent } = await import('@testing-library/user-event');
+    renderPage();
+
+    expect(await screen.findByText('درخواست‌های در انتظار ارجاع')).toBeInTheDocument();
+    expect(screen.getByText('ارجاع‌شده به مدیران')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'تعریف مشتری VIP جدید' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'بررسی و ارجاع' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'بررسی و ارجاع' }));
+    expect(screen.getByText('ارجاع درخواست صدور کارت')).toBeInTheDocument();
+    expect(screen.getByText('ارجاع به مدیران')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'ثبت ارجاع' }));
+    await waitFor(() => expect(refer).toHaveBeenCalledWith('s1', 'SENIOR'));
+    expect(await screen.findByText(/درخواست «سارا احمدی» ارجاع شد ✓/)).toBeInTheDocument();
   });
 
   it('the add-VIP form validates required fields', async () => {

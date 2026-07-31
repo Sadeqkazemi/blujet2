@@ -12,6 +12,7 @@ import { ErrorCode } from '../../common/errors';
 import {
   encryptPii,
   hashPii,
+  decryptPii,
   isValidIranianNationalId,
   normalizeNationalId,
 } from '../../common/pii-crypto';
@@ -187,7 +188,7 @@ export class ClubService {
       filters.push({ OR: or });
     }
 
-    const [members, all, pendingRequests] = await Promise.all([
+    const [members, all, pendingRequests, submittedRequests] = await Promise.all([
       this.prisma.clubMember.findMany({
         where: { AND: filters },
         orderBy: { joinDate: 'desc' },
@@ -196,6 +197,7 @@ export class ClubService {
         select: { level: true, cardStatus: true },
       }),
       this.prisma.clubCardRequest.count({ where: { status: 'REFERRED' } }),
+      this.prisma.clubCardRequest.count({ where: { status: 'SUBMITTED' } }),
     ]);
 
     // KPI cards always summarize the whole club, unfiltered (per design).
@@ -212,6 +214,7 @@ export class ClubService {
         totalMembers: all.length,
         issuedCards,
         pendingRequests,
+        submittedRequests,
         tierCounts,
       },
     };
@@ -404,6 +407,116 @@ export class ClubService {
       orderBy: { createdAt: 'desc' },
     });
     return requests;
+  }
+
+  /** SITE_ADMIN track: queue of member-initiated SUBMITTED card requests. */
+  async listSubmittedRequests() {
+    const requests = await this.prisma.clubCardRequest.findMany({
+      where: { status: 'SUBMITTED' },
+      include: {
+        member: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            points: true,
+            level: true,
+            birthDate: true,
+            joinDate: true,
+            nationalIdEnc: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return requests.map((r) => ({
+      id: r.id,
+      memberId: r.memberId,
+      member: {
+        id: r.member.id,
+        fullName: r.member.fullName,
+        email: r.member.email,
+        points: r.member.points,
+        level: r.member.level,
+        birthDate: r.member.birthDate,
+        joinDate: r.member.joinDate,
+        nationalId: decryptPii(r.member.nationalIdEnc),
+      },
+      level: r.level,
+      points: r.points,
+      status: r.status,
+      assignedTo: r.assignedTo,
+      cardNo: r.cardNo,
+      history: r.history,
+      createdAt: r.createdAt,
+    }));
+  }
+
+  /** SITE_ADMIN refers a SUBMITTED request to senior managers for approval. */
+  async referRequest(
+    actor: AuthenticatedUser,
+    id: string,
+    assignedTo: 'SENIOR' | 'CHAIR',
+  ) {
+    const request = await this.prisma.clubCardRequest.findUnique({
+      where: { id },
+      include: { member: true },
+    });
+    if (!request) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'درخواست یافت نشد.',
+      });
+    }
+    if (request.status !== 'SUBMITTED') {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'این درخواست قبلاً ارجاع شده است.',
+      });
+    }
+
+    const assigneeLabel =
+      assignedTo === 'SENIOR' ? 'مدیر ارشد' : 'رئیس هیئت مدیره';
+    const history = Array.isArray(request.history)
+      ? [...(request.history as unknown[])]
+      : [];
+    history.push({
+      step: 'referred',
+      labelFa: `ارجاع به ${assigneeLabel} توسط ادمین سایت`,
+      at: this.nowJalaliLabel(),
+    });
+
+    const updated = await this.prisma.clubCardRequest.update({
+      where: { id },
+      data: {
+        status: 'REFERRED',
+        assignedTo,
+        history: history as Prisma.InputJsonValue,
+      },
+      include: {
+        member: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            points: true,
+            level: true,
+          },
+        },
+      },
+    });
+
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'CLUB',
+      action: 'ارجاع درخواست کارت عضویت',
+      detail: `درخواست کارت «${request.member.fullName}» توسط ${actor.fullName} به ${assigneeLabel} ارجاع شد.`,
+      entityType: 'ClubCardRequest',
+      entityId: id,
+    });
+
+    return updated;
   }
 
   /** ⚑ Design authority rule: CEO/BOARD_CHAIR act on any REFERRED request;

@@ -69,6 +69,37 @@ describe('Club (e2e)', () => {
     return { member, req };
   }
 
+  async function createSubmittedRequest() {
+    const nid = validNationalId();
+    const member = await prisma.clubMember.create({
+      data: {
+        fullName: `عضو ارجاع ${crypto.randomUUID().slice(0, 6)}`,
+        email: `${crypto.randomUUID().slice(0, 8)}@submit.example`,
+        nationalIdEnc: encryptPii(nid),
+        nationalIdHash: hashPii(nid),
+        points: 6000,
+        level: 'GOLD',
+        cardStatus: 'REVIEW',
+      },
+    });
+    const req = await prisma.clubCardRequest.create({
+      data: {
+        memberId: member.id,
+        level: 'GOLD',
+        points: 6000,
+        status: 'SUBMITTED',
+        history: [
+          {
+            step: 'submitted',
+            labelFa: 'رسیدن به حد امتیاز و ثبت درخواست صدور کارت',
+            at: 'اکنون',
+          },
+        ],
+      },
+    });
+    return { member, req, nid };
+  }
+
   it('GET /club/members returns members + reconciling KPI counts; non-club roles get 403', async () => {
     const { accessToken } = await loginAs(app, 'ceo');
     const res = await request(app.getHttpServer())
@@ -216,6 +247,65 @@ describe('Club (e2e)', () => {
       },
     });
     expect(audit).not.toBeNull();
+  });
+
+  it('GET /club/submitted-card-requests: SITE_ADMIN lists SUBMITTED with nationalId; exec roles get 403', async () => {
+    const { req, nid } = await createSubmittedRequest();
+    const siteAdmin = await loginAs(app, 'site.admin');
+
+    const list = await request(app.getHttpServer())
+      .get('/club/submitted-card-requests')
+      .set('Authorization', `Bearer ${siteAdmin.accessToken}`);
+    expect(list.status).toBe(200);
+    const row = list.body.data.find((r: { id: string }) => r.id === req.id);
+    expect(row).toBeDefined();
+    expect(row.status).toBe('SUBMITTED');
+    expect(row.member.nationalId).toBe(nid);
+
+    for (const username of ['ceo', 'senior.rahimi', 'chair']) {
+      const { accessToken } = await loginAs(app, username);
+      const forbidden = await request(app.getHttpServer())
+        .get('/club/submitted-card-requests')
+        .set('Authorization', `Bearer ${accessToken}`);
+      expect(forbidden.status).toBe(403);
+    }
+  });
+
+  it('PATCH /club/card-requests/:id/refer: SITE_ADMIN SUBMITTED→REFERRED + audit; exec 403; already referred → 409', async () => {
+    const { req } = await createSubmittedRequest();
+    const siteAdmin = await loginAs(app, 'site.admin');
+
+    const referred = await request(app.getHttpServer())
+      .patch(`/club/card-requests/${req.id}/refer`)
+      .set('Authorization', `Bearer ${siteAdmin.accessToken}`)
+      .send({ assignedTo: 'SENIOR' });
+    expect(referred.status).toBe(200);
+    expect(referred.body.data.status).toBe('REFERRED');
+    expect(referred.body.data.assignedTo).toBe('SENIOR');
+    const history = referred.body.data.history as { step: string }[];
+    expect(history.some((h) => h.step === 'referred')).toBe(true);
+
+    const audit = await prisma.auditLog.findFirst({
+      where: {
+        category: 'CLUB',
+        entityType: 'ClubCardRequest',
+        entityId: req.id,
+      },
+    });
+    expect(audit).not.toBeNull();
+
+    const ceo = await loginAs(app, 'ceo');
+    const forbidden = await request(app.getHttpServer())
+      .patch(`/club/card-requests/${req.id}/refer`)
+      .set('Authorization', `Bearer ${ceo.accessToken}`)
+      .send({ assignedTo: 'CHAIR' });
+    expect(forbidden.status).toBe(403);
+
+    const again = await request(app.getHttpServer())
+      .patch(`/club/card-requests/${req.id}/refer`)
+      .set('Authorization', `Bearer ${siteAdmin.accessToken}`)
+      .send({ assignedTo: 'CHAIR' });
+    expect(again.status).toBe(409);
   });
 
   it('GET /club/card-requests never returns SUBMITTED rows', async () => {
