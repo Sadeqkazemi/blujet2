@@ -12,10 +12,11 @@ import { MySavedFlightsController } from './my-saved-flights.controller';
 import { PrivacyController } from './privacy.controller';
 import { PrivacyService } from './privacy.service';
 import { AuditModule } from '../audit/audit.module';
+import { CustomerReferralsModule } from '../customer-referrals/customer-referrals.module';
 import { PAYMENT_GATEWAY, SandboxPaymentGateway } from './payment-gateway';
 
 @Module({
-  imports: [AuditModule],
+  imports: [AuditModule, CustomerReferralsModule],
   controllers: [
     SearchController,
     BookingController,

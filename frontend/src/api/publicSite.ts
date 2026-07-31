@@ -9,6 +9,7 @@ import type {
   SavedFlight,
   SavedPassenger,
   SavedBankAccount,
+  CustomerReferralDashboard,
   ActiveSession,
   SearchFlightResult,
   SeatMapResult,
@@ -179,6 +180,10 @@ export function updateBankAccount(id: string, dto: { isDefault?: boolean }) {
 
 export function removeBankAccount(id: string) {
   return apiDelete<{ removed: boolean }>(`/my/bank-accounts/${id}`);
+}
+
+export function fetchMyReferral() {
+  return apiGet<CustomerReferralDashboard>('/my/referral');
 }
 
 export function fetchMySessions() {

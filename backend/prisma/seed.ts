@@ -738,6 +738,38 @@ async function main() {
         },
       });
     }
+
+    await prisma.user.updateMany({
+      where: { id: testUser.id, referralCode: null },
+      data: { referralCode: 'NEGAR-4152' },
+    });
+
+    const referralCount = await prisma.customerReferral.count({
+      where: { referrerUserId: testUser.id },
+    });
+    if (referralCount === 0) {
+      const friendPhones = [
+        { phone: '09180000091', fullName: 'رضا مرادی', status: 'REWARDED' as const, points: 500 },
+        { phone: '09180000092', fullName: 'سمیرا کریمی', status: 'REWARDED' as const, points: 500 },
+        { phone: '09180000093', fullName: 'آرش هاشمی', status: 'SIGNED_UP' as const, points: 0 },
+      ];
+      for (const f of friendPhones) {
+        const referred = await prisma.user.upsert({
+          where: { phone: f.phone },
+          update: { fullName: f.fullName },
+          create: { role: 'USER', phone: f.phone, fullName: f.fullName },
+        });
+        await prisma.customerReferral.create({
+          data: {
+            referrerUserId: testUser.id,
+            referredUserId: referred.id,
+            status: f.status,
+            pointsAwarded: f.points,
+            rewardedAt: f.status === 'REWARDED' ? new Date() : undefined,
+          },
+        });
+      }
+    }
   }
 
   // ── Phase 66: passenger survey settings + default question list ────────
