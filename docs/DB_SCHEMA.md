@@ -1868,6 +1868,39 @@ Migration: `20260731150000_customer_referrals`. Reward constant: 500
 points per successful first booking (server-side in
 `CustomerReferralsService`).
 
+## پنل کاربر — احراز هویت (`CustomerIdentityVerification`)
+
+National-ID card KYC for refunds/high-value purchases. **No selfie**
+(CLAUDE.md). Staff approve/reject is a future admin gap — this phase
+ships customer submit + status read only.
+
+```typeorm
+enum CustomerIdentityStatus {
+  NOT_STARTED
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+model CustomerIdentityVerification {
+  id           String                 @id @default(uuid())
+  userId       String                 @unique
+  user         User                   @relation("UserIdentityVerification", ...)
+  status       CustomerIdentityStatus @default(NOT_STARTED)
+  idCardFileId String?                // StoredFile id
+  submittedAt  DateTime?
+  reviewedAt   DateTime?
+  rejectReason String?
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+
+  @@map("customer_identity_verifications")
+}
+```
+
+Migration: `20260731160000_customer_identity`. Profile step is computed
+from `User.fullName` + `nationalIdEnc` + `birthDate` (not stored here).
+
 ## پنل کاربر — نشست‌های فعال (reuse `RefreshToken`)
 
 See `docs/API.md`'s matching section. No new table — customer-facing
