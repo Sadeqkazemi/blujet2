@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { fetchApiKeys, fetchMyWebserviceRequests, requestWebservice } from '../../api/agency-portal';
+import { fetchApiKeys, fetchAgencyPortalWebservicePlans, fetchMyWebserviceRequests, requestWebservice } from '../../api/agency-portal';
 import { ApiRequestError } from '../../api/envelope';
 import { formatJalaliDate } from '../../lib/jalali';
+import { faMoney } from '../../lib/fa-format';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import type { AgencyApiKeySummary, AgencyApiScope, AgencyWebserviceRequest } from '../../types/agency-portal';
 
@@ -33,11 +34,11 @@ const SCOPE_LABEL: Record<string, Tr> = {
   SEARCH_ONLY: { fa: 'فقط جستجو', en: 'Search Only', ar: 'البحث فقط' },
 };
 
-const WS_PLANS: { key: 1 | 3 | 12; label: Tr; priceLabel: string }[] = [
-  { key: 1, label: { fa: '۱ ماهه', en: '1 Month', ar: 'شهر واحد' }, priceLabel: '۴٬۵۰۰٬۰۰۰' },
-  { key: 3, label: { fa: '۳ ماهه', en: '3 Months', ar: '٣ أشهر' }, priceLabel: '۱۲٬۰۰۰٬۰۰۰' },
-  { key: 12, label: { fa: '۱۲ ماهه', en: '12 Months', ar: '١٢ شهرًا' }, priceLabel: '۴۲٬۰۰۰٬۰۰۰' },
-];
+const WS_PLAN_LABELS: Record<1 | 3 | 12, Tr> = {
+  1: { fa: '۱ ماهه', en: '1 Month', ar: 'شهر واحد' },
+  3: { fa: '۳ ماهه', en: '3 Months', ar: '٣ أشهر' },
+  12: { fa: '۱۲ ماهه', en: '12 Months', ar: '١٢ شهرًا' },
+};
 
 const STR: Record<StoredLocale, {
   toman: string;
@@ -150,18 +151,34 @@ export default function AgencyWebservicePage() {
   const [plan, setPlan] = useState<1 | 3 | 12>(1);
   const [requests, setRequests] = useState<AgencyWebserviceRequest[]>([]);
   const [apiKeys, setApiKeys] = useState<AgencyApiKeySummary[]>([]);
+  const [planPrices, setPlanPrices] = useState<Record<1 | 3 | 12, number>>({
+    1: 45_000_000,
+    3: 120_000_000,
+    12: 420_000_000,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const selPlan = WS_PLANS.find((p) => p.key === plan)!;
+  const wsPlans = ([1, 3, 12] as const).map((key) => ({
+    key,
+    label: WS_PLAN_LABELS[key],
+    priceLabel: faMoney(planPrices[key]),
+  }));
+
+  const selPlan = wsPlans.find((p) => p.key === plan)!;
 
   function reload() {
     setLoading(true);
-    Promise.all([fetchMyWebserviceRequests(), fetchApiKeys()])
-      .then(([r, k]) => {
+    Promise.all([fetchMyWebserviceRequests(), fetchApiKeys(), fetchAgencyPortalWebservicePlans()])
+      .then(([r, k, plans]) => {
         setRequests(r);
         setApiKeys(k);
+        const byMonth = Object.fromEntries(plans.plans.map((p) => [p.months, p.priceIrr])) as Record<
+          1 | 3 | 12,
+          number
+        >;
+        setPlanPrices(byMonth);
         setError(null);
       })
       .catch(() => setError(t.errorFallback))
@@ -236,7 +253,7 @@ export default function AgencyWebservicePage() {
 
           <div className="mb-2 text-xs font-bold text-[#5a6678]">{t.durationLabel}</div>
           <div className="mb-5 grid grid-cols-3 gap-2">
-            {WS_PLANS.map((p) => (
+            {wsPlans.map((p) => (
               <div
                 key={p.key}
                 data-testid={`ws-plan-${p.key}`}

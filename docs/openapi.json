@@ -4344,6 +4344,21 @@
         ]
       }
     },
+    "/agency-portal/webservice-plans": {
+      "get": {
+        "operationId": "AgencyPortalController_webservicePlans",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "قیمت‌های فعلی پلن‌های وب‌سرویس (ریال)",
+        "tags": [
+          "agency-portal"
+        ]
+      }
+    },
     "/agency-portal/webservice-requests": {
       "post": {
         "operationId": "AgencyPortalController_requestWebservice",
@@ -4397,6 +4412,44 @@
         ]
       }
     },
+    "/webservice/pricing": {
+      "get": {
+        "operationId": "WebservicePricingController_getPricing",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "قیمت پلن‌های وب‌سرویس B2B (ریال)",
+        "tags": [
+          "webservice-pricing"
+        ]
+      },
+      "patch": {
+        "operationId": "WebservicePricingController_updatePricing",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateWebservicePricingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "به‌روزرسانی قیمت پلن‌های ۱/۳/۱۲ ماهه — فقط مدیر بازرگانی",
+        "tags": [
+          "webservice-pricing"
+        ]
+      }
+    },
     "/flights/overview": {
       "get": {
         "operationId": "FlightsController_overview",
@@ -4422,29 +4475,6 @@
           }
         },
         "summary": "کاتالوگ فرودگاه‌ها برای فرم افزودن پرواز",
-        "tags": [
-          "flights"
-        ]
-      },
-      "post": {
-        "operationId": "FlightsController_createAirport",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateAirportDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "summary": "افزودن شهر/فرودگاه جدید به کاتالوگ",
         "tags": [
           "flights"
         ]
@@ -7386,28 +7416,29 @@
           "months"
         ]
       },
-      "CreateAirportDto": {
+      "UpdateWebservicePricingDto": {
         "type": "object",
         "properties": {
-          "cityFa": {
-            "type": "string",
-            "description": "نام شهر",
-            "example": "وان"
+          "month1PriceIrr": {
+            "type": "number",
+            "description": "قیمت پلن ۱ ماهه (ریال)",
+            "example": 45000000
           },
-          "code": {
-            "type": "string",
-            "description": "کد IATA فرودگاه",
-            "example": "VAS"
+          "month3PriceIrr": {
+            "type": "number",
+            "description": "قیمت پلن ۳ ماهه (ریال)",
+            "example": 120000000
           },
-          "tz": {
-            "type": "string",
-            "description": "منطقه زمانی IANA",
-            "example": "Asia/Tehran"
+          "month12PriceIrr": {
+            "type": "number",
+            "description": "قیمت پلن ۱۲ ماهه (ریال)",
+            "example": 420000000
           }
         },
         "required": [
-          "cityFa",
-          "code"
+          "month1PriceIrr",
+          "month3PriceIrr",
+          "month12PriceIrr"
         ]
       },
       "CreateFlightDto": {
