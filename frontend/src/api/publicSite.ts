@@ -6,6 +6,7 @@ import type {
   PayResult,
   PriceLock,
   RefundRequestView,
+  SavedFlight,
   SearchFlightResult,
   SeatMapResult,
   UserProfile,
@@ -114,6 +115,18 @@ export function createPriceLock(flightInstanceId: string, cabin: CabinClass) {
 
 export function cancelPriceLock(id: string) {
   return apiDelete<PriceLock>(`/my/price-locks/${id}`);
+}
+
+export function fetchSavedFlights() {
+  return apiGet<SavedFlight[]>('/my/saved-flights');
+}
+
+export function saveFlight(flightInstanceId: string, cabin: CabinClass) {
+  return apiPost<SavedFlight>('/my/saved-flights', { flightInstanceId, cabin });
+}
+
+export function removeSavedFlight(id: string) {
+  return apiDelete<{ removed: boolean }>(`/my/saved-flights/${id}`);
 }
 
 export function fetchMyProfile() {
