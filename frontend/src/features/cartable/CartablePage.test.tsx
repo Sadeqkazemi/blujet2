@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import CartablePage from './CartablePage';
 import * as cartableApi from '../../api/cartable';
 import * as useAuthModule from '../../hooks/useAuth';
+import { mockAuthUserWithRole } from '../../test/mockAuthUser';
 import type { CartableListResult } from '../../types/cartable';
 import type { Role } from '../../types/auth';
 
@@ -30,7 +31,7 @@ const LIST: CartableListResult = {
 function mockRole(role: Role) {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status: 'authenticated',
-    user: { id: 'u1', fullName: 'کاربر تست', role },
+    user: mockAuthUserWithRole(role),
     requestLogin: vi.fn(),
     confirmTwoFactor: vi.fn(),
     agencyLogin: vi.fn(),

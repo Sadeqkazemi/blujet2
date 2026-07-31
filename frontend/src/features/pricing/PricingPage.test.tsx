@@ -5,6 +5,7 @@ import PricingPage from './PricingPage';
 import * as pricingApi from '../../api/pricing';
 import * as authApi from '../../api/auth';
 import * as useAuthModule from '../../hooks/useAuth';
+import { mockAuthUserWithRole } from '../../test/mockAuthUser';
 import type { CeoPricingResult, CommercialPricingResult, PricingProposal } from '../../types/pricing';
 import type { Role } from '../../types/auth';
 
@@ -92,7 +93,7 @@ const COMMERCIAL_DATA: CommercialPricingResult = {
 function mockRole(role: Role) {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status: 'authenticated',
-    user: { id: 'me', fullName: 'کاربر تست', role },
+    user: mockAuthUserWithRole(role, { id: 'me' }),
     requestLogin: vi.fn(),
     confirmTwoFactor: vi.fn(),
     agencyLogin: vi.fn(),

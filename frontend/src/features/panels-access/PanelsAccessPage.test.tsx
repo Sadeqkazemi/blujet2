@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import PanelsAccessPage from './PanelsAccessPage';
 import * as panelsApi from '../../api/panels';
 import * as useAuthModule from '../../hooks/useAuth';
+import { mockAuthUserWithRole } from '../../test/mockAuthUser';
 import type { PanelAccessFlag } from '../../types/panels';
 import type { Role } from '../../types/auth';
 
@@ -15,7 +16,7 @@ const FLAGS: PanelAccessFlag[] = [
 function mockRole(role: Role) {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status: 'authenticated',
-    user: { id: 'u1', fullName: 'کاربر تست', role },
+    user: mockAuthUserWithRole(role),
     requestLogin: vi.fn(),
     confirmTwoFactor: vi.fn(),
     agencyLogin: vi.fn(),
@@ -42,14 +43,15 @@ describe('PanelsAccessPage', () => {
     expect(screen.getByRole('switch', { name: 'پنل مدیر مالی' })).toHaveAttribute('aria-checked', 'false');
   });
 
-  it('IT_MANAGER gets the read-only view: informational copy + disabled switches', async () => {
+  it('IT_MANAGER gets the read-only card grid view', async () => {
     mockRole('IT_MANAGER');
-    vi.spyOn(panelsApi, 'fetchAccessFlags').mockResolvedValue(FLAGS);
 
     render(<PanelsAccessPage />);
     expect(
       await screen.findByText(/تعیین سطح دسترسی ورود در اختیار مدیر عامل است/),
     ).toBeInTheDocument();
-    expect(screen.getByRole('switch', { name: 'پنل مدیر مالی' })).toBeDisabled();
+    expect(screen.getByText('پنل کارمند')).toBeInTheDocument();
+    expect(screen.getByText('پنل مدیر عامل')).toBeInTheDocument();
+    expect(screen.queryByRole('switch', { name: 'پنل مدیر مالی' })).not.toBeInTheDocument();
   });
 });

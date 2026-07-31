@@ -23,6 +23,12 @@ const KPIS = {
   operatingCostIrr: '4280000000',
   agencyDebtIrr: '0',
   agencyDebtCount: 0,
+  trends: {
+    revenuePct: 5,
+    profitPct: 4,
+    operatingCostPct: 2,
+    agencyDebtPct: 0,
+  },
 };
 
 const FLIGHTS_SUMMARY = { flightCount: 4, totalSeats: 720, soldSeats: 56, unsoldSeats: 664 };
@@ -41,7 +47,7 @@ describe('DashboardPage', () => {
     expect(screen.getByText('حاشیه ۸۰٪')).toBeInTheDocument();
 
     await waitFor(() => expect(screen.getByText('۴')).toBeInTheDocument());
-    expect(screen.getByText('۶۶۴')).toBeInTheDocument(); // unsold seats, Persian digits
+    expect(screen.getByText('۶۶۴')).toBeInTheDocument();
   });
 
   it('shows an error message when the reporting API fails', async () => {
@@ -54,8 +60,8 @@ describe('DashboardPage', () => {
     expect(await screen.findByText('خطا در دریافت اطلاعات داشبورد.')).toBeInTheDocument();
   });
 
-  it('disables the day/month/flight modes with a "coming later" message', async () => {
-    vi.spyOn(reportingApi, 'fetchSalesChart').mockResolvedValue(SALES_CHART);
+  it('loads day granularity with a date parameter', async () => {
+    const chartSpy = vi.spyOn(reportingApi, 'fetchSalesChart').mockResolvedValue(SALES_CHART);
     vi.spyOn(reportingApi, 'fetchKpis').mockResolvedValue(KPIS);
     vi.spyOn(reportingApi, 'fetchCompletedFlightsSummary').mockResolvedValue(FLIGHTS_SUMMARY);
 
@@ -64,6 +70,10 @@ describe('DashboardPage', () => {
     await screen.findByText('کل درآمد');
 
     await userEvent.click(screen.getByRole('button', { name: 'روزانه' }));
-    expect(await screen.findByText('این حالت نمایش در فاز بعدی تکمیل می‌شود.')).toBeInTheDocument();
+    expect(await screen.findByTestId('sales-chart-day')).toBeInTheDocument();
+
+    await waitFor(() =>
+      expect(chartSpy).toHaveBeenCalledWith(expect.objectContaining({ granularity: 'day', date: expect.any(String) })),
+    );
   });
 });

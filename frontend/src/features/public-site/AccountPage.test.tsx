@@ -4,9 +4,14 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AccountPage from './AccountPage';
 import * as useAuthModule from '../../hooks/useAuth';
+import { mockAuthUser } from '../../test/mockAuthUser';
 import * as useLocaleModule from '../../hooks/useLocale';
 import * as publicSiteApi from '../../api/publicSite';
+import * as supportTicketsApi from '../../api/support-tickets';
+import * as authApi from '../../api/auth';
 import type { BookingDetail, PriceLock, RefundRequestView, UserProfile } from '../../types/public-site';
+import type { ClubMembershipView } from '../../types/club-membership';
+import type { MySupportTicketRow } from '../../types/support-tickets';
 
 function mockLocale(locale: 'fa' | 'en' | 'ar') {
   vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale, setLocale: vi.fn() });
@@ -69,16 +74,48 @@ const PROFILE: UserProfile = {
   completionPct: 20,
 };
 
+const CLUB_MEMBERSHIP: ClubMembershipView = {
+  isMember: true,
+  level: 'GOLD',
+  balance: 12450,
+  cardStatus: 'ISSUED',
+  cardNo: 'GOLD-8842',
+  tierRules: { goldMinPoints: 5000, platinumMinPoints: 15000, cardRequestMinPoints: 5000 },
+  cardRequest: {
+    id: 'cr-1',
+    status: 'APPROVED',
+    cardNo: 'GOLD-8842',
+    createdAt: '2026-07-01T00:00:00.000Z',
+    history: [
+      { step: 'submitted', labelFa: 'ثبت درخواست', at: '۱۴۰۴/۰۳/۱۲' },
+      { step: 'approved', labelFa: 'تأیید', at: '۱۴۰۴/۰۳/۱۳' },
+    ],
+  },
+  canRequestCard: false,
+  pointsNeededForCard: 0,
+};
+
 function mockAuth(status: 'authenticated' | 'unauthenticated', signOut = vi.fn()) {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status,
-    user: status === 'authenticated' ? { id: 'u1', fullName: 'نگار رضایی', role: 'USER' } : null,
+    user: status === 'authenticated' ? mockAuthUser({ id: 'u1', fullName: 'نگار رضایی', role: 'USER' }) : null,
     requestLogin: vi.fn(),
     confirmTwoFactor: vi.fn(),
     agencyLogin: vi.fn(),
     signOut,
   });
 }
+
+const TICKET: MySupportTicketRow = {
+  id: 'tk-1',
+  trackingCode: 'TKAABBCCDD',
+  subject: 'مشکل در پرداخت',
+  body: 'وجه کسر شد ولی بلیط صادر نشد.',
+  status: 'IN_PROGRESS',
+  history: [{ step: 'submitted', labelFa: 'ثبت تیکت توسط کاربر', at: '2026-07-01T00:00:00.000Z' }],
+  createdAt: '2026-07-01T00:00:00.000Z',
+  updatedAt: '2026-07-01T00:00:00.000Z',
+};
 
 function renderPage() {
   return render(
@@ -92,9 +129,11 @@ beforeEach(() => {
   vi.spyOn(publicSiteApi, 'fetchMyBookings').mockResolvedValue([BOOKING]);
   vi.spyOn(publicSiteApi, 'fetchWallet').mockResolvedValue({ balanceIrr: '2500000' });
   vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({ isMember: true, level: 'GOLD', balance: 12450 });
+  vi.spyOn(publicSiteApi, 'fetchClubMembership').mockResolvedValue(CLUB_MEMBERSHIP);
   vi.spyOn(publicSiteApi, 'fetchMyRefunds').mockResolvedValue([REFUND]);
   vi.spyOn(publicSiteApi, 'fetchMyProfile').mockResolvedValue(PROFILE);
   vi.spyOn(publicSiteApi, 'fetchMyPriceLocks').mockResolvedValue([]);
+  vi.spyOn(supportTicketsApi, 'fetchMySupportTickets').mockResolvedValue([]);
 });
 
 describe('AccountPage', () => {
@@ -112,12 +151,14 @@ describe('AccountPage', () => {
     expect(await screen.findByTestId('wallet-balance')).toHaveTextContent('۲۵۰٬۰۰۰');
   });
 
-  it('switches to the points tab and shows tier + balance', async () => {
+  it('switches to the club tab and shows tier banner + issued card', async () => {
     mockAuth('authenticated');
     renderPage();
-    await userEvent.click(screen.getByTestId('account-tab-points'));
-    expect(await screen.findByText('۱۲۴۵۰')).toBeInTheDocument();
-    expect(screen.getByText('★ سطح طلایی')).toBeInTheDocument();
+    await screen.findByTestId('account-trip');
+    await userEvent.click(screen.getByTestId('account-tab-club'));
+    expect(await screen.findByTestId('club-card-tracker')).toBeInTheDocument();
+    expect(screen.getByText('عضو طلایی')).toBeInTheDocument();
+    expect(screen.getByText('GOLD-8842')).toBeInTheDocument();
   });
 
   it('switches to the passengers tab and lists unique passengers', async () => {
@@ -132,6 +173,27 @@ describe('AccountPage', () => {
     renderPage();
     await userEvent.click(screen.getByTestId('account-tab-refunds'));
     expect(await screen.findByTestId('account-refund')).toHaveTextContent('در حال بررسی');
+  });
+
+  it('switches to the tickets tab and lists support tickets', async () => {
+    mockAuth('authenticated');
+    vi.spyOn(supportTicketsApi, 'fetchMySupportTickets').mockResolvedValue([TICKET]);
+    renderPage();
+    await userEvent.click(screen.getByTestId('account-tab-tickets'));
+    expect(await screen.findByTestId('account-ticket')).toHaveTextContent('مشکل در پرداخت');
+    expect(screen.getByText('TKAABBCCDD', { exact: false })).toBeInTheDocument();
+  });
+
+  it('switches to the security tab and sets password via OTP flow API', async () => {
+    mockAuth('authenticated');
+    const setPw = vi.spyOn(authApi, 'setPassword').mockResolvedValue({ changed: true });
+    renderPage();
+    await userEvent.click(screen.getByTestId('account-tab-security'));
+    await userEvent.type(document.getElementById('acct-pw-new')!, 'secret12');
+    await userEvent.type(document.getElementById('acct-pw-confirm')!, 'secret12');
+    await userEvent.click(screen.getByTestId('account-save-password'));
+    await screen.findByText('رمز عبور با موفقیت تغییر کرد ✓');
+    expect(setPw).toHaveBeenCalledWith('secret12');
   });
 
   it('shows an incomplete-profile banner and saves identity fields from the profile tab', async () => {
@@ -247,23 +309,23 @@ describe('AccountPage', () => {
     await vi.waitFor(() => expect(topup).toHaveBeenCalledWith(5_000_000));
   });
 
-  it('renders translated tab labels and the points tier in English', async () => {
+  it('renders translated tab labels and the club tier in English', async () => {
     mockLocale('en');
     mockAuth('authenticated');
     renderPage();
-    expect(screen.getByTestId('account-tab-points')).toHaveTextContent('Loyalty Points');
+    expect(screen.getByTestId('account-tab-club')).toHaveTextContent('Loyalty Club');
     expect(screen.getByTestId('account-tab-refunds')).toHaveTextContent('Refunds');
-    await userEvent.click(screen.getByTestId('account-tab-points'));
-    expect(await screen.findByText('★ Tier Gold')).toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('account-tab-club'));
+    expect(await screen.findByText('Gold Member')).toBeInTheDocument();
   });
 
-  it('renders translated tab labels and the points tier in Arabic', async () => {
+  it('renders translated tab labels and the club tier in Arabic', async () => {
     mockLocale('ar');
     mockAuth('authenticated');
     renderPage();
-    expect(screen.getByTestId('account-tab-points')).toHaveTextContent('نقاط الولاء');
+    expect(screen.getByTestId('account-tab-club')).toHaveTextContent('نادي الولاء');
     expect(screen.getByTestId('account-tab-wallet')).toHaveTextContent('المحفظة');
-    await userEvent.click(screen.getByTestId('account-tab-points'));
-    expect(await screen.findByText('★ المستوى ذهبية')).toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('account-tab-club'));
+    expect(await screen.findByText('عضو ذهبية')).toBeInTheDocument();
   });
 });

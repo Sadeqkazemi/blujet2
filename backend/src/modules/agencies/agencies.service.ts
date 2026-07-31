@@ -387,6 +387,11 @@ export class AgenciesService {
     const includeScore =
       actor.role === 'FINANCE_MANAGER' || actor.role === 'COMMERCIAL_MANAGER';
 
+    const commercialExtras =
+      actor.role === 'COMMERCIAL_MANAGER'
+        ? await this.commercialDetailExtras(id)
+        : undefined;
+
     return {
       id: profile.userId,
       fullName: profile.user.fullName,
@@ -417,7 +422,136 @@ export class AgenciesService {
             }),
           }
         : {}),
+      ...(commercialExtras ? { commercialExtras } : {}),
       recentActivity,
+    };
+  }
+
+  private wsScopeLabel(scope: AgencyApiScope): string {
+    const labels: Record<AgencyApiScope, string> = {
+      FULL: 'وب‌سرویس فروش کامل',
+      SEARCH_BOOK: 'وب‌سرویس جستجو و رزرو',
+      SEARCH_ONLY: 'وب‌سرویس جستجو (آزمایشی)',
+    };
+    return labels[scope];
+  }
+
+  /** Commercial Manager agency-detail sections from design-reference-v2. */
+  private async commercialDetailExtras(id: string) {
+    const now = new Date();
+
+    const [bookings, wsApproved, apiKeys, invoiceAggs, ledgerRows] =
+      await Promise.all([
+        this.typeorm.booking.findMany({
+          where: { agencyId: id, status: { in: ['PAID', 'TICKETED'] } },
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+          select: {
+            priceIrr: true,
+            createdAt: true,
+            flightInstance: {
+              select: {
+                departureAt: true,
+                flight: {
+                  select: {
+                    flightNo: true,
+                    route: { select: { originCode: true, destCode: true } },
+                  },
+                },
+              },
+            },
+            _count: { select: { passengers: true } },
+          },
+        }),
+        this.typeorm.agencyWebserviceRequest.findMany({
+          where: { agencyId: id, status: 'APPROVED' },
+          orderBy: { decidedAt: 'desc' },
+          take: 10,
+        }),
+        this.typeorm.agencyApiKey.findMany({
+          where: { agencyId: id, status: 'ACTIVE' },
+          orderBy: { activatedAt: 'desc' },
+        }),
+        this.typeorm.agencyInvoice.groupBy({
+          by: ['status'],
+          where: { agencyId: id },
+          _sum: { amountIrr: true },
+        }),
+        this.typeorm.ledgerEntry.findMany({
+          where: { agencyId: id },
+          orderBy: { occurredAt: 'desc' },
+          take: 10,
+          select: {
+            id: true,
+            type: true,
+            signedAmountIrr: true,
+            occurredAt: true,
+            booking: { select: { pnr: true } },
+          },
+        }),
+      ]);
+
+    const flightsSold = bookings.map((b) => ({
+      routeFa: `${b.flightInstance.flight.route.originCode} ← ${b.flightInstance.flight.route.destCode}`,
+      flightNo: b.flightInstance.flight.flightNo,
+      departAt: b.flightInstance.departureAt.toISOString(),
+      seatCount: b._count.passengers,
+      salesIrr: b.priceIrr,
+    }));
+
+    const purchasedServices = [
+      ...wsApproved.map((r) => {
+        const start = r.decidedAt ?? r.createdAt;
+        const expiresAt = new Date(start);
+        expiresAt.setMonth(expiresAt.getMonth() + r.months);
+        const active = expiresAt > now;
+        return {
+          name: this.wsScopeLabel(r.scope),
+          purchasedAt: start.toISOString(),
+          expiresAt: expiresAt.toISOString(),
+          statusLabel: active ? 'فعال' : 'منقضی',
+          status: active ? ('ACTIVE' as const) : ('EXPIRED' as const),
+        };
+      }),
+      ...apiKeys
+        .filter((k) => !wsApproved.some((r) => r.scope === k.scope))
+        .map((k) => ({
+          name: this.wsScopeLabel(k.scope),
+          purchasedAt: k.activatedAt.toISOString(),
+          expiresAt: k.expiresAt?.toISOString() ?? null,
+          statusLabel: 'فعال',
+          status: 'ACTIVE' as const,
+        })),
+    ];
+
+    let paidTotalIrr: Irr = ZERO_IRR;
+    let unpaidTotalIrr: Irr = ZERO_IRR;
+    for (const row of invoiceAggs) {
+      const amount = row._sum.amountIrr ?? ZERO_IRR;
+      if (row.status === 'PAID') paidTotalIrr = addIrr(paidTotalIrr, amount);
+      else unpaidTotalIrr = addIrr(unpaidTotalIrr, amount);
+    }
+
+    const txTitle: Record<string, string> = {
+      SALE: 'فروش بلیط',
+      SETTLEMENT: 'تسویه حساب',
+      REFUND: 'استرداد',
+      COMMISSION: 'کمیسیون',
+    };
+
+    const transactions = ledgerRows.map((e) => ({
+      id: e.id,
+      titleFa: txTitle[e.type] ?? e.type,
+      occurredAt: e.occurredAt.toISOString(),
+      signedAmountIrr: e.signedAmountIrr,
+      ref: e.booking?.pnr ?? null,
+    }));
+
+    return {
+      flightsSold,
+      purchasedServices,
+      financeSummary: { paidTotalIrr, unpaidTotalIrr },
+      transactions,
     };
   }
 

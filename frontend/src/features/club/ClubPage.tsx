@@ -5,14 +5,16 @@ import {
   createClubMember,
   fetchCardRequests,
   fetchClubMembers,
+  fetchSubmittedCardRequests,
   issueClubCard,
+  referCardRequest,
   rejectCardRequest,
   updateClubMemberLevel,
 } from '../../api/club';
 import { faDigits } from '../../lib/fa-format';
 import { formatJalaliDate, parseJalaliDateToIso } from '../../lib/jalali';
 import Modal from '../../components/Modal';
-import type { ClubCardRequest, ClubMembersResult, ClubTier } from '../../types/club';
+import type { ClubCardRequest, ClubMembersResult, ClubSubmittedCardRequest, ClubTier } from '../../types/club';
 
 const TIER_LABELS: Record<ClubTier, string> = {
   SILVER: 'نقره‌ای',
@@ -27,6 +29,7 @@ const TIER_BADGES: Record<ClubTier, string> = {
 };
 
 const REQUEST_STATUS: Record<ClubCardRequest['status'], { label: string; className: string }> = {
+  SUBMITTED: { label: 'در انتظار ارجاع', className: 'bg-[#fbbf242e] text-[#b45309]' },
   REFERRED: { label: 'در انتظار تأیید شما', className: 'bg-[#a78bfa2e] text-[#6d28d9]' },
   APPROVED: { label: 'کارت صادر شد', className: 'bg-[#10b98124] text-[#059669]' },
   REJECTED: { label: 'رد شده', className: 'bg-danger/15 text-danger' },
@@ -39,16 +42,19 @@ function faPoints(points: number): string {
 export default function ClubPage() {
   const { user } = useAuth();
   const isSenior = user?.role === 'SENIOR_MANAGER';
+  const isSiteAdmin = user?.role === 'SITE_ADMIN';
 
   const [result, setResult] = useState<ClubMembersResult | null>(null);
   const [requests, setRequests] = useState<ClubCardRequest[]>([]);
+  const [submittedRequests, setSubmittedRequests] = useState<ClubSubmittedCardRequest[]>([]);
   const [levelFilter, setLevelFilter] = useState<ClubTier | null>(null);
   const [q, setQ] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const [detailRequest, setDetailRequest] = useState<ClubCardRequest | null>(null);
+  const [detailRequest, setDetailRequest] = useState<ClubCardRequest | ClubSubmittedCardRequest | null>(null);
+  const [referTarget, setReferTarget] = useState<'SENIOR' | 'CHAIR'>('SENIOR');
   const [expandedMember, setExpandedMember] = useState<string | null>(null);
 
   const [addOpen, setAddOpen] = useState(false);
@@ -58,23 +64,37 @@ export default function ClubPage() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [membersData, requestsData] = await Promise.all([
-        fetchClubMembers({ level: levelFilter ?? undefined, q: q || undefined }),
-        fetchCardRequests(),
-      ]);
+      const membersData = await fetchClubMembers({ level: levelFilter ?? undefined, q: q || undefined });
       setResult(membersData);
-      setRequests(requestsData);
+      if (isSiteAdmin) {
+        setSubmittedRequests(await fetchSubmittedCardRequests());
+        setRequests([]);
+      } else {
+        setRequests(await fetchCardRequests());
+        setSubmittedRequests([]);
+      }
     } catch {
       setError('خطا در دریافت اطلاعات باشگاه.');
     } finally {
       setLoading(false);
     }
-  }, [levelFilter, q]);
+  }, [levelFilter, q, isSiteAdmin]);
 
   useEffect(() => {
     const timer = setTimeout(() => void load(), 300);
     return () => clearTimeout(timer);
   }, [load]);
+
+  async function onRefer(req: ClubSubmittedCardRequest) {
+    try {
+      await referCardRequest(req.id, referTarget);
+      setNotice(`درخواست «${req.member.fullName}» ارجاع شد ✓`);
+      setDetailRequest(null);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'خطا در ارجاع درخواست.');
+    }
+  }
 
   async function onDecide(req: ClubCardRequest, decision: 'approve' | 'reject') {
     try {
@@ -144,18 +164,28 @@ export default function ClubPage() {
 
   const kpis = result?.kpis;
   const members = result?.members ?? [];
-  const visibleRequests = isSenior ? requests.filter((r) => r.status === 'REFERRED') : requests;
+  const visibleRequests = isSiteAdmin
+    ? submittedRequests
+    : isSenior
+      ? requests.filter((r) => r.status === 'REFERRED')
+      : requests;
 
   return (
     <div className="p-8">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-black text-ink">مشتریان VIP</h1>
+          <h1 className="text-xl font-black text-ink">
+            {isSiteAdmin ? 'باشگاه مشتریان' : 'مشتریان VIP'}
+          </h1>
           <p className="mt-1 text-sm text-muted">
-            {isSenior ? 'درخواست‌های ارجاع‌شده و اعضای باشگاه' : 'باشگاه مشتریان، کارت‌ها و درخواست‌ها'}
+            {isSiteAdmin
+              ? 'پروفایل اعضا، صدور کارت و ارجاع درخواست‌ها'
+              : isSenior
+                ? 'درخواست‌های ارجاع‌شده و اعضای باشگاه'
+                : 'باشگاه مشتریان، کارت‌ها و درخواست‌ها'}
           </p>
         </div>
-        {!isSenior && (
+        {!isSenior && !isSiteAdmin && (
           <button
             onClick={() => {
               setAddError(null);
@@ -182,35 +212,59 @@ export default function ClubPage() {
             <div className="font-num mt-1 text-lg font-black text-[#059669]">{faDigits(kpis.issuedCards)}</div>
           </div>
           <div className="rounded-xl border border-border bg-white p-4">
-            <div className="text-[11px] text-muted">درخواست در انتظار</div>
-            <div className="font-num mt-1 text-lg font-black text-[#6d28d9]">{faDigits(kpis.pendingRequests)}</div>
-          </div>
-          <div className="rounded-xl border border-border bg-white p-4">
-            <div className="text-[11px] text-muted">توزیع سطوح عضویت</div>
-            <div className="mt-1 space-y-0.5 text-[11px]">
-              {(['PLATINUM', 'GOLD', 'SILVER'] as ClubTier[]).map((t) => (
-                <div key={t} className="flex items-center justify-between">
-                  <span>{TIER_LABELS[t]}</span>
-                  <span className="font-num font-bold">{faDigits(kpis.tierCounts[t])}</span>
-                </div>
-              ))}
+            <div className="text-[11px] text-muted">
+              {isSiteAdmin ? 'درخواست‌های در انتظار ارجاع' : 'درخواست در انتظار'}
+            </div>
+            <div className="font-num mt-1 text-lg font-black text-[#6d28d9]">
+              {faDigits(isSiteAdmin ? kpis.submittedRequests : kpis.pendingRequests)}
             </div>
           </div>
+          {isSiteAdmin ? (
+            <div className="rounded-xl border border-border bg-white p-4">
+              <div className="text-[11px] text-muted">ارجاع‌شده به مدیران</div>
+              <div className="font-num mt-1 text-lg font-black text-[#a855f7]">{faDigits(kpis.pendingRequests)}</div>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-border bg-white p-4">
+              <div className="text-[11px] text-muted">توزیع سطوح عضویت</div>
+              <div className="mt-1 space-y-0.5 text-[11px]">
+                {(['PLATINUM', 'GOLD', 'SILVER'] as ClubTier[]).map((t) => (
+                  <div key={t} className="flex items-center justify-between">
+                    <span>{TIER_LABELS[t]}</span>
+                    <span className="font-num font-bold">{faDigits(kpis.tierCounts[t])}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       <section className="mb-6 rounded-xl border border-border bg-white p-5">
         <h2 className="mb-1 text-sm font-bold text-ink">
-          {isSenior ? 'درخواست‌های صدور کارت (ارجاع‌شده)' : 'درخواست‌های صدور کارت در انتظار تأیید شما'}
+          {isSiteAdmin
+            ? 'درخواست‌های صدور کارت (در انتظار ارجاع)'
+            : isSenior
+              ? 'درخواست‌های صدور کارت (ارجاع‌شده)'
+              : 'درخواست‌های صدور کارت در انتظار تأیید شما'}
         </h2>
         {isSenior && (
           <p className="mb-3 text-[11px] text-muted">
             درخواست‌هایی که ادمین سایت برای تأیید به شما ارجاع داده است؛ با تأیید شما کارت عضویت صادر می‌شود.
           </p>
         )}
+        {isSiteAdmin && (
+          <p className="mb-3 text-[11px] text-muted">
+            درخواست‌های ثبت‌شده توسط اعضا — پس از بررسی، به مدیر ارشد یا رئیس هیئت مدیره ارجاع دهید.
+          </p>
+        )}
         {visibleRequests.length === 0 ? (
           <p className="py-3 text-center text-xs text-muted">
-            {isSenior ? 'درخواست ارجاع‌شده‌ای وجود ندارد.' : 'درخواستی در انتظار تأیید نیست.'}
+            {isSiteAdmin
+              ? 'درخواستی در انتظار ارجاع نیست.'
+              : isSenior
+                ? 'درخواست ارجاع‌شده‌ای وجود ندارد.'
+                : 'درخواستی در انتظار تأیید نیست.'}
           </p>
         ) : (
           <ul className="divide-y divide-border">
@@ -229,7 +283,17 @@ export default function ClubPage() {
                     </div>
                   </div>
                   <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${st.className}`}>{st.label}</span>
-                  {isSenior ? (
+                  {isSiteAdmin ? (
+                    <button
+                      onClick={() => {
+                        setReferTarget('SENIOR');
+                        setDetailRequest(r);
+                      }}
+                      className="rounded-lg bg-accent px-3 py-2 text-xs font-bold text-white transition hover:bg-accent/90"
+                    >
+                      بررسی و ارجاع
+                    </button>
+                  ) : isSenior ? (
                     seniorCanAct && r.status === 'REFERRED' ? (
                       <div className="flex gap-2">
                         <button
@@ -395,12 +459,18 @@ export default function ClubPage() {
       </section>
 
       {detailRequest && (
-        <Modal title="بررسی درخواست صدور کارت" onClose={() => setDetailRequest(null)}>
+        <Modal title={isSiteAdmin ? 'ارجاع درخواست صدور کارت' : 'بررسی درخواست صدور کارت'} onClose={() => setDetailRequest(null)}>
           <div className="mb-3">
             <div className="text-sm font-bold text-ink">{detailRequest.member.fullName}</div>
             <div className="font-num mt-1 text-xs text-muted">
               کارت {TIER_LABELS[detailRequest.level]} · {faPoints(detailRequest.points)} امتیاز
             </div>
+            {isSiteAdmin && 'nationalId' in detailRequest.member && (
+              <div className="font-num mt-2 grid grid-cols-2 gap-2 text-[11px] text-muted">
+                <div>کد ملی: {faDigits(detailRequest.member.nationalId)}</div>
+                <div>ایمیل: {detailRequest.member.email}</div>
+              </div>
+            )}
           </div>
           <div className="mb-4">
             <h3 className="mb-2 text-xs font-bold text-ink">روند درخواست</h3>
@@ -413,7 +483,39 @@ export default function ClubPage() {
               ))}
             </ul>
           </div>
-          {detailRequest.status === 'REFERRED' && (
+          {isSiteAdmin && detailRequest.status === 'SUBMITTED' && (
+            <div className="space-y-3">
+              <div className="text-xs font-bold text-ink">ارجاع به مدیران</div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setReferTarget('SENIOR')}
+                  className={`flex-1 rounded-lg border px-3 py-2 text-[11px] font-bold ${
+                    referTarget === 'SENIOR' ? 'border-accent bg-accent/10 text-accent' : 'border-border text-text-2'
+                  }`}
+                >
+                  مدیر ارشد
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReferTarget('CHAIR')}
+                  className={`flex-1 rounded-lg border px-3 py-2 text-[11px] font-bold ${
+                    referTarget === 'CHAIR' ? 'border-accent bg-accent/10 text-accent' : 'border-border text-text-2'
+                  }`}
+                >
+                  رئیس هیئت مدیره
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => void onRefer(detailRequest as ClubSubmittedCardRequest)}
+                className="w-full rounded-lg bg-accent px-4 py-2 text-xs font-bold text-white transition hover:bg-accent/90"
+              >
+                ثبت ارجاع
+              </button>
+            </div>
+          )}
+          {!isSiteAdmin && detailRequest.status === 'REFERRED' && (
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => void onDecide(detailRequest, 'reject')}

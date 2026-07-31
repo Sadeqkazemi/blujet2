@@ -54,6 +54,7 @@ set and chart shape across every panel report.
 | GET | `/reporting/kpis` | same | Query: `granularity`, `periodKey?` (selected bar/day/month) → `{ revenueIrr, profitIrr, marginPct, operatingCostIrr, agencyDebtIrr, agencyDebtCount, trend: {...} }`. Re-scopes to the selected period, matching the "KPIs re-scope when a chart month is selected" rule. |
 | GET | `/reporting/completed-flights-summary` | same | Same `granularity`/`periodKey` filter → `{ flightCount, totalSeats, soldSeats, unsoldSeats }`, synced to the same period as the chart. |
 | GET | `/reporting/low-sales-alerts` | CEO, BOARD_CHAIR, SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | Flights &lt;72h out with occupancy below threshold — the design's recurring amber banner, currently hardcoded in every panel; this endpoint replaces the hardcoded copy with a real query. |
+| GET | `/reporting/commercial-overview` | COMMERCIAL_MANAGER | Commercial dashboard KPI row: `{ activeAgencies, passengersThisMonth, pendingAgencyRequests }`. |
 
 ### Manager activity / audit feed (`backend/src/modules/audit/`)
 
@@ -79,7 +80,7 @@ the parent resource.
 | Method | Path | Roles | Notes |
 |---|---|---|---|
 | GET | `/agencies` | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | Query: `q?` (name/license/manager/city search), `debtorsOnly?` (Commercial's "آژانس‌های دارای بدهی" panel). Returns list + the same 4 KPI cards (active count, total credit granted, total used/debt, pending-settlement count) confirmed identical across all three panels. |
-| GET | `/agencies/:id` | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | Detail: profile, computed stats (total sales, tickets issued, passengers), credit summary, recent activity timeline. `activityScore` (see DB_SCHEMA) is only included for FINANCE_MANAGER/COMMERCIAL_MANAGER — Senior Manager's detail view never showed it. |
+| GET | `/agencies/:id` | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | Detail: profile, computed stats (total sales, tickets issued, passengers), credit summary, recent activity timeline. `activityScore` (see DB_SCHEMA) is only included for FINANCE_MANAGER/COMMERCIAL_MANAGER — Senior Manager's detail view never showed it. For COMMERCIAL_MANAGER only, also returns `commercialExtras`: `{ flightsSold[], purchasedServices[], financeSummary, transactions[] }` for the design's overview/finance sub-sections. |
 | PATCH | `/agencies/:id/suspend` | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | `{ reason }` (required) → sets `suspendedAt`/`suspendReason`, `AuditLog(category=AGENCY)`. |
 | PATCH | `/agencies/:id/reactivate` | same as suspend | Clears suspension. |
 | GET | `/agencies/:id/credit` | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | `{ limitIrr, usedIrr (derived), remainingIrr }`. |
@@ -359,6 +360,9 @@ stays untouched on the same page).
     suggestion (if any), and the Jalali day list for the calendar filter.
 - GET `/flights/airports` — seeded airport catalog for the add-flight
   selects.
+- POST `/flights/airports` — `{ cityFa, code, tz? }` — add a city/airport
+  to the catalog (Commercial «شهرهای پروازی» tab); 409 on duplicate code or
+  city name; audited.
 - POST `/flights` — «افزودن پرواز» modal `{ originCode, destCode,
   flightNo, departureDate (Jalali), departureTime, capacity,
   basePriceToman }` — find-or-create Route/Flight, create instance;
@@ -671,9 +675,10 @@ panels. Key ⚑ decisions:
 
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/settings` | All `SystemSetting` key-values with server defaults (companyName, supportEmail, supportPhone, gateway toggles mellat/saman/zarin, global toggles maintenance/registration/charterSale/apiPublic/sandbox, brandColor) + the real `RefundPenaltyRule` brackets. |
-| PATCH | `/settings` | Partial key-value update; validated per key; audited (SYSTEM). |
+| GET | `/settings` | All `SystemSetting` key-values with server defaults (companyName, supportEmail, supportPhone, gateway toggles mellat/saman/zarin, global toggles maintenance/registration/charterSale/apiPublic/sandbox, brandColor, **socialLinks** — five fixed networks: instagram/telegram/whatsapp/linkedin/x, each `{ id, name, url, enabled }`) + the real `RefundPenaltyRule` brackets. |
+| PATCH | `/settings` | Partial key-value update; validated per key; audited (SYSTEM). `socialLinks` patch: array of partial entries; enabled links require non-empty URL (max 500 chars); unknown network ids rejected. |
 | PATCH | `/settings/refund-rules` | BOARD_CHAIR only — updates the REAL Phase 7 `RefundPenaltyRule.penaltyPct` per bracket (0–100 validated); audited. The refund engine keeps reading these same rows. |
+| GET | `/settings/social-links` | **Public** (no auth) — returns `{ links: [{ id, name, url }] }` for enabled networks with non-empty URLs; bare hostnames normalized to `https://`. Rate-limited. |
 
 ### `backend/src/modules/panels/` (change)
 
@@ -1029,6 +1034,72 @@ side anyway.
   dashboard's new summary section is this phase's only admin surface for
   it.
 
+### پنل کاربر — پیام به پشتیبانی (`/account` → تب `tickets`)
+Closes the gap flagged in `design-reference-v2/پنل کاربر.dc.html`'s
+`accountNav` (`tickets` / «پیام به پشتیبانی») — the public
+`POST /support-tickets` flow existed from Phase 20 but logged-in customers
+had no way to see their submissions inside `/account`.
+
+- `GET /my/support-tickets` (new, `USER` role) — list the caller's own
+  tickets: rows where `userId = caller.id`, **plus** any anonymous
+  submissions whose `requesterPhone` exactly matches the caller's stored
+  `User.phone` (covers tickets filed before login with the same number).
+  Returns `{ id, trackingCode, subject, body, status, history, createdAt,
+  updatedAt }` only — no admin-only fields (`dept`, `priority`,
+  `forwardedTo`).
+- `GET /my/support-tickets/:id` (new, `USER` role) — detail for one owned
+  ticket; `404` if the row isn't linked to the caller by `userId` or
+  phone match above.
+- `POST /my/support-tickets` (new, `USER` role, `@Throttle` 10/min per
+  account) — same body as the public submit DTO; always sets `userId` to
+  the caller. Returns `{ id, trackingCode }`.
+- Frontend: new `tickets` tab on `AccountPage.tsx` listing status +
+  tracking code + history timeline; link to `/support` to open a new
+  ticket. No reply thread or attachments (same Phase 20 deferrals).
+
+### پنل کاربر — باشگاه مشتریان (`/account` → تب `club`)
+Closes the gap flagged in `design-reference-v2/پنل کاربر.dc.html`'s
+`accountNav` (`club` / «باشگاه مشتریان»): tier banner + progress bar,
+membership-card issuance (request, tracker timeline, issued card display),
+and tier-benefits grid. BluBank block deferred (no backing schema).
+
+- `GET /my/club/membership` (new, `USER` role) — returns `{ isMember,
+  level, balance, cardStatus, cardNo, tierRules: { goldMinPoints,
+  platinumMinPoints, cardRequestMinPoints }, cardRequest: { id, status,
+  history, cardNo?, createdAt } | null, canRequestCard,
+  pointsNeededForCard }`. `balance` is the authoritative ledger sum
+  (`ClubPointsEntry`), not the staff display cache. `cardRequest` is the
+  latest non-REJECTED request (SUBMITTED/REFERRED/APPROVED).
+- `POST /my/club/card-request` (new, `USER` role, `@Throttle` 5/min per
+  account) — member-initiated card request: requires linked `ClubMember`,
+  `balance >= cardRequestMinPoints`, `cardStatus === NONE`, and no pending
+  SUBMITTED/REFERRED request. Creates a `ClubCardRequest(status=SUBMITTED)`
+  with a one-step history timeline and sets `ClubMember.cardStatus=REVIEW`.
+  `409` if already issued or a request is pending; `400` if below threshold.
+- Frontend: `club` tab on `AccountPage.tsx` (replaces the old minimal
+  `points` tab) wired to the endpoints above; keeps `GET /my/club-points`
+  for the header chip / price-lock eligibility checks.
+- Seed: links test USER `+989120000001` (نگار رضایی) to the seeded GOLD
+  `ClubMember` row and backfills a ledger entry when missing so manual
+  testing works immediately after `typeorm db seed`.
+
+### SITE_ADMIN — ارجاع درخواست‌های کارت SUBMITTED
+Completes the member-initiated card-request flow started above: after a
+USER submits via `POST /my/club/card-request`, the request sits in
+`SUBMITTED` until SITE_ADMIN refers it from the پنل ادمین سایت `club` tab.
+
+- `GET /club/submitted-card-requests` (new, `SITE_ADMIN` only) — list
+  `SUBMITTED` requests with member detail (incl. decrypted national ID for
+  this admin review surface only) + history timeline. Exec panels'
+  `GET /club/card-requests` still excludes SUBMITTED.
+- `PATCH /club/card-requests/:id/refer` (new, `SITE_ADMIN` only) — body
+  `{ assignedTo: 'SENIOR' | 'CHAIR' }`; `SUBMITTED → REFERRED`, appends a
+  history step, audited. `409` if not SUBMITTED.
+- `GET /club/members` KPI payload gains `submittedRequests` count (SUBMITTED
+  rows) alongside existing `pendingRequests` (REFERRED rows).
+- Frontend: `ClubPage.tsx` gains a `SITE_ADMIN` role branch — submitted
+  queue + refer modal (مدیر ارشد / رئیس هیئت مدیره picker); no approve/reject.
+
 ## Phase 21 — فراموشی رمز (customer forgot/set password)
 
 Third "dead forms" item. `ForgotPasswordPage.tsx` was entirely client-side
@@ -1134,11 +1205,14 @@ request/decide pattern exactly, for a new `AgencyWebserviceRequest`.
   `{ scope: 'FULL' | 'SEARCH_BOOK', months: 1 | 3 | 12, note?: string }`
   (whitelist DTO — `forbidNonWhitelisted` rejects any other field,
   including a client-supplied price). Creates a `PENDING`
-  `AgencyWebserviceRequest` with `priceIrr` computed server-side from a
-  fixed plan catalog (the design's own toman prices ×10 → ریال:
-  ۱ ماهه=۴۵٬۰۰۰٬۰۰۰, ۳ ماهه=۱۲۰٬۰۰۰٬۰۰۰, ۱۲ ماهه=۴۲۰٬۰۰۰٬۰۰۰ ریال), fires a
-  cartable task to `SENIOR_MANAGER`/`FINANCE_MANAGER`/`COMMERCIAL_MANAGER`
+  `AgencyWebserviceRequest` with `priceIrr` computed server-side from the
+  **configurable** plan catalog (`SystemSetting.webservicePlanPrices` —
+  defaults: ۱ ماهه=۴۵٬۰۰۰٬۰۰۰, ۳ ماهه=۱۲۰٬۰۰۰٬۰۰۰, ۱۲ ماهه=۴۲۰٬۰۰۰٬۰۰۰
+  ریال; editable by COMMERCIAL_MANAGER via `PATCH /webservice/pricing`),
+  fires a cartable task to `SENIOR_MANAGER`/`FINANCE_MANAGER`/`COMMERCIAL_MANAGER`
   (same review-role set as credit requests), and audit-logs.
+- `GET /agency-portal/webservice-plans` — current plan prices for this
+  agency's purchase UI (same three durations, server-computed IRR).
 - `GET /agency-portal/webservice-requests` — this agency's own request
   history.
 - `GET /agency-portal/api-keys` — this agency's own API keys, **metadata
@@ -1162,6 +1236,20 @@ request/decide pattern exactly, for a new `AgencyWebserviceRequest`.
   which updates first): if step-up verification fails, the request must
   stay `PENDING` for a retry, never end up `APPROVED` with no key actually
   issued.
+
+### Commercial Manager — webservice plan pricing
+
+- `GET /webservice/pricing` — `COMMERCIAL_MANAGER`, `CEO`, `SENIOR_MANAGER`
+  — `{ prices: { 1, 3, 12 } }` in IRR.
+- `PATCH /webservice/pricing` — `COMMERCIAL_MANAGER` only — body
+  `{ month1PriceIrr, month3PriceIrr, month12PriceIrr }`; audited
+  (SYSTEM). New agency purchase requests immediately use the updated
+  prices.
+
+Frontend: `CommercialWebservicePage.tsx` (Commercial panel's **وب سرویس**
+tab — `PANEL_NAV.COMMERCIAL_MANAGER` key `webservice`) edits the three
+plan prices; `AgencyWebservicePage.tsx` reads them via
+`GET /agency-portal/webservice-plans`.
 
 ### Raw key delivery — a scope decision, documented here
 
@@ -1724,16 +1812,11 @@ label, file name, Jalali upload date, status pill, تأیید/رد buttons on
 the endpoint's role gate — no `EmployeePermission` key currently grants
 document review).
 
-**Not corrected this phase, flagged instead**: while building this,
-discovered that the credit-requests and webservice-requests staff-decide
-endpoints this phase's code directly mirrors have **no frontend UI of
-their own either** — `AgencyDetailPage.tsx` never called
-`GET/PATCH .../credit-requests` or `GET/PATCH .../webservice-requests`
-before this phase, and still doesn't. Every credit-increase and
-webservice-purchase request submitted by an agency is currently
-decidable only via curl/Supertest. This is a real, parallel gap of the
-same shape as documents — reported to the user, deliberately left
-out of this phase's diff so it stays reviewable, not silently bundled in.
+Frontend (credit/webservice requests): `AgencyDetailPage.tsx`
+(Senior/Finance overview + Commercial مالی sub-tab) gained
+«درخواست‌های افزایش اعتبار» and «درخواست‌های خرید وب‌سرویس» cards —
+same approve/reject pattern as documents; webservice approval reuses the
+existing step-up gate (`API_KEY_ROTATE`) because it issues a real API key.
 
 ## Phase 40 — ترجیح زبان نمایش (display-language preference storage)
 
@@ -2226,16 +2309,10 @@ just a passive settings screen.
   own clubrules screen has no bulk-recompute action, so this stays
   scoped to what's actually designed: the config is applied the next
   time each member's points change).
-- `cardRequestMinPoints` is stored and returned by `GET`/`PATCH`, but has
-  **no real consumer yet** — the only place a `ClubCardRequest` is
-  created today is `POST /club/_test/card-request` (E2E-only, 404s in
-  prod) and the staff-only `issueCardDirect`/`decideRequest` flows; there
-  is no real, self-service "request a card" action anywhere in the
-  codebase for this threshold to gate. This is an explicit, documented
-  scope boundary (matching the design's own field, which the mock also
-  never wires to any real request-creation action) — not a fabricated
-  no-op field. Building the actual member-initiated card-request flow is
-  separate, larger, not-yet-approved work.
+- `cardRequestMinPoints` is stored and returned by `GET`/`PATCH`, and is
+  now consumed by `GET /my/club/membership` + `POST /my/club/card-request`
+  (member-initiated card-request flow in the user panel). Staff-side
+  referral of SUBMITTED requests (site-admin track) remains a separate gap.
 
 See `docs/features/club-tier-rules.md` for the acceptance checklist.
 New frontend page `ClubTierRulesPage.tsx` (route `clubrules`, CEO +

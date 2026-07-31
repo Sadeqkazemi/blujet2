@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import PublicHeader from './PublicHeader';
 import * as useAuthModule from '../../hooks/useAuth';
+import { mockAuthUser, mockAuthUserLocale } from '../../test/mockAuthUser';
 import * as useLocaleModule from '../../hooks/useLocale';
 import * as publicSiteApi from '../../api/publicSite';
 
@@ -24,7 +25,7 @@ describe('PublicHeader — logged-in user', () => {
     mockLocale();
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
       status: 'authenticated',
-      user: { id: 'u1', fullName: 'نگار رضایی', role: 'USER' },
+      user: mockAuthUser({ id: 'u1', fullName: 'نگار رضایی', role: 'USER' }),
       requestLogin: vi.fn(),
       confirmTwoFactor: vi.fn(),
       agencyLogin: vi.fn(),
@@ -42,7 +43,7 @@ describe('PublicHeader — logged-in user', () => {
     mockLocale();
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
       status: 'authenticated',
-      user: { id: 'u1', fullName: 'نگار رضایی', role: 'USER' },
+      user: mockAuthUser({ id: 'u1', fullName: 'نگار رضایی', role: 'USER' }),
       requestLogin: vi.fn(),
       confirmTwoFactor: vi.fn(),
       agencyLogin: vi.fn(),
@@ -61,7 +62,7 @@ describe('PublicHeader — logged-in user', () => {
     mockLocale('en');
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
       status: 'authenticated',
-      user: { id: 'u1', fullName: 'Negar Rezaei', role: 'USER' },
+      user: mockAuthUserLocale('EN', { id: 'u1', fullName: 'Negar Rezaei', role: 'USER' }),
       requestLogin: vi.fn(),
       confirmTwoFactor: vi.fn(),
       agencyLogin: vi.fn(),

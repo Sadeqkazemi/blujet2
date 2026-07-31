@@ -63,6 +63,28 @@ export class ReportingController {
     return { success: true, data };
   }
 
+  @Get('finance-dashboard-stats')
+  @Roles('FINANCE_MANAGER')
+  @ApiOperation({
+    summary:
+      'کارت‌های داشبورد مدیر مالی — آژانس/مسافر/بلیط/درآمد ماه جاری با روند',
+  })
+  async financeDashboardStats() {
+    const data = await this.reporting.financeDashboardStats();
+    return { success: true, data };
+  }
+
+  @Get('commercial-overview')
+  @Roles('COMMERCIAL_MANAGER')
+  @ApiOperation({
+    summary:
+      'Commercial Manager dashboard KPI row — active agencies, passengers this month, pending cooperation requests',
+  })
+  async commercialOverview() {
+    const data = await this.reporting.commercialOverview();
+    return { success: true, data };
+  }
+
   @Get('recent-transactions')
   @Roles('FINANCE_MANAGER')
   @ApiOperation({

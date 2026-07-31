@@ -6,6 +6,7 @@ import * as reportingApi from '../../api/reporting';
 import * as agenciesApi from '../../api/agencies';
 import * as reconciliationApi from '../../api/reconciliation';
 import * as useAuthModule from '../../hooks/useAuth';
+import { mockAuthUserWithRole } from '../../test/mockAuthUser';
 import type { Role } from '../../types/auth';
 import type {
   AgencySettlementsResult,
@@ -25,6 +26,12 @@ const KPIS: KpiResult = {
   operatingCostIrr: '3800000000',
   agencyDebtIrr: '900000000',
   agencyDebtCount: 2,
+  trends: {
+    revenuePct: 12,
+    profitPct: 8,
+    operatingCostPct: -3,
+    agencyDebtPct: 0,
+  },
 };
 
 const FLIGHTS: CompletedFlightsSummary = {
@@ -53,6 +60,8 @@ const TX: RecentTransactionsResult = {
       party: 'آژانس blujet',
       occurredAt: '2026-07-10T10:00:00.000Z',
       signedAmountIrr: '-450000000',
+      statusFa: 'موفق',
+      statusTone: 'success',
     },
   ],
 };
@@ -86,7 +95,7 @@ const RECONCILIATION_ITEM: ReconciliationItem = {
 function mockRole(role: Role) {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status: 'authenticated',
-    user: { id: 'u1', fullName: 'کاربر تست', role },
+    user: mockAuthUserWithRole(role),
     requestLogin: vi.fn(),
     confirmTwoFactor: vi.fn(),
     agencyLogin: vi.fn(),

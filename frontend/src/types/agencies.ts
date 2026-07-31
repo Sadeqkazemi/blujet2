@@ -71,6 +71,36 @@ export interface AgencyDetail {
   stats: { totalSalesIrr: string; ticketsIssued: number; passengers: number };
   activityScore?: AgencyActivityScore;
   recentActivity: AgencyAuditRow[];
+  commercialExtras?: AgencyCommercialExtras;
+}
+
+export interface AgencyFlightSoldRow {
+  routeFa: string;
+  flightNo: string;
+  departAt: string;
+  seatCount: number;
+  salesIrr: number;
+}
+
+export interface AgencyPurchasedService {
+  name: string;
+  purchasedAt: string;
+  expiresAt: string | null;
+  statusLabel: string;
+  status: 'ACTIVE' | 'EXPIRED';
+}
+
+export interface AgencyCommercialExtras {
+  flightsSold: AgencyFlightSoldRow[];
+  purchasedServices: AgencyPurchasedService[];
+  financeSummary: { paidTotalIrr: number; unpaidTotalIrr: number };
+  transactions: {
+    id: string;
+    titleFa: string;
+    occurredAt: string;
+    signedAmountIrr: number;
+    ref: string | null;
+  }[];
 }
 
 export interface AgencyMembershipRequest {

@@ -4,6 +4,9 @@ import { fetchSettings, updateRefundRules, updateSettings } from '../../api/admi
 import { ApiRequestError } from '../../api/envelope';
 import { faDigits, latinDigits } from '../../lib/fa-format';
 import type { RefundRuleRow, SettingsResult } from '../../types/admins';
+import type { SocialLinkEntry, SocialLinkId } from '../../types/social-links';
+import { SOCIAL_LINK_IDS } from '../../types/social-links';
+import { SocialIcon, socialBrandColor } from '../../components/public/SocialIcon';
 
 const GATEWAYS: { key: string; name: string; desc: string }[] = [
   { key: 'gatewayMellat', name: 'درگاه بانک ملت', desc: 'درگاه اصلی پرداخت' },
@@ -40,6 +43,7 @@ function Toggle({ on, onToggle, label }: { on: boolean; onToggle: () => void; la
 export default function SettingsPage() {
   const { user } = useAuth();
   const isChair = user?.role === 'BOARD_CHAIR';
+  const isSiteAdmin = user?.role === 'SITE_ADMIN';
   const [data, setData] = useState<SettingsResult | null>(null);
   const [draft, setDraft] = useState<Record<string, unknown>>({});
   const [ruleDraft, setRuleDraft] = useState<Record<string, string>>({});
@@ -66,13 +70,27 @@ export default function SettingsPage() {
   const boolOf = (key: string) => Boolean(draft[key]);
   const strOf = (key: string) => String(draft[key] ?? '');
 
+  const socialLinks = (): SocialLinkEntry[] => {
+    const raw = draft.socialLinks;
+    if (!Array.isArray(raw)) return [];
+    return raw as SocialLinkEntry[];
+  };
+
+  const updateSocialLink = (id: SocialLinkId, patch: Partial<SocialLinkEntry>) => {
+    setKey(
+      'socialLinks',
+      socialLinks().map((l) => (l.id === id ? { ...l, ...patch } : l)),
+    );
+  };
+
   async function onSave() {
     setSaving(true);
     setNotice(null);
     try {
-      const result = await updateSettings(draft);
+      const patch = isSiteAdmin ? { socialLinks: draft.socialLinks } : draft;
+      const result = await updateSettings(patch);
 
-      if (isChair && data) {
+      if (isChair && data && !isSiteAdmin) {
         const changed: { id: string; penaltyPct: number }[] = [];
         for (const rule of data.refundRules) {
           const parsed = parseInt(latinDigits(ruleDraft[rule.id] ?? ''), 10);
@@ -101,7 +119,9 @@ export default function SettingsPage() {
     <div className="p-8">
       <h1 className="mb-1 text-xl font-black text-ink">تنظیمات سامانه</h1>
       <p className="mb-6 text-sm text-muted">
-        پیکربندی سراسری — هر تغییر در دفتر رویدادها ثبت می‌شود
+        {isSiteAdmin
+          ? 'مدیریت لینک شبکه‌های اجتماعی نمایش‌داده‌شده در فوتر سایت'
+          : 'پیکربندی سراسری — هر تغییر در دفتر رویدادها ثبت می‌شود'}
       </p>
 
       {notice && (
@@ -217,6 +237,49 @@ export default function SettingsPage() {
         )}
 
         <div className="rounded-xl border border-border bg-white p-5">
+          <div className="mb-1 text-sm font-bold text-ink">شبکه‌های اجتماعی</div>
+          <p className="mb-4 text-[11px] text-muted">لینک‌های نمایش‌داده‌شده در فوتر سایت</p>
+          <div className="flex flex-col gap-3">
+            {SOCIAL_LINK_IDS.map((id) => {
+              const entry = socialLinks().find((l) => l.id === id);
+              if (!entry) return null;
+              return (
+                <div key={id} className="flex items-center gap-3 rounded-lg border border-border/70 p-3">
+                  <span
+                    className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-[#f4f7fb]"
+                    style={{ color: socialBrandColor(id) }}
+                  >
+                    <SocialIcon id={id} size={18} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <input
+                      aria-label={`نام ${entry.name}`}
+                      value={entry.name}
+                      onChange={(e) => updateSocialLink(id, { name: e.target.value })}
+                      className="mb-1.5 w-full rounded-md border border-border px-2.5 py-1.5 text-xs font-bold text-ink outline-none focus:border-accent"
+                    />
+                    <input
+                      aria-label={`آدرس ${entry.name}`}
+                      dir="ltr"
+                      value={entry.url}
+                      onChange={(e) => updateSocialLink(id, { url: e.target.value })}
+                      placeholder="example.com/blujet"
+                      className="font-num w-full rounded-md border border-border px-2.5 py-1.5 text-[11px] text-muted outline-none focus:border-accent"
+                    />
+                  </div>
+                  <Toggle
+                    on={entry.enabled}
+                    onToggle={() => updateSocialLink(id, { enabled: !entry.enabled })}
+                    label={entry.name}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {!isSiteAdmin && (
+        <div className="rounded-xl border border-border bg-white p-5">
           <div className="mb-1 text-sm font-bold text-ink">تنظیمات کلی سامانه</div>
           <p className="mb-4 text-[11px] text-muted">
             پیکربندی سراسری سایت — تغییرات روی کل سرویس اعمال می‌شود
@@ -237,6 +300,7 @@ export default function SettingsPage() {
             ))}
           </div>
         </div>
+        )}
       </div>
 
       <button

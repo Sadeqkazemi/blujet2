@@ -8,8 +8,9 @@ import { AuditService } from '../audit/audit.service';
 import { CartableService } from '../cartable/cartable.service';
 import { AgenciesService } from '../agencies/agencies.service';
 import { FilesService } from '../files/files.service';
+import { WebservicePricingService } from '../webservice-pricing/webservice-pricing.service';
 import { ErrorCode } from '../../common/errors';
-import { ZERO_IRR, addIrr, divRoundBigInt } from '../../common/money';
+import { ZERO_IRR, addIrr, divRoundBigInt, toIrr } from '../../common/money';
 import type { Irr } from '../../common/money';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type {
@@ -25,13 +26,9 @@ const CREDIT_REVIEW_ROLES = [
 
 const SOLD_STATUSES = ['PAID', 'TICKETED'] as const;
 
-// Phase 23: server-computed prices from the design's own plan catalog
-// (تومان × 10 → ریال). Never accept a client-supplied price.
-const WEBSERVICE_PLAN_PRICES_IRR: Record<number, Irr> = {
-  1: 45_000_000n,
-  3: 120_000_000n,
-  12: 420_000_000n,
-};
+// Phase 23: server-computed prices from the commercial-manager plan catalog
+// (stored in SystemSetting, editable via PATCH /webservice/pricing).
+// Never accept a client-supplied price.
 
 @Injectable()
 export class AgencyPortalService {
@@ -41,6 +38,7 @@ export class AgencyPortalService {
     private readonly cartable: CartableService,
     private readonly agencies: AgenciesService,
     private readonly files: FilesService,
+    private readonly webservicePricing: WebservicePricingService,
   ) {}
 
   private async getOwnProfileOrThrow(actor: AuthenticatedUser) {
@@ -397,16 +395,41 @@ export class AgencyPortalService {
   // ── Phase 23: real webservice (B2B API) purchase requests ──────────────
   // (replaces AgencyWebservicePage mock's local-only "requested"/"keyShown")
 
+  async assertAgency(actor: AuthenticatedUser) {
+    await this.getOwnProfileOrThrow(actor);
+  }
+
+  async webservicePlans() {
+    const prices = await this.webservicePricing.getPlanPrices();
+    return {
+      plans: ([1, 3, 12] as const).map((months) => ({
+        months,
+        // Wire format consistency: every *Irr field is a decimal string in
+        // responses (see docs/API.md) — this one is JSON-stored (not a
+        // TypeORM BigInt column) but still IRR money, so it goes through the
+        // same Irr/bigint-string path as every other price field.
+        priceIrr: toIrr(prices[months]),
+      })),
+    };
+  }
+
   async requestWebservice(actor: AuthenticatedUser, dto: RequestWebserviceDto) {
     await this.getOwnProfileOrThrow(actor);
-    const priceIrr = WEBSERVICE_PLAN_PRICES_IRR[dto.months];
+    const planPrices = await this.webservicePricing.getPlanPrices();
+    const planPriceIrr = planPrices[dto.months];
+    if (!planPriceIrr) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'مدت اشتراک نامعتبر است.',
+      });
+    }
 
     const request = await this.typeorm.agencyWebserviceRequest.create({
       data: {
         agencyId: actor.id,
         scope: dto.scope,
         months: dto.months,
-        priceIrr,
+        priceIrr: toIrr(planPriceIrr),
         note: dto.note,
       },
     });
@@ -425,7 +448,7 @@ export class AgencyPortalService {
       actorRole: actor.role,
       category: 'AGENCY',
       action: 'درخواست خرید وب‌سرویس آژانس',
-      detail: `آژانس «${actor.fullName}» درخواست وب‌سرویس با دامنه ${dto.scope} به مدت ${dto.months} ماه به مبلغ ${priceIrr} ریال ثبت کرد.`,
+      detail: `آژانس «${actor.fullName}» درخواست وب‌سرویس با دامنه ${dto.scope} به مدت ${dto.months} ماه به مبلغ ${planPriceIrr} ریال ثبت کرد.`,
       entityType: 'AgencyWebserviceRequest',
       entityId: request.id,
     });

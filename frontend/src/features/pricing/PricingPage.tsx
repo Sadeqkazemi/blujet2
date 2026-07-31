@@ -301,7 +301,7 @@ function CeoPricing() {
 }
 
 /** Commercial Manager view — pricing list + set-price modal. */
-function CommercialPricing() {
+function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
   const [data, setData] = useState<CommercialPricingResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -369,14 +369,23 @@ function CommercialPricing() {
   const locked = selected?.pricing?.status === 'REGISTERED';
 
   return (
-    <div className="p-8">
-      <div className="mb-6">
-        <h1 className="text-xl font-black text-ink">تعیین قیمت پرواز و ارسال به مدیر عامل</h1>
-        <p className="mt-1 text-sm text-muted">
-          نرخ پیشنهادی و نرخ قانونی هر پرواز را تعیین کنید؛ پس از تأیید مدیر عامل، قیمت ثبت و قفل می‌شود و قابل
-          تغییر نخواهد بود.
-        </p>
-      </div>
+    <div className={embedded ? '' : 'p-8'}>
+      {embedded ? (
+        <div className="mb-4">
+          <h2 className="text-sm font-bold text-ink">تعیین قیمت پرواز و ارسال به مدیر عامل</h2>
+          <p className="mt-0.5 text-[11px] text-muted">
+            نرخ پیشنهادی و نرخ قانونی هر پرواز را تعیین کنید؛ پس از تأیید مدیر عامل، قیمت ثبت و قفل می‌شود.
+          </p>
+        </div>
+      ) : (
+        <div className="mb-6">
+          <h1 className="text-xl font-black text-ink">تعیین قیمت پرواز و ارسال به مدیر عامل</h1>
+          <p className="mt-1 text-sm text-muted">
+            نرخ پیشنهادی و نرخ قانونی هر پرواز را تعیین کنید؛ پس از تأیید مدیر عامل، قیمت ثبت و قفل می‌شود و قابل
+            تغییر نخواهد بود.
+          </p>
+        </div>
+      )}
 
       {error && <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">{error}</p>}
       {notice && <p className="mb-4 rounded-lg bg-[#10b98115] p-3 text-sm text-[#059669]">{notice}</p>}
@@ -524,12 +533,10 @@ function CommercialPricing() {
   );
 }
 
-export default function PricingPage() {
+export default function PricingPage({ embedded = false }: { embedded?: boolean }) {
   const { user } = useAuth();
-  // EMPLOYEE (granted pr_propose) gets the same commercial-style
-  // proposal read/write view — see Phase 18 notes in docs/DB_SCHEMA.md.
   return user?.role === 'COMMERCIAL_MANAGER' || user?.role === 'EMPLOYEE' ? (
-    <CommercialPricing />
+    <CommercialPricing embedded={embedded} />
   ) : (
     <CeoPricing />
   );

@@ -3,7 +3,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import * as crypto from 'node:crypto';
 import { TypeORMService } from '../src/typeorm/typeorm.service';
-import { loginAs } from './helpers/login.helper';
+import { loginAs, loginAsCustomer } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 import { encryptPii, hashPii } from '../src/common/pii-crypto';
 import { ClubPointsService } from '../src/modules/booking-engine/club-points.service';
@@ -67,6 +67,37 @@ describe('Club (e2e)', () => {
       },
     });
     return { member, req };
+  }
+
+  async function createSubmittedRequest() {
+    const nid = validNationalId();
+    const member = await typeorm.clubMember.create({
+      data: {
+        fullName: `عضو ارجاع ${crypto.randomUUID().slice(0, 6)}`,
+        email: `${crypto.randomUUID().slice(0, 8)}@submit.example`,
+        nationalIdEnc: encryptPii(nid),
+        nationalIdHash: hashPii(nid),
+        points: 6000,
+        level: 'GOLD',
+        cardStatus: 'REVIEW',
+      },
+    });
+    const req = await typeorm.clubCardRequest.create({
+      data: {
+        memberId: member.id,
+        level: 'GOLD',
+        points: 6000,
+        status: 'SUBMITTED',
+        history: [
+          {
+            step: 'submitted',
+            labelFa: 'رسیدن به حد امتیاز و ثبت درخواست صدور کارت',
+            at: 'اکنون',
+          },
+        ],
+      },
+    });
+    return { member, req, nid };
   }
 
   it('GET /club/members returns members + reconciling KPI counts; non-club roles get 403', async () => {
@@ -216,6 +247,65 @@ describe('Club (e2e)', () => {
       },
     });
     expect(audit).not.toBeNull();
+  });
+
+  it('GET /club/submitted-card-requests: SITE_ADMIN lists SUBMITTED with nationalId; exec roles get 403', async () => {
+    const { req, nid } = await createSubmittedRequest();
+    const siteAdmin = await loginAs(app, 'site.admin');
+
+    const list = await request(app.getHttpServer())
+      .get('/club/submitted-card-requests')
+      .set('Authorization', `Bearer ${siteAdmin.accessToken}`);
+    expect(list.status).toBe(200);
+    const row = list.body.data.find((r: { id: string }) => r.id === req.id);
+    expect(row).toBeDefined();
+    expect(row.status).toBe('SUBMITTED');
+    expect(row.member.nationalId).toBe(nid);
+
+    for (const username of ['ceo', 'senior.rahimi', 'chair']) {
+      const { accessToken } = await loginAs(app, username);
+      const forbidden = await request(app.getHttpServer())
+        .get('/club/submitted-card-requests')
+        .set('Authorization', `Bearer ${accessToken}`);
+      expect(forbidden.status).toBe(403);
+    }
+  });
+
+  it('PATCH /club/card-requests/:id/refer: SITE_ADMIN SUBMITTED→REFERRED + audit; exec 403; already referred → 409', async () => {
+    const { req } = await createSubmittedRequest();
+    const siteAdmin = await loginAs(app, 'site.admin');
+
+    const referred = await request(app.getHttpServer())
+      .patch(`/club/card-requests/${req.id}/refer`)
+      .set('Authorization', `Bearer ${siteAdmin.accessToken}`)
+      .send({ assignedTo: 'SENIOR' });
+    expect(referred.status).toBe(200);
+    expect(referred.body.data.status).toBe('REFERRED');
+    expect(referred.body.data.assignedTo).toBe('SENIOR');
+    const history = referred.body.data.history as { step: string }[];
+    expect(history.some((h) => h.step === 'referred')).toBe(true);
+
+    const audit = await typeorm.auditLog.findFirst({
+      where: {
+        category: 'CLUB',
+        entityType: 'ClubCardRequest',
+        entityId: req.id,
+      },
+    });
+    expect(audit).not.toBeNull();
+
+    const ceo = await loginAs(app, 'ceo');
+    const forbidden = await request(app.getHttpServer())
+      .patch(`/club/card-requests/${req.id}/refer`)
+      .set('Authorization', `Bearer ${ceo.accessToken}`)
+      .send({ assignedTo: 'CHAIR' });
+    expect(forbidden.status).toBe(403);
+
+    const again = await request(app.getHttpServer())
+      .patch(`/club/card-requests/${req.id}/refer`)
+      .set('Authorization', `Bearer ${siteAdmin.accessToken}`)
+      .send({ assignedTo: 'CHAIR' });
+    expect(again.status).toBe(409);
   });
 
   it('GET /club/card-requests never returns SUBMITTED rows', async () => {
@@ -423,5 +513,74 @@ describe('Club (e2e)', () => {
       expect(updated.points).toBe(20000);
       expect(updated.level).toBe('PLATINUM');
     });
+  });
+
+  // ── Customer self-service (user panel club tab) ───────────────────────
+
+  async function linkMemberToUser(memberId: string, userId: string, points: number) {
+    await typeorm.clubPointsEntry.deleteMany({ where: { clubMemberId: memberId } });
+    await typeorm.clubPointsEntry.create({
+      data: { clubMemberId: memberId, type: 'EARN', signedPoints: points },
+    });
+    await typeorm.clubMember.update({
+      where: { id: memberId },
+      data: { userId, points, cardStatus: 'NONE', cardNo: null },
+    });
+  }
+
+  it('GET /my/club/membership returns full view for a linked member; 403 for staff', async () => {
+    const member = await createFreshMember();
+    const { accessToken, userId } = await loginAsCustomer(app, '09180000001');
+    await linkMemberToUser(member.id, userId!, 6200);
+
+    const res = await request(app.getHttpServer())
+      .get('/my/club/membership')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.isMember).toBe(true);
+    expect(res.body.data.balance).toBe(6200);
+    expect(res.body.data.canRequestCard).toBe(true);
+
+    const { accessToken: ceoToken } = await loginAs(app, 'ceo');
+    const forbidden = await request(app.getHttpServer())
+      .get('/my/club/membership')
+      .set('Authorization', `Bearer ${ceoToken}`);
+    expect(forbidden.status).toBe(403);
+  });
+
+  it('POST /my/club/card-request creates SUBMITTED request and sets REVIEW; rejects duplicate', async () => {
+    const member = await createFreshMember();
+    const { accessToken, userId } = await loginAsCustomer(app, '09180000002');
+    await linkMemberToUser(member.id, userId!, 6000);
+
+    const submit = await request(app.getHttpServer())
+      .post('/my/club/card-request')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({});
+    expect(submit.status).toBe(201);
+    expect(submit.body.data.status).toBe('SUBMITTED');
+
+    const memberAfter = await typeorm.clubMember.findUniqueOrThrow({
+      where: { id: member.id },
+    });
+    expect(memberAfter.cardStatus).toBe('REVIEW');
+
+    const duplicate = await request(app.getHttpServer())
+      .post('/my/club/card-request')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({});
+    expect(duplicate.status).toBe(409);
+  });
+
+  it('POST /my/club/card-request rejects when below cardRequestMinPoints', async () => {
+    const member = await createFreshMember();
+    const { accessToken, userId } = await loginAsCustomer(app, '09180000003');
+    await linkMemberToUser(member.id, userId!, 1000);
+
+    const res = await request(app.getHttpServer())
+      .post('/my/club/card-request')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({});
+    expect(res.status).toBe(400);
   });
 });

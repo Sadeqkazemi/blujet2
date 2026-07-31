@@ -38,10 +38,60 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
     expect(row).toHaveProperty('titleFa');
     expect(row).toHaveProperty('party');
     expect(row).toHaveProperty('signedAmountIrr');
+    expect(row).toHaveProperty('statusFa');
+    expect(row).toHaveProperty('statusTone');
 
     const ceo = await loginAs(app, 'ceo');
     const forbidden = await request(app.getHttpServer())
       .get('/reporting/recent-transactions')
+      .set('Authorization', auth(ceo.accessToken));
+    expect(forbidden.status).toBe(403);
+  });
+
+  it('GET /reporting/kpis: returns trend percentages alongside KPI values', async () => {
+    const finance = await loginAs(app, 'finance.karimi');
+    const res = await request(app.getHttpServer())
+      .get('/reporting/kpis?granularity=q6')
+      .set('Authorization', auth(finance.accessToken));
+    expect(res.status).toBe(200);
+    const { trends, revenueIrr } = res.body.data as {
+      revenueIrr: string;
+      trends: {
+        revenuePct: number;
+        profitPct: number;
+        operatingCostPct: number;
+        agencyDebtPct: number;
+      };
+    };
+    expect(Number(revenueIrr)).toBeGreaterThan(0);
+    expect(trends).toHaveProperty('revenuePct');
+    expect(trends).toHaveProperty('profitPct');
+    expect(trends).toHaveProperty('operatingCostPct');
+    expect(trends).toHaveProperty('agencyDebtPct');
+  });
+
+  it('GET /reporting/finance-dashboard-stats: finance manager gets real dashboard cards; other roles 403', async () => {
+    const finance = await loginAs(app, 'finance.karimi');
+    const res = await request(app.getHttpServer())
+      .get('/reporting/finance-dashboard-stats')
+      .set('Authorization', auth(finance.accessToken));
+    expect(res.status).toBe(200);
+    const data = res.body.data as {
+      activeAgencies: number;
+      passengersThisMonth: number;
+      ticketsSoldThisMonth: number;
+      revenueThisMonthIrr: string;
+      activeAgenciesTrendPct: number;
+    };
+    expect(data.activeAgencies).toBeGreaterThan(0);
+    expect(data.passengersThisMonth).toBeGreaterThanOrEqual(0);
+    expect(data.ticketsSoldThisMonth).toBeGreaterThanOrEqual(0);
+    expect(Number(data.revenueThisMonthIrr)).toBeGreaterThanOrEqual(0);
+    expect(typeof data.activeAgenciesTrendPct).toBe('number');
+
+    const ceo = await loginAs(app, 'ceo');
+    const forbidden = await request(app.getHttpServer())
+      .get('/reporting/finance-dashboard-stats')
       .set('Authorization', auth(ceo.accessToken));
     expect(forbidden.status).toBe(403);
   });

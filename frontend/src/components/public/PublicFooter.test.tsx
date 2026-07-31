@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import PublicFooter from './PublicFooter';
 import * as useLocaleModule from '../../hooks/useLocale';
 import * as useCareersEnabledModule from '../../hooks/useCareersEnabled';
+import * as useSocialLinksModule from '../../hooks/useSocialLinks';
 
 function mockLocale(locale: 'fa' | 'en' | 'ar' = 'fa') {
   vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale, setLocale: vi.fn() });
@@ -13,6 +14,7 @@ beforeEach(() => {
   // Deterministic by default — real fetch behavior is covered by
   // useCareersEnabled's own unit test, not here.
   vi.spyOn(useCareersEnabledModule, 'useCareersEnabled').mockReturnValue(false);
+  vi.spyOn(useSocialLinksModule, 'useSocialLinks').mockReturnValue([]);
 });
 
 function renderFooter() {
@@ -56,5 +58,14 @@ describe('PublicFooter', () => {
     vi.spyOn(useCareersEnabledModule, 'useCareersEnabled').mockReturnValue(true);
     renderFooter();
     expect(screen.getByText('فرصت‌های شغلی')).toHaveAttribute('href', '/careers');
+  });
+
+  it('renders social icons for enabled links', () => {
+    mockLocale('fa');
+    vi.spyOn(useSocialLinksModule, 'useSocialLinks').mockReturnValue([
+      { id: 'telegram', name: 'تلگرام', url: 'https://t.me/blujet' },
+    ]);
+    renderFooter();
+    expect(screen.getByLabelText('تلگرام')).toHaveAttribute('href', 'https://t.me/blujet');
   });
 });

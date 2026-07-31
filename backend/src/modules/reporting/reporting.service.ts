@@ -5,6 +5,7 @@ import { ErrorCode } from '../../common/errors';
 import { materializeDepartedInstances } from '../flights/flight-lifecycle.util';
 import {
   ZERO_IRR,
+  absIrr,
   addIrr,
   divRoundBigInt,
   isPositiveIrr,
@@ -14,9 +15,12 @@ import type { Irr } from '../../common/money';
 import {
   Bucket,
   CompletedFlightsSummary,
+  FinanceDashboardStats,
   KpiResult,
+  KpiTrends,
   SalesChartPeriod,
   SalesGranularity,
+  TransactionStatusTone,
 } from './reporting.types';
 
 const LOW_SALES_WINDOW_HOURS = 72;
@@ -201,20 +205,27 @@ export class ReportingService {
     return { start: buckets[0].start, end: buckets[buckets.length - 1].end };
   }
 
-  async kpis(
-    granularity: SalesGranularity,
-    params: {
-      periodStart?: string;
-      date?: string;
-      flightNo?: string;
-      periodKey?: string;
-    },
-  ): Promise<KpiResult> {
-    const { start, end, flightNo } = this.resolvePeriodRange(
-      granularity,
-      params,
+  private monthUtcRange(offsetMonths: number): { start: Date; end: Date } {
+    const now = new Date();
+    const start = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offsetMonths, 1),
     );
+    const end = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offsetMonths + 1, 1),
+    );
+    return { start, end };
+  }
 
+  private trendPct(current: number, previous: number): number {
+    if (previous === 0) return current > 0 ? 100 : 0;
+    return Math.round(((current - previous) / previous) * 100);
+  }
+
+  private async aggregateKpiWindow(
+    start: Date,
+    end: Date,
+    flightNo?: string,
+  ): Promise<Omit<KpiResult, 'trends' | 'agencyDebtIrr' | 'agencyDebtCount'>> {
     const entries = await this.typeorm.ledgerEntry.findMany({
       where: {
         occurredAt: { gte: start, lt: end },
@@ -248,16 +259,175 @@ export class ReportingService {
       ? Number(divRoundBigInt(profitIrr * 100n, revenueIrr))
       : 0;
 
+    return { revenueIrr, profitIrr, marginPct, operatingCostIrr };
+  }
+
+  private previousPeriodRange(
+    start: Date,
+    end: Date,
+  ): { start: Date; end: Date } {
+    const spanMs = end.getTime() - start.getTime();
+    return {
+      start: new Date(start.getTime() - spanMs),
+      end: new Date(start.getTime()),
+    };
+  }
+
+  async kpis(
+    granularity: SalesGranularity,
+    params: {
+      periodStart?: string;
+      date?: string;
+      flightNo?: string;
+      periodKey?: string;
+    },
+  ): Promise<KpiResult> {
+    const { start, end, flightNo } = this.resolvePeriodRange(
+      granularity,
+      params,
+    );
+
+    const current = await this.aggregateKpiWindow(start, end, flightNo);
+    const prevRange = this.previousPeriodRange(start, end);
+    const previous = await this.aggregateKpiWindow(
+      prevRange.start,
+      prevRange.end,
+      flightNo,
+    );
+
     const { agencyDebtIrr, agencyDebtCount } =
       await this.agencies.getDebtSummary();
 
+    const trends: KpiTrends = {
+      revenuePct: this.trendPct(
+        Number(current.revenueIrr),
+        Number(previous.revenueIrr),
+      ),
+      profitPct: this.trendPct(
+        Number(current.profitIrr),
+        Number(previous.profitIrr),
+      ),
+      operatingCostPct: this.trendPct(
+        Number(current.operatingCostIrr),
+        Number(previous.operatingCostIrr),
+      ),
+      agencyDebtPct: this.trendPct(
+        Number(agencyDebtIrr),
+        Number(agencyDebtIrr),
+      ),
+    };
+
     return {
-      revenueIrr,
-      profitIrr,
-      marginPct,
-      operatingCostIrr,
+      ...current,
       agencyDebtIrr,
       agencyDebtCount,
+      trends,
+    };
+  }
+
+  /** Design-aligned dashboard stat cards for FINANCE_MANAGER — all real DB counts. */
+  async financeDashboardStats(): Promise<FinanceDashboardStats> {
+    const thisMonth = this.monthUtcRange(0);
+    const lastMonth = this.monthUtcRange(-1);
+
+    const bookingStatuses = ['PAID', 'TICKETED'] as const;
+
+    const [
+      activeAgencies,
+      prevActiveAgencies,
+      passengersThisMonth,
+      prevPassengers,
+      ticketsThisMonth,
+      prevTickets,
+      revenueThisMonth,
+      prevRevenue,
+    ] = await Promise.all([
+      this.typeorm.agencyProfile.count({
+        where: { suspendedAt: null, user: { isActive: true } },
+      }),
+      this.typeorm.agencyProfile.count({
+        where: {
+          suspendedAt: null,
+          user: { isActive: true },
+          joinedAt: { lt: thisMonth.start },
+        },
+      }),
+      this.typeorm.passenger.count({
+        where: {
+          deletedAt: null,
+          booking: {
+            status: { in: [...bookingStatuses] },
+            createdAt: { gte: thisMonth.start, lt: thisMonth.end },
+          },
+        },
+      }),
+      this.typeorm.passenger.count({
+        where: {
+          deletedAt: null,
+          booking: {
+            status: { in: [...bookingStatuses] },
+            createdAt: { gte: lastMonth.start, lt: lastMonth.end },
+          },
+        },
+      }),
+      this.typeorm.booking.count({
+        where: {
+          status: { in: [...bookingStatuses] },
+          createdAt: { gte: thisMonth.start, lt: thisMonth.end },
+          deletedAt: null,
+        },
+      }),
+      this.typeorm.booking.count({
+        where: {
+          status: { in: [...bookingStatuses] },
+          createdAt: { gte: lastMonth.start, lt: lastMonth.end },
+          deletedAt: null,
+        },
+      }),
+      this.typeorm.ledgerEntry.aggregate({
+        where: {
+          type: 'SALE',
+          bookingId: { not: null },
+          occurredAt: { gte: thisMonth.start, lt: thisMonth.end },
+        },
+        _sum: { signedAmountIrr: true },
+      }),
+      this.typeorm.ledgerEntry.aggregate({
+        where: {
+          type: 'SALE',
+          bookingId: { not: null },
+          occurredAt: { gte: lastMonth.start, lt: lastMonth.end },
+        },
+        _sum: { signedAmountIrr: true },
+      }),
+    ]);
+
+    const revenueThisMonthIrr = absIrr(
+      revenueThisMonth._sum.signedAmountIrr ?? ZERO_IRR,
+    );
+    const revenuePrevIrr = absIrr(prevRevenue._sum.signedAmountIrr ?? ZERO_IRR);
+
+    return {
+      activeAgencies,
+      activeAgenciesTrendPct: this.trendPct(activeAgencies, prevActiveAgencies),
+      passengersThisMonth,
+      passengersTrendPct: this.trendPct(passengersThisMonth, prevPassengers),
+      ticketsSoldThisMonth: ticketsThisMonth,
+      ticketsTrendPct: this.trendPct(ticketsThisMonth, prevTickets),
+      revenueThisMonthIrr,
+      // Percentage derived from bigint money via divRoundBigInt (never a
+      // float division on the raw amounts) — trendPct itself stays
+      // number-only since it's also reused for plain counts above.
+      revenueTrendPct: isPositiveIrr(revenuePrevIrr)
+        ? Number(
+            divRoundBigInt(
+              subIrr(revenueThisMonthIrr, revenuePrevIrr) * 100n,
+              revenuePrevIrr,
+            ),
+          )
+        : revenueThisMonthIrr > ZERO_IRR
+          ? 100
+          : 0,
     };
   }
 
@@ -383,6 +553,16 @@ export class ReportingService {
       REFUND: 'استرداد بلیط',
     };
 
+    const statusFor = (
+      type: string,
+    ): { statusFa: string; statusTone: TransactionStatusTone } => {
+      if (type === 'REFUND')
+        return { statusFa: 'بازپرداخت', statusTone: 'danger' };
+      if (type === 'COMMISSION')
+        return { statusFa: 'در انتظار', statusTone: 'warning' };
+      return { statusFa: 'موفق', statusTone: 'success' };
+    };
+
     const rows = entries.map((e) => {
       const passenger = e.booking?.passengers[0]?.fullName;
       const route = e.booking
@@ -393,6 +573,7 @@ export class ReportingService {
         (passenger
           ? `${passenger}${e.booking ? ` · ${e.booking.pnr}` : ''}`
           : (route ?? '—'));
+      const { statusFa, statusTone } = statusFor(e.type);
       return {
         id: e.id,
         type: e.type,
@@ -400,6 +581,8 @@ export class ReportingService {
         party,
         occurredAt: e.occurredAt.toISOString(),
         signedAmountIrr: e.signedAmountIrr,
+        statusFa,
+        statusTone,
       };
     });
 
@@ -538,5 +721,38 @@ export class ReportingService {
       ZERO_IRR,
     );
     return { rows, outstandingIrr };
+  }
+
+  /** Commercial Manager dashboard KPI row — per design-reference-v2/پنل مدیر بازرگانی.dc.html */
+  async commercialOverview(): Promise<{
+    activeAgencies: number;
+    passengersThisMonth: number;
+    pendingAgencyRequests: number;
+  }> {
+    const now = new Date();
+    const monthStart = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
+    );
+    const monthEnd = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
+    );
+
+    const [activeAgencies, passengersThisMonth, pendingAgencyRequests] =
+      await Promise.all([
+        this.typeorm.agencyProfile.count({ where: { suspendedAt: null } }),
+        this.typeorm.passenger.count({
+          where: {
+            booking: {
+              status: { in: ['PAID', 'TICKETED'] },
+              createdAt: { gte: monthStart, lt: monthEnd },
+            },
+          },
+        }),
+        this.typeorm.agencyMembershipRequest.count({
+          where: { status: { in: ['PENDING', 'REFERRED'] } },
+        }),
+      ]);
+
+    return { activeAgencies, passengersThisMonth, pendingAgencyRequests };
   }
 }
