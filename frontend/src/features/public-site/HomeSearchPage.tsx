@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchAirports } from '../../api/publicSite';
 import { fetchPublicHomeContent } from '../../api/site-content';
+import { fetchPublicAppLinks } from '../../api/settings';
+import type { AppLinkId } from '../../types/app-links';
 import type { Airport } from '../../types/public-site';
 import type { PublicHomeContent } from '../../types/site-content';
 import PublicPageShell from '../../components/public/PublicPageShell';
@@ -32,6 +34,8 @@ const COUNTRY_NAMES: Record<string, Record<StoredLocale, string>> = {
   MHD: { fa: 'ایران', en: 'Iran', ar: 'إيران' },
   KIH: { fa: 'ایران', en: 'Iran', ar: 'إيران' },
 };
+
+const APP_LINK_ORDER: AppLinkId[] = ['app_store', 'google_play', 'bazaar_myket'];
 
 const DEST_HOURS: Record<string, number> = {
   IST: 3,
@@ -286,6 +290,12 @@ const STR: Record<StoredLocale, {
   },
 };
 
+const APP_LINK_LABELS: Record<AppLinkId, 'appStore' | 'googlePlay' | 'bazaarMyket'> = {
+  app_store: 'appStore',
+  google_play: 'googlePlay',
+  bazaar_myket: 'bazaarMyket',
+};
+
 const ERR: Record<StoredLocale, { airports: string; missing: string; sameCity: string }> = {
   fa: {
     airports: 'خطا در دریافت فهرست فرودگاه‌ها.',
@@ -317,6 +327,7 @@ export default function HomeSearchPage() {
   const [error, setError] = useState<string | null>(null);
   const [annClosed, setAnnClosed] = useState(false);
   const [homeContent, setHomeContent] = useState<PublicHomeContent | null>(null);
+  const [appLinks, setAppLinks] = useState<{ id: AppLinkId; url: string }[]>([]);
 
   useEffect(() => {
     fetchAirports()
@@ -326,6 +337,11 @@ export default function HomeSearchPage() {
       .then(setHomeContent)
       .catch(() => {
         /* keep static fallbacks */
+      });
+    fetchPublicAppLinks()
+      .then((res) => setAppLinks(res.links.map((l) => ({ id: l.id, url: l.url }))))
+      .catch(() => {
+        /* static labels without links */
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locale]);
@@ -861,15 +877,48 @@ export default function HomeSearchPage() {
               {t.appSub}
             </p>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#0d2640', color: '#fff', padding: '9px 16px', borderRadius: 12, fontSize: '12.5px', fontWeight: 600 }}>
-                <span style={{ fontSize: '14.5px' }}>⬇</span>{t.appStore}
-              </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#0d2640', color: '#fff', padding: '9px 16px', borderRadius: 12, fontSize: '12.5px', fontWeight: 600 }}>
-                <span style={{ fontSize: '14.5px' }}>⬇</span>{t.googlePlay}
-              </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#fff', border: '1.5px solid #d5e1f0', color: '#0d2640', padding: '9px 16px', borderRadius: 12, fontSize: '12.5px', fontWeight: 600 }}>
-                {t.bazaarMyket}
-              </span>
+              {APP_LINK_ORDER.map((id) => {
+                const link = appLinks.find((l) => l.id === id);
+                const label = t[APP_LINK_LABELS[id]];
+                const isBazaar = id === 'bazaar_myket';
+                const style: React.CSSProperties = {
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 7,
+                  background: isBazaar ? '#fff' : '#0d2640',
+                  color: isBazaar ? '#0d2640' : '#fff',
+                  padding: '9px 16px',
+                  borderRadius: 12,
+                  fontSize: '12.5px',
+                  fontWeight: 600,
+                  border: isBazaar ? '1.5px solid #d5e1f0' : 'none',
+                  textDecoration: 'none',
+                  fontFamily: 'inherit',
+                  cursor: link ? 'pointer' : 'default',
+                  opacity: link ? 1 : 0.85,
+                };
+                if (link) {
+                  return (
+                    <a
+                      key={id}
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      data-testid={`app-link-${id}`}
+                      style={style}
+                    >
+                      {!isBazaar && <span style={{ fontSize: '14.5px' }}>⬇</span>}
+                      {label}
+                    </a>
+                  );
+                }
+                return (
+                  <span key={id} data-testid={`app-link-${id}`} style={style}>
+                    {!isBazaar && <span style={{ fontSize: '14.5px' }}>⬇</span>}
+                    {label}
+                  </span>
+                );
+              })}
             </div>
           </div>
         </div>

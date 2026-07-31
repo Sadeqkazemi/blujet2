@@ -11,7 +11,19 @@ import {
   parseSocialLinks,
   publicSocialLinks,
 } from '../../common/social-links.util';
+import {
+  DEFAULT_APP_DOWNLOAD_LINKS,
+  parseAppDownloadLinks,
+  publicAppDownloadLinks,
+} from '../../common/app-download-links.util';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
+
+const SITE_ADMIN_PATCH_KEYS = new Set([
+  'socialLinks',
+  'supportEmail',
+  'supportPhone',
+  'appDownloadLinks',
+]);
 
 /** Every storable key with its server-side default. Unknown keys are
  * rejected — the settings table never becomes a free-form dumping ground. */
@@ -37,8 +49,10 @@ export const SETTING_DEFAULTS: Record<string, unknown> = {
   aboutUsText: 'blujet یک پلتفرم آنلاین رزرو بلیط هواپیما است.',
   contactAddress: 'تهران، ایران',
   termsText: 'قوانین و مقررات استفاده از خدمات blujet.',
-  // IT Manager settings tab — footer social links (Phase: social-links).
+  // IT Manager / SITE_ADMIN settings tab — footer social links.
   socialLinks: DEFAULT_SOCIAL_LINKS,
+  // SITE_ADMIN settings tab — app download buttons on the home page.
+  appDownloadLinks: DEFAULT_APP_DOWNLOAD_LINKS,
 };
 
 @Injectable()
@@ -76,12 +90,12 @@ export class SettingsService {
   async update(actor: AuthenticatedUser, patch: Record<string, unknown>) {
     const keys = Object.keys(patch);
     if (actor.role === 'SITE_ADMIN') {
-      const forbidden = keys.filter((k) => k !== 'socialLinks');
+      const forbidden = keys.filter((k) => !SITE_ADMIN_PATCH_KEYS.has(k));
       if (forbidden.length > 0) {
         throw new ForbiddenException({
           code: ErrorCode.FORBIDDEN,
           message:
-            'ادمین سایت فقط می‌تواند لینک شبکه‌های اجتماعی را ویرایش کند.',
+            'ادمین سایت فقط می‌تواند لینک‌های اجتماعی، تماس پشتیبانی و لینک اپلیکیشن را ویرایش کند.',
         });
       }
     }
@@ -103,6 +117,17 @@ export class SettingsService {
           throw new BadRequestException({
             code: ErrorCode.VALIDATION_FAILED,
             message: 'فرمت لینک‌های شبکه‌های اجتماعی نامعتبر است.',
+          });
+        }
+        continue;
+      }
+      if (key === 'appDownloadLinks') {
+        try {
+          patch[key] = parseAppDownloadLinks(patch[key]);
+        } catch {
+          throw new BadRequestException({
+            code: ErrorCode.VALIDATION_FAILED,
+            message: 'فرمت لینک‌های دانلود اپلیکیشن نامعتبر است.',
           });
         }
         continue;
@@ -193,5 +218,21 @@ export class SettingsService {
     const all = await this.getAll();
     const links = parseSocialLinks(all.settings.socialLinks);
     return { links: publicSocialLinks(links) };
+  }
+
+  /** Public home page — configured app store links with non-empty URLs. */
+  async getPublicAppLinks() {
+    const all = await this.getAll();
+    const links = parseAppDownloadLinks(all.settings.appDownloadLinks);
+    return { links: publicAppDownloadLinks(links) };
+  }
+
+  /** Public site chrome — support phone and email shown on contact/home. */
+  async getPublicSupportContact() {
+    const all = await this.getAll();
+    return {
+      phone: String(all.settings.supportPhone ?? SETTING_DEFAULTS.supportPhone),
+      email: String(all.settings.supportEmail ?? SETTING_DEFAULTS.supportEmail),
+    };
   }
 }

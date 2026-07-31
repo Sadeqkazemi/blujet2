@@ -5518,6 +5518,36 @@
         ]
       }
     },
+    "/settings/app-links": {
+      "get": {
+        "operationId": "SettingsPublicController_getAppLinks",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "لینک‌های دانلود اپلیکیشن برای صفحهٔ اصلی",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/settings/support-contact": {
+      "get": {
+        "operationId": "SettingsPublicController_getSupportContact",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تلفن و ایمیل پشتیبانی نمایش‌داده‌شده در سایت",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
     "/reconciliation": {
       "get": {
         "operationId": "ReconciliationController_list",

@@ -1537,6 +1537,14 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   deferred. Tests: 8 backend e2e + 4 MediaAdmin Vitest + updated HomeSearch Vitest.
   See `docs/features/site-admin-media.md`.
 
+- [x] **SITE_ADMIN settings — app links + support contact (Phase F)** —
+  `appDownloadLinks` in `SystemSetting`; SITE_ADMIN can PATCH social +
+  contact + app links; public `GET /settings/app-links` and
+  `/settings/support-contact`; `SettingsPage` contact/app sections;
+  `HomeSearchPage` app band wired to store URLs. Tests: extended
+  `phase12.e2e-spec.ts` + SettingsPage + HomeSearchPage Vitest.
+  See `docs/features/site-admin-settings-links.md`.
+
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is
 "done" only when every checklist item in its `docs/features/<name>.md` has

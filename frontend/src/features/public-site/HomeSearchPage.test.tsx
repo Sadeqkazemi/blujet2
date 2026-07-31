@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import HomeSearchPage from './HomeSearchPage';
 import * as publicSiteApi from '../../api/publicSite';
 import * as siteContentApi from '../../api/site-content';
+import * as settingsApi from '../../api/settings';
 import * as useAuthModule from '../../hooks/useAuth';
 import * as useLocaleModule from '../../hooks/useLocale';
 
@@ -89,6 +90,9 @@ describe('HomeSearchPage', () => {
   it('renders RTL search form with airports loaded', async () => {
     vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
     vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockResolvedValue(CMS_HOME);
+    vi.spyOn(settingsApi, 'fetchPublicAppLinks').mockResolvedValue({
+      links: [{ id: 'app_store', name: 'App Store', url: 'https://apps.apple.com/blujet' }],
+    });
     renderPage();
 
     expect(await screen.findAllByText('تهران (THR)')).toHaveLength(2);
@@ -98,6 +102,9 @@ describe('HomeSearchPage', () => {
   it('shows a validation error when submitted without selections', async () => {
     vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
     vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockResolvedValue(CMS_HOME);
+    vi.spyOn(settingsApi, 'fetchPublicAppLinks').mockResolvedValue({
+      links: [{ id: 'app_store', name: 'App Store', url: 'https://apps.apple.com/blujet' }],
+    });
     renderPage();
     await screen.findAllByText('تهران (THR)');
 
@@ -108,6 +115,9 @@ describe('HomeSearchPage', () => {
   it('renders CMS-driven marketing sections when home content loads', async () => {
     vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
     vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockResolvedValue(CMS_HOME);
+    vi.spyOn(settingsApi, 'fetchPublicAppLinks').mockResolvedValue({
+      links: [{ id: 'app_store', name: 'App Store', url: 'https://apps.apple.com/blujet' }],
+    });
     renderPage();
     await screen.findAllByText('تهران (THR)');
 
@@ -118,11 +128,15 @@ describe('HomeSearchPage', () => {
     expect(screen.getByTestId('popular-route-MHD')).toBeInTheDocument();
     expect(screen.getByText('پیشنهادهای ویژه')).toBeInTheDocument();
     expect(screen.getByText('با رسیدن به حد امتیاز، کارت عضویت بگیر')).toBeInTheDocument();
+    const appStore = screen.getByTestId('app-link-app_store');
+    expect(appStore.tagName).toBe('A');
+    expect(appStore).toHaveAttribute('href', 'https://apps.apple.com/blujet');
   });
 
   it('falls back to static marketing when CMS fetch fails', async () => {
     vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
     vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockRejectedValue(new Error('offline'));
+    vi.spyOn(settingsApi, 'fetchPublicAppLinks').mockResolvedValue({ links: [] });
     renderPage();
     await screen.findAllByText('تهران (THR)');
 
@@ -139,6 +153,9 @@ describe('HomeSearchPage', () => {
   it('rejects identical origin and destination', async () => {
     vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
     vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockResolvedValue(CMS_HOME);
+    vi.spyOn(settingsApi, 'fetchPublicAppLinks').mockResolvedValue({
+      links: [{ id: 'app_store', name: 'App Store', url: 'https://apps.apple.com/blujet' }],
+    });
     renderPage();
     await screen.findAllByText('تهران (THR)');
 
