@@ -1151,6 +1151,26 @@ rows — no schema change.
 - Frontend: `AccountSecuritySessions` on `AccountPage.tsx` `security` tab
   (device list, «دستگاه فعلی» badge, «پایان نشست» for others).
 
+### پنل کاربر — حساب‌های بانکی (`/account` → تب `banks`)
+Closes the «حساب‌های بانکی» section in
+`design-reference-v2/پنل کاربر.dc.html`: saved card + sheba for refund
+payouts.
+
+- `GET /my/bank-accounts` (new, `USER` role) — default first, then newest;
+  each row `{ id, bankName, bankShort, brandColor, cardMasked, sheba,
+  shebaMasked, isDefault, createdAt, updatedAt }`. PAN/sheba decrypted for
+  owner only; list UI uses masked fields.
+- `POST /my/bank-accounts` (new, `USER` role, `@Throttle` 20/min) — body
+  `{ cardNo, sheba, bankName? }`; 16-digit card + ISO13616 sheba checksum;
+  Persian digits normalized. Bank name/BIN guessed from card when omitted.
+  Max 5 rows per user; first row becomes default. `409` on duplicate sheba.
+- `PATCH /my/bank-accounts/:id` (new, `USER` role) — `{ isDefault?: true }`
+  clears other defaults for this user; owner-only `404`.
+- `DELETE /my/bank-accounts/:id` (new, `USER` role) — owner-only; if the
+  deleted row was default, the newest remaining row is promoted.
+- Frontend: `AccountBankAccountsTab` on `AccountPage.tsx` `banks` tab (card
+  list with brand chip + «پیش‌فرض» badge, inline add form).
+
 ## Phase 21 — فراموشی رمز (customer forgot/set password)
 
 Third "dead forms" item. `ForgotPasswordPage.tsx` was entirely client-side
