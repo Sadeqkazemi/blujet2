@@ -36,6 +36,7 @@ import type { MySupportTicketRow, SupportTicketStatus } from '../../types/suppor
 import AccountClubTab from './AccountClubTab';
 import AccountSavedFlightsTab from './AccountSavedFlightsTab';
 import AccountPassengersTab, { type SavedPassengerForm } from './AccountPassengersTab';
+import AccountProfileSavedPax from './AccountProfileSavedPax';
 
 // پنل کاربر — real data from the existing bookings/wallet/club-points/refunds
 // endpoints (none of this is mock). Matches design-reference/پنل کاربر.dc.html's
@@ -500,6 +501,7 @@ export default function AccountPage() {
   const [passengerFormBusy, setPassengerFormBusy] = useState(false);
   const [passengerFormError, setPassengerFormError] = useState<string | null>(null);
   const [passengerFormKey, setPassengerFormKey] = useState(0);
+  const [passengersAddPending, setPassengersAddPending] = useState(false);
   const [lockActionBusy, setLockActionBusy] = useState<string | null>(null);
   const [lockError, setLockError] = useState<string | null>(null);
 
@@ -925,6 +927,16 @@ export default function AccountPage() {
               </button>
             </form>
 
+            {savedPassengers && (
+              <AccountProfileSavedPax
+                passengers={savedPassengers}
+                onAdd={() => {
+                  setPassengersAddPending(true);
+                  setTab('passengers');
+                }}
+              />
+            )}
+
             <div style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 16, padding: '18px 20px' }}>
               <h3 style={{ fontSize: 14, fontWeight: 800, margin: '0 0 12px' }}>{t.emailHeading}</h3>
               <p style={{ fontSize: 12, color: '#5a6678', marginBottom: 12 }}>
@@ -1179,6 +1191,8 @@ export default function AccountPage() {
             busyId={passengerBusyId}
             formBusy={passengerFormBusy}
             formError={passengerFormError}
+            openAddOnMount={passengersAddPending}
+            onAddModalOpened={() => setPassengersAddPending(false)}
             onRemove={onRemovePassenger}
             onSave={onSavePassenger}
           />
