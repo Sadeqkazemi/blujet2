@@ -94,7 +94,7 @@ export interface SavedFlight {
   destCityFa: string;
   departureAt: string;
   arrivalAt: string;
-  priceIrr: number;
+  priceIrr: string;
   bookable: boolean;
   createdAt: string;
 }

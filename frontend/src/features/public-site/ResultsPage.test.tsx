@@ -185,7 +185,7 @@ describe('ResultsPage', () => {
         destCityFa: 'مشهد',
         departureAt: RESULT.departureAt,
         arrivalAt: RESULT.arrivalAt,
-        priceIrr: 380_000_000,
+        priceIrr: '380000000',
         bookable: true,
         createdAt: '2026-07-01T00:00:00.000Z',
       });
