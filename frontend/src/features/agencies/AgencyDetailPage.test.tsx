@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import AgencyDetailPage from './AgencyDetailPage';
 import * as agenciesApi from '../../api/agencies';
 import * as useAuthModule from '../../hooks/useAuth';
-import type { AgencyDetail } from '../../types/agencies';
+import type { AgencyDetail, AgencyDocument } from '../../types/agencies';
 import type { Role } from '../../types/auth';
 
 const DETAIL: AgencyDetail = {
@@ -52,12 +52,18 @@ function renderPage() {
   );
 }
 
+function stubStaffReviewFetches(documents: AgencyDocument[] = []) {
+  vi.spyOn(agenciesApi, 'fetchAgencyDocuments').mockResolvedValue(documents);
+  vi.spyOn(agenciesApi, 'fetchAgencyCreditRequests').mockResolvedValue([]);
+  vi.spyOn(agenciesApi, 'fetchAgencyWebserviceRequests').mockResolvedValue([]);
+}
+
 describe('AgencyDetailPage', () => {
   it("Senior Manager sees credit + API-key sections and no invoices/messages tabs or activity score", async () => {
     mockRole('SENIOR_MANAGER');
     vi.spyOn(agenciesApi, 'fetchAgencyDetail').mockResolvedValue(DETAIL);
     vi.spyOn(agenciesApi, 'fetchAgencyApiKeys').mockResolvedValue([]);
-    vi.spyOn(agenciesApi, 'fetchAgencyDocuments').mockResolvedValue([]);
+    stubStaffReviewFetches();
 
     renderPage();
 
@@ -74,7 +80,7 @@ describe('AgencyDetailPage', () => {
   it('Finance Manager sees credit + settle and no API-key/invoice-issue/messages', async () => {
     mockRole('FINANCE_MANAGER');
     vi.spyOn(agenciesApi, 'fetchAgencyDetail').mockResolvedValue(DETAIL_WITH_SCORE);
-    vi.spyOn(agenciesApi, 'fetchAgencyDocuments').mockResolvedValue([]);
+    stubStaffReviewFetches();
 
     renderPage();
 
@@ -90,7 +96,7 @@ describe('AgencyDetailPage', () => {
   it('Commercial Manager sees the نمای کلی/مالی/مکاتبه‌ها sub-tabs with invoice issuance and chat', async () => {
     mockRole('COMMERCIAL_MANAGER');
     vi.spyOn(agenciesApi, 'fetchAgencyDetail').mockResolvedValue(DETAIL_WITH_SCORE);
-    vi.spyOn(agenciesApi, 'fetchAgencyDocuments').mockResolvedValue([]);
+    stubStaffReviewFetches();
     vi.spyOn(agenciesApi, 'fetchAgencyInvoices').mockResolvedValue([
       {
         id: 'inv1',
@@ -186,7 +192,7 @@ describe('AgencyDetailPage', () => {
     mockRole('SENIOR_MANAGER');
     vi.spyOn(agenciesApi, 'fetchAgencyDetail').mockResolvedValue(DETAIL);
     vi.spyOn(agenciesApi, 'fetchAgencyApiKeys').mockResolvedValue([]);
-    vi.spyOn(agenciesApi, 'fetchAgencyDocuments').mockResolvedValue([]);
+    stubStaffReviewFetches();
     const suspend = vi.spyOn(agenciesApi, 'suspendAgency').mockResolvedValue(DETAIL);
 
     const { default: userEvent } = await import('@testing-library/user-event');
@@ -206,7 +212,7 @@ describe('AgencyDetailPage', () => {
   it('the credit modal parses a toman amount (Persian digits allowed) into rial', async () => {
     mockRole('FINANCE_MANAGER');
     vi.spyOn(agenciesApi, 'fetchAgencyDetail').mockResolvedValue(DETAIL);
-    vi.spyOn(agenciesApi, 'fetchAgencyDocuments').mockResolvedValue([]);
+    stubStaffReviewFetches();
     const update = vi
       .spyOn(agenciesApi, 'updateAgencyCredit')
       .mockResolvedValue({ limitIrr: 2_000_000_000, usedIrr: 310_000_000, remainingIrr: 1_690_000_000 });
@@ -226,7 +232,7 @@ describe('AgencyDetailPage', () => {
   it('Finance Manager can review an uploaded document and approve it', async () => {
     mockRole('FINANCE_MANAGER');
     vi.spyOn(agenciesApi, 'fetchAgencyDetail').mockResolvedValue(DETAIL);
-    vi.spyOn(agenciesApi, 'fetchAgencyDocuments').mockResolvedValue([
+    stubStaffReviewFetches([
       {
         id: 'doc1',
         agencyId: 'a1',
@@ -256,6 +262,39 @@ describe('AgencyDetailPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'تأیید' }));
     await waitFor(() => expect(decide).toHaveBeenCalledWith('a1', 'doc1', true));
     expect(await screen.findByText('مدرک تأیید شد ✓')).toBeInTheDocument();
+  });
+
+  it('FINANCE_MANAGER can approve a pending credit increase request', async () => {
+    mockRole('FINANCE_MANAGER');
+    vi.spyOn(agenciesApi, 'fetchAgencyDetail').mockResolvedValue(DETAIL);
+    vi.spyOn(agenciesApi, 'fetchAgencyInvoices').mockResolvedValue([]);
+    stubStaffReviewFetches();
+    vi.spyOn(agenciesApi, 'fetchAgencyWebserviceRequests').mockResolvedValue([]);
+    vi.spyOn(agenciesApi, 'fetchAgencyCreditRequests').mockResolvedValue([
+      {
+        id: 'cr1',
+        requestedLimitIrr: 2_000_000_000,
+        note: 'افزایش برای فصل پیک',
+        status: 'PENDING',
+        decidedAt: null,
+        createdAt: '2026-07-01T10:00:00.000Z',
+      },
+    ]);
+    const decide = vi.spyOn(agenciesApi, 'decideAgencyCreditRequest').mockResolvedValue({
+      id: 'cr1',
+      requestedLimitIrr: 2_000_000_000,
+      note: 'افزایش برای فصل پیک',
+      status: 'APPROVED',
+      decidedAt: '2026-07-02T10:00:00.000Z',
+      createdAt: '2026-07-01T10:00:00.000Z',
+    });
+
+    const { default: userEvent } = await import('@testing-library/user-event');
+    renderPage();
+
+    expect(await screen.findByText('درخواست‌های افزایش اعتبار')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'تأیید' }));
+    await waitFor(() => expect(decide).toHaveBeenCalledWith('a1', 'cr1', true));
   });
 
   it('EMPLOYEE never sees the documents card (not fetched for that role)', async () => {

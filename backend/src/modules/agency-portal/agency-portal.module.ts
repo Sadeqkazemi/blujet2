@@ -5,9 +5,10 @@ import { AuditModule } from '../audit/audit.module';
 import { CartableModule } from '../cartable/cartable.module';
 import { AgenciesModule } from '../agencies/agencies.module';
 import { FilesModule } from '../files/files.module';
+import { WebservicePricingModule } from '../webservice-pricing/webservice-pricing.module';
 
 @Module({
-  imports: [AuditModule, CartableModule, AgenciesModule, FilesModule],
+  imports: [AuditModule, CartableModule, AgenciesModule, FilesModule, WebservicePricingModule],
   controllers: [AgencyPortalController],
   providers: [AgencyPortalService],
 })

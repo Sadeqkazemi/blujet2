@@ -95,6 +95,7 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'finance', labelFa: 'مالی', implemented: true },
     { key: 'cartable', labelFa: 'کارتابل', implemented: true },
     { key: 'clubrules', labelFa: 'قوانین باشگاه مشتریان', implemented: true },
+    { key: 'webservice', labelFa: 'وب سرویس', implemented: true },
   ],
   IT_MANAGER: [
     // Phase 8: real service-health/os-metrics dashboard, not the shared
