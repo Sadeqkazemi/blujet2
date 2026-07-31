@@ -4,6 +4,7 @@ import { App } from 'supertest/types';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { loginAs, loginAsCustomer } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
+import { resetCustomerPhones } from './helpers/customer-state.helper';
 
 describe('Saved passengers (e2e)', () => {
   let app: INestApplication<App>;
@@ -12,6 +13,11 @@ describe('Saved passengers (e2e)', () => {
   beforeEach(async () => {
     app = await createTestApp();
     prisma = app.get(PrismaService);
+    await resetCustomerPhones(prisma, [
+      '09180000001',
+      '09180000002',
+      '09180000004',
+    ]);
   });
 
   afterEach(async () => {
