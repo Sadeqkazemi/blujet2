@@ -18,7 +18,8 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
   // Confirmed from پنل ادمین سایت.dc.html's roleDefs.siteAdmin.access.
   // `media` is in that same design list but still has no backend — left
   // out rather than shipped as a dead tab; see Phase 18 notes in
-  // docs/DB_SCHEMA.md. `blog` added in Phase D (real CMS backend).
+  // `blog` added in Phase D (real CMS backend).
+  // `media` added in Phase E (site content CMS backend).
   SITE_ADMIN: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
     { key: 'agencies', labelFa: 'مدیریت آژانس‌ها', implemented: true },
@@ -29,6 +30,7 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'refund', labelFa: 'استرداد بلیط', implemented: true },
     { key: 'tickets', labelFa: 'تیکت‌های پشتیبانی', implemented: true },
     { key: 'blog', labelFa: 'مدیریت بلاگ', implemented: true },
+    { key: 'media', labelFa: 'مدیریت سایت', implemented: true },
     { key: 'jobapps', labelFa: 'فرصت‌های شغلی', implemented: true },
     // Staff side of the customer KYC flow (/my/identity, Phase 17) — the
     // APPROVED/REJECTED transitions have to be reachable somewhere; no

@@ -72,6 +72,7 @@ import BlogPage from './features/public-site/BlogPage';
 import BlogPostPage from './features/public-site/BlogPostPage';
 import CareersAdminPage from './features/careers/CareersAdminPage';
 import BlogAdminPage from './features/blog/BlogAdminPage';
+import MediaAdminPage from './features/site-content/MediaAdminPage';
 import IdentityAdminPage from './features/identity-admin/IdentityAdminPage';
 
 export default function App() {
@@ -185,6 +186,9 @@ export default function App() {
               </Route>
               <Route path="blog" element={<TabGate tabKey="blog" />}>
                 <Route index element={<BlogAdminPage />} />
+              </Route>
+              <Route path="media" element={<TabGate tabKey="media" />}>
+                <Route index element={<MediaAdminPage />} />
               </Route>
               <Route path="kyc" element={<TabGate tabKey="kyc" />}>
                 <Route index element={<IdentityAdminPage />} />

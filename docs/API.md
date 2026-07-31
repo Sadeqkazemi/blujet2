@@ -2958,7 +2958,34 @@ Audit log category `CONTENT` on create/update/delete.
 ### Explicit deferrals
 
 - Comments (`commentCount` KPI is a placeholder)
-- Full `media` CMS tab
 
 Public pages: `/blog` + `/blog/:slug` — see `docs/features/public-blog.md`.
 See `docs/features/site-admin-blog.md` for the admin acceptance checklist.
+
+## Phase E — SITE_ADMIN media CMS
+
+**Scope:** image library, hero/announcement/promo banners, popular destinations,
+popular routes. Deferred: social links (settings tab), app download links,
+support contact, job postings block, static site pages list.
+
+### Admin (`SITE_ADMIN`, `media` tab)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/site-content/admin/library` | SITE_ADMIN | Image library rows (linked `StoredFile`). |
+| POST | `/site-content/admin/library` | SITE_ADMIN | Add — `{ storedFileId, label? }` from `POST /files`. |
+| DELETE | `/site-content/admin/library/:id` | SITE_ADMIN | Soft-delete library asset. |
+| GET | `/site-content/admin/blocks` | SITE_ADMIN | Hero, announcement, promo blocks (auto-seeded defaults). |
+| PATCH | `/site-content/admin/blocks/:key` | SITE_ADMIN | Update block — `HERO_BANNER` \| `ANNOUNCEMENT_BAR` \| `PROMO_BANNER`. |
+| GET/POST/PATCH/DELETE | `/site-content/admin/destinations` | SITE_ADMIN | Popular destination cards CRUD. |
+| GET/POST/PATCH/DELETE | `/site-content/admin/routes` | SITE_ADMIN | Popular route chips CRUD. |
+
+### Public
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/site-content/home` | public | Blocks + destinations + routes for home page wiring. |
+| GET | `/site-content/media/:fileId` | public | Serves bytes when file is in library, a block, destination, or published blog cover. |
+
+Home page reads `GET /site-content/home` for announcement/hero/promo/routes/destinations.
+See `docs/features/site-admin-media.md` for the acceptance checklist.

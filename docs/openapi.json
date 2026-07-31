@@ -7158,6 +7158,344 @@
           "blog"
         ]
       }
+    },
+    "/site-content/admin/library": {
+      "get": {
+        "operationId": "SiteContentAdminController_library",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "کتابخانهٔ تصاویر سایت",
+        "tags": [
+          "site-content"
+        ]
+      },
+      "post": {
+        "operationId": "SiteContentAdminController_addLibrary",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddLibraryAssetDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "افزودن تصویر به کتابخانه",
+        "tags": [
+          "site-content"
+        ]
+      }
+    },
+    "/site-content/admin/library/{id}": {
+      "delete": {
+        "operationId": "SiteContentAdminController_removeLibrary",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "حذف نرم تصویر از کتابخانه",
+        "tags": [
+          "site-content"
+        ]
+      }
+    },
+    "/site-content/admin/blocks": {
+      "get": {
+        "operationId": "SiteContentAdminController_blocks",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "بلوک‌های بنر صفحهٔ اصلی",
+        "tags": [
+          "site-content"
+        ]
+      }
+    },
+    "/site-content/admin/blocks/{key}": {
+      "patch": {
+        "operationId": "SiteContentAdminController_updateBlock",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateContentBlockDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "ویرایش یک بلوک بنر",
+        "tags": [
+          "site-content"
+        ]
+      }
+    },
+    "/site-content/admin/destinations": {
+      "get": {
+        "operationId": "SiteContentAdminController_destinations",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "مقاصد محبوب",
+        "tags": [
+          "site-content"
+        ]
+      },
+      "post": {
+        "operationId": "SiteContentAdminController_createDestination",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDestinationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "افزودن مقصد محبوب",
+        "tags": [
+          "site-content"
+        ]
+      }
+    },
+    "/site-content/admin/destinations/{id}": {
+      "patch": {
+        "operationId": "SiteContentAdminController_updateDestination",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDestinationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "ویرایش مقصد محبوب",
+        "tags": [
+          "site-content"
+        ]
+      },
+      "delete": {
+        "operationId": "SiteContentAdminController_deleteDestination",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "حذف مقصد محبوب",
+        "tags": [
+          "site-content"
+        ]
+      }
+    },
+    "/site-content/admin/routes": {
+      "get": {
+        "operationId": "SiteContentAdminController_routes",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "مسیرهای پرتردد",
+        "tags": [
+          "site-content"
+        ]
+      },
+      "post": {
+        "operationId": "SiteContentAdminController_createRoute",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRouteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "افزودن مسیر پرتردد",
+        "tags": [
+          "site-content"
+        ]
+      }
+    },
+    "/site-content/admin/routes/{id}": {
+      "patch": {
+        "operationId": "SiteContentAdminController_updateRoute",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRouteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "ویرایش مسیر پرتردد",
+        "tags": [
+          "site-content"
+        ]
+      },
+      "delete": {
+        "operationId": "SiteContentAdminController_deleteRoute",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "حذف مسیر پرتردد",
+        "tags": [
+          "site-content"
+        ]
+      }
+    },
+    "/site-content/home": {
+      "get": {
+        "operationId": "SiteContentPublicController_home",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "محتوای CMS صفحهٔ اصلی",
+        "tags": [
+          "site-content"
+        ]
+      }
+    },
+    "/site-content/media/{fileId}": {
+      "get": {
+        "operationId": "SiteContentPublicController_media",
+        "parameters": [
+          {
+            "name": "fileId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "دریافت تصویر محتوای سایت",
+        "tags": [
+          "site-content"
+        ]
+      }
     }
   },
   "info": {
@@ -9579,6 +9917,128 @@
           },
           "slug": {
             "type": "string"
+          }
+        }
+      },
+      "AddLibraryAssetDto": {
+        "type": "object",
+        "properties": {
+          "storedFileId": {
+            "type": "string",
+            "description": "StoredFile id from POST /files"
+          },
+          "label": {
+            "type": "string",
+            "example": "hero-istanbul.jpg"
+          }
+        },
+        "required": [
+          "storedFileId"
+        ]
+      },
+      "UpdateContentBlockDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "title": {
+            "type": "string"
+          },
+          "subtitle": {
+            "type": "string"
+          },
+          "buttonText": {
+            "type": "string"
+          },
+          "badgeText": {
+            "type": "string"
+          },
+          "imageFileId": {
+            "type": "object",
+            "nullable": true
+          }
+        }
+      },
+      "CreateDestinationDto": {
+        "type": "object",
+        "properties": {
+          "airportCode": {
+            "type": "string",
+            "example": "IST"
+          },
+          "priceIrr": {
+            "type": "number",
+            "description": "Price in IRR (integer)"
+          },
+          "imageFileId": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "airportCode",
+          "priceIrr"
+        ]
+      },
+      "UpdateDestinationDto": {
+        "type": "object",
+        "properties": {
+          "airportCode": {
+            "type": "string"
+          },
+          "priceIrr": {
+            "type": "number"
+          },
+          "imageFileId": {
+            "type": "object",
+            "nullable": true
+          },
+          "sortOrder": {
+            "type": "number"
+          }
+        }
+      },
+      "CreateRouteDto": {
+        "type": "object",
+        "properties": {
+          "fromAirportCode": {
+            "type": "string",
+            "example": "THR"
+          },
+          "toAirportCode": {
+            "type": "string",
+            "example": "MHD"
+          },
+          "priceIrr": {
+            "type": "number"
+          },
+          "sortOrder": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "fromAirportCode",
+          "toAirportCode",
+          "priceIrr"
+        ]
+      },
+      "UpdateRouteDto": {
+        "type": "object",
+        "properties": {
+          "fromAirportCode": {
+            "type": "string"
+          },
+          "toAirportCode": {
+            "type": "string"
+          },
+          "priceIrr": {
+            "type": "number"
+          },
+          "sortOrder": {
+            "type": "number"
           }
         }
       }

@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchAirports } from '../../api/publicSite';
+import { fetchPublicHomeContent } from '../../api/site-content';
 import type { Airport } from '../../types/public-site';
+import type { PublicHomeContent } from '../../types/site-content';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import JalaliDatePicker from '../../components/JalaliDatePicker';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { formatLocalePercent, formatToman } from '../../lib/fa-format';
+import { destinationGradient } from './site-content-shared';
 
 const TODAY_ISO = new Date().toISOString().slice(0, 10);
 
@@ -30,7 +33,16 @@ const COUNTRY_NAMES: Record<string, Record<StoredLocale, string>> = {
   KIH: { fa: 'ایران', en: 'Iran', ar: 'إيران' },
 };
 
-const POPULAR_ROUTES: { fromCode: string; toCode: string; tomanPrice: number }[] = [
+const DEST_HOURS: Record<string, number> = {
+  IST: 3,
+  DXB: 2,
+  MHD: 1.5,
+  KIH: 1.5,
+  SYZ: 1.5,
+  THR: 1,
+};
+
+const POPULAR_ROUTES_FALLBACK: { fromCode: string; toCode: string; tomanPrice: number }[] = [
   { fromCode: 'THR', toCode: 'MHD', tomanPrice: 1_600_000 },
   { fromCode: 'THR', toCode: 'IST', tomanPrice: 4_200_000 },
   { fromCode: 'THR', toCode: 'DXB', tomanPrice: 3_800_000 },
@@ -45,7 +57,7 @@ const OFFERS: { fromCode: string; toCode: string; was: number; now: number; offP
   { fromCode: 'THR', toCode: 'MHD', was: 2_100_000, now: 1_600_000, offPct: 24, deadlineDays: 1, grad: 'linear-gradient(160deg,#cdd9ec,#eaeff7)' },
 ];
 
-const POPULAR_DESTS: { code: string; hours: number; tomanPrice: number; grad: string }[] = [
+const POPULAR_DESTS_FALLBACK: { code: string; hours: number; tomanPrice: number; grad: string }[] = [
   { code: 'IST', hours: 3, tomanPrice: 4_200_000, grad: 'linear-gradient(160deg,#bcd6f2,#e3eefb)' },
   { code: 'DXB', hours: 2, tomanPrice: 3_800_000, grad: 'linear-gradient(160deg,#c8d9ec,#e8eef6)' },
   { code: 'MHD', hours: 1.5, tomanPrice: 1_600_000, grad: 'linear-gradient(160deg,#bfe0d8,#e6f2ee)' },
@@ -304,13 +316,57 @@ export default function HomeSearchPage() {
   const [dateIso, setDateIso] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [annClosed, setAnnClosed] = useState(false);
+  const [homeContent, setHomeContent] = useState<PublicHomeContent | null>(null);
 
   useEffect(() => {
     fetchAirports()
       .then(setAirports)
       .catch(() => setError(e.airports));
+    fetchPublicHomeContent()
+      .then(setHomeContent)
+      .catch(() => {
+        /* keep static fallbacks */
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locale]);
+
+  const blockMap = useMemo(
+    () => new Map((homeContent?.blocks ?? []).map((b) => [b.key, b])),
+    [homeContent],
+  );
+  const annBlock = blockMap.get('ANNOUNCEMENT_BAR');
+  const heroBlock = blockMap.get('HERO_BANNER');
+  const promoBlock = blockMap.get('PROMO_BANNER');
+
+  const popularRoutes = useMemo(() => {
+    if (homeContent?.routes?.length) {
+      return homeContent.routes.map((r) => ({
+        fromCode: r.fromAirportCode,
+        toCode: r.toAirportCode,
+        tomanPrice: Math.round(Number(r.priceIrr) / 10),
+      }));
+    }
+    return POPULAR_ROUTES_FALLBACK;
+  }, [homeContent]);
+
+  const popularDests = useMemo(() => {
+    if (homeContent?.destinations?.length) {
+      return homeContent.destinations.map((d, i) => ({
+        code: d.airportCode,
+        hours: DEST_HOURS[d.airportCode] ?? 2,
+        tomanPrice: Math.round(Number(d.priceIrr) / 10),
+        grad: destinationGradient(i),
+        imageUrl: d.imageUrl,
+      }));
+    }
+    return POPULAR_DESTS_FALLBACK;
+  }, [homeContent]);
+
+  const cityName = useMemo(
+    () => (code: string, cityFa?: string) =>
+      CITY_NAMES[code]?.[locale] ?? cityFa ?? code,
+    [locale],
+  );
 
   const cityLabel = useMemo(
     () => (code: string) => {
@@ -343,16 +399,16 @@ export default function HomeSearchPage() {
 
   return (
     <PublicPageShell>
-      {!annClosed && (
+      {!annClosed && (annBlock?.enabled !== false) && (
         <div style={{ background: 'linear-gradient(90deg,#0a1f36,#0d2640 40%,#123457)', color: '#fff', position: 'relative', zIndex: 40 }}>
           <div style={{ maxWidth: 1320, margin: '0 auto', padding: isMobile ? '8px 44px 8px 14px' : '11px 26px', display: 'flex', alignItems: 'center', justifyContent: isMobile ? 'flex-start' : 'center', gap: 14, flexWrap: isMobile ? 'nowrap' : 'wrap' }}>
-            <span style={{ fontSize: isMobile ? '11.5px' : '13.5px', fontWeight: 800, textAlign: isMobile ? 'right' : 'center' }}>{t.announcement}</span>
+            <span style={{ fontSize: isMobile ? '11.5px' : '13.5px', fontWeight: 800, textAlign: isMobile ? 'right' : 'center' }}>{annBlock?.title || t.announcement}</span>
             <button
               type="button"
               onClick={() => navigate('/flight-status')}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#f2c94c', color: '#0d2640', padding: '6px 16px', borderRadius: 20, fontSize: 12, fontWeight: 800, border: 'none', cursor: 'pointer', flex: 'none', fontFamily: 'inherit' }}
             >
-              {t.annView} <span style={{ fontSize: 12 }}>{locale === 'en' ? '→' : '←'}</span>
+              {annBlock?.buttonText || t.annView} <span style={{ fontSize: 12 }}>{locale === 'en' ? '→' : '←'}</span>
             </button>
             <button
               type="button"
@@ -404,13 +460,13 @@ export default function HomeSearchPage() {
                     marginBottom: 20,
                   }}
                 >
-                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#1f8a5b' }} /> {t.heroBadge}
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#1f8a5b' }} /> {heroBlock?.badgeText || t.heroBadge}
                 </div>
                 <h1 style={{ fontSize: isMobile ? '26px' : '41.5px', lineHeight: 1.18, fontWeight: 900, margin: '0 0 16px', letterSpacing: '-1px', color: '#fff' }}>
-                  {t.heroTitle}
+                  {heroBlock?.title || t.heroTitle}
                 </h1>
                 <p style={{ fontSize: isMobile ? '13.5px' : 16, lineHeight: 1.75, color: '#eaf1fb', margin: '0 0 24px', maxWidth: 500 }}>
-                  {t.heroSub}
+                  {heroBlock?.subtitle || t.heroSub}
                 </p>
               </div>
             </div>
@@ -557,7 +613,7 @@ export default function HomeSearchPage() {
                   <span style={{ fontSize: '11.5px', color: '#5a6678' }}>{t.popularRoutesSub}</span>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: gridColsRoutes, gap: 10 }}>
-                  {POPULAR_ROUTES.map((r) => (
+                  {popularRoutes.map((r) => (
                     <button
                       type="button"
                       key={`${r.fromCode}-${r.toCode}`}
@@ -575,7 +631,7 @@ export default function HomeSearchPage() {
                       }}
                     >
                       <span style={{ display: 'block', fontSize: 13, fontWeight: 800, color: '#16202e', marginBottom: 3 }}>
-                        {CITY_NAMES[r.fromCode]?.[locale]} <span style={{ color: '#b9c2cf', fontWeight: 600 }}>{locale === 'en' ? '→' : '←'}</span> {CITY_NAMES[r.toCode]?.[locale]}
+                        {cityName(r.fromCode)} <span style={{ color: '#b9c2cf', fontWeight: 600 }}>{locale === 'en' ? '→' : '←'}</span> {cityName(r.toCode)}
                       </span>
                       <span style={{ fontSize: '11.5px', color: '#1668c4', fontWeight: 800 }}>
                         {formatToman(r.tomanPrice, locale)} <span style={{ fontSize: 9, fontWeight: 400, color: '#8a96a6' }}>{t.toman}</span>
@@ -671,18 +727,18 @@ export default function HomeSearchPage() {
         </div>
       </section>
 
-      {/* MID BANNER */}
+      {(promoBlock?.enabled !== false) && (
       <section style={{ maxWidth: 1180, margin: '44px auto 0', padding: '0 26px' }}>
         <div style={{ position: 'relative', borderRadius: 24, overflow: 'hidden', minHeight: isMobile ? 175 : 208, boxShadow: '0 18px 44px -28px rgba(13,38,102,.4)', background: 'linear-gradient(100deg,#0d2666 0%,#1668c4 60%,#3f8ede 100%)' }}>
           <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'flex-start' : 'center', justifyContent: 'space-between', gap: 26, padding: isMobile ? '22px 20px' : '34px 46px', flexWrap: 'wrap' }}>
             <div style={{ maxWidth: 560 }}>
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#ffffff22', color: '#fff', padding: '5px 11px', borderRadius: 20, fontSize: '11.5px', fontWeight: 600, marginBottom: 14 }}>
                 <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#7ee0b0' }} />
-                {t.saleBadge}
+                {promoBlock?.badgeText || t.saleBadge}
               </div>
-              <h2 style={{ fontSize: isMobile ? 19 : 25, fontWeight: 800, color: '#fff', margin: '0 0 10px', letterSpacing: '-.5px' }}>{t.saleTitle}</h2>
+              <h2 style={{ fontSize: isMobile ? 19 : 25, fontWeight: 800, color: '#fff', margin: '0 0 10px', letterSpacing: '-.5px' }}>{promoBlock?.title || t.saleTitle}</h2>
               <p style={{ fontSize: '13.5px', color: '#e7eefb', margin: 0, lineHeight: 1.7, maxWidth: 480 }}>
-                {t.saleSub}
+                {promoBlock?.subtitle || t.saleSub}
               </p>
             </div>
             <button
@@ -690,11 +746,12 @@ export default function HomeSearchPage() {
               onClick={() => navigate('/destinations')}
               style={{ flex: 'none', display: 'inline-flex', alignItems: 'center', gap: 7, padding: '11px 25px', background: '#fff', color: '#1668c4', borderRadius: 12, fontSize: '13.5px', fontWeight: 800, border: 'none', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 12px 28px -14px rgba(11,33,56,.5)' }}
             >
-              {t.saleBtn} <span style={{ fontSize: '15.5px' }}>{locale === 'en' ? '→' : '←'}</span>
+              {promoBlock?.buttonText || t.saleBtn} <span style={{ fontSize: '15.5px' }}>{locale === 'en' ? '→' : '←'}</span>
             </button>
           </div>
         </div>
       </section>
+      )}
 
       {/* POPULAR DESTINATIONS */}
       <section style={{ maxWidth: 1180, margin: '0 auto', padding: '39px 26px 20px' }}>
@@ -712,7 +769,7 @@ export default function HomeSearchPage() {
           </button>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: gridCols4, gap: 18 }}>
-          {POPULAR_DESTS.map((d) => (
+          {popularDests.map((d) => (
             <button
               type="button"
               key={d.code}
@@ -720,16 +777,36 @@ export default function HomeSearchPage() {
               onClick={() => navigate(`/results?origin=THR&dest=${d.code}&date=${TODAY_ISO}`)}
               style={{ textAlign: locale === 'en' ? 'left' : 'right', background: '#fff', borderRadius: 16, overflow: 'hidden', boxShadow: '0 10px 30px -18px rgba(13,38,102,.25)', cursor: 'pointer', border: 'none', fontFamily: 'inherit', padding: 0 }}
             >
-              <div style={{ height: 150, background: d.grad, position: 'relative', display: 'flex', alignItems: 'flex-end', padding: 11 }}>
+              <div
+                style={{
+                  height: 150,
+                  background: d.grad,
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'flex-end',
+                  padding: 11,
+                  ...(('imageUrl' in d && d.imageUrl)
+                    ? {
+                        backgroundImage: `linear-gradient(180deg, transparent 20%, rgba(13,38,64,.75)), url(${d.imageUrl})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                      }
+                    : {}),
+                }}
+              >
                 <span style={{ background: '#ffffffe6', padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, color: '#0d3b66' }}>{t.flightHours(d.hours)}</span>
               </div>
               <div style={{ padding: '11px 12px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                  <span style={{ fontSize: '13.5px', fontWeight: 800, color: '#16202e' }}>{CITY_NAMES[d.code]?.[locale]}</span>
+                  <span style={{ fontSize: '13.5px', fontWeight: 800, color: '#16202e' }}>{cityName(d.code)}</span>
                   <span style={{ fontSize: 11, color: '#6b7787' }}>{COUNTRY_NAMES[d.code]?.[locale]}</span>
                 </div>
                 <div style={{ fontSize: '11.5px', color: '#6b7585' }}>
-                  {t.from} <span style={{ fontSize: '12.5px', fontWeight: 800, color: '#1668c4' }}>{formatToman(d.tomanPrice, locale)}</span> {t.toman}
+                  {t.from}{' '}
+                  <span style={{ fontSize: '12.5px', fontWeight: 800, color: '#1668c4' }}>
+                    {formatToman(d.tomanPrice, locale)}
+                  </span>{' '}
+                  {t.toman}
                 </div>
               </div>
             </button>

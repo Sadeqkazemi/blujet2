@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import HomeSearchPage from './HomeSearchPage';
 import * as publicSiteApi from '../../api/publicSite';
+import * as siteContentApi from '../../api/site-content';
 import * as useAuthModule from '../../hooks/useAuth';
 import * as useLocaleModule from '../../hooks/useLocale';
 
@@ -37,9 +38,57 @@ async function pickToday() {
   await userEvent.click(screen.getByTestId('home-date-today'));
 }
 
+const CMS_HOME = {
+  blocks: [
+    {
+      key: 'HERO_BANNER' as const,
+      enabled: true,
+      title: 'عنوان CMS',
+      subtitle: 'زیرعنوان CMS',
+      buttonText: 'جستجو',
+      badgeText: 'برچسب CMS',
+      imageFileId: null,
+      imageUrl: null,
+    },
+    {
+      key: 'ANNOUNCEMENT_BAR' as const,
+      enabled: true,
+      title: 'اطلاعیه CMS',
+      subtitle: '',
+      buttonText: 'جزئیات',
+      badgeText: '',
+      imageFileId: null,
+      imageUrl: null,
+    },
+    {
+      key: 'PROMO_BANNER' as const,
+      enabled: true,
+      title: 'پromo CMS',
+      subtitle: 'توضیح promo',
+      buttonText: 'رزرو',
+      badgeText: 'ویژه CMS',
+      imageFileId: null,
+      imageUrl: null,
+    },
+  ],
+  destinations: [
+    { airportCode: 'DXB', cityFa: 'دبی', priceIrr: '38000000', imageUrl: null },
+  ],
+  routes: [
+    {
+      fromAirportCode: 'THR',
+      toAirportCode: 'MHD',
+      fromCityFa: 'تهران',
+      toCityFa: 'مشهد',
+      priceIrr: '16000000',
+    },
+  ],
+};
+
 describe('HomeSearchPage', () => {
   it('renders RTL search form with airports loaded', async () => {
     vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
+    vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockResolvedValue(CMS_HOME);
     renderPage();
 
     expect(await screen.findAllByText('تهران (THR)')).toHaveLength(2);
@@ -48,6 +97,7 @@ describe('HomeSearchPage', () => {
 
   it('shows a validation error when submitted without selections', async () => {
     vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
+    vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockResolvedValue(CMS_HOME);
     renderPage();
     await screen.findAllByText('تهران (THR)');
 
@@ -55,8 +105,24 @@ describe('HomeSearchPage', () => {
     expect(screen.getByText('مبدأ، مقصد و تاریخ را انتخاب کنید.')).toBeInTheDocument();
   });
 
-  it('renders the mock marketing sections (offers, destinations, club, app)', async () => {
+  it('renders CMS-driven marketing sections when home content loads', async () => {
     vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
+    vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockResolvedValue(CMS_HOME);
+    renderPage();
+    await screen.findAllByText('تهران (THR)');
+
+    expect(screen.getByText('عنوان CMS')).toBeInTheDocument();
+    expect(screen.getByText('اطلاعیه CMS')).toBeInTheDocument();
+    expect(screen.getByText('پromo CMS')).toBeInTheDocument();
+    expect(screen.getByTestId('popular-dest-DXB')).toBeInTheDocument();
+    expect(screen.getByTestId('popular-route-MHD')).toBeInTheDocument();
+    expect(screen.getByText('پیشنهادهای ویژه')).toBeInTheDocument();
+    expect(screen.getByText('با رسیدن به حد امتیاز، کارت عضویت بگیر')).toBeInTheDocument();
+  });
+
+  it('falls back to static marketing when CMS fetch fails', async () => {
+    vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
+    vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockRejectedValue(new Error('offline'));
     renderPage();
     await screen.findAllByText('تهران (THR)');
 
@@ -72,6 +138,7 @@ describe('HomeSearchPage', () => {
 
   it('rejects identical origin and destination', async () => {
     vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
+    vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockResolvedValue(CMS_HOME);
     renderPage();
     await screen.findAllByText('تهران (THR)');
 
@@ -86,6 +153,16 @@ describe('HomeSearchPage', () => {
   it('renders translated marketing sections and Latin-digit toman prices in English', async () => {
     mockLocale('en');
     vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
+    vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockResolvedValue({
+      ...CMS_HOME,
+      blocks: CMS_HOME.blocks.map((b) =>
+        b.key === 'HERO_BANNER'
+          ? { ...b, title: 'Book your next flight with blujet', badgeText: 'Up to 5% cashback' }
+          : b.key === 'PROMO_BANNER'
+            ? { ...b, title: 'Up to 40% off international flights', badgeText: 'blujet Summer Sale' }
+            : b,
+      ),
+    });
     renderPage();
     await screen.findAllByText('Tehran (THR)');
 
@@ -101,6 +178,12 @@ describe('HomeSearchPage', () => {
   it('renders Arabic marketing sections with Eastern Arabic-Indic digits', async () => {
     mockLocale('ar');
     vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
+    vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockResolvedValue({
+      ...CMS_HOME,
+      blocks: CMS_HOME.blocks.map((b) =>
+        b.key === 'HERO_BANNER' ? { ...b, title: 'احجز رحلتك القادمة مع blujet' } : b,
+      ),
+    });
     renderPage();
     await screen.findAllByText('طهران (THR)');
 
