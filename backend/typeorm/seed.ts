@@ -1,4 +1,6 @@
 import 'dotenv/config';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import argon2 from 'argon2';
 import { TypeORMPg } from '@typeorm/adapter-pg';
 import { TypeORMClient } from '../generated/typeorm/client';
@@ -770,6 +772,56 @@ async function main() {
         });
       }
     }
+
+    // Seed one reviewable KYC request with a real tiny PNG so /panel/kyc
+    // and its protected file download work immediately after setup.
+    const kycUser = await typeorm.user.findUnique({
+      where: { phone: '09180000091' },
+      select: { id: true },
+    });
+    if (kycUser) {
+      const existingKyc = await typeorm.customerIdentityVerification.count({
+        where: { userId: kycUser.id },
+      });
+      if (existingKyc === 0) {
+        await typeorm.user.update({
+          where: { id: kycUser.id },
+          data: {
+            nationalIdEnc: encryptPii('0499370899'),
+            nationalIdHash: hashPii('0499370899'),
+            birthDate: new Date('1992-05-14'),
+          },
+        });
+        const uploadDir =
+          process.env.UPLOAD_DIR ?? path.join(process.cwd(), 'uploads');
+        fs.mkdirSync(uploadDir, { recursive: true });
+        const idCardPath = path.join(uploadDir, 'seed-id-card.png');
+        fs.writeFileSync(
+          idCardPath,
+          Buffer.from(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+            'base64',
+          ),
+        );
+        const idCardFile = await typeorm.storedFile.create({
+          data: {
+            ownerId: kycUser.id,
+            fileName: 'کارت-ملی.png',
+            mimeType: 'image/png',
+            sizeBytes: fs.statSync(idCardPath).size,
+            path: idCardPath,
+          },
+        });
+        await typeorm.customerIdentityVerification.create({
+          data: {
+            userId: kycUser.id,
+            status: 'SUBMITTED',
+            idCardFileId: idCardFile.id,
+            submittedAt: new Date(),
+          },
+        });
+      }
+    }
   }
 
   // ── Phase 66: passenger survey settings + default question list ────────
@@ -1028,8 +1080,15 @@ async function main() {
         { name: 'رضا احمدی', seat: '12B' },
       ];
       for (const p of demoPassengers) {
-        const booking = await typeorm.booking.create({
-          data: {
+        const booking = await typeorm.booking.upsert({
+          where: { pnr: `BJDEMO${p.seat}` },
+          update: {
+            flightInstanceId: demoInstance.id,
+            channel: 'SYSTEM',
+            status: 'TICKETED',
+            priceIrr: 38_000_000,
+          },
+          create: {
             pnr: `BJDEMO${p.seat}`,
             flightInstanceId: demoInstance.id,
             channel: 'SYSTEM',
@@ -1037,12 +1096,24 @@ async function main() {
             priceIrr: 38_000_000,
           },
         });
-        await typeorm.passenger.create({
-          data: { bookingId: booking.id, fullName: p.name, seatCode: p.seat },
+        const passenger = await typeorm.passenger.findFirst({
+          where: { bookingId: booking.id, seatCode: p.seat },
+          select: { id: true },
         });
-        await typeorm.ledgerEntry.create({
-          data: { bookingId: booking.id, type: 'SALE', signedAmountIrr: 38_000_000 },
+        if (!passenger) {
+          await typeorm.passenger.create({
+            data: { bookingId: booking.id, fullName: p.name, seatCode: p.seat },
+          });
+        }
+        const sale = await typeorm.ledgerEntry.findFirst({
+          where: { bookingId: booking.id, type: 'SALE' },
+          select: { id: true },
         });
+        if (!sale) {
+          await typeorm.ledgerEntry.create({
+            data: { bookingId: booking.id, type: 'SALE', signedAmountIrr: 38_000_000 },
+          });
+        }
       }
       // One demo managerial lock so the seat map/lock UI has real data —
       // already APPROVED (Phase 13D) with a real future hold-to-ticket
