@@ -7,6 +7,7 @@ import type {
   PriceLock,
   RefundRequestView,
   SavedFlight,
+  SavedPassenger,
   SearchFlightResult,
   SeatMapResult,
   UserProfile,
@@ -127,6 +128,39 @@ export function saveFlight(flightInstanceId: string, cabin: CabinClass) {
 
 export function removeSavedFlight(id: string) {
   return apiDelete<{ removed: boolean }>(`/my/saved-flights/${id}`);
+}
+
+export function fetchSavedPassengers() {
+  return apiGet<SavedPassenger[]>('/my/saved-passengers');
+}
+
+export function createSavedPassenger(dto: {
+  fullName: string;
+  latinName: string;
+  nationalId?: string;
+  passportNo?: string;
+  mobile?: string;
+  isChild?: boolean;
+}) {
+  return apiPost<SavedPassenger>('/my/saved-passengers', dto);
+}
+
+export function updateSavedPassenger(
+  id: string,
+  dto: {
+    fullName?: string;
+    latinName?: string;
+    nationalId?: string | null;
+    passportNo?: string | null;
+    mobile?: string | null;
+    isChild?: boolean;
+  },
+) {
+  return apiPatch<SavedPassenger>(`/my/saved-passengers/${id}`, dto);
+}
+
+export function removeSavedPassenger(id: string) {
+  return apiDelete<{ removed: boolean }>(`/my/saved-passengers/${id}`);
 }
 
 export function fetchMyProfile() {

@@ -98,6 +98,18 @@ export interface SavedFlight {
   createdAt: string;
 }
 
+export interface SavedPassenger {
+  id: string;
+  fullName: string;
+  latinName: string;
+  nationalId: string | null;
+  passportNo: string | null;
+  mobile: string | null;
+  isChild: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface PayResultOk {
   priceChanged: false;
   booking: BookingDetail;

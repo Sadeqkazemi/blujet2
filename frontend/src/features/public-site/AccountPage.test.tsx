@@ -9,7 +9,7 @@ import * as useLocaleModule from '../../hooks/useLocale';
 import * as publicSiteApi from '../../api/publicSite';
 import * as supportTicketsApi from '../../api/support-tickets';
 import * as authApi from '../../api/auth';
-import type { BookingDetail, PriceLock, RefundRequestView, SavedFlight, UserProfile } from '../../types/public-site';
+import type { BookingDetail, PriceLock, RefundRequestView, SavedFlight, SavedPassenger, UserProfile } from '../../types/public-site';
 import type { ClubMembershipView } from '../../types/club-membership';
 import type { MySupportTicketRow } from '../../types/support-tickets';
 
@@ -104,6 +104,18 @@ function mockAuth(status: 'authenticated' | 'unauthenticated', signOut = vi.fn()
   });
 }
 
+const SAVED_PASSENGER: SavedPassenger = {
+  id: 'sp-1',
+  fullName: 'محمد رضایی',
+  latinName: 'MOHAMMAD REZAEI',
+  nationalId: null,
+  passportNo: 'A22113344',
+  mobile: null,
+  isChild: false,
+  createdAt: '2026-07-01T00:00:00.000Z',
+  updatedAt: '2026-07-01T00:00:00.000Z',
+};
+
 const SAVED: SavedFlight = {
   id: 'sf-1',
   flightInstanceId: 'fi-3',
@@ -148,6 +160,7 @@ beforeEach(() => {
   vi.spyOn(publicSiteApi, 'fetchMyProfile').mockResolvedValue(PROFILE);
   vi.spyOn(publicSiteApi, 'fetchMyPriceLocks').mockResolvedValue([]);
   vi.spyOn(publicSiteApi, 'fetchSavedFlights').mockResolvedValue([SAVED]);
+  vi.spyOn(publicSiteApi, 'fetchSavedPassengers').mockResolvedValue([SAVED_PASSENGER]);
   vi.spyOn(supportTicketsApi, 'fetchMySupportTickets').mockResolvedValue([]);
 });
 
@@ -176,11 +189,50 @@ describe('AccountPage', () => {
     expect(screen.getByText('GOLD-8842')).toBeInTheDocument();
   });
 
-  it('switches to the passengers tab and lists unique passengers', async () => {
+  it('switches to the passengers tab and lists saved passengers with meta line', async () => {
     mockAuth('authenticated');
     renderPage();
     await userEvent.click(screen.getByTestId('account-tab-passengers'));
-    expect(await screen.findByTestId('account-passenger')).toHaveTextContent('نگار رضایی');
+    const row = await screen.findByTestId('account-passenger');
+    expect(row).toHaveTextContent('محمد رضایی');
+    expect(row).toHaveTextContent('MOHAMMAD REZAEI · A22113344');
+  });
+
+  it('adds a saved passenger from the modal', async () => {
+    mockAuth('authenticated');
+    const create = vi.spyOn(publicSiteApi, 'createSavedPassenger').mockResolvedValue({
+      ...SAVED_PASSENGER,
+      id: 'sp-2',
+      fullName: 'سارا احمدی',
+      latinName: 'SARA AHMADI',
+      passportNo: 'B99887766',
+    });
+    renderPage();
+    await userEvent.click(screen.getByTestId('account-tab-passengers'));
+    await userEvent.click(screen.getByTestId('passengers-add-open'));
+    await userEvent.type(screen.getByLabelText('نام و نام خانوادگی'), 'سارا احمدی');
+    await userEvent.type(screen.getByLabelText('نام لاتین (روی بلیط)'), 'Sara Ahmadi');
+    await userEvent.type(screen.getByLabelText('شماره گذرنامه'), 'B99887766');
+    await userEvent.click(screen.getByTestId('passengers-form-save'));
+    await vi.waitFor(() => expect(create).toHaveBeenCalled());
+    expect(create).toHaveBeenCalledWith({
+      fullName: 'سارا احمدی',
+      latinName: 'Sara Ahmadi',
+      nationalId: undefined,
+      passportNo: 'B99887766',
+      mobile: undefined,
+      isChild: false,
+    });
+  });
+
+  it('removes a saved passenger', async () => {
+    mockAuth('authenticated');
+    const remove = vi.spyOn(publicSiteApi, 'removeSavedPassenger').mockResolvedValue({ removed: true });
+    renderPage();
+    await userEvent.click(screen.getByTestId('account-tab-passengers'));
+    await screen.findByTestId('account-passenger');
+    await userEvent.click(screen.getByLabelText('حذف'));
+    await vi.waitFor(() => expect(remove).toHaveBeenCalledWith('sp-1'));
   });
 
   it('switches to the refunds tab and shows the real refund', async () => {

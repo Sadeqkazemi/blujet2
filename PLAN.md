@@ -1326,6 +1326,15 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   suite: 325/325 passing, 75 files. `tsc --noEmit` and lint clean on both
   packages. See `docs/features/careers.md` for the full checked-off
   acceptance checklist.
+- [x] **SITE_ADMIN club referral (merged PR #34)** — completes user-initiated
+  card-request flow: `GET /club/submitted-card-requests`, `PATCH
+  /club/card-requests/:id/refer`, `ClubPage.tsx` SITE_ADMIN branch.
+- [x] **User panel — نشان‌شده‌ها (saved flights)** — `SavedFlight` model +
+  `GET/POST/DELETE /my/saved-flights`; `AccountPage` `saved` tab +
+  `ResultsPage` bookmark button. See `docs/features/saved-flights.md`.
+- [x] **User panel — مسافران ذخیره‌شده (saved passengers)** — `SavedPassenger`
+  model + `GET/POST/PATCH/DELETE /my/saved-passengers`; `AccountPage`
+  `passengers` tab CRUD. See `docs/features/saved-passengers.md`.
 - [x] **Bug fix (senior review, found while chasing the "pre-existing"
   reporting flake): revenue reporting polluted by agency debt-calibration
   ledger rows.** The `reporting.e2e-spec.ts` sales-chart/kpis

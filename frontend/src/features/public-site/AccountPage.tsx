@@ -13,6 +13,10 @@ import {
   fetchMyRefunds,
   fetchPrivacyExport,
   fetchSavedFlights,
+  fetchSavedPassengers,
+  createSavedPassenger,
+  updateSavedPassenger,
+  removeSavedPassenger,
   fetchWallet,
   removeSavedFlight,
   requestEmailVerify,
@@ -26,11 +30,12 @@ import { changeOwnPassword, setPassword } from '../../api/auth';
 import { faDigits, faMoney, parseTomanToRial } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
-import type { BookingDetail, PriceLock, RefundRequestView, SavedFlight, UserProfile } from '../../types/public-site';
+import type { BookingDetail, PriceLock, RefundRequestView, SavedFlight, SavedPassenger, UserProfile } from '../../types/public-site';
 import type { ClubMembershipView } from '../../types/club-membership';
 import type { MySupportTicketRow, SupportTicketStatus } from '../../types/support-tickets';
 import AccountClubTab from './AccountClubTab';
 import AccountSavedFlightsTab from './AccountSavedFlightsTab';
+import AccountPassengersTab, { type SavedPassengerForm } from './AccountPassengersTab';
 
 // پنل کاربر — real data from the existing bookings/wallet/club-points/refunds
 // endpoints (none of this is mock). Matches design-reference/پنل کاربر.dc.html's
@@ -490,6 +495,11 @@ export default function AccountPage() {
   const [priceLocks, setPriceLocks] = useState<PriceLock[] | null>(null);
   const [savedFlights, setSavedFlights] = useState<SavedFlight[] | null>(null);
   const [savedBusyId, setSavedBusyId] = useState<string | null>(null);
+  const [savedPassengers, setSavedPassengers] = useState<SavedPassenger[] | null>(null);
+  const [passengerBusyId, setPassengerBusyId] = useState<string | null>(null);
+  const [passengerFormBusy, setPassengerFormBusy] = useState(false);
+  const [passengerFormError, setPassengerFormError] = useState<string | null>(null);
+  const [passengerFormKey, setPassengerFormKey] = useState(0);
   const [lockActionBusy, setLockActionBusy] = useState<string | null>(null);
   const [lockError, setLockError] = useState<string | null>(null);
 
@@ -537,6 +547,7 @@ export default function AccountPage() {
     fetchMyRefunds().then(setRefunds).catch(() => setRefunds([]));
     fetchMyPriceLocks().then(setPriceLocks).catch(() => setPriceLocks([]));
     fetchSavedFlights().then(setSavedFlights).catch(() => setSavedFlights([]));
+    fetchSavedPassengers().then(setSavedPassengers).catch(() => setSavedPassengers([]));
     fetchMyProfile()
       .then((p) => {
         setProfile(p);
@@ -670,6 +681,48 @@ export default function AccountPage() {
     }
   }
 
+  async function onRemovePassenger(id: string) {
+    setPassengerBusyId(id);
+    try {
+      await removeSavedPassenger(id);
+      setSavedPassengers((prev) => (prev ? prev.filter((p) => p.id !== id) : prev));
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t.saveErrorFallback);
+    } finally {
+      setPassengerBusyId(null);
+    }
+  }
+
+  async function onSavePassenger(form: SavedPassengerForm, editingId: string | null) {
+    setPassengerFormError(null);
+    setPassengerFormBusy(true);
+    try {
+      const dto = {
+        fullName: form.fullName.trim(),
+        latinName: form.latinName.trim(),
+        nationalId: form.nationalId.trim() || undefined,
+        passportNo: form.passportNo.trim() || undefined,
+        mobile: form.mobile.trim() || undefined,
+        isChild: form.isChild,
+      };
+      if (editingId) {
+        const updated = await updateSavedPassenger(editingId, dto);
+        setSavedPassengers((prev) =>
+          prev ? prev.map((p) => (p.id === editingId ? updated : p)) : prev,
+        );
+      } else {
+        const created = await createSavedPassenger(dto);
+        setSavedPassengers((prev) => (prev ? [created, ...prev] : [created]));
+      }
+      setPassengerFormKey((k) => k + 1);
+    } catch (err) {
+      setPassengerFormError(err instanceof ApiRequestError ? err.message : t.saveErrorFallback);
+      throw err;
+    } finally {
+      setPassengerFormBusy(false);
+    }
+  }
+
   async function onCancelLock(id: string) {
     setLockError(null);
     setLockActionBusy(id);
@@ -712,10 +765,6 @@ export default function AccountPage() {
       setPwSaving(false);
     }
   }
-
-  const passengerNames = bookings
-    ? Array.from(new Set(bookings.flatMap((b) => b.passengers.map((p) => p.fullName)).filter(Boolean)))
-    : [];
 
   return (
     <PublicPageShell>
@@ -1123,18 +1172,19 @@ export default function AccountPage() {
           </div>
         )}
 
-        {tab === 'passengers' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {passengerNames.length === 0 && <p style={{ fontSize: 13, color: '#8a96a6' }}>{t.passengersEmptyText}</p>}
-            {passengerNames.map((name) => (
-              <div key={name} data-testid="account-passenger" style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 14, padding: '13px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg,#1668c4,#0d3b66)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700 }}>
-                  {name.trim().split(/\s+/).map((w) => w[0]).join('')}
-                </div>
-                <span style={{ fontSize: 13, fontWeight: 700, color: '#16202e' }}>{name}</span>
-              </div>
-            ))}
-          </div>
+        {tab === 'passengers' && savedPassengers && (
+          <AccountPassengersTab
+            key={passengerFormKey}
+            passengers={savedPassengers}
+            busyId={passengerBusyId}
+            formBusy={passengerFormBusy}
+            formError={passengerFormError}
+            onRemove={onRemovePassenger}
+            onSave={onSavePassenger}
+          />
+        )}
+        {tab === 'passengers' && savedPassengers === null && (
+          <p style={{ fontSize: 13, color: '#6b7787' }}>{t.loading}</p>
         )}
 
         {tab === 'refunds' && (
