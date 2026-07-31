@@ -1505,6 +1505,13 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   Frontend: 10 Vitest tests in `ForgotPasswordPage.test.tsx`. See
   `docs/features/forgot-password-v2-visual.md`.
 
+- [x] **Panel sidebar badges + Jalali day-picker (Phase C)** — referrals
+  sidebar badge (purple: SENIOR_MANAGER `awaitingReport`, EMPLOYEE
+  `awaitingMyReport`); badge pills aligned to nav-row end; finance-ops view
+  now uses shared `SalesChartControls` with day/month Jalali filtering (not
+  just q3/q6/year). Tests: 3 PanelShell + 1 Dashboard month + 1 Finance
+  day-mode. See `docs/features/panel-sidebar-badges-day-picker.md`.
+
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is
 "done" only when every checklist item in its `docs/features/<name>.md` has

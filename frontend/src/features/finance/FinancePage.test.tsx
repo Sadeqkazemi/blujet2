@@ -159,6 +159,28 @@ describe('FinancePage', () => {
     await waitFor(() => expect(screen.queryByTestId('reconciliation-item')).not.toBeInTheDocument());
   });
 
+  it('FINANCE_MANAGER finance-ops view loads day granularity with Jalali date picker', async () => {
+    mockRole('FINANCE_MANAGER');
+    const kpiSpy = vi.spyOn(reportingApi, 'fetchKpis').mockResolvedValue(KPIS);
+    vi.spyOn(reportingApi, 'fetchLowSalesAlerts').mockResolvedValue([]);
+    vi.spyOn(reportingApi, 'fetchCompletedFlightsSummary').mockResolvedValue(FLIGHTS);
+    vi.spyOn(reportingApi, 'fetchRecentTransactions').mockResolvedValue(TX);
+    vi.spyOn(reportingApi, 'fetchRevenueMix').mockResolvedValue(MIX);
+    vi.spyOn(reportingApi, 'fetchAgencySettlements').mockResolvedValue(SETTLEMENTS);
+    vi.spyOn(reconciliationApi, 'fetchReconciliationQueue').mockResolvedValue([]);
+
+    render(<FinancePage />);
+    await screen.findByText('تراکنش‌های مالی اخیر');
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'روزانه' }));
+    expect(await screen.findByTestId('sales-chart-day')).toBeInTheDocument();
+
+    await waitFor(() =>
+      expect(kpiSpy).toHaveBeenCalledWith(expect.objectContaining({ granularity: 'day', date: expect.any(String) })),
+    );
+  });
+
   it('CEO gets the analytic view: sales chart + revenue mix, no transactions/settlements', async () => {
     mockRole('CEO');
     vi.spyOn(reportingApi, 'fetchSalesChart').mockResolvedValue([
