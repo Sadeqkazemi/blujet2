@@ -124,6 +124,7 @@ describe('Panels (e2e)', () => {
       'club',
       'refund',
       'tickets',
+      'blog',
       'jobapps',
       'kyc',
       'settings',

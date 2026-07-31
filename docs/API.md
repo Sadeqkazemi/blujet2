@@ -2925,3 +2925,40 @@ Schema: `CartableSourceType` gains `EMPLOYEE_MESSAGE` (migration
 `20260731120000_employee_cartable_source_type`).
 
 See `docs/features/employee-cartable.md` for the acceptance checklist.
+
+## Phase D — SITE_ADMIN blog CMS
+
+First slice of the پنل ادمین سایت.dc.html content-management deferrals
+(Phase 18 left `blog`/`media` out entirely). **Blog tab only** — the
+full `media` tab (banners, destinations, image library, app links) stays
+deferred to a later sub-phase.
+
+### Admin (`SITE_ADMIN`, `blog` tab)
+
+| Method | Path | Access | Notes |
+|--------|------|--------|-------|
+| GET | `/blog/admin/stats` | SITE_ADMIN | KPI row: `{ publishedCount, draftCount, totalViews, commentCount }` — `commentCount` is always `0` until a comments feature exists. |
+| GET | `/blog/admin/posts` | SITE_ADMIN | All non-deleted posts; optional `?category=NEWS\|GUIDE\|DEST\|OFFERS\|all`. |
+| GET | `/blog/admin/posts/:id` | SITE_ADMIN | Full row for edit modal. |
+| POST | `/blog/admin/posts` | SITE_ADMIN | Create — `{ title, body, category, status?, coverFileId?, scheduledAt?, slug? }`. |
+| PATCH | `/blog/admin/posts/:id` | SITE_ADMIN | Update any field; status transitions set/clear `publishedAt`/`scheduledAt`. |
+| DELETE | `/blog/admin/posts/:id` | SITE_ADMIN | Soft-delete (`deletedAt`). |
+
+Cover images reuse existing `POST /files` (`StoredFile` FK on `BlogPost`).
+Audit log category `CONTENT` on create/update/delete.
+
+### Public (no auth)
+
+| Method | Path | Access | Notes |
+|--------|------|--------|-------|
+| GET | `/blog/posts` | public | Published + due scheduled posts only; optional `?category=`. |
+| GET | `/blog/posts/:slug` | public | Detail; increments `viewCount`. Draft/future-scheduled → 404. |
+| GET | `/blog/covers/:fileId` | public | Serves cover bytes only when attached to a visible post. |
+
+### Explicit deferrals
+
+- Comments (`commentCount` KPI is a placeholder)
+- Public marketing-site blog pages (API ready; no frontend page this phase)
+- Full `media` CMS tab
+
+See `docs/features/site-admin-blog.md` for the acceptance checklist.
