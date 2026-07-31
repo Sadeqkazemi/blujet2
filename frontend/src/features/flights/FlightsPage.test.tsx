@@ -5,6 +5,7 @@ import * as flightsApi from '../../api/flights';
 import * as pricingApi from '../../api/pricing';
 import * as authApi from '../../api/auth';
 import * as useAuthModule from '../../hooks/useAuth';
+import { mockAuthUserWithRole } from '../../test/mockAuthUser';
 import { parseJalaliDateToIso } from '../../lib/jalali';
 import type {
   AircraftTypeOption,
@@ -114,7 +115,7 @@ const DETAIL: FlightDetail = {
 function mockRole(role: Role) {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status: 'authenticated',
-    user: { id: 'me', fullName: 'کاربر تست', role },
+    user: mockAuthUserWithRole(role, { id: 'me' }),
     requestLogin: vi.fn(),
     confirmTwoFactor: vi.fn(),
     agencyLogin: vi.fn(),
