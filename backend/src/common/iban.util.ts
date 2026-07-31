@@ -14,7 +14,9 @@ export function isValidSheba(input: string): boolean {
   if (!/^IR\d{24}$/.test(iban)) return false;
   // ISO 13616 mod-97 check
   const rearranged = iban.slice(4) + iban.slice(0, 4);
-  const numeric = rearranged.replace(/[A-Z]/g, (ch) => String(ch.charCodeAt(0) - 55));
+  const numeric = rearranged.replace(/[A-Z]/g, (ch) =>
+    String(ch.charCodeAt(0) - 55),
+  );
   let remainder = 0;
   for (let i = 0; i < numeric.length; i += 7) {
     remainder = Number(`${remainder}${numeric.slice(i, i + 7)}`) % 97;
@@ -40,7 +42,10 @@ export function maskSheba(iban: string): string {
   return `${digits.slice(0, 6)}•••${digits.slice(-4)}`;
 }
 
-const BANK_BY_BIN: Record<string, { name: string; short: string; color: string }> = {
+const BANK_BY_BIN: Record<
+  string,
+  { name: string; short: string; color: string }
+> = {
   '6104': { name: 'بانک ملت', short: 'ملت', color: '#d6336c' },
   '6219': { name: 'بانک سامان', short: 'سامان', color: '#1c7ed6' },
   '6037': { name: 'بانک ملی', short: 'ملی', color: '#0d6efd' },
@@ -55,6 +60,7 @@ export function guessBankFromPan(pan: string): {
 } {
   const bin = pan.slice(0, 4);
   const hit = BANK_BY_BIN[bin];
-  if (hit) return { bankName: hit.name, bankShort: hit.short, brandColor: hit.color };
+  if (hit)
+    return { bankName: hit.name, bankShort: hit.short, brandColor: hit.color };
   return { bankName: 'بانک', bankShort: bin, brandColor: '#1668c4' };
 }

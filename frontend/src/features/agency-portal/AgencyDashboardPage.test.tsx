@@ -13,16 +13,18 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+// Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON on
+// the backend — a JS number can't safely hold IRR amounts above 2^53).
 const DASHBOARD: AgencyDashboard = {
-  credit: { limitIrr: 1_800_000_000, usedIrr: 500_000_000, remainingIrr: 1_300_000_000 },
-  kpis: { salesThisMonthIrr: 384_000_000, ticketsIssuedTotal: 142, seatsSoldThisMonth: 12 },
+  credit: { limitIrr: '1800000000', usedIrr: '500000000', remainingIrr: '1300000000' },
+  kpis: { salesThisMonthIrr: '384000000', ticketsIssuedTotal: 142, seatsSoldThisMonth: 12 },
   monthlySales: [
-    { month: '2026-02', salesIrr: 100_000_000 },
-    { month: '2026-03', salesIrr: 120_000_000 },
-    { month: '2026-04', salesIrr: 90_000_000 },
-    { month: '2026-05', salesIrr: 200_000_000 },
-    { month: '2026-06', salesIrr: 150_000_000 },
-    { month: '2026-07', salesIrr: 384_000_000 },
+    { month: '2026-02', salesIrr: '100000000' },
+    { month: '2026-03', salesIrr: '120000000' },
+    { month: '2026-04', salesIrr: '90000000' },
+    { month: '2026-05', salesIrr: '200000000' },
+    { month: '2026-06', salesIrr: '150000000' },
+    { month: '2026-07', salesIrr: '384000000' },
   ],
 };
 

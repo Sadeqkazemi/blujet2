@@ -49,7 +49,10 @@ export function parseSocialLinks(input: unknown): SocialLinkEntry[] {
     if (!row || typeof row !== 'object') continue;
     const r = row as Record<string, unknown>;
     const id = r.id;
-    if (typeof id !== 'string' || !SOCIAL_LINK_IDS.includes(id as SocialLinkId)) {
+    if (
+      typeof id !== 'string' ||
+      !SOCIAL_LINK_IDS.includes(id as SocialLinkId)
+    ) {
       throw new Error(`invalid social link id: ${String(id)}`);
     }
     const current = byId.get(id as SocialLinkId)!;

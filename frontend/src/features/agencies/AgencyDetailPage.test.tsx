@@ -22,8 +22,10 @@ const DETAIL: AgencyDetail = {
   suspendedAt: null,
   suspendReason: null,
   joinedAt: '2023-04-10T00:00:00.000Z',
-  credit: { limitIrr: 1_800_000_000, usedIrr: 310_000_000, remainingIrr: 1_490_000_000 },
-  stats: { totalSalesIrr: 1_330_000_000, ticketsIssued: 7, passengers: 0 },
+  // Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON
+  // on the backend — a JS number can't safely hold IRR amounts above 2^53).
+  credit: { limitIrr: '1800000000', usedIrr: '310000000', remainingIrr: '1490000000' },
+  stats: { totalSalesIrr: '1330000000', ticketsIssued: 7, passengers: 0 },
   recentActivity: [],
 };
 
@@ -90,7 +92,7 @@ describe('AgencyDetailPage', () => {
         issuedById: 'u9',
         issuedAt: '2026-06-20T00:00:00.000Z',
         dueAt: '2026-07-05T00:00:00.000Z',
-        amountIrr: 800_000_000,
+        amountIrr: '800000000',
         status: 'UNPAID',
         paidAt: null,
       },
@@ -123,7 +125,7 @@ describe('AgencyDetailPage', () => {
         issuedById: 'u9',
         issuedAt: '2026-06-20T00:00:00.000Z',
         dueAt: '2026-07-05T00:00:00.000Z',
-        amountIrr: 800_000_000,
+        amountIrr: '800000000',
         status: 'UNPAID',
         paidAt: null,
       },
@@ -173,7 +175,7 @@ describe('AgencyDetailPage', () => {
         issuedById: 'u9',
         issuedAt: '2026-06-20T00:00:00.000Z',
         dueAt: '2026-07-05T00:00:00.000Z',
-        amountIrr: 800_000_000,
+        amountIrr: '800000000',
         status: 'UNPAID',
         paidAt: null,
       },
@@ -234,7 +236,7 @@ describe('AgencyDetailPage', () => {
     vi.spyOn(agenciesApi, 'fetchAgencyInvoices').mockResolvedValue([]);
     const update = vi
       .spyOn(agenciesApi, 'updateAgencyCredit')
-      .mockResolvedValue({ limitIrr: 2_000_000_000, usedIrr: 310_000_000, remainingIrr: 1_690_000_000 });
+      .mockResolvedValue({ limitIrr: '2000000000', usedIrr: '310000000', remainingIrr: '1690000000' });
 
     const { default: userEvent } = await import('@testing-library/user-event');
     renderPage();
@@ -293,7 +295,7 @@ describe('AgencyDetailPage', () => {
     vi.spyOn(agenciesApi, 'fetchAgencyCreditRequests').mockResolvedValue([
       {
         id: 'cr1',
-        requestedLimitIrr: 2_000_000_000,
+        requestedLimitIrr: '2000000000',
         note: 'افزایش برای فصل پیک',
         status: 'PENDING',
         decidedAt: null,
@@ -302,7 +304,7 @@ describe('AgencyDetailPage', () => {
     ]);
     const decide = vi.spyOn(agenciesApi, 'decideAgencyCreditRequest').mockResolvedValue({
       id: 'cr1',
-      requestedLimitIrr: 2_000_000_000,
+      requestedLimitIrr: '2000000000',
       note: 'افزایش برای فصل پیک',
       status: 'APPROVED',
       decidedAt: '2026-07-02T10:00:00.000Z',

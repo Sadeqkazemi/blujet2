@@ -327,12 +327,17 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
       });
     expect(patchRes.status).toBe(200);
     expect(
-      (patchRes.body.data.settings.socialLinks as { id: string; enabled: boolean }[]).find(
-        (l) => l.id === 'instagram',
-      )?.enabled,
+      (
+        patchRes.body.data.settings.socialLinks as {
+          id: string;
+          enabled: boolean;
+        }[]
+      ).find((l) => l.id === 'instagram')?.enabled,
     ).toBe(true);
 
-    const publicRes = await request(app.getHttpServer()).get('/settings/social-links');
+    const publicRes = await request(app.getHttpServer()).get(
+      '/settings/social-links',
+    );
     expect(publicRes.status).toBe(200);
     expect(publicRes.body.data.links).toEqual([
       {
@@ -383,7 +388,12 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
       .send({
         patch: {
           socialLinks: [
-            { id: 'instagram', name: 'blujet', url: 'instagram.com/blujet', enabled: true },
+            {
+              id: 'instagram',
+              name: 'blujet',
+              url: 'instagram.com/blujet',
+              enabled: true,
+            },
           ],
         },
       });

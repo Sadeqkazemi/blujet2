@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { ErrorCode } from '../../common/errors';
 import { getCabinPrice } from './pricing';
+import { ZERO_IRR, isPositiveIrr } from '../../common/money';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { CabinClass } from '../../../generated/prisma/enums';
 
@@ -47,7 +48,7 @@ export class SavedFlightsService {
         const inst = row.flightInstance;
         const originCode = inst.flight.route.originCode;
         const destCode = inst.flight.route.destCode;
-        let priceIrr = 0;
+        let priceIrr = ZERO_IRR;
         let bookable = false;
         if (inst.status === 'SCHEDULED' && inst.departureAt > now) {
           try {
@@ -56,7 +57,7 @@ export class SavedFlightsService {
               row.flightInstanceId,
               row.cabin,
             );
-            bookable = priceIrr > 0;
+            bookable = isPositiveIrr(priceIrr);
           } catch {
             bookable = false;
           }

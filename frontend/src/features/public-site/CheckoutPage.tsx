@@ -4,7 +4,7 @@ import { fetchClubPoints, fetchMyBooking, fetchWallet, payBooking } from '../../
 import { ApiRequestError } from '../../api/envelope';
 import { faMoney } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
-import type { BookingDetail } from '../../types/public-site';
+import type { BookingDetail, PayResultPriceChanged } from '../../types/public-site';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import FlowStepper from '../../components/public/FlowStepper';
 
@@ -14,10 +14,10 @@ export default function CheckoutPage() {
   const { bookingId } = useParams<{ bookingId: string }>();
   const navigate = useNavigate();
   const [booking, setBooking] = useState<BookingDetail | null>(null);
-  const [walletBalanceIrr, setWalletBalanceIrr] = useState<number | null>(null);
+  const [walletBalanceIrr, setWalletBalanceIrr] = useState<string | null>(null);
   const [isClubMember, setIsClubMember] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [priceChange, setPriceChange] = useState<{ previousPriceIrr: number; currentPriceIrr: number } | null>(null);
+  const [priceChange, setPriceChange] = useState<PayResultPriceChanged | null>(null);
   const [paying, setPaying] = useState(false);
   const [promoCode, setPromoCode] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('GATEWAY');
@@ -35,7 +35,7 @@ export default function CheckoutPage() {
       .catch(() => undefined);
   }, [bookingId]);
 
-  async function onPay(confirmedPriceIrr?: number) {
+  async function onPay(confirmedPriceIrr?: string | number) {
     if (!bookingId) return;
     setError(null);
     setPaying(true);

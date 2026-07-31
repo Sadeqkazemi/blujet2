@@ -12,6 +12,7 @@ import { decryptPii, encryptPii } from '../../common/pii-crypto';
 import { matchesLastName } from '../../common/passenger-name.util';
 import { computePenalty } from './penalty';
 import { StepUpService } from '../auth/step-up.service';
+import { negateIrr } from '../../common/money';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import { Prisma, type RefundRequest } from '../../../generated/prisma/client';
 
@@ -274,7 +275,7 @@ export class RefundsService {
         data: {
           bookingId: request.bookingId,
           type: 'REFUND',
-          signedAmountIrr: -request.refundableIrr,
+          signedAmountIrr: negateIrr(request.refundableIrr),
           createdById: actor.id,
         },
       });
@@ -643,7 +644,7 @@ export class RefundsService {
     const instance = await this.prisma.flightInstance.findFirstOrThrow({
       orderBy: { departureAt: 'desc' },
     });
-    const totalPaidIrr = 30_000_000;
+    const totalPaidIrr = 30_000_000n;
     const booking = await this.prisma.booking.create({
       data: {
         pnr: `RF${crypto.randomUUID().slice(0, 6).toUpperCase()}`,

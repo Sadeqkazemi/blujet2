@@ -88,7 +88,10 @@ export class SupportTicketsService {
     return user?.phone ?? null;
   }
 
-  private customerTicketWhere(userId: string, phone: string | null): Prisma.SupportTicketWhereInput {
+  private customerTicketWhere(
+    userId: string,
+    phone: string | null,
+  ): Prisma.SupportTicketWhereInput {
     const or: Prisma.SupportTicketWhereInput[] = [{ userId }];
     if (phone) {
       or.push({ userId: null, requesterPhone: phone });

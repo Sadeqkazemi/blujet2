@@ -17,12 +17,14 @@ import type {
 } from '../../types/reporting';
 import type { ReconciliationItem } from '../../types/reconciliation';
 
+// Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON on
+// the backend — a JS number can't safely hold IRR amounts above 2^53).
 const KPIS: KpiResult = {
-  revenueIrr: 5_000_000_000,
-  profitIrr: 1_200_000_000,
+  revenueIrr: '5000000000',
+  profitIrr: '1200000000',
   marginPct: 24,
-  operatingCostIrr: 3_800_000_000,
-  agencyDebtIrr: 900_000_000,
+  operatingCostIrr: '3800000000',
+  agencyDebtIrr: '900000000',
   agencyDebtCount: 2,
   trends: {
     revenuePct: 12,
@@ -40,11 +42,11 @@ const FLIGHTS: CompletedFlightsSummary = {
 };
 
 const MIX: RevenueMixResult = {
-  totalIrr: 5_000_000_000,
+  totalIrr: '5000000000',
   channels: [
-    { channel: 'SYSTEM', labelFa: 'فروش سیستمی', amountIrr: 2_300_000_000, pct: 46 },
-    { channel: 'CHARTER', labelFa: 'چارتر', amountIrr: 1_550_000_000, pct: 31 },
-    { channel: 'AGENCY', labelFa: 'آژانس همکار', amountIrr: 1_150_000_000, pct: 23 },
+    { channel: 'SYSTEM', labelFa: 'فروش سیستمی', amountIrr: '2300000000', pct: 46 },
+    { channel: 'CHARTER', labelFa: 'چارتر', amountIrr: '1550000000', pct: 31 },
+    { channel: 'AGENCY', labelFa: 'آژانس همکار', amountIrr: '1150000000', pct: 23 },
   ],
 };
 
@@ -57,7 +59,7 @@ const TX: RecentTransactionsResult = {
       titleFa: 'تسویه حساب',
       party: 'آژانس blujet',
       occurredAt: '2026-07-10T10:00:00.000Z',
-      signedAmountIrr: -450_000_000,
+      signedAmountIrr: '-450000000',
       statusFa: 'موفق',
       statusTone: 'success',
     },
@@ -65,13 +67,13 @@ const TX: RecentTransactionsResult = {
 };
 
 const SETTLEMENTS: AgencySettlementsResult = {
-  outstandingIrr: 900_000_000,
+  outstandingIrr: '900000000',
   rows: [
     {
       agencyId: 'ag1',
       agencyName: 'آژانس پرواز آسیا',
-      totalIrr: 300_000_000,
-      paidIrr: 0,
+      totalIrr: '300000000',
+      paidIrr: '0',
       paidPct: 0,
       dueAt: '2026-06-05T00:00:00.000Z',
       overdueDays: 42,
@@ -86,7 +88,7 @@ const RECONCILIATION_ITEM: ReconciliationItem = {
   pnr: 'BJ9K2L',
   bookingStatus: 'HELD',
   gatewayRefId: 'GW-88213',
-  amountIrr: 420_000_000,
+  amountIrr: '420000000',
   createdAt: '2026-07-12T09:00:00.000Z',
 };
 
@@ -164,9 +166,9 @@ describe('FinancePage', () => {
         periodKey: '2026-07-01',
         startDate: '2026-07-01T00:00:00.000Z',
         endDate: '2026-08-01T00:00:00.000Z',
-        systemIrr: 2_300_000_000,
-        charterIrr: 1_550_000_000,
-        agencyIrr: 1_150_000_000,
+        systemIrr: '2300000000',
+        charterIrr: '1550000000',
+        agencyIrr: '1150000000',
       },
     ]);
     vi.spyOn(reportingApi, 'fetchCompletedFlightsSummary').mockResolvedValue(FLIGHTS);

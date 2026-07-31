@@ -3,6 +3,7 @@ export interface ReconciliationItem {
   pnr: string;
   bookingStatus: string;
   gatewayRefId: string;
-  amountIrr: number;
+  // Decimal STRING on the wire (BigInt.prototype.toJSON on the backend).
+  amountIrr: string;
   createdAt: string;
 }

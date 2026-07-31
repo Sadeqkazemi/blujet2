@@ -431,7 +431,10 @@ describe('Reservation (e2e)', () => {
     expect(typeof res.body.data.todayBookings).toBe('number');
     expect(typeof res.body.data.activePnrs).toBe('number');
     expect(typeof res.body.data.seatsSold).toBe('number');
-    expect(typeof res.body.data.revenueIrr).toBe('number');
+    // Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON)
+    // — a JS number can't safely hold IRR amounts above 2^53.
+    expect(typeof res.body.data.revenueIrr).toBe('string');
+    expect(/^-?\d+$/.test(String(res.body.data.revenueIrr))).toBe(true);
   });
 
   // ── Role isolation ──────────────────────────────────────────────────

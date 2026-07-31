@@ -10,7 +10,9 @@ import {
 describe('iban.util', () => {
   it('normalizes Persian digits in card and sheba', () => {
     expect(normalizeCardPan('۶۱۰۴۳۳۷۱۱۲۳۴۴۵۲۱')).toBe('6104337112344521');
-    expect(normalizeSheba('ir۰۶۰۱۲۰۰۰۰۰۰۰۳۳۲۲۱۱۴۵۲۱')).toBe('IR0601200000003322114521');
+    expect(normalizeSheba('ir۰۶۰۱۲۰۰۰۰۰۰۰۳۳۲۲۱۱۴۵۲۱')).toBe(
+      'IR0601200000003322114521',
+    );
   });
 
   it('validates known-good Iranian IBAN', () => {

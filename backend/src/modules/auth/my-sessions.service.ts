@@ -5,10 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ErrorCode } from '../../common/errors';
-import {
-  formatSessionDevice,
-  hashRefreshToken,
-} from './auth-token.util';
+import { formatSessionDevice, hashRefreshToken } from './auth-token.util';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 
 @Injectable()
@@ -38,7 +35,11 @@ export class MySessionsService {
     }));
   }
 
-  async revoke(user: AuthenticatedUser, sessionId: string, currentRefreshToken?: string) {
+  async revoke(
+    user: AuthenticatedUser,
+    sessionId: string,
+    currentRefreshToken?: string,
+  ) {
     const row = await this.prisma.refreshToken.findUnique({
       where: { id: sessionId },
     });

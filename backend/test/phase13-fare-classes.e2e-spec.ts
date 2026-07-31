@@ -180,8 +180,9 @@ describe('Phase 13 Part B — fare-class management', () => {
       });
     expect(booking.status).toBe(201);
     // The EXPIRED (cheaper) class must be skipped — Y's price + tax used.
-    expect(booking.body.data.priceIrr).toBe(25_000_000 + 1_000_000);
-    expect(booking.body.data.taxIrr).toBe(1_000_000);
+    // Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON).
+    expect(booking.body.data.priceIrr).toBe(String(25_000_000 + 1_000_000));
+    expect(booking.body.data.taxIrr).toBe('1000000');
   });
 
   it('a fare rule scoped to a different channel is invisible to a SYSTEM-channel booking', async () => {
@@ -213,7 +214,7 @@ describe('Phase 13 Part B — fare-class management', () => {
     );
     // AGY-only rule invisible to public search → falls back to flat pricing,
     // not the 5,000,000 AGENCY-only rate.
-    expect(eco.priceIrr).not.toBe(5_000_000);
+    expect(eco.priceIrr).not.toBe('5000000');
   });
 
   it('rejects deleting a fare rule that an active booking is already stamped with', async () => {

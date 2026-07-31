@@ -258,7 +258,8 @@ describe('Flight engine completion', () => {
     const eco1 = mine1.cabins.find(
       (c: { cabin: string }) => c.cabin === 'ECONOMY',
     );
-    expect(eco1.priceIrr).toBe(30_000_000); // Y still open
+    // Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON).
+    expect(eco1.priceIrr).toBe('30000000'); // Y still open
 
     const customer = await loginAsCustomer(app, '09901112233');
     const booking = await request(app.getHttpServer())
@@ -270,7 +271,7 @@ describe('Flight engine completion', () => {
         passengers: [{ fullName: 'مسافر کلاس نرخی', seatCode: '10A' }],
       })
       .expect(201);
-    expect(booking.body.data.priceIrr).toBe(30_000_000);
+    expect(booking.body.data.priceIrr).toBe('30000000');
 
     const row = await prisma.booking.findUniqueOrThrow({
       where: { id: booking.body.data.id },
@@ -289,7 +290,7 @@ describe('Flight engine completion', () => {
     const eco2 = mine2.cabins.find(
       (c: { cabin: string }) => c.cabin === 'ECONOMY',
     );
-    expect(eco2.priceIrr).toBe(40_000_000);
+    expect(eco2.priceIrr).toBe('40000000');
   });
 
   it('pay walks HELD→PAID→TICKETED and lands TICKETED with a gateway ref in the audit trail', async () => {

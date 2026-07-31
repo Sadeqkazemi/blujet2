@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { ErrorCode } from '../../common/errors';
 import { getCabinPrice } from './pricing';
+import { pctOfIrr, roundIrrTo } from '../../common/money';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { CabinClass } from '../../../generated/prisma/enums';
 
@@ -73,8 +74,7 @@ export class PriceLockService {
       dto.flightInstanceId,
       dto.cabin,
     );
-    const feeIrr =
-      Math.round((priceIrr * LOCK_FEE_PCT) / 100 / 10_000) * 10_000;
+    const feeIrr = roundIrrTo(pctOfIrr(priceIrr, LOCK_FEE_PCT), 10_000n);
 
     return this.prisma.priceLock.create({
       data: {

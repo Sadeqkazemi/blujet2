@@ -62,7 +62,11 @@ export function fetchBookingByPnr(pnr: string) {
 }
 
 export interface PayOptions {
-  confirmedPriceIrr?: number;
+  // Round-tripped verbatim from BookingDetail.priceIrr (a decimal string) —
+  // never reconstructed from a parsed Number, so the re-price guard always
+  // compares against the exact value the user was shown. Also accepts a
+  // plain number for callers that construct a fresh value.
+  confirmedPriceIrr?: string | number;
   promoCode?: string;
   paymentMethod?: 'GATEWAY' | 'WALLET' | 'POINTS';
 }
@@ -106,11 +110,12 @@ export function submitAnonymousRefund(pnr: string, lastName: string, iban: strin
 }
 
 export function fetchWallet() {
-  return apiGet<{ balanceIrr: number }>('/my/wallet');
+  // Decimal STRING on the wire (BigInt.prototype.toJSON on the backend).
+  return apiGet<{ balanceIrr: string }>('/my/wallet');
 }
 
 export function topupWallet(amountIrr: number) {
-  return apiPost<{ balanceIrr: number }>('/my/wallet/topup', { amountIrr });
+  return apiPost<{ balanceIrr: string }>('/my/wallet/topup', { amountIrr });
 }
 
 export function fetchClubPoints() {

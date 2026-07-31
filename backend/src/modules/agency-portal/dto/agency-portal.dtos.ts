@@ -1,13 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsIn, IsOptional, IsString, MinLength } from 'class-validator';
 import {
-  IsIn,
-  IsInt,
-  IsOptional,
-  IsString,
-  Max,
-  Min,
-  MinLength,
-} from 'class-validator';
+  IsIrrAmount,
+  MinIrrAmount,
+  TransformToIrr,
+} from '../../../common/dto/irr.decorator';
+import type { Irr } from '../../../common/money';
 
 export class PostInboxMessageDto {
   @ApiProperty({ example: 'سلام، فردا تسویه انجام می‌شود.' })
@@ -18,13 +16,14 @@ export class PostInboxMessageDto {
 
 export class RequestCreditIncreaseDto {
   @ApiProperty({
-    example: 2_000_000_000,
-    description: 'سقف اعتبار درخواستی به ریال',
+    example: '2000000000',
+    type: String,
+    description: 'سقف اعتبار درخواستی به ریال (رشته یا عدد صحیح)',
   })
-  @IsInt()
-  @Min(1)
-  @Max(2_147_483_647)
-  requestedLimitIrr: number;
+  @IsIrrAmount()
+  @MinIrrAmount(1n)
+  @TransformToIrr()
+  requestedLimitIrr: Irr;
 
   @ApiPropertyOptional({ example: 'رشد فروش فصل تابستان' })
   @IsOptional()

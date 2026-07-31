@@ -3,14 +3,16 @@ import type {
   BookingChannel,
   CabinClass,
 } from '../../../generated/prisma/enums';
+import { type Irr, pctOfIrr, roundIrrTo } from '../../common/money';
 
 /** Same documented flat fallback as reservation/pnr.service.ts — no
  * canonical public-site fare exists for a flight with neither a Phase 6
  * registered price nor a Phase 11 CabinFare row. */
-const FALLBACK_ECONOMY_PRICE_IRR = 38_000_000;
-/** Business multiplier over the resolved economy price — a documented
- * placeholder until commercial pricing owns per-cabin fares directly. */
-const BUSINESS_MULTIPLIER = 1.8;
+const FALLBACK_ECONOMY_PRICE_IRR: Irr = 38_000_000n;
+/** Business multiplier over the resolved economy price, as an integer
+ * percent (180 = ×1.8) — a documented placeholder until commercial pricing
+ * owns per-cabin fares directly. */
+const BUSINESS_MULTIPLIER_PCT = 180;
 
 /**
  * Pricing is separate from availability (CLAUDE.md) — the single source of
@@ -22,7 +24,7 @@ export async function getCabinPrice(
   flightInstanceId: string,
   cabin: CabinClass,
   channel: BookingChannel = 'SYSTEM',
-): Promise<number> {
+): Promise<Irr> {
   const byClass = await resolveFareClass(
     prisma,
     flightInstanceId,
@@ -40,13 +42,13 @@ export async function getCabinPrice(
     where: { id: flightInstanceId },
     include: { pricing: true },
   });
-  const economyPrice =
+  const economyPrice: Irr =
     instance?.pricing?.status === 'REGISTERED'
       ? instance.pricing.registeredPriceIrr!
       : (instance?.basePriceIrr ?? FALLBACK_ECONOMY_PRICE_IRR);
 
   return cabin === 'BUSINESS'
-    ? Math.round((economyPrice * BUSINESS_MULTIPLIER) / 100_000) * 100_000
+    ? roundIrrTo(pctOfIrr(economyPrice, BUSINESS_MULTIPLIER_PCT), 100_000n)
     : economyPrice;
 }
 
@@ -69,7 +71,7 @@ export async function resolveFareClass(
   flightInstanceId: string,
   cabin: CabinClass,
   channel: BookingChannel = 'SYSTEM',
-): Promise<{ classCode: string; priceIrr: number; taxIrr: number } | null> {
+): Promise<{ classCode: string; priceIrr: Irr; taxIrr: Irr } | null> {
   const now = new Date();
   const allRules = await prisma.fareRule.findMany({
     where: { flightInstanceId, cabin },

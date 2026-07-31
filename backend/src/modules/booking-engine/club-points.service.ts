@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { ErrorCode } from '../../common/errors';
 import { resolveTierForPoints } from '../club/club.service';
 import type { Prisma } from '../../../generated/prisma/client';
+import type { Irr } from '../../common/money';
 
 /** Server-side config (CLAUDE.md: "conversion rate is server-side config")
  * — documented constants rather than a SystemSetting key, since no other
@@ -32,10 +33,12 @@ export class ClubPointsService {
   async earnForPurchase(
     tx: Prisma.TransactionClient,
     clubMemberId: string,
-    paidIrr: number,
+    paidIrr: Irr,
     bookingId: string,
   ) {
-    const points = Math.floor(paidIrr / IRR_PER_EARNED_POINT);
+    // Whole-IRR BigInt division (truncates, same as the old Math.floor) —
+    // never routes the amount through a float.
+    const points = Number(paidIrr / BigInt(IRR_PER_EARNED_POINT));
     if (points <= 0) return;
     await tx.clubPointsEntry.create({
       data: { clubMemberId, type: 'EARN', signedPoints: points, bookingId },
@@ -49,10 +52,13 @@ export class ClubPointsService {
   async redeemForPayment(
     tx: Prisma.TransactionClient,
     clubMemberId: string,
-    priceIrr: number,
+    priceIrr: Irr,
     bookingId: string,
   ): Promise<number> {
-    const pointsNeeded = Math.ceil(priceIrr / IRR_PER_REDEEMED_POINT);
+    // BigInt ceiling division — (a + b - 1) / b — same semantics as the old
+    // Math.ceil, no float involved.
+    const rate = BigInt(IRR_PER_REDEEMED_POINT);
+    const pointsNeeded = Number((priceIrr + rate - 1n) / rate);
     const sum = await tx.clubPointsEntry.aggregate({
       where: { clubMemberId },
       _sum: { signedPoints: true },

@@ -408,7 +408,7 @@ function Kpi({ value, label, locale }: { value: number; label: string; locale: S
   );
 }
 
-function Amount({ label, value, locale, green = false }: { label: string; value: number; locale: StoredLocale; green?: boolean }) {
+function Amount({ label, value, locale, green = false }: { label: string; value: number | string; locale: StoredLocale; green?: boolean }) {
   return (
     <div className="rounded-xl border border-border p-2 text-center">
       <div className="text-[10px] text-muted">{label}</div>

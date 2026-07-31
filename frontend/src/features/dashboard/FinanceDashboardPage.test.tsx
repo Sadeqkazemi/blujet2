@@ -12,7 +12,7 @@ const STATS = {
   passengersTrendPct: 15,
   ticketsSoldThisMonth: 280,
   ticketsTrendPct: 10,
-  revenueThisMonthIrr: 4_200_000_000,
+  revenueThisMonthIrr: '4200000000',
   revenueTrendPct: 12,
 };
 
@@ -21,9 +21,9 @@ const SALES_CHART = [
     periodKey: '2026-06-01',
     startDate: '2026-06-01T00:00:00.000Z',
     endDate: '2026-07-01T00:00:00.000Z',
-    systemIrr: 1_200_000_000,
-    charterIrr: 800_000_000,
-    agencyIrr: 600_000_000,
+    systemIrr: '1200000000',
+    charterIrr: '800000000',
+    agencyIrr: '600000000',
   },
 ];
 

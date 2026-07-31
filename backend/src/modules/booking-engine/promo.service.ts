@@ -2,6 +2,14 @@ import { BadRequestException } from '@nestjs/common';
 import { ErrorCode } from '../../common/errors';
 import type { Prisma } from '../../../generated/prisma/client';
 import type { CabinClass } from '../../../generated/prisma/enums';
+import {
+  type Irr,
+  ZERO_IRR,
+  maxIrr,
+  minIrr,
+  pctOfIrr,
+  subIrr,
+} from '../../common/money';
 
 /**
  * Validates + computes the discount for a promo code and records the
@@ -19,9 +27,9 @@ export async function applyPromoCode(
     originCode: string;
     destCode: string;
     cabin: CabinClass;
-    priceIrr: number;
+    priceIrr: Irr;
   },
-): Promise<{ discountIrr: number; finalPriceIrr: number }> {
+): Promise<{ discountIrr: Irr; finalPriceIrr: Irr }> {
   const promo = await tx.promoCode.findUnique({ where: { code: params.code } });
   if (!promo || !promo.active) {
     throw new BadRequestException({
@@ -86,9 +94,9 @@ export async function applyPromoCode(
 
   const discountIrr =
     promo.type === 'PERCENT'
-      ? Math.round((params.priceIrr * promo.value) / 100)
-      : Math.min(promo.value, params.priceIrr);
-  const finalPriceIrr = Math.max(params.priceIrr - discountIrr, 0);
+      ? pctOfIrr(params.priceIrr, Number(promo.value))
+      : minIrr(promo.value, params.priceIrr);
+  const finalPriceIrr = maxIrr(subIrr(params.priceIrr, discountIrr), ZERO_IRR);
 
   await tx.promoRedemption.create({
     data: {

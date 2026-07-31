@@ -10,6 +10,8 @@ import { AgenciesService } from '../agencies/agencies.service';
 import { FilesService } from '../files/files.service';
 import { WebservicePricingService } from '../webservice-pricing/webservice-pricing.service';
 import { ErrorCode } from '../../common/errors';
+import { ZERO_IRR, addIrr, divRoundBigInt, toIrr } from '../../common/money';
+import type { Irr } from '../../common/money';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type {
   RequestWebserviceDto,
@@ -105,12 +107,12 @@ export class AgencyPortalService {
       }),
     ]);
 
-    const monthBuckets = new Map<string, number>();
+    const monthBuckets = new Map<string, Irr>();
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       monthBuckets.set(
         `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
-        0,
+        ZERO_IRR,
       );
     }
     for (const row of salesRows) {
@@ -118,7 +120,7 @@ export class AgencyPortalService {
       if (monthBuckets.has(key)) {
         monthBuckets.set(
           key,
-          (monthBuckets.get(key) ?? 0) + row.signedAmountIrr,
+          addIrr(monthBuckets.get(key) ?? ZERO_IRR, row.signedAmountIrr),
         );
       }
     }
@@ -126,7 +128,7 @@ export class AgencyPortalService {
     return {
       credit,
       kpis: {
-        salesThisMonthIrr: salesThisMonth._sum.signedAmountIrr ?? 0,
+        salesThisMonthIrr: salesThisMonth._sum.signedAmountIrr ?? ZERO_IRR,
         ticketsIssuedTotal,
         seatsSoldThisMonth,
       },
@@ -167,7 +169,7 @@ export class AgencyPortalService {
 
   async requestCreditIncrease(
     actor: AuthenticatedUser,
-    dto: { requestedLimitIrr: number; note?: string },
+    dto: { requestedLimitIrr: Irr; note?: string },
   ) {
     await this.getOwnProfileOrThrow(actor);
     const current = await this.agencies.getCredit(actor.id);
@@ -245,7 +247,7 @@ export class AgencyPortalService {
         flightNo: string;
         route: string;
         ticketsCount: number;
-        salesIrr: number;
+        salesIrr: Irr;
       }
     >();
     const soldBookings = bookings.filter((b) =>
@@ -257,20 +259,25 @@ export class AgencyPortalService {
         flightNo: key,
         route: `${b.flightInstance.flight.route.originCode} → ${b.flightInstance.flight.route.destCode}`,
         ticketsCount: 0,
-        salesIrr: 0,
+        salesIrr: ZERO_IRR,
       };
       existing.ticketsCount += 1;
-      existing.salesIrr += b.priceIrr;
+      existing.salesIrr = addIrr(existing.salesIrr, b.priceIrr);
       perFlightMap.set(key, existing);
     }
 
-    const totalSalesIrr = soldBookings.reduce((s, b) => s + b.priceIrr, 0);
+    const totalSalesIrr = soldBookings.reduce(
+      (s, b) => addIrr(s, b.priceIrr),
+      ZERO_IRR,
+    );
     const ticketsIssued = soldBookings.length;
     const refundedCount = bookings.filter(
       (b) => b.status === 'REFUNDED',
     ).length;
-    const avgFareIrr =
-      ticketsIssued > 0 ? Math.round(totalSalesIrr / ticketsIssued) : 0;
+    const avgFareIrr: Irr =
+      ticketsIssued > 0
+        ? divRoundBigInt(totalSalesIrr, BigInt(ticketsIssued))
+        : ZERO_IRR;
     const refundRatePct =
       bookings.length > 0
         ? Math.round((refundedCount / bookings.length) * 1000) / 10
@@ -397,7 +404,11 @@ export class AgencyPortalService {
     return {
       plans: ([1, 3, 12] as const).map((months) => ({
         months,
-        priceIrr: prices[months],
+        // Wire format consistency: every *Irr field is a decimal string in
+        // responses (see docs/API.md) — this one is JSON-stored (not a
+        // Prisma BigInt column) but still IRR money, so it goes through the
+        // same Irr/bigint-string path as every other price field.
+        priceIrr: toIrr(prices[months]),
       })),
     };
   }
@@ -405,8 +416,8 @@ export class AgencyPortalService {
   async requestWebservice(actor: AuthenticatedUser, dto: RequestWebserviceDto) {
     await this.getOwnProfileOrThrow(actor);
     const planPrices = await this.webservicePricing.getPlanPrices();
-    const priceIrr = planPrices[dto.months];
-    if (!priceIrr) {
+    const planPriceIrr = planPrices[dto.months];
+    if (!planPriceIrr) {
       throw new BadRequestException({
         code: ErrorCode.VALIDATION_FAILED,
         message: 'مدت اشتراک نامعتبر است.',
@@ -418,7 +429,7 @@ export class AgencyPortalService {
         agencyId: actor.id,
         scope: dto.scope,
         months: dto.months,
-        priceIrr,
+        priceIrr: toIrr(planPriceIrr),
         note: dto.note,
       },
     });
@@ -437,7 +448,7 @@ export class AgencyPortalService {
       actorRole: actor.role,
       category: 'AGENCY',
       action: 'درخواست خرید وب‌سرویس آژانس',
-      detail: `آژانس «${actor.fullName}» درخواست وب‌سرویس با دامنه ${dto.scope} به مدت ${dto.months} ماه به مبلغ ${priceIrr} ریال ثبت کرد.`,
+      detail: `آژانس «${actor.fullName}» درخواست وب‌سرویس با دامنه ${dto.scope} به مدت ${dto.months} ماه به مبلغ ${planPriceIrr} ریال ثبت کرد.`,
       entityType: 'AgencyWebserviceRequest',
       entityId: request.id,
     });

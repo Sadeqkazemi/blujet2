@@ -1,23 +1,25 @@
+// Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON on
+// the backend — a JS number can't safely hold IRR amounts above 2^53).
 export interface AgencyCredit {
-  limitIrr: number;
-  usedIrr: number;
-  remainingIrr: number;
+  limitIrr: string;
+  usedIrr: string;
+  remainingIrr: string;
 }
 
 export interface AgencyDashboard {
   credit: AgencyCredit;
   kpis: {
-    salesThisMonthIrr: number;
+    salesThisMonthIrr: string;
     ticketsIssuedTotal: number;
     seatsSoldThisMonth: number;
   };
-  monthlySales: { month: string; salesIrr: number }[];
+  monthlySales: { month: string; salesIrr: string }[];
 }
 
 export interface AgencyLedgerEntry {
   id: string;
   type: 'SALE' | 'REFUND' | 'SETTLEMENT' | 'COMMISSION';
-  signedAmountIrr: number;
+  signedAmountIrr: string;
   occurredAt: string;
 }
 
@@ -28,7 +30,7 @@ export interface AgencyInvoice {
   invoiceNo: string;
   issuedAt: string;
   dueAt: string;
-  amountIrr: number;
+  amountIrr: string;
   status: AgencyInvoiceStatus;
   paidAt: string | null;
 }
@@ -37,7 +39,7 @@ export type AgencyCreditRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
 export interface AgencyCreditRequest {
   id: string;
-  requestedLimitIrr: number;
+  requestedLimitIrr: string;
   note: string | null;
   status: AgencyCreditRequestStatus;
   decidedAt: string | null;
@@ -50,7 +52,7 @@ export interface AgencySalesTicket {
   flightNo: string;
   route: string;
   departureAt: string;
-  priceIrr: number;
+  priceIrr: string;
   passengerCount: number;
 }
 
@@ -58,16 +60,16 @@ export interface AgencySalesPerFlight {
   flightNo: string;
   route: string;
   ticketsCount: number;
-  salesIrr: number;
+  salesIrr: string;
 }
 
 export interface AgencySalesReport {
   tickets: AgencySalesTicket[];
   perFlight: AgencySalesPerFlight[];
   summary: {
-    totalSalesIrr: number;
+    totalSalesIrr: string;
     ticketsIssued: number;
-    avgFareIrr: number;
+    avgFareIrr: string;
     refundRatePct: number;
   };
 }
@@ -108,7 +110,7 @@ export interface AgencyAllotmentRow {
   seatsUsed: number;
   type: 'SOFT' | 'HARD';
   releaseAt: string | null;
-  contractPriceIrr: number | null;
+  contractPriceIrr: string | null;
   active: boolean;
 }
 
@@ -127,7 +129,7 @@ export interface AgencyWebserviceRequest {
   id: string;
   scope: AgencyApiScope;
   months: 1 | 3 | 12;
-  priceIrr: number;
+  priceIrr: string;
   note: string | null;
   status: AgencyWebserviceRequestStatus;
   decidedAt: string | null;

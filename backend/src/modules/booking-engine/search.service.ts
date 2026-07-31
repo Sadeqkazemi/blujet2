@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RedisService } from '../../redis/redis.service';
 import { getCabinPrice } from './pricing';
+import type { Irr } from '../../common/money';
 import { enumerateSeats } from '../reservation/seat-layout';
 import { resolveAircraftType } from '../flights/aircraft-type.util';
 import type { CabinClass } from '../../../generated/prisma/enums';
@@ -117,7 +118,7 @@ export class SearchService {
       destCode: string;
       departureAt: Date;
       arrivalAt: Date;
-      cabins: { cabin: CabinClass; priceIrr: number; seatsLeft: number }[];
+      cabins: { cabin: CabinClass; priceIrr: Irr; seatsLeft: number }[];
     }[] = [];
     for (const instance of instances) {
       const map = await this.prisma.aircraftSeatMap.findUnique({
@@ -128,7 +129,7 @@ export class SearchService {
 
       const cabins: {
         cabin: CabinClass;
-        priceIrr: number;
+        priceIrr: Irr;
         seatsLeft: number;
       }[] = [];
       for (const cabin of ['ECONOMY', 'BUSINESS'] as const) {
@@ -240,7 +241,7 @@ export class SearchService {
       destCode: string;
       departureAt: Date;
       arrivalAt: Date;
-      cabins: { cabin: CabinClass; priceIrr: number; seatsLeft: number }[];
+      cabins: { cabin: CabinClass; priceIrr: Irr; seatsLeft: number }[];
       connection: {
         via: string;
         legs: {
@@ -257,11 +258,11 @@ export class SearchService {
       const legs = [a, b];
       const cabins: {
         cabin: CabinClass;
-        priceIrr: number;
+        priceIrr: Irr;
         seatsLeft: number;
       }[] = [];
       for (const cabin of ['ECONOMY', 'BUSINESS'] as const) {
-        let priceSum = 0;
+        let priceSum: Irr = 0n;
         let seatsLeft = Number.MAX_SAFE_INTEGER;
         let ok = true;
         for (const leg of legs) {

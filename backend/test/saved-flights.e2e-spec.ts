@@ -51,7 +51,7 @@ describe('Saved flights (e2e)', () => {
     expect(row).toBeDefined();
     expect(row.flightNo).toBeTruthy();
     expect(row.originCode).toBeTruthy();
-    expect(row.priceIrr).toBeGreaterThan(0);
+    expect(Number(row.priceIrr)).toBeGreaterThan(0);
 
     const dup = await request(app.getHttpServer())
       .post('/my/saved-flights')

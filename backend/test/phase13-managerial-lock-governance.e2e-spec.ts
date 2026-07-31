@@ -238,15 +238,15 @@ describe('Phase 13 Part D — managerial lock governance', () => {
 
     const free = await requestApproveFinalize('2C', 'FREE');
     expect(free.status).toBe(201);
-    expect(free.body.data.priceIrr).toBe(0);
+    expect(free.body.data.priceIrr).toBe('0');
 
     const discounted = await requestApproveFinalize('3A', 'DISCOUNTED', 20);
     expect(discounted.status).toBe(201);
-    expect(discounted.body.data.priceIrr).toBe(38_000_000 - 7_600_000);
+    expect(discounted.body.data.priceIrr).toBe(String(38_000_000 - 7_600_000));
 
     const payable = await requestApproveFinalize('3C', 'PAYABLE');
     expect(payable.status).toBe(201);
-    expect(payable.body.data.priceIrr).toBe(38_000_000);
+    expect(payable.body.data.priceIrr).toBe('38000000');
 
     const booking = await prisma.booking.findUniqueOrThrow({
       where: { pnr: free.body.data.pnr },

@@ -106,9 +106,9 @@ export default function FinanceDashboardPage() {
   }, [granularity, periodKey]);
 
   const channelSums = {
-    system: periods.reduce((s, p) => s + p.systemIrr, 0),
-    charter: periods.reduce((s, p) => s + p.charterIrr, 0),
-    agency: periods.reduce((s, p) => s + p.agencyIrr, 0),
+    system: periods.reduce((s, p) => s + Number(p.systemIrr), 0),
+    charter: periods.reduce((s, p) => s + Number(p.charterIrr), 0),
+    agency: periods.reduce((s, p) => s + Number(p.agencyIrr), 0),
   };
 
   return (
