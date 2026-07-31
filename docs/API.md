@@ -3012,3 +3012,15 @@ SITE_ADMIN may PATCH only: `socialLinks`, `supportEmail`, `supportPhone`,
 Home page app band reads `GET /settings/app-links`.
 Contact page phone/email cards read `GET /settings/support-contact`.
 See `docs/features/site-admin-settings-links.md`.
+
+## Phase G — Contact page support contact wiring
+
+See `docs/features/contact-support-contact-wiring.md`.
+
+## Phase H — Destinations page CMS highlights
+
+Reuses `GET /site-content/home` (no new endpoints). Destination cards on
+`/destinations` override price/image by airport code; «مسیرهای پرتردد»
+uses CMS route highlights with static fallbacks.
+
+See `docs/features/destinations-cms-wiring.md`.
