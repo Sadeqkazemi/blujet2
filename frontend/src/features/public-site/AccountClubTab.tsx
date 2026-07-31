@@ -239,7 +239,7 @@ function tierProgressInfo(membership: ClubMembershipView, locale: StoredLocale) 
         ? `حتى الذهبية: ${faDigits(remaining)} نقطة أخرى`
         : `تا طلایی: ${faDigits(remaining)} امتیاز دیگر`,
     progressPct: Math.min(100, Math.round((balance / gMin) * 100)),
-    style: level === 'GOLD' ? TIER_STYLE.GOLD : TIER_STYLE.SILVER,
+    style: TIER_STYLE.SILVER,
   };
 }
 
@@ -272,16 +272,17 @@ export default function AccountClubTab({ membership, onMembershipChange }: Props
     );
   }
 
-  const tierInfo = tierProgressInfo(membership, locale);
+  const m = membership;
+  const tierInfo = tierProgressInfo(m, locale);
   const tierStyle = tierInfo.style;
   const cardProgress = Math.min(
     100,
-    Math.round((membership.balance / membership.tierRules.cardRequestMinPoints) * 100),
+    Math.round((m.balance / m.tierRules.cardRequestMinPoints) * 100),
   );
-  const cardIssued = membership.cardStatus === 'ISSUED';
-  const showTracker = !!membership.cardRequest;
-  const cardSt = cardStatusStyle(membership.cardStatus);
-  const eligibleTier = TIER_LABEL[membership.level ?? 'GOLD']?.[locale] ?? membership.level ?? '';
+  const cardIssued = m.cardStatus === 'ISSUED';
+  const showTracker = !!m.cardRequest;
+  const cardSt = cardStatusStyle(m.cardStatus);
+  const eligibleTier = TIER_LABEL[m.level ?? 'GOLD']?.[locale] ?? m.level ?? '';
 
   async function onRequestCard() {
     setRequestBusy(true);
@@ -290,7 +291,7 @@ export default function AccountClubTab({ membership, onMembershipChange }: Props
     try {
       const req = await submitClubCardRequest();
       onMembershipChange({
-        ...membership,
+        ...m,
         cardStatus: 'REVIEW',
         cardRequest: req,
         canRequestCard: false,
