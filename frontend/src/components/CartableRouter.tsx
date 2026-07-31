@@ -1,6 +1,6 @@
-import { useAuth } from '../../hooks/useAuth';
-import CartablePage from './CartablePage';
-import EmployeeCartablePage from './EmployeeCartablePage';
+import { useAuth } from '../hooks/useAuth';
+import CartablePage from '../features/cartable/CartablePage';
+import EmployeeCartablePage from '../features/cartable/EmployeeCartablePage';
 
 /** The `cartable` tab key backs two views: exec panels get the full
  * review/transfer/compose UI (CartablePage); EMPLOYEE gets the simpler
