@@ -1,7 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-} from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { TypeORMService } from '../../typeorm/typeorm.service';
 import { ErrorCode } from '../../common/errors';
 import { FilesService } from '../files/files.service';
@@ -20,7 +17,9 @@ export class IdentityVerificationService {
     nationalIdEnc: string | null;
     birthDate: Date | null;
   }): boolean {
-    return Boolean(user.fullName?.trim() && user.nationalIdEnc && user.birthDate);
+    return Boolean(
+      user.fullName?.trim() && user.nationalIdEnc && user.birthDate,
+    );
   }
 
   private async getOrCreateRow(userId: string) {

@@ -210,7 +210,7 @@ const SAVED: SavedFlight = {
   destCityFa: 'مشهد',
   departureAt: '2026-08-02T05:00:00.000Z',
   arrivalAt: '2026-08-02T06:30:00.000Z',
-  priceIrr: 195_000_000,
+  priceIrr: '195000000',
   bookable: true,
   createdAt: '2026-07-01T00:00:00.000Z',
 };

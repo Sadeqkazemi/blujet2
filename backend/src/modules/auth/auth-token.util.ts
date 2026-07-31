@@ -13,10 +13,13 @@ export function formatSessionDevice(userAgent: string | null): string {
   const ua = userAgent.toLowerCase();
   if (ua.includes('iphone') || ua.includes('ipad')) return 'Safari · iOS';
   if (ua.includes('android')) {
-    return ua.includes('blujet') ? 'اپلیکیشن blujet · اندروید' : 'Chrome · Android';
+    return ua.includes('blujet')
+      ? 'اپلیکیشن blujet · اندروید'
+      : 'Chrome · Android';
   }
   if (ua.includes('windows')) return 'Chrome · Windows';
-  if (ua.includes('mac os') || ua.includes('macintosh')) return 'Safari · macOS';
+  if (ua.includes('mac os') || ua.includes('macintosh'))
+    return 'Safari · macOS';
   if (ua.includes('linux')) return 'Chrome · Linux';
   return userAgent.length > 48 ? `${userAgent.slice(0, 45)}…` : userAgent;
 }
