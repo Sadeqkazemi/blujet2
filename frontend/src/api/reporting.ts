@@ -11,6 +11,7 @@ import type {
   RevenueMixResult,
   SalesChartPeriod,
   StaffReportsResult,
+  CommercialOverview,
 } from '../types/reporting';
 
 function toQueryString(query: PeriodQuery): string {
@@ -41,6 +42,10 @@ export function fetchLowSalesAlerts() {
 
 export function fetchFinanceDashboardStats() {
   return apiGet<FinanceDashboardStats>('/reporting/finance-dashboard-stats');
+}
+
+export function fetchCommercialOverview() {
+  return apiGet<CommercialOverview>('/reporting/commercial-overview');
 }
 
 export function fetchRecentTransactions() {

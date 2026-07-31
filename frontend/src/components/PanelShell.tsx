@@ -47,7 +47,10 @@ export default function PanelShell() {
         fetchCartable()
           .then((r) => {
             if (r.totalOpen > 0) {
-              next.cartable = { count: r.totalOpen, className: 'bg-danger text-white' };
+              next.cartable = {
+                count: r.totalOpen,
+                className: 'bg-danger text-white',
+              };
             }
           })
           .catch(() => undefined),
@@ -59,7 +62,10 @@ export default function PanelShell() {
         fetchRefunds()
           .then((r) => {
             if (r.kpis.payoutQueue > 0) {
-              next.refund = { count: r.kpis.payoutQueue, className: 'bg-[#a855f7] text-white' };
+              next.refund = {
+                count: r.kpis.payoutQueue,
+                className: 'bg-[#a855f7] text-white',
+              };
             }
           })
           .catch(() => undefined),
@@ -71,7 +77,10 @@ export default function PanelShell() {
         fetchStaffReports()
           .then((r) => {
             if (r.newEmployeeEvents.length > 0) {
-              next.staff = { count: r.newEmployeeEvents.length, className: 'bg-danger text-white' };
+              next.staff = {
+                count: r.newEmployeeEvents.length,
+                className: 'bg-danger text-white',
+              };
             }
           })
           .catch(() => undefined),

@@ -42,6 +42,12 @@ export default function StaffReportsPage() {
 
   const selected = staffId ? data.staff.find((s) => s.id === staffId) : null;
 
+  const isNewStaff = (createdAt: string) => {
+    const created = new Date(createdAt).getTime();
+    const cutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
+    return created >= cutoff;
+  };
+
   return (
     <div className="p-8">
       <h1 className="mb-1 text-xl font-black text-ink">گزارش کارمندان</h1>
@@ -98,11 +104,14 @@ export default function StaffReportsPage() {
             <button
               key={s.id}
               onClick={() => setStaffId(s.id)}
-              className={`rounded-lg px-3.5 py-2 text-[11.5px] transition ${
+              className={`relative rounded-lg px-3.5 py-2 text-[11.5px] transition ${
                 staffId === s.id ? 'bg-accent font-bold text-white' : 'bg-body text-muted hover:text-ink'
               }`}
             >
               {s.fullName}
+              {isNewStaff(s.createdAt) && (
+                <span className="absolute -top-1 end-[-4px] h-2 w-2 rounded-full border-2 border-white bg-danger" />
+              )}
             </button>
           ))}
         </div>

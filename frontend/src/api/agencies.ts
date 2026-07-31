@@ -135,3 +135,33 @@ export function decideAgencyDocument(id: string, docId: string, approve: boolean
 export function notifyAllDebtors() {
   return apiPost<{ notifiedCount: number }>('/agencies/debtors/notify-all');
 }
+
+export function fetchAgencyCreditRequests(id: string) {
+  return apiGet<import('../types/agency-portal').AgencyCreditRequest[]>(
+    `/agencies/${id}/credit-requests`,
+  );
+}
+
+export function decideAgencyCreditRequest(id: string, reqId: string, approve: boolean) {
+  return apiPatch<import('../types/agency-portal').AgencyCreditRequest>(
+    `/agencies/${id}/credit-requests/${reqId}/decide`,
+    { approve },
+  );
+}
+
+export function fetchAgencyWebserviceRequests(id: string) {
+  return apiGet<import('../types/agency-portal').AgencyWebserviceRequest[]>(
+    `/agencies/${id}/webservice-requests`,
+  );
+}
+
+export function decideAgencyWebserviceRequest(
+  id: string,
+  reqId: string,
+  dto: { approve: boolean; stepUpChallengeId?: string; stepUpCode?: string },
+) {
+  return apiPatch<import('../types/agency-portal').AgencyWebserviceRequest>(
+    `/agencies/${id}/webservice-requests/${reqId}/decide`,
+    dto,
+  );
+}

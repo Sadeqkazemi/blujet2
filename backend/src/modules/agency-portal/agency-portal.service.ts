@@ -8,6 +8,7 @@ import { AuditService } from '../audit/audit.service';
 import { CartableService } from '../cartable/cartable.service';
 import { AgenciesService } from '../agencies/agencies.service';
 import { FilesService } from '../files/files.service';
+import { WebservicePricingService } from '../webservice-pricing/webservice-pricing.service';
 import { ErrorCode } from '../../common/errors';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type {
@@ -23,13 +24,9 @@ const CREDIT_REVIEW_ROLES = [
 
 const SOLD_STATUSES = ['PAID', 'TICKETED'] as const;
 
-// Phase 23: server-computed prices from the design's own plan catalog
-// (تومان × 10 → ریال). Never accept a client-supplied price.
-const WEBSERVICE_PLAN_PRICES_IRR: Record<number, number> = {
-  1: 45_000_000,
-  3: 120_000_000,
-  12: 420_000_000,
-};
+// Phase 23: server-computed prices from the commercial-manager plan catalog
+// (stored in SystemSetting, editable via PATCH /webservice/pricing).
+// Never accept a client-supplied price.
 
 @Injectable()
 export class AgencyPortalService {
@@ -39,6 +36,7 @@ export class AgencyPortalService {
     private readonly cartable: CartableService,
     private readonly agencies: AgenciesService,
     private readonly files: FilesService,
+    private readonly webservicePricing: WebservicePricingService,
   ) {}
 
   private async getOwnProfileOrThrow(actor: AuthenticatedUser) {
@@ -390,9 +388,30 @@ export class AgencyPortalService {
   // ── Phase 23: real webservice (B2B API) purchase requests ──────────────
   // (replaces AgencyWebservicePage mock's local-only "requested"/"keyShown")
 
+  async assertAgency(actor: AuthenticatedUser) {
+    await this.getOwnProfileOrThrow(actor);
+  }
+
+  async webservicePlans() {
+    const prices = await this.webservicePricing.getPlanPrices();
+    return {
+      plans: ([1, 3, 12] as const).map((months) => ({
+        months,
+        priceIrr: prices[months],
+      })),
+    };
+  }
+
   async requestWebservice(actor: AuthenticatedUser, dto: RequestWebserviceDto) {
     await this.getOwnProfileOrThrow(actor);
-    const priceIrr = WEBSERVICE_PLAN_PRICES_IRR[dto.months];
+    const planPrices = await this.webservicePricing.getPlanPrices();
+    const priceIrr = planPrices[dto.months];
+    if (!priceIrr) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'مدت اشتراک نامعتبر است.',
+      });
+    }
 
     const request = await this.typeorm.agencyWebserviceRequest.create({
       data: {

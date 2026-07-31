@@ -40,6 +40,7 @@ import StaffReportsPage from './features/staff-reports/StaffReportsPage';
 import ManagerReportsPage from './features/manager-reports/ManagerReportsPage';
 import AdminsPage from './features/admins/AdminsPage';
 import SettingsPage from './features/settings/SettingsPage';
+import CommercialWebservicePage from './features/webservice/CommercialWebservicePage';
 import SecurityRouter from './components/SecurityRouter';
 import LogsRouter from './components/LogsRouter';
 import ReferralsRouter from './components/ReferralsRouter';
@@ -132,6 +133,9 @@ export default function App() {
               </Route>
               <Route path="clubrules" element={<TabGate tabKey="clubrules" />}>
                 <Route index element={<ClubTierRulesPage />} />
+              </Route>
+              <Route path="webservice" element={<TabGate tabKey="webservice" />}>
+                <Route index element={<CommercialWebservicePage />} />
               </Route>
               <Route path="survey" element={<TabGate tabKey="survey" />}>
                 <Route index element={<SurveyRouter />} />

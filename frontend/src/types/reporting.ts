@@ -16,6 +16,12 @@ export interface KpiTrends {
   agencyDebtPct: number;
 }
 
+export interface CommercialOverview {
+  activeAgencies: number;
+  passengersThisMonth: number;
+  pendingAgencyRequests: number;
+}
+
 export interface KpiResult {
   revenueIrr: number;
   profitIrr: number;

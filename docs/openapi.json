@@ -816,6 +816,36 @@
         ]
       }
     },
+    "/reporting/finance-dashboard-stats": {
+      "get": {
+        "operationId": "ReportingController_financeDashboardStats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "کارت‌های داشبورد مدیر مالی — آژانس/مسافر/بلیط/درآمد ماه جاری با روند",
+        "tags": [
+          "reporting"
+        ]
+      }
+    },
+    "/reporting/commercial-overview": {
+      "get": {
+        "operationId": "ReportingController_commercialOverview",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Commercial Manager dashboard KPI row — active agencies, passengers this month, pending cooperation requests",
+        "tags": [
+          "reporting"
+        ]
+      }
+    },
     "/reporting/recent-transactions": {
       "get": {
         "operationId": "ReportingController_recentTransactions",
@@ -4359,6 +4389,21 @@
         ]
       }
     },
+    "/agency-portal/webservice-plans": {
+      "get": {
+        "operationId": "AgencyPortalController_webservicePlans",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "قیمت‌های فعلی پلن‌های وب‌سرویس (ریال)",
+        "tags": [
+          "agency-portal"
+        ]
+      }
+    },
     "/agency-portal/webservice-requests": {
       "post": {
         "operationId": "AgencyPortalController_requestWebservice",
@@ -4412,6 +4457,44 @@
         ]
       }
     },
+    "/webservice/pricing": {
+      "get": {
+        "operationId": "WebservicePricingController_getPricing",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "قیمت پلن‌های وب‌سرویس B2B (ریال)",
+        "tags": [
+          "webservice-pricing"
+        ]
+      },
+      "patch": {
+        "operationId": "WebservicePricingController_updatePricing",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateWebservicePricingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "به‌روزرسانی قیمت پلن‌های ۱/۳/۱۲ ماهه — فقط مدیر بازرگانی",
+        "tags": [
+          "webservice-pricing"
+        ]
+      }
+    },
     "/flights/overview": {
       "get": {
         "operationId": "FlightsController_overview",
@@ -4437,6 +4520,29 @@
           }
         },
         "summary": "کاتالوگ فرودگاه‌ها برای فرم افزودن پرواز",
+        "tags": [
+          "flights"
+        ]
+      },
+      "post": {
+        "operationId": "FlightsController_createAirport",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAirportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "افزودن شهر/فرودگاه جدید به کاتالوگ",
         "tags": [
           "flights"
         ]
@@ -5072,6 +5178,21 @@
           }
         },
         "summary": "تغییر درصد جریمهٔ بازه‌های واقعی استرداد — همان جدولی که موتور فاز ۷ می‌خواند",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/settings/social-links": {
+      "get": {
+        "operationId": "SettingsPublicController_getSocialLinks",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "لینک‌های فعال شبکه‌های اجتماعی برای فوتر سایت",
         "tags": [
           "settings"
         ]
@@ -7376,6 +7497,55 @@
         "required": [
           "scope",
           "months"
+        ]
+      },
+      "UpdateWebservicePricingDto": {
+        "type": "object",
+        "properties": {
+          "month1PriceIrr": {
+            "type": "number",
+            "description": "قیمت پلن ۱ ماهه (ریال)",
+            "example": 45000000
+          },
+          "month3PriceIrr": {
+            "type": "number",
+            "description": "قیمت پلن ۳ ماهه (ریال)",
+            "example": 120000000
+          },
+          "month12PriceIrr": {
+            "type": "number",
+            "description": "قیمت پلن ۱۲ ماهه (ریال)",
+            "example": 420000000
+          }
+        },
+        "required": [
+          "month1PriceIrr",
+          "month3PriceIrr",
+          "month12PriceIrr"
+        ]
+      },
+      "CreateAirportDto": {
+        "type": "object",
+        "properties": {
+          "cityFa": {
+            "type": "string",
+            "description": "نام شهر",
+            "example": "وان"
+          },
+          "code": {
+            "type": "string",
+            "description": "کد IATA فرودگاه",
+            "example": "VAS"
+          },
+          "tz": {
+            "type": "string",
+            "description": "منطقه زمانی IANA",
+            "example": "Asia/Tehran"
+          }
+        },
+        "required": [
+          "cityFa",
+          "code"
         ]
       },
       "CreateFlightDto": {

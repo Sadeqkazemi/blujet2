@@ -9,6 +9,13 @@ import type { AgencyApiKeySummary, AgencyWebserviceRequest } from '../../types/a
 function mockLoads(requests: AgencyWebserviceRequest[] = [], apiKeys: AgencyApiKeySummary[] = []) {
   vi.spyOn(portalApi, 'fetchMyWebserviceRequests').mockResolvedValue(requests);
   vi.spyOn(portalApi, 'fetchApiKeys').mockResolvedValue(apiKeys);
+  vi.spyOn(portalApi, 'fetchAgencyPortalWebservicePlans').mockResolvedValue({
+    plans: [
+      { months: 1, priceIrr: 45_000_000 },
+      { months: 3, priceIrr: 120_000_000 },
+      { months: 12, priceIrr: 420_000_000 },
+    ],
+  });
 }
 
 function mockLocale(locale: 'fa' | 'en' | 'ar') {

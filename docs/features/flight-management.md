@@ -37,16 +37,16 @@ untouched). Design source: FLIGHTS MANAGEMENT sections of
       — backend/test/flights.e2e-spec.ts › "ai-analysis persists suggestions with modelVersion…; down service degrades gracefully"
 
 ### Frontend (both panels)
-- [x] KPI row + three sub-tab pills (پروازهای فعال / پروازهای انجام‌شده / پروازهای آینده) matching the design
-      — frontend/src/features/flights/FlightsPage.test.tsx › "renders KPI cards and the active table…"
+- [x] KPI row + three sub-tab pills matching the design — Senior: فعال/انجام‌شده/آینده; Commercial: فعال/انجام‌شده/شهرهای پروازی (future planning shown on active tab per commercial design)
+      — FlightsPage.test.tsx + FlightCitiesTab.test.tsx
 - [x] Active table: 6 design columns, occupancy progress bar with the design's color thresholds (۱۰۰٪ amber, ≥۶۰٪ green, else blue), status pills, «افزودن پرواز» button
       — same test (status pills, occupancy, toman price)
 - [x] Add-flight modal: مبدأ/مقصد selects from the airport catalog, LTR flightNo/time/capacity/price inputs, inline validation message, success toast «پرواز جدید … اضافه شد ✓», new row appears in پروازهای فعال
       — FlightsPage.test.tsx › "add-flight modal: empty submit shows the design message; a full form converts Jalali+toman…"
 - [x] Flight detail modal: sold/cap, ضریب اشغال, قیمت پایه + the 3 channel bars (سیستمی/چارتری/آژانس with seats · revenue) + مجموع درآمد
       — FlightsPage.test.tsx › "flight detail modal shows the real channel breakdown and total revenue"
-- [x] Completed sub-tab: 4 KPI cards + report table with expandable row detail (design's 6 detail boxes)
-      — rendered from the same overview fixture; expand behavior exercised in the E2E journey
+- [x] Completed sub-tab: 4 KPI cards + report table — Senior: expandable 6-box detail + avg/loss columns; Commercial: separate channel columns per design
+      — FlightsPage role-specific rendering
 - [x] Future sub-tab: Jalali day-filter calendar (only days with flights clickable, «پاک‌کردن فیلتر»), expandable cards (ظرفیت / تعهد چارتری / قیمت پیشنهادی AI / نرخ نهایی و تخصیص), نرخ‌گذاری modal with «استفاده از قیمت AI», agency-seat cap, empty state «برای روز انتخاب‌شده پروازی برنامه‌ریزی نشده است.»
       — FlightsPage.test.tsx › "future tab: AI panel renders; the plan modal pre-fills from AI…" + calendar markup in FlightsPage.tsx (day chips disabled without flights)
 - [x] faMoney/faDigits/Jalali everywhere; flight codes LTR mono

@@ -46,6 +46,7 @@ set and chart shape across every panel report.
 | GET | `/reporting/kpis` | same | Query: `granularity`, `periodKey?` (selected bar/day/month) → `{ revenueIrr, profitIrr, marginPct, operatingCostIrr, agencyDebtIrr, agencyDebtCount, trend: {...} }`. Re-scopes to the selected period, matching the "KPIs re-scope when a chart month is selected" rule. |
 | GET | `/reporting/completed-flights-summary` | same | Same `granularity`/`periodKey` filter → `{ flightCount, totalSeats, soldSeats, unsoldSeats }`, synced to the same period as the chart. |
 | GET | `/reporting/low-sales-alerts` | CEO, BOARD_CHAIR, SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | Flights &lt;72h out with occupancy below threshold — the design's recurring amber banner, currently hardcoded in every panel; this endpoint replaces the hardcoded copy with a real query. |
+| GET | `/reporting/commercial-overview` | COMMERCIAL_MANAGER | Commercial dashboard KPI row: `{ activeAgencies, passengersThisMonth, pendingAgencyRequests }`. |
 
 ### Manager activity / audit feed (`backend/src/modules/audit/`)
 
@@ -71,7 +72,7 @@ the parent resource.
 | Method | Path | Roles | Notes |
 |---|---|---|---|
 | GET | `/agencies` | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | Query: `q?` (name/license/manager/city search), `debtorsOnly?` (Commercial's "آژانس‌های دارای بدهی" panel). Returns list + the same 4 KPI cards (active count, total credit granted, total used/debt, pending-settlement count) confirmed identical across all three panels. |
-| GET | `/agencies/:id` | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | Detail: profile, computed stats (total sales, tickets issued, passengers), credit summary, recent activity timeline. `activityScore` (see DB_SCHEMA) is only included for FINANCE_MANAGER/COMMERCIAL_MANAGER — Senior Manager's detail view never showed it. |
+| GET | `/agencies/:id` | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | Detail: profile, computed stats (total sales, tickets issued, passengers), credit summary, recent activity timeline. `activityScore` (see DB_SCHEMA) is only included for FINANCE_MANAGER/COMMERCIAL_MANAGER — Senior Manager's detail view never showed it. For COMMERCIAL_MANAGER only, also returns `commercialExtras`: `{ flightsSold[], purchasedServices[], financeSummary, transactions[] }` for the design's overview/finance sub-sections. |
 | PATCH | `/agencies/:id/suspend` | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | `{ reason }` (required) → sets `suspendedAt`/`suspendReason`, `AuditLog(category=AGENCY)`. |
 | PATCH | `/agencies/:id/reactivate` | same as suspend | Clears suspension. |
 | GET | `/agencies/:id/credit` | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | `{ limitIrr, usedIrr (derived), remainingIrr }`. |
@@ -351,6 +352,9 @@ stays untouched on the same page).
     suggestion (if any), and the Jalali day list for the calendar filter.
 - GET `/flights/airports` — seeded airport catalog for the add-flight
   selects.
+- POST `/flights/airports` — `{ cityFa, code, tz? }` — add a city/airport
+  to the catalog (Commercial «شهرهای پروازی» tab); 409 on duplicate code or
+  city name; audited.
 - POST `/flights` — «افزودن پرواز» modal `{ originCode, destCode,
   flightNo, departureDate (Jalali), departureTime, capacity,
   basePriceToman }` — find-or-create Route/Flight, create instance;
@@ -663,9 +667,10 @@ panels. Key ⚑ decisions:
 
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/settings` | All `SystemSetting` key-values with server defaults (companyName, supportEmail, supportPhone, gateway toggles mellat/saman/zarin, global toggles maintenance/registration/charterSale/apiPublic/sandbox, brandColor) + the real `RefundPenaltyRule` brackets. |
-| PATCH | `/settings` | Partial key-value update; validated per key; audited (SYSTEM). |
+| GET | `/settings` | All `SystemSetting` key-values with server defaults (companyName, supportEmail, supportPhone, gateway toggles mellat/saman/zarin, global toggles maintenance/registration/charterSale/apiPublic/sandbox, brandColor, **socialLinks** — five fixed networks: instagram/telegram/whatsapp/linkedin/x, each `{ id, name, url, enabled }`) + the real `RefundPenaltyRule` brackets. |
+| PATCH | `/settings` | Partial key-value update; validated per key; audited (SYSTEM). `socialLinks` patch: array of partial entries; enabled links require non-empty URL (max 500 chars); unknown network ids rejected. |
 | PATCH | `/settings/refund-rules` | BOARD_CHAIR only — updates the REAL Phase 7 `RefundPenaltyRule.penaltyPct` per bracket (0–100 validated); audited. The refund engine keeps reading these same rows. |
+| GET | `/settings/social-links` | **Public** (no auth) — returns `{ links: [{ id, name, url }] }` for enabled networks with non-empty URLs; bare hostnames normalized to `https://`. Rate-limited. |
 
 ### `backend/src/modules/panels/` (change)
 
@@ -1126,11 +1131,14 @@ request/decide pattern exactly, for a new `AgencyWebserviceRequest`.
   `{ scope: 'FULL' | 'SEARCH_BOOK', months: 1 | 3 | 12, note?: string }`
   (whitelist DTO — `forbidNonWhitelisted` rejects any other field,
   including a client-supplied price). Creates a `PENDING`
-  `AgencyWebserviceRequest` with `priceIrr` computed server-side from a
-  fixed plan catalog (the design's own toman prices ×10 → ریال:
-  ۱ ماهه=۴۵٬۰۰۰٬۰۰۰, ۳ ماهه=۱۲۰٬۰۰۰٬۰۰۰, ۱۲ ماهه=۴۲۰٬۰۰۰٬۰۰۰ ریال), fires a
-  cartable task to `SENIOR_MANAGER`/`FINANCE_MANAGER`/`COMMERCIAL_MANAGER`
+  `AgencyWebserviceRequest` with `priceIrr` computed server-side from the
+  **configurable** plan catalog (`SystemSetting.webservicePlanPrices` —
+  defaults: ۱ ماهه=۴۵٬۰۰۰٬۰۰۰, ۳ ماهه=۱۲۰٬۰۰۰٬۰۰۰, ۱۲ ماهه=۴۲۰٬۰۰۰٬۰۰۰
+  ریال; editable by COMMERCIAL_MANAGER via `PATCH /webservice/pricing`),
+  fires a cartable task to `SENIOR_MANAGER`/`FINANCE_MANAGER`/`COMMERCIAL_MANAGER`
   (same review-role set as credit requests), and audit-logs.
+- `GET /agency-portal/webservice-plans` — current plan prices for this
+  agency's purchase UI (same three durations, server-computed IRR).
 - `GET /agency-portal/webservice-requests` — this agency's own request
   history.
 - `GET /agency-portal/api-keys` — this agency's own API keys, **metadata
@@ -1154,6 +1162,20 @@ request/decide pattern exactly, for a new `AgencyWebserviceRequest`.
   which updates first): if step-up verification fails, the request must
   stay `PENDING` for a retry, never end up `APPROVED` with no key actually
   issued.
+
+### Commercial Manager — webservice plan pricing
+
+- `GET /webservice/pricing` — `COMMERCIAL_MANAGER`, `CEO`, `SENIOR_MANAGER`
+  — `{ prices: { 1, 3, 12 } }` in IRR.
+- `PATCH /webservice/pricing` — `COMMERCIAL_MANAGER` only — body
+  `{ month1PriceIrr, month3PriceIrr, month12PriceIrr }`; audited
+  (SYSTEM). New agency purchase requests immediately use the updated
+  prices.
+
+Frontend: `CommercialWebservicePage.tsx` (Commercial panel's **وب سرویس**
+tab — `PANEL_NAV.COMMERCIAL_MANAGER` key `webservice`) edits the three
+plan prices; `AgencyWebservicePage.tsx` reads them via
+`GET /agency-portal/webservice-plans`.
 
 ### Raw key delivery — a scope decision, documented here
 
@@ -1716,16 +1738,11 @@ label, file name, Jalali upload date, status pill, تأیید/رد buttons on
 the endpoint's role gate — no `EmployeePermission` key currently grants
 document review).
 
-**Not corrected this phase, flagged instead**: while building this,
-discovered that the credit-requests and webservice-requests staff-decide
-endpoints this phase's code directly mirrors have **no frontend UI of
-their own either** — `AgencyDetailPage.tsx` never called
-`GET/PATCH .../credit-requests` or `GET/PATCH .../webservice-requests`
-before this phase, and still doesn't. Every credit-increase and
-webservice-purchase request submitted by an agency is currently
-decidable only via curl/Supertest. This is a real, parallel gap of the
-same shape as documents — reported to the user, deliberately left
-out of this phase's diff so it stays reviewable, not silently bundled in.
+Frontend (credit/webservice requests): `AgencyDetailPage.tsx`
+(Senior/Finance overview + Commercial مالی sub-tab) gained
+«درخواست‌های افزایش اعتبار» and «درخواست‌های خرید وب‌سرویس» cards —
+same approve/reject pattern as documents; webservice approval reuses the
+existing step-up gate (`API_KEY_ROTATE`) because it issues a real API key.
 
 ## Phase 40 — ترجیح زبان نمایش (display-language preference storage)
 
