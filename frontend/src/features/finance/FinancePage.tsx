@@ -25,8 +25,15 @@ import type {
   RecentTransactionsResult,
   RevenueMixResult,
   SalesChartPeriod,
+  SalesGranularity,
   SettlementStatus,
 } from '../../types/reporting';
+
+const CHART_MODES: { key: SalesGranularity; label: string }[] = [
+  { key: 'q3', label: '۳ ماهه' },
+  { key: 'q6', label: '۶ ماهه' },
+  { key: 'year', label: 'سالانه' },
+];
 import type { ReconciliationItem } from '../../types/reconciliation';
 
 const SETTLEMENT_STATUS: Record<SettlementStatus, { label: string; className: string }> = {

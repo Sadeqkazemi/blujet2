@@ -49,6 +49,7 @@ const API_SCOPE_OPTIONS: { value: AgencyApiScope; label: string }[] = [
 const WS_SCOPE_LABEL: Record<AgencyApiScope, string> = {
   SEARCH_BOOK: 'جستجو و رزرو',
   FULL: 'فروش کامل (صدور بلیط)',
+  SEARCH_ONLY: 'فقط جستجو (آزمایشی)',
 };
 
 function SectionCard({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {

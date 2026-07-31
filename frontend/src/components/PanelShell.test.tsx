@@ -20,7 +20,7 @@ describe('PanelShell', () => {
   it('shows sidebar badges for cartable, refund queue, and new staff events', async () => {
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
       status: 'authenticated',
-      user: { id: 'u1', fullName: 'مدیر مالی', role: 'FINANCE_MANAGER', preferredLocale: 'fa' },
+      user: { id: 'u1', fullName: 'مدیر مالی', role: 'FINANCE_MANAGER', preferredLocale: 'FA' },
       requestLogin: vi.fn(),
       confirmTwoFactor: vi.fn(),
       agencyLogin: vi.fn(),

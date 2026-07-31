@@ -35,7 +35,14 @@ export default function CommercialWebservicePage() {
       const month1PriceIrr = parseTomanToRial(month1);
       const month3PriceIrr = parseTomanToRial(month3);
       const month12PriceIrr = parseTomanToRial(month12);
-      if (month1PriceIrr <= 0 || month3PriceIrr <= 0 || month12PriceIrr <= 0) {
+      if (
+        month1PriceIrr === null ||
+        month3PriceIrr === null ||
+        month12PriceIrr === null ||
+        month1PriceIrr <= 0 ||
+        month3PriceIrr <= 0 ||
+        month12PriceIrr <= 0
+      ) {
         setError('همهٔ قیمت‌ها باید عددی و بزرگ‌تر از صفر باشند.');
         return;
       }
@@ -84,9 +91,9 @@ export default function CommercialWebservicePage() {
                   onChange={(e) => setValue(latinDigits(e.target.value))}
                   className="font-num w-full rounded-lg border border-border px-3.5 py-2.5 text-sm outline-none focus:border-accent"
                 />
-                {value && (
+                {value && parseTomanToRial(value) !== null && (
                   <p className="mt-1 text-[10px] text-muted">
-                    ≈ {faMoney(parseTomanToRial(value))} تومان
+                    ≈ {faMoney(parseTomanToRial(value)!)} تومان
                   </p>
                 )}
               </div>

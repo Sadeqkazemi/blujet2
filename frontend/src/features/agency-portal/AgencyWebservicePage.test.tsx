@@ -10,7 +10,6 @@ function mockLoads(requests: AgencyWebserviceRequest[] = [], apiKeys: AgencyApiK
   vi.spyOn(portalApi, 'fetchMyWebserviceRequests').mockResolvedValue(requests);
   vi.spyOn(portalApi, 'fetchApiKeys').mockResolvedValue(apiKeys);
   vi.spyOn(portalApi, 'fetchAgencyPortalWebservicePlans').mockResolvedValue({
-    scope: 'SEARCH_BOOK',
     plans: [
       { months: 1, priceIrr: 45_000_000 },
       { months: 3, priceIrr: 120_000_000 },
