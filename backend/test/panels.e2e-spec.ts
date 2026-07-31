@@ -19,7 +19,7 @@ describe('Panels (e2e)', () => {
     await app.close();
   });
 
-  it('returns the confirmed tab set for Finance Manager (flights/admins/settings excluded)', async () => {
+  it('returns the confirmed tab set for Finance Manager (flights/flightops/admins/settings excluded)', async () => {
     const { accessToken } = await loginAs(app, 'finance.karimi');
     const res = await request(app.getHttpServer())
       .get('/panels/nav')
@@ -30,7 +30,6 @@ describe('Panels (e2e)', () => {
     expect(keys).toEqual([
       'dashboard',
       'agencies',
-      'flightops',
       'reports',
       'staff',
       'finance',
@@ -38,6 +37,7 @@ describe('Panels (e2e)', () => {
       'cartable',
     ]);
     expect(keys).not.toContain('flights');
+    expect(keys).not.toContain('flightops');
     expect(keys).not.toContain('admins');
     expect(keys).not.toContain('settings');
   });
