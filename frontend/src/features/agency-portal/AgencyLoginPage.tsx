@@ -149,8 +149,8 @@ function AgencyLoginForm() {
     setError(null);
     setSubmitting(true);
     try {
-      await agencyLogin(phone.trim(), password);
-      navigate('/agency', { replace: true });
+      const loggedIn = await agencyLogin(phone.trim(), password);
+      navigate(loggedIn.mustChangePassword ? '/required-password-change' : '/agency', { replace: true });
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.loginFailedFallback);
     } finally {
