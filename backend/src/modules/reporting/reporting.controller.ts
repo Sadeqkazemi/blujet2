@@ -63,6 +63,17 @@ export class ReportingController {
     return { success: true, data };
   }
 
+  @Get('finance-dashboard-stats')
+  @Roles('FINANCE_MANAGER')
+  @ApiOperation({
+    summary:
+      'کارت‌های داشبورد مدیر مالی — آژانس/مسافر/بلیط/درآمد ماه جاری با روند',
+  })
+  async financeDashboardStats() {
+    const data = await this.reporting.financeDashboardStats();
+    return { success: true, data };
+  }
+
   @Get('recent-transactions')
   @Roles('FINANCE_MANAGER')
   @ApiOperation({

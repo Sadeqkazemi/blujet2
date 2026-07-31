@@ -9,6 +9,13 @@ export interface SalesChartPeriod {
   agencyIrr: number;
 }
 
+export interface KpiTrends {
+  revenuePct: number;
+  profitPct: number;
+  operatingCostPct: number;
+  agencyDebtPct: number;
+}
+
 export interface KpiResult {
   revenueIrr: number;
   profitIrr: number;
@@ -16,6 +23,18 @@ export interface KpiResult {
   operatingCostIrr: number;
   agencyDebtIrr: number;
   agencyDebtCount: number;
+  trends: KpiTrends;
+}
+
+export interface FinanceDashboardStats {
+  activeAgencies: number;
+  activeAgenciesTrendPct: number;
+  passengersThisMonth: number;
+  passengersTrendPct: number;
+  ticketsSoldThisMonth: number;
+  ticketsTrendPct: number;
+  revenueThisMonthIrr: number;
+  revenueTrendPct: number;
 }
 
 export interface CompletedFlightsSummary {
@@ -47,6 +66,8 @@ export interface PeriodQuery {
 
 export type LedgerType = 'SALE' | 'REFUND' | 'SETTLEMENT' | 'COMMISSION';
 
+export type TransactionStatusTone = 'success' | 'warning' | 'danger';
+
 export interface RecentTransaction {
   id: string;
   type: LedgerType;
@@ -54,6 +75,8 @@ export interface RecentTransaction {
   party: string;
   occurredAt: string;
   signedAmountIrr: number;
+  statusFa: string;
+  statusTone: TransactionStatusTone;
 }
 
 export interface RecentTransactionsResult {

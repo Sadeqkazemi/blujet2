@@ -6,9 +6,12 @@ import { materializeDepartedInstances } from '../flights/flight-lifecycle.util';
 import {
   Bucket,
   CompletedFlightsSummary,
+  FinanceDashboardStats,
   KpiResult,
+  KpiTrends,
   SalesChartPeriod,
   SalesGranularity,
+  TransactionStatusTone,
 } from './reporting.types';
 
 const LOW_SALES_WINDOW_HOURS = 72;
@@ -192,20 +195,27 @@ export class ReportingService {
     return { start: buckets[0].start, end: buckets[buckets.length - 1].end };
   }
 
-  async kpis(
-    granularity: SalesGranularity,
-    params: {
-      periodStart?: string;
-      date?: string;
-      flightNo?: string;
-      periodKey?: string;
-    },
-  ): Promise<KpiResult> {
-    const { start, end, flightNo } = this.resolvePeriodRange(
-      granularity,
-      params,
+  private monthUtcRange(offsetMonths: number): { start: Date; end: Date } {
+    const now = new Date();
+    const start = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offsetMonths, 1),
     );
+    const end = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offsetMonths + 1, 1),
+    );
+    return { start, end };
+  }
 
+  private trendPct(current: number, previous: number): number {
+    if (previous === 0) return current > 0 ? 100 : 0;
+    return Math.round(((current - previous) / previous) * 100);
+  }
+
+  private async aggregateKpiWindow(
+    start: Date,
+    end: Date,
+    flightNo?: string,
+  ): Promise<Omit<KpiResult, 'trends' | 'agencyDebtIrr' | 'agencyDebtCount'>> {
     const entries = await this.prisma.ledgerEntry.findMany({
       where: {
         occurredAt: { gte: start, lt: end },
@@ -221,11 +231,6 @@ export class ReportingService {
     let operatingCostIrr = 0;
     for (const e of entries) {
       const amount = Math.abs(e.signedAmountIrr);
-      // AgenciesService.resetTestDebt reuses type:'SALE' for agency
-      // debt-line calibration (agencyId set, bookingId null, amount can
-      // be negative) — that's not ticket revenue, so it's excluded here
-      // the same way sumByChannel() already excludes it via its
-      // booking-relation filter.
       if (e.type === 'SALE') {
         if (e.bookingId) revenueIrr += amount;
       } else if (e.type === 'REFUND') refundIrr += amount;
@@ -237,16 +242,152 @@ export class ReportingService {
     const marginPct =
       revenueIrr > 0 ? Math.round((profitIrr / revenueIrr) * 100) : 0;
 
+    return { revenueIrr, profitIrr, marginPct, operatingCostIrr };
+  }
+
+  private previousPeriodRange(
+    start: Date,
+    end: Date,
+  ): { start: Date; end: Date } {
+    const spanMs = end.getTime() - start.getTime();
+    return {
+      start: new Date(start.getTime() - spanMs),
+      end: new Date(start.getTime()),
+    };
+  }
+
+  async kpis(
+    granularity: SalesGranularity,
+    params: {
+      periodStart?: string;
+      date?: string;
+      flightNo?: string;
+      periodKey?: string;
+    },
+  ): Promise<KpiResult> {
+    const { start, end, flightNo } = this.resolvePeriodRange(
+      granularity,
+      params,
+    );
+
+    const current = await this.aggregateKpiWindow(start, end, flightNo);
+    const prevRange = this.previousPeriodRange(start, end);
+    const previous = await this.aggregateKpiWindow(
+      prevRange.start,
+      prevRange.end,
+      flightNo,
+    );
+
     const { agencyDebtIrr, agencyDebtCount } =
       await this.agencies.getDebtSummary();
 
+    const trends: KpiTrends = {
+      revenuePct: this.trendPct(current.revenueIrr, previous.revenueIrr),
+      profitPct: this.trendPct(current.profitIrr, previous.profitIrr),
+      operatingCostPct: this.trendPct(
+        current.operatingCostIrr,
+        previous.operatingCostIrr,
+      ),
+      agencyDebtPct: this.trendPct(agencyDebtIrr, agencyDebtIrr),
+    };
+
     return {
-      revenueIrr,
-      profitIrr,
-      marginPct,
-      operatingCostIrr,
+      ...current,
       agencyDebtIrr,
       agencyDebtCount,
+      trends,
+    };
+  }
+
+  /** Design-aligned dashboard stat cards for FINANCE_MANAGER — all real DB counts. */
+  async financeDashboardStats(): Promise<FinanceDashboardStats> {
+    const thisMonth = this.monthUtcRange(0);
+    const lastMonth = this.monthUtcRange(-1);
+
+    const bookingStatuses = ['PAID', 'TICKETED'] as const;
+
+    const [
+      activeAgencies,
+      prevActiveAgencies,
+      passengersThisMonth,
+      prevPassengers,
+      ticketsThisMonth,
+      prevTickets,
+      revenueThisMonth,
+      prevRevenue,
+    ] = await Promise.all([
+      this.prisma.agencyProfile.count({
+        where: { suspendedAt: null, user: { isActive: true } },
+      }),
+      this.prisma.agencyProfile.count({
+        where: {
+          suspendedAt: null,
+          user: { isActive: true },
+          joinedAt: { lt: thisMonth.start },
+        },
+      }),
+      this.prisma.passenger.count({
+        where: {
+          deletedAt: null,
+          booking: {
+            status: { in: [...bookingStatuses] },
+            createdAt: { gte: thisMonth.start, lt: thisMonth.end },
+          },
+        },
+      }),
+      this.prisma.passenger.count({
+        where: {
+          deletedAt: null,
+          booking: {
+            status: { in: [...bookingStatuses] },
+            createdAt: { gte: lastMonth.start, lt: lastMonth.end },
+          },
+        },
+      }),
+      this.prisma.booking.count({
+        where: {
+          status: { in: [...bookingStatuses] },
+          createdAt: { gte: thisMonth.start, lt: thisMonth.end },
+          deletedAt: null,
+        },
+      }),
+      this.prisma.booking.count({
+        where: {
+          status: { in: [...bookingStatuses] },
+          createdAt: { gte: lastMonth.start, lt: lastMonth.end },
+          deletedAt: null,
+        },
+      }),
+      this.prisma.ledgerEntry.aggregate({
+        where: {
+          type: 'SALE',
+          bookingId: { not: null },
+          occurredAt: { gte: thisMonth.start, lt: thisMonth.end },
+        },
+        _sum: { signedAmountIrr: true },
+      }),
+      this.prisma.ledgerEntry.aggregate({
+        where: {
+          type: 'SALE',
+          bookingId: { not: null },
+          occurredAt: { gte: lastMonth.start, lt: lastMonth.end },
+        },
+        _sum: { signedAmountIrr: true },
+      }),
+    ]);
+
+    const revenueThisMonthIrr = Math.abs(revenueThisMonth._sum.signedAmountIrr ?? 0);
+    const revenuePrevIrr = Math.abs(prevRevenue._sum.signedAmountIrr ?? 0);
+
+    return {
+      activeAgencies,
+      activeAgenciesTrendPct: this.trendPct(activeAgencies, prevActiveAgencies),
+      passengersThisMonth,
+      passengersTrendPct: this.trendPct(passengersThisMonth, prevPassengers),
+      ticketsSoldThisMonth: ticketsThisMonth,
+      ticketsTrendPct: this.trendPct(ticketsThisMonth, prevTickets),
+      revenueThisMonthIrr,
+      revenueTrendPct: this.trendPct(revenueThisMonthIrr, revenuePrevIrr),
     };
   }
 
@@ -372,6 +513,16 @@ export class ReportingService {
       REFUND: 'استرداد بلیط',
     };
 
+    const statusFor = (
+      type: string,
+    ): { statusFa: string; statusTone: TransactionStatusTone } => {
+      if (type === 'REFUND')
+        return { statusFa: 'بازپرداخت', statusTone: 'danger' };
+      if (type === 'COMMISSION')
+        return { statusFa: 'در انتظار', statusTone: 'warning' };
+      return { statusFa: 'موفق', statusTone: 'success' };
+    };
+
     const rows = entries.map((e) => {
       const passenger = e.booking?.passengers[0]?.fullName;
       const route = e.booking
@@ -382,6 +533,7 @@ export class ReportingService {
         (passenger
           ? `${passenger}${e.booking ? ` · ${e.booking.pnr}` : ''}`
           : (route ?? '—'));
+      const { statusFa, statusTone } = statusFor(e.type);
       return {
         id: e.id,
         type: e.type,
@@ -389,6 +541,8 @@ export class ReportingService {
         party,
         occurredAt: e.occurredAt.toISOString(),
         signedAmountIrr: e.signedAmountIrr,
+        statusFa,
+        statusTone,
       };
     });
 

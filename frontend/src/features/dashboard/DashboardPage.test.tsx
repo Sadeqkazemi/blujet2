@@ -21,6 +21,12 @@ const KPIS = {
   operatingCostIrr: 4_280_000_000,
   agencyDebtIrr: 0,
   agencyDebtCount: 0,
+  trends: {
+    revenuePct: 5,
+    profitPct: 4,
+    operatingCostPct: 2,
+    agencyDebtPct: 0,
+  },
 };
 
 const FLIGHTS_SUMMARY = { flightCount: 4, totalSeats: 720, soldSeats: 56, unsoldSeats: 664 };

@@ -16,6 +16,13 @@ export interface SalesChartPeriod {
   agencyIrr: number;
 }
 
+export interface KpiTrends {
+  revenuePct: number;
+  profitPct: number;
+  operatingCostPct: number;
+  agencyDebtPct: number;
+}
+
 export interface KpiResult {
   revenueIrr: number;
   profitIrr: number;
@@ -23,7 +30,21 @@ export interface KpiResult {
   operatingCostIrr: number;
   agencyDebtIrr: number;
   agencyDebtCount: number;
+  trends: KpiTrends;
 }
+
+export interface FinanceDashboardStats {
+  activeAgencies: number;
+  activeAgenciesTrendPct: number;
+  passengersThisMonth: number;
+  passengersTrendPct: number;
+  ticketsSoldThisMonth: number;
+  ticketsTrendPct: number;
+  revenueThisMonthIrr: number;
+  revenueTrendPct: number;
+}
+
+export type TransactionStatusTone = 'success' | 'warning' | 'danger';
 
 export interface CompletedFlightsSummary {
   flightCount: number;
