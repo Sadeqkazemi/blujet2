@@ -8,6 +8,7 @@ import { mockAuthUser } from '../../test/mockAuthUser';
 import * as useLocaleModule from '../../hooks/useLocale';
 import * as publicSiteApi from '../../api/publicSite';
 import * as supportTicketsApi from '../../api/support-tickets';
+import * as authApi from '../../api/auth';
 import type { BookingDetail, PriceLock, RefundRequestView, UserProfile } from '../../types/public-site';
 import type { MySupportTicketRow } from '../../types/support-tickets';
 
@@ -154,6 +155,18 @@ describe('AccountPage', () => {
     await userEvent.click(screen.getByTestId('account-tab-tickets'));
     expect(await screen.findByTestId('account-ticket')).toHaveTextContent('مشکل در پرداخت');
     expect(screen.getByText('TKAABBCCDD', { exact: false })).toBeInTheDocument();
+  });
+
+  it('switches to the security tab and sets password via OTP flow API', async () => {
+    mockAuth('authenticated');
+    const setPw = vi.spyOn(authApi, 'setPassword').mockResolvedValue({ changed: true });
+    renderPage();
+    await userEvent.click(screen.getByTestId('account-tab-security'));
+    await userEvent.type(document.getElementById('acct-pw-new')!, 'secret12');
+    await userEvent.type(document.getElementById('acct-pw-confirm')!, 'secret12');
+    await userEvent.click(screen.getByTestId('account-save-password'));
+    await screen.findByText('رمز عبور با موفقیت تغییر کرد ✓');
+    expect(setPw).toHaveBeenCalledWith('secret12');
   });
 
   it('shows an incomplete-profile banner and saves identity fields from the profile tab', async () => {
