@@ -43,6 +43,7 @@ function Toggle({ on, onToggle, label }: { on: boolean; onToggle: () => void; la
 export default function SettingsPage() {
   const { user } = useAuth();
   const isChair = user?.role === 'BOARD_CHAIR';
+  const isSiteAdmin = user?.role === 'SITE_ADMIN';
   const [data, setData] = useState<SettingsResult | null>(null);
   const [draft, setDraft] = useState<Record<string, unknown>>({});
   const [ruleDraft, setRuleDraft] = useState<Record<string, string>>({});
@@ -86,9 +87,10 @@ export default function SettingsPage() {
     setSaving(true);
     setNotice(null);
     try {
-      const result = await updateSettings(draft);
+      const patch = isSiteAdmin ? { socialLinks: draft.socialLinks } : draft;
+      const result = await updateSettings(patch);
 
-      if (isChair && data) {
+      if (isChair && data && !isSiteAdmin) {
         const changed: { id: string; penaltyPct: number }[] = [];
         for (const rule of data.refundRules) {
           const parsed = parseInt(latinDigits(ruleDraft[rule.id] ?? ''), 10);
@@ -117,7 +119,9 @@ export default function SettingsPage() {
     <div className="p-8">
       <h1 className="mb-1 text-xl font-black text-ink">تنظیمات سامانه</h1>
       <p className="mb-6 text-sm text-muted">
-        پیکربندی سراسری — هر تغییر در دفتر رویدادها ثبت می‌شود
+        {isSiteAdmin
+          ? 'مدیریت لینک شبکه‌های اجتماعی نمایش‌داده‌شده در فوتر سایت'
+          : 'پیکربندی سراسری — هر تغییر در دفتر رویدادها ثبت می‌شود'}
       </p>
 
       {notice && (
@@ -274,6 +278,7 @@ export default function SettingsPage() {
           </div>
         </div>
 
+        {!isSiteAdmin && (
         <div className="rounded-xl border border-border bg-white p-5">
           <div className="mb-1 text-sm font-bold text-ink">تنظیمات کلی سامانه</div>
           <p className="mb-4 text-[11px] text-muted">
@@ -295,6 +300,7 @@ export default function SettingsPage() {
             ))}
           </div>
         </div>
+        )}
       </div>
 
       <button

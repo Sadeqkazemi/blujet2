@@ -369,6 +369,33 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
       });
   });
 
+  it('SITE_ADMIN can read settings and patch socialLinks only (not maintenance)', async () => {
+    const siteAdmin = await loginAs(app, 'site.admin');
+    const getRes = await request(app.getHttpServer())
+      .get('/settings')
+      .set('Authorization', auth(siteAdmin.accessToken));
+    expect(getRes.status).toBe(200);
+    expect(getRes.body.data.settings).toHaveProperty('socialLinks');
+
+    const patchSocial = await request(app.getHttpServer())
+      .patch('/settings')
+      .set('Authorization', auth(siteAdmin.accessToken))
+      .send({
+        patch: {
+          socialLinks: [
+            { id: 'instagram', name: 'blujet', url: 'instagram.com/blujet', enabled: true },
+          ],
+        },
+      });
+    expect(patchSocial.status).toBe(200);
+
+    const patchMaintenance = await request(app.getHttpServer())
+      .patch('/settings')
+      .set('Authorization', auth(siteAdmin.accessToken))
+      .send({ patch: { maintenance: true } });
+    expect(patchMaintenance.status).toBe(403);
+  });
+
   // ── IT read-only panels access ────────────────────────────────────────
 
   it('IT_MANAGER can read /panels/access but PATCH stays 403', async () => {

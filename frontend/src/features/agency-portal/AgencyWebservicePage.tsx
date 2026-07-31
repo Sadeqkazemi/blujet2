@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { fetchApiKeys, fetchAgencyPortalWebservicePlans, fetchMyWebserviceRequests, requestWebservice } from '../../api/agency-portal';
 import { ApiRequestError } from '../../api/envelope';
 import { formatJalaliDate } from '../../lib/jalali';
@@ -63,6 +64,7 @@ const STR: Record<StoredLocale, {
   domainLabel: string;
   keyNotice: string;
   activatedAtLabel: string;
+  viewDocsLabel: string;
 }> = {
   fa: {
     toman: 'تومان',
@@ -89,6 +91,7 @@ const STR: Record<StoredLocale, {
     keyNotice:
       'کلید دسترسی API به دلیل امنیت فقط یک‌بار — هنگام تأیید درخواست — از طریق مکاتبه (کارتابل) برای شما ارسال شده است. در صورت گم‌شدن کلید، درخواست صدور مجدد را با پشتیبانی مطرح کنید.',
     activatedAtLabel: 'فعال‌سازی:',
+    viewDocsLabel: 'مشاهده مستندات وب‌سرویس',
   },
   en: {
     toman: 'Toman',
@@ -115,6 +118,7 @@ const STR: Record<StoredLocale, {
     keyNotice:
       'For security, the API access key was sent to you only once — via correspondence (cartable) — when the request was approved. If you lose the key, request re-issuance through support.',
     activatedAtLabel: 'Activated:',
+    viewDocsLabel: 'View web service documentation',
   },
   ar: {
     toman: 'تومان',
@@ -141,6 +145,7 @@ const STR: Record<StoredLocale, {
     keyNotice:
       'لأسباب أمنية، أُرسل مفتاح الوصول إلى API لمرة واحدة فقط — عند الموافقة على الطلب — عبر المراسلات (الكارتابل). في حال فقدان المفتاح، يُرجى طلب إعادة الإصدار من الدعم.',
     activatedAtLabel: 'التفعيل:',
+    viewDocsLabel: 'عرض توثيق خدمة الويب',
   },
 };
 
@@ -318,6 +323,13 @@ export default function AgencyWebservicePage() {
           <div data-testid="ws-key-activated-at" className="text-[10.5px] text-[#8a96a6]">
             {t.activatedAtLabel} <span className="font-num">{formatJalaliDate(activeKey.activatedAt)}</span>
           </div>
+          <Link
+            to="/agency/apidocs"
+            data-testid="ws-view-docs"
+            className="mt-4 flex h-11 items-center justify-center gap-2 rounded-[10px] border border-[#d9e7f6] text-xs font-bold text-[#1668c4] transition hover:bg-[#f2f7fd]"
+          >
+            📄 {t.viewDocsLabel}
+          </Link>
         </div>
       )}
     </div>
