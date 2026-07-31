@@ -7,9 +7,13 @@ export class LookupBookingDto {
   @MinLength(4)
   pnr: string;
 
-  @ApiProperty({ example: 'رضایی', description: 'نام خانوادگی مسافر' })
+  @ApiProperty({
+    example: 'رضایی',
+    description: 'نام خانوادگی مسافر — حداقل ۳ کاراکتر',
+    minLength: 3,
+  })
   @IsString()
-  @MinLength(1)
+  @MinLength(3, { message: 'نام خانوادگی باید حداقل ۳ کاراکتر باشد.' })
   lastName: string;
 }
 
@@ -19,9 +23,13 @@ export class SubmitAnonymousRefundDto {
   @MinLength(4)
   pnr: string;
 
-  @ApiProperty({ example: 'رضایی', description: 'نام خانوادگی مسافر' })
+  @ApiProperty({
+    example: 'رضایی',
+    description: 'نام خانوادگی مسافر — حداقل ۳ کاراکتر',
+    minLength: 3,
+  })
   @IsString()
-  @MinLength(1)
+  @MinLength(3, { message: 'نام خانوادگی باید حداقل ۳ کاراکتر باشد.' })
   lastName: string;
 
   @ApiProperty({
