@@ -88,14 +88,13 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
   COMMERCIAL_MANAGER: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
     { key: 'agencies', labelFa: 'آژانس‌ها', implemented: true },
-    { key: 'flightops', labelFa: 'پروازها', implemented: true },
     { key: 'flights', labelFa: 'مدیریت پروازها', implemented: true },
     { key: 'reports', labelFa: 'گزارش مسافران', implemented: true },
     { key: 'staff', labelFa: 'گزارش کارمندان', implemented: true },
-    { key: 'finance', labelFa: 'مالی', implemented: true },
-    { key: 'cartable', labelFa: 'کارتابل', implemented: true },
     { key: 'clubrules', labelFa: 'قوانین باشگاه مشتریان', implemented: true },
     { key: 'webservice', labelFa: 'وب سرویس', implemented: true },
+    { key: 'finance', labelFa: 'مالی', implemented: true },
+    { key: 'cartable', labelFa: 'کارتابل', implemented: true },
   ],
   IT_MANAGER: [
     // Phase 8: real service-health/os-metrics dashboard, not the shared

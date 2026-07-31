@@ -1,5 +1,6 @@
 import { useOutletContext } from 'react-router-dom';
 import DashboardPage from '../features/dashboard/DashboardPage';
+import CommercialDashboardPage from '../features/dashboard/CommercialDashboardPage';
 import ItDashboardPage from '../features/it-manager/ItDashboardPage';
 import SiteAdminDashboardPage from '../features/dashboard/SiteAdminDashboardPage';
 import EmployeeDashboardPage from '../features/dashboard/EmployeeDashboardPage';
@@ -34,5 +35,6 @@ export default function DashboardRouter() {
   if (user?.role === 'IT_MANAGER') return <ItDashboardPage />;
   if (user?.role === 'SITE_ADMIN') return <SiteAdminDashboardPage />;
   if (user?.role === 'EMPLOYEE') return <EmployeeDashboardPage />;
+  if (user?.role === 'COMMERCIAL_MANAGER') return <CommercialDashboardPage />;
   return <DashboardPage />;
 }

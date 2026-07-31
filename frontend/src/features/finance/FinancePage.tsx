@@ -15,6 +15,7 @@ import { faDigits, faMoney, faPercent } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
 import SalesBarChart from '../../components/SalesBarChart';
 import SalesChartControls from '../../components/SalesChartControls';
+import StatTile from '../../components/StatTile';
 import { useSalesChartQuery } from '../../hooks/useSalesChartQuery';
 import type {
   AgencySettlementsResult,
@@ -426,6 +427,7 @@ function FinanceOpsView() {
 function FinanceAnalyticView() {
   const chart = useSalesChartQuery({ includeFlightMode: false });
   const [periods, setPeriods] = useState<SalesChartPeriod[]>([]);
+  const [kpis, setKpis] = useState<KpiResult | null>(null);
   const [flights, setFlights] = useState<CompletedFlightsSummary | null>(null);
   const [mix, setMix] = useState<RevenueMixResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -436,12 +438,14 @@ function FinanceAnalyticView() {
     let cancelled = false;
     Promise.all([
       fetchSalesChart(chart.query),
+      fetchKpis(chart.query),
       fetchCompletedFlightsSummary(chart.query),
       fetchRevenueMix(chart.query),
     ])
-      .then(([chartData, flightsData, mixData]) => {
+      .then(([chartData, kpiData, flightsData, mixData]) => {
         if (cancelled) return;
         setPeriods(chartData);
+        setKpis(kpiData);
         setFlights(flightsData);
         setMix(mixData);
       })
@@ -464,6 +468,25 @@ function FinanceAnalyticView() {
 
   return (
     <>
+      {kpis && (
+        <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
+          <StatTile label="کل درآمد" value={`${faMoney(kpis.revenueIrr)} تومان`} tone="good" />
+          <StatTile
+            label="سود خالص"
+            value={`${faMoney(kpis.profitIrr)} تومان`}
+            sublabel={`حاشیه ${faPercent(kpis.marginPct)}`}
+            tone="accent"
+          />
+          <StatTile label="هزینه عملیاتی" value={`${faMoney(kpis.operatingCostIrr)} تومان`} tone="warning" />
+          <StatTile
+            label="مطالبات معوق آژانس‌ها"
+            value={`${faMoney(kpis.agencyDebtIrr)} تومان`}
+            sublabel={`${faDigits(kpis.agencyDebtCount)} آژانس`}
+            tone="critical"
+          />
+        </div>
+      )}
+
       <div className="mb-6 rounded-xl border border-border bg-white p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>

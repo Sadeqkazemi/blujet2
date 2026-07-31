@@ -9,6 +9,12 @@ export interface SalesChartPeriod {
   agencyIrr: number;
 }
 
+export interface CommercialOverview {
+  activeAgencies: number;
+  passengersThisMonth: number;
+  pendingAgencyRequests: number;
+}
+
 export interface KpiResult {
   revenueIrr: number;
   profitIrr: number;
