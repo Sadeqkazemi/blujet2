@@ -1,39 +1,50 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { TypeORMService } from '../../typeorm/typeorm.service';
+import { decryptPii } from '../pii-crypto';
+import { MockSmsProvider } from './mock-sms.provider';
 import type {
   SmsMessageType,
   SmsProvider,
   SmsSendResult,
 } from './sms-provider.interface';
 
+const KAVENEGAR_SERVICE_KEY = 'ext_kavenegar';
+
 /** Real vendor per docs/DB_SCHEMA.md Phase 14's `ExternalServiceConfig
- * (key: "ext_kavenegar")` — https://kavenegar.com REST send API. Used
- * only when `SMS_PROVIDER=kavenegar` and `KAVENEGAR_API_KEY` are set
- * (see sms.module.ts); MockSmsProvider stays the dev/test default. */
+ * (key: "ext_kavenegar")` row — the SAME encrypted-at-rest, IT-Manager-
+ * editable mechanism already used for the zarinpal/amadeus/neshan rows
+ * (Phase 28's services tab), not a server env var. IT_MANAGER sets/
+ * rotates the key live from the panel; no server access or restart
+ * needed. Falls back to MockSmsProvider (log-only, always success)
+ * whenever the row is disabled or has no key configured — the same
+ * "vendor not connected yet" graceful-degradation posture already used
+ * for the AI summary/ML pricing providers. */
 @Injectable()
 export class KavenegarSmsProvider implements SmsProvider {
   private readonly logger = new Logger(KavenegarSmsProvider.name);
-  private readonly apiKey: string;
-  private readonly sender?: string;
 
-  constructor() {
-    const apiKey = process.env.KAVENEGAR_API_KEY;
-    if (!apiKey) {
-      throw new Error(
-        'KAVENEGAR_API_KEY is required when SMS_PROVIDER=kavenegar',
-      );
-    }
-    this.apiKey = apiKey;
-    this.sender = process.env.KAVENEGAR_SENDER_LINE || undefined;
-  }
+  constructor(
+    private readonly typeorm: TypeORMService,
+    private readonly mock: MockSmsProvider,
+  ) {}
 
   async send(
     phone: string,
     message: string,
     messageType: SmsMessageType,
   ): Promise<SmsSendResult> {
-    const url = `https://api.kavenegar.com/v1/${this.apiKey}/sms/send.json`;
+    const config = await this.typeorm.externalServiceConfig.findUnique({
+      where: { key: KAVENEGAR_SERVICE_KEY },
+    });
+    if (!config?.enabled || !config.apiKeyEncrypted) {
+      return this.mock.send(phone, message, messageType);
+    }
+
+    const apiKey = decryptPii(config.apiKeyEncrypted);
+    const url = `https://api.kavenegar.com/v1/${apiKey}/sms/send.json`;
     const params = new URLSearchParams({ receptor: phone, message });
-    if (this.sender) params.set('sender', this.sender);
+    const senderLine = process.env.KAVENEGAR_SENDER_LINE || undefined;
+    if (senderLine) params.set('sender', senderLine);
 
     try {
       const res = await fetch(`${url}?${params.toString()}`);
