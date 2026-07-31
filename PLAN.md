@@ -1524,8 +1524,9 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
 - [x] **SITE_ADMIN blog CMS (Phase D)** — `BlogPost` table + admin CRUD
   (`/blog/admin/*`) + public listing/detail (`/blog/posts*`, `/blog/covers/:id`);
   `blog` tab in SITE_ADMIN nav; `BlogAdminPage` (KPI row, category chips,
-  editor, post list). Media tab deferred. Tests: 5 backend e2e + 5 Vitest.
-  See `docs/features/site-admin-blog.md`.
+  editor, post list); public `/blog` + `/blog/:slug` pages with fa/en/ar.
+  Media tab deferred. Tests: 5 backend e2e + 5 admin Vitest + 4 public Vitest.
+  See `docs/features/site-admin-blog.md` + `docs/features/public-blog.md`.
 
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is

@@ -28,5 +28,6 @@ Design source: `design-reference-v2/پنل ادمین سایت.dc.html` (blog ta
 ## Explicit deferrals
 
 - Comments count in design KPI row (always 0 until comments feature exists)
-- Public blog listing page on marketing site (API only this phase)
 - Full media CMS tab (banners, destinations, image library)
+
+Public blog UI: see `docs/features/public-blog.md`.

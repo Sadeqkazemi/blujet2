@@ -2958,7 +2958,7 @@ Audit log category `CONTENT` on create/update/delete.
 ### Explicit deferrals
 
 - Comments (`commentCount` KPI is a placeholder)
-- Public marketing-site blog pages (API ready; no frontend page this phase)
 - Full `media` CMS tab
 
-See `docs/features/site-admin-blog.md` for the acceptance checklist.
+Public pages: `/blog` + `/blog/:slug` — see `docs/features/public-blog.md`.
+See `docs/features/site-admin-blog.md` for the admin acceptance checklist.
