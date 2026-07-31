@@ -82,6 +82,22 @@ export interface PriceLock {
   };
 }
 
+export interface SavedFlight {
+  id: string;
+  flightInstanceId: string;
+  cabin: CabinClass;
+  flightNo: string;
+  originCode: string;
+  destCode: string;
+  originCityFa: string;
+  destCityFa: string;
+  departureAt: string;
+  arrivalAt: string;
+  priceIrr: number;
+  bookable: boolean;
+  createdAt: string;
+}
+
 export interface PayResultOk {
   priceChanged: false;
   booking: BookingDetail;

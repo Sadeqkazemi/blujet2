@@ -1748,6 +1748,30 @@ only, reuses the existing `TwoFactorChallenge` table exactly like Phase 2's
   401s with a generic message — same non-oracle posture Phase 21's
   `customer/login-password` already uses for phone+password.
 
+## پنل کاربر — نشان‌شده‌ها (`SavedFlight`)
+
+See `docs/API.md`'s matching section. Bookmarks a specific flight instance
++ cabin for the logged-in customer (same granularity as `PriceLock`).
+
+```typeorm
+model SavedFlight {
+  id               String         @id @default(uuid())
+  userId           String
+  user             User           @relation("SavedFlightOwner", ...)
+  flightInstanceId String
+  flightInstance   FlightInstance @relation(...)
+  cabin            CabinClass
+  createdAt        DateTime       @default(now())
+
+  @@unique([userId, flightInstanceId, cabin])
+  @@index([userId, createdAt])
+  @@map("saved_flights")
+}
+```
+
+Migration: `20260731120000_saved_flights`. Cascades on user/instance
+delete. Application cap: 20 rows per user (enforced in service, not DB).
+
 ## Phase 65 — قوانین باشگاه مشتریان (Club Tier Rules)
 
 See `docs/API.md`'s Phase 65 section for the full reasoning and endpoint

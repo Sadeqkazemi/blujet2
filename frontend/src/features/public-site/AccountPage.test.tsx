@@ -9,7 +9,7 @@ import * as useLocaleModule from '../../hooks/useLocale';
 import * as publicSiteApi from '../../api/publicSite';
 import * as supportTicketsApi from '../../api/support-tickets';
 import * as authApi from '../../api/auth';
-import type { BookingDetail, PriceLock, RefundRequestView, UserProfile } from '../../types/public-site';
+import type { BookingDetail, PriceLock, RefundRequestView, SavedFlight, UserProfile } from '../../types/public-site';
 import type { ClubMembershipView } from '../../types/club-membership';
 import type { MySupportTicketRow } from '../../types/support-tickets';
 
@@ -104,6 +104,22 @@ function mockAuth(status: 'authenticated' | 'unauthenticated', signOut = vi.fn()
   });
 }
 
+const SAVED: SavedFlight = {
+  id: 'sf-1',
+  flightInstanceId: 'fi-3',
+  cabin: 'ECONOMY',
+  flightNo: 'BJ-300',
+  originCode: 'THR',
+  destCode: 'MHD',
+  originCityFa: 'تهران',
+  destCityFa: 'مشهد',
+  departureAt: '2026-08-02T05:00:00.000Z',
+  arrivalAt: '2026-08-02T06:30:00.000Z',
+  priceIrr: 195_000_000,
+  bookable: true,
+  createdAt: '2026-07-01T00:00:00.000Z',
+};
+
 const TICKET: MySupportTicketRow = {
   id: 'tk-1',
   trackingCode: 'TKAABBCCDD',
@@ -131,6 +147,7 @@ beforeEach(() => {
   vi.spyOn(publicSiteApi, 'fetchMyRefunds').mockResolvedValue([REFUND]);
   vi.spyOn(publicSiteApi, 'fetchMyProfile').mockResolvedValue(PROFILE);
   vi.spyOn(publicSiteApi, 'fetchMyPriceLocks').mockResolvedValue([]);
+  vi.spyOn(publicSiteApi, 'fetchSavedFlights').mockResolvedValue([SAVED]);
   vi.spyOn(supportTicketsApi, 'fetchMySupportTickets').mockResolvedValue([]);
 });
 
@@ -264,6 +281,15 @@ describe('AccountPage', () => {
     vi.spyOn(publicSiteApi, 'fetchMyBookings').mockResolvedValue([{ ...BOOKING, isPriceLocked: true }]);
     renderPage();
     expect(await screen.findByTestId('trip-price-locked-badge')).toBeInTheDocument();
+  });
+
+  it('switches to the saved tab and lists bookmarked flights with book action', async () => {
+    mockAuth('authenticated');
+    renderPage();
+    await userEvent.click(screen.getByTestId('account-tab-saved'));
+    expect(await screen.findByTestId('account-saved-flights')).toBeInTheDocument();
+    expect(screen.getByText('تهران ← مشهد')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'رزرو' })).toBeInTheDocument();
   });
 
   it('switches to the price-locks tab and lists a real lock with its route, price, fee, and cancel action', async () => {

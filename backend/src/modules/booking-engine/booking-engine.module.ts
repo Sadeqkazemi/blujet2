@@ -7,6 +7,8 @@ import { WalletPointsLockController } from './wallet-points-lock.controller';
 import { WalletService } from './wallet.service';
 import { ClubPointsService } from './club-points.service';
 import { PriceLockService } from './price-lock.service';
+import { SavedFlightsService } from './saved-flights.service';
+import { MySavedFlightsController } from './my-saved-flights.controller';
 import { PrivacyController } from './privacy.controller';
 import { PrivacyService } from './privacy.service';
 import { AuditModule } from '../audit/audit.module';
@@ -18,6 +20,7 @@ import { PAYMENT_GATEWAY, SandboxPaymentGateway } from './payment-gateway';
     SearchController,
     BookingController,
     WalletPointsLockController,
+    MySavedFlightsController,
     PrivacyController,
   ],
   providers: [
@@ -26,6 +29,7 @@ import { PAYMENT_GATEWAY, SandboxPaymentGateway } from './payment-gateway';
     WalletService,
     ClubPointsService,
     PriceLockService,
+    SavedFlightsService,
     PrivacyService,
     // PAYMENT_GATEWAY env var selects the driver; sandbox is the only one
     // until a real Shetab/PSP contract exists — the interface is final.
