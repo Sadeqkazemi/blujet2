@@ -11,6 +11,7 @@ interface AuthContextValue {
   confirmTwoFactor: (challengeId: string, code: string) => Promise<AuthUser>;
   agencyLogin: (phone: string, password: string) => Promise<AuthUser>;
   signOut: () => Promise<void>;
+  refreshMe: () => Promise<AuthUser>;
   // Public purchase engine (customer phone+OTP login) — optional so every
   // existing staff/agency test's mocked AuthContextValue literal (which
   // predates the customer track) keeps type-checking without change.
@@ -109,6 +110,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const refreshMe = useCallback(async () => {
+    const me = await authApi.fetchMe();
+    setUser(me);
+    setStatus('authenticated');
+    return me;
+  }, []);
+
   const value = useMemo(
     () => ({
       status,
@@ -117,6 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       confirmTwoFactor,
       agencyLogin,
       signOut,
+      refreshMe,
       requestOtp,
       verifyOtp,
       passwordLogin,
@@ -130,6 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       confirmTwoFactor,
       agencyLogin,
       signOut,
+      refreshMe,
       requestOtp,
       verifyOtp,
       passwordLogin,
