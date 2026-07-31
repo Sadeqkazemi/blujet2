@@ -875,6 +875,7 @@ enum CartableSourceType {
   MANAGER_REFERRAL
   AGENCY_REQUEST
   CHAIR_PERMISSION
+  EMPLOYEE_MESSAGE
 }
 
 enum CartableStatus {
