@@ -5183,6 +5183,21 @@
         ]
       }
     },
+    "/settings/social-links": {
+      "get": {
+        "operationId": "SettingsPublicController_getSocialLinks",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "لینک‌های فعال شبکه‌های اجتماعی برای فوتر سایت",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
     "/reconciliation": {
       "get": {
         "operationId": "ReconciliationController_list",

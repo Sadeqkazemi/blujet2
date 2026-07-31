@@ -2,6 +2,8 @@ import { Link } from 'react-router-dom';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { useT } from '../../lib/i18n';
 import { useCareersEnabled } from '../../hooks/useCareersEnabled';
+import { useSocialLinks } from '../../hooks/useSocialLinks';
+import { SocialIcon, socialBrandColor } from './SocialIcon';
 
 /** Public-site footer — matches design-reference-v2/صفحه اصلی.dc.html:
  * fa/en/ar translated + a single-column mobile layout. */
@@ -9,6 +11,7 @@ export default function PublicFooter() {
   const t = useT();
   const isMobile = useIsMobile();
   const careersEnabled = useCareersEnabled();
+  const socialLinks = useSocialLinks();
 
   return (
     <footer style={{ background: '#0d2640', color: '#aebfd4', marginTop: 72 }}>
@@ -30,6 +33,32 @@ export default function PublicFooter() {
             <span style={{ fontWeight: 900, fontSize: 18, color: '#fff' }}>blujet</span>
           </Link>
           <p style={{ fontSize: '13.5px', lineHeight: 1.85, margin: '0 0 20px', maxWidth: 300 }}>{t('footerTagline')}</p>
+          {socialLinks.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+              {socialLinks.map((link) => (
+                <a
+                  key={link.id}
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={link.name}
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 9,
+                    background: '#ffffff14',
+                    color: socialBrandColor(link.id),
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    textDecoration: 'none',
+                  }}
+                >
+                  <SocialIcon id={link.id} size={18} />
+                </a>
+              ))}
+            </div>
+          )}
         </div>
         <div>
           <div style={{ fontSize: '14.5px', fontWeight: 700, color: '#fff', marginBottom: 16 }}>{t('footerColServices')}</div>

@@ -667,9 +667,10 @@ panels. Key ⚑ decisions:
 
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/settings` | All `SystemSetting` key-values with server defaults (companyName, supportEmail, supportPhone, gateway toggles mellat/saman/zarin, global toggles maintenance/registration/charterSale/apiPublic/sandbox, brandColor) + the real `RefundPenaltyRule` brackets. |
-| PATCH | `/settings` | Partial key-value update; validated per key; audited (SYSTEM). |
+| GET | `/settings` | All `SystemSetting` key-values with server defaults (companyName, supportEmail, supportPhone, gateway toggles mellat/saman/zarin, global toggles maintenance/registration/charterSale/apiPublic/sandbox, brandColor, **socialLinks** — five fixed networks: instagram/telegram/whatsapp/linkedin/x, each `{ id, name, url, enabled }`) + the real `RefundPenaltyRule` brackets. |
+| PATCH | `/settings` | Partial key-value update; validated per key; audited (SYSTEM). `socialLinks` patch: array of partial entries; enabled links require non-empty URL (max 500 chars); unknown network ids rejected. |
 | PATCH | `/settings/refund-rules` | BOARD_CHAIR only — updates the REAL Phase 7 `RefundPenaltyRule.penaltyPct` per bracket (0–100 validated); audited. The refund engine keeps reading these same rows. |
+| GET | `/settings/social-links` | **Public** (no auth) — returns `{ links: [{ id, name, url }] }` for enabled networks with non-empty URLs; bare hostnames normalized to `https://`. Rate-limited. |
 
 ### `backend/src/modules/panels/` (change)
 
