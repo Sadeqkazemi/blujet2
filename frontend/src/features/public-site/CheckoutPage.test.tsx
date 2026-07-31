@@ -37,91 +37,37 @@ function renderPage() {
     <MemoryRouter initialEntries={['/checkout/b1']}>
       <Routes>
         <Route path="/checkout/:bookingId" element={<CheckoutPage />} />
+        <Route path="/payment/:bookingId" element={<div data-testid="payment-page">payment</div>} />
       </Routes>
     </MemoryRouter>,
   );
 }
 
 describe('CheckoutPage', () => {
-  it('renders the booking summary and price', async () => {
+  it('renders the booking summary for review', async () => {
     vi.spyOn(publicSiteApi, 'fetchMyBooking').mockResolvedValue(BOOKING);
     renderPage();
 
     expect(await screen.findByText('BJ-100')).toBeInTheDocument();
-    expect(screen.getByTestId('pay-submit')).toBeInTheDocument();
+    expect(screen.getByText('علی رضایی')).toBeInTheDocument();
+    expect(screen.getByTestId('continue-to-payment')).toBeInTheDocument();
+    expect(screen.queryByTestId('pay-submit')).not.toBeInTheDocument();
   });
 
-  it('pays successfully and would navigate to the ticket page', async () => {
+  it('navigates to the payment page when continue is clicked', async () => {
     vi.spyOn(publicSiteApi, 'fetchMyBooking').mockResolvedValue(BOOKING);
-    const payBooking = vi.spyOn(publicSiteApi, 'payBooking').mockResolvedValue({
-      priceChanged: false,
-      booking: { ...BOOKING, status: 'TICKETED' },
-    });
     renderPage();
-    await screen.findByTestId('pay-submit');
+    await screen.findByTestId('continue-to-payment');
 
-    await userEvent.click(screen.getByTestId('pay-submit'));
-    expect(payBooking).toHaveBeenCalledWith('b1', {
-      confirmedPriceIrr: undefined,
-      promoCode: undefined,
-      paymentMethod: 'GATEWAY',
-    });
+    await userEvent.click(screen.getByTestId('continue-to-payment'));
+    expect(await screen.findByTestId('payment-page')).toBeInTheDocument();
   });
 
-  it('sends the entered promo code and selected payment method', async () => {
-    vi.spyOn(publicSiteApi, 'fetchMyBooking').mockResolvedValue(BOOKING);
-    vi.spyOn(publicSiteApi, 'fetchWallet').mockResolvedValue({ balanceIrr: '1000000000' });
-    const payBooking = vi.spyOn(publicSiteApi, 'payBooking').mockResolvedValue({
-      priceChanged: false,
-      booking: { ...BOOKING, status: 'TICKETED' },
-    });
-    renderPage();
-    await screen.findByTestId('pay-submit');
-
-    await userEvent.type(screen.getByTestId('promo-code-input'), 'BLUE20');
-    await userEvent.click(screen.getByTestId('payment-method-WALLET'));
-    await userEvent.click(screen.getByTestId('pay-submit'));
-
-    expect(payBooking).toHaveBeenCalledWith('b1', {
-      confirmedPriceIrr: undefined,
-      promoCode: 'BLUE20',
-      paymentMethod: 'WALLET',
-    });
-  });
-
-  it('disables the pay-with-points option for a non-club-member', async () => {
-    vi.spyOn(publicSiteApi, 'fetchMyBooking').mockResolvedValue(BOOKING);
-    vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({
-      isMember: false,
-      level: null,
-      balance: 0,
-    });
-    renderPage();
-    await screen.findByTestId('pay-submit');
-
-    expect(screen.getByTestId('payment-method-POINTS')).toBeDisabled();
-  });
-
-  it('shows the re-price confirmation UI when the price changed', async () => {
-    vi.spyOn(publicSiteApi, 'fetchMyBooking').mockResolvedValue(BOOKING);
-    vi.spyOn(publicSiteApi, 'payBooking').mockResolvedValueOnce({
-      priceChanged: true,
-      previousPriceIrr: '380000000',
-      currentPriceIrr: '400000000',
-    });
-    renderPage();
-    await screen.findByTestId('pay-submit');
-
-    await userEvent.click(screen.getByTestId('pay-submit'));
-    expect(await screen.findByTestId('confirm-new-price')).toBeInTheDocument();
-    expect(screen.getByText('قیمت این پرواز تغییر کرده است.')).toBeInTheDocument();
-  });
-
-  it('shows an expired-hold state without a pay button', async () => {
+  it('shows an expired-hold state without a continue button', async () => {
     vi.spyOn(publicSiteApi, 'fetchMyBooking').mockResolvedValue({ ...BOOKING, status: 'EXPIRED' });
     renderPage();
 
     expect(await screen.findByText('مهلت نگهداری این رزرو به پایان رسیده است.')).toBeInTheDocument();
-    expect(screen.queryByTestId('pay-submit')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('continue-to-payment')).not.toBeInTheDocument();
   });
 });

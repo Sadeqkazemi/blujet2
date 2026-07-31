@@ -29,6 +29,10 @@ import { CustomerPasswordLoginDto } from './dto/customer-password-login.dto';
 import { UpdateLocaleDto } from './dto/update-locale.dto';
 import { RequestPasswordResetEmailDto } from './dto/request-password-reset-email.dto';
 import { VerifyPasswordResetEmailDto } from './dto/verify-password-reset-email.dto';
+import {
+  AgencyPasswordResetRequestDto,
+  AgencyPasswordResetVerifyDto,
+} from './dto/agency-password-reset.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { SkipMustChangePassword } from '../../common/decorators/skip-must-change-password.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -128,6 +132,34 @@ export class AuthController {
       dto.password,
       { userAgent: req.headers['user-agent'], ip: req.ip },
     );
+    setRefreshCookie(res, refreshToken);
+    return { success: true, data: { accessToken, user } };
+  }
+
+  @Post('agency/password-reset/request')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({ summary: 'بازیابی رمز آژانس — درخواست OTP پیامکی' })
+  async agencyPasswordResetRequest(@Body() dto: AgencyPasswordResetRequestDto) {
+    const result = await this.auth.requestAgencyPasswordReset(dto.phone);
+    return { success: true, data: result };
+  }
+
+  @Post('agency/password-reset/verify')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({ summary: 'بازیابی رمز آژانس — تأیید OTP و صدور توکن' })
+  async agencyPasswordResetVerify(
+    @Body() dto: AgencyPasswordResetVerifyDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { accessToken, refreshToken, user } =
+      await this.auth.verifyAgencyPasswordResetOtp(
+        dto.challengeId,
+        dto.code,
+        { userAgent: req.headers['user-agent'], ip: req.ip },
+      );
     setRefreshCookie(res, refreshToken);
     return { success: true, data: { accessToken, user } };
   }
@@ -266,7 +298,7 @@ export class AuthController {
   @Post('set-password')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('USER')
+  @Roles('USER', 'AGENCY')
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @ApiOperation({
     summary:

@@ -16,6 +16,7 @@ import type { TwoFactorProvider } from './providers/two-factor-provider.interfac
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import { CustomerReferralsService } from '../customer-referrals/customer-referrals.service';
 import type { Locale, Role } from '../../../generated/typeorm/enums';
+import { normalizeIranPhone } from '../../common/normalize-iran-phone';
 
 export interface AuthUserView {
   id: string;
@@ -164,7 +165,10 @@ export class AuthService {
   ): Promise<void> {
     await this.typeorm.user.update({
       where: { id: actor.id },
-      data: { passwordHash: await argon2.hash(newPassword) },
+      data: {
+        passwordHash: await argon2.hash(newPassword),
+        mustChangePassword: false,
+      },
     });
 
     await this.audit.record({
@@ -478,7 +482,7 @@ export class AuthService {
     user: AuthUserView;
   }> {
     const user = await this.typeorm.user.findUnique({
-      where: { phone },
+      where: { phone: normalizeIranPhone(phone) },
       include: { agencyProfile: true },
     });
 
@@ -631,6 +635,107 @@ export class AuthService {
     const refreshToken = await this.issueRefreshToken(user.id, context);
 
     return { accessToken, refreshToken, user: toAuthUserView(user) };
+  }
+
+  /** Agency forgot-password: SMS OTP to the agency account's registered phone. */
+  async requestAgencyPasswordReset(
+    phone: string,
+  ): Promise<{ challengeId: string }> {
+    const user = await this.typeorm.user.findUnique({
+      where: { phone: normalizeIranPhone(phone) },
+      include: { agencyProfile: true },
+    });
+    if (
+      !user ||
+      user.role !== 'AGENCY' ||
+      !user.isActive ||
+      user.agencyProfile?.suspendedAt
+    ) {
+      throw new UnauthorizedException({
+        code: ErrorCode.UNAUTHORIZED,
+        message: 'شماره تماس یافت نشد.',
+      });
+    }
+
+    const code = generateSixDigitCode();
+    const challenge = await this.typeorm.twoFactorChallenge.create({
+      data: {
+        userId: user.id,
+        purpose: 'AGENCY_PASSWORD_RESET',
+        codeHash: await argon2.hash(code),
+        expiresAt: new Date(Date.now() + TWO_FACTOR_TTL_MS),
+      },
+    });
+    await this.twoFactorProvider.sendCode(user, code);
+    return { challengeId: challenge.id };
+  }
+
+  async verifyAgencyPasswordResetOtp(
+    challengeId: string,
+    code: string,
+    context: { userAgent?: string; ip?: string },
+  ): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    user: AuthUserView;
+  }> {
+    const challenge = await this.typeorm.twoFactorChallenge.findUnique({
+      where: { id: challengeId },
+      include: { user: { include: { agencyProfile: true } } },
+    });
+    if (!challenge || challenge.purpose !== 'AGENCY_PASSWORD_RESET') {
+      throw new UnauthorizedException({
+        code: 'TWO_FACTOR_INVALID',
+        message: 'کد نامعتبر است.',
+      });
+    }
+    if (challenge.consumedAt) {
+      throw new UnauthorizedException({
+        code: 'TWO_FACTOR_INVALID',
+        message: 'این کد قبلاً استفاده شده است.',
+      });
+    }
+    if (challenge.expiresAt < new Date()) {
+      throw new UnauthorizedException({
+        code: 'TWO_FACTOR_EXPIRED',
+        message: 'کد منقضی شده است.',
+      });
+    }
+    if (challenge.attempts >= TWO_FACTOR_MAX_ATTEMPTS) {
+      throw new UnauthorizedException({
+        code: 'TWO_FACTOR_INVALID',
+        message: 'تعداد تلاش‌های مجاز به پایان رسید.',
+      });
+    }
+    const codeValid = await argon2.verify(challenge.codeHash, code);
+    if (!codeValid) {
+      await this.typeorm.twoFactorChallenge.update({
+        where: { id: challenge.id },
+        data: { attempts: { increment: 1 } },
+      });
+      throw new UnauthorizedException({
+        code: 'TWO_FACTOR_INVALID',
+        message: 'کد وارد شده نادرست است.',
+      });
+    }
+    await this.typeorm.twoFactorChallenge.update({
+      where: { id: challenge.id },
+      data: { consumedAt: new Date() },
+    });
+
+    const updated = await this.typeorm.user.update({
+      where: { id: challenge.userId },
+      data: { mustChangePassword: true },
+    });
+
+    const jwtUser: AuthenticatedUser = {
+      id: updated.id,
+      role: updated.role,
+      fullName: updated.fullName,
+    };
+    const accessToken = this.signAccessToken(jwtUser);
+    const refreshToken = await this.issueRefreshToken(updated.id, context);
+    return { accessToken, refreshToken, user: toAuthUserView(updated) };
   }
 
   /**

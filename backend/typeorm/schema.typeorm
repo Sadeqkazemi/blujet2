@@ -180,6 +180,8 @@ enum TwoFactorPurpose {
   // profile" are different trust decisions even though the delivery
   // mechanics are identical.
   PASSWORD_RESET_EMAIL
+  // Agency self-service password recovery via SMS OTP (same machinery).
+  AGENCY_PASSWORD_RESET
 }
 
 // Phase 15 — one scope per real high-risk call site found in the

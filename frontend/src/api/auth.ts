@@ -103,3 +103,18 @@ export async function customerPasswordLogin(phone: string, password: string) {
   setAccessToken(result.accessToken);
   return result;
 }
+
+/** Agency forgot-password — step 1: SMS OTP to the agency account phone. */
+export function requestAgencyPasswordReset(phone: string) {
+  return apiPost<{ challengeId: string }>('/auth/agency/password-reset/request', { phone });
+}
+
+/** Agency forgot-password — step 2: verify OTP and issue a short-lived token for set-password. */
+export async function verifyAgencyPasswordReset(challengeId: string, code: string) {
+  const result = await apiPost<{ accessToken: string; user: AuthUser }>(
+    '/auth/agency/password-reset/verify',
+    { challengeId, code },
+  );
+  setAccessToken(result.accessToken);
+  return result;
+}

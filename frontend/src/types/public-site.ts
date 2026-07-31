@@ -23,6 +23,37 @@ export interface SearchFlightResult {
   departureAt: string;
   arrivalAt: string;
   cabins: SearchCabinOption[];
+  connection?: {
+    via: string;
+    legs: {
+      flightInstanceId: string;
+      flightNo: string;
+      originCode: string;
+      destCode: string;
+      departureAt: string;
+      arrivalAt: string;
+    }[];
+  };
+}
+
+export type SearchAdvisoryRecommendation = 'buy' | 'wait';
+
+export interface SearchAdvisoryResult {
+  available: boolean;
+  recommendation?: SearchAdvisoryRecommendation;
+  reasonFa?: string;
+  predictedPriceIrr?: string;
+  confidence?: number;
+  modelVersion?: string;
+  cheapestDayLabel?: string;
+  priceIncreaseProbPct?: number;
+}
+
+export interface PriceCalendarDay {
+  date: string;
+  minPriceIrr: string;
+  dateLabelFa: string;
+  isCenter: boolean;
 }
 
 export type SeatStatus = 'FREE' | 'TAKEN';

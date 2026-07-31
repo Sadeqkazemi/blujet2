@@ -290,6 +290,24 @@ export class AgencyPortalService {
     };
   }
 
+  /** CSV export for agency sales — UTF-8 BOM for Excel Persian compatibility. */
+  async salesCsv(actor: AuthenticatedUser): Promise<string> {
+    const report = await this.sales(actor);
+    const header = 'PNR,Flight,Route,Departure,Status,Passengers,AmountIRR';
+    const rows = report.tickets.map((t) =>
+      [
+        t.pnr,
+        t.flightNo,
+        `"${t.route}"`,
+        t.departureAt.toISOString(),
+        t.status,
+        t.passengerCount,
+        String(t.priceIrr),
+      ].join(','),
+    );
+    return `\uFEFF${header}\n${rows.join('\n')}\n`;
+  }
+
   // ── Inbox ────────────────────────────────────────────────────────────
 
   async inbox(actor: AuthenticatedUser) {
