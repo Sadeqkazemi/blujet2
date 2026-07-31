@@ -509,6 +509,21 @@
         ]
       }
     },
+    "/audit/logs/badge-count": {
+      "get": {
+        "operationId": "AuditController_logsBadgeCount",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "شمارندهٔ badge سایدبار لاگ IT (۷ روز اخیر)",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
     "/audit/system-events": {
       "get": {
         "operationId": "AuditController_ceoSystemEvents",

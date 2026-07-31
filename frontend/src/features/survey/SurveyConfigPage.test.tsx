@@ -22,7 +22,7 @@ const STATS: SurveyStats = {
   totalResponses: 10,
   avgRating: 4.2,
   recentResponses: [
-    { id: 'r1', flightNo: 'EP-821', rating: 5, comment: 'عالی بود', at: '2026-07-01T00:00:00.000Z' },
+    { id: 'r1', flightNo: 'EP-821', route: 'تهران — مشهد', rating: 5, comment: 'عالی بود', at: '2026-07-01T00:00:00.000Z' },
   ],
 };
 
@@ -47,7 +47,8 @@ describe('SurveyConfigPage', () => {
     vi.spyOn(surveyApi, 'fetchSurveyStats').mockResolvedValue(STATS);
     render(<SurveyConfigPage />);
 
-    expect(await screen.findByText('نظرسنجی رضایت مسافران')).toBeInTheDocument();
+    expect(await screen.findByText('نظرسنجی مسافران')).toBeInTheDocument();
+    expect(screen.getByText('فعال‌سازی نظرسنجی پس از پرواز')).toBeInTheDocument();
     expect(screen.getByText('رضایت کلی از سفر')).toBeInTheDocument();
     expect(screen.getAllByTestId('survey-question-row')).toHaveLength(2);
     expect(screen.getByTestId('survey-recent-row')).toBeInTheDocument();
@@ -78,8 +79,8 @@ describe('SurveyConfigPage', () => {
     await screen.findByText('رضایت کلی از سفر');
 
     const user = userEvent.setup();
-    await user.type(screen.getByPlaceholderText('سؤال جدید…'), 'کیفیت پذیرایی');
-    await user.click(screen.getByText('افزودن'));
+    await user.type(screen.getByPlaceholderText('متن سؤال جدید…'), 'کیفیت پذیرایی');
+    await user.click(screen.getByRole('button', { name: 'افزودن سؤال' }));
 
     await waitFor(() => expect(add).toHaveBeenCalledWith('کیفیت پذیرایی'));
   });
