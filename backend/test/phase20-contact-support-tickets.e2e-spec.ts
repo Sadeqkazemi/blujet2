@@ -124,18 +124,22 @@ describe('Phase 20 — contact + support tickets (e2e)', () => {
 
       expect(listRes.status).toBe(200);
       expect(listRes.body.data.length).toBeGreaterThanOrEqual(2);
-      const subjects = listRes.body.data.map((t: { subject: string }) => t.subject);
+      const subjects = listRes.body.data.map(
+        (t: { subject: string }) => t.subject,
+      );
       expect(subjects).toContain('سوال قبل از ورود');
       expect(subjects).toContain('سوال بعد از ورود');
     });
 
     it('404s when requesting another user ticket by id', async () => {
-      const other = await request(app.getHttpServer()).post('/support-tickets').send({
-        requesterName: 'دیگری',
-        requesterPhone: '09129999999',
-        subject: 'خصوصی',
-        body: 'نباید دیده شود.',
-      });
+      const other = await request(app.getHttpServer())
+        .post('/support-tickets')
+        .send({
+          requesterName: 'دیگری',
+          requesterPhone: '09129999999',
+          subject: 'خصوصی',
+          body: 'نباید دیده شود.',
+        });
       const id = other.body.data.id as string;
 
       const { accessToken } = await loginAsCustomer(app, '09120000002');

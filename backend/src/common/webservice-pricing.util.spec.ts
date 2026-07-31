@@ -24,6 +24,8 @@ describe('webservice-pricing.util', () => {
     expect(priceForMonths(DEFAULT_WEBSERVICE_PLAN_PRICES_IRR, 3)).toBe(
       120_000_000,
     );
-    expect(priceForMonths(DEFAULT_WEBSERVICE_PLAN_PRICES_IRR, 6)).toBeUndefined();
+    expect(
+      priceForMonths(DEFAULT_WEBSERVICE_PLAN_PRICES_IRR, 6),
+    ).toBeUndefined();
   });
 });

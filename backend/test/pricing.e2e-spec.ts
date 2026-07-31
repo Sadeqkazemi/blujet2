@@ -98,7 +98,7 @@ describe('Pricing (e2e)', () => {
       .set('Authorization', `Bearer ${accessToken}`)
       .send({ proposedPriceIrr: 39_000_000 });
     expect(edited.status).toBe(200);
-    expect(edited.body.data.proposedPriceIrr).toBe(39_000_000);
+    expect(edited.body.data.proposedPriceIrr).toBe('39000000');
 
     const audit = await typeorm.auditLog.findFirst({
       where: { category: 'PRICING', entityId: created.body.data.id },
@@ -151,7 +151,7 @@ describe('Pricing (e2e)', () => {
       .send({ source: 'PROPOSED', ...stepUp1 });
     expect(registered.status).toBe(200);
     expect(registered.body.data.status).toBe('REGISTERED');
-    expect(registered.body.data.registeredPriceIrr).toBe(38_500_000);
+    expect(registered.body.data.registeredPriceIrr).toBe('38500000');
     expect(registered.body.data.approvedBy.role).toBe('CEO');
 
     const reEdit = await request(app.getHttpServer())
@@ -239,7 +239,9 @@ describe('Pricing (e2e)', () => {
     expect(suggestion.modelVersion).toBe('heuristic-test');
     // Advisory only — nothing else changed.
     expect(stored.status).toBe('PENDING');
-    expect(stored.proposedPriceIrr).toBe(38_500_000);
+    // stored is a direct TypeORM read (not JSON over HTTP) — proposedPriceIrr
+    // is a native bigint column.
+    expect(stored.proposedPriceIrr).toBe(38_500_000n);
     expect(stored.registeredPriceIrr).toBeNull();
 
     const stepUp = await stepUpFor(
@@ -253,7 +255,7 @@ describe('Pricing (e2e)', () => {
       .set('Authorization', `Bearer ${ceo.accessToken}`)
       .send({ source: 'AI', ...stepUp });
     expect(registered.status).toBe(200);
-    expect(registered.body.data.registeredPriceIrr).toBe(39_200_000);
+    expect(registered.body.data.registeredPriceIrr).toBe('39200000');
   });
 
   it('ml-service down: ai-analysis degrades gracefully (available:false, no 500) and register-by-proposed still works', async () => {
@@ -300,7 +302,7 @@ describe('Pricing (e2e)', () => {
       .set('Authorization', `Bearer ${ceo.accessToken}`)
       .send({ legalRateIrr: 45_000_000 });
     expect(legal.status).toBe(200);
-    expect(legal.body.data.legalRateIrr).toBe(45_000_000);
+    expect(legal.body.data.legalRateIrr).toBe('45000000');
 
     const finance = await loginAs(app, 'finance.karimi');
     const listForbidden = await request(app.getHttpServer())

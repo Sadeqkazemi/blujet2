@@ -142,7 +142,11 @@ describe('Booking engine (e2e)', () => {
       where: { bookingId, type: 'SALE' },
     });
     expect(ledger).toBeTruthy();
-    expect(ledger!.signedAmountIrr).toBe(payRes.body.data.booking.priceIrr);
+    // ledger is a direct TypeORM read (native bigint); the JSON response
+    // field is a decimal string (BigInt.prototype.toJSON) — compare same-type.
+    expect(ledger!.signedAmountIrr).toBe(
+      BigInt(String(payRes.body.data.booking.priceIrr)),
+    );
   });
 
   it('a booking cannot be paid twice', async () => {

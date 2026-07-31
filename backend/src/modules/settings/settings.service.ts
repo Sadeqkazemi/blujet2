@@ -1,4 +1,8 @@
-import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
 import { TypeORMService } from '../../typeorm/typeorm.service';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
@@ -76,7 +80,8 @@ export class SettingsService {
       if (forbidden.length > 0) {
         throw new ForbiddenException({
           code: ErrorCode.FORBIDDEN,
-          message: 'ادمین سایت فقط می‌تواند لینک شبکه‌های اجتماعی را ویرایش کند.',
+          message:
+            'ادمین سایت فقط می‌تواند لینک شبکه‌های اجتماعی را ویرایش کند.',
         });
       }
     }

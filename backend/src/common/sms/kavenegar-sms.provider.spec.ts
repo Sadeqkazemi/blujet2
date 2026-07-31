@@ -1,25 +1,74 @@
 import { KavenegarSmsProvider } from './kavenegar-sms.provider';
+import { MockSmsProvider } from './mock-sms.provider';
+import { TypeORMService } from '../../typeorm/typeorm.service';
+import { encryptPii } from '../pii-crypto';
 
 describe('KavenegarSmsProvider (unit)', () => {
   const originalFetch = global.fetch;
-  const originalKey = process.env.KAVENEGAR_API_KEY;
   const originalSender = process.env.KAVENEGAR_SENDER_LINE;
+
+  beforeAll(() => {
+    process.env.PII_ENCRYPTION_KEY = 'a'.repeat(64);
+  });
 
   afterEach(() => {
     global.fetch = originalFetch;
-    process.env.KAVENEGAR_API_KEY = originalKey;
     process.env.KAVENEGAR_SENDER_LINE = originalSender;
   });
 
-  it('throws at construction time when KAVENEGAR_API_KEY is unset', () => {
-    delete process.env.KAVENEGAR_API_KEY;
-    expect(() => new KavenegarSmsProvider()).toThrow(
-      'KAVENEGAR_API_KEY is required when SMS_PROVIDER=kavenegar',
-    );
+  function makeTypeORM(config: unknown) {
+    return {
+      externalServiceConfig: {
+        findUnique: jest.fn().mockResolvedValue(config),
+      },
+    } as unknown as TypeORMService;
+  }
+
+  it('falls back to the mock provider when no ExternalServiceConfig row exists (never a real network call)', async () => {
+    const fetchMock = jest.fn();
+    global.fetch = fetchMock;
+    const mock = new MockSmsProvider();
+    const mockSend = jest.spyOn(mock, 'send');
+
+    const provider = new KavenegarSmsProvider(makeTypeORM(null), mock);
+    const result = await provider.send('09121234567', 'کد شما: 1234', 'OTP');
+
+    expect(result).toEqual({ success: true });
+    expect(mockSend).toHaveBeenCalledWith('09121234567', 'کد شما: 1234', 'OTP');
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('sends via the Kavenegar REST API and reports success on status 200', async () => {
-    process.env.KAVENEGAR_API_KEY = 'test-key';
+  it('falls back to the mock provider when the IT panel row is disabled', async () => {
+    const fetchMock = jest.fn();
+    global.fetch = fetchMock;
+    const mock = new MockSmsProvider();
+
+    const provider = new KavenegarSmsProvider(
+      makeTypeORM({ enabled: false, apiKeyEncrypted: encryptPii('real-key') }),
+      mock,
+    );
+    const result = await provider.send('09121234567', 'پیام', 'OTP');
+
+    expect(result).toEqual({ success: true });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the mock provider when the row is enabled but has no key configured yet', async () => {
+    const fetchMock = jest.fn();
+    global.fetch = fetchMock;
+    const mock = new MockSmsProvider();
+
+    const provider = new KavenegarSmsProvider(
+      makeTypeORM({ enabled: true, apiKeyEncrypted: null }),
+      mock,
+    );
+    const result = await provider.send('09121234567', 'پیام', 'OTP');
+
+    expect(result).toEqual({ success: true });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('sends via the real Kavenegar REST API using the decrypted IT-panel key, and reports success on status 200', async () => {
     process.env.KAVENEGAR_SENDER_LINE = '10008663';
     const fetchMock = jest.fn().mockResolvedValue({
       ok: true,
@@ -29,20 +78,25 @@ describe('KavenegarSmsProvider (unit)', () => {
     });
     global.fetch = fetchMock;
 
-    const provider = new KavenegarSmsProvider();
+    const provider = new KavenegarSmsProvider(
+      makeTypeORM({
+        enabled: true,
+        apiKeyEncrypted: encryptPii('real-kavenegar-key'),
+      }),
+      new MockSmsProvider(),
+    );
     const result = await provider.send('09121234567', 'کد شما: 1234', 'OTP');
 
     expect(result).toEqual({ success: true });
     const [calledUrl] = fetchMock.mock.calls[0] as [string];
     expect(calledUrl).toContain(
-      'https://api.kavenegar.com/v1/test-key/sms/send.json',
+      'https://api.kavenegar.com/v1/real-kavenegar-key/sms/send.json',
     );
     expect(calledUrl).toContain('receptor=09121234567');
     expect(calledUrl).toContain('sender=10008663');
   });
 
   it('reports a real failure (never fabricated) when Kavenegar returns a non-200 status', async () => {
-    process.env.KAVENEGAR_API_KEY = 'test-key';
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -52,7 +106,10 @@ describe('KavenegarSmsProvider (unit)', () => {
         }),
     });
 
-    const provider = new KavenegarSmsProvider();
+    const provider = new KavenegarSmsProvider(
+      makeTypeORM({ enabled: true, apiKeyEncrypted: encryptPii('real-key') }),
+      new MockSmsProvider(),
+    );
     const result = await provider.send('09121234567', 'پیام', 'OTP');
 
     expect(result.success).toBe(false);
@@ -60,12 +117,14 @@ describe('KavenegarSmsProvider (unit)', () => {
   });
 
   it('catches a network error and reports it as a failure instead of throwing', async () => {
-    process.env.KAVENEGAR_API_KEY = 'test-key';
     global.fetch = jest
       .fn()
       .mockRejectedValue(new Error('network unreachable'));
 
-    const provider = new KavenegarSmsProvider();
+    const provider = new KavenegarSmsProvider(
+      makeTypeORM({ enabled: true, apiKeyEncrypted: encryptPii('real-key') }),
+      new MockSmsProvider(),
+    );
     const result = await provider.send('09121234567', 'پیام', 'OTP');
 
     expect(result.success).toBe(false);

@@ -82,15 +82,16 @@ describe('Webservice pricing (e2e)', () => {
       .set('Authorization', `Bearer ${agencyToken}`);
     expect(plansRes.status).toBe(200);
     expect(
-      plansRes.body.data.plans.find((p: { months: number }) => p.months === 1).priceIrr,
-    ).toBe(50_000_000);
+      plansRes.body.data.plans.find((p: { months: number }) => p.months === 1)
+        .priceIrr,
+    ).toBe('50000000');
 
     const createRes = await request(app.getHttpServer())
       .post('/agency-portal/webservice-requests')
       .set('Authorization', `Bearer ${agencyToken}`)
       .send({ scope: 'SEARCH_BOOK', months: 1 });
     expect(createRes.status).toBe(201);
-    expect(createRes.body.data.priceIrr).toBe(50_000_000);
+    expect(createRes.body.data.priceIrr).toBe('50000000');
 
     await request(app.getHttpServer())
       .patch('/webservice/pricing')

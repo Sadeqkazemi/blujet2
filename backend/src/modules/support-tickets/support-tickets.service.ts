@@ -88,7 +88,10 @@ export class SupportTicketsService {
     return user?.phone ?? null;
   }
 
-  private customerTicketWhere(userId: string, phone: string | null): TypeORM.SupportTicketWhereInput {
+  private customerTicketWhere(
+    userId: string,
+    phone: string | null,
+  ): TypeORM.SupportTicketWhereInput {
     const or: TypeORM.SupportTicketWhereInput[] = [{ userId }];
     if (phone) {
       or.push({ userId: null, requesterPhone: phone });

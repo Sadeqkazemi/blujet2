@@ -18,11 +18,11 @@ const ELIGIBLE: EligibleRefundBooking = {
   originCode: 'THR',
   destCode: 'MHD',
   departureAt: '2026-08-10T08:00:00.000Z',
-  totalPaidIrr: 20_000_000,
+  totalPaidIrr: '20000000',
   hoursLeft: 120,
   penaltyPct: 30,
-  penaltyAmountIrr: 6_000_000,
-  refundableIrr: 14_000_000,
+  penaltyAmountIrr: '6000000',
+  refundableIrr: '14000000',
   refundable: true,
 };
 
@@ -37,9 +37,9 @@ const REQUEST: RefundRequestView = {
   departureAt: '2026-08-12T08:00:00.000Z',
   status: 'FINANCE',
   penaltyPct: 50,
-  penaltyAmountIrr: 10_000_000,
-  refundableIrr: 10_000_000,
-  totalPaidIrr: 20_000_000,
+  penaltyAmountIrr: '10000000',
+  refundableIrr: '10000000',
+  totalPaidIrr: '20000000',
   history: [
     { step: 'submitted', labelFa: 'ثبت درخواست', at: '2026-07-20T08:00:00.000Z' },
     { step: 'review', labelFa: 'بررسی ادمین', at: '2026-07-20T09:00:00.000Z' },
@@ -130,11 +130,11 @@ describe('AccountRefundsTab', () => {
       ]);
     const preview = vi.spyOn(publicSiteApi, 'previewRefund').mockResolvedValue({
       bookingId: 'b1',
-      totalPaidIrr: 20_000_000,
+      totalPaidIrr: '20000000',
       hoursLeft: 119,
       penaltyPct: 30,
-      penaltyAmountIrr: 6_000_000,
-      refundableIrr: 14_000_000,
+      penaltyAmountIrr: '6000000',
+      refundableIrr: '14000000',
       refundable: true,
     });
     const submit = vi.spyOn(publicSiteApi, 'submitRefund').mockResolvedValue({

@@ -22,7 +22,7 @@ const DETAIL: PnrDetail = {
   pnr: 'BJDEMO1',
   status: 'TICKETED',
   channel: 'SYSTEM',
-  priceIrr: 380000000,
+  priceIrr: '380000000',
   flightNo: 'EP-821',
   originCode: 'THR',
   destCode: 'DXB',
@@ -36,7 +36,7 @@ const STATS: ReservationDashboardStats = {
   todayBookings: 2,
   activePnrs: 5,
   seatsSold: 12,
-  revenueIrr: 1000000000,
+  revenueIrr: '1000000000',
 };
 
 function mockRole(role: Role) {

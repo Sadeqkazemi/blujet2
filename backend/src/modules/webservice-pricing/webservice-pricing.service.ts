@@ -46,8 +46,12 @@ export class WebservicePricingService {
 
     await this.typeorm.systemSetting.upsert({
       where: { key: SETTING_KEY },
-      update: { value: parsed as object, updatedById: actor.id },
-      create: { key: SETTING_KEY, value: parsed as object, updatedById: actor.id },
+      update: { value: parsed, updatedById: actor.id },
+      create: {
+        key: SETTING_KEY,
+        value: parsed,
+        updatedById: actor.id,
+      },
     });
 
     await this.audit.record({

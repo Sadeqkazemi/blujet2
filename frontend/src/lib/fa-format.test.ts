@@ -23,6 +23,10 @@ describe('faMoney', () => {
   it('handles zero', () => {
     expect(faMoney(0)).toBe('۰');
   });
+
+  it('accepts a decimal string, the real API wire shape for IRR fields', () => {
+    expect(faMoney('127680000000')).toBe('۱۲٬۷۶۸٬۰۰۰٬۰۰۰');
+  });
 });
 
 describe('faPercent', () => {
@@ -65,5 +69,9 @@ describe('localeMoney', () => {
     expect(localeMoney(380_000_000, 'fa')).toBe('۳۸٬۰۰۰٬۰۰۰');
     expect(localeMoney(380_000_000, 'en')).toBe('38,000,000');
     expect(localeMoney(380_000_000, 'ar')).toBe('٣٨٬٠٠٠٬٠٠٠');
+  });
+
+  it('accepts a decimal string, the real API wire shape for IRR fields', () => {
+    expect(localeMoney('380000000', 'fa')).toBe('۳۸٬۰۰۰٬۰۰۰');
   });
 });

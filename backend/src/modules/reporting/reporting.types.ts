@@ -1,3 +1,5 @@
+import type { Irr } from '../../common/money';
+
 export type SalesGranularity =
   'day' | 'month' | 'q3' | 'q6' | 'year' | 'flight';
 
@@ -11,9 +13,9 @@ export interface SalesChartPeriod {
   periodKey: string;
   startDate: string;
   endDate: string;
-  systemIrr: number;
-  charterIrr: number;
-  agencyIrr: number;
+  systemIrr: Irr;
+  charterIrr: Irr;
+  agencyIrr: Irr;
 }
 
 export interface KpiTrends {
@@ -24,11 +26,11 @@ export interface KpiTrends {
 }
 
 export interface KpiResult {
-  revenueIrr: number;
-  profitIrr: number;
+  revenueIrr: Irr;
+  profitIrr: Irr;
   marginPct: number;
-  operatingCostIrr: number;
-  agencyDebtIrr: number;
+  operatingCostIrr: Irr;
+  agencyDebtIrr: Irr;
   agencyDebtCount: number;
   trends: KpiTrends;
 }
@@ -40,7 +42,7 @@ export interface FinanceDashboardStats {
   passengersTrendPct: number;
   ticketsSoldThisMonth: number;
   ticketsTrendPct: number;
-  revenueThisMonthIrr: number;
+  revenueThisMonthIrr: Irr;
   revenueTrendPct: number;
 }
 

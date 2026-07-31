@@ -115,7 +115,9 @@ export default function AgencyDashboardPage() {
   if (error) return <p className="p-8 text-sm text-danger">{error}</p>;
   if (!data) return <p className="p-8 text-sm text-muted">{t.loading}</p>;
 
-  const max = Math.max(1, ...data.monthlySales.map((m) => m.salesIrr));
+  // salesIrr is a decimal STRING on the wire — parse for this display-only
+  // chart-height ratio; individual monthly totals are far below 2^53.
+  const max = Math.max(1, ...data.monthlySales.map((m) => Number(m.salesIrr)));
   const kpis = [
     { label: t.kpiSales, value: faMoney(data.kpis.salesThisMonthIrr) },
     { label: t.kpiCredit, value: faMoney(data.credit.remainingIrr) },
@@ -145,7 +147,7 @@ export default function AgencyDashboardPage() {
               <div key={m.month} className="flex flex-1 flex-col items-center justify-end gap-1.5">
                 <div
                   className="w-full max-w-9 rounded-t-sm bg-accent"
-                  style={{ height: `${Math.max((m.salesIrr / max) * 100, 2)}%` }}
+                  style={{ height: `${Math.max((Number(m.salesIrr) / max) * 100, 2)}%` }}
                   aria-label={`${monthLabel(m.month, locale)} — ${faMoney(m.salesIrr)} ${t.toman}`}
                 />
                 <span className="text-[10px] text-muted">{monthLabel(m.month, locale)}</span>

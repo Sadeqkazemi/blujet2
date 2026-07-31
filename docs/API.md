@@ -11,6 +11,14 @@ Auth: `Authorization: Bearer <accessToken>` (JWT, short-lived) +
 httpOnly refresh cookie. All endpoints below require an authenticated staff
 session unless marked public.
 
+**Money fields (post Int→BigInt migration, see `docs/DB_SCHEMA.md`):**
+every IRR-denominated field (`priceIrr`, `taxIrr`, `amountIrr`,
+`signedAmountIrr`, `limitIrr`, `feeIrr`, ... — any field ending `Irr`,
+plus `PromoCode.value`) is serialized as a **decimal string**, not a JSON
+number, in every response (`{"priceIrr": "5000000"}`) — a JS `number`
+can't safely hold amounts above 2^53. The same fields accept either a
+decimal string or a plain integer as client input.
+
 ---
 
 ## Phase 1 — Auth, RBAC, panel shell, dashboard/reporting

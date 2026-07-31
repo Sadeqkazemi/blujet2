@@ -179,8 +179,7 @@ export class SurveyService {
         : 0,
       recentResponses: recent.map((r) => {
         const route = r.invite.flightInstance.flight.route;
-        const origin =
-          cityFa.get(route.originCode) ?? route.originCode;
+        const origin = cityFa.get(route.originCode) ?? route.originCode;
         const dest = cityFa.get(route.destCode) ?? route.destCode;
         return {
           id: r.id,

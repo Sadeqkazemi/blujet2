@@ -117,8 +117,8 @@ describe('Customer account refunds (e2e)', () => {
         originCode: 'THR',
         destCode: 'KIH',
         penaltyPct: 30,
-        penaltyAmountIrr: 6_000_000,
-        refundableIrr: 14_000_000,
+        penaltyAmountIrr: '6000000',
+        refundableIrr: '14000000',
       }),
     );
 
@@ -137,7 +137,7 @@ describe('Customer account refunds (e2e)', () => {
       .send({ bookingId: eligible.booking.id });
     expect(preview.status).toBe(201);
     expect(preview.body.data.refundable).toBe(true);
-    expect(preview.body.data.totalPaidIrr).toBe(20_000_000);
+    expect(preview.body.data.totalPaidIrr).toBe('20000000');
   });
 
   it('enforces validation, auth, ownership and non-refundable windows', async () => {

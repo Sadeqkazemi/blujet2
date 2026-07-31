@@ -9,7 +9,8 @@ export type CabinClass = 'ECONOMY' | 'BUSINESS';
 
 export interface SearchCabinOption {
   cabin: CabinClass;
-  priceIrr: number;
+  // Decimal STRING on the wire (BigInt.prototype.toJSON on the backend).
+  priceIrr: string;
   seatsLeft: number;
 }
 
@@ -50,7 +51,7 @@ export interface BookingDetail {
   pnr: string;
   status: BookingStatus;
   cabin: CabinClass;
-  priceIrr: number;
+  priceIrr: string;
   holdExpiresAt: string | null;
   flightInstanceId: string;
   flightNo: string;
@@ -68,8 +69,8 @@ export interface PriceLock {
   id: string;
   flightInstanceId: string;
   cabin: CabinClass;
-  lockedPriceIrr: number;
-  feeIrr: number;
+  lockedPriceIrr: string;
+  feeIrr: string;
   status: PriceLockStatus;
   expiresAt: string;
   createdAt: string;
@@ -93,7 +94,7 @@ export interface SavedFlight {
   destCityFa: string;
   departureAt: string;
   arrivalAt: string;
-  priceIrr: number;
+  priceIrr: string;
   bookable: boolean;
   createdAt: string;
 }
@@ -177,8 +178,8 @@ export interface PayResultOk {
 
 export interface PayResultPriceChanged {
   priceChanged: true;
-  previousPriceIrr: number;
-  currentPriceIrr: number;
+  previousPriceIrr: string;
+  currentPriceIrr: string;
 }
 
 export type PayResult = PayResultOk | PayResultPriceChanged;
@@ -194,9 +195,9 @@ export interface RefundRequestView {
   departureAt: string;
   status: 'SUBMITTED' | 'REVIEW' | 'FINANCE' | 'PAID';
   penaltyPct: number;
-  penaltyAmountIrr: number;
-  refundableIrr: number;
-  totalPaidIrr: number;
+  penaltyAmountIrr: string;
+  refundableIrr: string;
+  totalPaidIrr: string;
   history: { step: string; labelFa: string; at: string }[];
   createdAt: string;
   paidAt: string | null;
@@ -209,11 +210,11 @@ export interface EligibleRefundBooking {
   originCode: string;
   destCode: string;
   departureAt: string;
-  totalPaidIrr: number;
+  totalPaidIrr: string;
   hoursLeft: number;
   penaltyPct: number;
-  penaltyAmountIrr: number;
-  refundableIrr: number;
+  penaltyAmountIrr: string;
+  refundableIrr: string;
   refundable: boolean;
 }
 
@@ -226,11 +227,11 @@ export interface CustomerRefundRule {
 
 export interface RefundPreview {
   bookingId: string;
-  totalPaidIrr: number;
+  totalPaidIrr: string;
   hoursLeft: number;
   penaltyPct: number;
-  penaltyAmountIrr: number;
-  refundableIrr: number;
+  penaltyAmountIrr: string;
+  refundableIrr: string;
   refundable: boolean;
 }
 

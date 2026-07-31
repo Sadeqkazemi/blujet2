@@ -1315,12 +1315,16 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   corrected to say so plainly rather than leave an inaccurate design
   citation standing. Real Kavenegar SMS driver also added in this window
   (user provided the vendor, not part of Careers itself):
-  `KavenegarSmsProvider` behind the existing `SmsProvider` interface,
-  `sms.module.ts` factory-switches on `SMS_PROVIDER=kavenegar` +
-  `KAVENEGAR_API_KEY` (+ optional `KAVENEGAR_SENDER_LINE`), defaults to
-  `MockSmsProvider` everywhere else so the test suite never makes a real
-  network call — activation needs the user's real API key, not committed
-  anywhere. Backend: 16 e2e + 4 unit tests. Frontend: 12 page tests + 2
+  `KavenegarSmsProvider` behind the existing `SmsProvider` interface.
+  **Revised after the user asked whether the key could instead be
+  managed from پنل مدیر IT**: rather than a server env var, the provider
+  reads the pre-existing `ExternalServiceConfig(key:"ext_kavenegar")` row
+  (Phase 28's IT-panel-managed, encrypted-at-rest external-service
+  mechanism already used for زرین‌پال/آمادئوس/نشان) on every send, and
+  falls back to `MockSmsProvider` whenever it's disabled or keyless — so
+  the real key is set/rotated live from the panel, never committed
+  anywhere or held in `.env`. `KAVENEGAR_SENDER_LINE` remains the one
+  non-secret env var. Backend: 16 e2e + 4 unit tests. Frontend: 12 page tests + 2
   hook tests + 1 footer test = 15 new tests. Full backend e2e suite:
   392/392 passing. Full backend unit suite: 48/48 passing. Full frontend
   suite: 325/325 passing, 75 files. `tsc --noEmit` and lint clean on both
@@ -1413,6 +1417,70 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   392/392 — the flake that failed in every prior full-suite run this
   session is gone for real, not just quieted by DB timing. See
   `docs/DB_SCHEMA.md`'s matching entry for the full technical writeup.
+- [x] **Int → BigInt migration for every IRR money column** (closes the
+  "Known technical debt" note below — user explicitly reviewed and
+  approved this before it started, given the blast radius). All 27
+  IRR-denominated columns (`priceIrr`, `taxIrr`, `amountIrr`,
+  `signedAmountIrr`, `limitIrr`, `requestedLimitIrr`,
+  `contractPriceIrr`, `competitorPriceIrr`, `proposedPriceIrr`,
+  `legalRateIrr`, `registeredPriceIrr`, `totalPaidIrr`,
+  `penaltyAmountIrr`, `refundableIrr`, `discountIrr`, `lockedPriceIrr`,
+  `feeIrr`, `costIrr`, `basePriceIrr`, `PromoCode.value`) converted from
+  Postgres `integer` (Int32 ceiling ~2.14e9 IRR ≈ 214M toman — a real
+  agency credit line or yearly revenue aggregate can plausibly exceed
+  that) to `bigint`, via a single widening migration
+  (`20260731061249_money_columns_int_to_bigint`, plain
+  `ALTER COLUMN ... TYPE BIGINT` — no data loss, no downtime concern
+  pre-launch). Non-money `Int` fields (seat counts, percentages like
+  `penaltyPct`/`discountPct`, token counts, byte sizes, minutes) were
+  deliberately left untouched.
+  - New `backend/src/common/money.ts` — the single shared money-arithmetic
+    utility CLAUDE.md requires (`Irr = bigint`, `addIrr`/`subIrr`/
+    `negateIrr`/`pctOfIrr`/`roundIrrTo`/`divRoundBigInt`/`compareIrr`/
+    `maxIrr`/`minIrr`/`toIrr`) — every money computation in the backend
+    now routes through it instead of ad hoc bigint arithmetic, so a
+    `bigint + number` type error (which TypeScript catches, unlike the
+    old silent-Int32-overflow risk) can't hide a mixed-type bug.
+  - New `backend/src/common/bigint-json.ts` — patches
+    `BigInt.prototype.toJSON` so every money field serializes as a
+    decimal **string** in API responses (`JSON.stringify` throws on a raw
+    bigint; a JS `number` can't safely hold amounts above 2^53 anyway, so
+    string was already the correct wire shape for money). Imported once
+    in `main.ts` (real app) and `test/jest-setup.ts` (e2e).
+  - New `backend/src/common/dto/irr.decorator.ts` — `@IsIrrAmount()` /
+    `@MinIrrAmount(min)` / `@TransformToIrr()`, a bigint-safe replacement
+    for `@IsInt()`/`@Min()`/plain-number DTO fields (class-validator's own
+    `@Min()` mishandles bigint). Applied to every DTO field where a
+    client submits one of the 27 money columns (agency credit/invoice
+    amounts, wallet top-up, booking payment confirmation, fare-rule/
+    pricing-proposal prices, ...).
+  - ML-boundary exception, explicitly scoped and commented at only two
+    call sites (`flights.service.ts`/`pricing.service.ts` `runAiAnalysis()`
+    building the outbound `PriceSuggestionItem[]` payload): converts
+    `Irr` to a plain `number` for the FastAPI pricing-suggestion request,
+    since that's an advisory-only, one-way signal (CLAUDE.md ML Service
+    Rules — never authoritative, never round-tripped back into a stored
+    field without going through NestJS's own re-pricing/registration
+    logic) and every real fare amount is far below 2^53.
+  - Full backend unit suite: 50/50 passing. Full backend e2e suite:
+    391/392 passing (the one remaining failure is the pre-existing
+    documented Phase-51 timeout flake on
+    `flight-engine-completion.e2e-spec.ts`'s Y/B/M fare-class test —
+    confirmed unrelated to this migration by re-running with a longer
+    timeout, which passes with fully correct values). `tsc --noEmit` and
+    `eslint` clean on the backend. Frontend `tsc`/lint: no new errors
+    (17 pre-existing, unrelated `AuthUser.preferredLocale` errors remain,
+    verified present in the untouched baseline); frontend unit suite:
+    327/327 passing, 72 files. `frontend/src/lib/fa-format.ts` and every
+    page/type touching one of the 27 fields updated for the
+    string-on-the-wire reality.
+  - Two intentional test-behavior changes, not weakened assertions:
+    `agencies.e2e-spec.ts`'s "PATCH credit rejects a limit beyond the
+    Int32 rial ceiling" is obsolete by design (removing that ceiling was
+    the point) and now proves the validation guard against a negative
+    limit instead; `reporting.e2e-spec.ts`'s "money fields are raw
+    integers" assertion flips from `typeof === 'number'` to
+    `typeof === 'string'`, matching the new wire format on purpose.
 
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is
@@ -1437,16 +1505,9 @@ a passing test — see `docs/features/panel-shell-dashboard.md` for Phase 1.
 
 ## Known technical debt (pre-launch, not blocking current phases)
 
-- All IRR money columns (`priceIrr`, `signedAmountIrr`, `limitIrr`,
-  `amountIrr`) are Postgres `integer` (max ~2.14e9 ≈ 214,000,000 toman).
-  Fine for per-ticket/per-invoice amounts and current seed data, but a
-  large agency's credit line or a yearly revenue aggregate could
-  plausibly exceed that. Needs an `Int` → `BigInt` migration (with a
-  matching TypeORM/TS + JSON-serialization review, since `bigint` doesn't
-  `JSON.stringify` by default) before real financial figures are trusted
-  at scale — surfaced during Phase 3 seed data, not fixed inline to avoid
-  disturbing already-tested Phase 1 code without discussing the blast
-  radius first.
+- ~~All IRR money columns are Postgres `integer` (Int32 ceiling).~~
+  **Resolved** — see the "Int → BigInt migration" entry above. Every
+  money column is now `bigint`, end to end.
 
 ## Commands
 

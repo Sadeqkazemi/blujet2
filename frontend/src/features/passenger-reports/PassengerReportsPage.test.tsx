@@ -16,7 +16,7 @@ const HIT: PassengerReportHit = {
   departureAt: '2026-08-01T05:00:00.000Z',
   seatCode: '4C',
   cabin: 'BUSINESS',
-  priceIrr: 420_000_000,
+  priceIrr: '420000000',
 };
 
 describe('PassengerReportsPage', () => {

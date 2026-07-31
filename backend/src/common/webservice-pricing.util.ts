@@ -15,7 +15,9 @@ const MIN_PRICE_IRR = 1;
 const MAX_PRICE_IRR = 9_999_999_999_999;
 
 /** Validates a patch — all three month keys required, positive integer IRR. */
-export function parseWebservicePlanPrices(input: unknown): WebservicePlanPrices {
+export function parseWebservicePlanPrices(
+  input: unknown,
+): WebservicePlanPrices {
   if (!input || typeof input !== 'object') {
     throw new Error('webservicePlanPrices must be an object');
   }

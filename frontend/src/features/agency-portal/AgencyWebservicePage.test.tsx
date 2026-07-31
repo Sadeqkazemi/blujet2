@@ -39,7 +39,7 @@ const PENDING_REQUEST: AgencyWebserviceRequest = {
   id: 'wr1',
   scope: 'SEARCH_BOOK',
   months: 1,
-  priceIrr: 45_000_000,
+  priceIrr: '45000000',
   note: null,
   status: 'PENDING',
   decidedAt: null,

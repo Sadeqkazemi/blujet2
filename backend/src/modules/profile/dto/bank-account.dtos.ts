@@ -2,7 +2,10 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsBoolean, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class CreateBankAccountDto {
-  @ApiProperty({ example: '6104337112344521', description: '۱۶ رقم کارت (فارسی یا لاتین)' })
+  @ApiProperty({
+    example: '6104337112344521',
+    description: '۱۶ رقم کارت (فارسی یا لاتین)',
+  })
   @IsString()
   @MinLength(1)
   cardNo: string;

@@ -88,7 +88,9 @@ describe('Customer refund submission (e2e)', () => {
     return {
       accessToken,
       bookingId,
-      priceIrr: payRes.body.data.booking.priceIrr as number,
+      // Money fields are decimal STRINGs on the wire
+      // (BigInt.prototype.toJSON) — keep as string, compare via BigInt.
+      priceIrr: payRes.body.data.booking.priceIrr as string,
     };
   }
 
@@ -106,10 +108,13 @@ describe('Customer refund submission (e2e)', () => {
     expect(res.status).toBe(201);
     expect(res.body.data.status).toBe('SUBMITTED');
     expect(res.body.data.totalPaidIrr).toBe(priceIrr);
-    expect(res.body.data.refundableIrr).toBeLessThanOrEqual(priceIrr);
-    expect(res.body.data.penaltyAmountIrr + res.body.data.refundableIrr).toBe(
-      priceIrr,
+    expect(BigInt(String(res.body.data.refundableIrr))).toBeLessThanOrEqual(
+      BigInt(priceIrr),
     );
+    expect(
+      BigInt(String(res.body.data.penaltyAmountIrr)) +
+        BigInt(String(res.body.data.refundableIrr)),
+    ).toBe(BigInt(priceIrr));
     // No PII on the submission response (design's cards show none).
     expect(res.body.data.ibanEnc).toBeUndefined();
   });

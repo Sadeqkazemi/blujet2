@@ -73,7 +73,7 @@ export default function AgenciesListPage() {
   );
 
   const debtors = useMemo(
-    () => (result?.agencies ?? []).filter((a) => a.usedIrr > 0 || a.pendingInvoiceCount > 0),
+    () => (result?.agencies ?? []).filter((a) => Number(a.usedIrr) > 0 || a.pendingInvoiceCount > 0),
     [result],
   );
 
@@ -231,7 +231,7 @@ export default function AgenciesListPage() {
       ) : subTab === 'credit' && !isCommercial ? (
         <ul className="space-y-3">
           {result!.agencies.map((a) => {
-            const settled = a.usedIrr <= 0;
+            const settled = Number(a.usedIrr) <= 0;
             return (
               <li key={a.id} className="flex flex-wrap items-center gap-4 rounded-xl border border-border bg-white p-4">
                 <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-2 text-sm font-black text-accent">
@@ -246,7 +246,7 @@ export default function AgenciesListPage() {
                 <div className="text-left">
                   <div className="text-[10px] text-muted">بدهی جاری</div>
                   <div className={`font-num text-sm font-black ${settled ? 'text-[#059669]' : 'text-danger'}`}>
-                    {faMoney(Math.max(a.usedIrr, 0))} تومان
+                    {faMoney(Math.max(Number(a.usedIrr), 0))} تومان
                   </div>
                 </div>
                 <span
@@ -295,15 +295,15 @@ export default function AgenciesListPage() {
                     <div className="mb-1 flex items-center justify-between text-[10px] text-muted">
                       <span>اعتبار (مانده / سقف)</span>
                       <span className="font-num">
-                        {faMoney(Math.max(a.remainingIrr, 0))} / {faMoney(a.limitIrr)}
+                        {faMoney(Math.max(Number(a.remainingIrr), 0))} / {faMoney(a.limitIrr)}
                       </span>
                     </div>
-                    <CreditBar usedIrr={Math.max(a.usedIrr, 0)} limitIrr={a.limitIrr} />
+                    <CreditBar usedIrr={Math.max(Number(a.usedIrr), 0)} limitIrr={Number(a.limitIrr)} />
                   </div>
                   <div className="text-left">
                     <div className="text-[10px] text-muted">بدهی جاری</div>
-                    <div className={`font-num text-sm font-black ${a.usedIrr > 0 ? 'text-danger' : 'text-[#059669]'}`}>
-                      {faMoney(Math.max(a.usedIrr, 0))} تومان
+                    <div className={`font-num text-sm font-black ${Number(a.usedIrr) > 0 ? 'text-danger' : 'text-[#059669]'}`}>
+                      {faMoney(Math.max(Number(a.usedIrr), 0))} تومان
                     </div>
                   </div>
                   <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${badge.className}`}>{badge.label}</span>

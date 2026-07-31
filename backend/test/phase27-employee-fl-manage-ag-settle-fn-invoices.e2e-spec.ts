@@ -73,7 +73,7 @@ describe('Phase 27 — EMPLOYEE fl_manage/ag_settle/fn_invoices (e2e)', () => {
   // Mirrors AgenciesService.resetTestDebt: corrects the agency's *net*
   // ledger balance to an absolute target so this is safe to call even if
   // prior tests already left SALE/SETTLEMENT rows on the same agency.
-  async function setAgencyDebt(agencyId: string, targetIrr = 20_000_000) {
+  async function setAgencyDebt(agencyId: string, targetIrr = 20_000_000n) {
     const creator = await typeorm.user.findFirstOrThrow({
       where: { role: 'COMMERCIAL_MANAGER' },
     });
@@ -81,8 +81,8 @@ describe('Phase 27 — EMPLOYEE fl_manage/ag_settle/fn_invoices (e2e)', () => {
       where: { agencyId, type: { in: ['SALE', 'SETTLEMENT'] } },
       _sum: { signedAmountIrr: true },
     });
-    const deltaIrr = targetIrr - (sum._sum.signedAmountIrr ?? 0);
-    if (deltaIrr !== 0) {
+    const deltaIrr = targetIrr - (sum._sum.signedAmountIrr ?? 0n);
+    if (deltaIrr !== 0n) {
       await typeorm.ledgerEntry.create({
         data: {
           agencyId,

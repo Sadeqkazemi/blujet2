@@ -118,12 +118,10 @@ export class BankAccountsService {
     });
   }
 
-  async update(
-    user: AuthenticatedUser,
-    id: string,
-    dto: UpdateBankAccountDto,
-  ) {
-    const row = await this.typeorm.savedBankAccount.findUnique({ where: { id } });
+  async update(user: AuthenticatedUser, id: string, dto: UpdateBankAccountDto) {
+    const row = await this.typeorm.savedBankAccount.findUnique({
+      where: { id },
+    });
     if (!row || row.userId !== user.id) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -149,7 +147,9 @@ export class BankAccountsService {
   }
 
   async remove(user: AuthenticatedUser, id: string) {
-    const row = await this.typeorm.savedBankAccount.findUnique({ where: { id } });
+    const row = await this.typeorm.savedBankAccount.findUnique({
+      where: { id },
+    });
     if (!row || row.userId !== user.id) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,

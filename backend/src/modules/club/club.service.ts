@@ -188,17 +188,18 @@ export class ClubService {
       filters.push({ OR: or });
     }
 
-    const [members, all, pendingRequests, submittedRequests] = await Promise.all([
-      this.typeorm.clubMember.findMany({
-        where: { AND: filters },
-        orderBy: { joinDate: 'desc' },
-      }),
-      this.typeorm.clubMember.findMany({
-        select: { level: true, cardStatus: true },
-      }),
-      this.typeorm.clubCardRequest.count({ where: { status: 'REFERRED' } }),
-      this.typeorm.clubCardRequest.count({ where: { status: 'SUBMITTED' } }),
-    ]);
+    const [members, all, pendingRequests, submittedRequests] =
+      await Promise.all([
+        this.typeorm.clubMember.findMany({
+          where: { AND: filters },
+          orderBy: { joinDate: 'desc' },
+        }),
+        this.typeorm.clubMember.findMany({
+          select: { level: true, cardStatus: true },
+        }),
+        this.typeorm.clubCardRequest.count({ where: { status: 'REFERRED' } }),
+        this.typeorm.clubCardRequest.count({ where: { status: 'SUBMITTED' } }),
+      ]);
 
     // KPI cards always summarize the whole club, unfiltered (per design).
     const tierCounts = { SILVER: 0, GOLD: 0, PLATINUM: 0 };
@@ -556,7 +557,9 @@ export class ClubService {
       cardRequestMinPoints: rule.cardRequestMinPoints,
     };
 
-    const member = await this.typeorm.clubMember.findUnique({ where: { userId } });
+    const member = await this.typeorm.clubMember.findUnique({
+      where: { userId },
+    });
     if (!member) {
       return {
         isMember: false,
@@ -607,7 +610,9 @@ export class ClubService {
 
   /** Customer self-service: submit a membership-card issuance request. */
   async submitCardRequest(userId: string) {
-    const member = await this.typeorm.clubMember.findUnique({ where: { userId } });
+    const member = await this.typeorm.clubMember.findUnique({
+      where: { userId },
+    });
     if (!member) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -660,7 +665,7 @@ export class ClubService {
           level: member.level,
           points: balance,
           status: 'SUBMITTED',
-          history: history as TypeORM.InputJsonValue,
+          history: history,
         },
         select: {
           id: true,

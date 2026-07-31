@@ -113,7 +113,10 @@ describe('Purchase extras: promo codes, wallet, club points, price lock (e2e)', 
       userId: userId!,
       instance,
       bookingId: createRes.body.data.id as string,
-      priceIrr: createRes.body.data.priceIrr as number,
+      // Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON)
+      // — parsed here for test-only arithmetic; individual ticket prices are
+      // far below 2^53 so Number() loses no precision.
+      priceIrr: Number(createRes.body.data.priceIrr),
     };
   }
 
@@ -150,12 +153,12 @@ describe('Purchase extras: promo codes, wallet, club points, price lock (e2e)', 
 
     expect(payRes.status).toBe(201);
     const expected = priceIrr - Math.round(priceIrr * 0.2);
-    expect(payRes.body.data.booking.priceIrr).toBe(expected);
+    expect(payRes.body.data.booking.priceIrr).toBe(String(expected));
 
     const ledger = await typeorm.ledgerEntry.findFirst({
       where: { bookingId, type: 'SALE' },
     });
-    expect(ledger!.signedAmountIrr).toBe(expected);
+    expect(ledger!.signedAmountIrr).toBe(BigInt(expected));
   });
 
   it('rejects an unknown promo code', async () => {
@@ -327,7 +330,7 @@ describe('Purchase extras: promo codes, wallet, club points, price lock (e2e)', 
       .set('Authorization', `Bearer ${accessToken}`)
       .send({ flightInstanceId: instance.id, cabin: 'ECONOMY' });
     expect(lockRes.status).toBe(201);
-    const lockedPriceIrr = lockRes.body.data.lockedPriceIrr as number;
+    const lockedPriceIrr = Number(lockRes.body.data.lockedPriceIrr);
 
     // Market price moves (a registered fare change) — the lock must still win.
     await typeorm.cabinFare.upsert({
@@ -353,7 +356,7 @@ describe('Purchase extras: promo codes, wallet, club points, price lock (e2e)', 
         cabin: 'ECONOMY',
         passengers: [{ fullName: 'قفل قیمت', seatCode: '6A' }],
       });
-    expect(bookRes.body.data.priceIrr).toBe(lockedPriceIrr);
+    expect(bookRes.body.data.priceIrr).toBe(String(lockedPriceIrr));
 
     // Payment must not trigger the "price changed" flow.
     const payRes = await request(app.getHttpServer())
@@ -361,7 +364,7 @@ describe('Purchase extras: promo codes, wallet, club points, price lock (e2e)', 
       .set('Authorization', `Bearer ${accessToken}`)
       .send({});
     expect(payRes.body.data.priceChanged).toBe(false);
-    expect(payRes.body.data.booking.priceIrr).toBe(lockedPriceIrr);
+    expect(payRes.body.data.booking.priceIrr).toBe(String(lockedPriceIrr));
 
     const lockAfter = await typeorm.priceLock.findUnique({
       where: { id: lockRes.body.data.id },

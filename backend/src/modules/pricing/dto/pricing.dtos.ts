@@ -1,24 +1,33 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
-
-const INT32_MAX = 2_147_483_647;
+import { IsIn, IsOptional, IsString } from 'class-validator';
+import {
+  IsIrrAmount,
+  MinIrrAmount,
+  TransformToIrr,
+} from '../../../common/dto/irr.decorator';
+import type { Irr } from '../../../common/money';
 
 export class UpsertProposalDto {
-  @ApiProperty({ example: 38_500_000, description: 'نرخ پیشنهادی به ریال' })
-  @IsInt()
-  @Min(1, { message: 'نرخ پیشنهادی را وارد کنید' })
-  @Max(INT32_MAX)
-  proposedPriceIrr: number;
+  @ApiProperty({
+    example: '38500000',
+    type: String,
+    description: 'نرخ پیشنهادی به ریال',
+  })
+  @IsIrrAmount()
+  @MinIrrAmount(1n, { message: 'نرخ پیشنهادی را وارد کنید' })
+  @TransformToIrr()
+  proposedPriceIrr: Irr;
 
   @ApiPropertyOptional({
-    example: 42_000_000,
+    example: '42000000',
+    type: String,
     description: 'نرخ قانونی/مصوب به ریال',
   })
   @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(INT32_MAX)
-  legalRateIrr?: number;
+  @IsIrrAmount()
+  @MinIrrAmount(1n)
+  @TransformToIrr()
+  legalRateIrr?: Irr;
 
   @ApiPropertyOptional({ description: 'یادداشت برای مدیر عامل (اختیاری)' })
   @IsOptional()
@@ -28,13 +37,14 @@ export class UpsertProposalDto {
 
 export class SetLegalRateDto {
   @ApiProperty({
-    example: 42_000_000,
+    example: '42000000',
+    type: String,
     description: 'نرخ قانونی (مصوب سازمان هواپیمایی) به ریال',
   })
-  @IsInt()
-  @Min(1, { message: 'نرخ قانونی را وارد کنید' })
-  @Max(INT32_MAX)
-  legalRateIrr: number;
+  @IsIrrAmount()
+  @MinIrrAmount(1n, { message: 'نرخ قانونی را وارد کنید' })
+  @TransformToIrr()
+  legalRateIrr: Irr;
 }
 
 export class RegisterProposalDto {
