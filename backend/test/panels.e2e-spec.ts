@@ -42,6 +42,27 @@ describe('Panels (e2e)', () => {
     expect(keys).not.toContain('settings');
   });
 
+  it('returns the confirmed tab set for Commercial Manager (includes webservice + flights)', async () => {
+    const { accessToken } = await loginAs(app, 'comm.abbasi');
+    const res = await request(app.getHttpServer())
+      .get('/panels/nav')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(res.status).toBe(200);
+    const keys = res.body.data.map((t: { key: string }) => t.key);
+    expect(keys).toEqual([
+      'dashboard',
+      'agencies',
+      'flightops',
+      'flights',
+      'reports',
+      'staff',
+      'finance',
+      'cartable',
+      'clubrules',
+      'webservice',
+    ]);
+  });
+
   it('returns the confirmed tab set for CEO', async () => {
     const { accessToken } = await loginAs(app, 'ceo');
     const res = await request(app.getHttpServer())
