@@ -12,7 +12,9 @@ import {
   fetchMyProfile,
   fetchMyRefunds,
   fetchPrivacyExport,
+  fetchSavedFlights,
   fetchWallet,
+  removeSavedFlight,
   requestEmailVerify,
   topupWallet,
   updateMyProfile,
@@ -24,10 +26,11 @@ import { changeOwnPassword, setPassword } from '../../api/auth';
 import { faDigits, faMoney, parseTomanToRial } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
-import type { BookingDetail, PriceLock, RefundRequestView, UserProfile } from '../../types/public-site';
+import type { BookingDetail, PriceLock, RefundRequestView, SavedFlight, UserProfile } from '../../types/public-site';
 import type { ClubMembershipView } from '../../types/club-membership';
 import type { MySupportTicketRow, SupportTicketStatus } from '../../types/support-tickets';
 import AccountClubTab from './AccountClubTab';
+import AccountSavedFlightsTab from './AccountSavedFlightsTab';
 
 // پنل کاربر — real data from the existing bookings/wallet/club-points/refunds
 // endpoints (none of this is mock). Matches design-reference/پنل کاربر.dc.html's
@@ -69,13 +72,14 @@ const TIER_LABEL: Record<string, Tr> = {
   PLATINUM: { fa: 'پلاتین', en: 'Platinum', ar: 'بلاتينية' },
 };
 
-type TabKey = 'trips' | 'wallet' | 'club' | 'price-locks' | 'passengers' | 'refunds' | 'tickets' | 'security' | 'profile';
+type TabKey = 'trips' | 'wallet' | 'club' | 'saved' | 'price-locks' | 'passengers' | 'refunds' | 'tickets' | 'security' | 'profile';
 
 const TAB_LABEL: Record<TabKey, Tr> = {
   profile: { fa: 'پروفایل من', en: 'My Profile', ar: 'ملفي الشخصي' },
   trips: { fa: 'سفرها', en: 'Trips', ar: 'رحلاتي' },
   wallet: { fa: 'کیف پول', en: 'Wallet', ar: 'المحفظة' },
   club: { fa: 'باشگاه مشتریان', en: 'Loyalty Club', ar: 'نادي الولاء' },
+  saved: { fa: 'نشان‌شده‌ها', en: 'Saved', ar: 'المحفوظة' },
   'price-locks': { fa: 'قفل قیمت', en: 'Price Lock', ar: 'قفل السعر' },
   passengers: { fa: 'مسافران', en: 'Passengers', ar: 'المسافرون' },
   refunds: { fa: 'استرداد‌ها', en: 'Refunds', ar: 'الاستردادات' },
@@ -88,6 +92,7 @@ const TABS: { key: TabKey; icon: string }[] = [
   { key: 'trips', icon: '🧳' },
   { key: 'wallet', icon: '💳' },
   { key: 'club', icon: '★' },
+  { key: 'saved', icon: '🔖' },
   { key: 'price-locks', icon: '🔒' },
   { key: 'passengers', icon: '👤' },
   { key: 'refunds', icon: '↺' },
@@ -483,6 +488,8 @@ export default function AccountPage() {
   const [topupBusy, setTopupBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [priceLocks, setPriceLocks] = useState<PriceLock[] | null>(null);
+  const [savedFlights, setSavedFlights] = useState<SavedFlight[] | null>(null);
+  const [savedBusyId, setSavedBusyId] = useState<string | null>(null);
   const [lockActionBusy, setLockActionBusy] = useState<string | null>(null);
   const [lockError, setLockError] = useState<string | null>(null);
 
@@ -529,6 +536,7 @@ export default function AccountPage() {
     fetchClubMembership().then(setClubMembership).catch(() => setClubMembership(null));
     fetchMyRefunds().then(setRefunds).catch(() => setRefunds([]));
     fetchMyPriceLocks().then(setPriceLocks).catch(() => setPriceLocks([]));
+    fetchSavedFlights().then(setSavedFlights).catch(() => setSavedFlights([]));
     fetchMyProfile()
       .then((p) => {
         setProfile(p);
@@ -647,6 +655,18 @@ export default function AccountPage() {
       setError(err instanceof ApiRequestError ? err.message : t.topupErrorFallback);
     } finally {
       setTopupBusy(false);
+    }
+  }
+
+  async function onRemoveSaved(id: string) {
+    setSavedBusyId(id);
+    try {
+      await removeSavedFlight(id);
+      setSavedFlights((prev) => (prev ? prev.filter((f) => f.id !== id) : prev));
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t.saveErrorFallback);
+    } finally {
+      setSavedBusyId(null);
     }
   }
 
@@ -1038,6 +1058,18 @@ export default function AccountPage() {
                 setClubMembership(m);
                 setClub({ isMember: m.isMember, level: m.level, balance: m.balance });
               }}
+            />
+          )
+        )}
+
+        {tab === 'saved' && (
+          savedFlights === null ? (
+            <p style={{ fontSize: 13, color: '#6b7787' }}>{t.loading}</p>
+          ) : (
+            <AccountSavedFlightsTab
+              flights={savedFlights}
+              busyId={savedBusyId}
+              onRemove={(id) => void onRemoveSaved(id)}
             />
           )
         )}

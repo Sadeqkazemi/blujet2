@@ -1092,6 +1092,23 @@ USER submits via `POST /my/club/card-request`, the request sits in
 - Frontend: `ClubPage.tsx` gains a `SITE_ADMIN` role branch — submitted
   queue + refer modal (مدیر ارشد / رئیس هیئت مدیره picker); no approve/reject.
 
+### پنل کاربر — نشان‌شده‌ها (`/account` → تب `saved`)
+Closes the «نشان‌شده‌ها» tab in `design-reference-v2/پنل کاربر.dc.html`:
+list saved flight+cabin bookmarks, book (navigate to checkout flow), remove.
+
+- `GET /my/saved-flights` (new, `USER` role) — newest first; each row
+  includes `{ id, flightInstanceId, cabin, flightNo, originCode, destCode,
+  originCityFa, destCityFa, departureAt, arrivalAt, priceIrr, bookable,
+  createdAt }`. `priceIrr` is recomputed live via `getCabinPrice`; departed
+  or non-`SCHEDULED` instances return `bookable: false`.
+- `POST /my/saved-flights` (new, `USER` role, `@Throttle` 30/min) — body
+  `{ flightInstanceId, cabin }`; requires a future `SCHEDULED` instance with
+  a bookable cabin price. Max 20 rows per user. `409` on duplicate.
+- `DELETE /my/saved-flights/:id` (new, `USER` role) — owner-only; `404`
+  otherwise.
+- Frontend: new `saved` tab on `AccountPage.tsx` + bookmark control on
+  `ResultsPage.tsx` cabin rows (login-gated, same pattern as price lock).
+
 ## Phase 21 — فراموشی رمز (customer forgot/set password)
 
 Third "dead forms" item. `ForgotPasswordPage.tsx` was entirely client-side

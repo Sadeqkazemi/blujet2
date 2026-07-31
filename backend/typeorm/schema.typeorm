@@ -127,6 +127,7 @@ model User {
   promoRedemptions               PromoRedemption[]       @relation("PromoRedeemedBy")
   walletEntries                  WalletEntry[]           @relation("WalletOwner")
   priceLocks                     PriceLock[]             @relation("PriceLockOwner")
+  savedFlights                   SavedFlight[]           @relation("SavedFlightOwner")
   agencyAllotmentsCreated        AgencyAllotment[]
   paymentReconciliationsResolved PaymentReconciliation[]
   supportTickets                 SupportTicket[]         @relation("SupportTicketRequester")
@@ -354,6 +355,7 @@ model FlightInstance {
   seatLocks            SeatLock[]
   cabinFares           CabinFare[]
   priceLocks           PriceLock[]
+  savedFlights         SavedFlight[]
   fareRules            FareRule[]
   agencyAllotments     AgencyAllotment[]
   surveyInvites        SurveyInvite[]
@@ -1595,6 +1597,21 @@ model PriceLock {
   @@index([userId, status])
   @@index([flightInstanceId, cabin, status])
   @@map("price_locks")
+}
+
+// پنل کاربر — «نشان‌شده‌ها»: bookmark a flight+cabin for later booking.
+model SavedFlight {
+  id               String         @id @default(uuid())
+  userId           String
+  user             User           @relation("SavedFlightOwner", fields: [userId], references: [id], onDelete: Cascade)
+  flightInstanceId String
+  flightInstance   FlightInstance @relation(fields: [flightInstanceId], references: [id], onDelete: Cascade)
+  cabin            CabinClass
+  createdAt        DateTime       @default(now())
+
+  @@unique([userId, flightInstanceId, cabin])
+  @@index([userId, createdAt])
+  @@map("saved_flights")
 }
 
 // Phase 20: تماس با ما — a simple inbound inquiry, not a tracked/forwarded
