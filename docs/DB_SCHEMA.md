@@ -2391,3 +2391,43 @@ migration) and now proves the validation guard against a negative limit
 instead; `reporting.e2e-spec.ts`'s "money fields are raw integers"
 assertion flips from `typeof === 'number'` to `typeof === 'string'`,
 matching the new wire format on purpose.
+
+## Phase D — Blog CMS (`BlogPost`)
+
+Migration `20260731140000_blog_posts`.
+
+```typeorm
+enum BlogCategory { NEWS GUIDE DEST OFFERS }
+enum BlogPostStatus { DRAFT PUBLISHED SCHEDULED }
+
+model BlogPost {
+  id          String         @id @default(uuid())
+  title       String
+  slug        String         @unique
+  body        String         @db.Text
+  category    BlogCategory
+  status      BlogPostStatus @default(DRAFT)
+  coverFileId String?        @unique
+  coverFile   StoredFile?    @relation("BlogPostCover", ...)
+  authorId    String
+  author      User           @relation("BlogPostAuthor", ...)
+  viewCount   Int            @default(0)
+  publishedAt DateTime?
+  scheduledAt DateTime?
+  deletedAt   DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  @@map("blog_posts")
+}
+```
+
+Plus on `User`: `blogPostsAuthored BlogPost[] @relation("BlogPostAuthor")`.
+Plus on `StoredFile`: `blogCoverFor BlogPost? @relation("BlogPostCover")`.
+
+- `slug` is unique; auto-generated from title when omitted at create time.
+- Public visibility: `PUBLISHED`, or `SCHEDULED` with `scheduledAt <= now()`.
+- Soft-delete via `deletedAt`; admin list excludes deleted rows.
+- `PANEL_NAV.SITE_ADMIN` gains `{ key: 'blog', implemented: true }`; `media`
+  stays excluded (no backend yet).
+- Seed: five sample posts (three published, one draft, one future-scheduled)
+  authored by `site.admin`.

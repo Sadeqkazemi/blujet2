@@ -118,6 +118,7 @@ model User {
   aiUsageLogs         AiUsageLog[]     @relation("AiUsageLogUser")
 
   jobApplicationsAssigned JobApplication[] @relation("JobApplicationAssignee")
+  blogPostsAuthored       BlogPost[]       @relation("BlogPostAuthor")
 
   pricingProposalsMade     FarePricingProposal[] @relation("PricingProposedBy")
   pricingProposalsApproved FarePricingProposal[] @relation("PricingApprovedBy")
@@ -1036,6 +1037,7 @@ model StoredFile {
   createdAt DateTime @default(now())
 
   agencyDocument AgencyDocument?
+  blogCoverFor   BlogPost?       @relation("BlogPostCover")
 
   @@index([ownerId])
   @@map("stored_files")
@@ -1937,4 +1939,43 @@ model JobApplication {
   @@index([nationalIdHash])
   @@index([status])
   @@map("job_applications")
+}
+
+// ─── Phase D: SITE_ADMIN blog CMS ────────────────────────────────────────
+
+enum BlogCategory {
+  NEWS
+  GUIDE
+  DEST
+  OFFERS
+}
+
+enum BlogPostStatus {
+  DRAFT
+  PUBLISHED
+  SCHEDULED
+}
+
+model BlogPost {
+  id          String         @id @default(uuid())
+  title       String
+  slug        String         @unique
+  body        String         @db.Text
+  category    BlogCategory
+  status      BlogPostStatus @default(DRAFT)
+  coverFileId String?        @unique
+  coverFile   StoredFile?    @relation("BlogPostCover", fields: [coverFileId], references: [id])
+  authorId    String
+  author      User           @relation("BlogPostAuthor", fields: [authorId], references: [id])
+  viewCount   Int            @default(0)
+  publishedAt DateTime?
+  scheduledAt DateTime?
+  deletedAt   DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([status, deletedAt])
+  @@index([category])
+  @@index([authorId])
+  @@map("blog_posts")
 }

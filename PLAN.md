@@ -1521,6 +1521,12 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   permission chips. Tests: 6 backend e2e + 4 EmployeeCartable Vitest + 5
   EmployeeDashboard Vitest. See `docs/features/employee-cartable.md`.
 
+- [x] **SITE_ADMIN blog CMS (Phase D)** — `BlogPost` table + admin CRUD
+  (`/blog/admin/*`) + public listing/detail (`/blog/posts*`, `/blog/covers/:id`);
+  `blog` tab in SITE_ADMIN nav; `BlogAdminPage` (KPI row, category chips,
+  editor, post list). Media tab deferred. Tests: 5 backend e2e + 5 Vitest.
+  See `docs/features/site-admin-blog.md`.
+
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is
 "done" only when every checklist item in its `docs/features/<name>.md` has

@@ -69,6 +69,7 @@ import SurveyRouter from './components/SurveyRouter';
 import CareersPage from './features/public-site/CareersPage';
 import CareersApplyPage from './features/public-site/CareersApplyPage';
 import CareersAdminPage from './features/careers/CareersAdminPage';
+import BlogAdminPage from './features/blog/BlogAdminPage';
 import IdentityAdminPage from './features/identity-admin/IdentityAdminPage';
 
 export default function App() {
@@ -177,6 +178,9 @@ export default function App() {
               </Route>
               <Route path="jobapps" element={<TabGate tabKey="jobapps" />}>
                 <Route index element={<CareersAdminPage />} />
+              </Route>
+              <Route path="blog" element={<TabGate tabKey="blog" />}>
+                <Route index element={<BlogAdminPage />} />
               </Route>
               <Route path="kyc" element={<TabGate tabKey="kyc" />}>
                 <Route index element={<IdentityAdminPage />} />

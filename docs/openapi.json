@@ -6933,6 +6933,231 @@
           "careers"
         ]
       }
+    },
+    "/blog/admin/stats": {
+      "get": {
+        "operationId": "BlogAdminController_stats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "آمار KPI بلاگ (منتشرشده، پیش‌نویس، بازدید)",
+        "tags": [
+          "blog"
+        ]
+      }
+    },
+    "/blog/admin/posts": {
+      "get": {
+        "operationId": "BlogAdminController_list",
+        "parameters": [
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "NEWS",
+                "GUIDE",
+                "DEST",
+                "OFFERS",
+                "all"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست همهٔ مقالات (با فیلتر دسته‌بندی)",
+        "tags": [
+          "blog"
+        ]
+      },
+      "post": {
+        "operationId": "BlogAdminController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBlogPostDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ایجاد مقالهٔ جدید",
+        "tags": [
+          "blog"
+        ]
+      }
+    },
+    "/blog/admin/posts/{id}": {
+      "get": {
+        "operationId": "BlogAdminController_getOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "جزئیات یک مقاله برای ویرایش",
+        "tags": [
+          "blog"
+        ]
+      },
+      "patch": {
+        "operationId": "BlogAdminController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBlogPostDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "ویرایش مقاله",
+        "tags": [
+          "blog"
+        ]
+      },
+      "delete": {
+        "operationId": "BlogAdminController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "حذف نرم مقاله",
+        "tags": [
+          "blog"
+        ]
+      }
+    },
+    "/blog/posts": {
+      "get": {
+        "operationId": "BlogPublicController_list",
+        "parameters": [
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "NEWS",
+                "GUIDE",
+                "DEST",
+                "OFFERS"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست مقالات منتشرشده",
+        "tags": [
+          "blog"
+        ]
+      }
+    },
+    "/blog/posts/{slug}": {
+      "get": {
+        "operationId": "BlogPublicController_detail",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "جزئیات یک مقالهٔ منتشرشده",
+        "tags": [
+          "blog"
+        ]
+      }
+    },
+    "/blog/covers/{fileId}": {
+      "get": {
+        "operationId": "BlogPublicController_cover",
+        "parameters": [
+          {
+            "name": "fileId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "دریافت تصویر کاور مقالهٔ منتشرشده",
+        "tags": [
+          "blog"
+        ]
+      }
     }
   },
   "info": {
@@ -9270,6 +9495,92 @@
           "nationalId",
           "phone"
         ]
+      },
+      "CreateBlogPostDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "example": "راهنمای کامل چک‌این آنلاین پروازهای داخلی"
+          },
+          "body": {
+            "type": "string",
+            "example": "متن مقاله…"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "NEWS",
+              "GUIDE",
+              "DEST",
+              "OFFERS"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "PUBLISHED",
+              "SCHEDULED"
+            ],
+            "default": "DRAFT"
+          },
+          "coverFileId": {
+            "type": "string",
+            "description": "StoredFile id from POST /files"
+          },
+          "scheduledAt": {
+            "type": "string",
+            "description": "Required when status is SCHEDULED (ISO 8601 UTC)"
+          },
+          "slug": {
+            "type": "string",
+            "description": "URL slug — auto-generated if omitted"
+          }
+        },
+        "required": [
+          "title",
+          "body",
+          "category"
+        ]
+      },
+      "UpdateBlogPostDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "NEWS",
+              "GUIDE",
+              "DEST",
+              "OFFERS"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "PUBLISHED",
+              "SCHEDULED"
+            ]
+          },
+          "coverFileId": {
+            "type": "object",
+            "nullable": true
+          },
+          "scheduledAt": {
+            "type": "object"
+          },
+          "slug": {
+            "type": "string"
+          }
+        }
       }
     }
   }
