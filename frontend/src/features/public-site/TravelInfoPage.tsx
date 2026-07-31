@@ -1,5 +1,6 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import PublicPageShell from '../../components/public/PublicPageShell';
+import { fetchPublicSiteContent } from '../../api/settings';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { formatToman } from '../../lib/fa-format';
@@ -93,13 +94,27 @@ export default function TravelInfoPage() {
   const isMobile = useIsMobile();
   const t = STR[locale];
   const [active, setActive] = useState(0);
+  const [termsIntro, setTermsIntro] = useState<string | null>(null);
   const sectionRefs = useRef<Array<HTMLDivElement | null>>([]);
+
+  useEffect(() => {
+    fetchPublicSiteContent()
+      .then((res) => setTermsIntro(res.termsText.trim() || null))
+      .catch(() => {
+        /* static fallback */
+      });
+  }, []);
 
   return (
     <PublicPageShell>
       <section style={{ background: 'linear-gradient(150deg,#0d2640,#124a86)', color: '#fff', padding: '39px 22px 35px', textAlign: 'center' }}>
         <h1 style={{ fontSize: isMobile ? 24 : 30, fontWeight: 900, margin: '0 0 10px', letterSpacing: '-.5px' }}>{t.heroTitle}</h1>
         <p style={{ fontSize: 13, color: '#c9dcf3', margin: 0 }}>{t.heroSub}</p>
+        {locale === 'fa' && termsIntro && (
+          <p data-testid="terms-cms-intro" style={{ fontSize: 12.5, color: '#e2edf9', margin: '14px auto 0', maxWidth: 640, lineHeight: 1.9 }}>
+            {termsIntro}
+          </p>
+        )}
       </section>
 
       <div style={{ maxWidth: 1080, margin: '0 auto', padding: '31px 22px 47px', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '250px 1fr', gap: 24, alignItems: 'start' }}>

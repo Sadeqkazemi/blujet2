@@ -5548,6 +5548,21 @@
         ]
       }
     },
+    "/settings/site-content": {
+      "get": {
+        "operationId": "SettingsPublicController_getSiteContent",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "متن صفحات عمومی ثابت (درباره ما، قوانین، …)",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
     "/reconciliation": {
       "get": {
         "operationId": "ReconciliationController_list",

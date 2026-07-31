@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import MediaAdminPage from './MediaAdminPage';
 import * as siteContentApi from '../../api/site-content';
+import * as adminsApi from '../../api/admins';
 
 vi.mock('../../api/site-content');
 vi.mock('../../api/files', () => ({
@@ -71,6 +72,26 @@ describe('MediaAdminPage', () => {
     vi.mocked(siteContentApi.updateContentBlock).mockResolvedValue(mockBlocks[0]);
     vi.mocked(siteContentApi.updateDestination).mockResolvedValue(mockDestinations[0]);
     vi.mocked(siteContentApi.updateRoute).mockResolvedValue(mockRoutes[0]);
+    vi.spyOn(adminsApi, 'fetchSettings').mockResolvedValue({
+      settings: {
+        homeHeroTitle: 'عنوان',
+        homeHeroSubtitle: 'زیرعنوان',
+        aboutUsText: 'درباره blujet',
+        contactAddress: 'تهران',
+        termsText: 'قوانین',
+      },
+      refundRules: [],
+    });
+    vi.spyOn(adminsApi, 'updateSettings').mockResolvedValue({
+      settings: {
+        homeHeroTitle: 'عنوان',
+        homeHeroSubtitle: 'زیرعنوان',
+        aboutUsText: 'متن جدید',
+        contactAddress: 'تهران',
+        termsText: 'قوانین',
+      },
+      refundRules: [],
+    });
   });
 
   it('renders banner and CMS sections', async () => {
@@ -106,6 +127,21 @@ describe('MediaAdminPage', () => {
       expect(siteContentApi.updateContentBlock).toHaveBeenCalledWith('ANNOUNCEMENT_BAR', {
         enabled: false,
       });
+    });
+  });
+
+  it('lists site pages and saves edited about text', async () => {
+    const user = userEvent.setup();
+    render(<MediaAdminPage />);
+    expect(await screen.findByText('صفحات سایت')).toBeInTheDocument();
+    expect(screen.getByText('درباره ما')).toBeInTheDocument();
+    await user.click(screen.getByTestId('edit-site-page-about'));
+    const textarea = screen.getByDisplayValue('درباره blujet');
+    await user.clear(textarea);
+    await user.type(textarea, 'متن جدید');
+    await user.click(screen.getByRole('button', { name: 'ذخیره' }));
+    await waitFor(() => {
+      expect(adminsApi.updateSettings).toHaveBeenCalledWith({ aboutUsText: 'متن جدید' });
     });
   });
 });

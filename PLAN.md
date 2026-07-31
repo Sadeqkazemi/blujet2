@@ -1557,6 +1557,12 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   Tests: `DestinationsPage.test.tsx`.
   See `docs/features/destinations-cms-wiring.md`.
 
+- [x] **SITE_ADMIN static site pages CMS (Phase I)** —
+  «صفحات سایت» list in `MediaAdminPage`; SITE_ADMIN PATCH for page text keys;
+  public `GET /settings/site-content`; About/Contact/TravelInfo wired (fa).
+  Tests: `MediaAdminPage.test.tsx`, extended `phase12.e2e-spec.ts`.
+  See `docs/features/site-admin-static-pages.md`.
+
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is
 "done" only when every checklist item in its `docs/features/<name>.md` has

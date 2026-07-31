@@ -14,7 +14,13 @@ import {
   updateDestination,
   updateRoute,
 } from '../../api/site-content';
-import { uploadFile } from '../../api/files';
+import { fetchSettings, updateSettings } from '../../api/admins';
+import {
+  SITE_CONTENT_FIELD_LABELS,
+  SITE_PAGE_ROWS,
+  type SiteContentFieldKey,
+  type SitePageRow,
+} from '../../types/site-pages';
 import { faDigits, latinDigits, localeMoney } from '../../lib/fa-format';
 import Modal from '../../components/Modal';
 import { siteMediaUrl } from '../public-site/site-content-shared';
@@ -76,6 +82,12 @@ export default function MediaAdminPage() {
     toAirportCode: '',
     priceToman: '',
   });
+  const [siteContent, setSiteContent] = useState<Record<SiteContentFieldKey, string> | null>(
+    null,
+  );
+  const [editPage, setEditPage] = useState<SitePageRow | null>(null);
+  const [pageDraft, setPageDraft] = useState<Partial<Record<SiteContentFieldKey, string>>>({});
+  const [savingPage, setSavingPage] = useState(false);
 
   const blockMap = useMemo(
     () => new Map((blocks ?? []).map((b) => [b.key, b])),
@@ -84,16 +96,25 @@ export default function MediaAdminPage() {
 
   const load = useCallback(async () => {
     try {
-      const [lib, bl, dest, rt] = await Promise.all([
+      const [lib, bl, dest, rt, settings] = await Promise.all([
         fetchLibraryAssets(),
         fetchContentBlocks(),
         fetchDestinations(),
         fetchRoutes(),
+        fetchSettings(),
       ]);
       setLibrary(lib);
       setBlocks(bl);
       setDestinations(dest);
       setRoutes(rt);
+      const s = settings.settings;
+      setSiteContent({
+        homeHeroTitle: String(s.homeHeroTitle ?? ''),
+        homeHeroSubtitle: String(s.homeHeroSubtitle ?? ''),
+        aboutUsText: String(s.aboutUsText ?? ''),
+        contactAddress: String(s.contactAddress ?? ''),
+        termsText: String(s.termsText ?? ''),
+      });
     } catch {
       setError('خطا در دریافت محتوای سایت.');
     }
@@ -207,6 +228,35 @@ export default function MediaAdminPage() {
       await load();
     } catch {
       setError('خطا در حذف مقصد.');
+    }
+  }
+
+  function openPageEdit(page: SitePageRow) {
+    if (!siteContent || page.editableFields.length === 0) return;
+    const draft: Partial<Record<SiteContentFieldKey, string>> = {};
+    for (const key of page.editableFields) {
+      draft[key] = siteContent[key];
+    }
+    setPageDraft(draft);
+    setEditPage(page);
+  }
+
+  async function savePageFields() {
+    if (!editPage) return;
+    setSavingPage(true);
+    setError(null);
+    try {
+      const patch: Record<string, string> = {};
+      for (const key of editPage.editableFields) {
+        patch[key] = pageDraft[key] ?? '';
+      }
+      await updateSettings(patch);
+      setEditPage(null);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'خطا در ذخیرهٔ متن صفحه.');
+    } finally {
+      setSavingPage(false);
     }
   }
 
@@ -465,6 +515,44 @@ export default function MediaAdminPage() {
         </div>
       </div>
 
+      {/* Static site pages */}
+      <div className={cardClass()}>
+        <h3 className="m-0 text-[14.5px] font-extrabold text-white">صفحات سایت</h3>
+        <p className="mb-4 mt-1 text-[11px] text-[#6b7b94]">
+          فهرست صفحات عمومی و متن‌های قابل ویرایش
+        </p>
+        <div className="overflow-hidden rounded-[11px] border border-[#28344c]">
+          {SITE_PAGE_ROWS.map((page) => (
+            <div
+              key={page.id}
+              className="flex flex-wrap items-center gap-3 border-b border-[#1a2436] px-3 py-3 last:border-b-0"
+            >
+              <div className="min-w-[140px] flex-1">
+                <div className="text-[12.5px] font-bold text-[#e7ecf3]">{page.nameFa}</div>
+                <div className="text-[10.5px] text-[#6b7b94]" dir="ltr">
+                  {page.path}
+                </div>
+              </div>
+              <span className="rounded-[18px] bg-[rgba(34,197,94,.12)] px-2.5 py-1 text-[10.5px] font-bold text-[#22c55e]">
+                {page.statusLabel}
+              </span>
+              {page.editableFields.length > 0 ? (
+                <button
+                  type="button"
+                  data-testid={`edit-site-page-${page.id}`}
+                  onClick={() => openPageEdit(page)}
+                  className="cursor-pointer text-[10.5px] font-bold text-accent"
+                >
+                  ویرایش متن
+                </button>
+              ) : (
+                <span className="text-[10.5px] text-[#6b7b94]">{page.editHint ?? '—'}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Image library */}
       <div className={cardClass()}>
         <div className="mb-1 flex items-center justify-between">
@@ -634,6 +722,42 @@ export default function MediaAdminPage() {
                 className="rounded-lg bg-accent px-4 py-2 text-sm font-bold text-white"
               >
                 ذخیره
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {editPage && (
+        <Modal open onClose={() => setEditPage(null)} title={`ویرایش ${editPage.nameFa}`}>
+          <div className="flex flex-col gap-3">
+            {editPage.editHint && (
+              <p className="m-0 text-[11px] text-muted">{editPage.editHint}</p>
+            )}
+            {editPage.editableFields.map((field) => (
+              <label key={field} className="flex flex-col gap-1 text-sm">
+                <span className="text-muted">{SITE_CONTENT_FIELD_LABELS[field]}</span>
+                <textarea
+                  rows={field === 'aboutUsText' || field === 'termsText' ? 4 : 2}
+                  className="rounded-lg border border-border bg-panel px-3 py-2"
+                  value={pageDraft[field] ?? ''}
+                  onChange={(e) =>
+                    setPageDraft((d) => ({ ...d, [field]: e.target.value }))
+                  }
+                />
+              </label>
+            ))}
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setEditPage(null)} className="rounded-lg px-4 py-2 text-sm">
+                انصراف
+              </button>
+              <button
+                type="button"
+                disabled={savingPage}
+                onClick={() => void savePageFields()}
+                className="rounded-lg bg-accent px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+              >
+                {savingPage ? 'در حال ذخیره…' : 'ذخیره'}
               </button>
             </div>
           </div>

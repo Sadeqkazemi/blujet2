@@ -34,4 +34,11 @@ export class SettingsPublicController {
       data: await this.settings.getPublicSupportContact(),
     };
   }
+
+  @Get('site-content')
+  @Throttle({ default: { limit: 120, ttl: 60_000 } })
+  @ApiOperation({ summary: 'متن صفحات عمومی ثابت (درباره ما، قوانین، …)' })
+  async getSiteContent() {
+    return { success: true, data: await this.settings.getPublicSiteContent() };
+  }
 }

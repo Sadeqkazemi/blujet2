@@ -1,5 +1,6 @@
 import { apiGet } from './http';
 import type { PublicAppLinksResult, PublicSupportContact } from '../types/app-links';
+import type { PublicSiteContent } from '../types/site-pages';
 import type { PublicSocialLinksResult } from '../types/social-links';
 
 export function fetchPublicSocialLinks() {
@@ -12,4 +13,8 @@ export function fetchPublicAppLinks() {
 
 export function fetchPublicSupportContact() {
   return apiGet<PublicSupportContact>('/settings/support-contact');
+}
+
+export function fetchPublicSiteContent() {
+  return apiGet<PublicSiteContent>('/settings/site-content');
 }
