@@ -666,6 +666,36 @@ async function main() {
     await typeorm.clubTierRule.create({ data: {} });
   }
 
+  // Link the test USER to the seeded club member + backfill ledger so
+  // GET /my/club/membership works for manual testing after seed.
+  const testUser = await typeorm.user.findUnique({
+    where: { phone: '+989120000001' },
+    select: { id: true },
+  });
+  const negarMember = await typeorm.clubMember.findFirst({
+    where: { fullName: 'نگار رضایی' },
+  });
+  if (testUser && negarMember) {
+    if (!negarMember.userId) {
+      await typeorm.clubMember.update({
+        where: { id: negarMember.id },
+        data: { userId: testUser.id },
+      });
+    }
+    const entryCount = await typeorm.clubPointsEntry.count({
+      where: { clubMemberId: negarMember.id },
+    });
+    if (entryCount === 0 && negarMember.points > 0) {
+      await typeorm.clubPointsEntry.create({
+        data: {
+          clubMemberId: negarMember.id,
+          type: 'EARN',
+          signedPoints: negarMember.points,
+        },
+      });
+    }
+  }
+
   // ── Phase 66: passenger survey settings + default question list ────────
   const existingSurveySettingsCount = await typeorm.surveySettings.count();
   if (existingSurveySettingsCount === 0) {

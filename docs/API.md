@@ -1049,6 +1049,32 @@ had no way to see their submissions inside `/account`.
   tracking code + history timeline; link to `/support` to open a new
   ticket. No reply thread or attachments (same Phase 20 deferrals).
 
+### پنل کاربر — باشگاه مشتریان (`/account` → تب `club`)
+Closes the gap flagged in `design-reference-v2/پنل کاربر.dc.html`'s
+`accountNav` (`club` / «باشگاه مشتریان»): tier banner + progress bar,
+membership-card issuance (request, tracker timeline, issued card display),
+and tier-benefits grid. BluBank block deferred (no backing schema).
+
+- `GET /my/club/membership` (new, `USER` role) — returns `{ isMember,
+  level, balance, cardStatus, cardNo, tierRules: { goldMinPoints,
+  platinumMinPoints, cardRequestMinPoints }, cardRequest: { id, status,
+  history, cardNo?, createdAt } | null, canRequestCard,
+  pointsNeededForCard }`. `balance` is the authoritative ledger sum
+  (`ClubPointsEntry`), not the staff display cache. `cardRequest` is the
+  latest non-REJECTED request (SUBMITTED/REFERRED/APPROVED).
+- `POST /my/club/card-request` (new, `USER` role, `@Throttle` 5/min per
+  account) — member-initiated card request: requires linked `ClubMember`,
+  `balance >= cardRequestMinPoints`, `cardStatus === NONE`, and no pending
+  SUBMITTED/REFERRED request. Creates a `ClubCardRequest(status=SUBMITTED)`
+  with a one-step history timeline and sets `ClubMember.cardStatus=REVIEW`.
+  `409` if already issued or a request is pending; `400` if below threshold.
+- Frontend: `club` tab on `AccountPage.tsx` (replaces the old minimal
+  `points` tab) wired to the endpoints above; keeps `GET /my/club-points`
+  for the header chip / price-lock eligibility checks.
+- Seed: links test USER `+989120000001` (نگار رضایی) to the seeded GOLD
+  `ClubMember` row and backfills a ledger entry when missing so manual
+  testing works immediately after `typeorm db seed`.
+
 ## Phase 21 — فراموشی رمز (customer forgot/set password)
 
 Third "dead forms" item. `ForgotPasswordPage.tsx` was entirely client-side
@@ -2258,16 +2284,10 @@ just a passive settings screen.
   own clubrules screen has no bulk-recompute action, so this stays
   scoped to what's actually designed: the config is applied the next
   time each member's points change).
-- `cardRequestMinPoints` is stored and returned by `GET`/`PATCH`, but has
-  **no real consumer yet** — the only place a `ClubCardRequest` is
-  created today is `POST /club/_test/card-request` (E2E-only, 404s in
-  prod) and the staff-only `issueCardDirect`/`decideRequest` flows; there
-  is no real, self-service "request a card" action anywhere in the
-  codebase for this threshold to gate. This is an explicit, documented
-  scope boundary (matching the design's own field, which the mock also
-  never wires to any real request-creation action) — not a fabricated
-  no-op field. Building the actual member-initiated card-request flow is
-  separate, larger, not-yet-approved work.
+- `cardRequestMinPoints` is stored and returned by `GET`/`PATCH`, and is
+  now consumed by `GET /my/club/membership` + `POST /my/club/card-request`
+  (member-initiated card-request flow in the user panel). Staff-side
+  referral of SUBMITTED requests (site-admin track) remains a separate gap.
 
 See `docs/features/club-tier-rules.md` for the acceptance checklist.
 New frontend page `ClubTierRulesPage.tsx` (route `clubrules`, CEO +
