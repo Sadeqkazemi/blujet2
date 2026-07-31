@@ -5,6 +5,9 @@ import type {
   CabinClass,
   PayResult,
   PriceLock,
+  CustomerRefundRule,
+  EligibleRefundBooking,
+  RefundPreview,
   RefundRequestView,
   SavedFlight,
   SavedPassenger,
@@ -78,6 +81,18 @@ export function submitRefund(bookingId: string, iban: string) {
 
 export function fetchMyRefunds() {
   return apiGet<RefundRequestView[]>('/my/refunds');
+}
+
+export function fetchEligibleRefundBookings() {
+  return apiGet<EligibleRefundBooking[]>('/my/refunds/eligible-bookings');
+}
+
+export function fetchCustomerRefundRules() {
+  return apiGet<CustomerRefundRule[]>('/my/refunds/rules');
+}
+
+export function previewRefund(bookingId: string) {
+  return apiPost<RefundPreview>('/my/refunds/preview', { bookingId });
 }
 
 // مدیریت رزرو — anonymous PNR + last-name self-service (no login), a

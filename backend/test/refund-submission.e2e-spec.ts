@@ -176,7 +176,7 @@ describe('Customer refund submission (e2e)', () => {
       .post('/my/refunds')
       .set('Authorization', `Bearer ${stranger.accessToken}`)
       .send({ bookingId, iban: 'IR820170000000332211009900' });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(404);
   });
 
   it('listMine only returns the caller’s own refund requests', async () => {

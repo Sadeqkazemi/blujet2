@@ -161,11 +161,12 @@ describe('Phase 19 — anonymous manage-booking self-service (e2e)', () => {
 
       expect(res.status).toBe(201);
       expect(res.body.data.status).toBe('SUBMITTED');
-      expect(res.body.data.totalPaidIrr).toBe(priceIrr);
+      expect(res.body.data.totalPaidIrr).toBe(String(priceIrr));
       expect(
         BigInt(String(res.body.data.penaltyAmountIrr)) +
           BigInt(String(res.body.data.refundableIrr)),
       ).toBe(BigInt(priceIrr));
+      expect(res.body.data.trackingCode).toMatch(/^RF-[A-F0-9]{8}$/);
       expect(res.body.data.ibanEnc).toBeUndefined();
     });
 

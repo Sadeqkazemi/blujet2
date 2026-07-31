@@ -10,7 +10,6 @@ import {
   fetchMyBookings,
   fetchMyPriceLocks,
   fetchMyProfile,
-  fetchMyRefunds,
   fetchMySessions,
   fetchPrivacyExport,
   fetchSavedFlights,
@@ -40,7 +39,7 @@ import { changeOwnPassword, setPassword } from '../../api/auth';
 import { faDigits, faMoney, parseTomanToRial } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
-import type { BookingDetail, PriceLock, RefundRequestView, SavedFlight, SavedPassenger, SavedBankAccount, CustomerReferralDashboard, CustomerIdentityView, ActiveSession, UserProfile } from '../../types/public-site';
+import type { BookingDetail, PriceLock, SavedFlight, SavedPassenger, SavedBankAccount, CustomerReferralDashboard, CustomerIdentityView, ActiveSession, UserProfile } from '../../types/public-site';
 import AccountSecuritySessions from './AccountSecuritySessions';
 import type { ClubMembershipView } from '../../types/club-membership';
 import type { MySupportTicketRow, SupportTicketStatus } from '../../types/support-tickets';
@@ -51,6 +50,7 @@ import AccountBankAccountsTab, { type BankAccountForm } from './AccountBankAccou
 import AccountReferralTab from './AccountReferralTab';
 import AccountIdentityTab from './AccountIdentityTab';
 import AccountProfileSavedPax from './AccountProfileSavedPax';
+import AccountRefundsTab from './AccountRefundsTab';
 
 // پنل کاربر — real data from the existing bookings/wallet/club-points/refunds
 // endpoints (none of this is mock). Matches design-reference/پنل کاربر.dc.html's
@@ -77,13 +77,6 @@ const STATUS_LABEL: Record<string, StatusEntry> = {
   CANCELLED: { label: { fa: 'لغو شده', en: 'Cancelled', ar: 'ملغى' }, bg: '#f1f4f8', color: '#8a96a6' },
   EXPIRED: { label: { fa: 'منقضی شده', en: 'Expired', ar: 'منتهي الصلاحية' }, bg: '#fbf0ef', color: '#d64545' },
   REFUNDED: { label: { fa: 'مسترد شده', en: 'Refunded', ar: 'تم الاسترداد' }, bg: '#f1f4f8', color: '#8a96a6' },
-};
-
-const REFUND_STATUS_LABEL: Record<string, Tr> = {
-  SUBMITTED: { fa: 'ثبت شده', en: 'Submitted', ar: 'تم التقديم' },
-  REVIEW: { fa: 'در حال بررسی', en: 'Under Review', ar: 'قيد المراجعة' },
-  FINANCE: { fa: 'در حال پردازش مالی', en: 'Finance Processing', ar: 'قيد المعالجة المالية' },
-  PAID: { fa: 'پرداخت شده', en: 'Paid', ar: 'تم الدفع' },
 };
 
 const TIER_LABEL: Record<string, Tr> = {
@@ -509,7 +502,6 @@ export default function AccountPage() {
   const [wallet, setWallet] = useState<{ balanceIrr: string } | null>(null);
   const [club, setClub] = useState<{ isMember: boolean; level: string | null; balance: number } | null>(null);
   const [clubMembership, setClubMembership] = useState<ClubMembershipView | null>(null);
-  const [refunds, setRefunds] = useState<RefundRequestView[] | null>(null);
   const [topupAmount, setTopupAmount] = useState('');
   const [topupBusy, setTopupBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -580,7 +572,6 @@ export default function AccountPage() {
     fetchWallet().then(setWallet).catch(() => setWallet({ balanceIrr: '0' }));
     fetchClubPoints().then(setClub).catch(() => setClub(null));
     fetchClubMembership().then(setClubMembership).catch(() => setClubMembership(null));
-    fetchMyRefunds().then(setRefunds).catch(() => setRefunds([]));
     fetchMyPriceLocks().then(setPriceLocks).catch(() => setPriceLocks([]));
     fetchSavedFlights().then(setSavedFlights).catch(() => setSavedFlights([]));
     fetchSavedPassengers().then(setSavedPassengers).catch(() => setSavedPassengers([]));
@@ -1405,24 +1396,7 @@ export default function AccountPage() {
           <p style={{ fontSize: 13, color: '#6b7787' }}>{t.loading}</p>
         )}
 
-        {tab === 'refunds' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {refunds?.length === 0 && <p style={{ fontSize: 13, color: '#8a96a6' }}>{t.refundsEmptyText}</p>}
-            {refunds?.map((r) => (
-              <div key={r.id} data-testid="account-refund" style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 14, padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
-                <div>
-                  <div style={{ fontSize: 12.5, fontWeight: 800, color: '#0d2640' }}>
-                    {t.refundableAmountPrefix}{faMoney(r.refundableIrr)} {t.toman}
-                  </div>
-                  <div style={{ fontSize: 11, color: '#8a96a6', marginTop: 3 }}>{t.penaltyPrefix}{faDigits(r.penaltyPct)}{t.penaltySuffix}</div>
-                </div>
-                <span style={{ fontSize: 10.5, fontWeight: 800, background: '#eef4fb', color: '#1668c4', padding: '5px 12px', borderRadius: 14 }}>
-                  {REFUND_STATUS_LABEL[r.status]?.[locale] ?? r.status}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
+        {tab === 'refunds' && <AccountRefundsTab />}
 
         {tab === 'tickets' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

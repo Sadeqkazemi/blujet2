@@ -48,6 +48,7 @@ describe('Refunds (e2e)', () => {
     const penaltyAmountIrr = Math.round(totalPaidIrr * 0.3);
     const req = await prisma.refundRequest.create({
       data: {
+        trackingCode: `RF-${crypto.randomBytes(4).toString('hex').toUpperCase()}`,
         bookingId: booking.id,
         passengerName: `مسافر ${crypto.randomUUID().slice(0, 4)}`,
         ibanEnc: encryptPii('IR820170000000332211009900'),
@@ -120,11 +121,11 @@ describe('Refunds (e2e)', () => {
     expect(pay.status).toBe(403);
   });
 
-  it('refer sets the assignee + history WITHOUT changing status; non-staff assignee → 400', async () => {
+  it('finance reassignment changes assignee + history without changing FINANCE; non-finance assignee → 400', async () => {
     const { req } = await createRequest('FINANCE');
     const { accessToken } = await loginAs(app, 'finance.karimi');
     const staffer = await prisma.user.findFirstOrThrow({
-      where: { username: 'com.ahmadi' },
+      where: { username: 'finance.karimi' },
     });
 
     const res = await request(app.getHttpServer())
@@ -135,7 +136,7 @@ describe('Refunds (e2e)', () => {
     expect(res.body.data.status).toBe('FINANCE'); // unchanged, per design
     expect(res.body.data.assigneeId).toBe(staffer.id);
     const history = res.body.data.history as { labelFa: string }[];
-    expect(history.some((h) => h.labelFa.includes('ارجاع به'))).toBe(true);
+    expect(history.some((h) => h.labelFa.includes('تغییر مسئول'))).toBe(true);
 
     const customer = await prisma.user.findFirstOrThrow({
       where: { role: 'USER' },
