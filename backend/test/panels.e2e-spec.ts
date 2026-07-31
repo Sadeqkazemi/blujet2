@@ -125,6 +125,7 @@ describe('Panels (e2e)', () => {
       'refund',
       'tickets',
       'jobapps',
+      'kyc',
       'settings',
     ]);
   });
