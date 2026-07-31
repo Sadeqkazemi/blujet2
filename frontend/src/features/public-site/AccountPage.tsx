@@ -19,6 +19,7 @@ import {
 } from '../../api/publicSite';
 import { ApiRequestError } from '../../api/envelope';
 import { fetchMySupportTickets } from '../../api/support-tickets';
+import { changeOwnPassword, setPassword } from '../../api/auth';
 import { faDigits, faMoney, parseTomanToRial } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
@@ -65,7 +66,7 @@ const TIER_LABEL: Record<string, Tr> = {
   PLATINUM: { fa: 'پلاتین', en: 'Platinum', ar: 'بلاتينية' },
 };
 
-type TabKey = 'trips' | 'wallet' | 'points' | 'price-locks' | 'passengers' | 'refunds' | 'tickets' | 'profile';
+type TabKey = 'trips' | 'wallet' | 'points' | 'price-locks' | 'passengers' | 'refunds' | 'tickets' | 'security' | 'profile';
 
 const TAB_LABEL: Record<TabKey, Tr> = {
   profile: { fa: 'پروفایل من', en: 'My Profile', ar: 'ملفي الشخصي' },
@@ -76,6 +77,7 @@ const TAB_LABEL: Record<TabKey, Tr> = {
   passengers: { fa: 'مسافران', en: 'Passengers', ar: 'المسافرون' },
   refunds: { fa: 'استرداد‌ها', en: 'Refunds', ar: 'الاستردادات' },
   tickets: { fa: 'پیام به پشتیبانی', en: 'Message Support', ar: 'رسالة للدعم' },
+  security: { fa: 'امنیت حساب', en: 'Account Security', ar: 'أمان الحساب' },
 };
 
 const TABS: { key: TabKey; icon: string }[] = [
@@ -87,6 +89,7 @@ const TABS: { key: TabKey; icon: string }[] = [
   { key: 'passengers', icon: '👤' },
   { key: 'refunds', icon: '↺' },
   { key: 'tickets', icon: '💬' },
+  { key: 'security', icon: '🛡️' },
 ];
 
 const TICKET_STATUS_LABEL: Record<SupportTicketStatus, Tr> = {
@@ -188,6 +191,19 @@ const STR: Record<StoredLocale, {
   ticketsTrackingLabel: string;
   ticketsHistoryHeading: string;
   ticketsLoadError: string;
+  // security
+  securityHeading: string;
+  securitySub: string;
+  currentPasswordLabel: string;
+  currentPasswordHint: string;
+  newPasswordLabel: string;
+  confirmPasswordLabel: string;
+  savePasswordBtn: string;
+  savingPasswordBtn: string;
+  passwordSaved: string;
+  passwordErrorFallback: string;
+  passwordMismatch: string;
+  passwordTooShort: string;
 }> = {
   fa: {
     defaultUserName: 'کاربر',
@@ -262,6 +278,18 @@ const STR: Record<StoredLocale, {
     ticketsTrackingLabel: 'کد پیگیری',
     ticketsHistoryHeading: 'رویدادها',
     ticketsLoadError: 'خطا در دریافت تیکت‌ها.',
+    securityHeading: 'تغییر رمز عبور',
+    securitySub: 'برای امنیت بیشتر، رمز عبور خود را دوره‌ای تغییر دهید. اگر فقط با OTP وارد می‌شوید، فیلد رمز فعلی را خالی بگذارید.',
+    currentPasswordLabel: 'رمز عبور فعلی',
+    currentPasswordHint: '(اختیاری — فقط ورود با OTP)',
+    newPasswordLabel: 'رمز عبور جدید',
+    confirmPasswordLabel: 'تکرار رمز عبور جدید',
+    savePasswordBtn: 'ثبت رمز عبور جدید',
+    savingPasswordBtn: 'در حال ذخیره…',
+    passwordSaved: 'رمز عبور با موفقیت تغییر کرد ✓',
+    passwordErrorFallback: 'خطا در تغییر رمز عبور.',
+    passwordMismatch: 'تکرار رمز عبور جدید مطابقت ندارد.',
+    passwordTooShort: 'رمز عبور جدید باید حداقل ۶ کاراکتر باشد.',
   },
   en: {
     defaultUserName: 'User',
@@ -336,6 +364,18 @@ const STR: Record<StoredLocale, {
     ticketsTrackingLabel: 'Tracking code',
     ticketsHistoryHeading: 'Timeline',
     ticketsLoadError: 'Error loading tickets.',
+    securityHeading: 'Change Password',
+    securitySub: 'Change your password periodically for extra security. If you only sign in with OTP, leave the current password field empty.',
+    currentPasswordLabel: 'Current password',
+    currentPasswordHint: '(optional — OTP-only login)',
+    newPasswordLabel: 'New password',
+    confirmPasswordLabel: 'Confirm new password',
+    savePasswordBtn: 'Save new password',
+    savingPasswordBtn: 'Saving…',
+    passwordSaved: 'Password changed successfully ✓',
+    passwordErrorFallback: 'Error changing password.',
+    passwordMismatch: 'New password confirmation does not match.',
+    passwordTooShort: 'New password must be at least 6 characters.',
   },
   ar: {
     defaultUserName: 'مستخدم',
@@ -410,6 +450,18 @@ const STR: Record<StoredLocale, {
     ticketsTrackingLabel: 'رمز التتبع',
     ticketsHistoryHeading: 'الأحداث',
     ticketsLoadError: 'خطأ في تحميل التذاكر.',
+    securityHeading: 'تغيير كلمة المرور',
+    securitySub: 'غيّر كلمة مرورك بشكل دوري لمزيد من الأمان. إذا كنت تدخل فقط برمز OTP، اترك حقل كلمة المرور الحالية فارغاً.',
+    currentPasswordLabel: 'كلمة المرور الحالية',
+    currentPasswordHint: '(اختياري — دخول OTP فقط)',
+    newPasswordLabel: 'كلمة المرور الجديدة',
+    confirmPasswordLabel: 'تأكيد كلمة المرور الجديدة',
+    savePasswordBtn: 'حفظ كلمة المرور الجديدة',
+    savingPasswordBtn: 'جارٍ الحفظ…',
+    passwordSaved: 'تم تغيير كلمة المرور بنجاح ✓',
+    passwordErrorFallback: 'خطأ في تغيير كلمة المرور.',
+    passwordMismatch: 'تأكيد كلمة المرور الجديدة غير متطابق.',
+    passwordTooShort: 'يجب أن تكون كلمة المرور الجديدة ٦ أحرف على الأقل.',
   },
 };
 
@@ -452,6 +504,12 @@ export default function AccountPage() {
   const [tickets, setTickets] = useState<MySupportTicketRow[] | null>(null);
   const [ticketsError, setTicketsError] = useState<string | null>(null);
   const [expandedTicketId, setExpandedTicketId] = useState<string | null>(null);
+  const [pwCur, setPwCur] = useState('');
+  const [pwNew, setPwNew] = useState('');
+  const [pwConfirm, setPwConfirm] = useState('');
+  const [pwError, setPwError] = useState<string | null>(null);
+  const [pwNotice, setPwNotice] = useState<string | null>(null);
+  const [pwSaving, setPwSaving] = useState(false);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -597,6 +655,36 @@ export default function AccountPage() {
       setLockError(err instanceof ApiRequestError ? err.message : t.cancelErrorFallback);
     } finally {
       setLockActionBusy(null);
+    }
+  }
+
+  async function onSavePassword(e: React.FormEvent) {
+    e.preventDefault();
+    setPwError(null);
+    setPwNotice(null);
+    if (pwNew.length < 6) {
+      setPwError(t.passwordTooShort);
+      return;
+    }
+    if (pwNew !== pwConfirm) {
+      setPwError(t.passwordMismatch);
+      return;
+    }
+    setPwSaving(true);
+    try {
+      if (pwCur.trim()) {
+        await changeOwnPassword(pwCur, pwNew);
+      } else {
+        await setPassword(pwNew);
+      }
+      setPwNotice(t.passwordSaved);
+      setPwCur('');
+      setPwNew('');
+      setPwConfirm('');
+    } catch (err) {
+      setPwError(err instanceof ApiRequestError ? err.message : t.passwordErrorFallback);
+    } finally {
+      setPwSaving(false);
     }
   }
 
@@ -1102,6 +1190,57 @@ export default function AccountPage() {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {tab === 'security' && (
+          <div style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 16, padding: 18, maxWidth: 480 }}>
+            <h3 style={{ fontSize: 15, fontWeight: 800, margin: '0 0 4px' }}>{t.securityHeading}</h3>
+            <p style={{ fontSize: 11.5, color: '#8a96a6', margin: '0 0 16px', lineHeight: 1.8 }}>{t.securitySub}</p>
+            <form onSubmit={(e) => void onSavePassword(e)} style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+              <div>
+                <label htmlFor="acct-pw-cur" style={{ display: 'block', fontSize: 11.5, color: '#6b7787', marginBottom: 6 }}>
+                  {t.currentPasswordLabel} <span style={{ fontSize: 10 }}>{t.currentPasswordHint}</span>
+                </label>
+                <input
+                  id="acct-pw-cur"
+                  type="password"
+                  value={pwCur}
+                  onChange={(e) => setPwCur(e.target.value)}
+                  style={{ width: '100%', boxSizing: 'border-box', height: 46, border: '1.5px solid #e3e8ef', borderRadius: 12, padding: '0 14px', fontSize: 13, fontFamily: 'inherit' }}
+                />
+              </div>
+              <div>
+                <label htmlFor="acct-pw-new" style={{ display: 'block', fontSize: 11.5, color: '#6b7787', marginBottom: 6 }}>{t.newPasswordLabel}</label>
+                <input
+                  id="acct-pw-new"
+                  type="password"
+                  value={pwNew}
+                  onChange={(e) => setPwNew(e.target.value)}
+                  style={{ width: '100%', boxSizing: 'border-box', height: 46, border: '1.5px solid #e3e8ef', borderRadius: 12, padding: '0 14px', fontSize: 13, fontFamily: 'inherit' }}
+                />
+              </div>
+              <div>
+                <label htmlFor="acct-pw-confirm" style={{ display: 'block', fontSize: 11.5, color: '#6b7787', marginBottom: 6 }}>{t.confirmPasswordLabel}</label>
+                <input
+                  id="acct-pw-confirm"
+                  type="password"
+                  value={pwConfirm}
+                  onChange={(e) => setPwConfirm(e.target.value)}
+                  style={{ width: '100%', boxSizing: 'border-box', height: 46, border: '1.5px solid #e3e8ef', borderRadius: 12, padding: '0 14px', fontSize: 13, fontFamily: 'inherit' }}
+                />
+              </div>
+              {pwError && <p role="alert" style={{ fontSize: 12, color: '#e5484d' }}>{pwError}</p>}
+              {pwNotice && <p style={{ fontSize: 12, color: '#059669', fontWeight: 700 }}>{pwNotice}</p>}
+              <button
+                type="submit"
+                data-testid="account-save-password"
+                disabled={pwSaving}
+                style={{ marginTop: 4, height: 44, borderRadius: 11, background: '#1668c4', color: '#fff', fontSize: 12.5, fontWeight: 800, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+              >
+                {pwSaving ? t.savingPasswordBtn : t.savePasswordBtn}
+              </button>
+            </form>
           </div>
         )}
       </div>

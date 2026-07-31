@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
@@ -71,6 +71,15 @@ export class SettingsService {
 
   async update(actor: AuthenticatedUser, patch: Record<string, unknown>) {
     const keys = Object.keys(patch);
+    if (actor.role === 'SITE_ADMIN') {
+      const forbidden = keys.filter((k) => k !== 'socialLinks');
+      if (forbidden.length > 0) {
+        throw new ForbiddenException({
+          code: ErrorCode.FORBIDDEN,
+          message: 'ادمین سایت فقط می‌تواند لینک شبکه‌های اجتماعی را ویرایش کند.',
+        });
+      }
+    }
     const unknown = keys.filter((k) => !(k in SETTING_DEFAULTS));
     if (keys.length === 0 || unknown.length > 0) {
       throw new BadRequestException({
