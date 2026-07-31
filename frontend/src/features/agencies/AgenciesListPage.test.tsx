@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import AgenciesListPage from './AgenciesListPage';
 import * as agenciesApi from '../../api/agencies';
 import * as useAuthModule from '../../hooks/useAuth';
+import { mockAuthUserWithRole } from '../../test/mockAuthUser';
 import type { AgencyListResult, AgencyMembershipRequest } from '../../types/agencies';
 import type { Role } from '../../types/auth';
 
@@ -65,7 +66,7 @@ const REQUESTS: AgencyMembershipRequest[] = [
 function mockRole(role: Role) {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status: 'authenticated',
-    user: { id: 'u1', fullName: 'کاربر تست', role },
+    user: mockAuthUserWithRole(role),
     requestLogin: vi.fn(),
     confirmTwoFactor: vi.fn(),
     agencyLogin: vi.fn(),

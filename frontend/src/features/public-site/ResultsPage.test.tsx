@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import ResultsPage from './ResultsPage';
 import * as publicSiteApi from '../../api/publicSite';
 import * as useAuthModule from '../../hooks/useAuth';
+import { mockAuthUser } from '../../test/mockAuthUser';
 import * as useLocaleModule from '../../hooks/useLocale';
 import { ApiRequestError } from '../../api/envelope';
 import type { PriceLock, SearchFlightResult } from '../../types/public-site';
@@ -30,7 +31,7 @@ const RESULT: SearchFlightResult = {
 function renderPage(status: 'unauthenticated' | 'authenticated' = 'unauthenticated') {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status,
-    user: status === 'authenticated' ? { id: 'u1', fullName: 'کاربر تست', role: 'USER' } : null,
+    user: status === 'authenticated' ? mockAuthUser({ id: 'u1', fullName: 'کاربر تست', role: 'USER' }) : null,
     requestLogin: vi.fn(),
     confirmTwoFactor: vi.fn(),
     agencyLogin: vi.fn(),

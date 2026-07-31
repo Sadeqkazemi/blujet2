@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AccountPage from './AccountPage';
 import * as useAuthModule from '../../hooks/useAuth';
+import { mockAuthUser } from '../../test/mockAuthUser';
 import * as useLocaleModule from '../../hooks/useLocale';
 import * as publicSiteApi from '../../api/publicSite';
 import type { BookingDetail, PriceLock, RefundRequestView, UserProfile } from '../../types/public-site';
@@ -70,7 +71,7 @@ const PROFILE: UserProfile = {
 function mockAuth(status: 'authenticated' | 'unauthenticated', signOut = vi.fn()) {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status,
-    user: status === 'authenticated' ? { id: 'u1', fullName: 'نگار رضایی', role: 'USER' } : null,
+    user: status === 'authenticated' ? mockAuthUser({ id: 'u1', fullName: 'نگار رضایی', role: 'USER' }) : null,
     requestLogin: vi.fn(),
     confirmTwoFactor: vi.fn(),
     agencyLogin: vi.fn(),
