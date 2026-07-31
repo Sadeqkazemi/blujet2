@@ -119,6 +119,8 @@ model User {
 
   jobApplicationsAssigned JobApplication[] @relation("JobApplicationAssignee")
   blogPostsAuthored       BlogPost[]       @relation("BlogPostAuthor")
+  siteMediaUploaded       SiteMediaAsset[] @relation("SiteMediaUploader")
+  siteContentBlockUpdates SiteContentBlock[] @relation("SiteContentBlockUpdatedBy")
 
   pricingProposalsMade     FarePricingProposal[] @relation("PricingProposedBy")
   pricingProposalsApproved FarePricingProposal[] @relation("PricingApprovedBy")
@@ -1037,7 +1039,10 @@ model StoredFile {
   createdAt DateTime @default(now())
 
   agencyDocument AgencyDocument?
-  blogCoverFor   BlogPost?       @relation("BlogPostCover")
+  blogCoverFor     BlogPost?                 @relation("BlogPostCover")
+  siteMediaAsset   SiteMediaAsset?
+  contentBlockImage SiteContentBlock?
+  destHighlightFor SiteDestinationHighlight?
 
   @@index([ownerId])
   @@map("stored_files")
@@ -1978,4 +1983,71 @@ model BlogPost {
   @@index([category])
   @@index([authorId])
   @@map("blog_posts")
+}
+
+// ─── Phase E: SITE_ADMIN media / site content CMS ───────────────────────
+
+enum SiteContentBlockKey {
+  HERO_BANNER
+  ANNOUNCEMENT_BAR
+  PROMO_BANNER
+}
+
+model SiteMediaAsset {
+  id           String     @id @default(uuid())
+  storedFileId String     @unique
+  storedFile   StoredFile @relation(fields: [storedFileId], references: [id])
+  label        String
+  uploadedById String
+  uploadedBy   User       @relation("SiteMediaUploader", fields: [uploadedById], references: [id])
+  deletedAt    DateTime?
+  createdAt    DateTime   @default(now())
+
+  @@index([uploadedById])
+  @@map("site_media_assets")
+}
+
+model SiteContentBlock {
+  key          SiteContentBlockKey @id
+  enabled      Boolean             @default(true)
+  title        String              @default("")
+  subtitle     String              @default("")
+  buttonText   String              @default("")
+  badgeText    String              @default("")
+  imageFileId  String?             @unique
+  imageFile    StoredFile?         @relation(fields: [imageFileId], references: [id])
+  updatedById  String?
+  updatedBy    User?               @relation("SiteContentBlockUpdatedBy", fields: [updatedById], references: [id])
+  updatedAt    DateTime            @updatedAt
+
+  @@map("site_content_blocks")
+}
+
+model SiteDestinationHighlight {
+  id           String      @id @default(uuid())
+  airportCode  String
+  priceIrr     BigInt
+  imageFileId  String?     @unique
+  imageFile    StoredFile? @relation(fields: [imageFileId], references: [id])
+  sortOrder    Int         @default(0)
+  deletedAt    DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([sortOrder])
+  @@map("site_destination_highlights")
+}
+
+model SiteRouteHighlight {
+  id               String    @id @default(uuid())
+  fromAirportCode  String
+  toAirportCode    String
+  priceIrr         BigInt
+  sortOrder        Int       @default(0)
+  deletedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([sortOrder])
+  @@map("site_route_highlights")
 }

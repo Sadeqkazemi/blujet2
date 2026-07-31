@@ -951,6 +951,63 @@ async function main() {
     });
   }
 
+  // ── Phase E: site content CMS (home banners, routes, destinations) ───
+  const existingRouteHighlights = await prisma.siteRouteHighlight.count();
+  if (existingRouteHighlights === 0) {
+    await prisma.siteContentBlock.createMany({
+      data: [
+        {
+          key: 'HERO_BANNER',
+          enabled: true,
+          title: 'پرواز بعدی‌ات را با blujet رزرو کن',
+          subtitle:
+            'بیش از ۲۰۰ مقصد داخلی و بین‌المللی، با بهترین قیمت، پشتیبانی شبانه‌روزی و امتیاز در هر سفر.',
+          buttonText: 'مشاهده پیشنهادهای ویژه',
+          badgeText: 'در هر پرواز تا ۵٪ کش‌بک بگیرید',
+          updatedById: siteAdmin.id,
+        },
+        {
+          key: 'ANNOUNCEMENT_BAR',
+          enabled: true,
+          title:
+            'اطلاعیه مهم: برخی پروازهای امروز به‌دلیل شرایط جوی با تأخیر انجام می‌شوند — آخرین وضعیت پروازها را بررسی کنید',
+          subtitle: '',
+          buttonText: 'مشاهده',
+          badgeText: '',
+          updatedById: siteAdmin.id,
+        },
+        {
+          key: 'PROMO_BANNER',
+          enabled: true,
+          title: 'تا ۴۰٪ تخفیف روی پروازهای خارجی',
+          subtitle:
+            'رزرو تا پایان مرداد برای سفرهای تابستان — صندلی‌ها محدودند، فرصت را از دست نده.',
+          buttonText: 'مشاهده پروازها',
+          badgeText: 'حراج تابستانه blujet',
+          updatedById: siteAdmin.id,
+        },
+      ],
+      skipDuplicates: true,
+    });
+    await prisma.siteRouteHighlight.createMany({
+      data: [
+        { fromAirportCode: 'THR', toAirportCode: 'MHD', priceIrr: 16_000_000n, sortOrder: 0 },
+        { fromAirportCode: 'THR', toAirportCode: 'IST', priceIrr: 42_000_000n, sortOrder: 1 },
+        { fromAirportCode: 'THR', toAirportCode: 'DXB', priceIrr: 38_000_000n, sortOrder: 2 },
+        { fromAirportCode: 'MHD', toAirportCode: 'KIH', priceIrr: 21_000_000n, sortOrder: 3 },
+        { fromAirportCode: 'SYZ', toAirportCode: 'THR', priceIrr: 14_500_000n, sortOrder: 4 },
+      ],
+    });
+    await prisma.siteDestinationHighlight.createMany({
+      data: [
+        { airportCode: 'IST', priceIrr: 42_000_000n, sortOrder: 0 },
+        { airportCode: 'DXB', priceIrr: 38_000_000n, sortOrder: 1 },
+        { airportCode: 'MHD', priceIrr: 16_000_000n, sortOrder: 2 },
+        { airportCode: 'KIH', priceIrr: 21_000_000n, sortOrder: 3 },
+      ],
+    });
+  }
+
   // ── Phase 6: pricing proposals (one pending, one registered) ───────────
   const existingProposalCount = await prisma.farePricingProposal.count();
   if (existingProposalCount === 0) {

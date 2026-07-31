@@ -1528,6 +1528,15 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   Media tab deferred. Tests: 5 backend e2e + 5 admin Vitest + 4 public Vitest.
   See `docs/features/site-admin-blog.md` + `docs/features/public-blog.md`.
 
+- [x] **SITE_ADMIN media CMS (Phase E)** — `SiteMediaAsset`, `SiteContentBlock`,
+  `SiteDestinationHighlight`, `SiteRouteHighlight` + admin CRUD
+  (`/site-content/admin/*`) + public home payload (`GET /site-content/home`,
+  `GET /site-content/media/:fileId`); `media` tab in SITE_ADMIN nav;
+  `MediaAdminPage` (library, banners, destinations, routes); `HomeSearchPage`
+  wired to CMS with static fallbacks. Social/app/support/jobs in media tab
+  deferred. Tests: 8 backend e2e + 4 MediaAdmin Vitest + updated HomeSearch Vitest.
+  See `docs/features/site-admin-media.md`.
+
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is
 "done" only when every checklist item in its `docs/features/<name>.md` has

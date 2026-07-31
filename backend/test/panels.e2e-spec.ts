@@ -105,7 +105,13 @@ describe('Panels (e2e)', () => {
       .set('Authorization', `Bearer ${accessToken}`);
     expect(res.status).toBe(200);
     const keys = res.body.data.map((t: { key: string }) => t.key);
-    expect(keys).toEqual(['dashboard', 'agencies', 'flights', 'cartable', 'referrals']);
+    expect(keys).toEqual([
+      'dashboard',
+      'agencies',
+      'flights',
+      'cartable',
+      'referrals',
+    ]);
   });
 
   it('returns the confirmed tab set for SITE_ADMIN', async () => {
@@ -125,6 +131,7 @@ describe('Panels (e2e)', () => {
       'refund',
       'tickets',
       'blog',
+      'media',
       'jobapps',
       'kyc',
       'settings',

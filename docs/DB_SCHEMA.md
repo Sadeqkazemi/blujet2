@@ -2427,7 +2427,63 @@ Plus on `StoredFile`: `blogCoverFor BlogPost? @relation("BlogPostCover")`.
 - `slug` is unique; auto-generated from title when omitted at create time.
 - Public visibility: `PUBLISHED`, or `SCHEDULED` with `scheduledAt <= now()`.
 - Soft-delete via `deletedAt`; admin list excludes deleted rows.
-- `PANEL_NAV.SITE_ADMIN` gains `{ key: 'blog', implemented: true }`; `media`
-  stays excluded (no backend yet).
+- `PANEL_NAV.SITE_ADMIN` gains `{ key: 'blog', implemented: true }`.
 - Seed: five sample posts (three published, one draft, one future-scheduled)
   authored by `site.admin`.
+
+## Phase E — Site content CMS
+
+```prisma
+enum SiteContentBlockKey { HERO_BANNER ANNOUNCEMENT_BAR PROMO_BANNER }
+
+model SiteMediaAsset {
+  id           String     @id @default(uuid())
+  storedFileId String     @unique
+  label        String
+  uploadedById String
+  deletedAt    DateTime?
+  createdAt    DateTime   @default(now())
+  @@map("site_media_assets")
+}
+
+model SiteContentBlock {
+  key          SiteContentBlockKey @id
+  enabled      Boolean             @default(true)
+  title        String              @default("")
+  subtitle     String              @default("")
+  buttonText   String              @default("")
+  badgeText    String              @default("")
+  imageFileId  String?             @unique
+  updatedById  String?
+  updatedAt    DateTime            @updatedAt
+  @@map("site_content_blocks")
+}
+
+model SiteDestinationHighlight {
+  id          String    @id @default(uuid())
+  airportCode String
+  priceIrr    BigInt
+  imageFileId String?   @unique
+  sortOrder   Int       @default(0)
+  deletedAt   DateTime?
+  @@map("site_destination_highlights")
+}
+
+model SiteRouteHighlight {
+  id              String    @id @default(uuid())
+  fromAirportCode String
+  toAirportCode   String
+  priceIrr        BigInt
+  sortOrder       Int       @default(0)
+  deletedAt       DateTime?
+  @@map("site_route_highlights")
+}
+```
+
+Plus on `User`: `siteMediaUploaded`, `siteContentBlockUpdates`.
+Plus on `StoredFile`: `siteMediaAsset`, `contentBlockImage`, `destHighlightFor`.
+
+- Prices stored as IRR (`BigInt`); UI converts to toman at render time only.
+- Blocks auto-created with Persian defaults on first admin/public read if missing.
+- `PANEL_NAV.SITE_ADMIN` gains `{ key: 'media', implemented: true }`.
+- Seed: three blocks + five routes + four destinations matching home mock data.
