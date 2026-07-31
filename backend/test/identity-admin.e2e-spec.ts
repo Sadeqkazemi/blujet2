@@ -5,6 +5,7 @@ import { TypeORMService } from '../src/typeorm/typeorm.service';
 import { encryptPii } from '../src/common/pii-crypto';
 import { loginAs, loginAsCustomer } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
+import { resetCustomerPhones } from './helpers/customer-state.helper';
 
 const PNG_BYTES = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
@@ -19,6 +20,12 @@ describe('Identity admin review (e2e)', () => {
   beforeEach(async () => {
     app = await createTestApp();
     typeorm = app.get(TypeORMService);
+    await resetCustomerPhones(typeorm, [
+      '09180000201',
+      '09180000202',
+      '09180000203',
+      '09180000204',
+    ]);
   });
 
   afterEach(async () => {
