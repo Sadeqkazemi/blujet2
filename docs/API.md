@@ -1171,6 +1171,22 @@ payouts.
 - Frontend: `AccountBankAccountsTab` on `AccountPage.tsx` `banks` tab (card
   list with brand chip + «پیش‌فرض» badge, inline add form).
 
+### پنل کاربر — معرفی دوستان (`/account` → تب `referral`)
+Closes the «معرفی دوستان» section in
+`design-reference-v2/پنل کاربر.dc.html`.
+
+- `GET /my/referral` (new, `USER` role) — `{ referralCode, sharePath,
+  stats: { invitedCount, pointsEarned, successfulBookings }, invites:
+  [{ id, fullName, joinedAt, status, pointsAwarded }] }`. Code is
+  lazily generated on first read (`NAME-####` shape).
+- `POST /auth/otp/request` — optional `referralCode` in body; applied only
+  when the phone number is registering for the first time (ignored for
+  returning customers and invalid/self codes).
+- First ticketed booking by a referred user awards `500` club points to
+  the referrer's `ClubMember` ledger (if they are a member); idempotent.
+- Frontend: `AccountReferralTab` on `AccountPage.tsx` `referral` tab
+  (hero banner, copy/share, KPI cards, invited-friends list).
+
 ## Phase 21 — فراموشی رمز (customer forgot/set password)
 
 Third "dead forms" item. `ForgotPasswordPage.tsx` was entirely client-side

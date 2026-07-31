@@ -9,7 +9,7 @@ import * as useLocaleModule from '../../hooks/useLocale';
 import * as publicSiteApi from '../../api/publicSite';
 import * as supportTicketsApi from '../../api/support-tickets';
 import * as authApi from '../../api/auth';
-import type { BookingDetail, PriceLock, RefundRequestView, SavedFlight, SavedPassenger, SavedBankAccount, ActiveSession, UserProfile } from '../../types/public-site';
+import type { BookingDetail, PriceLock, RefundRequestView, SavedFlight, SavedPassenger, SavedBankAccount, CustomerReferralDashboard, ActiveSession, UserProfile } from '../../types/public-site';
 import type { ClubMembershipView } from '../../types/club-membership';
 import type { MySupportTicketRow } from '../../types/support-tickets';
 
@@ -149,6 +149,28 @@ const BANK_ACCOUNT: SavedBankAccount = {
   updatedAt: '2026-07-01T00:00:00.000Z',
 };
 
+const REFERRAL_DASH: CustomerReferralDashboard = {
+  referralCode: 'NEGAR-4152',
+  sharePath: '/signin?ref=NEGAR-4152',
+  stats: { invitedCount: 3, pointsEarned: 1000, successfulBookings: 2 },
+  invites: [
+    {
+      id: 'cr-1',
+      fullName: 'رضا مرادی',
+      joinedAt: '2026-07-01T00:00:00.000Z',
+      status: 'REWARDED',
+      pointsAwarded: 500,
+    },
+    {
+      id: 'cr-2',
+      fullName: 'آرش هاشمی',
+      joinedAt: '2026-07-02T00:00:00.000Z',
+      status: 'SIGNED_UP',
+      pointsAwarded: 0,
+    },
+  ],
+};
+
 const SAVED: SavedFlight = {
   id: 'sf-1',
   flightInstanceId: 'fi-3',
@@ -195,6 +217,7 @@ beforeEach(() => {
   vi.spyOn(publicSiteApi, 'fetchSavedFlights').mockResolvedValue([SAVED]);
   vi.spyOn(publicSiteApi, 'fetchSavedPassengers').mockResolvedValue([SAVED_PASSENGER]);
   vi.spyOn(publicSiteApi, 'fetchBankAccounts').mockResolvedValue([BANK_ACCOUNT]);
+  vi.spyOn(publicSiteApi, 'fetchMyReferral').mockResolvedValue(REFERRAL_DASH);
   vi.spyOn(publicSiteApi, 'fetchMySessions').mockResolvedValue([ACTIVE_SESSION, OTHER_SESSION]);
   vi.spyOn(supportTicketsApi, 'fetchMySupportTickets').mockResolvedValue([]);
 });
@@ -337,6 +360,22 @@ describe('AccountPage', () => {
       cardNo: '6219861977777730',
       sheba: 'IR060120000000332211452192',
     });
+  });
+
+  it('switches to the referral tab and shows code, KPIs, and invite list', async () => {
+    mockAuth('authenticated');
+    Object.assign(navigator, {
+      clipboard: { writeText: vi.fn().mockResolvedValue(undefined) },
+    });
+    renderPage();
+    await userEvent.click(screen.getByTestId('account-tab-referral'));
+    expect(await screen.findByTestId('account-referral')).toBeInTheDocument();
+    expect(screen.getByTestId('referral-code')).toHaveTextContent('NEGAR-4152');
+    expect(screen.getByTestId('kpi-invited')).toHaveTextContent('۳');
+    expect(screen.getByText('رضا مرادی')).toBeInTheDocument();
+    expect(screen.getByText('رزرو انجام شد')).toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('referral-copy'));
+    expect(await screen.findByText('کد معرف کپی شد ✓')).toBeInTheDocument();
   });
 
   it('shows saved passengers on the profile tab and opens add modal from there', async () => {
