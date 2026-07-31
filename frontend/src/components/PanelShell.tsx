@@ -1,7 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { fetchNav } from '../api/panels';
+import { fetchCartable } from '../api/cartable';
+import { fetchRefunds } from '../api/refunds';
+import { fetchStaffReports } from '../api/reporting';
+import { fetchLogsBadgeCount } from '../api/audit';
+import { faDigits } from '../lib/fa-format';
 import type { PanelNavItem } from '../types/panels';
 
 const ROLE_LABELS: Record<string, string> = {
@@ -15,16 +20,78 @@ const ROLE_LABELS: Record<string, string> = {
   EMPLOYEE: 'کارمند',
 };
 
+type NavBadge = { count: number; className: string };
+
 export default function PanelShell() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [nav, setNav] = useState<PanelNavItem[] | null>(null);
+  const [badges, setBadges] = useState<Record<string, NavBadge>>({});
 
   useEffect(() => {
     fetchNav()
       .then(setNav)
       .catch(() => setNav([]));
   }, []);
+
+  const navKeys = useMemo(() => new Set(nav?.map((item) => item.key) ?? []), [nav]);
+
+  useEffect(() => {
+    if (!nav || nav.length === 0) return;
+
+    const next: Record<string, NavBadge> = {};
+    const tasks: Promise<void>[] = [];
+
+    if (navKeys.has('cartable')) {
+      tasks.push(
+        fetchCartable()
+          .then((r) => {
+            if (r.totalOpen > 0) {
+              next.cartable = { count: r.totalOpen, className: 'bg-danger text-white' };
+            }
+          })
+          .catch(() => undefined),
+      );
+    }
+
+    if (navKeys.has('refund') && user?.role === 'FINANCE_MANAGER') {
+      tasks.push(
+        fetchRefunds()
+          .then((r) => {
+            if (r.kpis.payoutQueue > 0) {
+              next.refund = { count: r.kpis.payoutQueue, className: 'bg-[#a855f7] text-white' };
+            }
+          })
+          .catch(() => undefined),
+      );
+    }
+
+    if (navKeys.has('staff')) {
+      tasks.push(
+        fetchStaffReports()
+          .then((r) => {
+            if (r.newEmployeeEvents.length > 0) {
+              next.staff = { count: r.newEmployeeEvents.length, className: 'bg-danger text-white' };
+            }
+          })
+          .catch(() => undefined),
+      );
+    }
+
+    if (navKeys.has('logs') && user?.role === 'IT_MANAGER') {
+      tasks.push(
+        fetchLogsBadgeCount()
+          .then((r) => {
+            if (r.count > 0) {
+              next.logs = { count: r.count, className: 'bg-danger text-white' };
+            }
+          })
+          .catch(() => undefined),
+      );
+    }
+
+    void Promise.all(tasks).then(() => setBadges(next));
+  }, [nav, navKeys, user?.role]);
 
   async function onSignOut() {
     await signOut();
@@ -50,27 +117,41 @@ export default function PanelShell() {
 
         <nav className="mt-4 flex flex-1 flex-col gap-0.5 px-3">
           {nav === null && <div className="px-2 py-3 text-xs text-[#8fa1bb]">در حال بارگذاری…</div>}
-          {nav?.length === 0 && <div className="px-2 py-3 text-xs text-[#8fa1bb]">تبی برای این نقش تعریف نشده است.</div>}
-          {nav?.map((item) => (
-            <NavLink
-              key={item.key}
-              to={item.key === 'dashboard' ? '/panel' : `/panel/${item.key}`}
-              end={item.key === 'dashboard'}
-              className={({ isActive }) =>
-                `flex items-center justify-between rounded-lg px-3 py-2.5 text-sm transition ${
-                  isActive ? 'bg-accent/20 font-bold text-white' : 'text-[#9fb0c7] hover:bg-white/5'
-                }`
-              }
-            >
-              <span>{item.labelFa}</span>
-              {!item.implemented && <span className="text-[10px] text-[#5a6678]">به‌زودی</span>}
-            </NavLink>
-          ))}
+          {nav?.length === 0 && (
+            <div className="px-2 py-3 text-xs text-[#8fa1bb]">تبی برای این نقش تعریف نشده است.</div>
+          )}
+          {nav?.map((item) => {
+            const badge = badges[item.key];
+            return (
+              <NavLink
+                key={item.key}
+                to={item.key === 'dashboard' ? '/panel' : `/panel/${item.key}`}
+                end={item.key === 'dashboard'}
+                className={({ isActive }) =>
+                  `flex items-center justify-between rounded-lg px-3 py-2.5 text-sm transition ${
+                    isActive ? 'bg-accent/20 font-bold text-white' : 'text-[#9fb0c7] hover:bg-white/5'
+                  }`
+                }
+              >
+                <span className="flex items-center gap-2">
+                  {item.labelFa}
+                  {badge && (
+                    <span
+                      className={`font-num rounded-full px-2 py-0.5 text-[10px] font-bold ${badge.className}`}
+                    >
+                      {faDigits(badge.count)}
+                    </span>
+                  )}
+                </span>
+                {!item.implemented && <span className="text-[10px] text-[#5a6678]">به‌زودی</span>}
+              </NavLink>
+            );
+          })}
         </nav>
 
         <div className="border-t border-white/10 p-4">
           <button
-            onClick={onSignOut}
+            onClick={() => void onSignOut()}
             className="w-full rounded-lg border border-white/10 py-2 text-xs text-[#9fb0c7] transition hover:bg-white/5"
           >
             خروج از حساب

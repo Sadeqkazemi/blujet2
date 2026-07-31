@@ -399,9 +399,9 @@ describe('IT Manager (e2e)', () => {
       .get('/it/dashboard')
       .set(auth(accessToken));
     expect(res.status).toBe(200);
-    expect(res.body.data.kpis.activeEmployees).toBeGreaterThanOrEqual(0);
-    expect(res.body.data.resources.cpuCount).toBeGreaterThan(0);
-    expect(res.body.data.resources.memoryUsedPct).toBeGreaterThanOrEqual(0);
+    expect(res.body.data.kpis.servicesUp).toBeGreaterThanOrEqual(0);
+    expect(res.body.data.kpis.uptime30dPct).toBeGreaterThan(0);
+    expect(res.body.data.resources.cpuUsedPct).toBeGreaterThanOrEqual(0);
     expect(Array.isArray(res.body.data.recentEvents)).toBe(true);
   });
 
