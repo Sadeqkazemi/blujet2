@@ -23,6 +23,14 @@ export class PanelsController {
     return { success: true, data: await this.panels.getNav(user) };
   }
 
+  @Get('employee-context')
+  @UseGuards(RolesGuard)
+  @Roles('EMPLOYEE')
+  @ApiOperation({ summary: 'اطلاعات داشبورد کارمند — واحد و دسترسی‌ها' })
+  async getEmployeeContext(@CurrentUser() user: AuthenticatedUser) {
+    return { success: true, data: await this.panels.getEmployeeContext(user) };
+  }
+
   // Phase 12: IT_MANAGER reads the flags for its informational دسترسی به
   // پنل‌ها tab («تعیین سطح دسترسی ورود در اختیار مدیر عامل است») — PATCH
   // below stays CEO/SENIOR_MANAGER only.

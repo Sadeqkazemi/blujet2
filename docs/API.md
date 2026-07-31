@@ -2893,3 +2893,35 @@ See `docs/DB_SCHEMA.md`'s Phase 67 (DRAFT) section for the new
 `docs/features/careers.md` for the acceptance checklist. **No code has
 been written for this phase yet — awaiting explicit user approval per
 CLAUDE.md workflow rule 1.**
+
+## Phase B — EMPLOYEE cartable (پنل کارمند.dc.html)
+
+Closes the Phase 18 deferral where `cartable` appeared in the design's
+permission list but had no real backend gate for `EMPLOYEE`. New catalog
+keys `ct_list` (view) and `ct_process` (mark done + message manager) in
+both commercial and finance depts; `EMPLOYEE_SECTION_NAV.cartable` wires
+the tab when either key is granted.
+
+### `backend/src/modules/cartable/` (EMPLOYEE additions)
+
+| Method | Path | Access | Notes |
+|--------|------|--------|-------|
+| GET | `/cartable` | EMPLOYEE + `ct_list` | Same self-scoped list as exec roles. |
+| PATCH | `/cartable/:id/approve` | EMPLOYEE + `ct_process` | Employee UI «انجام شد ✓» maps here (note required server-side; frontend sends `انجام شد`). |
+| GET | `/cartable/manager-recipients` | EMPLOYEE + `ct_process` | Exec managers (+ IT_MANAGER, SITE_ADMIN) with `isOwnManager` for the employee's dept. |
+| POST | `/cartable/manager-message` | EMPLOYEE + `ct_process` | `{ toId, body }` → cartable task for target manager (`sourceType: EMPLOYEE_MESSAGE`). |
+| GET | `/cartable/manager-message/sent` | EMPLOYEE + `ct_process` | Caller's last 20 sent messages. |
+
+Reject/transfer/chair-permission endpoints stay exec-only (class-level
+`@Roles(...EXEC_ROLES, 'SITE_ADMIN')` unchanged on those handlers).
+
+### `backend/src/modules/panels/`
+
+| Method | Path | Access | Notes |
+|--------|------|--------|-------|
+| GET | `/panels/employee-context` | EMPLOYEE | `{ dept, deptLabelFa, rank, permissionLabelsFa[] }` for dashboard KPI/chip row. |
+
+Schema: `CartableSourceType` gains `EMPLOYEE_MESSAGE` (migration
+`20260731120000_employee_cartable_source_type`).
+
+See `docs/features/employee-cartable.md` for the acceptance checklist.

@@ -4,6 +4,7 @@ import type {
   CartableListResult,
   CartableTask,
   ChairPermission,
+  EmployeeManagerRecipient,
   ManagerMessageDept,
   MyReferralListResult,
   Referral,
@@ -11,6 +12,7 @@ import type {
   ReferralPriority,
   ReferralReport,
   SendMessageResult,
+  SentEmployeeManagerMessage,
   StaffDirectoryEntry,
 } from '../types/cartable';
 
@@ -92,4 +94,16 @@ export function sendManagerMessage(dto: {
   body: string;
 }) {
   return apiPost<SendMessageResult>('/manager-messages', dto);
+}
+
+export function fetchManagerRecipients() {
+  return apiGet<EmployeeManagerRecipient[]>('/cartable/manager-recipients');
+}
+
+export function sendEmployeeManagerMessage(dto: { toId: string; body: string }) {
+  return apiPost<{ id: string }>('/cartable/manager-message', dto);
+}
+
+export function fetchSentManagerMessages() {
+  return apiGet<SentEmployeeManagerMessage[]>('/cartable/manager-message/sent');
 }

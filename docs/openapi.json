@@ -608,6 +608,21 @@
         ]
       }
     },
+    "/panels/employee-context": {
+      "get": {
+        "operationId": "PanelsController_getEmployeeContext",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "اطلاعات داشبورد کارمند — واحد و دسترسی‌ها",
+        "tags": [
+          "panels"
+        ]
+      }
+    },
     "/panels/access": {
       "get": {
         "operationId": "PanelsController_getAccess",
@@ -1967,6 +1982,61 @@
           }
         },
         "summary": "کارتابل من — فقط موارد خود کاربر + شمارنده کارت‌ها",
+        "tags": [
+          "cartable"
+        ]
+      }
+    },
+    "/cartable/manager-recipients": {
+      "get": {
+        "operationId": "CartableController_managerRecipients",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست مدیران برای ارسال پیام — کارمند",
+        "tags": [
+          "cartable"
+        ]
+      }
+    },
+    "/cartable/manager-message": {
+      "post": {
+        "operationId": "CartableController_sendManagerMessage",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendEmployeeManagerMessageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ارسال پیام مستقیم به مدیر — تحویل در کارتابل مدیر",
+        "tags": [
+          "cartable"
+        ]
+      }
+    },
+    "/cartable/manager-message/sent": {
+      "get": {
+        "operationId": "CartableController_sentManagerMessages",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "پیام‌های ارسالی کارمند به مدیران",
         "tags": [
           "cartable"
         ]
@@ -7332,6 +7402,24 @@
           "phone",
           "challengeId",
           "code"
+        ]
+      },
+      "SendEmployeeManagerMessageDto": {
+        "type": "object",
+        "properties": {
+          "toId": {
+            "type": "string",
+            "description": "شناسه مدیر مقصد"
+          },
+          "body": {
+            "type": "string",
+            "description": "متن پیام",
+            "example": "لطفاً در مورد قرارداد آژانس راهنمایی کنید."
+          }
+        },
+        "required": [
+          "toId",
+          "body"
         ]
       },
       "ResolveCartableDto": {

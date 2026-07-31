@@ -164,6 +164,10 @@ export const EMPLOYEE_SECTION_NAV: Record<
     labelFa: 'استرداد بلیط',
     wiredKeys: ['rf_list', 'rf_details', 'rf_process'],
   },
+  cartable: {
+    labelFa: 'کارتابل',
+    wiredKeys: ['ct_list', 'ct_process'],
+  },
 };
 
 export const ALL_PANEL_KEYS = [

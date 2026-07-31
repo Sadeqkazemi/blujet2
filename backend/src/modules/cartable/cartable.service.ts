@@ -8,7 +8,7 @@ import {
 import { TypeORMService } from '../../typeorm/typeorm.service';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
-import { STAFF_ROLES } from '../../common/exec-roles';
+import { EXEC_ROLES, ROLE_LABELS_FA, STAFF_ROLES } from '../../common/exec-roles';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type {
   CartableCategory,
@@ -330,7 +330,8 @@ export class CartableService {
       | 'MANAGER_MESSAGE'
       | 'MANAGER_REFERRAL'
       | 'AGENCY_REQUEST'
-      | 'CHAIR_PERMISSION';
+      | 'CHAIR_PERMISSION'
+      | 'EMPLOYEE_MESSAGE';
     sourceId?: string;
   }) {
     return this.typeorm.cartableTask.create({ data: input });
@@ -354,5 +355,94 @@ export class CartableService {
       await this.createTask({ ...input, assigneeId: r.id });
     }
     return recipients.length;
+  }
+
+  /** Dept → the exec manager role that owns the employee's unit. */
+  private deptManagerRole(dept: string | null | undefined): Role | null {
+    if (dept === 'commercial' || dept === 'sales') return 'COMMERCIAL_MANAGER';
+    if (dept === 'finance') return 'FINANCE_MANAGER';
+    if (dept === 'it') return 'IT_MANAGER';
+    return null;
+  }
+
+  async listManagerRecipients(actor: AuthenticatedUser) {
+    const employee = await this.typeorm.user.findUniqueOrThrow({
+      where: { id: actor.id },
+      select: { dept: true },
+    });
+    const ownRole = this.deptManagerRole(employee.dept);
+
+    const managers = await this.typeorm.user.findMany({
+      where: { role: { in: [...EXEC_ROLES, 'IT_MANAGER', 'SITE_ADMIN'] }, isActive: true },
+      select: { id: true, fullName: true, role: true },
+      orderBy: { fullName: 'asc' },
+    });
+
+    return managers.map((m) => ({
+      id: m.id,
+      fullName: m.fullName,
+      role: m.role,
+      roleLabelFa: ROLE_LABELS_FA[m.role],
+      isOwnManager: ownRole !== null && m.role === ownRole,
+    }));
+  }
+
+  async sendEmployeeManagerMessage(
+    actor: AuthenticatedUser,
+    dto: { toId: string; body: string },
+  ) {
+    const target = await this.typeorm.user.findUnique({ where: { id: dto.toId } });
+    if (
+      !target ||
+      !target.isActive ||
+      ![...EXEC_ROLES, 'IT_MANAGER', 'SITE_ADMIN'].includes(target.role)
+    ) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'گیرندهٔ پیام معتبر نیست.',
+      });
+    }
+
+    const task = await this.createTask({
+      assigneeId: target.id,
+      category: 'MANAGER',
+      title: `پیام از ${actor.fullName}`,
+      description: dto.body,
+      senderId: actor.id,
+      senderLabelFa: `${actor.fullName} · کارمند`,
+      sourceType: 'EMPLOYEE_MESSAGE',
+    });
+
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'SYSTEM',
+      action: 'ارسال پیام کارمند به مدیر',
+      detail: `${actor.fullName} پیامی به ${target.fullName} ارسال کرد.`,
+      entityType: 'CartableTask',
+      entityId: task.id,
+    });
+
+    return {
+      id: task.id,
+      to: { id: target.id, fullName: target.fullName },
+      body: dto.body,
+      createdAt: task.createdAt,
+    };
+  }
+
+  async listSentEmployeeManagerMessages(actor: AuthenticatedUser) {
+    const rows = await this.typeorm.cartableTask.findMany({
+      where: { senderId: actor.id, sourceType: 'EMPLOYEE_MESSAGE' },
+      include: { assignee: { select: { fullName: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      toName: r.assignee.fullName,
+      body: r.description,
+      createdAt: r.createdAt,
+    }));
   }
 }

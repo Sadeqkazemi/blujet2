@@ -1231,7 +1231,7 @@ async function main() {
     },
   });
   for (const [employee, keys] of [
-    [commercialEmployee, ['ag_list', 'fl_view']],
+    [commercialEmployee, ['ag_list', 'fl_view', 'ct_list', 'ct_process']],
     [financeEmployee, ['rf_list']],
   ] as const) {
     const perms = await typeorm.permission.findMany({ where: { key: { in: keys as unknown as string[] } } });
@@ -1242,6 +1242,33 @@ async function main() {
         create: { employeeId: employee.id, permissionId: perm.id, grantedById: itManager.id },
       });
     }
+  }
+
+  const employeeCartableCount = await typeorm.cartableTask.count({
+    where: { assigneeId: commercialEmployee.id },
+  });
+  if (employeeCartableCount === 0) {
+    await typeorm.cartableTask.createMany({
+      data: [
+        {
+          assigneeId: commercialEmployee.id,
+          category: 'ADMIN',
+          title: 'بررسی قرارداد همکاری آژانس جدید',
+          description: 'نسخه پیش‌نویس قرارداد همکاری آژانس «پرواز آسیا» برای بازبینی واحد بازرگانی.',
+          senderId: commercialManager.id,
+          senderLabelFa: 'رضا مرادی · مدیر بازرگانی',
+          createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000),
+        },
+        {
+          assigneeId: commercialEmployee.id,
+          category: 'AGENCY',
+          title: 'پیگیری درخواست عضویت آژانس کیان‌سیر',
+          description: 'مدارک آژانس کیان‌سیر تکمیل شده — لطفاً صحت مجوز را بررسی کنید.',
+          senderLabelFa: 'ادمین سایت',
+          createdAt: new Date(Date.now() - 20 * 60 * 60 * 1000),
+        },
+      ],
+    });
   }
 
   // ── Phase 10: airport catalog + flight-management seed ────────────────
