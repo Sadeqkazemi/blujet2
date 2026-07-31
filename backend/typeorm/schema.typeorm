@@ -124,6 +124,7 @@ model User {
   refundsProcessed  RefundRequest[] @relation("RefundProcessedBy")
 
   bookings                       Booking[]               @relation("BookingUser")
+  itineraries                    Itinerary[]             @relation("ItineraryUser")
   promoRedemptions               PromoRedemption[]       @relation("PromoRedeemedBy")
   walletEntries                  WalletEntry[]           @relation("WalletOwner")
   priceLocks                     PriceLock[]             @relation("PriceLockOwner")
@@ -444,11 +445,33 @@ enum BookingStatus {
   NO_SHOW
 }
 
+// Multi-leg connection trips share one customer-facing PNR; each leg is a
+// separate Booking row linked here (legIndex 0, 1, …).
+model Itinerary {
+  id            String         @id @default(uuid())
+  pnr           String         @unique
+  userId        String?
+  user          User?          @relation("ItineraryUser", fields: [userId], references: [id])
+  agencyId      String?
+  agency        AgencyProfile? @relation(fields: [agencyId], references: [userId])
+  channel       BookingChannel
+  holdExpiresAt DateTime?
+  createdAt     DateTime       @default(now())
+  legs          Booking[]
+
+  @@index([userId])
+  @@index([agencyId])
+  @@map("itineraries")
+}
+
 model Booking {
   id               String         @id @default(uuid())
   pnr              String         @unique
   flightInstanceId String
   flightInstance   FlightInstance @relation(fields: [flightInstanceId], references: [id])
+  itineraryId      String?
+  itinerary        Itinerary?     @relation(fields: [itineraryId], references: [id])
+  legIndex         Int?
   channel          BookingChannel
   agencyId         String?
   agency           AgencyProfile? @relation(fields: [agencyId], references: [userId])
@@ -499,6 +522,7 @@ model Booking {
   @@index([channel])
   @@index([agencyId])
   @@index([userId])
+  @@index([itineraryId])
   @@map("bookings")
 }
 
@@ -606,6 +630,7 @@ model AgencyProfile {
   invoices       AgencyInvoice[]
   messages       AgencyMessage[]
   bookings       Booking[]
+  itineraries    Itinerary[]
   ledgerEntries  LedgerEntry[]         @relation("AgencyLedgerEntries")
   creditRequests AgencyCreditRequest[]
   documents      AgencyDocument[]

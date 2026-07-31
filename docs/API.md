@@ -326,6 +326,28 @@ not a real feature anywhere else in the codebase either).
 | GET | `/agency-portal/profile` | Own `AgencyProfile` fields — a dedicated lightweight query, NOT a reuse of the staff `detail()` method, since that method also returns internal `AuditLog` rows and an `activityScore` never meant for the agency's own eyes. |
 | GET | `/agency-portal/documents` | Own `AgencyDocument` list. |
 | POST | `/agency-portal/documents` | multipart `{ file, docType }` — reuses `FilesService.store` (PDF/PNG/JPG, ≤5MB), wraps the resulting `StoredFile` in an `AgencyDocument(status=PENDING)`. Staff review is deferred (see above) — status stays `PENDING` until that phase. |
+| POST | `/agency-portal/bookings` | `{ flightInstanceId, cabin, passengers[], allotmentId? }` — creates `channel=AGENCY` HELD booking (10-min TTL) against the agency's allotment or general agency pool; priced at `contractPriceIrr` when an active allotment supplies one. |
+| GET | `/agency-portal/bookings/:id` | Own booking detail. |
+| POST | `/agency-portal/bookings/:id/issue` | `{ confirmedPriceIrr? }` — re-prices, checks credit limit, posts `LedgerEntry(SALE, agencyId)`, transitions HELD→PAID→TICKETED. Returns `{ priceChanged, previousPriceIrr, currentPriceIrr }` when re-price differs and `confirmedPriceIrr` wasn't supplied. |
+
+### `backend/src/modules/agency-api/` — B2B machine credentials (`X-Api-Key` header, scope-gated)
+
+| Method | Path | Scope | Summary |
+|--------|------|-------|---------|
+| GET | `/agency-api/v1/flights` | SEARCH_ONLY+ | Same search payload as public `GET /search/flights`. |
+| GET | `/agency-api/v1/flights/:flightInstanceId/seats` | SEARCH_ONLY+ | Seat map. |
+| POST | `/agency-api/v1/bookings` | SEARCH_BOOK+ | Same body as portal booking create. |
+| GET | `/agency-api/v1/bookings/:id` | SEARCH_BOOK+ | Booking detail. |
+| POST | `/agency-api/v1/bookings/:id/issue` | SEARCH_BOOK+ | Credit issue — same as portal. |
+
+`FULL` scope satisfies any requirement; `SEARCH_ONLY` cannot book/issue.
+
+### Connection booking (customer track)
+
+| Method | Path | Summary |
+|--------|------|---------|
+| POST | `/bookings/connection` | `{ cabin, legs: [{ flightInstanceId, passengers[] }]×2 }` — atomic 2-leg HELD hold under one `Itinerary.pnr`; each leg is a separate `Booking` (`legIndex` 0/1). |
+| POST | `/bookings/itinerary/:itineraryId/pay` | Re-prices both legs, charges once (gateway/wallet/points), tickets all legs via shared FSM helper. |
 
 No `_test/*` seeding hook was needed for this feature (unlike club/pricing/reservation) — the seed already provisions two agencies (`+989120000002` gold, `+989120000003` silver, suspended) with the shared dev password, which is deterministic enough for Playwright. A `_test/set-password` endpoint was drafted and then removed: it would have lived under the same `@Roles('AGENCY')`-gated controller it was meant to bootstrap credentials for, which is unreachable before any credentials exist — a real chicken-and-egg gap, not a deliberate deferral.
 
@@ -443,8 +465,7 @@ screen exists for this yet, so these are backend-only for now.
 ## Phase 13 — Reservation engine completion, Part C
 
 See DB_SCHEMA.md's Phase 13 Part C — staff-side allotment bookkeeping
-only this phase; an agency actually booking against one is a follow-up
-(no payment-path design exists for it yet).
+**plus agency consumption** via `AgencyBookingService` (portal + B2B API).
 
 - `GET /flights/:instanceId/allotments` — `SENIOR_MANAGER` +
   `COMMERCIAL_MANAGER`. Lists the instance's allotments (agency name,
@@ -458,9 +479,7 @@ only this phase; an agency actually booking against one is a follow-up
   `releaseAt` is only meaningful (and only accepted) when `type: 'SOFT'`.
 - `DELETE /flights/:instanceId/allotments/:id` — same roles — 409
   `CONFLICT` if that agency already has an active booking on this
-  instance (there is currently no path that creates one — see
-  DB_SCHEMA.md — so this guard is a no-op today and becomes real once
-  agency booking creation lands).
+  instance.
 
 ## Phase 13 — Reservation engine completion, Part D
 

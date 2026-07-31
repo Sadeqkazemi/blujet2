@@ -12,6 +12,10 @@ import { Throttle } from '@nestjs/throttler';
 import { BookingService } from './booking.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { PayBookingDto } from './dto/pay-booking.dto';
+import {
+  CreateConnectionBookingDto,
+  PayItineraryDto,
+} from './dto/create-connection-booking.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -40,16 +44,42 @@ export class BookingController {
     return { success: true, data };
   }
 
+  @Post('connection')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({ summary: 'رزرو اتصال ۲پروازی — HELD با PNR مشترک' })
+  async createConnection(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateConnectionBookingDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    const data = await this.bookings.createConnectionBooking(
+      user,
+      dto,
+      idempotencyKey,
+    );
+    return { success: true, data };
+  }
+
+  @Post('itinerary/:itineraryId/pay')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({ summary: 'پرداخت رزرو اتصال — re-price مجموع هر دو پرواز' })
+  async payItinerary(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('itineraryId') itineraryId: string,
+    @Body() dto: PayItineraryDto,
+  ) {
+    const result = await this.bookings.payItinerary(itineraryId, user, {
+      confirmedPriceIrr: dto.confirmedPriceIrr,
+      promoCode: dto.promoCode,
+      paymentMethod: dto.paymentMethod,
+    });
+    return { success: true, data: result };
+  }
+
   @Get('me')
   @ApiOperation({ summary: 'فهرست رزروهای مشتری جاری' })
   async listMine(@CurrentUser() user: AuthenticatedUser) {
     return { success: true, data: await this.bookings.listMine(user) };
-  }
-
-  @Get(':id')
-  @ApiOperation({ summary: 'جزئیات یک رزرو با شناسه' })
-  async get(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
-    return { success: true, data: await this.bookings.getById(id, user) };
   }
 
   @Get('pnr/:pnr')
@@ -59,6 +89,12 @@ export class BookingController {
     @Param('pnr') pnr: string,
   ) {
     return { success: true, data: await this.bookings.getByPnr(pnr, user) };
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'جزئیات یک رزرو با شناسه' })
+  async get(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return { success: true, data: await this.bookings.getById(id, user) };
   }
 
   @Post(':id/pay')
