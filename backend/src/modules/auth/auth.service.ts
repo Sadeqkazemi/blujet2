@@ -14,6 +14,7 @@ import { hashRefreshToken } from './auth-token.util';
 import { TWO_FACTOR_PROVIDER } from './providers/two-factor-provider.interface';
 import type { TwoFactorProvider } from './providers/two-factor-provider.interface';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
+import { CustomerReferralsService } from '../customer-referrals/customer-referrals.service';
 
 const TWO_FACTOR_TTL_MS = 2 * 60 * 1000;
 const TWO_FACTOR_MAX_ATTEMPTS = 5;
@@ -47,6 +48,7 @@ export class AuthService {
     private readonly audit: AuditService,
     @Inject(TWO_FACTOR_PROVIDER)
     private readonly twoFactorProvider: TwoFactorProvider,
+    private readonly customerReferrals: CustomerReferralsService,
   ) {}
 
   /** Phase 12 «تغییر رمز عبور من» — the current password must verify before
@@ -493,12 +495,19 @@ export class AuthService {
    * ثبت‌نام — primary auth, no password). Find-or-create keeps this a
    * single step for first-time buyers, matching the design's single phone
    * field with no separate registration form. */
-  async requestOtp(phone: string): Promise<{ challengeId: string }> {
+  async requestOtp(
+    phone: string,
+    referralCode?: string,
+  ): Promise<{ challengeId: string }> {
+    const existing = await this.prisma.user.findUnique({ where: { phone } });
     const user = await this.prisma.user.upsert({
       where: { phone },
       update: {},
       create: { role: 'USER', phone, fullName: phone },
     });
+    if (!existing) {
+      await this.customerReferrals.applyOnSignup(user.id, referralCode);
+    }
     if (!user.isActive) {
       throw new ForbiddenException({
         code: 'ACCOUNT_SUSPENDED',
