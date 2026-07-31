@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPatch, apiPost } from './http';
+import { apiDelete, apiGet, apiPatch, apiPost, apiPostForm } from './http';
 import type {
   Airport,
   BookingDetail,
@@ -6,6 +6,12 @@ import type {
   PayResult,
   PriceLock,
   RefundRequestView,
+  SavedFlight,
+  SavedPassenger,
+  SavedBankAccount,
+  CustomerReferralDashboard,
+  CustomerIdentityView,
+  ActiveSession,
   SearchFlightResult,
   SeatMapResult,
   UserProfile,
@@ -119,6 +125,96 @@ export function createPriceLock(flightInstanceId: string, cabin: CabinClass) {
 
 export function cancelPriceLock(id: string) {
   return apiDelete<PriceLock>(`/my/price-locks/${id}`);
+}
+
+export function fetchSavedFlights() {
+  return apiGet<SavedFlight[]>('/my/saved-flights');
+}
+
+export function saveFlight(flightInstanceId: string, cabin: CabinClass) {
+  return apiPost<SavedFlight>('/my/saved-flights', { flightInstanceId, cabin });
+}
+
+export function removeSavedFlight(id: string) {
+  return apiDelete<{ removed: boolean }>(`/my/saved-flights/${id}`);
+}
+
+export function fetchSavedPassengers() {
+  return apiGet<SavedPassenger[]>('/my/saved-passengers');
+}
+
+export function createSavedPassenger(dto: {
+  fullName: string;
+  latinName: string;
+  nationalId?: string;
+  passportNo?: string;
+  mobile?: string;
+  isChild?: boolean;
+}) {
+  return apiPost<SavedPassenger>('/my/saved-passengers', dto);
+}
+
+export function updateSavedPassenger(
+  id: string,
+  dto: {
+    fullName?: string;
+    latinName?: string;
+    nationalId?: string | null;
+    passportNo?: string | null;
+    mobile?: string | null;
+    isChild?: boolean;
+  },
+) {
+  return apiPatch<SavedPassenger>(`/my/saved-passengers/${id}`, dto);
+}
+
+export function removeSavedPassenger(id: string) {
+  return apiDelete<{ removed: boolean }>(`/my/saved-passengers/${id}`);
+}
+
+export function fetchBankAccounts() {
+  return apiGet<SavedBankAccount[]>('/my/bank-accounts');
+}
+
+export function createBankAccount(dto: { cardNo: string; sheba: string; bankName?: string }) {
+  return apiPost<SavedBankAccount>('/my/bank-accounts', dto);
+}
+
+export function updateBankAccount(id: string, dto: { isDefault?: boolean }) {
+  return apiPatch<SavedBankAccount>(`/my/bank-accounts/${id}`, dto);
+}
+
+export function removeBankAccount(id: string) {
+  return apiDelete<{ removed: boolean }>(`/my/bank-accounts/${id}`);
+}
+
+export function fetchMyReferral() {
+  return apiGet<CustomerReferralDashboard>('/my/referral');
+}
+
+export function fetchMyIdentity() {
+  return apiGet<CustomerIdentityView>('/my/identity');
+}
+
+export function uploadIdentityIdCard(file: File) {
+  const form = new FormData();
+  form.append('file', file);
+  return apiPostForm<{ id: string; fileName: string; sizeBytes: number }>(
+    '/my/identity/id-card',
+    form,
+  );
+}
+
+export function submitIdentityVerification() {
+  return apiPost<CustomerIdentityView>('/my/identity/submit');
+}
+
+export function fetchMySessions() {
+  return apiGet<ActiveSession[]>('/my/sessions');
+}
+
+export function revokeMySession(id: string) {
+  return apiDelete<{ revoked: boolean }>(`/my/sessions/${id}`);
 }
 
 export function fetchMyProfile() {

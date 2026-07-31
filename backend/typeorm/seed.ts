@@ -696,6 +696,82 @@ async function main() {
     }
   }
 
+  // Sample saved passengers for the test USER (پنل کاربر → مسافران)
+  if (testUser) {
+    const savedPaxCount = await typeorm.savedPassenger.count({
+      where: { userId: testUser.id },
+    });
+    if (savedPaxCount === 0) {
+      await typeorm.savedPassenger.createMany({
+        data: [
+          {
+            userId: testUser.id,
+            fullName: 'محمد رضایی',
+            latinName: 'MOHAMMAD REZAEI',
+            passportNoEnc: encryptPii('A22113344'),
+          },
+          {
+            userId: testUser.id,
+            fullName: 'سارا احمدی',
+            latinName: 'SARA AHMADI',
+            passportNoEnc: encryptPii('B99887766'),
+          },
+        ],
+      });
+    }
+
+    const savedBankCount = await typeorm.savedBankAccount.count({
+      where: { userId: testUser.id },
+    });
+    if (savedBankCount === 0) {
+      await typeorm.savedBankAccount.create({
+        data: {
+          userId: testUser.id,
+          bankName: 'بانک ملت',
+          bankShort: 'ملت',
+          brandColor: '#d6336c',
+          cardPanEnc: encryptPii('6104337112344521'),
+          cardLast4: '4521',
+          shebaEnc: encryptPii('IR820540102680020817909002'),
+          shebaHash: hashPii('IR820540102680020817909002'),
+          isDefault: true,
+        },
+      });
+    }
+
+    await typeorm.user.updateMany({
+      where: { id: testUser.id, referralCode: null },
+      data: { referralCode: 'NEGAR-4152' },
+    });
+
+    const referralCount = await typeorm.customerReferral.count({
+      where: { referrerUserId: testUser.id },
+    });
+    if (referralCount === 0) {
+      const friendPhones = [
+        { phone: '09180000091', fullName: 'رضا مرادی', status: 'REWARDED' as const, points: 500 },
+        { phone: '09180000092', fullName: 'سمیرا کریمی', status: 'REWARDED' as const, points: 500 },
+        { phone: '09180000093', fullName: 'آرش هاشمی', status: 'SIGNED_UP' as const, points: 0 },
+      ];
+      for (const f of friendPhones) {
+        const referred = await typeorm.user.upsert({
+          where: { phone: f.phone },
+          update: { fullName: f.fullName },
+          create: { role: 'USER', phone: f.phone, fullName: f.fullName },
+        });
+        await typeorm.customerReferral.create({
+          data: {
+            referrerUserId: testUser.id,
+            referredUserId: referred.id,
+            status: f.status,
+            pointsAwarded: f.points,
+            rewardedAt: f.status === 'REWARDED' ? new Date() : undefined,
+          },
+        });
+      }
+    }
+  }
+
   // ── Phase 66: passenger survey settings + default question list ────────
   const existingSurveySettingsCount = await typeorm.surveySettings.count();
   if (existingSurveySettingsCount === 0) {

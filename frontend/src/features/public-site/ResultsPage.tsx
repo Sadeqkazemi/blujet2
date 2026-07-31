@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { createPriceLock, fetchClubPoints, searchFlights } from '../../api/publicSite';
+import { createPriceLock, fetchClubPoints, fetchSavedFlights, saveFlight, searchFlights } from '../../api/publicSite';
 import { ApiRequestError } from '../../api/envelope';
 import { useAuth } from '../../hooks/useAuth';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
@@ -98,6 +98,8 @@ const STR: Record<StoredLocale, {
   select: string;
   toman: string;
   priceLock: string;
+  saveFlight: string;
+  savedFlight: string;
   smartFareLock: string;
   fareLockIntro: (airline: string, dep: string) => string;
   learnAboutClub: string;
@@ -141,6 +143,8 @@ const STR: Record<StoredLocale, {
     select: 'انتخاب',
     toman: 'تومان',
     priceLock: 'قفل قیمت',
+    saveFlight: 'ذخیره',
+    savedFlight: 'ذخیره شد',
     smartFareLock: 'قفل قیمت هوشمند',
     fareLockIntro: (airline, dep) => `پرواز ${airline} ساعت ${dep} — قفل قیمت تا ۷۲ ساعت مخصوص اعضای سطح طلایی باشگاه مشتریان است.`,
     learnAboutClub: 'آشنایی با باشگاه',
@@ -184,6 +188,8 @@ const STR: Record<StoredLocale, {
     select: 'Select',
     toman: 'Toman',
     priceLock: 'Price Lock',
+    saveFlight: 'Save',
+    savedFlight: 'Saved',
     smartFareLock: 'AI Fare Lock',
     fareLockIntro: (airline, dep) => `${airline} flight at ${dep} — Price Lock for up to 72 hours is exclusive to Gold-tier loyalty club members.`,
     learnAboutClub: 'Learn about the Club',
@@ -227,6 +233,8 @@ const STR: Record<StoredLocale, {
     select: 'اختيار',
     toman: 'تومان',
     priceLock: 'قفل السعر',
+    saveFlight: 'حفظ',
+    savedFlight: 'محفوظ',
     smartFareLock: 'قفل السعر الذكي',
     fareLockIntro: (airline, dep) => `رحلة ${airline} الساعة ${dep} — قفل السعر حتى ٧٢ ساعة حصري لأعضاء الفئة الذهبية في نادي العملاء.`,
     learnAboutClub: 'تعرف على النادي',
@@ -272,17 +280,46 @@ export default function ResultsPage() {
   // real قفل قیمت (real bookable results only — see docs/features/wallet-price-lock.md)
   const [club, setClub] = useState<{ isMember: boolean; level: string | null } | null>(null);
   const [lockBusyKey, setLockBusyKey] = useState<string | null>(null);
+  const [saveBusyKey, setSaveBusyKey] = useState<string | null>(null);
+  const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set());
   const [realLockResult, setRealLockResult] = useState<RealLockResult | null>(null);
 
   useEffect(() => {
     if (status !== 'authenticated') {
       setClub(null);
+      setSavedKeys(new Set());
       return;
     }
     fetchClubPoints()
       .then((c) => setClub({ isMember: c.isMember, level: c.level }))
       .catch(() => setClub(null));
+    fetchSavedFlights()
+      .then((rows) =>
+        setSavedKeys(new Set(rows.map((r) => `${r.flightInstanceId}:${r.cabin}`))),
+      )
+      .catch(() => setSavedKeys(new Set()));
   }, [status]);
+
+  async function onSaveClick(flightInstanceId: string, cabin: CabinClass) {
+    if (status !== 'authenticated') {
+      navigate('/signin', { state: { from: `/results?${params.toString()}` } });
+      return;
+    }
+    const key = `${flightInstanceId}:${cabin}`;
+    if (savedKeys.has(key)) return;
+    setSaveBusyKey(key);
+    try {
+      await saveFlight(flightInstanceId, cabin);
+      setSavedKeys((prev) => new Set(prev).add(key));
+    } catch (err) {
+      setRealLockResult({
+        kind: 'error',
+        message: err instanceof ApiRequestError ? err.message : ERR[locale],
+      });
+    } finally {
+      setSaveBusyKey(null);
+    }
+  }
 
   async function onRealLockClick(flightInstanceId: string, cabin: CabinClass) {
     if (status !== 'authenticated') {
@@ -587,6 +624,21 @@ export default function ResultsPage() {
                           className="rounded-lg border border-[#d5e1f0] px-3 py-1 text-[10.5px] font-bold text-[#1668c4] disabled:opacity-40"
                         >
                           {lockBusyKey === `${r.flightInstanceId}:${c.cabin}` ? t.aiAnalyzing : `🔒 ${t.priceLock}`}
+                        </button>
+                        <button
+                          disabled={
+                            saveBusyKey === `${r.flightInstanceId}:${c.cabin}` ||
+                            savedKeys.has(`${r.flightInstanceId}:${c.cabin}`)
+                          }
+                          onClick={() => void onSaveClick(r.flightInstanceId, c.cabin)}
+                          data-testid={`real-save-${r.flightInstanceId}-${c.cabin}`}
+                          className="rounded-lg border border-[#d5e1f0] px-3 py-1 text-[10.5px] font-bold text-[#5a6678] disabled:opacity-60"
+                        >
+                          {saveBusyKey === `${r.flightInstanceId}:${c.cabin}`
+                            ? t.aiAnalyzing
+                            : savedKeys.has(`${r.flightInstanceId}:${c.cabin}`)
+                              ? `✓ ${t.savedFlight}`
+                              : `🔖 ${t.saveFlight}`}
                         </button>
                       </div>
                     </div>

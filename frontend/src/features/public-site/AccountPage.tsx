@@ -11,8 +11,24 @@ import {
   fetchMyPriceLocks,
   fetchMyProfile,
   fetchMyRefunds,
+  fetchMySessions,
   fetchPrivacyExport,
+  fetchSavedFlights,
+  fetchSavedPassengers,
+  createSavedPassenger,
+  updateSavedPassenger,
+  removeSavedPassenger,
+  fetchBankAccounts,
+  createBankAccount,
+  updateBankAccount,
+  removeBankAccount,
+  fetchMyReferral,
+  fetchMyIdentity,
+  uploadIdentityIdCard,
+  submitIdentityVerification,
+  revokeMySession,
   fetchWallet,
+  removeSavedFlight,
   requestEmailVerify,
   topupWallet,
   updateMyProfile,
@@ -24,10 +40,17 @@ import { changeOwnPassword, setPassword } from '../../api/auth';
 import { faDigits, faMoney, parseTomanToRial } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
-import type { BookingDetail, PriceLock, RefundRequestView, UserProfile } from '../../types/public-site';
+import type { BookingDetail, PriceLock, RefundRequestView, SavedFlight, SavedPassenger, SavedBankAccount, CustomerReferralDashboard, CustomerIdentityView, ActiveSession, UserProfile } from '../../types/public-site';
+import AccountSecuritySessions from './AccountSecuritySessions';
 import type { ClubMembershipView } from '../../types/club-membership';
 import type { MySupportTicketRow, SupportTicketStatus } from '../../types/support-tickets';
 import AccountClubTab from './AccountClubTab';
+import AccountSavedFlightsTab from './AccountSavedFlightsTab';
+import AccountPassengersTab, { type SavedPassengerForm } from './AccountPassengersTab';
+import AccountBankAccountsTab, { type BankAccountForm } from './AccountBankAccountsTab';
+import AccountReferralTab from './AccountReferralTab';
+import AccountIdentityTab from './AccountIdentityTab';
+import AccountProfileSavedPax from './AccountProfileSavedPax';
 
 // پنل کاربر — real data from the existing bookings/wallet/club-points/refunds
 // endpoints (none of this is mock). Matches design-reference/پنل کاربر.dc.html's
@@ -69,18 +92,22 @@ const TIER_LABEL: Record<string, Tr> = {
   PLATINUM: { fa: 'پلاتین', en: 'Platinum', ar: 'بلاتينية' },
 };
 
-type TabKey = 'trips' | 'wallet' | 'club' | 'price-locks' | 'passengers' | 'refunds' | 'tickets' | 'security' | 'profile';
+type TabKey = 'trips' | 'wallet' | 'club' | 'saved' | 'price-locks' | 'passengers' | 'refunds' | 'tickets' | 'security' | 'banks' | 'referral' | 'identity' | 'profile';
 
 const TAB_LABEL: Record<TabKey, Tr> = {
   profile: { fa: 'پروفایل من', en: 'My Profile', ar: 'ملفي الشخصي' },
   trips: { fa: 'سفرها', en: 'Trips', ar: 'رحلاتي' },
   wallet: { fa: 'کیف پول', en: 'Wallet', ar: 'المحفظة' },
   club: { fa: 'باشگاه مشتریان', en: 'Loyalty Club', ar: 'نادي الولاء' },
+  saved: { fa: 'نشان‌شده‌ها', en: 'Saved', ar: 'المحفوظة' },
   'price-locks': { fa: 'قفل قیمت', en: 'Price Lock', ar: 'قفل السعر' },
   passengers: { fa: 'مسافران', en: 'Passengers', ar: 'المسافرون' },
   refunds: { fa: 'استرداد‌ها', en: 'Refunds', ar: 'الاستردادات' },
   tickets: { fa: 'پیام به پشتیبانی', en: 'Message Support', ar: 'رسالة للدعم' },
   security: { fa: 'امنیت حساب', en: 'Account Security', ar: 'أمان الحساب' },
+  banks: { fa: 'حساب‌های بانکی', en: 'Bank Accounts', ar: 'الحسابات البنكية' },
+  referral: { fa: 'معرفی دوستان', en: 'Invite Friends', ar: 'دعوة الأصدقاء' },
+  identity: { fa: 'احراز هویت', en: 'Identity Verification', ar: 'التحقق من الهوية' },
 };
 
 const TABS: { key: TabKey; icon: string }[] = [
@@ -88,11 +115,15 @@ const TABS: { key: TabKey; icon: string }[] = [
   { key: 'trips', icon: '🧳' },
   { key: 'wallet', icon: '💳' },
   { key: 'club', icon: '★' },
+  { key: 'saved', icon: '🔖' },
   { key: 'price-locks', icon: '🔒' },
   { key: 'passengers', icon: '👤' },
   { key: 'refunds', icon: '↺' },
   { key: 'tickets', icon: '💬' },
   { key: 'security', icon: '🛡️' },
+  { key: 'banks', icon: '🏦' },
+  { key: 'referral', icon: '🎁' },
+  { key: 'identity', icon: '🛡️' },
 ];
 
 const TICKET_STATUS_LABEL: Record<SupportTicketStatus, Tr> = {
@@ -483,6 +514,28 @@ export default function AccountPage() {
   const [topupBusy, setTopupBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [priceLocks, setPriceLocks] = useState<PriceLock[] | null>(null);
+  const [savedFlights, setSavedFlights] = useState<SavedFlight[] | null>(null);
+  const [savedBusyId, setSavedBusyId] = useState<string | null>(null);
+  const [savedPassengers, setSavedPassengers] = useState<SavedPassenger[] | null>(null);
+  const [passengerBusyId, setPassengerBusyId] = useState<string | null>(null);
+  const [passengerFormBusy, setPassengerFormBusy] = useState(false);
+  const [passengerFormError, setPassengerFormError] = useState<string | null>(null);
+  const [passengerFormKey, setPassengerFormKey] = useState(0);
+  const [passengersAddPending, setPassengersAddPending] = useState(false);
+  const [sessions, setSessions] = useState<ActiveSession[] | null>(null);
+  const [sessionBusyId, setSessionBusyId] = useState<string | null>(null);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  const [bankAccounts, setBankAccounts] = useState<SavedBankAccount[] | null>(null);
+  const [bankBusyId, setBankBusyId] = useState<string | null>(null);
+  const [bankFormBusy, setBankFormBusy] = useState(false);
+  const [bankFormError, setBankFormError] = useState<string | null>(null);
+  const [referral, setReferral] = useState<CustomerReferralDashboard | null>(null);
+  const [referralCopyNotice, setReferralCopyNotice] = useState<string | null>(null);
+  const [identity, setIdentity] = useState<CustomerIdentityView | null>(null);
+  const [identityUploadBusy, setIdentityUploadBusy] = useState(false);
+  const [identitySubmitBusy, setIdentitySubmitBusy] = useState(false);
+  const [identityUploadError, setIdentityUploadError] = useState<string | null>(null);
+  const [identitySubmitError, setIdentitySubmitError] = useState<string | null>(null);
   const [lockActionBusy, setLockActionBusy] = useState<string | null>(null);
   const [lockError, setLockError] = useState<string | null>(null);
 
@@ -529,6 +582,12 @@ export default function AccountPage() {
     fetchClubMembership().then(setClubMembership).catch(() => setClubMembership(null));
     fetchMyRefunds().then(setRefunds).catch(() => setRefunds([]));
     fetchMyPriceLocks().then(setPriceLocks).catch(() => setPriceLocks([]));
+    fetchSavedFlights().then(setSavedFlights).catch(() => setSavedFlights([]));
+    fetchSavedPassengers().then(setSavedPassengers).catch(() => setSavedPassengers([]));
+    fetchMySessions().then(setSessions).catch(() => setSessions([]));
+    fetchBankAccounts().then(setBankAccounts).catch(() => setBankAccounts([]));
+    fetchMyReferral().then(setReferral).catch(() => setReferral(null));
+    fetchMyIdentity().then(setIdentity).catch(() => setIdentity(null));
     fetchMyProfile()
       .then((p) => {
         setProfile(p);
@@ -650,6 +709,183 @@ export default function AccountPage() {
     }
   }
 
+  async function onRemoveSaved(id: string) {
+    setSavedBusyId(id);
+    try {
+      await removeSavedFlight(id);
+      setSavedFlights((prev) => (prev ? prev.filter((f) => f.id !== id) : prev));
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t.saveErrorFallback);
+    } finally {
+      setSavedBusyId(null);
+    }
+  }
+
+  async function onRemovePassenger(id: string) {
+    setPassengerBusyId(id);
+    try {
+      await removeSavedPassenger(id);
+      setSavedPassengers((prev) => (prev ? prev.filter((p) => p.id !== id) : prev));
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t.saveErrorFallback);
+    } finally {
+      setPassengerBusyId(null);
+    }
+  }
+
+  async function onRevokeSession(id: string) {
+    setSessionError(null);
+    setSessionBusyId(id);
+    try {
+      await revokeMySession(id);
+      setSessions((prev) => (prev ? prev.filter((s) => s.id !== id) : prev));
+    } catch (err) {
+      setSessionError(err instanceof ApiRequestError ? err.message : t.saveErrorFallback);
+    } finally {
+      setSessionBusyId(null);
+    }
+  }
+
+  async function onRemoveBankAccount(id: string) {
+    setBankBusyId(id);
+    try {
+      await removeBankAccount(id);
+      setBankAccounts((prev) => {
+        if (!prev) return prev;
+        const next = prev.filter((a) => a.id !== id);
+        if (next.length > 0 && !next.some((a) => a.isDefault)) {
+          return next.map((a, i) => (i === 0 ? { ...a, isDefault: true } : a));
+        }
+        return next;
+      });
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t.saveErrorFallback);
+    } finally {
+      setBankBusyId(null);
+    }
+  }
+
+  async function onSetDefaultBankAccount(id: string) {
+    setBankBusyId(id);
+    try {
+      const updated = await updateBankAccount(id, { isDefault: true });
+      setBankAccounts((prev) =>
+        prev
+          ? prev.map((a) =>
+              a.id === updated.id ? updated : { ...a, isDefault: false },
+            )
+          : prev,
+      );
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t.saveErrorFallback);
+    } finally {
+      setBankBusyId(null);
+    }
+  }
+
+  async function onCreateBankAccount(form: BankAccountForm) {
+    setBankFormError(null);
+    setBankFormBusy(true);
+    try {
+      const created = await createBankAccount(form);
+      setBankAccounts((prev) => (prev ? [created, ...prev] : [created]));
+    } catch (err) {
+      setBankFormError(err instanceof ApiRequestError ? err.message : t.saveErrorFallback);
+      throw err;
+    } finally {
+      setBankFormBusy(false);
+    }
+  }
+
+  function onCopyReferralCode() {
+    if (!referral) return;
+    void navigator.clipboard.writeText(referral.referralCode).then(() => {
+      setReferralCopyNotice(
+        locale === 'fa'
+          ? 'کد معرف کپی شد ✓'
+          : locale === 'en'
+            ? 'Referral code copied ✓'
+            : 'تم نسخ رمز الإحالة ✓',
+      );
+      window.setTimeout(() => setReferralCopyNotice(null), 2500);
+    });
+  }
+
+  function onShareReferralLink() {
+    if (!referral) return;
+    const url = `${window.location.origin}${referral.sharePath}`;
+    if (navigator.share) {
+      void navigator.share({ title: 'blujet', url }).catch(() => undefined);
+    } else {
+      void navigator.clipboard.writeText(url);
+      setReferralCopyNotice(
+        locale === 'fa'
+          ? 'لینک دعوت کپی شد ✓'
+          : locale === 'en'
+            ? 'Invite link copied ✓'
+            : 'تم نسخ رابط الدعوة ✓',
+      );
+      window.setTimeout(() => setReferralCopyNotice(null), 2500);
+    }
+  }
+
+  async function onUploadIdentityIdCard(file: File) {
+    setIdentityUploadError(null);
+    setIdentityUploadBusy(true);
+    try {
+      await uploadIdentityIdCard(file);
+      setIdentity(await fetchMyIdentity());
+    } catch (err) {
+      setIdentityUploadError(err instanceof ApiRequestError ? err.message : t.saveErrorFallback);
+      throw err;
+    } finally {
+      setIdentityUploadBusy(false);
+    }
+  }
+
+  async function onSubmitIdentity() {
+    setIdentitySubmitError(null);
+    setIdentitySubmitBusy(true);
+    try {
+      setIdentity(await submitIdentityVerification());
+    } catch (err) {
+      setIdentitySubmitError(err instanceof ApiRequestError ? err.message : t.saveErrorFallback);
+      throw err;
+    } finally {
+      setIdentitySubmitBusy(false);
+    }
+  }
+
+  async function onSavePassenger(form: SavedPassengerForm, editingId: string | null) {
+    setPassengerFormError(null);
+    setPassengerFormBusy(true);
+    try {
+      const dto = {
+        fullName: form.fullName.trim(),
+        latinName: form.latinName.trim(),
+        nationalId: form.nationalId.trim() || undefined,
+        passportNo: form.passportNo.trim() || undefined,
+        mobile: form.mobile.trim() || undefined,
+        isChild: form.isChild,
+      };
+      if (editingId) {
+        const updated = await updateSavedPassenger(editingId, dto);
+        setSavedPassengers((prev) =>
+          prev ? prev.map((p) => (p.id === editingId ? updated : p)) : prev,
+        );
+      } else {
+        const created = await createSavedPassenger(dto);
+        setSavedPassengers((prev) => (prev ? [created, ...prev] : [created]));
+      }
+      setPassengerFormKey((k) => k + 1);
+    } catch (err) {
+      setPassengerFormError(err instanceof ApiRequestError ? err.message : t.saveErrorFallback);
+      throw err;
+    } finally {
+      setPassengerFormBusy(false);
+    }
+  }
+
   async function onCancelLock(id: string) {
     setLockError(null);
     setLockActionBusy(id);
@@ -692,10 +928,6 @@ export default function AccountPage() {
       setPwSaving(false);
     }
   }
-
-  const passengerNames = bookings
-    ? Array.from(new Set(bookings.flatMap((b) => b.passengers.map((p) => p.fullName)).filter(Boolean)))
-    : [];
 
   return (
     <PublicPageShell>
@@ -855,6 +1087,16 @@ export default function AccountPage() {
                 {profileSaving ? t.savingButton : t.saveButton}
               </button>
             </form>
+
+            {savedPassengers && (
+              <AccountProfileSavedPax
+                passengers={savedPassengers}
+                onAdd={() => {
+                  setPassengersAddPending(true);
+                  setTab('passengers');
+                }}
+              />
+            )}
 
             <div style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 16, padding: '18px 20px' }}>
               <h3 style={{ fontSize: 14, fontWeight: 800, margin: '0 0 12px' }}>{t.emailHeading}</h3>
@@ -1042,6 +1284,18 @@ export default function AccountPage() {
           )
         )}
 
+        {tab === 'saved' && (
+          savedFlights === null ? (
+            <p style={{ fontSize: 13, color: '#6b7787' }}>{t.loading}</p>
+          ) : (
+            <AccountSavedFlightsTab
+              flights={savedFlights}
+              busyId={savedBusyId}
+              onRemove={(id) => void onRemoveSaved(id)}
+            />
+          )
+        )}
+
         {tab === 'price-locks' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {lockError && <p role="alert" style={{ fontSize: 12, color: '#e5484d' }}>{lockError}</p>}
@@ -1091,18 +1345,64 @@ export default function AccountPage() {
           </div>
         )}
 
-        {tab === 'passengers' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {passengerNames.length === 0 && <p style={{ fontSize: 13, color: '#8a96a6' }}>{t.passengersEmptyText}</p>}
-            {passengerNames.map((name) => (
-              <div key={name} data-testid="account-passenger" style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 14, padding: '13px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg,#1668c4,#0d3b66)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700 }}>
-                  {name.trim().split(/\s+/).map((w) => w[0]).join('')}
-                </div>
-                <span style={{ fontSize: 13, fontWeight: 700, color: '#16202e' }}>{name}</span>
-              </div>
-            ))}
-          </div>
+        {tab === 'passengers' && savedPassengers && (
+          <AccountPassengersTab
+            key={passengerFormKey}
+            passengers={savedPassengers}
+            busyId={passengerBusyId}
+            formBusy={passengerFormBusy}
+            formError={passengerFormError}
+            openAddOnMount={passengersAddPending}
+            onAddModalOpened={() => setPassengersAddPending(false)}
+            onRemove={onRemovePassenger}
+            onSave={onSavePassenger}
+          />
+        )}
+        {tab === 'passengers' && savedPassengers === null && (
+          <p style={{ fontSize: 13, color: '#6b7787' }}>{t.loading}</p>
+        )}
+
+        {tab === 'banks' && bankAccounts && (
+          <AccountBankAccountsTab
+            accounts={bankAccounts}
+            busyId={bankBusyId}
+            formBusy={bankFormBusy}
+            formError={bankFormError}
+            onRemove={onRemoveBankAccount}
+            onSetDefault={onSetDefaultBankAccount}
+            onCreate={onCreateBankAccount}
+          />
+        )}
+        {tab === 'banks' && bankAccounts === null && (
+          <p style={{ fontSize: 13, color: '#6b7787' }}>{t.loading}</p>
+        )}
+
+        {tab === 'referral' && referral && (
+          <AccountReferralTab
+            data={referral}
+            copyNotice={referralCopyNotice}
+            onCopy={onCopyReferralCode}
+            onShare={onShareReferralLink}
+          />
+        )}
+        {tab === 'referral' && referral === null && (
+          <p style={{ fontSize: 13, color: '#6b7787' }}>{t.loading}</p>
+        )}
+
+        {tab === 'identity' && identity && (
+          <AccountIdentityTab
+            data={identity}
+            uploadBusy={identityUploadBusy}
+            submitBusy={identitySubmitBusy}
+            uploadError={identityUploadError}
+            submitError={identitySubmitError}
+            onUpload={onUploadIdentityIdCard}
+            onSubmit={onSubmitIdentity}
+            onGoProfile={() => setTab('profile')}
+          />
+        )}
+        {tab === 'identity' && identity === null && (
+          <p style={{ fontSize: 13, color: '#6b7787' }}>{t.loading}</p>
         )}
 
         {tab === 'refunds' && (
@@ -1188,7 +1488,8 @@ export default function AccountPage() {
         )}
 
         {tab === 'security' && (
-          <div style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 16, padding: 18, maxWidth: 480 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 520 }}>
+            <div style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 16, padding: 18 }}>
             <h3 style={{ fontSize: 15, fontWeight: 800, margin: '0 0 4px' }}>{t.securityHeading}</h3>
             <p style={{ fontSize: 11.5, color: '#8a96a6', margin: '0 0 16px', lineHeight: 1.8 }}>{t.securitySub}</p>
             <form onSubmit={(e) => void onSavePassword(e)} style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
@@ -1235,6 +1536,17 @@ export default function AccountPage() {
                 {pwSaving ? t.savingPasswordBtn : t.savePasswordBtn}
               </button>
             </form>
+            </div>
+            {sessionError && (
+              <p role="alert" style={{ fontSize: 12, color: '#e5484d', margin: 0 }}>{sessionError}</p>
+            )}
+            {sessions && (
+              <AccountSecuritySessions
+                sessions={sessions}
+                busyId={sessionBusyId}
+                onRevoke={onRevokeSession}
+              />
+            )}
           </div>
         )}
       </div>

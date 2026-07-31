@@ -159,6 +159,46 @@ describe('ResultsPage', () => {
     });
   });
 
+  describe('save flight bookmark', () => {
+    it('redirects an unauthenticated visitor to /signin when saving', async () => {
+      vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+      renderPage('unauthenticated');
+      await screen.findByTestId('result-card');
+
+      await userEvent.click(screen.getByTestId('real-save-fi-1-ECONOMY'));
+
+      expect(await screen.findByText('صفحه ورود')).toBeInTheDocument();
+    });
+
+    it('calls saveFlight for an authenticated user and marks the row saved', async () => {
+      vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+      vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({ isMember: false, level: null, balance: 0 });
+      vi.spyOn(publicSiteApi, 'fetchSavedFlights').mockResolvedValue([]);
+      const save = vi.spyOn(publicSiteApi, 'saveFlight').mockResolvedValue({
+        id: 'sf-new',
+        flightInstanceId: 'fi-1',
+        cabin: 'ECONOMY',
+        flightNo: 'BJ-100',
+        originCode: 'THR',
+        destCode: 'MHD',
+        originCityFa: 'تهران',
+        destCityFa: 'مشهد',
+        departureAt: RESULT.departureAt,
+        arrivalAt: RESULT.arrivalAt,
+        priceIrr: 380_000_000,
+        bookable: true,
+        createdAt: '2026-07-01T00:00:00.000Z',
+      });
+      renderPage('authenticated');
+      await screen.findByTestId('result-card');
+
+      await userEvent.click(screen.getByTestId('real-save-fi-1-ECONOMY'));
+
+      expect(save).toHaveBeenCalledWith('fi-1', 'ECONOMY');
+      expect(await screen.findByTestId('real-save-fi-1-ECONOMY')).toHaveTextContent('ذخیره شد');
+    });
+  });
+
   it('renders translated result cards with Latin-digit toman prices in English', async () => {
     mockLocale('en');
     vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
