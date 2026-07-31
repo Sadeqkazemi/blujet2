@@ -31,3 +31,4 @@ static site pages list.
 - Social links, app store links, support phone/email (existing settings paths)
 - Job postings section in media tab (use jobapps tab)
 - Full static pages CMS
+- CMS-only destinations not in the static catalog (Phase H wires matching codes only)

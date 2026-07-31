@@ -1551,6 +1551,12 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   Tests: extended `ContactPage.test.tsx`.
   See `docs/features/contact-support-contact-wiring.md`.
 
+- [x] **Destinations page — CMS highlights wiring (Phase H)** —
+  `DestinationsPage` reads `GET /site-content/home` to override destination
+  prices/images and popular routes (static catalog metadata unchanged).
+  Tests: `DestinationsPage.test.tsx`.
+  See `docs/features/destinations-cms-wiring.md`.
+
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is
 "done" only when every checklist item in its `docs/features/<name>.md` has

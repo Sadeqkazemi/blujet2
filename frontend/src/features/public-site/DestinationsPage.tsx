@@ -1,14 +1,16 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { fetchPublicHomeContent } from '../../api/site-content';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { formatToman } from '../../lib/fa-format';
+import type { PublicHomeContent } from '../../types/site-content';
 
-// Mock catalog matching design-reference/مقاصد.dc.html verbatim — the
-// backend has no featured-destinations/marketing-price API to source
-// these figures from honestly, so this page is presentational; clicking
-// a card goes to the REAL results page for that route.
+// Mock catalog matching design-reference/مقاصد.dc.html — presentational
+// metadata (duration, badges, map pins) stays static; destination prices,
+// cover images, and popular routes read CMS highlights via GET /site-content/home
+// with static fallbacks when the API is unavailable.
 interface Dest {
   name: Record<StoredLocale, string>;
   code: string;
@@ -19,6 +21,28 @@ interface Dest {
   badge?: Record<StoredLocale, string>;
   feat?: boolean;
   hue: [string, string];
+  imageUrl?: string | null;
+}
+
+const CITY_NAMES: Record<string, Record<StoredLocale, string>> = {
+  THR: { fa: 'تهران', en: 'Tehran', ar: 'طهران' },
+  MHD: { fa: 'مشهد', en: 'Mashhad', ar: 'مشهد' },
+  IST: { fa: 'استانبول', en: 'Istanbul', ar: 'إسطنبول' },
+  DXB: { fa: 'دبی', en: 'Dubai', ar: 'دبي' },
+  KIH: { fa: 'کیش', en: 'Kish', ar: 'كيش' },
+  SYZ: { fa: 'شیراز', en: 'Shiraz', ar: 'شيراز' },
+};
+
+const ROUTE_FREQ_FALLBACK: Record<StoredLocale, string> = {
+  fa: 'پروازهای هفتگی',
+  en: 'Weekly flights',
+  ar: 'رحلات أسبوعية',
+};
+
+function cityLabel(code: string, cityFa?: string): Record<StoredLocale, string> {
+  if (CITY_NAMES[code]) return CITY_NAMES[code];
+  const fa = cityFa ?? code;
+  return { fa, en: fa, ar: fa };
 }
 
 const DESTS: Dest[] = [
@@ -196,9 +220,51 @@ export default function DestinationsPage() {
   const t = STR[locale];
   const [tab, setTab] = useState<'all' | 'dom' | 'intl'>('all');
   const [q, setQ] = useState('');
+  const [homeContent, setHomeContent] = useState<PublicHomeContent | null>(null);
+
+  useEffect(() => {
+    fetchPublicHomeContent()
+      .then(setHomeContent)
+      .catch(() => {
+        /* static fallbacks */
+      });
+  }, []);
+
+  const destinations = useMemo(() => {
+    const cmsByCode = new Map(
+      (homeContent?.destinations ?? []).map((d) => [
+        d.airportCode,
+        { tomanPrice: Math.round(Number(d.priceIrr) / 10), imageUrl: d.imageUrl },
+      ]),
+    );
+    return DESTS.map((d) => {
+      const cms = cmsByCode.get(d.code);
+      if (!cms) return d;
+      return { ...d, tomanPrice: cms.tomanPrice, imageUrl: cms.imageUrl };
+    });
+  }, [homeContent]);
+
+  const routes = useMemo(() => {
+    if (!homeContent?.routes?.length) return ROUTES;
+    const staticByKey = new Map(
+      ROUTES.map((r) => [`${r.fromCode}-${r.toCode}`, r]),
+    );
+    return homeContent.routes.map((r) => {
+      const key = `${r.fromAirportCode}-${r.toAirportCode}`;
+      const fallback = staticByKey.get(key);
+      return {
+        fromName: fallback?.fromName ?? cityLabel(r.fromAirportCode, r.fromCityFa),
+        fromCode: r.fromAirportCode,
+        toName: fallback?.toName ?? cityLabel(r.toAirportCode, r.toCityFa),
+        toCode: r.toAirportCode,
+        tomanPrice: Math.round(Number(r.priceIrr) / 10),
+        freq: fallback?.freq ?? ROUTE_FREQ_FALLBACK,
+      };
+    });
+  }, [homeContent]);
 
   const query = q.trim();
-  const filtered = DESTS.filter(
+  const filtered = destinations.filter(
     (d) =>
       (tab === 'all' || d.region === tab) &&
       (!query || d.name[locale].includes(query) || d.code.toUpperCase().includes(query.toUpperCase())),
@@ -290,6 +356,9 @@ export default function DestinationsPage() {
                   display: 'block',
                   textDecoration: 'none',
                   background: `linear-gradient(135deg,${d.hue[0]},${d.hue[1]})`,
+                  backgroundImage: d.imageUrl ? `url(${d.imageUrl})` : undefined,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
                   cursor: 'pointer',
                 }}
               >
@@ -389,7 +458,7 @@ export default function DestinationsPage() {
         <h2 style={{ fontSize: 21, fontWeight: 900, color: '#0d2640', margin: '0 0 5px' }}>{t.routesTitle}</h2>
         <p style={{ fontSize: '12.5px', color: '#6b7585', margin: '0 0 18px' }}>{t.routesSub}</p>
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap: 13 }}>
-          {ROUTES.map((r) => (
+          {routes.map((r) => (
             <a
               key={`${r.fromCode}-${r.toCode}`}
               onClick={(e) => {
