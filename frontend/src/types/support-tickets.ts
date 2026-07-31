@@ -1,6 +1,17 @@
 export type SupportTicketStatus = 'OPEN' | 'IN_PROGRESS' | 'ANSWERED' | 'CLOSED';
 export type SupportTicketDept = 'SITE' | 'AGENCY';
 
+export interface MySupportTicketRow {
+  id: string;
+  trackingCode: string;
+  subject: string;
+  body: string;
+  status: SupportTicketStatus;
+  history: { step: string; labelFa: string; at: string }[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface SupportTicketRow {
   id: string;
   trackingCode: string;

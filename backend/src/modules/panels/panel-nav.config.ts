@@ -32,6 +32,7 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'refund', labelFa: 'استرداد بلیط', implemented: true },
     { key: 'tickets', labelFa: 'تیکت‌های پشتیبانی', implemented: true },
     { key: 'jobapps', labelFa: 'فرصت‌های شغلی', implemented: true },
+    { key: 'settings', labelFa: 'تنظیمات سامانه', implemented: true },
   ],
   CEO: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
