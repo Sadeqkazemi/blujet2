@@ -3,8 +3,63 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
+/** NestJS route prefixes — dev proxy sends these to the backend so a single
+ * forwarded port (5173) is enough when previewing in Cursor/browser. */
+const API_PROXY_PREFIXES = [
+  'auth',
+  'search',
+  'bookings',
+  'manage-booking',
+  'my',
+  'agency-portal',
+  'settings',
+  'site-content',
+  'blog',
+  'contact',
+  'careers',
+  'survey',
+  'flight-status',
+  'club',
+  'flights',
+  'flightops',
+  'reservation',
+  'pricing',
+  'refunds',
+  'agencies',
+  'cartable',
+  'referrals',
+  'manager-messages',
+  'files',
+  'reporting',
+  'passenger-reports',
+  'staff-reports',
+  'panels',
+  'admins',
+  'audit',
+  'it',
+  'support-tickets',
+  'identity-verifications',
+  'reconciliation',
+  'webservice',
+  'health',
+  'docs',
+] as const
+
+const devProxy = Object.fromEntries(
+  API_PROXY_PREFIXES.map((prefix) => [
+    `/${prefix}`,
+    { target: 'http://127.0.0.1:3000', changeOrigin: true },
+  ]),
+)
+
 // https://vite.dev/config/
 export default defineConfig({
+  server: {
+    host: '0.0.0.0',
+    port: 5173,
+    strictPort: true,
+    proxy: devProxy,
+  },
   plugins: [
     react(),
     tailwindcss(),
