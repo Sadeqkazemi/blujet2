@@ -42,13 +42,24 @@ const BOOKING: BookingDetail = {
 
 const REFUND: RefundRequestView = {
   id: 'r1',
+  trackingCode: 'RF-A1B2C3D4',
   bookingId: 'b1',
+  pnr: 'BJ4X2K',
+  flightNo: 'BJ-100',
+  originCode: 'THR',
+  destCode: 'MHD',
+  departureAt: '2026-08-01T05:00:00.000Z',
   status: 'REVIEW',
   penaltyPct: 30,
   penaltyAmountIrr: '4800000',
   refundableIrr: '11200000',
   totalPaidIrr: '16000000',
+  history: [
+    { step: 'submitted', labelFa: 'ثبت درخواست', at: '2026-07-01T00:00:00.000Z' },
+    { step: 'review', labelFa: 'بررسی ادمین', at: '2026-07-01T01:00:00.000Z' },
+  ],
   createdAt: '2026-07-01T00:00:00.000Z',
+  paidAt: null,
 };
 
 const LOCK: PriceLock = {
@@ -240,6 +251,8 @@ beforeEach(() => {
   vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({ isMember: true, level: 'GOLD', balance: 12450 });
   vi.spyOn(publicSiteApi, 'fetchClubMembership').mockResolvedValue(CLUB_MEMBERSHIP);
   vi.spyOn(publicSiteApi, 'fetchMyRefunds').mockResolvedValue([REFUND]);
+  vi.spyOn(publicSiteApi, 'fetchEligibleRefundBookings').mockResolvedValue([]);
+  vi.spyOn(publicSiteApi, 'fetchCustomerRefundRules').mockResolvedValue([]);
   vi.spyOn(publicSiteApi, 'fetchMyProfile').mockResolvedValue(PROFILE);
   vi.spyOn(publicSiteApi, 'fetchMyPriceLocks').mockResolvedValue([]);
   vi.spyOn(publicSiteApi, 'fetchSavedFlights').mockResolvedValue([SAVED]);
@@ -326,7 +339,7 @@ describe('AccountPage', () => {
     mockAuth('authenticated');
     renderPage();
     await userEvent.click(screen.getByTestId('account-tab-refunds'));
-    expect(await screen.findByTestId('account-refund')).toHaveTextContent('در حال بررسی');
+    expect(await screen.findByTestId('refund-tracking')).toHaveTextContent('در حال بررسی');
   });
 
   it('switches to the tickets tab and lists support tickets', async () => {

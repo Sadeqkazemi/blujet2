@@ -14,7 +14,31 @@ import { computePenalty } from './penalty';
 import { StepUpService } from '../auth/step-up.service';
 import { negateIrr } from '../../common/money';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import type { TypeORM, RefundRequest } from '../../../generated/typeorm/client';
+import { TypeORM, type RefundRequest } from '../../../generated/typeorm/client';
+
+const CUSTOMER_BOOKING_INCLUDE = {
+  flightInstance: {
+    include: { flight: { include: { route: true } } },
+  },
+  passengers: true,
+  refundRequests: true,
+} satisfies TypeORM.BookingInclude;
+
+type CustomerRefundBooking = TypeORM.BookingGetPayload<{
+  include: typeof CUSTOMER_BOOKING_INCLUDE;
+}>;
+
+type CustomerRefundRow = TypeORM.RefundRequestGetPayload<{
+  include: {
+    booking: {
+      include: {
+        flightInstance: {
+          include: { flight: { include: { route: true } } };
+        };
+      };
+    };
+  };
+}>;
 
 /** List-row shape: no PII at all (the design's cards show none). */
 function toListRow(
@@ -25,6 +49,28 @@ function toListRow(
   void mobileEnc;
   void ibanEnc;
   return rest;
+}
+
+function toCustomerRow(r: CustomerRefundRow) {
+  const { nidEnc, mobileEnc, ibanEnc, booking, ...rest } = r;
+  void nidEnc;
+  void mobileEnc;
+  void ibanEnc;
+  const instance = booking.flightInstance;
+  const flight = instance.flight;
+  return {
+    ...rest,
+    bookingId: booking.id,
+    pnr: booking.pnr,
+    flightNo: flight.flightNo,
+    originCode: flight.route.originCode,
+    destCode: flight.route.destCode,
+    departureAt: instance.departureAt,
+  };
+}
+
+function newTrackingCode(): string {
+  return `RF-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
 }
 
 @Injectable()
@@ -112,27 +158,51 @@ export class RefundsService {
     if (
       !assignee ||
       !assignee.isActive ||
-      assignee.role === 'USER' ||
-      assignee.role === 'AGENCY'
+      !(
+        assignee.role === 'FINANCE_MANAGER' ||
+        (assignee.role === 'EMPLOYEE' && assignee.dept === 'finance')
+      )
     ) {
       throw new BadRequestException({
         code: ErrorCode.VALIDATION_FAILED,
-        message: 'کارمند مقصد ارجاع معتبر نیست.',
+        message: 'مقصد ارجاع باید مدیر مالی یا کارمند فعال واحد مالی باشد.',
       });
     }
 
-    // Design behavior: refer sets the assignee WITHOUT advancing status.
     const history = Array.isArray(request.history)
       ? [...(request.history as unknown[])]
       : [];
-    history.push({
-      step: request.status.toLowerCase(),
-      labelFa: `ارجاع به ${assignee.fullName} (کارشناس مالی) توسط مدیر مالی`,
-      at: new Date().toISOString(),
-    });
+    const advancesToFinance =
+      actor.role === 'SITE_ADMIN' &&
+      (request.status === 'SUBMITTED' || request.status === 'REVIEW');
+    const now = new Date().toISOString();
+    if (advancesToFinance) {
+      history.push(
+        {
+          step: 'review',
+          labelFa: `بررسی درخواست توسط ${actor.fullName} (ادمین سایت)`,
+          at: now,
+        },
+        {
+          step: 'finance',
+          labelFa: `ارجاع به ${assignee.fullName} (واحد مالی)`,
+          at: now,
+        },
+      );
+    } else {
+      history.push({
+        step: request.status.toLowerCase(),
+        labelFa: `تغییر مسئول پرونده به ${assignee.fullName} توسط ${actor.fullName}`,
+        at: now,
+      });
+    }
     const updated = await this.typeorm.refundRequest.update({
       where: { id },
-      data: { assigneeId, history: history as TypeORM.InputJsonValue },
+      data: {
+        assigneeId,
+        status: advancesToFinance ? 'FINANCE' : request.status,
+        history: history as TypeORM.InputJsonValue,
+      },
       include: {
         assignee: { select: { id: true, fullName: true, role: true } },
       },
@@ -243,16 +313,35 @@ export class RefundsService {
    * confirmation." Booking must be TICKETED and owned by the caller; only
    * one request per booking (RefundStatus has no REJECTED to resubmit
    * against, so a second submission is always a conflict, not a retry). */
-  /** Shared eligibility checks + penalty computation + row creation for
-   * every customer-facing refund entry point (authenticated `/my/refunds`
-   * and the anonymous مدیریت رزرو flow) — so a future penalty-rule change
-   * can never apply to only one of them. */
-  private async createRefundRequest(
-    booking: TypeORM.BookingGetPayload<{
-      include: { flightInstance: true; passengers: true; refundRequests: true };
-    }>,
-    iban: string,
-    fallbackPassengerName: string,
+  private previewForBooking(
+    booking: CustomerRefundBooking,
+    rules: {
+      minHoursBeforeDeparture: number;
+      penaltyPct: number;
+      labelFa: string;
+    }[],
+  ) {
+    const hoursLeft =
+      (booking.flightInstance.departureAt.getTime() - Date.now()) / 3_600_000;
+    const penalty = computePenalty(rules, hoursLeft, booking.priceIrr);
+    return {
+      bookingId: booking.id,
+      totalPaidIrr: booking.priceIrr,
+      hoursLeft: Math.max(0, hoursLeft),
+      penaltyPct: penalty.penaltyPct,
+      penaltyAmountIrr: penalty.penaltyAmountIrr,
+      refundableIrr: penalty.refundableIrr,
+      refundable: hoursLeft > 0 && penalty.penaltyPct < 100,
+    };
+  }
+
+  private assertRefundable(
+    booking: CustomerRefundBooking,
+    rules: {
+      minHoursBeforeDeparture: number;
+      penaltyPct: number;
+      labelFa: string;
+    }[],
   ) {
     if (booking.status !== 'TICKETED' && booking.status !== 'PAID') {
       throw new ConflictException({
@@ -266,73 +355,163 @@ export class RefundsService {
         message: 'برای این رزرو قبلاً درخواست استرداد ثبت شده است.',
       });
     }
+    const preview = this.previewForBooking(booking, rules);
+    if (!preview.refundable) {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'با کمتر از ۳ ساعت زمان تا پرواز، استرداد مجاز نیست.',
+      });
+    }
+    return preview;
+  }
 
-    const rules = await this.typeorm.refundPenaltyRule.findMany();
-    const hoursLeft =
-      (booking.flightInstance.departureAt.getTime() - Date.now()) / 3_600_000;
-    const penalty = computePenalty(rules, hoursLeft, booking.priceIrr);
-    const passenger = booking.passengers[0];
+  async listEligibleBookings(userId: string) {
+    const [bookings, rules] = await Promise.all([
+      this.typeorm.booking.findMany({
+        where: {
+          userId,
+          status: { in: ['TICKETED', 'PAID'] },
+          refundRequests: { none: {} },
+        },
+        include: CUSTOMER_BOOKING_INCLUDE,
+        orderBy: { flightInstance: { departureAt: 'asc' } },
+      }),
+      this.typeorm.refundPenaltyRule.findMany(),
+    ]);
 
-    return this.typeorm.refundRequest.create({
-      data: {
-        bookingId: booking.id,
-        passengerName: passenger?.fullName ?? fallbackPassengerName,
-        nidEnc: passenger?.nationalIdEnc,
-        mobileEnc: passenger?.mobileEnc,
-        ibanEnc: encryptPii(iban),
-        totalPaidIrr: booking.priceIrr,
-        penaltyPct: penalty.penaltyPct,
-        penaltyAmountIrr: penalty.penaltyAmountIrr,
-        refundableIrr: penalty.refundableIrr,
-        history: [
-          {
-            step: 'submitted',
-            labelFa: 'ثبت درخواست استرداد توسط مشتری',
-            at: new Date().toISOString(),
-          },
-        ],
-      },
+    return bookings.flatMap((booking) => {
+      const preview = this.previewForBooking(booking, rules);
+      if (!preview.refundable) return [];
+      const flight = booking.flightInstance.flight;
+      return [
+        {
+          ...preview,
+          pnr: booking.pnr,
+          flightNo: flight.flightNo,
+          originCode: flight.route.originCode,
+          destCode: flight.route.destCode,
+          departureAt: booking.flightInstance.departureAt,
+        },
+      ];
     });
+  }
+
+  async listCustomerRules() {
+    const rules = await this.typeorm.refundPenaltyRule.findMany({
+      orderBy: { minHoursBeforeDeparture: 'desc' },
+    });
+    return rules.map((rule) => ({
+      minHoursBeforeDeparture: rule.minHoursBeforeDeparture,
+      penaltyPct: rule.penaltyPct,
+      labelFa: rule.labelFa,
+      isRefundable: rule.penaltyPct < 100,
+    }));
+  }
+
+  async previewMine(userId: string, bookingId: string) {
+    const [booking, rules] = await Promise.all([
+      this.typeorm.booking.findUnique({
+        where: { id: bookingId },
+        include: CUSTOMER_BOOKING_INCLUDE,
+      }),
+      this.typeorm.refundPenaltyRule.findMany(),
+    ]);
+    if (!booking || booking.userId !== userId) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'رزرو یافت نشد.',
+      });
+    }
+    return this.assertRefundable(booking, rules);
   }
 
   async submitFromCustomer(
     actor: AuthenticatedUser,
     dto: { bookingId: string; iban: string },
   ) {
-    const booking = await this.typeorm.booking.findUnique({
-      where: { id: dto.bookingId },
-      include: { flightInstance: true, passengers: true, refundRequests: true },
-    });
-    if (!booking) {
-      throw new NotFoundException({
-        code: ErrorCode.NOT_FOUND,
-        message: 'رزرو یافت نشد.',
+    let request: CustomerRefundRow | null = null;
+    for (let attempt = 0; attempt < 3 && !request; attempt += 1) {
+      try {
+        request = await this.typeorm.$transaction(async (tx) => {
+          const [booking, rules] = await Promise.all([
+            tx.booking.findUnique({
+              where: { id: dto.bookingId },
+              include: CUSTOMER_BOOKING_INCLUDE,
+            }),
+            tx.refundPenaltyRule.findMany(),
+          ]);
+          if (!booking || booking.userId !== actor.id) {
+            throw new NotFoundException({
+              code: ErrorCode.NOT_FOUND,
+              message: 'رزرو یافت نشد.',
+            });
+          }
+          const preview = this.assertRefundable(booking, rules);
+          const passenger = booking.passengers[0];
+          return tx.refundRequest.create({
+            data: {
+              trackingCode: newTrackingCode(),
+              bookingId: booking.id,
+              passengerName: passenger?.fullName ?? actor.fullName,
+              nidEnc: passenger?.nationalIdEnc,
+              mobileEnc: passenger?.mobileEnc,
+              ibanEnc: encryptPii(dto.iban),
+              totalPaidIrr: preview.totalPaidIrr,
+              penaltyPct: preview.penaltyPct,
+              penaltyAmountIrr: preview.penaltyAmountIrr,
+              refundableIrr: preview.refundableIrr,
+              history: [
+                {
+                  step: 'submitted',
+                  labelFa: 'ثبت درخواست استرداد توسط مشتری',
+                  at: new Date().toISOString(),
+                },
+              ],
+            },
+            include: {
+              booking: {
+                include: {
+                  flightInstance: {
+                    include: { flight: { include: { route: true } } },
+                  },
+                },
+              },
+            },
+          });
+        });
+      } catch (err) {
+        if (
+          err instanceof TypeORM.TypeORMClientKnownRequestError &&
+          err.code === 'P2002'
+        ) {
+          const target = JSON.stringify(err.meta?.target ?? '');
+          if (target.includes('trackingCode') && attempt < 2) continue;
+          throw new ConflictException({
+            code: ErrorCode.CONFLICT,
+            message: 'برای این رزرو قبلاً درخواست استرداد ثبت شده است.',
+          });
+        }
+        throw err;
+      }
+    }
+    if (!request) {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'ثبت درخواست انجام نشد؛ لطفاً دوباره تلاش کنید.',
       });
     }
-    if (booking.userId !== actor.id) {
-      throw new BadRequestException({
-        code: ErrorCode.FORBIDDEN,
-        message: 'این رزرو متعلق به شما نیست.',
-      });
-    }
-
-    const request = await this.createRefundRequest(
-      booking,
-      dto.iban,
-      actor.fullName,
-    );
 
     await this.audit.record({
       actorId: actor.id,
       actorRole: actor.role,
       category: 'REFUND',
       action: 'ثبت درخواست استرداد',
-      detail: `درخواست استرداد رزرو ${booking.pnr} توسط مشتری ثبت شد.`,
+      detail: `درخواست استرداد رزرو ${request.booking.pnr} توسط مشتری ثبت شد.`,
       entityType: 'RefundRequest',
       entityId: request.id,
     });
 
-    return toListRow(request);
+    return toCustomerRow(request);
   }
 
   /** Anonymous مدیریت رزرو self-service — same generic 404 whether the
@@ -342,7 +521,7 @@ export class RefundsService {
   async submitAnonymous(pnr: string, lastName: string, iban: string) {
     const booking = await this.typeorm.booking.findUnique({
       where: { pnr: pnr.trim().toUpperCase() },
-      include: { flightInstance: true, passengers: true, refundRequests: true },
+      include: CUSTOMER_BOOKING_INCLUDE,
     });
     if (
       !booking ||
@@ -354,22 +533,92 @@ export class RefundsService {
       });
     }
 
-    const request = await this.createRefundRequest(booking, iban, lastName);
-    return toListRow(request);
+    const rules = await this.typeorm.refundPenaltyRule.findMany();
+    const preview = this.assertRefundable(booking, rules);
+    const passenger = booking.passengers[0];
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const request = await this.typeorm.refundRequest.create({
+          data: {
+            trackingCode: newTrackingCode(),
+            bookingId: booking.id,
+            passengerName: passenger?.fullName ?? lastName,
+            nidEnc: passenger?.nationalIdEnc,
+            mobileEnc: passenger?.mobileEnc,
+            ibanEnc: encryptPii(iban),
+            totalPaidIrr: preview.totalPaidIrr,
+            penaltyPct: preview.penaltyPct,
+            penaltyAmountIrr: preview.penaltyAmountIrr,
+            refundableIrr: preview.refundableIrr,
+            history: [
+              {
+                step: 'submitted',
+                labelFa: 'ثبت درخواست استرداد توسط مشتری',
+                at: new Date().toISOString(),
+              },
+            ],
+          },
+          include: {
+            booking: {
+              include: {
+                flightInstance: {
+                  include: { flight: { include: { route: true } } },
+                },
+              },
+            },
+          },
+        });
+        return toCustomerRow(request);
+      } catch (err) {
+        if (
+          err instanceof TypeORM.TypeORMClientKnownRequestError &&
+          err.code === 'P2002'
+        ) {
+          const target = JSON.stringify(err.meta?.target ?? '');
+          if (target.includes('trackingCode') && attempt < 2) continue;
+          throw new ConflictException({
+            code: ErrorCode.CONFLICT,
+            message: 'برای این رزرو قبلاً درخواست استرداد ثبت شده است.',
+          });
+        }
+        throw err;
+      }
+    }
+    throw new ConflictException({
+      code: ErrorCode.CONFLICT,
+      message: 'ثبت درخواست انجام نشد؛ لطفاً دوباره تلاش کنید.',
+    });
   }
 
   async listMine(userId: string) {
     const requests = await this.typeorm.refundRequest.findMany({
       where: { booking: { userId } },
+      include: {
+        booking: {
+          include: {
+            flightInstance: {
+              include: { flight: { include: { route: true } } },
+            },
+          },
+        },
+      },
       orderBy: { createdAt: 'desc' },
     });
-    return requests.map(toListRow);
+    return requests.map(toCustomerRow);
   }
 
   async getMine(userId: string, id: string) {
     const request = await this.typeorm.refundRequest.findUnique({
       where: { id },
-      include: { booking: true },
+      include: {
+        booking: {
+          include: {
+            flightInstance: {
+              include: { flight: { include: { route: true } } },
+            },
+          },
+        },
+      },
     });
     if (!request || request.booking.userId !== userId) {
       throw new NotFoundException({
@@ -377,7 +626,7 @@ export class RefundsService {
         message: 'درخواست استرداد یافت نشد.',
       });
     }
-    return toListRow(request);
+    return toCustomerRow(request);
   }
 
   /**
@@ -411,6 +660,7 @@ export class RefundsService {
 
     return this.typeorm.refundRequest.create({
       data: {
+        trackingCode: newTrackingCode(),
         bookingId: booking.id,
         passengerName: `مسافر آزمایشی ${crypto.randomUUID().slice(0, 4)}`,
         nidEnc: encryptPii('0012345679'),

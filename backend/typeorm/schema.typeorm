@@ -1194,7 +1194,8 @@ model RefundPenaltyRule {
 
 model RefundRequest {
   id               String       @id @default(uuid())
-  bookingId        String
+  trackingCode     String       @unique
+  bookingId        String       @unique
   booking          Booking      @relation(fields: [bookingId], references: [id])
   passengerName    String
   nidEnc           String?

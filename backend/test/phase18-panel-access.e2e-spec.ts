@@ -53,6 +53,7 @@ describe('Phase 18 — SITE_ADMIN + EMPLOYEE panel access (e2e)', () => {
     });
     return typeorm.refundRequest.create({
       data: {
+        trackingCode: `RF-${crypto.randomBytes(4).toString('hex').toUpperCase()}`,
         bookingId: booking.id,
         passengerName: `مسافر ${crypto.randomUUID().slice(0, 4)}`,
         ibanEnc: encryptPii('IR820170000000332211009900'),
