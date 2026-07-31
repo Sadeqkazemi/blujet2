@@ -1200,10 +1200,33 @@ upload only).
   multipart) — PDF/PNG/JPG ≤5MB via `FilesService`; blocked when status is
   `SUBMITTED` or `APPROVED`.
 - `POST /my/identity/submit` (new, `USER` role) — requires profile step +
-  id card; sets `SUBMITTED`. Staff review (`APPROVED`/`REJECTED`) is a
-  separate admin gap.
+  id card; sets `SUBMITTED`.
 - Frontend: `AccountIdentityTab` — warning banner, 2-step checklist (no
   selfie), upload + submit matching the design layout.
+
+### پنل ادمین سایت — احراز هویت مشتریان (`/panel/kyc`)
+Staff side of the flow above — the `APPROVED`/`REJECTED` transitions have
+to be reachable somewhere; no design tab exists for it, so it follows the
+`jobapps` review-queue pattern (new `kyc` tab in `PANEL_NAV.SITE_ADMIN`).
+All endpoints: `JwtAuthGuard` + `RolesGuard` + `PanelAccessGuard`,
+`@Roles('SITE_ADMIN')`.
+
+- `GET /identity-verifications` (new) — rows with customer `fullName`,
+  `phone`, decrypted `nationalId`, `birthDate`, `status`, `submittedAt`,
+  `reviewedAt`, `rejectReason`, `idCardFileName`. `NOT_STARTED` rows are
+  excluded (nothing to review).
+- `GET /identity-verifications/:id/id-card` (new) — streams the id-card
+  file. Dedicated staff surface (careers-resume style) instead of
+  loosening the general `/files` ACL for all staff.
+- `PATCH /identity-verifications/:id/approve` (new) — `SUBMITTED →
+  APPROVED`, sets `reviewedAt`, audit (`ACCOUNT`). 409 otherwise.
+- `PATCH /identity-verifications/:id/reject` (new) — body
+  `{ rejectReason }` (required, ≤500 chars); `SUBMITTED → REJECTED`, sets
+  `reviewedAt` + `rejectReason` (shown to the customer, who can re-upload
+  and re-submit), audit (`ACCOUNT`). 409 otherwise.
+- Frontend: `IdentityAdminPage` — pending counter, queue list with
+  status badges, id-card download, approve button, reject modal with a
+  required reason.
 
 ## Phase 21 — فراموشی رمز (customer forgot/set password)
 
