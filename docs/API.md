@@ -1126,11 +1126,14 @@ request/decide pattern exactly, for a new `AgencyWebserviceRequest`.
   `{ scope: 'FULL' | 'SEARCH_BOOK', months: 1 | 3 | 12, note?: string }`
   (whitelist DTO — `forbidNonWhitelisted` rejects any other field,
   including a client-supplied price). Creates a `PENDING`
-  `AgencyWebserviceRequest` with `priceIrr` computed server-side from a
-  fixed plan catalog (the design's own toman prices ×10 → ریال:
-  ۱ ماهه=۴۵٬۰۰۰٬۰۰۰, ۳ ماهه=۱۲۰٬۰۰۰٬۰۰۰, ۱۲ ماهه=۴۲۰٬۰۰۰٬۰۰۰ ریال), fires a
-  cartable task to `SENIOR_MANAGER`/`FINANCE_MANAGER`/`COMMERCIAL_MANAGER`
+  `AgencyWebserviceRequest` with `priceIrr` computed server-side from the
+  **configurable** plan catalog (`SystemSetting.webservicePlanPrices` —
+  defaults: ۱ ماهه=۴۵٬۰۰۰٬۰۰۰, ۳ ماهه=۱۲۰٬۰۰۰٬۰۰۰, ۱۲ ماهه=۴۲۰٬۰۰۰٬۰۰۰
+  ریال; editable by COMMERCIAL_MANAGER via `PATCH /webservice/pricing`),
+  fires a cartable task to `SENIOR_MANAGER`/`FINANCE_MANAGER`/`COMMERCIAL_MANAGER`
   (same review-role set as credit requests), and audit-logs.
+- `GET /agency-portal/webservice-plans` — current plan prices for this
+  agency's purchase UI (same three durations, server-computed IRR).
 - `GET /agency-portal/webservice-requests` — this agency's own request
   history.
 - `GET /agency-portal/api-keys` — this agency's own API keys, **metadata
@@ -1154,6 +1157,20 @@ request/decide pattern exactly, for a new `AgencyWebserviceRequest`.
   which updates first): if step-up verification fails, the request must
   stay `PENDING` for a retry, never end up `APPROVED` with no key actually
   issued.
+
+### Commercial Manager — webservice plan pricing
+
+- `GET /webservice/pricing` — `COMMERCIAL_MANAGER`, `CEO`, `SENIOR_MANAGER`
+  — `{ prices: { 1, 3, 12 } }` in IRR.
+- `PATCH /webservice/pricing` — `COMMERCIAL_MANAGER` only — body
+  `{ month1PriceIrr, month3PriceIrr, month12PriceIrr }`; audited
+  (SYSTEM). New agency purchase requests immediately use the updated
+  prices.
+
+Frontend: `CommercialWebservicePage.tsx` (Commercial panel's **وب سرویس**
+tab — `PANEL_NAV.COMMERCIAL_MANAGER` key `webservice`) edits the three
+plan prices; `AgencyWebservicePage.tsx` reads them via
+`GET /agency-portal/webservice-plans`.
 
 ### Raw key delivery — a scope decision, documented here
 
@@ -1716,16 +1733,11 @@ label, file name, Jalali upload date, status pill, تأیید/رد buttons on
 the endpoint's role gate — no `EmployeePermission` key currently grants
 document review).
 
-**Not corrected this phase, flagged instead**: while building this,
-discovered that the credit-requests and webservice-requests staff-decide
-endpoints this phase's code directly mirrors have **no frontend UI of
-their own either** — `AgencyDetailPage.tsx` never called
-`GET/PATCH .../credit-requests` or `GET/PATCH .../webservice-requests`
-before this phase, and still doesn't. Every credit-increase and
-webservice-purchase request submitted by an agency is currently
-decidable only via curl/Supertest. This is a real, parallel gap of the
-same shape as documents — reported to the user, deliberately left
-out of this phase's diff so it stays reviewable, not silently bundled in.
+Frontend (credit/webservice requests): `AgencyDetailPage.tsx`
+(Senior/Finance overview + Commercial مالی sub-tab) gained
+«درخواست‌های افزایش اعتبار» and «درخواست‌های خرید وب‌سرویس» cards —
+same approve/reject pattern as documents; webservice approval reuses the
+existing step-up gate (`API_KEY_ROTATE`) because it issues a real API key.
 
 ## Phase 40 — ترجیح زبان نمایش (display-language preference storage)
 

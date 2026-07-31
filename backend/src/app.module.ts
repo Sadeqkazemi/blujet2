@@ -40,6 +40,7 @@ import { FlightStatusModule } from './modules/flight-status/flight-status.module
 import { FlightopsModule } from './modules/flightops/flightops.module';
 import { SurveyModule } from './modules/survey/survey.module';
 import { CareersModule } from './modules/careers/careers.module';
+import { WebservicePricingModule } from './modules/webservice-pricing/webservice-pricing.module';
 
 @Module({
   imports: [
@@ -109,6 +110,7 @@ import { CareersModule } from './modules/careers/careers.module';
     FlightopsModule,
     SurveyModule,
     CareersModule,
+    WebservicePricingModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
