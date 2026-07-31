@@ -32,6 +32,10 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'refund', labelFa: 'استرداد بلیط', implemented: true },
     { key: 'tickets', labelFa: 'تیکت‌های پشتیبانی', implemented: true },
     { key: 'jobapps', labelFa: 'فرصت‌های شغلی', implemented: true },
+    // Staff side of the customer KYC flow (/my/identity, Phase 17) — the
+    // APPROVED/REJECTED transitions have to be reachable somewhere; no
+    // design tab exists for it, so it follows the jobapps queue pattern.
+    { key: 'kyc', labelFa: 'احراز هویت مشتریان', implemented: true },
     { key: 'settings', labelFa: 'تنظیمات سامانه', implemented: true },
   ],
   CEO: [
