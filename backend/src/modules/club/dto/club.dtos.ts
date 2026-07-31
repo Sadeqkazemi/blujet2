@@ -83,3 +83,12 @@ export class UpdateTierRulesDto {
   @Min(0)
   cardRequestMinPoints: number;
 }
+
+export class ReferCardRequestDto {
+  @ApiProperty({
+    enum: ['SENIOR', 'CHAIR'],
+    description: 'مدیر ارشد یا رئیس هیئت مدیره — تنها دو مقصد ارجاع طراحی',
+  })
+  @IsIn(['SENIOR', 'CHAIR'])
+  assignedTo: 'SENIOR' | 'CHAIR';
+}

@@ -1075,6 +1075,23 @@ and tier-benefits grid. BluBank block deferred (no backing schema).
   `ClubMember` row and backfills a ledger entry when missing so manual
   testing works immediately after `prisma db seed`.
 
+### SITE_ADMIN — ارجاع درخواست‌های کارت SUBMITTED
+Completes the member-initiated card-request flow started above: after a
+USER submits via `POST /my/club/card-request`, the request sits in
+`SUBMITTED` until SITE_ADMIN refers it from the پنل ادمین سایت `club` tab.
+
+- `GET /club/submitted-card-requests` (new, `SITE_ADMIN` only) — list
+  `SUBMITTED` requests with member detail (incl. decrypted national ID for
+  this admin review surface only) + history timeline. Exec panels'
+  `GET /club/card-requests` still excludes SUBMITTED.
+- `PATCH /club/card-requests/:id/refer` (new, `SITE_ADMIN` only) — body
+  `{ assignedTo: 'SENIOR' | 'CHAIR' }`; `SUBMITTED → REFERRED`, appends a
+  history step, audited. `409` if not SUBMITTED.
+- `GET /club/members` KPI payload gains `submittedRequests` count (SUBMITTED
+  rows) alongside existing `pendingRequests` (REFERRED rows).
+- Frontend: `ClubPage.tsx` gains a `SITE_ADMIN` role branch — submitted
+  queue + refer modal (مدیر ارشد / رئیس هیئت مدیره picker); no approve/reject.
+
 ## Phase 21 — فراموشی رمز (customer forgot/set password)
 
 Third "dead forms" item. `ForgotPasswordPage.tsx` was entirely client-side
