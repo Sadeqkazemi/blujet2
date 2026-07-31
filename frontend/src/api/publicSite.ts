@@ -4,6 +4,7 @@ import type {
   BookingDetail,
   CabinClass,
   PayResult,
+  PriceCalendarDay,
   PriceLock,
   CustomerRefundRule,
   EligibleRefundBooking,
@@ -15,6 +16,7 @@ import type {
   CustomerReferralDashboard,
   CustomerIdentityView,
   ActiveSession,
+  SearchAdvisoryResult,
   SearchFlightResult,
   SeatMapResult,
   UserProfile,
@@ -29,6 +31,19 @@ export function searchFlights(origin: string, dest: string, date: string) {
   const q = new URLSearchParams({ origin, dest, date });
   return apiGet<SearchFlightResult[]>(`/search/flights?${q.toString()}`);
 }
+
+export function fetchSearchAdvisory(origin: string, dest: string, date: string) {
+  const q = new URLSearchParams({ origin, dest, date });
+  return apiGet<SearchAdvisoryResult>(`/search/advisory?${q.toString()}`);
+}
+
+export function fetchPriceCalendar(origin: string, dest: string, date: string) {
+  const q = new URLSearchParams({ origin, dest, date });
+  return apiGet<PriceCalendarDay[]>(`/search/price-calendar?${q.toString()}`);
+}
+
+/** @deprecated Use fetchPriceCalendar */
+export const fetchSearchPriceCalendar = fetchPriceCalendar;
 
 export function fetchSeatMap(flightInstanceId: string) {
   return apiGet<SeatMapResult>(`/search/flights/${flightInstanceId}/seatmap`);

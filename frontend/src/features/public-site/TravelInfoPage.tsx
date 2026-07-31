@@ -98,19 +98,19 @@ export default function TravelInfoPage() {
   const sectionRefs = useRef<Array<HTMLDivElement | null>>([]);
 
   useEffect(() => {
-    fetchPublicSiteContent()
+    fetchPublicSiteContent(locale)
       .then((res) => setTermsIntro(res.termsText.trim() || null))
       .catch(() => {
         /* static fallback */
       });
-  }, []);
+  }, [locale]);
 
   return (
     <PublicPageShell>
       <section style={{ background: 'linear-gradient(150deg,#0d2640,#124a86)', color: '#fff', padding: '39px 22px 35px', textAlign: 'center' }}>
         <h1 style={{ fontSize: isMobile ? 24 : 30, fontWeight: 900, margin: '0 0 10px', letterSpacing: '-.5px' }}>{t.heroTitle}</h1>
         <p style={{ fontSize: 13, color: '#c9dcf3', margin: 0 }}>{t.heroSub}</p>
-        {locale === 'fa' && termsIntro && (
+        {termsIntro && (
           <p data-testid="terms-cms-intro" style={{ fontSize: 12.5, color: '#e2edf9', margin: '14px auto 0', maxWidth: 640, lineHeight: 1.9 }}>
             {termsIntro}
           </p>

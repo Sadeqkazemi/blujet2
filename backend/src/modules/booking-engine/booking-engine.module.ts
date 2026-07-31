@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { SearchController } from './search.controller';
 import { SearchService } from './search.service';
+import { SearchAdvisoryService } from './search-advisory.service';
 import { BookingController } from './booking.controller';
 import { BookingService } from './booking.service';
 import { WalletPointsLockController } from './wallet-points-lock.controller';
@@ -13,10 +14,11 @@ import { PrivacyController } from './privacy.controller';
 import { PrivacyService } from './privacy.service';
 import { AuditModule } from '../audit/audit.module';
 import { CustomerReferralsModule } from '../customer-referrals/customer-referrals.module';
+import { AiModule } from '../ai/ai.module';
 import { PAYMENT_GATEWAY, SandboxPaymentGateway } from './payment-gateway';
 
 @Module({
-  imports: [AuditModule, CustomerReferralsModule],
+  imports: [AuditModule, CustomerReferralsModule, AiModule],
   controllers: [
     SearchController,
     BookingController,
@@ -26,6 +28,7 @@ import { PAYMENT_GATEWAY, SandboxPaymentGateway } from './payment-gateway';
   ],
   providers: [
     SearchService,
+    SearchAdvisoryService,
     BookingService,
     WalletService,
     ClubPointsService,

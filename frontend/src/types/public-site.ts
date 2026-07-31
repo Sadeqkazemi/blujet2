@@ -25,6 +25,26 @@ export interface SearchFlightResult {
   cabins: SearchCabinOption[];
 }
 
+export type SearchAdvisoryRecommendation = 'buy' | 'wait';
+
+export interface SearchAdvisoryResult {
+  available: boolean;
+  recommendation?: SearchAdvisoryRecommendation;
+  reasonFa?: string;
+  predictedPriceIrr?: string;
+  confidence?: number;
+  modelVersion?: string;
+  cheapestDayLabel?: string;
+  priceIncreaseProbPct?: number;
+}
+
+export interface PriceCalendarDay {
+  date: string;
+  minPriceIrr: string;
+  dateLabelFa: string;
+  isCenter: boolean;
+}
+
 export type SeatStatus = 'FREE' | 'TAKEN';
 
 export interface SeatMapCell {

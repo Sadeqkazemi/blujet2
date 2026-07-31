@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import TicketPage from './TicketPage';
 import * as publicSiteApi from '../../api/publicSite';
 import * as useAuthModule from '../../hooks/useAuth';
+import * as useLocaleModule from '../../hooks/useLocale';
 import type { BookingDetail } from '../../types/public-site';
 
 const TICKETED: BookingDetail = {
@@ -24,7 +25,7 @@ const TICKETED: BookingDetail = {
   passengers: [{ fullName: 'علی رضایی', seatCode: '2A' }],
 };
 
-function renderPage() {
+function renderPage(locale: 'fa' | 'en' | 'ar' = 'fa') {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status: 'unauthenticated',
     user: null,
@@ -33,6 +34,7 @@ function renderPage() {
     agencyLogin: vi.fn(),
     signOut: vi.fn(),
   });
+  vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale, setLocale: vi.fn() });
   return render(
     <MemoryRouter initialEntries={['/ticket/BJABC123']}>
       <Routes>
@@ -79,5 +81,13 @@ describe('TicketPage', () => {
     await userEvent.click(screen.getByTestId('submit-refund'));
 
     expect(await screen.findByText(/درخواست استرداد ثبت شد/)).toBeInTheDocument();
+  });
+
+  it('renders English strings when locale is en', async () => {
+    vi.spyOn(publicSiteApi, 'fetchBookingByPnr').mockResolvedValue(TICKETED);
+    renderPage('en');
+
+    expect(await screen.findByText('E-ticket')).toBeInTheDocument();
+    expect(screen.getByText('Request ticket refund')).toBeInTheDocument();
   });
 });

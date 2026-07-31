@@ -5,6 +5,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import BookPage from './BookPage';
 import * as publicSiteApi from '../../api/publicSite';
 import * as useAuthModule from '../../hooks/useAuth';
+import * as useLocaleModule from '../../hooks/useLocale';
 import { mockAuthUser } from '../../test/mockAuthUser';
 import type { SeatMapResult, SavedPassenger } from '../../types/public-site';
 
@@ -42,6 +43,7 @@ function renderPage() {
 describe('BookPage', () => {
   beforeEach(() => {
     vi.spyOn(publicSiteApi, 'fetchSavedPassengers').mockResolvedValue([]);
+    vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale: 'fa', setLocale: vi.fn() });
   });
 
   it('shows the OTP login form when unauthenticated', async () => {
@@ -204,5 +206,21 @@ describe('BookPage', () => {
 
     expect(await screen.findByTestId('business-seat-lock')).toBeInTheDocument();
     expect(screen.getByTestId('seat-1A')).toBeDisabled();
+  });
+
+  it('renders English strings when locale is en', async () => {
+    vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale: 'en', setLocale: vi.fn() });
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      status: 'authenticated',
+      user: mockAuthUser({ id: 'u1', fullName: '09121234567', role: 'USER' }),
+      requestLogin: vi.fn(),
+      confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
+      signOut: vi.fn(),
+    });
+    vi.spyOn(publicSiteApi, 'fetchSeatMap').mockResolvedValue(SEATMAP);
+    renderPage();
+
+    expect(await screen.findByText('Seat selection & passenger details')).toBeInTheDocument();
   });
 });

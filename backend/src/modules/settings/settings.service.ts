@@ -27,8 +27,23 @@ const SITE_ADMIN_PATCH_KEYS = new Set([
   'homeHeroSubtitle',
   'aboutUsText',
   'contactAddress',
+  'contactOfficeHours',
   'termsText',
+  ...(['homeHeroTitle', 'homeHeroSubtitle', 'aboutUsText', 'contactAddress', 'contactOfficeHours', 'termsText'] as const).flatMap(
+    (base) => [`${base}_en`, `${base}_ar`] as const,
+  ),
 ]);
+
+const LOCALE_CONTENT_BASES = [
+  'homeHeroTitle',
+  'homeHeroSubtitle',
+  'aboutUsText',
+  'contactAddress',
+  'contactOfficeHours',
+  'termsText',
+] as const;
+
+export type PublicContentLocale = 'fa' | 'en' | 'ar';
 
 /** Every storable key with its server-side default. Unknown keys are
  * rejected — the settings table never becomes a free-form dumping ground. */
@@ -53,7 +68,21 @@ export const SETTING_DEFAULTS: Record<string, unknown> = {
   homeHeroSubtitle: 'بهترین قیمت بلیط هواپیما را با blujet پیدا کنید',
   aboutUsText: 'blujet یک پلتفرم آنلاین رزرو بلیط هواپیما است.',
   contactAddress: 'تهران، ایران',
+  contactOfficeHours: 'شنبه تا پنج‌شنبه ۸:۰۰ تا ۲۰:۰۰ — جمعه‌ها تعطیل',
   termsText: 'قوانین و مقررات استفاده از خدمات blujet.',
+  homeHeroTitle_en: 'Fly anywhere you want',
+  homeHeroSubtitle_en: 'Find the best flight prices with blujet',
+  aboutUsText_en:
+    'blujet is an online platform for booking airline tickets.',
+  contactAddress_en: 'Tehran, Iran',
+  contactOfficeHours_en: 'Sat–Thu 8:00–20:00 — closed on Fridays',
+  termsText_en: 'Terms and conditions for using blujet services.',
+  homeHeroTitle_ar: 'سافر إلى أي مكان تريده',
+  homeHeroSubtitle_ar: 'اعثر على أفضل أسعار التذاكر مع blujet',
+  aboutUsText_ar: 'blujet منصة إلكترونية لحجز تذاكر الطيران.',
+  contactAddress_ar: 'طهران، إيران',
+  contactOfficeHours_ar: 'السبت–الخميس ٨:٠٠–٢٠:٠٠ — مغلق يوم الجمعة',
+  termsText_ar: 'الشروط والأحكام لاستخدام خدمات blujet.',
   // IT Manager / SITE_ADMIN settings tab — footer social links.
   socialLinks: DEFAULT_SOCIAL_LINKS,
   // SITE_ADMIN settings tab — app download buttons on the home page.
@@ -242,20 +271,22 @@ export class SettingsService {
   }
 
   /** Public static page copy edited from the SITE_ADMIN media tab. */
-  async getPublicSiteContent() {
+  async getPublicSiteContent(locale: PublicContentLocale = 'fa') {
     const all = await this.getAll();
+    const pick = (base: (typeof LOCALE_CONTENT_BASES)[number]) => {
+      if (locale !== 'fa') {
+        const localized = all.settings[`${base}_${locale}`];
+        if (localized && String(localized).trim()) return String(localized);
+      }
+      return String(all.settings[base] ?? SETTING_DEFAULTS[base]);
+    };
     return {
-      homeHeroTitle: String(
-        all.settings.homeHeroTitle ?? SETTING_DEFAULTS.homeHeroTitle,
-      ),
-      homeHeroSubtitle: String(
-        all.settings.homeHeroSubtitle ?? SETTING_DEFAULTS.homeHeroSubtitle,
-      ),
-      aboutUsText: String(all.settings.aboutUsText ?? SETTING_DEFAULTS.aboutUsText),
-      contactAddress: String(
-        all.settings.contactAddress ?? SETTING_DEFAULTS.contactAddress,
-      ),
-      termsText: String(all.settings.termsText ?? SETTING_DEFAULTS.termsText),
+      homeHeroTitle: pick('homeHeroTitle'),
+      homeHeroSubtitle: pick('homeHeroSubtitle'),
+      aboutUsText: pick('aboutUsText'),
+      contactAddress: pick('contactAddress'),
+      contactOfficeHours: pick('contactOfficeHours'),
+      termsText: pick('termsText'),
     };
   }
 }

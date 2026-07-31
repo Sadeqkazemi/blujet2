@@ -120,6 +120,7 @@ export default function ContactPage() {
   const t = STR[locale];
   const [supportContact, setSupportContact] = useState(FALLBACK_SUPPORT);
   const [officeAddress, setOfficeAddress] = useState<string | null>(null);
+  const [officeHours, setOfficeHours] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [subject, setSubject] = useState('');
@@ -141,12 +142,15 @@ export default function ContactPage() {
       .catch(() => {
         /* keep static fallbacks */
       });
-    fetchPublicSiteContent()
-      .then((res) => setOfficeAddress(res.contactAddress.trim() || null))
+    fetchPublicSiteContent(locale)
+      .then((res) => {
+        setOfficeAddress(res.contactAddress.trim() || null);
+        setOfficeHours(res.contactOfficeHours.trim() || null);
+      })
       .catch(() => {
         /* keep static fallbacks */
       });
-  }, []);
+  }, [locale]);
 
   const channels = [
     {
@@ -160,9 +164,11 @@ export default function ContactPage() {
     ...STATIC_CHANNELS.map((c) => ({
       ...c,
       value:
-        c.kind === 'address' && locale === 'fa' && officeAddress
+        c.kind === 'address' && officeAddress
           ? officeAddress
-          : c.value[locale],
+          : c.kind === 'hours' && officeHours
+            ? officeHours
+            : c.value[locale],
     })),
   ];
 
