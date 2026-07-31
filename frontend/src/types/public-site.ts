@@ -110,6 +110,16 @@ export interface SavedPassenger {
   updatedAt: string;
 }
 
+export interface ActiveSession {
+  id: string;
+  deviceLabel: string;
+  ip: string | null;
+  userAgent: string | null;
+  createdAt: string;
+  expiresAt: string;
+  isCurrent: boolean;
+}
+
 export interface PayResultOk {
   priceChanged: false;
   booking: BookingDetail;

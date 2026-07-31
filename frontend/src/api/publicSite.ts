@@ -8,6 +8,7 @@ import type {
   RefundRequestView,
   SavedFlight,
   SavedPassenger,
+  ActiveSession,
   SearchFlightResult,
   SeatMapResult,
   UserProfile,
@@ -161,6 +162,14 @@ export function updateSavedPassenger(
 
 export function removeSavedPassenger(id: string) {
   return apiDelete<{ removed: boolean }>(`/my/saved-passengers/${id}`);
+}
+
+export function fetchMySessions() {
+  return apiGet<ActiveSession[]>('/my/sessions');
+}
+
+export function revokeMySession(id: string) {
+  return apiDelete<{ revoked: boolean }>(`/my/sessions/${id}`);
 }
 
 export function fetchMyProfile() {

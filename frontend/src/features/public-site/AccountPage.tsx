@@ -11,12 +11,14 @@ import {
   fetchMyPriceLocks,
   fetchMyProfile,
   fetchMyRefunds,
+  fetchMySessions,
   fetchPrivacyExport,
   fetchSavedFlights,
   fetchSavedPassengers,
   createSavedPassenger,
   updateSavedPassenger,
   removeSavedPassenger,
+  revokeMySession,
   fetchWallet,
   removeSavedFlight,
   requestEmailVerify,
@@ -30,7 +32,8 @@ import { changeOwnPassword, setPassword } from '../../api/auth';
 import { faDigits, faMoney, parseTomanToRial } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
-import type { BookingDetail, PriceLock, RefundRequestView, SavedFlight, SavedPassenger, UserProfile } from '../../types/public-site';
+import type { BookingDetail, PriceLock, RefundRequestView, SavedFlight, SavedPassenger, ActiveSession, UserProfile } from '../../types/public-site';
+import AccountSecuritySessions from './AccountSecuritySessions';
 import type { ClubMembershipView } from '../../types/club-membership';
 import type { MySupportTicketRow, SupportTicketStatus } from '../../types/support-tickets';
 import AccountClubTab from './AccountClubTab';
@@ -502,6 +505,9 @@ export default function AccountPage() {
   const [passengerFormError, setPassengerFormError] = useState<string | null>(null);
   const [passengerFormKey, setPassengerFormKey] = useState(0);
   const [passengersAddPending, setPassengersAddPending] = useState(false);
+  const [sessions, setSessions] = useState<ActiveSession[] | null>(null);
+  const [sessionBusyId, setSessionBusyId] = useState<string | null>(null);
+  const [sessionError, setSessionError] = useState<string | null>(null);
   const [lockActionBusy, setLockActionBusy] = useState<string | null>(null);
   const [lockError, setLockError] = useState<string | null>(null);
 
@@ -550,6 +556,7 @@ export default function AccountPage() {
     fetchMyPriceLocks().then(setPriceLocks).catch(() => setPriceLocks([]));
     fetchSavedFlights().then(setSavedFlights).catch(() => setSavedFlights([]));
     fetchSavedPassengers().then(setSavedPassengers).catch(() => setSavedPassengers([]));
+    fetchMySessions().then(setSessions).catch(() => setSessions([]));
     fetchMyProfile()
       .then((p) => {
         setProfile(p);
@@ -692,6 +699,19 @@ export default function AccountPage() {
       setError(err instanceof ApiRequestError ? err.message : t.saveErrorFallback);
     } finally {
       setPassengerBusyId(null);
+    }
+  }
+
+  async function onRevokeSession(id: string) {
+    setSessionError(null);
+    setSessionBusyId(id);
+    try {
+      await revokeMySession(id);
+      setSessions((prev) => (prev ? prev.filter((s) => s.id !== id) : prev));
+    } catch (err) {
+      setSessionError(err instanceof ApiRequestError ? err.message : t.saveErrorFallback);
+    } finally {
+      setSessionBusyId(null);
     }
   }
 
@@ -1284,7 +1304,8 @@ export default function AccountPage() {
         )}
 
         {tab === 'security' && (
-          <div style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 16, padding: 18, maxWidth: 480 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 520 }}>
+            <div style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 16, padding: 18 }}>
             <h3 style={{ fontSize: 15, fontWeight: 800, margin: '0 0 4px' }}>{t.securityHeading}</h3>
             <p style={{ fontSize: 11.5, color: '#8a96a6', margin: '0 0 16px', lineHeight: 1.8 }}>{t.securitySub}</p>
             <form onSubmit={(e) => void onSavePassword(e)} style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
@@ -1331,6 +1352,17 @@ export default function AccountPage() {
                 {pwSaving ? t.savingPasswordBtn : t.savePasswordBtn}
               </button>
             </form>
+            </div>
+            {sessionError && (
+              <p role="alert" style={{ fontSize: 12, color: '#e5484d', margin: 0 }}>{sessionError}</p>
+            )}
+            {sessions && (
+              <AccountSecuritySessions
+                sessions={sessions}
+                busyId={sessionBusyId}
+                onRevoke={onRevokeSession}
+              />
+            )}
           </div>
         )}
       </div>
