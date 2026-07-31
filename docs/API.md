@@ -3010,4 +3010,5 @@ SITE_ADMIN may PATCH only: `socialLinks`, `supportEmail`, `supportPhone`,
 | GET | `/settings/support-contact` | public | `{ phone, email }` from system settings. |
 
 Home page app band reads `GET /settings/app-links`.
+Contact page phone/email cards read `GET /settings/support-contact`.
 See `docs/features/site-admin-settings-links.md`.

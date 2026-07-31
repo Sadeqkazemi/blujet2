@@ -1545,6 +1545,12 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   `phase12.e2e-spec.ts` + SettingsPage + HomeSearchPage Vitest.
   See `docs/features/site-admin-settings-links.md`.
 
+- [x] **Contact page — support contact wiring (Phase G)** —
+  `ContactPage` reads `GET /settings/support-contact` for phone/email
+  channel cards (static fallbacks on failure; address/hours unchanged).
+  Tests: extended `ContactPage.test.tsx`.
+  See `docs/features/contact-support-contact-wiring.md`.
+
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is
 "done" only when every checklist item in its `docs/features/<name>.md` has
