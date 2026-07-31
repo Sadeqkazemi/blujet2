@@ -315,6 +315,7 @@ export default function PaymentPage() {
 
   async function onPay(confirmedPriceIrr?: string | number) {
     if (!bookingId) return;
+    if (booking.status === 'HELD' && holdSecs <= 0 && booking.holdExpiresAt) return;
     setError(null);
     setPaying(true);
     try {
@@ -350,7 +351,7 @@ export default function PaymentPage() {
     );
   }
 
-  if (booking.status === 'EXPIRED') {
+  if (booking.status === 'EXPIRED' || (booking.status === 'HELD' && holdSecs <= 0 && booking.holdExpiresAt)) {
     return (
       <PublicPageShell>
         <div className="mx-auto max-w-md p-8 text-center">
@@ -365,6 +366,9 @@ export default function PaymentPage() {
       </PublicPageShell>
     );
   }
+
+  const holdExpired =
+    booking.status === 'HELD' && holdSecs <= 0 && Boolean(booking.holdExpiresAt);
 
   const holdUrgent = holdSecs <= 120;
   const holdBg = holdUrgent ? 'bg-[#fdecec]' : 'bg-[#e8f5ee]';
@@ -452,7 +456,7 @@ export default function PaymentPage() {
             {t.newPrice(localeMoney(priceChange.currentPriceIrr, locale))}
           </p>
           <button
-            disabled={paying}
+            disabled={paying || holdExpired}
             onClick={() => onPay(priceChange.currentPriceIrr)}
             data-testid="confirm-new-price"
             className="w-full rounded-xl bg-[#1668c4] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-60"
@@ -463,7 +467,7 @@ export default function PaymentPage() {
       ) : (
         <>
           <button
-            disabled={paying}
+            disabled={paying || holdExpired}
             onClick={() => onPay()}
             data-testid="pay-submit"
             className="mt-[18px] flex h-[52px] w-full items-center justify-center rounded-xl bg-[#1668c4] text-[14.5px] font-extrabold text-white disabled:opacity-60"
@@ -547,7 +551,7 @@ export default function PaymentPage() {
         </div>
         {!priceChange && (
           <button
-            disabled={paying}
+            disabled={paying || holdExpired}
             onClick={() => onPay()}
             data-testid="pay-submit-mobile"
             className="flex h-12 max-w-[200px] flex-1 items-center justify-center rounded-xl bg-[#1668c4] text-[12.5px] font-extrabold text-white disabled:opacity-60"

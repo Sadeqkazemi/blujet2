@@ -410,7 +410,8 @@ export default function ResultsPage() {
 
   const filteredResults = useMemo(() => {
     let list = [...(results ?? [])];
-    if (fStops === 'one') list = [];
+    if (fStops === 'direct') list = list.filter((f) => !f.connection);
+    if (fStops === 'one') list = list.filter((f) => Boolean(f.connection));
     if (fTime !== 'all') list = list.filter((f) => depHourBucket(f.departureAt) === fTime);
     if (fAirline !== 'all') list = list.filter((f) => flightAirlineLabel(f.flightNo) === fAirline);
     list.sort((a, b) => {
@@ -499,7 +500,12 @@ export default function ResultsPage() {
                 className={`cursor-pointer border-b-2 px-1 py-2.5 text-center ${sel ? 'border-[#1668c4] bg-[#f2f7fd]' : 'border-transparent'}`}
               >
                 <div className={`text-[11px] font-bold ${sel ? 'text-[#1668c4]' : 'text-[#5a6678]'}`}>
-                  {formatJalaliDate(`${c.date}T12:00:00Z`)}
+                  {locale === 'en'
+                    ? new Date(`${c.date}T12:00:00Z`).toLocaleDateString('en-GB', {
+                        day: 'numeric',
+                        month: 'short',
+                      })
+                    : formatJalaliDate(`${c.date}T12:00:00Z`)}
                 </div>
                 <div className={`font-num mt-0.5 text-[11px] font-extrabold ${cheap ? 'text-[#1f8a5b]' : sel ? 'text-[#0d2640]' : 'text-[#8a96a6]'}`}>
                   {toman > 0 ? formatToman(toman, locale) : '—'}
