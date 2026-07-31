@@ -696,6 +696,31 @@ async function main() {
     }
   }
 
+  // Sample saved passengers for the test USER (پنل کاربر → مسافران)
+  if (testUser) {
+    const savedPaxCount = await prisma.savedPassenger.count({
+      where: { userId: testUser.id },
+    });
+    if (savedPaxCount === 0) {
+      await prisma.savedPassenger.createMany({
+        data: [
+          {
+            userId: testUser.id,
+            fullName: 'محمد رضایی',
+            latinName: 'MOHAMMAD REZAEI',
+            passportNoEnc: encryptPii('A22113344'),
+          },
+          {
+            userId: testUser.id,
+            fullName: 'سارا احمدی',
+            latinName: 'SARA AHMADI',
+            passportNoEnc: encryptPii('B99887766'),
+          },
+        ],
+      });
+    }
+  }
+
   // ── Phase 66: passenger survey settings + default question list ────────
   const existingSurveySettingsCount = await prisma.surveySettings.count();
   if (existingSurveySettingsCount === 0) {

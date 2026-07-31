@@ -1202,11 +1202,10 @@ step anywhere in the project.
   (CLAUDE.md: booking/payment must keep working regardless of AI/profile
   state; national ID stays optional at the DTO level exactly as it is
   today — this phase does not make it required to book).
-- ⚑ **Explicitly not built this phase**: saved-passengers CRUD, bank
-  cards, active-sessions list, invite-friends, and any document/selfie
-  upload — all real sections of the same design page, all out of scope
-  for a "notify when incomplete" feature. Flagged here so a future phase
-  doesn't assume they were silently included.
+- ⚑ **Explicitly not built in Phase 17**: bank cards, active-sessions
+  list, invite-friends, and any document/selfie upload — all real sections
+  of the same design page, all out of scope for a "notify when incomplete"
+  feature. Saved-passengers CRUD moved to its own section below.
 
 ## Phase 18 — SITE_ADMIN + EMPLOYEE panel access
 
@@ -1771,6 +1770,36 @@ model SavedFlight {
 
 Migration: `20260731120000_saved_flights`. Cascades on user/instance
 delete. Application cap: 20 rows per user (enforced in service, not DB).
+
+## پنل کاربر — مسافران ذخیره‌شده (`SavedPassenger`)
+
+See `docs/API.md`'s matching section. Per-user address book for checkout
+autofill — separate from booking-scoped `Passenger` rows.
+
+```prisma
+model SavedPassenger {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation("SavedPassengerOwner", ...)
+  fullName       String
+  latinName      String
+  nationalIdEnc  String?
+  nationalIdHash String?
+  passportNoEnc  String?
+  mobileEnc      String?
+  isChild        Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([userId, nationalIdHash])
+  @@map("saved_passengers")
+}
+```
+
+Migration: `20260731130000_saved_passengers`. PII columns follow the same
+AES-256-GCM + HMAC hash pattern as `ClubMember`/`Passenger`. Application
+cap: 20 rows per user; duplicate national ID per user rejected in service.
 
 ## Phase 65 — قوانین باشگاه مشتریان (Club Tier Rules)
 

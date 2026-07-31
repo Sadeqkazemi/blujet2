@@ -1109,6 +1109,27 @@ list saved flight+cabin bookmarks, book (navigate to checkout flow), remove.
 - Frontend: new `saved` tab on `AccountPage.tsx` + bookmark control on
   `ResultsPage.tsx` cabin rows (login-gated, same pattern as price lock).
 
+### پنل کاربر — مسافران ذخیره‌شده (`/account` → تب `passengers`)
+Closes the «مسافران ذخیره‌شده» section in
+`design-reference-v2/پنل کاربر.dc.html`: customer address-book CRUD for
+checkout autofill (autofill wiring on `BookPage` deferred).
+
+- `GET /my/saved-passengers` (new, `USER` role) — newest first; each row
+  `{ id, fullName, latinName, nationalId, passportNo, mobile, isChild,
+  createdAt }`. PII decrypted for the owner only.
+- `POST /my/saved-passengers` (new, `USER` role, `@Throttle` 30/min) — body
+  `{ fullName, latinName, nationalId?, passportNo?, mobile?, isChild? }`;
+  at least one of `nationalId` or `passportNo` required; national ID
+  checksum validated when present. Max 20 rows per user. `409` when the same
+  national ID is already saved for this user.
+- `PATCH /my/saved-passengers/:id` (new, `USER` role) — same field shape as
+  POST (all optional except at least one id doc must remain); owner-only;
+  `404` otherwise.
+- `DELETE /my/saved-passengers/:id` (new, `USER` role) — owner-only; `404`
+  otherwise.
+- Frontend: replace booking-name stub on `AccountPage.tsx` `passengers` tab
+  with `AccountPassengersTab` (list + add/edit modal + remove).
+
 ## Phase 21 — فراموشی رمز (customer forgot/set password)
 
 Third "dead forms" item. `ForgotPasswordPage.tsx` was entirely client-side
