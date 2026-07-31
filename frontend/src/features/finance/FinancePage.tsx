@@ -14,6 +14,9 @@ import { fetchReconciliationQueue, resolveReconciliation } from '../../api/recon
 import { faDigits, faMoney, faPercent } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
 import SalesBarChart from '../../components/SalesBarChart';
+import SalesChartControls from '../../components/SalesChartControls';
+import StatTile from '../../components/StatTile';
+import { useSalesChartQuery } from '../../hooks/useSalesChartQuery';
 import type {
   AgencySettlementsResult,
   CompletedFlightsSummary,
@@ -25,13 +28,13 @@ import type {
   SalesGranularity,
   SettlementStatus,
 } from '../../types/reporting';
-import type { ReconciliationItem } from '../../types/reconciliation';
 
 const CHART_MODES: { key: SalesGranularity; label: string }[] = [
   { key: 'q3', label: '۳ ماهه' },
   { key: 'q6', label: '۶ ماهه' },
   { key: 'year', label: 'سالانه' },
 ];
+import type { ReconciliationItem } from '../../types/reconciliation';
 
 const SETTLEMENT_STATUS: Record<SettlementStatus, { label: string; className: string }> = {
   SETTLED: { label: 'تسویه شد', className: 'bg-[#10b98124] text-[#059669]' },
@@ -114,19 +117,79 @@ function CompletedFlightsCard({ flights }: { flights: CompletedFlightsSummary })
 
 function LowSalesBanner({ alerts }: { alerts: LowSalesAlert[] }) {
   if (alerts.length === 0) return null;
-  const a = alerts[0];
   return (
-    <div className="mb-6 flex items-center gap-3 rounded-xl border border-[#f59e0b59] bg-[#f59e0b14] p-4">
-      <span className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-[#f59e0b29] text-[#b45309]">
-        ⚠
-      </span>
-      <div className="text-xs leading-6">
-        <div className="font-extrabold text-[#b45309]">هشدار فروش ضعیف — کمتر از ۷۲ ساعت تا پرواز</div>
-        <div className="text-text-2">
-          پرواز <span className="ltr font-num inline-block">{a.flightNo}</span> {a.originCode} ← {a.destCode} (
-          {formatJalaliDate(a.departureAt)}) تنها {faDigits(a.soldSeats)} از {faDigits(a.capacity)} صندلی فروخته
-          شده است.
+    <div className="mb-6 flex flex-col gap-3">
+      {alerts.map((a) => (
+        <div
+          key={`${a.flightNo}-${a.departureAt}`}
+          className="flex items-center gap-3 rounded-xl border border-[#f59e0b59] bg-[#f59e0b14] p-4"
+        >
+          <span className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-[#f59e0b29] text-[#b45309]">
+            ⚠
+          </span>
+          <div className="text-xs leading-6">
+            <div className="font-extrabold text-[#b45309]">هشدار فروش ضعیف — کمتر از ۷۲ ساعت تا پرواز</div>
+            <div className="text-text-2">
+              پرواز <span className="ltr font-num inline-block">{a.flightNo}</span> {a.originCode} ← {a.destCode} (
+              {formatJalaliDate(a.departureAt)}) تنها {faDigits(a.soldSeats)} از {faDigits(a.capacity)} صندلی فروخته
+              شده است.
+            </div>
+          </div>
         </div>
+      ))}
+    </div>
+  );
+}
+
+const TX_STATUS_CLASS: Record<string, string> = {
+  success: 'bg-[#10b98124] text-[#059669]',
+  warning: 'bg-[#f59e0b24] text-[#b45309]',
+  danger: 'bg-danger/15 text-danger',
+};
+
+const TX_ICON_CLASS: Record<string, string> = {
+  SALE: 'bg-accent/10 text-accent',
+  SETTLEMENT: 'bg-[#10b98118] text-[#059669]',
+  COMMISSION: 'bg-[#f59e0b18] text-[#b45309]',
+  REFUND: 'bg-danger/10 text-danger',
+};
+
+function trendBadge(pct: number): string {
+  if (pct === 0) return '۰٪';
+  return `${pct > 0 ? '+' : '−'}${faDigits(Math.abs(pct))}٪`;
+}
+
+function FinanceKpiCard({
+  label,
+  value,
+  sublabel,
+  trendPct,
+  countBadge,
+  iconClass,
+}: {
+  label: string;
+  value: string;
+  sublabel?: string;
+  trendPct?: number;
+  countBadge?: string;
+  iconClass: string;
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-white p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${iconClass}`}>●</span>
+        {countBadge ? (
+          <span className="rounded-full bg-danger/10 px-2 py-0.5 text-[10px] font-bold text-danger">{countBadge}</span>
+        ) : trendPct !== undefined ? (
+          <span className="rounded-full bg-[#10b98118] px-2 py-0.5 text-[10px] font-bold text-[#059669]">
+            {trendBadge(trendPct)}
+          </span>
+        ) : null}
+      </div>
+      <div className="font-num text-lg font-black text-ink">{value}</div>
+      <div className="mt-1 text-[11px] text-muted">
+        {label}
+        {sublabel ? ` · ${sublabel}` : ''}
       </div>
     </div>
   );
@@ -246,6 +309,7 @@ function ReconciliationQueueCard({
 /** FINANCE_MANAGER's finance-ops layout — the only panel with transactions
  * and agency settlements, per the design. */
 function FinanceOpsView() {
+  const [granularity, setGranularity] = useState<SalesGranularity>('year');
   const [kpis, setKpis] = useState<KpiResult | null>(null);
   const [alerts, setAlerts] = useState<LowSalesAlert[]>([]);
   const [flights, setFlights] = useState<CompletedFlightsSummary | null>(null);
@@ -258,11 +322,11 @@ function FinanceOpsView() {
 
   function reload() {
     Promise.all([
-      fetchKpis({ granularity: 'year' }),
+      fetchKpis({ granularity }),
       fetchLowSalesAlerts(),
-      fetchCompletedFlightsSummary({ granularity: 'year' }),
+      fetchCompletedFlightsSummary({ granularity }),
       fetchRecentTransactions(),
-      fetchRevenueMix({ granularity: 'year' }),
+      fetchRevenueMix({ granularity }),
       fetchAgencySettlements(),
       fetchReconciliationQueue(),
     ])
@@ -278,7 +342,7 @@ function FinanceOpsView() {
       .catch(() => setError('خطا در دریافت اطلاعات مالی.'));
   }
 
-  useEffect(reload, []);
+  useEffect(reload, [granularity]);
 
   async function onResolveReconciliation(id: string, note: string) {
     await resolveReconciliation(id, note);
@@ -298,13 +362,33 @@ function FinanceOpsView() {
   if (!kpis || !flights || !tx || !mix || !settlements || !reconciliation)
     return <p className="p-8 text-sm text-muted">در حال بارگذاری…</p>;
 
+  const periodLabel =
+    granularity === 'year' ? 'سال جاری' : granularity === 'q6' ? '۶ ماهه' : '۳ ماهه';
+
   const kpiCards = [
-    { label: 'کل درآمد (تومان)', value: faMoney(kpis.revenueIrr) },
-    { label: `سود خالص · حاشیه ${faPercent(kpis.marginPct)}`, value: faMoney(kpis.profitIrr) },
-    { label: 'هزینه عملیاتی (تومان)', value: faMoney(kpis.operatingCostIrr) },
     {
-      label: `مطالبات معوق آژانس‌ها · ${faDigits(kpis.agencyDebtCount)} آژانس`,
+      label: `کل درآمد · ${periodLabel}`,
+      value: faMoney(kpis.revenueIrr),
+      trendPct: kpis.trends.revenuePct,
+      iconClass: 'bg-[#10b98118] text-[#059669]',
+    },
+    {
+      label: `سود خالص · حاشیه ${faPercent(kpis.marginPct)}`,
+      value: faMoney(kpis.profitIrr),
+      trendPct: kpis.trends.profitPct,
+      iconClass: 'bg-accent/10 text-accent',
+    },
+    {
+      label: 'هزینه عملیاتی',
+      value: faMoney(kpis.operatingCostIrr),
+      trendPct: kpis.trends.operatingCostPct,
+      iconClass: 'bg-[#f59e0b18] text-[#b45309]',
+    },
+    {
+      label: 'مطالبات معوق آژانس‌ها',
       value: faMoney(kpis.agencyDebtIrr),
+      countBadge: faDigits(kpis.agencyDebtCount),
+      iconClass: 'bg-danger/10 text-danger',
     },
   ];
 
@@ -313,12 +397,27 @@ function FinanceOpsView() {
       {notice && (
         <p className="mb-4 rounded-lg bg-[#10b98118] p-3 text-xs font-bold text-[#059669]">{notice}</p>
       )}
+
+      <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
+        <span className="text-[11px] text-muted">بازهٔ گزارش:</span>
+        <div className="flex gap-1 rounded-lg border border-border bg-body p-1">
+          {CHART_MODES.map((m) => (
+            <button
+              key={m.key}
+              onClick={() => setGranularity(m.key)}
+              className={`rounded-md px-3 py-1.5 text-[11px] transition ${
+                granularity === m.key ? 'bg-accent font-bold text-white' : 'text-muted hover:text-ink'
+              }`}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
         {kpiCards.map((k) => (
-          <div key={k.label} className="rounded-xl border border-border bg-white p-4">
-            <div className="font-num text-lg font-black text-ink">{k.value}</div>
-            <div className="mt-1 text-[11px] text-muted">{k.label}</div>
-          </div>
+          <FinanceKpiCard key={k.label} {...k} />
         ))}
       </div>
 
@@ -342,12 +441,22 @@ function FinanceOpsView() {
           <div className="flex flex-col divide-y divide-border/60">
             {tx.rows.map((t) => (
               <div key={t.id} className="flex items-center gap-3 py-2.5 text-xs">
+                <span
+                  className={`flex h-9 w-9 flex-none items-center justify-center rounded-lg text-sm ${TX_ICON_CLASS[t.type] ?? 'bg-body text-muted'}`}
+                >
+                  {t.type === 'REFUND' ? '↩' : t.type === 'COMMISSION' ? '₪' : '✓'}
+                </span>
                 <div className="min-w-0 flex-1">
                   <div className="font-extrabold text-ink">{t.titleFa}</div>
                   <div className="mt-0.5 text-[10px] text-muted">
                     {t.party} · {formatJalaliDateTime(t.occurredAt)}
                   </div>
                 </div>
+                <span
+                  className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${TX_STATUS_CLASS[t.statusTone]}`}
+                >
+                  {t.statusFa}
+                </span>
                 <span
                   className={`font-num font-black whitespace-nowrap ${
                     Number(t.signedAmountIrr) >= 0 && t.type !== 'REFUND' ? 'text-[#059669]' : 'text-danger'
@@ -429,27 +538,27 @@ function FinanceOpsView() {
 
 /** Analytic مالی view for CEO / Board Chair / Senior / Commercial. */
 function FinanceAnalyticView() {
-  const [granularity, setGranularity] = useState<SalesGranularity>('q6');
-  const [periodKey, setPeriodKey] = useState<string | null>(null);
+  const chart = useSalesChartQuery({ includeFlightMode: false });
   const [periods, setPeriods] = useState<SalesChartPeriod[]>([]);
+  const [kpis, setKpis] = useState<KpiResult | null>(null);
   const [flights, setFlights] = useState<CompletedFlightsSummary | null>(null);
   const [mix, setMix] = useState<RevenueMixResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setPeriodKey(null);
-  }, [granularity]);
+    if (!chart.isQueryReady) return;
 
-  useEffect(() => {
     let cancelled = false;
     Promise.all([
-      fetchSalesChart({ granularity }),
-      fetchCompletedFlightsSummary({ granularity, periodKey: periodKey ?? undefined }),
-      fetchRevenueMix({ granularity, periodKey: periodKey ?? undefined }),
+      fetchSalesChart(chart.query),
+      fetchKpis(chart.query),
+      fetchCompletedFlightsSummary(chart.query),
+      fetchRevenueMix(chart.query),
     ])
-      .then(([chartData, flightsData, mixData]) => {
+      .then(([chartData, kpiData, flightsData, mixData]) => {
         if (cancelled) return;
         setPeriods(chartData);
+        setKpis(kpiData);
         setFlights(flightsData);
         setMix(mixData);
       })
@@ -459,7 +568,7 @@ function FinanceAnalyticView() {
     return () => {
       cancelled = true;
     };
-  }, [granularity, periodKey]);
+  }, [chart.query, chart.isQueryReady]);
 
   if (error) return <p className="p-8 text-sm text-danger">{error}</p>;
   if (!flights || !mix) return <p className="p-8 text-sm text-muted">در حال بارگذاری…</p>;
@@ -475,25 +584,44 @@ function FinanceAnalyticView() {
 
   return (
     <>
+      {kpis && (
+        <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
+          <StatTile label="کل درآمد" value={`${faMoney(kpis.revenueIrr)} تومان`} tone="good" />
+          <StatTile
+            label="سود خالص"
+            value={`${faMoney(kpis.profitIrr)} تومان`}
+            sublabel={`حاشیه ${faPercent(kpis.marginPct)}`}
+            tone="accent"
+          />
+          <StatTile label="هزینه عملیاتی" value={`${faMoney(kpis.operatingCostIrr)} تومان`} tone="warning" />
+          <StatTile
+            label="مطالبات معوق آژانس‌ها"
+            value={`${faMoney(kpis.agencyDebtIrr)} تومان`}
+            sublabel={`${faDigits(kpis.agencyDebtCount)} آژانس`}
+            tone="critical"
+          />
+        </div>
+      )}
+
       <div className="mb-6 rounded-xl border border-border bg-white p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-sm font-bold text-ink">نمودار فروش</div>
             <div className="mt-0.5 text-[11px] text-muted">به تفکیک کانال فروش · تومان</div>
           </div>
-          <div className="flex gap-1 rounded-lg border border-border bg-body p-1">
-            {CHART_MODES.map((m) => (
-              <button
-                key={m.key}
-                onClick={() => setGranularity(m.key)}
-                className={`rounded-md px-3 py-1.5 text-[11px] transition ${
-                  granularity === m.key ? 'bg-accent font-bold text-white' : 'text-muted hover:text-ink'
-                }`}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
+          <SalesChartControls
+            modes={chart.modes}
+            granularity={chart.granularity}
+            onGranularityChange={chart.setGranularity}
+            selectedDate={chart.selectedDate}
+            onSelectedDateChange={chart.setSelectedDate}
+            selectedMonthStart={chart.selectedMonthStart}
+            onSelectedMonthStartChange={chart.setSelectedMonthStart}
+            flightNo={chart.flightNo}
+            onFlightNoChange={chart.setFlightNo}
+            onApplyFlightNo={chart.applyFlightNo}
+            variant="segmented"
+          />
         </div>
 
         <div className="mb-4 grid grid-cols-3 gap-3">
@@ -520,7 +648,11 @@ function FinanceAnalyticView() {
           </div>
         </div>
 
-        <SalesBarChart periods={periods} selectedPeriodKey={periodKey} onSelectPeriod={setPeriodKey} />
+        <SalesBarChart
+          periods={periods}
+          selectedPeriodKey={chart.periodKey}
+          onSelectPeriod={chart.setPeriodKey}
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.7fr_1fr]">

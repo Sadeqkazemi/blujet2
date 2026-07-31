@@ -19,6 +19,17 @@ function generateTrackingCode(): string {
   return `TK${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
 }
 
+const CUSTOMER_TICKET_SELECT = {
+  id: true,
+  trackingCode: true,
+  subject: true,
+  body: true,
+  status: true,
+  history: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
 @Injectable()
 export class SupportTicketsService {
   constructor(
@@ -45,6 +56,71 @@ export class SupportTicketsService {
       },
     });
     return { id: ticket.id, trackingCode: ticket.trackingCode };
+  }
+
+  async submitForUser(actor: AuthenticatedUser, dto: SubmitSupportTicketDto) {
+    const ticket = await this.prisma.supportTicket.create({
+      data: {
+        userId: actor.id,
+        trackingCode: generateTrackingCode(),
+        requesterName: dto.requesterName,
+        requesterPhone: dto.requesterPhone,
+        subject: dto.subject,
+        body: dto.body,
+        history: [
+          {
+            step: 'submitted',
+            labelFa: 'ثبت تیکت توسط کاربر',
+            at: new Date().toISOString(),
+          },
+        ],
+      },
+      select: CUSTOMER_TICKET_SELECT,
+    });
+    return { id: ticket.id, trackingCode: ticket.trackingCode };
+  }
+
+  private async callerPhone(userId: string): Promise<string | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { phone: true },
+    });
+    return user?.phone ?? null;
+  }
+
+  private customerTicketWhere(
+    userId: string,
+    phone: string | null,
+  ): Prisma.SupportTicketWhereInput {
+    const or: Prisma.SupportTicketWhereInput[] = [{ userId }];
+    if (phone) {
+      or.push({ userId: null, requesterPhone: phone });
+    }
+    return { OR: or };
+  }
+
+  async listMine(actor: AuthenticatedUser) {
+    const phone = await this.callerPhone(actor.id);
+    return this.prisma.supportTicket.findMany({
+      where: this.customerTicketWhere(actor.id, phone),
+      select: CUSTOMER_TICKET_SELECT,
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async getMine(actor: AuthenticatedUser, id: string) {
+    const phone = await this.callerPhone(actor.id);
+    const ticket = await this.prisma.supportTicket.findFirst({
+      where: { id, ...this.customerTicketWhere(actor.id, phone) },
+      select: CUSTOMER_TICKET_SELECT,
+    });
+    if (!ticket) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'تیکت یافت نشد.',
+      });
+    }
+    return ticket;
   }
 
   async list(filters: {

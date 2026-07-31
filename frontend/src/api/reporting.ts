@@ -2,6 +2,7 @@ import { apiGet } from './http';
 import type {
   AgencySettlementsResult,
   CompletedFlightsSummary,
+  FinanceDashboardStats,
   KpiResult,
   LowSalesAlert,
   PassengerReportHit,
@@ -10,6 +11,7 @@ import type {
   RevenueMixResult,
   SalesChartPeriod,
   StaffReportsResult,
+  CommercialOverview,
 } from '../types/reporting';
 
 function toQueryString(query: PeriodQuery): string {
@@ -36,6 +38,14 @@ export function fetchCompletedFlightsSummary(query: PeriodQuery) {
 
 export function fetchLowSalesAlerts() {
   return apiGet<LowSalesAlert[]>('/reporting/low-sales-alerts');
+}
+
+export function fetchFinanceDashboardStats() {
+  return apiGet<FinanceDashboardStats>('/reporting/finance-dashboard-stats');
+}
+
+export function fetchCommercialOverview() {
+  return apiGet<CommercialOverview>('/reporting/commercial-overview');
 }
 
 export function fetchRecentTransactions() {

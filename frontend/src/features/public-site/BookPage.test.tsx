@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import BookPage from './BookPage';
 import * as publicSiteApi from '../../api/publicSite';
 import * as useAuthModule from '../../hooks/useAuth';
+import { mockAuthUser } from '../../test/mockAuthUser';
 import type { SeatMapResult } from '../../types/public-site';
 
 const SEATMAP: SeatMapResult = {
@@ -70,7 +71,7 @@ describe('BookPage', () => {
   it('lets an authenticated customer pick a free seat, fill passenger info, and submit', async () => {
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
       status: 'authenticated',
-      user: { id: 'u1', fullName: '09121234567', role: 'USER' },
+      user: mockAuthUser({ id: 'u1', fullName: '09121234567', role: 'USER' }),
       requestLogin: vi.fn(),
       confirmTwoFactor: vi.fn(),
       agencyLogin: vi.fn(),
@@ -116,7 +117,7 @@ describe('BookPage', () => {
   it('locks business-cabin seat selection below the 15,000-point club threshold', async () => {
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
       status: 'authenticated',
-      user: { id: 'u1', fullName: '09121234567', role: 'USER' },
+      user: mockAuthUser({ id: 'u1', fullName: '09121234567', role: 'USER' }),
       requestLogin: vi.fn(),
       confirmTwoFactor: vi.fn(),
       agencyLogin: vi.fn(),

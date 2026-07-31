@@ -1,7 +1,16 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
+import {
+  DEFAULT_SOCIAL_LINKS,
+  parseSocialLinks,
+  publicSocialLinks,
+} from '../../common/social-links.util';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 
 /** Every storable key with its server-side default. Unknown keys are
@@ -28,6 +37,8 @@ export const SETTING_DEFAULTS: Record<string, unknown> = {
   aboutUsText: 'blujet یک پلتفرم آنلاین رزرو بلیط هواپیما است.',
   contactAddress: 'تهران، ایران',
   termsText: 'قوانین و مقررات استفاده از خدمات blujet.',
+  // IT Manager settings tab — footer social links (Phase: social-links).
+  socialLinks: DEFAULT_SOCIAL_LINKS,
 };
 
 @Injectable()
@@ -64,6 +75,16 @@ export class SettingsService {
 
   async update(actor: AuthenticatedUser, patch: Record<string, unknown>) {
     const keys = Object.keys(patch);
+    if (actor.role === 'SITE_ADMIN') {
+      const forbidden = keys.filter((k) => k !== 'socialLinks');
+      if (forbidden.length > 0) {
+        throw new ForbiddenException({
+          code: ErrorCode.FORBIDDEN,
+          message:
+            'ادمین سایت فقط می‌تواند لینک شبکه‌های اجتماعی را ویرایش کند.',
+        });
+      }
+    }
     const unknown = keys.filter((k) => !(k in SETTING_DEFAULTS));
     if (keys.length === 0 || unknown.length > 0) {
       throw new BadRequestException({
@@ -75,6 +96,17 @@ export class SettingsService {
       });
     }
     for (const key of keys) {
+      if (key === 'socialLinks') {
+        try {
+          patch[key] = parseSocialLinks(patch[key]);
+        } catch {
+          throw new BadRequestException({
+            code: ErrorCode.VALIDATION_FAILED,
+            message: 'فرمت لینک‌های شبکه‌های اجتماعی نامعتبر است.',
+          });
+        }
+        continue;
+      }
       const expected = typeof SETTING_DEFAULTS[key];
       if (typeof patch[key] !== expected) {
         throw new BadRequestException({
@@ -154,5 +186,12 @@ export class SettingsService {
     });
 
     return this.getAll();
+  }
+
+  /** Public footer — enabled social links only, no auth required. */
+  async getPublicSocialLinks() {
+    const all = await this.getAll();
+    const links = parseSocialLinks(all.settings.socialLinks);
+    return { links: publicSocialLinks(links) };
   }
 }

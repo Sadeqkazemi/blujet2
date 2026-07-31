@@ -12,6 +12,7 @@ import {
 import { faDigits } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import Modal from '../../components/Modal';
+import JalaliDatePicker from '../../components/JalaliDatePicker';
 import ComposeMessageModal from './ComposeMessageModal';
 import type {
   CartableCategory,
@@ -39,6 +40,7 @@ export default function CartablePage() {
 
   const [result, setResult] = useState<CartableListResult | null>(null);
   const [category, setCategory] = useState<CartableCategory | null>(null);
+  const [filterDate, setFilterDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -55,7 +57,10 @@ export default function CartablePage() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const data = await fetchCartable({ category: category ?? undefined });
+      const data = await fetchCartable({
+        category: category ?? undefined,
+        date: filterDate ?? undefined,
+      });
       setResult(data);
       if (hasChairGate) setChairPerm(await fetchChairPermission());
     } catch {
@@ -63,7 +68,7 @@ export default function CartablePage() {
     } finally {
       setLoading(false);
     }
-  }, [category, hasChairGate]);
+  }, [category, filterDate, hasChairGate]);
 
   useEffect(() => {
     void load();
@@ -167,6 +172,20 @@ export default function CartablePage() {
           </div>
         </section>
       )}
+
+      <div className="mb-4 flex flex-wrap items-end gap-3">
+        <div>
+          <JalaliDatePicker label="فیلتر روز (شمسی)" value={filterDate} onChange={setFilterDate} />
+        </div>
+        {filterDate && (
+          <button
+            onClick={() => setFilterDate(null)}
+            className="rounded-lg border border-border px-3 py-2 text-xs font-bold text-muted transition hover:text-ink"
+          >
+            حذف فیلتر روز
+          </button>
+        )}
+      </div>
 
       <div className="mb-6 grid grid-cols-3 gap-4">
         {CATEGORY_CARDS.map((c) => (

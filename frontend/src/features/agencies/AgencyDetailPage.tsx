@@ -2,12 +2,16 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import {
+  decideAgencyCreditRequest,
   decideAgencyDocument,
+  decideAgencyWebserviceRequest,
   fetchAgencyApiKeys,
+  fetchAgencyCreditRequests,
   fetchAgencyDetail,
   fetchAgencyDocuments,
   fetchAgencyInvoices,
   fetchAgencyMessages,
+  fetchAgencyWebserviceRequests,
   issueAgencyApiKey,
   issueAgencyInvoice,
   payAgencyInvoice,
@@ -23,7 +27,7 @@ import { faDigits, faMoney, parseTomanToRial } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime, parseJalaliDateToIso } from '../../lib/jalali';
 import { useStepUp } from '../../hooks/useStepUp';
 import Modal from '../../components/Modal';
-import { DOCUMENT_STATUS, DOCUMENT_TYPE_LABELS, INVOICE_STATUS, TIER_LABELS, statusBadge } from './agency-labels';
+import { DOCUMENT_STATUS, DOCUMENT_TYPE_LABELS, INVOICE_STATUS, REQUEST_STATUS, TIER_LABELS, statusBadge } from './agency-labels';
 import type {
   AgencyApiKey,
   AgencyApiScope,
@@ -32,6 +36,7 @@ import type {
   AgencyInvoice,
   AgencyMessage,
 } from '../../types/agencies';
+import type { AgencyCreditRequest, AgencyWebserviceRequest } from '../../types/agency-portal';
 
 type CommercialTab = 'overview' | 'finance' | 'messages';
 
@@ -40,6 +45,12 @@ const API_SCOPE_OPTIONS: { value: AgencyApiScope; label: string }[] = [
   { value: 'SEARCH_BOOK', label: 'جستجو + رزرو' },
   { value: 'SEARCH_ONLY', label: 'فقط جستجو (آزمایشی)' },
 ];
+
+const WS_SCOPE_LABEL: Record<AgencyApiScope, string> = {
+  SEARCH_BOOK: 'جستجو و رزرو',
+  FULL: 'فروش کامل (صدور بلیط)',
+  SEARCH_ONLY: 'فقط جستجو (آزمایشی)',
+};
 
 function SectionCard({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
@@ -107,6 +118,10 @@ export default function AgencyDetailPage() {
   const [documents, setDocuments] = useState<AgencyDocument[]>([]);
   const [documentError, setDocumentError] = useState<string | null>(null);
 
+  const [creditRequests, setCreditRequests] = useState<AgencyCreditRequest[]>([]);
+  const [webserviceRequests, setWebserviceRequests] = useState<AgencyWebserviceRequest[]>([]);
+  const [requestError, setRequestError] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     setError(null);
     try {
@@ -118,8 +133,18 @@ export default function AgencyDetailPage() {
         setInvoices(inv);
         setMessages(msgs);
       }
+      if (role === 'FINANCE_MANAGER') {
+        setInvoices(await fetchAgencyInvoices(agencyId));
+      }
       if (role === 'SENIOR_MANAGER' || role === 'FINANCE_MANAGER' || role === 'COMMERCIAL_MANAGER') {
-        setDocuments(await fetchAgencyDocuments(agencyId));
+        const [docs, creditReqs, wsReqs] = await Promise.all([
+          fetchAgencyDocuments(agencyId),
+          fetchAgencyCreditRequests(agencyId),
+          fetchAgencyWebserviceRequests(agencyId),
+        ]);
+        setDocuments(docs);
+        setCreditRequests(creditReqs);
+        setWebserviceRequests(wsReqs);
       }
       // EMPLOYEE holding fn_invoices reaches the same invoices table as
       // COMMERCIAL_MANAGER (via the non-tabbed overview branch below) but
@@ -287,6 +312,35 @@ export default function AgencyDetailPage() {
     }
   }
 
+  async function onDecideCreditRequest(req: AgencyCreditRequest, approve: boolean) {
+    setRequestError(null);
+    try {
+      await decideAgencyCreditRequest(agencyId, req.id, approve);
+      setNotice(approve ? 'درخواست افزایش اعتبار تأیید شد ✓' : 'درخواست افزایش اعتبار رد شد.');
+      setCreditRequests(await fetchAgencyCreditRequests(agencyId));
+      await load();
+    } catch {
+      setRequestError('خطا در ثبت تصمیم روی درخواست اعتبار.');
+    }
+  }
+
+  async function onDecideWebserviceRequest(req: AgencyWebserviceRequest, approve: boolean) {
+    setRequestError(null);
+    try {
+      let dto: { approve: boolean; stepUpChallengeId?: string; stepUpCode?: string } = { approve };
+      if (approve) {
+        const fields = await stepUp.confirm();
+        dto = { approve: true, ...fields };
+      }
+      await decideAgencyWebserviceRequest(agencyId, req.id, dto);
+      setNotice(approve ? 'درخواست وب‌سرویس تأیید و کلید صادر شد ✓' : 'درخواست وب‌سرویس رد شد.');
+      setWebserviceRequests(await fetchAgencyWebserviceRequests(agencyId));
+    } catch (err) {
+      if (err instanceof Error && err.message === 'CANCELLED') return;
+      setRequestError('خطا در ثبت تصمیم روی درخواست وب‌سرویس.');
+    }
+  }
+
   async function onSendMessage() {
     const body = messageDraft.trim();
     if (!body) return;
@@ -396,6 +450,104 @@ export default function AgencyDetailPage() {
                       </button>
                       <button
                         onClick={() => void onDecideDocument(doc, false)}
+                        className="rounded-lg bg-danger px-2.5 py-1 text-[11px] font-bold text-white transition hover:bg-danger/90"
+                      >
+                        رد
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </SectionCard>
+  );
+
+  const staffReviewRoles = isSenior || isFinance || isCommercial;
+
+  const creditRequestsCard = staffReviewRoles && (
+    <SectionCard title="درخواست‌های افزایش اعتبار">
+      {requestError && <p className="mb-3 rounded-lg bg-danger/10 p-2 text-xs text-danger">{requestError}</p>}
+      {creditRequests.length === 0 ? (
+        <p className="text-xs text-muted">درخواستی ثبت نشده است.</p>
+      ) : (
+        <div className="space-y-2">
+          {creditRequests.map((req) => {
+            const status = REQUEST_STATUS[req.status];
+            return (
+              <div key={req.id} className="flex items-center justify-between rounded-lg bg-surface p-3">
+                <div className="min-w-0">
+                  <div className="font-num text-xs font-bold text-ink">
+                    سقف درخواستی: {faMoney(req.requestedLimitIrr)} تومان
+                  </div>
+                  {req.note && <div className="mt-0.5 text-[11px] text-muted">{req.note}</div>}
+                  <div className="mt-0.5 text-[10px] text-muted">{formatJalaliDateTime(req.createdAt)}</div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${status.className}`}>
+                    {status.label}
+                  </span>
+                  {req.status === 'PENDING' && (
+                    <>
+                      <button
+                        onClick={() => void onDecideCreditRequest(req, true)}
+                        className="rounded-lg bg-[#059669] px-2.5 py-1 text-[11px] font-bold text-white transition hover:bg-[#047857]"
+                      >
+                        تأیید
+                      </button>
+                      <button
+                        onClick={() => void onDecideCreditRequest(req, false)}
+                        className="rounded-lg bg-danger px-2.5 py-1 text-[11px] font-bold text-white transition hover:bg-danger/90"
+                      >
+                        رد
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </SectionCard>
+  );
+
+  const webserviceRequestsCard = staffReviewRoles && (
+    <SectionCard title="درخواست‌های خرید وب‌سرویس">
+      {webserviceRequests.length === 0 ? (
+        <p className="text-xs text-muted">درخواستی ثبت نشده است.</p>
+      ) : (
+        <div className="space-y-2">
+          {webserviceRequests.map((req) => {
+            const status = REQUEST_STATUS[req.status];
+            return (
+              <div key={req.id} className="flex items-center justify-between rounded-lg bg-surface p-3">
+                <div className="min-w-0">
+                  <div className="text-xs font-bold text-ink">
+                    {WS_SCOPE_LABEL[req.scope]} — {faDigits(req.months)} ماهه
+                  </div>
+                  <div className="font-num mt-0.5 text-[11px] text-muted">
+                    {faMoney(req.priceIrr)} تومان
+                  </div>
+                  {req.note && <div className="mt-0.5 text-[11px] text-muted">{req.note}</div>}
+                  <div className="mt-0.5 text-[10px] text-muted">{formatJalaliDateTime(req.createdAt)}</div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${status.className}`}>
+                    {status.label}
+                  </span>
+                  {req.status === 'PENDING' && (
+                    <>
+                      <button
+                        onClick={() => void onDecideWebserviceRequest(req, true)}
+                        className="rounded-lg bg-[#059669] px-2.5 py-1 text-[11px] font-bold text-white transition hover:bg-[#047857]"
+                      >
+                        تأیید
+                      </button>
+                      <button
+                        onClick={() => void onDecideWebserviceRequest(req, false)}
                         className="rounded-lg bg-danger px-2.5 py-1 text-[11px] font-bold text-white transition hover:bg-danger/90"
                       >
                         رد
@@ -583,7 +735,7 @@ export default function AgencyDetailPage() {
     </SectionCard>
   );
 
-  const invoicesSection = (isCommercial || isEmployee) && (
+  const invoicesSection = (isCommercial || isFinance || isEmployee) && (
     <SectionCard
       title="فاکتورهای صادرشده"
       action={
@@ -703,6 +855,152 @@ export default function AgencyDetailPage() {
     </section>
   );
 
+  const extras = detail.commercialExtras;
+
+  const flightsSoldSection = extras && (
+    <SectionCard title="میزان پرواز فروخته‌شده">
+      {extras.flightsSold.length === 0 ? (
+        <p className="py-4 text-center text-xs text-muted">فروشی برای این آژانس ثبت نشده است.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-[560px] w-full text-right text-xs">
+            <thead>
+              <tr className="border-b border-border text-[10px] text-muted">
+                <th className="py-2 font-bold">مسیر</th>
+                <th className="py-2 font-bold">پرواز</th>
+                <th className="py-2 font-bold">تاریخ</th>
+                <th className="py-2 font-bold">صندلی</th>
+                <th className="py-2 font-bold">مبلغ فروش</th>
+              </tr>
+            </thead>
+            <tbody>
+              {extras.flightsSold.map((f, i) => (
+                <tr key={`${f.flightNo}-${i}`} className="border-b border-border/60">
+                  <td className="py-2.5 font-bold text-ink">{f.routeFa}</td>
+                  <td className="ltr font-num py-2.5 text-muted">{f.flightNo}</td>
+                  <td className="font-num py-2.5 text-muted">{formatJalaliDate(f.departAt)}</td>
+                  <td className="font-num py-2.5 font-bold">{faDigits(f.seatCount)}</td>
+                  <td className="font-num py-2.5 font-bold text-[#059669]">{faMoney(f.salesIrr)} تومان</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </SectionCard>
+  );
+
+  const purchasedServicesSection = extras && (
+    <SectionCard title="سرویس‌های خریداری‌شده">
+      {extras.purchasedServices.length === 0 ? (
+        <p className="py-4 text-center text-xs text-muted">سرویسی خریداری نشده است.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-[560px] w-full text-right text-xs">
+            <thead>
+              <tr className="border-b border-border text-[10px] text-muted">
+                <th className="py-2 font-bold">سرویس</th>
+                <th className="py-2 font-bold">تاریخ خرید</th>
+                <th className="py-2 font-bold">تاریخ انقضا</th>
+                <th className="py-2 font-bold">وضعیت</th>
+              </tr>
+            </thead>
+            <tbody>
+              {extras.purchasedServices.map((s, i) => (
+                <tr key={`${s.name}-${i}`} className="border-b border-border/60">
+                  <td className="py-2.5 font-bold text-ink">{s.name}</td>
+                  <td className="font-num py-2.5 text-muted">{formatJalaliDate(s.purchasedAt)}</td>
+                  <td className="font-num py-2.5 text-muted">
+                    {s.expiresAt ? formatJalaliDate(s.expiresAt) : '—'}
+                  </td>
+                  <td className="py-2.5">
+                    <span
+                      className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                        s.status === 'ACTIVE' ? 'bg-[#10b98124] text-[#059669]' : 'bg-surface text-muted'
+                      }`}
+                    >
+                      {s.statusLabel}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </SectionCard>
+  );
+
+  const unpaidInvoices = invoices.filter((inv) => inv.status !== 'PAID');
+
+  const financeKpiRow = extras && (
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <StatBox label="درآمد کل فروش" value={`${faMoney(detail.stats.totalSalesIrr)} تومان`} />
+      <StatBox label="مجموع پرداخت‌شده" value={`${faMoney(extras.financeSummary.paidTotalIrr)} تومان`} />
+      <StatBox label="مانده پرداخت‌نشده" value={`${faMoney(extras.financeSummary.unpaidTotalIrr)} تومان`} />
+      <StatBox label="مانده اعتبار" value={`${faMoney(detail.credit.remainingIrr)} تومان`} />
+    </div>
+  );
+
+  const unpaidInvoicesSection = isCommercial && unpaidInvoices.length > 0 && (
+    <SectionCard
+      title="فاکتورهای پرداخت‌نشده"
+      action={
+        <span className="font-num text-sm font-extrabold text-danger">
+          {faMoney(unpaidInvoices.reduce((s, i) => s + Number(i.amountIrr), 0))} تومان
+        </span>
+      }
+    >
+      <div className="flex flex-col gap-2">
+        {unpaidInvoices.map((inv) => (
+          <div key={inv.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 py-2.5">
+            <div>
+              <div className="ltr font-num text-xs font-bold text-ink">{inv.invoiceNo}</div>
+              <div className="mt-0.5 text-[10.5px] text-muted">
+                صدور {formatJalaliDate(inv.issuedAt)} · سررسید {formatJalaliDate(inv.dueAt)}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="font-num text-xs font-extrabold text-danger">{faMoney(inv.amountIrr)} تومان</span>
+              <button
+                onClick={() => void onRemindInvoice(inv)}
+                className="rounded-md bg-[#f59e0b1a] px-2.5 py-1 text-[10px] font-bold text-[#b45309]"
+              >
+                یادآوری
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </SectionCard>
+  );
+
+  const transactionsSection = extras && extras.transactions.length > 0 && (
+    <SectionCard title="تراکنش‌ها">
+      <div className="flex flex-col gap-2">
+        {extras.transactions.map((t) => (
+          <div key={t.id} className="flex items-center justify-between gap-3 border-b border-border/60 py-2.5">
+            <div>
+              <div className="text-xs font-bold text-ink">{t.titleFa}</div>
+              <div className="mt-0.5 text-[10.5px] text-muted">
+                {formatJalaliDateTime(t.occurredAt)}
+                {t.ref ? ` · PNR ${t.ref}` : ''}
+              </div>
+            </div>
+            <span
+              className={`font-num text-xs font-extrabold ${
+                t.signedAmountIrr >= 0 ? 'text-[#059669]' : 'text-danger'
+              }`}
+            >
+              {t.signedAmountIrr >= 0 ? '+' : ''}
+              {faMoney(Math.abs(t.signedAmountIrr))} تومان
+            </span>
+          </div>
+        ))}
+      </div>
+    </SectionCard>
+  );
+
   const overviewContent = (
     <div className="space-y-4">
       {statsRow}
@@ -713,6 +1011,8 @@ export default function AgencyDetailPage() {
          only ever renders for an EMPLOYEE holding fn_invoices. */}
       {invoicesSection}
       {documentsCard}
+      {creditRequestsCard}
+      {webserviceRequestsCard}
       {infoAndActivity}
     </div>
   );
@@ -783,13 +1083,20 @@ export default function AgencyDetailPage() {
               {statsRow}
               {scoreCard}
               {infoAndActivity}
+              {flightsSoldSection}
+              {purchasedServicesSection}
             </div>
           )}
           {tab === 'finance' && (
             <div className="space-y-4">
+              {financeKpiRow}
               {creditCard}
               {invoicesSection}
+              {unpaidInvoicesSection}
+              {transactionsSection}
               {documentsCard}
+              {creditRequestsCard}
+              {webserviceRequestsCard}
             </div>
           )}
           {tab === 'messages' && messagesSection}

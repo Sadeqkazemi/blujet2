@@ -5,6 +5,7 @@ import { useAuth } from '../../hooks/useAuth';
 import {
   cancelPriceLock,
   deleteMyAccount,
+  fetchClubMembership,
   fetchClubPoints,
   fetchMyBookings,
   fetchMyPriceLocks,
@@ -18,10 +19,15 @@ import {
   verifyEmail,
 } from '../../api/publicSite';
 import { ApiRequestError } from '../../api/envelope';
+import { fetchMySupportTickets } from '../../api/support-tickets';
+import { changeOwnPassword, setPassword } from '../../api/auth';
 import { faDigits, faMoney, parseTomanToRial } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import type { BookingDetail, PriceLock, RefundRequestView, UserProfile } from '../../types/public-site';
+import type { ClubMembershipView } from '../../types/club-membership';
+import type { MySupportTicketRow, SupportTicketStatus } from '../../types/support-tickets';
+import AccountClubTab from './AccountClubTab';
 
 // پنل کاربر — real data from the existing bookings/wallet/club-points/refunds
 // endpoints (none of this is mock). Matches design-reference/پنل کاربر.dc.html's
@@ -63,27 +69,38 @@ const TIER_LABEL: Record<string, Tr> = {
   PLATINUM: { fa: 'پلاتین', en: 'Platinum', ar: 'بلاتينية' },
 };
 
-type TabKey = 'trips' | 'wallet' | 'points' | 'price-locks' | 'passengers' | 'refunds' | 'profile';
+type TabKey = 'trips' | 'wallet' | 'club' | 'price-locks' | 'passengers' | 'refunds' | 'tickets' | 'security' | 'profile';
 
 const TAB_LABEL: Record<TabKey, Tr> = {
   profile: { fa: 'پروفایل من', en: 'My Profile', ar: 'ملفي الشخصي' },
   trips: { fa: 'سفرها', en: 'Trips', ar: 'رحلاتي' },
   wallet: { fa: 'کیف پول', en: 'Wallet', ar: 'المحفظة' },
-  points: { fa: 'امتیاز باشگاه', en: 'Loyalty Points', ar: 'نقاط الولاء' },
+  club: { fa: 'باشگاه مشتریان', en: 'Loyalty Club', ar: 'نادي الولاء' },
   'price-locks': { fa: 'قفل قیمت', en: 'Price Lock', ar: 'قفل السعر' },
   passengers: { fa: 'مسافران', en: 'Passengers', ar: 'المسافرون' },
   refunds: { fa: 'استرداد‌ها', en: 'Refunds', ar: 'الاستردادات' },
+  tickets: { fa: 'پیام به پشتیبانی', en: 'Message Support', ar: 'رسالة للدعم' },
+  security: { fa: 'امنیت حساب', en: 'Account Security', ar: 'أمان الحساب' },
 };
 
 const TABS: { key: TabKey; icon: string }[] = [
   { key: 'profile', icon: '🪪' },
   { key: 'trips', icon: '🧳' },
   { key: 'wallet', icon: '💳' },
-  { key: 'points', icon: '★' },
+  { key: 'club', icon: '★' },
   { key: 'price-locks', icon: '🔒' },
   { key: 'passengers', icon: '👤' },
   { key: 'refunds', icon: '↺' },
+  { key: 'tickets', icon: '💬' },
+  { key: 'security', icon: '🛡️' },
 ];
+
+const TICKET_STATUS_LABEL: Record<SupportTicketStatus, Tr> = {
+  OPEN: { fa: 'باز', en: 'Open', ar: 'مفتوح' },
+  IN_PROGRESS: { fa: 'در حال بررسی', en: 'In Progress', ar: 'قيد المعالجة' },
+  ANSWERED: { fa: 'پاسخ داده‌شده', en: 'Answered', ar: 'تم الرد' },
+  CLOSED: { fa: 'بسته‌شده', en: 'Closed', ar: 'مغلق' },
+};
 
 const CABIN_LABEL: Record<string, Tr> = {
   ECONOMY: { fa: 'اکونومی', en: 'Economy', ar: 'اقتصادية' },
@@ -171,6 +188,25 @@ const STR: Record<StoredLocale, {
   refundableAmountPrefix: string;
   penaltyPrefix: string;
   penaltySuffix: string;
+  // tickets
+  ticketsEmptyText: string;
+  ticketsNewLink: string;
+  ticketsTrackingLabel: string;
+  ticketsHistoryHeading: string;
+  ticketsLoadError: string;
+  // security
+  securityHeading: string;
+  securitySub: string;
+  currentPasswordLabel: string;
+  currentPasswordHint: string;
+  newPasswordLabel: string;
+  confirmPasswordLabel: string;
+  savePasswordBtn: string;
+  savingPasswordBtn: string;
+  passwordSaved: string;
+  passwordErrorFallback: string;
+  passwordMismatch: string;
+  passwordTooShort: string;
 }> = {
   fa: {
     defaultUserName: 'کاربر',
@@ -240,6 +276,23 @@ const STR: Record<StoredLocale, {
     refundableAmountPrefix: 'مبلغ قابل استرداد: ',
     penaltyPrefix: 'جریمه ',
     penaltySuffix: '٪',
+    ticketsEmptyText: 'هنوز تیکتی ثبت نکرده‌اید.',
+    ticketsNewLink: 'ارسال پیام جدید به پشتیبانی',
+    ticketsTrackingLabel: 'کد پیگیری',
+    ticketsHistoryHeading: 'رویدادها',
+    ticketsLoadError: 'خطا در دریافت تیکت‌ها.',
+    securityHeading: 'تغییر رمز عبور',
+    securitySub: 'برای امنیت بیشتر، رمز عبور خود را دوره‌ای تغییر دهید. اگر فقط با OTP وارد می‌شوید، فیلد رمز فعلی را خالی بگذارید.',
+    currentPasswordLabel: 'رمز عبور فعلی',
+    currentPasswordHint: '(اختیاری — فقط ورود با OTP)',
+    newPasswordLabel: 'رمز عبور جدید',
+    confirmPasswordLabel: 'تکرار رمز عبور جدید',
+    savePasswordBtn: 'ثبت رمز عبور جدید',
+    savingPasswordBtn: 'در حال ذخیره…',
+    passwordSaved: 'رمز عبور با موفقیت تغییر کرد ✓',
+    passwordErrorFallback: 'خطا در تغییر رمز عبور.',
+    passwordMismatch: 'تکرار رمز عبور جدید مطابقت ندارد.',
+    passwordTooShort: 'رمز عبور جدید باید حداقل ۶ کاراکتر باشد.',
   },
   en: {
     defaultUserName: 'User',
@@ -309,6 +362,23 @@ const STR: Record<StoredLocale, {
     refundableAmountPrefix: 'Refundable amount: ',
     penaltyPrefix: '',
     penaltySuffix: '% penalty',
+    ticketsEmptyText: 'You have not submitted any support tickets yet.',
+    ticketsNewLink: 'Send a new message to support',
+    ticketsTrackingLabel: 'Tracking code',
+    ticketsHistoryHeading: 'Timeline',
+    ticketsLoadError: 'Error loading tickets.',
+    securityHeading: 'Change Password',
+    securitySub: 'Change your password periodically for extra security. If you only sign in with OTP, leave the current password field empty.',
+    currentPasswordLabel: 'Current password',
+    currentPasswordHint: '(optional — OTP-only login)',
+    newPasswordLabel: 'New password',
+    confirmPasswordLabel: 'Confirm new password',
+    savePasswordBtn: 'Save new password',
+    savingPasswordBtn: 'Saving…',
+    passwordSaved: 'Password changed successfully ✓',
+    passwordErrorFallback: 'Error changing password.',
+    passwordMismatch: 'New password confirmation does not match.',
+    passwordTooShort: 'New password must be at least 6 characters.',
   },
   ar: {
     defaultUserName: 'مستخدم',
@@ -378,6 +448,23 @@ const STR: Record<StoredLocale, {
     refundableAmountPrefix: 'المبلغ القابل للاسترداد: ',
     penaltyPrefix: '',
     penaltySuffix: '٪ جزاء',
+    ticketsEmptyText: 'لم تُقدّم أي تذكرة دعم بعد.',
+    ticketsNewLink: 'إرسال رسالة جديدة للدعم',
+    ticketsTrackingLabel: 'رمز التتبع',
+    ticketsHistoryHeading: 'الأحداث',
+    ticketsLoadError: 'خطأ في تحميل التذاكر.',
+    securityHeading: 'تغيير كلمة المرور',
+    securitySub: 'غيّر كلمة مرورك بشكل دوري لمزيد من الأمان. إذا كنت تدخل فقط برمز OTP، اترك حقل كلمة المرور الحالية فارغاً.',
+    currentPasswordLabel: 'كلمة المرور الحالية',
+    currentPasswordHint: '(اختياري — دخول OTP فقط)',
+    newPasswordLabel: 'كلمة المرور الجديدة',
+    confirmPasswordLabel: 'تأكيد كلمة المرور الجديدة',
+    savePasswordBtn: 'حفظ كلمة المرور الجديدة',
+    savingPasswordBtn: 'جارٍ الحفظ…',
+    passwordSaved: 'تم تغيير كلمة المرور بنجاح ✓',
+    passwordErrorFallback: 'خطأ في تغيير كلمة المرور.',
+    passwordMismatch: 'تأكيد كلمة المرور الجديدة غير متطابق.',
+    passwordTooShort: 'يجب أن تكون كلمة المرور الجديدة ٦ أحرف على الأقل.',
   },
 };
 
@@ -390,6 +477,7 @@ export default function AccountPage() {
   const [bookings, setBookings] = useState<BookingDetail[] | null>(null);
   const [wallet, setWallet] = useState<{ balanceIrr: string } | null>(null);
   const [club, setClub] = useState<{ isMember: boolean; level: string | null; balance: number } | null>(null);
+  const [clubMembership, setClubMembership] = useState<ClubMembershipView | null>(null);
   const [refunds, setRefunds] = useState<RefundRequestView[] | null>(null);
   const [topupAmount, setTopupAmount] = useState('');
   const [topupBusy, setTopupBusy] = useState(false);
@@ -417,6 +505,15 @@ export default function AccountPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [tickets, setTickets] = useState<MySupportTicketRow[] | null>(null);
+  const [ticketsError, setTicketsError] = useState<string | null>(null);
+  const [expandedTicketId, setExpandedTicketId] = useState<string | null>(null);
+  const [pwCur, setPwCur] = useState('');
+  const [pwNew, setPwNew] = useState('');
+  const [pwConfirm, setPwConfirm] = useState('');
+  const [pwError, setPwError] = useState<string | null>(null);
+  const [pwNotice, setPwNotice] = useState<string | null>(null);
+  const [pwSaving, setPwSaving] = useState(false);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -429,6 +526,7 @@ export default function AccountPage() {
     fetchMyBookings().then(setBookings).catch(() => setBookings([]));
     fetchWallet().then(setWallet).catch(() => setWallet({ balanceIrr: '0' }));
     fetchClubPoints().then(setClub).catch(() => setClub(null));
+    fetchClubMembership().then(setClubMembership).catch(() => setClubMembership(null));
     fetchMyRefunds().then(setRefunds).catch(() => setRefunds([]));
     fetchMyPriceLocks().then(setPriceLocks).catch(() => setPriceLocks([]));
     fetchMyProfile()
@@ -442,6 +540,12 @@ export default function AccountPage() {
         });
       })
       .catch(() => setProfile(null));
+    fetchMySupportTickets()
+      .then(setTickets)
+      .catch(() => {
+        setTickets([]);
+        setTicketsError(STR.fa.ticketsLoadError);
+      });
   }, [status]);
 
   async function onSaveProfile(e: React.FormEvent) {
@@ -556,6 +660,36 @@ export default function AccountPage() {
       setLockError(err instanceof ApiRequestError ? err.message : t.cancelErrorFallback);
     } finally {
       setLockActionBusy(null);
+    }
+  }
+
+  async function onSavePassword(e: React.FormEvent) {
+    e.preventDefault();
+    setPwError(null);
+    setPwNotice(null);
+    if (pwNew.length < 6) {
+      setPwError(t.passwordTooShort);
+      return;
+    }
+    if (pwNew !== pwConfirm) {
+      setPwError(t.passwordMismatch);
+      return;
+    }
+    setPwSaving(true);
+    try {
+      if (pwCur.trim()) {
+        await changeOwnPassword(pwCur, pwNew);
+      } else {
+        await setPassword(pwNew);
+      }
+      setPwNotice(t.passwordSaved);
+      setPwCur('');
+      setPwNew('');
+      setPwConfirm('');
+    } catch (err) {
+      setPwError(err instanceof ApiRequestError ? err.message : t.passwordErrorFallback);
+    } finally {
+      setPwSaving(false);
     }
   }
 
@@ -894,29 +1028,18 @@ export default function AccountPage() {
           </div>
         )}
 
-        {tab === 'points' && (
-          <div style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 18, padding: '24px 26px' }}>
-            {club?.isMember ? (
-              <>
-                <div style={{ fontSize: 12, color: '#8a96a6', marginBottom: 6 }}>{t.currentPointsLabel}</div>
-                <div style={{ fontSize: 30, fontWeight: 900, color: '#1668c4', marginBottom: 10 }}>{faDigits(club.balance)}</div>
-                <div style={{ fontSize: 12.5, color: '#caa53a', fontWeight: 700, marginBottom: 16 }}>
-                  {t.pointsTierPrefix}
-                  {TIER_LABEL[club.level ?? '']?.[locale] ?? club.level}
-                </div>
-                <Link to="/club" style={{ fontSize: 12.5, color: '#1668c4', fontWeight: 700, textDecoration: 'none' }}>
-                  {t.viewClubLink}
-                </Link>
-              </>
-            ) : (
-              <div style={{ textAlign: 'center', padding: 20 }}>
-                <p style={{ fontSize: 13, color: '#6b7787', marginBottom: 14 }}>{t.notMemberText}</p>
-                <Link to="/club" style={{ background: '#1668c4', color: '#fff', padding: '10px 24px', borderRadius: 11, fontSize: 12.5, fontWeight: 800, textDecoration: 'none' }}>
-                  {t.joinFreeBtn}
-                </Link>
-              </div>
-            )}
-          </div>
+        {tab === 'club' && (
+          clubMembership === null ? (
+            <p style={{ fontSize: 13, color: '#6b7787' }}>{t.loading}</p>
+          ) : (
+            <AccountClubTab
+              membership={clubMembership}
+              onMembershipChange={(m) => {
+                setClubMembership(m);
+                setClub({ isMember: m.isMember, level: m.level, balance: m.balance });
+              }}
+            />
+          )
         )}
 
         {tab === 'price-locks' && (
@@ -998,6 +1121,120 @@ export default function AccountPage() {
                 </span>
               </div>
             ))}
+          </div>
+        )}
+
+        {tab === 'tickets' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {ticketsError && <p role="alert" style={{ fontSize: 12, color: '#e5484d' }}>{ticketsError}</p>}
+            <div style={{ marginBottom: 4 }}>
+              <Link to="/support" style={{ fontSize: 12.5, color: '#1668c4', fontWeight: 700, textDecoration: 'none' }}>
+                {t.ticketsNewLink} →
+              </Link>
+            </div>
+            {tickets === null && <p style={{ fontSize: 13, color: '#6b7787' }}>{t.loading}</p>}
+            {tickets?.length === 0 && (
+              <div style={{ background: '#fff', border: '1px dashed #e5e9f0', borderRadius: 16, padding: 40, textAlign: 'center', color: '#8a96a6', fontSize: 13 }}>
+                {t.ticketsEmptyText}
+              </div>
+            )}
+            {tickets?.map((tk) => {
+              const st = TICKET_STATUS_LABEL[tk.status];
+              const expanded = expandedTicketId === tk.id;
+              return (
+                <div key={tk.id} data-testid="account-ticket" style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 16, overflow: 'hidden' }}>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedTicketId(expanded ? null : tk.id)}
+                    style={{ width: '100%', border: 'none', background: 'transparent', padding: '14px 16px', textAlign: 'inherit', cursor: 'pointer', fontFamily: 'inherit' }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                      <div style={{ textAlign: locale === 'en' ? 'left' : 'right' }}>
+                        <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0d2640' }}>{tk.subject}</div>
+                        <div style={{ fontSize: 11, color: '#8a96a6', marginTop: 4 }}>
+                          {t.ticketsTrackingLabel}: <span className="font-num" dir="ltr">{tk.trackingCode}</span>
+                          {' · '}
+                          {formatJalaliDateTime(tk.createdAt)}
+                        </div>
+                      </div>
+                      <span style={{ fontSize: 10.5, fontWeight: 800, background: '#eef4fb', color: '#1668c4', padding: '5px 12px', borderRadius: 14 }}>
+                        {st?.[locale] ?? tk.status}
+                      </span>
+                    </div>
+                  </button>
+                  {expanded && (
+                    <div style={{ borderTop: '1px solid #eef1f5', padding: '14px 16px', background: '#fafbfd' }}>
+                      <p style={{ fontSize: 12.5, color: '#3b4554', lineHeight: 1.8, margin: '0 0 14px', whiteSpace: 'pre-wrap' }}>{tk.body}</p>
+                      {tk.history.length > 0 && (
+                        <>
+                          <div style={{ fontSize: 11.5, fontWeight: 800, color: '#6b7787', marginBottom: 8 }}>{t.ticketsHistoryHeading}</div>
+                          <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            {tk.history.map((h, i) => (
+                              <li key={`${h.step}-${i}`} style={{ fontSize: 11.5, color: '#5a6678' }}>
+                                <span style={{ color: '#8a96a6' }}>{formatJalaliDateTime(h.at)}</span>
+                                {' — '}
+                                {h.labelFa}
+                              </li>
+                            ))}
+                          </ul>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {tab === 'security' && (
+          <div style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 16, padding: 18, maxWidth: 480 }}>
+            <h3 style={{ fontSize: 15, fontWeight: 800, margin: '0 0 4px' }}>{t.securityHeading}</h3>
+            <p style={{ fontSize: 11.5, color: '#8a96a6', margin: '0 0 16px', lineHeight: 1.8 }}>{t.securitySub}</p>
+            <form onSubmit={(e) => void onSavePassword(e)} style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+              <div>
+                <label htmlFor="acct-pw-cur" style={{ display: 'block', fontSize: 11.5, color: '#6b7787', marginBottom: 6 }}>
+                  {t.currentPasswordLabel} <span style={{ fontSize: 10 }}>{t.currentPasswordHint}</span>
+                </label>
+                <input
+                  id="acct-pw-cur"
+                  type="password"
+                  value={pwCur}
+                  onChange={(e) => setPwCur(e.target.value)}
+                  style={{ width: '100%', boxSizing: 'border-box', height: 46, border: '1.5px solid #e3e8ef', borderRadius: 12, padding: '0 14px', fontSize: 13, fontFamily: 'inherit' }}
+                />
+              </div>
+              <div>
+                <label htmlFor="acct-pw-new" style={{ display: 'block', fontSize: 11.5, color: '#6b7787', marginBottom: 6 }}>{t.newPasswordLabel}</label>
+                <input
+                  id="acct-pw-new"
+                  type="password"
+                  value={pwNew}
+                  onChange={(e) => setPwNew(e.target.value)}
+                  style={{ width: '100%', boxSizing: 'border-box', height: 46, border: '1.5px solid #e3e8ef', borderRadius: 12, padding: '0 14px', fontSize: 13, fontFamily: 'inherit' }}
+                />
+              </div>
+              <div>
+                <label htmlFor="acct-pw-confirm" style={{ display: 'block', fontSize: 11.5, color: '#6b7787', marginBottom: 6 }}>{t.confirmPasswordLabel}</label>
+                <input
+                  id="acct-pw-confirm"
+                  type="password"
+                  value={pwConfirm}
+                  onChange={(e) => setPwConfirm(e.target.value)}
+                  style={{ width: '100%', boxSizing: 'border-box', height: 46, border: '1.5px solid #e3e8ef', borderRadius: 12, padding: '0 14px', fontSize: 13, fontFamily: 'inherit' }}
+                />
+              </div>
+              {pwError && <p role="alert" style={{ fontSize: 12, color: '#e5484d' }}>{pwError}</p>}
+              {pwNotice && <p style={{ fontSize: 12, color: '#059669', fontWeight: 700 }}>{pwNotice}</p>}
+              <button
+                type="submit"
+                data-testid="account-save-password"
+                disabled={pwSaving}
+                style={{ marginTop: 4, height: 44, borderRadius: 11, background: '#1668c4', color: '#fff', fontSize: 12.5, fontWeight: 800, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+              >
+                {pwSaving ? t.savingPasswordBtn : t.savePasswordBtn}
+              </button>
+            </form>
           </div>
         )}
       </div>

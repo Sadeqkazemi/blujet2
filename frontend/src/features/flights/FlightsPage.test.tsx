@@ -1,10 +1,11 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import FlightsPage from './FlightsPage';
 import * as flightsApi from '../../api/flights';
 import * as pricingApi from '../../api/pricing';
 import * as authApi from '../../api/auth';
 import * as useAuthModule from '../../hooks/useAuth';
+import { mockAuthUserWithRole } from '../../test/mockAuthUser';
 import { parseJalaliDateToIso } from '../../lib/jalali';
 import type {
   AircraftTypeOption,
@@ -118,7 +119,7 @@ const DETAIL: FlightDetail = {
 function mockRole(role: Role) {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status: 'authenticated',
-    user: { id: 'me', fullName: 'کاربر تست', role },
+    user: mockAuthUserWithRole(role, { id: 'me' }),
     requestLogin: vi.fn(),
     confirmTwoFactor: vi.fn(),
     agencyLogin: vi.fn(),
@@ -241,11 +242,15 @@ describe('FlightsPage', () => {
     expect(within(dialog).getByLabelText('نرخ نهایی (تومان)')).toHaveValue('4100000');
 
     const agencyInput = within(dialog).getByLabelText(/تخصیص صندلی آژانس/);
-    await userEvent.clear(agencyInput);
-    await userEvent.type(agencyInput, '50');
+    fireEvent.change(agencyInput, { target: { value: '50' } });
     await userEvent.click(within(dialog).getByRole('button', { name: 'ثبت نرخ و تخصیص صندلی' }));
 
-    await waitFor(() => expect(planSpy).toHaveBeenCalledWith('fu1', 41_000_000, 50));
+    await waitFor(() =>
+      expect(planSpy).toHaveBeenCalledWith(
+        'fu1',
+        expect.objectContaining({ priceIrr: 41_000_000, agencySeats: 50 }),
+      ),
+    );
     expect(await screen.findByText(/نرخ و تخصیص صندلی تهران ← دبی ثبت شد ✓/)).toBeInTheDocument();
   });
 
@@ -271,15 +276,19 @@ describe('FlightsPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('Commercial additionally gets the embedded Phase 6 pricing section', async () => {
+  it('Commercial shows cities tab and embedded pricing on active tab', async () => {
     mockRole('COMMERCIAL_MANAGER');
     mockData();
     vi.spyOn(pricingApi, 'fetchCommercialPricing').mockResolvedValue({ flights: [] });
 
     render(<FlightsPage />);
-    expect(
-      await screen.findByText('تعیین قیمت پرواز و ارسال به مدیر عامل'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('تعیین قیمت پرواز و ارسال به مدیر عامل')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'پروازهای آینده' })).not.toBeInTheDocument();
+
+    const { default: userEvent } = await import('@testing-library/user-event');
+    await userEvent.click(screen.getByRole('button', { name: 'شهرهای پروازی' }));
+    expect(await screen.findByText('شهرهای دارای پرواز')).toBeInTheDocument();
+    expect(screen.getByText('تهران')).toBeInTheDocument();
   });
 
   it('Senior does NOT get the pricing section', async () => {

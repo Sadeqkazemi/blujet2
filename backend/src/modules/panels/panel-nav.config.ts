@@ -32,6 +32,7 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'refund', labelFa: 'استرداد بلیط', implemented: true },
     { key: 'tickets', labelFa: 'تیکت‌های پشتیبانی', implemented: true },
     { key: 'jobapps', labelFa: 'فرصت‌های شغلی', implemented: true },
+    { key: 'settings', labelFa: 'تنظیمات سامانه', implemented: true },
   ],
   CEO: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
@@ -78,7 +79,6 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
   FINANCE_MANAGER: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
     { key: 'agencies', labelFa: 'آژانس‌ها', implemented: true },
-    { key: 'flightops', labelFa: 'پروازها', implemented: true },
     { key: 'reports', labelFa: 'گزارش مسافران', implemented: true },
     { key: 'staff', labelFa: 'گزارش کارمندان', implemented: true },
     { key: 'finance', labelFa: 'مالی', implemented: true },
@@ -88,13 +88,13 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
   COMMERCIAL_MANAGER: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
     { key: 'agencies', labelFa: 'آژانس‌ها', implemented: true },
-    { key: 'flightops', labelFa: 'پروازها', implemented: true },
     { key: 'flights', labelFa: 'مدیریت پروازها', implemented: true },
     { key: 'reports', labelFa: 'گزارش مسافران', implemented: true },
     { key: 'staff', labelFa: 'گزارش کارمندان', implemented: true },
+    { key: 'clubrules', labelFa: 'قوانین باشگاه مشتریان', implemented: true },
+    { key: 'webservice', labelFa: 'وب سرویس', implemented: true },
     { key: 'finance', labelFa: 'مالی', implemented: true },
     { key: 'cartable', labelFa: 'کارتابل', implemented: true },
-    { key: 'clubrules', labelFa: 'قوانین باشگاه مشتریان', implemented: true },
   ],
   IT_MANAGER: [
     // Phase 8: real service-health/os-metrics dashboard, not the shared
@@ -108,9 +108,9 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'reservation', labelFa: 'سامانه رزرواسیون', implemented: true },
     { key: 'panels', labelFa: 'دسترسی به پنل‌ها', implemented: true },
     { key: 'logs', labelFa: 'لاگ و رویدادها', implemented: true },
+    { key: 'survey', labelFa: 'نظرسنجی مسافران', implemented: true },
     { key: 'backup', labelFa: 'پشتیبان‌گیری', implemented: true },
     { key: 'settings', labelFa: 'تنظیمات سامانه', implemented: true },
-    { key: 'survey', labelFa: 'نظرسنجی مسافران', implemented: true },
   ],
 };
 

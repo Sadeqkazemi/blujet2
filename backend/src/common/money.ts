@@ -41,6 +41,10 @@ export function negateIrr(a: Irr): Irr {
   return -a;
 }
 
+export function absIrr(a: Irr): Irr {
+  return a < ZERO_IRR ? -a : a;
+}
+
 /** Integer-percent of an amount, rounded half-away-from-zero (matches the
  * rounding the app already used for penalty/discount percentages). */
 export function pctOfIrr(amount: Irr, pct: number): Irr {

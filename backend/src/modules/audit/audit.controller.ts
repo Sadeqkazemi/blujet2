@@ -48,6 +48,14 @@ export class AuditController {
     return { success: true, data };
   }
 
+  @Get('logs/badge-count')
+  @Roles('IT_MANAGER')
+  @ApiOperation({ summary: 'شمارندهٔ badge سایدبار لاگ IT (۷ روز اخیر)' })
+  async logsBadgeCount() {
+    const count = await this.audit.systemLogsBadgeCount();
+    return { success: true, data: { count } };
+  }
+
   @Get('system-events')
   @Roles('CEO')
   @ApiOperation({

@@ -39,6 +39,10 @@ export default function ServicesPage() {
     apiKey: '',
   });
 
+  const [confirmTarget, setConfirmTarget] = useState<
+    { kind: 'internal'; service: InternalService } | { kind: 'external'; service: ExternalService } | null
+  >(null);
+
   const load = useCallback(async () => {
     try {
       const data = await fetchItServices();
@@ -59,8 +63,31 @@ export default function ServicesPage() {
   }, [load]);
 
   async function onToggleInternal(s: InternalService) {
+    setConfirmTarget({ kind: 'internal', service: s });
+  }
+
+  async function confirmToggleInternal() {
+    if (!confirmTarget || confirmTarget.kind !== 'internal') return;
+    const s = confirmTarget.service;
     try {
       await toggleInternalService(s.key, !s.enabled);
+      setConfirmTarget(null);
+      await load();
+    } catch {
+      setError('خطا در تغییر وضعیت سرویس.');
+    }
+  }
+
+  async function onToggleExternal(s: ExternalService) {
+    setConfirmTarget({ kind: 'external', service: s });
+  }
+
+  async function confirmToggleExternal() {
+    if (!confirmTarget || confirmTarget.kind !== 'external') return;
+    const s = confirmTarget.service;
+    try {
+      await updateExternalService(s.id, { enabled: !s.enabled });
+      setConfirmTarget(null);
       await load();
     } catch {
       setError('خطا در تغییر وضعیت سرویس.');
@@ -152,11 +179,17 @@ export default function ServicesPage() {
           <p className="mt-1 text-sm text-muted">وضعیت و کنترل تمام سرویس‌های فعال در سایت</p>
         </div>
         <div className="flex items-center gap-4 text-xs">
-          <span>
+          <span className="rounded-xl border border-border bg-white px-3 py-2">
             <span className="font-num font-black text-[#059669]">
               {faDigits(internal.filter((s) => s.enabled).length + external.filter((s) => s.enabled).length)}
             </span>{' '}
             <span className="text-muted">سرویس فعال</span>
+          </span>
+          <span className="rounded-xl border border-border bg-white px-3 py-2">
+            <span className="font-num font-black text-ink">
+              {faDigits(internal.length + external.length)}
+            </span>{' '}
+            <span className="text-muted">کل سرویس‌ها</span>
           </span>
         </div>
       </div>
@@ -262,6 +295,19 @@ export default function ServicesPage() {
                 <div className="text-xs font-bold text-ink">{s.nameFa}</div>
                 <div className="mt-0.5 text-[10px] text-muted">{s.provider}</div>
               </div>
+              <button
+                role="switch"
+                aria-checked={s.enabled}
+                aria-label={s.nameFa}
+                onClick={() => onToggleExternal(s)}
+                className={`relative h-6 w-11 rounded-full transition ${s.enabled ? 'bg-accent' : 'bg-border'}`}
+              >
+                <span
+                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${
+                    s.enabled ? 'right-0.5' : 'right-[22px]'
+                  }`}
+                />
+              </button>
             </div>
             <div className="ltr mb-2 truncate rounded-md bg-surface px-2 py-1 text-[10px] text-muted">{s.endpoint}</div>
             {testResult?.id === s.id && (
@@ -420,6 +466,38 @@ export default function ServicesPage() {
               className="rounded-lg bg-accent px-4 py-2 text-xs font-bold text-white transition hover:bg-accent/90"
             >
               ثبت تغییرات
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {confirmTarget && (
+        <Modal
+          title={confirmTarget.service.enabled ? 'غیرفعال‌سازی سرویس' : 'فعال‌سازی سرویس'}
+          onClose={() => setConfirmTarget(null)}
+        >
+          <p className="mb-4 text-xs text-muted">
+            آیا سرویس «{confirmTarget.service.nameFa}» روی سایت{' '}
+            {confirmTarget.service.enabled ? 'غیرفعال' : 'فعال'} شود؟
+          </p>
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => setConfirmTarget(null)}
+              className="rounded-lg bg-surface px-4 py-2 text-xs font-bold text-text-2"
+            >
+              انصراف
+            </button>
+            <button
+              onClick={() =>
+                void (confirmTarget.kind === 'internal'
+                  ? confirmToggleInternal()
+                  : confirmToggleExternal())
+              }
+              className={`rounded-lg px-4 py-2 text-xs font-bold text-white ${
+                confirmTarget.service.enabled ? 'bg-danger' : 'bg-accent'
+              }`}
+            >
+              {confirmTarget.service.enabled ? 'غیرفعال کن' : 'فعال کن'}
             </button>
           </div>
         </Modal>

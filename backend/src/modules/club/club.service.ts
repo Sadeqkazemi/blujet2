@@ -12,6 +12,7 @@ import { ErrorCode } from '../../common/errors';
 import {
   encryptPii,
   hashPii,
+  decryptPii,
   isValidIranianNationalId,
   normalizeNationalId,
 } from '../../common/pii-crypto';
@@ -187,16 +188,18 @@ export class ClubService {
       filters.push({ OR: or });
     }
 
-    const [members, all, pendingRequests] = await Promise.all([
-      this.prisma.clubMember.findMany({
-        where: { AND: filters },
-        orderBy: { joinDate: 'desc' },
-      }),
-      this.prisma.clubMember.findMany({
-        select: { level: true, cardStatus: true },
-      }),
-      this.prisma.clubCardRequest.count({ where: { status: 'REFERRED' } }),
-    ]);
+    const [members, all, pendingRequests, submittedRequests] =
+      await Promise.all([
+        this.prisma.clubMember.findMany({
+          where: { AND: filters },
+          orderBy: { joinDate: 'desc' },
+        }),
+        this.prisma.clubMember.findMany({
+          select: { level: true, cardStatus: true },
+        }),
+        this.prisma.clubCardRequest.count({ where: { status: 'REFERRED' } }),
+        this.prisma.clubCardRequest.count({ where: { status: 'SUBMITTED' } }),
+      ]);
 
     // KPI cards always summarize the whole club, unfiltered (per design).
     const tierCounts = { SILVER: 0, GOLD: 0, PLATINUM: 0 };
@@ -212,6 +215,7 @@ export class ClubService {
         totalMembers: all.length,
         issuedCards,
         pendingRequests,
+        submittedRequests,
         tierCounts,
       },
     };
@@ -406,6 +410,116 @@ export class ClubService {
     return requests;
   }
 
+  /** SITE_ADMIN track: queue of member-initiated SUBMITTED card requests. */
+  async listSubmittedRequests() {
+    const requests = await this.prisma.clubCardRequest.findMany({
+      where: { status: 'SUBMITTED' },
+      include: {
+        member: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            points: true,
+            level: true,
+            birthDate: true,
+            joinDate: true,
+            nationalIdEnc: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return requests.map((r) => ({
+      id: r.id,
+      memberId: r.memberId,
+      member: {
+        id: r.member.id,
+        fullName: r.member.fullName,
+        email: r.member.email,
+        points: r.member.points,
+        level: r.member.level,
+        birthDate: r.member.birthDate,
+        joinDate: r.member.joinDate,
+        nationalId: decryptPii(r.member.nationalIdEnc),
+      },
+      level: r.level,
+      points: r.points,
+      status: r.status,
+      assignedTo: r.assignedTo,
+      cardNo: r.cardNo,
+      history: r.history,
+      createdAt: r.createdAt,
+    }));
+  }
+
+  /** SITE_ADMIN refers a SUBMITTED request to senior managers for approval. */
+  async referRequest(
+    actor: AuthenticatedUser,
+    id: string,
+    assignedTo: 'SENIOR' | 'CHAIR',
+  ) {
+    const request = await this.prisma.clubCardRequest.findUnique({
+      where: { id },
+      include: { member: true },
+    });
+    if (!request) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'درخواست یافت نشد.',
+      });
+    }
+    if (request.status !== 'SUBMITTED') {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'این درخواست قبلاً ارجاع شده است.',
+      });
+    }
+
+    const assigneeLabel =
+      assignedTo === 'SENIOR' ? 'مدیر ارشد' : 'رئیس هیئت مدیره';
+    const history = Array.isArray(request.history)
+      ? [...(request.history as unknown[])]
+      : [];
+    history.push({
+      step: 'referred',
+      labelFa: `ارجاع به ${assigneeLabel} توسط ادمین سایت`,
+      at: this.nowJalaliLabel(),
+    });
+
+    const updated = await this.prisma.clubCardRequest.update({
+      where: { id },
+      data: {
+        status: 'REFERRED',
+        assignedTo,
+        history: history as Prisma.InputJsonValue,
+      },
+      include: {
+        member: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            points: true,
+            level: true,
+          },
+        },
+      },
+    });
+
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'CLUB',
+      action: 'ارجاع درخواست کارت عضویت',
+      detail: `درخواست کارت «${request.member.fullName}» توسط ${actor.fullName} به ${assigneeLabel} ارجاع شد.`,
+      entityType: 'ClubCardRequest',
+      entityId: id,
+    });
+
+    return updated;
+  }
+
   /** ⚑ Design authority rule: CEO/BOARD_CHAIR act on any REFERRED request;
    * SENIOR_MANAGER only on assignedTo=SENIOR. */
   private assertCanDecide(
@@ -424,6 +538,149 @@ export class ClubService {
     // Presentational timestamp for the history timeline (design shows
     // Jalali date-time strings); precise auditing lives in AuditLog.
     return new Date().toISOString();
+  }
+
+  private async getMemberPointsBalance(memberId: string): Promise<number> {
+    const sum = await this.prisma.clubPointsEntry.aggregate({
+      where: { clubMemberId: memberId },
+      _sum: { signedPoints: true },
+    });
+    return sum._sum.signedPoints ?? 0;
+  }
+
+  /** Customer self-service: full club membership view for the user panel. */
+  async getMyMembership(userId: string) {
+    const rule = await this.getOrCreateTierRule();
+    const tierRules = {
+      goldMinPoints: rule.goldMinPoints,
+      platinumMinPoints: rule.platinumMinPoints,
+      cardRequestMinPoints: rule.cardRequestMinPoints,
+    };
+
+    const member = await this.prisma.clubMember.findUnique({
+      where: { userId },
+    });
+    if (!member) {
+      return {
+        isMember: false,
+        level: null,
+        balance: 0,
+        cardStatus: null,
+        cardNo: null,
+        tierRules,
+        cardRequest: null,
+        canRequestCard: false,
+        pointsNeededForCard: rule.cardRequestMinPoints,
+      };
+    }
+
+    const balance = await this.getMemberPointsBalance(member.id);
+    const cardRequest = await this.prisma.clubCardRequest.findFirst({
+      where: {
+        memberId: member.id,
+        status: { in: ['SUBMITTED', 'REFERRED', 'APPROVED'] },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        status: true,
+        history: true,
+        cardNo: true,
+        createdAt: true,
+      },
+    });
+
+    const canRequestCard =
+      member.cardStatus === 'NONE' &&
+      balance >= rule.cardRequestMinPoints &&
+      !cardRequest;
+
+    return {
+      isMember: true,
+      level: member.level,
+      balance,
+      cardStatus: member.cardStatus,
+      cardNo: member.cardNo,
+      tierRules,
+      cardRequest,
+      canRequestCard,
+      pointsNeededForCard: Math.max(rule.cardRequestMinPoints - balance, 0),
+    };
+  }
+
+  /** Customer self-service: submit a membership-card issuance request. */
+  async submitCardRequest(userId: string) {
+    const member = await this.prisma.clubMember.findUnique({
+      where: { userId },
+    });
+    if (!member) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'عضو باشگاه یافت نشد.',
+      });
+    }
+
+    const rule = await this.getOrCreateTierRule();
+    const balance = await this.getMemberPointsBalance(member.id);
+
+    if (balance < rule.cardRequestMinPoints) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'برای درخواست کارت عضویت به حد نصاب امتیاز نرسیده‌اید.',
+      });
+    }
+
+    if (member.cardStatus === 'ISSUED') {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'کارت عضویت شما قبلاً صادر شده است.',
+      });
+    }
+
+    const pending = await this.prisma.clubCardRequest.findFirst({
+      where: {
+        memberId: member.id,
+        status: { in: ['SUBMITTED', 'REFERRED'] },
+      },
+    });
+    if (pending) {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'درخواست قبلی شما در حال بررسی است.',
+      });
+    }
+
+    const history = [
+      {
+        step: 'submitted',
+        labelFa: 'رسیدن به حد امتیاز و ثبت درخواست صدور کارت',
+        at: this.nowJalaliLabel(),
+      },
+    ];
+
+    return this.prisma.$transaction(async (tx) => {
+      const req = await tx.clubCardRequest.create({
+        data: {
+          memberId: member.id,
+          level: member.level,
+          points: balance,
+          status: 'SUBMITTED',
+          history: history,
+        },
+        select: {
+          id: true,
+          status: true,
+          history: true,
+          cardNo: true,
+          createdAt: true,
+        },
+      });
+      await tx.clubMember.update({
+        where: { id: member.id },
+        data: { cardStatus: 'REVIEW' },
+      });
+      return req;
+    });
   }
 
   async decideRequest(
