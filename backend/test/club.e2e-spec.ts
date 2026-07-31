@@ -5,6 +5,7 @@ import * as crypto from 'node:crypto';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { loginAs, loginAsCustomer } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
+import { resetCustomerPhones } from './helpers/customer-state.helper';
 import { encryptPii, hashPii } from '../src/common/pii-crypto';
 import { ClubPointsService } from '../src/modules/booking-engine/club-points.service';
 
@@ -30,6 +31,11 @@ describe('Club (e2e)', () => {
   beforeEach(async () => {
     app = await createTestApp();
     prisma = app.get(PrismaService);
+    await resetCustomerPhones(prisma, [
+      '09180000001',
+      '09180000002',
+      '09180000003',
+    ]);
   });
 
   afterEach(async () => {
@@ -522,6 +528,10 @@ describe('Club (e2e)', () => {
     userId: string,
     points: number,
   ) {
+    await prisma.clubMember.updateMany({
+      where: { userId },
+      data: { userId: null },
+    });
     await prisma.clubPointsEntry.deleteMany({
       where: { clubMemberId: memberId },
     });

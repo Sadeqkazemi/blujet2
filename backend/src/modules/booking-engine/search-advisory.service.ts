@@ -5,7 +5,6 @@ import {
   type PriceSuggestionProvider,
 } from '../ai/price-suggestion.provider';
 import { SearchService } from './search.service';
-import type { Irr } from '../../common/money';
 
 export type SearchAdvisoryRecommendation = 'buy' | 'wait';
 
@@ -43,14 +42,17 @@ export class SearchAdvisoryService {
       return { available: false };
     }
 
-    const cheapestToday = dayResults.reduce((min, row) => {
-      const econ = row.cabins.find((c) => c.cabin === 'ECONOMY');
-      const p = BigInt(econ?.priceIrr ?? row.cabins[0]!.priceIrr);
-      return p < min ? p : min;
-    }, BigInt(
-      dayResults[0]!.cabins.find((c) => c.cabin === 'ECONOMY')?.priceIrr ??
-        dayResults[0]!.cabins[0]!.priceIrr,
-    ));
+    const cheapestToday = dayResults.reduce(
+      (min, row) => {
+        const econ = row.cabins.find((c) => c.cabin === 'ECONOMY');
+        const p = BigInt(econ?.priceIrr ?? row.cabins[0].priceIrr);
+        return p < min ? p : min;
+      },
+      BigInt(
+        dayResults[0].cabins.find((c) => c.cabin === 'ECONOMY')?.priceIrr ??
+          dayResults[0].cabins[0].priceIrr,
+      ),
+    );
 
     const pricedDays = calendar.filter((row) => BigInt(row.minPriceIrr) > 0n);
     const calendarMin =
@@ -58,7 +60,7 @@ export class SearchAdvisoryService {
         ? pricedDays.reduce((min, row) => {
             const p = BigInt(row.minPriceIrr);
             return p < min ? p : min;
-          }, BigInt(pricedDays[0]!.minPriceIrr))
+          }, BigInt(pricedDays[0].minPriceIrr))
         : cheapestToday;
 
     const cheapestEntry = pricedDays.find(

@@ -5,6 +5,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { encryptPii } from '../src/common/pii-crypto';
 import { loginAs, loginAsCustomer } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
+import { resetCustomerPhones } from './helpers/customer-state.helper';
 
 const PNG_BYTES = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
@@ -18,6 +19,7 @@ describe('Customer identity verification (e2e)', () => {
   beforeEach(async () => {
     app = await createTestApp();
     prisma = app.get(PrismaService);
+    await resetCustomerPhones(prisma, ['09180000101', '09180000102']);
   });
 
   afterEach(async () => {

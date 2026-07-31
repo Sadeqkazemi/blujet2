@@ -4,6 +4,7 @@ import { App } from 'supertest/types';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { loginAs, loginAsCustomer } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
+import { resetCustomerPhones } from './helpers/customer-state.helper';
 
 const VALID_SHEBA = 'IR820540102680020817909002';
 const VALID_CARD = '6104337112344521';
@@ -16,6 +17,11 @@ describe('Bank accounts (e2e)', () => {
   beforeEach(async () => {
     app = await createTestApp();
     prisma = app.get(PrismaService);
+    await resetCustomerPhones(prisma, [
+      '09180000001',
+      '09180000002',
+      '09180000004',
+    ]);
   });
 
   afterEach(async () => {

@@ -298,6 +298,44 @@ describe('Booking engine (e2e)', () => {
     expect(seat.status).toBe('FREE');
   });
 
+  it('an idempotency-key retry on payment returns the same ticketed booking, not a double charge', async () => {
+    const instance = await freshInstance();
+    const { accessToken } = await loginAsCustomer(app, '09130000011');
+    const key = `pay-idem-${instance.id}`;
+
+    const createRes = await request(app.getHttpServer())
+      .post('/bookings')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        flightInstanceId: instance.id,
+        cabin: 'ECONOMY',
+        passengers: [{ fullName: 'پرداخت تکراری', seatCode: '3A' }],
+      });
+    expect(createRes.status).toBe(201);
+    const bookingId = createRes.body.data.id;
+
+    const first = await request(app.getHttpServer())
+      .post(`/bookings/${bookingId}/pay`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .set('Idempotency-Key', key)
+      .send({});
+    expect(first.status).toBe(201);
+    expect(first.body.data.booking.status).toBe('TICKETED');
+
+    const second = await request(app.getHttpServer())
+      .post(`/bookings/${bookingId}/pay`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .set('Idempotency-Key', key)
+      .send({});
+    expect(second.status).toBe(201);
+    expect(second.body.data.booking.id).toBe(first.body.data.booking.id);
+
+    const reconCount = await prisma.paymentReconciliation.count({
+      where: { bookingId },
+    });
+    expect(reconCount).toBe(1);
+  });
+
   // ── Mandatory concurrency test (CLAUDE.md) ───────────────────────────
 
   it('two concurrent buyers of the LAST seat — exactly one succeeds, inventory never goes negative', async () => {

@@ -29,19 +29,25 @@ const SITE_ADMIN_PATCH_KEYS = new Set([
   'contactAddress',
   'contactOfficeHours',
   'termsText',
-  ...(['homeHeroTitle', 'homeHeroSubtitle', 'aboutUsText', 'contactAddress', 'contactOfficeHours', 'termsText'] as const).flatMap(
-    (base) => [`${base}_en`, `${base}_ar`] as const,
-  ),
+  ...(
+    [
+      'homeHeroTitle',
+      'homeHeroSubtitle',
+      'aboutUsText',
+      'contactAddress',
+      'contactOfficeHours',
+      'termsText',
+    ] as const
+  ).flatMap((base) => [`${base}_en`, `${base}_ar`] as const),
 ]);
 
-const LOCALE_CONTENT_BASES = [
-  'homeHeroTitle',
-  'homeHeroSubtitle',
-  'aboutUsText',
-  'contactAddress',
-  'contactOfficeHours',
-  'termsText',
-] as const;
+type LocaleContentBase =
+  | 'homeHeroTitle'
+  | 'homeHeroSubtitle'
+  | 'aboutUsText'
+  | 'contactAddress'
+  | 'contactOfficeHours'
+  | 'termsText';
 
 export type PublicContentLocale = 'fa' | 'en' | 'ar';
 
@@ -72,8 +78,7 @@ export const SETTING_DEFAULTS: Record<string, unknown> = {
   termsText: 'قوانین و مقررات استفاده از خدمات blujet.',
   homeHeroTitle_en: 'Fly anywhere you want',
   homeHeroSubtitle_en: 'Find the best flight prices with blujet',
-  aboutUsText_en:
-    'blujet is an online platform for booking airline tickets.',
+  aboutUsText_en: 'blujet is an online platform for booking airline tickets.',
   contactAddress_en: 'Tehran, Iran',
   contactOfficeHours_en: 'Sat–Thu 8:00–20:00 — closed on Fridays',
   termsText_en: 'Terms and conditions for using blujet services.',
@@ -273,12 +278,15 @@ export class SettingsService {
   /** Public static page copy edited from the SITE_ADMIN media tab. */
   async getPublicSiteContent(locale: PublicContentLocale = 'fa') {
     const all = await this.getAll();
-    const pick = (base: (typeof LOCALE_CONTENT_BASES)[number]) => {
+    const pick = (base: LocaleContentBase) => {
       if (locale !== 'fa') {
         const localized = all.settings[`${base}_${locale}`];
-        if (localized && String(localized).trim()) return String(localized);
+        if (typeof localized === 'string' && localized.trim()) {
+          return localized;
+        }
       }
-      return String(all.settings[base] ?? SETTING_DEFAULTS[base]);
+      const fallback = all.settings[base] ?? SETTING_DEFAULTS[base];
+      return typeof fallback === 'string' ? fallback : String(fallback);
     };
     return {
       homeHeroTitle: pick('homeHeroTitle'),
