@@ -10,6 +10,7 @@ import type {
   RevenueMixResult,
   SalesChartPeriod,
   StaffReportsResult,
+  CommercialOverview,
 } from '../types/reporting';
 
 function toQueryString(query: PeriodQuery): string {
@@ -36,6 +37,10 @@ export function fetchCompletedFlightsSummary(query: PeriodQuery) {
 
 export function fetchLowSalesAlerts() {
   return apiGet<LowSalesAlert[]>('/reporting/low-sales-alerts');
+}
+
+export function fetchCommercialOverview() {
+  return apiGet<CommercialOverview>('/reporting/commercial-overview');
 }
 
 export function fetchRecentTransactions() {

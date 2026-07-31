@@ -63,6 +63,17 @@ export class ReportingController {
     return { success: true, data };
   }
 
+  @Get('commercial-overview')
+  @Roles('COMMERCIAL_MANAGER')
+  @ApiOperation({
+    summary:
+      'Commercial Manager dashboard KPI row — active agencies, passengers this month, pending cooperation requests',
+  })
+  async commercialOverview() {
+    const data = await this.reporting.commercialOverview();
+    return { success: true, data };
+  }
+
   @Get('recent-transactions')
   @Roles('FINANCE_MANAGER')
   @ApiOperation({

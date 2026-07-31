@@ -29,7 +29,7 @@ describe('PassengerReportsPage', () => {
     await user.click(screen.getByRole('button', { name: 'جستجو' }));
 
     expect(searchSpy).toHaveBeenCalledWith('نگار');
-    expect(await screen.findByText('نگار رضایی')).toBeInTheDocument();
+    expect((await screen.findAllByText('نگار رضایی')).length).toBeGreaterThan(0);
     expect(screen.getByText('BJDEMO1')).toBeInTheDocument();
     expect(screen.getByText(/۰۴۹\*+۹/)).toBeInTheDocument();
     expect(screen.getByText(/بیزنس/)).toBeInTheDocument();

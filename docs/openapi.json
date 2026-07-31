@@ -801,6 +801,21 @@
         ]
       }
     },
+    "/reporting/commercial-overview": {
+      "get": {
+        "operationId": "ReportingController_commercialOverview",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Commercial Manager dashboard KPI row — active agencies, passengers this month, pending cooperation requests",
+        "tags": [
+          "reporting"
+        ]
+      }
+    },
     "/reporting/recent-transactions": {
       "get": {
         "operationId": "ReportingController_recentTransactions",
@@ -4478,6 +4493,29 @@
         "tags": [
           "flights"
         ]
+      },
+      "post": {
+        "operationId": "FlightsController_createAirport",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAirportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "افزودن شهر/فرودگاه جدید به کاتالوگ",
+        "tags": [
+          "flights"
+        ]
       }
     },
     "/flights/aircraft-types": {
@@ -7439,6 +7477,30 @@
           "month1PriceIrr",
           "month3PriceIrr",
           "month12PriceIrr"
+        ]
+      },
+      "CreateAirportDto": {
+        "type": "object",
+        "properties": {
+          "cityFa": {
+            "type": "string",
+            "description": "نام شهر",
+            "example": "وان"
+          },
+          "code": {
+            "type": "string",
+            "description": "کد IATA فرودگاه",
+            "example": "VAS"
+          },
+          "tz": {
+            "type": "string",
+            "description": "منطقه زمانی IANA",
+            "example": "Asia/Tehran"
+          }
+        },
+        "required": [
+          "cityFa",
+          "code"
         ]
       },
       "CreateFlightDto": {
