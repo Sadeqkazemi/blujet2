@@ -15,7 +15,8 @@ Design: `design-reference-v2/پنل کاربر.dc.html` → profile section `sav
 - [x] Add-passenger modal saves via API — `AccountPage.test.tsx`
 - [x] Remove passenger via ✕ — `AccountPage.test.tsx`
 - [x] Empty state «مسافری ذخیره نشده است» — covered by `AccountPassengersTab` (empty array in other tests)
+- [x] `BookPage` autofill chips fill active passenger row — `BookPage.test.tsx`
 
 ## Explicitly deferred
-- Autofill chips on `BookPage` / `ResultsPage` checkout (separate follow-up).
 - Saved-passengers preview block on profile tab (passengers tab is canonical for CRUD).
+- Results-page buy modal autofill (real flow routes through `BookPage` today).
