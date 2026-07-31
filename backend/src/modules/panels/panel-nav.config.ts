@@ -99,8 +99,8 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
   IT_MANAGER: [
     // Phase 8: real service-health/os-metrics dashboard, not the shared
     // sales/KPI one the other 5 roles get (IT_MANAGER stays excluded from
-    // REPORTING_ROLES). reservation/panels/settings stay deferred to
-    // Phase 9 / Phase 12 respectively — see docs/API.md's Phase 8 note.
+    // REPORTING_ROLES). reservation/panels/settings/survey landed in
+    // Phases 9 / 12 / 66 — all implemented below.
     { key: 'dashboard', labelFa: 'داشبورد فنی', implemented: true },
     { key: 'users', labelFa: 'کاربران و دسترسی‌ها', implemented: true },
     { key: 'security', labelFa: 'رمزها و امنیت', implemented: true },

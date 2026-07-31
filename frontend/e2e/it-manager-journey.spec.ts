@@ -61,3 +61,10 @@ test('Non-IT role has no IT-panel nav entries (role isolation)', async ({ page }
   await expect(page.getByRole('link', { name: 'سرویس‌های سایت' })).not.toBeVisible();
   await expect(page.getByRole('link', { name: 'پشتیبان‌گیری' })).not.toBeVisible();
 });
+
+test('IT Manager opens the survey config tab', async ({ page }) => {
+  await loginAs(page, 'itadmin');
+  await page.getByRole('link', { name: 'نظرسنجی مسافران' }).click();
+  await expect(page.getByRole('heading', { name: 'نظرسنجی مسافران' })).toBeVisible();
+  await expect(page.getByText('سؤالات نظرسنجی')).toBeVisible();
+});
