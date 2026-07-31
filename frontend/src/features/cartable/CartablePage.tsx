@@ -175,8 +175,7 @@ export default function CartablePage() {
 
       <div className="mb-4 flex flex-wrap items-end gap-3">
         <div>
-          <label className="mb-1 block text-[11px] font-bold text-muted">فیلتر روز (شمسی)</label>
-          <JalaliDatePicker value={filterDate} onChange={setFilterDate} />
+          <JalaliDatePicker label="فیلتر روز (شمسی)" value={filterDate} onChange={setFilterDate} />
         </div>
         {filterDate && (
           <button
