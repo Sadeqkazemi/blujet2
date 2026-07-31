@@ -8,26 +8,14 @@ import type {
   CompletedFlightsSummary,
   KpiResult,
   SalesChartPeriod,
-  SalesGranularity,
 } from '../../types/reporting';
 import SalesBarChart from '../../components/SalesBarChart';
+import SalesChartControls from '../../components/SalesChartControls';
 import StatTile from '../../components/StatTile';
-
-const IMPLEMENTED_MODES: { key: SalesGranularity; label: string }[] = [
-  { key: 'q3', label: '۳ ماهه' },
-  { key: 'q6', label: '۶ ماهه' },
-  { key: 'year', label: 'سالانه' },
-];
-
-const PENDING_MODES: { key: SalesGranularity; label: string }[] = [
-  { key: 'day', label: 'روزانه' },
-  { key: 'month', label: 'ماهانه' },
-  { key: 'flight', label: 'شماره پرواز' },
-];
+import { useSalesChartQuery } from '../../hooks/useSalesChartQuery';
 
 export default function DashboardPage() {
-  const [granularity, setGranularity] = useState<SalesGranularity>('q6');
-  const [periodKey, setPeriodKey] = useState<string | null>(null);
+  const chart = useSalesChartQuery({ includeFlightMode: true });
   const [periods, setPeriods] = useState<SalesChartPeriod[]>([]);
   const [kpis, setKpis] = useState<KpiResult | null>(null);
   const [flights, setFlights] = useState<CompletedFlightsSummary | null>(null);
@@ -36,27 +24,26 @@ export default function DashboardPage() {
   const [cartable, setCartable] = useState<CartableListResult | null>(null);
 
   useEffect(() => {
-    // Widget only — a failure here never breaks the dashboard.
     fetchCartable()
       .then(setCartable)
       .catch(() => setCartable(null));
   }, []);
 
   useEffect(() => {
-    setPeriodKey(null);
-  }, [granularity]);
-
-  useEffect(() => {
-    if (!IMPLEMENTED_MODES.some((m) => m.key === granularity)) return;
+    if (!chart.isQueryReady) {
+      setPeriods([]);
+      setLoading(false);
+      return;
+    }
 
     let cancelled = false;
     setLoading(true);
     setError(null);
 
     Promise.all([
-      fetchSalesChart({ granularity }),
-      fetchKpis({ granularity, periodKey: periodKey ?? undefined }),
-      fetchCompletedFlightsSummary({ granularity, periodKey: periodKey ?? undefined }),
+      fetchSalesChart(chart.query),
+      fetchKpis(chart.query),
+      fetchCompletedFlightsSummary(chart.query),
     ])
       .then(([chartData, kpiData, flightsData]) => {
         if (cancelled) return;
@@ -74,7 +61,7 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [granularity, periodKey]);
+  }, [chart.query, chart.isQueryReady]);
 
   return (
     <div className="p-8">
@@ -137,40 +124,32 @@ export default function DashboardPage() {
       )}
 
       <div className="rounded-xl border border-border bg-white p-5">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <h2 className="text-sm font-bold text-ink">نمودار فروش</h2>
-          <div className="flex flex-wrap gap-1.5">
-            {IMPLEMENTED_MODES.map((m) => (
-              <button
-                key={m.key}
-                onClick={() => setGranularity(m.key)}
-                className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
-                  granularity === m.key ? 'bg-accent text-white' : 'bg-surface text-text-2 hover:bg-surface-2'
-                }`}
-              >
-                {m.label}
-              </button>
-            ))}
-            {PENDING_MODES.map((m) => (
-              <button
-                key={m.key}
-                onClick={() => setGranularity(m.key)}
-                className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
-                  granularity === m.key ? 'bg-accent text-white' : 'bg-surface text-text-2 hover:bg-surface-2'
-                }`}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
+          <SalesChartControls
+            modes={chart.modes}
+            granularity={chart.granularity}
+            onGranularityChange={chart.setGranularity}
+            selectedDate={chart.selectedDate}
+            onSelectedDateChange={chart.setSelectedDate}
+            selectedMonthStart={chart.selectedMonthStart}
+            onSelectedMonthStartChange={chart.setSelectedMonthStart}
+            flightNo={chart.flightNo}
+            onFlightNoChange={chart.setFlightNo}
+            onApplyFlightNo={chart.applyFlightNo}
+          />
         </div>
 
-        {!IMPLEMENTED_MODES.some((m) => m.key === granularity) ? (
-          <p className="py-10 text-center text-sm text-muted">این حالت نمایش در فاز بعدی تکمیل می‌شود.</p>
+        {!chart.isQueryReady ? (
+          <p className="py-10 text-center text-sm text-muted">شماره پرواز را وارد کنید.</p>
         ) : loading ? (
           <p className="py-10 text-center text-sm text-muted">در حال بارگذاری…</p>
         ) : (
-          <SalesBarChart periods={periods} selectedPeriodKey={periodKey} onSelectPeriod={setPeriodKey} />
+          <SalesBarChart
+            periods={periods}
+            selectedPeriodKey={chart.periodKey}
+            onSelectPeriod={chart.setPeriodKey}
+          />
         )}
       </div>
 
