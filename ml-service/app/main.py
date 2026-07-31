@@ -20,5 +20,7 @@ async def health() -> dict:
 
 
 from .api.pricing import router as pricing_router  # noqa: E402
+from .api.recommendations import router as recommendations_router  # noqa: E402
 
 app.include_router(pricing_router)
+app.include_router(recommendations_router)

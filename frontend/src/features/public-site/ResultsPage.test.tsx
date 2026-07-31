@@ -202,6 +202,25 @@ describe('ResultsPage', () => {
 
       expect(await screen.findByTestId('ai-error')).toBeInTheDocument();
     });
+
+    it('shows an English explanation summary when locale is en', async () => {
+      mockLocale('en');
+      vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+      vi.spyOn(publicSiteApi, 'fetchPriceAdvisory').mockResolvedValue({
+        available: true,
+        recommendation: 'BUY_NOW',
+        explanationFa: 'احتمال افزایش قیمت در ۴۸ ساعت آینده بالاست.',
+        modelVersion: 'rec-v1',
+        confidence: 0.82,
+      });
+      renderPage();
+      await screen.findByTestId('result-card');
+
+      await userEvent.click(screen.getByTestId('ai-ask'));
+
+      expect(await screen.findByTestId('ai-result')).toHaveTextContent('prices may rise');
+      expect(screen.queryByText('احتمال افزایش قیمت در ۴۸ ساعت آینده بالاست.')).not.toBeInTheDocument();
+    });
   });
 
   it('renders translated result cards with Latin-digit toman prices in English', async () => {

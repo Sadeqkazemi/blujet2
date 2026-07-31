@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { createPriceLock, fetchClubPoints, fetchPriceAdvisory, searchFlights } from '../../api/publicSite';
 import { ApiRequestError } from '../../api/envelope';
+import { formatAdvisoryExplanation } from '../../lib/advisory-text';
 import { useAuth } from '../../hooks/useAuth';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
@@ -497,7 +498,9 @@ export default function ResultsPage() {
                 <div className="mb-1.5 inline-block rounded-full bg-[#e8f5ee] px-2.5 py-1 text-[11px] font-extrabold text-[#1f8a5b]">
                   ✓ {advisoryHeadline}
                 </div>
-                <p className="text-[11px] leading-6 text-[#3f546b]">{advisory.explanationFa}</p>
+                <p className="text-[11px] leading-6 text-[#3f546b]">
+                  {formatAdvisoryExplanation(advisory, locale)}
+                </p>
               </div>
             )}
           </div>

@@ -24,6 +24,14 @@ const BOOKING: BookingDetail = {
   passengers: [{ fullName: 'علی رضایی', seatCode: '2A' }],
 };
 
+function mockWalletAndClub(
+  walletBalanceIrr = 500_000_000,
+  club = { isMember: false, level: null as string | null, balance: 0 },
+) {
+  vi.spyOn(publicSiteApi, 'fetchWallet').mockResolvedValue({ balanceIrr: walletBalanceIrr });
+  vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue(club);
+}
+
 function renderPage() {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status: 'unauthenticated',
@@ -45,14 +53,16 @@ function renderPage() {
 describe('CheckoutPage', () => {
   it('renders the booking summary and price', async () => {
     vi.spyOn(publicSiteApi, 'fetchMyBooking').mockResolvedValue(BOOKING);
+    mockWalletAndClub();
     renderPage();
 
     expect(await screen.findByText('BJ-100')).toBeInTheDocument();
     expect(screen.getByTestId('pay-submit')).toBeInTheDocument();
   });
 
-  it('pays successfully and would navigate to the ticket page', async () => {
+  it('pays successfully when wallet balance covers the price', async () => {
     vi.spyOn(publicSiteApi, 'fetchMyBooking').mockResolvedValue(BOOKING);
+    mockWalletAndClub(500_000_000);
     const payBooking = vi.spyOn(publicSiteApi, 'payBooking').mockResolvedValue({
       priceChanged: false,
       booking: { ...BOOKING, status: 'TICKETED' },
@@ -70,7 +80,7 @@ describe('CheckoutPage', () => {
 
   it('sends the entered promo code and selected payment method', async () => {
     vi.spyOn(publicSiteApi, 'fetchMyBooking').mockResolvedValue(BOOKING);
-    vi.spyOn(publicSiteApi, 'fetchWallet').mockResolvedValue({ balanceIrr: 1_000_000_000 });
+    mockWalletAndClub(1_000_000_000);
     const payBooking = vi.spyOn(publicSiteApi, 'payBooking').mockResolvedValue({
       priceChanged: false,
       booking: { ...BOOKING, status: 'TICKETED' },
@@ -91,6 +101,7 @@ describe('CheckoutPage', () => {
 
   it('disables the gateway option when MVP checkout flag is off', async () => {
     vi.spyOn(publicSiteApi, 'fetchMyBooking').mockResolvedValue(BOOKING);
+    mockWalletAndClub();
     renderPage();
     await screen.findByTestId('pay-submit');
 
@@ -98,13 +109,50 @@ describe('CheckoutPage', () => {
     expect(screen.getByTestId('payment-method-WALLET')).toBeChecked();
   });
 
+  it('blocks pay and shows inline top-up when wallet balance is insufficient', async () => {
+    vi.spyOn(publicSiteApi, 'fetchMyBooking').mockResolvedValue(BOOKING);
+    mockWalletAndClub(0);
+    renderPage();
+    await screen.findByTestId('checkout-wallet-topup');
+
+    expect(screen.getByTestId('pay-submit')).toBeDisabled();
+    expect(screen.getByTestId('payment-method-WALLET')).toBeChecked();
+    expect(screen.getByTestId('pay-blocked-hint')).toBeInTheDocument();
+  });
+
+  it('enables pay after a successful inline wallet top-up', async () => {
+    vi.spyOn(publicSiteApi, 'fetchMyBooking').mockResolvedValue(BOOKING);
+    mockWalletAndClub(0);
+    vi.spyOn(publicSiteApi, 'topupWallet').mockResolvedValue({ balanceIrr: 500_000_000 });
+    const payBooking = vi.spyOn(publicSiteApi, 'payBooking').mockResolvedValue({
+      priceChanged: false,
+      booking: { ...BOOKING, status: 'TICKETED' },
+    });
+    renderPage();
+    await screen.findByTestId('checkout-wallet-topup');
+
+    await userEvent.type(screen.getByTestId('checkout-topup-amount'), '50000000');
+    await userEvent.click(screen.getByTestId('checkout-topup-submit'));
+    await screen.findByTestId('pay-submit');
+
+    expect(screen.getByTestId('pay-submit')).not.toBeDisabled();
+    await userEvent.click(screen.getByTestId('pay-submit'));
+    expect(payBooking).toHaveBeenCalled();
+  });
+
+  it('defaults to points when wallet is empty but club points cover the price', async () => {
+    vi.spyOn(publicSiteApi, 'fetchMyBooking').mockResolvedValue(BOOKING);
+    mockWalletAndClub(0, { isMember: true, level: 'GOLD', balance: 50_000 });
+    renderPage();
+    await screen.findByTestId('pay-submit');
+
+    expect(screen.getByTestId('payment-method-POINTS')).toBeChecked();
+    expect(screen.getByTestId('pay-submit')).not.toBeDisabled();
+  });
+
   it('disables the pay-with-points option for a non-club-member', async () => {
     vi.spyOn(publicSiteApi, 'fetchMyBooking').mockResolvedValue(BOOKING);
-    vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({
-      isMember: false,
-      level: null,
-      balance: 0,
-    });
+    mockWalletAndClub(500_000_000, { isMember: false, level: null, balance: 0 });
     renderPage();
     await screen.findByTestId('pay-submit');
 
@@ -113,6 +161,7 @@ describe('CheckoutPage', () => {
 
   it('shows the re-price confirmation UI when the price changed', async () => {
     vi.spyOn(publicSiteApi, 'fetchMyBooking').mockResolvedValue(BOOKING);
+    mockWalletAndClub();
     vi.spyOn(publicSiteApi, 'payBooking').mockResolvedValueOnce({
       priceChanged: true,
       previousPriceIrr: 380_000_000,
@@ -124,6 +173,19 @@ describe('CheckoutPage', () => {
     await userEvent.click(screen.getByTestId('pay-submit'));
     expect(await screen.findByTestId('confirm-new-price')).toBeInTheDocument();
     expect(screen.getByText('قیمت این پرواز تغییر کرده است.')).toBeInTheDocument();
+  });
+
+  it('keeps the checkout form visible when payment fails', async () => {
+    vi.spyOn(publicSiteApi, 'fetchMyBooking').mockResolvedValue(BOOKING);
+    mockWalletAndClub();
+    vi.spyOn(publicSiteApi, 'payBooking').mockRejectedValue(new Error('fail'));
+    renderPage();
+    await screen.findByTestId('pay-submit');
+
+    await userEvent.click(screen.getByTestId('pay-submit'));
+
+    expect(await screen.findByText('خطا در پرداخت.')).toBeInTheDocument();
+    expect(screen.getByTestId('pay-submit')).toBeInTheDocument();
   });
 
   it('shows an expired-hold state without a pay button', async () => {
