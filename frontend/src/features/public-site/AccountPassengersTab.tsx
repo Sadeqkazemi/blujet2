@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import type { SavedPassenger } from '../../types/public-site';
 
@@ -120,6 +120,8 @@ interface Props {
   busyId: string | null;
   formBusy: boolean;
   formError: string | null;
+  openAddOnMount?: boolean;
+  onAddModalOpened?: () => void;
   onRemove: (id: string) => void;
   onSave: (form: SavedPassengerForm, editingId: string | null) => Promise<void>;
 }
@@ -129,6 +131,8 @@ export default function AccountPassengersTab({
   busyId,
   formBusy,
   formError,
+  openAddOnMount = false,
+  onAddModalOpened,
   onRemove,
   onSave,
 }: Props) {
@@ -138,6 +142,16 @@ export default function AccountPassengersTab({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<SavedPassengerForm>(emptyPassengerForm());
   const [localError, setLocalError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!openAddOnMount) return;
+    setEditingId(null);
+    setForm(emptyPassengerForm());
+    setLocalError(null);
+    setModalOpen(true);
+    onAddModalOpened?.();
+    // onAddModalOpened is intentionally omitted — parent inline setter is stable enough for one-shot open
+  }, [openAddOnMount]);
 
   function openAdd() {
     setEditingId(null);
