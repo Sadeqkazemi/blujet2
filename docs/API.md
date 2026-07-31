@@ -351,6 +351,9 @@ stays untouched on the same page).
     suggestion (if any), and the Jalali day list for the calendar filter.
 - GET `/flights/airports` — seeded airport catalog for the add-flight
   selects.
+- POST `/flights/airports` — `{ cityFa, code, tz? }` — add a city/airport
+  to the catalog (Commercial «شهرهای پروازی» tab); 409 on duplicate code or
+  city name; audited.
 - POST `/flights` — «افزودن پرواز» modal `{ originCode, destCode,
   flightNo, departureDate (Jalali), departureTime, capacity,
   basePriceToman }` — find-or-create Route/Flight, create instance;
