@@ -719,6 +719,25 @@ async function main() {
         ],
       });
     }
+
+    const savedBankCount = await typeorm.savedBankAccount.count({
+      where: { userId: testUser.id },
+    });
+    if (savedBankCount === 0) {
+      await typeorm.savedBankAccount.create({
+        data: {
+          userId: testUser.id,
+          bankName: 'بانک ملت',
+          bankShort: 'ملت',
+          brandColor: '#d6336c',
+          cardPanEnc: encryptPii('6104337112344521'),
+          cardLast4: '4521',
+          shebaEnc: encryptPii('IR820540102680020817909002'),
+          shebaHash: hashPii('IR820540102680020817909002'),
+          isDefault: true,
+        },
+      });
+    }
   }
 
   // ── Phase 66: passenger survey settings + default question list ────────

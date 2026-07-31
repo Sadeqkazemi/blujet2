@@ -120,6 +120,19 @@ export interface ActiveSession {
   isCurrent: boolean;
 }
 
+export interface SavedBankAccount {
+  id: string;
+  bankName: string;
+  bankShort: string;
+  brandColor: string;
+  cardMasked: string | null;
+  sheba: string;
+  shebaMasked: string;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface PayResultOk {
   priceChanged: false;
   booking: BookingDetail;

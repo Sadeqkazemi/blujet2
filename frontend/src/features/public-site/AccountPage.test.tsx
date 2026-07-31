@@ -9,7 +9,7 @@ import * as useLocaleModule from '../../hooks/useLocale';
 import * as publicSiteApi from '../../api/publicSite';
 import * as supportTicketsApi from '../../api/support-tickets';
 import * as authApi from '../../api/auth';
-import type { BookingDetail, PriceLock, RefundRequestView, SavedFlight, SavedPassenger, ActiveSession, UserProfile } from '../../types/public-site';
+import type { BookingDetail, PriceLock, RefundRequestView, SavedFlight, SavedPassenger, SavedBankAccount, ActiveSession, UserProfile } from '../../types/public-site';
 import type { ClubMembershipView } from '../../types/club-membership';
 import type { MySupportTicketRow } from '../../types/support-tickets';
 
@@ -136,6 +136,19 @@ const SAVED_PASSENGER: SavedPassenger = {
   updatedAt: '2026-07-01T00:00:00.000Z',
 };
 
+const BANK_ACCOUNT: SavedBankAccount = {
+  id: 'ba-1',
+  bankName: 'بانک ملت',
+  bankShort: 'ملت',
+  brandColor: '#d6336c',
+  cardMasked: '6104 3371 •••• 4521',
+  sheba: 'IR820540102680020817909002',
+  shebaMasked: '820540•••9002',
+  isDefault: true,
+  createdAt: '2026-07-01T00:00:00.000Z',
+  updatedAt: '2026-07-01T00:00:00.000Z',
+};
+
 const SAVED: SavedFlight = {
   id: 'sf-1',
   flightInstanceId: 'fi-3',
@@ -181,6 +194,7 @@ beforeEach(() => {
   vi.spyOn(publicSiteApi, 'fetchMyPriceLocks').mockResolvedValue([]);
   vi.spyOn(publicSiteApi, 'fetchSavedFlights').mockResolvedValue([SAVED]);
   vi.spyOn(publicSiteApi, 'fetchSavedPassengers').mockResolvedValue([SAVED_PASSENGER]);
+  vi.spyOn(publicSiteApi, 'fetchBankAccounts').mockResolvedValue([BANK_ACCOUNT]);
   vi.spyOn(publicSiteApi, 'fetchMySessions').mockResolvedValue([ACTIVE_SESSION, OTHER_SESSION]);
   vi.spyOn(supportTicketsApi, 'fetchMySupportTickets').mockResolvedValue([]);
 });
@@ -296,6 +310,33 @@ describe('AccountPage', () => {
     await userEvent.click(screen.getByTestId('account-save-password'));
     await screen.findByText('رمز عبور با موفقیت تغییر کرد ✓');
     expect(setPw).toHaveBeenCalledWith('secret12');
+  });
+
+  it('switches to the banks tab and lists saved accounts with default badge', async () => {
+    mockAuth('authenticated');
+    const create = vi.spyOn(publicSiteApi, 'createBankAccount').mockResolvedValue({
+      ...BANK_ACCOUNT,
+      id: 'ba-2',
+      bankName: 'بانک سامان',
+      bankShort: 'سامان',
+      brandColor: '#1c7ed6',
+      cardMasked: '6219 8619 •••• 7730',
+      isDefault: false,
+    });
+    renderPage();
+    await userEvent.click(screen.getByTestId('account-tab-banks'));
+    expect(await screen.findByTestId('account-banks')).toBeInTheDocument();
+    expect(screen.getByText('بانک ملت')).toBeInTheDocument();
+    expect(screen.getByTestId('bank-default-badge')).toBeInTheDocument();
+
+    await userEvent.type(screen.getByTestId('bank-input-card'), '6219861977777730');
+    await userEvent.type(screen.getByTestId('bank-input-sheba'), 'IR060120000000332211452192');
+    await userEvent.click(screen.getByTestId('bank-submit'));
+    await vi.waitFor(() => expect(create).toHaveBeenCalled());
+    expect(create).toHaveBeenCalledWith({
+      cardNo: '6219861977777730',
+      sheba: 'IR060120000000332211452192',
+    });
   });
 
   it('shows saved passengers on the profile tab and opens add modal from there', async () => {

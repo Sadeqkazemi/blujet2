@@ -129,6 +129,7 @@ model User {
   priceLocks                     PriceLock[]             @relation("PriceLockOwner")
   savedFlights                   SavedFlight[]           @relation("SavedFlightOwner")
   savedPassengers                SavedPassenger[]        @relation("SavedPassengerOwner")
+  savedBankAccounts              SavedBankAccount[]      @relation("SavedBankAccountOwner")
   agencyAllotmentsCreated        AgencyAllotment[]
   paymentReconciliationsResolved PaymentReconciliation[]
   supportTickets                 SupportTicket[]         @relation("SupportTicketRequester")
@@ -1632,6 +1633,26 @@ model SavedPassenger {
   @@index([userId, createdAt])
   @@index([userId, nationalIdHash])
   @@map("saved_passengers")
+}
+
+model SavedBankAccount {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation("SavedBankAccountOwner", fields: [userId], references: [id], onDelete: Cascade)
+  bankName    String
+  bankShort   String
+  brandColor  String
+  cardPanEnc  String?
+  cardLast4   String?
+  shebaEnc    String
+  shebaHash   String
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([userId, shebaHash])
+  @@map("saved_bank_accounts")
 }
 
 // Phase 20: تماس با ما — a simple inbound inquiry, not a tracked/forwarded
