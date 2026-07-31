@@ -6,7 +6,6 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import * as crypto from 'node:crypto';
 import { TypeORMService } from '../../typeorm/typeorm.service';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
@@ -16,6 +15,7 @@ import {
   isValidIranianNationalId,
   normalizeNationalId,
 } from '../../common/pii-crypto';
+import { generateUniquePnr } from '../../common/pnr.util';
 import { enumerateSeats } from '../reservation/seat-layout';
 import { matchesLastName } from '../../common/passenger-name.util';
 import { resolveAircraftType } from '../flights/aircraft-type.util';
@@ -35,10 +35,6 @@ export type PaymentMethod = 'GATEWAY' | 'WALLET' | 'POINTS';
 /** CLAUDE.md: "HELD has a 10-minute TTL (matches the design's hold timer);
  * expiry releases inventory automatically." */
 const HOLD_TTL_MS = 10 * 60 * 1000;
-
-function generatePnr(): string {
-  return `BJ${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
-}
 
 const BOOKING_INCLUDE = {
   passengers: true,
@@ -244,7 +240,7 @@ export class BookingService {
 
       const created = await tx.booking.create({
         data: {
-          pnr: generatePnr(),
+          pnr: await generateUniquePnr(tx),
           flightInstanceId: instance.id,
           channel: 'SYSTEM',
           status: 'HELD',

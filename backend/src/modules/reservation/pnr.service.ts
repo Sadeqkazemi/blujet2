@@ -4,7 +4,6 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import * as crypto from 'node:crypto';
 import { TypeORMService } from '../../typeorm/typeorm.service';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
@@ -14,6 +13,7 @@ import {
   isValidIranianNationalId,
   normalizeNationalId,
 } from '../../common/pii-crypto';
+import { generateUniquePnr } from '../../common/pnr.util';
 import { enumerateSeats, isKnownSeat } from './seat-layout';
 import { resolveAircraftType } from '../flights/aircraft-type.util';
 import { materializeFlownBookings } from '../flights/flight-lifecycle.util';
@@ -30,10 +30,6 @@ import type {
  * fallback (never invented dynamic pricing) when a flight instance has no
  * Phase 6 registered price. */
 const FALLBACK_PRICE_IRR = 38_000_000;
-
-function generatePnr(): string {
-  return `BJ${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
-}
 
 @Injectable()
 export class PnrService {
@@ -369,52 +365,9 @@ export class PnrService {
       });
     }
 
-    const [sold, lock, pricing] = await Promise.all([
-      this.typeorm.passenger.findFirst({
-        where: {
-          seatCode: dto.seatCode,
-          booking: {
-            flightInstanceId: dto.flightInstanceId,
-            status: { not: 'CANCELLED' },
-          },
-        },
-      }),
-      this.typeorm.seatLock.findFirst({
-        where: {
-          flightInstanceId: dto.flightInstanceId,
-          seatCode: dto.seatCode,
-          releasedAt: null,
-          expiresAt: { gt: new Date() },
-        },
-      }),
-      this.typeorm.farePricingProposal.findUnique({
-        where: { flightInstanceId: dto.flightInstanceId },
-      }),
-    ]);
-    if (sold || lock) {
-      throw new ConflictException({
-        code: ErrorCode.CONFLICT,
-        message: 'این صندلی در دسترس نیست.',
-      });
-    }
-
-    // Staff-issued PNRs are channel SYSTEM, same public pool as the online
-    // booking engine — must not oversell past what's reserved for agencies/
-    // charter (Phase 13).
-    const counts = await this.searchService.takenCountsByChannel(
-      dto.flightInstanceId,
-    );
-    const publicPoolLimit =
-      instance.capacity -
-      instance.charterSeats -
-      (instance.agencySeatsAllocated ?? 0);
-    if (counts.SYSTEM + counts.MANAGERIAL + 1 > publicPoolLimit) {
-      throw new ConflictException({
-        code: ErrorCode.POOL_EXHAUSTED,
-        message: 'ظرفیت فروش عمومی این پرواز تکمیل شده است.',
-      });
-    }
-
+    const pricing = await this.typeorm.farePricingProposal.findUnique({
+      where: { flightInstanceId: dto.flightInstanceId },
+    });
     const priceIrr =
       pricing?.status === 'REGISTERED'
         ? pricing.registeredPriceIrr!
@@ -430,9 +383,51 @@ export class PnrService {
     }
 
     const booking = await this.typeorm.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM flight_instances WHERE id = ${dto.flightInstanceId} FOR UPDATE`;
+
+      const [sold, lock] = await Promise.all([
+        tx.passenger.findFirst({
+          where: {
+            seatCode: dto.seatCode,
+            booking: {
+              flightInstanceId: dto.flightInstanceId,
+              status: { not: 'CANCELLED' },
+            },
+          },
+        }),
+        tx.seatLock.findFirst({
+          where: {
+            flightInstanceId: dto.flightInstanceId,
+            seatCode: dto.seatCode,
+            releasedAt: null,
+            expiresAt: { gt: new Date() },
+          },
+        }),
+      ]);
+      if (sold || lock) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'این صندلی در دسترس نیست.',
+        });
+      }
+
+      const counts = await this.searchService.takenCountsByChannel(
+        dto.flightInstanceId,
+      );
+      const publicPoolLimit =
+        instance.capacity -
+        instance.charterSeats -
+        (instance.agencySeatsAllocated ?? 0);
+      if (counts.SYSTEM + counts.MANAGERIAL + 1 > publicPoolLimit) {
+        throw new ConflictException({
+          code: ErrorCode.POOL_EXHAUSTED,
+          message: 'ظرفیت فروش عمومی این پرواز تکمیل شده است.',
+        });
+      }
+
       const created = await tx.booking.create({
         data: {
-          pnr: generatePnr(),
+          pnr: await generateUniquePnr(tx),
           flightInstanceId: dto.flightInstanceId,
           channel: 'SYSTEM',
           status: 'TICKETED',
@@ -553,9 +548,27 @@ export class PnrService {
     }
 
     const booking = await this.typeorm.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM flight_instances WHERE id = ${lock.flightInstanceId} FOR UPDATE`;
+
+      const seatTaken = await tx.passenger.findFirst({
+        where: {
+          seatCode: lock.seatCode,
+          booking: {
+            flightInstanceId: lock.flightInstanceId,
+            status: { not: 'CANCELLED' },
+          },
+        },
+      });
+      if (seatTaken) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'این صندلی در دسترس نیست.',
+        });
+      }
+
       const created = await tx.booking.create({
         data: {
-          pnr: generatePnr(),
+          pnr: await generateUniquePnr(tx),
           flightInstanceId: lock.flightInstanceId,
           channel: 'SYSTEM',
           status: 'TICKETED',
