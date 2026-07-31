@@ -25,6 +25,7 @@ import { SearchService } from './search.service';
 import { PriceLockService } from './price-lock.service';
 import { WalletService } from './wallet.service';
 import { ClubPointsService } from './club-points.service';
+import { CustomerReferralsService } from '../customer-referrals/customer-referrals.service';
 import { applyPromoCode } from './promo.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { CreateBookingDto } from './dto/create-booking.dto';
@@ -59,6 +60,7 @@ export class BookingService {
     private readonly priceLocks: PriceLockService,
     private readonly wallet: WalletService,
     private readonly clubPoints: ClubPointsService,
+    private readonly customerReferrals: CustomerReferralsService,
     @Inject(PAYMENT_GATEWAY)
     private readonly gateway: PaymentGateway,
   ) {}
@@ -565,6 +567,14 @@ export class BookingService {
       // pay never earns points back (no redeem-to-earn loophole).
       if (member && paymentMethod !== 'POINTS') {
         await this.clubPoints.earnForPurchase(tx, member.id, finalPriceIrr, id);
+      }
+
+      if (booking.userId) {
+        await this.customerReferrals.processFirstTicketedBooking(
+          tx,
+          booking.userId,
+          id,
+        );
       }
 
       return {

@@ -133,6 +133,27 @@ export interface SavedBankAccount {
   updatedAt: string;
 }
 
+export type CustomerReferralStatus = 'SIGNED_UP' | 'BOOKED' | 'REWARDED';
+
+export interface CustomerReferralInvite {
+  id: string;
+  fullName: string;
+  joinedAt: string;
+  status: CustomerReferralStatus;
+  pointsAwarded: number;
+}
+
+export interface CustomerReferralDashboard {
+  referralCode: string;
+  sharePath: string;
+  stats: {
+    invitedCount: number;
+    pointsEarned: number;
+    successfulBookings: number;
+  };
+  invites: CustomerReferralInvite[];
+}
+
 export interface PayResultOk {
   priceChanged: false;
   booking: BookingDetail;

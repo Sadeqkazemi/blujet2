@@ -9,6 +9,7 @@ import { StepUpService } from './step-up.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { TWO_FACTOR_PROVIDER } from './providers/two-factor-provider.interface';
 import { MockTwoFactorProvider } from './providers/mock-two-factor.provider';
+import { CustomerReferralsModule } from '../customer-referrals/customer-referrals.module';
 import { AuditModule } from '../audit/audit.module';
 import { SmsModule } from '../sms/sms.module';
 
@@ -21,6 +22,7 @@ import { SmsModule } from '../sms/sms.module';
     }),
     AuditModule,
     SmsModule,
+    CustomerReferralsModule,
   ],
   controllers: [AuthController, MySessionsController],
   providers: [

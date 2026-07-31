@@ -1831,6 +1831,43 @@ model SavedBankAccount {
 Migration: `20260731140000_saved_bank_accounts`. Application cap: 5 rows
 per user; duplicate sheba per user rejected in service.
 
+## پنل کاربر — معرفی دوستان (Customer Referral)
+
+Invite-friends program for the public user panel — distinct from Phase 4
+`ManagerReferral` (staff workflow).
+
+```typeorm
+// User.referralCode String? @unique — lazily assigned per customer
+
+enum CustomerReferralStatus {
+  SIGNED_UP   // registered with referrer's code
+  BOOKED      // reserved for future use
+  REWARDED    // first ticketed booking completed; points credited
+}
+
+model CustomerReferral {
+  id             String                 @id @default(uuid())
+  referrerUserId String
+  referrer       User                   @relation("CustomerReferralsMade", ...)
+  referredUserId String                 @unique
+  referred       User                   @relation("CustomerReferralReceived", ...)
+  status         CustomerReferralStatus @default(SIGNED_UP)
+  pointsAwarded  Int                    @default(0)
+  firstBookingId String?                @unique
+  firstBooking   Booking?               @relation("CustomerReferralFirstBooking", ...)
+  rewardedAt     DateTime?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  @@index([referrerUserId, createdAt])
+  @@map("customer_referrals")
+}
+```
+
+Migration: `20260731150000_customer_referrals`. Reward constant: 500
+points per successful first booking (server-side in
+`CustomerReferralsService`).
+
 ## پنل کاربر — نشست‌های فعال (reuse `RefreshToken`)
 
 See `docs/API.md`'s matching section. No new table — customer-facing

@@ -71,6 +71,8 @@ model User {
   // localStorage until they log in (see docs/API.md).
   preferredLocale Locale @default(FA)
 
+  referralCode String? @unique
+
   employeePermissions     EmployeePermission[] @relation("EmployeePermissionHolder")
   passwordResetsReceived  PasswordResetEvent[] @relation("PasswordResetTarget")
   passwordResetsPerformed PasswordResetEvent[] @relation("PasswordResetActor")
@@ -130,6 +132,8 @@ model User {
   savedFlights                   SavedFlight[]           @relation("SavedFlightOwner")
   savedPassengers                SavedPassenger[]        @relation("SavedPassengerOwner")
   savedBankAccounts              SavedBankAccount[]      @relation("SavedBankAccountOwner")
+  customerReferralsMade          CustomerReferral[]      @relation("CustomerReferralsMade")
+  customerReferralReceived       CustomerReferral?       @relation("CustomerReferralReceived")
   agencyAllotmentsCreated        AgencyAllotment[]
   paymentReconciliationsResolved PaymentReconciliation[]
   supportTickets                 SupportTicket[]         @relation("SupportTicketRequester")
@@ -492,6 +496,7 @@ model Booking {
   seatLock          SeatLock?               @relation("SeatLockFinalizedBooking")
   reconciliations   PaymentReconciliation[]
   surveyInvite      SurveyInvite?
+  customerReferralFirst CustomerReferral? @relation("CustomerReferralFirstBooking")
 
   // Fare-class bucket (Y/B/M) this booking consumed, when FareRule
   // pricing was in effect; null under flat CabinFare pricing.
@@ -1653,6 +1658,30 @@ model SavedBankAccount {
   @@index([userId, createdAt])
   @@index([userId, shebaHash])
   @@map("saved_bank_accounts")
+}
+
+enum CustomerReferralStatus {
+  SIGNED_UP
+  BOOKED
+  REWARDED
+}
+
+model CustomerReferral {
+  id             String                 @id @default(uuid())
+  referrerUserId String
+  referrer       User                   @relation("CustomerReferralsMade", fields: [referrerUserId], references: [id], onDelete: Cascade)
+  referredUserId String                 @unique
+  referred       User                   @relation("CustomerReferralReceived", fields: [referredUserId], references: [id], onDelete: Cascade)
+  status         CustomerReferralStatus @default(SIGNED_UP)
+  pointsAwarded  Int                    @default(0)
+  firstBookingId String?                @unique
+  firstBooking   Booking?               @relation("CustomerReferralFirstBooking", fields: [firstBookingId], references: [id])
+  rewardedAt     DateTime?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  @@index([referrerUserId, createdAt])
+  @@map("customer_referrals")
 }
 
 // Phase 20: تماس با ما — a simple inbound inquiry, not a tracked/forwarded

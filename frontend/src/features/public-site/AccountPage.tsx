@@ -22,6 +22,7 @@ import {
   createBankAccount,
   updateBankAccount,
   removeBankAccount,
+  fetchMyReferral,
   revokeMySession,
   fetchWallet,
   removeSavedFlight,
@@ -36,7 +37,7 @@ import { changeOwnPassword, setPassword } from '../../api/auth';
 import { faDigits, faMoney, parseTomanToRial } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
-import type { BookingDetail, PriceLock, RefundRequestView, SavedFlight, SavedPassenger, SavedBankAccount, ActiveSession, UserProfile } from '../../types/public-site';
+import type { BookingDetail, PriceLock, RefundRequestView, SavedFlight, SavedPassenger, SavedBankAccount, CustomerReferralDashboard, ActiveSession, UserProfile } from '../../types/public-site';
 import AccountSecuritySessions from './AccountSecuritySessions';
 import type { ClubMembershipView } from '../../types/club-membership';
 import type { MySupportTicketRow, SupportTicketStatus } from '../../types/support-tickets';
@@ -44,6 +45,7 @@ import AccountClubTab from './AccountClubTab';
 import AccountSavedFlightsTab from './AccountSavedFlightsTab';
 import AccountPassengersTab, { type SavedPassengerForm } from './AccountPassengersTab';
 import AccountBankAccountsTab, { type BankAccountForm } from './AccountBankAccountsTab';
+import AccountReferralTab from './AccountReferralTab';
 import AccountProfileSavedPax from './AccountProfileSavedPax';
 
 // پنل کاربر — real data from the existing bookings/wallet/club-points/refunds
@@ -86,7 +88,7 @@ const TIER_LABEL: Record<string, Tr> = {
   PLATINUM: { fa: 'پلاتین', en: 'Platinum', ar: 'بلاتينية' },
 };
 
-type TabKey = 'trips' | 'wallet' | 'club' | 'saved' | 'price-locks' | 'passengers' | 'refunds' | 'tickets' | 'security' | 'banks' | 'profile';
+type TabKey = 'trips' | 'wallet' | 'club' | 'saved' | 'price-locks' | 'passengers' | 'refunds' | 'tickets' | 'security' | 'banks' | 'referral' | 'profile';
 
 const TAB_LABEL: Record<TabKey, Tr> = {
   profile: { fa: 'پروفایل من', en: 'My Profile', ar: 'ملفي الشخصي' },
@@ -100,6 +102,7 @@ const TAB_LABEL: Record<TabKey, Tr> = {
   tickets: { fa: 'پیام به پشتیبانی', en: 'Message Support', ar: 'رسالة للدعم' },
   security: { fa: 'امنیت حساب', en: 'Account Security', ar: 'أمان الحساب' },
   banks: { fa: 'حساب‌های بانکی', en: 'Bank Accounts', ar: 'الحسابات البنكية' },
+  referral: { fa: 'معرفی دوستان', en: 'Invite Friends', ar: 'دعوة الأصدقاء' },
 };
 
 const TABS: { key: TabKey; icon: string }[] = [
@@ -114,6 +117,7 @@ const TABS: { key: TabKey; icon: string }[] = [
   { key: 'tickets', icon: '💬' },
   { key: 'security', icon: '🛡️' },
   { key: 'banks', icon: '🏦' },
+  { key: 'referral', icon: '🎁' },
 ];
 
 const TICKET_STATUS_LABEL: Record<SupportTicketStatus, Tr> = {
@@ -519,6 +523,8 @@ export default function AccountPage() {
   const [bankBusyId, setBankBusyId] = useState<string | null>(null);
   const [bankFormBusy, setBankFormBusy] = useState(false);
   const [bankFormError, setBankFormError] = useState<string | null>(null);
+  const [referral, setReferral] = useState<CustomerReferralDashboard | null>(null);
+  const [referralCopyNotice, setReferralCopyNotice] = useState<string | null>(null);
   const [lockActionBusy, setLockActionBusy] = useState<string | null>(null);
   const [lockError, setLockError] = useState<string | null>(null);
 
@@ -569,6 +575,7 @@ export default function AccountPage() {
     fetchSavedPassengers().then(setSavedPassengers).catch(() => setSavedPassengers([]));
     fetchMySessions().then(setSessions).catch(() => setSessions([]));
     fetchBankAccounts().then(setBankAccounts).catch(() => setBankAccounts([]));
+    fetchMyReferral().then(setReferral).catch(() => setReferral(null));
     fetchMyProfile()
       .then((p) => {
         setProfile(p);
@@ -775,6 +782,38 @@ export default function AccountPage() {
       throw err;
     } finally {
       setBankFormBusy(false);
+    }
+  }
+
+  function onCopyReferralCode() {
+    if (!referral) return;
+    void navigator.clipboard.writeText(referral.referralCode).then(() => {
+      setReferralCopyNotice(
+        locale === 'fa'
+          ? 'کد معرف کپی شد ✓'
+          : locale === 'en'
+            ? 'Referral code copied ✓'
+            : 'تم نسخ رمز الإحالة ✓',
+      );
+      window.setTimeout(() => setReferralCopyNotice(null), 2500);
+    });
+  }
+
+  function onShareReferralLink() {
+    if (!referral) return;
+    const url = `${window.location.origin}${referral.sharePath}`;
+    if (navigator.share) {
+      void navigator.share({ title: 'blujet', url }).catch(() => undefined);
+    } else {
+      void navigator.clipboard.writeText(url);
+      setReferralCopyNotice(
+        locale === 'fa'
+          ? 'لینک دعوت کپی شد ✓'
+          : locale === 'en'
+            ? 'Invite link copied ✓'
+            : 'تم نسخ رابط الدعوة ✓',
+      );
+      window.setTimeout(() => setReferralCopyNotice(null), 2500);
     }
   }
 
@@ -1296,6 +1335,18 @@ export default function AccountPage() {
           />
         )}
         {tab === 'banks' && bankAccounts === null && (
+          <p style={{ fontSize: 13, color: '#6b7787' }}>{t.loading}</p>
+        )}
+
+        {tab === 'referral' && referral && (
+          <AccountReferralTab
+            data={referral}
+            copyNotice={referralCopyNotice}
+            onCopy={onCopyReferralCode}
+            onShare={onShareReferralLink}
+          />
+        )}
+        {tab === 'referral' && referral === null && (
           <p style={{ fontSize: 13, color: '#6b7787' }}>{t.loading}</p>
         )}
 
