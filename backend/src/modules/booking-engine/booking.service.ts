@@ -20,6 +20,7 @@ import { enumerateSeats } from '../reservation/seat-layout';
 import { matchesLastName } from '../../common/passenger-name.util';
 import { resolveAircraftType } from '../flights/aircraft-type.util';
 import { getCabinPrice, resolveFareClass } from './pricing';
+import type { Irr } from '../../common/money';
 import { PAYMENT_GATEWAY, type PaymentGateway } from './payment-gateway';
 import { SearchService } from './search.service';
 import { PriceLockService } from './price-lock.service';
@@ -201,8 +202,9 @@ export class BookingService {
     // stored total so ledger/refunds/reporting — which all read
     // priceIrr as-is — never need to know tax exists; taxIrr is stored
     // alongside purely for receipt display.
-    const taxIrr = (fareClass?.taxIrr ?? 0) * dto.passengers.length;
-    const priceIrr = unitPriceIrr * dto.passengers.length + taxIrr;
+    const passengerCount = BigInt(dto.passengers.length);
+    const taxIrr = (fareClass?.taxIrr ?? 0n) * passengerCount;
+    const priceIrr = unitPriceIrr * passengerCount + taxIrr;
     const contactUser = await this.prisma.user.findUniqueOrThrow({
       where: { id: user.id },
       select: { phone: true },
@@ -390,7 +392,7 @@ export class BookingService {
     id: string,
     user: AuthenticatedUser,
     options: {
-      confirmedPriceIrr?: number;
+      confirmedPriceIrr?: Irr;
       promoCode?: string;
       paymentMethod?: PaymentMethod;
     } = {},
@@ -425,8 +427,9 @@ export class BookingService {
           booking.flightInstanceId,
           booking.cabin,
         );
+    const bookingPassengerCount = BigInt(booking.passengers.length);
     const currentTaxIrr =
-      (currentFareClass?.taxIrr ?? 0) * booking.passengers.length;
+      (currentFareClass?.taxIrr ?? 0n) * bookingPassengerCount;
     const currentPriceIrr = isLocked
       ? booking.priceIrr
       : (await getCabinPrice(
@@ -434,7 +437,7 @@ export class BookingService {
           booking.flightInstanceId,
           booking.cabin,
         )) *
-          booking.passengers.length +
+          bookingPassengerCount +
         currentTaxIrr;
 
     if (!isLocked && currentPriceIrr !== booking.priceIrr) {
@@ -482,7 +485,7 @@ export class BookingService {
 
     const paid = await this.prisma.$transaction(async (tx) => {
       let finalPriceIrr = currentPriceIrr;
-      let discountIrr = 0;
+      let discountIrr: Irr = 0n;
       if (options.promoCode) {
         const result = await applyPromoCode(tx, {
           code: options.promoCode,

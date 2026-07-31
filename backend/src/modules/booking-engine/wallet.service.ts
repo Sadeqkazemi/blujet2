@@ -2,6 +2,7 @@ import { ConflictException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ErrorCode } from '../../common/errors';
 import type { Prisma } from '../../../generated/prisma/client';
+import { type Irr, ZERO_IRR, negateIrr } from '../../common/money';
 
 /** Balance is ALWAYS SUM(signedAmountIrr) — never a mutable column
  * (CLAUDE.md). Top-up is a sandbox "always succeeds" gateway, matching the
@@ -10,15 +11,15 @@ import type { Prisma } from '../../../generated/prisma/client';
 export class WalletService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getBalance(userId: string): Promise<number> {
+  async getBalance(userId: string): Promise<Irr> {
     const sum = await this.prisma.walletEntry.aggregate({
       where: { userId },
       _sum: { signedAmountIrr: true },
     });
-    return sum._sum.signedAmountIrr ?? 0;
+    return sum._sum.signedAmountIrr ?? ZERO_IRR;
   }
 
-  async topup(userId: string, amountIrr: number) {
+  async topup(userId: string, amountIrr: Irr) {
     await this.prisma.walletEntry.create({
       data: { userId, type: 'TOPUP', signedAmountIrr: amountIrr },
     });
@@ -30,14 +31,14 @@ export class WalletService {
   async charge(
     tx: Prisma.TransactionClient,
     userId: string,
-    amountIrr: number,
+    amountIrr: Irr,
     bookingId: string,
   ) {
     const sum = await tx.walletEntry.aggregate({
       where: { userId },
       _sum: { signedAmountIrr: true },
     });
-    const balance = sum._sum.signedAmountIrr ?? 0;
+    const balance = sum._sum.signedAmountIrr ?? ZERO_IRR;
     if (balance < amountIrr) {
       throw new ConflictException({
         code: ErrorCode.CONFLICT,
@@ -48,7 +49,7 @@ export class WalletService {
       data: {
         userId,
         type: 'PURCHASE',
-        signedAmountIrr: -amountIrr,
+        signedAmountIrr: negateIrr(amountIrr),
         bookingId,
       },
     });

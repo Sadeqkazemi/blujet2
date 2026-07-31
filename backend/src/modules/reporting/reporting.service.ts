@@ -4,6 +4,14 @@ import { AgenciesService } from '../agencies/agencies.service';
 import { ErrorCode } from '../../common/errors';
 import { materializeDepartedInstances } from '../flights/flight-lifecycle.util';
 import {
+  ZERO_IRR,
+  addIrr,
+  divRoundBigInt,
+  isPositiveIrr,
+  subIrr,
+} from '../../common/money';
+import type { Irr } from '../../common/money';
+import {
   Bucket,
   CompletedFlightsSummary,
   KpiResult,
@@ -106,10 +114,11 @@ export class ReportingService {
       select: { signedAmountIrr: true, booking: { select: { channel: true } } },
     });
 
-    const totals = { SYSTEM: 0, CHARTER: 0, AGENCY: 0 };
+    const totals = { SYSTEM: ZERO_IRR, CHARTER: ZERO_IRR, AGENCY: ZERO_IRR };
     for (const entry of entries) {
       const channel = entry.booking?.channel;
-      if (channel) totals[channel] += entry.signedAmountIrr;
+      if (channel)
+        totals[channel] = addIrr(totals[channel], entry.signedAmountIrr);
     }
     return totals;
   }
@@ -216,26 +225,28 @@ export class ReportingService {
       select: { type: true, signedAmountIrr: true, bookingId: true },
     });
 
-    let revenueIrr = 0;
-    let refundIrr = 0;
-    let operatingCostIrr = 0;
+    let revenueIrr: Irr = ZERO_IRR;
+    let refundIrr: Irr = ZERO_IRR;
+    let operatingCostIrr: Irr = ZERO_IRR;
     for (const e of entries) {
-      const amount = Math.abs(e.signedAmountIrr);
+      const amount: Irr =
+        e.signedAmountIrr < 0n ? -e.signedAmountIrr : e.signedAmountIrr;
       // AgenciesService.resetTestDebt reuses type:'SALE' for agency
       // debt-line calibration (agencyId set, bookingId null, amount can
       // be negative) — that's not ticket revenue, so it's excluded here
       // the same way sumByChannel() already excludes it via its
       // booking-relation filter.
       if (e.type === 'SALE') {
-        if (e.bookingId) revenueIrr += amount;
-      } else if (e.type === 'REFUND') refundIrr += amount;
+        if (e.bookingId) revenueIrr = addIrr(revenueIrr, amount);
+      } else if (e.type === 'REFUND') refundIrr = addIrr(refundIrr, amount);
       else if (e.type === 'SETTLEMENT' || e.type === 'COMMISSION')
-        operatingCostIrr += amount;
+        operatingCostIrr = addIrr(operatingCostIrr, amount);
     }
 
-    const profitIrr = revenueIrr - refundIrr - operatingCostIrr;
-    const marginPct =
-      revenueIrr > 0 ? Math.round((profitIrr / revenueIrr) * 100) : 0;
+    const profitIrr = subIrr(subIrr(revenueIrr, refundIrr), operatingCostIrr);
+    const marginPct = isPositiveIrr(revenueIrr)
+      ? Number(divRoundBigInt(profitIrr * 100n, revenueIrr))
+      : 0;
 
     const { agencyDebtIrr, agencyDebtCount } =
       await this.agencies.getDebtSummary();
@@ -428,14 +439,16 @@ export class ReportingService {
       },
     });
 
-    const sums = { SYSTEM: 0, CHARTER: 0, AGENCY: 0 };
+    const sums = { SYSTEM: ZERO_IRR, CHARTER: ZERO_IRR, AGENCY: ZERO_IRR };
     for (const e of entries) {
       if (!e.booking) continue;
-      sums[e.booking.channel] += Math.abs(e.signedAmountIrr);
+      const amount: Irr =
+        e.signedAmountIrr < 0n ? -e.signedAmountIrr : e.signedAmountIrr;
+      sums[e.booking.channel] = addIrr(sums[e.booking.channel], amount);
     }
-    const totalIrr = sums.SYSTEM + sums.CHARTER + sums.AGENCY;
-    const pct = (n: number) =>
-      totalIrr > 0 ? Math.round((n / totalIrr) * 100) : 0;
+    const totalIrr = addIrr(sums.SYSTEM, sums.CHARTER, sums.AGENCY);
+    const pct = (n: Irr) =>
+      isPositiveIrr(totalIrr) ? Number(divRoundBigInt(n * 100n, totalIrr)) : 0;
 
     return {
       totalIrr,
@@ -476,10 +489,13 @@ export class ReportingService {
     const rows = agencies
       .filter((a) => a.invoices.length > 0)
       .map((a) => {
-        const totalIrr = a.invoices.reduce((s, i) => s + i.amountIrr, 0);
+        const totalIrr = a.invoices.reduce(
+          (s, i) => addIrr(s, i.amountIrr),
+          ZERO_IRR,
+        );
         const paidIrr = a.invoices
           .filter((i) => i.status === 'PAID')
-          .reduce((s, i) => s + i.amountIrr, 0);
+          .reduce((s, i) => addIrr(s, i.amountIrr), ZERO_IRR);
         const unpaid = a.invoices
           .filter((i) => i.status !== 'PAID')
           .sort((x, y) => x.dueAt.getTime() - y.dueAt.getTime());
@@ -505,7 +521,9 @@ export class ReportingService {
           agencyName: a.user.fullName,
           totalIrr,
           paidIrr,
-          paidPct: totalIrr > 0 ? Math.round((paidIrr / totalIrr) * 100) : 0,
+          paidPct: isPositiveIrr(totalIrr)
+            ? Number(divRoundBigInt(paidIrr * 100n, totalIrr))
+            : 0,
           dueAt: earliestUnpaid?.dueAt.toISOString() ?? null,
           overdueDays,
           status,
@@ -516,8 +534,8 @@ export class ReportingService {
       });
 
     const outstandingIrr = rows.reduce(
-      (s, r) => s + (r.totalIrr - r.paidIrr),
-      0,
+      (s, r) => addIrr(s, subIrr(r.totalIrr, r.paidIrr)),
+      ZERO_IRR,
     );
     return { rows, outstandingIrr };
   }

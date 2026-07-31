@@ -111,19 +111,25 @@ describe('Reporting (e2e)', () => {
     expect(chart.status).toBe(200);
     expect(chart.body.data).toHaveLength(6);
 
-    const chartTotal = chart.body.data.reduce(
+    // Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON)
+    // — sum via BigInt so precision is exact, never a float, at any scale.
+    const chartTotal: bigint = chart.body.data.reduce(
       (
-        sum: number,
-        p: { systemIrr: number; charterIrr: number; agencyIrr: number },
-      ) => sum + p.systemIrr + p.charterIrr + p.agencyIrr,
-      0,
+        sum: bigint,
+        p: { systemIrr: string; charterIrr: string; agencyIrr: string },
+      ) =>
+        sum +
+        BigInt(String(p.systemIrr)) +
+        BigInt(String(p.charterIrr)) +
+        BigInt(String(p.agencyIrr)),
+      0n,
     );
 
     const kpis = await request(app.getHttpServer())
       .get('/reporting/kpis?granularity=q6')
       .set('Authorization', `Bearer ${ceoToken}`);
     expect(kpis.status).toBe(200);
-    expect(kpis.body.data.revenueIrr).toBe(chartTotal);
+    expect(BigInt(String(kpis.body.data.revenueIrr))).toBe(chartTotal);
   });
 
   it('a bookingless SALE ledger row (AgenciesService.resetTestDebt-style agency debt calibration) never pollutes revenue reporting', async () => {
@@ -155,24 +161,28 @@ describe('Reporting (e2e)', () => {
     const chart = await request(app.getHttpServer())
       .get('/reporting/sales-chart?granularity=q6')
       .set('Authorization', `Bearer ${ceoToken}`);
-    const chartTotal = chart.body.data.reduce(
+    const chartTotal: bigint = chart.body.data.reduce(
       (
-        sum: number,
-        p: { systemIrr: number; charterIrr: number; agencyIrr: number },
-      ) => sum + p.systemIrr + p.charterIrr + p.agencyIrr,
-      0,
+        sum: bigint,
+        p: { systemIrr: string; charterIrr: string; agencyIrr: string },
+      ) =>
+        sum +
+        BigInt(String(p.systemIrr)) +
+        BigInt(String(p.charterIrr)) +
+        BigInt(String(p.agencyIrr)),
+      0n,
     );
     const after = await request(app.getHttpServer())
       .get('/reporting/kpis?granularity=q6')
       .set('Authorization', `Bearer ${ceoToken}`);
 
     expect(after.body.data.revenueIrr).toBe(before.body.data.revenueIrr);
-    expect(after.body.data.revenueIrr).toBe(chartTotal);
+    expect(BigInt(String(after.body.data.revenueIrr))).toBe(chartTotal);
 
     const mix = await request(app.getHttpServer())
       .get('/reporting/revenue-mix?granularity=q6')
       .set('Authorization', `Bearer ${ceoToken}`);
-    expect(mix.body.data.totalIrr).toBe(chartTotal);
+    expect(BigInt(String(mix.body.data.totalIrr))).toBe(chartTotal);
   });
 
   it('kpis re-scope to a single periodKey — sum of all periodKeys equals the full-range total', async () => {
@@ -183,27 +193,36 @@ describe('Reporting (e2e)', () => {
       (p: { periodKey: string }) => p.periodKey,
     );
 
-    let summedRevenue = 0;
+    let summedRevenue = 0n;
     for (const periodKey of periodKeys) {
       const res = await request(app.getHttpServer())
         .get(`/reporting/kpis?granularity=q6&periodKey=${periodKey}`)
         .set('Authorization', `Bearer ${ceoToken}`);
       expect(res.status).toBe(200);
-      summedRevenue += res.body.data.revenueIrr;
+      summedRevenue += BigInt(String(res.body.data.revenueIrr));
     }
 
     const full = await request(app.getHttpServer())
       .get('/reporting/kpis?granularity=q6')
       .set('Authorization', `Bearer ${ceoToken}`);
-    expect(summedRevenue).toBe(full.body.data.revenueIrr);
+    expect(summedRevenue).toBe(BigInt(String(full.body.data.revenueIrr)));
   });
 
   it('marginPct is derived, never hardcoded — matches round(profit/revenue*100)', async () => {
     const res = await request(app.getHttpServer())
       .get('/reporting/kpis?granularity=q6')
       .set('Authorization', `Bearer ${ceoToken}`);
-    const { revenueIrr, profitIrr, marginPct } = res.body.data;
-    expect(marginPct).toBe(Math.round((profitIrr / revenueIrr) * 100));
+    // Money fields are decimal STRINGs on the wire — parsed here for a
+    // display-only sanity check against the server's bigint-exact
+    // divRoundBigInt derivation; these q6 aggregates are far below 2^53.
+    const { revenueIrr, profitIrr, marginPct } = res.body.data as {
+      revenueIrr: string;
+      profitIrr: string;
+      marginPct: number;
+    };
+    expect(marginPct).toBe(
+      Math.round((Number(profitIrr) / Number(revenueIrr)) * 100),
+    );
   });
 
   it('an invalid periodKey is rejected with 400', async () => {
@@ -228,10 +247,10 @@ describe('Reporting (e2e)', () => {
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveLength(1);
     const total =
-      res.body.data[0].systemIrr +
-      res.body.data[0].charterIrr +
-      res.body.data[0].agencyIrr;
-    expect(total).toBeGreaterThan(0);
+      BigInt(String(res.body.data[0].systemIrr)) +
+      BigInt(String(res.body.data[0].charterIrr)) +
+      BigInt(String(res.body.data[0].agencyIrr));
+    expect(total).toBeGreaterThan(0n);
   });
 
   it('completed-flights-summary reconciles: sold + unsold === total seats', async () => {
@@ -253,11 +272,18 @@ describe('Reporting (e2e)', () => {
     }
   });
 
-  it('money fields are raw integers, never pre-formatted display strings', async () => {
+  // Design intentionally changed here (CLAUDE.md Financial Rules / the
+  // Int→BigInt migration): a JS `number` can't safely hold IRR amounts
+  // above 2^53, so every money field is now a decimal STRING on the wire
+  // (BigInt.prototype.toJSON — see src/common/bigint-json.ts), not a
+  // number. This still isn't a "pre-formatted display string" — no
+  // thousands separators, no Persian digits, no decimal point, just the
+  // raw integer as text — so the test now asserts exactly that shape.
+  it('money fields are exact-integer decimal strings, never pre-formatted display strings', async () => {
     const res = await request(app.getHttpServer())
       .get('/reporting/kpis?granularity=q6')
       .set('Authorization', `Bearer ${ceoToken}`);
-    expect(typeof res.body.data.revenueIrr).toBe('number');
-    expect(Number.isInteger(res.body.data.revenueIrr)).toBe(true);
+    expect(typeof res.body.data.revenueIrr).toBe('string');
+    expect(/^-?\d+$/.test(String(res.body.data.revenueIrr))).toBe(true);
   });
 });

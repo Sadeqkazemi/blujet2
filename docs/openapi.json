@@ -6362,9 +6362,9 @@
         "type": "object",
         "properties": {
           "limitIrr": {
-            "type": "number",
-            "example": 1800000000,
-            "description": "سقف اعتبار به ریال"
+            "type": "string",
+            "example": "1800000000",
+            "description": "سقف اعتبار به ریال (رشته یا عدد صحیح)"
           }
         },
         "required": [
@@ -6426,9 +6426,9 @@
         "type": "object",
         "properties": {
           "amountIrr": {
-            "type": "number",
-            "example": 800000000,
-            "description": "مبلغ فاکتور به ریال"
+            "type": "string",
+            "example": "800000000",
+            "description": "مبلغ فاکتور به ریال (رشته یا عدد صحیح)"
           },
           "dueAt": {
             "type": "string",
@@ -6973,13 +6973,13 @@
         "type": "object",
         "properties": {
           "proposedPriceIrr": {
-            "type": "number",
-            "example": 38500000,
+            "type": "string",
+            "example": "38500000",
             "description": "نرخ پیشنهادی به ریال"
           },
           "legalRateIrr": {
-            "type": "number",
-            "example": 42000000,
+            "type": "string",
+            "example": "42000000",
             "description": "نرخ قانونی/مصوب به ریال"
           },
           "note": {
@@ -6995,8 +6995,8 @@
         "type": "object",
         "properties": {
           "legalRateIrr": {
-            "type": "number",
-            "example": 42000000,
+            "type": "string",
+            "example": "42000000",
             "description": "نرخ قانونی (مصوب سازمان هواپیمایی) به ریال"
           }
         },
@@ -7237,8 +7237,8 @@
         "type": "object",
         "properties": {
           "confirmedPriceIrr": {
-            "type": "number",
-            "description": "Client-confirmed price from the checkout screen. Required to complete payment when the price changed since booking creation (re-price guard) — CLAUDE.md: \"if the price changed, show the new price and require explicit user confirmation before charging.\""
+            "type": "string",
+            "description": "Client-confirmed price from the checkout screen (decimal string or integer). Required to complete payment when the price changed since booking creation (re-price guard) — CLAUDE.md: \"if the price changed, show the new price and require explicit user confirmation before charging.\""
           },
           "promoCode": {
             "type": "string",
@@ -7258,8 +7258,8 @@
         "type": "object",
         "properties": {
           "amountIrr": {
-            "type": "number",
-            "example": 5000000
+            "type": "string",
+            "example": "5000000"
           }
         },
         "required": [
@@ -7289,9 +7289,9 @@
         "type": "object",
         "properties": {
           "requestedLimitIrr": {
-            "type": "number",
-            "example": 2000000000,
-            "description": "سقف اعتبار درخواستی به ریال"
+            "type": "string",
+            "example": "2000000000",
+            "description": "سقف اعتبار درخواستی به ریال (رشته یا عدد صحیح)"
           },
           "note": {
             "type": "string",
@@ -7391,9 +7391,9 @@
             "example": 180
           },
           "basePriceIrr": {
-            "type": "number",
+            "type": "string",
             "description": "قیمت پایه (ریال)",
-            "example": 38000000
+            "example": "38000000"
           }
         },
         "required": [
@@ -7457,9 +7457,9 @@
         "type": "object",
         "properties": {
           "priceIrr": {
-            "type": "number",
+            "type": "string",
             "description": "نرخ برنامه‌ریزی (ریال)",
-            "example": 39000000
+            "example": "39000000"
           },
           "agencySeats": {
             "type": "number",
@@ -7519,9 +7519,9 @@
             "example": "Y"
           },
           "priceIrr": {
-            "type": "number",
+            "type": "string",
             "description": "قیمت (ریال)",
-            "example": 30000000
+            "example": "30000000"
           },
           "seatsAllocated": {
             "type": "number",
@@ -7529,9 +7529,9 @@
             "example": 20
           },
           "taxIrr": {
-            "type": "number",
+            "type": "string",
             "description": "مالیات/عوارض (ریال)",
-            "example": 0
+            "example": "0"
           },
           "refundable": {
             "type": "boolean"
@@ -7575,13 +7575,13 @@
         "type": "object",
         "properties": {
           "priceIrr": {
-            "type": "number"
+            "type": "string"
           },
           "seatsAllocated": {
             "type": "number"
           },
           "taxIrr": {
-            "type": "number"
+            "type": "string"
           },
           "refundable": {
             "type": "boolean"
@@ -7636,7 +7636,7 @@
             "description": "موعد آزادسازی خودکار (فقط برای نوع SOFT، UTC ISO)"
           },
           "contractPriceIrr": {
-            "type": "number",
+            "type": "string",
             "description": "نرخ قراردادی این آژانس (ریال)"
           }
         },

@@ -8,13 +8,15 @@ import * as useAuthModule from '../../hooks/useAuth';
 import type { CeoPricingResult, CommercialPricingResult, PricingProposal } from '../../types/pricing';
 import type { Role } from '../../types/auth';
 
+// Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON on
+// the backend — a JS number can't safely hold IRR amounts above 2^53).
 const PROPOSAL: PricingProposal = {
   id: 'pp1',
   flightInstanceId: 'fi1',
-  basePriceIrr: 38_000_000,
-  competitorPriceIrr: 39_000_000,
-  proposedPriceIrr: 38_500_000,
-  legalRateIrr: 42_000_000,
+  basePriceIrr: '38000000',
+  competitorPriceIrr: '39000000',
+  proposedPriceIrr: '38500000',
+  legalRateIrr: '42000000',
   note: 'قیمت کمی پایین‌تر از رقبا برای پرکردن صندلی‌های آزاد.',
   status: 'PENDING',
   registeredPriceIrr: null,
@@ -51,7 +53,7 @@ const REGISTERED: PricingProposal = {
   ...PROPOSAL,
   id: 'pp3',
   status: 'REGISTERED',
-  registeredPriceIrr: 38_500_000,
+  registeredPriceIrr: '38500000',
   approvedBy: { id: 'u2', fullName: 'محمد رحیمی', role: 'CEO' },
   approvedAt: '2026-07-15T00:00:00.000Z',
 };

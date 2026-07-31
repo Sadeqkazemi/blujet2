@@ -12,7 +12,7 @@ const BOOKING: BookingDetail = {
   pnr: 'BJABC123',
   status: 'HELD',
   cabin: 'ECONOMY',
-  priceIrr: 380_000_000,
+  priceIrr: '380000000',
   holdExpiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
   flightInstanceId: 'fi-1',
   flightNo: 'BJ-100',
@@ -70,7 +70,7 @@ describe('CheckoutPage', () => {
 
   it('sends the entered promo code and selected payment method', async () => {
     vi.spyOn(publicSiteApi, 'fetchMyBooking').mockResolvedValue(BOOKING);
-    vi.spyOn(publicSiteApi, 'fetchWallet').mockResolvedValue({ balanceIrr: 1_000_000_000 });
+    vi.spyOn(publicSiteApi, 'fetchWallet').mockResolvedValue({ balanceIrr: '1000000000' });
     const payBooking = vi.spyOn(publicSiteApi, 'payBooking').mockResolvedValue({
       priceChanged: false,
       booking: { ...BOOKING, status: 'TICKETED' },
@@ -106,8 +106,8 @@ describe('CheckoutPage', () => {
     vi.spyOn(publicSiteApi, 'fetchMyBooking').mockResolvedValue(BOOKING);
     vi.spyOn(publicSiteApi, 'payBooking').mockResolvedValueOnce({
       priceChanged: true,
-      previousPriceIrr: 380_000_000,
-      currentPriceIrr: 400_000_000,
+      previousPriceIrr: '380000000',
+      currentPriceIrr: '400000000',
     });
     renderPage();
     await screen.findByTestId('pay-submit');

@@ -15,6 +15,16 @@ import { ErrorCode } from '../../common/errors';
 import { generateTempPassword } from '../../common/temp-password';
 import { StepUpService } from '../auth/step-up.service';
 import { SmsService } from '../sms/sms.service';
+import {
+  ZERO_IRR,
+  addIrr,
+  isPositiveIrr,
+  isZeroIrr,
+  maxIrr,
+  negateIrr,
+  subIrr,
+} from '../../common/money';
+import type { Irr } from '../../common/money';
 import { TWO_FACTOR_PROVIDER } from '../auth/providers/two-factor-provider.interface';
 import type { TwoFactorProvider } from '../auth/providers/two-factor-provider.interface';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
@@ -164,9 +174,7 @@ export class AgenciesService {
   /** SUM(SALE) + SUM(SETTLEMENT) per agency — SETTLEMENT rows are stored
    * signed-negative, so this single grouped sum is the derived "used" figure
    * (see LedgerEntry.agencyId note in docs/DB_SCHEMA.md). */
-  private async computeUsedIrr(
-    agencyIds: string[],
-  ): Promise<Map<string, number>> {
+  private async computeUsedIrr(agencyIds: string[]): Promise<Map<string, Irr>> {
     if (agencyIds.length === 0) return new Map();
     const rows = await this.prisma.ledgerEntry.groupBy({
       by: ['agencyId'],
@@ -181,7 +189,7 @@ export class AgenciesService {
         .filter(
           (r): r is typeof r & { agencyId: string } => r.agencyId !== null,
         )
-        .map((r) => [r.agencyId, r._sum.signedAmountIrr ?? 0]),
+        .map((r) => [r.agencyId, r._sum.signedAmountIrr ?? ZERO_IRR]),
     );
   }
 
@@ -234,7 +242,7 @@ export class AgenciesService {
    * the only cross-module read of agency data, kept to a small public getter
    * rather than duplicating the ledger-derivation query in ReportingService. */
   async getDebtSummary(): Promise<{
-    agencyDebtIrr: number;
+    agencyDebtIrr: Irr;
     agencyDebtCount: number;
   }> {
     const agencyIds = (
@@ -242,11 +250,11 @@ export class AgenciesService {
     ).map((p) => p.userId);
     const usedByAgency = await this.computeUsedIrr(agencyIds);
 
-    let agencyDebtIrr = 0;
+    let agencyDebtIrr: Irr = ZERO_IRR;
     let agencyDebtCount = 0;
     for (const used of usedByAgency.values()) {
-      if (used > 0) {
-        agencyDebtIrr += used;
+      if (isPositiveIrr(used)) {
+        agencyDebtIrr = addIrr(agencyDebtIrr, used);
         agencyDebtCount += 1;
       }
     }
@@ -278,8 +286,8 @@ export class AgenciesService {
     );
 
     const rows = profiles.map((p) => {
-      const usedIrr = Math.max(usedByAgency.get(p.userId) ?? 0, 0);
-      const limitIrr = p.creditLine?.limitIrr ?? 0;
+      const usedIrr = maxIrr(usedByAgency.get(p.userId) ?? ZERO_IRR, ZERO_IRR);
+      const limitIrr = p.creditLine?.limitIrr ?? ZERO_IRR;
       return {
         id: p.userId,
         fullName: p.user.fullName,
@@ -290,7 +298,7 @@ export class AgenciesService {
         isActive: !p.suspendedAt,
         limitIrr,
         usedIrr,
-        remainingIrr: limitIrr - usedIrr,
+        remainingIrr: subIrr(limitIrr, usedIrr),
         pendingInvoiceCount: unpaidByAgency.get(p.userId) ?? 0,
       };
     });
@@ -299,8 +307,11 @@ export class AgenciesService {
     // own search/debtors filter (matches the design's fixed summary cards).
     const kpis = {
       activeCount: rows.filter((r) => r.isActive).length,
-      totalCreditGrantedIrr: rows.reduce((s, r) => s + r.limitIrr, 0),
-      totalUsedIrr: rows.reduce((s, r) => s + r.usedIrr, 0),
+      totalCreditGrantedIrr: rows.reduce(
+        (s, r) => addIrr(s, r.limitIrr),
+        ZERO_IRR,
+      ),
+      totalUsedIrr: rows.reduce((s, r) => addIrr(s, r.usedIrr), ZERO_IRR),
       pendingSettlementCount: rows.filter((r) => r.pendingInvoiceCount > 0)
         .length,
     };
@@ -318,7 +329,7 @@ export class AgenciesService {
     }
     if (query.debtorsOnly) {
       agencies = agencies.filter(
-        (r) => r.usedIrr > 0 || r.pendingInvoiceCount > 0,
+        (r) => isPositiveIrr(r.usedIrr) || r.pendingInvoiceCount > 0,
       );
     }
 
@@ -368,8 +379,8 @@ export class AgenciesService {
       }),
     ]);
 
-    const usedIrr = Math.max(usedByAgency.get(id) ?? 0, 0);
-    const limitIrr = profile.creditLine?.limitIrr ?? 0;
+    const usedIrr = maxIrr(usedByAgency.get(id) ?? ZERO_IRR, ZERO_IRR);
+    const limitIrr = profile.creditLine?.limitIrr ?? ZERO_IRR;
     const isActive = !profile.suspendedAt;
 
     // Senior Manager's detail view never showed this — presentational only.
@@ -390,9 +401,9 @@ export class AgenciesService {
       suspendedAt: profile.suspendedAt,
       suspendReason: profile.suspendReason,
       joinedAt: profile.joinedAt,
-      credit: { limitIrr, usedIrr, remainingIrr: limitIrr - usedIrr },
+      credit: { limitIrr, usedIrr, remainingIrr: subIrr(limitIrr, usedIrr) },
       stats: {
-        totalSalesIrr: salesAgg._sum.signedAmountIrr ?? 0,
+        totalSalesIrr: salesAgg._sum.signedAmountIrr ?? ZERO_IRR,
         ticketsIssued: ticketCount,
         passengers: passengerCount,
       },
@@ -460,12 +471,12 @@ export class AgenciesService {
       this.prisma.agencyCreditLine.findUnique({ where: { agencyId: id } }),
       this.computeUsedIrr([id]),
     ]);
-    const limitIrr = creditLine?.limitIrr ?? 0;
-    const usedIrr = Math.max(usedByAgency.get(id) ?? 0, 0);
-    return { limitIrr, usedIrr, remainingIrr: limitIrr - usedIrr };
+    const limitIrr = creditLine?.limitIrr ?? ZERO_IRR;
+    const usedIrr = maxIrr(usedByAgency.get(id) ?? ZERO_IRR, ZERO_IRR);
+    return { limitIrr, usedIrr, remainingIrr: subIrr(limitIrr, usedIrr) };
   }
 
-  async updateCredit(actor: AuthenticatedUser, id: string, limitIrr: number) {
+  async updateCredit(actor: AuthenticatedUser, id: string, limitIrr: Irr) {
     await this.getProfileOrThrow(id);
     const updated = await this.prisma.agencyCreditLine.upsert({
       where: { agencyId: id },
@@ -485,19 +496,19 @@ export class AgenciesService {
     });
 
     const usedByAgency = await this.computeUsedIrr([id]);
-    const usedIrr = Math.max(usedByAgency.get(id) ?? 0, 0);
+    const usedIrr = maxIrr(usedByAgency.get(id) ?? ZERO_IRR, ZERO_IRR);
     return {
       limitIrr: updated.limitIrr,
       usedIrr,
-      remainingIrr: updated.limitIrr - usedIrr,
+      remainingIrr: subIrr(updated.limitIrr, usedIrr),
     };
   }
 
   async settle(actor: AuthenticatedUser, id: string) {
     await this.getProfileOrThrow(id);
     const usedByAgency = await this.computeUsedIrr([id]);
-    const outstanding = Math.max(usedByAgency.get(id) ?? 0, 0);
-    if (outstanding <= 0) {
+    const outstanding = maxIrr(usedByAgency.get(id) ?? ZERO_IRR, ZERO_IRR);
+    if (!isPositiveIrr(outstanding)) {
       throw new ConflictException({
         code: ErrorCode.CONFLICT,
         message: 'بدهی معوقی برای تسویه وجود ندارد.',
@@ -508,7 +519,7 @@ export class AgenciesService {
       data: {
         agencyId: id,
         type: 'SETTLEMENT',
-        signedAmountIrr: -outstanding,
+        signedAmountIrr: negateIrr(outstanding),
         createdById: actor.id,
       },
     });
@@ -863,7 +874,7 @@ export class AgenciesService {
   async issueInvoice(
     actor: AuthenticatedUser,
     id: string,
-    dto: { amountIrr: number; dueAt: string },
+    dto: { amountIrr: Irr; dueAt: string },
   ) {
     await this.getProfileOrThrow(id);
     const created = await this.prisma.agencyInvoice.create({
@@ -909,10 +920,10 @@ export class AgenciesService {
         message: 'آژانس یافت نشد.',
       });
     }
-    const targetIrr = 100_000_000;
-    const usedIrr = (await this.computeUsedIrr([id])).get(id) ?? 0;
-    const deltaIrr = targetIrr - usedIrr;
-    if (deltaIrr !== 0) {
+    const targetIrr: Irr = 100_000_000n;
+    const usedIrr = (await this.computeUsedIrr([id])).get(id) ?? ZERO_IRR;
+    const deltaIrr = subIrr(targetIrr, usedIrr);
+    if (!isZeroIrr(deltaIrr)) {
       await this.prisma.ledgerEntry.create({
         data: {
           agencyId: id,
@@ -953,7 +964,7 @@ export class AgenciesService {
         data: {
           agencyId: id,
           type: 'SETTLEMENT',
-          signedAmountIrr: -invoice.amountIrr,
+          signedAmountIrr: negateIrr(invoice.amountIrr),
           createdById: actor.id,
         },
       });

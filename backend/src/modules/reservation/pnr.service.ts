@@ -18,6 +18,8 @@ import { enumerateSeats, isKnownSeat } from './seat-layout';
 import { resolveAircraftType } from '../flights/aircraft-type.util';
 import { materializeFlownBookings } from '../flights/flight-lifecycle.util';
 import { SearchService } from '../booking-engine/search.service';
+import { ZERO_IRR, pctOfIrr, subIrr } from '../../common/money';
+import type { Irr } from '../../common/money';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type {
   FinalizeLockDto,
@@ -29,7 +31,7 @@ import type {
 /** No canonical public-site fare table exists yet — a documented flat
  * fallback (never invented dynamic pricing) when a flight instance has no
  * Phase 6 registered price. */
-const FALLBACK_PRICE_IRR = 38_000_000;
+const FALLBACK_PRICE_IRR: Irr = 38_000_000n;
 
 function generatePnr(): string {
   return `BJ${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
@@ -301,7 +303,7 @@ export class PnrService {
       destCode: string;
       departureAt: Date;
       arrivalAt: Date;
-      priceIrr: number;
+      priceIrr: Irr;
       seatsLeft: number;
     }[] = [];
     for (const instance of instances) {
@@ -534,12 +536,11 @@ export class PnrService {
       pricing?.status === 'REGISTERED'
         ? pricing.registeredPriceIrr!
         : FALLBACK_PRICE_IRR;
-    const priceIrr =
+    const priceIrr: Irr =
       lock.classification === 'FREE'
-        ? 0
+        ? ZERO_IRR
         : lock.classification === 'DISCOUNTED'
-          ? basePriceIrr -
-            Math.round((basePriceIrr * (lock.discountPct ?? 0)) / 100)
+          ? subIrr(basePriceIrr, pctOfIrr(basePriceIrr, lock.discountPct ?? 0))
           : basePriceIrr;
 
     const nationalId = dto.passengerNationalId
@@ -629,7 +630,7 @@ export class PnrService {
       todayBookings: todayCount,
       activePnrs: activePnrCount,
       seatsSold: soldSeats,
-      revenueIrr: revenue._sum.signedAmountIrr ?? 0,
+      revenueIrr: revenue._sum.signedAmountIrr ?? ZERO_IRR,
     };
   }
 

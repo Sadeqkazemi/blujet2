@@ -14,14 +14,16 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const CREDIT: AgencyCredit = { limitIrr: 1_800_000_000, usedIrr: 500_000_000, remainingIrr: 1_300_000_000 };
+// Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON on
+// the backend — a JS number can't safely hold IRR amounts above 2^53).
+const CREDIT: AgencyCredit = { limitIrr: '1800000000', usedIrr: '500000000', remainingIrr: '1300000000' };
 const INVOICES: AgencyInvoice[] = [
   {
     id: 'inv1',
     invoiceNo: 'INV-1002',
     issuedAt: '2026-06-20T00:00:00.000Z',
     dueAt: '2026-07-05T00:00:00.000Z',
-    amountIrr: 800_000_000,
+    amountIrr: '800000000',
     status: 'UNPAID',
     paidAt: null,
   },
@@ -52,7 +54,7 @@ describe('AgencyCreditPage', () => {
     mockLoads();
     const requestSpy = vi.spyOn(portalApi, 'requestCreditIncrease').mockResolvedValue({
       id: 'r1',
-      requestedLimitIrr: 2_000_000_000,
+      requestedLimitIrr: '2000000000',
       note: null,
       status: 'PENDING',
       decidedAt: null,

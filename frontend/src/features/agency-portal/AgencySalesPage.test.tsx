@@ -21,12 +21,12 @@ const REPORT: AgencySalesReport = {
       flightNo: 'EP-821',
       route: 'THR → DXB',
       departureAt: '2026-08-01T05:00:00.000Z',
-      priceIrr: 190_000_000,
+      priceIrr: '190000000',
       passengerCount: 1,
     },
   ],
-  perFlight: [{ flightNo: 'EP-821', route: 'THR → DXB', ticketsCount: 4, salesIrr: 700_000_000 }],
-  summary: { totalSalesIrr: 760_000_000, ticketsIssued: 4, avgFareIrr: 190_000_000, refundRatePct: 0 },
+  perFlight: [{ flightNo: 'EP-821', route: 'THR → DXB', ticketsCount: 4, salesIrr: '700000000' }],
+  summary: { totalSalesIrr: '760000000', ticketsIssued: 4, avgFareIrr: '190000000', refundRatePct: 0 },
 };
 
 describe('AgencySalesPage', () => {

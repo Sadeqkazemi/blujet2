@@ -57,7 +57,8 @@ export interface PnrDetail {
   pnr: string;
   status: BookingStatus;
   channel: string;
-  priceIrr: number;
+  // Decimal STRING on the wire (BigInt.prototype.toJSON on the backend).
+  priceIrr: string;
   flightNo: string;
   originCode: string;
   destCode: string;
@@ -75,7 +76,7 @@ export interface FlightSearchResult {
   destCode: string;
   departureAt: string;
   arrivalAt: string;
-  priceIrr: number;
+  priceIrr: string;
   seatsLeft: number;
 }
 
@@ -83,5 +84,5 @@ export interface ReservationDashboardStats {
   todayBookings: number;
   activePnrs: number;
   seatsSold: number;
-  revenueIrr: number;
+  revenueIrr: string;
 }

@@ -414,7 +414,7 @@ describe('Club (e2e)', () => {
       // 2,000,000,000 IRR at 100,000 IRR/point = 20,000 points — comfortably
       // past the seeded PLATINUM threshold (15,000).
       await prisma.$transaction((tx) =>
-        clubPoints.earnForPurchase(tx, member.id, 2_000_000_000, booking.id),
+        clubPoints.earnForPurchase(tx, member.id, 2_000_000_000n, booking.id),
       );
 
       const updated = await prisma.clubMember.findUniqueOrThrow({

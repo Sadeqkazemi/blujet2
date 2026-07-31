@@ -9,7 +9,8 @@ export type CabinClass = 'ECONOMY' | 'BUSINESS';
 
 export interface SearchCabinOption {
   cabin: CabinClass;
-  priceIrr: number;
+  // Decimal STRING on the wire (BigInt.prototype.toJSON on the backend).
+  priceIrr: string;
   seatsLeft: number;
 }
 
@@ -50,7 +51,7 @@ export interface BookingDetail {
   pnr: string;
   status: BookingStatus;
   cabin: CabinClass;
-  priceIrr: number;
+  priceIrr: string;
   holdExpiresAt: string | null;
   flightInstanceId: string;
   flightNo: string;
@@ -68,8 +69,8 @@ export interface PriceLock {
   id: string;
   flightInstanceId: string;
   cabin: CabinClass;
-  lockedPriceIrr: number;
-  feeIrr: number;
+  lockedPriceIrr: string;
+  feeIrr: string;
   status: PriceLockStatus;
   expiresAt: string;
   createdAt: string;
@@ -89,8 +90,8 @@ export interface PayResultOk {
 
 export interface PayResultPriceChanged {
   priceChanged: true;
-  previousPriceIrr: number;
-  currentPriceIrr: number;
+  previousPriceIrr: string;
+  currentPriceIrr: string;
 }
 
 export type PayResult = PayResultOk | PayResultPriceChanged;
@@ -100,9 +101,9 @@ export interface RefundRequestView {
   bookingId: string;
   status: 'SUBMITTED' | 'REVIEW' | 'FINANCE' | 'PAID';
   penaltyPct: number;
-  penaltyAmountIrr: number;
-  refundableIrr: number;
-  totalPaidIrr: number;
+  penaltyAmountIrr: string;
+  refundableIrr: string;
+  totalPaidIrr: string;
   createdAt: string;
 }
 

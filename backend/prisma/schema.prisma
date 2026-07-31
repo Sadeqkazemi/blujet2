@@ -322,7 +322,7 @@ model FlightInstance {
   // Phase 10: display/plan figures from مدیریت پروازها. basePriceIrr is the
   // design's «قیمت پایه/نرخ اصلی» and the completed-flights سود/ضرر baseline —
   // NEVER the bookable price (that stays with Phase 6's registered proposal).
-  basePriceIrr         Int?
+  basePriceIrr         BigInt?
   agencySeatsAllocated Int?
   // Phase 13: optional sale window — NULL on either end means "no
   // restriction" (every pre-existing instance keeps working unchanged).
@@ -383,7 +383,7 @@ model CabinFare {
   flightInstanceId String
   flightInstance   FlightInstance @relation(fields: [flightInstanceId], references: [id])
   cabin            CabinClass
-  priceIrr         Int
+  priceIrr         BigInt
   updatedAt        DateTime       @updatedAt
 
   @@unique([flightInstanceId, cabin])
@@ -400,14 +400,14 @@ model FareRule {
   flightInstance     FlightInstance   @relation(fields: [flightInstanceId], references: [id])
   cabin              CabinClass
   classCode          String
-  priceIrr           Int
+  priceIrr           BigInt
   seatsAllocated     Int
   refundable         Boolean          @default(true)
   // Phase 13 Part B — see docs/DB_SCHEMA.md for the full reasoning behind
   // each field, and what's deliberately NOT here (ticketing deadline, a
   // separate per-class cancellation-penalty schedule, min sale capacity).
   changeable         Boolean          @default(true)
-  taxIrr             Int              @default(0)
+  taxIrr             BigInt              @default(0)
   baggageAllowanceKg Int?
   validFrom          DateTime?
   validUntil         DateTime?
@@ -453,13 +453,13 @@ model Booking {
   agencyId         String?
   agency           AgencyProfile? @relation(fields: [agencyId], references: [userId])
   status           BookingStatus  @default(DRAFT)
-  priceIrr         Int
+  priceIrr         BigInt
   // Phase 13 Part B: tax/fee portion already included in priceIrr above,
   // broken out here purely for receipt display — set once at creation
   // from the resolved FareRule.taxIrr (0 under flat/no-fare-class
   // pricing). Never re-derived later so a receipt stays accurate even if
   // the originating FareRule is edited/deleted afterward.
-  taxIrr           Int            @default(0)
+  taxIrr           BigInt            @default(0)
   createdAt        DateTime       @default(now())
 
   // Public purchase engine (customer track) additions — nullable/optional
@@ -517,7 +517,7 @@ model PaymentReconciliation {
   bookingId      String
   booking        Booking                     @relation(fields: [bookingId], references: [id])
   gatewayRefId   String
-  amountIrr      Int
+  amountIrr      BigInt
   status         PaymentReconciliationStatus @default(PENDING)
   resolvedById   String?
   resolvedBy     User?                       @relation(fields: [resolvedById], references: [id])
@@ -561,7 +561,7 @@ model LedgerEntry {
   bookingId       String?
   booking         Booking?        @relation(fields: [bookingId], references: [id])
   type            LedgerEntryType
-  signedAmountIrr Int
+  signedAmountIrr BigInt
   occurredAt      DateTime        @default(now())
   createdById     String?
   createdBy       User?           @relation("LedgerCreatedBy", fields: [createdById], references: [id])
@@ -635,7 +635,7 @@ model AgencyAllotment {
   // seats return to the general agency pool without deleting the row.
   releaseAt        DateTime?
   // This agency's contracted per-seat rate; null = normal price resolution.
-  contractPriceIrr Int?
+  contractPriceIrr BigInt?
   createdById      String
   createdBy        User           @relation(fields: [createdById], references: [id])
   createdAt        DateTime       @default(now())
@@ -648,7 +648,7 @@ model AgencyAllotment {
 model AgencyCreditLine {
   agencyId    String        @id
   agency      AgencyProfile @relation(fields: [agencyId], references: [userId])
-  limitIrr    Int
+  limitIrr    BigInt
   updatedById String?
   updatedBy   User?         @relation("AgencyCreditUpdatedBy", fields: [updatedById], references: [id])
   updatedAt   DateTime      @updatedAt
@@ -743,7 +743,7 @@ model AgencyInvoice {
   issuedBy   User                @relation("AgencyInvoiceIssuedBy", fields: [issuedById], references: [id])
   issuedAt   DateTime            @default(now())
   dueAt      DateTime
-  amountIrr  Int
+  amountIrr  BigInt
   status     AgencyInvoiceStatus @default(UNPAID)
   paidAt     DateTime?
 
@@ -782,7 +782,7 @@ model AgencyCreditRequest {
   id                String                    @id @default(uuid())
   agencyId          String
   agency            AgencyProfile             @relation(fields: [agencyId], references: [userId])
-  requestedLimitIrr Int
+  requestedLimitIrr BigInt
   note              String?
   status            AgencyCreditRequestStatus @default(PENDING)
   decidedById       String?
@@ -812,7 +812,7 @@ model AgencyWebserviceRequest {
   agency      AgencyProfile                  @relation(fields: [agencyId], references: [userId])
   scope       AgencyApiScope
   months      Int
-  priceIrr    Int
+  priceIrr    BigInt
   note        String?
   status      AgencyWebserviceRequestStatus  @default(PENDING)
   decidedById String?
@@ -1138,15 +1138,15 @@ model FarePricingProposal {
   id                 String                @id @default(uuid())
   flightInstanceId   String                @unique
   flightInstance     FlightInstance        @relation(fields: [flightInstanceId], references: [id])
-  basePriceIrr       Int
-  competitorPriceIrr Int
-  proposedPriceIrr   Int
-  legalRateIrr       Int?
+  basePriceIrr       BigInt
+  competitorPriceIrr BigInt
+  proposedPriceIrr   BigInt
+  legalRateIrr       BigInt?
   note               String?
   proposedById       String
   proposedBy         User                  @relation("PricingProposedBy", fields: [proposedById], references: [id])
   status             PricingProposalStatus @default(PENDING)
-  registeredPriceIrr Int?
+  registeredPriceIrr BigInt?
   approvedById       String?
   approvedBy         User?                 @relation("PricingApprovedBy", fields: [approvedById], references: [id])
   approvedAt         DateTime?
@@ -1191,10 +1191,10 @@ model RefundRequest {
   mobileEnc        String?
   // 24-digit شبا — encrypted at rest, decrypted only for the finance surface.
   ibanEnc          String
-  totalPaidIrr     Int
+  totalPaidIrr     BigInt
   penaltyPct       Int
-  penaltyAmountIrr Int
-  refundableIrr    Int
+  penaltyAmountIrr BigInt
+  refundableIrr    BigInt
   status           RefundStatus @default(SUBMITTED)
   // Design: refer sets the assignee WITHOUT advancing status.
   assigneeId       String?
@@ -1484,7 +1484,7 @@ model PromoCode {
   id             String      @id @default(uuid())
   code           String      @unique
   type           PromoType
-  value          Int
+  value          BigInt
   originCode     String?
   destCode       String?
   cabin          CabinClass?
@@ -1510,7 +1510,7 @@ model PromoRedemption {
   booking     Booking   @relation(fields: [bookingId], references: [id])
   userId      String
   user        User      @relation("PromoRedeemedBy", fields: [userId], references: [id])
-  discountIrr Int
+  discountIrr BigInt
   createdAt   DateTime  @default(now())
 
   @@index([promoCodeId])
@@ -1532,7 +1532,7 @@ model WalletEntry {
   userId          String
   user            User            @relation("WalletOwner", fields: [userId], references: [id])
   type            WalletEntryType
-  signedAmountIrr Int
+  signedAmountIrr BigInt
   bookingId       String?
   booking         Booking?        @relation(fields: [bookingId], references: [id])
   createdAt       DateTime        @default(now())
@@ -1581,8 +1581,8 @@ model PriceLock {
   flightInstanceId String
   flightInstance   FlightInstance  @relation(fields: [flightInstanceId], references: [id])
   cabin            CabinClass
-  lockedPriceIrr   Int
-  feeIrr           Int
+  lockedPriceIrr   BigInt
+  feeIrr           BigInt
   status           PriceLockStatus @default(ACTIVE)
   expiresAt        DateTime
   createdAt        DateTime        @default(now())
@@ -1721,7 +1721,7 @@ model AiUsageLog {
   contextId    String?
   inputTokens  Int
   outputTokens Int
-  costIrr      Int?
+  costIrr      BigInt?
   createdAt    DateTime @default(now())
 
   @@index([provider, createdAt])

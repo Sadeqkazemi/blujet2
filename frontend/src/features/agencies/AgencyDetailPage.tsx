@@ -318,7 +318,7 @@ export default function AgencyDetailPage() {
       title="اعتبار آژانس"
       action={
         <div className="flex gap-2">
-          {(isSenior || isFinance || isEmployee) && detail.credit.usedIrr > 0 && (
+          {(isSenior || isFinance || isEmployee) && Number(detail.credit.usedIrr) > 0 && (
             <button
               onClick={() => void onSettle()}
               className="rounded-lg bg-[#059669] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-[#047857]"
@@ -347,13 +347,13 @@ export default function AgencyDetailPage() {
         <div className="rounded-lg bg-surface p-3">
           <div className="text-[10px] text-muted">مصرف‌شده</div>
           <div className="font-num mt-1 text-sm font-black text-danger">
-            {faMoney(Math.max(detail.credit.usedIrr, 0))} تومان
+            {faMoney(Math.max(Number(detail.credit.usedIrr), 0))} تومان
           </div>
         </div>
         <div className="rounded-lg bg-surface p-3">
           <div className="text-[10px] text-muted">مانده اعتبار</div>
           <div className="font-num mt-1 text-sm font-black text-[#059669]">
-            {faMoney(Math.max(detail.credit.remainingIrr, 0))} تومان
+            {faMoney(Math.max(Number(detail.credit.remainingIrr), 0))} تومان
           </div>
         </div>
       </div>

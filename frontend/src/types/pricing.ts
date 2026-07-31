@@ -1,6 +1,9 @@
 export type PricingStatus = 'PENDING' | 'REGISTERED';
 
 export interface AiSuggestion {
+  // Advisory-only ML output, persisted as a plain JSON blob (not a native
+  // bigint column, never routed through BigInt.prototype.toJSON) — stays a
+  // real JS number, unlike the other Irr fields on this page.
   priceIrr: number;
   reason: string;
   factors: string[];
@@ -14,13 +17,15 @@ export interface AiSuggestion {
 export interface PricingProposal {
   id: string;
   flightInstanceId: string;
-  basePriceIrr: number;
-  competitorPriceIrr: number;
-  proposedPriceIrr: number;
-  legalRateIrr: number | null;
+  // Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON
+  // on the backend — a JS number can't safely hold IRR amounts above 2^53).
+  basePriceIrr: string;
+  competitorPriceIrr: string;
+  proposedPriceIrr: string;
+  legalRateIrr: string | null;
   note: string | null;
   status: PricingStatus;
-  registeredPriceIrr: number | null;
+  registeredPriceIrr: string | null;
   approvedAt: string | null;
   aiSuggestion: AiSuggestion | null;
   createdAt: string;

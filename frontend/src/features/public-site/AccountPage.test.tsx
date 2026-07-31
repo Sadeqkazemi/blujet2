@@ -16,12 +16,14 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+// Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON on
+// the backend — a JS number can't safely hold IRR amounts above 2^53).
 const BOOKING: BookingDetail = {
   id: 'b1',
   pnr: 'BJ4X2K',
   status: 'TICKETED',
   cabin: 'ECONOMY',
-  priceIrr: 16_000_000,
+  priceIrr: '16000000',
   holdExpiresAt: null,
   flightInstanceId: 'fi-1',
   flightNo: 'BJ-100',
@@ -38,9 +40,9 @@ const REFUND: RefundRequestView = {
   bookingId: 'b1',
   status: 'REVIEW',
   penaltyPct: 30,
-  penaltyAmountIrr: 4_800_000,
-  refundableIrr: 11_200_000,
-  totalPaidIrr: 16_000_000,
+  penaltyAmountIrr: '4800000',
+  refundableIrr: '11200000',
+  totalPaidIrr: '16000000',
   createdAt: '2026-07-01T00:00:00.000Z',
 };
 
@@ -48,8 +50,8 @@ const LOCK: PriceLock = {
   id: 'pl-1',
   flightInstanceId: 'fi-2',
   cabin: 'BUSINESS',
-  lockedPriceIrr: 680_000_000,
-  feeIrr: 2_040_000,
+  lockedPriceIrr: '680000000',
+  feeIrr: '2040000',
   status: 'ACTIVE',
   expiresAt: '2026-08-04T05:00:00.000Z',
   createdAt: '2026-08-01T00:00:00.000Z',
@@ -88,7 +90,7 @@ function renderPage() {
 
 beforeEach(() => {
   vi.spyOn(publicSiteApi, 'fetchMyBookings').mockResolvedValue([BOOKING]);
-  vi.spyOn(publicSiteApi, 'fetchWallet').mockResolvedValue({ balanceIrr: 250_000_0 });
+  vi.spyOn(publicSiteApi, 'fetchWallet').mockResolvedValue({ balanceIrr: '2500000' });
   vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({ isMember: true, level: 'GOLD', balance: 12450 });
   vi.spyOn(publicSiteApi, 'fetchMyRefunds').mockResolvedValue([REFUND]);
   vi.spyOn(publicSiteApi, 'fetchMyProfile').mockResolvedValue(PROFILE);
@@ -235,7 +237,7 @@ describe('AccountPage', () => {
 
   it('tops up the wallet using Persian-digit input, converting toman to rial correctly (regression: raw Number()*10 silently produced NaN)', async () => {
     mockAuth('authenticated');
-    const topup = vi.spyOn(publicSiteApi, 'topupWallet').mockResolvedValue({ balanceIrr: 5_000_000 });
+    const topup = vi.spyOn(publicSiteApi, 'topupWallet').mockResolvedValue({ balanceIrr: '5000000' });
     renderPage();
     await userEvent.click(screen.getByTestId('account-tab-wallet'));
 

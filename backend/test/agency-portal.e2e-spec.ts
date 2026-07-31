@@ -194,11 +194,14 @@ describe('Agency Portal (e2e)', () => {
       .get('/agency-portal/dashboard')
       .set('Authorization', auth(accessToken));
     expect(res.status).toBe(200);
-    expect(res.body.data.kpis.salesThisMonthIrr).toBeGreaterThanOrEqual(
+    // Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON)
+    // — parse for a numeric comparison; individual amounts here are far
+    // below 2^53 so Number() loses no precision for this display-only check.
+    expect(Number(res.body.data.kpis.salesThisMonthIrr)).toBeGreaterThanOrEqual(
       50_000_000,
     );
     expect(res.body.data.monthlySales).toHaveLength(6);
-    expect(res.body.data.credit.limitIrr).toBe(1_000_000_000);
+    expect(res.body.data.credit.limitIrr).toBe('1000000000');
   });
 
   it('GET /agency-portal/credit matches the staff-side derivation', async () => {
@@ -209,9 +212,9 @@ describe('Agency Portal (e2e)', () => {
       .get('/agency-portal/credit')
       .set('Authorization', auth(accessToken));
     expect(res.body.data).toEqual({
-      limitIrr: 700_000_000,
-      usedIrr: 100_000_000,
-      remainingIrr: 600_000_000,
+      limitIrr: '700000000',
+      usedIrr: '100000000',
+      remainingIrr: '600000000',
     });
   });
 
@@ -270,7 +273,7 @@ describe('Agency Portal (e2e)', () => {
     const creditRes = await request(app.getHttpServer())
       .get(`/agencies/${agency.id}/credit`)
       .set('Authorization', auth(finance.accessToken));
-    expect(creditRes.body.data.limitIrr).toBe(900_000_000);
+    expect(creditRes.body.data.limitIrr).toBe('900000000');
 
     const redecideRes = await request(app.getHttpServer())
       .patch(`/agencies/${agency.id}/credit-requests/${requestId}/decide`)
@@ -300,7 +303,7 @@ describe('Agency Portal (e2e)', () => {
     const creditRes = await request(app.getHttpServer())
       .get(`/agencies/${agency.id}/credit`)
       .set('Authorization', auth(finance.accessToken));
-    expect(creditRes.body.data.limitIrr).toBe(500_000_000);
+    expect(creditRes.body.data.limitIrr).toBe('500000000');
   });
 
   // ── Sales & inbox ─────────────────────────────────────────────────────
@@ -317,7 +320,7 @@ describe('Agency Portal (e2e)', () => {
       .set('Authorization', auth(accessToken));
     expect(res.status).toBe(200);
     expect(res.body.data.tickets).toHaveLength(1);
-    expect(res.body.data.summary.totalSalesIrr).toBe(30_000_000);
+    expect(res.body.data.summary.totalSalesIrr).toBe('30000000');
   });
 
   it('inbox: agency can read and post, posted messages are senderIsAgency=true, staff sees them', async () => {
@@ -381,7 +384,7 @@ describe('Agency Portal (e2e)', () => {
       .send({ scope: 'SEARCH_BOOK', months: 3, note: 'اتصال آزمایشی' });
     expect(createRes.status).toBe(201);
     expect(createRes.body.data.status).toBe('PENDING');
-    expect(createRes.body.data.priceIrr).toBe(120_000_000);
+    expect(createRes.body.data.priceIrr).toBe('120000000');
 
     const mineRes = await request(app.getHttpServer())
       .get('/agency-portal/webservice-requests')
@@ -395,7 +398,7 @@ describe('Agency Portal (e2e)', () => {
       .set('Authorization', auth(finance.accessToken));
     expect(staffRes.status).toBe(200);
     expect(staffRes.body.data).toHaveLength(1);
-    expect(staffRes.body.data[0].priceIrr).toBe(120_000_000);
+    expect(staffRes.body.data[0].priceIrr).toBe('120000000');
   });
 
   it('rejects a client-supplied price outright (whitelist DTO) — price always comes from the plan catalog', async () => {
@@ -412,7 +415,7 @@ describe('Agency Portal (e2e)', () => {
       .set('Authorization', auth(accessToken))
       .send({ scope: 'FULL', months: 12 });
     expect(createRes.status).toBe(201);
-    expect(createRes.body.data.priceIrr).toBe(420_000_000);
+    expect(createRes.body.data.priceIrr).toBe('420000000');
   });
 
   it('approval issues a real API key, delivers the raw key once via the inbox, and self-service reads never expose it', async () => {

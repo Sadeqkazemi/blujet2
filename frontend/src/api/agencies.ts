@@ -52,7 +52,8 @@ export function updateAgencyCredit(id: string, limitIrr: number) {
 }
 
 export function settleAgency(id: string) {
-  return apiPost<{ settledIrr: number; ledgerEntryId: string }>(`/agencies/${id}/settle`);
+  // settledIrr is a decimal STRING on the wire (BigInt.prototype.toJSON).
+  return apiPost<{ settledIrr: string; ledgerEntryId: string }>(`/agencies/${id}/settle`);
 }
 
 export function fetchAgencyRequests(status?: AgencyMembershipStatus) {

@@ -4,10 +4,12 @@ export interface RefundListRow {
   id: string;
   bookingId: string;
   passengerName: string;
-  totalPaidIrr: number;
+  // Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON
+  // on the backend — a JS number can't safely hold IRR amounts above 2^53).
+  totalPaidIrr: string;
   penaltyPct: number;
-  penaltyAmountIrr: number;
-  refundableIrr: number;
+  penaltyAmountIrr: string;
+  refundableIrr: string;
   status: RefundStatus;
   assigneeId: string | null;
   assignee: { id: string; fullName: string; role: string } | null;

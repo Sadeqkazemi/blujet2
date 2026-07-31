@@ -31,9 +31,13 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PanelAccessGuard } from '../panels/panel-access.guard';
 import { EmployeePermissionGuard } from '../../common/guards/employee-permission.guard';
 import { RequiresPermission } from '../../common/decorators/requires-permission.decorator';
+import {
+  IsIrrAmount,
+  MinIrrAmount,
+  TransformToIrr,
+} from '../../common/dto/irr.decorator';
+import type { Irr } from '../../common/money';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-
-const MAX_INT32 = 2_147_483_647;
 
 class CreateFlightDto {
   @ApiProperty({ description: 'کد فرودگاه مبدأ', example: 'THR' })
@@ -61,11 +65,15 @@ class CreateFlightDto {
   @Max(1000)
   capacity: number;
 
-  @ApiProperty({ description: 'قیمت پایه (ریال)', example: 38_000_000 })
-  @IsInt()
-  @Min(1)
-  @Max(MAX_INT32)
-  basePriceIrr: number;
+  @ApiProperty({
+    description: 'قیمت پایه (ریال)',
+    example: '38000000',
+    type: String,
+  })
+  @IsIrrAmount()
+  @MinIrrAmount(1n)
+  @TransformToIrr()
+  basePriceIrr: Irr;
 }
 
 class CreateScheduleDto {
@@ -111,11 +119,15 @@ class CreateScheduleDto {
 }
 
 class PlanFlightDto {
-  @ApiProperty({ description: 'نرخ برنامه‌ریزی (ریال)', example: 39_000_000 })
-  @IsInt()
-  @Min(1)
-  @Max(MAX_INT32)
-  priceIrr: number;
+  @ApiProperty({
+    description: 'نرخ برنامه‌ریزی (ریال)',
+    example: '39000000',
+    type: String,
+  })
+  @IsIrrAmount()
+  @MinIrrAmount(1n)
+  @TransformToIrr()
+  priceIrr: Irr;
 
   @ApiProperty({ description: 'تخصیص صندلی آژانس', example: 60 })
   @IsInt()
@@ -165,11 +177,15 @@ class CreateFareRuleDto {
   @IsString()
   classCode: string;
 
-  @ApiProperty({ description: 'قیمت (ریال)', example: 30_000_000 })
-  @IsInt()
-  @Min(1)
-  @Max(MAX_INT32)
-  priceIrr: number;
+  @ApiProperty({
+    description: 'قیمت (ریال)',
+    example: '30000000',
+    type: String,
+  })
+  @IsIrrAmount()
+  @MinIrrAmount(1n)
+  @TransformToIrr()
+  priceIrr: Irr;
 
   @ApiProperty({ description: 'تعداد صندلی تخصیص‌یافته', example: 20 })
   @IsInt()
@@ -180,13 +196,14 @@ class CreateFareRuleDto {
   @ApiProperty({
     description: 'مالیات/عوارض (ریال)',
     required: false,
-    example: 0,
+    example: '0',
+    type: String,
   })
   @IsOptional()
-  @IsInt()
-  @Min(0)
-  @Max(MAX_INT32)
-  taxIrr?: number;
+  @IsIrrAmount()
+  @MinIrrAmount(0n)
+  @TransformToIrr()
+  taxIrr?: Irr;
 
   @ApiProperty({ required: false })
   @IsOptional()
@@ -228,12 +245,12 @@ class CreateFareRuleDto {
 }
 
 class UpdateFareRuleDto {
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false, type: String })
   @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(MAX_INT32)
-  priceIrr?: number;
+  @IsIrrAmount()
+  @MinIrrAmount(1n)
+  @TransformToIrr()
+  priceIrr?: Irr;
 
   @ApiProperty({ required: false })
   @IsOptional()
@@ -242,12 +259,12 @@ class UpdateFareRuleDto {
   @Max(1000)
   seatsAllocated?: number;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false, type: String })
   @IsOptional()
-  @IsInt()
-  @Min(0)
-  @Max(MAX_INT32)
-  taxIrr?: number;
+  @IsIrrAmount()
+  @MinIrrAmount(0n)
+  @TransformToIrr()
+  taxIrr?: Irr;
 
   @ApiProperty({ required: false })
   @IsOptional()
@@ -314,12 +331,13 @@ class CreateAllotmentDto {
   @ApiProperty({
     required: false,
     description: 'نرخ قراردادی این آژانس (ریال)',
+    type: String,
   })
   @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(MAX_INT32)
-  contractPriceIrr?: number;
+  @IsIrrAmount()
+  @MinIrrAmount(1n)
+  @TransformToIrr()
+  contractPriceIrr?: Irr;
 }
 
 @ApiTags('flights')

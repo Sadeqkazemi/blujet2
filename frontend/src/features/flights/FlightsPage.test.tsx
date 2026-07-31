@@ -33,6 +33,8 @@ const FUTURE_ROW: FutureFlightRow = {
   basePriceIrr: null,
   agencySeatsAllocated: null,
   aiSuggestion: {
+    // Advisory-only ML output — a plain JSON number, unlike the other Irr
+    // fields on this page (see types/flights.ts).
     priceIrr: 41_000_000,
     reason: 'با توجه به فصل تابستان، نرخ پیشنهادی هم‌تراز رقباست.',
     factors: ['فصل: اوج سفر'],
@@ -56,7 +58,9 @@ const OVERVIEW: FlightsOverview = {
       capacity: 180,
       charterSeats: 60,
       sold: 152,
-      basePriceIrr: 38_000_000,
+      // Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON
+      // on the backend).
+      basePriceIrr: '38000000',
       derivedStatus: 'SELLING',
     },
     {
@@ -68,7 +72,7 @@ const OVERVIEW: FlightsOverview = {
       capacity: 140,
       charterSeats: 0,
       sold: 0,
-      basePriceIrr: 15_000_000,
+      basePriceIrr: '15000000',
       derivedStatus: 'CANCELLED',
     },
   ],
@@ -81,17 +85,17 @@ const OVERVIEW: FlightsOverview = {
         destCode: 'DXB',
         departureAt: '2026-07-10T08:30:00.000Z',
         tickets: 3,
-        basePriceIrr: 30_000_000,
-        avgPriceIrr: 40_000_000,
-        revenueIrr: 120_000_000,
-        channelRevenueIrr: { SYSTEM: 80_000_000, CHARTER: 0, AGENCY: 40_000_000 },
-        profitIrr: 30_000_000,
-        lossIrr: 0,
+        basePriceIrr: '30000000',
+        avgPriceIrr: '40000000',
+        revenueIrr: '120000000',
+        channelRevenueIrr: { SYSTEM: '80000000', CHARTER: '0', AGENCY: '40000000' },
+        profitIrr: '30000000',
+        lossIrr: '0',
       },
     ],
     kpis: {
-      totalSalesIrr: 120_000_000,
-      totalProfitIrr: 30_000_000,
+      totalSalesIrr: '120000000',
+      totalProfitIrr: '30000000',
       totalTickets: 3,
       flightCount: 1,
     },
@@ -102,11 +106,11 @@ const OVERVIEW: FlightsOverview = {
 const DETAIL: FlightDetail = {
   ...OVERVIEW.active[0],
   channels: [
-    { channel: 'SYSTEM', seats: 80, revenueIrr: 3_040_000_000 },
-    { channel: 'CHARTER', seats: 45, revenueIrr: 1_710_000_000 },
-    { channel: 'AGENCY', seats: 27, revenueIrr: 1_026_000_000 },
+    { channel: 'SYSTEM', seats: 80, revenueIrr: '3040000000' },
+    { channel: 'CHARTER', seats: 45, revenueIrr: '1710000000' },
+    { channel: 'AGENCY', seats: 27, revenueIrr: '1026000000' },
   ],
-  totalRevenueIrr: 5_776_000_000,
+  totalRevenueIrr: '5776000000',
   occupancyPct: 84,
   aircraftType: 'Airbus A320',
 };
@@ -215,7 +219,7 @@ describe('FlightsPage', () => {
     mockData();
     const planSpy = vi.spyOn(flightsApi, 'planFlight').mockResolvedValue({
       id: 'fu1',
-      basePriceIrr: 41_000_000,
+      basePriceIrr: '41000000',
       agencySeatsAllocated: 50,
       directSeats: 70,
       proposalPending: false,
