@@ -9,7 +9,7 @@ import * as useLocaleModule from '../../hooks/useLocale';
 import * as publicSiteApi from '../../api/publicSite';
 import * as supportTicketsApi from '../../api/support-tickets';
 import * as authApi from '../../api/auth';
-import type { BookingDetail, PriceLock, RefundRequestView, SavedFlight, SavedPassenger, UserProfile } from '../../types/public-site';
+import type { BookingDetail, PriceLock, RefundRequestView, SavedFlight, SavedPassenger, ActiveSession, UserProfile } from '../../types/public-site';
 import type { ClubMembershipView } from '../../types/club-membership';
 import type { MySupportTicketRow } from '../../types/support-tickets';
 
@@ -104,6 +104,26 @@ function mockAuth(status: 'authenticated' | 'unauthenticated', signOut = vi.fn()
   });
 }
 
+const ACTIVE_SESSION: ActiveSession = {
+  id: 'sess-1',
+  deviceLabel: 'Chrome · Windows',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0',
+  createdAt: '2026-07-01T00:00:00.000Z',
+  expiresAt: '2026-08-01T00:00:00.000Z',
+  isCurrent: true,
+};
+
+const OTHER_SESSION: ActiveSession = {
+  id: 'sess-2',
+  deviceLabel: 'اپلیکیشن blujet · اندروید',
+  ip: '10.0.0.2',
+  userAgent: 'blujet-android/1.0',
+  createdAt: '2026-06-28T00:00:00.000Z',
+  expiresAt: '2026-08-01T00:00:00.000Z',
+  isCurrent: false,
+};
+
 const SAVED_PASSENGER: SavedPassenger = {
   id: 'sp-1',
   fullName: 'محمد رضایی',
@@ -161,6 +181,7 @@ beforeEach(() => {
   vi.spyOn(publicSiteApi, 'fetchMyPriceLocks').mockResolvedValue([]);
   vi.spyOn(publicSiteApi, 'fetchSavedFlights').mockResolvedValue([SAVED]);
   vi.spyOn(publicSiteApi, 'fetchSavedPassengers').mockResolvedValue([SAVED_PASSENGER]);
+  vi.spyOn(publicSiteApi, 'fetchMySessions').mockResolvedValue([ACTIVE_SESSION, OTHER_SESSION]);
   vi.spyOn(supportTicketsApi, 'fetchMySupportTickets').mockResolvedValue([]);
 });
 
@@ -249,6 +270,20 @@ describe('AccountPage', () => {
     await userEvent.click(screen.getByTestId('account-tab-tickets'));
     expect(await screen.findByTestId('account-ticket')).toHaveTextContent('مشکل در پرداخت');
     expect(screen.getByText('TKAABBCCDD', { exact: false })).toBeInTheDocument();
+  });
+
+  it('switches to the security tab and lists active sessions with revoke', async () => {
+    mockAuth('authenticated');
+    const revoke = vi.spyOn(publicSiteApi, 'revokeMySession').mockResolvedValue({ revoked: true });
+    renderPage();
+    await userEvent.click(screen.getByTestId('account-tab-security'));
+    expect(await screen.findByTestId('account-sessions')).toBeInTheDocument();
+    expect(screen.getByTestId('session-current-badge')).toBeInTheDocument();
+    expect(screen.getByText('Chrome · Windows')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId('session-revoke-sess-2'));
+    await vi.waitFor(() => expect(revoke).toHaveBeenCalledWith('sess-2'));
+    expect(screen.queryByText('اپلیکیشن blujet · اندروید')).not.toBeInTheDocument();
   });
 
   it('switches to the security tab and sets password via OTP flow API', async () => {

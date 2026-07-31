@@ -1136,6 +1136,21 @@ checkout autofill (autofill wiring on `BookPage` deferred).
   preview (`AccountProfileSavedPax`); «+ افزودن مسافر» switches to the
   `passengers` tab and opens the add modal.
 
+### پنل کاربر — نشست‌های فعال (`/account` → تب `security`)
+Closes the «نشست‌های فعال / دستگاه‌های متصل» block in
+`design-reference-v2/پنل کاربر.dc.html`. Reuses existing `RefreshToken`
+rows — no schema change.
+
+- `GET /my/sessions` (new, `USER` role) — non-revoked, non-expired refresh
+  tokens for the caller only; each row `{ id, deviceLabel, ip, userAgent,
+  createdAt, expiresAt, isCurrent }`. `isCurrent` is true when the
+  request's `blujet_refresh` cookie matches that row's hash.
+- `DELETE /my/sessions/:id` (new, `USER` role) — revokes one other-device
+  session; `403` if targeting the current cookie's session (use logout
+  instead); owner-only `404`.
+- Frontend: `AccountSecuritySessions` on `AccountPage.tsx` `security` tab
+  (device list, «دستگاه فعلی» badge, «پایان نشست» for others).
+
 ## Phase 21 — فراموشی رمز (customer forgot/set password)
 
 Third "dead forms" item. `ForgotPasswordPage.tsx` was entirely client-side
