@@ -1481,6 +1481,29 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
     limit instead; `reporting.e2e-spec.ts`'s "money fields are raw
     integers" assertion flips from `typeof === 'number'` to
     `typeof === 'string'`, matching the new wire format on purpose.
+- [x] **Staff auth surfaces — forced password change + login polish** —
+  closes the long-deferred `mustChangePassword` enforcement gap (IT/admin
+  temp-password resets previously set the flag but never blocked panel
+  access): `GET /auth/me` and login responses now expose
+  `mustChangePassword`; `JwtAuthGuard` returns `403 PASSWORD_CHANGE_REQUIRED`
+  on every JWT-protected staff/agency route except `/auth/me`,
+  `/auth/change-password`, and `/auth/logout`; frontend
+  `ForcePasswordChangePage` at `/required-password-change` gates
+  `ProtectedRoute`/`AgencyProtectedRoute` until `POST /auth/change-password`
+  clears the flag. Staff login/2FA polish: design-aligned button copy
+  («ورود به سامانه»), bottom toast for forgot-password (contact IT),
+  SVG feature icons in `StaffLoginLayout`, 2FA back link. Backend: 1 new
+  e2e case in `auth.e2e-spec.ts` (22 total passing). Frontend: 19 auth
+  unit tests passing across `LoginPage`, `TwoFactorPage`,
+  `ForcePasswordChangePage`. See `docs/features/staff-auth-surfaces.md`.
+- [x] **Forgot-password v2 visual parity** — redesigned
+  `/forgot-password` to match `design-reference-v2/فراموشی رمز.dc.html`: 960px
+  two-column card, gradient visual panel (SVG plane, hidden <768px), header with
+  locale switcher + back chip, 3-step stepper, +98 phone prefix with hints,
+  6-cell OTP (backend stays 6-digit), password strength meter, secure footer
+  note. Phone **and** email paths kept in all locales (Phase 51 unchanged).
+  Frontend: 10 Vitest tests in `ForgotPasswordPage.test.tsx`. See
+  `docs/features/forgot-password-v2-visual.md`.
 
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is
