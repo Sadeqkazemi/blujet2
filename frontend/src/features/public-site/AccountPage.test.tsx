@@ -263,6 +263,19 @@ describe('AccountPage', () => {
     expect(setPw).toHaveBeenCalledWith('secret12');
   });
 
+  it('shows saved passengers on the profile tab and opens add modal from there', async () => {
+    mockAuth('authenticated');
+    renderPage();
+    await userEvent.click(screen.getByTestId('account-tab-profile'));
+    expect(await screen.findByTestId('profile-saved-pax')).toBeInTheDocument();
+    expect(screen.getAllByTestId('profile-saved-pax-row')).toHaveLength(1);
+    expect(screen.getByText('MOHAMMAD REZAEI · A22113344')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId('profile-saved-pax-add'));
+    expect(await screen.findByTestId('passengers-form-modal')).toBeInTheDocument();
+    expect(screen.getByTestId('account-passengers')).toBeInTheDocument();
+  });
+
   it('shows an incomplete-profile banner and saves identity fields from the profile tab', async () => {
     mockAuth('authenticated');
     const update = vi.spyOn(publicSiteApi, 'updateMyProfile').mockResolvedValue({

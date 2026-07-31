@@ -1334,7 +1334,7 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   `ResultsPage` bookmark button. See `docs/features/saved-flights.md`.
 - [x] **User panel — مسافران ذخیره‌شده (saved passengers)** — `SavedPassenger`
   model + `GET/POST/PATCH/DELETE /my/saved-passengers`; `AccountPage`
-  `passengers` tab CRUD + `BookPage` autofill chips. See
+  `passengers` tab CRUD + `BookPage` autofill chips + profile-tab preview block. See
   `docs/features/saved-passengers.md`.
 - [x] **Bug fix (senior review, found while chasing the "pre-existing"
   reporting flake): revenue reporting polluted by agency debt-calibration
