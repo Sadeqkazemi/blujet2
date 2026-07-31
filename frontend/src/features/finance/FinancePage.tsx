@@ -25,15 +25,8 @@ import type {
   RecentTransactionsResult,
   RevenueMixResult,
   SalesChartPeriod,
-  SalesGranularity,
   SettlementStatus,
 } from '../../types/reporting';
-
-const CHART_MODES: { key: SalesGranularity; label: string }[] = [
-  { key: 'q3', label: '۳ ماهه' },
-  { key: 'q6', label: '۶ ماهه' },
-  { key: 'year', label: 'سالانه' },
-];
 import type { ReconciliationItem } from '../../types/reconciliation';
 
 const SETTLEMENT_STATUS: Record<SettlementStatus, { label: string; className: string }> = {
@@ -309,7 +302,7 @@ function ReconciliationQueueCard({
 /** FINANCE_MANAGER's finance-ops layout — the only panel with transactions
  * and agency settlements, per the design. */
 function FinanceOpsView() {
-  const [granularity, setGranularity] = useState<SalesGranularity>('year');
+  const chart = useSalesChartQuery({ includeFlightMode: false });
   const [kpis, setKpis] = useState<KpiResult | null>(null);
   const [alerts, setAlerts] = useState<LowSalesAlert[]>([]);
   const [flights, setFlights] = useState<CompletedFlightsSummary | null>(null);
@@ -320,13 +313,15 @@ function FinanceOpsView() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  function reload() {
+  useEffect(() => {
+    if (!chart.isQueryReady) return;
+
     Promise.all([
-      fetchKpis({ granularity }),
+      fetchKpis(chart.query),
       fetchLowSalesAlerts(),
-      fetchCompletedFlightsSummary({ granularity }),
+      fetchCompletedFlightsSummary(chart.query),
       fetchRecentTransactions(),
-      fetchRevenueMix({ granularity }),
+      fetchRevenueMix(chart.query),
       fetchAgencySettlements(),
       fetchReconciliationQueue(),
     ])
@@ -338,11 +333,10 @@ function FinanceOpsView() {
         setMix(m);
         setSettlements(s);
         setReconciliation(r);
+        setError(null);
       })
       .catch(() => setError('خطا در دریافت اطلاعات مالی.'));
-  }
-
-  useEffect(reload, [granularity]);
+  }, [chart.query, chart.isQueryReady]);
 
   async function onResolveReconciliation(id: string, note: string) {
     await resolveReconciliation(id, note);
@@ -359,11 +353,21 @@ function FinanceOpsView() {
   }
 
   if (error) return <p className="p-8 text-sm text-danger">{error}</p>;
-  if (!kpis || !flights || !tx || !mix || !settlements || !reconciliation)
+  if (!chart.isQueryReady || !kpis || !flights || !tx || !mix || !settlements || !reconciliation)
     return <p className="p-8 text-sm text-muted">در حال بارگذاری…</p>;
 
   const periodLabel =
-    granularity === 'year' ? 'سال جاری' : granularity === 'q6' ? '۶ ماهه' : '۳ ماهه';
+    chart.granularity === 'year'
+      ? 'سال جاری'
+      : chart.granularity === 'q6'
+        ? '۶ ماهه'
+        : chart.granularity === 'q3'
+          ? '۳ ماهه'
+          : chart.granularity === 'month'
+            ? 'ماهانه'
+            : chart.granularity === 'day'
+              ? 'روزانه'
+              : '';
 
   const kpiCards = [
     {
@@ -400,19 +404,19 @@ function FinanceOpsView() {
 
       <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
         <span className="text-[11px] text-muted">بازهٔ گزارش:</span>
-        <div className="flex gap-1 rounded-lg border border-border bg-body p-1">
-          {CHART_MODES.map((m) => (
-            <button
-              key={m.key}
-              onClick={() => setGranularity(m.key)}
-              className={`rounded-md px-3 py-1.5 text-[11px] transition ${
-                granularity === m.key ? 'bg-accent font-bold text-white' : 'text-muted hover:text-ink'
-              }`}
-            >
-              {m.label}
-            </button>
-          ))}
-        </div>
+        <SalesChartControls
+          modes={chart.modes}
+          granularity={chart.granularity}
+          onGranularityChange={chart.setGranularity}
+          selectedDate={chart.selectedDate}
+          onSelectedDateChange={chart.setSelectedDate}
+          selectedMonthStart={chart.selectedMonthStart}
+          onSelectedMonthStartChange={chart.setSelectedMonthStart}
+          flightNo={chart.flightNo}
+          onFlightNoChange={chart.setFlightNo}
+          onApplyFlightNo={chart.applyFlightNo}
+          variant="segmented"
+        />
       </div>
 
       <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">

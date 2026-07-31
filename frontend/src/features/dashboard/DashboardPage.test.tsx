@@ -76,4 +76,21 @@ describe('DashboardPage', () => {
       expect(chartSpy).toHaveBeenCalledWith(expect.objectContaining({ granularity: 'day', date: expect.any(String) })),
     );
   });
+
+  it('loads month granularity with a periodStart parameter', async () => {
+    const chartSpy = vi.spyOn(reportingApi, 'fetchSalesChart').mockResolvedValue(SALES_CHART);
+    vi.spyOn(reportingApi, 'fetchKpis').mockResolvedValue(KPIS);
+    vi.spyOn(reportingApi, 'fetchCompletedFlightsSummary').mockResolvedValue(FLIGHTS_SUMMARY);
+
+    const { default: userEvent } = await import('@testing-library/user-event');
+    render(<DashboardPage />);
+    await screen.findByText('کل درآمد');
+
+    await userEvent.click(screen.getByRole('button', { name: 'ماهانه' }));
+    await waitFor(() =>
+      expect(chartSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ granularity: 'month', periodStart: expect.any(String) }),
+      ),
+    );
+  });
 });
