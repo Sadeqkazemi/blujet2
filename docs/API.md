@@ -1026,6 +1026,29 @@ side anyway.
   dashboard's new summary section is this phase's only admin surface for
   it.
 
+### پنل کاربر — پیام به پشتیبانی (`/account` → تب `tickets`)
+Closes the gap flagged in `design-reference-v2/پنل کاربر.dc.html`'s
+`accountNav` (`tickets` / «پیام به پشتیبانی») — the public
+`POST /support-tickets` flow existed from Phase 20 but logged-in customers
+had no way to see their submissions inside `/account`.
+
+- `GET /my/support-tickets` (new, `USER` role) — list the caller's own
+  tickets: rows where `userId = caller.id`, **plus** any anonymous
+  submissions whose `requesterPhone` exactly matches the caller's stored
+  `User.phone` (covers tickets filed before login with the same number).
+  Returns `{ id, trackingCode, subject, body, status, history, createdAt,
+  updatedAt }` only — no admin-only fields (`dept`, `priority`,
+  `forwardedTo`).
+- `GET /my/support-tickets/:id` (new, `USER` role) — detail for one owned
+  ticket; `404` if the row isn't linked to the caller by `userId` or
+  phone match above.
+- `POST /my/support-tickets` (new, `USER` role, `@Throttle` 10/min per
+  account) — same body as the public submit DTO; always sets `userId` to
+  the caller. Returns `{ id, trackingCode }`.
+- Frontend: new `tickets` tab on `AccountPage.tsx` listing status +
+  tracking code + history timeline; link to `/support` to open a new
+  ticket. No reply thread or attachments (same Phase 20 deferrals).
+
 ## Phase 21 — فراموشی رمز (customer forgot/set password)
 
 Third "dead forms" item. `ForgotPasswordPage.tsx` was entirely client-side

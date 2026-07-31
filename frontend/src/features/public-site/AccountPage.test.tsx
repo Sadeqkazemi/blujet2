@@ -7,7 +7,9 @@ import * as useAuthModule from '../../hooks/useAuth';
 import { mockAuthUser } from '../../test/mockAuthUser';
 import * as useLocaleModule from '../../hooks/useLocale';
 import * as publicSiteApi from '../../api/publicSite';
+import * as supportTicketsApi from '../../api/support-tickets';
 import type { BookingDetail, PriceLock, RefundRequestView, UserProfile } from '../../types/public-site';
+import type { MySupportTicketRow } from '../../types/support-tickets';
 
 function mockLocale(locale: 'fa' | 'en' | 'ar') {
   vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale, setLocale: vi.fn() });
@@ -79,6 +81,17 @@ function mockAuth(status: 'authenticated' | 'unauthenticated', signOut = vi.fn()
   });
 }
 
+const TICKET: MySupportTicketRow = {
+  id: 'tk-1',
+  trackingCode: 'TKAABBCCDD',
+  subject: 'مشکل در پرداخت',
+  body: 'وجه کسر شد ولی بلیط صادر نشد.',
+  status: 'IN_PROGRESS',
+  history: [{ step: 'submitted', labelFa: 'ثبت تیکت توسط کاربر', at: '2026-07-01T00:00:00.000Z' }],
+  createdAt: '2026-07-01T00:00:00.000Z',
+  updatedAt: '2026-07-01T00:00:00.000Z',
+};
+
 function renderPage() {
   return render(
     <MemoryRouter>
@@ -94,6 +107,7 @@ beforeEach(() => {
   vi.spyOn(publicSiteApi, 'fetchMyRefunds').mockResolvedValue([REFUND]);
   vi.spyOn(publicSiteApi, 'fetchMyProfile').mockResolvedValue(PROFILE);
   vi.spyOn(publicSiteApi, 'fetchMyPriceLocks').mockResolvedValue([]);
+  vi.spyOn(supportTicketsApi, 'fetchMySupportTickets').mockResolvedValue([]);
 });
 
 describe('AccountPage', () => {
@@ -131,6 +145,15 @@ describe('AccountPage', () => {
     renderPage();
     await userEvent.click(screen.getByTestId('account-tab-refunds'));
     expect(await screen.findByTestId('account-refund')).toHaveTextContent('در حال بررسی');
+  });
+
+  it('switches to the tickets tab and lists support tickets', async () => {
+    mockAuth('authenticated');
+    vi.spyOn(supportTicketsApi, 'fetchMySupportTickets').mockResolvedValue([TICKET]);
+    renderPage();
+    await userEvent.click(screen.getByTestId('account-tab-tickets'));
+    expect(await screen.findByTestId('account-ticket')).toHaveTextContent('مشکل در پرداخت');
+    expect(screen.getByText('TKAABBCCDD', { exact: false })).toBeInTheDocument();
   });
 
   it('shows an incomplete-profile banner and saves identity fields from the profile tab', async () => {

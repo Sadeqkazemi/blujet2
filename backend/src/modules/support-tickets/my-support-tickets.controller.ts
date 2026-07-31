@@ -1,0 +1,50 @@
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
+import { SupportTicketsService } from './support-tickets.service';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { SubmitSupportTicketDto } from './dto/support-ticket.dtos';
+import type { AuthenticatedUser } from '../../common/types/authenticated-user';
+
+/** Customer account: list/detail/submit own support tickets (see
+ * docs/API.md's «پنل کاربر — پیام به پشتیبانی» section). Kept separate
+ * from SupportTicketsController so USER accounts never touch the
+ * SITE_ADMIN review endpoints. */
+@ApiTags('support-tickets')
+@Controller('my/support-tickets')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('USER')
+export class MySupportTicketsController {
+  constructor(private readonly tickets: SupportTicketsService) {}
+
+  @Get()
+  @ApiOperation({ summary: 'فهرست تیکت‌های پشتیبانی مشتری جاری' })
+  async listMine(@CurrentUser() actor: AuthenticatedUser) {
+    const data = await this.tickets.listMine(actor);
+    return { success: true, data };
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'جزئیات یک تیکت پشتیبانی مشتری' })
+  async getMine(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    const data = await this.tickets.getMine(actor, id);
+    return { success: true, data };
+  }
+
+  @Post()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({ summary: 'ثبت تیکت پشتیبانی از پنل کاربر (با ورود)' })
+  async submit(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Body() dto: SubmitSupportTicketDto,
+  ) {
+    const data = await this.tickets.submitForUser(actor, dto);
+    return { success: true, data };
+  }
+}
