@@ -97,3 +97,45 @@ export interface AllotmentRow {
   createdAt: string;
   active: boolean;
 }
+
+export interface FareRuleRow {
+  id: string;
+  flightInstanceId: string;
+  cabin: 'ECONOMY' | 'BUSINESS';
+  classCode: string;
+  priceIrr: number;
+  seatsAllocated: number;
+  taxIrr: number;
+  refundable: boolean;
+  changeable: boolean;
+  baggageAllowanceKg: number | null;
+  validFrom: string | null;
+  validUntil: string | null;
+  allowedChannels: ('SYSTEM' | 'CHARTER' | 'AGENCY')[];
+}
+
+export interface CreateFareRulePayload {
+  cabin: 'ECONOMY' | 'BUSINESS';
+  classCode: string;
+  priceIrr: number;
+  seatsAllocated: number;
+  taxIrr?: number;
+  refundable?: boolean;
+  changeable?: boolean;
+  baggageAllowanceKg?: number;
+  validFrom?: string;
+  validUntil?: string;
+  allowedChannels?: ('SYSTEM' | 'CHARTER' | 'AGENCY')[];
+}
+
+export interface UpdateFareRulePayload {
+  priceIrr?: number;
+  seatsAllocated?: number;
+  taxIrr?: number;
+  refundable?: boolean;
+  changeable?: boolean;
+  baggageAllowanceKg?: number;
+  validFrom?: string;
+  validUntil?: string;
+  allowedChannels?: ('SYSTEM' | 'CHARTER' | 'AGENCY')[];
+}

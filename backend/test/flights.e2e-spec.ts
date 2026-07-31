@@ -209,6 +209,25 @@ describe('Flights (e2e)', () => {
     expect(denied.status).toBe(403);
   });
 
+  it('POST /flights/airports creates a new airport and rejects duplicates', async () => {
+    const { accessToken } = await loginAs(app, 'comm.abbasi');
+    const suffix = Date.now().toString(36).slice(-4).toUpperCase();
+    const code = `Z${suffix[0]}${suffix[1]}`.replace(/[^A-Z]/g, 'X');
+    const cityFa = `شهر تست ${suffix}`;
+    const created = await request(app.getHttpServer())
+      .post('/flights/airports')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ cityFa, code });
+    expect(created.status).toBe(201);
+    expect(created.body.data.code).toBe(code);
+
+    const dup = await request(app.getHttpServer())
+      .post('/flights/airports')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ cityFa: `${cityFa} ۲`, code });
+    expect(dup.status).toBe(409);
+  });
+
   it('POST /flights: validations (same origin/dest, past date, duplicate flightNo on another route) then a clean create', async () => {
     const { accessToken } = await loginAs(app, 'senior.rahimi');
     const base = {

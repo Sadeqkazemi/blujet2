@@ -306,6 +306,69 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
     expect(forbidden.status).toBe(403);
   });
 
+  it('social links: IT_MANAGER patches socialLinks, public GET returns enabled only', async () => {
+    const it = await loginAs(app, 'itadmin');
+
+    const patchRes = await request(app.getHttpServer())
+      .patch('/settings')
+      .set('Authorization', auth(it.accessToken))
+      .send({
+        patch: {
+          socialLinks: [
+            {
+              id: 'instagram',
+              name: 'اینستاگرام blujet',
+              url: 'instagram.com/blujet',
+              enabled: true,
+            },
+            { id: 'telegram', enabled: false },
+          ],
+        },
+      });
+    expect(patchRes.status).toBe(200);
+    expect(
+      (patchRes.body.data.settings.socialLinks as { id: string; enabled: boolean }[]).find(
+        (l) => l.id === 'instagram',
+      )?.enabled,
+    ).toBe(true);
+
+    const publicRes = await request(app.getHttpServer()).get('/settings/social-links');
+    expect(publicRes.status).toBe(200);
+    expect(publicRes.body.data.links).toEqual([
+      {
+        id: 'instagram',
+        name: 'اینستاگرام blujet',
+        url: 'https://instagram.com/blujet',
+      },
+    ]);
+
+    const badPatch = await request(app.getHttpServer())
+      .patch('/settings')
+      .set('Authorization', auth(it.accessToken))
+      .send({
+        patch: {
+          socialLinks: [{ id: 'instagram', enabled: true, url: '  ' }],
+        },
+      });
+    expect(badPatch.status).toBe(400);
+
+    // Restore defaults for repeatable runs.
+    await request(app.getHttpServer())
+      .patch('/settings')
+      .set('Authorization', auth(it.accessToken))
+      .send({
+        patch: {
+          socialLinks: [
+            { id: 'instagram', enabled: false, url: '' },
+            { id: 'telegram', enabled: false },
+            { id: 'whatsapp', enabled: false },
+            { id: 'linkedin', enabled: false },
+            { id: 'x', enabled: false },
+          ],
+        },
+      });
+  });
+
   // ── IT read-only panels access ────────────────────────────────────────
 
   it('IT_MANAGER can read /panels/access but PATCH stays 403', async () => {
