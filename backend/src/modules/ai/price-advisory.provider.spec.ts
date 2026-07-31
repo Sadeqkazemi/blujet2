@@ -41,6 +41,25 @@ describe('MlPriceAdvisoryProvider (unit)', () => {
     ).resolves.toEqual({ available: false, reason: 'ADVISORY_UNAVAILABLE' });
   });
 
+  it('returns ADVISORY_UNAVAILABLE when recommendation enum is invalid', async () => {
+    process.env.ML_SERVICE_URL = 'http://ml';
+    process.env.ML_SERVICE_INTERNAL_TOKEN = 'tok';
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          model_version: 'rec-v1',
+          recommendation: 'MAYBE',
+          explanation_fa: 'نامعتبر',
+          confidence: 0.5,
+        }),
+    });
+    const provider = new MlPriceAdvisoryProvider();
+    await expect(
+      provider.advise({ origin: 'THR', dest: 'MHD', date: '2026-08-01' }),
+    ).resolves.toEqual({ available: false, reason: 'ADVISORY_UNAVAILABLE' });
+  });
+
   it('returns an available advisory when ml-service responds with a valid payload', async () => {
     process.env.ML_SERVICE_URL = 'http://ml';
     process.env.ML_SERVICE_INTERNAL_TOKEN = 'tok';

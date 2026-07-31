@@ -87,11 +87,11 @@ export class MlPriceAdvisoryProvider implements PriceAdvisoryProvider {
       }
       const body = (await res.json()) as MlRecommendationWire;
       if (
-        !body.recommendation ||
+        (body.recommendation !== 'BUY_NOW' && body.recommendation !== 'WAIT') ||
         !body.explanation_fa ||
         typeof body.confidence !== 'number'
       ) {
-        this.logger.warn('ml-service recommendations payload incomplete');
+        this.logger.warn('ml-service recommendations payload incomplete or invalid');
         return UNAVAILABLE;
       }
       return {
