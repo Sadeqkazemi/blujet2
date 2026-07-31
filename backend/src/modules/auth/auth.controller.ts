@@ -30,6 +30,7 @@ import { UpdateLocaleDto } from './dto/update-locale.dto';
 import { RequestPasswordResetEmailDto } from './dto/request-password-reset-email.dto';
 import { VerifyPasswordResetEmailDto } from './dto/verify-password-reset-email.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { SkipMustChangePassword } from '../../common/decorators/skip-must-change-password.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -205,6 +206,7 @@ export class AuthController {
 
   @Post('logout')
   @HttpCode(HttpStatus.OK)
+  @SkipMustChangePassword()
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Revoke the current refresh token' })
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
@@ -217,6 +219,7 @@ export class AuthController {
   }
 
   @Get('me')
+  @SkipMustChangePassword()
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: "Current authenticated user's identity and role" })
   async me(@CurrentUser() user: AuthenticatedUser) {
@@ -240,6 +243,7 @@ export class AuthController {
 
   @Post('change-password')
   @HttpCode(HttpStatus.OK)
+  @SkipMustChangePassword()
   @UseGuards(JwtAuthGuard)
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @ApiOperation({

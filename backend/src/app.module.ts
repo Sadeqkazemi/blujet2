@@ -9,6 +9,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
 import { HealthModule } from './health/health.module';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
+import { CommonModule } from './common/common.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { PanelsModule } from './modules/panels/panels.module';
 import { ReportingModule } from './modules/reporting/reporting.module';
@@ -77,6 +78,7 @@ import { WebservicePricingModule } from './modules/webservice-pricing/webservice
     ThrottlerModule.forRoot({
       throttlers: [{ ttl: 60_000, limit: 600 }],
     }),
+    CommonModule,
     PrismaModule,
     RedisModule,
     HealthModule,

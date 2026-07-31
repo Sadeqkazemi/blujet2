@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { ApiRequestError } from '../../api/envelope';
 import { StaffLoginLayout } from './StaffLoginLayout';
@@ -35,8 +35,8 @@ export default function TwoFactorPage() {
     setError(null);
     setSubmitting(true);
     try {
-      await confirmTwoFactor(challengeId!, code.trim());
-      navigate('/panel', { replace: true });
+      const loggedIn = await confirmTwoFactor(challengeId!, code.trim());
+      navigate(loggedIn.mustChangePassword ? '/required-password-change' : '/panel', { replace: true });
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : 'خطا در تأیید کد.');
     } finally {
@@ -46,8 +46,16 @@ export default function TwoFactorPage() {
 
   return (
     <StaffLoginLayout>
+      <div className="mb-4 flex h-[46px] w-[46px] items-center justify-center rounded-2xl bg-gradient-to-br from-accent/10 to-accent/20 text-accent">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="4" y="10" width="16" height="10" rx="2" />
+          <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+        </svg>
+      </div>
       <div className="mb-1.5 text-[19px] font-black text-[#0f172a]">تأیید هویت دومرحله‌ای</div>
-      <div className="mb-5 text-[11.5px] leading-[1.9] text-[#64748b]">کد ۶ رقمی ارسال‌شده را وارد کنید.</div>
+      <div className="mb-5 text-[11.5px] leading-[1.9] text-[#64748b]">
+        کد ۶ رقمی ارسال‌شده به موبایل ثبت‌شده را وارد کنید.
+      </div>
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
         <div>
@@ -80,6 +88,13 @@ export default function TwoFactorPage() {
           {submitting ? 'در حال بررسی…' : 'تأیید و ورود'}
         </button>
       </form>
+
+      <Link
+        to="/login"
+        className="mt-5 block text-center text-[11.5px] font-semibold text-[#64748b] hover:text-accent"
+      >
+        ‹ بازگشت به ورود
+      </Link>
     </StaffLoginLayout>
   );
 }

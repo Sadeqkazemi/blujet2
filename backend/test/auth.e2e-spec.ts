@@ -1,5 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
+import * as argon2 from 'argon2';
 import { App } from 'supertest/types';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { TWO_FACTOR_PROVIDER } from '../src/modules/auth/providers/two-factor-provider.interface';
@@ -114,6 +115,7 @@ describe('Auth (e2e)', () => {
     expect(verifyRes!.status).toBe(200);
     expect(verifyRes!.body.data.accessToken).toBeDefined();
     expect(verifyRes!.body.data.user.role).toBe('FINANCE_MANAGER');
+    expect(verifyRes!.body.data.user.mustChangePassword).toBe(false);
     const setCookie = verifyRes!.headers['set-cookie'];
     expect(setCookie).toBeDefined();
     expect(String(setCookie)).toContain('blujet_refresh=');
@@ -163,6 +165,52 @@ describe('Auth (e2e)', () => {
       .set('Authorization', `Bearer ${accessToken}`);
     expect(res.status).toBe(200);
     expect(res.body.data.role).toBe('CEO');
+    expect(res.body.data.mustChangePassword).toBe(false);
+  });
+
+  it('mustChangePassword blocks panel APIs until POST /auth/change-password clears the flag', async () => {
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { username: 'finance.karimi' },
+    });
+    const originalHash = user.passwordHash;
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { mustChangePassword: true },
+    });
+
+    const { accessToken, verifyRes } = await loginAs(app, 'finance.karimi');
+    expect(verifyRes!.body.data.user.mustChangePassword).toBe(true);
+
+    const blocked = await request(app.getHttpServer())
+      .get('/panels/nav')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(blocked.status).toBe(403);
+    expect(blocked.body.error.code).toBe('PASSWORD_CHANGE_REQUIRED');
+
+    const me = await request(app.getHttpServer())
+      .get('/auth/me')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(me.status).toBe(200);
+    expect(me.body.data.mustChangePassword).toBe(true);
+
+    const changed = await request(app.getHttpServer())
+      .post('/auth/change-password')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ currentPassword: 'Blujet@1404', newPassword: 'Blujet@1404-new' });
+    expect(changed.status).toBe(200);
+
+    const nav = await request(app.getHttpServer())
+      .get('/panels/nav')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(nav.status).toBe(200);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash: originalHash ?? (await argon2.hash('Blujet@1404')),
+        mustChangePassword: false,
+      },
+    });
   });
 
   it('/auth/me defaults preferredLocale to FA; PATCH /auth/me/locale updates it and persists', async () => {

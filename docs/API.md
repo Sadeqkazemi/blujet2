@@ -663,7 +663,11 @@ panels. Key ⚑ decisions:
 
 | Method | Path | Roles | Notes |
 |---|---|---|---|
-| POST | `/auth/change-password` | any authenticated staff | «تغییر رمز عبور من» `{ currentPassword, newPassword (min 6) }` — verifies the current password (argon2) before updating; 401 on mismatch; audited (SECURITY, no password material logged). |
+| POST | `/auth/change-password` | any authenticated staff or agency | «تغییر رمز عبور من» `{ currentPassword, newPassword (min 6) }` — verifies the current password (argon2) before updating; 401 on mismatch; sets `mustChangePassword=false` on success; audited (SECURITY, no password material logged). **Always allowed** even when `mustChangePassword=true` (the forced-change gate). |
+| GET | `/auth/me` | any authenticated | Returns `{ id, fullName, role, preferredLocale, mustChangePassword }`. |
+| * | any other JWT-protected staff/agency route | staff + agency | When `mustChangePassword=true`, returns `403` with code `PASSWORD_CHANGE_REQUIRED` and message «قبل از ادامه باید رمز عبور خود را تغییر دهید.» — enforced in `JwtAuthGuard` after token validation. Skipped on `/auth/me`, `/auth/change-password`, `/auth/logout`. |
+
+**Forced password change (Phase staff-auth):** IT/admin/agency-approval flows that issue a temporary password set `mustChangePassword=true`. After 2FA (staff) or direct login (agency), the frontend redirects to `/required-password-change` until `POST /auth/change-password` succeeds. This closes the gap where temp passwords could be used indefinitely.
 
 ### `backend/src/modules/audit/` (addition)
 
