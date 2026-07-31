@@ -2,12 +2,16 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import {
+  decideAgencyCreditRequest,
   decideAgencyDocument,
+  decideAgencyWebserviceRequest,
   fetchAgencyApiKeys,
+  fetchAgencyCreditRequests,
   fetchAgencyDetail,
   fetchAgencyDocuments,
   fetchAgencyInvoices,
   fetchAgencyMessages,
+  fetchAgencyWebserviceRequests,
   issueAgencyApiKey,
   issueAgencyInvoice,
   payAgencyInvoice,
@@ -23,7 +27,7 @@ import { faDigits, faMoney, parseTomanToRial } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime, parseJalaliDateToIso } from '../../lib/jalali';
 import { useStepUp } from '../../hooks/useStepUp';
 import Modal from '../../components/Modal';
-import { DOCUMENT_STATUS, DOCUMENT_TYPE_LABELS, INVOICE_STATUS, TIER_LABELS, statusBadge } from './agency-labels';
+import { DOCUMENT_STATUS, DOCUMENT_TYPE_LABELS, INVOICE_STATUS, REQUEST_STATUS, TIER_LABELS, statusBadge } from './agency-labels';
 import type {
   AgencyApiKey,
   AgencyApiScope,
@@ -32,6 +36,7 @@ import type {
   AgencyInvoice,
   AgencyMessage,
 } from '../../types/agencies';
+import type { AgencyCreditRequest, AgencyWebserviceRequest } from '../../types/agency-portal';
 
 type CommercialTab = 'overview' | 'finance' | 'messages';
 
@@ -40,6 +45,11 @@ const API_SCOPE_OPTIONS: { value: AgencyApiScope; label: string }[] = [
   { value: 'SEARCH_BOOK', label: 'جستجو + رزرو' },
   { value: 'SEARCH_ONLY', label: 'فقط جستجو (آزمایشی)' },
 ];
+
+const WS_SCOPE_LABEL: Record<AgencyApiScope, string> = {
+  SEARCH_BOOK: 'جستجو و رزرو',
+  FULL: 'فروش کامل (صدور بلیط)',
+};
 
 function SectionCard({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
@@ -107,6 +117,10 @@ export default function AgencyDetailPage() {
   const [documents, setDocuments] = useState<AgencyDocument[]>([]);
   const [documentError, setDocumentError] = useState<string | null>(null);
 
+  const [creditRequests, setCreditRequests] = useState<AgencyCreditRequest[]>([]);
+  const [webserviceRequests, setWebserviceRequests] = useState<AgencyWebserviceRequest[]>([]);
+  const [requestError, setRequestError] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     setError(null);
     try {
@@ -122,7 +136,14 @@ export default function AgencyDetailPage() {
         setInvoices(await fetchAgencyInvoices(agencyId));
       }
       if (role === 'SENIOR_MANAGER' || role === 'FINANCE_MANAGER' || role === 'COMMERCIAL_MANAGER') {
-        setDocuments(await fetchAgencyDocuments(agencyId));
+        const [docs, creditReqs, wsReqs] = await Promise.all([
+          fetchAgencyDocuments(agencyId),
+          fetchAgencyCreditRequests(agencyId),
+          fetchAgencyWebserviceRequests(agencyId),
+        ]);
+        setDocuments(docs);
+        setCreditRequests(creditReqs);
+        setWebserviceRequests(wsReqs);
       }
       // EMPLOYEE holding fn_invoices reaches the same invoices table as
       // COMMERCIAL_MANAGER (via the non-tabbed overview branch below) but
@@ -290,6 +311,35 @@ export default function AgencyDetailPage() {
     }
   }
 
+  async function onDecideCreditRequest(req: AgencyCreditRequest, approve: boolean) {
+    setRequestError(null);
+    try {
+      await decideAgencyCreditRequest(agencyId, req.id, approve);
+      setNotice(approve ? 'درخواست افزایش اعتبار تأیید شد ✓' : 'درخواست افزایش اعتبار رد شد.');
+      setCreditRequests(await fetchAgencyCreditRequests(agencyId));
+      await load();
+    } catch {
+      setRequestError('خطا در ثبت تصمیم روی درخواست اعتبار.');
+    }
+  }
+
+  async function onDecideWebserviceRequest(req: AgencyWebserviceRequest, approve: boolean) {
+    setRequestError(null);
+    try {
+      let dto: { approve: boolean; stepUpChallengeId?: string; stepUpCode?: string } = { approve };
+      if (approve) {
+        const fields = await stepUp.confirm();
+        dto = { approve: true, ...fields };
+      }
+      await decideAgencyWebserviceRequest(agencyId, req.id, dto);
+      setNotice(approve ? 'درخواست وب‌سرویس تأیید و کلید صادر شد ✓' : 'درخواست وب‌سرویس رد شد.');
+      setWebserviceRequests(await fetchAgencyWebserviceRequests(agencyId));
+    } catch (err) {
+      if (err instanceof Error && err.message === 'CANCELLED') return;
+      setRequestError('خطا در ثبت تصمیم روی درخواست وب‌سرویس.');
+    }
+  }
+
   async function onSendMessage() {
     const body = messageDraft.trim();
     if (!body) return;
@@ -399,6 +449,104 @@ export default function AgencyDetailPage() {
                       </button>
                       <button
                         onClick={() => void onDecideDocument(doc, false)}
+                        className="rounded-lg bg-danger px-2.5 py-1 text-[11px] font-bold text-white transition hover:bg-danger/90"
+                      >
+                        رد
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </SectionCard>
+  );
+
+  const staffReviewRoles = isSenior || isFinance || isCommercial;
+
+  const creditRequestsCard = staffReviewRoles && (
+    <SectionCard title="درخواست‌های افزایش اعتبار">
+      {requestError && <p className="mb-3 rounded-lg bg-danger/10 p-2 text-xs text-danger">{requestError}</p>}
+      {creditRequests.length === 0 ? (
+        <p className="text-xs text-muted">درخواستی ثبت نشده است.</p>
+      ) : (
+        <div className="space-y-2">
+          {creditRequests.map((req) => {
+            const status = REQUEST_STATUS[req.status];
+            return (
+              <div key={req.id} className="flex items-center justify-between rounded-lg bg-surface p-3">
+                <div className="min-w-0">
+                  <div className="font-num text-xs font-bold text-ink">
+                    سقف درخواستی: {faMoney(req.requestedLimitIrr)} تومان
+                  </div>
+                  {req.note && <div className="mt-0.5 text-[11px] text-muted">{req.note}</div>}
+                  <div className="mt-0.5 text-[10px] text-muted">{formatJalaliDateTime(req.createdAt)}</div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${status.className}`}>
+                    {status.label}
+                  </span>
+                  {req.status === 'PENDING' && (
+                    <>
+                      <button
+                        onClick={() => void onDecideCreditRequest(req, true)}
+                        className="rounded-lg bg-[#059669] px-2.5 py-1 text-[11px] font-bold text-white transition hover:bg-[#047857]"
+                      >
+                        تأیید
+                      </button>
+                      <button
+                        onClick={() => void onDecideCreditRequest(req, false)}
+                        className="rounded-lg bg-danger px-2.5 py-1 text-[11px] font-bold text-white transition hover:bg-danger/90"
+                      >
+                        رد
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </SectionCard>
+  );
+
+  const webserviceRequestsCard = staffReviewRoles && (
+    <SectionCard title="درخواست‌های خرید وب‌سرویس">
+      {webserviceRequests.length === 0 ? (
+        <p className="text-xs text-muted">درخواستی ثبت نشده است.</p>
+      ) : (
+        <div className="space-y-2">
+          {webserviceRequests.map((req) => {
+            const status = REQUEST_STATUS[req.status];
+            return (
+              <div key={req.id} className="flex items-center justify-between rounded-lg bg-surface p-3">
+                <div className="min-w-0">
+                  <div className="text-xs font-bold text-ink">
+                    {WS_SCOPE_LABEL[req.scope]} — {faDigits(req.months)} ماهه
+                  </div>
+                  <div className="font-num mt-0.5 text-[11px] text-muted">
+                    {faMoney(req.priceIrr)} تومان
+                  </div>
+                  {req.note && <div className="mt-0.5 text-[11px] text-muted">{req.note}</div>}
+                  <div className="mt-0.5 text-[10px] text-muted">{formatJalaliDateTime(req.createdAt)}</div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${status.className}`}>
+                    {status.label}
+                  </span>
+                  {req.status === 'PENDING' && (
+                    <>
+                      <button
+                        onClick={() => void onDecideWebserviceRequest(req, true)}
+                        className="rounded-lg bg-[#059669] px-2.5 py-1 text-[11px] font-bold text-white transition hover:bg-[#047857]"
+                      >
+                        تأیید
+                      </button>
+                      <button
+                        onClick={() => void onDecideWebserviceRequest(req, false)}
                         className="rounded-lg bg-danger px-2.5 py-1 text-[11px] font-bold text-white transition hover:bg-danger/90"
                       >
                         رد
@@ -716,6 +864,8 @@ export default function AgencyDetailPage() {
          only ever renders for an EMPLOYEE holding fn_invoices. */}
       {invoicesSection}
       {documentsCard}
+      {creditRequestsCard}
+      {webserviceRequestsCard}
       {infoAndActivity}
     </div>
   );
@@ -793,6 +943,8 @@ export default function AgencyDetailPage() {
               {creditCard}
               {invoicesSection}
               {documentsCard}
+              {creditRequestsCard}
+              {webserviceRequestsCard}
             </div>
           )}
           {tab === 'messages' && messagesSection}

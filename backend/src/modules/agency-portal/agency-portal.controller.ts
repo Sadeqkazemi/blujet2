@@ -148,6 +148,13 @@ export class AgencyPortalController {
     };
   }
 
+  @Get('webservice-plans')
+  @ApiOperation({ summary: 'قیمت‌های فعلی پلن‌های وب‌سرویس (ریال)' })
+  async webservicePlans(@CurrentUser() actor: AuthenticatedUser) {
+    await this.portal.assertAgency(actor);
+    return { success: true, data: await this.portal.webservicePlans() };
+  }
+
   @Post('webservice-requests')
   @ApiOperation({
     summary: 'درخواست خرید وب‌سرویس B2B — مستقیماً کلید صادر نمی‌کند',
