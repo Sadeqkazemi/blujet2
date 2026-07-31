@@ -52,7 +52,7 @@ export class UpdateRefundRulesDto {
 @ApiTags('settings')
 @Controller('settings')
 @UseGuards(JwtAuthGuard, RolesGuard, PanelAccessGuard)
-@Roles('BOARD_CHAIR', 'IT_MANAGER')
+@Roles('BOARD_CHAIR', 'IT_MANAGER', 'SITE_ADMIN')
 export class SettingsController {
   constructor(private readonly settings: SettingsService) {}
 

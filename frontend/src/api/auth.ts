@@ -76,6 +76,10 @@ export function setPassword(newPassword: string) {
   return apiPost<{ changed: boolean }>('/auth/set-password', { newPassword });
 }
 
+export function changeOwnPassword(currentPassword: string, newPassword: string) {
+  return apiPost<{ changed: boolean }>('/auth/change-password', { currentPassword, newPassword });
+}
+
 /** فراموشی رمز — email path (Phase 51): an alternative to phone+SMS OTP for
  * customers whose account has a verified email. */
 export function requestPasswordResetEmail(email: string) {

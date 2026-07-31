@@ -17,6 +17,7 @@ const NAV_ITEMS: { key: string; label: Tr }[] = [
   { key: 'credit', label: { fa: 'اعتبار و مانده', en: 'Credit & Balance', ar: 'الرصيد والائتمان' } },
   { key: 'sales', label: { fa: 'فروش و گزارش', en: 'Sales & Reports', ar: 'المبيعات والتقارير' } },
   { key: 'webservice', label: { fa: 'وب‌سرویس (API)', en: 'Web Service (API)', ar: 'خدمة الويب (API)' } },
+  { key: 'apidocs', label: { fa: 'مستندات وب‌سرویس', en: 'Web Service Docs', ar: 'توثيق خدمة الويب' } },
   { key: 'inbox', label: { fa: 'کارتابل و پیام‌ها', en: 'Inbox & Messages', ar: 'الوارد والرسائل' } },
   { key: 'profile', label: { fa: 'پروفایل و مدارک', en: 'Profile & Documents', ar: 'الملف الشخصي والمستندات' } },
 ];
