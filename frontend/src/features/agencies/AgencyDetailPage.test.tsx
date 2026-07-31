@@ -72,16 +72,33 @@ describe('AgencyDetailPage', () => {
     expect(screen.queryByText('امتیاز فعالیت آژانس')).not.toBeInTheDocument();
   });
 
-  it('Finance Manager sees credit + settle and no API-key/invoice-issue/messages', async () => {
+  it('Finance Manager sees credit + settle, issued invoices (no issue button), and no API-key/messages', async () => {
     mockRole('FINANCE_MANAGER');
     vi.spyOn(agenciesApi, 'fetchAgencyDetail').mockResolvedValue(DETAIL_WITH_SCORE);
     vi.spyOn(agenciesApi, 'fetchAgencyDocuments').mockResolvedValue([]);
+    vi.spyOn(agenciesApi, 'fetchAgencyInvoices').mockResolvedValue([
+      {
+        id: 'inv1',
+        agencyId: 'a1',
+        invoiceNo: 'INV-1002',
+        issuedById: 'u9',
+        issuedAt: '2026-06-20T00:00:00.000Z',
+        dueAt: '2026-07-05T00:00:00.000Z',
+        amountIrr: 800_000_000,
+        status: 'UNPAID',
+        paidAt: null,
+      },
+    ]);
 
     renderPage();
 
     expect(await screen.findByText('اعتبار آژانس')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'ثبت تسویه' })).toBeInTheDocument();
     expect(screen.getByText('امتیاز فعالیت آژانس')).toBeInTheDocument();
+    expect(await screen.findByText('فاکتورهای صادرشده')).toBeInTheDocument();
+    expect(screen.getByText('INV-1002')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'یادآوری' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'ثبت پرداخت این فاکتور' })).toBeInTheDocument();
 
     expect(screen.queryByText('دسترسی API رزرواسیون')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'صدور فاکتور' })).not.toBeInTheDocument();
@@ -207,6 +224,7 @@ describe('AgencyDetailPage', () => {
   it('the credit modal parses a toman amount (Persian digits allowed) into rial', async () => {
     mockRole('FINANCE_MANAGER');
     vi.spyOn(agenciesApi, 'fetchAgencyDetail').mockResolvedValue(DETAIL);
+    vi.spyOn(agenciesApi, 'fetchAgencyInvoices').mockResolvedValue([]);
     vi.spyOn(agenciesApi, 'fetchAgencyDocuments').mockResolvedValue([]);
     const update = vi
       .spyOn(agenciesApi, 'updateAgencyCredit')
@@ -227,6 +245,7 @@ describe('AgencyDetailPage', () => {
   it('Finance Manager can review an uploaded document and approve it', async () => {
     mockRole('FINANCE_MANAGER');
     vi.spyOn(agenciesApi, 'fetchAgencyDetail').mockResolvedValue(DETAIL);
+    vi.spyOn(agenciesApi, 'fetchAgencyInvoices').mockResolvedValue([]);
     vi.spyOn(agenciesApi, 'fetchAgencyDocuments').mockResolvedValue([
       {
         id: 'doc1',

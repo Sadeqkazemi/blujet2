@@ -118,6 +118,9 @@ export default function AgencyDetailPage() {
         setInvoices(inv);
         setMessages(msgs);
       }
+      if (role === 'FINANCE_MANAGER') {
+        setInvoices(await fetchAgencyInvoices(agencyId));
+      }
       if (role === 'SENIOR_MANAGER' || role === 'FINANCE_MANAGER' || role === 'COMMERCIAL_MANAGER') {
         setDocuments(await fetchAgencyDocuments(agencyId));
       }
@@ -583,7 +586,7 @@ export default function AgencyDetailPage() {
     </SectionCard>
   );
 
-  const invoicesSection = (isCommercial || isEmployee) && (
+  const invoicesSection = (isCommercial || isFinance || isEmployee) && (
     <SectionCard
       title="فاکتورهای صادرشده"
       action={

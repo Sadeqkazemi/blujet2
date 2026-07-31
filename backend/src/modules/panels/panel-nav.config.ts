@@ -78,7 +78,6 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
   FINANCE_MANAGER: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
     { key: 'agencies', labelFa: 'آژانس‌ها', implemented: true },
-    { key: 'flightops', labelFa: 'پروازها', implemented: true },
     { key: 'reports', labelFa: 'گزارش مسافران', implemented: true },
     { key: 'staff', labelFa: 'گزارش کارمندان', implemented: true },
     { key: 'finance', labelFa: 'مالی', implemented: true },
