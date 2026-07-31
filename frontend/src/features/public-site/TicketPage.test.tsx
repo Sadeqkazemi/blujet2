@@ -12,7 +12,7 @@ const TICKETED: BookingDetail = {
   pnr: 'BJABC123',
   status: 'TICKETED',
   cabin: 'ECONOMY',
-  priceIrr: 380_000_000,
+  priceIrr: '380000000',
   holdExpiresAt: null,
   flightInstanceId: 'fi-1',
   flightNo: 'BJ-100',
@@ -59,9 +59,9 @@ describe('TicketPage', () => {
       bookingId: 'b1',
       status: 'SUBMITTED',
       penaltyPct: 30,
-      penaltyAmountIrr: 114_000_000,
-      refundableIrr: 266_000_000,
-      totalPaidIrr: 380_000_000,
+      penaltyAmountIrr: '114000000',
+      refundableIrr: '266000000',
+      totalPaidIrr: '380000000',
       createdAt: new Date().toISOString(),
     });
     renderPage();

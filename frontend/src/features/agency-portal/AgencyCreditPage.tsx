@@ -356,9 +356,9 @@ export default function AgencyCreditPage() {
                   <div className="font-bold">{LEDGER_LABEL[entry.type][locale]}</div>
                   <div className="text-[10px] text-muted">{formatJalaliDateTime(entry.occurredAt)}</div>
                 </div>
-                <span className={`font-num font-bold ${entry.signedAmountIrr < 0 ? 'text-[#059669]' : 'text-danger'}`}>
-                  {entry.signedAmountIrr < 0 ? '+' : '−'}
-                  {faMoney(Math.abs(entry.signedAmountIrr))}
+                <span className={`font-num font-bold ${Number(entry.signedAmountIrr) < 0 ? 'text-[#059669]' : 'text-danger'}`}>
+                  {Number(entry.signedAmountIrr) < 0 ? '+' : '−'}
+                  {faMoney(Math.abs(Number(entry.signedAmountIrr)))}
                 </span>
               </div>
             ))}

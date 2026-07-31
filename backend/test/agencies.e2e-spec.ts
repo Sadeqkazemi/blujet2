@@ -174,8 +174,11 @@ describe('Agencies (e2e)', () => {
       .set('Authorization', `Bearer ${accessToken}`);
     expect(res.status).toBe(200);
     expect(res.body.data.stats.ticketsIssued).toBe(2);
-    expect(res.body.data.stats.totalSalesIrr).toBe(500_000_000);
-    expect(res.body.data.credit.usedIrr).toBe(500_000_000);
+    // Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON —
+    // see src/common/bigint-json.ts): a JS number can't safely hold IRR
+    // amounts above 2^53.
+    expect(res.body.data.stats.totalSalesIrr).toBe('500000000');
+    expect(res.body.data.credit.usedIrr).toBe('500000000');
   });
 
   it('activityScore is included for Finance/Commercial but omitted for Senior Manager', async () => {
@@ -266,8 +269,8 @@ describe('Agencies (e2e)', () => {
       .send({ limitIrr: 2_000_000_000 });
 
     expect(res.status).toBe(200);
-    expect(res.body.data.limitIrr).toBe(2_000_000_000);
-    expect(res.body.data.usedIrr).toBe(400_000_000);
+    expect(res.body.data.limitIrr).toBe('2000000000');
+    expect(res.body.data.usedIrr).toBe('400000000');
 
     const auditRow = await typeorm.auditLog.findFirst({
       where: {
@@ -291,22 +294,27 @@ describe('Agencies (e2e)', () => {
       .set('Authorization', `Bearer ${accessToken}`);
 
     expect(res.status).toBe(201);
-    expect(res.body.data.settledIrr).toBe(700_000_000);
+    expect(res.body.data.settledIrr).toBe('700000000');
 
     const sum = await typeorm.ledgerEntry.aggregate({
       where: { agencyId, type: { in: ['SALE', 'SETTLEMENT'] } },
       _sum: { signedAmountIrr: true },
     });
-    expect(sum._sum.signedAmountIrr).toBe(0);
+    expect(sum._sum.signedAmountIrr).toBe(0n);
   });
 
-  it('PATCH credit rejects a limit beyond the Int32 rial ceiling with 400, not a DB 500', async () => {
+  // Money columns are now BigInt (no Int32 ceiling by design — that's the
+  // whole point of this migration), so a large limit like 3,000,000,000 is
+  // legitimately accepted now. The validation guard itself (MinIrrAmount /
+  // IsIrrAmount on UpdateCreditDto) is still real, so this test now proves
+  // that guard against a genuinely invalid input (negative) instead.
+  it('PATCH credit rejects a negative limit with 400, not a DB 500', async () => {
     const agencyId = await createFreshAgency();
     const { accessToken } = await loginAs(app, 'finance.karimi');
     const res = await request(app.getHttpServer())
       .patch(`/agencies/${agencyId}/credit`)
       .set('Authorization', `Bearer ${accessToken}`)
-      .send({ limitIrr: 3_000_000_000 });
+      .send({ limitIrr: -1 });
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('VALIDATION_FAILED');
   });
@@ -609,7 +617,7 @@ describe('Agencies (e2e)', () => {
     const finalLine = await typeorm.agencyCreditLine.findUniqueOrThrow({
       where: { agencyId },
     });
-    expect([1_100_000_000, 1_200_000_000]).toContain(finalLine.limitIrr);
+    expect([1_100_000_000n, 1_200_000_000n]).toContain(finalLine.limitIrr);
 
     const auditRows = await typeorm.auditLog.findMany({
       where: {

@@ -202,7 +202,7 @@ export default function FlightsPage() {
   function openPlan(row: FutureFlightRow) {
     setPlan(row);
     const initial = row.basePriceIrr ?? row.aiSuggestion?.priceIrr ?? null;
-    setPlanPrice(initial != null ? String(Math.round(initial / 10)) : '');
+    setPlanPrice(initial != null ? String(Math.round(Number(initial) / 10)) : '');
     setPlanAgency(
       String(
         row.agencySeatsAllocated ??
@@ -526,10 +526,10 @@ export default function FlightsPage() {
                             {faMoney(d.channelRevenueIrr.CHARTER)} / {faMoney(d.channelRevenueIrr.AGENCY)}
                           </span>
                           <span className="font-num font-black text-[#059669]">
-                            {d.profitIrr > 0 ? `${faMoney(d.profitIrr)}` : '—'}
+                            {Number(d.profitIrr) > 0 ? `${faMoney(d.profitIrr)}` : '—'}
                           </span>
-                          <span className={`font-num font-black ${d.lossIrr > 0 ? 'text-danger' : 'text-muted'}`}>
-                            {d.lossIrr > 0 ? faMoney(d.lossIrr) : '—'}
+                          <span className={`font-num font-black ${Number(d.lossIrr) > 0 ? 'text-danger' : 'text-muted'}`}>
+                            {Number(d.lossIrr) > 0 ? faMoney(d.lossIrr) : '—'}
                           </span>
                         </button>
                         {expandedDone === d.id && (

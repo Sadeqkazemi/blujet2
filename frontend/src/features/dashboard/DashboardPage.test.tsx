@@ -3,23 +3,25 @@ import { describe, expect, it, vi } from 'vitest';
 import DashboardPage from './DashboardPage';
 import * as reportingApi from '../../api/reporting';
 
+// Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON on
+// the backend — a JS number can't safely hold IRR amounts above 2^53).
 const SALES_CHART = [
   {
     periodKey: '2026-06-01',
     startDate: '2026-06-01T00:00:00.000Z',
     endDate: '2026-07-01T00:00:00.000Z',
-    systemIrr: 9_120_000_000,
-    charterIrr: 7_600_000_000,
-    agencyIrr: 4_560_000_000,
+    systemIrr: '9120000000',
+    charterIrr: '7600000000',
+    agencyIrr: '4560000000',
   },
 ];
 
 const KPIS = {
-  revenueIrr: 21_280_000_000,
-  profitIrr: 17_000_000_000,
+  revenueIrr: '21280000000',
+  profitIrr: '17000000000',
   marginPct: 80,
-  operatingCostIrr: 4_280_000_000,
-  agencyDebtIrr: 0,
+  operatingCostIrr: '4280000000',
+  agencyDebtIrr: '0',
   agencyDebtCount: 0,
 };
 

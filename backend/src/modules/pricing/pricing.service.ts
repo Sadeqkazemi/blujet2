@@ -14,6 +14,8 @@ import {
 import { StepUpService } from '../auth/step-up.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { TypeORM } from '../../../generated/typeorm/client';
+import { addIrr, pctOfIrr, roundIrrTo, toIrr } from '../../common/money';
+import type { Irr } from '../../common/money';
 
 const LOCKED_MESSAGE =
   'قیمت این پرواز توسط مدیر عامل تأیید و قفل شده است و دیگر قابل تغییر نیست.';
@@ -77,7 +79,7 @@ export class PricingService {
   async upsertProposal(
     actor: AuthenticatedUser,
     flightInstanceId: string,
-    dto: { proposedPriceIrr: number; legalRateIrr?: number; note?: string },
+    dto: { proposedPriceIrr: Irr; legalRateIrr?: Irr; note?: string },
   ) {
     const instance = await this.typeorm.flightInstance.findUnique({
       where: { id: flightInstanceId },
@@ -112,7 +114,10 @@ export class PricingService {
       dto.proposedPriceIrr;
     const competitorPriceIrr =
       instance.pricing?.competitorPriceIrr ??
-      Math.round((basePriceIrr * 1.03) / 100_000) * 100_000;
+      // Design's "competitor" tile = base + 3%, rounded to the nearest
+      // 100,000 IRR "round number" price — same roundIrrTo pattern as the
+      // business-cabin multiplier in pricing.ts, no float involved.
+      roundIrrTo(addIrr(basePriceIrr, pctOfIrr(basePriceIrr, 3)), 100_000n);
 
     const proposal = await this.typeorm.farePricingProposal.upsert({
       where: { flightInstanceId },
@@ -151,11 +156,7 @@ export class PricingService {
     return proposal;
   }
 
-  async setLegalRate(
-    actor: AuthenticatedUser,
-    id: string,
-    legalRateIrr: number,
-  ) {
+  async setLegalRate(actor: AuthenticatedUser, id: string, legalRateIrr: Irr) {
     const proposal = await this.typeorm.farePricingProposal.findUnique({
       where: { id },
       include: this.proposalInclude(),
@@ -217,7 +218,7 @@ export class PricingService {
       });
     }
 
-    let price = proposal.proposedPriceIrr;
+    let price: Irr = proposal.proposedPriceIrr;
     if (source === 'AI') {
       const suggestion =
         proposal.aiSuggestion as unknown as PersistedAiSuggestion | null;
@@ -227,7 +228,12 @@ export class PricingService {
           message: 'برای این پیشنهاد تحلیل هوش مصنوعی ثبت نشده است.',
         });
       }
-      price = suggestion.priceIrr;
+      // The CEO's explicit registration action (this authenticated,
+      // step-up-verified endpoint) is what actually authorizes the price —
+      // the AI suggestion itself never sets it. Individual fare amounts are
+      // far below 2^53, so converting the advisory JSON number to Irr here
+      // loses no precision.
+      price = toIrr(suggestion.priceIrr);
     }
 
     // Conditional update guards against a concurrent double-register.
@@ -306,14 +312,20 @@ export class PricingService {
     if (pending.length === 0) return { analyzed: 0, available: true };
 
     const result = await this.priceSuggestions.suggest(
+      // ADVISORY-ONLY ML boundary (CLAUDE.md ML Service Rules): the
+      // FastAPI service expects plain JSON numbers, and this payload is a
+      // one-way outbound signal for a suggestion — never round-tripped
+      // back into a stored/authoritative field without going through
+      // NestJS's own re-pricing/registration logic above. Individual fare
+      // amounts are far below 2^53, so Number() loses no precision here.
       pending.map((p) => ({
         proposal_id: p.id,
         origin_code: p.flightInstance.flight.route.originCode,
         dest_code: p.flightInstance.flight.route.destCode,
         departure_at: p.flightInstance.departureAt.toISOString(),
-        base_price_irr: p.basePriceIrr,
-        competitor_price_irr: p.competitorPriceIrr,
-        proposed_price_irr: p.proposedPriceIrr,
+        base_price_irr: Number(p.basePriceIrr),
+        competitor_price_irr: Number(p.competitorPriceIrr),
+        proposed_price_irr: Number(p.proposedPriceIrr),
         capacity: p.flightInstance.capacity,
         charter_seats: p.flightInstance.charterSeats,
       })),

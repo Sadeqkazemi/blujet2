@@ -212,7 +212,11 @@ describe('Phase 13 Part E — PNR lifecycle + payment reconciliation', () => {
     });
     expect(reconciliation).not.toBeNull();
     expect(reconciliation!.status).toBe('RESOLVED');
-    expect(reconciliation!.amountIrr).toBe(paid.body.data.booking.priceIrr);
+    // reconciliation is a direct TypeORM read (native bigint); the JSON
+    // response field is a decimal string (BigInt.prototype.toJSON).
+    expect(reconciliation!.amountIrr).toBe(
+      BigInt(String(paid.body.data.booking.priceIrr)),
+    );
   });
 
   it('a GATEWAY payment whose ticketing transaction fails (bad promo) leaves a PENDING reconciliation row — the real mismatch queue', async () => {

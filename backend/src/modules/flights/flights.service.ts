@@ -20,6 +20,14 @@ import { StepUpService } from '../auth/step-up.service';
 import type { PersistedAiSuggestion } from '../pricing/pricing.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { TypeORM } from '../../../generated/typeorm/client';
+import {
+  ZERO_IRR,
+  addIrr,
+  divRoundBigInt,
+  maxIrr,
+  subIrr,
+} from '../../common/money';
+import type { Irr } from '../../common/money';
 
 /** SCHEDULED instances departing beyond this window belong to the
  * پروازهای آینده sub-tab; the rest are پروازهای فعال. */
@@ -158,20 +166,23 @@ export class FlightsService {
     });
 
     const rows = departed.map((i) => {
-      const channels = { SYSTEM: 0, CHARTER: 0, AGENCY: 0 } as Record<
-        'SYSTEM' | 'CHARTER' | 'AGENCY',
-        number
-      >;
+      const channels = {
+        SYSTEM: ZERO_IRR,
+        CHARTER: ZERO_IRR,
+        AGENCY: ZERO_IRR,
+      } as Record<'SYSTEM' | 'CHARTER' | 'AGENCY', Irr>;
       let tickets = 0;
-      let revenueIrr = 0;
+      let revenueIrr: Irr = ZERO_IRR;
       for (const c of byChannel.filter((b) => b.flightInstanceId === i.id)) {
-        channels[c.channel] = c._sum.priceIrr ?? 0;
+        const sum = c._sum.priceIrr ?? ZERO_IRR;
+        channels[c.channel] = sum;
         tickets += c._count._all;
-        revenueIrr += c._sum.priceIrr ?? 0;
+        revenueIrr = addIrr(revenueIrr, sum);
       }
-      const base = i.basePriceIrr ?? 0;
-      const avgIrr = tickets > 0 ? Math.round(revenueIrr / tickets) : 0;
-      const delta = (avgIrr - base) * tickets;
+      const base = i.basePriceIrr ?? ZERO_IRR;
+      const avgIrr: Irr =
+        tickets > 0 ? divRoundBigInt(revenueIrr, BigInt(tickets)) : ZERO_IRR;
+      const delta: Irr = subIrr(avgIrr, base) * BigInt(tickets);
       return {
         id: i.id,
         flightNo: i.flight.flightNo,
@@ -183,16 +194,16 @@ export class FlightsService {
         avgPriceIrr: avgIrr,
         revenueIrr,
         channelRevenueIrr: channels,
-        profitIrr: Math.max(delta, 0),
-        lossIrr: Math.max(-delta, 0),
+        profitIrr: maxIrr(delta, ZERO_IRR),
+        lossIrr: maxIrr(-delta, ZERO_IRR),
       };
     });
 
     return {
       rows,
       kpis: {
-        totalSalesIrr: rows.reduce((a, r) => a + r.revenueIrr, 0),
-        totalProfitIrr: rows.reduce((a, r) => a + r.profitIrr, 0),
+        totalSalesIrr: rows.reduce((a, r) => addIrr(a, r.revenueIrr), ZERO_IRR),
+        totalProfitIrr: rows.reduce((a, r) => addIrr(a, r.profitIrr), ZERO_IRR),
         totalTickets: rows.reduce((a, r) => a + r.tickets, 0),
         flightCount: rows.length,
       },
@@ -226,7 +237,7 @@ export class FlightsService {
       flightNo: string;
       departureAt: string;
       capacity: number;
-      basePriceIrr: number;
+      basePriceIrr: Irr;
     },
   ) {
     if (dto.originCode === dto.destCode) {
@@ -331,7 +342,7 @@ export class FlightsService {
       return {
         channel: ch,
         seats: row?._count._all ?? 0,
-        revenueIrr: row?._sum.priceIrr ?? 0,
+        revenueIrr: row?._sum.priceIrr ?? ZERO_IRR,
       };
     });
     const sold = channels.reduce((a, c) => a + c.seats, 0);
@@ -343,7 +354,10 @@ export class FlightsService {
         instance.capacity,
       ),
       channels,
-      totalRevenueIrr: channels.reduce((a, c) => a + c.revenueIrr, 0),
+      totalRevenueIrr: channels.reduce(
+        (a, c) => addIrr(a, c.revenueIrr),
+        ZERO_IRR,
+      ),
       occupancyPct:
         instance.capacity > 0
           ? Math.round((sold / instance.capacity) * 100)
@@ -360,7 +374,7 @@ export class FlightsService {
     actor: AuthenticatedUser,
     id: string,
     dto: {
-      priceIrr: number;
+      priceIrr: Irr;
       agencySeats: number;
       saleStartsAt?: string;
       saleEndsAt?: string;
@@ -554,17 +568,26 @@ export class FlightsService {
     if (future.length === 0) return { analyzed: 0, available: true };
 
     const result = await this.priceSuggestions.suggest(
-      future.map((i) => ({
-        proposal_id: i.id,
-        origin_code: i.flight.route.originCode,
-        dest_code: i.flight.route.destCode,
-        departure_at: i.departureAt.toISOString(),
-        base_price_irr: i.basePriceIrr ?? 30_000_000,
-        competitor_price_irr: i.basePriceIrr ?? 30_000_000,
-        proposed_price_irr: i.basePriceIrr ?? 30_000_000,
-        capacity: i.capacity,
-        charter_seats: i.charterSeats,
-      })),
+      future.map((i) => {
+        // ADVISORY-ONLY ML boundary (CLAUDE.md ML Service Rules): the
+        // FastAPI service expects plain JSON numbers, and this payload is
+        // a one-way outbound signal for a suggestion — never round-tripped
+        // back into a stored/authoritative field without going through
+        // NestJS's own re-pricing logic. Individual fare amounts are far
+        // below 2^53, so Number() loses no precision here.
+        const basePriceIrr = Number(i.basePriceIrr ?? 30_000_000n);
+        return {
+          proposal_id: i.id,
+          origin_code: i.flight.route.originCode,
+          dest_code: i.flight.route.destCode,
+          departure_at: i.departureAt.toISOString(),
+          base_price_irr: basePriceIrr,
+          competitor_price_irr: basePriceIrr,
+          proposed_price_irr: basePriceIrr,
+          capacity: i.capacity,
+          charter_seats: i.charterSeats,
+        };
+      }),
       requestId,
     );
     if (!result) return { analyzed: 0, available: false };
@@ -819,9 +842,9 @@ export class FlightsService {
     dto: {
       cabin: 'ECONOMY' | 'BUSINESS';
       classCode: string;
-      priceIrr: number;
+      priceIrr: Irr;
       seatsAllocated: number;
-      taxIrr?: number;
+      taxIrr?: Irr;
       refundable?: boolean;
       changeable?: boolean;
       baggageAllowanceKg?: number;
@@ -861,7 +884,7 @@ export class FlightsService {
         classCode: dto.classCode,
         priceIrr: dto.priceIrr,
         seatsAllocated: dto.seatsAllocated,
-        taxIrr: dto.taxIrr ?? 0,
+        taxIrr: dto.taxIrr ?? ZERO_IRR,
         refundable: dto.refundable ?? true,
         changeable: dto.changeable ?? true,
         baggageAllowanceKg: dto.baggageAllowanceKg,
@@ -889,9 +912,9 @@ export class FlightsService {
     instanceId: string,
     ruleId: string,
     dto: {
-      priceIrr?: number;
+      priceIrr?: Irr;
       seatsAllocated?: number;
-      taxIrr?: number;
+      taxIrr?: Irr;
       refundable?: boolean;
       changeable?: boolean;
       baggageAllowanceKg?: number;
@@ -1057,7 +1080,7 @@ export class FlightsService {
       seatsAllocated: number;
       type?: 'SOFT' | 'HARD';
       releaseAt?: string;
-      contractPriceIrr?: number;
+      contractPriceIrr?: Irr;
     },
   ) {
     const instance = await this.typeorm.flightInstance.findUnique({

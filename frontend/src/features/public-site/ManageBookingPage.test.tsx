@@ -22,7 +22,7 @@ const BOOKING: BookingDetail = {
   pnr: 'BJ4X2K',
   status: 'TICKETED',
   cabin: 'ECONOMY',
-  priceIrr: 160_000_000,
+  priceIrr: '160000000',
   holdExpiresAt: null,
   flightInstanceId: 'fi-1',
   flightNo: 'BJ-102',
@@ -88,9 +88,9 @@ describe('ManageBookingPage', () => {
       bookingId: 'b1',
       status: 'SUBMITTED',
       penaltyPct: 30,
-      penaltyAmountIrr: 4_800_000,
-      refundableIrr: 11_200_000,
-      totalPaidIrr: 16_000_000,
+      penaltyAmountIrr: '4800000',
+      refundableIrr: '11200000',
+      totalPaidIrr: '16000000',
       createdAt: new Date().toISOString(),
     } satisfies RefundRequestView);
     renderPage();
@@ -130,9 +130,9 @@ describe('ManageBookingPage', () => {
       bookingId: 'b1',
       status: 'SUBMITTED',
       penaltyPct: 30,
-      penaltyAmountIrr: 4_800_000,
-      refundableIrr: 11_200_000,
-      totalPaidIrr: 16_000_000,
+      penaltyAmountIrr: '4800000',
+      refundableIrr: '11200000',
+      totalPaidIrr: '16000000',
       createdAt: new Date().toISOString(),
     } satisfies RefundRequestView);
     renderPage();

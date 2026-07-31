@@ -9,6 +9,8 @@ import { CartableService } from '../cartable/cartable.service';
 import { AgenciesService } from '../agencies/agencies.service';
 import { FilesService } from '../files/files.service';
 import { ErrorCode } from '../../common/errors';
+import { ZERO_IRR, addIrr, divRoundBigInt } from '../../common/money';
+import type { Irr } from '../../common/money';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type {
   RequestWebserviceDto,
@@ -25,10 +27,10 @@ const SOLD_STATUSES = ['PAID', 'TICKETED'] as const;
 
 // Phase 23: server-computed prices from the design's own plan catalog
 // (تومان × 10 → ریال). Never accept a client-supplied price.
-const WEBSERVICE_PLAN_PRICES_IRR: Record<number, number> = {
-  1: 45_000_000,
-  3: 120_000_000,
-  12: 420_000_000,
+const WEBSERVICE_PLAN_PRICES_IRR: Record<number, Irr> = {
+  1: 45_000_000n,
+  3: 120_000_000n,
+  12: 420_000_000n,
 };
 
 @Injectable()
@@ -107,12 +109,12 @@ export class AgencyPortalService {
       }),
     ]);
 
-    const monthBuckets = new Map<string, number>();
+    const monthBuckets = new Map<string, Irr>();
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       monthBuckets.set(
         `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
-        0,
+        ZERO_IRR,
       );
     }
     for (const row of salesRows) {
@@ -120,7 +122,7 @@ export class AgencyPortalService {
       if (monthBuckets.has(key)) {
         monthBuckets.set(
           key,
-          (monthBuckets.get(key) ?? 0) + row.signedAmountIrr,
+          addIrr(monthBuckets.get(key) ?? ZERO_IRR, row.signedAmountIrr),
         );
       }
     }
@@ -128,7 +130,7 @@ export class AgencyPortalService {
     return {
       credit,
       kpis: {
-        salesThisMonthIrr: salesThisMonth._sum.signedAmountIrr ?? 0,
+        salesThisMonthIrr: salesThisMonth._sum.signedAmountIrr ?? ZERO_IRR,
         ticketsIssuedTotal,
         seatsSoldThisMonth,
       },
@@ -169,7 +171,7 @@ export class AgencyPortalService {
 
   async requestCreditIncrease(
     actor: AuthenticatedUser,
-    dto: { requestedLimitIrr: number; note?: string },
+    dto: { requestedLimitIrr: Irr; note?: string },
   ) {
     await this.getOwnProfileOrThrow(actor);
     const current = await this.agencies.getCredit(actor.id);
@@ -247,7 +249,7 @@ export class AgencyPortalService {
         flightNo: string;
         route: string;
         ticketsCount: number;
-        salesIrr: number;
+        salesIrr: Irr;
       }
     >();
     const soldBookings = bookings.filter((b) =>
@@ -259,20 +261,25 @@ export class AgencyPortalService {
         flightNo: key,
         route: `${b.flightInstance.flight.route.originCode} → ${b.flightInstance.flight.route.destCode}`,
         ticketsCount: 0,
-        salesIrr: 0,
+        salesIrr: ZERO_IRR,
       };
       existing.ticketsCount += 1;
-      existing.salesIrr += b.priceIrr;
+      existing.salesIrr = addIrr(existing.salesIrr, b.priceIrr);
       perFlightMap.set(key, existing);
     }
 
-    const totalSalesIrr = soldBookings.reduce((s, b) => s + b.priceIrr, 0);
+    const totalSalesIrr = soldBookings.reduce(
+      (s, b) => addIrr(s, b.priceIrr),
+      ZERO_IRR,
+    );
     const ticketsIssued = soldBookings.length;
     const refundedCount = bookings.filter(
       (b) => b.status === 'REFUNDED',
     ).length;
-    const avgFareIrr =
-      ticketsIssued > 0 ? Math.round(totalSalesIrr / ticketsIssued) : 0;
+    const avgFareIrr: Irr =
+      ticketsIssued > 0
+        ? divRoundBigInt(totalSalesIrr, BigInt(ticketsIssued))
+        : ZERO_IRR;
     const refundRatePct =
       bookings.length > 0
         ? Math.round((refundedCount / bookings.length) * 1000) / 10

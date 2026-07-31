@@ -163,32 +163,38 @@ describe('Flights (e2e)', () => {
       .set('Authorization', `Bearer ${accessToken}`);
     expect(res.status).toBe(200);
 
+    // Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON)
+    // — see src/common/bigint-json.ts.
     const row = (
       res.body.data.completed.rows as {
         id: string;
         tickets: number;
-        revenueIrr: number;
-        avgPriceIrr: number;
-        channelRevenueIrr: Record<string, number>;
-        profitIrr: number;
-        lossIrr: number;
+        revenueIrr: string;
+        avgPriceIrr: string;
+        channelRevenueIrr: Record<string, string>;
+        profitIrr: string;
+        lossIrr: string;
       }[]
     ).find((r) => r.id === departed.id)!;
     expect(row.tickets).toBe(3);
-    expect(row.revenueIrr).toBe(100_000_000);
-    expect(row.channelRevenueIrr.SYSTEM).toBe(80_000_000);
-    expect(row.channelRevenueIrr.AGENCY).toBe(20_000_000);
-    expect(row.channelRevenueIrr.CHARTER).toBe(0);
-    expect(row.avgPriceIrr).toBe(Math.round(100_000_000 / 3));
+    expect(row.revenueIrr).toBe('100000000');
+    expect(row.channelRevenueIrr.SYSTEM).toBe('80000000');
+    expect(row.channelRevenueIrr.AGENCY).toBe('20000000');
+    expect(row.channelRevenueIrr.CHARTER).toBe('0');
+    expect(row.avgPriceIrr).toBe(String(Math.round(100_000_000 / 3)));
     // avg > base → profit, no loss (real math, no fabricated 18٪ margin).
-    expect(row.profitIrr).toBe((row.avgPriceIrr - 30_000_000) * 3);
-    expect(row.lossIrr).toBe(0);
+    expect(row.profitIrr).toBe(
+      String((Number(row.avgPriceIrr) - 30_000_000) * 3),
+    );
+    expect(row.lossIrr).toBe('0');
 
     const { kpis, rows } = res.body.data.completed as {
-      kpis: { totalSalesIrr: number; totalTickets: number };
-      rows: { revenueIrr: number; tickets: number }[];
+      kpis: { totalSalesIrr: string; totalTickets: number };
+      rows: { revenueIrr: string; tickets: number }[];
     };
-    expect(kpis.totalSalesIrr).toBe(rows.reduce((a, r) => a + r.revenueIrr, 0));
+    expect(Number(kpis.totalSalesIrr)).toBe(
+      rows.reduce((a, r) => a + Number(r.revenueIrr), 0),
+    );
     expect(kpis.totalTickets).toBe(rows.reduce((a, r) => a + r.tickets, 0));
   });
 
@@ -280,14 +286,14 @@ describe('Flights (e2e)', () => {
       .set('Authorization', `Bearer ${accessToken}`);
     expect(res.status).toBe(200);
     const { channels, totalRevenueIrr, sold } = res.body.data as {
-      channels: { channel: string; seats: number; revenueIrr: number }[];
-      totalRevenueIrr: number;
+      channels: { channel: string; seats: number; revenueIrr: string }[];
+      totalRevenueIrr: string;
       sold: number;
     };
     expect(sold).toBe(2);
-    expect(totalRevenueIrr).toBe(58_000_000);
+    expect(totalRevenueIrr).toBe('58000000');
     expect(channels.find((c) => c.channel === 'SYSTEM')?.seats).toBe(1);
-    expect(channels.find((c) => c.channel === 'AGENCY')?.revenueIrr).toBe(0);
+    expect(channels.find((c) => c.channel === 'AGENCY')?.revenueIrr).toBe('0');
   });
 
   it('plan: agency-seat cap enforced; commercial save upserts a PENDING Phase 6 proposal; REGISTERED price → 409', async () => {
@@ -309,17 +315,18 @@ describe('Flights (e2e)', () => {
       .set('Authorization', `Bearer ${commercial.accessToken}`)
       .send({ priceIrr: 39_000_000, agencySeats: 60 });
     expect(ok.status).toBe(200);
-    expect(ok.body.data.basePriceIrr).toBe(39_000_000);
+    expect(ok.body.data.basePriceIrr).toBe('39000000');
     expect(ok.body.data.agencySeatsAllocated).toBe(60);
     expect(ok.body.data.directSeats).toBe(60);
     expect(ok.body.data.proposalPending).toBe(true);
 
     // ⚑ The plan never registers a bookable price — the proposal stays PENDING.
+    // (direct TypeORM read — proposedPriceIrr is a native bigint column.)
     const proposal = await typeorm.farePricingProposal.findUniqueOrThrow({
       where: { flightInstanceId: instance.id },
     });
     expect(proposal.status).toBe('PENDING');
-    expect(proposal.proposedPriceIrr).toBe(39_000_000);
+    expect(proposal.proposedPriceIrr).toBe(39_000_000n);
 
     // Once the CEO registers it, re-planning is locked.
     await typeorm.farePricingProposal.update({

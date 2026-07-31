@@ -388,7 +388,7 @@ export default function AccountPage() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<TabKey>('trips');
   const [bookings, setBookings] = useState<BookingDetail[] | null>(null);
-  const [wallet, setWallet] = useState<{ balanceIrr: number } | null>(null);
+  const [wallet, setWallet] = useState<{ balanceIrr: string } | null>(null);
   const [club, setClub] = useState<{ isMember: boolean; level: string | null; balance: number } | null>(null);
   const [refunds, setRefunds] = useState<RefundRequestView[] | null>(null);
   const [topupAmount, setTopupAmount] = useState('');
@@ -427,7 +427,7 @@ export default function AccountPage() {
   useEffect(() => {
     if (status !== 'authenticated') return;
     fetchMyBookings().then(setBookings).catch(() => setBookings([]));
-    fetchWallet().then(setWallet).catch(() => setWallet({ balanceIrr: 0 }));
+    fetchWallet().then(setWallet).catch(() => setWallet({ balanceIrr: '0' }));
     fetchClubPoints().then(setClub).catch(() => setClub(null));
     fetchMyRefunds().then(setRefunds).catch(() => setRefunds([]));
     fetchMyPriceLocks().then(setPriceLocks).catch(() => setPriceLocks([]));

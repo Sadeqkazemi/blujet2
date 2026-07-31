@@ -9,17 +9,19 @@ const PERIODS: SalesChartPeriod[] = [
     periodKey: '2026-02-01',
     startDate: '2026-02-01T00:00:00.000Z',
     endDate: '2026-03-01T00:00:00.000Z',
-    systemIrr: 9_120_000_000,
-    charterIrr: 7_600_000_000,
-    agencyIrr: 4_560_000_000,
+    // Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON
+    // on the backend).
+    systemIrr: '9120000000',
+    charterIrr: '7600000000',
+    agencyIrr: '4560000000',
   },
   {
     periodKey: '2026-03-01',
     startDate: '2026-03-01T00:00:00.000Z',
     endDate: '2026-04-01T00:00:00.000Z',
-    systemIrr: 1_000_000_000,
-    charterIrr: 500_000_000,
-    agencyIrr: 200_000_000,
+    systemIrr: '1000000000',
+    charterIrr: '500000000',
+    agencyIrr: '200000000',
   },
 ];
 

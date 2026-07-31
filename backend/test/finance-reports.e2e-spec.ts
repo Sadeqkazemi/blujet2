@@ -54,13 +54,18 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
       .get('/reporting/revenue-mix?granularity=year')
       .set('Authorization', auth(ceo.accessToken));
     expect(res.status).toBe(200);
+    // Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON)
+    // — parsed here for a display-only sum; individual channel sums here are
+    // far below 2^53 so Number() loses no precision.
     const { totalIrr, channels } = res.body.data as {
-      totalIrr: number;
-      channels: { channel: string; amountIrr: number; pct: number }[];
+      totalIrr: string;
+      channels: { channel: string; amountIrr: string; pct: number }[];
     };
     expect(channels).toHaveLength(3);
-    expect(channels.reduce((s, c) => s + c.amountIrr, 0)).toBe(totalIrr);
-    expect(totalIrr).toBeGreaterThan(0);
+    expect(channels.reduce((s, c) => s + Number(c.amountIrr), 0)).toBe(
+      Number(totalIrr),
+    );
+    expect(Number(totalIrr)).toBeGreaterThan(0);
   });
 
   // ── agency settlements ─────────────────────────────────────────────────
@@ -78,14 +83,14 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
         status: string;
         overdueDays: number;
       }[];
-      outstandingIrr: number;
+      outstandingIrr: string;
     };
     expect(rows.length).toBeGreaterThan(0);
     // Seed: the silver agency has an OVERDUE invoice (due 2026-06-05).
     const overdue = rows.find((r) => r.status === 'OVERDUE');
     expect(overdue).toBeDefined();
     expect(overdue!.overdueDays).toBeGreaterThan(0);
-    expect(outstandingIrr).toBeGreaterThan(0);
+    expect(Number(outstandingIrr)).toBeGreaterThan(0);
 
     const commercial = await loginAs(app, 'comm.abbasi');
     const forbidden = await request(app.getHttpServer())

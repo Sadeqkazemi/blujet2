@@ -889,13 +889,21 @@ the user's explicit scope (2026-07-22): **management panel only**
 `ExternalServiceConfig` entry with no code behind it). Added
 `backend/src/common/sms/kavenegar-sms.provider.ts` implementing the same
 `SmsProvider` interface, calling Kavenegar's real send API
-(`https://api.kavenegar.com/v1/{key}/sms/send.json`). `sms.module.ts` now
-factory-switches on `SMS_PROVIDER`: `"kavenegar"` (+ `KAVENEGAR_API_KEY`,
-optional `KAVENEGAR_SENDER_LINE`) uses the real driver; anything else —
-the dev/test default — keeps `MockSmsProvider`, so the existing test
-suite never makes a real network call. Failures (bad credit, invalid
-line, network error) are reported as real `SmsLog(status: FAILED)` rows
-via the existing `SmsService`, never fabricated as success.
+(`https://api.kavenegar.com/v1/{key}/sms/send.json`). `sms.module.ts`
+permanently binds `SMS_PROVIDER` to `KavenegarSmsProvider`; the class
+itself checks the `ext_kavenegar` `ExternalServiceConfig` row (Phase 28's
+IT Manager panel → سرویس‌های خارجی) on every send and falls back to
+`MockSmsProvider` whenever it's disabled or has no key configured. The
+API key is **not** a server env var — it's the same encrypted-at-rest
+(`apiKeyEncrypted`, via `encryptPii`), IT_MANAGER-editable mechanism
+already used for زرین‌پال/آمادئوس/نشان, so it can be set/rotated live
+from the panel with no server access or restart. `KAVENEGAR_SENDER_LINE`
+remains the one SMS-related env var (the approved originator line — not
+a secret, optional). The seed `ext_kavenegar` row ships disabled/keyless,
+so the existing test suite never makes a real network call. Failures
+(bad credit, invalid line, network error) are reported as real
+`SmsLog(status: FAILED)` rows via the existing `SmsService`, never
+fabricated as success.
 
 ---
 
@@ -2117,3 +2125,90 @@ and asserts `kpis().revenueIrr` is unchanged and still reconciles with
 (391/391) after the fix — the sales-chart/kpis reconciliation test that
 had failed in every one of the last several full-suite runs this session
 now passes deterministically.
+
+---
+
+## Int → BigInt migration: every IRR money column
+
+Closes the "known technical debt" flagged during Phase 3 seed data: every
+IRR-denominated column was Postgres `integer` (Int32 ceiling ~2.14e9 IRR ≈
+214,000,000 toman) — fine for a single ticket price, but a real agency
+credit line or a yearly revenue KPI aggregate can plausibly exceed that.
+User explicitly reviewed and approved the migration (and the direct
+`ALTER COLUMN` approach over an expand/contract dual-column pattern,
+appropriate since this is still pre-launch with no live production
+traffic) before it started, given it touches the entire financial core.
+
+**Schema**: all 27 IRR columns — `FlightInstance.basePriceIrr`,
+`CabinFare.priceIrr`, `FareRule.{priceIrr,taxIrr}`,
+`Booking.{priceIrr,taxIrr}`, `PaymentReconciliation.amountIrr`,
+`LedgerEntry.signedAmountIrr`, `AgencyAllotment.contractPriceIrr`,
+`AgencyCreditLine.limitIrr`, `AgencyInvoice.amountIrr`,
+`AgencyCreditRequest.requestedLimitIrr`,
+`AgencyWebserviceRequest.priceIrr`,
+`FarePricingProposal.{basePriceIrr,competitorPriceIrr,proposedPriceIrr,legalRateIrr,registeredPriceIrr}`,
+`RefundRequest.{totalPaidIrr,penaltyAmountIrr,refundableIrr}`,
+`PromoCode.value` (dual percent/fixed — a FIXED-type code's value is an
+IRR amount), `PromoRedemption.discountIrr`, `WalletEntry.signedAmountIrr`,
+`PriceLock.{lockedPriceIrr,feeIrr}`, `AiUsageLog.costIrr` — converted
+`Int`/`Int?` → `BigInt`/`BigInt?`. Non-money `Int` fields (seat counts,
+percentages like `penaltyPct`/`discountPct`, token counts, byte sizes,
+minutes) deliberately untouched. Single migration
+`20260731061249_money_columns_int_to_bigint`: plain
+`ALTER COLUMN ... TYPE BIGINT` per column — Postgres's standard widening
+conversion, no data loss, applied cleanly to both the dev and test
+databases with existing data present.
+
+**New shared infrastructure** (CLAUDE.md: "Money is NEVER a float. All
+arithmetic through a single money utility module" — this module didn't
+actually exist yet before this migration; it does now):
+- `backend/src/common/money.ts` — `Irr = bigint`, plus `addIrr`/`subIrr`/
+  `negateIrr`/`pctOfIrr` (integer-percent, half-away-from-zero rounding)/
+  `roundIrrTo` (round to nearest step, e.g. the business-cabin multiplier's
+  "nearest 100,000 IRR")/`divRoundBigInt` (bigint division with the same
+  rounding, used for margin %, revenue-mix %, paid %, average-fare
+  derivations)/`compareIrr`/`maxIrr`/`minIrr`/`isPositiveIrr`/
+  `isNegativeIrr`/`isZeroIrr`/`toIrr` (parses a DTO value, throws on a
+  non-integer). Every service touching money now goes through this
+  instead of hand-rolled bigint arithmetic.
+- `backend/src/common/bigint-json.ts` — `BigInt.prototype.toJSON` patched
+  to render as a decimal string (`JSON.stringify` throws on a raw
+  `bigint`; a JS `number` can't safely represent amounts above 2^53
+  anyway, so every money field in every API response is now a **string**,
+  e.g. `{"priceIrr": "5000000"}`). Imported for its side effect in
+  `main.ts` (real app) and `test/jest-setup.ts` (e2e tests).
+- `backend/src/common/dto/irr.decorator.ts` — `@IsIrrAmount()` (accepts a
+  bigint/integer-number/numeric-string), `@MinIrrAmount(min: bigint)`
+  (bigint-safe stand-in for class-validator's own `@Min()`, which
+  mishandles bigint), `@TransformToIrr()` (converts the validated value to
+  `bigint` via `class-transformer`). Applied to every DTO field where a
+  client submits one of the 27 columns as input (agency credit-limit
+  updates, invoice amounts, wallet top-up, booking payment confirmation,
+  fare-rule/pricing-proposal prices, ...).
+
+**ML-boundary exception** (the only place a bigint is deliberately
+converted back to a plain `number`): `flights.service.ts`/
+`pricing.service.ts`'s `runAiAnalysis()`, building the outbound
+`PriceSuggestionItem[]` payload sent to the internal FastAPI pricing
+service. Justified because ML output is advisory-only (CLAUDE.md ML
+Service Rules — never authoritative, never sets a bookable price by
+itself) and every real fare amount is far below 2^53, so no precision is
+lost in practice; the suggestion only becomes an authoritative
+`registeredPriceIrr` when a CEO explicitly registers it, at which point
+`pricing.service.ts`'s `register()` converts it back to `Irr` via
+`toIrr()`.
+
+**Testing**: full backend unit suite 50/50; full backend e2e suite
+391/392 (the one remaining failure is the pre-existing, previously
+documented Phase-51 timeout flake on `flight-engine-completion.e2e-spec.ts`'s
+Y/B/M fare-class test, confirmed unrelated to this migration by re-running
+it with a longer timeout, which passes with correct values); `tsc
+--noEmit` and `eslint` clean on the backend; frontend `tsc`/lint show no
+new errors; frontend unit suite 327/327, 72 files.
+Two intentional test-behavior changes (not weakened assertions):
+`agencies.e2e-spec.ts`'s "rejects a limit beyond the Int32 ceiling" test
+is obsolete by design (removing that ceiling was the point of the
+migration) and now proves the validation guard against a negative limit
+instead; `reporting.e2e-spec.ts`'s "money fields are raw integers"
+assertion flips from `typeof === 'number'` to `typeof === 'string'`,
+matching the new wire format on purpose.

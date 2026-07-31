@@ -350,10 +350,10 @@ function FinanceOpsView() {
                 </div>
                 <span
                   className={`font-num font-black whitespace-nowrap ${
-                    t.signedAmountIrr >= 0 && t.type !== 'REFUND' ? 'text-[#059669]' : 'text-danger'
+                    Number(t.signedAmountIrr) >= 0 && t.type !== 'REFUND' ? 'text-[#059669]' : 'text-danger'
                   }`}
                 >
-                  {t.signedAmountIrr >= 0 ? '+' : '−'} {faMoney(Math.abs(t.signedAmountIrr))}
+                  {Number(t.signedAmountIrr) >= 0 ? '+' : '−'} {faMoney(Math.abs(Number(t.signedAmountIrr)))}
                 </span>
               </div>
             ))}
@@ -464,10 +464,13 @@ function FinanceAnalyticView() {
   if (error) return <p className="p-8 text-sm text-danger">{error}</p>;
   if (!flights || !mix) return <p className="p-8 text-sm text-muted">در حال بارگذاری…</p>;
 
+  // Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON on
+  // the backend) — parsed here for this display-only sum; period totals are
+  // far below 2^53 so Number() loses no precision.
   const sums = {
-    system: periods.reduce((s, p) => s + p.systemIrr, 0),
-    charter: periods.reduce((s, p) => s + p.charterIrr, 0),
-    agency: periods.reduce((s, p) => s + p.agencyIrr, 0),
+    system: periods.reduce((s, p) => s + Number(p.systemIrr), 0),
+    charter: periods.reduce((s, p) => s + Number(p.charterIrr), 0),
+    agency: periods.reduce((s, p) => s + Number(p.agencyIrr), 0),
   };
 
   return (

@@ -21,7 +21,12 @@ export default function SalesBarChart({ periods, selectedPeriodKey, onSelectPeri
   const [hovered, setHovered] = useState<string | null>(null);
   const [tableView, setTableView] = useState(false);
 
-  const totals = periods.map((p) => p.systemIrr + p.charterIrr + p.agencyIrr);
+  // Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON on
+  // the backend) — parsed here for this display-only chart; period totals
+  // are far below 2^53 so Number() loses no precision.
+  const totals = periods.map(
+    (p) => Number(p.systemIrr) + Number(p.charterIrr) + Number(p.agencyIrr),
+  );
   const max = Math.max(1, ...totals);
 
   return (
@@ -64,7 +69,9 @@ export default function SalesBarChart({ periods, selectedPeriodKey, onSelectPeri
                   <td className="py-2">{faMoney(p.systemIrr)}</td>
                   <td className="py-2">{faMoney(p.charterIrr)}</td>
                   <td className="py-2">{faMoney(p.agencyIrr)}</td>
-                  <td className="py-2 font-bold">{faMoney(p.systemIrr + p.charterIrr + p.agencyIrr)}</td>
+                  <td className="py-2 font-bold">
+                    {faMoney(Number(p.systemIrr) + Number(p.charterIrr) + Number(p.agencyIrr))}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -106,7 +113,7 @@ export default function SalesBarChart({ periods, selectedPeriodKey, onSelectPeri
                 >
                   {SERIES.map((s) => {
                     const segTotal = totals[i] || 1;
-                    const segPct = (p[s.key] / segTotal) * 100;
+                    const segPct = (Number(p[s.key]) / segTotal) * 100;
                     return (
                       <div
                         key={s.key}

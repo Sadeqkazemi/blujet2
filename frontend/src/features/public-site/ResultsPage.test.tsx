@@ -22,8 +22,8 @@ const RESULT: SearchFlightResult = {
   departureAt: '2026-08-01T05:00:00.000Z',
   arrivalAt: '2026-08-01T06:30:00.000Z',
   cabins: [
-    { cabin: 'ECONOMY', priceIrr: 380_000_000, seatsLeft: 10 },
-    { cabin: 'BUSINESS', priceIrr: 680_000_000, seatsLeft: 0 },
+    { cabin: 'ECONOMY', priceIrr: '380000000', seatsLeft: 10 },
+    { cabin: 'BUSINESS', priceIrr: '680000000', seatsLeft: 0 },
   ],
 };
 
@@ -123,8 +123,8 @@ describe('ResultsPage', () => {
         id: 'pl-1',
         flightInstanceId: 'fi-1',
         cabin: 'ECONOMY',
-        lockedPriceIrr: 380_000_000,
-        feeIrr: 1_140_000,
+        lockedPriceIrr: '380000000',
+        feeIrr: '1140000',
         status: 'ACTIVE',
         expiresAt: '2026-08-04T05:00:00.000Z',
         createdAt: '2026-08-01T00:00:00.000Z',

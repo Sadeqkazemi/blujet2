@@ -1,20 +1,22 @@
 export type SalesGranularity = 'day' | 'month' | 'q3' | 'q6' | 'year' | 'flight';
 
+// Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON on
+// the backend — a JS number can't safely hold IRR amounts above 2^53).
 export interface SalesChartPeriod {
   periodKey: string;
   startDate: string;
   endDate: string;
-  systemIrr: number;
-  charterIrr: number;
-  agencyIrr: number;
+  systemIrr: string;
+  charterIrr: string;
+  agencyIrr: string;
 }
 
 export interface KpiResult {
-  revenueIrr: number;
-  profitIrr: number;
+  revenueIrr: string;
+  profitIrr: string;
   marginPct: number;
-  operatingCostIrr: number;
-  agencyDebtIrr: number;
+  operatingCostIrr: string;
+  agencyDebtIrr: string;
   agencyDebtCount: number;
 }
 
@@ -53,7 +55,7 @@ export interface RecentTransaction {
   titleFa: string;
   party: string;
   occurredAt: string;
-  signedAmountIrr: number;
+  signedAmountIrr: string;
 }
 
 export interface RecentTransactionsResult {
@@ -64,12 +66,12 @@ export interface RecentTransactionsResult {
 export interface RevenueMixChannel {
   channel: 'SYSTEM' | 'CHARTER' | 'AGENCY';
   labelFa: string;
-  amountIrr: number;
+  amountIrr: string;
   pct: number;
 }
 
 export interface RevenueMixResult {
-  totalIrr: number;
+  totalIrr: string;
   channels: RevenueMixChannel[];
 }
 
@@ -78,8 +80,8 @@ export type SettlementStatus = 'SETTLED' | 'PENDING' | 'OVERDUE';
 export interface AgencySettlementRow {
   agencyId: string;
   agencyName: string;
-  totalIrr: number;
-  paidIrr: number;
+  totalIrr: string;
+  paidIrr: string;
   paidPct: number;
   dueAt: string | null;
   overdueDays: number;
@@ -89,7 +91,7 @@ export interface AgencySettlementRow {
 
 export interface AgencySettlementsResult {
   rows: AgencySettlementRow[];
-  outstandingIrr: number;
+  outstandingIrr: string;
 }
 
 export interface PassengerReportHit {
@@ -103,7 +105,7 @@ export interface PassengerReportHit {
   departureAt: string;
   seatCode: string | null;
   cabin: 'BUSINESS' | 'ECONOMY' | null;
-  priceIrr: number;
+  priceIrr: string;
 }
 
 export interface StaffReportsResult {

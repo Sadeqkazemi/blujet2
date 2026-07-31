@@ -23,8 +23,10 @@ function routeLabel(p: { flight: { flightNo: string; route: { originCode: string
   return `${p.flight.route.originCode} ← ${p.flight.route.destCode}`;
 }
 
-function vsCompetitorLabel(proposed: number, competitor: number): string {
-  const delta = ((proposed - competitor) / competitor) * 100;
+function vsCompetitorLabel(proposed: string | number, competitor: string | number): string {
+  // Money fields are decimal STRINGs on the wire — parsed here for this
+  // display-only ratio; individual proposal amounts are far below 2^53.
+  const delta = ((Number(proposed) - Number(competitor)) / Number(competitor)) * 100;
   if (Math.abs(delta) < 1) return 'هم‌تراز رقبا';
   const pct = faDigits(Math.abs(Math.round(delta)));
   return delta < 0 ? `${pct}٪ پایین‌تر از رقبا` : `${pct}٪ بالاتر از رقبا`;
