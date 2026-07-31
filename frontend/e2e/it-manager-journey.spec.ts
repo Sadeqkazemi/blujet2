@@ -29,6 +29,7 @@ test('IT Manager creates an employee, grants a permission, resets their password
   // matched by name only since prior runs may have left same-named rows.
   const row = page.locator('li', { hasText: 'کارمند سناریوی تست' }).first();
   await row.getByRole('button', { name: 'تعلیق' }).click();
+  await page.getByRole('button', { name: 'تعلیق حساب' }).click();
   await expect(row.getByText('مسدود')).toBeVisible();
 });
 

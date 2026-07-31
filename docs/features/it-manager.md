@@ -108,8 +108,11 @@ log screen — so this is a new card below that grid, not a redesign.
 - [x] لاگ: 5-column table with actor/unit/level — `LogsPage.test.tsx` + `audit.e2e-spec.ts`
 - [x] سرویس‌ها: confirm dialog on toggle, external enable switch, summary cards — `ServicesPage.test.tsx`
 
-### Deferred (scoped out with reasons, not silently dropped)
-- Suspend/reactivate confirmation dialog (the design shows a generic confirm-notification pattern for every destructive action) — `EmployeesPage`'s suspend button acts immediately without a confirm step; low-risk (reversible via the same button) and consistent with `ClubPage`'s direct-action buttons, but flagged here rather than silently matching only part of the design.
+### Phase IT-panel low-priority gaps (design alignment — 2026-07-31)
+- [x] Suspend confirmation dialog before deactivating an employee — `EmployeesPage.test.tsx: 'shows suspend confirmation before deactivating an employee'` + `it-manager-journey.spec.ts`
+- [x] Custom organizational unit in add-user form («+ ایجاد واحد سازمانی جدید») — `EmployeesPage.test.tsx: 'creates a custom organizational unit in the add-user form'`
+- [x] Dashboard bandwidth resource bar (Linux `/proc/net/dev` sampling) — `ItDashboardPage.test.tsx` + `dashboard.service.ts`
+- [x] Survey config two-column layout with star ratings and route labels on recent responses — `SurveyConfigPage.test.tsx` + `survey.service.ts`
 
 ---
 

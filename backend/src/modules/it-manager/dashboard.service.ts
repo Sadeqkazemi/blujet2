@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import * as os from 'node:os';
+import { readFile } from 'node:fs/promises';
 import { statfs } from 'node:fs/promises';
 import { PrismaService } from '../../prisma/prisma.service';
 
@@ -16,6 +17,37 @@ export class ItDashboardService {
     } catch {
       return null;
     }
+  }
+
+  /** Sample /proc/net/dev on Linux — relative utilization, not synthetic. */
+  private async readNetworkBytes(): Promise<number | null> {
+    if (process.platform !== 'linux') return null;
+    try {
+      const raw = await readFile('/proc/net/dev', 'utf8');
+      let total = 0;
+      for (const line of raw.split('\n').slice(2)) {
+        const parts = line.trim().split(/\s+/);
+        if (parts.length < 10) continue;
+        const iface = parts[0]?.replace(':', '') ?? '';
+        if (iface === 'lo') continue;
+        total += Number(parts[1]) + Number(parts[9]);
+      }
+      return total;
+    } catch {
+      return null;
+    }
+  }
+
+  private async bandwidthUsedPct(): Promise<number | null> {
+    const start = await this.readNetworkBytes();
+    if (start === null) return null;
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    const end = await this.readNetworkBytes();
+    if (end === null) return null;
+    const bytesPerSec = Math.max(0, (end - start) / 0.2);
+    // Normalize against 100 Mbps (~12.5 MB/s) as a display ceiling.
+    const cap = 12.5 * 1024 * 1024;
+    return Math.min(100, Math.round((bytesPerSec / cap) * 1000) / 10);
   }
 
   async get() {
@@ -46,7 +78,10 @@ export class ItDashboardService {
       }),
     ]);
     const external = await this.prisma.externalServiceConfig.findMany();
-    const diskUsedPct = await this.diskUsedPct();
+    const [diskUsedPct, bandwidthUsedPct] = await Promise.all([
+      this.diskUsedPct(),
+      this.bandwidthUsedPct(),
+    ]);
 
     const servicesUp =
       internalServices.filter((s) => s.enabled).length +
@@ -95,6 +130,7 @@ export class ItDashboardService {
         cpuUsedPct,
         memoryUsedPct,
         diskUsedPct,
+        bandwidthUsedPct,
         loadAvg1m,
         cpuCount,
         uptimeSeconds: os.uptime(),

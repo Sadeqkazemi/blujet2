@@ -24,7 +24,7 @@ const DATA: ItDashboardData = {
     { name: 'موتور جستجوی پرواز', uptimePct: 99.99, enabled: true },
     { name: 'استرداد آنلاین', uptimePct: 98.2, enabled: false },
   ],
-  resources: { cpuUsedPct: 34, memoryUsedPct: 42.5, diskUsedPct: 48, loadAvg1m: 0.85, cpuCount: 4, uptimeSeconds: 3600 },
+  resources: { cpuUsedPct: 34, memoryUsedPct: 42.5, diskUsedPct: 48, bandwidthUsedPct: 12, loadAvg1m: 0.85, cpuCount: 4, uptimeSeconds: 3600 },
   recentEvents: [
     { id: 'e1', text: 'کارمند «رضا کاظمی» ایجاد شد.', category: 'ACCOUNT', createdAt: '2026-07-17T08:00:00.000Z' },
   ],
