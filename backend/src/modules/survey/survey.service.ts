@@ -151,7 +151,11 @@ export class SurveyService {
           take: 8,
           include: {
             invite: {
-              include: { flightInstance: { include: { flight: true } } },
+              include: {
+                flightInstance: {
+                  include: { flight: { include: { route: true } } },
+                },
+              },
             },
           },
         }),
@@ -166,6 +170,7 @@ export class SurveyService {
       recentResponses: recent.map((r) => ({
         id: r.id,
         flightNo: r.invite.flightInstance.flight.flightNo,
+        route: `${r.invite.flightInstance.flight.route.originCityFa} — ${r.invite.flightInstance.flight.route.destCityFa}`,
         rating: r.rating,
         comment: r.comment,
         at: r.createdAt,

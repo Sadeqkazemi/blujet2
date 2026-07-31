@@ -48,8 +48,15 @@ const IT_SCOPE = [
   { label: 'دسترسی به پنل رئیس هیئت مدیره', status: 'غیرمجاز', ok: false },
 ];
 
-function deptRoleLabel(dept: string | null, rank: string | null) {
-  const d = dept ? (DEPT_LABELS[dept] ?? dept) : '—';
+function deptRoleLabel(
+  dept: string | null,
+  rank: string | null,
+  customLabels: Record<string, string>,
+) {
+  let d = '—';
+  if (dept) {
+    d = DEPT_LABELS[dept] ?? customLabels[dept] ?? (dept.startsWith('custom_') ? 'واحد سفارشی' : dept);
+  }
   return `${rank ?? 'کارشناس'} · ${d}`;
 }
 
@@ -71,6 +78,11 @@ export default function EmployeesPage() {
     referralScope: 'MANAGERS_ONLY' as 'MANAGERS_ONLY' | 'ALL_STAFF',
   });
   const [selectedPerms, setSelectedPerms] = useState<Set<string>>(new Set());
+  const [customDeptLabels, setCustomDeptLabels] = useState<Record<string, string>>({});
+  const [customDepts, setCustomDepts] = useState<{ id: string; label: string }[]>([]);
+  const [addingDept, setAddingDept] = useState(false);
+  const [newDeptName, setNewDeptName] = useState('');
+  const [statusConfirm, setStatusConfirm] = useState<EmployeeListRow | null>(null);
 
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detail, setDetail] = useState<EmployeeDetail | null>(null);
@@ -134,10 +146,20 @@ export default function EmployeesPage() {
         referralScope: 'MANAGERS_ONLY',
       });
       setSelectedPerms(new Set());
+      setAddingDept(false);
+      setNewDeptName('');
       await load();
     } catch (e) {
       setAddError(e instanceof Error ? e.message : 'خطا در ایجاد کارمند.');
     }
+  }
+
+  function requestStatusChange(row: EmployeeListRow) {
+    if (row.isActive) {
+      setStatusConfirm(row);
+      return;
+    }
+    void onToggleStatus(row);
   }
 
   async function onToggleStatus(row: EmployeeListRow) {
@@ -178,7 +200,30 @@ export default function EmployeesPage() {
     }
   }
 
-  const catalogGroups = catalog?.[form.dept === 'sales' ? 'commercial' : form.dept] ?? [];
+  async function confirmSuspend() {
+    if (!statusConfirm) return;
+    await onToggleStatus(statusConfirm);
+    setStatusConfirm(null);
+  }
+
+  function submitNewDept() {
+    const name = newDeptName.trim();
+    if (!name) return;
+    const id = `custom_${Date.now()}`;
+    setCustomDepts((prev) => [...prev, { id, label: name }]);
+    setCustomDeptLabels((prev) => ({ ...prev, [id]: name }));
+    setForm((f) => ({ ...f, dept: id }));
+    setAddingDept(false);
+    setNewDeptName('');
+    setNotice(`واحد سازمانی «${name}» ایجاد شد ✓`);
+  }
+
+  const catalogDeptKey = form.dept.startsWith('custom_')
+    ? null
+    : form.dept === 'sales'
+      ? 'commercial'
+      : form.dept;
+  const catalogGroups = catalogDeptKey ? (catalog?.[catalogDeptKey] ?? []) : [];
 
   return (
     <div className="p-8">
@@ -229,7 +274,7 @@ export default function EmployeesPage() {
                 >
                   {e.fullName}
                 </button>
-                <span className="text-text-2">{deptRoleLabel(e.dept, e.rank)}</span>
+                <span className="text-text-2">{deptRoleLabel(e.dept, e.rank, customDeptLabels)}</span>
                 <span className="font-num ltr text-muted">{e.username}</span>
                 <span className="font-num text-muted">
                   {e.lastLoginAt ? formatJalaliDateTime(e.lastLoginAt) : 'هنوز وارد نشده'}
@@ -255,7 +300,7 @@ export default function EmployeesPage() {
                     ریست رمز
                   </button>
                   <button
-                    onClick={() => void onToggleStatus(e)}
+                    onClick={() => requestStatusChange(e)}
                     className={`rounded-lg border border-border px-2 py-1 text-[10px] font-bold ${
                       e.isActive ? 'text-danger' : 'text-[#059669]'
                     }`}
@@ -436,7 +481,61 @@ export default function EmployeesPage() {
                 {d.label}
               </button>
             ))}
+            {customDepts.map((d) => (
+              <button
+                key={d.id}
+                type="button"
+                onClick={() => setForm({ ...form, dept: d.id })}
+                className={`rounded-lg px-3 py-2 text-[11px] font-bold transition ${
+                  form.dept === d.id ? 'bg-[#f59e0b] text-white' : 'bg-surface text-text-2'
+                }`}
+              >
+                {d.label}
+              </button>
+            ))}
           </div>
+          {addingDept ? (
+            <div className="mt-2 flex gap-2">
+              <input
+                value={newDeptName}
+                onChange={(e) => setNewDeptName(e.target.value)}
+                placeholder="نام واحد جدید (مثلاً بازاریابی)"
+                className="flex-1 rounded-lg border border-border p-2.5 text-xs outline-none focus:border-accent"
+              />
+              <button
+                type="button"
+                onClick={submitNewDept}
+                className="rounded-lg bg-accent px-3 py-2 text-[11px] font-bold text-white"
+              >
+                افزودن
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAddingDept(false);
+                  setNewDeptName('');
+                }}
+                className="rounded-lg border border-border px-3 py-2 text-[11px] font-bold text-text-2"
+              >
+                انصراف
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setAddingDept(true)}
+              className="mt-2 text-[11px] font-bold text-accent"
+            >
+              + ایجاد واحد سازمانی جدید
+            </button>
+          )}
+
+          {form.dept.startsWith('custom_') && catalogGroups.length === 0 && (
+            <p className="mt-2 text-[10.5px] text-muted">
+              برای واحد سفارشی، کاتالوگ دسترسی از پیش تعریف نشده — پس از ایجاد حساب می‌توانید دسترسی‌ها
+              را در جزئیات اضافه کنید.
+            </p>
+          )}
 
           {catalogGroups.length > 0 && (
             <div className="mt-3">
@@ -489,6 +588,29 @@ export default function EmployeesPage() {
               className="rounded-lg bg-accent px-4 py-2 text-xs font-bold text-white transition hover:bg-accent/90"
             >
               ایجاد حساب و اعلان به مدیر
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {statusConfirm && (
+        <Modal title="تعلیق حساب کارمند" onClose={() => setStatusConfirm(null)}>
+          <p className="mb-4 text-xs text-muted">
+            آیا حساب «{statusConfirm.fullName}» معلق شود؟ کارمند تا زمان فعال‌سازی مجدد نمی‌تواند وارد
+            سامانه شود.
+          </p>
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => setStatusConfirm(null)}
+              className="rounded-lg bg-surface px-4 py-2 text-xs font-bold text-text-2"
+            >
+              انصراف
+            </button>
+            <button
+              onClick={() => void confirmSuspend()}
+              className="rounded-lg bg-danger px-4 py-2 text-xs font-bold text-white"
+            >
+              تعلیق حساب
             </button>
           </div>
         </Modal>

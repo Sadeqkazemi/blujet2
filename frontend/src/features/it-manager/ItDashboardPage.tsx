@@ -67,6 +67,9 @@ export default function ItDashboardPage() {
     ...(data.resources.diskUsedPct !== null
       ? [{ label: 'دیسک', pct: data.resources.diskUsedPct, color: 'bg-[#059669]' }]
       : []),
+    ...(data.resources.bandwidthUsedPct !== null
+      ? [{ label: 'پهنای باند', pct: data.resources.bandwidthUsedPct, color: 'bg-[#f59e0b]' }]
+      : []),
   ];
 
   return (

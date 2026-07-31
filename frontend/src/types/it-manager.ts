@@ -125,6 +125,7 @@ export interface ItDashboardData {
     cpuUsedPct: number;
     memoryUsedPct: number;
     diskUsedPct: number | null;
+    bandwidthUsedPct: number | null;
     loadAvg1m: number;
     cpuCount: number;
     uptimeSeconds: number;
