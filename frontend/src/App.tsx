@@ -24,7 +24,7 @@ import AgencyProfilePage from './features/agency-portal/AgencyProfilePage';
 import AgenciesListPage from './features/agencies/AgenciesListPage';
 import AgencyDetailPage from './features/agencies/AgencyDetailPage';
 import RequestDetailPage from './features/agencies/RequestDetailPage';
-import CartablePage from './features/cartable/CartablePage';
+import CartableRouter from './components/CartableRouter';
 import ClubPage from './features/club/ClubPage';
 import ClubTierRulesPage from './features/club/ClubTierRulesPage';
 import EmployeesPage from './features/it-manager/EmployeesPage';
@@ -125,7 +125,7 @@ export default function App() {
                 <Route path=":agencyId" element={<AgencyDetailPage />} />
               </Route>
               <Route path="cartable" element={<TabGate tabKey="cartable" />}>
-                <Route index element={<CartablePage />} />
+                <Route index element={<CartableRouter />} />
               </Route>
               <Route path="referrals" element={<TabGate tabKey="referrals" />}>
                 <Route index element={<ReferralsRouter />} />

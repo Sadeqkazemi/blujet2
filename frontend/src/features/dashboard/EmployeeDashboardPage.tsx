@@ -1,5 +1,9 @@
-import { useOutletContext } from 'react-router-dom';
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useOutletContext } from 'react-router-dom';
+import { fetchCartable, fetchMyReferrals } from '../../api/cartable';
+import { fetchEmployeeContext } from '../../api/panels';
+import { faDigits } from '../../lib/fa-format';
+import type { EmployeeContext } from '../../types/panels';
 import type { PanelNavItem } from '../../types/panels';
 
 interface PanelShellContext {
@@ -12,29 +16,93 @@ const TAB_DESCRIPTIONS: Record<string, string> = {
   pricing: 'ثبت نرخ پیشنهادی برای پروازهای آینده',
   reports: 'جستجوی مسافر و مشاهده جزئیات بلیط',
   refund: 'بررسی و ارجاع درخواست‌های استرداد بلیط',
+  cartable: 'کارهای در انتظار اقدام و ارسال پیام به مدیر',
   referrals: 'درخواست‌های ارجاع‌شده به شما توسط مدیران',
 };
 
 /**
- * پنل کارمند.dc.html's dashboard sub is "نمای کلی کارها و ارجاعات واحد" —
- * an overview of the employee's granted sections. Since PANEL_NAV for
- * EMPLOYEE is computed per-user from real EmployeePermission grants (see
- * PanelsService.getNav), this reuses that same server-computed nav rather
- * than a separate endpoint — every link here is real access, not mock.
+ * پنل کارمند.dc.html's dashboard: KPI cards (open cartable + pending
+ * referrals + unit), permission chips, and section link grid.
  */
 export default function EmployeeDashboardPage() {
   const { nav } = useOutletContext<PanelShellContext>();
   const sections = (nav ?? []).filter((item) => item.key !== 'dashboard');
-  // "referrals" is always present regardless of IT-granted permissions
-  // (پنل کارمند.dc.html's navKeys formula appends it unconditionally) —
-  // excluded from this specific check so the "no access yet" message
-  // still shows correctly for an employee with zero permission grants.
   const grantedSections = sections.filter((item) => item.key !== 'referrals');
+
+  const [context, setContext] = useState<EmployeeContext | null>(null);
+  const [openTasks, setOpenTasks] = useState<number | null>(null);
+  const [openReferrals, setOpenReferrals] = useState<number | null>(null);
+
+  const hasCartable = nav?.some((item) => item.key === 'cartable') ?? false;
+
+  useEffect(() => {
+    fetchEmployeeContext()
+      .then(setContext)
+      .catch(() => setContext(null));
+  }, []);
+
+  useEffect(() => {
+    const tasks: Promise<void>[] = [];
+    if (hasCartable) {
+      tasks.push(
+        fetchCartable()
+          .then((r) => setOpenTasks(r.totalOpen))
+          .catch(() => setOpenTasks(null)),
+      );
+    }
+    tasks.push(
+      fetchMyReferrals()
+        .then((r) => setOpenReferrals(r.counts.awaitingMyReport))
+        .catch(() => setOpenReferrals(null)),
+    );
+    void Promise.all(tasks);
+  }, [hasCartable]);
 
   return (
     <div className="p-6">
       <h1 className="text-lg font-bold text-ink">داشبورد کارمند</h1>
-      <p className="mt-1 text-xs text-muted">نمای کلی دسترسی‌های فعال شما</p>
+      <p className="mt-1 text-xs text-muted">نمای کلی کارها و ارجاعات واحد</p>
+
+      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="rounded-xl border border-border bg-white p-4">
+          <div className="mb-2 text-[11px] text-muted">کارهای باز کارتابل</div>
+          <div className="font-num text-2xl font-black text-[#f59e0b]">
+            {openTasks === null ? '—' : faDigits(openTasks)}
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-white p-4">
+          <div className="mb-2 text-[11px] text-muted">ارجاعات در انتظار</div>
+          <div className="font-num text-2xl font-black text-[#a855f7]">
+            {openReferrals === null ? '—' : faDigits(openReferrals)}
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-white p-4">
+          <div className="mb-2 text-[11px] text-muted">واحد سازمانی</div>
+          <div className="text-base font-bold text-ink">
+            {context?.deptLabelFa ?? '—'}
+          </div>
+        </div>
+      </div>
+
+      {context && context.permissionLabelsFa.length > 0 && (
+        <section className="mt-5 rounded-xl border border-border bg-white p-4">
+          <h2 className="text-sm font-bold text-ink">دسترسی‌های شما در این واحد</h2>
+          <p className="mt-1 text-[11px] text-muted">
+            این دسترسی‌ها توسط مدیر IT مطابق واحد سازمانی شما تعیین شده است.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {context.permissionLabelsFa.map((label) => (
+              <span
+                key={label}
+                className="flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-[11px] text-ink"
+              >
+                <span className="text-[#059669]">✓</span>
+                {label}
+              </span>
+            ))}
+          </div>
+        </section>
+      )}
 
       {nav === null && <p className="mt-4 text-xs text-muted">در حال بارگذاری…</p>}
       {nav !== null && grantedSections.length === 0 && (
