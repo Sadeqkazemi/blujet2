@@ -26,6 +26,8 @@ export const DOCUMENT_STATUS: Record<AgencyDocumentStatus, { label: string; clas
   REJECTED: { label: 'رد شد', className: 'bg-danger/15 text-danger' },
 };
 
+export const REQUEST_STATUS = DOCUMENT_STATUS;
+
 export const ACTIVE_BADGE = { label: 'فعال', className: 'bg-[#10b98124] text-[#059669]' };
 export const SUSPENDED_BADGE = { label: 'تعلیق‌شده', className: 'bg-danger/15 text-danger' };
 

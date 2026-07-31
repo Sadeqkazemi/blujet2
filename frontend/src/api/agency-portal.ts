@@ -83,6 +83,12 @@ export function fetchMyWebserviceRequests() {
   return apiGet<AgencyWebserviceRequest[]>('/agency-portal/webservice-requests');
 }
 
+export function fetchAgencyPortalWebservicePlans() {
+  return apiGet<{ plans: { months: 1 | 3 | 12; priceIrr: number }[] }>(
+    '/agency-portal/webservice-plans',
+  );
+}
+
 export function fetchApiKeys() {
   return apiGet<AgencyApiKeySummary[]>('/agency-portal/api-keys');
 }
