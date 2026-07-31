@@ -5,6 +5,7 @@ import * as crypto from 'node:crypto';
 import { TypeORMService } from '../src/typeorm/typeorm.service';
 import { loginAs, loginAsCustomer } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
+import { resetCustomerPhones } from './helpers/customer-state.helper';
 import { encryptPii, hashPii } from '../src/common/pii-crypto';
 import { ClubPointsService } from '../src/modules/booking-engine/club-points.service';
 
@@ -30,6 +31,11 @@ describe('Club (e2e)', () => {
   beforeEach(async () => {
     app = await createTestApp();
     typeorm = app.get(TypeORMService);
+    await resetCustomerPhones(typeorm, [
+      '09180000001',
+      '09180000002',
+      '09180000003',
+    ]);
   });
 
   afterEach(async () => {
@@ -522,6 +528,10 @@ describe('Club (e2e)', () => {
     userId: string,
     points: number,
   ) {
+    await typeorm.clubMember.updateMany({
+      where: { userId },
+      data: { userId: null },
+    });
     await typeorm.clubPointsEntry.deleteMany({
       where: { clubMemberId: memberId },
     });

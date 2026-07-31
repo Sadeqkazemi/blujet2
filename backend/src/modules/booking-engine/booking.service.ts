@@ -398,7 +398,27 @@ export class BookingService {
       promoCode?: string;
       paymentMethod?: PaymentMethod;
     } = {},
+    idempotencyKey?: string,
   ) {
+    if (idempotencyKey) {
+      const prior = await this.typeorm.payIdempotencyRecord.findUnique({
+        where: { idempotencyKey },
+        include: { booking: { include: BOOKING_INCLUDE } },
+      });
+      if (prior) {
+        if (prior.bookingId !== id || prior.userId !== user.id) {
+          throw new ConflictException({
+            code: ErrorCode.CONFLICT,
+            message: 'کلید یکتایی پرداخت برای رزرو دیگری استفاده شده است.',
+          });
+        }
+        return {
+          priceChanged: false as const,
+          booking: this.toDetail(await this.materializeExpiry(prior.booking)),
+        };
+      }
+    }
+
     const booking = await this.getOwnedBooking(id, user);
     if (booking.status === 'EXPIRED') {
       throw new ConflictException({
@@ -407,13 +427,22 @@ export class BookingService {
           'مهلت نگهداری این رزرو به پایان رسیده است. لطفاً دوباره رزرو کنید.',
       });
     }
+    if (booking.status === 'TICKETED' || booking.status === 'PAID') {
+      if (idempotencyKey) {
+        return {
+          priceChanged: false as const,
+          booking: this.toDetail(await this.materializeExpiry(booking)),
+        };
+      }
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'این رزرو قبلاً پرداخت شده است.',
+      });
+    }
     if (booking.status !== 'HELD') {
       throw new ConflictException({
         code: ErrorCode.CONFLICT,
-        message:
-          booking.status === 'TICKETED' || booking.status === 'PAID'
-            ? 'این رزرو قبلاً پرداخت شده است.'
-            : 'این رزرو قابل پرداخت نیست.',
+        message: 'این رزرو قابل پرداخت نیست.',
       });
     }
 
@@ -466,23 +495,32 @@ export class BookingService {
     // docs/DB_SCHEMA.md.
     let reconciliationId: string | null = null;
     if (paymentMethod === 'GATEWAY') {
-      const { authority } = await this.gateway.request(currentPriceIrr, id);
-      const verified = await this.gateway.verify(authority, currentPriceIrr);
-      if (!verified.ok) {
-        throw new ConflictException({
-          code: ErrorCode.CONFLICT,
-          message: 'پرداخت از سوی درگاه تأیید نشد. مبلغی کسر نشده است.',
-        });
-      }
-      gatewayRefId = verified.refId;
-      const reconciliation = await this.typeorm.paymentReconciliation.create({
-        data: {
-          bookingId: id,
-          gatewayRefId: verified.refId,
-          amountIrr: currentPriceIrr,
-        },
+      const existingRecon = await this.typeorm.paymentReconciliation.findFirst({
+        where: { bookingId: id },
+        orderBy: { createdAt: 'desc' },
       });
-      reconciliationId = reconciliation.id;
+      if (existingRecon) {
+        gatewayRefId = existingRecon.gatewayRefId;
+        reconciliationId = existingRecon.id;
+      } else {
+        const { authority } = await this.gateway.request(currentPriceIrr, id);
+        const verified = await this.gateway.verify(authority, currentPriceIrr);
+        if (!verified.ok) {
+          throw new ConflictException({
+            code: ErrorCode.CONFLICT,
+            message: 'پرداخت از سوی درگاه تأیید نشد. مبلغی کسر نشده است.',
+          });
+        }
+        gatewayRefId = verified.refId;
+        const reconciliation = await this.typeorm.paymentReconciliation.create({
+          data: {
+            bookingId: id,
+            gatewayRefId: verified.refId,
+            amountIrr: currentPriceIrr,
+          },
+        });
+        reconciliationId = reconciliation.id;
+      }
     }
 
     const paid = await this.typeorm.$transaction(async (tx) => {
@@ -527,6 +565,13 @@ export class BookingService {
         data: { status: 'PAID', priceIrr: finalPriceIrr },
       });
       if (captured.count === 0) {
+        const latest = await tx.booking.findUniqueOrThrow({
+          where: { id },
+          include: BOOKING_INCLUDE,
+        });
+        if (latest.status === 'TICKETED' || latest.status === 'PAID') {
+          return { booking: latest, discountIrr: 0n };
+        }
         throw new ConflictException({
           code: ErrorCode.CONFLICT,
           message: 'این رزرو قبلاً پرداخت شده است.',
@@ -588,6 +633,14 @@ export class BookingService {
         discountIrr,
       };
     });
+
+    if (idempotencyKey) {
+      await this.typeorm.payIdempotencyRecord
+        .create({
+          data: { idempotencyKey, bookingId: id, userId: user.id },
+        })
+        .catch(() => undefined);
+    }
 
     await this.audit.record({
       actorId: user.id,

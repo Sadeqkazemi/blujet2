@@ -140,6 +140,7 @@ model User {
   identityVerification           CustomerIdentityVerification? @relation("UserIdentityVerification")
   agencyAllotmentsCreated        AgencyAllotment[]
   paymentReconciliationsResolved PaymentReconciliation[]
+  payIdempotencyRecords          PayIdempotencyRecord[]
   supportTickets                 SupportTicket[]         @relation("SupportTicketRequester")
   supportTicketsForwarded        SupportTicket[]         @relation("SupportTicketForwardedTo")
 
@@ -501,6 +502,7 @@ model Booking {
   // SeatLock — the FK itself lives on SeatLock.bookingId (unique).
   seatLock          SeatLock?               @relation("SeatLockFinalizedBooking")
   reconciliations   PaymentReconciliation[]
+  payIdempotencyRecords PayIdempotencyRecord[]
   surveyInvite      SurveyInvite?
   customerReferralFirst CustomerReferral? @relation("CustomerReferralFirstBooking")
 
@@ -542,6 +544,21 @@ model PaymentReconciliation {
 
   @@index([status])
   @@map("payment_reconciliations")
+}
+
+// Guards double-submit on POST /bookings/:id/pay — a client retry with the
+// same Idempotency-Key header returns the same ticketed booking.
+model PayIdempotencyRecord {
+  id             String   @id @default(uuid())
+  idempotencyKey String   @unique
+  bookingId      String
+  booking        Booking  @relation(fields: [bookingId], references: [id])
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  createdAt      DateTime @default(now())
+
+  @@index([bookingId])
+  @@map("pay_idempotency_records")
 }
 
 model Passenger {
