@@ -40,6 +40,7 @@ import { FlightStatusModule } from './modules/flight-status/flight-status.module
 import { FlightopsModule } from './modules/flightops/flightops.module';
 import { SurveyModule } from './modules/survey/survey.module';
 import { CareersModule } from './modules/careers/careers.module';
+import { CustomerReferralsModule } from './modules/customer-referrals/customer-referrals.module';
 import { WebservicePricingModule } from './modules/webservice-pricing/webservice-pricing.module';
 
 @Module({
@@ -103,6 +104,7 @@ import { WebservicePricingModule } from './modules/webservice-pricing/webservice
     BookingEngineModule,
     ReconciliationModule,
     ProfileModule,
+    CustomerReferralsModule,
     ManageBookingModule,
     ContactModule,
     SupportTicketsModule,

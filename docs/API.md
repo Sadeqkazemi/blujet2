@@ -1100,6 +1100,119 @@ USER submits via `POST /my/club/card-request`, the request sits in
 - Frontend: `ClubPage.tsx` gains a `SITE_ADMIN` role branch — submitted
   queue + refer modal (مدیر ارشد / رئیس هیئت مدیره picker); no approve/reject.
 
+### پنل کاربر — نشان‌شده‌ها (`/account` → تب `saved`)
+Closes the «نشان‌شده‌ها» tab in `design-reference-v2/پنل کاربر.dc.html`:
+list saved flight+cabin bookmarks, book (navigate to checkout flow), remove.
+
+- `GET /my/saved-flights` (new, `USER` role) — newest first; each row
+  includes `{ id, flightInstanceId, cabin, flightNo, originCode, destCode,
+  originCityFa, destCityFa, departureAt, arrivalAt, priceIrr, bookable,
+  createdAt }`. `priceIrr` is recomputed live via `getCabinPrice`; departed
+  or non-`SCHEDULED` instances return `bookable: false`.
+- `POST /my/saved-flights` (new, `USER` role, `@Throttle` 30/min) — body
+  `{ flightInstanceId, cabin }`; requires a future `SCHEDULED` instance with
+  a bookable cabin price. Max 20 rows per user. `409` on duplicate.
+- `DELETE /my/saved-flights/:id` (new, `USER` role) — owner-only; `404`
+  otherwise.
+- Frontend: new `saved` tab on `AccountPage.tsx` + bookmark control on
+  `ResultsPage.tsx` cabin rows (login-gated, same pattern as price lock).
+
+### پنل کاربر — مسافران ذخیره‌شده (`/account` → تب `passengers`)
+Closes the «مسافران ذخیره‌شده» section in
+`design-reference-v2/پنل کاربر.dc.html`: customer address-book CRUD for
+checkout autofill (autofill wiring on `BookPage` deferred).
+
+- `GET /my/saved-passengers` (new, `USER` role) — newest first; each row
+  `{ id, fullName, latinName, nationalId, passportNo, mobile, isChild,
+  createdAt }`. PII decrypted for the owner only.
+- `POST /my/saved-passengers` (new, `USER` role, `@Throttle` 30/min) — body
+  `{ fullName, latinName, nationalId?, passportNo?, mobile?, isChild? }`;
+  at least one of `nationalId` or `passportNo` required; national ID
+  checksum validated when present. Max 20 rows per user. `409` when the same
+  national ID is already saved for this user.
+- `PATCH /my/saved-passengers/:id` (new, `USER` role) — same field shape as
+  POST (all optional except at least one id doc must remain); owner-only;
+  `404` otherwise.
+- `DELETE /my/saved-passengers/:id` (new, `USER` role) — owner-only; `404`
+  otherwise.
+- Frontend: replace booking-name stub on `AccountPage.tsx` `passengers` tab
+  with `AccountPassengersTab` (list + add/edit modal + remove).
+- Frontend: `BookPage.tsx` shows saved-passenger autofill chips (logged-in
+  `USER` only) above the passenger form; chip fills the focused seat row
+  with `fullName`, `nationalId`, and `mobile`.
+- Frontend: `AccountPage.tsx` profile tab includes a read-only saved-passengers
+  preview (`AccountProfileSavedPax`); «+ افزودن مسافر» switches to the
+  `passengers` tab and opens the add modal.
+
+### پنل کاربر — نشست‌های فعال (`/account` → تب `security`)
+Closes the «نشست‌های فعال / دستگاه‌های متصل» block in
+`design-reference-v2/پنل کاربر.dc.html`. Reuses existing `RefreshToken`
+rows — no schema change.
+
+- `GET /my/sessions` (new, `USER` role) — non-revoked, non-expired refresh
+  tokens for the caller only; each row `{ id, deviceLabel, ip, userAgent,
+  createdAt, expiresAt, isCurrent }`. `isCurrent` is true when the
+  request's `blujet_refresh` cookie matches that row's hash.
+- `DELETE /my/sessions/:id` (new, `USER` role) — revokes one other-device
+  session; `403` if targeting the current cookie's session (use logout
+  instead); owner-only `404`.
+- Frontend: `AccountSecuritySessions` on `AccountPage.tsx` `security` tab
+  (device list, «دستگاه فعلی» badge, «پایان نشست» for others).
+
+### پنل کاربر — حساب‌های بانکی (`/account` → تب `banks`)
+Closes the «حساب‌های بانکی» section in
+`design-reference-v2/پنل کاربر.dc.html`: saved card + sheba for refund
+payouts.
+
+- `GET /my/bank-accounts` (new, `USER` role) — default first, then newest;
+  each row `{ id, bankName, bankShort, brandColor, cardMasked, sheba,
+  shebaMasked, isDefault, createdAt, updatedAt }`. PAN/sheba decrypted for
+  owner only; list UI uses masked fields.
+- `POST /my/bank-accounts` (new, `USER` role, `@Throttle` 20/min) — body
+  `{ cardNo, sheba, bankName? }`; 16-digit card + ISO13616 sheba checksum;
+  Persian digits normalized. Bank name/BIN guessed from card when omitted.
+  Max 5 rows per user; first row becomes default. `409` on duplicate sheba.
+- `PATCH /my/bank-accounts/:id` (new, `USER` role) — `{ isDefault?: true }`
+  clears other defaults for this user; owner-only `404`.
+- `DELETE /my/bank-accounts/:id` (new, `USER` role) — owner-only; if the
+  deleted row was default, the newest remaining row is promoted.
+- Frontend: `AccountBankAccountsTab` on `AccountPage.tsx` `banks` tab (card
+  list with brand chip + «پیش‌فرض» badge, inline add form).
+
+### پنل کاربر — معرفی دوستان (`/account` → تب `referral`)
+Closes the «معرفی دوستان» section in
+`design-reference-v2/پنل کاربر.dc.html`.
+
+- `GET /my/referral` (new, `USER` role) — `{ referralCode, sharePath,
+  stats: { invitedCount, pointsEarned, successfulBookings }, invites:
+  [{ id, fullName, joinedAt, status, pointsAwarded }] }`. Code is
+  lazily generated on first read (`NAME-####` shape).
+- `POST /auth/otp/request` — optional `referralCode` in body; applied only
+  when the phone number is registering for the first time (ignored for
+  returning customers and invalid/self codes).
+- First ticketed booking by a referred user awards `500` club points to
+  the referrer's `ClubMember` ledger (if they are a member); idempotent.
+- Frontend: `AccountReferralTab` on `AccountPage.tsx` `referral` tab
+  (hero banner, copy/share, KPI cards, invited-friends list).
+
+### پنل کاربر — احراز هویت (`/account` → تب `identity`)
+Closes the «احراز هویت» section in `design-reference-v2/پنل کاربر.dc.html`
+**without the selfie step** (explicit CLAUDE.md cut — national ID card
+upload only).
+
+- `GET /my/identity` (new, `USER` role) — `{ status, isComplete,
+  canSubmit, submittedAt, rejectReason, steps: [{ key, done }],
+  idCardFile? }`. Step `profile` is derived from User identity fields;
+  step `id_card` from an uploaded StoredFile id.
+- `POST /my/identity/id-card` (new, `USER` role, `@Throttle` 10/min,
+  multipart) — PDF/PNG/JPG ≤5MB via `FilesService`; blocked when status is
+  `SUBMITTED` or `APPROVED`.
+- `POST /my/identity/submit` (new, `USER` role) — requires profile step +
+  id card; sets `SUBMITTED`. Staff review (`APPROVED`/`REJECTED`) is a
+  separate admin gap.
+- Frontend: `AccountIdentityTab` — warning banner, 2-step checklist (no
+  selfie), upload + submit matching the design layout.
+
 ## Phase 21 — فراموشی رمز (customer forgot/set password)
 
 Third "dead forms" item. `ForgotPasswordPage.tsx` was entirely client-side

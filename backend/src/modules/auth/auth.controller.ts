@@ -141,7 +141,7 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Challenge issued' })
   @ApiResponse({ status: 403, description: 'Account suspended' })
   async requestOtp(@Body() dto: RequestOtpDto) {
-    const result = await this.auth.requestOtp(dto.phone);
+    const result = await this.auth.requestOtp(dto.phone, dto.referralCode);
     return { success: true, data: result };
   }
 

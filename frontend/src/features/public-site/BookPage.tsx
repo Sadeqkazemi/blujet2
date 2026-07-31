@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { createBooking, fetchClubPoints, fetchSeatMap } from '../../api/publicSite';
+import { createBooking, fetchClubPoints, fetchSavedPassengers, fetchSeatMap } from '../../api/publicSite';
 import { ApiRequestError } from '../../api/envelope';
-import type { CabinClass, SeatMapCell } from '../../types/public-site';
+import type { CabinClass, SavedPassenger, SeatMapCell } from '../../types/public-site';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import FlowStepper from '../../components/public/FlowStepper';
+import SavedPassengerAutofill, { savedPassengerToDraft } from './SavedPassengerAutofill';
 
 // Business seat selection is a design-confirmed perk gate: at least 15,000
 // club points (the پلاتین threshold) are required, matching the design's
@@ -95,6 +96,9 @@ export default function BookPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [clubBalance, setClubBalance] = useState<number | null>(null);
+  const [savedPassengers, setSavedPassengers] = useState<SavedPassenger[]>([]);
+  const [activePassengerIndex, setActivePassengerIndex] = useState(0);
+  const [passengerSourceIds, setPassengerSourceIds] = useState<(string | null)[]>([]);
 
   useEffect(() => {
     if (!flightInstanceId) return;
@@ -110,6 +114,18 @@ export default function BookPage() {
       .catch(() => setClubBalance(0));
   }, [status, cabin]);
 
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    fetchSavedPassengers()
+      .then(setSavedPassengers)
+      .catch(() => setSavedPassengers([]));
+  }, [status]);
+
+  const usedSavedIds = useMemo(
+    () => new Set(passengerSourceIds.filter((id): id is string => Boolean(id))),
+    [passengerSourceIds],
+  );
+
   const businessLocked = cabin === 'BUSINESS' && (clubBalance ?? 0) < BUSINESS_SEAT_MIN_POINTS;
 
   function toggleSeat(seatCode: string) {
@@ -121,8 +137,23 @@ export default function BookPage() {
         while (arr.length > next.length) arr.pop();
         return arr;
       });
+      setPassengerSourceIds((ids) => {
+        const arr = [...ids];
+        while (arr.length < next.length) arr.push(null);
+        while (arr.length > next.length) arr.pop();
+        return arr;
+      });
+      if (next.length > 0 && activePassengerIndex >= next.length) {
+        setActivePassengerIndex(next.length - 1);
+      }
       return next;
     });
+  }
+
+  function applySavedPassenger(saved: SavedPassenger, index: number) {
+    const draft = savedPassengerToDraft(saved);
+    setPassengers((arr) => arr.map((x, j) => (j === index ? draft : x)));
+    setPassengerSourceIds((arr) => arr.map((id, j) => (j === index ? saved.id : id)));
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -212,32 +243,58 @@ export default function BookPage() {
 
       {selectedSeats.length > 0 && (
         <form onSubmit={onSubmit} className="flex flex-col gap-4">
+          <SavedPassengerAutofill
+            passengers={savedPassengers}
+            activeIndex={activePassengerIndex}
+            usedIds={usedSavedIds}
+            onSelect={applySavedPassenger}
+          />
           {passengers.map((p, i) => (
-            <div key={selectedSeats[i]} className="rounded-xl border border-[#e5e9f0] bg-white p-4">
+            <div
+              key={selectedSeats[i]}
+              className="rounded-xl border border-[#e5e9f0] bg-white p-4"
+              style={
+                activePassengerIndex === i
+                  ? { borderColor: '#1668c4', boxShadow: '0 0 0 1px #1668c4' }
+                  : undefined
+              }
+              onFocusCapture={() => setActivePassengerIndex(i)}
+            >
               <div className="mb-2 text-xs font-bold text-[#6b7b94]">مسافر صندلی {selectedSeats[i]}</div>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 <input
                   data-testid={`pax-name-${i}`}
                   value={p.fullName}
-                  onChange={(e) =>
-                    setPassengers((arr) => arr.map((x, j) => (j === i ? { ...x, fullName: e.target.value } : x)))
-                  }
+                  onChange={(e) => {
+                    setPassengers((arr) =>
+                      arr.map((x, j) => (j === i ? { ...x, fullName: e.target.value } : x)),
+                    );
+                    setPassengerSourceIds((arr) => arr.map((id, j) => (j === i ? null : id)));
+                  }}
                   placeholder="نام و نام خانوادگی"
                   className="rounded-lg border border-[#e5e9f0] px-3 py-2 text-sm outline-none focus:border-[#1668c4]"
                 />
                 <input
+                  data-testid={`pax-national-id-${i}`}
                   value={p.nationalId}
-                  onChange={(e) =>
-                    setPassengers((arr) => arr.map((x, j) => (j === i ? { ...x, nationalId: e.target.value } : x)))
-                  }
+                  onChange={(e) => {
+                    setPassengers((arr) =>
+                      arr.map((x, j) => (j === i ? { ...x, nationalId: e.target.value } : x)),
+                    );
+                    setPassengerSourceIds((arr) => arr.map((id, j) => (j === i ? null : id)));
+                  }}
                   placeholder="کد ملی (اختیاری)"
                   className="font-num rounded-lg border border-[#e5e9f0] px-3 py-2 text-sm outline-none focus:border-[#1668c4]"
                 />
                 <input
+                  data-testid={`pax-mobile-${i}`}
                   value={p.mobile}
-                  onChange={(e) =>
-                    setPassengers((arr) => arr.map((x, j) => (j === i ? { ...x, mobile: e.target.value } : x)))
-                  }
+                  onChange={(e) => {
+                    setPassengers((arr) =>
+                      arr.map((x, j) => (j === i ? { ...x, mobile: e.target.value } : x)),
+                    );
+                    setPassengerSourceIds((arr) => arr.map((id, j) => (j === i ? null : id)));
+                  }}
                   placeholder="موبایل (اختیاری)"
                   className="font-num rounded-lg border border-[#e5e9f0] px-3 py-2 text-sm outline-none focus:border-[#1668c4]"
                 />

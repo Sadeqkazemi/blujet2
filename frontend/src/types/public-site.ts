@@ -83,6 +83,94 @@ export interface PriceLock {
   };
 }
 
+export interface SavedFlight {
+  id: string;
+  flightInstanceId: string;
+  cabin: CabinClass;
+  flightNo: string;
+  originCode: string;
+  destCode: string;
+  originCityFa: string;
+  destCityFa: string;
+  departureAt: string;
+  arrivalAt: string;
+  priceIrr: number;
+  bookable: boolean;
+  createdAt: string;
+}
+
+export interface SavedPassenger {
+  id: string;
+  fullName: string;
+  latinName: string;
+  nationalId: string | null;
+  passportNo: string | null;
+  mobile: string | null;
+  isChild: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ActiveSession {
+  id: string;
+  deviceLabel: string;
+  ip: string | null;
+  userAgent: string | null;
+  createdAt: string;
+  expiresAt: string;
+  isCurrent: boolean;
+}
+
+export interface SavedBankAccount {
+  id: string;
+  bankName: string;
+  bankShort: string;
+  brandColor: string;
+  cardMasked: string | null;
+  sheba: string;
+  shebaMasked: string;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CustomerReferralStatus = 'SIGNED_UP' | 'BOOKED' | 'REWARDED';
+
+export interface CustomerReferralInvite {
+  id: string;
+  fullName: string;
+  joinedAt: string;
+  status: CustomerReferralStatus;
+  pointsAwarded: number;
+}
+
+export interface CustomerReferralDashboard {
+  referralCode: string;
+  sharePath: string;
+  stats: {
+    invitedCount: number;
+    pointsEarned: number;
+    successfulBookings: number;
+  };
+  invites: CustomerReferralInvite[];
+}
+
+export type CustomerIdentityStatus =
+  | 'NOT_STARTED'
+  | 'SUBMITTED'
+  | 'APPROVED'
+  | 'REJECTED';
+
+export interface CustomerIdentityView {
+  status: CustomerIdentityStatus;
+  isComplete: boolean;
+  canSubmit: boolean;
+  submittedAt: string | null;
+  rejectReason: string | null;
+  steps: { key: 'profile' | 'id_card'; done: boolean }[];
+  idCardFile: { id: string; fileName: string; sizeBytes: number } | null;
+}
+
 export interface PayResultOk {
   priceChanged: false;
   booking: BookingDetail;

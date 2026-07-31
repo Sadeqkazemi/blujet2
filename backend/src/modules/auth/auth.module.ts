@@ -3,10 +3,13 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { MySessionsController } from './my-sessions.controller';
+import { MySessionsService } from './my-sessions.service';
 import { StepUpService } from './step-up.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { TWO_FACTOR_PROVIDER } from './providers/two-factor-provider.interface';
 import { MockTwoFactorProvider } from './providers/mock-two-factor.provider';
+import { CustomerReferralsModule } from '../customer-referrals/customer-referrals.module';
 import { AuditModule } from '../audit/audit.module';
 import { SmsModule } from '../sms/sms.module';
 
@@ -19,10 +22,12 @@ import { SmsModule } from '../sms/sms.module';
     }),
     AuditModule,
     SmsModule,
+    CustomerReferralsModule,
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, MySessionsController],
   providers: [
     AuthService,
+    MySessionsService,
     StepUpService,
     JwtStrategy,
     { provide: TWO_FACTOR_PROVIDER, useClass: MockTwoFactorProvider },

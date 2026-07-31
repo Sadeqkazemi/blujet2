@@ -9,7 +9,7 @@ import * as useLocaleModule from '../../hooks/useLocale';
 import * as publicSiteApi from '../../api/publicSite';
 import * as supportTicketsApi from '../../api/support-tickets';
 import * as authApi from '../../api/auth';
-import type { BookingDetail, PriceLock, RefundRequestView, UserProfile } from '../../types/public-site';
+import type { BookingDetail, PriceLock, RefundRequestView, SavedFlight, SavedPassenger, SavedBankAccount, CustomerReferralDashboard, CustomerIdentityView, ActiveSession, UserProfile } from '../../types/public-site';
 import type { ClubMembershipView } from '../../types/club-membership';
 import type { MySupportTicketRow } from '../../types/support-tickets';
 
@@ -106,6 +106,115 @@ function mockAuth(status: 'authenticated' | 'unauthenticated', signOut = vi.fn()
   });
 }
 
+const ACTIVE_SESSION: ActiveSession = {
+  id: 'sess-1',
+  deviceLabel: 'Chrome · Windows',
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0',
+  createdAt: '2026-07-01T00:00:00.000Z',
+  expiresAt: '2026-08-01T00:00:00.000Z',
+  isCurrent: true,
+};
+
+const OTHER_SESSION: ActiveSession = {
+  id: 'sess-2',
+  deviceLabel: 'اپلیکیشن blujet · اندروید',
+  ip: '10.0.0.2',
+  userAgent: 'blujet-android/1.0',
+  createdAt: '2026-06-28T00:00:00.000Z',
+  expiresAt: '2026-08-01T00:00:00.000Z',
+  isCurrent: false,
+};
+
+const SAVED_PASSENGER: SavedPassenger = {
+  id: 'sp-1',
+  fullName: 'محمد رضایی',
+  latinName: 'MOHAMMAD REZAEI',
+  nationalId: null,
+  passportNo: 'A22113344',
+  mobile: null,
+  isChild: false,
+  createdAt: '2026-07-01T00:00:00.000Z',
+  updatedAt: '2026-07-01T00:00:00.000Z',
+};
+
+const BANK_ACCOUNT: SavedBankAccount = {
+  id: 'ba-1',
+  bankName: 'بانک ملت',
+  bankShort: 'ملت',
+  brandColor: '#d6336c',
+  cardMasked: '6104 3371 •••• 4521',
+  sheba: 'IR820540102680020817909002',
+  shebaMasked: '820540•••9002',
+  isDefault: true,
+  createdAt: '2026-07-01T00:00:00.000Z',
+  updatedAt: '2026-07-01T00:00:00.000Z',
+};
+
+const IDENTITY_NOT_STARTED: CustomerIdentityView = {
+  status: 'NOT_STARTED',
+  isComplete: false,
+  canSubmit: false,
+  submittedAt: null,
+  rejectReason: null,
+  steps: [
+    { key: 'profile', done: false },
+    { key: 'id_card', done: false },
+  ],
+  idCardFile: null,
+};
+
+const IDENTITY_READY: CustomerIdentityView = {
+  status: 'NOT_STARTED',
+  isComplete: false,
+  canSubmit: true,
+  submittedAt: null,
+  rejectReason: null,
+  steps: [
+    { key: 'profile', done: true },
+    { key: 'id_card', done: true },
+  ],
+  idCardFile: { id: 'f1', fileName: 'کارت-ملی.png', sizeBytes: 1234 },
+};
+
+const REFERRAL_DASH: CustomerReferralDashboard = {
+  referralCode: 'NEGAR-4152',
+  sharePath: '/signin?ref=NEGAR-4152',
+  stats: { invitedCount: 3, pointsEarned: 1000, successfulBookings: 2 },
+  invites: [
+    {
+      id: 'cr-1',
+      fullName: 'رضا مرادی',
+      joinedAt: '2026-07-01T00:00:00.000Z',
+      status: 'REWARDED',
+      pointsAwarded: 500,
+    },
+    {
+      id: 'cr-2',
+      fullName: 'آرش هاشمی',
+      joinedAt: '2026-07-02T00:00:00.000Z',
+      status: 'SIGNED_UP',
+      pointsAwarded: 0,
+    },
+  ],
+};
+
+const SAVED: SavedFlight = {
+  id: 'sf-1',
+  flightInstanceId: 'fi-3',
+  cabin: 'ECONOMY',
+  flightNo: 'BJ-300',
+  originCode: 'THR',
+  destCode: 'MHD',
+  originCityFa: 'تهران',
+  destCityFa: 'مشهد',
+  departureAt: '2026-08-02T05:00:00.000Z',
+  arrivalAt: '2026-08-02T06:30:00.000Z',
+  priceIrr: 195_000_000,
+  bookable: true,
+  createdAt: '2026-07-01T00:00:00.000Z',
+};
+
 const TICKET: MySupportTicketRow = {
   id: 'tk-1',
   trackingCode: 'TKAABBCCDD',
@@ -133,6 +242,12 @@ beforeEach(() => {
   vi.spyOn(publicSiteApi, 'fetchMyRefunds').mockResolvedValue([REFUND]);
   vi.spyOn(publicSiteApi, 'fetchMyProfile').mockResolvedValue(PROFILE);
   vi.spyOn(publicSiteApi, 'fetchMyPriceLocks').mockResolvedValue([]);
+  vi.spyOn(publicSiteApi, 'fetchSavedFlights').mockResolvedValue([SAVED]);
+  vi.spyOn(publicSiteApi, 'fetchSavedPassengers').mockResolvedValue([SAVED_PASSENGER]);
+  vi.spyOn(publicSiteApi, 'fetchBankAccounts').mockResolvedValue([BANK_ACCOUNT]);
+  vi.spyOn(publicSiteApi, 'fetchMyReferral').mockResolvedValue(REFERRAL_DASH);
+  vi.spyOn(publicSiteApi, 'fetchMyIdentity').mockResolvedValue(IDENTITY_NOT_STARTED);
+  vi.spyOn(publicSiteApi, 'fetchMySessions').mockResolvedValue([ACTIVE_SESSION, OTHER_SESSION]);
   vi.spyOn(supportTicketsApi, 'fetchMySupportTickets').mockResolvedValue([]);
 });
 
@@ -161,11 +276,50 @@ describe('AccountPage', () => {
     expect(screen.getByText('GOLD-8842')).toBeInTheDocument();
   });
 
-  it('switches to the passengers tab and lists unique passengers', async () => {
+  it('switches to the passengers tab and lists saved passengers with meta line', async () => {
     mockAuth('authenticated');
     renderPage();
     await userEvent.click(screen.getByTestId('account-tab-passengers'));
-    expect(await screen.findByTestId('account-passenger')).toHaveTextContent('نگار رضایی');
+    const row = await screen.findByTestId('account-passenger');
+    expect(row).toHaveTextContent('محمد رضایی');
+    expect(row).toHaveTextContent('MOHAMMAD REZAEI · A22113344');
+  });
+
+  it('adds a saved passenger from the modal', async () => {
+    mockAuth('authenticated');
+    const create = vi.spyOn(publicSiteApi, 'createSavedPassenger').mockResolvedValue({
+      ...SAVED_PASSENGER,
+      id: 'sp-2',
+      fullName: 'سارا احمدی',
+      latinName: 'SARA AHMADI',
+      passportNo: 'B99887766',
+    });
+    renderPage();
+    await userEvent.click(screen.getByTestId('account-tab-passengers'));
+    await userEvent.click(screen.getByTestId('passengers-add-open'));
+    await userEvent.type(screen.getByLabelText('نام و نام خانوادگی'), 'سارا احمدی');
+    await userEvent.type(screen.getByLabelText('نام لاتین (روی بلیط)'), 'Sara Ahmadi');
+    await userEvent.type(screen.getByLabelText('شماره گذرنامه'), 'B99887766');
+    await userEvent.click(screen.getByTestId('passengers-form-save'));
+    await vi.waitFor(() => expect(create).toHaveBeenCalled());
+    expect(create).toHaveBeenCalledWith({
+      fullName: 'سارا احمدی',
+      latinName: 'Sara Ahmadi',
+      nationalId: undefined,
+      passportNo: 'B99887766',
+      mobile: undefined,
+      isChild: false,
+    });
+  });
+
+  it('removes a saved passenger', async () => {
+    mockAuth('authenticated');
+    const remove = vi.spyOn(publicSiteApi, 'removeSavedPassenger').mockResolvedValue({ removed: true });
+    renderPage();
+    await userEvent.click(screen.getByTestId('account-tab-passengers'));
+    await screen.findByTestId('account-passenger');
+    await userEvent.click(screen.getByLabelText('حذف'));
+    await vi.waitFor(() => expect(remove).toHaveBeenCalledWith('sp-1'));
   });
 
   it('switches to the refunds tab and shows the real refund', async () => {
@@ -184,6 +338,20 @@ describe('AccountPage', () => {
     expect(screen.getByText('TKAABBCCDD', { exact: false })).toBeInTheDocument();
   });
 
+  it('switches to the security tab and lists active sessions with revoke', async () => {
+    mockAuth('authenticated');
+    const revoke = vi.spyOn(publicSiteApi, 'revokeMySession').mockResolvedValue({ revoked: true });
+    renderPage();
+    await userEvent.click(screen.getByTestId('account-tab-security'));
+    expect(await screen.findByTestId('account-sessions')).toBeInTheDocument();
+    expect(screen.getByTestId('session-current-badge')).toBeInTheDocument();
+    expect(screen.getByText('Chrome · Windows')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId('session-revoke-sess-2'));
+    await vi.waitFor(() => expect(revoke).toHaveBeenCalledWith('sess-2'));
+    expect(screen.queryByText('اپلیکیشن blujet · اندروید')).not.toBeInTheDocument();
+  });
+
   it('switches to the security tab and sets password via OTP flow API', async () => {
     mockAuth('authenticated');
     const setPw = vi.spyOn(authApi, 'setPassword').mockResolvedValue({ changed: true });
@@ -194,6 +362,86 @@ describe('AccountPage', () => {
     await userEvent.click(screen.getByTestId('account-save-password'));
     await screen.findByText('رمز عبور با موفقیت تغییر کرد ✓');
     expect(setPw).toHaveBeenCalledWith('secret12');
+  });
+
+  it('switches to the banks tab and lists saved accounts with default badge', async () => {
+    mockAuth('authenticated');
+    const create = vi.spyOn(publicSiteApi, 'createBankAccount').mockResolvedValue({
+      ...BANK_ACCOUNT,
+      id: 'ba-2',
+      bankName: 'بانک سامان',
+      bankShort: 'سامان',
+      brandColor: '#1c7ed6',
+      cardMasked: '6219 8619 •••• 7730',
+      isDefault: false,
+    });
+    renderPage();
+    await userEvent.click(screen.getByTestId('account-tab-banks'));
+    expect(await screen.findByTestId('account-banks')).toBeInTheDocument();
+    expect(screen.getByText('بانک ملت')).toBeInTheDocument();
+    expect(screen.getByTestId('bank-default-badge')).toBeInTheDocument();
+
+    await userEvent.type(screen.getByTestId('bank-input-card'), '6219861977777730');
+    await userEvent.type(screen.getByTestId('bank-input-sheba'), 'IR060120000000332211452192');
+    await userEvent.click(screen.getByTestId('bank-submit'));
+    await vi.waitFor(() => expect(create).toHaveBeenCalled());
+    expect(create).toHaveBeenCalledWith({
+      cardNo: '6219861977777730',
+      sheba: 'IR060120000000332211452192',
+    });
+  });
+
+  it('switches to the referral tab and shows code, KPIs, and invite list', async () => {
+    mockAuth('authenticated');
+    Object.assign(navigator, {
+      clipboard: { writeText: vi.fn().mockResolvedValue(undefined) },
+    });
+    renderPage();
+    await userEvent.click(screen.getByTestId('account-tab-referral'));
+    expect(await screen.findByTestId('account-referral')).toBeInTheDocument();
+    expect(screen.getByTestId('referral-code')).toHaveTextContent('NEGAR-4152');
+    expect(screen.getByTestId('kpi-invited')).toHaveTextContent('۳');
+    expect(screen.getByText('رضا مرادی')).toBeInTheDocument();
+    expect(screen.getByText('رزرو انجام شد')).toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('referral-copy'));
+    expect(await screen.findByText('کد معرف کپی شد ✓')).toBeInTheDocument();
+  });
+
+  it('switches to the identity tab and shows incomplete steps with profile link', async () => {
+    mockAuth('authenticated');
+    renderPage();
+    await userEvent.click(screen.getByTestId('account-tab-identity'));
+    expect(await screen.findByTestId('account-identity')).toBeInTheDocument();
+    expect(screen.getByText('احراز هویت شما هنوز کامل نشده است')).toBeInTheDocument();
+    expect(screen.getByTestId('identity-go-profile')).toBeInTheDocument();
+    expect(screen.getAllByTestId('identity-step')).toHaveLength(2);
+    expect(screen.queryByTestId('identity-submit')).not.toBeInTheDocument();
+  });
+
+  it('submits identity verification when profile and id card are complete', async () => {
+    mockAuth('authenticated');
+    vi.spyOn(publicSiteApi, 'fetchMyIdentity').mockResolvedValue(IDENTITY_READY);
+    const submit = vi
+      .spyOn(publicSiteApi, 'submitIdentityVerification')
+      .mockResolvedValue({ ...IDENTITY_READY, status: 'SUBMITTED', canSubmit: false });
+    renderPage();
+    await userEvent.click(screen.getByTestId('account-tab-identity'));
+    expect(await screen.findByTestId('identity-submit')).toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('identity-submit'));
+    await vi.waitFor(() => expect(submit).toHaveBeenCalled());
+  });
+
+  it('shows saved passengers on the profile tab and opens add modal from there', async () => {
+    mockAuth('authenticated');
+    renderPage();
+    await userEvent.click(screen.getByTestId('account-tab-profile'));
+    expect(await screen.findByTestId('profile-saved-pax')).toBeInTheDocument();
+    expect(screen.getAllByTestId('profile-saved-pax-row')).toHaveLength(1);
+    expect(screen.getByText('MOHAMMAD REZAEI · A22113344')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId('profile-saved-pax-add'));
+    expect(await screen.findByTestId('passengers-form-modal')).toBeInTheDocument();
+    expect(screen.getByTestId('account-passengers')).toBeInTheDocument();
   });
 
   it('shows an incomplete-profile banner and saves identity fields from the profile tab', async () => {
@@ -266,6 +514,15 @@ describe('AccountPage', () => {
     vi.spyOn(publicSiteApi, 'fetchMyBookings').mockResolvedValue([{ ...BOOKING, isPriceLocked: true }]);
     renderPage();
     expect(await screen.findByTestId('trip-price-locked-badge')).toBeInTheDocument();
+  });
+
+  it('switches to the saved tab and lists bookmarked flights with book action', async () => {
+    mockAuth('authenticated');
+    renderPage();
+    await userEvent.click(screen.getByTestId('account-tab-saved'));
+    expect(await screen.findByTestId('account-saved-flights')).toBeInTheDocument();
+    expect(screen.getByText('تهران ← مشهد')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'رزرو' })).toBeInTheDocument();
   });
 
   it('switches to the price-locks tab and lists a real lock with its route, price, fee, and cancel action', async () => {
