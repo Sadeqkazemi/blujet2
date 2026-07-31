@@ -1336,6 +1336,9 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   model + `GET/POST/PATCH/DELETE /my/saved-passengers`; `AccountPage`
   `passengers` tab CRUD + `BookPage` autofill chips + profile-tab preview block. See
   `docs/features/saved-passengers.md`.
+- [ ] **User panel — نشست‌های فعال (active sessions)** — `GET/DELETE /my/sessions`
+  over `RefreshToken`; `AccountSecuritySessions` on security tab. See
+  `docs/features/active-sessions.md`.
 - [x] **Bug fix (senior review, found while chasing the "pre-existing"
   reporting flake): revenue reporting polluted by agency debt-calibration
   ledger rows.** The `reporting.e2e-spec.ts` sales-chart/kpis

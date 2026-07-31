@@ -10,6 +10,7 @@ import * as crypto from 'node:crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
+import { hashRefreshToken } from './auth-token.util';
 import { TWO_FACTOR_PROVIDER } from './providers/two-factor-provider.interface';
 import type { TwoFactorProvider } from './providers/two-factor-provider.interface';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
@@ -35,7 +36,7 @@ function generateSixDigitCode(): string {
 }
 
 function hashToken(token: string): string {
-  return crypto.createHash('sha256').update(token).digest('hex');
+  return hashRefreshToken(token);
 }
 
 @Injectable()

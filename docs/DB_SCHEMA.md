@@ -1202,10 +1202,10 @@ step anywhere in the project.
   (CLAUDE.md: booking/payment must keep working regardless of AI/profile
   state; national ID stays optional at the DTO level exactly as it is
   today — this phase does not make it required to book).
-- ⚑ **Explicitly not built in Phase 17**: bank cards, active-sessions
-  list, invite-friends, and any document/selfie upload — all real sections
-  of the same design page, all out of scope for a "notify when incomplete"
-  feature. Saved-passengers CRUD moved to its own section below.
+- ⚑ **Explicitly not built in Phase 17**: bank cards, invite-friends,
+  and any document/selfie upload — all real sections of the same design
+  page. Active-sessions moved to its own section below; saved-passengers
+  shipped separately.
 
 ## Phase 18 — SITE_ADMIN + EMPLOYEE panel access
 
@@ -1800,6 +1800,12 @@ model SavedPassenger {
 Migration: `20260731130000_saved_passengers`. PII columns follow the same
 AES-256-GCM + HMAC hash pattern as `ClubMember`/`Passenger`. Application
 cap: 20 rows per user; duplicate national ID per user rejected in service.
+
+## پنل کاربر — نشست‌های فعال (reuse `RefreshToken`)
+
+See `docs/API.md`'s matching section. No new table — customer-facing
+list/revoke over existing `RefreshToken` rows (`userAgent`, `ip`,
+`revokedAt`), scoped to `userId = caller.id`.
 
 ## Phase 65 — قوانین باشگاه مشتریان (Club Tier Rules)
 
