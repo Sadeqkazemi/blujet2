@@ -154,6 +154,22 @@ export interface CustomerReferralDashboard {
   invites: CustomerReferralInvite[];
 }
 
+export type CustomerIdentityStatus =
+  | 'NOT_STARTED'
+  | 'SUBMITTED'
+  | 'APPROVED'
+  | 'REJECTED';
+
+export interface CustomerIdentityView {
+  status: CustomerIdentityStatus;
+  isComplete: boolean;
+  canSubmit: boolean;
+  submittedAt: string | null;
+  rejectReason: string | null;
+  steps: { key: 'profile' | 'id_card'; done: boolean }[];
+  idCardFile: { id: string; fileName: string; sizeBytes: number } | null;
+}
+
 export interface PayResultOk {
   priceChanged: false;
   booking: BookingDetail;

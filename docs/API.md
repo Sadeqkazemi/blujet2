@@ -1187,6 +1187,24 @@ Closes the «معرفی دوستان» section in
 - Frontend: `AccountReferralTab` on `AccountPage.tsx` `referral` tab
   (hero banner, copy/share, KPI cards, invited-friends list).
 
+### پنل کاربر — احراز هویت (`/account` → تب `identity`)
+Closes the «احراز هویت» section in `design-reference-v2/پنل کاربر.dc.html`
+**without the selfie step** (explicit CLAUDE.md cut — national ID card
+upload only).
+
+- `GET /my/identity` (new, `USER` role) — `{ status, isComplete,
+  canSubmit, submittedAt, rejectReason, steps: [{ key, done }],
+  idCardFile? }`. Step `profile` is derived from User identity fields;
+  step `id_card` from an uploaded StoredFile id.
+- `POST /my/identity/id-card` (new, `USER` role, `@Throttle` 10/min,
+  multipart) — PDF/PNG/JPG ≤5MB via `FilesService`; blocked when status is
+  `SUBMITTED` or `APPROVED`.
+- `POST /my/identity/submit` (new, `USER` role) — requires profile step +
+  id card; sets `SUBMITTED`. Staff review (`APPROVED`/`REJECTED`) is a
+  separate admin gap.
+- Frontend: `AccountIdentityTab` — warning banner, 2-step checklist (no
+  selfie), upload + submit matching the design layout.
+
 ## Phase 21 — فراموشی رمز (customer forgot/set password)
 
 Third "dead forms" item. `ForgotPasswordPage.tsx` was entirely client-side

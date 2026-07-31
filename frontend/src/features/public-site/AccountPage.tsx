@@ -23,6 +23,9 @@ import {
   updateBankAccount,
   removeBankAccount,
   fetchMyReferral,
+  fetchMyIdentity,
+  uploadIdentityIdCard,
+  submitIdentityVerification,
   revokeMySession,
   fetchWallet,
   removeSavedFlight,
@@ -37,7 +40,7 @@ import { changeOwnPassword, setPassword } from '../../api/auth';
 import { faDigits, faMoney, parseTomanToRial } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
-import type { BookingDetail, PriceLock, RefundRequestView, SavedFlight, SavedPassenger, SavedBankAccount, CustomerReferralDashboard, ActiveSession, UserProfile } from '../../types/public-site';
+import type { BookingDetail, PriceLock, RefundRequestView, SavedFlight, SavedPassenger, SavedBankAccount, CustomerReferralDashboard, CustomerIdentityView, ActiveSession, UserProfile } from '../../types/public-site';
 import AccountSecuritySessions from './AccountSecuritySessions';
 import type { ClubMembershipView } from '../../types/club-membership';
 import type { MySupportTicketRow, SupportTicketStatus } from '../../types/support-tickets';
@@ -46,6 +49,7 @@ import AccountSavedFlightsTab from './AccountSavedFlightsTab';
 import AccountPassengersTab, { type SavedPassengerForm } from './AccountPassengersTab';
 import AccountBankAccountsTab, { type BankAccountForm } from './AccountBankAccountsTab';
 import AccountReferralTab from './AccountReferralTab';
+import AccountIdentityTab from './AccountIdentityTab';
 import AccountProfileSavedPax from './AccountProfileSavedPax';
 
 // پنل کاربر — real data from the existing bookings/wallet/club-points/refunds
@@ -88,7 +92,7 @@ const TIER_LABEL: Record<string, Tr> = {
   PLATINUM: { fa: 'پلاتین', en: 'Platinum', ar: 'بلاتينية' },
 };
 
-type TabKey = 'trips' | 'wallet' | 'club' | 'saved' | 'price-locks' | 'passengers' | 'refunds' | 'tickets' | 'security' | 'banks' | 'referral' | 'profile';
+type TabKey = 'trips' | 'wallet' | 'club' | 'saved' | 'price-locks' | 'passengers' | 'refunds' | 'tickets' | 'security' | 'banks' | 'referral' | 'identity' | 'profile';
 
 const TAB_LABEL: Record<TabKey, Tr> = {
   profile: { fa: 'پروفایل من', en: 'My Profile', ar: 'ملفي الشخصي' },
@@ -103,6 +107,7 @@ const TAB_LABEL: Record<TabKey, Tr> = {
   security: { fa: 'امنیت حساب', en: 'Account Security', ar: 'أمان الحساب' },
   banks: { fa: 'حساب‌های بانکی', en: 'Bank Accounts', ar: 'الحسابات البنكية' },
   referral: { fa: 'معرفی دوستان', en: 'Invite Friends', ar: 'دعوة الأصدقاء' },
+  identity: { fa: 'احراز هویت', en: 'Identity Verification', ar: 'التحقق من الهوية' },
 };
 
 const TABS: { key: TabKey; icon: string }[] = [
@@ -118,6 +123,7 @@ const TABS: { key: TabKey; icon: string }[] = [
   { key: 'security', icon: '🛡️' },
   { key: 'banks', icon: '🏦' },
   { key: 'referral', icon: '🎁' },
+  { key: 'identity', icon: '🛡️' },
 ];
 
 const TICKET_STATUS_LABEL: Record<SupportTicketStatus, Tr> = {
@@ -525,6 +531,11 @@ export default function AccountPage() {
   const [bankFormError, setBankFormError] = useState<string | null>(null);
   const [referral, setReferral] = useState<CustomerReferralDashboard | null>(null);
   const [referralCopyNotice, setReferralCopyNotice] = useState<string | null>(null);
+  const [identity, setIdentity] = useState<CustomerIdentityView | null>(null);
+  const [identityUploadBusy, setIdentityUploadBusy] = useState(false);
+  const [identitySubmitBusy, setIdentitySubmitBusy] = useState(false);
+  const [identityUploadError, setIdentityUploadError] = useState<string | null>(null);
+  const [identitySubmitError, setIdentitySubmitError] = useState<string | null>(null);
   const [lockActionBusy, setLockActionBusy] = useState<string | null>(null);
   const [lockError, setLockError] = useState<string | null>(null);
 
@@ -576,6 +587,7 @@ export default function AccountPage() {
     fetchMySessions().then(setSessions).catch(() => setSessions([]));
     fetchBankAccounts().then(setBankAccounts).catch(() => setBankAccounts([]));
     fetchMyReferral().then(setReferral).catch(() => setReferral(null));
+    fetchMyIdentity().then(setIdentity).catch(() => setIdentity(null));
     fetchMyProfile()
       .then((p) => {
         setProfile(p);
@@ -814,6 +826,33 @@ export default function AccountPage() {
             : 'تم نسخ رابط الدعوة ✓',
       );
       window.setTimeout(() => setReferralCopyNotice(null), 2500);
+    }
+  }
+
+  async function onUploadIdentityIdCard(file: File) {
+    setIdentityUploadError(null);
+    setIdentityUploadBusy(true);
+    try {
+      await uploadIdentityIdCard(file);
+      setIdentity(await fetchMyIdentity());
+    } catch (err) {
+      setIdentityUploadError(err instanceof ApiRequestError ? err.message : t.saveErrorFallback);
+      throw err;
+    } finally {
+      setIdentityUploadBusy(false);
+    }
+  }
+
+  async function onSubmitIdentity() {
+    setIdentitySubmitError(null);
+    setIdentitySubmitBusy(true);
+    try {
+      setIdentity(await submitIdentityVerification());
+    } catch (err) {
+      setIdentitySubmitError(err instanceof ApiRequestError ? err.message : t.saveErrorFallback);
+      throw err;
+    } finally {
+      setIdentitySubmitBusy(false);
     }
   }
 
@@ -1347,6 +1386,22 @@ export default function AccountPage() {
           />
         )}
         {tab === 'referral' && referral === null && (
+          <p style={{ fontSize: 13, color: '#6b7787' }}>{t.loading}</p>
+        )}
+
+        {tab === 'identity' && identity && (
+          <AccountIdentityTab
+            data={identity}
+            uploadBusy={identityUploadBusy}
+            submitBusy={identitySubmitBusy}
+            uploadError={identityUploadError}
+            submitError={identitySubmitError}
+            onUpload={onUploadIdentityIdCard}
+            onSubmit={onSubmitIdentity}
+            onGoProfile={() => setTab('profile')}
+          />
+        )}
+        {tab === 'identity' && identity === null && (
           <p style={{ fontSize: 13, color: '#6b7787' }}>{t.loading}</p>
         )}
 

@@ -134,6 +134,7 @@ model User {
   savedBankAccounts              SavedBankAccount[]      @relation("SavedBankAccountOwner")
   customerReferralsMade          CustomerReferral[]      @relation("CustomerReferralsMade")
   customerReferralReceived       CustomerReferral?       @relation("CustomerReferralReceived")
+  identityVerification           CustomerIdentityVerification? @relation("UserIdentityVerification")
   agencyAllotmentsCreated        AgencyAllotment[]
   paymentReconciliationsResolved PaymentReconciliation[]
   supportTickets                 SupportTicket[]         @relation("SupportTicketRequester")
@@ -1682,6 +1683,28 @@ model CustomerReferral {
 
   @@index([referrerUserId, createdAt])
   @@map("customer_referrals")
+}
+
+enum CustomerIdentityStatus {
+  NOT_STARTED
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+model CustomerIdentityVerification {
+  id           String                 @id @default(uuid())
+  userId       String                 @unique
+  user         User                   @relation("UserIdentityVerification", fields: [userId], references: [id], onDelete: Cascade)
+  status       CustomerIdentityStatus @default(NOT_STARTED)
+  idCardFileId String?
+  submittedAt  DateTime?
+  reviewedAt   DateTime?
+  rejectReason String?
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+
+  @@map("customer_identity_verifications")
 }
 
 // Phase 20: تماس با ما — a simple inbound inquiry, not a tracked/forwarded
