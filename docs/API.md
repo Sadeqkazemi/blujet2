@@ -1132,6 +1132,9 @@ checkout autofill (autofill wiring on `BookPage` deferred).
 - Frontend: `BookPage.tsx` shows saved-passenger autofill chips (logged-in
   `USER` only) above the passenger form; chip fills the focused seat row
   with `fullName`, `nationalId`, and `mobile`.
+- Frontend: `AccountPage.tsx` profile tab includes a read-only saved-passengers
+  preview (`AccountProfileSavedPax`); «+ افزودن مسافر» switches to the
+  `passengers` tab and opens the add modal.
 
 ## Phase 21 — فراموشی رمز (customer forgot/set password)
 

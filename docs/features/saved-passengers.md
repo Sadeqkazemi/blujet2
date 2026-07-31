@@ -16,7 +16,7 @@ Design: `design-reference-v2/پنل کاربر.dc.html` → profile section `sav
 - [x] Remove passenger via ✕ — `AccountPage.test.tsx`
 - [x] Empty state «مسافری ذخیره نشده است» — covered by `AccountPassengersTab` (empty array in other tests)
 - [x] `BookPage` autofill chips fill active passenger row — `BookPage.test.tsx`
+- [x] Profile tab preview block lists saved passengers + routes add to passengers tab — `AccountPage.test.tsx`
 
 ## Explicitly deferred
-- Saved-passengers preview block on profile tab (passengers tab is canonical for CRUD).
-- Results-page buy modal autofill (real flow routes through `BookPage` today).
+- Bank cards, active sessions, invite-friends, KYC selfie upload (Phase 17 scope cuts).
