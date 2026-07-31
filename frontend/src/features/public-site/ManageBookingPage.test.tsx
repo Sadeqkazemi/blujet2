@@ -85,13 +85,21 @@ describe('ManageBookingPage', () => {
     vi.spyOn(publicSiteApi, 'lookupBookingByPnrAndLastName').mockResolvedValue(BOOKING);
     const submit = vi.spyOn(publicSiteApi, 'submitAnonymousRefund').mockResolvedValue({
       id: 'r1',
+      trackingCode: 'RF-A1B2C3D4',
       bookingId: 'b1',
+      pnr: 'BJ4X2K',
+      flightNo: 'BJ-100',
+      originCode: 'THR',
+      destCode: 'MHD',
+      departureAt: BOOKING.departureAt,
       status: 'SUBMITTED',
       penaltyPct: 30,
       penaltyAmountIrr: 4_800_000,
       refundableIrr: 11_200_000,
       totalPaidIrr: 16_000_000,
+      history: [{ step: 'submitted', labelFa: 'ثبت درخواست', at: new Date().toISOString() }],
       createdAt: new Date().toISOString(),
+      paidAt: null,
     } satisfies RefundRequestView);
     renderPage();
 
@@ -127,13 +135,21 @@ describe('ManageBookingPage', () => {
     vi.spyOn(publicSiteApi, 'lookupBookingByPnrAndLastName').mockResolvedValue(BOOKING);
     const submit = vi.spyOn(publicSiteApi, 'submitAnonymousRefund').mockResolvedValue({
       id: 'r1',
+      trackingCode: 'RF-A1B2C3D4',
       bookingId: 'b1',
+      pnr: 'BJ4X2K',
+      flightNo: 'BJ-100',
+      originCode: 'THR',
+      destCode: 'MHD',
+      departureAt: BOOKING.departureAt,
       status: 'SUBMITTED',
       penaltyPct: 30,
       penaltyAmountIrr: 4_800_000,
       refundableIrr: 11_200_000,
       totalPaidIrr: 16_000_000,
+      history: [{ step: 'submitted', labelFa: 'Submitted', at: new Date().toISOString() }],
       createdAt: new Date().toISOString(),
+      paidAt: null,
     } satisfies RefundRequestView);
     renderPage();
 

@@ -646,7 +646,27 @@ export class PnrService {
         message: 'یافت نشد.',
       });
     }
-    const flight = await this.prisma.flight.findFirstOrThrow();
+    // Persistent E2E databases also contain synthetic AAA/BBB-style routes
+    // from lower-level tests. Pick a route whose codes exist in the public
+    // airport selector or the browser journey cannot select the fresh
+    // instance even though it was created successfully.
+    const airportCodes = (
+      await this.prisma.airport.findMany({ select: { code: true } })
+    ).map((airport) => airport.code);
+    const aircraftTypes = (
+      await this.prisma.aircraftSeatMap.findMany({
+        select: { aircraftType: true },
+      })
+    ).map((seatMap) => seatMap.aircraftType);
+    const flight = await this.prisma.flight.findFirstOrThrow({
+      where: {
+        aircraftType: { in: aircraftTypes },
+        route: {
+          originCode: { in: airportCodes },
+          destCode: { in: airportCodes },
+        },
+      },
+    });
     // Wide random jitter (25-125 days out) so repeated E2E runs practically
     // never collide on the same calendar day and confuse the date search.
     const daysAhead = 25 + Math.floor(Math.random() * 100);

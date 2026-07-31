@@ -56,13 +56,21 @@ describe('TicketPage', () => {
     vi.spyOn(publicSiteApi, 'fetchBookingByPnr').mockResolvedValue(TICKETED);
     vi.spyOn(publicSiteApi, 'submitRefund').mockResolvedValue({
       id: 'r1',
+      trackingCode: 'RF-A1B2C3D4',
       bookingId: 'b1',
+      pnr: TICKETED.pnr,
+      flightNo: TICKETED.flightNo,
+      originCode: TICKETED.originCode,
+      destCode: TICKETED.destCode,
+      departureAt: TICKETED.departureAt,
       status: 'SUBMITTED',
       penaltyPct: 30,
       penaltyAmountIrr: 114_000_000,
       refundableIrr: 266_000_000,
       totalPaidIrr: 380_000_000,
+      history: [{ step: 'submitted', labelFa: 'ثبت درخواست', at: new Date().toISOString() }],
       createdAt: new Date().toISOString(),
+      paidAt: null,
     });
     renderPage();
 
