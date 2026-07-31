@@ -8,6 +8,7 @@ import type {
   RefundRequestView,
   SavedFlight,
   SavedPassenger,
+  SavedBankAccount,
   ActiveSession,
   SearchFlightResult,
   SeatMapResult,
@@ -162,6 +163,22 @@ export function updateSavedPassenger(
 
 export function removeSavedPassenger(id: string) {
   return apiDelete<{ removed: boolean }>(`/my/saved-passengers/${id}`);
+}
+
+export function fetchBankAccounts() {
+  return apiGet<SavedBankAccount[]>('/my/bank-accounts');
+}
+
+export function createBankAccount(dto: { cardNo: string; sheba: string; bankName?: string }) {
+  return apiPost<SavedBankAccount>('/my/bank-accounts', dto);
+}
+
+export function updateBankAccount(id: string, dto: { isDefault?: boolean }) {
+  return apiPatch<SavedBankAccount>(`/my/bank-accounts/${id}`, dto);
+}
+
+export function removeBankAccount(id: string) {
+  return apiDelete<{ removed: boolean }>(`/my/bank-accounts/${id}`);
 }
 
 export function fetchMySessions() {

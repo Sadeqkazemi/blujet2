@@ -1801,6 +1801,36 @@ Migration: `20260731130000_saved_passengers`. PII columns follow the same
 AES-256-GCM + HMAC hash pattern as `ClubMember`/`Passenger`. Application
 cap: 20 rows per user; duplicate national ID per user rejected in service.
 
+## پنل کاربر — حساب‌های بانکی (`SavedBankAccount`)
+
+Customer refund payout destination — card PAN + Iranian sheba (IBAN).
+Encrypted at rest like other PII; sheba deduped per user via `shebaHash`.
+
+```prisma
+model SavedBankAccount {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation("SavedBankAccountOwner", ...)
+  bankName    String
+  bankShort   String
+  brandColor  String
+  cardPanEnc  String?
+  cardLast4   String?
+  shebaEnc    String
+  shebaHash   String
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([userId, shebaHash])
+  @@map("saved_bank_accounts")
+}
+```
+
+Migration: `20260731140000_saved_bank_accounts`. Application cap: 5 rows
+per user; duplicate sheba per user rejected in service.
+
 ## پنل کاربر — نشست‌های فعال (reuse `RefreshToken`)
 
 See `docs/API.md`'s matching section. No new table — customer-facing
