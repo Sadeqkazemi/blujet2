@@ -2989,3 +2989,25 @@ support contact, job postings block, static site pages list.
 
 Home page reads `GET /site-content/home` for announcement/hero/promo/routes/destinations.
 See `docs/features/site-admin-media.md` for the acceptance checklist.
+
+## Phase F — SITE_ADMIN settings (app links + support contact)
+
+Completes Phase E deferrals for app download links and public support
+phone/email (social links already in settings).
+
+### Admin (`SITE_ADMIN`, `settings` tab)
+
+SITE_ADMIN may PATCH only: `socialLinks`, `supportEmail`, `supportPhone`,
+`appDownloadLinks` (all other keys → 403).
+
+`appDownloadLinks` shape: `[{ id: 'app_store'|'google_play'|'bazaar_myket', name, url }]`.
+
+### Public
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/settings/app-links` | public | Store links with non-empty URLs (https-normalized). |
+| GET | `/settings/support-contact` | public | `{ phone, email }` from system settings. |
+
+Home page app band reads `GET /settings/app-links`.
+See `docs/features/site-admin-settings-links.md`.

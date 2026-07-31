@@ -17,4 +17,21 @@ export class SettingsPublicController {
   async getSocialLinks() {
     return { success: true, data: await this.settings.getPublicSocialLinks() };
   }
+
+  @Get('app-links')
+  @Throttle({ default: { limit: 120, ttl: 60_000 } })
+  @ApiOperation({ summary: 'لینک‌های دانلود اپلیکیشن برای صفحهٔ اصلی' })
+  async getAppLinks() {
+    return { success: true, data: await this.settings.getPublicAppLinks() };
+  }
+
+  @Get('support-contact')
+  @Throttle({ default: { limit: 120, ttl: 60_000 } })
+  @ApiOperation({ summary: 'تلفن و ایمیل پشتیبانی نمایش‌داده‌شده در سایت' })
+  async getSupportContact() {
+    return {
+      success: true,
+      data: await this.settings.getPublicSupportContact(),
+    };
+  }
 }

@@ -374,13 +374,14 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
       });
   });
 
-  it('SITE_ADMIN can read settings and patch socialLinks only (not maintenance)', async () => {
+  it('SITE_ADMIN can read settings and patch site chrome keys only (not maintenance)', async () => {
     const siteAdmin = await loginAs(app, 'site.admin');
     const getRes = await request(app.getHttpServer())
       .get('/settings')
       .set('Authorization', auth(siteAdmin.accessToken));
     expect(getRes.status).toBe(200);
     expect(getRes.body.data.settings).toHaveProperty('socialLinks');
+    expect(getRes.body.data.settings).toHaveProperty('appDownloadLinks');
 
     const patchSocial = await request(app.getHttpServer())
       .patch('/settings')
@@ -395,9 +396,34 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
               enabled: true,
             },
           ],
+          supportPhone: '021-91000000',
+          supportEmail: 'support@blujet.example',
+          appDownloadLinks: [
+            {
+              id: 'app_store',
+              name: 'App Store',
+              url: 'apps.apple.com/blujet',
+            },
+            { id: 'google_play', name: 'Google Play', url: '' },
+            { id: 'bazaar_myket', name: 'بازار', url: '' },
+          ],
         },
       });
     expect(patchSocial.status).toBe(200);
+    expect(patchSocial.body.data.settings.supportPhone).toBe('021-91000000');
+
+    const publicApps = await request(app.getHttpServer()).get(
+      '/settings/app-links',
+    );
+    expect(publicApps.status).toBe(200);
+    expect(publicApps.body.data.links).toHaveLength(1);
+    expect(publicApps.body.data.links[0].url).toContain('apps.apple.com');
+
+    const publicContact = await request(app.getHttpServer()).get(
+      '/settings/support-contact',
+    );
+    expect(publicContact.status).toBe(200);
+    expect(publicContact.body.data.phone).toBe('021-91000000');
 
     const patchMaintenance = await request(app.getHttpServer())
       .patch('/settings')
