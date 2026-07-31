@@ -18,6 +18,10 @@ import {
   createSavedPassenger,
   updateSavedPassenger,
   removeSavedPassenger,
+  fetchBankAccounts,
+  createBankAccount,
+  updateBankAccount,
+  removeBankAccount,
   revokeMySession,
   fetchWallet,
   removeSavedFlight,
@@ -32,13 +36,14 @@ import { changeOwnPassword, setPassword } from '../../api/auth';
 import { faDigits, faMoney, parseTomanToRial } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
-import type { BookingDetail, PriceLock, RefundRequestView, SavedFlight, SavedPassenger, ActiveSession, UserProfile } from '../../types/public-site';
+import type { BookingDetail, PriceLock, RefundRequestView, SavedFlight, SavedPassenger, SavedBankAccount, ActiveSession, UserProfile } from '../../types/public-site';
 import AccountSecuritySessions from './AccountSecuritySessions';
 import type { ClubMembershipView } from '../../types/club-membership';
 import type { MySupportTicketRow, SupportTicketStatus } from '../../types/support-tickets';
 import AccountClubTab from './AccountClubTab';
 import AccountSavedFlightsTab from './AccountSavedFlightsTab';
 import AccountPassengersTab, { type SavedPassengerForm } from './AccountPassengersTab';
+import AccountBankAccountsTab, { type BankAccountForm } from './AccountBankAccountsTab';
 import AccountProfileSavedPax from './AccountProfileSavedPax';
 
 // پنل کاربر — real data from the existing bookings/wallet/club-points/refunds
@@ -81,7 +86,7 @@ const TIER_LABEL: Record<string, Tr> = {
   PLATINUM: { fa: 'پلاتین', en: 'Platinum', ar: 'بلاتينية' },
 };
 
-type TabKey = 'trips' | 'wallet' | 'club' | 'saved' | 'price-locks' | 'passengers' | 'refunds' | 'tickets' | 'security' | 'profile';
+type TabKey = 'trips' | 'wallet' | 'club' | 'saved' | 'price-locks' | 'passengers' | 'refunds' | 'tickets' | 'security' | 'banks' | 'profile';
 
 const TAB_LABEL: Record<TabKey, Tr> = {
   profile: { fa: 'پروفایل من', en: 'My Profile', ar: 'ملفي الشخصي' },
@@ -94,6 +99,7 @@ const TAB_LABEL: Record<TabKey, Tr> = {
   refunds: { fa: 'استرداد‌ها', en: 'Refunds', ar: 'الاستردادات' },
   tickets: { fa: 'پیام به پشتیبانی', en: 'Message Support', ar: 'رسالة للدعم' },
   security: { fa: 'امنیت حساب', en: 'Account Security', ar: 'أمان الحساب' },
+  banks: { fa: 'حساب‌های بانکی', en: 'Bank Accounts', ar: 'الحسابات البنكية' },
 };
 
 const TABS: { key: TabKey; icon: string }[] = [
@@ -107,6 +113,7 @@ const TABS: { key: TabKey; icon: string }[] = [
   { key: 'refunds', icon: '↺' },
   { key: 'tickets', icon: '💬' },
   { key: 'security', icon: '🛡️' },
+  { key: 'banks', icon: '🏦' },
 ];
 
 const TICKET_STATUS_LABEL: Record<SupportTicketStatus, Tr> = {
@@ -508,6 +515,10 @@ export default function AccountPage() {
   const [sessions, setSessions] = useState<ActiveSession[] | null>(null);
   const [sessionBusyId, setSessionBusyId] = useState<string | null>(null);
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const [bankAccounts, setBankAccounts] = useState<SavedBankAccount[] | null>(null);
+  const [bankBusyId, setBankBusyId] = useState<string | null>(null);
+  const [bankFormBusy, setBankFormBusy] = useState(false);
+  const [bankFormError, setBankFormError] = useState<string | null>(null);
   const [lockActionBusy, setLockActionBusy] = useState<string | null>(null);
   const [lockError, setLockError] = useState<string | null>(null);
 
@@ -557,6 +568,7 @@ export default function AccountPage() {
     fetchSavedFlights().then(setSavedFlights).catch(() => setSavedFlights([]));
     fetchSavedPassengers().then(setSavedPassengers).catch(() => setSavedPassengers([]));
     fetchMySessions().then(setSessions).catch(() => setSessions([]));
+    fetchBankAccounts().then(setBankAccounts).catch(() => setBankAccounts([]));
     fetchMyProfile()
       .then((p) => {
         setProfile(p);
@@ -712,6 +724,57 @@ export default function AccountPage() {
       setSessionError(err instanceof ApiRequestError ? err.message : t.saveErrorFallback);
     } finally {
       setSessionBusyId(null);
+    }
+  }
+
+  async function onRemoveBankAccount(id: string) {
+    setBankBusyId(id);
+    try {
+      await removeBankAccount(id);
+      setBankAccounts((prev) => {
+        if (!prev) return prev;
+        const next = prev.filter((a) => a.id !== id);
+        if (next.length > 0 && !next.some((a) => a.isDefault)) {
+          return next.map((a, i) => (i === 0 ? { ...a, isDefault: true } : a));
+        }
+        return next;
+      });
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t.saveErrorFallback);
+    } finally {
+      setBankBusyId(null);
+    }
+  }
+
+  async function onSetDefaultBankAccount(id: string) {
+    setBankBusyId(id);
+    try {
+      const updated = await updateBankAccount(id, { isDefault: true });
+      setBankAccounts((prev) =>
+        prev
+          ? prev.map((a) =>
+              a.id === updated.id ? updated : { ...a, isDefault: false },
+            )
+          : prev,
+      );
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t.saveErrorFallback);
+    } finally {
+      setBankBusyId(null);
+    }
+  }
+
+  async function onCreateBankAccount(form: BankAccountForm) {
+    setBankFormError(null);
+    setBankFormBusy(true);
+    try {
+      const created = await createBankAccount(form);
+      setBankAccounts((prev) => (prev ? [created, ...prev] : [created]));
+    } catch (err) {
+      setBankFormError(err instanceof ApiRequestError ? err.message : t.saveErrorFallback);
+      throw err;
+    } finally {
+      setBankFormBusy(false);
     }
   }
 
@@ -1218,6 +1281,21 @@ export default function AccountPage() {
           />
         )}
         {tab === 'passengers' && savedPassengers === null && (
+          <p style={{ fontSize: 13, color: '#6b7787' }}>{t.loading}</p>
+        )}
+
+        {tab === 'banks' && bankAccounts && (
+          <AccountBankAccountsTab
+            accounts={bankAccounts}
+            busyId={bankBusyId}
+            formBusy={bankFormBusy}
+            formError={bankFormError}
+            onRemove={onRemoveBankAccount}
+            onSetDefault={onSetDefaultBankAccount}
+            onCreate={onCreateBankAccount}
+          />
+        )}
+        {tab === 'banks' && bankAccounts === null && (
           <p style={{ fontSize: 13, color: '#6b7787' }}>{t.loading}</p>
         )}
 
