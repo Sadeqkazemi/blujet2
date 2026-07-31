@@ -99,6 +99,15 @@ log screen — so this is a new card below that grid, not a redesign.
       breaking the rest of the page — `ServicesPage.test.tsx: 'does not
       render the SMS log section when it fails to load'`
 
+### Phase IT-panel gaps (design alignment — 2026-07-31)
+- [x] Nav order: survey before backup — `panel-nav.config.ts`
+- [x] Sidebar badge on «لاگ و رویدادها» (7-day count) — `PanelShell.tsx` + `GET /audit/logs/badge-count`
+- [x] داشبورد فنی: design KPIs, clickable cards, health badge, CPU/RAM/disk bars — `ItDashboardPage.test.tsx`
+- [x] کاربران: 6-col table, referral scope, rank picker, perm matrix, pw quick-reset, IT scope — `EmployeesPage.test.tsx`
+- [x] دسترسی پنل‌ها: IT card grid (read-only) — `PanelsAccessPage.test.tsx`
+- [x] لاگ: 5-column table with actor/unit/level — `LogsPage.test.tsx` + `audit.e2e-spec.ts`
+- [x] سرویس‌ها: confirm dialog on toggle, external enable switch, summary cards — `ServicesPage.test.tsx`
+
 ### Deferred (scoped out with reasons, not silently dropped)
 - Suspend/reactivate confirmation dialog (the design shows a generic confirm-notification pattern for every destructive action) — `EmployeesPage`'s suspend button acts immediately without a confirm step; low-risk (reversible via the same button) and consistent with `ClubPage`'s direct-action buttons, but flagged here rather than silently matching only part of the design.
 

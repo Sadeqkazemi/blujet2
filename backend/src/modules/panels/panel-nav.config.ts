@@ -108,9 +108,9 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'reservation', labelFa: 'سامانه رزرواسیون', implemented: true },
     { key: 'panels', labelFa: 'دسترسی به پنل‌ها', implemented: true },
     { key: 'logs', labelFa: 'لاگ و رویدادها', implemented: true },
+    { key: 'survey', labelFa: 'نظرسنجی مسافران', implemented: true },
     { key: 'backup', labelFa: 'پشتیبان‌گیری', implemented: true },
     { key: 'settings', labelFa: 'تنظیمات سامانه', implemented: true },
-    { key: 'survey', labelFa: 'نظرسنجی مسافران', implemented: true },
   ],
 };
 

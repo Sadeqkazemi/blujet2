@@ -39,8 +39,8 @@ describe('EmployeesPage', () => {
     const createSpy = vi.spyOn(itApi, 'createEmployee');
 
     render(<EmployeesPage />);
-    expect(await screen.findByText('رضا کاظمی')).toBeInTheDocument();
-    expect(screen.getByText('فعال')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'رضا کاظمی' })).toBeInTheDocument();
+    expect(screen.getAllByText('فعال').length).toBeGreaterThan(0);
 
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'افزودن کاربر' }));

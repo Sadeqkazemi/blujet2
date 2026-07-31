@@ -20,6 +20,39 @@ const DEPT_OPTIONS = [
   { value: 'it', label: 'واحد IT' },
 ];
 
+const DEPT_LABELS: Record<string, string> = {
+  commercial: 'واحد بازرگانی',
+  sales: 'واحد فروش',
+  finance: 'واحد مالی',
+  it: 'واحد IT',
+};
+
+const RANK_OPTIONS = ['کارآموز', 'کارشناس', 'کارشناس ارشد', 'سرپرست واحد', 'معاون'];
+
+const PERM_MATRIX = [
+  { role: 'مدیر مالی', managedBy: 'تحت مدیریت IT', caps: [true, true, false, false, false] },
+  { role: 'مدیر بازرگانی', managedBy: 'تحت مدیریت IT', caps: [true, false, false, true, false] },
+  { role: 'ادمین سایت', managedBy: 'تحت مدیریت IT', caps: [true, false, true, false, true] },
+  { role: 'آژانس', managedBy: 'تحت مدیریت IT', caps: [true, false, false, false, false] },
+  { role: 'مدیر ارشد', managedBy: 'فقط رئیس هیئت مدیره', caps: [true, true, true, true, true] },
+  { role: 'رئیس هیئت مدیره', managedBy: 'بالاترین سطح', caps: [true, true, true, true, true] },
+];
+
+const PERM_COLS = ['داشبورد', 'مالی', 'محتوا', 'کاربران', 'تنظیمات'];
+
+const IT_SCOPE = [
+  { label: 'مدیریت کاربران و حساب‌ها', status: 'مجاز', ok: true },
+  { label: 'بازنشانی و مدیریت رمز عبور', status: 'مجاز', ok: true },
+  { label: 'تعیین دسترسی نقش‌ها', status: 'مجاز', ok: true },
+  { label: 'دسترسی به پنل مدیر ارشد', status: 'غیرمجاز', ok: false },
+  { label: 'دسترسی به پنل رئیس هیئت مدیره', status: 'غیرمجاز', ok: false },
+];
+
+function deptRoleLabel(dept: string | null, rank: string | null) {
+  const d = dept ? (DEPT_LABELS[dept] ?? dept) : '—';
+  return `${rank ?? 'کارشناس'} · ${d}`;
+}
+
 export default function EmployeesPage() {
   const [employees, setEmployees] = useState<EmployeeListRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,6 +68,7 @@ export default function EmployeesPage() {
     password: '',
     dept: 'commercial',
     rank: 'کارشناس',
+    referralScope: 'MANAGERS_ONLY' as 'MANAGERS_ONLY' | 'ALL_STAFF',
   });
   const [selectedPerms, setSelectedPerms] = useState<Set<string>>(new Set());
 
@@ -86,11 +120,19 @@ export default function EmployeesPage() {
         password: form.password,
         dept: form.dept,
         rank: form.rank,
+        referralScope: form.referralScope,
         permissionKeys: Array.from(selectedPerms),
       });
       setNotice(`کارمند «${form.fullName.trim()}» ایجاد شد ✓`);
       setAddOpen(false);
-      setForm({ fullName: '', username: '', password: '', dept: 'commercial', rank: 'کارشناس' });
+      setForm({
+        fullName: '',
+        username: '',
+        password: '',
+        dept: 'commercial',
+        rank: 'کارشناس',
+        referralScope: 'MANAGERS_ONLY',
+      });
       setSelectedPerms(new Set());
       await load();
     } catch (e) {
@@ -104,6 +146,15 @@ export default function EmployeesPage() {
       await load();
     } catch {
       setError('خطا در تغییر وضعیت حساب.');
+    }
+  }
+
+  async function onQuickReset(row: EmployeeListRow) {
+    try {
+      const { tempPassword: pw } = await resetEmployeePassword(row.id);
+      setNotice(`رمز موقت «${row.fullName}»: ${pw}`);
+    } catch {
+      setError('خطا در بازنشانی رمز عبور.');
     }
   }
 
@@ -152,7 +203,15 @@ export default function EmployeesPage() {
       {error && <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">{error}</p>}
       {notice && <p className="mb-4 rounded-lg bg-[#10b98115] p-3 text-sm text-[#059669]">{notice}</p>}
 
-      <section className="rounded-xl border border-border bg-white p-5">
+      <section className="mb-8 overflow-hidden rounded-xl border border-border bg-white">
+        <div className="grid grid-cols-[1.6fr_1.3fr_1.4fr_1fr_0.9fr_1.4fr] gap-2 border-b border-border bg-surface px-4 py-2.5 text-[10.5px] font-bold text-muted">
+          <span>کاربر</span>
+          <span>نقش</span>
+          <span>نام کاربری</span>
+          <span>آخرین ورود</span>
+          <span>وضعیت</span>
+          <span>اقدامات</span>
+        </div>
         {loading ? (
           <p className="py-6 text-center text-sm text-muted">در حال بارگذاری…</p>
         ) : employees.length === 0 ? (
@@ -160,45 +219,48 @@ export default function EmployeesPage() {
         ) : (
           <ul className="divide-y divide-border">
             {employees.map((e) => (
-              <li key={e.id} className="flex flex-wrap items-center gap-3 py-3">
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-surface-2 text-xs font-black text-accent">
-                  {e.fullName.slice(0, 1)}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <button
-                    onClick={() => setDetailId(e.id)}
-                    className="text-sm font-bold text-ink underline decoration-dashed underline-offset-4"
-                  >
-                    {e.fullName}
-                  </button>
-                  <div className="font-num mt-0.5 text-[11px] text-muted">
-                    <span className="ltr">{e.username}</span> · {e.dept ?? '—'}
-                  </div>
-                </div>
-                <span className="text-[11px] text-muted">
+              <li
+                key={e.id}
+                className="grid grid-cols-[1.6fr_1.3fr_1.4fr_1fr_0.9fr_1.4fr] items-center gap-2 px-4 py-3 text-xs"
+              >
+                <button
+                  onClick={() => setDetailId(e.id)}
+                  className="text-right font-bold text-ink underline decoration-dashed underline-offset-4"
+                >
+                  {e.fullName}
+                </button>
+                <span className="text-text-2">{deptRoleLabel(e.dept, e.rank)}</span>
+                <span className="font-num ltr text-muted">{e.username}</span>
+                <span className="font-num text-muted">
                   {e.lastLoginAt ? formatJalaliDateTime(e.lastLoginAt) : 'هنوز وارد نشده'}
                 </span>
                 <span
-                  className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                  className={`w-fit rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
                     e.isActive ? 'bg-[#10b98124] text-[#059669]' : 'bg-danger/15 text-danger'
                   }`}
                 >
                   {e.isActive ? 'فعال' : 'مسدود'}
                 </span>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-1.5">
                   <button
                     onClick={() => setDetailId(e.id)}
-                    className="rounded-lg border border-border bg-surface px-3 py-1.5 text-[11px] font-bold text-text-2"
+                    className="rounded-lg border border-border bg-surface px-2 py-1 text-[10px] font-bold text-text-2"
                   >
                     جزئیات
                   </button>
                   <button
+                    onClick={() => void onQuickReset(e)}
+                    className="rounded-lg border border-border px-2 py-1 text-[10px] font-bold text-accent"
+                  >
+                    ریست رمز
+                  </button>
+                  <button
                     onClick={() => void onToggleStatus(e)}
-                    className={`rounded-lg border border-border px-3 py-1.5 text-[11px] font-bold ${
+                    className={`rounded-lg border border-border px-2 py-1 text-[10px] font-bold ${
                       e.isActive ? 'text-danger' : 'text-[#059669]'
                     }`}
                   >
-                    {e.isActive ? 'مسدود کردن' : 'فعال‌سازی'}
+                    {e.isActive ? 'تعلیق' : 'فعال‌سازی'}
                   </button>
                 </div>
               </li>
@@ -206,6 +268,88 @@ export default function EmployeesPage() {
           </ul>
         )}
       </section>
+
+      <div className="mb-3 flex items-center gap-2">
+        <span className="h-5 w-1 rounded bg-[#f59e0b]" />
+        <div>
+          <h2 className="text-sm font-bold text-ink">دسترسی و سطوح کارمندان</h2>
+          <p className="text-[11px] text-muted">تعیین سطح دسترسی کارمندان واحدها و مدیریت رمز عبور</p>
+        </div>
+      </div>
+
+      <div className="mb-4 rounded-xl border border-border bg-white p-4 text-xs leading-6 text-text-2">
+        واحد IT فقط دسترسی <strong className="text-ink">کارمندان</strong> واحدها را تعیین می‌کند.
+        دسترسی به پنل‌های مدیریتی توسط <strong className="text-ink">مدیر عامل</strong> و{' '}
+        <strong className="text-ink">مدیر ارشد</strong> مدیریت می‌شود.
+      </div>
+
+      <section className="mb-6 overflow-hidden rounded-xl border border-border bg-white">
+        <div className="grid grid-cols-[1.4fr_repeat(5,1fr)] gap-2 border-b border-border bg-surface px-4 py-2.5 text-[10.5px] font-bold text-muted">
+          <span>نقش</span>
+          {PERM_COLS.map((c) => (
+            <span key={c} className="text-center">
+              {c}
+            </span>
+          ))}
+        </div>
+        {PERM_MATRIX.map((p) => (
+          <div
+            key={p.role}
+            className="grid grid-cols-[1.4fr_repeat(5,1fr)] items-center gap-2 border-t border-border px-4 py-3 text-xs"
+          >
+            <div>
+              <div className="font-bold text-ink">{p.role}</div>
+              <div className="text-[10px] text-muted">{p.managedBy}</div>
+            </div>
+            {p.caps.map((ok, i) => (
+              <span key={i} className="text-center text-base">
+                {ok ? '✓' : '—'}
+              </span>
+            ))}
+          </div>
+        ))}
+      </section>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <section className="rounded-xl border border-border bg-white p-5">
+          <h3 className="mb-1 text-sm font-bold text-ink">مدیریت رمز عبور کارمندان</h3>
+          <p className="mb-3 text-[10.5px] text-muted">
+            فقط رمز عبور کارمندان واحدها قابل بازنشانی است.
+          </p>
+          <div className="flex flex-col gap-2">
+            {employees.map((e) => (
+              <div key={e.id} className="flex items-center gap-2 rounded-lg border border-border p-2.5 text-xs">
+                <span className="flex-1 font-bold text-ink">
+                  {e.fullName}{' '}
+                  <span className="font-normal text-muted">· {DEPT_LABELS[e.dept ?? ''] ?? e.dept}</span>
+                </span>
+                <button
+                  onClick={() => void onQuickReset(e)}
+                  className="rounded-lg border border-border px-2.5 py-1 text-[10px] font-bold text-accent"
+                >
+                  بازنشانی رمز
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-border bg-white p-5">
+          <h3 className="mb-3 text-sm font-bold text-ink">سطح دسترسی واحد IT</h3>
+          <ul className="divide-y divide-border">
+            {IT_SCOPE.map((s) => (
+              <li key={s.label} className="flex items-center justify-between py-2.5 text-xs">
+                <span className="text-text-2">{s.label}</span>
+                <span
+                  className={`font-bold ${s.ok ? 'text-[#059669]' : 'text-danger'}`}
+                >
+                  {s.status}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      </div>
 
       {addOpen && (
         <Modal title="ایجاد کارمند جدید" onClose={() => setAddOpen(false)}>
@@ -239,14 +383,54 @@ export default function EmployeesPage() {
             onChange={(e) => setForm({ ...form, password: e.target.value })}
             className="w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent"
           />
+
+          <div className="mb-1 mt-3 text-xs font-bold text-ink">رتبه سازمانی</div>
+          <div className="flex flex-wrap gap-1.5">
+            {RANK_OPTIONS.map((r) => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => setForm({ ...form, rank: r })}
+                className={`rounded-lg px-3 py-2 text-[11px] font-bold transition ${
+                  form.rank === r ? 'bg-accent text-white' : 'bg-surface text-text-2'
+                }`}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+
+          <div className="mb-1 mt-3 text-xs font-bold text-ink">دسترسی ارجاعات</div>
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              type="button"
+              onClick={() => setForm({ ...form, referralScope: 'MANAGERS_ONLY' })}
+              className={`rounded-lg px-3 py-2 text-[11px] font-bold transition ${
+                form.referralScope === 'MANAGERS_ONLY' ? 'bg-accent text-white' : 'bg-surface text-text-2'
+              }`}
+            >
+              فقط مدیران بخش‌ها
+            </button>
+            <button
+              type="button"
+              onClick={() => setForm({ ...form, referralScope: 'ALL_STAFF' })}
+              className={`rounded-lg px-3 py-2 text-[11px] font-bold transition ${
+                form.referralScope === 'ALL_STAFF' ? 'bg-accent text-white' : 'bg-surface text-text-2'
+              }`}
+            >
+              همه کارمندان
+            </button>
+          </div>
+
           <div className="mb-1 mt-3 text-xs font-bold text-ink">واحد سازمانی</div>
           <div className="flex flex-wrap gap-1.5">
             {DEPT_OPTIONS.map((d) => (
               <button
                 key={d.value}
+                type="button"
                 onClick={() => setForm({ ...form, dept: d.value })}
                 className={`rounded-lg px-3 py-2 text-[11px] font-bold transition ${
-                  form.dept === d.value ? 'bg-accent text-white' : 'bg-surface text-text-2 hover:bg-surface-2'
+                  form.dept === d.value ? 'bg-accent text-white' : 'bg-surface text-text-2'
                 }`}
               >
                 {d.label}
@@ -267,6 +451,7 @@ export default function EmployeesPage() {
                         return (
                           <button
                             key={p.key}
+                            type="button"
                             onClick={() =>
                               setSelectedPerms((prev) => {
                                 const next = new Set(prev);
@@ -326,7 +511,10 @@ export default function EmployeesPage() {
 
           <div className="mb-2 flex items-center justify-between">
             <div className="text-xs font-bold text-ink">
-              دسترسی‌های فعال <span className="text-[10.5px] font-normal text-muted">({faDigits(detail.permissions.length)})</span>
+              دسترسی‌های فعال{' '}
+              <span className="text-[10.5px] font-normal text-muted">
+                ({faDigits(detail.permissions.length)})
+              </span>
             </div>
           </div>
           <div className="flex flex-col gap-1.5">

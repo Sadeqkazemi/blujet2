@@ -98,6 +98,9 @@ describe('Audit (e2e)', () => {
     expect(res.status).toBe(200);
     for (const row of res.body.data) {
       expect(['SYSTEM', 'ACCOUNT']).toContain(row.category);
+      expect(row).toHaveProperty('actorName');
+      expect(row).toHaveProperty('unit');
+      expect(row).toHaveProperty('level');
     }
   });
 
