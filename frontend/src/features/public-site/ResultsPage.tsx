@@ -24,6 +24,7 @@ import type {
 } from '../../types/public-site';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import FlowStepper from '../../components/public/FlowStepper';
+import { parseResultsSearchParams } from '../../components/public/flight-search/search-url';
 
 const CABIN_LABEL: Record<string, Record<StoredLocale, string>> = {
   ECONOMY: { fa: 'اکونومی', en: 'Economy', ar: 'اقتصادية' },
@@ -115,6 +116,11 @@ const STR: Record<StoredLocale, {
   fee: string;
   gotIt: string;
   lockFailedTitle: string;
+  outboundTitle: string;
+  returnTitle: string;
+  legTitle: (n: number) => string;
+  selectOutboundFirst: string;
+  paxSummary: (adults: number, cabin: string) => string;
 }> = {
   fa: {
     changeSearch: 'تغییر جستجو',
@@ -162,6 +168,11 @@ const STR: Record<StoredLocale, {
     fee: 'کارمزد',
     gotIt: 'متوجه شدم',
     lockFailedTitle: 'قفل قیمت ثبت نشد',
+    outboundTitle: 'پرواز رفت',
+    returnTitle: 'پرواز برگشت',
+    legTitle: (n) => `مسیر ${n}`,
+    selectOutboundFirst: 'ابتدا پرواز رفت را انتخاب کنید',
+    paxSummary: (adults, cabin) => `${faDigits(adults)} مسافر · ${cabin === 'BUSINESS' ? 'بیزینس' : 'اکونومی'}`,
   },
   en: {
     changeSearch: 'Change search',
@@ -209,6 +220,11 @@ const STR: Record<StoredLocale, {
     fee: 'Fee',
     gotIt: 'Got it',
     lockFailedTitle: 'Price Lock failed',
+    outboundTitle: 'Outbound flight',
+    returnTitle: 'Return flight',
+    legTitle: (n) => `Leg ${n}`,
+    selectOutboundFirst: 'Select an outbound flight first',
+    paxSummary: (adults, cabin) => `${adults} passenger${adults > 1 ? 's' : ''} · ${cabin === 'BUSINESS' ? 'Business' : 'Economy'}`,
   },
   ar: {
     changeSearch: 'تغيير البحث',
@@ -256,6 +272,11 @@ const STR: Record<StoredLocale, {
     fee: 'رسوم',
     gotIt: 'حسنًا',
     lockFailedTitle: 'تعذّر تسجيل قفل السعر',
+    outboundTitle: 'رحلة الذهاب',
+    returnTitle: 'رحلة العودة',
+    legTitle: (n) => `المسار ${n}`,
+    selectOutboundFirst: 'اختر رحلة الذهاب أولاً',
+    paxSummary: (adults, cabin) => `${faDigits(adults)} مسافر · ${cabin === 'BUSINESS' ? 'درجة الأعمال' : 'اقتصادية'}`,
   },
 };
 
@@ -272,11 +293,19 @@ export default function ResultsPage() {
   const { locale } = useLocale();
   const isMobile = useIsMobile();
   const t = STR[locale];
-  const origin = params.get('origin') ?? '';
-  const dest = params.get('dest') ?? '';
-  const date = params.get('date') ?? '';
+  const parsed = useMemo(() => parseResultsSearchParams(params), [params]);
+
+  const activeLeg = parsed?.trip === 'multi' ? parsed.legs[parsed.legIndex] : parsed?.legs[0];
+  const origin = activeLeg?.origin ?? params.get('origin') ?? '';
+  const dest = activeLeg?.dest ?? params.get('dest') ?? '';
+  const date = activeLeg?.date ?? params.get('date') ?? '';
+  const returnDate = parsed?.returnDate ?? '';
+  const preferredCabin = parsed?.cabin ?? 'ECONOMY';
+  const trip = parsed?.trip ?? 'oneway';
+  const selectedFlights = parsed?.selectedFlights ?? [];
 
   const [results, setResults] = useState<SearchFlightResult[] | null>(null);
+  const [returnResults, setReturnResults] = useState<SearchFlightResult[] | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [calendarDays, setCalendarDays] = useState<PriceCalendarDay[] | null>(null);
 
@@ -310,9 +339,10 @@ export default function ResultsPage() {
   }, [status]);
 
   useEffect(() => {
-    if (!origin || !dest || !date) return;
+    if (!parsed || !origin || !dest || !date) return;
     let cancelled = false;
     setResults(null);
+    setReturnResults(null);
     setSearchError(null);
     setAiState('idle');
     setAdvisory(null);
@@ -328,6 +358,16 @@ export default function ResultsPage() {
         }
       });
 
+    if (trip === 'round' && returnDate) {
+      searchFlights(dest, origin, returnDate)
+        .then((found) => {
+          if (!cancelled) setReturnResults(found);
+        })
+        .catch(() => {
+          if (!cancelled) setReturnResults([]);
+        });
+    }
+
     fetchPriceCalendar(origin, dest, date)
       .then((days) => {
         if (!cancelled) setCalendarDays(days);
@@ -339,7 +379,107 @@ export default function ResultsPage() {
     return () => {
       cancelled = true;
     };
-  }, [origin, dest, date, t.searchError]);
+  }, [parsed, origin, dest, date, returnDate, trip, t.searchError]);
+
+  function onSelectFlight(flightInstanceId: string, cabin: CabinClass, leg: 'outbound' | 'return' | 'multi') {
+    if (trip === 'oneway') {
+      navigate(`/book/${flightInstanceId}?cabin=${cabin}`);
+      return;
+    }
+    if (trip === 'round') {
+      if (leg === 'outbound') {
+        const next = new URLSearchParams(params);
+        next.set('sel', `${flightInstanceId}:${cabin}`);
+        setParams(next);
+        return;
+      }
+      const outboundSel = selectedFlights[0];
+      if (!outboundSel) return;
+      const [outId, outCabin] = outboundSel.split(':');
+      navigate(
+        `/book/${outId}?cabin=${outCabin}&returnFlightId=${flightInstanceId}&returnCabin=${cabin}`,
+      );
+      return;
+    }
+    if (trip === 'multi' && parsed) {
+      const newSel = [...selectedFlights, `${flightInstanceId}:${cabin}`];
+      if (parsed.legIndex + 1 < parsed.legs.length) {
+        const next = new URLSearchParams(params);
+        next.set('sel', newSel.join(','));
+        next.set('leg', String(parsed.legIndex + 1));
+        setParams(next);
+        return;
+      }
+      const [firstId, firstCabin] = newSel[0]!.split(':');
+      navigate(`/book/${firstId}?cabin=${firstCabin}`);
+    }
+  }
+
+  function renderFlightCards(
+    list: SearchFlightResult[],
+    leg: 'outbound' | 'return' | 'multi',
+    options?: { disabled?: boolean },
+  ) {
+    const disabled = options?.disabled ?? false;
+    return list.map((r) => (
+      <div key={`${leg}-${r.flightInstanceId}`} data-testid="result-card" className="rounded-2xl border border-[#e5e9f0] bg-white p-5 shadow-sm">
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <div className="font-num text-sm font-extrabold text-[#0d2640]">{r.flightNo}</div>
+            <div className="mt-1 text-xs text-[#6b7b94]">{formatJalaliDateTime(r.departureAt)}</div>
+          </div>
+          <div className="text-xs text-[#6b7b94]">{r.aircraftType}</div>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          {r.cabins.map((c) => (
+              <div key={c.cabin} className="flex min-w-[160px] flex-1 items-center justify-between rounded-xl border border-[#e5e9f0] p-3">
+                <div>
+                  <div className="text-[11px] text-[#6b7b94]">{CABIN_LABEL[c.cabin][locale]}</div>
+                  <div className="font-num text-sm font-extrabold text-[#1668c4]">{localeMoney(c.priceIrr, locale)} {t.toman}</div>
+                  <div className="text-[10px] text-[#6b7b94]">{faDigits(c.seatsLeft)} {t.seatsLeft}</div>
+                </div>
+                <div className="flex flex-col items-end gap-1.5">
+                  <button
+                    disabled={c.seatsLeft === 0 || disabled}
+                    onClick={() => onSelectFlight(r.flightInstanceId, c.cabin, leg)}
+                    className="rounded-lg bg-[#1668c4] px-4 py-2 text-xs font-bold text-white disabled:opacity-40"
+                  >
+                    {t.select}
+                  </button>
+                  {leg !== 'return' && (
+                    <>
+                      <button
+                        disabled={lockBusyKey === `${r.flightInstanceId}:${c.cabin}`}
+                        onClick={() => void onRealLockClick(r.flightInstanceId, c.cabin)}
+                        data-testid={`real-lock-${r.flightInstanceId}-${c.cabin}`}
+                        className="rounded-lg border border-[#d5e1f0] px-3 py-1 text-[10.5px] font-bold text-[#1668c4] disabled:opacity-40"
+                      >
+                        {lockBusyKey === `${r.flightInstanceId}:${c.cabin}` ? t.aiAnalyzing : `🔒 ${t.priceLock}`}
+                      </button>
+                      <button
+                        disabled={
+                          saveBusyKey === `${r.flightInstanceId}:${c.cabin}` ||
+                          savedKeys.has(`${r.flightInstanceId}:${c.cabin}`)
+                        }
+                        onClick={() => void onSaveClick(r.flightInstanceId, c.cabin)}
+                        data-testid={`real-save-${r.flightInstanceId}-${c.cabin}`}
+                        className="rounded-lg border border-[#d5e1f0] px-3 py-1 text-[10.5px] font-bold text-[#5a6678] disabled:opacity-60"
+                      >
+                        {saveBusyKey === `${r.flightInstanceId}:${c.cabin}`
+                          ? t.aiAnalyzing
+                          : savedKeys.has(`${r.flightInstanceId}:${c.cabin}`)
+                            ? `✓ ${t.savedFlight}`
+                            : `🔖 ${t.saveFlight}`}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
+        </div>
+      </div>
+    ));
+  }
 
   async function onSaveClick(flightInstanceId: string, cabin: CabinClass) {
     if (status !== 'authenticated') {
@@ -417,15 +557,42 @@ export default function ResultsPage() {
     list.sort((a, b) => {
       if (sort === 'early') return a.departureAt.localeCompare(b.departureAt);
       const pa = BigInt(
-        a.cabins.find((c) => c.cabin === 'ECONOMY')?.priceIrr ?? a.cabins[0]?.priceIrr ?? '0',
+        a.cabins.find((c) => c.cabin === preferredCabin)?.priceIrr ??
+          a.cabins.find((c) => c.cabin === 'ECONOMY')?.priceIrr ??
+          a.cabins[0]?.priceIrr ??
+          '0',
       );
       const pb = BigInt(
-        b.cabins.find((c) => c.cabin === 'ECONOMY')?.priceIrr ?? b.cabins[0]?.priceIrr ?? '0',
+        b.cabins.find((c) => c.cabin === preferredCabin)?.priceIrr ??
+          b.cabins.find((c) => c.cabin === 'ECONOMY')?.priceIrr ??
+          b.cabins[0]?.priceIrr ??
+          '0',
       );
       return pa < pb ? -1 : pa > pb ? 1 : 0;
     });
     return list;
-  }, [results, fStops, fTime, fAirline, sort]);
+  }, [results, fStops, fTime, fAirline, sort, preferredCabin]);
+
+  const filteredReturnResults = useMemo(() => {
+    let list = [...(returnResults ?? [])];
+    list.sort((a, b) => {
+      if (sort === 'early') return a.departureAt.localeCompare(b.departureAt);
+      const pa = BigInt(
+        a.cabins.find((c) => c.cabin === preferredCabin)?.priceIrr ??
+          a.cabins.find((c) => c.cabin === 'ECONOMY')?.priceIrr ??
+          a.cabins[0]?.priceIrr ??
+          '0',
+      );
+      const pb = BigInt(
+        b.cabins.find((c) => c.cabin === preferredCabin)?.priceIrr ??
+          b.cabins.find((c) => c.cabin === 'ECONOMY')?.priceIrr ??
+          b.cabins[0]?.priceIrr ??
+          '0',
+      );
+      return pa < pb ? -1 : pa > pb ? 1 : 0;
+    });
+    return list;
+  }, [returnResults, sort, preferredCabin]);
 
   const calendarMinPrice = useMemo(() => {
     const prices = (calendarDays ?? [])
@@ -442,7 +609,7 @@ export default function ResultsPage() {
     setParams(next);
   }
 
-  if (!origin || !dest || !date) {
+  if (!parsed || !origin || !dest || !date) {
     return (
       <PublicPageShell>
         <div className="mx-auto max-w-3xl p-10 text-center">
@@ -470,7 +637,14 @@ export default function ResultsPage() {
             <span className="rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold">
               {formatJalaliDate(`${date}T12:00:00Z`)}
             </span>
-            <span className="rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold">{t.onePassengerEconomy}</span>
+            <span className="rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold">
+              {t.paxSummary(parsed.adults, preferredCabin)}
+            </span>
+            {trip === 'round' && returnDate && (
+              <span className="rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold">
+                {formatJalaliDate(`${returnDate}T12:00:00Z`)} {locale === 'en' ? 'return' : locale === 'ar' ? 'عودة' : 'برگشت'}
+              </span>
+            )}
           </div>
           <button
             onClick={() => navigate('/')}
@@ -639,60 +813,27 @@ export default function ResultsPage() {
           )}
 
           <div className="flex flex-col gap-3">
-            {filteredResults.map((r) => (
-              <div key={r.flightInstanceId} data-testid="result-card" className="rounded-2xl border border-[#e5e9f0] bg-white p-5 shadow-sm">
-                <div className="mb-3 flex items-center justify-between">
-                  <div>
-                    <div className="font-num text-sm font-extrabold text-[#0d2640]">{r.flightNo}</div>
-                    <div className="mt-1 text-xs text-[#6b7b94]">{formatJalaliDateTime(r.departureAt)}</div>
-                  </div>
-                  <div className="text-xs text-[#6b7b94]">{r.aircraftType}</div>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  {r.cabins.map((c) => (
-                    <div key={c.cabin} className="flex min-w-[160px] flex-1 items-center justify-between rounded-xl border border-[#e5e9f0] p-3">
-                      <div>
-                        <div className="text-[11px] text-[#6b7b94]">{CABIN_LABEL[c.cabin][locale]}</div>
-                        <div className="font-num text-sm font-extrabold text-[#1668c4]">{localeMoney(c.priceIrr, locale)} {t.toman}</div>
-                        <div className="text-[10px] text-[#6b7b94]">{faDigits(c.seatsLeft)} {t.seatsLeft}</div>
-                      </div>
-                      <div className="flex flex-col items-end gap-1.5">
-                        <button
-                          disabled={c.seatsLeft === 0}
-                          onClick={() => navigate(`/book/${r.flightInstanceId}?cabin=${c.cabin}`)}
-                          className="rounded-lg bg-[#1668c4] px-4 py-2 text-xs font-bold text-white disabled:opacity-40"
-                        >
-                          {t.select}
-                        </button>
-                        <button
-                          disabled={lockBusyKey === `${r.flightInstanceId}:${c.cabin}`}
-                          onClick={() => void onRealLockClick(r.flightInstanceId, c.cabin)}
-                          data-testid={`real-lock-${r.flightInstanceId}-${c.cabin}`}
-                          className="rounded-lg border border-[#d5e1f0] px-3 py-1 text-[10.5px] font-bold text-[#1668c4] disabled:opacity-40"
-                        >
-                          {lockBusyKey === `${r.flightInstanceId}:${c.cabin}` ? t.aiAnalyzing : `🔒 ${t.priceLock}`}
-                        </button>
-                        <button
-                          disabled={
-                            saveBusyKey === `${r.flightInstanceId}:${c.cabin}` ||
-                            savedKeys.has(`${r.flightInstanceId}:${c.cabin}`)
-                          }
-                          onClick={() => void onSaveClick(r.flightInstanceId, c.cabin)}
-                          data-testid={`real-save-${r.flightInstanceId}-${c.cabin}`}
-                          className="rounded-lg border border-[#d5e1f0] px-3 py-1 text-[10.5px] font-bold text-[#5a6678] disabled:opacity-60"
-                        >
-                          {saveBusyKey === `${r.flightInstanceId}:${c.cabin}`
-                            ? t.aiAnalyzing
-                            : savedKeys.has(`${r.flightInstanceId}:${c.cabin}`)
-                              ? `✓ ${t.savedFlight}`
-                              : `🔖 ${t.saveFlight}`}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+            {trip === 'multi' && parsed && (
+              <h2 className="text-sm font-black text-[#0d2640]">{t.legTitle(parsed.legIndex + 1)}</h2>
+            )}
+            {trip === 'round' && (
+              <h2 className="text-sm font-black text-[#0d2640]">{t.outboundTitle}</h2>
+            )}
+            {renderFlightCards(filteredResults, trip === 'multi' ? 'multi' : 'outbound')}
+
+            {trip === 'round' && (
+              <>
+                <h2 className="mt-4 text-sm font-black text-[#0d2640]">{t.returnTitle}</h2>
+                {!selectedFlights[0] && (
+                  <p className="text-xs text-[#8a96a6]">{t.selectOutboundFirst}</p>
+                )}
+                {returnResults === null && <p className="text-sm text-[#6b7b94]">{t.searching}</p>}
+                {renderFlightCards(filteredReturnResults, 'return', {
+                  disabled: !selectedFlights[0],
+                })}
+              </>
+            )}
+
             {results !== null && results.length > 0 && filteredResults.length === 0 && (
               <div className="rounded-2xl border border-dashed border-[#e5e9f0] p-8 text-center text-sm text-[#6b7b94]">
                 {t.noFlightsForFilters}

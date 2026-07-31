@@ -28,6 +28,7 @@ import {
   subIrr,
 } from '../../common/money';
 import type { Irr } from '../../common/money';
+import { RedisService } from '../../redis/redis.service';
 
 /** SCHEDULED instances departing beyond this window belong to the
  * پروازهای آینده sub-tab; the rest are پروازهای فعال. */
@@ -48,6 +49,7 @@ export class FlightsService {
     @Inject(PRICE_SUGGESTION_PROVIDER)
     private readonly priceSuggestions: PriceSuggestionProvider,
     private readonly stepUp: StepUpService,
+    private readonly redis: RedisService,
   ) {}
 
   private async soldByInstance(
@@ -258,6 +260,7 @@ export class FlightsService {
       entityType: 'Airport',
       entityId: created.id,
     });
+    await this.redis.del('search:airports');
     return created;
   }
 

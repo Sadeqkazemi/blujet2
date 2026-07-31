@@ -7,7 +7,7 @@ import type { AppLinkId } from '../../types/app-links';
 import type { Airport } from '../../types/public-site';
 import type { PublicHomeContent } from '../../types/site-content';
 import PublicPageShell from '../../components/public/PublicPageShell';
-import JalaliDatePicker from '../../components/JalaliDatePicker';
+import FlightSearchForm from '../../components/public/flight-search/FlightSearchForm';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { formatLocalePercent, formatToman } from '../../lib/fa-format';
@@ -321,9 +321,6 @@ export default function HomeSearchPage() {
   const t = STR[locale];
   const e = ERR[locale];
   const [airports, setAirports] = useState<Airport[]>([]);
-  const [origin, setOrigin] = useState('');
-  const [dest, setDest] = useState('');
-  const [dateIso, setDateIso] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [annClosed, setAnnClosed] = useState(false);
   const [homeContent, setHomeContent] = useState<PublicHomeContent | null>(null);
@@ -384,32 +381,6 @@ export default function HomeSearchPage() {
     [locale],
   );
 
-  const cityLabel = useMemo(
-    () => (code: string) => {
-      const airport = airports.find((a) => a.code === code);
-      return airport ? `${CITY_NAMES[code]?.[locale] ?? airport.cityFa} (${code})` : code;
-    },
-    [airports, locale],
-  );
-
-  function onSubmit(ev: React.FormEvent) {
-    ev.preventDefault();
-    if (!origin || !dest || !dateIso) {
-      setError(e.missing);
-      return;
-    }
-    if (origin === dest) {
-      setError(e.sameCity);
-      return;
-    }
-    navigate(`/results?origin=${origin}&dest=${dest}&date=${dateIso.slice(0, 10)}`);
-  }
-
-  function swap() {
-    setOrigin(dest);
-    setDest(origin);
-  }
-
   const gridCols4 = isMobile ? 'repeat(2, 1fr)' : 'repeat(4,1fr)';
   const gridColsRoutes = isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(180px, 1fr))';
 
@@ -457,7 +428,7 @@ export default function HomeSearchPage() {
       )}
 
       <section style={{ background: '#f6f8fb' }}>
-        <div style={{ position: 'relative', height: isMobile ? 380 : 420, overflow: 'hidden', background: 'linear-gradient(110deg,#0d2640 0%,#123a63 50%,#1668c4 100%)' }}>
+        <div style={{ position: 'relative', height: isMobile ? 380 : 500, overflow: 'hidden', background: 'linear-gradient(110deg,#0d2640 0%,#123a63 50%,#1668c4 100%)' }}>
           <div style={{ position: 'absolute', inset: 0, zIndex: 2 }}>
             <div style={{ maxWidth: 1180, margin: '0 auto', padding: '0 26px', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
               <div style={{ maxWidth: 600 }}>
@@ -501,127 +472,17 @@ export default function HomeSearchPage() {
               zIndex: 30,
             }}
           >
-            <form onSubmit={onSubmit} style={{ padding: '13px 16px 16px' }}>
+            <div style={{ padding: '13px 16px 16px' }}>
               {error && (
                 <p style={{ marginBottom: 12, borderRadius: 10, background: '#fef2f2', padding: 10, fontSize: 12, color: '#e5484d' }}>{error}</p>
               )}
 
-              <div style={{ display: 'flex', gap: isMobile ? 14 : 25, marginBottom: 20, alignItems: 'center', flexWrap: 'wrap' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 7, color: '#16202e', fontWeight: 700, fontSize: 13 }}>
-                  <span style={{ width: 20, height: 20, borderRadius: '50%', border: '2px solid #1668c4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#1668c4' }} />
-                  </span>
-                  {t.tripOneWay}
-                </span>
-                <span title="Coming soon" style={{ display: 'flex', alignItems: 'center', gap: 7, color: '#c5cedb', fontWeight: 500, fontSize: 13, cursor: 'not-allowed' }}>
-                  <span style={{ width: 20, height: 20, borderRadius: '50%', border: '2px solid #dfe3e9' }} />
-                  {t.tripRoundTrip}
-                </span>
-                <span title="Coming soon" style={{ display: 'flex', alignItems: 'center', gap: 7, color: '#c5cedb', fontWeight: 500, fontSize: 13, cursor: 'not-allowed' }}>
-                  <span style={{ width: 20, height: 20, borderRadius: '50%', border: '2px solid #dfe3e9' }} />
-                  {t.tripMultiCity}
-                </span>
-              </div>
-
-              <div style={{ display: isMobile ? 'grid' : 'flex', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'none', alignItems: 'stretch', position: 'relative', border: isMobile ? 'none' : '1.5px solid #e3e9f1', borderRadius: 14, background: isMobile ? 'transparent' : '#fff', flexWrap: 'wrap', gap: isMobile ? 10 : 0 }}>
-                <div style={{ flex: '1.5 1 165px', minWidth: 165, padding: '5px 20px 5px 13px', gridColumn: isMobile ? '1' : 'auto', background: isMobile ? '#fff' : 'transparent', borderRadius: isMobile ? 12 : 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#6b7787', fontWeight: 600, marginBottom: 3 }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 21s-6-5.3-6-10a6 6 0 0 1 12 0c0 4.7-6 10-6 10z" />
-                      <circle cx="12" cy="11" r="2" />
-                    </svg>
-                    {t.lblOrigin}
-                  </div>
-                  <select
-                    id="origin"
-                    data-testid="home-origin"
-                    value={origin}
-                    onChange={(ev) => setOrigin(ev.target.value)}
-                    style={{ width: '100%', border: 'none', outline: 'none', fontSize: '14.5px', fontWeight: 800, color: origin ? '#0d2640' : '#6b7787', background: 'transparent', fontFamily: 'inherit' }}
-                  >
-                    <option value="">{t.selectPlaceholder}</option>
-                    {airports.map((a) => (
-                      <option key={a.id} value={a.code}>
-                        {cityLabel(a.code)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div
-                  onClick={swap}
-                  style={{
-                    alignSelf: 'center',
-                    width: 40,
-                    height: 40,
-                    flex: 'none',
-                    borderRadius: '50%',
-                    background: '#fff',
-                    border: '1.5px solid #e3e9f1',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#1668c4',
-                    fontSize: '15.5px',
-                    cursor: 'pointer',
-                    zIndex: 3,
-                    margin: isMobile ? '6px auto' : '0 -20px',
-                    boxShadow: '0 3px 10px rgba(13,38,102,.12)',
-                    gridColumn: isMobile ? '1 / -1' : 'auto',
-                  }}
-                >
-                  ⇄
-                </div>
-
-                <div style={{ flex: '1.5 1 165px', minWidth: 165, padding: '5px 20px', borderRight: isMobile ? 'none' : '1px solid #eef1f5', gridColumn: isMobile ? '2' : 'auto', background: isMobile ? '#fff' : 'transparent', borderRadius: isMobile ? 12 : 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#6b7787', fontWeight: 600, marginBottom: 3 }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 21s-6-5.3-6-10a6 6 0 0 1 12 0c0 4.7-6 10-6 10z" />
-                      <circle cx="12" cy="11" r="2" />
-                    </svg>
-                    {t.lblDestination}
-                  </div>
-                  <select
-                    id="dest"
-                    data-testid="home-dest"
-                    value={dest}
-                    onChange={(ev) => setDest(ev.target.value)}
-                    style={{ width: '100%', border: 'none', outline: 'none', fontSize: '14.5px', fontWeight: 800, color: dest ? '#0d2640' : '#6b7787', background: 'transparent', fontFamily: 'inherit' }}
-                  >
-                    <option value="">{t.selectPlaceholder}</option>
-                    {airports.map((a) => (
-                      <option key={a.id} value={a.code}>
-                        {cityLabel(a.code)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div style={{ flex: '1.1 1 120px', minWidth: 120, borderRight: isMobile ? 'none' : '1px solid #eef1f5', gridColumn: isMobile ? '1 / -1' : 'auto' }}>
-                  <JalaliDatePicker label={t.lblDepartDate} value={dateIso} onChange={setDateIso} minDate={TODAY_ISO} testId="home-date" />
-                </div>
-
-                <button
-                  type="submit"
-                  data-testid="home-search-submit"
-                  style={{
-                    flex: 'none',
-                    margin: 8,
-                    border: 'none',
-                    borderRadius: 11,
-                    background: '#1668c4',
-                    color: '#fff',
-                    padding: '0 28px',
-                    fontSize: '13.5px',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    gridColumn: isMobile ? '1 / -1' : 'auto',
-                    height: isMobile ? 44 : 'auto',
-                  }}
-                >
-                  {t.btnSearchFlight}
-                </button>
-              </div>
+              <FlightSearchForm
+                airports={airports}
+                locale={locale}
+                onError={setError}
+                onSubmit={(url) => navigate(url)}
+              />
 
               <div style={{ marginTop: 36 }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 15 }}>
@@ -656,7 +517,7 @@ export default function HomeSearchPage() {
                   ))}
                 </div>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       </section>

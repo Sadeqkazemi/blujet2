@@ -39,6 +39,11 @@ async function pickToday() {
   await userEvent.click(screen.getByTestId('home-date-today'));
 }
 
+async function pickAirport(testId: string, code: string) {
+  await userEvent.click(screen.getByTestId(testId));
+  await userEvent.click(screen.getByTestId(`${testId}-option-${code}`));
+}
+
 const CMS_HOME = {
   blocks: [
     {
@@ -95,8 +100,11 @@ describe('HomeSearchPage', () => {
     });
     renderPage();
 
-    expect(await screen.findAllByText('تهران (THR)')).toHaveLength(2);
-    expect(screen.getByTestId('home-search-submit')).toBeInTheDocument();
+    expect(await screen.findByTestId('home-search-submit')).toBeInTheDocument();
+    expect(await screen.findByTestId('home-origin')).toBeInTheDocument();
+    expect(screen.getByTestId('trip-round')).toBeInTheDocument();
+    expect(screen.getByTestId('trip-oneway')).toBeInTheDocument();
+    expect(screen.getByTestId('trip-multi')).toBeInTheDocument();
   });
 
   it('shows a validation error when submitted without selections', async () => {
@@ -106,7 +114,7 @@ describe('HomeSearchPage', () => {
       links: [{ id: 'app_store', name: 'App Store', url: 'https://apps.apple.com/blujet' }],
     });
     renderPage();
-    await screen.findAllByText('تهران (THR)');
+    await screen.findByTestId('home-origin');
 
     await userEvent.click(screen.getByTestId('home-search-submit'));
     expect(screen.getByText('مبدأ، مقصد و تاریخ را انتخاب کنید.')).toBeInTheDocument();
@@ -119,7 +127,7 @@ describe('HomeSearchPage', () => {
       links: [{ id: 'app_store', name: 'App Store', url: 'https://apps.apple.com/blujet' }],
     });
     renderPage();
-    await screen.findAllByText('تهران (THR)');
+    await screen.findByTestId('home-origin');
 
     expect(screen.getByText('عنوان CMS')).toBeInTheDocument();
     expect(screen.getByText('اطلاعیه CMS')).toBeInTheDocument();
@@ -138,7 +146,7 @@ describe('HomeSearchPage', () => {
     vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockRejectedValue(new Error('offline'));
     vi.spyOn(settingsApi, 'fetchPublicAppLinks').mockResolvedValue({ links: [] });
     renderPage();
-    await screen.findAllByText('تهران (THR)');
+    await screen.findByTestId('home-origin');
 
     expect(screen.getByText('پیشنهادهای ویژه')).toBeInTheDocument();
     expect(screen.getByTestId('offer-THR-IST')).toBeInTheDocument();
@@ -150,21 +158,18 @@ describe('HomeSearchPage', () => {
     expect(screen.getByText('سفرت را همراه خودت ببر')).toBeInTheDocument();
   });
 
-  it('rejects identical origin and destination', async () => {
+  it('excludes the selected origin from destination picker options', async () => {
     vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
     vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockResolvedValue(CMS_HOME);
     vi.spyOn(settingsApi, 'fetchPublicAppLinks').mockResolvedValue({
       links: [{ id: 'app_store', name: 'App Store', url: 'https://apps.apple.com/blujet' }],
     });
     renderPage();
-    await screen.findAllByText('تهران (THR)');
+    await screen.findByTestId('home-origin');
 
-    await userEvent.selectOptions(screen.getByTestId('home-origin'), 'THR');
-    await userEvent.selectOptions(screen.getByTestId('home-dest'), 'THR');
-    await pickToday();
-    await userEvent.click(screen.getByTestId('home-search-submit'));
-
-    expect(screen.getByText('مبدأ و مقصد نمی‌توانند یکسان باشند.')).toBeInTheDocument();
+    await pickAirport('home-origin', 'THR');
+    await userEvent.click(screen.getByTestId('home-dest'));
+    expect(screen.queryByTestId('home-dest-option-THR')).not.toBeInTheDocument();
   });
 
   it('renders translated marketing sections and Latin-digit toman prices in English', async () => {
@@ -181,7 +186,7 @@ describe('HomeSearchPage', () => {
       ),
     });
     renderPage();
-    await screen.findAllByText('Tehran (THR)');
+    await screen.findByTestId('home-origin');
 
     expect(screen.getByText('Book your next flight with blujet')).toBeInTheDocument();
     expect(screen.getByText('Special Offers')).toBeInTheDocument();
@@ -202,7 +207,7 @@ describe('HomeSearchPage', () => {
       ),
     });
     renderPage();
-    await screen.findAllByText('طهران (THR)');
+    await screen.findByTestId('home-origin');
 
     expect(screen.getByText('احجز رحلتك القادمة مع blujet')).toBeInTheDocument();
     expect(screen.getByText('عروض خاصة')).toBeInTheDocument();
