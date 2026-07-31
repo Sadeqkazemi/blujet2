@@ -109,6 +109,21 @@ export class BookingService {
     };
   }
 
+  /** Anonymous manage-booking surface — only the credential-matching
+   * passenger keeps their name; co-travellers are redacted. */
+  private toAnonymousDetail(b: BookingWithRelations, lastName: string) {
+    const detail = this.toDetail(b);
+    return {
+      ...detail,
+      passengers: b.passengers.map((p) => ({
+        fullName: matchesLastName(p.fullName, lastName)
+          ? p.fullName
+          : 'مسافر همراه',
+        seatCode: p.seatCode,
+      })),
+    };
+  }
+
   async createBooking(
     user: AuthenticatedUser,
     dto: CreateBookingDto,
@@ -367,7 +382,10 @@ export class BookingService {
         message: 'رزرو یافت نشد.',
       });
     }
-    return this.toDetail(await this.materializeExpiry(booking));
+    return this.toAnonymousDetail(
+      await this.materializeExpiry(booking),
+      lastName,
+    );
   }
 
   async listMine(user: AuthenticatedUser) {

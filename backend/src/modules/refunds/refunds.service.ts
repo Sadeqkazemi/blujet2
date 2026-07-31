@@ -533,18 +533,21 @@ export class RefundsService {
       });
     }
 
+    const matchedPassenger = booking.passengers.find((p) =>
+      matchesLastName(p.fullName, lastName),
+    )!;
+
     const rules = await this.prisma.refundPenaltyRule.findMany();
     const preview = this.assertRefundable(booking, rules);
-    const passenger = booking.passengers[0];
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
         const request = await this.prisma.refundRequest.create({
           data: {
             trackingCode: newTrackingCode(),
             bookingId: booking.id,
-            passengerName: passenger?.fullName ?? lastName,
-            nidEnc: passenger?.nationalIdEnc,
-            mobileEnc: passenger?.mobileEnc,
+            passengerName: matchedPassenger.fullName,
+            nidEnc: matchedPassenger.nationalIdEnc,
+            mobileEnc: matchedPassenger.mobileEnc,
             ibanEnc: encryptPii(iban),
             totalPaidIrr: preview.totalPaidIrr,
             penaltyPct: preview.penaltyPct,

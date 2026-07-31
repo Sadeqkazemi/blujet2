@@ -27,7 +27,7 @@ describe('Phase 21 — forgot/set password + customer password login (e2e)', () 
     it('401s without a token', async () => {
       const res = await request(app.getHttpServer())
         .post('/auth/set-password')
-        .send({ newPassword: 'NewPass1234' });
+        .send({ newPassword: 'NewPass123!' });
       expect(res.status).toBe(401);
     });
 
@@ -36,7 +36,7 @@ describe('Phase 21 — forgot/set password + customer password login (e2e)', () 
       const res = await request(app.getHttpServer())
         .post('/auth/set-password')
         .set('Authorization', `Bearer ${accessToken}`)
-        .send({ newPassword: 'NewPass1234' });
+        .send({ newPassword: 'NewPass123!' });
       expect(res.status).toBe(403);
     });
 
@@ -49,6 +49,15 @@ describe('Phase 21 — forgot/set password + customer password login (e2e)', () 
       expect(res.status).toBe(400);
     });
 
+    it('400s a password without required complexity', async () => {
+      const { accessToken } = await loginAsCustomer(app, '09130000007');
+      const res = await request(app.getHttpServer())
+        .post('/auth/set-password')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ newPassword: 'FreshPass123' });
+      expect(res.status).toBe(400);
+    });
+
     it('sets a real password with no current-password check, usable to log in afterward', async () => {
       const phone = '09130000002';
       const { accessToken } = await loginAsCustomer(app, phone);
@@ -56,12 +65,12 @@ describe('Phase 21 — forgot/set password + customer password login (e2e)', () 
       const setRes = await request(app.getHttpServer())
         .post('/auth/set-password')
         .set('Authorization', `Bearer ${accessToken}`)
-        .send({ newPassword: 'FreshPass123' });
+        .send({ newPassword: 'FreshPass123!' });
       expect(setRes.status).toBe(200);
 
       const loginRes = await request(app.getHttpServer())
         .post('/auth/customer/login-password')
-        .send({ phone, password: 'FreshPass123' });
+        .send({ phone, password: 'FreshPass123!' });
       expect(loginRes.status).toBe(200);
       expect(loginRes.body.data.accessToken).toBeTruthy();
       expect(loginRes.body.data.user.role).toBe('USER');
@@ -74,7 +83,7 @@ describe('Phase 21 — forgot/set password + customer password login (e2e)', () 
       await request(app.getHttpServer())
         .post('/auth/set-password')
         .set('Authorization', `Bearer ${accessToken}`)
-        .send({ newPassword: 'AuditedPass1' });
+        .send({ newPassword: 'AuditedPass1!' });
 
       const row = await prisma.auditLog.findFirst({
         where: { entityId: userId, category: 'SECURITY' },
@@ -91,7 +100,7 @@ describe('Phase 21 — forgot/set password + customer password login (e2e)', () 
       await request(app.getHttpServer())
         .post('/auth/set-password')
         .set('Authorization', `Bearer ${accessToken}`)
-        .send({ newPassword: 'CorrectPass1' });
+        .send({ newPassword: 'CorrectPass1!' });
 
       const res = await request(app.getHttpServer())
         .post('/auth/customer/login-password')
@@ -121,7 +130,7 @@ describe('Phase 21 — forgot/set password + customer password login (e2e)', () 
       await request(app.getHttpServer())
         .post('/auth/set-password')
         .set('Authorization', `Bearer ${accessToken}`)
-        .send({ newPassword: 'SuspendedPw1' });
+        .send({ newPassword: 'SuspendedPw1!' });
       await prisma.user.update({
         where: { id: userId },
         data: { isActive: false },
@@ -129,7 +138,7 @@ describe('Phase 21 — forgot/set password + customer password login (e2e)', () 
 
       const res = await request(app.getHttpServer())
         .post('/auth/customer/login-password')
-        .send({ phone, password: 'SuspendedPw1' });
+        .send({ phone, password: 'SuspendedPw1!' });
       expect(res.status).toBe(403);
 
       // Cleanup — this phone number is shared, ambient fixture data in the
