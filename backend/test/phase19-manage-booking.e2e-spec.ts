@@ -140,6 +140,61 @@ describe('Phase 19 — anonymous manage-booking self-service (e2e)', () => {
       expect(wrongName.body.error.code).toBe(wrongPnr.body.error.code);
       expect(wrongName.body.error.message).toBe(wrongPnr.body.error.message);
     });
+
+    it('redacts co-passenger names on multi-passenger bookings', async () => {
+      const { accessToken } = await loginAsCustomer(app, '09150000009');
+      const departureAt = new Date(Date.now() + 12 * 24 * 60 * 60 * 1000);
+      const instance = await prisma.flightInstance.create({
+        data: {
+          flightId,
+          departureAt,
+          arrivalAt: new Date(departureAt.getTime() + 85 * 60 * 1000),
+          capacity: 4,
+          status: 'SCHEDULED',
+        },
+      });
+      const createRes = await request(app.getHttpServer())
+        .post('/bookings')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          flightInstanceId: instance.id,
+          cabin: 'ECONOMY',
+          passengers: [
+            {
+              fullName: 'علی رضایی',
+              nationalId: '0012345679',
+              seatCode: '1A',
+            },
+            {
+              fullName: 'مینا احمدی',
+              seatCode: '1C',
+            },
+          ],
+        });
+      const bookingId = createRes.body.data.id as string;
+      const payRes = await request(app.getHttpServer())
+        .post(`/bookings/${bookingId}/pay`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({});
+      const pnr = payRes.body.data.booking.pnr as string;
+
+      const res = await request(app.getHttpServer())
+        .post('/manage-booking/lookup')
+        .send({ pnr, lastName: 'رضایی' });
+
+      expect(res.status).toBe(201);
+      expect(res.body.data.passengers).toEqual([
+        { fullName: 'علی رضایی', seatCode: '1A' },
+        { fullName: 'مسافر همراه', seatCode: '1C' },
+      ]);
+    });
+
+    it('400s when last name is shorter than 3 characters', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/manage-booking/lookup')
+        .send({ pnr: 'BJ4X2K', lastName: 'رض' });
+      expect(res.status).toBe(400);
+    });
   });
 
   describe('POST /manage-booking/refund', () => {

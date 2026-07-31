@@ -119,7 +119,7 @@ describe('Phase 51 — password reset via verified email (e2e)', () => {
       const setRes = await request(app.getHttpServer())
         .post('/auth/set-password')
         .set('Authorization', `Bearer ${verifyRes.body.data.accessToken}`)
-        .send({ newPassword: 'FreshEmailPw1' });
+        .send({ newPassword: 'FreshEmailPw1!' });
       expect(setRes.status).toBe(200);
     });
 
