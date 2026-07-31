@@ -2,6 +2,7 @@ import { apiGet, apiPatch, apiPost } from './http';
 import type {
   ContactMessageRow,
   ForwardTarget,
+  MySupportTicketRow,
   SupportTicketRow,
   SupportTicketStatus,
 } from '../types/support-tickets';
@@ -14,6 +15,23 @@ export function submitSupportTicket(dto: {
   body: string;
 }) {
   return apiPost<{ id: string; trackingCode: string }>('/support-tickets', dto);
+}
+
+export function fetchMySupportTickets() {
+  return apiGet<MySupportTicketRow[]>('/my/support-tickets');
+}
+
+export function fetchMySupportTicketDetail(id: string) {
+  return apiGet<MySupportTicketRow>(`/my/support-tickets/${id}`);
+}
+
+export function submitMySupportTicket(dto: {
+  requesterName: string;
+  requesterPhone: string;
+  subject: string;
+  body: string;
+}) {
+  return apiPost<{ id: string; trackingCode: string }>('/my/support-tickets', dto);
 }
 
 export function fetchSupportTickets(filters: { status?: SupportTicketStatus } = {}) {

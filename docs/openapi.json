@@ -5575,6 +5575,68 @@
         ]
       }
     },
+    "/my/support-tickets": {
+      "get": {
+        "operationId": "MySupportTicketsController_listMine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست تیکت‌های پشتیبانی مشتری جاری",
+        "tags": [
+          "support-tickets"
+        ]
+      },
+      "post": {
+        "operationId": "MySupportTicketsController_submit",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitSupportTicketDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ثبت تیکت پشتیبانی از پنل کاربر (با ورود)",
+        "tags": [
+          "support-tickets"
+        ]
+      }
+    },
+    "/my/support-tickets/{id}": {
+      "get": {
+        "operationId": "MySupportTicketsController_getMine",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "جزئیات یک تیکت پشتیبانی مشتری",
+        "tags": [
+          "support-tickets"
+        ]
+      }
+    },
     "/flight-status": {
       "get": {
         "operationId": "FlightStatusController_lookup",
