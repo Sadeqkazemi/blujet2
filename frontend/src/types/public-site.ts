@@ -24,6 +24,18 @@ export interface SearchFlightResult {
   cabins: SearchCabinOption[];
 }
 
+export type PriceAdvisoryRecommendation = 'BUY_NOW' | 'WAIT';
+
+export type PriceAdvisoryResult =
+  | { available: false; reason: 'ADVISORY_UNAVAILABLE' }
+  | {
+      available: true;
+      recommendation: PriceAdvisoryRecommendation;
+      explanationFa: string;
+      modelVersion: string;
+      confidence: number;
+    };
+
 export type SeatStatus = 'FREE' | 'TAKEN';
 
 export interface SeatMapCell {

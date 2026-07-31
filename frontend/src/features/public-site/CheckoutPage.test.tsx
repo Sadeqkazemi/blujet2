@@ -64,7 +64,7 @@ describe('CheckoutPage', () => {
     expect(payBooking).toHaveBeenCalledWith('b1', {
       confirmedPriceIrr: undefined,
       promoCode: undefined,
-      paymentMethod: 'GATEWAY',
+      paymentMethod: 'WALLET',
     });
   });
 
@@ -87,6 +87,15 @@ describe('CheckoutPage', () => {
       promoCode: 'BLUE20',
       paymentMethod: 'WALLET',
     });
+  });
+
+  it('disables the gateway option when MVP checkout flag is off', async () => {
+    vi.spyOn(publicSiteApi, 'fetchMyBooking').mockResolvedValue(BOOKING);
+    renderPage();
+    await screen.findByTestId('pay-submit');
+
+    expect(screen.getByTestId('payment-method-GATEWAY')).toBeDisabled();
+    expect(screen.getByTestId('payment-method-WALLET')).toBeChecked();
   });
 
   it('disables the pay-with-points option for a non-club-member', async () => {

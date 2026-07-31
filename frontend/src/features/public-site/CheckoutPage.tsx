@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { fetchClubPoints, fetchMyBooking, fetchWallet, payBooking } from '../../api/publicSite';
 import { ApiRequestError } from '../../api/envelope';
 import { faMoney } from '../../lib/fa-format';
+import { GATEWAY_CHECKOUT_ENABLED } from '../../lib/payment-config';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import type { BookingDetail } from '../../types/public-site';
 import PublicPageShell from '../../components/public/PublicPageShell';
@@ -20,7 +21,9 @@ export default function CheckoutPage() {
   const [priceChange, setPriceChange] = useState<{ previousPriceIrr: number; currentPriceIrr: number } | null>(null);
   const [paying, setPaying] = useState(false);
   const [promoCode, setPromoCode] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('GATEWAY');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(
+    GATEWAY_CHECKOUT_ENABLED ? 'GATEWAY' : 'WALLET',
+  );
 
   useEffect(() => {
     if (!bookingId) return;
@@ -86,7 +89,11 @@ export default function CheckoutPage() {
   }
 
   const methods: { key: PaymentMethod; label: string; disabled?: boolean }[] = [
-    { key: 'GATEWAY', label: 'درگاه پرداخت' },
+    {
+      key: 'GATEWAY',
+      label: GATEWAY_CHECKOUT_ENABLED ? 'درگاه پرداخت' : 'درگاه پرداخت (به‌زودی)',
+      disabled: !GATEWAY_CHECKOUT_ENABLED,
+    },
     { key: 'WALLET', label: `کیف پول${walletBalanceIrr !== null ? ` (${faMoney(walletBalanceIrr)} تومان)` : ''}` },
     { key: 'POINTS', label: 'امتیاز باشگاه مشتریان', disabled: !isClubMember },
   ];

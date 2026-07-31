@@ -158,6 +158,52 @@ describe('ResultsPage', () => {
     });
   });
 
+  describe('AI price radar', () => {
+    it('calls fetchPriceAdvisory and shows unavailable when ML is not ready', async () => {
+      vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+      const fetchAdvisory = vi.spyOn(publicSiteApi, 'fetchPriceAdvisory').mockResolvedValue({
+        available: false,
+        reason: 'ADVISORY_UNAVAILABLE',
+      });
+      renderPage();
+      await screen.findByTestId('result-card');
+
+      await userEvent.click(screen.getByTestId('ai-ask'));
+
+      expect(fetchAdvisory).toHaveBeenCalledWith('THR', 'MHD', '2026-08-01');
+      expect(await screen.findByTestId('ai-unavailable')).toBeInTheDocument();
+    });
+
+    it('shows the advisory recommendation when the API returns available=true', async () => {
+      vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+      vi.spyOn(publicSiteApi, 'fetchPriceAdvisory').mockResolvedValue({
+        available: true,
+        recommendation: 'BUY_NOW',
+        explanationFa: 'احتمال افزایش قیمت در ۴۸ ساعت آینده بالاست.',
+        modelVersion: 'rec-v1',
+        confidence: 0.82,
+      });
+      renderPage();
+      await screen.findByTestId('result-card');
+
+      await userEvent.click(screen.getByTestId('ai-ask'));
+
+      expect(await screen.findByTestId('ai-result')).toBeInTheDocument();
+      expect(screen.getByText('احتمال افزایش قیمت در ۴۸ ساعت آینده بالاست.')).toBeInTheDocument();
+    });
+
+    it('shows an error state when fetchPriceAdvisory rejects', async () => {
+      vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+      vi.spyOn(publicSiteApi, 'fetchPriceAdvisory').mockRejectedValue(new Error('network'));
+      renderPage();
+      await screen.findByTestId('result-card');
+
+      await userEvent.click(screen.getByTestId('ai-ask'));
+
+      expect(await screen.findByTestId('ai-error')).toBeInTheDocument();
+    });
+  });
+
   it('renders translated result cards with Latin-digit toman prices in English', async () => {
     mockLocale('en');
     vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);

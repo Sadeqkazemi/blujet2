@@ -9,6 +9,7 @@ import type {
   SearchFlightResult,
   SeatMapResult,
   UserProfile,
+  PriceAdvisoryResult,
 } from '../types/public-site';
 
 export function fetchAirports() {
@@ -18,6 +19,16 @@ export function fetchAirports() {
 export function searchFlights(origin: string, dest: string, date: string) {
   const q = new URLSearchParams({ origin, dest, date });
   return apiGet<SearchFlightResult[]>(`/search/flights?${q.toString()}`);
+}
+
+export function fetchPriceAdvisory(
+  origin: string,
+  dest: string,
+  date: string,
+  cabin: CabinClass = 'ECONOMY',
+) {
+  const q = new URLSearchParams({ origin, dest, date, cabin });
+  return apiGet<PriceAdvisoryResult>(`/search/price-advisory?${q.toString()}`);
 }
 
 export function fetchSeatMap(flightInstanceId: string) {

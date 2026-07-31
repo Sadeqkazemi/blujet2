@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { createPriceLock, fetchClubPoints, searchFlights } from '../../api/publicSite';
+import { createPriceLock, fetchClubPoints, fetchPriceAdvisory, searchFlights } from '../../api/publicSite';
 import { ApiRequestError } from '../../api/envelope';
 import { useAuth } from '../../hooks/useAuth';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { faDigits, formatToman, localeMoney } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
-import type { CabinClass, PriceLock, SearchFlightResult } from '../../types/public-site';
+import type { CabinClass, PriceAdvisoryResult, PriceLock, SearchFlightResult } from '../../types/public-site';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import FlowStepper from '../../components/public/FlowStepper';
 
@@ -86,8 +86,10 @@ const STR: Record<StoredLocale, {
   aiSub: string;
   aiAnalyze: string;
   aiAnalyzing: string;
-  aiRecommendation: string;
-  aiExplain: (flightTime: string, dayLabel: string) => string;
+  aiUnavailable: string;
+  aiRecommendationBuy: string;
+  aiRecommendationWait: string;
+  aiError: string;
   sortCheap: string;
   sortEarly: string;
   flightsCount: string;
@@ -128,9 +130,10 @@ const STR: Record<StoredLocale, {
     aiSub: 'همین حالا بخرم یا صبر کنم؟ رادار روند قیمت این مسیر را تحلیل می‌کند.',
     aiAnalyze: 'تحلیل کن',
     aiAnalyzing: 'در حال تحلیل…',
-    aiRecommendation: 'توصیه: همین حالا بخرید',
-    aiExplain: (flightTime, dayLabel) =>
-      `احتمال گرانی تا ۴۸ ساعت آینده حدود ۸۰٪ است؛ ارزان‌ترین گزینه، پرواز کاسپین ساعت ${flightTime} است. اگر انعطاف دارید، ${dayLabel} ارزان‌تر است.`,
+    aiUnavailable: 'سرویس تحلیل قیمت فعلاً در دسترس نیست. جستجو و رزرو بدون این قابلیت همچنان فعال است.',
+    aiRecommendationBuy: 'توصیه: همین حالا بخرید',
+    aiRecommendationWait: 'توصیه: کمی صبر کنید',
+    aiError: 'خطا در دریافت تحلیل قیمت. لطفاً دوباره تلاش کنید.',
     sortCheap: 'ارزان‌ترین',
     sortEarly: 'زودترین حرکت',
     flightsCount: 'پرواز',
@@ -171,9 +174,10 @@ const STR: Record<StoredLocale, {
     aiSub: "Buy now or wait? The radar analyzes this route's price trend.",
     aiAnalyze: 'Analyze price',
     aiAnalyzing: 'Analyzing…',
-    aiRecommendation: 'Recommendation: Buy now',
-    aiExplain: (flightTime, dayLabel) =>
-      `There's roughly an 80% chance of a price increase over the next 48 hours; the cheapest option is the Caspian flight at ${flightTime}. If you're flexible, ${dayLabel} is cheaper.`,
+    aiUnavailable: 'Price analysis is not available yet. Search and booking still work without it.',
+    aiRecommendationBuy: 'Recommendation: Buy now',
+    aiRecommendationWait: 'Recommendation: Wait',
+    aiError: 'Could not load price analysis. Please try again.',
     sortCheap: 'Cheapest',
     sortEarly: 'Earliest flight',
     flightsCount: 'flights',
@@ -214,9 +218,10 @@ const STR: Record<StoredLocale, {
     aiSub: 'هل أشتري الآن أم أنتظر؟ يحلل الرادار اتجاه أسعار هذا المسار.',
     aiAnalyze: 'تحليل السعر',
     aiAnalyzing: 'جارٍ التحليل…',
-    aiRecommendation: 'التوصية: اشترِ الآن',
-    aiExplain: (flightTime, dayLabel) =>
-      `احتمال ارتفاع السعر خلال الـ ٤٨ ساعة القادمة نحو ٨٠٪؛ أرخص خيار هو رحلة كاسپين الساعة ${flightTime}. إذا كان لديك مرونة، فإن ${dayLabel} أرخص.`,
+    aiUnavailable: 'خدمة تحليل الأسعار غير متاحة حاليًا. البحث والحجز يعملان بدونها.',
+    aiRecommendationBuy: 'التوصية: اشترِ الآن',
+    aiRecommendationWait: 'التوصية: انتظر قليلاً',
+    aiError: 'تعذّر تحميل تحليل السعر. يرجى المحاولة مرة أخرى.',
     sortCheap: 'الأرخص',
     sortEarly: 'أبكر رحلة',
     flightsCount: 'رحلة',
@@ -266,7 +271,8 @@ export default function ResultsPage() {
   const [fTime, setFTime] = useState<'all' | 'morning' | 'noon' | 'evening'>('all');
   const [fAirline, setFAirline] = useState('all');
   const [sort, setSort] = useState<'cheap' | 'early'>('cheap');
-  const [aiState, setAiState] = useState<'idle' | 'loading' | 'done'>('idle');
+  const [aiState, setAiState] = useState<'idle' | 'loading' | 'unavailable' | 'done' | 'error'>('idle');
+  const [advisory, setAdvisory] = useState<PriceAdvisoryResult | null>(null);
   const [lockFor, setLockFor] = useState<MockFlight | null>(null);
 
   // real قفل قیمت (real bookable results only — see docs/features/wallet-price-lock.md)
@@ -330,10 +336,25 @@ export default function ResultsPage() {
     };
   }, [origin, dest, date]);
 
-  function askAi() {
+  async function askAi() {
+    if (!origin || !dest || !date) return;
     setAiState('loading');
-    setTimeout(() => setAiState('done'), 900);
+    setAdvisory(null);
+    try {
+      const result = await fetchPriceAdvisory(origin, dest, date);
+      setAdvisory(result);
+      setAiState(result.available ? 'done' : 'unavailable');
+    } catch {
+      setAiState('error');
+    }
   }
+
+  const advisoryHeadline =
+    advisory?.available === true
+      ? advisory.recommendation === 'BUY_NOW'
+        ? t.aiRecommendationBuy
+        : t.aiRecommendationWait
+      : null;
 
   const mockShown = useMemo(() => {
     let list = [...MOCK_FLIGHTS];
@@ -461,14 +482,22 @@ export default function ResultsPage() {
               </button>
             )}
             {aiState === 'loading' && <div className="text-center text-[11px] text-[#8a96a6]">{t.aiAnalyzing}</div>}
-            {aiState === 'done' && (
+            {aiState === 'unavailable' && (
+              <p data-testid="ai-unavailable" className="text-[11px] leading-6 text-[#8a96a6]">
+                {t.aiUnavailable}
+              </p>
+            )}
+            {aiState === 'error' && (
+              <p data-testid="ai-error" className="text-[11px] leading-6 text-[#d64545]">
+                {t.aiError}
+              </p>
+            )}
+            {aiState === 'done' && advisory?.available && (
               <div data-testid="ai-result">
                 <div className="mb-1.5 inline-block rounded-full bg-[#e8f5ee] px-2.5 py-1 text-[11px] font-extrabold text-[#1f8a5b]">
-                  ✓ {t.aiRecommendation}
+                  ✓ {advisoryHeadline}
                 </div>
-                <p className="text-[11px] leading-6 text-[#3f546b]">
-                  {t.aiExplain('۱۶:۴۵', locale === 'fa' ? 'دوشنبه ۱۵ تیر' : locale === 'ar' ? 'يوم الاثنين ١٥ تير' : 'Monday, 15 Tir')}
-                </p>
+                <p className="text-[11px] leading-6 text-[#3f546b]">{advisory.explanationFa}</p>
               </div>
             )}
           </div>
