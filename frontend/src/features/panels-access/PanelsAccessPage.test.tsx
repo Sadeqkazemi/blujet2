@@ -42,14 +42,15 @@ describe('PanelsAccessPage', () => {
     expect(screen.getByRole('switch', { name: 'پنل مدیر مالی' })).toHaveAttribute('aria-checked', 'false');
   });
 
-  it('IT_MANAGER gets the read-only view: informational copy + disabled switches', async () => {
+  it('IT_MANAGER gets the read-only card grid view', async () => {
     mockRole('IT_MANAGER');
-    vi.spyOn(panelsApi, 'fetchAccessFlags').mockResolvedValue(FLAGS);
 
     render(<PanelsAccessPage />);
     expect(
       await screen.findByText(/تعیین سطح دسترسی ورود در اختیار مدیر عامل است/),
     ).toBeInTheDocument();
-    expect(screen.getByRole('switch', { name: 'پنل مدیر مالی' })).toBeDisabled();
+    expect(screen.getByText('پنل کارمند')).toBeInTheDocument();
+    expect(screen.getByText('پنل مدیر عامل')).toBeInTheDocument();
+    expect(screen.queryByRole('switch', { name: 'پنل مدیر مالی' })).not.toBeInTheDocument();
   });
 });
