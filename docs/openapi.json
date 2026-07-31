@@ -454,6 +454,45 @@
         ]
       }
     },
+    "/my/sessions": {
+      "get": {
+        "operationId": "MySessionsController_listMine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست نشست‌های فعال مشتری",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/my/sessions/{id}": {
+      "delete": {
+        "operationId": "MySessionsController_revoke",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "پایان نشست دستگاه دیگر",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
     "/audit/manager-reports": {
       "get": {
         "operationId": "AuditController_managerReports",
@@ -536,6 +575,21 @@
         "summary": "CEO لاگ و رویدادها — ردیف‌های واقعی AuditLog با سطح presentational",
         "tags": [
           "audit"
+        ]
+      }
+    },
+    "/my/referral": {
+      "get": {
+        "operationId": "MyReferralController_getMine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "کد معرف، آمار و فهرست دوستان دعوت‌شده",
+        "tags": [
+          "profile"
         ]
       }
     },
@@ -2460,6 +2514,55 @@
         ]
       }
     },
+    "/club/submitted-card-requests": {
+      "get": {
+        "operationId": "ClubController_listSubmittedRequests",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "درخواست‌های SUBMITTED در انتظار ارجاع — فقط ادمین سایت",
+        "tags": [
+          "club"
+        ]
+      }
+    },
+    "/club/card-requests/{id}/refer": {
+      "patch": {
+        "operationId": "ClubController_referRequest",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReferCardRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "ارجاع درخواست SUBMITTED به مدیر ارشد یا رئیس هیئت مدیره",
+        "tags": [
+          "club"
+        ]
+      }
+    },
     "/club/_test/card-request": {
       "post": {
         "operationId": "ClubController_createTestRequest",
@@ -4146,6 +4249,68 @@
         ]
       }
     },
+    "/my/saved-flights": {
+      "get": {
+        "operationId": "MySavedFlightsController_listMine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست پروازهای ذخیره‌شده مشتری",
+        "tags": [
+          "purchase-extras"
+        ]
+      },
+      "post": {
+        "operationId": "MySavedFlightsController_save",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveFlightDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ذخیره پرواز برای رزرو بعدی",
+        "tags": [
+          "purchase-extras"
+        ]
+      }
+    },
+    "/my/saved-flights/{id}": {
+      "delete": {
+        "operationId": "MySavedFlightsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "حذف پرواز از نشان‌شده‌ها",
+        "tags": [
+          "purchase-extras"
+        ]
+      }
+    },
     "/my/privacy/export": {
       "get": {
         "operationId": "PrivacyController_export",
@@ -5355,6 +5520,336 @@
         ]
       }
     },
+    "/my/saved-passengers": {
+      "get": {
+        "operationId": "MySavedPassengersController_listMine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست مسافران ذخیره‌شده مشتری",
+        "tags": [
+          "profile"
+        ]
+      },
+      "post": {
+        "operationId": "MySavedPassengersController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSavedPassengerDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "افزودن مسافر به دفترچه آدرس",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/my/saved-passengers/{id}": {
+      "patch": {
+        "operationId": "MySavedPassengersController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSavedPassengerDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "ویرایش مسافر ذخیره‌شده",
+        "tags": [
+          "profile"
+        ]
+      },
+      "delete": {
+        "operationId": "MySavedPassengersController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "حذف مسافر از دفترچه",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/my/bank-accounts": {
+      "get": {
+        "operationId": "MyBankAccountsController_listMine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست حساب‌های بانکی مشتری",
+        "tags": [
+          "profile"
+        ]
+      },
+      "post": {
+        "operationId": "MyBankAccountsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBankAccountDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ثبت کارت/شبای جدید",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/my/bank-accounts/{id}": {
+      "patch": {
+        "operationId": "MyBankAccountsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBankAccountDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تنظیم حساب پیش‌فرض",
+        "tags": [
+          "profile"
+        ]
+      },
+      "delete": {
+        "operationId": "MyBankAccountsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "حذف حساب بانکی",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/my/identity": {
+      "get": {
+        "operationId": "MyIdentityController_getMine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "وضعیت احراز هویت و مراحل تکمیل",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/my/identity/id-card": {
+      "post": {
+        "operationId": "MyIdentityController_uploadIdCard",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "بارگذاری تصویر کارت ملی (PDF/PNG/JPG)",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/my/identity/submit": {
+      "post": {
+        "operationId": "MyIdentityController_submit",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ثبت و ارسال مدارک برای بررسی",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/identity-verifications": {
+      "get": {
+        "operationId": "IdentityAdminController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست درخواست‌های احراز هویت مشتریان",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/identity-verifications/{id}/id-card": {
+      "get": {
+        "operationId": "IdentityAdminController_getIdCard",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "دریافت تصویر کارت ملی یک درخواست",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/identity-verifications/{id}/approve": {
+      "patch": {
+        "operationId": "IdentityAdminController_approve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تأیید احراز هویت مشتری",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/identity-verifications/{id}/reject": {
+      "patch": {
+        "operationId": "IdentityAdminController_reject",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectIdentityVerificationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "رد احراز هویت مشتری با ذکر دلیل",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
     "/manage-booking/lookup": {
       "post": {
         "operationId": "ManageBookingController_lookup",
@@ -6396,6 +6891,11 @@
             "type": "string",
             "example": "09121234567",
             "description": "شماره موبایل مشتری"
+          },
+          "referralCode": {
+            "type": "string",
+            "example": "NEGAR-4152",
+            "description": "کد معرف (فقط برای ثبت‌نام اول)"
           }
         },
         "required": [
@@ -6962,6 +7462,22 @@
           "level"
         ]
       },
+      "ReferCardRequestDto": {
+        "type": "object",
+        "properties": {
+          "assignedTo": {
+            "type": "string",
+            "enum": [
+              "SENIOR",
+              "CHAIR"
+            ],
+            "description": "مدیر ارشد یا رئیس هیئت مدیره — تنها دو مقصد ارجاع طراحی"
+          }
+        },
+        "required": [
+          "assignedTo"
+        ]
+      },
       "UpdateTierRulesDto": {
         "type": "object",
         "properties": {
@@ -7506,6 +8022,27 @@
               "ECONOMY",
               "BUSINESS"
             ]
+          }
+        },
+        "required": [
+          "flightInstanceId",
+          "cabin"
+        ]
+      },
+      "SaveFlightDto": {
+        "type": "object",
+        "properties": {
+          "flightInstanceId": {
+            "type": "string",
+            "example": "00000000-0000-0000-0000-000000000001"
+          },
+          "cabin": {
+            "type": "string",
+            "enum": [
+              "ECONOMY",
+              "BUSINESS"
+            ],
+            "example": "ECONOMY"
           }
         },
         "required": [
@@ -8089,6 +8626,117 @@
         "required": [
           "challengeId",
           "code"
+        ]
+      },
+      "CreateSavedPassengerDto": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string",
+            "example": "محمد رضایی"
+          },
+          "latinName": {
+            "type": "string",
+            "example": "MOHAMMAD REZAEI",
+            "description": "Latin ticket name"
+          },
+          "nationalId": {
+            "type": "string",
+            "example": "0012345679"
+          },
+          "passportNo": {
+            "type": "string",
+            "example": "A22113344"
+          },
+          "mobile": {
+            "type": "string",
+            "example": "09121234567"
+          },
+          "isChild": {
+            "type": "boolean",
+            "example": false
+          }
+        },
+        "required": [
+          "fullName",
+          "latinName"
+        ]
+      },
+      "UpdateSavedPassengerDto": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string",
+            "example": "محمد رضایی"
+          },
+          "latinName": {
+            "type": "string",
+            "example": "MOHAMMAD REZAEI"
+          },
+          "nationalId": {
+            "type": "object",
+            "example": "0012345679",
+            "nullable": true
+          },
+          "passportNo": {
+            "type": "object",
+            "example": "A22113344",
+            "nullable": true
+          },
+          "mobile": {
+            "type": "object",
+            "example": "09121234567",
+            "nullable": true
+          },
+          "isChild": {
+            "type": "boolean",
+            "example": false
+          }
+        }
+      },
+      "CreateBankAccountDto": {
+        "type": "object",
+        "properties": {
+          "cardNo": {
+            "type": "string",
+            "example": "6104337112344521",
+            "description": "۱۶ رقم کارت (فارسی یا لاتین)"
+          },
+          "sheba": {
+            "type": "string",
+            "example": "IR820540102680020817909002"
+          },
+          "bankName": {
+            "type": "string",
+            "example": "بانک ملت"
+          }
+        },
+        "required": [
+          "cardNo",
+          "sheba"
+        ]
+      },
+      "UpdateBankAccountDto": {
+        "type": "object",
+        "properties": {
+          "isDefault": {
+            "type": "boolean",
+            "example": true
+          }
+        }
+      },
+      "RejectIdentityVerificationDto": {
+        "type": "object",
+        "properties": {
+          "rejectReason": {
+            "type": "string",
+            "description": "دلیل رد مدارک — به کاربر در تب احراز هویت نمایش داده می‌شود",
+            "example": "تصویر کارت ملی ناخوانا است؛ لطفاً تصویر واضح‌تری بارگذاری کنید.",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "rejectReason"
         ]
       },
       "LookupBookingDto": {
