@@ -5518,6 +5518,51 @@
         ]
       }
     },
+    "/settings/app-links": {
+      "get": {
+        "operationId": "SettingsPublicController_getAppLinks",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "لینک‌های دانلود اپلیکیشن برای صفحهٔ اصلی",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/settings/support-contact": {
+      "get": {
+        "operationId": "SettingsPublicController_getSupportContact",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تلفن و ایمیل پشتیبانی نمایش‌داده‌شده در سایت",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/settings/site-content": {
+      "get": {
+        "operationId": "SettingsPublicController_getSiteContent",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "متن صفحات عمومی ثابت (درباره ما، قوانین، …)",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
     "/reconciliation": {
       "get": {
         "operationId": "ReconciliationController_list",
@@ -6931,6 +6976,569 @@
         "summary": "ثبت درخواست استخدام برای یک فرصت شغلی",
         "tags": [
           "careers"
+        ]
+      }
+    },
+    "/blog/admin/stats": {
+      "get": {
+        "operationId": "BlogAdminController_stats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "آمار KPI بلاگ (منتشرشده، پیش‌نویس، بازدید)",
+        "tags": [
+          "blog"
+        ]
+      }
+    },
+    "/blog/admin/posts": {
+      "get": {
+        "operationId": "BlogAdminController_list",
+        "parameters": [
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "NEWS",
+                "GUIDE",
+                "DEST",
+                "OFFERS",
+                "all"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست همهٔ مقالات (با فیلتر دسته‌بندی)",
+        "tags": [
+          "blog"
+        ]
+      },
+      "post": {
+        "operationId": "BlogAdminController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBlogPostDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ایجاد مقالهٔ جدید",
+        "tags": [
+          "blog"
+        ]
+      }
+    },
+    "/blog/admin/posts/{id}": {
+      "get": {
+        "operationId": "BlogAdminController_getOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "جزئیات یک مقاله برای ویرایش",
+        "tags": [
+          "blog"
+        ]
+      },
+      "patch": {
+        "operationId": "BlogAdminController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBlogPostDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "ویرایش مقاله",
+        "tags": [
+          "blog"
+        ]
+      },
+      "delete": {
+        "operationId": "BlogAdminController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "حذف نرم مقاله",
+        "tags": [
+          "blog"
+        ]
+      }
+    },
+    "/blog/posts": {
+      "get": {
+        "operationId": "BlogPublicController_list",
+        "parameters": [
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "NEWS",
+                "GUIDE",
+                "DEST",
+                "OFFERS"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست مقالات منتشرشده",
+        "tags": [
+          "blog"
+        ]
+      }
+    },
+    "/blog/posts/{slug}": {
+      "get": {
+        "operationId": "BlogPublicController_detail",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "جزئیات یک مقالهٔ منتشرشده",
+        "tags": [
+          "blog"
+        ]
+      }
+    },
+    "/blog/covers/{fileId}": {
+      "get": {
+        "operationId": "BlogPublicController_cover",
+        "parameters": [
+          {
+            "name": "fileId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "دریافت تصویر کاور مقالهٔ منتشرشده",
+        "tags": [
+          "blog"
+        ]
+      }
+    },
+    "/site-content/admin/library": {
+      "get": {
+        "operationId": "SiteContentAdminController_library",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "کتابخانهٔ تصاویر سایت",
+        "tags": [
+          "site-content"
+        ]
+      },
+      "post": {
+        "operationId": "SiteContentAdminController_addLibrary",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddLibraryAssetDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "افزودن تصویر به کتابخانه",
+        "tags": [
+          "site-content"
+        ]
+      }
+    },
+    "/site-content/admin/library/{id}": {
+      "delete": {
+        "operationId": "SiteContentAdminController_removeLibrary",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "حذف نرم تصویر از کتابخانه",
+        "tags": [
+          "site-content"
+        ]
+      }
+    },
+    "/site-content/admin/blocks": {
+      "get": {
+        "operationId": "SiteContentAdminController_blocks",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "بلوک‌های بنر صفحهٔ اصلی",
+        "tags": [
+          "site-content"
+        ]
+      }
+    },
+    "/site-content/admin/blocks/{key}": {
+      "patch": {
+        "operationId": "SiteContentAdminController_updateBlock",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateContentBlockDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "ویرایش یک بلوک بنر",
+        "tags": [
+          "site-content"
+        ]
+      }
+    },
+    "/site-content/admin/destinations": {
+      "get": {
+        "operationId": "SiteContentAdminController_destinations",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "مقاصد محبوب",
+        "tags": [
+          "site-content"
+        ]
+      },
+      "post": {
+        "operationId": "SiteContentAdminController_createDestination",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDestinationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "افزودن مقصد محبوب",
+        "tags": [
+          "site-content"
+        ]
+      }
+    },
+    "/site-content/admin/destinations/{id}": {
+      "patch": {
+        "operationId": "SiteContentAdminController_updateDestination",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDestinationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "ویرایش مقصد محبوب",
+        "tags": [
+          "site-content"
+        ]
+      },
+      "delete": {
+        "operationId": "SiteContentAdminController_deleteDestination",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "حذف مقصد محبوب",
+        "tags": [
+          "site-content"
+        ]
+      }
+    },
+    "/site-content/admin/routes": {
+      "get": {
+        "operationId": "SiteContentAdminController_routes",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "مسیرهای پرتردد",
+        "tags": [
+          "site-content"
+        ]
+      },
+      "post": {
+        "operationId": "SiteContentAdminController_createRoute",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRouteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "افزودن مسیر پرتردد",
+        "tags": [
+          "site-content"
+        ]
+      }
+    },
+    "/site-content/admin/routes/{id}": {
+      "patch": {
+        "operationId": "SiteContentAdminController_updateRoute",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRouteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "ویرایش مسیر پرتردد",
+        "tags": [
+          "site-content"
+        ]
+      },
+      "delete": {
+        "operationId": "SiteContentAdminController_deleteRoute",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "حذف مسیر پرتردد",
+        "tags": [
+          "site-content"
+        ]
+      }
+    },
+    "/site-content/home": {
+      "get": {
+        "operationId": "SiteContentPublicController_home",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "محتوای CMS صفحهٔ اصلی",
+        "tags": [
+          "site-content"
+        ]
+      }
+    },
+    "/site-content/media/{fileId}": {
+      "get": {
+        "operationId": "SiteContentPublicController_media",
+        "parameters": [
+          {
+            "name": "fileId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "دریافت تصویر محتوای سایت",
+        "tags": [
+          "site-content"
         ]
       }
     }
@@ -9270,6 +9878,214 @@
           "nationalId",
           "phone"
         ]
+      },
+      "CreateBlogPostDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "example": "راهنمای کامل چک‌این آنلاین پروازهای داخلی"
+          },
+          "body": {
+            "type": "string",
+            "example": "متن مقاله…"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "NEWS",
+              "GUIDE",
+              "DEST",
+              "OFFERS"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "PUBLISHED",
+              "SCHEDULED"
+            ],
+            "default": "DRAFT"
+          },
+          "coverFileId": {
+            "type": "string",
+            "description": "StoredFile id from POST /files"
+          },
+          "scheduledAt": {
+            "type": "string",
+            "description": "Required when status is SCHEDULED (ISO 8601 UTC)"
+          },
+          "slug": {
+            "type": "string",
+            "description": "URL slug — auto-generated if omitted"
+          }
+        },
+        "required": [
+          "title",
+          "body",
+          "category"
+        ]
+      },
+      "UpdateBlogPostDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "NEWS",
+              "GUIDE",
+              "DEST",
+              "OFFERS"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "PUBLISHED",
+              "SCHEDULED"
+            ]
+          },
+          "coverFileId": {
+            "type": "object",
+            "nullable": true
+          },
+          "scheduledAt": {
+            "type": "object"
+          },
+          "slug": {
+            "type": "string"
+          }
+        }
+      },
+      "AddLibraryAssetDto": {
+        "type": "object",
+        "properties": {
+          "storedFileId": {
+            "type": "string",
+            "description": "StoredFile id from POST /files"
+          },
+          "label": {
+            "type": "string",
+            "example": "hero-istanbul.jpg"
+          }
+        },
+        "required": [
+          "storedFileId"
+        ]
+      },
+      "UpdateContentBlockDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "title": {
+            "type": "string"
+          },
+          "subtitle": {
+            "type": "string"
+          },
+          "buttonText": {
+            "type": "string"
+          },
+          "badgeText": {
+            "type": "string"
+          },
+          "imageFileId": {
+            "type": "object",
+            "nullable": true
+          }
+        }
+      },
+      "CreateDestinationDto": {
+        "type": "object",
+        "properties": {
+          "airportCode": {
+            "type": "string",
+            "example": "IST"
+          },
+          "priceIrr": {
+            "type": "number",
+            "description": "Price in IRR (integer)"
+          },
+          "imageFileId": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "airportCode",
+          "priceIrr"
+        ]
+      },
+      "UpdateDestinationDto": {
+        "type": "object",
+        "properties": {
+          "airportCode": {
+            "type": "string"
+          },
+          "priceIrr": {
+            "type": "number"
+          },
+          "imageFileId": {
+            "type": "object",
+            "nullable": true
+          },
+          "sortOrder": {
+            "type": "number"
+          }
+        }
+      },
+      "CreateRouteDto": {
+        "type": "object",
+        "properties": {
+          "fromAirportCode": {
+            "type": "string",
+            "example": "THR"
+          },
+          "toAirportCode": {
+            "type": "string",
+            "example": "MHD"
+          },
+          "priceIrr": {
+            "type": "number"
+          },
+          "sortOrder": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "fromAirportCode",
+          "toAirportCode",
+          "priceIrr"
+        ]
+      },
+      "UpdateRouteDto": {
+        "type": "object",
+        "properties": {
+          "fromAirportCode": {
+            "type": "string"
+          },
+          "toAirportCode": {
+            "type": "string"
+          },
+          "priceIrr": {
+            "type": "number"
+          },
+          "sortOrder": {
+            "type": "number"
+          }
+        }
       }
     }
   }

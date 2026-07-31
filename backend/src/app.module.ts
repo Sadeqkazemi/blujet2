@@ -41,6 +41,8 @@ import { FlightStatusModule } from './modules/flight-status/flight-status.module
 import { FlightopsModule } from './modules/flightops/flightops.module';
 import { SurveyModule } from './modules/survey/survey.module';
 import { CareersModule } from './modules/careers/careers.module';
+import { BlogModule } from './modules/blog/blog.module';
+import { SiteContentModule } from './modules/site-content/site-content.module';
 import { CustomerReferralsModule } from './modules/customer-referrals/customer-referrals.module';
 import { WebservicePricingModule } from './modules/webservice-pricing/webservice-pricing.module';
 
@@ -114,6 +116,8 @@ import { WebservicePricingModule } from './modules/webservice-pricing/webservice
     FlightopsModule,
     SurveyModule,
     CareersModule,
+    BlogModule,
+    SiteContentModule,
     WebservicePricingModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

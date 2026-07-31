@@ -2925,3 +2925,114 @@ Schema: `CartableSourceType` gains `EMPLOYEE_MESSAGE` (migration
 `20260731120000_employee_cartable_source_type`).
 
 See `docs/features/employee-cartable.md` for the acceptance checklist.
+
+## Phase D — SITE_ADMIN blog CMS
+
+First slice of the پنل ادمین سایت.dc.html content-management deferrals
+(Phase 18 left `blog`/`media` out entirely). **Blog tab only** — the
+full `media` tab (banners, destinations, image library, app links) stays
+deferred to a later sub-phase.
+
+### Admin (`SITE_ADMIN`, `blog` tab)
+
+| Method | Path | Access | Notes |
+|--------|------|--------|-------|
+| GET | `/blog/admin/stats` | SITE_ADMIN | KPI row: `{ publishedCount, draftCount, totalViews, commentCount }` — `commentCount` is always `0` until a comments feature exists. |
+| GET | `/blog/admin/posts` | SITE_ADMIN | All non-deleted posts; optional `?category=NEWS\|GUIDE\|DEST\|OFFERS\|all`. |
+| GET | `/blog/admin/posts/:id` | SITE_ADMIN | Full row for edit modal. |
+| POST | `/blog/admin/posts` | SITE_ADMIN | Create — `{ title, body, category, status?, coverFileId?, scheduledAt?, slug? }`. |
+| PATCH | `/blog/admin/posts/:id` | SITE_ADMIN | Update any field; status transitions set/clear `publishedAt`/`scheduledAt`. |
+| DELETE | `/blog/admin/posts/:id` | SITE_ADMIN | Soft-delete (`deletedAt`). |
+
+Cover images reuse existing `POST /files` (`StoredFile` FK on `BlogPost`).
+Audit log category `CONTENT` on create/update/delete.
+
+### Public (no auth)
+
+| Method | Path | Access | Notes |
+|--------|------|--------|-------|
+| GET | `/blog/posts` | public | Published + due scheduled posts only; optional `?category=`. |
+| GET | `/blog/posts/:slug` | public | Detail; increments `viewCount`. Draft/future-scheduled → 404. |
+| GET | `/blog/covers/:fileId` | public | Serves cover bytes only when attached to a visible post. |
+
+### Explicit deferrals
+
+- Comments (`commentCount` KPI is a placeholder)
+
+Public pages: `/blog` + `/blog/:slug` — see `docs/features/public-blog.md`.
+See `docs/features/site-admin-blog.md` for the admin acceptance checklist.
+
+## Phase E — SITE_ADMIN media CMS
+
+**Scope:** image library, hero/announcement/promo banners, popular destinations,
+popular routes. Deferred: social links (settings tab), app download links,
+support contact, job postings block, static site pages list.
+
+### Admin (`SITE_ADMIN`, `media` tab)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/site-content/admin/library` | SITE_ADMIN | Image library rows (linked `StoredFile`). |
+| POST | `/site-content/admin/library` | SITE_ADMIN | Add — `{ storedFileId, label? }` from `POST /files`. |
+| DELETE | `/site-content/admin/library/:id` | SITE_ADMIN | Soft-delete library asset. |
+| GET | `/site-content/admin/blocks` | SITE_ADMIN | Hero, announcement, promo blocks (auto-seeded defaults). |
+| PATCH | `/site-content/admin/blocks/:key` | SITE_ADMIN | Update block — `HERO_BANNER` \| `ANNOUNCEMENT_BAR` \| `PROMO_BANNER`. |
+| GET/POST/PATCH/DELETE | `/site-content/admin/destinations` | SITE_ADMIN | Popular destination cards CRUD. |
+| GET/POST/PATCH/DELETE | `/site-content/admin/routes` | SITE_ADMIN | Popular route chips CRUD. |
+
+### Public
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/site-content/home` | public | Blocks + destinations + routes for home page wiring. |
+| GET | `/site-content/media/:fileId` | public | Serves bytes when file is in library, a block, destination, or published blog cover. |
+
+Home page reads `GET /site-content/home` for announcement/hero/promo/routes/destinations.
+See `docs/features/site-admin-media.md` for the acceptance checklist.
+
+## Phase F — SITE_ADMIN settings (app links + support contact)
+
+Completes Phase E deferrals for app download links and public support
+phone/email (social links already in settings).
+
+### Admin (`SITE_ADMIN`, `settings` tab)
+
+SITE_ADMIN may PATCH only: `socialLinks`, `supportEmail`, `supportPhone`,
+`appDownloadLinks` (all other keys → 403).
+
+`appDownloadLinks` shape: `[{ id: 'app_store'|'google_play'|'bazaar_myket', name, url }]`.
+
+### Public
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/settings/app-links` | public | Store links with non-empty URLs (https-normalized). |
+| GET | `/settings/support-contact` | public | `{ phone, email }` from system settings. |
+
+Home page app band reads `GET /settings/app-links`.
+Contact page phone/email cards read `GET /settings/support-contact`.
+See `docs/features/site-admin-settings-links.md`.
+
+## Phase G — Contact page support contact wiring
+
+See `docs/features/contact-support-contact-wiring.md`.
+
+## Phase H — Destinations page CMS highlights
+
+Reuses `GET /site-content/home` (no new endpoints). Destination cards on
+`/destinations` override price/image by airport code; «مسیرهای پرتردد»
+uses CMS route highlights with static fallbacks.
+
+See `docs/features/destinations-cms-wiring.md`.
+
+## Phase I — SITE_ADMIN static site pages CMS
+
+Reuses `SystemSetting` keys (`aboutUsText`, `contactAddress`, `termsText`,
+`homeHeroTitle`, `homeHeroSubtitle`). SITE_ADMIN may PATCH these from the
+media tab «صفحات سایت» section.
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/settings/site-content` | public | Static page copy for public rendering. |
+
+See `docs/features/site-admin-static-pages.md`.

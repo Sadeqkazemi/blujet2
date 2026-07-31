@@ -891,6 +891,123 @@ async function main() {
     });
   }
 
+  // ── Phase D: sample blog posts ─────────────────────────────────────────
+  const siteAdmin = staffByUsername.get('site.admin')!;
+  const existingBlogCount = await typeorm.blogPost.count();
+  if (existingBlogCount === 0) {
+    const publishedAt = new Date(Date.now() - 5 * 24 * 3_600_000);
+    await typeorm.blogPost.createMany({
+      data: [
+        {
+          title: 'راهنمای کامل چک‌این آنلاین پروازهای داخلی',
+          slug: 'online-checkin-guide',
+          body: 'برای چک‌این آنلاین، کافی است از ۲۴ ساعت قبل از پرواز وارد سامانه blujet شوید و کد رزرو خود را وارد کنید…',
+          category: 'GUIDE',
+          status: 'PUBLISHED',
+          authorId: siteAdmin.id,
+          viewCount: 4210,
+          publishedAt,
+        },
+        {
+          title: '۱۰ مقصد بی‌نظیر تابستانی که باید ببینید',
+          slug: 'summer-destinations',
+          body: 'تابستان فرصت طلایی برای سفر به مقاصد ساحلی و کوهستانی است. در این مقاله ده مقصد محبوب را معرفی می‌کنیم…',
+          category: 'DEST',
+          status: 'PUBLISHED',
+          authorId: siteAdmin.id,
+          viewCount: 8740,
+          publishedAt: new Date(Date.now() - 3 * 24 * 3_600_000),
+        },
+        {
+          title: 'قوانین جدید بار همراه در پروازهای بین‌المللی',
+          slug: 'intl-baggage-rules',
+          body: 'از ابتدای مرداد، محدودیت‌های جدیدی برای بار همراه در پروازهای بین‌المللی اعمال می‌شود…',
+          category: 'NEWS',
+          status: 'PUBLISHED',
+          authorId: siteAdmin.id,
+          viewCount: 3105,
+          publishedAt: new Date(Date.now() - 7 * 24 * 3_600_000),
+        },
+        {
+          title: 'چطور با امتیاز باشگاه بلیط رایگان بگیریم؟',
+          slug: 'club-free-ticket-draft',
+          body: 'اعضای باشگاه مشتریان blujet می‌توانند با جمع‌آوری امتیاز، بلیط رایگان دریافت کنند…',
+          category: 'GUIDE',
+          status: 'DRAFT',
+          authorId: siteAdmin.id,
+          viewCount: 0,
+        },
+        {
+          title: 'تخفیف ویژهٔ پروازهای استانبول تا پایان مرداد',
+          slug: 'istanbul-offer-scheduled',
+          body: 'تا پایان مرداد ۱۴۰۵، ۱۵٪ تخفیف روی پروازهای مستقیم تهران–استانبول اعمال می‌شود…',
+          category: 'OFFERS',
+          status: 'SCHEDULED',
+          authorId: siteAdmin.id,
+          viewCount: 0,
+          scheduledAt: new Date(Date.now() + 14 * 24 * 3_600_000),
+        },
+      ],
+    });
+  }
+
+  // ── Phase E: site content CMS (home banners, routes, destinations) ───
+  const existingRouteHighlights = await typeorm.siteRouteHighlight.count();
+  if (existingRouteHighlights === 0) {
+    await typeorm.siteContentBlock.createMany({
+      data: [
+        {
+          key: 'HERO_BANNER',
+          enabled: true,
+          title: 'پرواز بعدی‌ات را با blujet رزرو کن',
+          subtitle:
+            'بیش از ۲۰۰ مقصد داخلی و بین‌المللی، با بهترین قیمت، پشتیبانی شبانه‌روزی و امتیاز در هر سفر.',
+          buttonText: 'مشاهده پیشنهادهای ویژه',
+          badgeText: 'در هر پرواز تا ۵٪ کش‌بک بگیرید',
+          updatedById: siteAdmin.id,
+        },
+        {
+          key: 'ANNOUNCEMENT_BAR',
+          enabled: true,
+          title:
+            'اطلاعیه مهم: برخی پروازهای امروز به‌دلیل شرایط جوی با تأخیر انجام می‌شوند — آخرین وضعیت پروازها را بررسی کنید',
+          subtitle: '',
+          buttonText: 'مشاهده',
+          badgeText: '',
+          updatedById: siteAdmin.id,
+        },
+        {
+          key: 'PROMO_BANNER',
+          enabled: true,
+          title: 'تا ۴۰٪ تخفیف روی پروازهای خارجی',
+          subtitle:
+            'رزرو تا پایان مرداد برای سفرهای تابستان — صندلی‌ها محدودند، فرصت را از دست نده.',
+          buttonText: 'مشاهده پروازها',
+          badgeText: 'حراج تابستانه blujet',
+          updatedById: siteAdmin.id,
+        },
+      ],
+      skipDuplicates: true,
+    });
+    await typeorm.siteRouteHighlight.createMany({
+      data: [
+        { fromAirportCode: 'THR', toAirportCode: 'MHD', priceIrr: 16_000_000n, sortOrder: 0 },
+        { fromAirportCode: 'THR', toAirportCode: 'IST', priceIrr: 42_000_000n, sortOrder: 1 },
+        { fromAirportCode: 'THR', toAirportCode: 'DXB', priceIrr: 38_000_000n, sortOrder: 2 },
+        { fromAirportCode: 'MHD', toAirportCode: 'KIH', priceIrr: 21_000_000n, sortOrder: 3 },
+        { fromAirportCode: 'SYZ', toAirportCode: 'THR', priceIrr: 14_500_000n, sortOrder: 4 },
+      ],
+    });
+    await typeorm.siteDestinationHighlight.createMany({
+      data: [
+        { airportCode: 'IST', priceIrr: 42_000_000n, sortOrder: 0 },
+        { airportCode: 'DXB', priceIrr: 38_000_000n, sortOrder: 1 },
+        { airportCode: 'MHD', priceIrr: 16_000_000n, sortOrder: 2 },
+        { airportCode: 'KIH', priceIrr: 21_000_000n, sortOrder: 3 },
+      ],
+    });
+  }
+
   // ── Phase 6: pricing proposals (one pending, one registered) ───────────
   const existingProposalCount = await typeorm.farePricingProposal.count();
   if (existingProposalCount === 0) {

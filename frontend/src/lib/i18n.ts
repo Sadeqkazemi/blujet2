@@ -47,6 +47,7 @@ const DICT = {
   footerContact: { fa: 'تماس با ما', en: 'Contact Us', ar: 'اتصل بنا' },
   footerTerms: { fa: 'قوانین و مقررات', en: 'Terms & Conditions', ar: 'الشروط والأحكام' },
   footerCareers: { fa: 'فرصت‌های شغلی', en: 'Careers', ar: 'الوظائف' },
+  footerBlog: { fa: 'بلاگ', en: 'Blog', ar: 'المدونة' },
   footerHelpCenter: { fa: 'مرکز راهنما', en: 'Help Center', ar: 'مركز المساعدة' },
   footerFaq: { fa: 'سوالات متداول', en: 'FAQ', ar: 'الأسئلة الشائعة' },
   footerPhone: { fa: '۰۲۱ — ۹۱۰۰۰۰۰۰', en: '021 — 91000000', ar: '٠٢١ — ٩١٠٠٠٠٠٠' },

@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import { submitContactMessage } from '../../api/contact';
+import { fetchPublicSupportContact, fetchPublicSiteContent } from '../../api/settings';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import { arDigits, faDigits } from '../../lib/fa-format';
 
 // تماس با ما — content matching design-reference/تماس با ما.dc.html.
 // The design's own form requires name+phone+subject+msg (see its onSend
@@ -19,12 +21,38 @@ interface Tr {
   ar: string;
 }
 
-const CHANNELS: { icon: string; bg: string; color: string; title: Tr; value: Tr; ltr: boolean }[] = [
-  { icon: '☎', bg: '#eef4fb', color: '#1668c4', title: { fa: 'تلفن پشتیبانی ۲۴ ساعته', en: '24-Hour Support Line', ar: 'خط الدعم على مدار الساعة' }, value: { fa: '۰۲۱ — ۹۱۰۰۰۰۰۰', en: '021 — 91000000', ar: '٠٢١ — ٩١٠٠٠٠٠٠' }, ltr: true },
-  { icon: '✉', bg: '#fbf6ea', color: '#c47d1a', title: { fa: 'ایمیل', en: 'Email', ar: 'البريد الإلكتروني' }, value: { fa: 'support@blujet.ir', en: 'support@blujet.ir', ar: 'support@blujet.ir' }, ltr: true },
-  { icon: '📍', bg: '#eef9f1', color: '#1f8a5b', title: { fa: 'دفتر مرکزی', en: 'Head Office', ar: 'المكتب الرئيسي' }, value: { fa: 'تهران، خیابان ولیعصر، برج blujet، طبقه ۱۲', en: 'Tehran, Valiasr St, blujet Tower, 12th Floor', ar: 'طهران، شارع ولي‌عصر، برج blujet، الطابق ١٢' }, ltr: false },
-  { icon: '🕑', bg: '#fbf0ef', color: '#d64545', title: { fa: 'ساعات کاری دفتر', en: 'Office Hours', ar: 'ساعات عمل المكتب' }, value: { fa: 'شنبه تا چهارشنبه، ۸ تا ۱۷', en: 'Saturday to Wednesday, 8 to 17', ar: 'من السبت إلى الأربعاء، من الساعة ٨ إلى ١٧' }, ltr: false },
+const FALLBACK_SUPPORT = {
+  phone: '021 — 91000000',
+  email: 'support@blujet.ir',
+};
+
+function formatSupportPhone(phone: string, locale: StoredLocale): string {
+  if (locale === 'en') return phone;
+  if (locale === 'ar') return arDigits(phone);
+  return faDigits(phone);
+}
+
+const STATIC_CHANNELS: { icon: string; bg: string; color: string; title: Tr; value: Tr; ltr: boolean; kind: 'address' | 'hours' }[] = [
+  { icon: '📍', bg: '#eef9f1', color: '#1f8a5b', title: { fa: 'دفتر مرکزی', en: 'Head Office', ar: 'المكتب الرئيسي' }, value: { fa: 'تهران، خیابان ولیعصر، برج blujet، طبقه ۱۲', en: 'Tehran, Valiasr St, blujet Tower, 12th Floor', ar: 'طهران، شارع ولي‌عصر، برج blujet، الطابق ١٢' }, ltr: false, kind: 'address' },
+  { icon: '🕑', bg: '#fbf0ef', color: '#d64545', title: { fa: 'ساعات کاری دفتر', en: 'Office Hours', ar: 'ساعات عمل المكتب' }, value: { fa: 'شنبه تا چهارشنبه، ۸ تا ۱۷', en: 'Saturday to Wednesday, 8 to 17', ar: 'من السبت إلى الأربعاء، من الساعة ٨ إلى ١٧' }, ltr: false, kind: 'hours' },
 ];
+
+const SUPPORT_CHANNEL_META = {
+  phone: {
+    icon: '☎',
+    bg: '#eef4fb',
+    color: '#1668c4',
+    title: { fa: 'تلفن پشتیبانی ۲۴ ساعته', en: '24-Hour Support Line', ar: 'خط الدعم على مدار الساعة' },
+    ltr: true,
+  },
+  email: {
+    icon: '✉',
+    bg: '#fbf6ea',
+    color: '#c47d1a',
+    title: { fa: 'ایمیل', en: 'Email', ar: 'البريد الإلكتروني' },
+    ltr: true,
+  },
+} as const;
 
 const STR: Record<StoredLocale, {
   heroTitle: string;
@@ -90,6 +118,8 @@ export default function ContactPage() {
   const { locale } = useLocale();
   const isMobile = useIsMobile();
   const t = STR[locale];
+  const [supportContact, setSupportContact] = useState(FALLBACK_SUPPORT);
+  const [officeAddress, setOfficeAddress] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [subject, setSubject] = useState('');
@@ -99,6 +129,42 @@ export default function ContactPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const canSubmit = name.trim() && phone.trim() && subject.trim() && msg.trim();
+
+  useEffect(() => {
+    fetchPublicSupportContact()
+      .then((res) => {
+        setSupportContact({
+          phone: res.phone.trim() || FALLBACK_SUPPORT.phone,
+          email: res.email.trim() || FALLBACK_SUPPORT.email,
+        });
+      })
+      .catch(() => {
+        /* keep static fallbacks */
+      });
+    fetchPublicSiteContent()
+      .then((res) => setOfficeAddress(res.contactAddress.trim() || null))
+      .catch(() => {
+        /* keep static fallbacks */
+      });
+  }, []);
+
+  const channels = [
+    {
+      ...SUPPORT_CHANNEL_META.phone,
+      value: formatSupportPhone(supportContact.phone, locale),
+    },
+    {
+      ...SUPPORT_CHANNEL_META.email,
+      value: supportContact.email,
+    },
+    ...STATIC_CHANNELS.map((c) => ({
+      ...c,
+      value:
+        c.kind === 'address' && locale === 'fa' && officeAddress
+          ? officeAddress
+          : c.value[locale],
+    })),
+  ];
 
   async function onSubmit() {
     if (!canSubmit) return;
@@ -128,15 +194,15 @@ export default function ContactPage() {
 
       <div style={{ maxWidth: 1080, margin: '0 auto', padding: '31px 22px 55px', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.2fr', gap: 22, alignItems: 'start' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {CHANNELS.map((c) => (
+          {channels.map((c) => (
             <div key={c.title.fa} style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 15, padding: '16px 17px', display: 'flex', alignItems: 'center', gap: 13 }}>
               <div style={{ width: 44, height: 44, borderRadius: 12, background: c.bg, color: c.color, fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
                 {c.icon}
               </div>
               <div>
                 <div style={{ fontSize: 12.5, fontWeight: 800, color: '#0d2640' }}>{c.title[locale]}</div>
-                <div style={{ fontSize: 12, color: '#5a6678', marginTop: 3 }} dir={c.ltr ? 'ltr' : undefined}>
-                  {c.value[locale]}
+                <div data-testid={c.title.en === 'Email' ? 'contact-support-email' : c.title.en === '24-Hour Support Line' ? 'contact-support-phone' : undefined} style={{ fontSize: 12, color: '#5a6678', marginTop: 3 }} dir={c.ltr ? 'ltr' : undefined}>
+                  {c.value}
                 </div>
               </div>
             </div>
