@@ -517,8 +517,14 @@ describe('Club (e2e)', () => {
 
   // ── Customer self-service (user panel club tab) ───────────────────────
 
-  async function linkMemberToUser(memberId: string, userId: string, points: number) {
-    await typeorm.clubPointsEntry.deleteMany({ where: { clubMemberId: memberId } });
+  async function linkMemberToUser(
+    memberId: string,
+    userId: string,
+    points: number,
+  ) {
+    await typeorm.clubPointsEntry.deleteMany({
+      where: { clubMemberId: memberId },
+    });
     await typeorm.clubPointsEntry.create({
       data: { clubMemberId: memberId, type: 'EARN', signedPoints: points },
     });
