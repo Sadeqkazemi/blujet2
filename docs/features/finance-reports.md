@@ -65,6 +65,25 @@ change field).
       empty/too-short one) and removes the row from the list on success —
       same test, both assertions
 
+## Finance panel alignment (2026-07-31)
+
+Design reference: `design-reference-v2/پنل مدیر مالی.dc.html`. Nav for
+`FINANCE_MANAGER` matches design exactly (7 tabs — `flightops` removed).
+
+### Backend
+- [x] `GET /reporting/finance-dashboard-stats` (FINANCE_MANAGER only): active agencies, passengers/tickets/revenue this month with month-over-month trend pct — `'GET /reporting/finance-dashboard-stats: finance manager gets real dashboard cards; other roles 403'`
+- [x] `GET /reporting/kpis` now includes `trends` (revenue/profit/cost/debt pct vs previous period) — `'GET /reporting/kpis: returns trend percentages alongside KPI values'`
+- [x] `GET /reporting/recent-transactions` rows include `statusFa` + `statusTone` — extended assertion in existing recent-transactions test
+
+### Frontend
+- [x] FINANCE_MANAGER gets a dedicated `FinanceDashboardPage` (4 stat cards, sales chart, cartable widget) via `DashboardRouter` — `FinanceDashboardPage.test.tsx`
+- [x] `FinancePage` finance-ops view: period picker, KPI trend badges, transaction status pills, multiple low-sales alerts — existing `FinancePage.test.tsx` (mocks updated)
+- [x] `AgencyDetailPage`: FINANCE_MANAGER sees issued invoices with pay/remind (no issue button) — `AgencyDetailPage.test.tsx`
+
+### Tests
+- Backend e2e: 12 tests in `finance-reports.e2e-spec.ts` (+2 new)
+- Frontend: `FinanceDashboardPage.test.tsx` (+1 test)
+
 ## Deferred (scoped out with reasons, not silently dropped)
 - Excel/PDF export buttons — mock-only toasts in the design, consistent with every prior phase's deferral.
 - The finance mock's `finMonths` income/expense chart — computed in the mock script but never rendered in any panel's markup (orphaned).

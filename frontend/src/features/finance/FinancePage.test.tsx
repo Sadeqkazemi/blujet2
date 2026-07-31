@@ -24,6 +24,12 @@ const KPIS: KpiResult = {
   operatingCostIrr: 3_800_000_000,
   agencyDebtIrr: 900_000_000,
   agencyDebtCount: 2,
+  trends: {
+    revenuePct: 12,
+    profitPct: 8,
+    operatingCostPct: -3,
+    agencyDebtPct: 0,
+  },
 };
 
 const FLIGHTS: CompletedFlightsSummary = {
@@ -52,6 +58,8 @@ const TX: RecentTransactionsResult = {
       party: 'آژانس blujet',
       occurredAt: '2026-07-10T10:00:00.000Z',
       signedAmountIrr: -450_000_000,
+      statusFa: 'موفق',
+      statusTone: 'success',
     },
   ],
 };
