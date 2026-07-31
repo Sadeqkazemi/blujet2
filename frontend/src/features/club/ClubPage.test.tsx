@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import ClubPage from './ClubPage';
 import * as clubApi from '../../api/club';
 import * as useAuthModule from '../../hooks/useAuth';
+import { mockAuthUserWithRole } from '../../test/mockAuthUser';
 import type { ClubCardRequest, ClubMembersResult } from '../../types/club';
 import type { Role } from '../../types/auth';
 
@@ -64,7 +65,7 @@ const CHAIR_REQ: ClubCardRequest = {
 function mockRole(role: Role) {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status: 'authenticated',
-    user: { id: 'u1', fullName: 'کاربر تست', role },
+    user: mockAuthUserWithRole(role),
     requestLogin: vi.fn(),
     confirmTwoFactor: vi.fn(),
     agencyLogin: vi.fn(),

@@ -6,6 +6,7 @@ import * as reportingApi from '../../api/reporting';
 import * as agenciesApi from '../../api/agencies';
 import * as reconciliationApi from '../../api/reconciliation';
 import * as useAuthModule from '../../hooks/useAuth';
+import { mockAuthUserWithRole } from '../../test/mockAuthUser';
 import type { Role } from '../../types/auth';
 import type {
   AgencySettlementsResult,
@@ -84,7 +85,7 @@ const RECONCILIATION_ITEM: ReconciliationItem = {
 function mockRole(role: Role) {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status: 'authenticated',
-    user: { id: 'u1', fullName: 'کاربر تست', role },
+    user: mockAuthUserWithRole(role),
     requestLogin: vi.fn(),
     confirmTwoFactor: vi.fn(),
     agencyLogin: vi.fn(),
