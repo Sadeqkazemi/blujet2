@@ -1,10 +1,15 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common';
+import * as fs from 'node:fs';
 import { TypeORMService } from '../../typeorm/typeorm.service';
 import { ErrorCode } from '../../common/errors';
 import { FilesService } from '../files/files.service';
+import { AuditService } from '../audit/audit.service';
+import { decryptPii } from '../../common/pii-crypto';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { CustomerIdentityStatus } from '../../../generated/typeorm/client';
 
@@ -13,6 +18,7 @@ export class IdentityVerificationService {
   constructor(
     private readonly typeorm: TypeORMService,
     private readonly files: FilesService,
+    private readonly audit: AuditService,
   ) {}
 
   private profileIdentityComplete(user: {
@@ -20,7 +26,9 @@ export class IdentityVerificationService {
     nationalIdEnc: string | null;
     birthDate: Date | null;
   }): boolean {
-    return Boolean(user.fullName?.trim() && user.nationalIdEnc && user.birthDate);
+    return Boolean(
+      user.fullName?.trim() && user.nationalIdEnc && user.birthDate,
+    );
   }
 
   private async getOrCreateRow(userId: string) {
@@ -157,5 +165,143 @@ export class IdentityVerificationService {
       },
     });
     return this.getMine(user);
+  }
+
+  // ── SITE_ADMIN review queue ─────────────────────────────────────────
+
+  /** NOT_STARTED rows (customer opened the tab but never submitted) are
+   * not reviewable — the admin queue only lists submitted/decided ones. */
+  async adminList() {
+    const rows = await this.typeorm.customerIdentityVerification.findMany({
+      where: { status: { not: 'NOT_STARTED' } },
+      include: {
+        user: {
+          select: {
+            fullName: true,
+            phone: true,
+            nationalIdEnc: true,
+            birthDate: true,
+          },
+        },
+      },
+      orderBy: [{ submittedAt: 'desc' }],
+    });
+    const fileIds = rows
+      .map((r) => r.idCardFileId)
+      .filter((id): id is string => Boolean(id));
+    const files = await this.typeorm.storedFile.findMany({
+      where: { id: { in: fileIds } },
+      select: { id: true, fileName: true },
+    });
+    const fileNameById = new Map(files.map((f) => [f.id, f.fileName]));
+
+    return rows.map((r) => ({
+      id: r.id,
+      fullName: r.user.fullName,
+      phone: r.user.phone,
+      nationalId: r.user.nationalIdEnc
+        ? decryptPii(r.user.nationalIdEnc)
+        : null,
+      birthDate: r.user.birthDate,
+      status: r.status,
+      submittedAt: r.submittedAt,
+      reviewedAt: r.reviewedAt,
+      rejectReason: r.rejectReason,
+      idCardFileName: r.idCardFileId
+        ? (fileNameById.get(r.idCardFileId) ?? null)
+        : null,
+    }));
+  }
+
+  private async adminRequireRow(id: string) {
+    const row = await this.typeorm.customerIdentityVerification.findUnique({
+      where: { id },
+      include: { user: { select: { fullName: true, phone: true } } },
+    });
+    if (!row) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'درخواست احراز هویت یافت نشد.',
+      });
+    }
+    return row;
+  }
+
+  /** Streams the customer's id-card by verification id after the SITE_ADMIN
+   * role guard — a dedicated staff surface like careers' resume download,
+   * instead of loosening the general /files ACL for all staff. */
+  async adminGetIdCard(id: string) {
+    const row = await this.adminRequireRow(id);
+    if (!row.idCardFileId) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'برای این درخواست کارت ملی بارگذاری نشده است.',
+      });
+    }
+    const stored = await this.typeorm.storedFile.findUnique({
+      where: { id: row.idCardFileId },
+    });
+    if (!stored || !fs.existsSync(stored.path)) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'محتوای فایل در دسترس نیست.',
+      });
+    }
+    return {
+      fileName: stored.fileName,
+      mimeType: stored.mimeType,
+      stream: fs.createReadStream(stored.path),
+    };
+  }
+
+  private async adminRequireSubmitted(id: string) {
+    const row = await this.adminRequireRow(id);
+    if (row.status !== 'SUBMITTED') {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'فقط درخواست‌های در انتظار بررسی قابل تأیید یا رد هستند.',
+      });
+    }
+    return row;
+  }
+
+  async adminApprove(actor: AuthenticatedUser, id: string) {
+    const row = await this.adminRequireSubmitted(id);
+    const updated = await this.typeorm.customerIdentityVerification.update({
+      where: { id },
+      data: { status: 'APPROVED', reviewedAt: new Date(), rejectReason: null },
+    });
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'ACCOUNT',
+      action: 'تأیید احراز هویت مشتری',
+      detail: `${actor.fullName} احراز هویت «${row.user.fullName}» را تأیید کرد.`,
+      entityType: 'CustomerIdentityVerification',
+      entityId: updated.id,
+    });
+    return { id: updated.id, status: updated.status };
+  }
+
+  async adminReject(
+    actor: AuthenticatedUser,
+    id: string,
+    rejectReason: string,
+  ) {
+    const row = await this.adminRequireSubmitted(id);
+    const updated = await this.typeorm.customerIdentityVerification.update({
+      where: { id },
+      data: { status: 'REJECTED', reviewedAt: new Date(), rejectReason },
+    });
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'ACCOUNT',
+      action: 'رد احراز هویت مشتری',
+      detail: `${actor.fullName} احراز هویت «${row.user.fullName}» را رد کرد: ${rejectReason}`,
+      entityType: 'CustomerIdentityVerification',
+      entityId: updated.id,
+    });
+    return { id: updated.id, status: updated.status };
   }
 }
