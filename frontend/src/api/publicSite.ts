@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPatch, apiPost } from './http';
+import { apiDelete, apiGet, apiPatch, apiPost, apiPostForm } from './http';
 import type {
   Airport,
   BookingDetail,
@@ -10,6 +10,7 @@ import type {
   SavedPassenger,
   SavedBankAccount,
   CustomerReferralDashboard,
+  CustomerIdentityView,
   ActiveSession,
   SearchFlightResult,
   SeatMapResult,
@@ -184,6 +185,23 @@ export function removeBankAccount(id: string) {
 
 export function fetchMyReferral() {
   return apiGet<CustomerReferralDashboard>('/my/referral');
+}
+
+export function fetchMyIdentity() {
+  return apiGet<CustomerIdentityView>('/my/identity');
+}
+
+export function uploadIdentityIdCard(file: File) {
+  const form = new FormData();
+  form.append('file', file);
+  return apiPostForm<{ id: string; fileName: string; sizeBytes: number }>(
+    '/my/identity/id-card',
+    form,
+  );
+}
+
+export function submitIdentityVerification() {
+  return apiPost<CustomerIdentityView>('/my/identity/submit');
 }
 
 export function fetchMySessions() {
