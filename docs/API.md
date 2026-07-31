@@ -1228,6 +1228,70 @@ All endpoints: `JwtAuthGuard` + `RolesGuard` + `PanelAccessGuard`,
   status badges, id-card download, approve button, reject modal with a
   required reason.
 
+### پنل کاربر — استرداد بلیط (`/account` → تب `refunds`)
+Closes the gap between `design-reference-v2/پنل کاربر.dc.html`'s full
+refund tab and the current amount/status-only list. The same
+`RefundPenaltyRule` rows and `computePenalty` function remain authoritative
+for every surface; the browser never decides eligibility or money.
+
+All endpoints below are `JwtAuthGuard` + `RolesGuard`,
+`@Roles('USER')`, owner-scoped, and return the standard response envelope.
+
+- `GET /my/refunds/eligible-bookings` (new) — upcoming owned bookings
+  whose status is `TICKETED|PAID`, which have no prior refund request, and
+  whose current rule is refundable (`penaltyPct < 100`). Each row:
+  `{ bookingId, pnr, flightNo, originCode, destCode, departureAt,
+  totalPaidIrr, hoursLeft, penaltyPct, penaltyAmountIrr, refundableIrr }`.
+  The amounts are a server-computed preview at response time.
+- `GET /my/refunds/rules` (new) — the current four customer-readable
+  brackets sorted by `minHoursBeforeDeparture DESC`:
+  `{ minHoursBeforeDeparture, penaltyPct, labelFa, isRefundable }[]`.
+  This is read-only; BOARD_CHAIR's existing settings endpoint remains the
+  only rule editor.
+- `POST /my/refunds/preview` (new) — body `{ bookingId }`; repeats
+  ownership/status/no-prior-request checks and returns
+  `{ bookingId, totalPaidIrr, hoursLeft, penaltyPct, penaltyAmountIrr,
+  refundableIrr, refundable }`. This is called when opening the confirm
+  modal so a stale list cannot display an old time bracket. 404 for
+  unknown/not-owned booking; 409 when ineligible.
+- `POST /my/refunds` (existing, enriched response) — body
+  `{ bookingId, iban }`. **Always recomputes** eligibility and penalty in
+  the transaction immediately before creating the request; the preview
+  is advisory and is never trusted. Existing IBAN validation/encryption
+  remains. Response uses the enriched customer row below.
+- `GET /my/refunds` (existing, enriched) — customer rows:
+  `{ id, trackingCode, bookingId, pnr, flightNo, originCode, destCode,
+  departureAt, status, totalPaidIrr, penaltyPct, penaltyAmountIrr,
+  refundableIrr, history: [{ step, labelFa, at }], createdAt, paidAt }`.
+  No IBAN or other passenger PII is returned.
+- `GET /my/refunds/:id` (existing, enriched) — same shape; 404 for another
+  user's request. Static routes (`eligible-bookings`, `rules`, `preview`)
+  are declared before `:id`.
+
+Status tracking remains the existing server lifecycle:
+`SUBMITTED → REVIEW → FINANCE → PAID`. The UI renders actual
+`RefundRequest.history` entries plus pending placeholders for the
+remaining stages; it does not fabricate completed timestamps.
+
+Production-flow correction included in this phase: the existing
+`PATCH /refunds/:id/refer` currently assigns a finance user but leaves a
+customer-created request at `SUBMITTED`, while `PATCH /refunds/:id/pay`
+correctly accepts only `FINANCE`; that makes payout unreachable outside
+the E2E-only seeded FINANCE row. When a SITE_ADMIN refers a
+`SUBMITTED|REVIEW` request to an active finance assignee, the operation now
+atomically records the admin-review and finance-referral history entries
+and advances it to `FINANCE`. Reassignment of an already-`FINANCE` request
+does not advance status again. Payment authority remains
+FINANCE_MANAGER-only and step-up protected.
+
+Frontend: a dedicated `AccountRefundsTab` matching the approved design:
+navy intro/KPIs, eligible-flight cards, four live rule cards, submission
+modal with a saved-bank-account selector/manual IBAN fallback and
+server-refreshed breakdown, and request cards with route/PNR/tracking code
+and the four-stage timeline. fa uses Jalali/Persian digits, en uses the
+design's English copy/LTR, ar uses RTL Arabic copy with the shared fallback
+rules.
+
 ## Phase 21 — فراموشی رمز (customer forgot/set password)
 
 Third "dead forms" item. `ForgotPasswordPage.tsx` was entirely client-side

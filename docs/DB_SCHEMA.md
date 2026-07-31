@@ -229,17 +229,34 @@ banner: «۱ پیشنهاد مدیر بازرگانی → ۲ تحلیل هوش �
 ## Phase 7 — Refunds
 
 Grounded in extraction of the Finance Manager's استرداد بلیط tab (the
-primary payout surface), the customer/site-admin submission flow (their
-tracks, not built here), and `site-data.js`'s `refunds` shapes. Lifecycle:
+primary payout surface), the customer/site-admin submission flow, and
+`site-data.js`'s `refunds` shapes. Lifecycle:
 مشتری ثبت → ادمین سایت ارجاع → مدیر مالی پرداخت, tracked as
 `SUBMITTED → REVIEW → FINANCE → PAID`.
 
-- `RefundRequest { id, bookingId→Booking, passengerName, nidEnc?/mobileEnc? (PII encrypted like everywhere else — the mocks store plaintext), ibanEnc (24-digit شبا, encrypted at rest, returned only to the finance surface), totalPaidIrr, penaltyPct, penaltyAmountIrr, refundableIrr, status: SUBMITTED|REVIEW|FINANCE|PAID, assigneeId→User? (finance staffer — the design's refer sets assignee WITHOUT advancing status; payment still happens from the finance manager's view), processedById→User?, paidAt?, history Json[] of {step, labelFa, at}, createdAt }` — real FK to Booking (⚑ fixes the mocks' `RF-{length+1044}` id-collision scheme).
+- `RefundRequest { id, trackingCode String @unique, bookingId String @unique→Booking, passengerName, nidEnc?/mobileEnc? (PII encrypted like everywhere else — the mocks store plaintext), ibanEnc (24-digit شبا, encrypted at rest, returned only to the finance surface), totalPaidIrr, penaltyPct, penaltyAmountIrr, refundableIrr, status: SUBMITTED|REVIEW|FINANCE|PAID, assigneeId→User? (finance staffer; SITE_ADMIN referral of a customer-created request advances it to FINANCE, while later finance reassignment only changes the assignee), processedById→User?, paidAt?, history Json[] of {step, labelFa, at}, createdAt }` — real FK to Booking. `trackingCode` is generated server-side as an opaque short `RF-XXXXXXXX` code with collision retry; it is display/search identity only, never authorization. Existing rows are backfilled in the migration before the unique/not-null constraint is applied (⚑ fixes the mocks' `RF-{length+1044}` id-collision scheme without exposing UUIDs as customer tracking codes).
 - `RefundPenaltyRule { id, minHoursBeforeDeparture, penaltyPct, labelFa }` — ⚑ the mocks contain THREE inconsistent penalty schemes (customer engine: 30/50/70/100 by hours-to-departure; a dead two-bracket 30/80 settings editor; seeds hardcoding ٪۳۰). The customer panel's 4-bracket engine is the only actually-executed rule, so it becomes the seeded, server-side source of truth: ≥72h→30٪, 24–72h→50٪, 3–24h→70٪, <3h→100٪ (غیرقابل استرداد). Penalty is computed server-side at request creation; the static settings editor is dead UI and is not built.
 - ⚑ **Real financial effect on pay** (the mocks only flip a status field): `PATCH pay` runs in one transaction — `LedgerEntry(type=REFUND, signedAmountIrr = −refundableIrr, bookingId, createdBy)`, `Booking.status → REFUNDED`, request → `PAID` + `processedById/paidAt` + history row, `AuditLog(category=REFUND)`. Double-pay guarded (409). The actual bank transfer to the شبا stays out-of-band until the PaymentGateway lands on the public track — the ledger row is the system of record.
-- No reject action exists anywhere in the finance design — none is built (status enum stays minimal; a site-admin-side rejection belongs to that track).
-- `REVIEW` is unreachable via any mock action (admin refer jumps straight to FINANCE) — kept in the enum for the site-admin track's future use; this track never sets it.
-- Submission/site-admin referral belong to the customer/site-admin tracks — until they land, requests come from seed + the established non-production `_test` hook pattern for E2E.
+- No reject action exists anywhere in the finance design — none is built;
+  the status enum stays minimal.
+- `REVIEW` remains a valid imported/migration state. The real SITE_ADMIN
+  refer operation accepts `SUBMITTED|REVIEW`, appends both actual review
+  and finance-referral history events, and commits `FINANCE` atomically;
+  no read endpoint mutates status merely because an admin opened a row.
+- Customer submission and SITE_ADMIN/finance processing are now real. The
+  account-tab completion adds no other table: eligible bookings are a
+  server query over owned `Booking` + `FlightInstance` with
+  `NOT EXISTS RefundRequest`; rule cards read `RefundPenaltyRule`; tracking
+  uses the existing `history` JSON. Only `RefundRequest.trackingCode`
+  requires a migration.
+- Penalty previews are never persisted and never authoritative. The
+  submission transaction re-reads the booking, locks/guards the one-request
+  invariant, recomputes the current bracket, and stores the resulting
+  integer IRR snapshot (`totalPaidIrr`, `penaltyAmountIrr`,
+  `refundableIrr`). A unique `bookingId` constraint is added to
+  `RefundRequest` so two concurrent submissions for one booking cannot
+  both succeed; the service maps the losing insert to stable 409
+  `CONFLICT`.
 
 ## Phase 8 — Employee management (IT Manager)
 
