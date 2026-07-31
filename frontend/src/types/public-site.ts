@@ -185,13 +185,53 @@ export type PayResult = PayResultOk | PayResultPriceChanged;
 
 export interface RefundRequestView {
   id: string;
+  trackingCode: string;
   bookingId: string;
+  pnr: string;
+  flightNo: string;
+  originCode: string;
+  destCode: string;
+  departureAt: string;
   status: 'SUBMITTED' | 'REVIEW' | 'FINANCE' | 'PAID';
   penaltyPct: number;
   penaltyAmountIrr: number;
   refundableIrr: number;
   totalPaidIrr: number;
+  history: { step: string; labelFa: string; at: string }[];
   createdAt: string;
+  paidAt: string | null;
+}
+
+export interface EligibleRefundBooking {
+  bookingId: string;
+  pnr: string;
+  flightNo: string;
+  originCode: string;
+  destCode: string;
+  departureAt: string;
+  totalPaidIrr: number;
+  hoursLeft: number;
+  penaltyPct: number;
+  penaltyAmountIrr: number;
+  refundableIrr: number;
+  refundable: boolean;
+}
+
+export interface CustomerRefundRule {
+  minHoursBeforeDeparture: number;
+  penaltyPct: number;
+  labelFa: string;
+  isRefundable: boolean;
+}
+
+export interface RefundPreview {
+  bookingId: string;
+  totalPaidIrr: number;
+  hoursLeft: number;
+  penaltyPct: number;
+  penaltyAmountIrr: number;
+  refundableIrr: number;
+  refundable: boolean;
 }
 
 export interface UserProfile {

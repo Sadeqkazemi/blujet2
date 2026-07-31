@@ -163,6 +163,7 @@ describe('Phase 19 — anonymous manage-booking self-service (e2e)', () => {
       expect(res.body.data.penaltyAmountIrr + res.body.data.refundableIrr).toBe(
         priceIrr,
       );
+      expect(res.body.data.trackingCode).toMatch(/^RF-[A-F0-9]{8}$/);
       expect(res.body.data.ibanEnc).toBeUndefined();
     });
 

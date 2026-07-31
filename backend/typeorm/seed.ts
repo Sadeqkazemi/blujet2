@@ -1008,11 +1008,26 @@ async function main() {
           ],
         },
       ];
-      for (const r of refundSeeds) {
+      for (const [index, r] of refundSeeds.entries()) {
         const penaltyAmountIrr = Math.round((r.totalPaidIrr * r.penaltyPct) / 100);
+        const refundBooking = await typeorm.booking.create({
+          data: {
+            pnr: `RFSEED${String(index + 1).padStart(2, '0')}`,
+            flightInstanceId: someBooking.flightInstanceId,
+            channel: someBooking.channel,
+            status: r.status === 'PAID' ? 'REFUNDED' : 'TICKETED',
+            priceIrr: r.totalPaidIrr,
+            taxIrr: someBooking.taxIrr,
+            userId: someBooking.userId,
+            contactPhone: someBooking.contactPhone,
+            cabin: someBooking.cabin,
+            fareClassCode: someBooking.fareClassCode,
+          },
+        });
         const created = await typeorm.refundRequest.create({
           data: {
-            bookingId: someBooking.id,
+            trackingCode: `RF-${String(index + 1).padStart(8, '0')}`,
+            bookingId: refundBooking.id,
             passengerName: r.passengerName,
             nidEnc: encryptPii('0012345679'),
             mobileEnc: encryptPii('09121112233'),
@@ -1031,7 +1046,7 @@ async function main() {
         if (r.status === 'PAID') {
           await typeorm.ledgerEntry.create({
             data: {
-              bookingId: someBooking.id,
+              bookingId: refundBooking.id,
               type: 'REFUND',
               signedAmountIrr: -created.refundableIrr,
               createdById: financeManager.id,

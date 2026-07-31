@@ -3494,6 +3494,61 @@
         ]
       }
     },
+    "/my/refunds/eligible-bookings": {
+      "get": {
+        "operationId": "RefundsCustomerController_eligibleBookings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست رزروهای قابل استرداد با پیش‌نمایش جریمه",
+        "tags": [
+          "refunds"
+        ]
+      }
+    },
+    "/my/refunds/rules": {
+      "get": {
+        "operationId": "RefundsCustomerController_rules",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "قوانین جاری جریمه استرداد برای نمایش به مشتری",
+        "tags": [
+          "refunds"
+        ]
+      }
+    },
+    "/my/refunds/preview": {
+      "post": {
+        "operationId": "RefundsCustomerController_preview",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewRefundDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "بازمحاسبه مالکیت، امکان استرداد و جریمه پیش از تأیید",
+        "tags": [
+          "refunds"
+        ]
+      }
+    },
     "/my/refunds/{id}": {
       "get": {
         "operationId": "RefundsCustomerController_getMine",
@@ -7807,7 +7862,9 @@
         "type": "object",
         "properties": {
           "bookingId": {
-            "type": "string"
+            "type": "string",
+            "description": "شناسه رزرو متعلق به مشتری جاری",
+            "example": "c2c3954d-b315-40d2-a663-bad2d310bec2"
           },
           "iban": {
             "type": "string",
@@ -7818,6 +7875,19 @@
         "required": [
           "bookingId",
           "iban"
+        ]
+      },
+      "PreviewRefundDto": {
+        "type": "object",
+        "properties": {
+          "bookingId": {
+            "type": "string",
+            "description": "شناسه رزرو متعلق به مشتری جاری",
+            "example": "c2c3954d-b315-40d2-a663-bad2d310bec2"
+          }
+        },
+        "required": [
+          "bookingId"
         ]
       },
       "LockSeatDto": {

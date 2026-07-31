@@ -1373,6 +1373,20 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   demo-booking loop was also made idempotent (`Booking.upsert` plus
   passenger/SALE existence checks): running the seed twice had previously
   failed on globally unique demo PNRs after flight instances changed.
+- [x] **User panel — complete refund tab (account refunds)** — closes the
+  gap between `design-reference-v2/پنل کاربر.dc.html` and the previous
+  amount/status-only list: live eligible bookings + penalty previews,
+  API-driven four-bracket rules, saved-bank/manual-IBAN confirmation,
+  short tracking codes and real four-stage history. Backend adds
+  `GET /my/refunds/eligible-bookings|rules`, `POST /my/refunds/preview`,
+  enriched list/detail/submit responses, unique tracking/booking
+  constraints (including a two-client concurrency test), and fixes the
+  previously unreachable production payout path by advancing SITE_ADMIN
+  referrals to `FINANCE`. Frontend: `AccountRefundsTab` in fa/en/ar +
+  responsive states and a real Playwright account-refund journey. Full
+  clean-database backend E2E: 429/429; frontend: 366/366; focused
+  Playwright journey: 1/1; see
+  `docs/features/customer-account-refunds.md`.
 - [x] **Bug fix (senior review, found while chasing the "pre-existing"
   reporting flake): revenue reporting polluted by agency debt-calibration
   ledger rows.** The `reporting.e2e-spec.ts` sales-chart/kpis

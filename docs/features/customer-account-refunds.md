@@ -9,35 +9,35 @@ finance payout remain compatible and use the same penalty engine.
 
 ## Database and concurrency
 
-- [ ] Migration adds non-null unique `RefundRequest.trackingCode`
+- [x] Migration adds non-null unique `RefundRequest.trackingCode`
       (`RF-XXXXXXXX`) and backfills existing rows without exposing UUIDs.
-- [ ] Migration adds unique `RefundRequest.bookingId`; two concurrent
+- [x] Migration adds unique `RefundRequest.bookingId`; two concurrent
       submissions for one booking yield exactly one request and one stable
       409 response.
-- [ ] Seed creates realistic requests in multiple lifecycle states with
+- [x] Seed creates realistic requests in multiple lifecycle states with
       history and tracking codes; existing refund/payment tests remain green.
 
 ## Customer API
 
-- [ ] `GET /my/refunds/eligible-bookings` is USER-only and owner-scoped;
+- [x] `GET /my/refunds/eligible-bookings` is USER-only and owner-scoped;
       returns only `TICKETED|PAID`, no-prior-request bookings with current
       server-computed penalty/refundable amounts; excludes <3h/100% cases.
-- [ ] `GET /my/refunds/rules` returns the authoritative four brackets in
+- [x] `GET /my/refunds/rules` returns the authoritative four brackets in
       descending threshold order; no customer write surface exists.
-- [ ] `POST /my/refunds/preview` validates ownership and eligibility and
+- [x] `POST /my/refunds/preview` validates ownership and eligibility and
       recomputes the current rule; unknown/not-owned is 404, ineligible is
       409, malformed body is 400.
-- [ ] `POST /my/refunds` recomputes rather than trusting preview values,
+- [x] `POST /my/refunds` recomputes rather than trusting preview values,
       validates/encrypts IBAN, creates tracking/history, and returns the
       enriched customer row.
-- [ ] `GET /my/refunds` and `GET /my/refunds/:id` return route, PNR,
+- [x] `GET /my/refunds` and `GET /my/refunds/:id` return route, PNR,
       flight/departure, tracking code, amount snapshot and history; never
       return IBAN or passenger PII; detail is owner-only.
-- [ ] Staff/agency roles receive 403 on every `/my/refunds/*` customer
+- [x] Staff/agency roles receive 403 on every `/my/refunds/*` customer
       endpoint; auth failure is 401.
-- [ ] Existing anonymous manage-booking and ticket-page submissions receive
+- [x] Existing anonymous manage-booking and ticket-page submissions receive
       tracking codes and preserve their response compatibility.
-- [ ] SITE_ADMIN referral fixes the existing unreachable payout path:
+- [x] SITE_ADMIN referral fixes the existing unreachable payout path:
       `SUBMITTED|REVIEW → FINANCE` with admin-review + finance-referral
       history; FINANCE reassignment stays FINANCE; only FINANCE_MANAGER can
       still execute the step-up-protected payout.
@@ -49,23 +49,23 @@ existing `refund-submission.e2e-spec.ts`, `refunds.e2e-spec.ts`, and
 
 ## Frontend
 
-- [ ] `AccountRefundsTab` renders the navy intro/KPIs and correct
+- [x] `AccountRefundsTab` renders the navy intro/KPIs and correct
       loading/error/empty states.
-- [ ] Eligible-flight cards show route, PNR/flight, Jalali local departure,
+- [x] Eligible-flight cards show route, PNR/flight, Jalali local departure,
       time left, penalty and refundable toman using shared formatters.
-- [ ] Four rule cards render from API data (not hardcoded percentages) with
+- [x] Four rule cards render from API data (not hardcoded percentages) with
       the process note from the design.
-- [ ] «درخواست استرداد» opens a modal, refreshes the server preview, offers
+- [x] «درخواست استرداد» opens a modal, refreshes the server preview, offers
       saved bank accounts plus validated manual IBAN fallback, and shows
       paid/penalty/refundable breakdown before confirmation.
-- [ ] Successful submission closes the modal, removes the booking from
+- [x] Successful submission closes the modal, removes the booking from
       eligible cards, and adds its tracking card without a page reload;
       API errors remain visible and do not duplicate requests.
-- [ ] Tracking cards show route, PNR, short tracking code, status, amount and
+- [x] Tracking cards show route, PNR, short tracking code, status, amount and
       four-stage timeline; only actual history entries are marked complete.
-- [ ] fa is RTL/Jalali/Persian digits, en is LTR with design English copy,
+- [x] fa is RTL/Jalali/Persian digits, en is LTR with design English copy,
       ar is RTL with Arabic copy/shared fallback; isolated codes remain LTR.
-- [ ] Responsive layout preserves the design structure on mobile.
+- [x] Responsive layout preserves the design structure on mobile.
 
 Proof target:
 `frontend/src/features/public-site/AccountRefundsTab.test.tsx` and an
@@ -74,8 +74,8 @@ account-page integration test in `AccountPage.test.tsx`; Playwright journey
 
 ## Completion gate
 
-- [ ] TypeORM generate/migrate/seed all succeed.
-- [ ] Backend unit + E2E, frontend Vitest, Playwright journey, lint and
+- [x] TypeORM generate/migrate/seed all succeed.
+- [x] Backend unit + E2E, frontend Vitest, Playwright journey, lint and
       typecheck all pass.
-- [ ] `docs/openapi.json`, `docs/API.md`, `docs/DB_SCHEMA.md`, generated
+- [x] `docs/openapi.json`, `docs/API.md`, `docs/DB_SCHEMA.md`, generated
       frontend types and `PLAN.md` are synchronized after implementation.
