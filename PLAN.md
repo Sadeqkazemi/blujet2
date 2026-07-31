@@ -1512,6 +1512,15 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   just q3/q6/year). Tests: 3 PanelShell + 1 Dashboard month + 1 Finance
   day-mode. See `docs/features/panel-sidebar-badges-day-picker.md`.
 
+- [x] **EMPLOYEE cartable (Phase B)** — permission-gated `cartable` tab for
+  EMPLOYEE (`ct_list` / `ct_process` in `PERMISSION_CATALOG` + `EMPLOYEE_SECTION_NAV`);
+  `GET/PATCH approve /cartable/*`, `POST/GET /cartable/manager-message*`,
+  `GET /cartable/manager-recipients`, `GET /panels/employee-context`; frontend
+  `EmployeeCartablePage` (message-to-manager + «انجام شد ✓») via `CartableRouter`;
+  `EmployeeDashboardPage` KPI cards (open cartable, pending referrals, unit) +
+  permission chips. Tests: 6 backend e2e + 4 EmployeeCartable Vitest + 5
+  EmployeeDashboard Vitest. See `docs/features/employee-cartable.md`.
+
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is
 "done" only when every checklist item in its `docs/features/<name>.md` has

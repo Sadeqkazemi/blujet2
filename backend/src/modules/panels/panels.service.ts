@@ -12,6 +12,7 @@ import {
   PANEL_NAV,
   PanelNavItem,
 } from './panel-nav.config';
+import { PERMISSION_CATALOG } from '../it-manager/permission-catalog';
 import { AuthenticatedUser } from '../../common/types/authenticated-user';
 import { ErrorCode } from '../../common/errors';
 
@@ -53,6 +54,65 @@ export class PanelsService {
     // EMPLOYEE gets the tab now.
     items.push({ key: 'referrals', labelFa: 'ارجاعات', implemented: true });
     return items;
+  }
+
+  /** Dashboard context for پنل کارمند.dc.html — dept label + granted perm chips. */
+  async getEmployeeContext(user: AuthenticatedUser) {
+    if (user.role !== 'EMPLOYEE') {
+      throw new ForbiddenException({
+        code: ErrorCode.FORBIDDEN,
+        message: 'این endpoint فقط برای کارمند است.',
+      });
+    }
+
+    const employee = await this.typeorm.user.findUniqueOrThrow({
+      where: { id: user.id },
+      select: { dept: true, rank: true },
+    });
+
+    const deptLabels: Record<string, string> = {
+      commercial: 'بازرگانی',
+      sales: 'فروش',
+      finance: 'مالی',
+      it: 'فناوری اطلاعات',
+      site: 'پشتیبانی سایت',
+    };
+
+    const grants = await this.typeorm.employeePermission.findMany({
+      where: { employeeId: user.id },
+      select: { permission: { select: { key: true, labelFa: true, sectionKey: true } } },
+    });
+
+    const sectionLabels: Record<string, string> = {
+      dashboard: 'داشبورد',
+      cartable: 'کارتابل',
+      referrals: 'ارجاعات',
+    };
+    for (const entry of PERMISSION_CATALOG) {
+      sectionLabels[entry.sectionKey] = entry.sectionLabelFa;
+    }
+
+    const grantedSectionKeys = new Set<string>();
+    for (const [sectionKey, section] of Object.entries(EMPLOYEE_SECTION_NAV)) {
+      if (section.wiredKeys.some((key) => grants.some((g) => g.permission.key === key))) {
+        grantedSectionKeys.add(sectionKey);
+      }
+    }
+
+    const permissionLabels = [
+      'داشبورد',
+      ...Array.from(grantedSectionKeys)
+        .map((key) => sectionLabels[key] ?? key)
+        .filter((label) => label !== 'داشبورد'),
+      'ارجاعات',
+    ];
+
+    return {
+      dept: employee.dept,
+      deptLabelFa: deptLabels[employee.dept ?? ''] ?? employee.dept ?? '—',
+      rank: employee.rank,
+      permissionLabelsFa: permissionLabels,
+    };
   }
 
   async getAccessFlags(role: AuthenticatedUser['role']) {
