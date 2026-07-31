@@ -426,6 +426,145 @@ export class ClubService {
     return new Date().toISOString();
   }
 
+  private async getMemberPointsBalance(memberId: string): Promise<number> {
+    const sum = await this.prisma.clubPointsEntry.aggregate({
+      where: { clubMemberId: memberId },
+      _sum: { signedPoints: true },
+    });
+    return sum._sum.signedPoints ?? 0;
+  }
+
+  /** Customer self-service: full club membership view for the user panel. */
+  async getMyMembership(userId: string) {
+    const rule = await this.getOrCreateTierRule();
+    const tierRules = {
+      goldMinPoints: rule.goldMinPoints,
+      platinumMinPoints: rule.platinumMinPoints,
+      cardRequestMinPoints: rule.cardRequestMinPoints,
+    };
+
+    const member = await this.prisma.clubMember.findUnique({ where: { userId } });
+    if (!member) {
+      return {
+        isMember: false,
+        level: null,
+        balance: 0,
+        cardStatus: null,
+        cardNo: null,
+        tierRules,
+        cardRequest: null,
+        canRequestCard: false,
+        pointsNeededForCard: rule.cardRequestMinPoints,
+      };
+    }
+
+    const balance = await this.getMemberPointsBalance(member.id);
+    const cardRequest = await this.prisma.clubCardRequest.findFirst({
+      where: {
+        memberId: member.id,
+        status: { in: ['SUBMITTED', 'REFERRED', 'APPROVED'] },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        status: true,
+        history: true,
+        cardNo: true,
+        createdAt: true,
+      },
+    });
+
+    const canRequestCard =
+      member.cardStatus === 'NONE' &&
+      balance >= rule.cardRequestMinPoints &&
+      !cardRequest;
+
+    return {
+      isMember: true,
+      level: member.level,
+      balance,
+      cardStatus: member.cardStatus,
+      cardNo: member.cardNo,
+      tierRules,
+      cardRequest,
+      canRequestCard,
+      pointsNeededForCard: Math.max(rule.cardRequestMinPoints - balance, 0),
+    };
+  }
+
+  /** Customer self-service: submit a membership-card issuance request. */
+  async submitCardRequest(userId: string) {
+    const member = await this.prisma.clubMember.findUnique({ where: { userId } });
+    if (!member) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'عضو باشگاه یافت نشد.',
+      });
+    }
+
+    const rule = await this.getOrCreateTierRule();
+    const balance = await this.getMemberPointsBalance(member.id);
+
+    if (balance < rule.cardRequestMinPoints) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'برای درخواست کارت عضویت به حد نصاب امتیاز نرسیده‌اید.',
+      });
+    }
+
+    if (member.cardStatus === 'ISSUED') {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'کارت عضویت شما قبلاً صادر شده است.',
+      });
+    }
+
+    const pending = await this.prisma.clubCardRequest.findFirst({
+      where: {
+        memberId: member.id,
+        status: { in: ['SUBMITTED', 'REFERRED'] },
+      },
+    });
+    if (pending) {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'درخواست قبلی شما در حال بررسی است.',
+      });
+    }
+
+    const history = [
+      {
+        step: 'submitted',
+        labelFa: 'رسیدن به حد امتیاز و ثبت درخواست صدور کارت',
+        at: this.nowJalaliLabel(),
+      },
+    ];
+
+    return this.prisma.$transaction(async (tx) => {
+      const req = await tx.clubCardRequest.create({
+        data: {
+          memberId: member.id,
+          level: member.level,
+          points: balance,
+          status: 'SUBMITTED',
+          history: history as Prisma.InputJsonValue,
+        },
+        select: {
+          id: true,
+          status: true,
+          history: true,
+          cardNo: true,
+          createdAt: true,
+        },
+      });
+      await tx.clubMember.update({
+        where: { id: member.id },
+        data: { cardStatus: 'REVIEW' },
+      });
+      return req;
+    });
+  }
+
   async decideRequest(
     actor: AuthenticatedUser,
     id: string,

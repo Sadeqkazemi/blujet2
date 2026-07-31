@@ -5,6 +5,7 @@ import { useAuth } from '../../hooks/useAuth';
 import {
   cancelPriceLock,
   deleteMyAccount,
+  fetchClubMembership,
   fetchClubPoints,
   fetchMyBookings,
   fetchMyPriceLocks,
@@ -24,7 +25,9 @@ import { faDigits, faMoney, parseTomanToRial } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import type { BookingDetail, PriceLock, RefundRequestView, UserProfile } from '../../types/public-site';
+import type { ClubMembershipView } from '../../types/club-membership';
 import type { MySupportTicketRow, SupportTicketStatus } from '../../types/support-tickets';
+import AccountClubTab from './AccountClubTab';
 
 // پنل کاربر — real data from the existing bookings/wallet/club-points/refunds
 // endpoints (none of this is mock). Matches design-reference/پنل کاربر.dc.html's
@@ -66,13 +69,13 @@ const TIER_LABEL: Record<string, Tr> = {
   PLATINUM: { fa: 'پلاتین', en: 'Platinum', ar: 'بلاتينية' },
 };
 
-type TabKey = 'trips' | 'wallet' | 'points' | 'price-locks' | 'passengers' | 'refunds' | 'tickets' | 'security' | 'profile';
+type TabKey = 'trips' | 'wallet' | 'club' | 'price-locks' | 'passengers' | 'refunds' | 'tickets' | 'security' | 'profile';
 
 const TAB_LABEL: Record<TabKey, Tr> = {
   profile: { fa: 'پروفایل من', en: 'My Profile', ar: 'ملفي الشخصي' },
   trips: { fa: 'سفرها', en: 'Trips', ar: 'رحلاتي' },
   wallet: { fa: 'کیف پول', en: 'Wallet', ar: 'المحفظة' },
-  points: { fa: 'امتیاز باشگاه', en: 'Loyalty Points', ar: 'نقاط الولاء' },
+  club: { fa: 'باشگاه مشتریان', en: 'Loyalty Club', ar: 'نادي الولاء' },
   'price-locks': { fa: 'قفل قیمت', en: 'Price Lock', ar: 'قفل السعر' },
   passengers: { fa: 'مسافران', en: 'Passengers', ar: 'المسافرون' },
   refunds: { fa: 'استرداد‌ها', en: 'Refunds', ar: 'الاستردادات' },
@@ -84,7 +87,7 @@ const TABS: { key: TabKey; icon: string }[] = [
   { key: 'profile', icon: '🪪' },
   { key: 'trips', icon: '🧳' },
   { key: 'wallet', icon: '💳' },
-  { key: 'points', icon: '★' },
+  { key: 'club', icon: '★' },
   { key: 'price-locks', icon: '🔒' },
   { key: 'passengers', icon: '👤' },
   { key: 'refunds', icon: '↺' },
@@ -474,6 +477,7 @@ export default function AccountPage() {
   const [bookings, setBookings] = useState<BookingDetail[] | null>(null);
   const [wallet, setWallet] = useState<{ balanceIrr: number } | null>(null);
   const [club, setClub] = useState<{ isMember: boolean; level: string | null; balance: number } | null>(null);
+  const [clubMembership, setClubMembership] = useState<ClubMembershipView | null>(null);
   const [refunds, setRefunds] = useState<RefundRequestView[] | null>(null);
   const [topupAmount, setTopupAmount] = useState('');
   const [topupBusy, setTopupBusy] = useState(false);
@@ -522,6 +526,7 @@ export default function AccountPage() {
     fetchMyBookings().then(setBookings).catch(() => setBookings([]));
     fetchWallet().then(setWallet).catch(() => setWallet({ balanceIrr: 0 }));
     fetchClubPoints().then(setClub).catch(() => setClub(null));
+    fetchClubMembership().then(setClubMembership).catch(() => setClubMembership(null));
     fetchMyRefunds().then(setRefunds).catch(() => setRefunds([]));
     fetchMyPriceLocks().then(setPriceLocks).catch(() => setPriceLocks([]));
     fetchMyProfile()
@@ -1023,29 +1028,18 @@ export default function AccountPage() {
           </div>
         )}
 
-        {tab === 'points' && (
-          <div style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 18, padding: '24px 26px' }}>
-            {club?.isMember ? (
-              <>
-                <div style={{ fontSize: 12, color: '#8a96a6', marginBottom: 6 }}>{t.currentPointsLabel}</div>
-                <div style={{ fontSize: 30, fontWeight: 900, color: '#1668c4', marginBottom: 10 }}>{faDigits(club.balance)}</div>
-                <div style={{ fontSize: 12.5, color: '#caa53a', fontWeight: 700, marginBottom: 16 }}>
-                  {t.pointsTierPrefix}
-                  {TIER_LABEL[club.level ?? '']?.[locale] ?? club.level}
-                </div>
-                <Link to="/club" style={{ fontSize: 12.5, color: '#1668c4', fontWeight: 700, textDecoration: 'none' }}>
-                  {t.viewClubLink}
-                </Link>
-              </>
-            ) : (
-              <div style={{ textAlign: 'center', padding: 20 }}>
-                <p style={{ fontSize: 13, color: '#6b7787', marginBottom: 14 }}>{t.notMemberText}</p>
-                <Link to="/club" style={{ background: '#1668c4', color: '#fff', padding: '10px 24px', borderRadius: 11, fontSize: 12.5, fontWeight: 800, textDecoration: 'none' }}>
-                  {t.joinFreeBtn}
-                </Link>
-              </div>
-            )}
-          </div>
+        {tab === 'club' && (
+          clubMembership === null ? (
+            <p style={{ fontSize: 13, color: '#6b7787' }}>{t.loading}</p>
+          ) : (
+            <AccountClubTab
+              membership={clubMembership}
+              onMembershipChange={(m) => {
+                setClubMembership(m);
+                setClub({ isMember: m.isMember, level: m.level, balance: m.balance });
+              }}
+            />
+          )
         )}
 
         {tab === 'price-locks' && (

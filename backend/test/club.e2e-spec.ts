@@ -3,7 +3,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import * as crypto from 'node:crypto';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { loginAs } from './helpers/login.helper';
+import { loginAs, loginAsCustomer } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 import { encryptPii, hashPii } from '../src/common/pii-crypto';
 import { ClubPointsService } from '../src/modules/booking-engine/club-points.service';
@@ -423,5 +423,74 @@ describe('Club (e2e)', () => {
       expect(updated.points).toBe(20000);
       expect(updated.level).toBe('PLATINUM');
     });
+  });
+
+  // ── Customer self-service (user panel club tab) ───────────────────────
+
+  async function linkMemberToUser(memberId: string, userId: string, points: number) {
+    await prisma.clubPointsEntry.deleteMany({ where: { clubMemberId: memberId } });
+    await prisma.clubPointsEntry.create({
+      data: { clubMemberId: memberId, type: 'EARN', signedPoints: points },
+    });
+    await prisma.clubMember.update({
+      where: { id: memberId },
+      data: { userId, points, cardStatus: 'NONE', cardNo: null },
+    });
+  }
+
+  it('GET /my/club/membership returns full view for a linked member; 403 for staff', async () => {
+    const member = await createFreshMember();
+    const { accessToken, userId } = await loginAsCustomer(app, '09180000001');
+    await linkMemberToUser(member.id, userId!, 6200);
+
+    const res = await request(app.getHttpServer())
+      .get('/my/club/membership')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.isMember).toBe(true);
+    expect(res.body.data.balance).toBe(6200);
+    expect(res.body.data.canRequestCard).toBe(true);
+
+    const { accessToken: ceoToken } = await loginAs(app, 'ceo');
+    const forbidden = await request(app.getHttpServer())
+      .get('/my/club/membership')
+      .set('Authorization', `Bearer ${ceoToken}`);
+    expect(forbidden.status).toBe(403);
+  });
+
+  it('POST /my/club/card-request creates SUBMITTED request and sets REVIEW; rejects duplicate', async () => {
+    const member = await createFreshMember();
+    const { accessToken, userId } = await loginAsCustomer(app, '09180000002');
+    await linkMemberToUser(member.id, userId!, 6000);
+
+    const submit = await request(app.getHttpServer())
+      .post('/my/club/card-request')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({});
+    expect(submit.status).toBe(201);
+    expect(submit.body.data.status).toBe('SUBMITTED');
+
+    const memberAfter = await prisma.clubMember.findUniqueOrThrow({
+      where: { id: member.id },
+    });
+    expect(memberAfter.cardStatus).toBe('REVIEW');
+
+    const duplicate = await request(app.getHttpServer())
+      .post('/my/club/card-request')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({});
+    expect(duplicate.status).toBe(409);
+  });
+
+  it('POST /my/club/card-request rejects when below cardRequestMinPoints', async () => {
+    const member = await createFreshMember();
+    const { accessToken, userId } = await loginAsCustomer(app, '09180000003');
+    await linkMemberToUser(member.id, userId!, 1000);
+
+    const res = await request(app.getHttpServer())
+      .post('/my/club/card-request')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({});
+    expect(res.status).toBe(400);
   });
 });

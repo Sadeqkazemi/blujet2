@@ -2561,6 +2561,36 @@
         ]
       }
     },
+    "/my/club/membership": {
+      "get": {
+        "operationId": "MyClubController_getMembership",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "اطلاعات عضویت باشگاه مشتریان مشتری جاری",
+        "tags": [
+          "club"
+        ]
+      }
+    },
+    "/my/club/card-request": {
+      "post": {
+        "operationId": "MyClubController_submitCardRequest",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ثبت درخواست صدور کارت عضویت باشگاه",
+        "tags": [
+          "club"
+        ]
+      }
+    },
     "/it/permissions": {
       "get": {
         "operationId": "EmployeesController_catalog",

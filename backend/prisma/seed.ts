@@ -666,6 +666,36 @@ async function main() {
     await prisma.clubTierRule.create({ data: {} });
   }
 
+  // Link the test USER to the seeded club member + backfill ledger so
+  // GET /my/club/membership works for manual testing after seed.
+  const testUser = await prisma.user.findUnique({
+    where: { phone: '+989120000001' },
+    select: { id: true },
+  });
+  const negarMember = await prisma.clubMember.findFirst({
+    where: { fullName: 'نگار رضایی' },
+  });
+  if (testUser && negarMember) {
+    if (!negarMember.userId) {
+      await prisma.clubMember.update({
+        where: { id: negarMember.id },
+        data: { userId: testUser.id },
+      });
+    }
+    const entryCount = await prisma.clubPointsEntry.count({
+      where: { clubMemberId: negarMember.id },
+    });
+    if (entryCount === 0 && negarMember.points > 0) {
+      await prisma.clubPointsEntry.create({
+        data: {
+          clubMemberId: negarMember.id,
+          type: 'EARN',
+          signedPoints: negarMember.points,
+        },
+      });
+    }
+  }
+
   // ── Phase 66: passenger survey settings + default question list ────────
   const existingSurveySettingsCount = await prisma.surveySettings.count();
   if (existingSurveySettingsCount === 0) {
