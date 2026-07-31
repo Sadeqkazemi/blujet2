@@ -10,6 +10,7 @@ import type {
   SeatMapResult,
   UserProfile,
 } from '../types/public-site';
+import type { ClubCardRequestView, ClubMembershipView } from '../types/club-membership';
 
 export function fetchAirports() {
   return apiGet<Airport[]>('/search/airports');
@@ -93,6 +94,14 @@ export function topupWallet(amountIrr: number) {
 
 export function fetchClubPoints() {
   return apiGet<{ isMember: boolean; level: string | null; balance: number }>('/my/club-points');
+}
+
+export function fetchClubMembership() {
+  return apiGet<ClubMembershipView>('/my/club/membership');
+}
+
+export function submitClubCardRequest() {
+  return apiPost<ClubCardRequestView>('/my/club/card-request', {});
 }
 
 export function fetchMyPriceLocks() {
