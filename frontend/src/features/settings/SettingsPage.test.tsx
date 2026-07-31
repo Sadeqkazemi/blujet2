@@ -6,6 +6,15 @@ import * as adminsApi from '../../api/admins';
 import * as useAuthModule from '../../hooks/useAuth';
 import type { Role } from '../../types/auth';
 import type { SettingsResult } from '../../types/admins';
+import type { SocialLinkEntry } from '../../types/social-links';
+
+const DEFAULT_SOCIAL_LINKS: SocialLinkEntry[] = [
+  { id: 'instagram', name: 'اینستاگرام', url: '', enabled: false },
+  { id: 'telegram', name: 'تلگرام', url: '', enabled: false },
+  { id: 'whatsapp', name: 'واتساپ', url: '', enabled: false },
+  { id: 'linkedin', name: 'لینکدین', url: '', enabled: false },
+  { id: 'x', name: 'ایکس (توییتر)', url: '', enabled: false },
+];
 
 const DATA: SettingsResult = {
   settings: {
@@ -26,6 +35,7 @@ const DATA: SettingsResult = {
     aboutUsText: 'blujet یک پلتفرم آنلاین رزرو بلیط هواپیما است.',
     contactAddress: 'تهران، ایران',
     termsText: 'قوانین و مقررات استفاده از خدمات blujet.',
+    socialLinks: DEFAULT_SOCIAL_LINKS,
   },
   refundRules: [
     { id: 'r1', minHoursBeforeDeparture: 72, penaltyPct: 30, labelFa: 'بیش از ۷۲ ساعت مانده به پرواز' },
@@ -68,7 +78,37 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
     expect(await screen.findByText('تنظیمات کلی سامانه')).toBeInTheDocument();
+    expect(screen.getByText('شبکه‌های اجتماعی')).toBeInTheDocument();
     expect(screen.queryByText('اطلاعات شرکت')).not.toBeInTheDocument();
     expect(screen.queryByText('قوانین استرداد')).not.toBeInTheDocument();
+  });
+
+  it('IT_MANAGER can save an enabled social link', async () => {
+    mockRole('IT_MANAGER');
+    vi.spyOn(adminsApi, 'fetchSettings').mockResolvedValue(DATA);
+    const updateSpy = vi.spyOn(adminsApi, 'updateSettings').mockResolvedValue(DATA);
+
+    render(<SettingsPage />);
+    expect(await screen.findByText('شبکه‌های اجتماعی')).toBeInTheDocument();
+
+    const user = userEvent.setup();
+    const urlInput = screen.getByLabelText('آدرس اینستاگرام');
+    await user.type(urlInput, 'instagram.com/blujet');
+    await user.click(screen.getByRole('switch', { name: 'اینستاگرام' }));
+    await user.click(screen.getByRole('button', { name: 'ذخیره تنظیمات' }));
+
+    await waitFor(() =>
+      expect(updateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          socialLinks: expect.arrayContaining([
+            expect.objectContaining({
+              id: 'instagram',
+              url: 'instagram.com/blujet',
+              enabled: true,
+            }),
+          ]),
+        }),
+      ),
+    );
   });
 });
