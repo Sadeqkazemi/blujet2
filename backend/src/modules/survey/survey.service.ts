@@ -161,20 +161,36 @@ export class SurveyService {
         }),
       ]);
 
+    const airportCodes = new Set<string>();
+    for (const r of recent) {
+      airportCodes.add(r.invite.flightInstance.flight.route.originCode);
+      airportCodes.add(r.invite.flightInstance.flight.route.destCode);
+    }
+    const airports = await this.typeorm.airport.findMany({
+      where: { code: { in: [...airportCodes] } },
+    });
+    const cityFa = new Map(airports.map((a) => [a.code, a.cityFa]));
+
     return {
       flightsWithSurvey,
       totalResponses,
       avgRating: ratingAgg._avg.rating
         ? Math.round(ratingAgg._avg.rating * 10) / 10
         : 0,
-      recentResponses: recent.map((r) => ({
-        id: r.id,
-        flightNo: r.invite.flightInstance.flight.flightNo,
-        route: `${r.invite.flightInstance.flight.route.originCityFa} — ${r.invite.flightInstance.flight.route.destCityFa}`,
-        rating: r.rating,
-        comment: r.comment,
-        at: r.createdAt,
-      })),
+      recentResponses: recent.map((r) => {
+        const route = r.invite.flightInstance.flight.route;
+        const origin =
+          cityFa.get(route.originCode) ?? route.originCode;
+        const dest = cityFa.get(route.destCode) ?? route.destCode;
+        return {
+          id: r.id,
+          flightNo: r.invite.flightInstance.flight.flightNo,
+          route: `${origin} — ${dest}`,
+          rating: r.rating,
+          comment: r.comment,
+          at: r.createdAt,
+        };
+      }),
     };
   }
 
