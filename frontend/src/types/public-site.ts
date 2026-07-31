@@ -23,6 +23,17 @@ export interface SearchFlightResult {
   departureAt: string;
   arrivalAt: string;
   cabins: SearchCabinOption[];
+  connection?: {
+    via: string;
+    legs: {
+      flightInstanceId: string;
+      flightNo: string;
+      originCode: string;
+      destCode: string;
+      departureAt: string;
+      arrivalAt: string;
+    }[];
+  };
 }
 
 export type SearchAdvisoryRecommendation = 'buy' | 'wait';

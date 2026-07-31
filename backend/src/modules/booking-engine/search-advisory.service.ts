@@ -52,12 +52,16 @@ export class SearchAdvisoryService {
         dayResults[0]!.cabins[0]!.priceIrr,
     ));
 
-    const calendarMin = calendar.reduce((min, row) => {
-      const p = BigInt(row.minPriceIrr);
-      return p < min ? p : min;
-    }, cheapestToday);
+    const pricedDays = calendar.filter((row) => BigInt(row.minPriceIrr) > 0n);
+    const calendarMin =
+      pricedDays.length > 0
+        ? pricedDays.reduce((min, row) => {
+            const p = BigInt(row.minPriceIrr);
+            return p < min ? p : min;
+          }, BigInt(pricedDays[0]!.minPriceIrr))
+        : cheapestToday;
 
-    const cheapestEntry = calendar.find(
+    const cheapestEntry = pricedDays.find(
       (c) => BigInt(c.minPriceIrr) === calendarMin,
     );
 

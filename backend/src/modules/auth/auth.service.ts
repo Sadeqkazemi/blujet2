@@ -16,6 +16,7 @@ import type { TwoFactorProvider } from './providers/two-factor-provider.interfac
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import { CustomerReferralsService } from '../customer-referrals/customer-referrals.service';
 import type { Locale, Role } from '../../../generated/prisma/enums';
+import { normalizeIranPhone } from '../../common/normalize-iran-phone';
 
 export interface AuthUserView {
   id: string;
@@ -164,7 +165,10 @@ export class AuthService {
   ): Promise<void> {
     await this.prisma.user.update({
       where: { id: actor.id },
-      data: { passwordHash: await argon2.hash(newPassword) },
+      data: {
+        passwordHash: await argon2.hash(newPassword),
+        mustChangePassword: false,
+      },
     });
 
     await this.audit.record({
@@ -478,7 +482,7 @@ export class AuthService {
     user: AuthUserView;
   }> {
     const user = await this.prisma.user.findUnique({
-      where: { phone },
+      where: { phone: normalizeIranPhone(phone) },
       include: { agencyProfile: true },
     });
 
@@ -638,7 +642,7 @@ export class AuthService {
     phone: string,
   ): Promise<{ challengeId: string }> {
     const user = await this.prisma.user.findUnique({
-      where: { phone },
+      where: { phone: normalizeIranPhone(phone) },
       include: { agencyProfile: true },
     });
     if (
@@ -719,15 +723,19 @@ export class AuthService {
       data: { consumedAt: new Date() },
     });
 
-    const user = challenge.user;
+    const updated = await this.prisma.user.update({
+      where: { id: challenge.userId },
+      data: { mustChangePassword: true },
+    });
+
     const jwtUser: AuthenticatedUser = {
-      id: user.id,
-      role: user.role,
-      fullName: user.fullName,
+      id: updated.id,
+      role: updated.role,
+      fullName: updated.fullName,
     };
     const accessToken = this.signAccessToken(jwtUser);
-    const refreshToken = await this.issueRefreshToken(user.id, context);
-    return { accessToken, refreshToken, user: toAuthUserView(user) };
+    const refreshToken = await this.issueRefreshToken(updated.id, context);
+    return { accessToken, refreshToken, user: toAuthUserView(updated) };
   }
 
   /**

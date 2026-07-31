@@ -39,10 +39,10 @@ describe('Search advisory & price calendar (e2e)', () => {
     expect(res.body.data.homeHeroTitle).toContain('Fly');
   });
 
-  it('POST /auth/agency/password-reset/request issues challenge for seeded agency', async () => {
+  it('POST /auth/agency/password-reset/request accepts 09-format phone', async () => {
     const res = await request(app.getHttpServer())
       .post('/auth/agency/password-reset/request')
-      .send({ phone: '+989120000002' })
+      .send({ phone: '09120000002' })
       .expect(200);
     expect(res.body.data.challengeId).toBeTruthy();
   });
