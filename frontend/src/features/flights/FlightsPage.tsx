@@ -19,6 +19,7 @@ import { faDigits, faMoney, latinDigits, parseTomanToRial } from '../../lib/fa-f
 import { dayjs, formatJalaliDateTime, parseJalaliDateToIso } from '../../lib/jalali';
 import Modal from '../../components/Modal';
 import JalaliDatePicker from '../../components/JalaliDatePicker';
+import FareRulesSection from '../../components/FareRulesSection';
 import PricingPage from '../pricing/PricingPage';
 import FlightCitiesTab from './FlightCitiesTab';
 import type {
@@ -1112,6 +1113,8 @@ export default function FlightsPage() {
               </div>
             )}
           </div>
+
+          <FareRulesSection instanceId={detail.id} />
         </Modal>
       )}
       {aircraftStepUp.modal}
@@ -1303,6 +1306,8 @@ export default function FlightsPage() {
             )}
             {allotmentError && <p className="mt-2 text-[11px] text-danger">{allotmentError}</p>}
           </div>
+
+          <FareRulesSection instanceId={plan.id} />
         </Modal>
       )}
     </div>
