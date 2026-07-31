@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { fetchNav } from '../api/panels';
-import { fetchCartable } from '../api/cartable';
+import { fetchCartable, fetchMyReferrals, fetchReferrals } from '../api/cartable';
 import { fetchRefunds } from '../api/refunds';
 import { fetchStaffReports } from '../api/reporting';
 import { fetchLogsBadgeCount } from '../api/audit';
@@ -99,6 +99,36 @@ export default function PanelShell() {
       );
     }
 
+    if (navKeys.has('referrals')) {
+      if (user?.role === 'EMPLOYEE') {
+        tasks.push(
+          fetchMyReferrals()
+            .then((r) => {
+              if (r.counts.awaitingMyReport > 0) {
+                next.referrals = {
+                  count: r.counts.awaitingMyReport,
+                  className: 'bg-[#a855f7] text-white',
+                };
+              }
+            })
+            .catch(() => undefined),
+        );
+      } else if (user?.role === 'SENIOR_MANAGER') {
+        tasks.push(
+          fetchReferrals()
+            .then((r) => {
+              if (r.kpis.awaitingReport > 0) {
+                next.referrals = {
+                  count: r.kpis.awaitingReport,
+                  className: 'bg-[#a855f7] text-white',
+                };
+              }
+            })
+            .catch(() => undefined),
+        );
+      }
+    }
+
     void Promise.all(tasks).then(() => setBadges(next));
   }, [nav, navKeys, user?.role]);
 
@@ -142,16 +172,15 @@ export default function PanelShell() {
                   }`
                 }
               >
-                <span className="flex items-center gap-2">
-                  {item.labelFa}
-                  {badge && (
-                    <span
-                      className={`font-num rounded-full px-2 py-0.5 text-[10px] font-bold ${badge.className}`}
-                    >
-                      {faDigits(badge.count)}
-                    </span>
-                  )}
-                </span>
+                <span className="flex-1">{item.labelFa}</span>
+                {badge && (
+                  <span
+                    data-testid={`nav-badge-${item.key}`}
+                    className={`font-num ms-2 min-w-[20px] rounded-full px-1.5 py-0.5 text-center text-[10px] font-extrabold ${badge.className}`}
+                  >
+                    {faDigits(badge.count)}
+                  </span>
+                )}
                 {!item.implemented && <span className="text-[10px] text-[#5a6678]">به‌زودی</span>}
               </NavLink>
             );

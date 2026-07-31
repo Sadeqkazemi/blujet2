@@ -50,9 +50,61 @@ describe('PanelShell', () => {
     renderShell();
 
     await waitFor(() => {
-      expect(screen.getByText('۳')).toBeInTheDocument();
-      expect(screen.getByText('۲')).toBeInTheDocument();
-      expect(screen.getByText('۱')).toBeInTheDocument();
+      expect(screen.getByTestId('nav-badge-cartable')).toHaveTextContent('۳');
+      expect(screen.getByTestId('nav-badge-refund')).toHaveTextContent('۲');
+      expect(screen.getByTestId('nav-badge-staff')).toHaveTextContent('۱');
+    });
+  });
+
+  it('shows a purple referrals badge for SENIOR_MANAGER when reports are awaiting', async () => {
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      status: 'authenticated',
+      user: { id: 'u2', fullName: 'مدیر ارشد', role: 'SENIOR_MANAGER', preferredLocale: 'FA' },
+      requestLogin: vi.fn(),
+      confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
+      signOut: vi.fn(),
+    });
+    vi.spyOn(panelsApi, 'fetchNav').mockResolvedValue([
+      { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
+      { key: 'referrals', labelFa: 'ارجاعات', implemented: true },
+    ]);
+    vi.spyOn(cartableApi, 'fetchReferrals').mockResolvedValue({
+      referrals: [],
+      kpis: { total: 4, awaitingReport: 2, reported: 1, closed: 1 },
+    });
+
+    renderShell();
+
+    await waitFor(() => {
+      const badge = screen.getByTestId('nav-badge-referrals');
+      expect(badge).toHaveTextContent('۲');
+      expect(badge.className).toContain('a855f7');
+    });
+  });
+
+  it('shows a purple referrals badge for EMPLOYEE when my report is pending', async () => {
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      status: 'authenticated',
+      user: { id: 'u3', fullName: 'کارمند', role: 'EMPLOYEE', preferredLocale: 'FA' },
+      requestLogin: vi.fn(),
+      confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
+      signOut: vi.fn(),
+    });
+    vi.spyOn(panelsApi, 'fetchNav').mockResolvedValue([
+      { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
+      { key: 'referrals', labelFa: 'ارجاعات', implemented: true },
+    ]);
+    vi.spyOn(cartableApi, 'fetchMyReferrals').mockResolvedValue({
+      referrals: [],
+      counts: { total: 3, awaitingMyReport: 1 },
+    });
+
+    renderShell();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('nav-badge-referrals')).toHaveTextContent('۱');
     });
   });
 });
