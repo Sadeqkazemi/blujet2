@@ -517,8 +517,14 @@ describe('Club (e2e)', () => {
 
   // ── Customer self-service (user panel club tab) ───────────────────────
 
-  async function linkMemberToUser(memberId: string, userId: string, points: number) {
-    await prisma.clubPointsEntry.deleteMany({ where: { clubMemberId: memberId } });
+  async function linkMemberToUser(
+    memberId: string,
+    userId: string,
+    points: number,
+  ) {
+    await prisma.clubPointsEntry.deleteMany({
+      where: { clubMemberId: memberId },
+    });
     await prisma.clubPointsEntry.create({
       data: { clubMemberId: memberId, type: 'EARN', signedPoints: points },
     });

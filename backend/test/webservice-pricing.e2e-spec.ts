@@ -82,7 +82,8 @@ describe('Webservice pricing (e2e)', () => {
       .set('Authorization', `Bearer ${agencyToken}`);
     expect(plansRes.status).toBe(200);
     expect(
-      plansRes.body.data.plans.find((p: { months: number }) => p.months === 1).priceIrr,
+      plansRes.body.data.plans.find((p: { months: number }) => p.months === 1)
+        .priceIrr,
     ).toBe('50000000');
 
     const createRes = await request(app.getHttpServer())

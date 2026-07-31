@@ -5,10 +5,12 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { loginAs, loginAsCustomer } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
-function extractRefreshCookie(setCookie: string | string[] | undefined): string {
+function extractRefreshCookie(
+  setCookie: string | string[] | undefined,
+): string {
   const raw = Array.isArray(setCookie) ? setCookie[0] : setCookie;
   if (!raw) throw new Error('No set-cookie header');
-  return raw.split(';')[0]!;
+  return raw.split(';')[0];
 }
 
 describe('My sessions (e2e)', () => {
@@ -43,7 +45,9 @@ describe('My sessions (e2e)', () => {
         code: codeRes.body.data.code,
       });
     expect(secondVerify.status).toBe(200);
-    const currentCookie = extractRefreshCookie(secondVerify.headers['set-cookie']);
+    const currentCookie = extractRefreshCookie(
+      secondVerify.headers['set-cookie'],
+    );
 
     const list = await request(app.getHttpServer())
       .get('/my/sessions')
@@ -51,8 +55,12 @@ describe('My sessions (e2e)', () => {
       .set('Cookie', currentCookie);
     expect(list.status).toBe(200);
     expect(list.body.data.length).toBeGreaterThanOrEqual(2);
-    const current = list.body.data.find((s: { isCurrent: boolean }) => s.isCurrent);
-    const other = list.body.data.find((s: { isCurrent: boolean }) => !s.isCurrent);
+    const current = list.body.data.find(
+      (s: { isCurrent: boolean }) => s.isCurrent,
+    );
+    const other = list.body.data.find(
+      (s: { isCurrent: boolean }) => !s.isCurrent,
+    );
     expect(current).toBeDefined();
     expect(other).toBeDefined();
 
@@ -68,7 +76,9 @@ describe('My sessions (e2e)', () => {
       .set('Cookie', currentCookie);
     expect(revoke.status).toBe(200);
 
-    const revoked = await prisma.refreshToken.findUnique({ where: { id: other.id } });
+    const revoked = await prisma.refreshToken.findUnique({
+      where: { id: other.id },
+    });
     expect(revoked!.revokedAt).not.toBeNull();
 
     const after = await prisma.refreshToken.findMany({
@@ -93,7 +103,7 @@ describe('My sessions (e2e)', () => {
 
     const other = await loginAsCustomer(app, '09180000004');
     const notFound = await request(app.getHttpServer())
-      .delete(`/my/sessions/${rows[0]!.id}`)
+      .delete(`/my/sessions/${rows[0].id}`)
       .set('Authorization', `Bearer ${other.accessToken}`);
     expect(notFound.status).toBe(404);
   });
