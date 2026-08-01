@@ -671,7 +671,36 @@ export default function ResultsPage() {
                 saveBusyKey={saveBusyKey}
                 showGoldLock={Boolean(club?.isMember && GOLD_TIER_LEVELS.includes(club.level ?? ''))}
                 onToggle={() => setExpandedId((id) => (id === r.flightInstanceId ? null : r.flightInstanceId))}
-                onBuy={(c) => navigate(`/book/${r.flightInstanceId}?cabin=${c}`)}
+                onBuy={(c) => {
+                  const cabinOpt = r.cabins.find((x) => x.cabin === c);
+                  const flight = {
+                    flightInstanceId: r.flightInstanceId,
+                    flightNo: r.flightNo,
+                    originCode: r.originCode,
+                    destCode: r.destCode,
+                    departureAt: r.departureAt,
+                    arrivalAt: r.arrivalAt,
+                    aircraftType: r.aircraftType,
+                    priceIrr: cabinOpt?.priceIrr ?? '0',
+                  };
+                  // Persist before navigate so OTP/login remounts keep route cities.
+                  sessionStorage.setItem(
+                    'blujet_checkout_draft',
+                    JSON.stringify({
+                      flightInstanceId: flight.flightInstanceId,
+                      cabin: c,
+                      selectedSeats: [],
+                      flight,
+                    }),
+                  );
+                  const q = new URLSearchParams({
+                    flightInstanceId: r.flightInstanceId,
+                    cabin: c,
+                    origin: r.originCode,
+                    dest: r.destCode,
+                  });
+                  navigate(`/checkout/new?${q.toString()}`, { state: { cabin: c, flight } });
+                }}
                 onLock={(c) => void onRealLockClick(r.flightInstanceId, c)}
                 onSave={(c) => void onSaveClick(r.flightInstanceId, c)}
               />

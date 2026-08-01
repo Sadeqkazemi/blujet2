@@ -1420,6 +1420,8 @@ model AircraftSeatMap {
   economyRowEnd     Int
   economyColsLeft   String[]
   economyColsRight  String[]
+  /// Seat codes omitted from the cabin (e.g. MD-80 rear exit/galley: 28A/B, 29A/B, 30A/B).
+  excludedSeatCodes String[] @default([])
   updatedAt         DateTime @updatedAt
 
   @@map("aircraft_seat_maps")
