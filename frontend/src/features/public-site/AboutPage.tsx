@@ -89,60 +89,60 @@ export default function AboutPage() {
 
   return (
     <PublicPageShell>
-      <section style={{ background: 'linear-gradient(150deg,#0d2640,#124a86)', color: '#fff', padding: '45px 22px 60px', textAlign: 'center' }}>
-        <div style={{ maxWidth: 720, margin: '0 auto' }}>
-          <div style={{ display: 'inline-block', background: '#ffffff22', border: '1px solid #ffffff44', padding: '6px 12px', borderRadius: 28, fontSize: '11.5px', fontWeight: 700, marginBottom: 18 }}>
+      <section style={{ background: 'linear-gradient(135deg,#0d2640,#16406e)', color: '#fff', padding: '44px 22px' }}>
+        <div style={{ maxWidth: 820, margin: '0 auto', textAlign: 'center' }}>
+          <div style={{ fontSize: '11.5px', color: '#7fa8da', fontWeight: 700, letterSpacing: 1, marginBottom: 12 }}>
             {t.eyebrow}
           </div>
-          <h1 style={{ fontSize: isMobile ? 24 : 32, fontWeight: 900, margin: '0 0 14px', letterSpacing: '-.6px' }}>{t.heroTitle}</h1>
-          <p style={{ fontSize: 14, color: '#c9dcf3', margin: 0, lineHeight: 1.95 }}>
+          <h1 style={{ fontSize: isMobile ? 26 : 32.5, fontWeight: 900, margin: '0 0 16px', lineHeight: 1.4, letterSpacing: '-.6px' }}>{t.heroTitle}</h1>
+          <p style={{ fontSize: '14.5px', color: '#aac4e2', margin: 0, lineHeight: 2 }}>
             {heroDesc}
           </p>
         </div>
       </section>
 
-      <section style={{ maxWidth: 1080, margin: '-30px auto 0', padding: '0 22px', position: 'relative' }}>
-        <div style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 16, boxShadow: '0 18px 40px -22px rgba(13,38,102,.3)', display: 'grid', gridTemplateColumns: gridCols4 }}>
+      <section style={{ maxWidth: 1320, margin: '-40px auto 0', padding: '0 26px', position: 'relative' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: gridCols4, gap: 15 }}>
           {STATS.map((s) => (
-            <div key={s.label.fa} style={{ padding: 18, textAlign: 'center', borderLeft: '1px solid #f2f4f7' }}>
-              <div style={{ fontSize: 24, fontWeight: 900, color: '#1668c4' }}>{s.value[locale]}</div>
-              <div style={{ fontSize: '11.5px', color: '#6b7585', marginTop: 4 }}>{s.label[locale]}</div>
+            <div key={s.label.fa} style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 14, padding: 16, textAlign: 'center', boxShadow: '0 10px 30px -22px rgba(13,38,102,.5)' }}>
+              <div style={{ fontSize: 27, fontWeight: 900, color: '#1668c4' }}>{s.value[locale]}</div>
+              <div style={{ fontSize: '11.5px', color: '#8a96a6', marginTop: 5 }}>{s.label[locale]}</div>
             </div>
           ))}
         </div>
       </section>
 
-      <section style={{ maxWidth: 1080, margin: '0 auto', padding: '37px 22px 8px', display: 'grid', gridTemplateColumns: gridCols2, gap: 18 }}>
-        <div style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 18, padding: '22px 24px' }}>
-          <div style={{ width: 42, height: 42, borderRadius: 12, background: '#eef4fb', color: '#1668c4', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 13 }}>
-            🎯
+      <section style={{ maxWidth: 1320, margin: '48px auto 0', padding: '0 26px', display: 'grid', gridTemplateColumns: gridCols2, gap: 20 }}>
+        <div style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 14, padding: 21 }}>
+          <div style={{ width: 48, height: 48, borderRadius: 13, background: '#eef4fb', color: '#1668c4', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1.4" fill="currentColor" /></svg>
           </div>
-          <h2 style={{ fontSize: 16, fontWeight: 900, color: '#0d2640', margin: '0 0 9px' }}>{t.missionTitle}</h2>
-          <p style={{ fontSize: 12.5, color: '#5a6678', margin: 0, lineHeight: 2 }}>
+          <h2 style={{ fontSize: 17, fontWeight: 800, color: '#0d2640', margin: '0 0 10px' }}>{t.missionTitle}</h2>
+          <p style={{ fontSize: '12.5px', color: '#5a6678', margin: 0, lineHeight: 2 }}>
             {t.missionDesc}
           </p>
         </div>
-        <div style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 18, padding: '22px 24px' }}>
-          <div style={{ width: 42, height: 42, borderRadius: 12, background: '#fff7e6', color: '#caa53a', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 13 }}>
-            🔭
+        <div style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 14, padding: 21 }}>
+          <div style={{ width: 48, height: 48, borderRadius: 13, background: '#eef9f1', color: '#1f8a5b', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z" /><circle cx="12" cy="12" r="2.8" /></svg>
           </div>
-          <h2 style={{ fontSize: 16, fontWeight: 900, color: '#0d2640', margin: '0 0 9px' }}>{t.visionTitle}</h2>
-          <p style={{ fontSize: 12.5, color: '#5a6678', margin: 0, lineHeight: 2 }}>
+          <h2 style={{ fontSize: 17, fontWeight: 800, color: '#0d2640', margin: '0 0 10px' }}>{t.visionTitle}</h2>
+          <p style={{ fontSize: '12.5px', color: '#5a6678', margin: 0, lineHeight: 2 }}>
             {t.visionDesc}
           </p>
         </div>
       </section>
 
-      <section style={{ maxWidth: 1080, margin: '0 auto', padding: '28px 22px 55px' }}>
-        <h2 style={{ fontSize: 19, fontWeight: 900, color: '#0d2640', margin: '0 0 18px', textAlign: 'center' }}>{t.valuesHeading}</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: gridCols3, gap: 14 }}>
+      <section style={{ maxWidth: 1320, margin: '48px auto 0', padding: '0 26px 56px' }}>
+        <h2 style={{ fontSize: 19, fontWeight: 900, color: '#0d2640', margin: '0 0 20px', textAlign: 'center' }}>{t.valuesHeading}</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: gridCols3, gap: 15 }}>
           {VALUES.map((v) => (
-            <div key={v.title.fa} style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 16, padding: '20px 18px', textAlign: 'center' }}>
-              <div style={{ width: 46, height: 46, borderRadius: 13, background: v.bg, color: v.color, fontSize: 19, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+            <div key={v.title.fa} style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 14, padding: 16 }}>
+              <div style={{ width: 40, height: 40, borderRadius: 11, background: v.bg, color: v.color, fontSize: 17, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
                 {v.icon}
               </div>
-              <div style={{ fontSize: 14, fontWeight: 800, color: '#0d2640', marginBottom: 7 }}>{v.title[locale]}</div>
-              <div style={{ fontSize: 12, color: '#6b7585', lineHeight: 1.9 }}>{v.desc[locale]}</div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: '#0d2640', marginBottom: 6 }}>{v.title[locale]}</div>
+              <div style={{ fontSize: '11.5px', color: '#8a96a6', lineHeight: 1.9 }}>{v.desc[locale]}</div>
             </div>
           ))}
         </div>

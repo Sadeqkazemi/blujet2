@@ -22,11 +22,11 @@ Systematic page-by-page alignment with bundled HTML exports. Each phase = layout
 | 7 | ورود و ثبتنام | `ورود و ثبتنام.html` | Med | [x] Two-column card, visual panel, OTP layout |
 | 8 | فراموشی رمز | `فراموشی رمز.html` | Low | [x] Two-column card, stepper, OTP cells, visual panel |
 | 9 | مقاصد | `مقاصد.html` | Med | [x] Route cards, map pins pulse, mobile map hide |
-| 10 | باشگاه مشتریان | `باشگاه مشتریان.html` | Med | [~] i18n done |
-| 11 | پشتیبانی | `پشتیبانی.html` | Med | [~] i18n done |
-| 12 | درباره ما / تماس / قوانین | bundled | Low | [~] i18n done |
-| 13 | صفحه 404 / maintenance | bundled | Low | [x] Light layout, header, gradient 404, plane path |
-| 14 | فرصت‌های شغلی + فرم | bundled | Low | [ ] |
+| 10 | باشگاه مشتریان | `باشگاه مشتریان.html` | Med | [x] Tier cards, card issuance, Saman banner, gold CTA |
+| 11 | پشتیبانی | `پشتیبانی.html` | Med | [x] Hero card, FAQ + dark ticket sidebar |
+| 12 | درباره ما / تماس / قوانین | bundled | Low | [x] Hero, stats cards, channels, TOC layout |
+| 13 | صفحه 404 / maintenance | bundled | Low | [x] Light 404 + maintenance layout, gear animation |
+| 14 | فرصت‌های شغلی + فرم | bundled | Low | [~] List page done; apply form pending |
 | 15 | پنل کاربر | `پنل کاربر.html` | High | [ ] |
 | 16 | پنل آژانس | `پنل آژانس.html` | High | [ ] Mobile shell |
 | 17–24 | Staff panels (8) | bundled | High each | [ ] Desktop fidelity pass |
