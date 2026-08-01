@@ -76,6 +76,15 @@ export function latinDigits(value: string): string {
     .replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
 }
 
+/** Normalizes Iranian mobile input to Latin digits only (max 11 chars). */
+export function normalizeIranMobile(raw: string): string {
+  return latinDigits(raw).replace(/\D/g, '').slice(0, 11);
+}
+
+export function isValidIranMobile(phone: string): boolean {
+  return /^09\d{9}$/.test(phone);
+}
+
 /**
  * Parses a تومان amount typed by the user (Persian or Latin digits, optional
  * ٬/, separators) into integer IRR. The rial↔toman conversion lives ONLY in

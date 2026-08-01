@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { fetchClubPoints } from '../../api/publicSite';
+import { fetchClubPoints, fetchMyProfile } from '../../api/publicSite';
 import { faDigits } from '../../lib/fa-format';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useT } from '../../lib/i18n';
@@ -64,7 +64,13 @@ function UserFilledIcon({ size = 18 }: { size?: number }) {
 }
 
 function isFlightsRoute(pathname: string) {
-  return pathname === '/' || pathname.startsWith('/results') || pathname.startsWith('/book');
+  return (
+    pathname === '/' ||
+    pathname.startsWith('/results') ||
+    pathname.startsWith('/book') ||
+    pathname.startsWith('/checkout') ||
+    pathname.startsWith('/payment')
+  );
 }
 
 /** Sticky public-site header — matches design-reference-v2 shared shell. */
@@ -81,6 +87,7 @@ export default function PublicHeader() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loginDrawerOpen, setLoginDrawerOpen] = useState(false);
   const [club, setClub] = useState<{ isMember: boolean; level: string | null; balance: number } | null>(null);
+  const [profileIncomplete, setProfileIncomplete] = useState(false);
 
   const loggedIn = status === 'authenticated' && user?.role === 'USER';
   const notifications = NOTIFICATIONS[locale];
@@ -88,10 +95,17 @@ export default function PublicHeader() {
   const notifCountLabel = locale === 'fa' ? faDigits(notifCount) : String(notifCount);
 
   useEffect(() => {
-    if (!loggedIn) return;
+    if (!loggedIn) {
+      setClub(null);
+      setProfileIncomplete(false);
+      return;
+    }
     fetchClubPoints()
       .then(setClub)
       .catch(() => setClub(null));
+    fetchMyProfile()
+      .then((p) => setProfileIncomplete(p.completionPct < 100))
+      .catch(() => setProfileIncomplete(false));
   }, [loggedIn]);
 
   const navLinks = [
@@ -153,8 +167,67 @@ export default function PublicHeader() {
     </>
   );
 
+  const completeProfileBanner = profileIncomplete ? (
+    <Link
+      to="/account?tab=profile"
+      data-testid="public-complete-profile"
+      onClick={() => {
+        setMenuOpen(false);
+        setMobileMenuOpen(false);
+      }}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        padding: '10px 12px',
+        background: '#fff7ed',
+        borderBottom: '1px solid #f6dcbb',
+        textDecoration: 'none',
+        color: '#9a5b16',
+        fontSize: '11.5px',
+        fontWeight: 700,
+      }}
+    >
+      <span
+        style={{
+          width: 16,
+          height: 16,
+          borderRadius: '50%',
+          background: '#e5484d',
+          color: '#fff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 10,
+          flex: 'none',
+        }}
+      >
+        !
+      </span>
+      {t('completeProfileLabel')}
+    </Link>
+  ) : null;
+
+  const profileWarnDot = (borderColor: string) =>
+    profileIncomplete ? (
+      <span
+        data-testid="public-profile-incomplete-dot"
+        style={{
+          position: 'absolute',
+          top: -2,
+          right: -2,
+          width: 11,
+          height: 11,
+          borderRadius: '50%',
+          background: '#e5484d',
+          border: `1.5px solid ${borderColor}`,
+        }}
+      />
+    ) : null;
+
   const userMenuItems = (mobileCompact: boolean) => (
     <>
+      {completeProfileBanner}
       <Link
         to="/account"
         onClick={() => setMenuOpen(false)}
@@ -462,13 +535,19 @@ export default function PublicHeader() {
                           justifyContent: 'center',
                           fontWeight: 700,
                           fontSize: '13.5px',
+                          position: 'relative',
                         }}
                       >
                         <UserFilledIcon />
+                        {profileWarnDot('#fff')}
                       </div>
                       <div style={{ lineHeight: 1.35, textAlign: isRTL ? 'right' : 'left' }}>
                         <div style={{ fontSize: 13, fontWeight: 700, color: '#16202e' }}>{user.fullName}</div>
-                        {club?.isMember && tierLabel && <div style={{ fontSize: 10, color: '#caa53a', fontWeight: 700 }}>★ {tierLabel}</div>}
+                        {profileIncomplete ? (
+                          <div style={{ fontSize: 10, color: '#e5484d', fontWeight: 700 }}>{t('completeProfileLabel')}</div>
+                        ) : (
+                          club?.isMember && tierLabel && <div style={{ fontSize: 10, color: '#caa53a', fontWeight: 700 }}>★ {tierLabel}</div>
+                        )}
                       </div>
                       <span style={{ fontSize: 10, color: '#6b7787', marginRight: 2 }}>▼</span>
                     </div>
@@ -556,9 +635,11 @@ export default function PublicHeader() {
                       justifyContent: 'center',
                       color: '#fff',
                       cursor: 'pointer',
+                      position: 'relative',
                     }}
                   >
                     <UserOutlineIcon size={19} />
+                    {profileWarnDot('#0d2640')}
                   </span>
                   {menuOpen && (
                     <>

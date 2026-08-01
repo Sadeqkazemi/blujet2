@@ -1,10 +1,10 @@
 import { apiGet, apiPatch, apiPost } from './http';
 import { setAccessToken } from './token-store';
-import { latinDigits } from '../lib/fa-format';
+import { latinDigits, normalizeIranMobile } from '../lib/fa-format';
 import type { AuthUser, Locale } from '../types/auth';
 
 function normalizePhone(phone: string) {
-  return latinDigits(phone).replace(/\s/g, '');
+  return normalizeIranMobile(latinDigits(phone).replace(/\s/g, ''));
 }
 
 function normalizeOtpCode(code: string) {
@@ -59,6 +59,11 @@ export function requestOtp(phone: string) {
   return apiPost<{ challengeId: string }>('/auth/otp/request', { phone: normalizePhone(phone) });
 }
 
+/** Dev/E2E only — reads the mock OTP after requestOtp (404 in production). */
+export function fetchDevLastOtp(phone: string) {
+  return apiGet<{ code: string }>(`/auth/_test/last-otp/${encodeURIComponent(normalizePhone(phone))}`);
+}
+
 export type StepUpScope =
   | 'ADMIN_ROLE_CHANGE'
   | 'API_KEY_ROTATE'
@@ -106,7 +111,7 @@ export async function verifyPasswordResetEmail(challengeId: string, code: string
 
 export async function customerPasswordLogin(phone: string, password: string) {
   const result = await apiPost<{ accessToken: string; user: AuthUser }>('/auth/customer/login-password', {
-    phone,
+    phone: normalizePhone(phone),
     password,
   });
   setAccessToken(result.accessToken);

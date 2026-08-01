@@ -21,14 +21,14 @@ type DemoRow = {
 
 /** Subset of the design's static flight table (نتایج پرواز.dc.html lines 1344–1368). */
 const DEMO_ROWS: DemoRow[] = [
-  { id: 1, flightNo: 'EP-821', dep: '08:30', durMin: 135, stops: 0, priceToman: 3_800_000, seats: 5, aircraft: 'Airbus A320' },
-  { id: 2, flightNo: 'W5-112', dep: '13:10', durMin: 220, stops: 1, priceToman: 4_250_000, seats: 9, aircraft: 'Airbus A340' },
-  { id: 3, flightNo: 'IR-655', dep: '20:00', durMin: 140, stops: 0, priceToman: 4_100_000, seats: 3, aircraft: 'ATR 72' },
-  { id: 4, flightNo: 'QB-220', dep: '06:15', durMin: 145, stops: 0, priceToman: 3_950_000, seats: 7, aircraft: 'Boeing 737' },
-  { id: 5, flightNo: 'RV-431', dep: '16:45', durMin: 265, stops: 1, priceToman: 3_650_000, seats: 2, aircraft: 'MD-82' },
-  { id: 6, flightNo: 'VR-550', dep: '11:00', durMin: 150, stops: 0, priceToman: 4_400_000, seats: 6, aircraft: 'Boeing 737' },
-  { id: 7, flightNo: 'Y9-301', dep: '05:30', durMin: 140, stops: 0, priceToman: 3_720_000, seats: 4, aircraft: 'Airbus A320' },
-  { id: 8, flightNo: 'ZV-402', dep: '07:15', durMin: 145, stops: 0, priceToman: 3_880_000, seats: 8, aircraft: 'Boeing 737' },
+  { id: 1, flightNo: 'EP-821', dep: '08:30', durMin: 135, stops: 0, priceToman: 3_800_000, seats: 5, aircraft: 'MD-80' },
+  { id: 2, flightNo: 'W5-112', dep: '13:10', durMin: 220, stops: 1, priceToman: 4_250_000, seats: 9, aircraft: 'MD-80' },
+  { id: 3, flightNo: 'IR-655', dep: '20:00', durMin: 140, stops: 0, priceToman: 4_100_000, seats: 3, aircraft: 'MD-80' },
+  { id: 4, flightNo: 'QB-220', dep: '06:15', durMin: 145, stops: 0, priceToman: 3_950_000, seats: 7, aircraft: 'MD-80' },
+  { id: 5, flightNo: 'RV-431', dep: '16:45', durMin: 265, stops: 1, priceToman: 3_650_000, seats: 2, aircraft: 'MD-80' },
+  { id: 6, flightNo: 'VR-550', dep: '11:00', durMin: 150, stops: 0, priceToman: 4_400_000, seats: 6, aircraft: 'MD-80' },
+  { id: 7, flightNo: 'Y9-301', dep: '05:30', durMin: 140, stops: 0, priceToman: 3_720_000, seats: 4, aircraft: 'MD-80' },
+  { id: 8, flightNo: 'ZV-402', dep: '07:15', durMin: 145, stops: 0, priceToman: 3_880_000, seats: 8, aircraft: 'MD-80' },
 ];
 
 function isoAtLocalTime(date: string, hhmm: string, tz: string): string {

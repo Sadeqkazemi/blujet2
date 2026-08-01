@@ -49,7 +49,7 @@ const API_PROXY_PREFIXES = [
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   /** Override when backend PORT ≠ 3000 (see frontend/.env.example). */
-  const apiProxyTarget = env.VITE_DEV_API_PROXY || 'http://127.0.0.1:3000'
+  const apiProxyTarget = env.VITE_DEV_API_PROXY || 'http://127.0.0.1:3001'
 
   const devProxy = Object.fromEntries(
     API_PROXY_PREFIXES.map((prefix) => [
