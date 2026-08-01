@@ -39,6 +39,7 @@ import { changeOwnPassword, setPassword } from '../../api/auth';
 import { faDigits, faMoney, parseTomanToRial } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import type { BookingDetail, PriceLock, SavedFlight, SavedPassenger, SavedBankAccount, CustomerReferralDashboard, CustomerIdentityView, ActiveSession, UserProfile } from '../../types/public-site';
 import AccountSecuritySessions from './AccountSecuritySessions';
 import type { ClubMembershipView } from '../../types/club-membership';
@@ -103,13 +104,16 @@ const TAB_LABEL: Record<TabKey, Tr> = {
   identity: { fa: 'احراز هویت', en: 'Identity Verification', ar: 'التحقق من الهوية' },
 };
 
-const TABS: { key: TabKey; icon: string }[] = [
-  { key: 'profile', icon: '🪪' },
+const PRIMARY_TABS: { key: TabKey; icon: string }[] = [
   { key: 'trips', icon: '🧳' },
   { key: 'wallet', icon: '💳' },
   { key: 'club', icon: '★' },
   { key: 'saved', icon: '🔖' },
   { key: 'price-locks', icon: '🔒' },
+];
+
+const ACCOUNT_TABS: { key: TabKey; icon: string }[] = [
+  { key: 'profile', icon: '🪪' },
   { key: 'passengers', icon: '👤' },
   { key: 'refunds', icon: '↺' },
   { key: 'tickets', icon: '💬' },
@@ -118,6 +122,8 @@ const TABS: { key: TabKey; icon: string }[] = [
   { key: 'referral', icon: '🎁' },
   { key: 'identity', icon: '🛡️' },
 ];
+
+const TABS: { key: TabKey; icon: string }[] = [...PRIMARY_TABS, ...ACCOUNT_TABS];
 
 const TICKET_STATUS_LABEL: Record<SupportTicketStatus, Tr> = {
   OPEN: { fa: 'باز', en: 'Open', ar: 'مفتوح' },
@@ -231,6 +237,9 @@ const STR: Record<StoredLocale, {
   passwordErrorFallback: string;
   passwordMismatch: string;
   passwordTooShort: string;
+  sidebarPointsLabel: string;
+  sidebarWalletLink: string;
+  sidebarLogout: string;
 }> = {
   fa: {
     defaultUserName: 'کاربر',
@@ -317,6 +326,9 @@ const STR: Record<StoredLocale, {
     passwordErrorFallback: 'خطا در تغییر رمز عبور.',
     passwordMismatch: 'تکرار رمز عبور جدید مطابقت ندارد.',
     passwordTooShort: 'رمز عبور جدید باید حداقل ۶ کاراکتر باشد.',
+    sidebarPointsLabel: 'امتیاز باشگاه',
+    sidebarWalletLink: 'کیف پول ›',
+    sidebarLogout: 'خروج از حساب',
   },
   en: {
     defaultUserName: 'User',
@@ -403,6 +415,9 @@ const STR: Record<StoredLocale, {
     passwordErrorFallback: 'Error changing password.',
     passwordMismatch: 'New password confirmation does not match.',
     passwordTooShort: 'New password must be at least 6 characters.',
+    sidebarPointsLabel: 'Loyalty Points',
+    sidebarWalletLink: 'Wallet ›',
+    sidebarLogout: 'Sign Out',
   },
   ar: {
     defaultUserName: 'مستخدم',
@@ -489,12 +504,16 @@ const STR: Record<StoredLocale, {
     passwordErrorFallback: 'خطأ في تغيير كلمة المرور.',
     passwordMismatch: 'تأكيد كلمة المرور الجديدة غير متطابق.',
     passwordTooShort: 'يجب أن تكون كلمة المرور الجديدة ٦ أحرف على الأقل.',
+    sidebarPointsLabel: 'نقاط النادي',
+    sidebarWalletLink: 'المحفظة ›',
+    sidebarLogout: 'تسجيل الخروج',
   },
 };
 
 export default function AccountPage() {
   const { status, user, signOut } = useAuth();
   const { locale } = useLocale();
+  const isMobile = useIsMobile();
   const t = STR[locale];
   const navigate = useNavigate();
   const [tab, setTab] = useState<TabKey>('trips');
@@ -922,52 +941,79 @@ export default function AccountPage() {
 
   return (
     <PublicPageShell>
-      <section style={{ background: 'linear-gradient(150deg,#0d2640,#124a86)', color: '#fff', padding: '36px 22px 30px' }}>
-        <div style={{ maxWidth: 1080, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(255,255,255,.16)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 18 }}>
-            {(user?.fullName ?? t.defaultUserName).trim().split(/\s+/).slice(0, 2).map((p) => p[0]).join('')}
-          </div>
-          <div>
-            <h1 style={{ fontSize: 20, fontWeight: 900, margin: '0 0 4px' }}>{user?.fullName ?? t.defaultUserName}</h1>
-            {club?.isMember && club.level && (
-              <div style={{ fontSize: 12.5, color: '#e7c66b', fontWeight: 700 }}>
-                {t.memberPrefix}
-                {TIER_LABEL[club.level]?.[locale] ?? club.level}
+      <div
+        style={{
+          maxWidth: 1320,
+          margin: '0 auto',
+          padding: '20px 22px 44px',
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : locale === 'en' ? '290px 1fr' : '262px 1fr',
+          gap: 20,
+          alignItems: 'start',
+        }}
+      >
+        <aside
+          style={{
+            position: isMobile ? 'static' : 'sticky',
+            top: isMobile ? undefined : 86,
+            alignSelf: 'start',
+            background: '#fff',
+            border: '1px solid #e9eef4',
+            borderRadius: 18,
+            overflow: 'hidden',
+            boxShadow: '0 20px 44px -32px rgba(13,38,102,.55)',
+          }}
+        >
+          <div style={{ padding: '16px 15px 15px', background: 'linear-gradient(150deg,#123a62 0%,#0c243d 100%)', color: '#fff' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'linear-gradient(135deg,#ffffff2e,#ffffff0f)', border: '1.5px solid #ffffff59', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
+                <svg width="27" height="27" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm0 2c-5.33 0-9 2.69-9 6v2h18v-2c0-3.31-3.67-6-9-6z" /></svg>
               </div>
-            )}
+              <div style={{ minWidth: 0, lineHeight: 1.4 }}>
+                <div style={{ fontSize: '15.5px', fontWeight: 800 }}>{user?.fullName ?? t.defaultUserName}</div>
+                {club?.isMember && club.level && (
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 6, fontSize: 10, fontWeight: 700, color: '#f2d98a', background: '#ffffff17', border: '1px solid #ffffff29', padding: '3px 9px', borderRadius: 12, whiteSpace: 'nowrap' }}>
+                    {t.memberPrefix}
+                    {TIER_LABEL[club.level]?.[locale] ?? club.level}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#ffffff12', border: '1px solid #ffffff24', borderRadius: 12, padding: '9px 8px 9px 12px' }}>
+              <div style={{ lineHeight: 1.35, minWidth: 0 }}>
+                <div style={{ fontSize: '9.5px', color: '#aac4e2', whiteSpace: 'nowrap' }}>{t.sidebarPointsLabel}</div>
+                <div style={{ fontSize: 16, fontWeight: 900, marginTop: 2, whiteSpace: 'nowrap' }}>{club ? faDigits(club.balance) : '—'}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTab('wallet')}
+                style={{ border: 'none', fontSize: 10, fontWeight: 800, color: '#0d2640', background: '#f2d98a', padding: '7px 11px', borderRadius: 9, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}
+              >
+                {t.sidebarWalletLink}
+              </button>
+            </div>
           </div>
-        </div>
-      </section>
-
-      <div style={{ maxWidth: 1080, margin: '0 auto', padding: '0 22px 60px' }}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: -20, marginBottom: 24 }}>
-          {TABS.map((tb) => (
+          <div style={{ padding: 9 }}>
+            {PRIMARY_TABS.map((tb) => (
+              <SidebarNavItem key={tb.key} tb={tb} active={tab === tb.key} locale={locale} onSelect={() => setTab(tb.key)} />
+            ))}
+            <div style={{ height: 6 }} />
+            {ACCOUNT_TABS.map((tb) => (
+              <SidebarNavItem key={tb.key} tb={tb} active={tab === tb.key} locale={locale} onSelect={() => setTab(tb.key)} />
+            ))}
+            <div style={{ height: 1, background: '#eef1f5', margin: '11px 6px 7px' }} />
             <button
-              key={tb.key}
               type="button"
-              data-testid={`account-tab-${tb.key}`}
-              onClick={() => setTab(tb.key)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 7,
-                border: '1px solid #e6eaf0',
-                background: tab === tb.key ? '#1668c4' : '#fff',
-                color: tab === tb.key ? '#fff' : '#3b4554',
-                borderRadius: 12,
-                padding: '10px 16px',
-                fontSize: 12.5,
-                fontWeight: 700,
-                cursor: 'pointer',
-                boxShadow: tab === tb.key ? '0 10px 24px -12px rgba(22,104,196,.5)' : '0 6px 16px -12px rgba(13,38,102,.3)',
-                fontFamily: 'inherit',
-              }}
+              onClick={() => void signOut()}
+              style={{ display: 'flex', alignItems: 'center', gap: 11, width: '100%', padding: '9px 12px', borderRadius: 11, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#e5484d', fontFamily: 'inherit' }}
             >
-              <span>{tb.icon}</span>
-              {TAB_LABEL[tb.key][locale]}
+              <span style={{ width: 20, textAlign: 'center' }}>↩</span>
+              {t.sidebarLogout}
             </button>
-          ))}
-        </div>
+          </div>
+        </aside>
+
+        <main style={{ minWidth: 0 }}>
 
         {error && <p style={{ marginBottom: 16, borderRadius: 10, background: '#fef2f2', padding: 10, fontSize: 12, color: '#e5484d' }}>{error}</p>}
 
@@ -1523,7 +1569,64 @@ export default function AccountPage() {
             )}
           </div>
         )}
+        </main>
       </div>
     </PublicPageShell>
+  );
+}
+
+function SidebarNavItem({
+  tb,
+  active,
+  locale,
+  onSelect,
+}: {
+  tb: { key: TabKey; icon: string };
+  active: boolean;
+  locale: StoredLocale;
+  onSelect: () => void;
+}) {
+  const barSide = locale === 'en' ? 'left' : 'right';
+  return (
+    <button
+      type="button"
+      data-testid={`account-tab-${tb.key}`}
+      onClick={onSelect}
+      style={{
+        position: 'relative',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 11,
+        width: '100%',
+        padding: '9px 12px',
+        borderRadius: 11,
+        border: 'none',
+        cursor: 'pointer',
+        fontSize: locale === 'en' ? 12 : 13,
+        whiteSpace: 'nowrap',
+        fontWeight: active ? 800 : 600,
+        color: active ? '#1668c4' : '#3b4554',
+        background: active ? '#eef4fb' : 'transparent',
+        marginBottom: 2,
+        fontFamily: 'inherit',
+        textAlign: locale === 'en' ? 'left' : 'right',
+      }}
+    >
+      <span
+        style={{
+          position: 'absolute',
+          [barSide]: -1,
+          top: '50%',
+          transform: 'translateY(-50%)',
+          width: 3,
+          height: active ? 18 : 0,
+          borderRadius: 3,
+          background: '#1668c4',
+          transition: 'height .15s',
+        }}
+      />
+      <span style={{ width: 20, textAlign: 'center', flex: 'none' }}>{tb.icon}</span>
+      {TAB_LABEL[tb.key][locale]}
+    </button>
   );
 }
