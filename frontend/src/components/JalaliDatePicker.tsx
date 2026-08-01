@@ -47,10 +47,20 @@ interface JalaliDatePickerProps {
   /** Opt-in: open the calendar as a full-width bottom sheet on mobile
    * (design-reference-v2 search box behavior). Off for panel usages. */
   mobileSheet?: boolean;
+  /** Hide the built-in label row — use when an external label is rendered above. */
+  showLabel?: boolean;
 }
 
 /** Jalali (شمسی) date picker — CLAUDE.md requires Jalali everywhere users pick dates. */
-export default function JalaliDatePicker({ label, value, onChange, minDate, testId, mobileSheet = false }: JalaliDatePickerProps) {
+export default function JalaliDatePicker({
+  label,
+  value,
+  onChange,
+  minDate,
+  testId,
+  mobileSheet = false,
+  showLabel = true,
+}: JalaliDatePickerProps) {
   const isMobile = useIsMobile();
   const asSheet = mobileSheet && isMobile;
   const [open, setOpen] = useState(false);
@@ -79,8 +89,9 @@ export default function JalaliDatePicker({ label, value, onChange, minDate, test
       <div
         data-testid={testId}
         onClick={() => setOpen((v) => !v)}
-        style={{ cursor: 'pointer', padding: '5px 13px', display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}
+        style={{ cursor: 'pointer', padding: showLabel ? '5px 13px' : '0 15px', display: 'flex', flexDirection: 'column', justifyContent: 'center', height: showLabel ? '100%' : 56 }}
       >
+        {showLabel ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#9aa4b2', fontWeight: 600, marginBottom: 3 }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="4" width="18" height="18" rx="2" />
@@ -88,7 +99,16 @@ export default function JalaliDatePicker({ label, value, onChange, minDate, test
           </svg>
           {label}
         </div>
-        <div style={{ fontSize: '13.5px', fontWeight: 800, color: value ? '#0d2640' : '#aeb6c2' }}>{displayValue}</div>
+        ) : null}
+        <div style={{ fontSize: showLabel ? '13.5px' : 14, fontWeight: 800, color: value ? '#16202e' : '#aeb6c2', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <span>{displayValue}</span>
+          {!showLabel ? (
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#8a96a6" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <rect x="3" y="5" width="18" height="16" rx="2" />
+              <path d="M3 10h18M8 3v4M16 3v4" />
+            </svg>
+          ) : null}
+        </div>
       </div>
 
       {open && (
