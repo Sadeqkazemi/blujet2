@@ -39,12 +39,13 @@ export default function FeatureQuickLinks({ locale, labels, hrefs }: FeatureQuic
     <section style={{ maxWidth: 1180, margin: '0 auto', padding: isMobile ? '20px 26px 0' : '49px 26px 23px' }}>
       <div
         style={{
-          display: isMobile ? 'grid' : 'grid',
-          gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
+          display: isMobile ? 'flex' : 'grid',
+          gridTemplateColumns: isMobile ? undefined : 'repeat(4, 1fr)',
           background: '#fff',
           border: '1px solid #eef2f7',
           borderRadius: 16,
-          overflow: 'hidden',
+          overflowX: isMobile ? 'auto' : 'hidden',
+          scrollSnapType: isMobile ? 'x mandatory' : 'none',
         }}
       >
         {labels.map((label, i) => (
@@ -57,7 +58,8 @@ export default function FeatureQuickLinks({ locale, labels, hrefs }: FeatureQuic
               textAlign: 'center',
               border: 'none',
               borderLeft: i > 0 && !isMobile ? '1px solid #eef2f7' : undefined,
-              borderTop: i >= 2 && isMobile ? '1px solid #eef2f7' : undefined,
+              flex: isMobile ? '0 0 calc(50% - 6.5px)' : undefined,
+              scrollSnapAlign: isMobile ? 'start' : undefined,
               padding: '22px 14px',
               display: 'flex',
               flexDirection: 'column',
