@@ -900,8 +900,38 @@ export default function HomeSearchPage() {
         </div>
       </section>
 
+      {(promoBlock?.enabled !== false) && (
+      <section style={{ maxWidth: 1180, margin: '44px auto 0', padding: '0 26px' }}>
+        <div style={{ position: 'relative', borderRadius: 24, overflow: 'hidden', minHeight: isMobile ? 175 : 208, boxShadow: '0 18px 44px -28px rgba(13,38,102,.4)', background: 'linear-gradient(100deg,#0d2666 0%,#1668c4 60%,#3f8ede 100%)' }}>
+          <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'flex-start' : 'center', justifyContent: 'space-between', gap: 26, padding: isMobile ? '22px 20px' : '34px 46px', flexWrap: 'wrap' }}>
+            <div style={{ maxWidth: 560 }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#ffffff22', color: '#fff', padding: '5px 11px', borderRadius: 20, fontSize: '11.5px', fontWeight: 600, marginBottom: 14 }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#7ee0b0' }} />
+                {promoBlock?.badgeText || t.saleBadge}
+              </div>
+              <h2 style={{ fontSize: isMobile ? 19 : 25, fontWeight: 800, color: '#fff', margin: '0 0 10px', letterSpacing: '-.5px' }}>{promoBlock?.title || t.saleTitle}</h2>
+              <p style={{ fontSize: '13.5px', color: '#e7eefb', margin: 0, lineHeight: 1.7, maxWidth: 480 }}>
+                {promoBlock?.subtitle || t.saleSub}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate('/destinations')}
+              style={{ flex: 'none', display: 'inline-flex', alignItems: 'center', gap: 7, padding: '11px 25px', background: '#fff', color: '#1668c4', borderRadius: 12, fontSize: '13.5px', fontWeight: 800, border: 'none', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 12px 28px -14px rgba(11,33,56,.5)' }}
+            >
+              {promoBlock?.buttonText || t.saleBtn} <span style={{ fontSize: '15.5px' }}>{locale === 'en' ? '→' : '←'}</span>
+            </button>
+          </div>
+        </div>
+      </section>
+      )}
+
+      {!isMobile && (
+        <PromoSlider locale={locale} loyaltySlide={loyaltySlide} appSlide={appSlide} />
+      )}
+
       {/* POPULAR DESTINATIONS */}
-      <section style={{ maxWidth: 1180, margin: '0 auto', padding: '39px 26px 20px' }}>
+      <section style={{ maxWidth: 1180, margin: '0 auto', padding: isMobile ? '39px 26px 49px' : '39px 26px 20px' }}>
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 26 }}>
           <div>
             <h2 style={{ fontSize: 19, fontWeight: 800, margin: '0 0 6px', letterSpacing: '-.5px', color: '#16202e' }}>{t.popularDestTitle}</h2>
@@ -986,36 +1016,6 @@ export default function HomeSearchPage() {
           ))}
         </div>
       </section>
-
-      {(promoBlock?.enabled !== false) && (
-      <section style={{ maxWidth: 1180, margin: '44px auto 0', padding: '0 26px' }}>
-        <div style={{ position: 'relative', borderRadius: 24, overflow: 'hidden', minHeight: isMobile ? 175 : 208, boxShadow: '0 18px 44px -28px rgba(13,38,102,.4)', background: 'linear-gradient(100deg,#0d2666 0%,#1668c4 60%,#3f8ede 100%)' }}>
-          <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'flex-start' : 'center', justifyContent: 'space-between', gap: 26, padding: isMobile ? '22px 20px' : '34px 46px', flexWrap: 'wrap' }}>
-            <div style={{ maxWidth: 560 }}>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#ffffff22', color: '#fff', padding: '5px 11px', borderRadius: 20, fontSize: '11.5px', fontWeight: 600, marginBottom: 14 }}>
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#7ee0b0' }} />
-                {promoBlock?.badgeText || t.saleBadge}
-              </div>
-              <h2 style={{ fontSize: isMobile ? 19 : 25, fontWeight: 800, color: '#fff', margin: '0 0 10px', letterSpacing: '-.5px' }}>{promoBlock?.title || t.saleTitle}</h2>
-              <p style={{ fontSize: '13.5px', color: '#e7eefb', margin: 0, lineHeight: 1.7, maxWidth: 480 }}>
-                {promoBlock?.subtitle || t.saleSub}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => navigate('/destinations')}
-              style={{ flex: 'none', display: 'inline-flex', alignItems: 'center', gap: 7, padding: '11px 25px', background: '#fff', color: '#1668c4', borderRadius: 12, fontSize: '13.5px', fontWeight: 800, border: 'none', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 12px 28px -14px rgba(11,33,56,.5)' }}
-            >
-              {promoBlock?.buttonText || t.saleBtn} <span style={{ fontSize: '15.5px' }}>{locale === 'en' ? '→' : '←'}</span>
-            </button>
-          </div>
-        </div>
-      </section>
-      )}
-
-      {!isMobile && (
-        <PromoSlider locale={locale} loyaltySlide={loyaltySlide} appSlide={appSlide} />
-      )}
 
       <SearchLoadingOverlay
         locale={locale}
