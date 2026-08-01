@@ -1,10 +1,12 @@
 import { useAuth } from '../hooks/useAuth';
 import AdminsPage from '../features/admins/AdminsPage';
-import BoardChairAdminsPage from '../features/admins/BoardChairAdminsPage';
+import PanelAdminsPage from '../features/admins/PanelAdminsPage';
 
-/** BOARD_CHAIR uses the design shell with an empty managers list (no seed/mock rows). */
+const PANEL_ADMIN_ROLES = new Set(['BOARD_CHAIR', 'CEO', 'SENIOR_MANAGER']);
+
+/** Executive panels use the dark design shell; others keep the legacy light page. */
 export default function AdminsRouter() {
   const { user } = useAuth();
-  if (user?.role === 'BOARD_CHAIR') return <BoardChairAdminsPage />;
+  if (user?.role && PANEL_ADMIN_ROLES.has(user.role)) return <PanelAdminsPage />;
   return <AdminsPage />;
 }
