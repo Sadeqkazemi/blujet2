@@ -1,5 +1,4 @@
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import TicketPage from './TicketPage';
@@ -52,36 +51,7 @@ describe('TicketPage', () => {
     expect(await screen.findByText('BJABC123')).toBeInTheDocument();
     expect(screen.getByTestId('ticket-barcode')).toBeInTheDocument();
     expect(screen.getByText('علی رضایی')).toBeInTheDocument();
-    expect(screen.getByTestId('open-refund-form')).toBeInTheDocument();
-  });
-
-  it('submits a refund request and shows the penalty breakdown', async () => {
-    vi.spyOn(publicSiteApi, 'fetchBookingByPnr').mockResolvedValue(TICKETED);
-    vi.spyOn(publicSiteApi, 'submitRefund').mockResolvedValue({
-      id: 'r1',
-      trackingCode: 'RF-A1B2C3D4',
-      bookingId: 'b1',
-      pnr: TICKETED.pnr,
-      flightNo: TICKETED.flightNo,
-      originCode: TICKETED.originCode,
-      destCode: TICKETED.destCode,
-      departureAt: TICKETED.departureAt,
-      status: 'SUBMITTED',
-      penaltyPct: 30,
-      penaltyAmountIrr: '114000000',
-      refundableIrr: '266000000',
-      totalPaidIrr: '380000000',
-      history: [{ step: 'submitted', labelFa: 'ثبت درخواست', at: new Date().toISOString() }],
-      createdAt: new Date().toISOString(),
-      paidAt: null,
-    });
-    renderPage();
-
-    await userEvent.click(await screen.findByTestId('open-refund-form'));
-    await userEvent.type(screen.getByTestId('refund-iban'), 'IR820170000000332211009900');
-    await userEvent.click(screen.getByTestId('submit-refund'));
-
-    expect(await screen.findByText(/درخواست استرداد ثبت شد/)).toBeInTheDocument();
+    expect(screen.queryByTestId('open-refund-form')).not.toBeInTheDocument();
   });
 
   it('renders English strings when locale is en', async () => {
@@ -89,6 +59,6 @@ describe('TicketPage', () => {
     renderPage('en');
 
     expect(await screen.findByText('E-ticket')).toBeInTheDocument();
-    expect(screen.getByText('Request ticket refund')).toBeInTheDocument();
+    expect(screen.queryByText('Request ticket refund')).not.toBeInTheDocument();
   });
 });
