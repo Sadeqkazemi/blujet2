@@ -45,7 +45,7 @@ describe('AgencySalesPage', () => {
     vi.spyOn(portalApi, 'fetchSales').mockResolvedValue(REPORT);
     render(<AgencySalesPage />);
 
-    expect(await screen.findByText('Sales & Reports')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Sales & Reports' })).toBeInTheDocument();
     expect(screen.getByText('Total Sales (Toman)')).toBeInTheDocument();
     expect(screen.getByText('Sales per Flight')).toBeInTheDocument();
     expect(screen.getByText('Ticketed')).toBeInTheDocument();
@@ -56,7 +56,7 @@ describe('AgencySalesPage', () => {
     vi.spyOn(portalApi, 'fetchSales').mockResolvedValue(REPORT);
     render(<AgencySalesPage />);
 
-    expect(await screen.findByText('المبيعات والتقارير')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'المبيعات والتقارير' })).toBeInTheDocument();
     expect(screen.getByText('تم إصدار التذكرة')).toBeInTheDocument();
   });
 

@@ -57,7 +57,7 @@ describe('AgencyProfilePage', () => {
     vi.spyOn(portalApi, 'fetchDocuments').mockResolvedValue(DOCUMENTS);
     render(<AgencyProfilePage />);
 
-    expect(await screen.findByText('Profile & Documents')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Profile & Documents' })).toBeInTheDocument();
     expect(screen.getByText('License Number')).toBeInTheDocument();
     expect(screen.getByText('Gold Partner Agency')).toBeInTheDocument();
     expect(screen.getByText('Pending')).toBeInTheDocument();
@@ -69,7 +69,7 @@ describe('AgencyProfilePage', () => {
     vi.spyOn(portalApi, 'fetchDocuments').mockResolvedValue(DOCUMENTS);
     render(<AgencyProfilePage />);
 
-    expect(await screen.findByText('الملف الشخصي والمستندات')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'الملف الشخصي والمستندات' })).toBeInTheDocument();
     expect(screen.getByText('قيد المراجعة')).toBeInTheDocument();
   });
 });
