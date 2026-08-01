@@ -8,6 +8,7 @@ import type { CabinClass, SavedPassenger, SeatMapCell } from '../../types/public
 import PublicPageShell from '../../components/public/PublicPageShell';
 import FlowStepper from '../../components/public/FlowStepper';
 import SavedPassengerAutofill, { savedPassengerToDraft } from './SavedPassengerAutofill';
+import { latinDigits } from '../../lib/fa-format';
 
 const BUSINESS_SEAT_MIN_POINTS = 15_000;
 
@@ -112,6 +113,14 @@ const STR: Record<
   },
 };
 
+function sanitizeMobileInput(raw: string) {
+  return latinDigits(raw).replace(/[^\d]/g, '').slice(0, 11);
+}
+
+function sanitizeOtpInput(raw: string) {
+  return latinDigits(raw).replace(/\D/g, '').slice(0, 6);
+}
+
 function OtpLoginInline() {
   const { requestOtp, verifyOtp } = useAuth();
   const { locale } = useLocale();
@@ -151,10 +160,14 @@ function OtpLoginInline() {
         <form onSubmit={onRequest} className="flex flex-col gap-3">
           <input
             data-testid="otp-phone"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+            dir="ltr"
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            onChange={(e) => setPhone(sanitizeMobileInput(e.target.value))}
             placeholder={t.otpPhonePlaceholder}
-            className="rounded-lg border border-[#eef1f5] px-3.5 py-2.5 text-sm outline-none focus:border-[#1668c4]"
+            className="rounded-lg border border-[#eef1f5] px-3.5 py-2.5 text-sm text-[#16202e] outline-none focus:border-[#1668c4]"
           />
           <button type="submit" className="rounded-lg bg-[#1668c4] px-4 py-2.5 text-sm font-bold text-white">
             {t.otpRequest}
@@ -164,11 +177,21 @@ function OtpLoginInline() {
         <form onSubmit={onVerify} className="flex flex-col gap-3">
           <input
             data-testid="otp-code"
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            dir="ltr"
             value={code}
-            onChange={(e) => setCode(e.target.value)}
+            onChange={(e) => setCode(sanitizeOtpInput(e.target.value))}
             placeholder={t.otpCodePlaceholder}
-            className="font-num rounded-lg border border-[#eef1f5] px-3.5 py-2.5 text-sm outline-none focus:border-[#1668c4]"
+            maxLength={6}
+            className="font-num rounded-lg border border-[#eef1f5] px-3.5 py-2.5 text-sm text-[#16202e] outline-none focus:border-[#1668c4]"
           />
+          {import.meta.env.DEV && (
+            <p data-testid="otp-dev-hint" className="text-center text-[11px] text-[#6b7585]">
+              {locale === 'en' ? 'Dev OTP code: 123456' : 'کد توسعه (OTP): ۱۲۳۴۵۶'}
+            </p>
+          )}
           <button type="submit" className="rounded-lg bg-[#1668c4] px-4 py-2.5 text-sm font-bold text-white">
             {t.otpVerify}
           </button>

@@ -17,6 +17,7 @@ import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import { CustomerReferralsService } from '../customer-referrals/customer-referrals.service';
 import type { Locale, Role } from '../../../generated/prisma/enums';
 import { normalizeIranPhone } from '../../common/normalize-iran-phone';
+import { generateOtpCode } from '../../common/generate-otp-code';
 
 export interface AuthUserView {
   id: string;
@@ -59,7 +60,7 @@ const STAFF_ROLES = [
 ] as const;
 
 function generateSixDigitCode(): string {
-  return crypto.randomInt(0, 1_000_000).toString().padStart(6, '0');
+  return generateOtpCode();
 }
 
 function hashToken(token: string): string {
@@ -534,11 +535,14 @@ export class AuthService {
     phone: string,
     referralCode?: string,
   ): Promise<{ challengeId: string }> {
-    const existing = await this.prisma.user.findUnique({ where: { phone } });
+    const normalizedPhone = normalizeIranPhone(phone);
+    const existing = await this.prisma.user.findUnique({
+      where: { phone: normalizedPhone },
+    });
     const user = await this.prisma.user.upsert({
-      where: { phone },
+      where: { phone: normalizedPhone },
       update: {},
-      create: { role: 'USER', phone, fullName: phone },
+      create: { role: 'USER', phone: normalizedPhone, fullName: normalizedPhone },
     });
     if (!existing) {
       await this.customerReferrals.applyOnSignup(user.id, referralCode);
@@ -550,7 +554,16 @@ export class AuthService {
       });
     }
 
-    const code = generateSixDigitCode();
+    await this.prisma.twoFactorChallenge.updateMany({
+      where: {
+        userId: user.id,
+        purpose: 'CUSTOMER_OTP_LOGIN',
+        consumedAt: null,
+      },
+      data: { consumedAt: new Date() },
+    });
+
+    const code = generateOtpCode();
     const challenge = await this.prisma.twoFactorChallenge.create({
       data: {
         userId: user.id,
