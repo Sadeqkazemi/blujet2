@@ -1,12 +1,36 @@
+import type { CSSProperties } from 'react';
 import { useEffect, useState } from 'react';
 import { fetchSystemLogs } from '../../api/it-manager';
 import { formatJalaliDateTime } from '../../lib/jalali';
+import { StaffAlert, StaffPanelCard, StaffPanelPageHeader } from '../../components/staff-panel-ui';
+import { STAFF_PANEL } from '../../lib/staff-panel-theme';
+import { staffCard, staffStatusStyle } from '../../lib/staff-panel-styles';
 import type { AuditLogRow } from '../../types/it-manager';
 
-const LEVEL_LABEL: Record<AuditLogRow['level'], { label: string; className: string }> = {
-  info: { label: 'info', className: 'bg-[#3b82f62e] text-[#1d4ed8]' },
-  warn: { label: 'warn', className: 'bg-[#f59e0b24] text-[#b45309]' },
-  error: { label: 'error', className: 'bg-danger/15 text-danger' },
+const LEVEL_LABEL: Record<AuditLogRow['level'], { label: string; tone: 'accent' | 'warning' | 'danger' }> = {
+  info: { label: 'info', tone: 'accent' },
+  warn: { label: 'warn', tone: 'warning' },
+  error: { label: 'error', tone: 'danger' },
+};
+
+const tableHeader: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '0.9fr 1.2fr 2fr 0.8fr 0.7fr',
+  gap: 8,
+  borderBottom: `1px solid ${STAFF_PANEL.sidebarBorder}`,
+  padding: '10px 16px',
+  fontSize: 10.5,
+  fontWeight: 800,
+  color: STAFF_PANEL.textMuted,
+};
+
+const tableRow: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '0.9fr 1.2fr 2fr 0.8fr 0.7fr',
+  gap: 8,
+  alignItems: 'center',
+  padding: '12px 16px',
+  fontSize: 11,
 };
 
 export default function LogsPage() {
@@ -20,14 +44,16 @@ export default function LogsPage() {
   }, []);
 
   return (
-    <div className="p-8">
-      <h1 className="mb-1 text-xl font-black text-ink">لاگ و رویدادها</h1>
-      <p className="mb-6 text-sm text-muted">فعالیت‌های ثبت‌شدهٔ کارمندان واحدها — اقدامات و ایجاد حساب‌ها</p>
+    <div style={{ padding: '24px 28px' }}>
+      <StaffPanelPageHeader
+        title="لاگ و رویدادها"
+        subtitle="فعالیت‌های ثبت‌شدهٔ کارمندان واحدها — اقدامات و ایجاد حساب‌ها"
+      />
 
-      {error && <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">{error}</p>}
+      {error && <StaffAlert tone="error">{error}</StaffAlert>}
 
-      <section className="overflow-hidden rounded-xl border border-border bg-white">
-        <div className="grid grid-cols-[0.9fr_1.2fr_2fr_0.8fr_0.7fr] gap-2 border-b border-border bg-surface px-4 py-2.5 text-[10.5px] font-bold text-muted">
+      <div style={{ ...staffCard, overflow: 'hidden' }}>
+        <div style={tableHeader}>
           <span>زمان</span>
           <span>کارمند</span>
           <span>رویداد</span>
@@ -35,29 +61,34 @@ export default function LogsPage() {
           <span>سطح</span>
         </div>
         {logs.length === 0 ? (
-          <p className="py-8 text-center text-xs text-muted">فعالیتی از کارمندان ثبت نشده است.</p>
+          <p style={{ padding: '32px 0', textAlign: 'center', fontSize: 11, color: STAFF_PANEL.textMuted }}>
+            فعالیتی از کارمندان ثبت نشده است.
+          </p>
         ) : (
-          <ul className="divide-y divide-border">
-            {logs.map((l) => {
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+            {logs.map((l, idx) => {
               const lvl = LEVEL_LABEL[l.level] ?? LEVEL_LABEL.info;
               return (
                 <li
                   key={l.id}
-                  className="grid grid-cols-[0.9fr_1.2fr_2fr_0.8fr_0.7fr] items-center gap-2 px-4 py-3 text-xs"
+                  style={{
+                    ...tableRow,
+                    borderTop: idx > 0 ? `1px solid ${STAFF_PANEL.sidebarBorder}` : undefined,
+                  }}
                 >
-                  <span className="font-num text-muted">{formatJalaliDateTime(l.createdAt)}</span>
-                  <span className="font-bold text-text-2">{l.actorName}</span>
-                  <span className="text-text-2">{l.action} — {l.detail}</span>
-                  <span className="text-text-2">{l.unit}</span>
-                  <span className={`w-fit rounded-full px-2 py-0.5 text-[10px] font-bold ${lvl.className}`}>
-                    {lvl.label}
+                  <span style={{ color: STAFF_PANEL.textMuted }}>{formatJalaliDateTime(l.createdAt)}</span>
+                  <span style={{ fontWeight: 800, color: STAFF_PANEL.text }}>{l.actorName}</span>
+                  <span style={{ color: STAFF_PANEL.navMuted }}>
+                    {l.action} — {l.detail}
                   </span>
+                  <span style={{ color: STAFF_PANEL.navMuted }}>{l.unit}</span>
+                  <span style={staffStatusStyle(lvl.tone)}>{lvl.label}</span>
                 </li>
               );
             })}
           </ul>
         )}
-      </section>
+      </div>
     </div>
   );
 }

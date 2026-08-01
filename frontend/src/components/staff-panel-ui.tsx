@@ -343,3 +343,81 @@ export function StaffCountPill({ children }: { children: ReactNode }) {
     </span>
   );
 }
+
+export function StaffToggle({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={onChange}
+      style={{
+        position: 'relative',
+        height: 24,
+        width: 44,
+        borderRadius: 12,
+        border: 'none',
+        cursor: 'pointer',
+        background: checked ? STAFF_PANEL.accent : STAFF_PANEL.inputBorder,
+        transition: 'background 0.2s',
+        flexShrink: 0,
+      }}
+    >
+      <span
+        style={{
+          position: 'absolute',
+          top: 2,
+          right: checked ? 2 : 22,
+          height: 20,
+          width: 20,
+          borderRadius: '50%',
+          background: '#fff',
+          transition: 'right 0.2s',
+        }}
+      />
+    </button>
+  );
+}
+
+export function StaffSecondaryButton({
+  children,
+  onClick,
+  disabled,
+  danger,
+}: {
+  children: ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        borderRadius: 10,
+        border: `1px solid ${danger ? STAFF_PANEL.danger : STAFF_PANEL.inputBorder}`,
+        background: 'transparent',
+        color: danger ? STAFF_PANEL.danger : STAFF_PANEL.navMuted,
+        padding: '8px 14px',
+        fontSize: 11,
+        fontWeight: 800,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.5 : 1,
+        fontFamily: 'inherit',
+      }}
+    >
+      {children}
+    </button>
+  );
+}

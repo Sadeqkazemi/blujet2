@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import {
   createExternalService,
@@ -11,11 +12,45 @@ import {
 import { faDigits, faPercent } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import Modal from '../../components/Modal';
+import {
+  StaffAlert,
+  StaffCountPill,
+  StaffPanelCard,
+  StaffPanelPageHeader,
+  StaffPrimaryButton,
+  StaffSecondaryButton,
+  StaffToggle,
+} from '../../components/staff-panel-ui';
+import { STAFF_PANEL } from '../../lib/staff-panel-theme';
+import { staffInnerTile, staffInput, staffStatusStyle } from '../../lib/staff-panel-styles';
 import type { ExternalService, InternalService, SmsLogResult } from '../../types/it-manager';
 
 const SMS_MESSAGE_TYPE_LABEL: Record<string, string> = {
   OTP: 'کد یکبار مصرف',
   TEMP_PASSWORD: 'رمز موقت',
+};
+
+const inputStyle: CSSProperties = {
+  ...staffInput,
+  width: '100%',
+  padding: 12,
+  fontSize: 12,
+  boxSizing: 'border-box',
+};
+
+const labelStyle: CSSProperties = {
+  display: 'block',
+  marginBottom: 4,
+  fontWeight: 800,
+  fontSize: 12,
+  color: STAFF_PANEL.text,
+};
+
+const serviceCardStyle: CSSProperties = {
+  background: STAFF_PANEL.cardBg,
+  border: `1px solid ${STAFF_PANEL.cardBorder}`,
+  borderRadius: 14,
+  padding: 12,
 };
 
 export default function ServicesPage() {
@@ -171,166 +206,223 @@ export default function ServicesPage() {
     }
   }
 
+  const activeCount = internal.filter((s) => s.enabled).length + external.filter((s) => s.enabled).length;
+  const totalCount = internal.length + external.length;
+
   return (
-    <div className="p-8">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-black text-ink">سرویس‌های سایت</h1>
-          <p className="mt-1 text-sm text-muted">وضعیت و کنترل تمام سرویس‌های فعال در سایت</p>
-        </div>
-        <div className="flex items-center gap-4 text-xs">
-          <span className="rounded-xl border border-border bg-white px-3 py-2">
-            <span className="font-num font-black text-[#059669]">
-              {faDigits(internal.filter((s) => s.enabled).length + external.filter((s) => s.enabled).length)}
-            </span>{' '}
-            <span className="text-muted">سرویس فعال</span>
-          </span>
-          <span className="rounded-xl border border-border bg-white px-3 py-2">
-            <span className="font-num font-black text-ink">
-              {faDigits(internal.length + external.length)}
-            </span>{' '}
-            <span className="text-muted">کل سرویس‌ها</span>
-          </span>
+    <div style={{ padding: '24px 28px' }}>
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: 12,
+          marginBottom: 24,
+        }}
+      >
+        <StaffPanelPageHeader
+          title="سرویس‌های سایت"
+          subtitle="وضعیت و کنترل تمام سرویس‌های فعال در سایت"
+        />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4, fontSize: 11 }}>
+          <StaffCountPill>
+            <span style={{ fontWeight: 900, color: STAFF_PANEL.success }}>{faDigits(activeCount)}</span>{' '}
+            <span style={{ color: STAFF_PANEL.textMuted }}>سرویس فعال</span>
+          </StaffCountPill>
+          <StaffCountPill>
+            <span style={{ fontWeight: 900, color: STAFF_PANEL.text }}>{faDigits(totalCount)}</span>{' '}
+            <span style={{ color: STAFF_PANEL.textMuted }}>کل سرویس‌ها</span>
+          </StaffCountPill>
         </div>
       </div>
 
-      {error && <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">{error}</p>}
+      {error && <StaffAlert tone="error">{error}</StaffAlert>}
 
-      <h2 className="mb-3 text-sm font-bold text-ink">سرویس‌های داخلی سایت</h2>
-      <div className="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <h2 style={{ marginBottom: 12, fontSize: 13, fontWeight: 800, color: STAFF_PANEL.text }}>سرویس‌های داخلی سایت</h2>
+      <div
+        style={{
+          marginBottom: 32,
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+          gap: 12,
+        }}
+      >
         {internal.map((s) => (
-          <div key={s.id} className="rounded-xl border border-border bg-white p-3">
-            <div className="mb-3 flex items-start justify-between gap-2">
+          <div key={s.id} style={serviceCardStyle}>
+            <div style={{ marginBottom: 12, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
               <div>
-                <div className="text-xs font-bold text-ink">{s.nameFa}</div>
-                <div className="mt-0.5 text-[10px] text-muted">آپ‌تایم {faPercent(s.uptimePct)}</div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: STAFF_PANEL.text }}>{s.nameFa}</div>
+                <div style={{ marginTop: 2, fontSize: 10, color: STAFF_PANEL.textMuted }}>آپ‌تایم {faPercent(s.uptimePct)}</div>
               </div>
-              <button
-                role="switch"
-                aria-checked={s.enabled}
-                aria-label={s.nameFa}
-                onClick={() => void onToggleInternal(s)}
-                className={`relative h-6 w-11 rounded-full transition ${s.enabled ? 'bg-accent' : 'bg-border'}`}
-              >
-                <span
-                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${
-                    s.enabled ? 'right-0.5' : 'right-[22px]'
-                  }`}
-                />
-              </button>
+              <StaffToggle checked={s.enabled} onChange={() => void onToggleInternal(s)} label={s.nameFa} />
             </div>
-            <span
-              className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                s.enabled ? 'bg-[#10b98124] text-[#059669]' : 'bg-danger/15 text-danger'
-              }`}
-            >
-              {s.enabled ? 'فعال' : 'غیرفعال'}
-            </span>
+            <span style={staffStatusStyle(s.enabled ? 'success' : 'danger')}>{s.enabled ? 'فعال' : 'غیرفعال'}</span>
           </div>
         ))}
       </div>
 
       {smsLog && (
-        <div className="mb-8 rounded-xl border border-border bg-white p-4">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-bold text-ink">سامانه پیامک (SMS)</h2>
-            <span
-              className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                smsLog.enabled ? 'bg-[#10b98124] text-[#059669]' : 'bg-danger/15 text-danger'
-              }`}
-            >
+        <StaffPanelCard
+          title="سامانه پیامک (SMS)"
+          style={{ marginBottom: 32 }}
+          headerAction={
+            <span style={staffStatusStyle(smsLog.enabled ? 'success' : 'danger')}>
               {smsLog.enabled ? 'فعال' : 'غیرفعال'}
             </span>
-          </div>
-          <div className="mb-4 flex gap-6 text-xs">
+          }
+        >
+          <div style={{ marginBottom: 16, display: 'flex', gap: 24, fontSize: 11 }}>
             <div>
-              <span className="font-num font-black text-[#059669]">{faDigits(smsLog.todaySuccessCount)}</span>{' '}
-              <span className="text-muted">ارسال موفق امروز</span>
+              <span style={{ fontWeight: 900, color: STAFF_PANEL.success }}>{faDigits(smsLog.todaySuccessCount)}</span>{' '}
+              <span style={{ color: STAFF_PANEL.textMuted }}>ارسال موفق امروز</span>
             </div>
             <div>
-              <span className="font-num font-black text-danger">{faDigits(smsLog.todayFailedCount)}</span>{' '}
-              <span className="text-muted">ارسال ناموفق امروز</span>
+              <span style={{ fontWeight: 900, color: STAFF_PANEL.danger }}>{faDigits(smsLog.todayFailedCount)}</span>{' '}
+              <span style={{ color: STAFF_PANEL.textMuted }}>ارسال ناموفق امروز</span>
             </div>
           </div>
-          <div className="flex flex-col divide-y divide-border/60">
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
             {smsLog.recent.length === 0 && (
-              <p className="py-2 text-xs text-muted">پیامکی ثبت نشده است.</p>
+              <p style={{ padding: '8px 0', fontSize: 11, color: STAFF_PANEL.textMuted, margin: 0 }}>
+                پیامکی ثبت نشده است.
+              </p>
             )}
-            {smsLog.recent.map((r) => (
-              <div key={r.id} data-testid="sms-log-row" className="flex items-center gap-3 py-2 text-xs">
-                <div className="ltr font-num min-w-[110px] text-muted">{r.phoneMasked}</div>
-                <div className="min-w-[110px] text-ink">{SMS_MESSAGE_TYPE_LABEL[r.messageType] ?? r.messageType}</div>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                    r.status === 'SUCCESS' ? 'bg-[#10b98124] text-[#059669]' : 'bg-danger/15 text-danger'
-                  }`}
-                >
+            {smsLog.recent.map((r, idx) => (
+              <div
+                key={r.id}
+                data-testid="sms-log-row"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '8px 0',
+                  fontSize: 11,
+                  borderTop: idx > 0 ? `1px solid ${STAFF_PANEL.sidebarBorder}` : undefined,
+                }}
+              >
+                <div style={{ direction: 'ltr', minWidth: 110, color: STAFF_PANEL.textMuted }}>{r.phoneMasked}</div>
+                <div style={{ minWidth: 110, color: STAFF_PANEL.text }}>
+                  {SMS_MESSAGE_TYPE_LABEL[r.messageType] ?? r.messageType}
+                </div>
+                <span style={staffStatusStyle(r.status === 'SUCCESS' ? 'success' : 'danger')}>
                   {r.status === 'SUCCESS' ? 'موفق' : 'ناموفق'}
                 </span>
-                {r.failureReason && <span className="text-[10.5px] text-danger">{r.failureReason}</span>}
-                <span className="mr-auto text-[10.5px] text-muted">{formatJalaliDateTime(r.createdAt)}</span>
+                {r.failureReason && (
+                  <span style={{ fontSize: 10.5, color: STAFF_PANEL.danger }}>{r.failureReason}</span>
+                )}
+                <span style={{ marginRight: 'auto', fontSize: 10.5, color: STAFF_PANEL.textMuted }}>
+                  {formatJalaliDateTime(r.createdAt)}
+                </span>
               </div>
             ))}
           </div>
-        </div>
+        </StaffPanelCard>
       )}
 
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-bold text-ink">سرویس‌های خارجی (API)</h2>
-        <button
+      <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <h2 style={{ fontSize: 13, fontWeight: 800, color: STAFF_PANEL.text, margin: 0 }}>سرویس‌های خارجی (API)</h2>
+        <StaffPrimaryButton
           onClick={() => {
             setAddError(null);
             setAddOpen(true);
           }}
-          className="rounded-lg bg-accent px-3 py-1.5 text-[11px] font-bold text-white transition hover:bg-accent/90"
+          style={{ padding: '6px 12px', fontSize: 11 }}
         >
           افزودن سرویس خارجی
-        </button>
+        </StaffPrimaryButton>
       </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+          gap: 12,
+        }}
+      >
         {external.map((s) => (
-          <div key={s.id} className="rounded-xl border border-border bg-white p-3">
-            <div className="mb-2 flex items-start justify-between gap-2">
+          <div key={s.id} style={serviceCardStyle}>
+            <div style={{ marginBottom: 8, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
               <div>
-                <div className="text-xs font-bold text-ink">{s.nameFa}</div>
-                <div className="mt-0.5 text-[10px] text-muted">{s.provider}</div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: STAFF_PANEL.text }}>{s.nameFa}</div>
+                <div style={{ marginTop: 2, fontSize: 10, color: STAFF_PANEL.textMuted }}>{s.provider}</div>
               </div>
-              <button
-                role="switch"
-                aria-checked={s.enabled}
-                aria-label={s.nameFa}
-                onClick={() => onToggleExternal(s)}
-                className={`relative h-6 w-11 rounded-full transition ${s.enabled ? 'bg-accent' : 'bg-border'}`}
-              >
-                <span
-                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${
-                    s.enabled ? 'right-0.5' : 'right-[22px]'
-                  }`}
-                />
-              </button>
+              <StaffToggle checked={s.enabled} onChange={() => onToggleExternal(s)} label={s.nameFa} />
             </div>
-            <div className="ltr mb-2 truncate rounded-md bg-surface px-2 py-1 text-[10px] text-muted">{s.endpoint}</div>
+            <div
+              style={{
+                ...staffInnerTile,
+                marginBottom: 8,
+                direction: 'ltr',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                fontSize: 10,
+                color: STAFF_PANEL.textMuted,
+              }}
+            >
+              {s.endpoint}
+            </div>
             {testResult?.id === s.id && (
-              <div className={`mb-2 rounded-md p-1.5 text-[10px] ${testResult.ok ? 'bg-[#10b98115] text-[#059669]' : 'bg-danger/10 text-danger'}`}>
+              <div
+                style={{
+                  marginBottom: 8,
+                  borderRadius: 8,
+                  padding: 6,
+                  fontSize: 10,
+                  ...(testResult.ok
+                    ? { background: 'rgba(52,211,153,0.12)', color: STAFF_PANEL.success }
+                    : { background: 'rgba(248,113,113,0.12)', color: STAFF_PANEL.danger }),
+                }}
+              >
                 {testResult.message}
               </div>
             )}
-            <div className="flex items-center justify-between">
-              <span
-                className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                  s.enabled ? 'bg-[#10b98124] text-[#059669]' : 'bg-danger/15 text-danger'
-                }`}
-              >
-                {s.enabled ? 'فعال' : 'غیرفعال'}
-              </span>
-              <div className="flex gap-2">
-                <button onClick={() => onOpenSettings(s)} className="text-[10.5px] font-bold text-accent">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={staffStatusStyle(s.enabled ? 'success' : 'danger')}>{s.enabled ? 'فعال' : 'غیرفعال'}</span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => onOpenSettings(s)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    fontSize: 10.5,
+                    fontWeight: 800,
+                    color: STAFF_PANEL.link,
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
                   تنظیمات
                 </button>
-                <button onClick={() => void onTest(s)} className="text-[10.5px] font-bold text-accent">
+                <button
+                  type="button"
+                  onClick={() => void onTest(s)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    fontSize: 10.5,
+                    fontWeight: 800,
+                    color: STAFF_PANEL.link,
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
                   تست اتصال
                 </button>
-                <button onClick={() => void onRemove(s)} className="text-[10.5px] font-bold text-danger">
+                <button
+                  type="button"
+                  onClick={() => void onRemove(s)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    fontSize: 10.5,
+                    fontWeight: 800,
+                    color: STAFF_PANEL.danger,
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
                   حذف
                 </button>
               </div>
@@ -340,17 +432,17 @@ export default function ServicesPage() {
       </div>
 
       {addOpen && (
-        <Modal title="تعریف سرویس خارجی جدید" onClose={() => setAddOpen(false)}>
-          <label className="mb-1 block text-xs font-bold text-ink" htmlFor="svc-name">
+        <Modal dark title="تعریف سرویس خارجی جدید" onClose={() => setAddOpen(false)}>
+          <label style={labelStyle} htmlFor="svc-name">
             نام سرویس
           </label>
           <input
             id="svc-name"
             value={form.nameFa}
             onChange={(e) => setForm({ ...form, nameFa: e.target.value })}
-            className="w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent"
+            style={inputStyle}
           />
-          <label className="mb-1 mt-3 block text-xs font-bold text-ink" htmlFor="svc-endpoint">
+          <label style={{ ...labelStyle, marginTop: 12 }} htmlFor="svc-endpoint">
             آدرس Endpoint
           </label>
           <input
@@ -359,9 +451,9 @@ export default function ServicesPage() {
             value={form.endpoint}
             onChange={(e) => setForm({ ...form, endpoint: e.target.value })}
             placeholder="https://api.provider.com/v1/"
-            className="ltr w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent"
+            style={inputStyle}
           />
-          <label className="mb-1 mt-3 block text-xs font-bold text-ink" htmlFor="svc-key">
+          <label style={{ ...labelStyle, marginTop: 12 }} htmlFor="svc-key">
             کلید احراز (API Key)
           </label>
           <input
@@ -369,39 +461,32 @@ export default function ServicesPage() {
             dir="ltr"
             value={form.apiKey}
             onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
-            className="ltr w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent"
+            style={inputStyle}
           />
           {addError && (
-            <p role="alert" className="mt-2 text-xs text-danger">
+            <p role="alert" style={{ marginTop: 8, fontSize: 11, color: STAFF_PANEL.danger }}>
               {addError}
             </p>
           )}
-          <div className="mt-4 flex justify-end gap-2">
-            <button onClick={() => setAddOpen(false)} className="rounded-lg bg-surface px-4 py-2 text-xs font-bold text-text-2">
-              انصراف
-            </button>
-            <button
-              onClick={() => void onCreate()}
-              className="rounded-lg bg-accent px-4 py-2 text-xs font-bold text-white transition hover:bg-accent/90"
-            >
-              ثبت و اتصال سرویس
-            </button>
+          <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <StaffSecondaryButton onClick={() => setAddOpen(false)}>انصراف</StaffSecondaryButton>
+            <StaffPrimaryButton onClick={() => void onCreate()}>ثبت و اتصال سرویس</StaffPrimaryButton>
           </div>
         </Modal>
       )}
 
       {editTarget && (
-        <Modal title="تنظیمات سرویس" onClose={() => setEditTarget(null)}>
-          <label className="mb-1 block text-xs font-bold text-ink" htmlFor="edit-svc-name">
+        <Modal dark title="تنظیمات سرویس" onClose={() => setEditTarget(null)}>
+          <label style={labelStyle} htmlFor="edit-svc-name">
             نام سرویس
           </label>
           <input
             id="edit-svc-name"
             value={editForm.nameFa}
             onChange={(e) => setEditForm({ ...editForm, nameFa: e.target.value })}
-            className="w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent"
+            style={inputStyle}
           />
-          <label className="mb-1 mt-3 block text-xs font-bold text-ink" htmlFor="edit-svc-endpoint">
+          <label style={{ ...labelStyle, marginTop: 12 }} htmlFor="edit-svc-endpoint">
             آدرس Endpoint
           </label>
           <input
@@ -409,11 +494,11 @@ export default function ServicesPage() {
             dir="ltr"
             value={editForm.endpoint}
             onChange={(e) => setEditForm({ ...editForm, endpoint: e.target.value })}
-            className="ltr w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent"
+            style={inputStyle}
           />
-          <div className="mt-3 grid grid-cols-2 gap-3">
+          <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
-              <label className="mb-1 block text-xs font-bold text-ink" htmlFor="edit-svc-method">
+              <label style={labelStyle} htmlFor="edit-svc-method">
                 متد
               </label>
               <select
@@ -421,14 +506,14 @@ export default function ServicesPage() {
                 dir="ltr"
                 value={editForm.method}
                 onChange={(e) => setEditForm({ ...editForm, method: e.target.value as 'GET' | 'POST' })}
-                className="ltr w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent"
+                style={inputStyle}
               >
                 <option value="POST">POST</option>
                 <option value="GET">GET</option>
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-bold text-ink" htmlFor="edit-svc-timeout">
+              <label style={labelStyle} htmlFor="edit-svc-timeout">
                 مهلت اتصال (میلی‌ثانیه)
               </label>
               <input
@@ -437,11 +522,11 @@ export default function ServicesPage() {
                 inputMode="numeric"
                 value={editForm.timeoutMs}
                 onChange={(e) => setEditForm({ ...editForm, timeoutMs: e.target.value })}
-                className="ltr w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent"
+                style={inputStyle}
               />
             </div>
           </div>
-          <label className="mb-1 mt-3 block text-xs font-bold text-ink" htmlFor="edit-svc-key">
+          <label style={{ ...labelStyle, marginTop: 12 }} htmlFor="edit-svc-key">
             کلید احراز (API Key)
           </label>
           <input
@@ -450,55 +535,65 @@ export default function ServicesPage() {
             value={editForm.apiKey}
             onChange={(e) => setEditForm({ ...editForm, apiKey: e.target.value })}
             placeholder={editTarget.hasApiKey ? 'برای تغییر وارد کنید — خالی یعنی بدون تغییر' : '—'}
-            className="ltr w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent placeholder:text-[10px]"
+            style={{ ...inputStyle, fontSize: 11 }}
           />
           {editError && (
-            <p role="alert" className="mt-2 text-xs text-danger">
+            <p role="alert" style={{ marginTop: 8, fontSize: 11, color: STAFF_PANEL.danger }}>
               {editError}
             </p>
           )}
-          <div className="mt-4 flex justify-end gap-2">
-            <button onClick={() => setEditTarget(null)} className="rounded-lg bg-surface px-4 py-2 text-xs font-bold text-text-2">
-              انصراف
-            </button>
-            <button
-              onClick={() => void onSaveSettings()}
-              className="rounded-lg bg-accent px-4 py-2 text-xs font-bold text-white transition hover:bg-accent/90"
-            >
-              ثبت تغییرات
-            </button>
+          <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <StaffSecondaryButton onClick={() => setEditTarget(null)}>انصراف</StaffSecondaryButton>
+            <StaffPrimaryButton onClick={() => void onSaveSettings()}>ثبت تغییرات</StaffPrimaryButton>
           </div>
         </Modal>
       )}
 
       {confirmTarget && (
         <Modal
+          dark
           title={confirmTarget.service.enabled ? 'غیرفعال‌سازی سرویس' : 'فعال‌سازی سرویس'}
           onClose={() => setConfirmTarget(null)}
         >
-          <p className="mb-4 text-xs text-muted">
+          <p style={{ marginBottom: 16, fontSize: 11, color: STAFF_PANEL.textMuted }}>
             آیا سرویس «{confirmTarget.service.nameFa}» روی سایت{' '}
             {confirmTarget.service.enabled ? 'غیرفعال' : 'فعال'} شود؟
           </p>
-          <div className="flex justify-end gap-2">
-            <button
-              onClick={() => setConfirmTarget(null)}
-              className="rounded-lg bg-surface px-4 py-2 text-xs font-bold text-text-2"
-            >
-              انصراف
-            </button>
-            <button
-              onClick={() =>
-                void (confirmTarget.kind === 'internal'
-                  ? confirmToggleInternal()
-                  : confirmToggleExternal())
-              }
-              className={`rounded-lg px-4 py-2 text-xs font-bold text-white ${
-                confirmTarget.service.enabled ? 'bg-danger' : 'bg-accent'
-              }`}
-            >
-              {confirmTarget.service.enabled ? 'غیرفعال کن' : 'فعال کن'}
-            </button>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <StaffSecondaryButton onClick={() => setConfirmTarget(null)}>انصراف</StaffSecondaryButton>
+            {confirmTarget.service.enabled ? (
+              <button
+                type="button"
+                onClick={() =>
+                  void (confirmTarget.kind === 'internal'
+                    ? confirmToggleInternal()
+                    : confirmToggleExternal())
+                }
+                style={{
+                  borderRadius: 10,
+                  background: STAFF_PANEL.danger,
+                  color: '#fff',
+                  padding: '8px 16px',
+                  fontSize: 11.5,
+                  fontWeight: 800,
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                غیرفعال کن
+              </button>
+            ) : (
+              <StaffPrimaryButton
+                onClick={() =>
+                  void (confirmTarget.kind === 'internal'
+                    ? confirmToggleInternal()
+                    : confirmToggleExternal())
+                }
+              >
+                فعال کن
+              </StaffPrimaryButton>
+            )}
           </div>
         </Modal>
       )}
