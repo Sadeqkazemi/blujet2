@@ -124,6 +124,7 @@ describe('CheckoutPage', () => {
     expect(screen.getByTestId('checkout-route-label')).toHaveTextContent('تهران به مشهد');
     expect(screen.getByTestId('checkout-pax-step')).toBeInTheDocument();
     expect(screen.getByTestId('checkout-pricing-sidebar')).toBeInTheDocument();
+    expect(screen.getByTestId('checkout-next')).toHaveTextContent('تأیید و ادامه');
     expect(screen.getByTestId('checkout-mobile-sticky')).toBeInTheDocument();
     expect(screen.getByTestId('checkout-next-mobile')).toHaveTextContent('تأیید و ادامه');
   });
