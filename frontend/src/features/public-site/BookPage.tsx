@@ -3,9 +3,9 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { createBooking, fetchClubPoints, fetchSavedPassengers, fetchSeatMap } from '../../api/publicSite';
-import { fetchDevLastOtp } from '../../api/auth';
 import { ApiRequestError } from '../../api/envelope';
 import { faDigits, isValidIranMobile, normalizeIranMobile } from '../../lib/fa-format';
+import { isMockOtpEnabled, MOCK_CUSTOMER_OTP_CODE } from '../../lib/mock-customer-otp';
 import type { CabinClass, SavedPassenger, SeatMapCell } from '../../types/public-site';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import FlowStepper from '../../components/public/FlowStepper';
@@ -59,7 +59,7 @@ const STR: Record<
     otpSent: (phone) => `کد تأیید به ${faDigits(phone)} ارسال شد.`,
     otpRequesting: 'در حال ارسال…',
     otpResend: 'ارسال مجدد کد',
-    otpDevHint: (code) => `محیط توسعه — کد: ${faDigits(code)}`,
+    otpDevHint: (code) => `کد آزمایشی: ${faDigits(code)}`,
     title: 'انتخاب صندلی و اطلاعات مسافران',
     businessLock: '🔒 انتخاب صندلی بیزینس نیازمند حداقل ۱۵٬۰۰۰ امتیاز باشگاه است',
     seatMapLoading: 'در حال بارگذاری نقشه صندلی…',
@@ -88,7 +88,7 @@ const STR: Record<
     otpSent: (phone) => `Verification code sent to ${phone}.`,
     otpRequesting: 'Sending…',
     otpResend: 'Resend code',
-    otpDevHint: (code) => `Dev — code: ${code}`,
+    otpDevHint: (code) => `Test code: ${code}`,
     title: 'Seat selection & passenger details',
     businessLock: '🔒 Business seat selection requires at least 15,000 club points',
     seatMapLoading: 'Loading seat map…',
@@ -117,7 +117,7 @@ const STR: Record<
     otpSent: (phone) => `تم إرسال الرمز إلى ${phone}.`,
     otpRequesting: 'جارٍ الإرسال…',
     otpResend: 'إعادة إرسال الرمز',
-    otpDevHint: (code) => `بيئة التطوير — الرمز: ${code}`,
+    otpDevHint: (code) => `رمز تجريبي: ${code}`,
     title: 'اختيار المقعد وبيانات المسافرين',
     businessLock: '🔒 اختيار مقعد درجة الأعمال يتطلب ١٥٬٠٠٠ نقطة على الأقل',
     seatMapLoading: 'جارٍ تحميل خريطة المقاعد…',
@@ -160,22 +160,17 @@ function OtpLoginInline() {
       return;
     }
     setBusy(true);
-    let issuedChallengeId: string | null = null;
     try {
-      issuedChallengeId = await requestOtp(normalizedPhone);
+      const issuedChallengeId = await requestOtp(normalizedPhone);
       setChallengeId(issuedChallengeId);
       setCode('');
+      if (isMockOtpEnabled()) {
+        setDevCode(MOCK_CUSTOMER_OTP_CODE);
+      }
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.otpSendError);
     } finally {
       setBusy(false);
-    }
-    if (issuedChallengeId && import.meta.env.DEV) {
-      void fetchDevLastOtp(normalizedPhone)
-        .then(({ code: mockCode }) => setDevCode(mockCode))
-        .catch(() => {
-          /* mock endpoint unavailable outside dev */
-        });
     }
   }
 
