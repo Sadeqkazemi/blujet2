@@ -118,6 +118,8 @@ describe('HomeSearchPage', () => {
     renderPage();
 
     expect(await screen.findByTestId('home-origin')).toBeInTheDocument();
+    expect(screen.getByTestId('home-origin')).toHaveTextContent('شهر مبدا');
+    expect(screen.getByTestId('home-dest')).toHaveTextContent('ابتدا مبدا را انتخاب کنید');
     expect(screen.getByTestId('home-search-submit')).toBeInTheDocument();
     expect(document.getElementById('search-card')).toBeInTheDocument();
   });
@@ -171,6 +173,18 @@ describe('HomeSearchPage', () => {
     expect(screen.getByTestId('popular-route-MHD')).toBeInTheDocument();
     expect(screen.getByText('با رسیدن به حد امتیاز، کارت عضویت بگیر')).toBeInTheDocument();
     expect(screen.getByText('سفرت را همراه خودت ببر')).toBeInTheDocument();
+  });
+
+  it('shows selected city names in origin and destination fields', async () => {
+    mockHomeApis();
+    renderPage();
+    await screen.findByTestId('home-origin');
+
+    await pickAirport('home-origin', 'THR');
+    await pickAirport('home-dest', 'MHD');
+
+    expect(screen.getByTestId('home-origin')).toHaveTextContent('تهران');
+    expect(screen.getByTestId('home-dest')).toHaveTextContent('مشهد');
   });
 
   it('rejects identical origin and destination', async () => {

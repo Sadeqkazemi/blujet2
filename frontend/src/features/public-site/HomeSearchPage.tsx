@@ -15,21 +15,11 @@ import HomeSearchCard from './home/HomeSearchCard';
 import HomePromoCarousel from './home/HomePromoCarousel';
 import { QUICK_LINK_ICONS } from './home/home-icons';
 import { HOME_EXTRA, buildSearchCopy } from './home/home-copy';
+import { AIRPORT_CITY_NAMES, airportCityName } from '../../lib/airport-cities';
 
 const TODAY_ISO = new Date().toISOString().slice(0, 10);
 
-// Raw route/airport data: kept locale-neutral (city names + numeric toman
-// amounts), formatted per-locale at render time so fa/en/ar all show the
-// same real underlying prices — no invented USD conversion like the design
-// mock's EN mode, since the real backend always charges in IRR/toman.
-const CITY_NAMES: Record<string, Record<StoredLocale, string>> = {
-  THR: { fa: 'تهران', en: 'Tehran', ar: 'طهران' },
-  MHD: { fa: 'مشهد', en: 'Mashhad', ar: 'مشهد' },
-  IST: { fa: 'استانبول', en: 'Istanbul', ar: 'إسطنبول' },
-  DXB: { fa: 'دبی', en: 'Dubai', ar: 'دبي' },
-  KIH: { fa: 'کیش', en: 'Kish', ar: 'كيش' },
-  SYZ: { fa: 'شیراز', en: 'Shiraz', ar: 'شيراز' },
-};
+const CITY_NAMES = AIRPORT_CITY_NAMES;
 
 const COUNTRY_NAMES: Record<string, Record<StoredLocale, string>> = {
   IST: { fa: 'ترکیه', en: 'Turkey', ar: 'تركيا' },
@@ -138,6 +128,9 @@ const STR: Record<StoredLocale, {
     lblDestination: 'مقصد',
     lblDepartDate: 'تاریخ رفت',
     selectPlaceholder: 'انتخاب کنید',
+    originPlaceholder: 'شهر مبدا',
+    destPlaceholder: 'شهر مقصد',
+    destNeedOriginPlaceholder: 'ابتدا مبدا را انتخاب کنید',
     btnSearchFlight: 'جستجوی پرواز',
     popularRoutesTitle: 'مسیرهای پرتردد',
     popularRoutesSub: 'ارزان‌ترین نرخ در پرطرفدارترین مسیرها',
@@ -193,6 +186,9 @@ const STR: Record<StoredLocale, {
     lblDestination: 'To',
     lblDepartDate: 'Departure date',
     selectPlaceholder: 'Select',
+    originPlaceholder: 'Origin city',
+    destPlaceholder: 'Destination city',
+    destNeedOriginPlaceholder: 'Select origin first',
     btnSearchFlight: 'Search Flights',
     popularRoutesTitle: 'Popular Routes',
     popularRoutesSub: 'The best fares on the most popular routes',
@@ -248,6 +244,9 @@ const STR: Record<StoredLocale, {
     lblDestination: 'إلى',
     lblDepartDate: 'تاريخ المغادرة',
     selectPlaceholder: 'اختر',
+    originPlaceholder: 'مدينة المغادرة',
+    destPlaceholder: 'مدينة الوصول',
+    destNeedOriginPlaceholder: 'اختر المغادرة أولاً',
     btnSearchFlight: 'البحث عن رحلات',
     popularRoutesTitle: 'المسارات الأكثر طلبًا',
     popularRoutesSub: 'أرخص الأسعار على أكثر المسارات طلبًا',
@@ -373,8 +372,7 @@ export default function HomeSearchPage() {
   }, [homeContent]);
 
   const cityName = useMemo(
-    () => (code: string, cityFa?: string) =>
-      CITY_NAMES[code]?.[locale] ?? cityFa ?? code,
+    () => (code: string, cityFa?: string) => airportCityName(code, locale, cityFa),
     [locale],
   );
 
@@ -386,6 +384,9 @@ export default function HomeSearchPage() {
     lblDestination: t.lblDestination,
     lblDepartDate: t.lblDepartDate,
     selectPlaceholder: t.selectPlaceholder,
+    originPlaceholder: t.originPlaceholder,
+    destPlaceholder: t.destPlaceholder,
+    destNeedOriginPlaceholder: t.destNeedOriginPlaceholder,
     cityListLabel: locale === 'en' ? 'Cities with an airport' : locale === 'ar' ? 'مدن بها مطار' : 'شهرهای دارای فرودگاه',
     popularRoutesTitle: t.popularRoutesTitle,
     popularRoutesSub: t.popularRoutesSub,
