@@ -413,51 +413,52 @@ export default function HomeSearchPage() {
   const gridCols4 = isMobile ? 'repeat(2, 1fr)' : 'repeat(4,1fr)';
   const gridColsRoutes = isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(180px, 1fr))';
 
-  return (
-    <PublicPageShell>
-      {!annClosed && (annBlock?.enabled !== false) && (
-        <div style={{ background: 'linear-gradient(90deg,#0a1f36,#0d2640 40%,#123457)', color: '#fff', position: 'relative', zIndex: 40 }}>
-          <div style={{ maxWidth: 1320, margin: '0 auto', padding: isMobile ? '8px 44px 8px 14px' : '11px 26px', display: 'flex', alignItems: 'center', justifyContent: isMobile ? 'flex-start' : 'center', gap: 14, flexWrap: isMobile ? 'nowrap' : 'wrap' }}>
-            <span style={{ fontSize: isMobile ? '11.5px' : '13.5px', fontWeight: 800, textAlign: isMobile ? 'right' : 'center' }}>{annBlock?.title || t.announcement}</span>
-            <button
-              type="button"
-              onClick={() => navigate('/flight-status')}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#f2c94c', color: '#0d2640', padding: '6px 16px', borderRadius: 20, fontSize: 12, fontWeight: 800, border: 'none', cursor: 'pointer', flex: 'none', fontFamily: 'inherit' }}
-            >
-              {annBlock?.buttonText || t.annView} <span style={{ fontSize: 12 }}>{locale === 'en' ? '→' : '←'}</span>
-            </button>
-            <button
-              type="button"
-              data-testid="ann-close"
-              onClick={() => setAnnClosed(true)}
-              aria-label={t.annClose}
-              style={{
-                position: 'absolute',
-                left: 14,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                width: 26,
-                height: 26,
-                borderRadius: '50%',
-                background: 'rgba(255,255,255,.12)',
-                color: '#cfe0f2',
-                border: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 14,
-                cursor: 'pointer',
-                lineHeight: 1,
-              }}
-            >
-              ×
-            </button>
-          </div>
+  const announcementBar =
+    !annClosed && annBlock?.enabled !== false ? (
+      <div style={{ background: 'linear-gradient(90deg,#0a1f36,#0d2640 40%,#123457)', color: '#fff', position: 'relative', zIndex: 60 }}>
+        <div style={{ maxWidth: 1320, margin: '0 auto', padding: isMobile ? '8px 44px 8px 14px' : '11px 26px', display: 'flex', alignItems: 'center', justifyContent: isMobile ? 'flex-start' : 'center', gap: 14, flexWrap: isMobile ? 'nowrap' : 'wrap' }}>
+          <span style={{ fontSize: isMobile ? '11.5px' : '13.5px', fontWeight: 800, textAlign: isMobile ? 'right' : 'center' }}>{annBlock?.title || t.announcement}</span>
+          <button
+            type="button"
+            onClick={() => navigate('/flight-status')}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#f2c94c', color: '#0d2640', padding: '6px 16px', borderRadius: 20, fontSize: 12, fontWeight: 800, border: 'none', cursor: 'pointer', flex: 'none', fontFamily: 'inherit' }}
+          >
+            {annBlock?.buttonText || t.annView} <span style={{ fontSize: 12 }}>{locale === 'en' ? '→' : '←'}</span>
+          </button>
+          <button
+            type="button"
+            data-testid="ann-close"
+            onClick={() => setAnnClosed(true)}
+            aria-label={t.annClose}
+            style={{
+              position: 'absolute',
+              left: 14,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              width: 26,
+              height: 26,
+              borderRadius: '50%',
+              background: 'rgba(255,255,255,.12)',
+              color: '#cfe0f2',
+              border: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 14,
+              cursor: 'pointer',
+              lineHeight: 1,
+            }}
+          >
+            ×
+          </button>
         </div>
-      )}
+      </div>
+    ) : null;
 
+  return (
+    <PublicPageShell beforeHeader={announcementBar}>
       <section style={{ background: '#f6f8fb' }}>
-        <div style={{ position: 'relative', height: isMobile ? 380 : 420, overflow: 'hidden', background: 'linear-gradient(110deg,#0d2640 0%,#123a63 50%,#1668c4 100%)' }}>
+        <div style={{ position: 'relative', height: isMobile ? 380 : 500, overflow: 'hidden', background: 'linear-gradient(110deg,#0d2640 0%,#123a63 50%,#1668c4 100%)' }}>
           <div style={{ position: 'absolute', inset: 0, zIndex: 2 }}>
             <div style={{ maxWidth: 1180, margin: '0 auto', padding: '0 26px', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
               <div style={{ maxWidth: 600 }}>

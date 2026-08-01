@@ -172,7 +172,7 @@ export default function PublicFooter() {
         <>
           <div
             style={{
-              maxWidth: 1320,
+              maxWidth: 1180,
               margin: '0 auto',
               padding: '39px 26px 20px',
               display: 'grid',
