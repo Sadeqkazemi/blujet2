@@ -281,3 +281,65 @@ export function staffSegmentedControl(active: boolean): CSSProperties {
     color: active ? '#fff' : STAFF_PANEL.navMuted,
   };
 }
+
+export function StaffAlert({ tone, children }: { tone: 'error' | 'success'; children: ReactNode }) {
+  const bg = tone === 'error' ? 'rgba(248,113,113,0.12)' : 'rgba(52,211,153,0.12)';
+  const color = tone === 'error' ? STAFF_PANEL.danger : STAFF_PANEL.success;
+  return (
+    <p style={{ marginBottom: 16, borderRadius: 10, background: bg, padding: '10px 12px', fontSize: 12, color }}>
+      {children}
+    </p>
+  );
+}
+
+export function StaffPrimaryButton({
+  children,
+  onClick,
+  disabled,
+  style,
+}: {
+  children: ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  style?: CSSProperties;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        borderRadius: 10,
+        background: STAFF_PANEL.accent,
+        color: '#fff',
+        padding: '8px 16px',
+        fontSize: 11.5,
+        fontWeight: 800,
+        border: 'none',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.5 : 1,
+        fontFamily: 'inherit',
+        ...style,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+export function StaffCountPill({ children }: { children: ReactNode }) {
+  return (
+    <span
+      style={{
+        borderRadius: 20,
+        background: STAFF_PANEL.inputBg,
+        padding: '6px 12px',
+        fontSize: 11,
+        fontWeight: 800,
+        color: STAFF_PANEL.navMuted,
+      }}
+    >
+      {children}
+    </span>
+  );
+}

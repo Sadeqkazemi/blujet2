@@ -13,6 +13,13 @@ import { faDigits } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import Modal from '../../components/Modal';
 import JalaliDatePicker from '../../components/JalaliDatePicker';
+import {
+  StaffAlert,
+  StaffCountPill,
+  StaffPanelPageHeader,
+  StaffPrimaryButton,
+} from '../../components/staff-panel-ui';
+import { STAFF_PANEL } from '../../lib/staff-panel-theme';
 import ComposeMessageModal from './ComposeMessageModal';
 import type {
   CartableCategory,
@@ -123,48 +130,77 @@ export default function CartablePage() {
   const tasks = result?.tasks ?? [];
 
   return (
-    <div className="p-8">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-black text-ink">کارتابل من</h1>
-          <p className="mt-1 text-sm text-muted">درخواست‌های در انتظار بررسی شما</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="rounded-full bg-surface px-3 py-1.5 text-xs font-bold text-text-2">
-            {faDigits(result?.totalOpen ?? 0)} مورد
-          </span>
-          <button
-            onClick={() => setComposeOpen(true)}
-            className="rounded-lg bg-accent px-4 py-2 text-xs font-bold text-white transition hover:bg-accent/90"
-          >
-            ایجاد پیام
-          </button>
+    <div style={{ padding: '24px 28px' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 24 }}>
+        <StaffPanelPageHeader title="کارتابل من" subtitle="درخواست‌های در انتظار بررسی شما" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+          <StaffCountPill>{faDigits(result?.totalOpen ?? 0)} مورد</StaffCountPill>
+          <StaffPrimaryButton onClick={() => setComposeOpen(true)}>ایجاد پیام</StaffPrimaryButton>
         </div>
       </div>
 
-      {error && <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">{error}</p>}
-      {notice && <p className="mb-4 rounded-lg bg-[#10b98115] p-3 text-sm text-[#059669]">{notice}</p>}
+      {error && <StaffAlert tone="error">{error}</StaffAlert>}
+      {notice && <StaffAlert tone="success">{notice}</StaffAlert>}
 
       {hasChairGate && (
-        <section className="mb-6 rounded-xl border border-[#f59e0b40] bg-[#f59e0b0d] p-5">
-          <h2 className="text-sm font-bold text-[#92400e]">ارجاع و ارسال گزارش به رئیس هیئت مدیره</h2>
-          <p className="mt-1 text-[11px] leading-relaxed text-[#92400e]/80">
+        <section
+          style={{
+            marginBottom: 24,
+            borderRadius: 14,
+            border: `1px solid rgba(245,158,11,0.35)`,
+            background: 'rgba(245,158,11,0.08)',
+            padding: 16,
+          }}
+        >
+          <h2 style={{ fontSize: 13, fontWeight: 800, color: STAFF_PANEL.warning, margin: 0 }}>
+            ارجاع و ارسال گزارش به رئیس هیئت مدیره
+          </h2>
+          <p style={{ marginTop: 4, fontSize: 11, lineHeight: 1.6, color: STAFF_PANEL.navMuted }}>
             دسترسی کامل کارتابل و ارجاعات مخصوص مدیر ارشد و مدیر عامل است؛ ارسال گزارش به رئیس هیئت مدیره
             نیازمند مجوز ایشان است.
           </p>
-          <div className="mt-3">
+          <div style={{ marginTop: 12 }}>
             {chairPerm?.status === 'APPROVED' ? (
-              <span className="rounded-full bg-[#10b98124] px-3 py-1.5 text-xs font-bold text-[#059669]">
+              <span
+                style={{
+                  borderRadius: 20,
+                  background: 'rgba(52,211,153,0.15)',
+                  padding: '6px 12px',
+                  fontSize: 11,
+                  fontWeight: 800,
+                  color: STAFF_PANEL.success,
+                }}
+              >
                 مجوز تأیید شد ✓
               </span>
             ) : chairPerm?.status === 'PENDING' ? (
-              <span className="rounded-full bg-[#f59e0b24] px-3 py-1.5 text-xs font-bold text-[#b45309]">
+              <span
+                style={{
+                  borderRadius: 20,
+                  background: 'rgba(245,158,11,0.15)',
+                  padding: '6px 12px',
+                  fontSize: 11,
+                  fontWeight: 800,
+                  color: STAFF_PANEL.warning,
+                }}
+              >
                 درخواست ارسال شد — در انتظار تأیید
               </span>
             ) : (
               <button
+                type="button"
                 onClick={() => void onRequestChairPerm()}
-                className="rounded-lg bg-[#b45309] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#92400e]"
+                style={{
+                  borderRadius: 10,
+                  background: STAFF_PANEL.warning,
+                  color: '#fff',
+                  padding: '8px 14px',
+                  fontSize: 11.5,
+                  fontWeight: 800,
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
               >
                 درخواست مجوز از رئیس هیئت مدیره
               </button>
@@ -173,65 +209,100 @@ export default function CartablePage() {
         </section>
       )}
 
-      <div className="mb-4 flex flex-wrap items-end gap-3">
-        <div>
-          <JalaliDatePicker label="فیلتر روز (شمسی)" value={filterDate} onChange={setFilterDate} />
-        </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 12, marginBottom: 16 }}>
+        <JalaliDatePicker label="فیلتر روز (شمسی)" value={filterDate} onChange={setFilterDate} />
         {filterDate && (
           <button
+            type="button"
             onClick={() => setFilterDate(null)}
-            className="rounded-lg border border-border px-3 py-2 text-xs font-bold text-muted transition hover:text-ink"
+            style={{
+              borderRadius: 10,
+              border: `1px solid ${STAFF_PANEL.inputBorder}`,
+              background: 'transparent',
+              padding: '8px 12px',
+              fontSize: 11,
+              fontWeight: 700,
+              color: STAFF_PANEL.textMuted,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
           >
             حذف فیلتر روز
           </button>
         )}
       </div>
 
-      <div className="mb-6 grid grid-cols-3 gap-4">
-        {CATEGORY_CARDS.map((c) => (
-          <button
-            key={c.key}
-            onClick={() => setCategory(category === c.key ? null : c.key)}
-            className={`rounded-xl border p-4 text-right transition ${
-              category === c.key ? 'border-accent bg-accent/5' : 'border-border bg-white hover:border-accent/40'
-            }`}
-          >
-            <div className="text-[11px] text-muted">{c.label}</div>
-            <div className="font-num mt-1 text-lg font-black text-ink">
-              {faDigits(result?.counts[c.key] ?? 0)}
-            </div>
-          </button>
-        ))}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
+        {CATEGORY_CARDS.map((c) => {
+          const active = category === c.key;
+          return (
+            <button
+              key={c.key}
+              type="button"
+              onClick={() => setCategory(active ? null : c.key)}
+              style={{
+                borderRadius: 14,
+                border: `1px solid ${active ? STAFF_PANEL.accent : STAFF_PANEL.cardBorder}`,
+                background: active ? STAFF_PANEL.accentSoft : STAFF_PANEL.cardBg,
+                padding: 14,
+                textAlign: 'right',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              <div style={{ fontSize: 11, color: STAFF_PANEL.textMuted }}>{c.label}</div>
+              <div style={{ marginTop: 4, fontSize: 18, fontWeight: 900, color: '#fff' }}>
+                {faDigits(result?.counts[c.key] ?? 0)}
+              </div>
+            </button>
+          );
+        })}
       </div>
 
       {loading ? (
-        <p className="py-10 text-center text-sm text-muted">در حال بارگذاری…</p>
+        <p style={{ padding: '40px 0', textAlign: 'center', fontSize: 12, color: STAFF_PANEL.textMuted }}>در حال بارگذاری…</p>
       ) : tasks.length === 0 ? (
-        <p className="py-10 text-center text-sm text-muted">
+        <p style={{ padding: '40px 0', textAlign: 'center', fontSize: 12, color: STAFF_PANEL.textMuted }}>
           {category ? 'موردی با این فیلتر یافت نشد ✓' : 'کارتابل خالی است ✓'}
         </p>
       ) : (
-        <ul className="space-y-3">
+        <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
           {tasks.map((t) => (
-            <li key={t.id} className="flex flex-wrap items-center gap-4 rounded-xl border border-border bg-white p-4">
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-bold text-ink">{t.title}</span>
-                  <span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-[10px] font-bold text-accent">
+            <li
+              key={t.id}
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                gap: 14,
+                borderRadius: 14,
+                border: `1px solid ${STAFF_PANEL.cardBorder}`,
+                background: STAFF_PANEL.cardBg,
+                padding: 14,
+              }}
+            >
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: STAFF_PANEL.text }}>{t.title}</span>
+                  <span
+                    style={{
+                      borderRadius: 20,
+                      background: STAFF_PANEL.accentSoft,
+                      padding: '3px 10px',
+                      fontSize: 10,
+                      fontWeight: 800,
+                      color: STAFF_PANEL.accent,
+                    }}
+                  >
                     {CATEGORY_BADGES[t.category]}
                   </span>
                 </div>
-                <div className="mt-1 text-[11px] text-muted">
+                <div style={{ marginTop: 4, fontSize: 11, color: STAFF_PANEL.textMuted }}>
                   ارسال از: {t.senderLabelFa ?? t.sender?.fullName ?? '—'}
                 </div>
               </div>
-              <span className="font-num text-[10px] text-muted-2">{formatJalaliDateTime(t.createdAt)}</span>
-              <button
-                onClick={() => openReview(t)}
-                className="rounded-lg bg-accent px-4 py-2 text-xs font-bold text-white transition hover:bg-accent/90"
-              >
-                بررسی
-              </button>
+              <span style={{ fontSize: 10, color: STAFF_PANEL.textMuted }}>{formatJalaliDateTime(t.createdAt)}</span>
+              <StaffPrimaryButton onClick={() => openReview(t)}>بررسی</StaffPrimaryButton>
             </li>
           ))}
         </ul>
@@ -246,18 +317,25 @@ export default function CartablePage() {
 
       {reviewTask && (
         <Modal title="بررسی درخواست" onClose={() => setReviewTask(null)}>
-          <div className="mb-3">
-            <div className="text-sm font-bold text-ink">{reviewTask.title}</div>
-            <p className="mt-1 text-xs leading-relaxed text-text-2">{reviewTask.description}</p>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: STAFF_PANEL.text }}>{reviewTask.title}</div>
+            <p style={{ marginTop: 4, fontSize: 11, lineHeight: 1.6, color: STAFF_PANEL.textMuted }}>{reviewTask.description}</p>
           </div>
-          <div className="mb-4 rounded-lg bg-surface p-3">
-            <div className="text-[10px] text-muted">ارسال‌کننده‌ی درخواست</div>
-            <div className="mt-0.5 text-xs font-bold text-ink">
+          <div
+            style={{
+              marginBottom: 16,
+              borderRadius: 10,
+              background: STAFF_PANEL.inputBg,
+              padding: 12,
+            }}
+          >
+            <div style={{ fontSize: 10, color: STAFF_PANEL.textMuted }}>ارسال‌کننده‌ی درخواست</div>
+            <div style={{ marginTop: 2, fontSize: 11, fontWeight: 800, color: STAFF_PANEL.text }}>
               {reviewTask.senderLabelFa ?? reviewTask.sender?.fullName ?? '—'}
             </div>
           </div>
 
-          <label className="mb-1 block text-xs font-bold text-ink" htmlFor="review-note">
+          <label style={{ display: 'block', marginBottom: 4, fontSize: 11, fontWeight: 800, color: STAFF_PANEL.text }} htmlFor="review-note">
             نظر مدیر *
           </label>
           <textarea
@@ -266,17 +344,39 @@ export default function CartablePage() {
             onChange={(e) => setNote(e.target.value)}
             placeholder="توضیح یا دلیل تصمیم خود را بنویسید…"
             rows={3}
-            className="w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent"
+            style={{
+              width: '100%',
+              borderRadius: 10,
+              border: `1px solid ${STAFF_PANEL.inputBorder}`,
+              background: STAFF_PANEL.inputBg,
+              color: STAFF_PANEL.text,
+              padding: 12,
+              fontSize: 11,
+              outline: 'none',
+              fontFamily: 'inherit',
+              boxSizing: 'border-box',
+            }}
           />
 
-          <label className="mb-1 mt-3 block text-xs font-bold text-ink" htmlFor="review-transfer">
+          <label style={{ display: 'block', marginTop: 12, marginBottom: 4, fontSize: 11, fontWeight: 800, color: STAFF_PANEL.text }} htmlFor="review-transfer">
             انتقال به مدیر دیگر (اختیاری)
           </label>
           <select
             id="review-transfer"
             value={transferTo}
             onChange={(e) => setTransferTo(e.target.value)}
-            className="w-full rounded-lg border border-border bg-white p-3 text-xs outline-none transition focus:border-accent"
+            style={{
+              width: '100%',
+              borderRadius: 10,
+              border: `1px solid ${STAFF_PANEL.inputBorder}`,
+              background: STAFF_PANEL.inputBg,
+              color: STAFF_PANEL.text,
+              padding: 12,
+              fontSize: 11,
+              outline: 'none',
+              fontFamily: 'inherit',
+              boxSizing: 'border-box',
+            }}
           >
             <option value="">— انتخاب مدیر —</option>
             {staff.map((s) => (
@@ -287,28 +387,62 @@ export default function CartablePage() {
           </select>
 
           {reviewError && (
-            <p role="alert" className="mt-2 text-xs text-danger">
+            <p role="alert" style={{ marginTop: 8, fontSize: 11, color: STAFF_PANEL.danger }}>
               {reviewError}
             </p>
           )}
 
-          <div className="mt-4 flex justify-end gap-2">
+          <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
             <button
+              type="button"
               onClick={() => void onDecide('transfer')}
               disabled={!transferTo}
-              className="rounded-lg border border-accent/40 px-4 py-2 text-xs font-bold text-accent transition hover:bg-accent/5 disabled:opacity-50"
+              style={{
+                borderRadius: 10,
+                border: `1px solid ${STAFF_PANEL.accent}`,
+                background: 'transparent',
+                color: STAFF_PANEL.accent,
+                padding: '8px 16px',
+                fontSize: 11.5,
+                fontWeight: 800,
+                cursor: transferTo ? 'pointer' : 'not-allowed',
+                opacity: transferTo ? 1 : 0.5,
+                fontFamily: 'inherit',
+              }}
             >
               انتقال
             </button>
             <button
+              type="button"
               onClick={() => void onDecide('reject')}
-              className="rounded-lg bg-danger px-4 py-2 text-xs font-bold text-white transition hover:bg-danger/90"
+              style={{
+                borderRadius: 10,
+                background: STAFF_PANEL.danger,
+                color: '#fff',
+                padding: '8px 16px',
+                fontSize: 11.5,
+                fontWeight: 800,
+                border: 'none',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
             >
               انصراف
             </button>
             <button
+              type="button"
               onClick={() => void onDecide('approve')}
-              className="rounded-lg bg-[#059669] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#047857]"
+              style={{
+                borderRadius: 10,
+                background: STAFF_PANEL.success,
+                color: '#fff',
+                padding: '8px 16px',
+                fontSize: 11.5,
+                fontWeight: 800,
+                border: 'none',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
             >
               تأیید
             </button>

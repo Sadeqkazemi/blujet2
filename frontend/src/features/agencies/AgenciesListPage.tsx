@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
@@ -8,29 +9,56 @@ import {
   settleAgency,
 } from '../../api/agencies';
 import { faDigits, faMoney } from '../../lib/fa-format';
+import {
+  StaffAlert,
+  StaffKpiCard,
+  StaffPanelCard,
+  StaffPanelPageHeader,
+  staffSegmentedControl,
+} from '../../components/staff-panel-ui';
+import { STAFF_PANEL } from '../../lib/staff-panel-theme';
 import { TIER_LABELS, statusBadge } from './agency-labels';
 import type { AgencyListResult, AgencyListRow, AgencyMembershipRequest } from '../../types/agencies';
 
 type SubTab = 'list' | 'credit';
 
-function KpiCard({ label, value, valueClass }: { label: string; value: string; valueClass: string }) {
+function CreditBar({ usedIrr, limitIrr }: { usedIrr: number; limitIrr: number }) {
+  const pct = limitIrr > 0 ? Math.min((usedIrr / limitIrr) * 100, 100) : usedIrr > 0 ? 100 : 0;
+  const color = pct >= 90 ? STAFF_PANEL.danger : pct >= 60 ? STAFF_PANEL.warning : STAFF_PANEL.success;
   return (
-    <div className="rounded-xl border border-border bg-white p-4">
-      <div className="text-[11px] text-muted">{label}</div>
-      <div className={`font-num mt-1 text-lg font-black ${valueClass}`}>{value}</div>
+    <div style={{ height: 6, width: '100%', overflow: 'hidden', borderRadius: 4, background: STAFF_PANEL.inputBg }}>
+      <div style={{ height: '100%', background: color, width: `${pct}%` }} />
     </div>
   );
 }
 
-function CreditBar({ usedIrr, limitIrr }: { usedIrr: number; limitIrr: number }) {
-  const pct = limitIrr > 0 ? Math.min((usedIrr / limitIrr) * 100, 100) : usedIrr > 0 ? 100 : 0;
-  const tone = pct >= 90 ? 'bg-danger' : pct >= 60 ? 'bg-[#f59e0b]' : 'bg-[#059669]';
-  return (
-    <div className="h-1.5 w-full overflow-hidden rounded bg-surface">
-      <div className={`h-full ${tone}`} style={{ width: `${pct}%` }} />
-    </div>
-  );
-}
+const searchInputStyle: CSSProperties = {
+  height: 46,
+  width: '100%',
+  borderRadius: 12,
+  border: `1px solid ${STAFF_PANEL.inputBorder}`,
+  background: STAFF_PANEL.inputBg,
+  color: STAFF_PANEL.text,
+  padding: '0 16px',
+  fontSize: 11.5,
+  outline: 'none',
+  fontFamily: 'inherit',
+  boxSizing: 'border-box',
+};
+
+const avatarStyle: CSSProperties = {
+  display: 'flex',
+  width: 40,
+  height: 40,
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderRadius: 12,
+  background: STAFF_PANEL.accentSoft,
+  fontSize: 13,
+  fontWeight: 900,
+  color: STAFF_PANEL.accent,
+  flexShrink: 0,
+};
 
 export default function AgenciesListPage() {
   const { user } = useAuth();
@@ -104,49 +132,85 @@ export default function AgenciesListPage() {
   const kpis = result?.kpis;
 
   return (
-    <div className="p-8">
-      <div className="mb-6">
-        <h1 className="text-xl font-black text-ink">آژانس‌ها</h1>
-        <p className="mt-1 text-sm text-muted">
-          {isCommercial ? 'آژانس‌های همکار، فاکتورها و مکاتبه‌ها' : 'مدیریت آژانس‌های همکار، اعتبار و تسویه'}
-        </p>
-      </div>
+    <div style={{ padding: '24px 28px' }}>
+      <StaffPanelPageHeader
+        title="آژانس‌ها"
+        subtitle={
+          isCommercial ? 'آژانس‌های همکار، فاکتورها و مکاتبه‌ها' : 'مدیریت آژانس‌های همکار، اعتبار و تسویه'
+        }
+      />
 
-      {error && <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">{error}</p>}
-      {notice && <p className="mb-4 rounded-lg bg-[#10b98115] p-3 text-sm text-[#059669]">{notice}</p>}
+      {error && <StaffAlert tone="error">{error}</StaffAlert>}
+      {notice && <StaffAlert tone="success">{notice}</StaffAlert>}
 
-      <section className="mb-6 rounded-xl border border-border bg-white p-5">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-bold text-ink">
-            {isCommercial ? 'درخواست‌های همکاری آژانس‌ها' : 'درخواست‌های جدید عضویت'}
-          </h2>
-          <span className="rounded-full bg-[#f59e0b1f] px-3 py-1 text-[11px] font-bold text-[#b45309]">
+      <StaffPanelCard
+        title={isCommercial ? 'درخواست‌های همکاری آژانس‌ها' : 'درخواست‌های جدید عضویت'}
+        headerAction={
+          <span
+            style={{
+              borderRadius: 20,
+              background: 'rgba(245,158,11,0.12)',
+              padding: '4px 12px',
+              fontSize: 11,
+              fontWeight: 800,
+              color: STAFF_PANEL.warning,
+            }}
+          >
             {faDigits(pendingRequests.length)} {isCommercial ? 'درخواست' : 'در انتظار'}
           </span>
-        </div>
+        }
+        style={{ marginBottom: 24 }}
+      >
         {pendingRequests.length === 0 ? (
-          <p className="py-3 text-center text-xs text-muted">
+          <p style={{ padding: '12px 0', textAlign: 'center', fontSize: 11, color: STAFF_PANEL.textMuted }}>
             {isCommercial ? 'درخواست همکاری جدیدی وجود ندارد.' : 'درخواست جدیدی در انتظار تأیید نیست.'}
           </p>
         ) : (
-          <ul className="divide-y divide-border">
-            {pendingRequests.map((r) => (
-              <li key={r.id} className="flex flex-wrap items-center gap-3 py-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-2 text-sm font-black text-accent">
-                  {r.applicantName.slice(0, 1)}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-bold text-ink">{r.applicantName}</div>
-                  <div className="mt-0.5 text-[11px] text-muted">
-                    مدیر: {r.managerName} · مجوز <span className="ltr font-num">{r.licenseNo}</span> · {r.city}
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+            {pendingRequests.map((r, idx) => (
+              <li
+                key={r.id}
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '12px 0',
+                  borderTop: idx > 0 ? `1px solid ${STAFF_PANEL.sidebarBorder}` : undefined,
+                }}
+              >
+                <span style={avatarStyle}>{r.applicantName.slice(0, 1)}</span>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: STAFF_PANEL.text }}>{r.applicantName}</div>
+                  <div style={{ marginTop: 2, fontSize: 11, color: STAFF_PANEL.textMuted }}>
+                    مدیر: {r.managerName} · مجوز <span style={{ direction: 'ltr' }}>{r.licenseNo}</span> · {r.city}
                   </div>
                 </div>
                 {r.status === 'REFERRED' && (
-                  <span className="rounded-full bg-accent/10 px-2.5 py-1 text-[10px] font-bold text-accent">ارجاع‌شده</span>
+                  <span
+                    style={{
+                      borderRadius: 20,
+                      background: STAFF_PANEL.accentSoft,
+                      padding: '4px 10px',
+                      fontSize: 10,
+                      fontWeight: 800,
+                      color: STAFF_PANEL.accent,
+                    }}
+                  >
+                    ارجاع‌شده
+                  </span>
                 )}
                 <Link
                   to={`/panel/agencies/requests/${r.id}`}
-                  className="rounded-lg bg-accent px-3 py-2 text-xs font-bold text-white transition hover:bg-accent/90"
+                  style={{
+                    borderRadius: 10,
+                    background: STAFF_PANEL.accent,
+                    color: '#fff',
+                    padding: '8px 12px',
+                    fontSize: 11,
+                    fontWeight: 800,
+                    textDecoration: 'none',
+                  }}
                 >
                   {isCommercial ? 'بررسی و اقدام' : 'بررسی درخواست'}
                 </Link>
@@ -154,38 +218,84 @@ export default function AgenciesListPage() {
             ))}
           </ul>
         )}
-      </section>
+      </StaffPanelCard>
 
       {!isCommercial && kpis && (
-        <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-          <KpiCard label="آژانس‌های فعال" value={faDigits(kpis.activeCount)} valueClass="text-ink" />
-          <KpiCard label="مجموع اعتبار اعطاشده" value={`${faMoney(kpis.totalCreditGrantedIrr)} تومان`} valueClass="text-accent" />
-          <KpiCard label="اعتبار مصرف‌شده (بدهی)" value={`${faMoney(kpis.totalUsedIrr)} تومان`} valueClass="text-danger" />
-          <KpiCard label="در انتظار تسویه" value={faDigits(kpis.pendingSettlementCount)} valueClass="text-[#b45309]" />
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+            gap: 12,
+            marginBottom: 24,
+          }}
+        >
+          <StaffKpiCard label="آژانس‌های فعال" value={faDigits(kpis.activeCount)} />
+          <StaffKpiCard label="مجموع اعتبار اعطاشده" value={`${faMoney(kpis.totalCreditGrantedIrr)} تومان`} iconColor={STAFF_PANEL.accent} />
+          <StaffKpiCard label="اعتبار مصرف‌شده (بدهی)" value={`${faMoney(kpis.totalUsedIrr)} تومان`} iconColor={STAFF_PANEL.danger} />
+          <StaffKpiCard label="در انتظار تسویه" value={faDigits(kpis.pendingSettlementCount)} iconColor={STAFF_PANEL.warning} />
         </div>
       )}
 
       {isCommercial && debtors.length > 0 && (
-        <section className="mb-6 rounded-xl border border-[#f59e0b40] bg-[#f59e0b0d] p-5">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-sm font-bold text-[#92400e]">
+        <section
+          style={{
+            marginBottom: 24,
+            borderRadius: 14,
+            border: `1px solid rgba(245,158,11,0.35)`,
+            background: 'rgba(245,158,11,0.08)',
+            padding: 16,
+          }}
+        >
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
+            <h2 style={{ fontSize: 13, fontWeight: 800, color: STAFF_PANEL.warning, margin: 0 }}>
               آژانس‌های دارای بدهی یا فاکتور پرداخت‌نشده
-              <span className="mr-2 rounded-full bg-[#f59e0b26] px-2.5 py-0.5 text-[11px] font-bold">
+              <span
+                style={{
+                  marginRight: 8,
+                  borderRadius: 20,
+                  background: 'rgba(245,158,11,0.15)',
+                  padding: '4px 10px',
+                  fontSize: 11,
+                  fontWeight: 800,
+                }}
+              >
                 {faDigits(debtors.length)} آژانس
               </span>
             </h2>
             <button
+              type="button"
               onClick={() => void onNotifyAll()}
-              className="rounded-lg bg-[#b45309] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#92400e]"
+              style={{
+                borderRadius: 10,
+                background: STAFF_PANEL.warning,
+                color: '#fff',
+                padding: '8px 12px',
+                fontSize: 11,
+                fontWeight: 800,
+                border: 'none',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
             >
               ارسال اعلان به همه
             </button>
           </div>
-          <ul className="divide-y divide-[#f59e0b26]">
-            {debtors.map((d) => (
-              <li key={d.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
-                <span className="font-bold text-ink">{d.fullName}</span>
-                <span className="font-num text-xs text-[#92400e]">مبلغ {faMoney(d.usedIrr)} تومان</span>
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+            {debtors.map((d, idx) => (
+              <li
+                key={d.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  padding: '10px 0',
+                  borderTop: idx > 0 ? '1px solid rgba(245,158,11,0.15)' : undefined,
+                  fontSize: 13,
+                }}
+              >
+                <span style={{ fontWeight: 800, color: STAFF_PANEL.text }}>{d.fullName}</span>
+                <span style={{ fontSize: 11, color: STAFF_PANEL.warning }}>مبلغ {faMoney(d.usedIrr)} تومان</span>
               </li>
             ))}
           </ul>
@@ -193,77 +303,96 @@ export default function AgenciesListPage() {
       )}
 
       {!isCommercial && (
-        <div className="mb-4 flex gap-1.5">
+        <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
           {(
             [
               { key: 'list', label: 'آژانس‌های همکار' },
               { key: 'credit', label: 'اعتبار و تسویه' },
             ] as { key: SubTab; label: string }[]
           ).map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setSubTab(t.key)}
-              className={`rounded-full px-4 py-2 text-xs font-bold transition ${
-                subTab === t.key ? 'bg-accent text-white' : 'bg-surface text-text-2 hover:bg-surface-2'
-              }`}
-            >
+            <button key={t.key} type="button" onClick={() => setSubTab(t.key)} style={staffSegmentedControl(subTab === t.key)}>
               {t.label}
             </button>
           ))}
         </div>
       )}
 
-      {isCommercial && <h2 className="mb-3 text-sm font-bold text-ink">آژانس‌های همکار</h2>}
+      {isCommercial && (
+        <h2 style={{ marginBottom: 12, fontSize: 13, fontWeight: 800, color: STAFF_PANEL.text }}>آژانس‌های همکار</h2>
+      )}
 
-      <div className="mb-4">
+      <div style={{ marginBottom: 16 }}>
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="جستجوی آژانس بر اساس نام، مجوز، مدیر یا شهر…"
-          className="h-[46px] w-full rounded-xl border border-border bg-white px-4 text-xs text-ink outline-none transition focus:border-accent"
+          style={searchInputStyle}
         />
       </div>
 
       {loading ? (
-        <p className="py-10 text-center text-sm text-muted">در حال بارگذاری…</p>
+        <p style={{ padding: '40px 0', textAlign: 'center', fontSize: 12, color: STAFF_PANEL.textMuted }}>در حال بارگذاری…</p>
       ) : (result?.agencies.length ?? 0) === 0 ? (
-        <p className="py-10 text-center text-sm text-muted">آژانسی با این عبارت یافت نشد.</p>
+        <p style={{ padding: '40px 0', textAlign: 'center', fontSize: 12, color: STAFF_PANEL.textMuted }}>آژانسی با این عبارت یافت نشد.</p>
       ) : subTab === 'credit' && !isCommercial ? (
-        <ul className="space-y-3">
+        <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
           {result!.agencies.map((a) => {
             const settled = Number(a.usedIrr) <= 0;
             return (
-              <li key={a.id} className="flex flex-wrap items-center gap-4 rounded-xl border border-border bg-white p-4">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-2 text-sm font-black text-accent">
-                  {a.fullName.slice(0, 1)}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-bold text-ink">{a.fullName}</div>
-                  <div className="mt-0.5 text-[11px] text-muted">
-                    مجوز <span className="ltr font-num">{a.licenseNo}</span> · {a.city}
+              <li
+                key={a.id}
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  gap: 14,
+                  borderRadius: 14,
+                  border: `1px solid ${STAFF_PANEL.cardBorder}`,
+                  background: STAFF_PANEL.cardBg,
+                  padding: 14,
+                }}
+              >
+                <span style={avatarStyle}>{a.fullName.slice(0, 1)}</span>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: STAFF_PANEL.text }}>{a.fullName}</div>
+                  <div style={{ marginTop: 2, fontSize: 11, color: STAFF_PANEL.textMuted }}>
+                    مجوز <span style={{ direction: 'ltr' }}>{a.licenseNo}</span> · {a.city}
                   </div>
                 </div>
-                <div className="text-left">
-                  <div className="text-[10px] text-muted">بدهی جاری</div>
-                  <div className={`font-num text-sm font-black ${settled ? 'text-[#059669]' : 'text-danger'}`}>
+                <div style={{ textAlign: 'left' }}>
+                  <div style={{ fontSize: 10, color: STAFF_PANEL.textMuted }}>بدهی جاری</div>
+                  <div style={{ fontSize: 13, fontWeight: 900, color: settled ? STAFF_PANEL.success : STAFF_PANEL.danger }}>
                     {faMoney(Math.max(Number(a.usedIrr), 0))} تومان
                   </div>
                 </div>
                 <span
-                  className={`rounded-full px-3 py-1 text-[10px] font-bold ${
-                    settled ? 'bg-[#10b98124] text-[#059669]' : 'bg-[#f59e0b24] text-[#b45309]'
-                  }`}
+                  style={{
+                    borderRadius: 20,
+                    padding: '4px 12px',
+                    fontSize: 10,
+                    fontWeight: 800,
+                    background: settled ? 'rgba(52,211,153,0.15)' : 'rgba(245,158,11,0.15)',
+                    color: settled ? STAFF_PANEL.success : STAFF_PANEL.warning,
+                  }}
                 >
                   {settled ? 'تسویه شد' : 'در انتظار پرداخت'}
                 </span>
                 <button
+                  type="button"
                   disabled={settled || settlingId === a.id}
                   onClick={() => void onSettle(a)}
-                  className={`rounded-lg px-3 py-2 text-xs font-bold transition ${
-                    settled
-                      ? 'cursor-default bg-surface text-muted'
-                      : 'bg-[#059669] text-white hover:bg-[#047857]'
-                  }`}
+                  style={{
+                    borderRadius: 10,
+                    padding: '8px 12px',
+                    fontSize: 11,
+                    fontWeight: 800,
+                    border: 'none',
+                    cursor: settled ? 'default' : 'pointer',
+                    fontFamily: 'inherit',
+                    background: settled ? STAFF_PANEL.inputBg : STAFF_PANEL.success,
+                    color: settled ? STAFF_PANEL.textMuted : '#fff',
+                    opacity: settlingId === a.id ? 0.7 : 1,
+                  }}
                 >
                   {settled ? 'تسویه شده' : settlingId === a.id ? 'در حال ثبت…' : 'ثبت تسویه'}
                 </button>
@@ -272,41 +401,65 @@ export default function AgenciesListPage() {
           })}
         </ul>
       ) : (
-        <ul className="space-y-3">
+        <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
           {result!.agencies.map((a) => {
             const badge = statusBadge(a.isActive);
+            const badgeColor = a.isActive ? STAFF_PANEL.success : STAFF_PANEL.textMuted;
             return (
               <li key={a.id}>
                 <button
+                  type="button"
                   onClick={() => navigate(`/panel/agencies/${a.id}`)}
-                  className="flex w-full flex-wrap items-center gap-4 rounded-xl border border-border bg-white p-4 text-right transition hover:border-accent/40"
+                  style={{
+                    display: 'flex',
+                    width: '100%',
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
+                    gap: 14,
+                    borderRadius: 14,
+                    border: `1px solid ${STAFF_PANEL.cardBorder}`,
+                    background: STAFF_PANEL.cardBg,
+                    padding: 14,
+                    textAlign: 'right',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
                 >
-                  <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-surface-2 text-base font-black text-accent">
-                    {a.fullName.slice(0, 1)}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-bold text-ink">{a.fullName}</div>
-                    <div className="mt-0.5 text-[11px] text-muted">
-                      مجوز <span className="ltr font-num">{a.licenseNo}</span> · {a.city} · سطح همکاری{' '}
-                      <span className="font-bold text-[#b45309]">{TIER_LABELS[a.tier]}</span>
+                  <span style={{ ...avatarStyle, width: 44, height: 44, fontSize: 15 }}>{a.fullName.slice(0, 1)}</span>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: STAFF_PANEL.text }}>{a.fullName}</div>
+                    <div style={{ marginTop: 2, fontSize: 11, color: STAFF_PANEL.textMuted }}>
+                      مجوز <span style={{ direction: 'ltr' }}>{a.licenseNo}</span> · {a.city} · سطح همکاری{' '}
+                      <span style={{ fontWeight: 800, color: STAFF_PANEL.warning }}>{TIER_LABELS[a.tier]}</span>
                     </div>
                   </div>
-                  <div className="w-44">
-                    <div className="mb-1 flex items-center justify-between text-[10px] text-muted">
+                  <div style={{ width: 176 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4, fontSize: 10, color: STAFF_PANEL.textMuted }}>
                       <span>اعتبار (مانده / سقف)</span>
-                      <span className="font-num">
+                      <span>
                         {faMoney(Math.max(Number(a.remainingIrr), 0))} / {faMoney(a.limitIrr)}
                       </span>
                     </div>
                     <CreditBar usedIrr={Math.max(Number(a.usedIrr), 0)} limitIrr={Number(a.limitIrr)} />
                   </div>
-                  <div className="text-left">
-                    <div className="text-[10px] text-muted">بدهی جاری</div>
-                    <div className={`font-num text-sm font-black ${Number(a.usedIrr) > 0 ? 'text-danger' : 'text-[#059669]'}`}>
+                  <div style={{ textAlign: 'left' }}>
+                    <div style={{ fontSize: 10, color: STAFF_PANEL.textMuted }}>بدهی جاری</div>
+                    <div style={{ fontSize: 13, fontWeight: 900, color: Number(a.usedIrr) > 0 ? STAFF_PANEL.danger : STAFF_PANEL.success }}>
                       {faMoney(Math.max(Number(a.usedIrr), 0))} تومان
                     </div>
                   </div>
-                  <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${badge.className}`}>{badge.label}</span>
+                  <span
+                    style={{
+                      borderRadius: 20,
+                      padding: '4px 12px',
+                      fontSize: 10,
+                      fontWeight: 800,
+                      background: a.isActive ? 'rgba(52,211,153,0.15)' : STAFF_PANEL.inputBg,
+                      color: badgeColor,
+                    }}
+                  >
+                    {badge.label}
+                  </span>
                 </button>
               </li>
             );
