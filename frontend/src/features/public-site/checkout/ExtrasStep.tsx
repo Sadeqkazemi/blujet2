@@ -5,7 +5,12 @@ import type { CabinClass, SeatMapCell } from '../../../types/public-site';
 import { CHECKOUT_COPY } from './checkout-copy';
 import type { ExtraServiceState } from './checkout-types';
 import Md80SeatMap from './Md80SeatMap';
-import { buildMd80Seats, isMd80Aircraft } from './md80-seat-layout';
+import {
+  buildMd80Seats,
+  looksLikeLegacyA320SeatPayload,
+  mapLegacyTakenSeatsToMd80,
+  shouldUseMd80SeatMap,
+} from './md80-seat-layout';
 
 function SvgBag() {
   return (
@@ -165,15 +170,23 @@ export default function ExtrasStep({
   const t = CHECKOUT_COPY[locale];
   const [seatOpen, setSeatOpen] = useState(true);
   const aircraft = aircraftType.trim() || 'MD-80';
-  // Public checkout always prefers the MD-80 cabin chart from the PDF.
-  const useMd80 = isMd80Aircraft(aircraft) || aircraft === '' || aircraft === 'MD-80';
+  const rawSeats = seats ?? [];
+  const useMd80 = shouldUseMd80SeatMap(aircraft, rawSeats);
 
-  const displaySeats =
-    seats && seats.length > 0
-      ? seats
-      : useMd80
-        ? buildMd80Seats()
-        : [];
+  const displaySeats = useMd80
+    ? (() => {
+        const takenRaw = rawSeats.filter((s) => s.status === 'TAKEN').map((s) => s.seatCode);
+        const taken = looksLikeLegacyA320SeatPayload(rawSeats)
+          ? mapLegacyTakenSeatsToMd80(takenRaw)
+          : takenRaw;
+        return buildMd80Seats(taken).map((built) => {
+          const fromApi = rawSeats.find((s) => s.seatCode === built.seatCode);
+          return fromApi ?? built;
+        });
+      })()
+    : rawSeats.length > 0
+      ? rawSeats
+      : [];
   const sold = displaySeats.filter((s) => s.status === 'TAKEN').length;
   const cap = displaySeats.length || (useMd80 ? 140 : 0);
 

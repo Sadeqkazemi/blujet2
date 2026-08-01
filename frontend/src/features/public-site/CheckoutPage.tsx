@@ -40,8 +40,10 @@ import {
 } from './checkout/checkout-types';
 import {
   buildMd80Seats,
-  isMd80Aircraft,
+  looksLikeLegacyA320SeatPayload,
   looksLikeMd80SeatPayload,
+  mapLegacyTakenSeatsToMd80,
+  shouldUseMd80SeatMap,
 } from './checkout/md80-seat-layout';
 
 const BUSINESS_SEAT_MIN_POINTS = 15_000;
@@ -174,11 +176,15 @@ export default function CheckoutPage() {
     if (!draft) return;
     // Full aircraft map. For MD-80, if the API is empty or still on legacy
     // lettering, fall back to the PDF chart inventory so the picker is never blank.
-    const useMd80 = isMd80Aircraft(draft.flight.aircraftType ?? 'MD-80');
+    const aircraft = draft.flight.aircraftType ?? 'MD-80';
     fetchSeatMap(draft.flightInstanceId)
       .then((m) => {
+        const useMd80 = shouldUseMd80SeatMap(aircraft, m.seats);
         if (useMd80 && !looksLikeMd80SeatPayload(m.seats)) {
-          const taken = m.seats.filter((s) => s.status === 'TAKEN').map((s) => s.seatCode);
+          const takenRaw = m.seats.filter((s) => s.status === 'TAKEN').map((s) => s.seatCode);
+          const taken = looksLikeLegacyA320SeatPayload(m.seats)
+            ? mapLegacyTakenSeatsToMd80(takenRaw)
+            : takenRaw;
           setSeats(buildMd80Seats(taken));
           return;
         }

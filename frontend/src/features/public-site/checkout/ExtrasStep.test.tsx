@@ -61,15 +61,45 @@ describe('ExtrasStep — design parity', () => {
     expect(map).toHaveAttribute('data-aircraft', 'MD-80');
     expect(screen.getByTestId('checkout-seat-toggle')).toHaveTextContent('MD-80');
     expect(screen.getByText('فرست کلاس')).toBeInTheDocument();
+    expect(screen.getByText('Main Cabin Extra')).toBeInTheDocument();
     expect(screen.getByText('اکونومی')).toBeInTheDocument();
-    // Rear exit/galley rows omit A/B — amenity labels visible
     expect(screen.getAllByText('خروج').length).toBeGreaterThan(0);
     expect(screen.getAllByText('گالی').length).toBeGreaterThan(0);
-    // Visible seat buttons for PDF letters
     expect(screen.getByTestId('checkout-seat-7D')).toBeInTheDocument();
     expect(screen.getByTestId('checkout-seat-3F')).toBeInTheDocument();
     expect(screen.getByTestId('checkout-seat-3A')).toBeInTheDocument();
     expect(screen.queryByTestId('checkout-seat-28A')).not.toBeInTheDocument();
+  });
+
+  it('uses MD-80 PDF chart when API still returns legacy A320 lettering', () => {
+    const legacyA320: SeatMapCell[] = [
+      { seatCode: '3A', row: 3, cabin: 'BUSINESS', status: 'FREE' },
+      { seatCode: '3B', row: 3, cabin: 'BUSINESS', status: 'FREE' },
+      { seatCode: '3C', row: 3, cabin: 'BUSINESS', status: 'TAKEN' },
+      { seatCode: '3D', row: 3, cabin: 'BUSINESS', status: 'FREE' },
+      { seatCode: '7A', row: 7, cabin: 'ECONOMY', status: 'FREE' },
+      { seatCode: '7B', row: 7, cabin: 'ECONOMY', status: 'FREE' },
+      { seatCode: '7C', row: 7, cabin: 'ECONOMY', status: 'TAKEN' },
+      { seatCode: '7D', row: 7, cabin: 'ECONOMY', status: 'FREE' },
+      { seatCode: '7E', row: 7, cabin: 'ECONOMY', status: 'FREE' },
+    ];
+    render(
+      <ExtrasStep
+        locale="fa"
+        extras={defaultExtras()}
+        onToggleExtra={vi.fn()}
+        seats={legacyA320}
+        selectedSeats={[]}
+        onToggleSeat={vi.fn()}
+        businessLocked={false}
+        bookedCabin="ECONOMY"
+        aircraftType="Airbus A320"
+      />,
+    );
+
+    expect(screen.getByTestId('checkout-seat-map')).toHaveAttribute('data-aircraft', 'MD-80');
+    expect(screen.getByTestId('checkout-seat-7D')).toBeInTheDocument();
+    expect(screen.queryByTestId('checkout-seat-7C')).not.toBeInTheDocument();
   });
 
   it('still shows all MD-80 seats when the API seat list is empty', () => {
