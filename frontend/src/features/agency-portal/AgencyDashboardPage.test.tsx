@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AgencyDashboardPage from './AgencyDashboardPage';
 import * as portalApi from '../../api/agency-portal';
@@ -29,23 +30,31 @@ const DASHBOARD: AgencyDashboard = {
 };
 
 describe('AgencyDashboardPage', () => {
+  function renderPage() {
+    return render(
+      <MemoryRouter>
+        <AgencyDashboardPage />
+      </MemoryRouter>,
+    );
+  }
+
   it('renders real KPI cards and the 6-month sales chart from the API, not fabricated data', async () => {
     vi.spyOn(portalApi, 'fetchDashboard').mockResolvedValue(DASHBOARD);
-    render(<AgencyDashboardPage />);
+    renderPage();
 
-    expect(await screen.findByText('داشبورد')).toBeInTheDocument();
-    expect(screen.getByText('۳۸٬۴۰۰٬۰۰۰')).toBeInTheDocument();
-    expect(screen.getByText('۱۳۰٬۰۰۰٬۰۰۰')).toBeInTheDocument();
+    expect(await screen.findByText('داشبورد آژانس')).toBeInTheDocument();
+    expect(screen.getByTestId('agency-kpi-sales')).toHaveTextContent('۳۸٬۴۰۰٬۰۰۰');
+    expect(screen.getByTestId('agency-credit-card')).toHaveTextContent('۱۳۰٬۰۰۰٬۰۰۰');
     expect(screen.getByRole('img', { name: 'نمودار فروش ۶ ماه اخیر' })).toBeInTheDocument();
   });
 
   it('renders translated headings and KPI labels in English', async () => {
     mockLocale('en');
     vi.spyOn(portalApi, 'fetchDashboard').mockResolvedValue(DASHBOARD);
-    render(<AgencyDashboardPage />);
+    renderPage();
 
-    expect(await screen.findByText('Dashboard')).toBeInTheDocument();
-    expect(screen.getByText("This Month's Sales (Toman)")).toBeInTheDocument();
+    expect(await screen.findByText('Agency Dashboard')).toBeInTheDocument();
+    expect(screen.getByText("Sales this month")).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Last 6 months sales chart' })).toBeInTheDocument();
     expect(screen.getByText('Ordibehesht')).toBeInTheDocument();
   });
@@ -53,9 +62,9 @@ describe('AgencyDashboardPage', () => {
   it('renders translated headings and KPI labels in Arabic', async () => {
     mockLocale('ar');
     vi.spyOn(portalApi, 'fetchDashboard').mockResolvedValue(DASHBOARD);
-    render(<AgencyDashboardPage />);
+    renderPage();
 
-    expect(await screen.findByText('لوحة التحكم')).toBeInTheDocument();
-    expect(screen.getByText('ملخص الرصيد')).toBeInTheDocument();
+    expect(await screen.findByText('لوحة تحكم الوكالة')).toBeInTheDocument();
+    expect(screen.getByTestId('agency-credit-card')).toHaveTextContent('الرصيد المتبقي');
   });
 });
