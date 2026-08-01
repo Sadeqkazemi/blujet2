@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useT } from '../../lib/i18n';
-import { faDigits } from '../../lib/fa-format';
 import { AGENCY_NAV_ITEMS, agencyInitials } from './agency-nav-config';
 import type { AgencyNavKey } from './agency-nav-config';
 

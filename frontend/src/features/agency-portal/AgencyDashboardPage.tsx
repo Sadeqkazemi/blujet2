@@ -130,7 +130,7 @@ function KpiCard({
           <AgencyMiniIcon paths={iconPaths} />
         </div>
       </div>
-      <div style={{ fontSize: 21.5, fontWeight: 900, color: '#0d2640', letterSpacing: '-.5px' }}>{value}</div>
+      <div className="font-num" style={{ fontSize: 21.5, fontWeight: 900, color: '#0d2640', letterSpacing: '-.5px' }}>{value}</div>
       <div style={{ fontSize: 11.5, color: '#8a96a6', marginTop: 3 }}>{label}</div>
     </div>
   );
@@ -233,7 +233,7 @@ export default function AgencyDashboardPage() {
                 key={m.month}
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7, height: '100%', justifyContent: 'flex-end' }}
               >
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#5a6678' }}>{formatChartValue(m.salesIrr, locale)}</div>
+                <div className="font-num" style={{ fontSize: 10, fontWeight: 700, color: '#5a6678' }}>{formatChartValue(m.salesIrr, locale)}</div>
                 <div
                   style={{
                     width: '100%',
@@ -261,14 +261,14 @@ export default function AgencyDashboardPage() {
           }}
         >
           <div style={{ fontSize: 11.5, color: '#aac4e2', fontWeight: 600 }}>{t.creditCardLabel}</div>
-          <div style={{ fontSize: 27, fontWeight: 900, margin: '6px 0 2px', letterSpacing: '-.5px' }}>
+          <div className="font-num" style={{ fontSize: 27, fontWeight: 900, margin: '6px 0 2px', letterSpacing: '-.5px' }}>
             {moneyWithUnit(data.credit.remainingIrr)}
           </div>
-          <div style={{ fontSize: 11.5, color: '#8fb0d6' }}>{t.creditLimitOf(moneyWithUnit(data.credit.limitIrr))}</div>
+          <div className="font-num" style={{ fontSize: 11.5, color: '#8fb0d6' }}>{t.creditLimitOf(moneyWithUnit(data.credit.limitIrr))}</div>
           <div style={{ height: 9, background: 'rgba(255,255,255,.16)', borderRadius: 6, margin: '16px 0 8px', overflow: 'hidden' }}>
             <div style={{ width: `${pct}%`, height: '100%', background: 'linear-gradient(90deg,#4ade80,#22c55e)', borderRadius: 6 }} />
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#aac4e2' }}>
+          <div className="font-num" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#aac4e2' }}>
             <span>
               {t.usedLabel} {moneyWithUnit(data.credit.usedIrr)}
             </span>
