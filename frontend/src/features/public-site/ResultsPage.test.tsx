@@ -131,6 +131,14 @@ describe('ResultsPage', () => {
     expect(await screen.findAllByTestId('result-card')).toHaveLength(5);
   });
 
+  it('shows THR→MHD demo flights immediately while the search request is still pending', async () => {
+    vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
+    vi.spyOn(publicSiteApi, 'searchFlights').mockReturnValue(new Promise(() => {}));
+    renderPage();
+    expect(await screen.findAllByTestId('result-card')).toHaveLength(5);
+    expect(screen.queryByText('در حال جستجو…')).not.toBeInTheDocument();
+  });
+
   it('opens edit-search modal with trip type, airport pickers, and inline calendar', async () => {
     vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
     vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);

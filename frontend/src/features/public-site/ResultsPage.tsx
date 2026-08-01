@@ -124,6 +124,10 @@ export default function ResultsPage() {
     setPage(1);
     setExpandedId(null);
 
+    const timeout = window.setTimeout(() => {
+      if (!cancelled) setResults((prev) => (prev === null ? [] : prev));
+    }, 12_000);
+
     searchFlights(origin, dest, date)
       .then((found) => {
         if (!cancelled) setResults(found);
@@ -133,10 +137,14 @@ export default function ResultsPage() {
           setResults([]);
           setSearchError(copy.searchError);
         }
+      })
+      .finally(() => {
+        window.clearTimeout(timeout);
       });
 
     return () => {
       cancelled = true;
+      window.clearTimeout(timeout);
     };
   }, [origin, dest, date, copy.searchError]);
 
@@ -146,12 +154,13 @@ export default function ResultsPage() {
   const cityLabel = (code: string) =>
     airportCityLabel(code, locale, airportMap.get(code)?.cityFa);
 
-  /** API results, or design-reference demo flights for THR↔MHD when inventory is empty. */
+  /** API results, or design-reference demo flights for THR↔MHD while loading / when inventory is empty. */
   const effectiveResults = useMemo(() => {
-    if (results === null) return null;
+    const demo =
+      isThrMhdRoute(origin, dest) && date ? demoFlightsForThrMhd(origin, dest, date) : [];
+    if (results === null) return demo.length > 0 ? demo : null;
     if (results.length > 0) return results;
-    if (isThrMhdRoute(origin, dest)) return demoFlightsForThrMhd(origin, dest, date);
-    return [];
+    return demo.length > 0 ? demo : [];
   }, [results, origin, dest, date]);
 
   const airlines = useMemo(() => {
@@ -584,7 +593,9 @@ export default function ResultsPage() {
           </div>
         )}
 
-        {results === null && <p style={{ fontSize: 14, color: '#6b7b94' }}>{copy.searching}</p>}
+        {results === null && effectiveResults === null && (
+          <p style={{ fontSize: 14, color: '#6b7b94' }}>{copy.searching}</p>
+        )}
 
         {searchError && (
           <div

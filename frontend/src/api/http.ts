@@ -48,8 +48,18 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}, retry 
     if (refreshed) return apiRequest<T>(path, init, false);
   }
 
-  const body = (await res.json()) as ApiEnvelope<T>;
-  if (!body.success || !body.data) {
+  const raw = await res.text();
+  let body: ApiEnvelope<T>;
+  try {
+    body = JSON.parse(raw) as ApiEnvelope<T>;
+  } catch {
+    throw new ApiRequestError(
+      'BAD_GATEWAY',
+      res.status === 502 ? 'سرور در دسترس نیست. لطفاً چند لحظه بعد دوباره تلاش کنید.' : 'خطا در ارتباط با سرور',
+      res.status,
+    );
+  }
+  if (!body.success || body.data == null) {
     throw new ApiRequestError(body.error?.code ?? 'UNKNOWN', body.error?.message ?? 'خطای ناشناخته', res.status);
   }
   return body.data;
