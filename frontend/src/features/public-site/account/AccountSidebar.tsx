@@ -1,7 +1,8 @@
 import type { AuthUser } from '../../../types/auth';
-import { faDigits, faMoney } from '../../../lib/fa-format';
+import { faDigits } from '../../../lib/fa-format';
 import { useLocale, type StoredLocale } from '../../../hooks/useLocale';
 import type { TabKey } from './account-types';
+import { accountNavByGroup } from './account-nav-items';
 
 const TIER_LABEL: Record<string, Record<StoredLocale, string>> = {
   SILVER: { fa: 'عضو نقره‌ای باشگاه', en: 'Silver Club Member', ar: 'عضو فضية النادي' },
@@ -42,170 +43,109 @@ const STR: Record<
   },
 };
 
-type NavItem = { key: TabKey; label: Record<StoredLocale, string>; icon: React.ReactNode };
-
-const PRIMARY_NAV: NavItem[] = [
-  {
-    key: 'profile',
-    label: { fa: 'پروفایل من', en: 'My Profile', ar: 'ملفي الشخصي' },
-    icon: (
-      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <path d="M20 21v-1.5a4.5 4.5 0 0 0-4.5-4.5h-7A4.5 4.5 0 0 0 4 19.5V21" />
-        <circle cx="12" cy="7.5" r="4" />
-      </svg>
-    ),
-  },
-  {
-    key: 'account-info',
-    label: { fa: 'اطلاعات حساب', en: 'Account Information', ar: 'معلومات الحساب' },
-    icon: (
-      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <rect x="4" y="4" width="16" height="16" rx="2" />
-        <path d="M8 9h8M8 13h5" />
-      </svg>
-    ),
-  },
-  {
-    key: 'trips',
-    label: { fa: 'سفرها و خریدها', en: 'Trips & Purchases', ar: 'الرحلات والمشتريات' },
-    icon: (
-      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h15A1.5 1.5 0 0 1 21 8.5v2.2a1.6 1.6 0 0 0 0 2.6v2.2A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 15.5v-2.2a1.6 1.6 0 0 0 0-2.6Z" />
-        <path d="M14 7v12" strokeDasharray="1.5 2.5" />
-      </svg>
-    ),
-  },
-  {
-    key: 'refunds',
-    label: { fa: 'استرداد بلیط', en: 'Refund Ticket', ar: 'استرداد التذكرة' },
-    icon: (
-      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <path d="M9 14 4 9l5-5" />
-        <path d="M4 9h10a6 6 0 0 1 6 6v1" />
-      </svg>
-    ),
-  },
-  {
-    key: 'wallet',
-    label: { fa: 'کیف پول و امتیاز', en: 'Wallet & Points', ar: 'المحفظة والنقاط' },
-    icon: (
-      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <path d="M21 11V7.5A1.5 1.5 0 0 0 19.5 6H5a2 2 0 0 1 0-4h13" />
-        <path d="M3 4v14a2 2 0 0 0 2 2h14.5a1.5 1.5 0 0 0 1.5-1.5V15" />
-        <path d="M21 11h-4a2 2 0 0 0 0 4h4Z" />
-      </svg>
-    ),
-  },
-  {
-    key: 'club',
-    label: { fa: 'باشگاه مشتریان', en: 'Loyalty Club', ar: 'نادي الولاء' },
-    icon: (
-      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <path d="M3 8.5 7 12l5-7 5 7 4-3.5-1.8 9.5a1 1 0 0 1-1 .8H5.8a1 1 0 0 1-1-.8Z" />
-        <circle cx="12" cy="3.6" r="1.1" fill="currentColor" stroke="none" />
-      </svg>
-    ),
-  },
-];
-
-const ACCOUNT_NAV: NavItem[] = [
-  {
-    key: 'saved',
-    label: { fa: 'نشان‌شده‌ها', en: 'Saved', ar: 'المحفوظة' },
-    icon: (
-      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z" />
-      </svg>
-    ),
-  },
-  {
-    key: 'price-locks',
-    label: { fa: 'قفل قیمت', en: 'Price Lock', ar: 'قفل السعر' },
-    icon: (
-      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <rect x="5" y="11" width="14" height="10" rx="2" />
-        <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-      </svg>
-    ),
-  },
-  {
-    key: 'passengers',
-    label: { fa: 'مسافران', en: 'Passengers', ar: 'المسافرون' },
-    icon: (
-      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <circle cx="12" cy="8" r="4" />
-        <path d="M4 20c0-4 4-6 8-6s8 2 8 6" />
-      </svg>
-    ),
-  },
-  {
-    key: 'tickets',
-    label: { fa: 'پیام به پشتیبانی', en: 'Message Support', ar: 'رسالة للدعم' },
-    icon: (
-      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-      </svg>
-    ),
-  },
-  {
-    key: 'identity',
-    label: { fa: 'احراز هویت', en: 'Identity Verification', ar: 'التحقق من الهوية' },
-    icon: (
-      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <rect x="3" y="5" width="18" height="14" rx="2" />
-        <circle cx="8.5" cy="11" r="2" />
-        <path d="M13 10h5M13 14h4M5.5 16a3 3 0 0 1 6 0" />
-      </svg>
-    ),
-  },
-  {
-    key: 'security',
-    label: { fa: 'امنیت حساب', en: 'Account Security', ar: 'أمان الحساب' },
-    icon: (
-      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <path d="M12 3l7 3v5.5c0 4.2-2.9 7.4-7 8.5-4.1-1.1-7-4.3-7-8.5V6l7-3z" />
-      </svg>
-    ),
-  },
-  {
-    key: 'banks',
-    label: { fa: 'حساب‌های بانکی', en: 'Bank Accounts', ar: 'الحسابات البنكية' },
-    icon: (
-      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <rect x="2" y="5" width="20" height="14" rx="2" />
-        <path d="M2 10h20" />
-      </svg>
-    ),
-  },
-  {
-    key: 'referral',
-    label: { fa: 'معرفی دوستان', en: 'Invite Friends', ar: 'دعوة الأصدقاء' },
-    icon: (
-      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-        <circle cx="9" cy="7" r="4" />
-        <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-      </svg>
-    ),
-  },
-];
+const NAV_ICONS: Record<TabKey, React.ReactNode> = {
+  profile: (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M20 21v-1.5a4.5 4.5 0 0 0-4.5-4.5h-7A4.5 4.5 0 0 0 4 19.5V21" />
+      <circle cx="12" cy="7.5" r="4" />
+    </svg>
+  ),
+  'account-info': (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="4" y="4" width="16" height="16" rx="2" />
+      <path d="M8 9h8M8 13h5" />
+    </svg>
+  ),
+  trips: (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h15A1.5 1.5 0 0 1 21 8.5v2.2a1.6 1.6 0 0 0 0 2.6v2.2A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 15.5v-2.2a1.6 1.6 0 0 0 0-2.6Z" />
+      <path d="M14 7v12" strokeDasharray="1.5 2.5" />
+    </svg>
+  ),
+  refunds: (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M9 14 4 9l5-5" />
+      <path d="M4 9h10a6 6 0 0 1 6 6v1" />
+    </svg>
+  ),
+  wallet: (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M21 11V7.5A1.5 1.5 0 0 0 19.5 6H5a2 2 0 0 1 0-4h13" />
+      <path d="M3 4v14a2 2 0 0 0 2 2h14.5a1.5 1.5 0 0 0 1.5-1.5V15" />
+      <path d="M21 11h-4a2 2 0 0 0 0 4h4Z" />
+    </svg>
+  ),
+  club: (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M3 8.5 7 12l5-7 5 7 4-3.5-1.8 9.5a1 1 0 0 1-1 .8H5.8a1 1 0 0 1-1-.8Z" />
+      <circle cx="12" cy="3.6" r="1.1" fill="currentColor" stroke="none" />
+    </svg>
+  ),
+  saved: (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z" />
+    </svg>
+  ),
+  'price-locks': (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="5" y="11" width="14" height="10" rx="2" />
+      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+    </svg>
+  ),
+  passengers: (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 20c0-4 4-6 8-6s8 2 8 6" />
+    </svg>
+  ),
+  tickets: (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  ),
+  identity: (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <circle cx="8.5" cy="11" r="2" />
+      <path d="M13 10h5M13 14h4M5.5 16a3 3 0 0 1 6 0" />
+    </svg>
+  ),
+  security: (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M12 3l7 3v5.5c0 4.2-2.9 7.4-7 8.5-4.1-1.1-7-4.3-7-8.5V6l7-3z" />
+    </svg>
+  ),
+  banks: (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="2" y="5" width="20" height="14" rx="2" />
+      <path d="M2 10h20" />
+    </svg>
+  ),
+  referral: (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  ),
+};
 
 function NavButton({
-  item,
+  tabKey,
+  label,
   active,
-  locale,
   onSelect,
 }: {
-  item: NavItem;
+  tabKey: TabKey;
+  label: string;
   active: boolean;
-  locale: StoredLocale;
   onSelect: () => void;
 }) {
   return (
     <button
       type="button"
-      data-testid={`account-tab-${item.key}`}
+      data-testid={`account-tab-${tabKey}`}
       onClick={onSelect}
       style={{
         position: 'relative',
@@ -251,9 +191,9 @@ function NavButton({
           flex: 'none',
         }}
       >
-        {item.icon}
+        {NAV_ICONS[tabKey]}
       </span>
-      {item.label[locale]}
+      {label}
     </button>
   );
 }
@@ -282,6 +222,9 @@ export default function AccountSidebar({
     club?.isMember && club.level
       ? (TIER_LABEL[club.level]?.[locale] ?? club.level)
       : t.newMember;
+
+  const primaryNav = accountNavByGroup('primary');
+  const accountNav = accountNavByGroup('account');
 
   return (
     <aside
@@ -384,22 +327,22 @@ export default function AccountSidebar({
         </div>
       </div>
       <div style={{ padding: 9 }}>
-        {PRIMARY_NAV.map((item) => (
+        {primaryNav.map((item) => (
           <NavButton
             key={item.key}
-            item={item}
+            tabKey={item.key}
+            label={item.label[locale]}
             active={tab === item.key}
-            locale={locale}
             onSelect={() => onTabChange(item.key)}
           />
         ))}
         <div style={{ height: 6 }} />
-        {ACCOUNT_NAV.map((item) => (
+        {accountNav.map((item) => (
           <NavButton
             key={item.key}
-            item={item}
+            tabKey={item.key}
+            label={item.label[locale]}
             active={tab === item.key}
-            locale={locale}
             onSelect={() => onTabChange(item.key)}
           />
         ))}

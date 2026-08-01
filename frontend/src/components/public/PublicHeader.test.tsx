@@ -6,6 +6,7 @@ import PublicHeader from './PublicHeader';
 import * as useAuthModule from '../../hooks/useAuth';
 import { mockAuthUser, mockAuthUserLocale } from '../../test/mockAuthUser';
 import * as useLocaleModule from '../../hooks/useLocale';
+import * as useIsMobileModule from '../../hooks/useIsMobile';
 import * as publicSiteApi from '../../api/publicSite';
 
 function mockLocale(locale: 'fa' | 'en' | 'ar' = 'fa') {
@@ -127,5 +128,40 @@ describe('PublicHeader — logged-in user', () => {
     await userEvent.click(screen.getByTestId('public-lang-toggle'));
     await userEvent.click(screen.getByTestId('public-lang-option-en'));
     expect(setLocale).toHaveBeenCalledWith('en');
+  });
+
+  it('shows account panel links in the mobile hamburger menu when logged in', async () => {
+    mockLocale();
+    vi.spyOn(useIsMobileModule, 'useIsMobile').mockReturnValue(true);
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      status: 'authenticated',
+      user: mockAuthUser({ id: 'u1', fullName: 'نگار رضایی', role: 'USER' }),
+      requestLogin: vi.fn(),
+      confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
+      signOut: vi.fn(),
+    });
+    vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({ isMember: true, level: 'GOLD', balance: 12450 });
+    vi.spyOn(publicSiteApi, 'fetchMyProfile').mockResolvedValue({
+      fullName: 'نگار رضایی',
+      phone: '09121234567',
+      email: null,
+      emailVerified: false,
+      nationalId: null,
+      birthDate: null,
+      passportNo: null,
+      completionPct: 100,
+    });
+
+    renderHeader();
+    await userEvent.click(screen.getByTestId('public-mobile-menu-toggle'));
+
+    expect(screen.getByTestId('public-mobile-account-profile')).toHaveAttribute('href', '/account?tab=profile');
+    expect(screen.getByTestId('public-mobile-account-account-info')).toHaveAttribute('href', '/account?tab=account-info');
+    expect(screen.getByTestId('public-mobile-account-trips')).toHaveAttribute('href', '/account?tab=trips');
+    expect(screen.getByText('مدیریت پروفایل')).toBeInTheDocument();
+    expect(screen.getByText('اطلاعات حساب')).toBeInTheDocument();
+    expect(screen.getAllByText('سفرها و مدیریت رزرو').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('public-mobile-account-security')).toHaveAttribute('href', '/account?tab=security');
   });
 });

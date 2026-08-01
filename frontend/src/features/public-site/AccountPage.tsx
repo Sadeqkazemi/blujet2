@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import { useAuth } from '../../hooks/useAuth';
 import {
@@ -55,6 +55,7 @@ import AccountProfileTab from './account/AccountProfileTab';
 import AccountInfoTab from './account/AccountInfoTab';
 import AccountPrivacyPanel from './account/AccountPrivacyPanel';
 import type { TabKey } from './account/account-types';
+import { isAccountTabKey } from './account/account-nav-items';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
 // پنل کاربر — real data from the existing bookings/wallet/club-points/refunds
@@ -463,7 +464,9 @@ export default function AccountPage() {
   const t = STR[locale];
   const isMobile = useIsMobile();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<TabKey>('trips');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlTab = searchParams.get('tab');
+  const [tab, setTab] = useState<TabKey>(() => (isAccountTabKey(urlTab) ? urlTab : 'trips'));
   const [bookings, setBookings] = useState<BookingDetail[] | null>(null);
   const [wallet, setWallet] = useState<{ balanceIrr: string } | null>(null);
   const [club, setClub] = useState<{ isMember: boolean; level: string | null; balance: number } | null>(null);
@@ -525,6 +528,24 @@ export default function AccountPage() {
   const [pwError, setPwError] = useState<string | null>(null);
   const [pwNotice, setPwNotice] = useState<string | null>(null);
   const [pwSaving, setPwSaving] = useState(false);
+
+  const selectTab = (next: TabKey) => {
+    setTab(next);
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        params.set('tab', next);
+        return params;
+      },
+      { replace: true },
+    );
+  };
+
+  useEffect(() => {
+    if (isAccountTabKey(urlTab) && urlTab !== tab) {
+      setTab(urlTab);
+    }
+  }, [urlTab, tab]);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -901,7 +922,7 @@ export default function AccountPage() {
       >
         <AccountSidebar
           tab={tab}
-          onTabChange={setTab}
+          onTabChange={selectTab}
           user={user}
           club={club}
           onSignOut={() => void signOut().then(() => navigate('/', { replace: true }))}
@@ -933,7 +954,7 @@ export default function AccountPage() {
             <div style={{ display: 'flex', gap: 10 }}>
               <button
                 type="button"
-                onClick={() => setTab('account-info')}
+                onClick={() => selectTab('account-info')}
                 style={{ border: 'none', borderRadius: 9, background: '#e7c66b', color: '#3b2f0e', padding: '7px 14px', fontSize: 11.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
               >
                 {t.bannerCompleteBtn}
@@ -958,7 +979,7 @@ export default function AccountPage() {
             walletBalanceIrr={wallet?.balanceIrr ?? null}
             passengerCount={savedPassengers?.length ?? 0}
             isMobile={isMobile}
-            onNavigateTab={setTab}
+            onNavigateTab={selectTab}
           />
         )}
 
@@ -1180,7 +1201,7 @@ export default function AccountPage() {
             submitError={identitySubmitError}
             onUpload={onUploadIdentityIdCard}
             onSubmit={onSubmitIdentity}
-            onGoProfile={() => setTab('profile')}
+            onGoProfile={() => selectTab('profile')}
           />
         )}
         {tab === 'identity' && identity === null && (

@@ -6,6 +6,11 @@ import { faDigits } from '../../lib/fa-format';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useT } from '../../lib/i18n';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import {
+  accountTabHref,
+  mobileAccountNavItems,
+  mobileAccountNavLabel,
+} from '../../features/public-site/account/account-nav-items';
 
 const TIER_KEY: Record<string, 'tierSilver' | 'tierGold' | 'tierPlatinum'> = {
   SILVER: 'tierSilver',
@@ -59,6 +64,25 @@ function UserFilledIcon({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
       <path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm0 2c-5.33 0-9 2.69-9 6v2h18v-2c0-3.31-3.67-6-9-6z" />
+    </svg>
+  );
+}
+
+function ChevronIcon({ isRTL }: { isRTL: boolean }) {
+  return (
+    <svg
+      width={16}
+      height={16}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="#9aa4b2"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ flex: 'none', transform: isRTL ? 'scaleX(-1)' : undefined }}
+      aria-hidden
+    >
+      <path d="M9 18l6-6-6-6" />
     </svg>
   );
 }
@@ -169,7 +193,7 @@ export default function PublicHeader() {
 
   const completeProfileBanner = profileIncomplete ? (
     <Link
-      to="/account?tab=profile"
+      to="/account?tab=account-info"
       data-testid="public-complete-profile"
       onClick={() => {
         setMenuOpen(false);
@@ -723,7 +747,44 @@ export default function PublicHeader() {
             </span>
           </div>
           <div style={{ padding: '4px 24px 0', display: 'flex', flexDirection: 'column' }}>
-            {navLinks.map((link, i) => (
+            <Link
+              to="/"
+              onClick={() => setMobileMenuOpen(false)}
+              style={{
+                padding: '20px 0',
+                textDecoration: 'none',
+                color: '#16202e',
+                fontSize: 17,
+                fontWeight: 700,
+              }}
+            >
+              {t('navFlights')}
+            </Link>
+            {loggedIn &&
+              mobileAccountNavItems().map((item) => (
+                <Link
+                  key={item.key}
+                  to={accountTabHref(item.key)}
+                  data-testid={`public-mobile-account-${item.key}`}
+                  onClick={() => setMobileMenuOpen(false)}
+                  style={{
+                    padding: '20px 0',
+                    textDecoration: 'none',
+                    color: '#16202e',
+                    fontSize: 17,
+                    fontWeight: 700,
+                    borderTop: '1px solid #eef1f5',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 12,
+                  }}
+                >
+                  <span style={{ whiteSpace: 'nowrap' }}>{mobileAccountNavLabel(item, locale)}</span>
+                  <ChevronIcon isRTL={isRTL} />
+                </Link>
+              ))}
+            {navLinks.slice(1).map((link, i, arr) => (
               <Link
                 key={link.to}
                 to={link.to}
@@ -734,11 +795,16 @@ export default function PublicHeader() {
                   color: '#16202e',
                   fontSize: 17,
                   fontWeight: 700,
-                  borderTop: i > 0 ? '1px solid #eef1f5' : undefined,
-                  borderBottom: i === navLinks.length - 1 ? '1px solid #eef1f5' : undefined,
+                  borderTop: '1px solid #eef1f5',
+                  borderBottom: i === arr.length - 1 ? '1px solid #eef1f5' : undefined,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 12,
                 }}
               >
                 {link.label}
+                <ChevronIcon isRTL={isRTL} />
               </Link>
             ))}
           </div>
@@ -756,24 +822,16 @@ export default function PublicHeader() {
               </span>
             )}
             {loggedIn && user && (
-              <>
-                <Link
-                  to="/manage-booking"
-                  onClick={() => setMobileMenuOpen(false)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0', textDecoration: 'none', color: '#16202e', fontSize: 14, fontWeight: 700 }}
-                >
-                  🧳 {t('tripsLabel')}
-                </Link>
-                <span
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    void signOut();
-                  }}
-                  style={{ padding: '10px 0', color: '#e5484d', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
-                >
-                  ↩ {t('logoutLabel')}
-                </span>
-              </>
+              <span
+                data-testid="public-logout"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  void signOut();
+                }}
+                style={{ padding: '10px 0', color: '#e5484d', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+              >
+                ↩ {t('logoutLabel')}
+              </span>
             )}
           </div>
         </div>
