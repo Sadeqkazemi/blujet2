@@ -5,7 +5,6 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import * as argon2 from 'argon2';
-import * as crypto from 'node:crypto';
 import { TypeORMService } from '../../typeorm/typeorm.service';
 import { ErrorCode } from '../../common/errors';
 import {
@@ -19,10 +18,7 @@ import type { TwoFactorProvider } from '../auth/providers/two-factor-provider.in
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { User } from '../../../generated/typeorm/client';
 import type { UpdateProfileDto } from './dto/profile.dtos';
-
-function generateSixDigitCode(): string {
-  return crypto.randomInt(0, 1_000_000).toString().padStart(6, '0');
-}
+import { generateOtpCode } from '../../common/generate-otp-code';
 
 const EMAIL_VERIFY_TTL_MS = 2 * 60 * 1000;
 const EMAIL_VERIFY_MAX_ATTEMPTS = 5;
@@ -111,7 +107,7 @@ export class ProfileService {
       });
     }
 
-    const code = generateSixDigitCode();
+    const code = generateOtpCode();
     const challenge = await this.typeorm.twoFactorChallenge.create({
       data: {
         userId: actor.id,

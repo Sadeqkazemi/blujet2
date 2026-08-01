@@ -7,13 +7,10 @@ import { TWO_FACTOR_PROVIDER } from './providers/two-factor-provider.interface';
 import type { TwoFactorProvider } from './providers/two-factor-provider.interface';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { StepUpScope } from '../../../generated/typeorm/enums';
+import { generateOtpCode } from '../../common/generate-otp-code';
 
 const STEP_UP_TTL_MS = 2 * 60 * 1000;
 const STEP_UP_MAX_ATTEMPTS = 5;
-
-function generateSixDigitCode(): string {
-  return crypto.randomInt(0, 1_000_000).toString().padStart(6, '0');
-}
 
 /** Phase 15 — a fresh re-authentication challenge required immediately
  * before a high-risk write, on top of (not instead of) the actor's
@@ -35,7 +32,7 @@ export class StepUpService {
     const user = await this.typeorm.user.findUniqueOrThrow({
       where: { id: actor.id },
     });
-    const code = generateSixDigitCode();
+    const code = generateOtpCode();
     const challenge = await this.typeorm.twoFactorChallenge.create({
       data: {
         userId: actor.id,
