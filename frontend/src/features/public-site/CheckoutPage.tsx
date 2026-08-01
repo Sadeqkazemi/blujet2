@@ -394,11 +394,47 @@ export default function CheckoutPage() {
   const grandIrr = Number(priceIrr) + extrasIrr;
   const grandDisplay = localeMoney(grandIrr, locale);
 
-  return (
-    <PublicPageShell>
-      {/* Design: mobile = simple title bar; desktop = circular step bar (not FlowStepper pills) */}
-      {isMobile ? (
-        <div className="flex items-center gap-3 border-b border-[#eef1f5] bg-white px-4 py-3">
+  const stepBody = (
+    <>
+      {step === 'pax' && (
+        <PassengerStep
+          locale={locale}
+          passengers={passengers}
+          onChange={setPassengers}
+          savedPassengers={savedPassengers}
+        />
+      )}
+      {step === 'extras' && (
+        <ExtrasStep
+          locale={locale}
+          extras={extras}
+          onToggleExtra={toggleExtra}
+          seats={seats}
+          selectedSeats={selectedSeats}
+          onToggleSeat={toggleSeat}
+          businessLocked={businessLocked}
+        />
+      )}
+      {step === 'review' && (
+        <ReviewStep
+          locale={locale}
+          passengers={passengers}
+          extras={extras}
+          selectedSeats={selectedSeats}
+        />
+      )}
+    </>
+  );
+
+  // Explicit mobile/desktop trees (design bundle) — do not rely on Tailwind
+  // breakpoints alone; Cursor/device preview can desync CSS media queries.
+  if (isMobile) {
+    return (
+      <PublicPageShell>
+        <div
+          className="flex items-center gap-3 border-b border-[#eef1f5] bg-white px-4 py-3"
+          data-testid="checkout-mobile-titlebar"
+        >
           <button
             type="button"
             onClick={() => (step === 'pax' ? navigate(-1) : goBack())}
@@ -409,49 +445,21 @@ export default function CheckoutPage() {
           </button>
           <span className="text-sm font-extrabold text-[#16202e]">{t.title}</span>
         </div>
-      ) : (
-        <CheckoutStepBar current={step} locale={locale} />
-      )}
 
-      <div className="mx-auto grid max-w-[1180px] grid-cols-1 items-start gap-2.5 px-3.5 py-3.5 pb-28 md:grid-cols-[1fr_340px] md:px-6 md:py-5 md:pb-11">
-        <div className="flex min-w-0 flex-col gap-[15px]">
+        <div
+          className="mx-auto flex w-full max-w-[1180px] flex-col gap-[15px] px-3.5 py-3.5 pb-28"
+          data-testid="checkout-mobile-main"
+        >
           <FlightSummaryCard flight={draft.flight} cabin={draft.cabin} locale={locale} />
-          {step === 'pax' && (
-            <PassengerStep
-              locale={locale}
-              passengers={passengers}
-              onChange={setPassengers}
-              savedPassengers={savedPassengers}
-            />
-          )}
-          {step === 'extras' && (
-            <ExtrasStep
-              locale={locale}
-              extras={extras}
-              onToggleExtra={toggleExtra}
-              seats={seats}
-              selectedSeats={selectedSeats}
-              onToggleSeat={toggleSeat}
-              businessLocked={businessLocked}
-            />
-          )}
-          {step === 'review' && (
-            <ReviewStep
-              locale={locale}
-              passengers={passengers}
-              extras={extras}
-              selectedSeats={selectedSeats}
-            />
-          )}
-          {error && isMobile && (
-            <div className="rounded-[10px] border border-[#f5c6c6] bg-[#fdecec] px-3.5 py-2.5 text-xs font-semibold text-[#c0343a]">
+          {stepBody}
+          {error && (
+            <div
+              className="rounded-[10px] border border-[#f5c6c6] bg-[#fdecec] px-3.5 py-2.5 text-xs font-semibold text-[#c0343a]"
+              data-testid="checkout-error"
+            >
               {error}
             </div>
           )}
-        </div>
-
-        {/* Design: pricing sidebar on desktop; on mobile sticky bar carries CTA */}
-        <div className="hidden md:block">
           <PricingSidebar
             locale={locale}
             priceIrr={priceIrr}
@@ -459,43 +467,69 @@ export default function CheckoutPage() {
             extras={extras}
             nextLabel={nextLabel}
             onNext={goNext}
-            onBack={goBack}
-            canBack={step !== 'pax'}
+            canBack={false}
             busy={busy}
-            error={error}
+            hideActions
           />
         </div>
-      </div>
 
-      {/* Design mobile sticky: back | مجموع + price | تأیید و ادامه */}
-      <div
-        className="fixed bottom-0 left-0 right-0 z-[80] flex items-center justify-between gap-2.5 border-t border-[#e6eaf0] bg-white px-4 py-2.5 shadow-[0_-8px_24px_-14px_rgba(13,38,102,.3)] md:hidden"
-        data-testid="checkout-mobile-sticky"
-      >
-        {step !== 'pax' && (
+        <div
+          className="fixed bottom-0 left-0 right-0 z-[80] flex items-center justify-between gap-2.5 border-t border-[#e6eaf0] bg-white px-4 py-2.5 shadow-[0_-8px_24px_-14px_rgba(13,38,102,.3)]"
+          data-testid="checkout-mobile-sticky"
+        >
+          {step !== 'pax' && (
+            <button
+              type="button"
+              onClick={goBack}
+              className="flex h-12 w-12 flex-none items-center justify-center rounded-xl border border-[#e6eaf0] bg-[#f2f5f9]"
+            >
+              →
+            </button>
+          )}
+          <div className="min-w-0">
+            <div className="text-[10.5px] text-[#9aa4b2]">{t.total}</div>
+            <div className="whitespace-nowrap text-[15px] font-black text-[#1668c4]">
+              {grandDisplay} {t.toman}
+            </div>
+          </div>
           <button
             type="button"
-            onClick={goBack}
-            className="flex h-12 w-12 flex-none items-center justify-center rounded-xl border border-[#e6eaf0] bg-[#f2f5f9]"
+            disabled={busy}
+            onClick={goNext}
+            data-testid="checkout-next-mobile"
+            className="flex h-12 max-w-[220px] flex-1 items-center justify-center rounded-xl bg-[#1668c4] text-[12.5px] font-extrabold text-white disabled:opacity-60"
           >
-            →
+            {busy ? t.loading : nextLabel}
           </button>
-        )}
-        <div className="min-w-0">
-          <div className="text-[10.5px] text-[#9aa4b2]">{t.total}</div>
-          <div className="whitespace-nowrap text-[15px] font-black text-[#1668c4]">
-            {grandDisplay} {t.toman}
-          </div>
         </div>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={goNext}
-          data-testid="checkout-next-mobile"
-          className="flex h-12 max-w-[220px] flex-1 items-center justify-center rounded-xl bg-[#1668c4] text-[12.5px] font-extrabold text-white disabled:opacity-60"
-        >
-          {busy ? t.loading : nextLabel}
-        </button>
+      </PublicPageShell>
+    );
+  }
+
+  return (
+    <PublicPageShell>
+      <CheckoutStepBar current={step} locale={locale} />
+      <div
+        className="mx-auto grid max-w-[1180px] items-start gap-2.5 px-6 py-5"
+        data-testid="checkout-desktop-main"
+        style={{ gridTemplateColumns: 'minmax(0, 1fr) 340px' }}
+      >
+        <div className="flex min-w-0 flex-col gap-[15px]">
+          <FlightSummaryCard flight={draft.flight} cabin={draft.cabin} locale={locale} />
+          {stepBody}
+        </div>
+        <PricingSidebar
+          locale={locale}
+          priceIrr={priceIrr}
+          paxCount={Math.max(1, passengers.length)}
+          extras={extras}
+          nextLabel={nextLabel}
+          onNext={goNext}
+          onBack={goBack}
+          canBack={step !== 'pax'}
+          busy={busy}
+          error={error}
+        />
       </div>
     </PublicPageShell>
   );

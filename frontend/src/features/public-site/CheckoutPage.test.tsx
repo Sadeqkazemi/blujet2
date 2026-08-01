@@ -6,6 +6,7 @@ import CheckoutPage from './CheckoutPage';
 import * as publicSiteApi from '../../api/publicSite';
 import * as useAuthModule from '../../hooks/useAuth';
 import * as useLocaleModule from '../../hooks/useLocale';
+import * as useIsMobileModule from '../../hooks/useIsMobile';
 import type { BookingDetail, SeatMapResult } from '../../types/public-site';
 import { mockAuthUser } from '../../test/mockAuthUser';
 
@@ -64,6 +65,7 @@ describe('CheckoutPage', () => {
   beforeEach(() => {
     sessionStorage.clear();
     vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale: 'fa', setLocale: vi.fn() });
+    vi.spyOn(useIsMobileModule, 'useIsMobile').mockReturnValue(false);
     vi.spyOn(publicSiteApi, 'fetchSavedPassengers').mockResolvedValue([]);
     vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({
       isMember: true,
@@ -96,6 +98,34 @@ describe('CheckoutPage', () => {
     expect(screen.getByTestId('checkout-route-label')).toHaveTextContent('تهران به مشهد');
     expect(screen.getByTestId('checkout-pricing-sidebar')).toBeInTheDocument();
     expect(screen.getByTestId('checkout-step-pax')).toBeInTheDocument();
+  });
+
+  it('mobile layout shows flight route + passenger form above pricing', async () => {
+    vi.spyOn(useIsMobileModule, 'useIsMobile').mockReturnValue(true);
+    mockAuth();
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: '/checkout/new',
+            search: '?flightInstanceId=fi-1&cabin=ECONOMY&origin=THR&dest=MHD',
+            state: FLIGHT_STATE,
+          },
+        ]}
+      >
+        <Routes>
+          <Route path="/checkout/:bookingId" element={<CheckoutPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByTestId('checkout-mobile-main')).toBeInTheDocument();
+    expect(screen.getByTestId('checkout-mobile-titlebar')).toHaveTextContent('تکمیل خرید');
+    expect(screen.getByTestId('checkout-route-label')).toHaveTextContent('تهران به مشهد');
+    expect(screen.getByTestId('checkout-pax-step')).toBeInTheDocument();
+    expect(screen.getByTestId('checkout-pricing-sidebar')).toBeInTheDocument();
+    expect(screen.getByTestId('checkout-mobile-sticky')).toBeInTheDocument();
+    expect(screen.getByTestId('checkout-next-mobile')).toHaveTextContent('تأیید و ادامه');
   });
 
   it('keeps origin/destination from sessionStorage after auth remount', async () => {
