@@ -17,7 +17,7 @@ export function OtpCells({
 }: {
   digits: string[];
   onChange: (next: string[]) => void;
-  onComplete?: () => void;
+  onComplete?: (code: string) => void;
   testIdPrefix?: string;
   autoFocus?: boolean;
 }) {
@@ -35,7 +35,7 @@ export function OtpCells({
       const focusIdx = Math.min(startIndex + chars.length, OTP_LEN - 1);
       refs.current[focusIdx]?.focus();
       if (next.every((v) => v !== '')) {
-        onComplete?.();
+        onComplete?.(next.join(''));
       }
     },
     [digits, onChange, onComplete],
@@ -56,7 +56,7 @@ export function OtpCells({
         refs.current[index + 1]?.focus();
       }
       if (next.every((v) => v !== '')) {
-        onComplete?.();
+        onComplete?.(next.join(''));
       }
     },
     [applyDigits, digits, onChange, onComplete],

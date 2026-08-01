@@ -18,7 +18,7 @@ describe('OtpCells', () => {
     expect(onChange).toHaveBeenCalled();
     const lastCall = onChange.mock.calls.at(-1)?.[0] as string[];
     expect(lastCall.join('')).toBe('482913');
-    expect(onComplete).toHaveBeenCalled();
+    expect(onComplete).toHaveBeenCalledWith('482913');
   });
 
   it('accepts multi-digit input in a single cell change (SMS autofill)', () => {

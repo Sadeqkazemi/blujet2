@@ -14,6 +14,7 @@ function mockLocale(locale: 'fa' | 'en' | 'ar') {
 
 const requestOtp = vi.fn().mockResolvedValue('challenge-1');
 const verifyOtp = vi.fn().mockResolvedValue({ id: 'u1', fullName: 'نگار رضایی', role: 'USER' });
+const devMockOtpLogin = vi.fn().mockResolvedValue({ id: 'u1', fullName: 'نگار رضایی', role: 'USER' });
 const agencyLogin = vi.fn().mockResolvedValue({ id: 'a1', fullName: 'آژانس blujet', role: 'AGENCY' });
 
 beforeEach(() => {
@@ -26,6 +27,7 @@ beforeEach(() => {
     agencyLogin,
     requestOtp,
     verifyOtp,
+    devMockOtpLogin,
     passwordLogin: vi.fn(),
     signOut: vi.fn(),
   });

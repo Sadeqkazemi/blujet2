@@ -10,7 +10,7 @@ import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { ApiRequestError } from '../../api/envelope';
 import { faDigits } from '../../lib/fa-format';
 import { normalizePhone, phoneOk } from '../../lib/phone';
-import { DEV_OTP_CODE, isDevOtpMockSend } from '../../lib/dev-otp';
+import { DEV_OTP_CODE, canDevOtpFallback, isDevOtpMockSend } from '../../lib/dev-otp';
 
 const RESEND_SECONDS = 120;
 
@@ -332,7 +332,7 @@ function OrDivider({ label }: { label: string }) {
 }
 
 export default function CustomerLoginPage() {
-  const { status, user, requestOtp, verifyOtp, agencyLogin } = useAuth();
+  const { status, user, requestOtp, verifyOtp, devMockOtpLogin, agencyLogin } = useAuth();
   const { locale } = useLocale();
   const t = STR[locale];
   const isMobile = useIsMobile();
@@ -476,24 +476,53 @@ export default function CustomerLoginPage() {
     }
   }
 
-  async function onVerify(e?: React.FormEvent) {
-    e?.preventDefault();
-    if (code.length !== OTP_LEN) return;
+  async function verifyOtpFlow(submittedCode?: string) {
+    const otpCode = (submittedCode ?? otpDigits.join('')).trim();
+    if (otpCode.length !== OTP_LEN || busy) return;
+
     setError(null);
     setBusy(true);
     try {
+      if (otpSendMocked && isDevOtpMockSend()) {
+        if (otpCode !== DEV_OTP_CODE) {
+          setError(t.errInvalidCode);
+          return;
+        }
+        try {
+          let cid = challengeId;
+          if (!cid) {
+            cid = await requestOtp!(phone.trim());
+            setChallengeId(cid);
+            setOtpSendMocked(false);
+          }
+          await verifyOtp!(cid, otpCode);
+        } catch (err) {
+          if (canDevOtpFallback(err)) {
+            await devMockOtpLogin!(phone.trim(), isLogin ? undefined : fullName);
+            setOtpSendMocked(false);
+          } else {
+            throw err;
+          }
+        }
+        return;
+      }
+
       let cid = challengeId;
-      if (otpSendMocked && !cid) {
+      if (!cid) {
         cid = await requestOtp!(phone.trim());
         setChallengeId(cid);
-        setOtpSendMocked(false);
       }
-      await verifyOtp!(cid!, code.trim());
+      await verifyOtp!(cid, otpCode);
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.errInvalidCode);
     } finally {
       setBusy(false);
     }
+  }
+
+  async function onVerify(e?: React.FormEvent) {
+    e?.preventDefault();
+    await verifyOtpFlow();
   }
 
   async function onAgencyLogin(e: React.FormEvent) {
@@ -989,6 +1018,7 @@ export default function CustomerLoginPage() {
                     key={challengeId ?? (otpSendMocked ? 'mock-otp' : 'otp')}
                     digits={otpDigits}
                     onChange={setOtpDigits}
+                    onComplete={(completedCode) => void verifyOtpFlow(completedCode)}
                     testIdPrefix="signin-code-cell"
                     autoFocus
                   />
