@@ -20,7 +20,16 @@ const DICT = {
   navSupport: { fa: 'پشتیبانی', en: 'Support', ar: 'الدعم' },
   menuTitle: { fa: 'منو', en: 'Menu', ar: 'القائمة' },
   btnLoginSignup: { fa: 'ورود / ثبت‌نام', en: 'Log in / Sign up', ar: 'ورود / تسجيل الدخول' },
+  btnLoginOnly: { fa: 'ورود', en: 'Log in', ar: 'تسجيل الدخول' },
   btnJoinClub: { fa: 'عضویت باشگاه', en: 'Join Club', ar: 'الانضمام إلى النادي' },
+  loginDrawerTitle: { fa: 'ورود', en: 'Log in', ar: 'تسجيل الدخول' },
+  loginWelcome: {
+    fa: 'به باشگاه مشتریان blujet خوش آمدید، برنامه وفاداری پروازهای blujet.',
+    en: 'Welcome to blujet Club, the loyalty programme for blujet flights.',
+    ar: 'مرحبًا بك في نادي blujet، برنامج الولاء لرحلات blujet.',
+  },
+  discoverMoreLabel: { fa: 'بیشتر بدانید', en: 'Discover more', ar: 'اكتشف المزيد' },
+  notifNewLabel: { fa: 'جدید', en: 'New', ar: 'جديد' },
   notificationsTitle: { fa: 'اعلان‌ها', en: 'Notifications', ar: 'الإشعارات' },
   profileLabel: { fa: 'مشاهده پروفایل', en: 'View Profile', ar: 'عرض الملف الشخصي' },
   tripsLabel: { fa: 'سفرها و مدیریت رزرو', en: 'Trips & Booking Management', ar: 'الرحلات وإدارة الحجز' },
@@ -56,6 +65,10 @@ const DICT = {
     en: '© 2026 blujet. All rights reserved.',
     ar: '© ٢٠٢٦ blujet. جميع الحقوق محفوظة.',
   },
+  badgeTrust: { fa: 'نماد اعتماد الکترونیکی', en: 'e-Trust Seal', ar: 'رمز الثقة الإلكترونية' },
+  badgeGuild: { fa: 'انجمن صنفی دفاتر خدمات مسافرتی', en: 'Travel Agencies Guild', ar: 'اتحاد وكالات السفر' },
+  badgeSamandehi: { fa: 'ساماندهی', en: 'Samandehi Registered', ar: 'ساماندهی' },
+  badgeIata: { fa: 'عضو IATA', en: 'IATA Member', ar: 'عضو IATA' },
 } satisfies Record<string, Record<StoredLocale, string>>;
 
 export type TranslationKey = keyof typeof DICT;

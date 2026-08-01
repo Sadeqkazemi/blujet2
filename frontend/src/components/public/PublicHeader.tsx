@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { fetchClubPoints } from '../../api/publicSite';
 import { faDigits } from '../../lib/fa-format';
@@ -13,10 +13,6 @@ const TIER_KEY: Record<string, 'tierSilver' | 'tierGold' | 'tierPlatinum'> = {
   PLATINUM: 'tierPlatinum',
 };
 
-// Sample notification feed — the design's own placeholder content; no
-// backend notifications endpoint exists yet, so this stays presentational.
-// Translated inline here (not lib/i18n.ts) since it's placeholder content
-// specific to this component, not a real shared-shell string.
 const NOTIFICATIONS: Record<StoredLocale, { icon: string; title: string; body: string; time: string }[]> = {
   fa: [
     { icon: '✈', title: 'یادآوری سفر', body: 'پرواز تهران → دبی شما فرداست. آنلاین چک‌این باز است.', time: '۱ ساعت پیش' },
@@ -46,22 +42,55 @@ function initials(fullName: string) {
   return parts.slice(0, 2).map((p) => p[0] ?? '').join('') || 'کا';
 }
 
-/** Sticky public-site header — matches design-reference-v2/صفحه اصلی.dc.html:
- * fa/en/ar language switcher + real matchMedia-driven mobile layout. */
+function GlobeIcon({ size = 15 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18M12 3c2.5 2.5 4 5.7 4 9s-1.5 6.5-4 9c-2.5-2.5-4-5.7-4-9s1.5-6.5 4-9z" />
+    </svg>
+  );
+}
+
+function UserOutlineIcon({ size = 17 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21c0-4 4-6 8-6s8 2 8 6" />
+    </svg>
+  );
+}
+
+function UserFilledIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm0 2c-5.33 0-9 2.69-9 6v2h18v-2c0-3.31-3.67-6-9-6z" />
+    </svg>
+  );
+}
+
+function isFlightsRoute(pathname: string) {
+  return pathname === '/' || pathname.startsWith('/results') || pathname.startsWith('/book');
+}
+
+/** Sticky public-site header — matches design-reference-v2 shared shell. */
 export default function PublicHeader() {
   const { status, user, signOut } = useAuth();
   const { locale, setLocale } = useLocale();
   const t = useT();
   const isMobile = useIsMobile();
+  const location = useLocation();
   const isRTL = locale !== 'en';
   const [menuOpen, setMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [loginDrawerOpen, setLoginDrawerOpen] = useState(false);
   const [club, setClub] = useState<{ isMember: boolean; level: string | null; balance: number } | null>(null);
 
   const loggedIn = status === 'authenticated' && user?.role === 'USER';
   const notifications = NOTIFICATIONS[locale];
+  const notifCount = notifications.length;
+  const notifCountLabel = locale === 'fa' ? faDigits(notifCount) : String(notifCount);
 
   useEffect(() => {
     if (!loggedIn) return;
@@ -71,82 +100,114 @@ export default function PublicHeader() {
   }, [loggedIn]);
 
   const navLinks = [
-    { to: '/', label: t('navFlights'), active: true },
-    { to: '/destinations', label: t('navDestinations') },
-    { to: '/club', label: t('navLoyalty') },
-    { to: '/travel-info', label: t('navTravelInfo') },
-    { to: '/support', label: t('navSupport') },
+    { to: '/', label: t('navFlights'), active: isFlightsRoute(location.pathname) },
+    { to: '/destinations', label: t('navDestinations'), active: location.pathname.startsWith('/destinations') },
+    { to: '/club', label: t('navLoyalty'), active: location.pathname.startsWith('/club') },
+    { to: '/support', label: t('navSupport'), active: location.pathname.startsWith('/support') },
   ];
 
   const tierLabel = club?.level ? t(TIER_KEY[club.level] ?? 'tierSilver') : null;
+  const logoTextColor = isMobile ? '#fff' : '#16202e';
+  const logoSquareBg = isMobile ? '#fff' : '#1668c4';
+  const logoIconColor = isMobile ? '#1668c4' : '#fff';
 
-  const langSwitcher = (
-    <div style={{ position: 'relative' }}>
-      <span
-        data-testid="public-lang-toggle"
-        onClick={() => setLangOpen((v) => !v)}
+  const langDropdown = (
+    <>
+      <div onClick={() => setLangOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 120 }} />
+      <div
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          cursor: 'pointer',
-          color: '#5a6678',
-          border: '1.5px solid #e2e7ee',
-          borderRadius: 20,
-          padding: '6px 12px',
-          fontSize: '12.5px',
-          fontWeight: 700,
+          position: 'absolute',
+          top: 44,
+          [isRTL ? 'left' : 'right']: 0,
+          width: 150,
+          background: '#fff',
+          border: '1px solid #e6eaf0',
+          borderRadius: 14,
+          boxShadow: '0 20px 50px -16px rgba(13,38,64,.35)',
+          zIndex: 130,
+          overflow: 'hidden',
+          padding: 6,
         }}
       >
-        🌐 {locale.toUpperCase()}
-      </span>
-      {langOpen && (
-        <>
-          <div onClick={() => setLangOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 120 }} />
+        {LANG_OPTIONS.map((opt) => (
           <div
+            key={opt.value}
+            data-testid={`public-lang-option-${opt.value}`}
+            onClick={() => {
+              setLocale(opt.value);
+              setLangOpen(false);
+            }}
             style={{
-              position: 'absolute',
-              top: 44,
-              [isRTL ? 'left' : 'right']: 0,
-              width: 150,
-              background: '#fff',
-              border: '1px solid #e6eaf0',
-              borderRadius: 14,
-              boxShadow: '0 20px 50px -16px rgba(13,38,64,.35)',
-              zIndex: 130,
-              overflow: 'hidden',
-              padding: 6,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 8,
+              padding: '9px 11px',
+              borderRadius: 9,
+              fontSize: '12.5px',
+              fontWeight: 600,
+              color: '#16202e',
+              cursor: 'pointer',
             }}
           >
-            {LANG_OPTIONS.map((opt) => (
-              <div
-                key={opt.value}
-                data-testid={`public-lang-option-${opt.value}`}
-                onClick={() => {
-                  setLocale(opt.value);
-                  setLangOpen(false);
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 8,
-                  padding: '9px 11px',
-                  borderRadius: 9,
-                  fontSize: '12.5px',
-                  fontWeight: 600,
-                  color: '#16202e',
-                  cursor: 'pointer',
-                }}
-              >
-                {opt.label}
-                {locale === opt.value && <span style={{ color: '#1668c4', fontWeight: 900 }}>✓</span>}
-              </div>
-            ))}
+            {opt.label}
+            {locale === opt.value && <span style={{ color: '#1668c4', fontWeight: 900 }}>✓</span>}
           </div>
-        </>
+        ))}
+      </div>
+    </>
+  );
+
+  const userMenuItems = (mobileCompact: boolean) => (
+    <>
+      <Link
+        to="/account"
+        onClick={() => setMenuOpen(false)}
+        style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: '11.5px', color: '#16202e', textDecoration: 'none', fontWeight: 600 }}
+      >
+        <span style={{ color: '#1668c4' }}>
+          <UserFilledIcon size={14} />
+        </span>
+        {t('profileLabel')}
+      </Link>
+      <Link
+        to="/manage-booking"
+        onClick={() => setMenuOpen(false)}
+        style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: '11.5px', color: '#16202e', textDecoration: 'none', fontWeight: 600 }}
+      >
+        <span style={{ color: '#1668c4' }}>🧳</span>
+        {t('tripsLabel')}
+      </Link>
+      {!mobileCompact && (
+        <Link
+          to="/manage-booking"
+          onClick={() => setMenuOpen(false)}
+          style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: '11.5px', color: '#16202e', textDecoration: 'none', fontWeight: 600 }}
+        >
+          <span style={{ color: '#1668c4' }}>↺</span>
+          {t('refundLabel')}
+        </Link>
       )}
-    </div>
+      <Link
+        to="/club"
+        onClick={() => setMenuOpen(false)}
+        style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: '11.5px', color: '#16202e', textDecoration: 'none', fontWeight: 600 }}
+      >
+        <span style={{ color: '#1668c4' }}>★</span>
+        {t('navLoyalty')}
+      </Link>
+      <span
+        data-testid="public-logout"
+        onClick={() => {
+          setMenuOpen(false);
+          void signOut();
+        }}
+        style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: '11.5px', color: '#e5484d', fontWeight: 600, cursor: 'pointer' }}
+      >
+        <span>↩</span>
+        {t('logoutLabel')}
+      </span>
+    </>
   );
 
   return (
@@ -174,15 +235,16 @@ export default function PublicHeader() {
               data-testid="public-mobile-menu-toggle"
               onClick={() => setMobileMenuOpen((v) => !v)}
               style={{
-                width: 38,
-                height: 38,
+                width: 40,
+                height: 40,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 borderRadius: 10,
                 cursor: 'pointer',
-                fontSize: 17,
+                fontSize: 18,
                 color: '#fff',
+                flex: 'none',
               }}
             >
               ☰
@@ -191,24 +253,24 @@ export default function PublicHeader() {
 
           <Link
             to="/"
-            style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none', color: isMobile ? '#fff' : 'inherit' }}
+            style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none', color: logoTextColor }}
           >
             <div
               style={{
                 width: 38,
                 height: 38,
                 borderRadius: 10,
-                background: isMobile ? '#fff' : '#1668c4',
+                background: logoSquareBg,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: isMobile ? '#1668c4' : '#fff',
-                fontSize: 18,
+                color: logoIconColor,
+                fontSize: 19,
               }}
             >
               ✈
             </div>
-            <span style={{ fontWeight: 900, fontSize: 18, letterSpacing: '-.5px' }}>blujet</span>
+            <span style={{ fontWeight: 900, fontSize: 18, letterSpacing: '-.5px', color: logoTextColor }}>blujet</span>
           </Link>
 
           {!isMobile && (
@@ -231,7 +293,28 @@ export default function PublicHeader() {
 
           {!isMobile && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              {langSwitcher}
+              <div style={{ position: 'relative' }}>
+                <span
+                  data-testid="public-lang-toggle"
+                  onClick={() => setLangOpen((v) => !v)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    cursor: 'pointer',
+                    color: '#5a6678',
+                    border: '1.5px solid #e2e7ee',
+                    borderRadius: 20,
+                    padding: '6px 12px',
+                    fontSize: '12.5px',
+                    fontWeight: 700,
+                  }}
+                >
+                  <GlobeIcon />
+                  {locale.toUpperCase()}
+                </span>
+                {langOpen && langDropdown}
+              </div>
               {!loggedIn && (
                 <>
                   <Link
@@ -247,12 +330,10 @@ export default function PublicHeader() {
                       fontSize: '12.5px',
                       fontWeight: 700,
                       textDecoration: 'none',
+                      whiteSpace: 'nowrap',
                     }}
                   >
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="8" r="4" />
-                      <path d="M4 21c0-4 4-6 8-6s8 2 8 6" />
-                    </svg>
+                    <UserOutlineIcon />
                     {t('btnLoginSignup')}
                   </Link>
                   <Link
@@ -265,6 +346,7 @@ export default function PublicHeader() {
                       fontSize: '12.5px',
                       fontWeight: 700,
                       textDecoration: 'none',
+                      whiteSpace: 'nowrap',
                     }}
                   >
                     {t('btnJoinClub')}
@@ -287,13 +369,35 @@ export default function PublicHeader() {
                         alignItems: 'center',
                         justifyContent: 'center',
                         color: '#5a6678',
-                        fontSize: '15.5px',
+                        fontSize: '16.5px',
                         position: 'relative',
                         cursor: 'pointer',
                       }}
                     >
                       🔔
-                      <span style={{ position: 'absolute', top: 9, [isRTL ? 'left' : 'right']: 12, width: 8, height: 8, borderRadius: '50%', background: '#e5484d', border: '1.5px solid #fff' }} />
+                      <span
+                        style={{
+                          position: 'absolute',
+                          top: 5,
+                          [isRTL ? 'left' : 'right']: 8,
+                          minWidth: 16,
+                          height: 16,
+                          padding: '0 3px',
+                          boxSizing: 'border-box',
+                          borderRadius: 8,
+                          background: '#e5484d',
+                          border: '1.5px solid #fff',
+                          color: '#fff',
+                          fontSize: 9,
+                          fontWeight: 800,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          lineHeight: 1,
+                        }}
+                      >
+                        {notifCountLabel}
+                      </span>
                     </div>
                     {notifOpen && (
                       <>
@@ -313,23 +417,25 @@ export default function PublicHeader() {
                           }}
                         >
                           <div style={{ padding: '11px 12px', borderBottom: '1px solid #eef1f5', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <span style={{ fontSize: '12.5px', fontWeight: 800, color: '#0d2640' }}>{t('notificationsTitle')}</span>
-                            <span style={{ fontSize: 10, fontWeight: 700, color: '#1668c4', background: '#eef4fb', padding: '2px 7px', borderRadius: 12 }}>
-                              {locale === 'fa' ? faDigits(notifications.length) : notifications.length}
+                            <span style={{ fontSize: '13.5px', fontWeight: 800, color: '#0d2640' }}>{t('notificationsTitle')}</span>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: '#1668c4', background: '#eef4fb', padding: '2px 7px', borderRadius: 12 }}>
+                              {t('notifNewLabel')}
                             </span>
                           </div>
-                          {notifications.map((n) => (
-                            <div key={n.title + n.time} style={{ display: 'flex', gap: 9, padding: '11px 12px', borderBottom: '1px solid #f4f6fa' }}>
-                              <span style={{ width: 34, height: 34, borderRadius: 10, background: '#f3f5f8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14.5px', flex: 'none' }}>
-                                {n.icon}
-                              </span>
-                              <div style={{ minWidth: 0 }}>
-                                <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#16202e' }}>{n.title}</div>
-                                <div style={{ fontSize: 11, color: '#6b7787', marginTop: 2, lineHeight: 1.7 }}>{n.body}</div>
-                                <div style={{ fontSize: '9.5px', color: '#6b7787', marginTop: 4 }}>{n.time}</div>
+                          <div style={{ maxHeight: 360, overflow: 'auto' }}>
+                            {notifications.map((n) => (
+                              <div key={n.title + n.time} style={{ display: 'flex', gap: 9, padding: '11px 12px', borderBottom: '1px solid #f4f6fa' }}>
+                                <span style={{ width: 34, height: 34, borderRadius: 10, background: '#f3f5f8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15.5px', flex: 'none' }}>
+                                  {n.icon}
+                                </span>
+                                <div style={{ minWidth: 0 }}>
+                                  <div style={{ fontSize: '13.5px', fontWeight: 700, color: '#16202e' }}>{n.title}</div>
+                                  <div style={{ fontSize: 13, color: '#6b7787', marginTop: 2, lineHeight: 1.7 }}>{n.body}</div>
+                                  <div style={{ fontSize: '12.5px', color: '#6b7787', marginTop: 4 }}>{n.time}</div>
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
                       </>
                     )}
@@ -345,7 +451,7 @@ export default function PublicHeader() {
                         background: '#fff',
                         border: '1px solid #e6eaf0',
                         padding: '4px 10px 4px 7px',
-                        borderRadius: 30,
+                        borderRadius: 28,
                         cursor: 'pointer',
                       }}
                     >
@@ -360,16 +466,16 @@ export default function PublicHeader() {
                           alignItems: 'center',
                           justifyContent: 'center',
                           fontWeight: 700,
-                          fontSize: '11.5px',
+                          fontSize: '13.5px',
                         }}
                       >
-                        {initials(user.fullName)}
+                        <UserFilledIcon />
                       </div>
                       <div style={{ lineHeight: 1.35, textAlign: isRTL ? 'right' : 'left' }}>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: '#16202e' }}>{user.fullName}</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#16202e' }}>{user.fullName}</div>
                         {club?.isMember && tierLabel && <div style={{ fontSize: 10, color: '#caa53a', fontWeight: 700 }}>★ {tierLabel}</div>}
                       </div>
-                      <span style={{ fontSize: 8, color: '#6b7787', marginRight: 2 }}>▼</span>
+                      <span style={{ fontSize: 10, color: '#6b7787', marginRight: 2 }}>▼</span>
                     </div>
 
                     {menuOpen && (
@@ -383,67 +489,30 @@ export default function PublicHeader() {
                             width: 320,
                             background: '#fff',
                             border: '1px solid #e6eaf0',
-                            borderRadius: 16,
+                            borderRadius: 14,
                             boxShadow: '0 20px 50px -16px rgba(13,38,64,.35)',
                             zIndex: 130,
                             overflow: 'hidden',
                           }}
                         >
-                          <div style={{ padding: 15, background: 'linear-gradient(135deg,#0d2640,#16406e)', color: '#fff' }}>
+                          <div style={{ padding: 12, background: 'linear-gradient(135deg,#0d2640,#16406e)', color: '#fff' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                              <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'rgba(255,255,255,.16)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '13.5px' }}>
-                                {initials(user.fullName)}
+                              <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'rgba(255,255,255,.16)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '14.5px' }}>
+                                <UserFilledIcon size={22} />
                               </div>
                               <div style={{ lineHeight: 1.5 }}>
-                                <div style={{ fontSize: '13.5px', fontWeight: 800 }}>{user.fullName}</div>
+                                <div style={{ fontSize: '14.5px', fontWeight: 800 }}>{user.fullName}</div>
                                 {club?.isMember && tierLabel && <div style={{ fontSize: '10.5px', color: '#caa53a', fontWeight: 700 }}>★ {tierLabel}</div>}
                               </div>
                             </div>
                             {club?.isMember && (
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, background: 'rgba(255,255,255,.1)', borderRadius: 10, padding: '7px 11px' }}>
-                                <span style={{ fontSize: 11, color: '#aac4e2' }}>{t('pointsLabel')}</span>
-                                <span style={{ fontSize: '12.5px', fontWeight: 800 }}>{locale === 'fa' ? faDigits(club.balance) : club.balance}</span>
+                                <span style={{ fontSize: 13, color: '#aac4e2' }}>{t('pointsLabel')}</span>
+                                <span style={{ fontSize: '13.5px', fontWeight: 800 }}>{locale === 'fa' ? faDigits(club.balance) : club.balance}</span>
                               </div>
                             )}
                           </div>
-                          <div style={{ padding: 5 }}>
-                            <Link
-                              to="/account"
-                              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: '11.5px', color: '#16202e', textDecoration: 'none', fontWeight: 600 }}
-                            >
-                              <span style={{ color: '#1668c4' }}>👤</span>
-                              {t('profileLabel')}
-                            </Link>
-                            <Link
-                              to="/manage-booking"
-                              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: '11.5px', color: '#16202e', textDecoration: 'none', fontWeight: 600 }}
-                            >
-                              <span style={{ color: '#1668c4' }}>🧳</span>
-                              {t('tripsLabel')}
-                            </Link>
-                            <Link
-                              to="/manage-booking"
-                              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: '11.5px', color: '#16202e', textDecoration: 'none', fontWeight: 600 }}
-                            >
-                              <span style={{ color: '#1668c4' }}>↺</span>
-                              {t('refundLabel')}
-                            </Link>
-                            <Link
-                              to="/club"
-                              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: '11.5px', color: '#16202e', textDecoration: 'none', fontWeight: 600 }}
-                            >
-                              <span style={{ color: '#1668c4' }}>★</span>
-                              {t('navLoyalty')}
-                            </Link>
-                            <span
-                              data-testid="public-logout"
-                              onClick={() => void signOut()}
-                              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: '11.5px', color: '#e5484d', fontWeight: 600, cursor: 'pointer' }}
-                            >
-                              <span>↩</span>
-                              {t('logoutLabel')}
-                            </span>
-                          </div>
+                          <div style={{ padding: 5 }}>{userMenuItems(false)}</div>
                         </div>
                       </>
                     )}
@@ -454,25 +523,101 @@ export default function PublicHeader() {
           )}
 
           {isMobile && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span
-                data-testid="public-lang-toggle-mobile"
-                onClick={() => setLocale(locale === 'fa' ? 'en' : locale === 'en' ? 'ar' : 'fa')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  height: 36,
-                  padding: '0 9px',
-                  borderRadius: 20,
-                  background: 'rgba(255,255,255,.16)',
-                  color: '#fff',
-                  cursor: 'pointer',
-                  fontSize: '11.5px',
-                  fontWeight: 800,
-                }}
-              >
-                🌐 {locale.toUpperCase()}
-              </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <div style={{ position: 'relative' }}>
+                <span
+                  data-testid="public-lang-toggle-mobile"
+                  onClick={() => setLangOpen((v) => !v)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 3,
+                    height: 36,
+                    padding: '0 9px',
+                    borderRadius: 20,
+                    background: 'rgba(255,255,255,.16)',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    fontSize: '11.5px',
+                    fontWeight: 800,
+                  }}
+                >
+                  <GlobeIcon size={16} />
+                  {locale.toUpperCase()}
+                </span>
+                {langOpen && langDropdown}
+              </div>
+              {loggedIn && user ? (
+                <div style={{ position: 'relative' }}>
+                  <span
+                    data-testid="public-user-menu-toggle-mobile"
+                    onClick={() => setMenuOpen((v) => !v)}
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#fff',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <UserOutlineIcon size={19} />
+                  </span>
+                  {menuOpen && (
+                    <>
+                      <div onClick={() => setMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 120 }} />
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: 46,
+                          [isRTL ? 'left' : 'right']: 0,
+                          width: 250,
+                          background: '#fff',
+                          border: '1px solid #e6eaf0',
+                          borderRadius: 14,
+                          boxShadow: '0 20px 50px -16px rgba(13,38,64,.35)',
+                          zIndex: 130,
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <div style={{ padding: 13, background: 'linear-gradient(135deg,#0d2640,#16406e)', color: '#fff' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                            <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'rgba(255,255,255,.16)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13 }}>
+                              <UserFilledIcon size={18} />
+                            </div>
+                            <div style={{ lineHeight: 1.5 }}>
+                              <div style={{ fontSize: '13.5px', fontWeight: 800 }}>{user.fullName}</div>
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ padding: 5 }}>{userMenuItems(true)}</div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <span
+                  data-testid="public-signin-mobile"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    setLoginDrawerOpen(true);
+                  }}
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#fff',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <UserOutlineIcon size={19} />
+                </span>
+              )}
             </div>
           )}
         </div>
@@ -507,73 +652,143 @@ export default function PublicHeader() {
                 key={link.to}
                 to={link.to}
                 onClick={() => setMobileMenuOpen(false)}
-                style={{ padding: '20px 0', textDecoration: 'none', color: '#16202e', fontSize: 17, fontWeight: 700, borderTop: i > 0 ? '1px solid #eef1f5' : undefined }}
+                style={{
+                  padding: '20px 0',
+                  textDecoration: 'none',
+                  color: '#16202e',
+                  fontSize: 17,
+                  fontWeight: 700,
+                  borderTop: i > 0 ? '1px solid #eef1f5' : undefined,
+                  borderBottom: i === navLinks.length - 1 ? '1px solid #eef1f5' : undefined,
+                }}
               >
                 {link.label}
               </Link>
             ))}
           </div>
-          <div style={{ margin: '14px 24px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {LANG_OPTIONS.map((opt) => (
-              <span
-                key={opt.value}
-                data-testid={`public-mobile-lang-option-${opt.value}`}
-                onClick={() => setLocale(opt.value)}
-                style={{
-                  textAlign: 'center',
-                  padding: 11,
-                  border: '1.5px solid #e2e7ee',
-                  borderRadius: 10,
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: locale === opt.value ? '#1668c4' : '#5a6678',
-                  cursor: 'pointer',
-                }}
-              >
-                {opt.label}
-              </span>
-            ))}
-          </div>
-          <div style={{ margin: '10px 24px 32px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ marginTop: 'auto', padding: '14px 24px 32px', display: 'flex', flexDirection: 'column', gap: 10 }}>
             {!loggedIn && (
-              <Link
-                to="/signin"
-                onClick={() => setMobileMenuOpen(false)}
-                style={{ textAlign: 'center', padding: 13, border: '1.5px solid #d5e1f0', color: '#0d2640', borderRadius: 10, fontSize: 14, fontWeight: 700, textDecoration: 'none' }}
+              <span
+                data-testid="public-login-drawer-open"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  setLoginDrawerOpen(true);
+                }}
+                style={{ textAlign: 'center', padding: 13, border: '1.5px solid #d5e1f0', color: '#0d2640', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
               >
-                {t('btnLoginSignup')}
-              </Link>
+                {t('btnLoginOnly')}
+              </span>
             )}
             {loggedIn && user && (
               <>
-                <Link
-                  to="/account"
-                  onClick={() => setMobileMenuOpen(false)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0', textDecoration: 'none', color: '#16202e', fontSize: 14, fontWeight: 700 }}
-                >
-                  <span style={{ color: '#1668c4' }}>👤</span>
-                  {t('profileLabel')}
-                </Link>
                 <Link
                   to="/manage-booking"
                   onClick={() => setMobileMenuOpen(false)}
                   style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0', textDecoration: 'none', color: '#16202e', fontSize: 14, fontWeight: 700 }}
                 >
-                  <span style={{ color: '#1668c4' }}>🧳</span>
-                  {t('tripsLabel')}
+                  🧳 {t('tripsLabel')}
                 </Link>
                 <span
                   onClick={() => {
                     setMobileMenuOpen(false);
                     void signOut();
                   }}
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0', color: '#e5484d', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+                  style={{ padding: '10px 0', color: '#e5484d', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
                 >
-                  <span>↩</span>
-                  {t('logoutLabel')}
+                  ↩ {t('logoutLabel')}
                 </span>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {loginDrawerOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'linear-gradient(165deg,#0d2640,#1668c4)',
+            color: '#fff',
+            zIndex: 210,
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', padding: '26px 20px 18px' }}>
+            <span style={{ fontSize: 22, fontWeight: 800, color: '#fff' }}>{t('loginDrawerTitle')}</span>
+            <span
+              data-testid="public-login-drawer-close"
+              onClick={() => setLoginDrawerOpen(false)}
+              style={{
+                position: 'absolute',
+                [isRTL ? 'left' : 'right']: 20,
+                top: 22,
+                width: 34,
+                height: 34,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 24,
+                color: '#fff',
+                cursor: 'pointer',
+              }}
+            >
+              ×
+            </span>
+          </div>
+          <div style={{ padding: '34px 28px 0', textAlign: 'center' }}>
+            <p style={{ fontSize: 16, lineHeight: 1.7, color: '#dbe7f7', margin: '8px 0 34px' }}>{t('loginWelcome')}</p>
+            <Link
+              to="/signin"
+              onClick={() => setLoginDrawerOpen(false)}
+              style={{
+                display: 'block',
+                padding: 16,
+                background: '#fff',
+                color: '#0d2640',
+                borderRadius: 30,
+                fontSize: '15.5px',
+                fontWeight: 800,
+                textDecoration: 'none',
+                marginBottom: 14,
+              }}
+            >
+              {t('btnLoginOnly')}
+            </Link>
+            <Link
+              to="/club"
+              onClick={() => setLoginDrawerOpen(false)}
+              style={{
+                display: 'block',
+                padding: 16,
+                background: 'transparent',
+                color: '#fff',
+                border: '1.5px solid rgba(255,255,255,.6)',
+                borderRadius: 30,
+                fontSize: '15.5px',
+                fontWeight: 800,
+                textDecoration: 'none',
+                marginBottom: 22,
+              }}
+            >
+              {t('btnJoinClub')}
+            </Link>
+            <Link
+              to="/club"
+              onClick={() => setLoginDrawerOpen(false)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 7,
+                color: '#fff',
+                textDecoration: 'none',
+                fontSize: 14,
+                fontWeight: 700,
+              }}
+            >
+              {t('discoverMoreLabel')} <span>{isRTL ? '←' : '→'}</span>
+            </Link>
           </div>
         </div>
       )}
