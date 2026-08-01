@@ -6,7 +6,6 @@ import {
   fetchClubPoints,
   fetchSavedFlights,
   fetchSearchAdvisory,
-  fetchPriceCalendar,
   saveFlight,
   searchFlights,
 } from '../../api/publicSite';
@@ -19,7 +18,6 @@ import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
 import type {
   Airport,
   CabinClass,
-  PriceCalendarDay,
   PriceLock,
   SearchAdvisoryResult,
   SearchFlightResult,
@@ -79,7 +77,6 @@ export default function ResultsPage() {
   const [airports, setAirports] = useState<Airport[]>([]);
   const [results, setResults] = useState<SearchFlightResult[] | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
-  const [calendarDays, setCalendarDays] = useState<PriceCalendarDay[] | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -136,14 +133,6 @@ export default function ResultsPage() {
         }
       });
 
-    fetchPriceCalendar(origin, dest, date)
-      .then((days) => {
-        if (!cancelled) setCalendarDays(days);
-      })
-      .catch(() => {
-        if (!cancelled) setCalendarDays([]);
-      });
-
     return () => {
       cancelled = true;
     };
@@ -169,12 +158,6 @@ export default function ResultsPage() {
 
   const totalPages = Math.max(1, Math.ceil(filteredResults.length / PAGE_SIZE));
   const pagedResults = filteredResults.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  const calendarMinPrice = useMemo(() => {
-    const prices = (calendarDays ?? []).map((d) => BigInt(d.minPriceIrr)).filter((p) => p > 0n);
-    if (prices.length === 0) return null;
-    return prices.reduce((min, p) => (p < min ? p : min));
-  }, [calendarDays]);
 
   const aiPickId = useMemo(() => {
     if (!advisory || advisory.recommendation !== 'buy' || filteredResults.length === 0) return null;
@@ -240,13 +223,6 @@ export default function ResultsPage() {
     } catch {
       setAiState('error');
     }
-  }
-
-  function onCalendarDayClick(dayDate: string) {
-    if (dayDate === date) return;
-    const next = new URLSearchParams(params);
-    next.set('date', dayDate);
-    setParams(next);
   }
 
   function applyEditSearch(nextOrigin: string, nextDest: string, nextDate: string) {
@@ -806,12 +782,8 @@ export default function ResultsPage() {
         origin={origin}
         dest={dest}
         date={date}
-        calendarDays={calendarDays}
-        calendarMinPrice={calendarMinPrice}
-        selectedDate={date}
         onClose={() => setEditOpen(false)}
         onApply={applyEditSearch}
-        onCalendarDayClick={onCalendarDayClick}
       />
 
       {realLockResult && (
