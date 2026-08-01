@@ -18,13 +18,19 @@ import {
   panelBtnGhost,
   panelBtnPrimary,
   panelCard,
-  panelElevated,
   panelInput,
   panelMuted,
   panelMuted2,
   panelText,
   panelTitle,
 } from '../panel/panel-theme';
+import {
+  deriveUsernameFromEmail,
+  PERM_DEFS,
+  rolePermissionPreset,
+  type PermKey,
+  type PermState,
+} from './admin-permissions';
 
 const CREATABLE_ROLES: { value: AdminCreatableRole; label: string }[] = [
   { value: 'SENIOR_MANAGER', label: 'مدیر ارشد' },
@@ -56,9 +62,9 @@ function formatRelativeFa(iso: string | null): string {
 }
 
 function generatePassword(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#';
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789@#%';
   let out = '';
-  for (let i = 0; i < 12; i++) out += chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < 10; i++) out += chars[Math.floor(Math.random() * chars.length)];
   return out;
 }
 
@@ -99,6 +105,129 @@ function StatusDot({ row }: { row: AdminRow }) {
   );
 }
 
+function PermToggle({
+  on,
+  onChange,
+  large,
+  label,
+}: {
+  on: boolean;
+  onChange: () => void;
+  large?: boolean;
+  label: string;
+}) {
+  const h = large ? 'h-[26px] w-[46px]' : 'h-[25px] w-11';
+  const knob = large ? 'h-5 w-5 top-[3px]' : 'h-5 w-5 top-[2.5px]';
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      onClick={onChange}
+      className={`relative shrink-0 rounded-[13px] transition ${h} ${on ? 'bg-panel-accent' : 'bg-[#28344c]'}`}
+    >
+      <span
+        className={`absolute rounded-full transition-all ${knob} ${on ? 'right-[2.5px] bg-white' : 'left-[2.5px] bg-[#6b7b94]'}`}
+      />
+    </button>
+  );
+}
+
+function DeliveryCards({
+  value,
+  onChange,
+  label,
+  compact,
+}: {
+  value: 'sms' | 'email';
+  onChange: (v: 'sms' | 'email') => void;
+  label?: string;
+  compact?: boolean;
+}) {
+  const options: { id: 'sms' | 'email'; label: string }[] = [
+    { id: 'sms', label: 'پیامک' },
+    { id: 'email', label: 'ایمیل سازمانی' },
+  ];
+
+  return (
+    <div>
+      {label ? <div className={`mb-2 text-[11px] ${panelMuted}`}>{label}</div> : null}
+      <div className={`flex gap-2 ${compact ? 'flex-wrap' : ''}`}>
+        {options.map((opt) => {
+          const selected = value === opt.id;
+          return (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => onChange(opt.id)}
+              className={`flex flex-1 cursor-pointer items-center gap-2 rounded-[11px] border-[1.5px] px-[11px] transition ${
+                compact ? 'py-[7px]' : 'py-2.5'
+              } ${
+                selected
+                  ? 'border-[#3b82f6] bg-[rgba(59,130,246,.12)]'
+                  : 'border-[#28344c] bg-[#0f1623]'
+              }`}
+            >
+              <span
+                className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-2 ${
+                  selected ? 'border-[#3b82f6]' : 'border-[#28344c]'
+                }`}
+              >
+                {selected ? <span className="h-[9px] w-[9px] rounded-full bg-[#3b82f6]" /> : null}
+              </span>
+              <span className={`text-[11.5px] font-bold ${panelText}`}>{opt.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function PermissionsList({
+  perms,
+  onToggle,
+  boxed,
+  largeToggles,
+}: {
+  perms: PermState;
+  onToggle: (key: PermKey) => void;
+  boxed?: boolean;
+  largeToggles?: boolean;
+}) {
+  const inner = PERM_DEFS.map((pd, idx) => (
+    <div
+      key={pd.key}
+      className={`flex items-center justify-between py-2.5 ${
+        idx < PERM_DEFS.length - 1 ? 'border-b border-[#22304a]' : ''
+      } ${boxed ? '' : 'border-b border-[#1a2436] px-[3px] py-[11px] last:border-b-0'}`}
+    >
+      <div className="leading-snug">
+        <div className={`font-semibold ${panelText} ${boxed ? 'text-xs' : 'text-[12.5px]'}`}>{pd.label}</div>
+        <div className={`text-[10.5px] ${panelMuted} ${boxed ? '' : 'text-[11px]'}`}>{pd.desc}</div>
+      </div>
+      <PermToggle on={perms[pd.key]} onChange={() => onToggle(pd.key)} large={largeToggles} label={pd.label} />
+    </div>
+  ));
+
+  if (boxed) {
+    return (
+      <div className="rounded-[13px] border border-[#28344c] bg-[#18223a] px-[11px] py-[5px]">{inner}</div>
+    );
+  }
+  return <div className="flex flex-col gap-[3px]">{inner}</div>;
+}
+
+const RefreshIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d="M21 2v6h-6" />
+    <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+    <path d="M3 22v-6h6" />
+    <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+  </svg>
+);
+
 /** Dark management-panel admins tab — design-reference-v2/پنل رئیس هیئت مدیره.dc.html */
 export default function PanelAdminsPage() {
   const [rows, setRows] = useState<AdminRow[] | null>(null);
@@ -109,14 +238,16 @@ export default function PanelAdminsPage() {
   const [addForm, setAddForm] = useState({
     fullName: '',
     email: '',
-    username: '',
     role: 'IT_MANAGER' as AdminCreatableRole,
     password: '',
     delivery: 'sms' as 'sms' | 'email',
   });
-  const [addError, setAddError] = useState<string | null>(null);
+  const [addPerms, setAddPerms] = useState<PermState>(() => rolePermissionPreset('IT_MANAGER'));
+  const [addError, setAddError] = useState(false);
+  const [detailPerms, setDetailPerms] = useState<PermState | null>(null);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
   const [newPass, setNewPass] = useState('');
+  const [cpSuggested, setCpSuggested] = useState('');
   const [resetDelivery, setResetDelivery] = useState<'sms' | 'email'>('sms');
   const stepUp = useStepUp('ADMIN_ROLE_CHANGE');
 
@@ -131,32 +262,53 @@ export default function PanelAdminsPage() {
 
   useEffect(reload, []);
 
+  function openAddModal() {
+    setAddError(false);
+    setAddForm({
+      fullName: '',
+      email: '',
+      role: 'IT_MANAGER',
+      password: '',
+      delivery: 'sms',
+    });
+    setAddPerms(rolePermissionPreset('IT_MANAGER'));
+    setAddOpen(true);
+  }
+
+  function pickAddRole(role: AdminCreatableRole) {
+    setAddForm((f) => ({ ...f, role }));
+    setAddPerms(rolePermissionPreset(role));
+  }
+
+  function toggleAddPerm(key: PermKey) {
+    setAddPerms((p) => ({ ...p, [key]: !p[key] }));
+  }
+
+  function openDetail(row: AdminRow) {
+    setSelected(row);
+    setDetailPerms(rolePermissionPreset(row.role as AdminCreatableRole));
+    setNewPass('');
+    setCpSuggested('');
+    setResetDelivery('sms');
+  }
+
   async function onSubmitAdd() {
-    const { fullName, email, username, password } = addForm;
-    if (!fullName.trim() || !email.trim() || !username.trim() || password.length < 6) {
-      setAddError('همهٔ فیلدها الزامی است و رمز باید حداقل ۶ کاراکتر باشد.');
+    const { fullName, email, password, role, delivery } = addForm;
+    if (!fullName.trim() || !email.trim() || password.length < 6) {
+      setAddError(true);
       return;
     }
-    setAddError(null);
+    setAddError(false);
+    const username = deriveUsernameFromEmail(email);
     try {
       const fields = await stepUp.confirm();
-      await createAdmin({ ...addForm, ...fields });
+      await createAdmin({ fullName, email, username, role, password, delivery, ...fields });
       setAddOpen(false);
-      setAddForm({
-        fullName: '',
-        email: '',
-        username: '',
-        role: 'IT_MANAGER',
-        password: '',
-        delivery: 'sms',
-      });
-      setNotice(
-        `مدیر جدید افزوده شد و رمز عبور از طریق ${addForm.delivery === 'sms' ? 'پیامک' : 'ایمیل سازمانی'} ارسال شد ✓`,
-      );
+      setNotice(`مدیر جدید افزوده شد و رمز عبور از طریق ${delivery === 'sms' ? 'پیامک' : 'ایمیل سازمانی'} ارسال شد ✓`);
       reload();
     } catch (err) {
       if (err instanceof Error && err.message === 'CANCELLED') return;
-      setAddError(err instanceof ApiRequestError ? err.message : 'خطا در ایجاد حساب.');
+      setAddError(true);
     }
   }
 
@@ -179,6 +331,7 @@ export default function PanelAdminsPage() {
       });
       setTempPassword(result.tempPassword);
       setNewPass('');
+      setCpSuggested('');
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : 'خطا در بازنشانی رمز.');
     }
@@ -187,7 +340,9 @@ export default function PanelAdminsPage() {
   if (error) return <PanelAlert>{error}</PanelAlert>;
   if (!rows) return <p className={`text-sm ${panelMuted}`}>در حال بارگذاری…</p>;
 
-  if (selected) {
+  if (selected && detailPerms) {
+    const rolePreset = rolePermissionPreset(selected.role as AdminCreatableRole);
+
     return (
       <div className="flex flex-col gap-[15px]">
         <button
@@ -201,9 +356,7 @@ export default function PanelAdminsPage() {
           بازگشت به فهرست ادمین‌ها
         </button>
 
-        <div
-          className={`flex flex-wrap items-center gap-[15px] rounded-2xl border border-[#2a3550] bg-gradient-to-br from-[#172339] to-[#1d2a44] p-4`}
-        >
+        <div className="flex flex-wrap items-center gap-[15px] rounded-2xl border border-[#2a3550] bg-gradient-to-br from-[#172339] to-[#1d2a44] p-4">
           <span className="flex h-[60px] w-[60px] flex-none items-center justify-center rounded-full bg-gradient-to-br from-[#3b82f6] to-[#9333ea] text-base font-black text-white">
             {panelInitials(selected.fullName)}
           </span>
@@ -217,12 +370,46 @@ export default function PanelAdminsPage() {
         </div>
 
         <div className={`${panelCard} p-[15px]`}>
+          <h3 className={`mb-1 text-[13.5px] ${panelTitle}`}>سطح دسترسی</h3>
+          <p className={`mb-[18px] text-[11.5px] ${panelMuted}`}>
+            دسترسی‌های این ادمین را با کلید‌های زیر تعیین کنید.
+          </p>
+          <PermissionsList
+            perms={detailPerms}
+            onToggle={(key) => setDetailPerms((p) => ({ ...p!, [key]: !p![key] }))}
+            largeToggles
+          />
+          <div className="mt-5 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setNotice('سطح دسترسی ذخیره شد. دسترسی‌های عملیاتی بر اساس نقش «' + selected.roleLabelFa + '» اعمال می‌شود.');
+                setSelected(null);
+              }}
+              className={`flex h-[46px] items-center justify-center px-[21px] text-[12.5px] font-extrabold ${panelBtnPrimary}`}
+            >
+              ذخیره سطح دسترسی
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setDetailPerms({ ...rolePreset });
+                setSelected(null);
+              }}
+              className={`flex h-[46px] items-center justify-center px-[18px] text-[12.5px] font-semibold ${panelBtnGhost}`}
+            >
+              انصراف
+            </button>
+          </div>
+        </div>
+
+        <div className={`${panelCard} p-[15px]`}>
           <h3 className={`mb-1 text-[13.5px] ${panelTitle}`}>امنیت و دسترسی ورود</h3>
           <p className={`mb-4 text-[11.5px] ${panelMuted}`}>
             رمز عبور این مدیر را تغییر دهید یا ورود او به پنل را مسدود/فعال کنید.
           </p>
 
-          <div className={`mb-[18px] flex items-center justify-between gap-2.5 rounded-[11px] bg-[#0f1726] px-[13px] py-[11px]`}>
+          <div className="mb-[18px] flex items-center justify-between gap-2.5 rounded-[11px] bg-[#0f1726] px-[13px] py-[11px]">
             <div className="leading-snug">
               <div className={`text-xs font-bold ${panelText}`}>وضعیت ورود به پنل</div>
               <div className={`text-[10.5px] ${panelMuted}`}>نقش: {selected.roleLabelFa}</div>
@@ -247,9 +434,10 @@ export default function PanelAdminsPage() {
             />
             <button
               type="button"
-              onClick={() => setNewPass(generatePassword())}
+              onClick={() => setCpSuggested(generatePassword())}
               className={`flex items-center gap-1.5 px-3.5 py-2.5 text-[11.5px] font-bold ${panelBtnGhost}`}
             >
+              <RefreshIcon />
               تولید رمز
             </button>
             <button
@@ -262,30 +450,25 @@ export default function PanelAdminsPage() {
             </button>
           </div>
 
-          <button
-            type="button"
-            onClick={() => void onResetPassword(selected)}
-            className="mb-4 w-full rounded-[11px] border border-[rgba(59,130,246,.35)] bg-[rgba(59,130,246,.12)] py-2.5 text-xs font-extrabold text-[#60a5fa] transition hover:brightness-110"
-          >
-            تولید رمز موقت
-          </button>
-
-          <div className="mb-5 flex flex-wrap items-center gap-2">
-            <span className={`text-[11px] ${panelMuted}`}>ارسال از طریق:</span>
-            {(['sms', 'email'] as const).map((d) => (
+          {cpSuggested ? (
+            <div className="mb-[11px] flex flex-wrap items-center gap-2 rounded-[10px] border border-[rgba(59,130,246,.3)] bg-[rgba(59,130,246,.08)] px-3 py-2">
+              <span className={`text-[11px] ${panelMuted}`}>پیشنهاد:</span>
+              <span className="font-num ltr text-[12.5px] font-bold text-white">{cpSuggested}</span>
               <button
-                key={d}
                 type="button"
-                onClick={() => setResetDelivery(d)}
-                className={`rounded-[9px] border px-3 py-1.5 text-[11.5px] font-bold transition ${
-                  resetDelivery === d
-                    ? 'border-[#3b82f6] bg-[rgba(59,130,246,.12)] text-white'
-                    : 'border-panel-border-2 text-panel-muted-2'
-                }`}
+                onClick={() => {
+                  setNewPass(cpSuggested);
+                  setCpSuggested('');
+                }}
+                className="mr-auto text-[11px] font-bold text-[#3b82f6]"
               >
-                {d === 'sms' ? 'پیامک' : 'ایمیل سازمانی'}
+                استفاده از این رمز
               </button>
-            ))}
+            </div>
+          ) : null}
+
+          <div className="mb-5">
+            <DeliveryCards value={resetDelivery} onChange={setResetDelivery} label="ارسال از طریق:" compact />
           </div>
 
           {selected.managedByCaller && (
@@ -327,10 +510,7 @@ export default function PanelAdminsPage() {
           <h3 className={`m-0 text-[14.5px] ${panelTitle}`}>مدیران</h3>
           <button
             type="button"
-            onClick={() => {
-              setAddError(null);
-              setAddOpen(true);
-            }}
+            onClick={openAddModal}
             className="flex items-center gap-1.5 rounded-[9px] bg-panel-accent px-[11px] py-[7px] text-[11.5px] font-bold text-white transition hover:brightness-110"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
@@ -358,8 +538,8 @@ export default function PanelAdminsPage() {
               <button
                 key={r.id}
                 type="button"
-                onClick={() => setSelected(r)}
-                className={`grid w-full grid-cols-1 items-center gap-2 border-b border-[#1b2536] px-[11px] py-3 text-right transition last:border-b-0 hover:bg-[#18223a] md:grid-cols-[2fr_1.6fr_1.2fr_1fr_0.5fr] md:gap-0`}
+                onClick={() => openDetail(r)}
+                className="grid w-full grid-cols-1 items-center gap-2 border-b border-[#1b2536] px-[11px] py-3 text-right transition last:border-b-0 hover:bg-[#18223a] md:grid-cols-[2fr_1.6fr_1.2fr_1fr_0.5fr] md:gap-0"
               >
                 <div className="flex items-center gap-[9px]">
                   <span className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-gradient-to-br from-[#3b82f6] to-[#9333ea] text-[11px] font-extrabold text-white">
@@ -389,52 +569,70 @@ export default function PanelAdminsPage() {
       </div>
 
       {addOpen && (
-        <PanelModal title="افزودن مدیر / ادمین" onClose={() => setAddOpen(false)} wide>
-          <div className="flex flex-col gap-3">
-            <div>
-              <label htmlFor="pa-name" className={`mb-1.5 block text-[11.5px] ${panelMuted}`}>
-                نام و نام خانوادگی
-              </label>
-              <input
-                id="pa-name"
-                value={addForm.fullName}
-                onChange={(e) => setAddForm((f) => ({ ...f, fullName: e.target.value }))}
-                className={`w-full px-3 py-2.5 text-sm ${panelInput}`}
-              />
+        <PanelModal
+          title="افزودن مدیر / ادمین"
+          onClose={() => setAddOpen(false)}
+          wide
+          footer={
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void onSubmitAdd()}
+                className={`flex h-[46px] flex-1 items-center justify-center gap-1.5 text-[12.5px] font-extrabold ${panelBtnPrimary}`}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+                افزودن و تعیین دسترسی
+              </button>
+              <button
+                type="button"
+                onClick={() => setAddOpen(false)}
+                className={`flex h-[46px] shrink-0 items-center justify-center px-[18px] text-[12.5px] font-semibold ${panelBtnGhost}`}
+              >
+                انصراف
+              </button>
             </div>
-            <div>
-              <label htmlFor="pa-email" className={`mb-1.5 block text-[11.5px] ${panelMuted}`}>
-                ایمیل سازمانی
-              </label>
-              <input
-                id="pa-email"
-                dir="ltr"
-                value={addForm.email}
-                onChange={(e) => setAddForm((f) => ({ ...f, email: e.target.value }))}
-                className={`font-num ltr w-full px-3 py-2.5 text-sm ${panelInput}`}
-              />
+          }
+        >
+          <div className="flex flex-col gap-[13px]">
+            <div className="grid grid-cols-1 gap-[13px] sm:grid-cols-2">
+              <div>
+                <label htmlFor="pa-name" className={`mb-2 block text-[11.5px] font-bold ${panelText}`}>
+                  نام و نام خانوادگی <span className="text-[#f87171]">*</span>
+                </label>
+                <input
+                  id="pa-name"
+                  value={addForm.fullName}
+                  onChange={(e) => setAddForm((f) => ({ ...f, fullName: e.target.value }))}
+                  placeholder="مثلاً نیما رضوی"
+                  className={`h-[46px] w-full px-[11px] text-xs ${panelInput} ${addError && !addForm.fullName.trim() ? 'border-[#f87171]' : ''}`}
+                />
+              </div>
+              <div>
+                <label htmlFor="pa-email" className={`mb-2 block text-[11.5px] font-bold ${panelText}`}>
+                  ایمیل سازمانی <span className="text-[#f87171]">*</span>
+                </label>
+                <input
+                  id="pa-email"
+                  dir="ltr"
+                  value={addForm.email}
+                  onChange={(e) => setAddForm((f) => ({ ...f, email: e.target.value }))}
+                  placeholder="name@aseman.ir"
+                  className={`font-num ltr h-[46px] w-full px-[11px] text-left text-xs ${panelInput} ${addError && !addForm.email.trim() ? 'border-[#f87171]' : ''}`}
+                />
+              </div>
             </div>
+
             <div>
-              <label htmlFor="pa-username" className={`mb-1.5 block text-[11.5px] ${panelMuted}`}>
-                نام کاربری
-              </label>
-              <input
-                id="pa-username"
-                dir="ltr"
-                value={addForm.username}
-                onChange={(e) => setAddForm((f) => ({ ...f, username: e.target.value }))}
-                className={`font-num ltr w-full px-3 py-2.5 text-sm ${panelInput}`}
-              />
-            </div>
-            <div>
-              <label htmlFor="pa-role" className={`mb-1.5 block text-[11.5px] ${panelMuted}`}>
-                نقش
+              <label htmlFor="pa-role" className={`mb-2 block text-[11.5px] font-bold ${panelText}`}>
+                نقش / سطح دسترسی
               </label>
               <select
                 id="pa-role"
                 value={addForm.role}
-                onChange={(e) => setAddForm((f) => ({ ...f, role: e.target.value as AdminCreatableRole }))}
-                className={`w-full px-3 py-2.5 text-sm ${panelInput}`}
+                onChange={(e) => pickAddRole(e.target.value as AdminCreatableRole)}
+                className={`h-[46px] w-full cursor-pointer px-[11px] text-xs ${panelInput}`}
               >
                 {CREATABLE_ROLES.map((role) => (
                   <option key={role.value} value={role.value}>
@@ -442,10 +640,14 @@ export default function PanelAdminsPage() {
                   </option>
                 ))}
               </select>
+              <p className={`mt-[7px] text-[11px] ${panelMuted}`}>
+                با انتخاب نقش، دسترسی‌های پیش‌فرض آن اعمال می‌شود و می‌توانید آن‌ها را تغییر دهید.
+              </p>
             </div>
+
             <div>
-              <label htmlFor="pa-pass" className={`mb-1.5 block text-[11.5px] ${panelMuted}`}>
-                رمز عبور اولیه (حداقل ۶ کاراکتر)
+              <label htmlFor="pa-pass" className={`mb-2 block text-[11.5px] font-bold ${panelText}`}>
+                رمز عبور ورود <span className="text-[#f87171]">*</span>
               </label>
               <div className="flex gap-2">
                 <input
@@ -453,42 +655,32 @@ export default function PanelAdminsPage() {
                   dir="ltr"
                   value={addForm.password}
                   onChange={(e) => setAddForm((f) => ({ ...f, password: e.target.value }))}
-                  className={`font-num ltr min-w-0 flex-1 px-3 py-2.5 text-sm ${panelInput}`}
+                  placeholder="حداقل ۶ کاراکتر"
+                  className={`font-num ltr h-[46px] min-w-0 flex-1 px-[11px] text-left text-[12.5px] ${panelInput} ${addError && addForm.password.length < 6 ? 'border-[#f87171]' : ''}`}
                 />
                 <button
                   type="button"
                   onClick={() => setAddForm((f) => ({ ...f, password: generatePassword() }))}
-                  className={`shrink-0 px-3 py-2 text-[11px] font-bold ${panelBtnGhost}`}
+                  className={`flex h-[46px] shrink-0 items-center gap-1.5 px-[13px] text-[11.5px] font-bold ${panelBtnGhost}`}
                 >
-                  تولید
+                  <RefreshIcon />
+                  تولید خودکار
                 </button>
               </div>
+              <DeliveryCards
+                value={addForm.delivery}
+                onChange={(d) => setAddForm((f) => ({ ...f, delivery: d }))}
+                label="روش ارسال رمز عبور به مدیر:"
+              />
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className={`text-[11px] ${panelMuted}`}>ارسال از طریق:</span>
-              {(['sms', 'email'] as const).map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => setAddForm((f) => ({ ...f, delivery: d }))}
-                  className={`rounded-[9px] border px-3 py-1.5 text-[11px] font-bold transition ${
-                    addForm.delivery === d
-                      ? 'border-[#3b82f6] bg-[rgba(59,130,246,.12)] text-white'
-                      : 'border-panel-border-2 text-panel-muted-2'
-                  }`}
-                >
-                  {d === 'sms' ? 'پیامک' : 'ایمیل سازمانی'}
-                </button>
-              ))}
-            </div>
-            {addError && (
-              <p role="alert" className="text-xs text-[#f87171]">
-                {addError}
+
+            <PermissionsList perms={addPerms} onToggle={toggleAddPerm} boxed />
+
+            {addError ? (
+              <p role="alert" className="text-[11.5px] font-semibold text-[#f87171]">
+                نام، ایمیل و رمز عبور (حداقل ۶ کاراکتر) الزامی است.
               </p>
-            )}
-            <button type="button" onClick={() => void onSubmitAdd()} className={`py-2.5 ${panelBtnPrimary}`}>
-              ایجاد حساب و ارسال رمز
-            </button>
+            ) : null}
           </div>
         </PanelModal>
       )}

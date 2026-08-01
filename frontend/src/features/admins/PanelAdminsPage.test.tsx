@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import PanelAdminsPage from './PanelAdminsPage';
@@ -37,18 +37,19 @@ describe('PanelAdminsPage', () => {
     expect(await screen.findByText('هنوز اطلاعاتی وارد نشده است.')).toBeInTheDocument();
   });
 
-  it('opens detail view with block and password reset actions', async () => {
+  it('opens detail view with permissions and security sections', async () => {
     vi.spyOn(adminsApi, 'fetchAdmins').mockResolvedValue(ROWS);
     vi.spyOn(adminsApi, 'resetAdminPassword').mockResolvedValue({ tempPassword: 'Tmp-1234-Xy' });
     render(<PanelAdminsPage />);
 
     await userEvent.click(await screen.findByText('مدیر مالی نمونه'));
-    expect(await screen.findByText('امنیت و دسترسی ورود')).toBeInTheDocument();
+    expect(await screen.findByText('سطح دسترسی')).toBeInTheDocument();
+    expect(screen.getByText('امنیت و دسترسی ورود')).toBeInTheDocument();
+    expect(screen.getByText('مدیریت پروازها')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'مسدودسازی ورود به پنل' })).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: 'تولید رمز موقت' }));
-    await waitFor(() => expect(adminsApi.resetAdminPassword).toHaveBeenCalled());
-    expect(await screen.findByText('Tmp-1234-Xy')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'تولید رمز' }));
+    expect(screen.getByText('پیشنهاد:')).toBeInTheDocument();
   });
 
   it('validates add-admin form before calling API', async () => {
@@ -58,13 +59,25 @@ describe('PanelAdminsPage', () => {
     await screen.findByText('هنوز اطلاعاتی وارد نشده است.');
 
     await userEvent.click(screen.getByRole('button', { name: 'افزودن مدیر / ادمین' }));
-    await userEvent.type(screen.getByLabelText('نام و نام خانوادگی'), 'مدیر تازه');
-    await userEvent.type(screen.getByLabelText('ایمیل سازمانی'), 'new@blujet.example');
-    await userEvent.type(screen.getByLabelText('نام کاربری'), 'new.admin');
-    await userEvent.type(screen.getByLabelText('رمز عبور اولیه (حداقل ۶ کاراکتر)'), '123');
-    await userEvent.click(screen.getByRole('button', { name: 'ایجاد حساب و ارسال رمز' }));
+    expect(screen.getByText('مدیریت مدیران')).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText(/نام و نام خانوادگی/), 'مدیر تازه');
+    await userEvent.type(screen.getByLabelText(/ایمیل سازمانی/), 'new@blujet.example');
+    await userEvent.type(screen.getByLabelText(/رمز عبور ورود/), '123');
+    await userEvent.click(screen.getByRole('button', { name: 'افزودن و تعیین دسترسی' }));
 
     expect(await screen.findByRole('alert')).toBeInTheDocument();
     expect(createSpy).not.toHaveBeenCalled();
+  });
+
+  it('applies role permission presets when role changes', async () => {
+    vi.spyOn(adminsApi, 'fetchAdmins').mockResolvedValue([]);
+    render(<PanelAdminsPage />);
+    await screen.findByText('هنوز اطلاعاتی وارد نشده است.');
+
+    await userEvent.click(screen.getByRole('button', { name: 'افزودن مدیر / ادمین' }));
+    await userEvent.selectOptions(screen.getByLabelText(/نقش \/ سطح دسترسی/), 'FINANCE_MANAGER');
+
+    expect(screen.getByRole('switch', { name: 'مالی و تسویه' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('switch', { name: 'مدیریت پروازها' })).toHaveAttribute('aria-checked', 'false');
   });
 });
