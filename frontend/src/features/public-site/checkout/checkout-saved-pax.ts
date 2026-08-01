@@ -70,9 +70,11 @@ export function monthNameToValue(month: string): string {
     const n = Number(trimmed);
     if (n >= 1 && n <= 12) return String(n);
   }
-  const lists: readonly string[][] = [FA_MONTHS, EN_MONTHS_FULL, AR_MONTHS];
+  const lists = [FA_MONTHS, EN_MONTHS_FULL, AR_MONTHS] as const;
   for (const list of lists) {
-    const idx = list.findIndex((m) => m === trimmed || m.toLowerCase() === trimmed.toLowerCase());
+    const idx = (list as readonly string[]).findIndex(
+      (m) => m === trimmed || m.toLowerCase() === trimmed.toLowerCase(),
+    );
     if (idx >= 0) return String(idx + 1);
   }
   return '';
