@@ -1,0 +1,23 @@
+/** Shared dark-theme tokens for staff management panels (design-reference-v2). */
+export const STAFF_PANEL = {
+  pageBg: '#0f1623',
+  sidebarBg: '#141d2e',
+  sidebarBorder: '#1f2a3d',
+  cardBg: '#141d2e',
+  cardBorder: '#1f2a3d',
+  cardBorderAlt: '#2a3550',
+  inputBg: '#18223a',
+  inputBorder: '#28344c',
+  roleBadgeBg: '#18223a',
+  roleBadgeBorder: '#2a3a55',
+  text: '#e7ecf3',
+  textMuted: '#6b7b94',
+  navMuted: '#9fb0c7',
+  accent: '#3b82f6',
+  accentSoft: 'rgba(59,130,246,0.16)',
+  link: '#60a5fa',
+  danger: '#f87171',
+  warning: '#f59e0b',
+  purple: '#a855f7',
+  success: '#34d399',
+} as const;

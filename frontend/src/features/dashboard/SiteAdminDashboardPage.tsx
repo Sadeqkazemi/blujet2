@@ -1,25 +1,89 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchAgencyRequests } from '../../api/agencies';
 import { fetchRefunds } from '../../api/refunds';
 import { fetchRecentContactMessages } from '../../api/support-tickets';
 import { faDigits } from '../../lib/fa-format';
 import { formatJalaliDate } from '../../lib/jalali';
+import { STAFF_PANEL } from '../../lib/staff-panel-theme';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import type { AgencyMembershipRequest } from '../../types/agencies';
 import type { RefundsResult } from '../../types/refunds';
 import type { ContactMessageRow } from '../../types/support-tickets';
 
-/**
- * پنل ادمین سایت.dc.html's dashboard sub-title is "درخواست‌ها، استرداد
- * بلیط و کارهای در انتظار اقدام" (a combined new-requests feed). This is
- * a real, scoped v1 of that feed — pending agency requests, refunds
- * awaiting admin review, and (Phase 20) recent تماس با ما messages, all
- * from endpoints SITE_ADMIN already has real access to — rather than the
- * design's fuller multi-widget composition, which stays a deferred polish
- * item (see Phase 18/20 notes in docs/DB_SCHEMA.md). ContactMessage has no
- * dedicated review UI of its own — this feed IS its admin surface.
- */
+function agencyInitial(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return name.slice(0, 2).toUpperCase() || 'AG';
+}
+
+function FeedCard({
+  title,
+  count,
+  countColor,
+  countBg,
+  loading,
+  empty,
+  children,
+  footer,
+}: {
+  title: string;
+  count: number | null;
+  countColor: string;
+  countBg: string;
+  loading: boolean;
+  empty: string;
+  children: ReactNode;
+  footer?: ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        background: STAFF_PANEL.cardBg,
+        border: `1px solid ${STAFF_PANEL.cardBorderAlt}`,
+        borderRadius: 14,
+        overflow: 'hidden',
+      }}
+    >
+      <div
+        style={{
+          padding: '12px 14px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          borderBottom: `1px solid ${STAFF_PANEL.sidebarBorder}`,
+        }}
+      >
+        <h3 style={{ fontSize: 13.5, fontWeight: 800, color: '#fff', margin: 0, flex: 1 }}>{title}</h3>
+        {count !== null && (
+          <span
+            style={{
+              fontSize: 10.5,
+              fontWeight: 700,
+              color: countColor,
+              background: countBg,
+              padding: '2px 9px',
+              borderRadius: 18,
+            }}
+          >
+            {faDigits(count)} در انتظار
+          </span>
+        )}
+      </div>
+      <div style={{ padding: '5px 8px' }}>
+        {loading && <p style={{ padding: '16px 11px', textAlign: 'center', color: STAFF_PANEL.textMuted, fontSize: 11.5, margin: 0 }}>در حال بارگذاری…</p>}
+        {!loading && empty && (
+          <p style={{ padding: '16px 11px', textAlign: 'center', color: STAFF_PANEL.textMuted, fontSize: 11.5, margin: 0 }}>{empty}</p>
+        )}
+        {children}
+      </div>
+      {footer}
+    </div>
+  );
+}
+
 export default function SiteAdminDashboardPage() {
+  const isMobile = useIsMobile();
   const [requests, setRequests] = useState<AgencyMembershipRequest[] | null>(null);
   const [refunds, setRefunds] = useState<RefundsResult | null>(null);
   const [messages, setMessages] = useState<ContactMessageRow[] | null>(null);
@@ -35,96 +99,185 @@ export default function SiteAdminDashboardPage() {
       .catch(() => setError('خطا در دریافت اطلاعات داشبورد.'));
   }, []);
 
-  const awaitingRefunds = refunds?.requests.filter(
-    (r) => r.status === 'SUBMITTED' || r.status === 'REVIEW',
-  ) ?? [];
+  const awaitingRefunds = refunds?.requests.filter((r) => r.status === 'SUBMITTED' || r.status === 'REVIEW') ?? [];
 
   return (
-    <div className="p-6">
-      <h1 className="text-lg font-bold text-ink">داشبورد</h1>
-      <p className="mt-1 text-xs text-muted">درخواست‌ها، استرداد بلیط و کارهای در انتظار اقدام</p>
-
-      {error && <p className="mt-4 text-xs text-danger">{error}</p>}
-
-      <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
-        <div className="rounded-xl border border-border bg-white p-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-ink">درخواست‌های عضویت آژانس در انتظار</h2>
-            <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-bold text-accent">
-              {faDigits(requests?.length ?? 0)}
-            </span>
-          </div>
-          <ul className="mt-3 flex flex-col gap-2">
-            {requests === null && <li className="text-xs text-muted">در حال بارگذاری…</li>}
-            {requests?.length === 0 && (
-              <li className="text-xs text-muted">درخواست در انتظاری وجود ندارد.</li>
-            )}
-            {requests?.map((r) => (
-              <li key={r.id}>
-                <Link
-                  to={`/panel/agencies/requests/${r.id}`}
-                  className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-xs transition hover:bg-surface"
-                >
-                  <span className="font-bold text-ink">{r.applicantName}</span>
-                  <span className="text-muted">{formatJalaliDate(r.createdAt)}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
+    <div data-testid="site-admin-dashboard">
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontSize: 20.5, fontWeight: 900, color: '#fff', margin: 0 }}>داشبورد</h1>
+        <div style={{ fontSize: 11.5, color: STAFF_PANEL.textMuted, marginTop: 4 }}>
+          درخواست‌ها، استرداد بلیط و کارهای در انتظار اقدام
         </div>
+      </div>
 
-        <div className="rounded-xl border border-border bg-white p-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-ink">استرداد بلیط در انتظار بررسی</h2>
-            <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-bold text-accent">
-              {faDigits(awaitingRefunds.length)}
-            </span>
-          </div>
-          <ul className="mt-3 flex flex-col gap-2">
-            {refunds === null && <li className="text-xs text-muted">در حال بارگذاری…</li>}
-            {refunds && awaitingRefunds.length === 0 && (
-              <li className="text-xs text-muted">درخواست استرداد در انتظاری وجود ندارد.</li>
-            )}
-            {awaitingRefunds.map((r) => (
-              <li key={r.id}>
-                <Link
-                  to="/panel/refund"
-                  className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-xs transition hover:bg-surface"
+      {error && <p style={{ fontSize: 12, color: STAFF_PANEL.danger, marginBottom: 16 }}>{error}</p>}
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+          gap: 15,
+        }}
+      >
+        <FeedCard
+          title="درخواست‌های عضویت آژانس"
+          count={requests?.length ?? null}
+          countColor={STAFF_PANEL.warning}
+          countBg="rgba(245,158,11,0.14)"
+          loading={requests === null}
+          empty="درخواست در انتظاری وجود ندارد."
+          footer={
+            <Link
+              to="/panel/agencies"
+              style={{
+                display: 'block',
+                padding: '11px 14px',
+                borderTop: `1px solid ${STAFF_PANEL.sidebarBorder}`,
+                textAlign: 'center',
+                fontSize: 11.5,
+                fontWeight: 700,
+                color: STAFF_PANEL.link,
+                textDecoration: 'none',
+              }}
+            >
+              مدیریت آژانس‌ها ←
+            </Link>
+          }
+        >
+          {requests?.map((r) => (
+            <Link
+              key={r.id}
+              to={`/panel/agencies/requests/${r.id}`}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 11,
+                padding: '10px 9px',
+                borderRadius: 10,
+                textDecoration: 'none',
+                color: 'inherit',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                <span
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 10,
+                    background: '#1d2a40',
+                    color: STAFF_PANEL.warning,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 800,
+                    fontSize: 11,
+                    flex: 'none',
+                  }}
                 >
-                  <span className="font-bold text-ink">{r.passengerName}</span>
-                  <span className="text-muted">{formatJalaliDate(r.createdAt)}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="rounded-xl border border-border bg-white p-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-ink">آخرین پیام‌های تماس با ما</h2>
-            <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-bold text-accent">
-              {faDigits(messages?.length ?? 0)}
-            </span>
-          </div>
-          <ul className="mt-3 flex flex-col gap-2">
-            {messages === null && <li className="text-xs text-muted">در حال بارگذاری…</li>}
-            {messages?.length === 0 && (
-              <li className="text-xs text-muted">پیامی ثبت نشده است.</li>
-            )}
-            {messages?.map((m) => (
-              <li
-                key={m.id}
-                className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-xs"
-              >
-                <span className="min-w-0 flex-1 truncate">
-                  <span className="font-bold text-ink">{m.name}</span>
-                  <span className="mr-1 text-muted">— {m.subject}</span>
+                  {agencyInitial(r.applicantName)}
                 </span>
-                <span className="mr-2 shrink-0 text-muted">{formatJalaliDate(m.createdAt)}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
+                <div style={{ minWidth: 0, lineHeight: 1.5 }}>
+                  <div style={{ fontWeight: 700, color: STAFF_PANEL.text, fontSize: 12 }}>{r.applicantName}</div>
+                  <div style={{ fontSize: 10.5, color: STAFF_PANEL.textMuted }}>
+                    مدیر: {r.managerName} · {r.city}
+                  </div>
+                </div>
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 700, color: STAFF_PANEL.link, flex: 'none' }}>بررسی ←</span>
+            </Link>
+          ))}
+        </FeedCard>
+
+        <FeedCard
+          title="استرداد بلیط در انتظار بررسی"
+          count={refunds ? awaitingRefunds.length : null}
+          countColor={STAFF_PANEL.warning}
+          countBg="rgba(245,158,11,0.14)"
+          loading={refunds === null}
+          empty="درخواست استرداد در انتظاری وجود ندارد."
+          footer={
+            <Link
+              to="/panel/refund"
+              style={{
+                display: 'block',
+                padding: '11px 14px',
+                borderTop: `1px solid ${STAFF_PANEL.sidebarBorder}`,
+                textAlign: 'center',
+                fontSize: 11.5,
+                fontWeight: 700,
+                color: STAFF_PANEL.link,
+                textDecoration: 'none',
+              }}
+            >
+              مدیریت استرداد ←
+            </Link>
+          }
+        >
+          {awaitingRefunds.map((r) => (
+            <Link
+              key={r.id}
+              to="/panel/refund"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 11,
+                padding: '10px 9px',
+                borderRadius: 10,
+                textDecoration: 'none',
+                color: 'inherit',
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 700, color: STAFF_PANEL.text, fontSize: 12 }}>{r.passengerName}</div>
+                <div style={{ fontSize: 10.5, color: STAFF_PANEL.textMuted }}>{formatJalaliDate(r.createdAt)}</div>
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 700, color: STAFF_PANEL.link, flex: 'none' }}>بررسی ←</span>
+            </Link>
+          ))}
+        </FeedCard>
+
+        <FeedCard
+          title="آخرین پیام‌های تماس با ما"
+          count={messages?.length ?? null}
+          countColor={STAFF_PANEL.link}
+          countBg="rgba(96,165,250,0.14)"
+          loading={messages === null}
+          empty="پیامی ثبت نشده است."
+        >
+          {messages?.map((m) => (
+            <div
+              key={m.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 11,
+                padding: '10px 9px',
+                borderRadius: 10,
+              }}
+            >
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontWeight: 700, color: STAFF_PANEL.text, fontSize: 12 }}>{m.name}</div>
+                <div
+                  style={{
+                    fontSize: 10.5,
+                    color: STAFF_PANEL.textMuted,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
+                  {m.subject}
+                </div>
+              </div>
+              <span style={{ fontSize: 10.5, color: STAFF_PANEL.textMuted, flex: 'none' }}>
+                {formatJalaliDate(m.createdAt)}
+              </span>
+            </div>
+          ))}
+        </FeedCard>
       </div>
     </div>
   );
