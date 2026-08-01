@@ -51,6 +51,8 @@ const STR: Record<
     pointsAfter: string;
     pointsUnit: string;
     passengerCount: (n: number) => string;
+    passengerInfo: string;
+    seatLabel: string;
   }
 > = {
   fa: {
@@ -86,6 +88,8 @@ const STR: Record<
     pointsAfter: 'موجودی بعد از خرید',
     pointsUnit: 'امتیاز',
     passengerCount: (n) => `${faDigits(n)} مسافر`,
+    passengerInfo: 'اطلاعات مسافر',
+    seatLabel: 'صندلی',
   },
   en: {
     loading: 'Loading…',
@@ -120,6 +124,8 @@ const STR: Record<
     pointsAfter: 'Balance after purchase',
     pointsUnit: 'points',
     passengerCount: (n) => `${n} passenger${n === 1 ? '' : 's'}`,
+    passengerInfo: 'Passenger information',
+    seatLabel: 'Seat',
   },
   ar: {
     loading: 'جارٍ التحميل…',
@@ -154,6 +160,8 @@ const STR: Record<
     pointsAfter: 'الرصيد بعد الشراء',
     pointsUnit: 'نقطة',
     passengerCount: (n) => `${faDigits(n)} مسافر`,
+    passengerInfo: 'بيانات المسافر',
+    seatLabel: 'المقعد',
   },
 };
 
@@ -488,6 +496,39 @@ export default function PaymentPage() {
 
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
           <main className="flex min-w-0 flex-1 flex-col gap-4">
+            <section
+              className="rounded-[14px] border border-[#eef1f5] bg-white p-4"
+              data-testid="payment-passengers"
+            >
+              <div className="mb-4 flex items-center gap-2.5">
+                <span className="flex h-[30px] w-[30px] items-center justify-center rounded-[9px] bg-[#eef4fb] text-[#1668c4]">
+                  👤
+                </span>
+                <h3 className="m-0 text-[15.5px] font-extrabold text-[#0d2640]">{t.passengerInfo}</h3>
+              </div>
+              <div className="flex flex-col gap-2">
+                {booking.passengers.map((p, i) => (
+                  <div
+                    key={`${p.fullName}-${p.seatCode}-${i}`}
+                    className="flex items-center justify-between rounded-[13px] border border-[#eef1f5] px-3.5 py-3"
+                  >
+                    <div>
+                      <div className="text-[12.5px] font-extrabold text-[#0d2640]">{p.fullName}</div>
+                      <div className="mt-0.5 text-[10.5px] text-[#8a96a6]">
+                        {t.seatLabel}:{' '}
+                        <span className="font-bold text-[#1668c4]" dir="ltr">
+                          {p.seatCode ?? '—'}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-[11px] font-bold text-[#8a96a6]">
+                      {locale === 'en' ? `${i + 1}. Adult` : `${faDigits(i + 1)}. بزرگسال`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </section>
+
             <section className="rounded-[14px] border border-[#eef1f5] bg-white p-4">
               <h3 className="mb-[18px] text-[15.5px] font-extrabold text-[#0d2640]">{t.paymentMethods}</h3>
               <div className="flex flex-col gap-2.5">

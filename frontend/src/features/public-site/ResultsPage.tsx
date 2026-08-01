@@ -671,7 +671,27 @@ export default function ResultsPage() {
                 saveBusyKey={saveBusyKey}
                 showGoldLock={Boolean(club?.isMember && GOLD_TIER_LEVELS.includes(club.level ?? ''))}
                 onToggle={() => setExpandedId((id) => (id === r.flightInstanceId ? null : r.flightInstanceId))}
-                onBuy={(c) => navigate(`/book/${r.flightInstanceId}?cabin=${c}`)}
+                onBuy={(c) => {
+                  const cabinOpt = r.cabins.find((x) => x.cabin === c);
+                  navigate(
+                    `/checkout/new?flightInstanceId=${encodeURIComponent(r.flightInstanceId)}&cabin=${c}`,
+                    {
+                      state: {
+                        cabin: c,
+                        flight: {
+                          flightInstanceId: r.flightInstanceId,
+                          flightNo: r.flightNo,
+                          originCode: r.originCode,
+                          destCode: r.destCode,
+                          departureAt: r.departureAt,
+                          arrivalAt: r.arrivalAt,
+                          aircraftType: r.aircraftType,
+                          priceIrr: cabinOpt?.priceIrr ?? '0',
+                        },
+                      },
+                    },
+                  );
+                }}
                 onLock={(c) => void onRealLockClick(r.flightInstanceId, c)}
                 onSave={(c) => void onSaveClick(r.flightInstanceId, c)}
               />

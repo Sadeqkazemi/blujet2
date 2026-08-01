@@ -1,11 +1,13 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 import CheckoutPage from './CheckoutPage';
 import * as publicSiteApi from '../../api/publicSite';
 import * as useAuthModule from '../../hooks/useAuth';
-import type { BookingDetail } from '../../types/public-site';
+import * as useLocaleModule from '../../hooks/useLocale';
+import type { BookingDetail, SeatMapResult } from '../../types/public-site';
+import { mockAuthUser } from '../../test/mockAuthUser';
 
 const BOOKING: BookingDetail = {
   id: 'b1',
@@ -21,51 +23,172 @@ const BOOKING: BookingDetail = {
   departureAt: '2026-08-01T05:00:00.000Z',
   arrivalAt: '2026-08-01T06:30:00.000Z',
   isPriceLocked: false,
-  passengers: [{ fullName: 'علی رضایی', seatCode: '2A' }],
+  passengers: [{ fullName: 'ALI REZAEI', seatCode: '2A' }],
 };
 
-function renderPage() {
+const SEATMAP: SeatMapResult = {
+  flightInstanceId: 'fi-1',
+  seats: [
+    { seatCode: '2A', row: 2, cabin: 'ECONOMY', status: 'FREE' },
+    { seatCode: '2C', row: 2, cabin: 'ECONOMY', status: 'FREE' },
+    { seatCode: '2B', row: 2, cabin: 'ECONOMY', status: 'TAKEN' },
+  ],
+};
+
+const FLIGHT_STATE = {
+  cabin: 'ECONOMY' as const,
+  flight: {
+    flightInstanceId: 'fi-1',
+    flightNo: 'BJ-100',
+    originCode: 'THR',
+    destCode: 'MHD',
+    departureAt: '2026-08-01T05:00:00.000Z',
+    arrivalAt: '2026-08-01T06:30:00.000Z',
+    aircraftType: 'A320',
+    priceIrr: '380000000',
+  },
+};
+
+function mockAuth(status: 'authenticated' | 'unauthenticated' = 'authenticated') {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
-    status: 'unauthenticated',
-    user: null,
+    status,
+    user: status === 'authenticated' ? mockAuthUser() : null,
     requestLogin: vi.fn(),
     confirmTwoFactor: vi.fn(),
     agencyLogin: vi.fn(),
     signOut: vi.fn(),
   });
-  return render(
-    <MemoryRouter initialEntries={['/checkout/b1']}>
-      <Routes>
-        <Route path="/checkout/:bookingId" element={<CheckoutPage />} />
-        <Route path="/payment/:bookingId" element={<div data-testid="payment-page">payment</div>} />
-      </Routes>
-    </MemoryRouter>,
-  );
 }
 
 describe('CheckoutPage', () => {
-  it('renders the booking summary for review', async () => {
-    vi.spyOn(publicSiteApi, 'fetchMyBooking').mockResolvedValue(BOOKING);
-    renderPage();
-
-    expect(await screen.findByText('BJ-100')).toBeInTheDocument();
-    expect(screen.getByText('علی رضایی')).toBeInTheDocument();
-    expect(screen.getByTestId('continue-to-payment')).toBeInTheDocument();
-    expect(screen.queryByTestId('pay-submit')).not.toBeInTheDocument();
+  beforeEach(() => {
+    sessionStorage.clear();
+    vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale: 'fa', setLocale: vi.fn() });
+    vi.spyOn(publicSiteApi, 'fetchSavedPassengers').mockResolvedValue([]);
+    vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({
+      isMember: true,
+      level: 'GOLD',
+      balance: 20_000,
+    });
+    vi.spyOn(publicSiteApi, 'fetchSeatMap').mockResolvedValue(SEATMAP);
   });
 
-  it('navigates to the payment page when continue is clicked', async () => {
-    vi.spyOn(publicSiteApi, 'fetchMyBooking').mockResolvedValue(BOOKING);
-    renderPage();
-    await screen.findByTestId('continue-to-payment');
+  it('renders the passenger wizard step for /checkout/new', async () => {
+    mockAuth();
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: '/checkout/new',
+            search: '?flightInstanceId=fi-1&cabin=ECONOMY',
+            state: FLIGHT_STATE,
+          },
+        ]}
+      >
+        <Routes>
+          <Route path="/checkout/:bookingId" element={<CheckoutPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
 
+    expect(await screen.findByTestId('checkout-pax-step')).toBeInTheDocument();
+    expect(screen.getByTestId('checkout-flight-summary')).toBeInTheDocument();
+    expect(screen.getByTestId('checkout-pricing-sidebar')).toBeInTheDocument();
+    expect(screen.getByTestId('checkout-step-pax')).toBeInTheDocument();
+  });
+
+  it('advances pax → extras → review and creates a booking', async () => {
+    mockAuth();
+    const createBooking = vi.spyOn(publicSiteApi, 'createBooking').mockResolvedValue(BOOKING);
+
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: '/checkout/new',
+            search: '?flightInstanceId=fi-1&cabin=ECONOMY',
+            state: FLIGHT_STATE,
+          },
+        ]}
+      >
+        <Routes>
+          <Route path="/checkout/:bookingId" element={<CheckoutPage />} />
+          <Route path="/payment/:bookingId" element={<div data-testid="payment-page">payment</div>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await screen.findByTestId('checkout-pax-step');
+    await userEvent.type(screen.getByTestId('checkout-pax-first-0'), 'ALI');
+    await userEvent.type(screen.getByTestId('checkout-pax-last-0'), 'REZAEI');
+    await userEvent.selectOptions(screen.getByTestId('checkout-pax-gender-0'), 'male');
+    await userEvent.type(screen.getByTestId('checkout-pax-nid-0'), '0012345678');
+
+    // DOB selects — first select in each group is day/month/year
+    const selects = screen.getAllByRole('combobox');
+    // gender is first; then day, month, year
+    await userEvent.selectOptions(selects[1]!, '1');
+    await userEvent.selectOptions(selects[2]!, '1');
+    await userEvent.selectOptions(selects[3]!, '1370');
+
+    await userEvent.click(screen.getByTestId('checkout-next'));
+    expect(await screen.findByTestId('checkout-extras-step')).toBeInTheDocument();
+
+    await userEvent.click(await screen.findByTestId('checkout-seat-2A'));
+    await userEvent.click(screen.getByTestId('checkout-extra-baggage'));
+    await userEvent.click(screen.getByTestId('checkout-next'));
+
+    expect(await screen.findByTestId('checkout-review-step')).toBeInTheDocument();
+    expect(screen.getByText('ALI REZAEI')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId('checkout-next'));
+    expect(createBooking).toHaveBeenCalledWith(
+      expect.objectContaining({
+        flightInstanceId: 'fi-1',
+        cabin: 'ECONOMY',
+        passengers: [
+          expect.objectContaining({
+            fullName: 'ALI REZAEI',
+            nationalId: '0012345678',
+            seatCode: '2A',
+          }),
+        ],
+      }),
+    );
+    expect(await screen.findByTestId('payment-page')).toBeInTheDocument();
+  });
+
+  it('shows held-booking summary with continue-to-payment for existing ids', async () => {
+    mockAuth();
+    vi.spyOn(publicSiteApi, 'fetchMyBooking').mockResolvedValue(BOOKING);
+    render(
+      <MemoryRouter initialEntries={['/checkout/b1']}>
+        <Routes>
+          <Route path="/checkout/:bookingId" element={<CheckoutPage />} />
+          <Route path="/payment/:bookingId" element={<div data-testid="payment-page">payment</div>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByTestId('continue-to-payment')).toBeInTheDocument();
+    expect(screen.getByText('ALI REZAEI')).toBeInTheDocument();
     await userEvent.click(screen.getByTestId('continue-to-payment'));
     expect(await screen.findByTestId('payment-page')).toBeInTheDocument();
   });
 
   it('shows an expired-hold state without a continue button', async () => {
-    vi.spyOn(publicSiteApi, 'fetchMyBooking').mockResolvedValue({ ...BOOKING, status: 'EXPIRED' });
-    renderPage();
+    mockAuth();
+    vi.spyOn(publicSiteApi, 'fetchMyBooking').mockResolvedValue({
+      ...BOOKING,
+      status: 'EXPIRED',
+    });
+    render(
+      <MemoryRouter initialEntries={['/checkout/b1']}>
+        <Routes>
+          <Route path="/checkout/:bookingId" element={<CheckoutPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
 
     expect(await screen.findByText('مهلت نگهداری این رزرو به پایان رسیده است.')).toBeInTheDocument();
     expect(screen.queryByTestId('continue-to-payment')).not.toBeInTheDocument();
