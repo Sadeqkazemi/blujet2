@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import JalaliDatePicker from '../../components/JalaliDatePicker';
 import { fetchAirports } from '../../api/publicSite';
@@ -177,6 +177,7 @@ function todayIso() {
 
 export default function FlightStatusPage() {
   const { locale } = useLocale();
+  const location = useLocation();
   const t = STR[locale];
   const [mode, setMode] = useState<'flightNo' | 'route'>('flightNo');
   const [flightNo, setFlightNo] = useState('');
@@ -195,6 +196,15 @@ export default function FlightStatusPage() {
       .then(setAirports)
       .catch(() => setAirports([]));
   }, []);
+
+  useEffect(() => {
+    const st = location.state as { flightNo?: string; dateIso?: string } | null;
+    if (st?.flightNo) {
+      setMode('flightNo');
+      setFlightNo(st.flightNo);
+    }
+    if (st?.dateIso) setDateIso(new Date(st.dateIso).toISOString());
+  }, [location.state]);
 
   async function search(e: React.FormEvent) {
     e.preventDefault();

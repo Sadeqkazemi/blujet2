@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import {
   changeSeatByPnr,
@@ -214,6 +215,7 @@ const STR: Record<StoredLocale, {
 
 export default function ManageBookingPage() {
   const { locale } = useLocale();
+  const location = useLocation();
   const t = STR[locale];
   const [pnr, setPnr] = useState('');
   const [lastName, setLastName] = useState('');
@@ -231,6 +233,12 @@ export default function ManageBookingPage() {
   const [seatError, setSeatError] = useState<string | null>(null);
   const [seatBusy, setSeatBusy] = useState(false);
   const [seatChanged, setSeatChanged] = useState(false);
+
+  useEffect(() => {
+    const st = location.state as { pnr?: string; lastName?: string } | null;
+    if (st?.pnr) setPnr(st.pnr);
+    if (st?.lastName) setLastName(st.lastName);
+  }, [location.state]);
 
   async function lookup(e: React.FormEvent) {
     e.preventDefault();

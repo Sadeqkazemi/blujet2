@@ -102,9 +102,22 @@ describe('HomeSearchPage', () => {
 
     expect(await screen.findByTestId('home-search-submit')).toBeInTheDocument();
     expect(await screen.findByTestId('home-origin')).toBeInTheDocument();
-    expect(screen.getByTestId('trip-round')).toBeInTheDocument();
     expect(screen.getByTestId('trip-oneway')).toBeInTheDocument();
+    expect(screen.getByTestId('trip-round')).toBeInTheDocument();
     expect(screen.getByTestId('trip-multi')).toBeInTheDocument();
+    expect(screen.getByTestId('hero-cta')).toBeInTheDocument();
+  });
+
+  it('switches to inline manage tab without leaving the page', async () => {
+    vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
+    vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockResolvedValue(CMS_HOME);
+    vi.spyOn(settingsApi, 'fetchPublicAppLinks').mockResolvedValue({ links: [] });
+    renderPage();
+    await screen.findByTestId('home-origin');
+
+    await userEvent.click(screen.getByTestId('top-tab-manage'));
+    expect(screen.getByTestId('home-manage-tab')).toBeInTheDocument();
+    expect(screen.queryByTestId('home-search-submit')).not.toBeInTheDocument();
   });
 
   it('shows a validation error when submitted without selections', async () => {

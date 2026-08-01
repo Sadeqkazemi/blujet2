@@ -1,5 +1,12 @@
 import type { CabinClass } from '../../../types/public-site';
 
+/** UI-only cabin (design shows First); maps to BUSINESS for search API. */
+export type UiCabinClass = CabinClass | 'FIRST';
+
+export function toSearchCabin(cabin: UiCabinClass): CabinClass {
+  return cabin === 'FIRST' ? 'BUSINESS' : cabin;
+}
+
 export type TripType = 'oneway' | 'round' | 'multi';
 
 export interface SearchLeg {
@@ -29,7 +36,7 @@ export function buildResultsUrl(input: {
   adults?: number;
   children?: number;
   infants?: number;
-  cabin?: CabinClass;
+  cabin?: UiCabinClass;
 }): string {
   const q = new URLSearchParams();
   q.set('trip', input.trip);
@@ -52,7 +59,7 @@ export function buildResultsUrl(input: {
   q.set('adults', String(input.adults ?? 1));
   if (input.children) q.set('children', String(input.children));
   if (input.infants) q.set('infants', String(input.infants));
-  q.set('cabin', input.cabin ?? 'ECONOMY');
+  q.set('cabin', toSearchCabin(input.cabin ?? 'ECONOMY'));
   return `/results?${q.toString()}`;
 }
 

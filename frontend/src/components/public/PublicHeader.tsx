@@ -58,6 +58,7 @@ export default function PublicHeader() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [loginDrawerOpen, setLoginDrawerOpen] = useState(false);
   const [club, setClub] = useState<{ isMember: boolean; level: string | null; balance: number } | null>(null);
 
   const loggedIn = status === 'authenticated' && user?.role === 'USER';
@@ -473,6 +474,48 @@ export default function PublicHeader() {
               >
                 🌐 {locale.toUpperCase()}
               </span>
+              {!loggedIn && (
+                <span
+                  data-testid="public-mobile-login-drawer"
+                  onClick={() => setLoginDrawerOpen(true)}
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#fff',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="8" r="4" />
+                    <path d="M4 21c0-4 4-6 8-6s8 2 8 6" />
+                  </svg>
+                </span>
+              )}
+              {loggedIn && user && (
+                <span
+                  data-testid="public-user-menu-toggle-mobile"
+                  onClick={() => setMenuOpen((v) => !v)}
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#fff',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="8" r="4" />
+                    <path d="M4 21c0-4 4-6 8-6s8 2 8 6" />
+                  </svg>
+                </span>
+              )}
             </div>
           )}
         </div>
@@ -574,6 +617,87 @@ export default function PublicHeader() {
                 </span>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {isMobile && loginDrawerOpen && (
+        <div
+          data-testid="public-login-drawer"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'linear-gradient(165deg,#0d2640,#1668c4)',
+            color: '#fff',
+            zIndex: 210,
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', padding: '26px 20px 18px' }}>
+            <span style={{ fontSize: 22, fontWeight: 800, color: '#fff' }}>{t('btnLoginSignup')}</span>
+            <span
+              onClick={() => setLoginDrawerOpen(false)}
+              style={{
+                position: 'absolute',
+                [isRTL ? 'left' : 'right']: 20,
+                top: 22,
+                width: 34,
+                height: 34,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 24,
+                color: '#fff',
+                cursor: 'pointer',
+              }}
+            >
+              ×
+            </span>
+          </div>
+          <div style={{ padding: '34px 28px 0', textAlign: 'center' }}>
+            <p style={{ fontSize: 16, lineHeight: 1.7, color: '#dbe7f7', margin: '8px 0 34px' }}>
+              {locale === 'en'
+                ? 'Sign in to manage bookings, earn loyalty points, and get exclusive offers.'
+                : locale === 'ar'
+                  ? 'سجّل الدخول لإدارة الحجوزات وكسب نقاط النادي والحصول على عروض حصرية.'
+                  : 'برای مدیریت رزروها، دریافت امتیاز باشگاه و پیشنهادهای اختصاصی وارد شوید.'}
+            </p>
+            <Link
+              to="/signin"
+              onClick={() => setLoginDrawerOpen(false)}
+              style={{
+                display: 'block',
+                padding: 16,
+                background: '#fff',
+                color: '#0d2640',
+                borderRadius: 30,
+                fontSize: '15.5px',
+                fontWeight: 800,
+                textDecoration: 'none',
+                marginBottom: 14,
+              }}
+            >
+              {t('btnLoginSignup')}
+            </Link>
+            <Link
+              to="/club"
+              onClick={() => setLoginDrawerOpen(false)}
+              style={{
+                display: 'block',
+                padding: 16,
+                background: 'transparent',
+                color: '#fff',
+                border: '1.5px solid rgba(255,255,255,.6)',
+                borderRadius: 30,
+                fontSize: '15.5px',
+                fontWeight: 800,
+                textDecoration: 'none',
+                marginBottom: 22,
+              }}
+            >
+              {t('btnJoinClub')}
+            </Link>
           </div>
         </div>
       )}

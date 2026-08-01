@@ -2,11 +2,16 @@ import { useMemo, useState } from 'react';
 import type { StoredLocale } from '../../../hooks/useLocale';
 import { useIsMobile } from '../../../hooks/useIsMobile';
 import JalaliDatePicker from '../../JalaliDatePicker';
-import type { Airport, CabinClass } from '../../../types/public-site';
+import type { Airport } from '../../../types/public-site';
 import AirportCityPicker from './AirportCityPicker';
-import PassengerCabinPicker, { type PassengerCabinState } from './PassengerCabinPicker';
+import PassengerCabinPicker, { type PassengerCabinState, uiCabinLabel } from './PassengerCabinPicker';
 import { filterAirportsByService } from './airport-utils';
-import { buildResultsUrl, type SearchLeg, type TripType } from './search-url';
+import { buildResultsUrl, type SearchLeg, type TripType, type UiCabinClass } from './search-url';
+
+export interface SearchSubmitMeta {
+  origin: string;
+  dest: string;
+}
 
 const TODAY_ISO = new Date().toISOString().slice(0, 10);
 
@@ -24,11 +29,9 @@ const STR: Record<
     lblReturnDate: string;
     btnSearch: string;
     flightTypeLabel: string;
-    systemFlight: string;
-    charterFlight: string;
-    charterNotice: string;
     cabinEconomy: string;
     cabinBusiness: string;
+    cabinFirst: string;
     legLabel: (n: number) => string;
     addLeg: string;
     removeLeg: string;
@@ -50,12 +53,9 @@ const STR: Record<
     lblReturnDate: 'تاریخ برگشت',
     btnSearch: 'جستجو',
     flightTypeLabel: 'نوع پرواز:',
-    systemFlight: 'سیستمی',
-    charterFlight: 'چارتری',
-    charterNotice:
-      'پروازهای چارتری با ظرفیت محدود و قیمت مقطوع؛ امکان استرداد بر اساس قوانین چارترکننده متفاوت است.',
     cabinEconomy: 'اکونومی',
     cabinBusiness: 'بیزینس',
+    cabinFirst: 'فرست',
     legLabel: (n) => `مسیر ${n}`,
     addLeg: '+ افزودن مسیر',
     removeLeg: 'حذف مسیر',
@@ -76,12 +76,9 @@ const STR: Record<
     lblReturnDate: 'Return',
     btnSearch: 'Search',
     flightTypeLabel: 'Flight type:',
-    systemFlight: 'Scheduled',
-    charterFlight: 'Charter',
-    charterNotice:
-      'Charter flights have limited capacity and fixed fares; refund rules differ from scheduled flights.',
     cabinEconomy: 'Economy',
     cabinBusiness: 'Business',
+    cabinFirst: 'First',
     legLabel: (n) => `Leg ${n}`,
     addLeg: '+ Add leg',
     removeLeg: 'Remove leg',
@@ -102,11 +99,9 @@ const STR: Record<
     lblReturnDate: 'تاريخ العودة',
     btnSearch: 'بحث',
     flightTypeLabel: 'نوع الرحلة:',
-    systemFlight: 'مجدولة',
-    charterFlight: 'تشارتر',
-    charterNotice: 'رحلات التشارتر بسعة محدودة وأسعار ثابتة؛ قواعد الاسترداد مختلفة.',
     cabinEconomy: 'اقتصادية',
     cabinBusiness: 'درجة الأعمال',
+    cabinFirst: 'الدرجة الأولى',
     legLabel: (n) => `المسار ${n}`,
     addLeg: '+ إضافة مسار',
     removeLeg: 'حذف المسار',
@@ -120,7 +115,7 @@ const STR: Record<
 interface FlightSearchFormProps {
   airports: Airport[];
   locale: StoredLocale;
-  onSubmit: (url: string) => void;
+  onSubmit: (url: string, meta?: SearchSubmitMeta) => void;
   onError?: (message: string) => void;
 }
 
@@ -197,8 +192,7 @@ export default function FlightSearchForm({
   const t = STR[locale];
 
   const [service, setService] = useState<'domestic' | 'intl'>('domestic');
-  const [flightKind, setFlightKind] = useState<'system' | 'charter'>('system');
-  const [trip, setTrip] = useState<TripType>('round');
+  const [trip, setTrip] = useState<TripType>('oneway');
   const [origin, setOrigin] = useState('');
   const [dest, setDest] = useState('');
   const [dateIso, setDateIso] = useState<string | null>(null);
@@ -246,6 +240,7 @@ export default function FlightSearchForm({
           legs: multiLegs.map((l) => ({ ...l, date: l.date.slice(0, 10) })),
           ...pax,
         }),
+        { origin: multiLegs[0]?.origin ?? '', dest: multiLegs[0]?.dest ?? '' },
       );
       return;
     }
@@ -270,6 +265,7 @@ export default function FlightSearchForm({
         returnDate: returnDateIso?.slice(0, 10),
         ...pax,
       }),
+      { origin, dest },
     );
   }
 
@@ -293,7 +289,20 @@ export default function FlightSearchForm({
     setMultiLegs(multiLegs.filter((_, i) => i !== index));
   }
 
-  const cabinLabel = pax.cabin === 'BUSINESS' ? t.cabinBusiness : t.cabinEconomy;
+  const cabinLabel = uiCabinLabel(pax.cabin, locale);
+
+  const serviceIcons = {
+    domestic: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M21 16v-2l-8-5V3.5C13 2.67 12.33 2 11.5 2S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l4-1 4 1v-1.5L13 19v-5.5l8 2.5z" />
+      </svg>
+    ),
+    intl: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm7.86 6h-3.02c-.28-1.32-.68-2.6-1.2-3.78A8.03 8.03 0 0 1 19.86 8zM12 4.06c.83 1.11 1.5 2.53 1.91 3.94h-3.82c.41-1.41 1.08-2.83 1.91-3.94zM4.26 14A7.9 7.9 0 0 1 4 12c0-.69.08-1.36.26-2h3.38c-.08.66-.14 1.32-.14 2s.06 1.34.14 2H4.26zm.9 2h3.02c.28 1.32.68 2.6 1.2 3.78A7.99 7.99 0 0 1 5.16 16zm3.02-8H5.16a7.99 7.99 0 0 1 4.22-3.78C8.86 5.4 8.46 6.68 8.18 8zM12 19.94c-.83-1.11-1.5-2.53-1.91-3.94h3.82c-.41 1.41-1.08 2.83-1.91 3.94zM14.34 14H9.66c-.09-.66-.16-1.32-.16-2s.07-1.35.16-2h4.68c.09.65.16 1.32.16 2s-.07 1.34-.16 2zm.25 5.78c.52-1.18.92-2.46 1.2-3.78h3.02a8.03 8.03 0 0 1-4.22 3.78zM16.36 14c.08-.66.14-1.32.14-2s-.06-1.34-.14-2h3.38c.18.64.26 1.31.26 2s-.08 1.36-.26 2h-3.38z" />
+      </svg>
+    ),
+  };
 
   const searchBtnStyle: React.CSSProperties = {
     flex: 'none',
@@ -359,6 +368,7 @@ export default function FlightSearchForm({
                   fontFamily: 'inherit',
                 }}
               >
+                {serviceIcons[key]}
                 {label}
               </button>
             );
@@ -366,43 +376,20 @@ export default function FlightSearchForm({
         </div>
       </div>
 
-      {flightKind === 'charter' && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 9,
-            background: '#fff7ed',
-            border: '1px solid #fde3c4',
-            color: '#9a5b16',
-            borderRadius: 12,
-            padding: '11px 14px',
-            marginBottom: 18,
-            fontSize: 12,
-            fontWeight: 600,
-          }}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z" />
-          </svg>
-          {t.charterNotice}
-        </div>
-      )}
-
       <div style={{ display: 'flex', gap: isMobile ? 14 : 25, marginBottom: 20, alignItems: 'center', flexWrap: 'wrap' }}>
-        <TripRadio
-          active={trip === 'round'}
-          label={t.tripRoundTrip}
-          onClick={() => setTrip('round')}
-          onDark={isMobile}
-          testId="trip-round"
-        />
         <TripRadio
           active={trip === 'oneway'}
           label={t.tripOneWay}
           onClick={() => setTrip('oneway')}
           onDark={isMobile}
           testId="trip-oneway"
+        />
+        <TripRadio
+          active={trip === 'round'}
+          label={t.tripRoundTrip}
+          onClick={() => setTrip('round')}
+          onDark={isMobile}
+          testId="trip-round"
         />
         <TripRadio
           active={trip === 'multi'}
@@ -719,14 +706,20 @@ export default function FlightSearchForm({
                         gap: 6,
                       }}
                     >
-                      {([['ECONOMY', t.cabinEconomy], ['BUSINESS', t.cabinBusiness]] as const).map(([cab, lbl]) => {
+                      {(
+                        [
+                          ['ECONOMY', t.cabinEconomy],
+                          ['BUSINESS', t.cabinBusiness],
+                          ['FIRST', t.cabinFirst],
+                        ] as const
+                      ).map(([cab, lbl]) => {
                         const active = pax.cabin === cab;
                         return (
                           <button
                             key={cab}
                             type="button"
                             onClick={() => {
-                              setPax({ ...pax, cabin: cab as CabinClass });
+                              setPax({ ...pax, cabin: cab as UiCabinClass });
                               setClassBoxOpen(false);
                             }}
                             style={{
@@ -762,14 +755,19 @@ export default function FlightSearchForm({
             <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 18 }}>
               <span style={{ fontSize: '11.5px', color: '#8a96a6', fontWeight: 600 }}>{t.flightTypeLabel}</span>
               <div style={{ display: 'inline-flex', background: '#eef1f5', borderRadius: 10, padding: 3 }}>
-                {(['system', 'charter'] as const).map((kind) => {
-                  const active = flightKind === kind;
+                {(
+                  [
+                    ['ECONOMY', t.cabinEconomy],
+                    ['BUSINESS', t.cabinBusiness],
+                  ] as const
+                ).map(([cab, lbl]) => {
+                  const active = pax.cabin === cab;
                   return (
                     <button
-                      key={kind}
+                      key={cab}
                       type="button"
-                      data-testid={`flight-kind-${kind}`}
-                      onClick={() => setFlightKind(kind)}
+                      data-testid={`cabin-quick-${cab}`}
+                      onClick={() => setPax({ ...pax, cabin: cab })}
                       style={{
                         padding: '7px 17px',
                         borderRadius: 8,
@@ -783,7 +781,7 @@ export default function FlightSearchForm({
                         fontFamily: 'inherit',
                       }}
                     >
-                      {kind === 'system' ? t.systemFlight : t.charterFlight}
+                      {lbl}
                     </button>
                   );
                 })}

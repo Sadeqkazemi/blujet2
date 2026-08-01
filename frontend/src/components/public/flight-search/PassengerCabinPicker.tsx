@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { StoredLocale } from '../../../hooks/useLocale';
 import { useIsMobile } from '../../../hooks/useIsMobile';
 import { formatToman } from '../../../lib/fa-format';
-import type { CabinClass } from '../../../types/public-site';
+import type { UiCabinClass } from './search-url';
 
 const STR: Record<
   StoredLocale,
@@ -17,6 +17,7 @@ const STR: Record<
     cabinClass: string;
     economy: string;
     business: string;
+    first: string;
     confirm: string;
     pickDateFirst: string;
   }
@@ -32,6 +33,7 @@ const STR: Record<
     cabinClass: 'کلاس پروازی',
     economy: 'اکونومی',
     business: 'بیزینس',
+    first: 'فرست',
     confirm: 'تأیید',
     pickDateFirst: 'ابتدا تاریخ پرواز را انتخاب کنید',
   },
@@ -46,6 +48,7 @@ const STR: Record<
     cabinClass: 'Cabin class',
     economy: 'Economy',
     business: 'Business',
+    first: 'First',
     confirm: 'Confirm',
     pickDateFirst: 'Select a travel date first',
   },
@@ -60,6 +63,7 @@ const STR: Record<
     cabinClass: 'درجة السفر',
     economy: 'اقتصادية',
     business: 'درجة الأعمال',
+    first: 'الدرجة الأولى',
     confirm: 'تأكيد',
     pickDateFirst: 'اختر تاريخ السفر أولاً',
   },
@@ -69,7 +73,14 @@ export interface PassengerCabinState {
   adults: number;
   children: number;
   infants: number;
-  cabin: CabinClass;
+  cabin: UiCabinClass;
+}
+
+export function uiCabinLabel(cabin: UiCabinClass, locale: StoredLocale): string {
+  const t = STR[locale];
+  if (cabin === 'BUSINESS') return t.business;
+  if (cabin === 'FIRST') return t.first;
+  return t.economy;
 }
 
 interface PassengerCabinPickerProps {
@@ -168,10 +179,10 @@ export default function PassengerCabinPicker({
   ];
   if (value.children) parts.push(`${formatToman(value.children, locale)} ${t.children}`);
   if (value.infants) parts.push(`${formatToman(value.infants, locale)} ${t.infants}`);
-  const cabinLabel = value.cabin === 'BUSINESS' ? t.business : t.economy;
+  const cabinLabel = uiCabinLabel(value.cabin, locale);
   const summary = `${parts.join(' · ')} · ${cabinLabel}`;
 
-  function setCabin(cabin: CabinClass) {
+  function setCabin(cabin: UiCabinClass) {
     onChange({ ...value, cabin });
   }
 
@@ -316,7 +327,13 @@ export default function PassengerCabinPicker({
                 {t.cabinClass}
               </div>
               <div style={{ display: 'flex', gap: 7 }}>
-                {[(['ECONOMY', t.economy] as const), (['BUSINESS', t.business] as const)].map(([cab, lbl]) => {
+                {(
+                  [
+                    ['ECONOMY', t.economy],
+                    ['BUSINESS', t.business],
+                    ['FIRST', t.first],
+                  ] as const
+                ).map(([cab, lbl]) => {
                   const active = value.cabin === cab;
                   return (
                     <button
