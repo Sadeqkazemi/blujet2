@@ -80,10 +80,47 @@ describe('BookPage', () => {
     await userEvent.type(await screen.findByTestId('otp-phone'), '09121234567');
     await userEvent.click(screen.getByRole('button', { name: 'دریافت کد' }));
     expect(requestOtp).toHaveBeenCalledWith('09121234567');
+    expect(await screen.findByTestId('otp-sent-notice')).toBeInTheDocument();
 
     await userEvent.type(await screen.findByTestId('otp-code'), '482913');
     await userEvent.click(screen.getByRole('button', { name: 'تأیید و ورود' }));
     expect(verifyOtp).toHaveBeenCalledWith('challenge-1', '482913');
+  });
+
+  it('normalizes Persian digits before requesting OTP', async () => {
+    const requestOtp = vi.fn().mockResolvedValue('challenge-1');
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      status: 'unauthenticated',
+      user: null,
+      requestLogin: vi.fn(),
+      confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
+      signOut: vi.fn(),
+      requestOtp,
+      verifyOtp: vi.fn(),
+    });
+    renderPage();
+
+    await userEvent.type(await screen.findByTestId('otp-phone'), '۰۹۱۲۱۲۳۴۵۶۷');
+    await userEvent.click(screen.getByRole('button', { name: 'دریافت کد' }));
+    expect(requestOtp).toHaveBeenCalledWith('09121234567');
+  });
+
+  it('shows validation error for an incomplete phone number', async () => {
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      status: 'unauthenticated',
+      user: null,
+      requestLogin: vi.fn(),
+      confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
+      signOut: vi.fn(),
+      requestOtp: vi.fn(),
+      verifyOtp: vi.fn(),
+    });
+    renderPage();
+
+    await userEvent.type(await screen.findByTestId('otp-phone'), '0912');
+    expect(screen.getByRole('button', { name: 'دریافت کد' })).toBeDisabled();
   });
 
   it('lets an authenticated customer pick a free seat, fill passenger info, and submit', async () => {
