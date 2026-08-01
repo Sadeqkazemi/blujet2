@@ -49,3 +49,13 @@ body {
     transform: rotate(360deg);
   }
 }
+
+/* Horizontal scroll without visible scrollbar (design bundle .hscroll) */
+.hscroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.hscroll::-webkit-scrollbar {
+  display: none;
+}
