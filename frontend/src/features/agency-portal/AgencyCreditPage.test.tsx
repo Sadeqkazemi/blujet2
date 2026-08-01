@@ -77,9 +77,9 @@ describe('AgencyCreditPage', () => {
     mockLoads();
     render(<AgencyCreditPage />);
 
-    expect(await screen.findByText('Credit & Balance')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Credit & Balance' })).toBeInTheDocument();
     expect(screen.getByText('Credit Limit')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Pay from Credit' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Pay from credit' })).toBeInTheDocument();
   });
 
   it('renders translated headings and invoice status in Arabic', async () => {
@@ -87,7 +87,7 @@ describe('AgencyCreditPage', () => {
     mockLoads();
     render(<AgencyCreditPage />);
 
-    expect(await screen.findByText('الرصيد والائتمان')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'الرصيد والائتمان' })).toBeInTheDocument();
     expect(screen.getByText('بانتظار الدفع')).toBeInTheDocument();
   });
 });
