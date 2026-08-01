@@ -175,12 +175,8 @@ export default function AgencySalesPage() {
   }
 
   return (
-    <div className="p-8">
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="mb-1 text-xl font-black text-ink">{t.heading}</h1>
-          <p className="text-sm text-muted">{t.subtitle}</p>
-        </div>
+    <div>
+      <div className="mb-6 flex flex-wrap items-start justify-end gap-3">
         <button
           type="button"
           data-testid="sales-export"
