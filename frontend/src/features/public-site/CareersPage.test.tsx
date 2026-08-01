@@ -43,14 +43,16 @@ describe('CareersPage', () => {
 
     expect(await screen.findByText('کارشناس پشتیبانی مسافران')).toBeInTheDocument();
     expect(screen.getByText('پشتیبانی · تهران')).toBeInTheDocument();
-    expect(screen.getByText('مشاهده و ارسال درخواست ←')).toHaveAttribute('href', '/careers/j1/apply');
+    expect(screen.getByText('مشاهده و ارسال رزومه')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /کارشناس پشتیبانی مسافران/ })).toHaveAttribute('href', '/careers/j1/apply');
   });
 
   it('shows the empty state when there are no active jobs', async () => {
     vi.spyOn(careersApi, 'fetchActiveJobs').mockResolvedValue([]);
     renderPage();
 
-    expect(await screen.findByTestId('careers-empty')).toHaveTextContent('در حال حاضر فرصت شغلی فعالی وجود ندارد.');
+    expect(await screen.findByTestId('careers-empty')).toHaveTextContent('در حال حاضر فرصت شغلی فعالی وجود ندارد');
+    expect(screen.getByText('به‌زودی آگهی‌های استخدام جدید در همین صفحه منتشر می‌شود.')).toBeInTheDocument();
   });
 
   it('shows an error message when the fetch fails', async () => {
