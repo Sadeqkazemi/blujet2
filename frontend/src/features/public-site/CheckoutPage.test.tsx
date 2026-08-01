@@ -24,15 +24,15 @@ const BOOKING: BookingDetail = {
   departureAt: '2026-08-01T05:00:00.000Z',
   arrivalAt: '2026-08-01T06:30:00.000Z',
   isPriceLocked: false,
-  passengers: [{ fullName: 'ALI REZAEI', seatCode: '2A' }],
+  passengers: [{ fullName: 'ALI REZAEI', seatCode: '7A' }],
 };
 
 const SEATMAP: SeatMapResult = {
   flightInstanceId: 'fi-1',
   seats: [
-    { seatCode: '2A', row: 2, cabin: 'ECONOMY', status: 'FREE' },
-    { seatCode: '2C', row: 2, cabin: 'ECONOMY', status: 'FREE' },
-    { seatCode: '2B', row: 2, cabin: 'ECONOMY', status: 'TAKEN' },
+    { seatCode: '7A', row: 7, cabin: 'ECONOMY', status: 'FREE' },
+    { seatCode: '7B', row: 7, cabin: 'ECONOMY', status: 'FREE' },
+    { seatCode: '7E', row: 7, cabin: 'ECONOMY', status: 'TAKEN' },
   ],
 };
 
@@ -216,7 +216,7 @@ describe('CheckoutPage', () => {
     await userEvent.click(screen.getByTestId('checkout-next'));
     expect(await screen.findByTestId('checkout-extras-step')).toBeInTheDocument();
 
-    await userEvent.click(await screen.findByTestId('checkout-seat-2A'));
+    await userEvent.click(await screen.findByTestId('checkout-seat-7A'));
     await userEvent.click(screen.getByTestId('checkout-extra-baggage'));
     await userEvent.click(screen.getByTestId('checkout-next'));
 
@@ -232,7 +232,7 @@ describe('CheckoutPage', () => {
           expect.objectContaining({
             fullName: 'ALI REZAEI',
             nationalId: '0012345678',
-            seatCode: '2A',
+            seatCode: '7A',
           }),
         ],
       }),
