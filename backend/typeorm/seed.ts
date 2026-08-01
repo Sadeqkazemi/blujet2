@@ -1457,6 +1457,73 @@ async function main() {
     }
   }
 
+  // Bookable dev/test flights (THR↔MHD) — idempotent; also runnable via
+  // `npx tsx scripts/create-demo-flights.ts` without re-seeding.
+  const tehranDeparture = (daysFromNow: number, hourLocal: number, minuteLocal = 0): Date => {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() + daysFromNow);
+    const tehranOffsetMin = 3 * 60 + 30;
+    const localMin = hourLocal * 60 + minuteLocal;
+    const utcMin = localMin - tehranOffsetMin;
+    d.setUTCHours(Math.floor(utcMin / 60), utcMin % 60, 0, 0);
+    return d;
+  };
+  const ensureBookableInstance = async (
+    flightId: string,
+    departureAt: Date,
+    durationMin: number,
+    basePriceIrr: bigint,
+  ) => {
+    const dayStart = new Date(departureAt);
+    dayStart.setUTCHours(0, 0, 0, 0);
+    const dayEnd = new Date(dayStart.getTime() + 24 * 3_600_000);
+    const existing = await typeorm.flightInstance.findFirst({
+      where: { flightId, departureAt: { gte: dayStart, lt: dayEnd } },
+    });
+    if (existing) return existing;
+    return typeorm.flightInstance.create({
+      data: {
+        flightId,
+        departureAt,
+        arrivalAt: new Date(departureAt.getTime() + durationMin * 60_000),
+        capacity: 180,
+        charterSeats: 0,
+        status: 'SCHEDULED',
+        basePriceIrr,
+      },
+    });
+  };
+
+  const mhdDurationMin = 90;
+  const thrMhdRoute = await typeorm.route.upsert({
+    where: { originCode_destCode: { originCode: 'THR', destCode: 'MHD' } },
+    update: { durationMin: mhdDurationMin },
+    create: { originCode: 'THR', destCode: 'MHD', durationMin: mhdDurationMin },
+  });
+  const mhdThrRoute = await typeorm.route.upsert({
+    where: { originCode_destCode: { originCode: 'MHD', destCode: 'THR' } },
+    update: { durationMin: mhdDurationMin },
+    create: { originCode: 'MHD', destCode: 'THR', durationMin: mhdDurationMin },
+  });
+  const bj701 = await typeorm.flight.upsert({
+    where: { flightNo: 'BJ-701' },
+    update: {},
+    create: { flightNo: 'BJ-701', routeId: thrMhdRoute.id, aircraftType: 'Airbus A320' },
+  });
+  const bj703 = await typeorm.flight.upsert({
+    where: { flightNo: 'BJ-703' },
+    update: {},
+    create: { flightNo: 'BJ-703', routeId: thrMhdRoute.id, aircraftType: 'Airbus A320' },
+  });
+  const bj702 = await typeorm.flight.upsert({
+    where: { flightNo: 'BJ-702' },
+    update: {},
+    create: { flightNo: 'BJ-702', routeId: mhdThrRoute.id, aircraftType: 'Airbus A320' },
+  });
+  await ensureBookableInstance(bj701.id, tehranDeparture(1, 8), mhdDurationMin, 16_000_000n);
+  await ensureBookableInstance(bj703.id, tehranDeparture(1, 18, 30), mhdDurationMin, 14_500_000n);
+  await ensureBookableInstance(bj702.id, tehranDeparture(4, 17), mhdDurationMin, 17_500_000n);
+
   console.log('Seed complete.');
   console.log(`Staff dev password (all roles): ${STAFF_PASSWORD}`);
 }
