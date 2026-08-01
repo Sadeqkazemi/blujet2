@@ -193,7 +193,9 @@ export class AuthService {
     refreshToken: string;
     user: AuthUserView;
   }> {
-    const user = await this.typeorm.user.findUnique({ where: { phone } });
+    const user = await this.typeorm.user.findUnique({
+      where: { phone: normalizeIranPhone(phone) },
+    });
     if (!user || user.role !== 'USER' || !user.passwordHash) {
       throw new UnauthorizedException({
         code: ErrorCode.UNAUTHORIZED,
@@ -534,11 +536,14 @@ export class AuthService {
     phone: string,
     referralCode?: string,
   ): Promise<{ challengeId: string }> {
-    const existing = await this.typeorm.user.findUnique({ where: { phone } });
+    const normalizedPhone = normalizeIranPhone(phone);
+    const existing = await this.typeorm.user.findUnique({
+      where: { phone: normalizedPhone },
+    });
     const user = await this.typeorm.user.upsert({
-      where: { phone },
+      where: { phone: normalizedPhone },
       update: {},
-      create: { role: 'USER', phone, fullName: phone },
+      create: { role: 'USER', phone: normalizedPhone, fullName: normalizedPhone },
     });
     if (!existing) {
       await this.customerReferrals.applyOnSignup(user.id, referralCode);
@@ -766,7 +771,9 @@ export class AuthService {
       !this.twoFactorProvider.getLastCode
     )
       return null;
-    const user = await this.typeorm.user.findUnique({ where: { phone } });
+    const user = await this.typeorm.user.findUnique({
+      where: { phone: normalizeIranPhone(phone) },
+    });
     if (!user) return null;
     return this.twoFactorProvider.getLastCode(user.id) ?? null;
   }
