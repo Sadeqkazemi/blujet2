@@ -446,20 +446,18 @@ describe('AccountPage', () => {
     await vi.waitFor(() => expect(submit).toHaveBeenCalled());
   });
 
-  it('shows saved passengers on the profile tab and opens add modal from there', async () => {
+  it('shows saved passengers on the passengers tab and opens add modal', async () => {
     mockAuth('authenticated');
     renderPage();
-    await userEvent.click(screen.getByTestId('account-tab-profile'));
-    expect(await screen.findByTestId('profile-saved-pax')).toBeInTheDocument();
-    expect(screen.getAllByTestId('profile-saved-pax-row')).toHaveLength(1);
+    await userEvent.click(screen.getByTestId('account-tab-passengers'));
+    expect(await screen.findByTestId('account-passenger')).toBeInTheDocument();
     expect(screen.getByText('MOHAMMAD REZAEI · A22113344')).toBeInTheDocument();
 
-    await userEvent.click(screen.getByTestId('profile-saved-pax-add'));
+    await userEvent.click(screen.getByTestId('passengers-add-open'));
     expect(await screen.findByTestId('passengers-form-modal')).toBeInTheDocument();
-    expect(screen.getByTestId('account-passengers')).toBeInTheDocument();
   });
 
-  it('shows an incomplete-profile banner and saves identity fields from the profile tab', async () => {
+  it('shows an incomplete-profile banner and saves identity fields from the account-info tab', async () => {
     mockAuth('authenticated');
     const update = vi.spyOn(publicSiteApi, 'updateMyProfile').mockResolvedValue({
       ...PROFILE,
@@ -470,7 +468,7 @@ describe('AccountPage', () => {
 
     expect(await screen.findByTestId('profile-incomplete-banner')).toHaveTextContent('۲۰٪');
 
-    await userEvent.click(screen.getByTestId('account-tab-profile'));
+    await userEvent.click(screen.getByTestId('account-tab-account-info'));
     await userEvent.click(await screen.findByTestId('profile-edit-toggle'));
     const nationalIdInput = await screen.findByLabelText('کد ملی');
     await userEvent.type(nationalIdInput, '0012345679');
@@ -484,7 +482,7 @@ describe('AccountPage', () => {
     });
   });
 
-  it('downloads a real data export as JSON', async () => {
+  it('downloads a real data export as JSON from the security tab', async () => {
     mockAuth('authenticated');
     const exportSpy = vi.spyOn(publicSiteApi, 'fetchPrivacyExport').mockResolvedValue({ user: PROFILE });
     const createObjectURL = vi.fn().mockReturnValue('blob:mock-url');
@@ -492,7 +490,7 @@ describe('AccountPage', () => {
     vi.stubGlobal('URL', { ...URL, createObjectURL, revokeObjectURL });
 
     renderPage();
-    await userEvent.click(screen.getByTestId('account-tab-profile'));
+    await userEvent.click(screen.getByTestId('account-tab-security'));
     await userEvent.click(screen.getByTestId('privacy-export-button'));
 
     await vi.waitFor(() => expect(exportSpy).toHaveBeenCalled());
@@ -502,13 +500,13 @@ describe('AccountPage', () => {
     vi.unstubAllGlobals();
   });
 
-  it('deletes the account only after explicit confirmation, then signs out', async () => {
+  it('deletes the account only after explicit confirmation from the security tab, then signs out', async () => {
     const signOut = vi.fn().mockResolvedValue(undefined);
     mockAuth('authenticated', signOut);
     const deleteSpy = vi.spyOn(publicSiteApi, 'deleteMyAccount').mockResolvedValue({ deleted: true });
 
     renderPage();
-    await userEvent.click(screen.getByTestId('account-tab-profile'));
+    await userEvent.click(screen.getByTestId('account-tab-security'));
     await userEvent.click(screen.getByTestId('privacy-delete-open'));
 
     expect(screen.getByTestId('privacy-delete-confirm')).toBeInTheDocument();

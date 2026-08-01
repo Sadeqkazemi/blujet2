@@ -52,6 +52,8 @@ import AccountIdentityTab from './AccountIdentityTab';
 import AccountRefundsTab from './AccountRefundsTab';
 import AccountSidebar from './account/AccountSidebar';
 import AccountProfileTab from './account/AccountProfileTab';
+import AccountInfoTab from './account/AccountInfoTab';
+import AccountPrivacyPanel from './account/AccountPrivacyPanel';
 import type { TabKey } from './account/account-types';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
@@ -931,7 +933,7 @@ export default function AccountPage() {
             <div style={{ display: 'flex', gap: 10 }}>
               <button
                 type="button"
-                onClick={() => setTab('profile')}
+                onClick={() => setTab('account-info')}
                 style={{ border: 'none', borderRadius: 9, background: '#e7c66b', color: '#3b2f0e', padding: '7px 14px', fontSize: 11.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
               >
                 {t.bannerCompleteBtn}
@@ -951,36 +953,30 @@ export default function AccountPage() {
           <AccountProfileTab
             user={user}
             profile={profile}
+            bookings={bookings}
+            clubBalance={club?.balance ?? 0}
+            walletBalanceIrr={wallet?.balanceIrr ?? null}
+            passengerCount={savedPassengers?.length ?? 0}
+            isMobile={isMobile}
+            onNavigateTab={setTab}
+          />
+        )}
+
+        {tab === 'account-info' && (
+          <AccountInfoTab
+            profile={profile}
             profileForm={profileForm}
             onProfileFormChange={setProfileForm}
             onSaveProfile={onSaveProfile}
             profileSaving={profileSaving}
             profileError={profileError}
             profileNotice={profileNotice}
-            bookings={bookings}
-            clubBalance={club?.balance ?? 0}
-            walletBalanceIrr={wallet?.balanceIrr ?? null}
-            savedPassengers={savedPassengers}
             isMobile={isMobile}
-            onGoSecurity={() => setTab('security')}
-            onAddPassenger={() => {
-              setPassengersAddPending(true);
-              setTab('passengers');
-            }}
             emailChallengeId={emailChallengeId}
             emailCode={emailCode}
             onEmailCodeChange={setEmailCode}
             onRequestEmailVerify={onRequestEmailVerify}
             onVerifyEmail={onVerifyEmail}
-            exportBusy={exportBusy}
-            exportError={exportError}
-            onExportData={onExportData}
-            deleteConfirmOpen={deleteConfirmOpen}
-            deleteBusy={deleteBusy}
-            deleteError={deleteError}
-            onDeleteOpen={() => setDeleteConfirmOpen(true)}
-            onDeleteCancel={() => setDeleteConfirmOpen(false)}
-            onDeleteConfirm={onConfirmDelete}
           />
         )}
 
@@ -1257,7 +1253,7 @@ export default function AccountPage() {
         )}
 
         {tab === 'security' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 520 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: isMobile ? '100%' : 520 }}>
             <div style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 16, padding: 18 }}>
             <h3 style={{ fontSize: 15, fontWeight: 800, margin: '0 0 4px' }}>{t.securityHeading}</h3>
             <p style={{ fontSize: 11.5, color: '#8a96a6', margin: '0 0 16px', lineHeight: 1.8 }}>{t.securitySub}</p>
@@ -1316,6 +1312,17 @@ export default function AccountPage() {
                 onRevoke={onRevokeSession}
               />
             )}
+            <AccountPrivacyPanel
+              exportBusy={exportBusy}
+              exportError={exportError}
+              onExportData={onExportData}
+              deleteConfirmOpen={deleteConfirmOpen}
+              deleteBusy={deleteBusy}
+              deleteError={deleteError}
+              onDeleteOpen={() => setDeleteConfirmOpen(true)}
+              onDeleteCancel={() => setDeleteConfirmOpen(false)}
+              onDeleteConfirm={onConfirmDelete}
+            />
           </div>
         )}
         </main>

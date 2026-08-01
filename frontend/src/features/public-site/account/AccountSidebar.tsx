@@ -56,6 +56,16 @@ const PRIMARY_NAV: NavItem[] = [
     ),
   },
   {
+    key: 'account-info',
+    label: { fa: 'اطلاعات حساب', en: 'Account Information', ar: 'معلومات الحساب' },
+    icon: (
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <rect x="4" y="4" width="16" height="16" rx="2" />
+        <path d="M8 9h8M8 13h5" />
+      </svg>
+    ),
+  },
+  {
     key: 'trips',
     label: { fa: 'سفرها و خریدها', en: 'Trips & Purchases', ar: 'الرحلات والمشتريات' },
     icon: (

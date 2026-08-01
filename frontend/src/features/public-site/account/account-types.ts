@@ -1,5 +1,6 @@
 export type TabKey =
   | 'profile'
+  | 'account-info'
   | 'trips'
   | 'wallet'
   | 'club'
