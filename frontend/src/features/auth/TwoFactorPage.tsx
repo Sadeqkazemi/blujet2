@@ -1,26 +1,51 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { fetchDevLastStaffCode } from '../../api/auth';
 import { useAuth } from '../../hooks/useAuth';
 import { ApiRequestError } from '../../api/envelope';
 import { StaffLoginLayout } from './StaffLoginLayout';
 
 interface LocationState {
   challengeId?: string;
+  username?: string;
 }
 
 export default function TwoFactorPage() {
   const { confirmTwoFactor } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const challengeId = (location.state as LocationState | null)?.challengeId;
+  const state = (location.state as LocationState | null) ?? {};
+  const challengeId = state.challengeId;
+  const username = state.username;
 
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [devCodeHint, setDevCodeHint] = useState<string | null>(null);
+  const [devCodeError, setDevCodeError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!challengeId) navigate('/login', { replace: true });
   }, [challengeId, navigate]);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV || !username) return;
+    let cancelled = false;
+    fetchDevLastStaffCode(username)
+      .then(({ code: devCode }) => {
+        if (cancelled) return;
+        setCode(devCode);
+        setDevCodeHint(devCode);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDevCodeError('کد تأیید در دسترس نیست — backend را اجرا کنید و دوباره از صفحه ورود تلاش کنید.');
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [username]);
 
   if (!challengeId) {
     return null;
@@ -44,6 +69,18 @@ export default function TwoFactorPage() {
     }
   }
 
+  async function reloadDevCode() {
+    if (!username) return;
+    setDevCodeError(null);
+    try {
+      const { code: devCode } = await fetchDevLastStaffCode(username);
+      setCode(devCode);
+      setDevCodeHint(devCode);
+    } catch {
+      setDevCodeError('کد تأیید یافت نشد. به صفحه ورود برگردید و دوباره تلاش کنید.');
+    }
+  }
+
   return (
     <StaffLoginLayout>
       <div className="mb-4 flex h-[46px] w-[46px] items-center justify-center rounded-2xl bg-gradient-to-br from-accent/10 to-accent/20 text-accent">
@@ -54,8 +91,39 @@ export default function TwoFactorPage() {
       </div>
       <div className="mb-1.5 text-[19px] font-black text-[#0f172a]">تأیید هویت دومرحله‌ای</div>
       <div className="mb-5 text-[11.5px] leading-[1.9] text-[#64748b]">
-        کد ۶ رقمی ارسال‌شده به موبایل ثبت‌شده را وارد کنید.
+        {import.meta.env.DEV
+          ? 'در محیط توسعه، کد ۶ رقمی به‌صورت خودکار پر می‌شود. در production کد به موبایل ثبت‌شده ارسال می‌شود.'
+          : 'کد ۶ رقمی ارسال‌شده به موبایل ثبت‌شده را وارد کنید.'}
       </div>
+
+      {import.meta.env.DEV && (
+        <div
+          data-testid="staff-2fa-dev-hint"
+          className="mb-4 rounded-[10px] border border-[#bfdbfe] bg-[#eff6ff] px-3 py-2.5 text-[11px] leading-[1.9] text-[#1e40af]"
+        >
+          {devCodeHint ? (
+            <p>
+              کد تأیید (محیط dev):{' '}
+              <span dir="ltr" className="font-mono font-bold tracking-widest">
+                {devCodeHint}
+              </span>
+            </p>
+          ) : devCodeError ? (
+            <p role="status">{devCodeError}</p>
+          ) : (
+            <p>در حال دریافت کد تأیید از سرور…</p>
+          )}
+          {username && (
+            <button
+              type="button"
+              onClick={() => void reloadDevCode()}
+              className="mt-1 text-[11px] font-bold text-accent"
+            >
+              دریافت مجدد کد
+            </button>
+          )}
+        </div>
+      )}
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
         <div>

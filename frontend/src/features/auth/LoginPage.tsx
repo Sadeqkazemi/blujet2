@@ -34,9 +34,19 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       const challengeId = await requestLogin(username.trim(), password);
-      navigate('/two-factor', { state: { challengeId } });
+      navigate('/two-factor', { state: { challengeId, username: username.trim() } });
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : 'خطا در ورود. دوباره تلاش کنید.');
+      if (err instanceof ApiRequestError) {
+        if (err.code === 'RATE_LIMITED' || err.status === 429) {
+          setError('تعداد تلاش‌های ورود زیاد است. لطفاً یک دقیقه صبر کنید و دوباره تلاش کنید.');
+        } else if (err.code === 'BAD_GATEWAY' || err.code === 'TIMEOUT' || err.status === 502 || err.status === 408) {
+          setError('سرور در دسترس نیست. backend را اجرا کنید (npm run start:dev) و دوباره تلاش کنید.');
+        } else {
+          setError(err.message);
+        }
+      } else {
+        setError('خطا در ورود. دوباره تلاش کنید.');
+      }
     } finally {
       setSubmitting(false);
     }

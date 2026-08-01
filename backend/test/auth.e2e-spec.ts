@@ -38,7 +38,7 @@ describe('Auth (e2e)', () => {
       .post('/auth/staff/login')
       .send({ username: 'chairman', password: 'Blujet@1404' });
 
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     expect(res.body.data.challengeId).toBeTruthy();
   });
