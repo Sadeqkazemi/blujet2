@@ -1,4 +1,4 @@
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './hooks/useAuth';
 import { LocaleProvider } from './hooks/useLocale';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -107,6 +107,7 @@ export default function App() {
           <Route path="/blog/:slug" element={<BlogPostPage />} />
 
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/staff/login" element={<Navigate to="/login" replace />} />
           <Route path="/two-factor" element={<TwoFactorPage />} />
           <Route path="/required-password-change" element={<ForcePasswordChangePage />} />
           <Route path="/agency/login" element={<AgencyLoginPage />} />

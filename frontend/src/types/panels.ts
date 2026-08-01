@@ -10,6 +10,11 @@ export interface PanelAccessFlag {
   updatedAt: string | null;
 }
 
+export interface PanelSelfStatus {
+  panelKey: string | null;
+  enabled: boolean;
+}
+
 export interface EmployeeContext {
   dept: string | null;
   deptLabelFa: string;

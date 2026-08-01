@@ -10,6 +10,7 @@ import {
   INTERNAL_SERVICE_SEED,
   PERMISSION_CATALOG,
 } from '../src/modules/it-manager/permission-catalog';
+import { ALL_PANEL_KEYS } from '../src/modules/panels/panel-nav.config';
 
 const typeorm = new TypeORMClient({
   adapter: new TypeORMPg({ connectionString: process.env.DATABASE_URL }),
@@ -48,6 +49,16 @@ async function main() {
     });
     staffByUsername.set(s.username, user);
   }
+
+  // Dev seed: every management panel starts enabled so staff can log in immediately.
+  for (const panelKey of ALL_PANEL_KEYS) {
+    await typeorm.panelAccessFlag.upsert({
+      where: { panelKey },
+      update: { enabled: true },
+      create: { panelKey, enabled: true },
+    });
+  }
+
   const seniorManager = staffByUsername.get('senior.rahimi')!;
   const commercialManager = staffByUsername.get('comm.abbasi')!;
   const financeManager = staffByUsername.get('finance.karimi')!;

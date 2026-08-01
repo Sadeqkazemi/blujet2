@@ -190,6 +190,42 @@ describe('Panels (e2e)', () => {
     expect(res.status).toBe(403);
   });
 
+  it('GET /panels/self-status: CEO sees enabled=true by default', async () => {
+    const { accessToken } = await loginAs(app, 'ceo');
+    const res = await request(app.getHttpServer())
+      .get('/panels/self-status')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual({ panelKey: 'CEO', enabled: true });
+  });
+
+  it('when SENIOR_MANAGER disables CEO panel, CEO gets 404 on reporting and self-status shows disabled', async () => {
+    const senior = await loginAs(app, 'senior.rahimi');
+    const ceo = await loginAs(app, 'ceo');
+
+    await request(app.getHttpServer())
+      .patch('/panels/access/CEO')
+      .set('Authorization', `Bearer ${senior.accessToken}`)
+      .send({ enabled: false })
+      .expect(200);
+
+    const status = await request(app.getHttpServer())
+      .get('/panels/self-status')
+      .set('Authorization', `Bearer ${ceo.accessToken}`);
+    expect(status.status).toBe(200);
+    expect(status.body.data.enabled).toBe(false);
+
+    const blocked = await request(app.getHttpServer())
+      .get('/reporting/kpis?granularity=q6')
+      .set('Authorization', `Bearer ${ceo.accessToken}`);
+    expect(blocked.status).toBe(404);
+
+    await request(app.getHttpServer())
+      .patch('/panels/access/CEO')
+      .set('Authorization', `Bearer ${senior.accessToken}`)
+      .send({ enabled: true });
+  });
+
   it('two simultaneous toggles of the same panel from two CEO sessions do not crash and leave a consistent final state', async () => {
     const ceoA = await loginAs(app, 'ceo');
     const ceoB = await loginAs(app, 'ceo');

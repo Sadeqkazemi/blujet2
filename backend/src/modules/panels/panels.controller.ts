@@ -23,6 +23,15 @@ export class PanelsController {
     return { success: true, data: await this.panels.getNav(user) };
   }
 
+  @Get('self-status')
+  @ApiOperation({
+    summary:
+      'Whether this role\'s panel is enabled — used by the shell before rendering tabs',
+  })
+  async getSelfStatus(@CurrentUser() user: AuthenticatedUser) {
+    return { success: true, data: await this.panels.getSelfPanelStatus(user.role) };
+  }
+
   @Get('employee-context')
   @UseGuards(RolesGuard)
   @Roles('EMPLOYEE')

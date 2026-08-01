@@ -658,6 +658,21 @@
         ]
       }
     },
+    "/panels/self-status": {
+      "get": {
+        "operationId": "PanelsController_getSelfStatus",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Whether this role's panel is enabled — used by the shell before rendering tabs",
+        "tags": [
+          "panels"
+        ]
+      }
+    },
     "/panels/employee-context": {
       "get": {
         "operationId": "PanelsController_getEmployeeContext",

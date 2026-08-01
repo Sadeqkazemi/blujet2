@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { fetchNav } from '../../api/panels';
+import { fetchNav, fetchPanelSelfStatus } from '../../api/panels';
 import { fetchCartable, fetchMyReferrals, fetchReferrals } from '../../api/cartable';
 import { fetchRefunds } from '../../api/refunds';
 import { fetchStaffReports } from '../../api/reporting';
@@ -47,6 +47,7 @@ export default function PanelShell() {
   const navigate = useNavigate();
   const location = useLocation();
   const [nav, setNav] = useState<PanelNavItem[] | null>(null);
+  const [panelEnabled, setPanelEnabled] = useState<boolean | null>(null);
   const [badges, setBadges] = useState<Record<string, NavBadge>>({});
 
   const currentKey = activeNavKey(location.pathname);
@@ -55,9 +56,15 @@ export default function PanelShell() {
   const pageSub = PANEL_PAGE_SUBTITLES[currentKey] ?? '';
 
   useEffect(() => {
-    fetchNav()
-      .then(setNav)
-      .catch(() => setNav([]));
+    Promise.all([fetchNav(), fetchPanelSelfStatus()])
+      .then(([navItems, status]) => {
+        setNav(navItems);
+        setPanelEnabled(status.enabled);
+      })
+      .catch(() => {
+        setNav([]);
+        setPanelEnabled(true);
+      });
   }, []);
 
   const navKeys = useMemo(() => new Set(nav?.map((item) => item.key) ?? []), [nav]);
@@ -151,6 +158,34 @@ export default function PanelShell() {
   const roleLabel = user ? (ROLE_LABELS[user.role] ?? user.role) : '';
   const roleSub = user ? (ROLE_SUB[user.role] ?? '') : '';
   const initials = panelInitials(user?.fullName ?? roleLabel);
+
+  if (panelEnabled === false) {
+    return (
+      <div
+        dir="rtl"
+        data-testid="panel-blocked"
+        className="flex min-h-screen flex-col items-center justify-center bg-[#0f1623] px-6 font-sans text-[#e7ecf3]"
+      >
+        <div className="max-w-md rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-8 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[rgba(248,113,113,.16)] text-2xl">
+            🔒
+          </div>
+          <h1 className="mb-2 text-lg font-black text-white">پنل {roleLabel} غیرفعال است</h1>
+          <p className="mb-6 text-sm leading-7 text-[#9fb0c7]">
+            دسترسی این پنل توسط مدیر ارشد یا مدیر عامل موقتاً مسدود شده است. برای فعال‌سازی مجدد با واحد
+            مدیریت تماس بگیرید.
+          </p>
+          <button
+            type="button"
+            onClick={() => void onSignOut()}
+            className="rounded-xl bg-[#3b82f6] px-5 py-2.5 text-sm font-bold text-white transition hover:brightness-110"
+          >
+            خروج از حساب
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

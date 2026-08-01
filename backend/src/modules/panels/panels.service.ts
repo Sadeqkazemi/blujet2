@@ -166,20 +166,34 @@ export class PanelsService {
     return flag;
   }
 
-  async assertPanelEnabledForSelf(role: AuthenticatedUser['role']) {
+  /** Maps a staff role to the PanelAccessFlag key that gates its panel login. */
+  private selfPanelKey(role: AuthenticatedUser['role']): string | null {
     const selfKeyByRole: Partial<Record<AuthenticatedUser['role'], string>> = {
       SITE_ADMIN: 'SITE_ADMIN',
+      CEO: 'CEO',
+      BOARD_CHAIR: 'BOARD_CHAIR',
+      SENIOR_MANAGER: 'SENIOR_MANAGER',
       FINANCE_MANAGER: 'FINANCE',
       COMMERCIAL_MANAGER: 'COMMERCIAL',
       IT_MANAGER: 'IT',
     };
-    const key = selfKeyByRole[role];
-    if (!key) return;
+    return selfKeyByRole[role] ?? null;
+  }
+
+  async getSelfPanelStatus(role: AuthenticatedUser['role']) {
+    const panelKey = this.selfPanelKey(role);
+    if (!panelKey) return { panelKey: null, enabled: true as const };
 
     const flag = await this.typeorm.panelAccessFlag.findUnique({
-      where: { panelKey: key },
+      where: { panelKey },
     });
-    if (flag && !flag.enabled) {
+    const enabled = !flag || flag.enabled;
+    return { panelKey, enabled };
+  }
+
+  async assertPanelEnabledForSelf(role: AuthenticatedUser['role']) {
+    const { enabled } = await this.getSelfPanelStatus(role);
+    if (!enabled) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
         message: 'این پنل موقتاً غیرفعال شده است.',
