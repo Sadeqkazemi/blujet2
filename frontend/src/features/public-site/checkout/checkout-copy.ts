@@ -32,6 +32,7 @@ export const CHECKOUT_COPY: Record<
     adultLabel: (n: number) => string;
     nationalId: string;
     passport: string;
+    scanDocument: string;
     firstNameLatin: string;
     lastNameLatin: string;
     gender: string;
@@ -84,8 +85,9 @@ export const CHECKOUT_COPY: Record<
     backStep: 'بازگشت به مرحله قبل',
     completePaxError: 'لطفاً اطلاعات همه مسافران را کامل کنید.',
     adultLabel: (n) => `${n}. بزرگسال`,
-    nationalId: 'کارت ملی',
-    passport: 'پاسپورت',
+    nationalId: 'کد ملی',
+    passport: 'گذرنامه',
+    scanDocument: 'اسکن مدرک',
     firstNameLatin: 'نام (لاتین)',
     lastNameLatin: 'نام خانوادگی (لاتین)',
     gender: 'جنسیت',
@@ -148,6 +150,7 @@ export const CHECKOUT_COPY: Record<
     adultLabel: (n) => `${n}. Adult`,
     nationalId: 'National ID',
     passport: 'Passport',
+    scanDocument: 'Scan document',
     firstNameLatin: 'First name (Latin)',
     lastNameLatin: 'Last name (Latin)',
     gender: 'Gender',
@@ -210,6 +213,7 @@ export const CHECKOUT_COPY: Record<
     adultLabel: (n) => `${n}. بالغ`,
     nationalId: 'بطاقة الهوية',
     passport: 'جواز السفر',
+    scanDocument: 'مسح المستند',
     firstNameLatin: 'الاسم (لاتيني)',
     lastNameLatin: 'اسم العائلة (لاتيني)',
     gender: 'الجنس',

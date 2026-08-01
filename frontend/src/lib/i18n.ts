@@ -32,6 +32,11 @@ const DICT = {
   notifNewLabel: { fa: 'جدید', en: 'New', ar: 'جديد' },
   notificationsTitle: { fa: 'اعلان‌ها', en: 'Notifications', ar: 'الإشعارات' },
   profileLabel: { fa: 'مشاهده پروفایل', en: 'View Profile', ar: 'عرض الملف الشخصي' },
+  completeProfileLabel: {
+    fa: 'تکمیل پروفایل خود را انجام دهید',
+    en: 'Complete your profile',
+    ar: 'أكمل ملفك الشخصي',
+  },
   tripsLabel: { fa: 'سفرها و مدیریت رزرو', en: 'Trips & Booking Management', ar: 'الرحلات وإدارة الحجز' },
   refundLabel: { fa: 'استرداد', en: 'Refund', ar: 'الاسترداد' },
   pointsLabel: { fa: 'امتیاز باشگاه', en: 'Club Points', ar: 'نقاط النادي' },

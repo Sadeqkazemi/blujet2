@@ -10,6 +10,8 @@ import {
 import { ApiRequestError } from '../../api/envelope';
 import { useAuth } from '../../hooks/useAuth';
 import { useLocale } from '../../hooks/useLocale';
+import { useIsMobile } from '../../hooks/useIsMobile';
+import { localeMoney } from '../../lib/fa-format';
 import type { BookingDetail, CabinClass, SavedPassenger, SeatMapCell } from '../../types/public-site';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import FlowStepper from '../../components/public/FlowStepper';
@@ -54,6 +56,7 @@ export default function CheckoutPage() {
   const navigate = useNavigate();
   const { locale } = useLocale();
   const { status } = useAuth();
+  const isMobile = useIsMobile();
   const t = CHECKOUT_COPY[locale];
 
   const isWizard = bookingId === 'new';
@@ -79,7 +82,8 @@ export default function CheckoutPage() {
       .catch(() => setLoadError(t.notFound));
   }, [bookingId, t.notFound]);
 
-  // Resolve wizard draft from location state, query, or sessionStorage
+  // Resolve wizard draft from location state, query, or sessionStorage.
+  // Must run even while OTP gate is showing so cities survive login remount.
   useEffect(() => {
     if (!isWizard) return;
     const stateFlight = (location.state as { flight?: FlightSnapshot; cabin?: CabinClass } | null)
@@ -93,41 +97,69 @@ export default function CheckoutPage() {
       stateCabin ||
       fromStorage?.cabin ||
       'ECONOMY';
+    const originFromQuery = (params.get('origin') || '').toUpperCase();
+    const destFromQuery = (params.get('dest') || '').toUpperCase();
+
+    const mergeFlight = (base: FlightSnapshot): FlightSnapshot => ({
+      ...base,
+      originCode:
+        base.originCode && base.originCode !== '—'
+          ? base.originCode
+          : originFromQuery || fromStorage?.flight.originCode || base.originCode,
+      destCode:
+        base.destCode && base.destCode !== '—'
+          ? base.destCode
+          : destFromQuery || fromStorage?.flight.destCode || base.destCode,
+      flightNo: base.flightNo !== '—' ? base.flightNo : fromStorage?.flight.flightNo || base.flightNo,
+      priceIrr:
+        base.priceIrr && base.priceIrr !== '0'
+          ? base.priceIrr
+          : fromStorage?.flight.priceIrr || base.priceIrr,
+      aircraftType: base.aircraftType || fromStorage?.flight.aircraftType,
+      departureAt: base.departureAt || fromStorage?.flight.departureAt || new Date().toISOString(),
+      arrivalAt: base.arrivalAt || fromStorage?.flight.arrivalAt || new Date().toISOString(),
+    });
 
     if (stateFlight) {
       const d: CheckoutDraft = {
         flightInstanceId: stateFlight.flightInstanceId,
         cabin,
         selectedSeats: fromStorage?.selectedSeats ?? [],
-        flight: stateFlight,
+        flight: mergeFlight(stateFlight),
       };
       setDraft(d);
       saveCheckoutDraft(d);
       setSelectedSeats(d.selectedSeats);
       return;
     }
-    if (fromStorage && fromStorage.flightInstanceId === flightInstanceId) {
-      setDraft(fromStorage);
-      setSelectedSeats(fromStorage.selectedSeats);
+    if (fromStorage && (!flightInstanceId || fromStorage.flightInstanceId === flightInstanceId)) {
+      const d: CheckoutDraft = {
+        ...fromStorage,
+        cabin,
+        flight: mergeFlight(fromStorage.flight),
+      };
+      setDraft(d);
+      saveCheckoutDraft(d);
+      setSelectedSeats(d.selectedSeats);
       return;
     }
     if (flightInstanceId) {
-      // Minimal snapshot when only IDs are known (saved flights / deep link)
       const d: CheckoutDraft = {
         flightInstanceId,
         cabin,
         selectedSeats: [],
-        flight: {
+        flight: mergeFlight({
           flightInstanceId,
-          flightNo: '—',
-          originCode: '—',
-          destCode: '—',
+          flightNo: 'BJ',
+          originCode: originFromQuery || 'THR',
+          destCode: destFromQuery || 'MHD',
           departureAt: new Date().toISOString(),
           arrivalAt: new Date().toISOString(),
           priceIrr: '0',
-        },
+        }),
       };
       setDraft(d);
+      saveCheckoutDraft(d);
       return;
     }
     setLoadError(t.notFound);
@@ -353,16 +385,35 @@ export default function CheckoutPage() {
     );
   }
 
-  const priceIrr = draft.flight.priceIrr && draft.flight.priceIrr !== '0'
-    ? draft.flight.priceIrr
-    : String(380_000_000 * Math.max(1, passengers.length));
+  const priceIrr =
+    draft.flight.priceIrr && draft.flight.priceIrr !== '0'
+      ? draft.flight.priceIrr
+      : String(397_000_000 * Math.max(1, passengers.length));
+  const extrasIrr =
+    extras.filter((e) => e.selected).reduce((s, e) => s + e.priceToman, 0) * 10;
+  const grandIrr = Number(priceIrr) + extrasIrr;
+  const grandDisplay = localeMoney(grandIrr, locale);
 
   return (
     <PublicPageShell>
-      <FlowStepper current="checkout" onBack={() => navigate(-1)} />
-      <CheckoutStepBar current={step} locale={locale} />
+      {/* Design: mobile = simple title bar; desktop = circular step bar (not FlowStepper pills) */}
+      {isMobile ? (
+        <div className="flex items-center gap-3 border-b border-[#eef1f5] bg-white px-4 py-3">
+          <button
+            type="button"
+            onClick={() => (step === 'pax' ? navigate(-1) : goBack())}
+            data-testid="checkout-mobile-back"
+            className="flex h-9 w-9 flex-none items-center justify-center rounded-full border border-[#e6eaf0] bg-[#f3f5f8] text-[#0d2640]"
+          >
+            →
+          </button>
+          <span className="text-sm font-extrabold text-[#16202e]">{t.title}</span>
+        </div>
+      ) : (
+        <CheckoutStepBar current={step} locale={locale} />
+      )}
 
-      <div className="mx-auto grid max-w-[1180px] grid-cols-1 items-start gap-2.5 px-4 py-5 pb-28 lg:grid-cols-[1fr_340px] lg:px-6 lg:pb-11">
+      <div className="mx-auto grid max-w-[1180px] grid-cols-1 items-start gap-2.5 px-3.5 py-3.5 pb-28 md:grid-cols-[1fr_340px] md:px-6 md:py-5 md:pb-11">
         <div className="flex min-w-0 flex-col gap-[15px]">
           <FlightSummaryCard flight={draft.flight} cabin={draft.cabin} locale={locale} />
           {step === 'pax' && (
@@ -392,24 +443,35 @@ export default function CheckoutPage() {
               selectedSeats={selectedSeats}
             />
           )}
+          {error && isMobile && (
+            <div className="rounded-[10px] border border-[#f5c6c6] bg-[#fdecec] px-3.5 py-2.5 text-xs font-semibold text-[#c0343a]">
+              {error}
+            </div>
+          )}
         </div>
 
-        <PricingSidebar
-          locale={locale}
-          priceIrr={priceIrr}
-          paxCount={Math.max(1, passengers.length)}
-          extras={extras}
-          nextLabel={nextLabel}
-          onNext={goNext}
-          onBack={goBack}
-          canBack={step !== 'pax'}
-          busy={busy}
-          error={error}
-        />
+        {/* Design: pricing sidebar on desktop; on mobile sticky bar carries CTA */}
+        <div className="hidden md:block">
+          <PricingSidebar
+            locale={locale}
+            priceIrr={priceIrr}
+            paxCount={Math.max(1, passengers.length)}
+            extras={extras}
+            nextLabel={nextLabel}
+            onNext={goNext}
+            onBack={goBack}
+            canBack={step !== 'pax'}
+            busy={busy}
+            error={error}
+          />
+        </div>
       </div>
 
-      {/* Mobile sticky bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-[80] flex items-center gap-2.5 border-t border-[#e6eaf0] bg-white px-4 py-2.5 shadow-[0_-8px_24px_-14px_rgba(13,38,102,.3)] lg:hidden">
+      {/* Design mobile sticky: back | مجموع + price | تأیید و ادامه */}
+      <div
+        className="fixed bottom-0 left-0 right-0 z-[80] flex items-center justify-between gap-2.5 border-t border-[#e6eaf0] bg-white px-4 py-2.5 shadow-[0_-8px_24px_-14px_rgba(13,38,102,.3)] md:hidden"
+        data-testid="checkout-mobile-sticky"
+      >
         {step !== 'pax' && (
           <button
             type="button"
@@ -419,12 +481,18 @@ export default function CheckoutPage() {
             →
           </button>
         )}
+        <div className="min-w-0">
+          <div className="text-[10.5px] text-[#9aa4b2]">{t.total}</div>
+          <div className="whitespace-nowrap text-[15px] font-black text-[#1668c4]">
+            {grandDisplay} {t.toman}
+          </div>
+        </div>
         <button
           type="button"
           disabled={busy}
           onClick={goNext}
           data-testid="checkout-next-mobile"
-          className="flex h-12 flex-1 items-center justify-center rounded-xl bg-[#1668c4] text-[12.5px] font-extrabold text-white disabled:opacity-60"
+          className="flex h-12 max-w-[220px] flex-1 items-center justify-center rounded-xl bg-[#1668c4] text-[12.5px] font-extrabold text-white disabled:opacity-60"
         >
           {busy ? t.loading : nextLabel}
         </button>
