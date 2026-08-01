@@ -1,5 +1,7 @@
 @import "tailwindcss";
 @import "@fontsource-variable/vazirmatn";
+@import "@fontsource/roboto-mono/400.css";
+@import "@fontsource/roboto-mono/700.css";
 
 @theme {
   --font-sans: 'Vazirmatn Variable', Vazirmatn, sans-serif;

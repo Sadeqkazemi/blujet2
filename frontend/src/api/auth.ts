@@ -17,7 +17,7 @@ export function staffLogin(username: string, password: string) {
 
 export async function agencyLogin(phone: string, password: string) {
   const result = await apiPost<{ accessToken: string; user: AuthUser }>('/auth/agency/login', {
-    phone,
+    phone: normalizePhone(phone),
     password,
   });
   setAccessToken(result.accessToken);
@@ -120,7 +120,7 @@ export async function customerPasswordLogin(phone: string, password: string) {
 
 /** Agency forgot-password — step 1: SMS OTP to the agency account phone. */
 export function requestAgencyPasswordReset(phone: string) {
-  return apiPost<{ challengeId: string }>('/auth/agency/password-reset/request', { phone });
+  return apiPost<{ challengeId: string }>('/auth/agency/password-reset/request', { phone: normalizePhone(phone) });
 }
 
 /** Agency forgot-password — step 2: verify OTP and issue a short-lived token for set-password. */

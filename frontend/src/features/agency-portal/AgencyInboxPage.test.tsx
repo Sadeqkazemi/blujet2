@@ -50,8 +50,7 @@ describe('AgencyInboxPage', () => {
     vi.spyOn(portalApi, 'fetchInbox').mockResolvedValue(MESSAGES);
     render(<AgencyInboxPage />);
 
-    expect(await screen.findByText('Inbox & Messages')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('Write your message…')).toBeInTheDocument();
+    expect(await screen.findByPlaceholderText('Write your message…')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Send' })).toBeInTheDocument();
   });
 
@@ -60,7 +59,6 @@ describe('AgencyInboxPage', () => {
     vi.spyOn(portalApi, 'fetchInbox').mockResolvedValue([]);
     render(<AgencyInboxPage />);
 
-    expect(await screen.findByText('الوارد والرسائل')).toBeInTheDocument();
-    expect(screen.getByText('لا توجد رسائل بعد.')).toBeInTheDocument();
+    expect(await screen.findByText('لا توجد رسائل بعد.')).toBeInTheDocument();
   });
 });

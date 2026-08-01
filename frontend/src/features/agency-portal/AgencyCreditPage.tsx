@@ -247,12 +247,8 @@ export default function AgencyCreditPage() {
   if (!credit) return <p className="p-8 text-sm text-muted">{t.loading}</p>;
 
   return (
-    <div className="p-8">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="mb-1 text-xl font-black text-ink">{t.heading}</h1>
-          <p className="text-sm text-muted">{t.subtitle}</p>
-        </div>
+    <div>
+      <div className="mb-6 flex items-center justify-end">
         <button
           onClick={() => setRequestOpen(true)}
           className="rounded-lg bg-accent px-4 py-2 text-xs font-bold text-white transition hover:brightness-110"
@@ -264,15 +260,15 @@ export default function AgencyCreditPage() {
       <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
         <div className="rounded-xl border border-border bg-white p-4">
           <div className="text-[11px] text-muted">{t.creditLimitLabel}</div>
-          <div className="font-num mt-1 text-lg font-black text-ink">{faMoney(credit.limitIrr)} {t.toman}</div>
+          <div className="mt-1 text-lg font-black text-ink">{faMoney(credit.limitIrr)} {t.toman}</div>
         </div>
         <div className="rounded-xl border border-border bg-white p-4">
           <div className="text-[11px] text-muted">{t.creditUsedLabel}</div>
-          <div className="font-num mt-1 text-lg font-black text-ink">{faMoney(credit.usedIrr)} {t.toman}</div>
+          <div className="mt-1 text-lg font-black text-ink">{faMoney(credit.usedIrr)} {t.toman}</div>
         </div>
         <div className="rounded-xl border border-border bg-white p-4">
           <div className="text-[11px] text-muted">{t.creditRemainingLabel}</div>
-          <div className="font-num mt-1 text-lg font-black text-accent">{faMoney(credit.remainingIrr)} {t.toman}</div>
+          <div className="mt-1 text-lg font-black text-accent">{faMoney(credit.remainingIrr)} {t.toman}</div>
         </div>
       </div>
 
@@ -298,10 +294,10 @@ export default function AgencyCreditPage() {
                   return (
                     <tr key={inv.id} className="border-b border-border/60">
                       <td className="py-2.5">
-                        <span className="ltr font-num">{inv.invoiceNo}</span>
+                        <span className="ltr">{inv.invoiceNo}</span>
                       </td>
-                      <td className="font-num py-2.5">{formatJalaliDate(inv.dueAt)}</td>
-                      <td className="font-num py-2.5 font-bold">{faMoney(inv.amountIrr)} {t.toman}</td>
+                      <td className="py-2.5">{formatJalaliDate(inv.dueAt)}</td>
+                      <td className="py-2.5 font-bold">{faMoney(inv.amountIrr)} {t.toman}</td>
                       <td className="py-2.5">
                         <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${st.className}`}>
                           {st.label[locale]}
@@ -335,7 +331,7 @@ export default function AgencyCreditPage() {
               const st = CREDIT_REQUEST_STATUS[r.status];
               return (
                 <div key={r.id} className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2 text-xs">
-                  <span className="font-num font-bold">{faMoney(r.requestedLimitIrr)} {t.toman}</span>
+                  <span className="font-bold">{faMoney(r.requestedLimitIrr)} {t.toman}</span>
                   <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${st.className}`}>{st.label[locale]}</span>
                 </div>
               );
@@ -356,7 +352,7 @@ export default function AgencyCreditPage() {
                   <div className="font-bold">{LEDGER_LABEL[entry.type][locale]}</div>
                   <div className="text-[10px] text-muted">{formatJalaliDateTime(entry.occurredAt)}</div>
                 </div>
-                <span className={`font-num font-bold ${Number(entry.signedAmountIrr) < 0 ? 'text-[#059669]' : 'text-danger'}`}>
+                <span className={`font-bold ${Number(entry.signedAmountIrr) < 0 ? 'text-[#059669]' : 'text-danger'}`}>
                   {Number(entry.signedAmountIrr) < 0 ? '+' : '−'}
                   {faMoney(Math.abs(Number(entry.signedAmountIrr)))}
                 </span>
@@ -376,7 +372,7 @@ export default function AgencyCreditPage() {
               </label>
               <input
                 id="requestedLimit"
-                className="font-num w-full rounded-lg border border-border bg-white px-3.5 py-2.5 text-sm outline-none focus:border-accent"
+                className="ltr w-full rounded-lg border border-border bg-white px-3.5 py-2.5 text-sm font-bold outline-none focus:border-accent"
                 value={requestedLimit}
                 onChange={(e) => setRequestedLimit(e.target.value)}
                 inputMode="numeric"
