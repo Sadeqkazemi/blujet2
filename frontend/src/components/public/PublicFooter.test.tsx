@@ -3,18 +3,22 @@ import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import PublicFooter from './PublicFooter';
 import * as useLocaleModule from '../../hooks/useLocale';
-import * as useCareersEnabledModule from '../../hooks/useCareersEnabled';
-import * as useSocialLinksModule from '../../hooks/useSocialLinks';
+import * as useIsMobileModule from '../../hooks/useIsMobile';
 
 function mockLocale(locale: 'fa' | 'en' | 'ar' = 'fa') {
   vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale, setLocale: vi.fn() });
 }
 
+function mockDesktop() {
+  vi.spyOn(useIsMobileModule, 'useIsMobile').mockReturnValue(false);
+}
+
+function mockMobile() {
+  vi.spyOn(useIsMobileModule, 'useIsMobile').mockReturnValue(true);
+}
+
 beforeEach(() => {
-  // Deterministic by default — real fetch behavior is covered by
-  // useCareersEnabled's own unit test, not here.
-  vi.spyOn(useCareersEnabledModule, 'useCareersEnabled').mockReturnValue(false);
-  vi.spyOn(useSocialLinksModule, 'useSocialLinks').mockReturnValue([]);
+  vi.restoreAllMocks();
 });
 
 function renderFooter() {
@@ -25,13 +29,17 @@ function renderFooter() {
   );
 }
 
-describe('PublicFooter', () => {
+describe('PublicFooter — desktop', () => {
+  beforeEach(() => mockDesktop());
+
   it('renders Persian labels by default', () => {
     mockLocale('fa');
     renderFooter();
     expect(screen.getByText('خدمات')).toBeInTheDocument();
     expect(screen.getByText('رزرو پرواز')).toHaveAttribute('href', '/results');
     expect(screen.getByText('© ۱۴۰۵ blujet. تمامی حقوق محفوظ است.')).toBeInTheDocument();
+    expect(screen.queryByText('استرداد بلیط')).not.toBeInTheDocument();
+    expect(screen.queryByText('بلاگ')).not.toBeInTheDocument();
   });
 
   it('renders English labels when locale is en', () => {
@@ -42,30 +50,35 @@ describe('PublicFooter', () => {
     expect(screen.getByText('© 2026 blujet. All rights reserved.')).toBeInTheDocument();
   });
 
-  it('renders Arabic labels when locale is ar', () => {
-    mockLocale('ar');
+  it('renders app download buttons and trust badges', () => {
+    mockLocale('fa');
     renderFooter();
-    expect(screen.getByText('الخدمات')).toBeInTheDocument();
-    expect(screen.getByText('حجز رحلة')).toHaveAttribute('href', '/results');
+    expect(screen.getByTestId('footer-app-store')).toBeInTheDocument();
+    expect(screen.getByTestId('footer-google-play')).toBeInTheDocument();
+    expect(screen.getByTestId('footer-trust-badges')).toBeInTheDocument();
+    expect(screen.getByText('نماد اعتماد الکترونیکی')).toBeInTheDocument();
+    expect(screen.getByText('عضو IATA')).toBeInTheDocument();
   });
 
-  it('hides the careers link when disabled, shows it when enabled', () => {
+  it('renders company links without blog or careers', () => {
     mockLocale('fa');
-    const { unmount } = renderFooter();
+    renderFooter();
+    expect(screen.getByText('درباره ما')).toHaveAttribute('href', '/about');
+    expect(screen.getByText('تماس با ما')).toHaveAttribute('href', '/contact');
+    expect(screen.getByText('قوانین و مقررات')).toHaveAttribute('href', '/travel-info');
     expect(screen.queryByText('فرصت‌های شغلی')).not.toBeInTheDocument();
-    unmount();
-
-    vi.spyOn(useCareersEnabledModule, 'useCareersEnabled').mockReturnValue(true);
-    renderFooter();
-    expect(screen.getByText('فرصت‌های شغلی')).toHaveAttribute('href', '/careers');
   });
+});
 
-  it('renders social icons for enabled links', () => {
+describe('PublicFooter — mobile', () => {
+  beforeEach(() => mockMobile());
+
+  it('renders centered brand block and accordion sections', () => {
     mockLocale('fa');
-    vi.spyOn(useSocialLinksModule, 'useSocialLinks').mockReturnValue([
-      { id: 'telegram', name: 'تلگرام', url: 'https://t.me/blujet' },
-    ]);
     renderFooter();
-    expect(screen.getByLabelText('تلگرام')).toHaveAttribute('href', 'https://t.me/blujet');
+    expect(screen.getByTestId('footer-app-store')).toBeInTheDocument();
+    expect(screen.getByText('خدمات')).toBeInTheDocument();
+    expect(screen.getByText('شرکت')).toBeInTheDocument();
+    expect(screen.getByText('پشتیبانی')).toBeInTheDocument();
   });
 });

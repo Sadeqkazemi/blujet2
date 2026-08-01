@@ -708,15 +708,24 @@ async function main() {
         data: [
           {
             userId: testUser.id,
-            fullName: 'محمد رضایی',
-            latinName: 'MOHAMMAD REZAEI',
-            passportNoEnc: encryptPii('A22113344'),
+            fullName: 'نگار رضایی',
+            latinName: 'NEGAR REZAEI',
+            nationalIdEnc: encryptPii('0074185969'),
+            nationalIdHash: hashPii('0074185969'),
           },
           {
             userId: testUser.id,
-            fullName: 'سارا احمدی',
-            latinName: 'SARA AHMADI',
-            passportNoEnc: encryptPii('B99887766'),
+            fullName: 'صادق کاظمی',
+            latinName: 'SADEQ KAZEMI',
+            nationalIdEnc: encryptPii('0060326786'),
+            nationalIdHash: hashPii('0060326786'),
+          },
+          {
+            userId: testUser.id,
+            fullName: 'محمد رضایی',
+            latinName: 'MOHAMMAD REZAEI',
+            nationalIdEnc: encryptPii('0012345679'),
+            nationalIdHash: hashPii('0012345679'),
           },
         ],
       });
@@ -1182,7 +1191,7 @@ async function main() {
     update: {},
     create: {
       aircraftType: 'Airbus A320',
-      // Matches ReservationSystem.dc.html's MD-88 mock numbers verbatim:
+      // Legacy reservation-panel layout (kept for existing e2e fixtures):
       // rows 3-6 business 2-2 (16 seats), rows 7-32 economy 2-3 (130 seats).
       businessRowStart: 3,
       businessRowEnd: 6,
@@ -1192,6 +1201,36 @@ async function main() {
       economyRowEnd: 32,
       economyColsLeft: ['A', 'B'],
       economyColsRight: ['C', 'D', 'E'],
+    },
+  });
+
+  // Public checkout seat map — design-reference-v2/MD-80-seatmap.pdf
+  // First Class 3–6: A B | E F; Economy 7–32: A B | D E F;
+  // rear exit/galley omits 28A/B, 29A/B, 30A/B → 140 seats.
+  await prisma.aircraftSeatMap.upsert({
+    where: { aircraftType: 'MD-80' },
+    update: {
+      businessRowStart: 3,
+      businessRowEnd: 6,
+      businessColsLeft: ['A', 'B'],
+      businessColsRight: ['E', 'F'],
+      economyRowStart: 7,
+      economyRowEnd: 32,
+      economyColsLeft: ['A', 'B'],
+      economyColsRight: ['D', 'E', 'F'],
+      excludedSeatCodes: ['28A', '28B', '29A', '29B', '30A', '30B'],
+    },
+    create: {
+      aircraftType: 'MD-80',
+      businessRowStart: 3,
+      businessRowEnd: 6,
+      businessColsLeft: ['A', 'B'],
+      businessColsRight: ['E', 'F'],
+      economyRowStart: 7,
+      economyRowEnd: 32,
+      economyColsLeft: ['A', 'B'],
+      economyColsRight: ['D', 'E', 'F'],
+      excludedSeatCodes: ['28A', '28B', '29A', '29B', '30A', '30B'],
     },
   });
 
@@ -1206,7 +1245,7 @@ async function main() {
     if (existingPax === 0) {
       const demoPassengers: { name: string; seat: string }[] = [
         { name: 'نگار رضایی', seat: '3A' },
-        { name: 'سارا احمدی', seat: '3C' },
+        { name: 'سارا احمدی', seat: '3E' },
         { name: 'کیوان حسینی', seat: '9A' },
         { name: 'یاسمن مرادی', seat: '9D' },
         { name: 'رضا احمدی', seat: '12B' },
@@ -1454,6 +1493,52 @@ async function main() {
           basePriceIrr: 38_000_000,
         },
       });
+    }
+  }
+
+  // THR→MHD is the design's primary public search route (home popular routes,
+  // نتایج پرواز.dc.html). Seed a few weeks of SCHEDULED inventory so search
+  // returns real rows even before the frontend demo fallback kicks in.
+  const thrMhdRoute = await prisma.route.upsert({
+    where: { originCode_destCode: { originCode: 'THR', destCode: 'MHD' } },
+    update: {},
+    create: { originCode: 'THR', destCode: 'MHD', durationMin: 90 },
+  });
+  const thrMhdFlight = await prisma.flight.upsert({
+    where: { flightNo: 'BJ-100' },
+    update: { routeId: thrMhdRoute.id, aircraftType: 'MD-80' },
+    create: { flightNo: 'BJ-100', routeId: thrMhdRoute.id, aircraftType: 'MD-80' },
+  });
+  const thrMhdScheduled = await prisma.flightInstance.count({
+    where: {
+      flightId: thrMhdFlight.id,
+      status: 'SCHEDULED',
+      departureAt: { gt: new Date() },
+    },
+  });
+  if (thrMhdScheduled === 0) {
+    for (let d = 1; d <= 21; d++) {
+      for (const [hour, minute] of [
+        [5, 30],
+        [9, 0],
+        [13, 10],
+        [20, 0],
+      ] as const) {
+        const departureAt = new Date();
+        departureAt.setUTCDate(departureAt.getUTCDate() + d);
+        departureAt.setUTCHours(hour, minute, 0, 0);
+        await prisma.flightInstance.create({
+          data: {
+            flightId: thrMhdFlight.id,
+            departureAt,
+            arrivalAt: new Date(departureAt.getTime() + 90 * 60_000),
+            capacity: 180,
+            charterSeats: 60,
+            status: 'SCHEDULED',
+            basePriceIrr: 16_000_000,
+          },
+        });
+      }
     }
   }
 

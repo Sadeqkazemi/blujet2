@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { dayjs } from '../lib/jalali';
+import { dayjs, isoDateAtNoon, toIsoDateOnly } from '../lib/jalali';
 import { faDigits } from '../lib/fa-format';
 
 const WEEKDAYS = ['ش', 'ی', 'د', 'س', 'چ', 'پ', 'ج'];
@@ -31,8 +31,8 @@ function buildMonthCells(viewMonth: ReturnType<typeof dayjs>, minIso: string | n
   const cells: (Cell | null)[] = Array.from({ length: offset }, () => null);
   for (let d = 1; d <= daysInMonth; d++) {
     const day = start.add(d - 1, 'day');
-    const iso = day.toDate().toISOString();
-    cells.push({ date: d, iso, disabled: minIso ? iso.slice(0, 10) < minIso.slice(0, 10) : false });
+    const iso = toIsoDateOnly(day);
+    cells.push({ date: d, iso, disabled: minIso ? iso < minIso.slice(0, 10) : false });
   }
   return cells;
 }
@@ -43,10 +43,22 @@ interface JalaliDatePickerProps {
   onChange: (iso: string) => void;
   minDate?: string;
   testId?: string;
+  placeholder?: string;
+  subLabel?: string;
+  isRTL?: boolean;
 }
 
 /** Jalali (شمسی) date picker — CLAUDE.md requires Jalali everywhere users pick dates. */
-export default function JalaliDatePicker({ label, value, onChange, minDate, testId }: JalaliDatePickerProps) {
+export default function JalaliDatePicker({
+  label,
+  value,
+  onChange,
+  minDate,
+  testId,
+  placeholder = 'انتخاب کنید',
+  subLabel,
+  isRTL = true,
+}: JalaliDatePickerProps) {
   const [open, setOpen] = useState(false);
   const [viewMonth, setViewMonth] = useState(() => (value ? dayjs(value).calendar('jalali') : dayjs().calendar('jalali')));
   const rootRef = useRef<HTMLDivElement>(null);
@@ -66,10 +78,18 @@ export default function JalaliDatePicker({ label, value, onChange, minDate, test
 
   const displayValue = value
     ? faDigits(dayjs(value).calendar('jalali').format('YYYY/MM/DD'))
-    : 'انتخاب کنید';
+    : placeholder;
+
+  const weekdaySub =
+    subLabel ??
+    (value
+      ? faDigits(dayjs(value).calendar('jalali').format('dddd')) +
+        ' ' +
+        faDigits(String(dayjs(value).calendar('jalali').year()))
+      : label);
 
   return (
-    <div ref={rootRef} style={{ position: 'relative' }}>
+    <div ref={rootRef} style={{ position: 'relative', height: '100%' }}>
       <div
         data-testid={testId}
         onClick={() => setOpen((v) => !v)}
@@ -83,6 +103,7 @@ export default function JalaliDatePicker({ label, value, onChange, minDate, test
           {label}
         </div>
         <div style={{ fontSize: '13.5px', fontWeight: 800, color: value ? '#0d2640' : '#aeb6c2' }}>{displayValue}</div>
+        <div style={{ fontSize: '10.5px', color: '#aeb6c2', marginTop: 1 }}>{weekdaySub}</div>
       </div>
 
       {open && (
@@ -91,7 +112,7 @@ export default function JalaliDatePicker({ label, value, onChange, minDate, test
             position: 'absolute',
             top: '100%',
             marginTop: 8,
-            right: 0,
+            [isRTL ? 'right' : 'left']: 0,
             width: 300,
             maxWidth: '92vw',
             background: '#fff',
@@ -108,7 +129,7 @@ export default function JalaliDatePicker({ label, value, onChange, minDate, test
               onClick={() => {
                 const today = dayjs().calendar('jalali');
                 setViewMonth(today);
-                onChange(today.toDate().toISOString());
+                onChange(isoDateAtNoon(toIsoDateOnly(today)));
                 setOpen(false);
               }}
               style={{ padding: '7px 15px', border: '1.5px solid #1668c4', borderRadius: 22, color: '#1668c4', fontSize: '11.5px', fontWeight: 700, cursor: 'pointer' }}
@@ -144,14 +165,14 @@ export default function JalaliDatePicker({ label, value, onChange, minDate, test
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 2 }}>
             {cells.map((c, i) => {
               if (!c) return <span key={`blank-${i}`} />;
-              const isSelected = selectedIsoDay === c.iso.slice(0, 10);
+              const isSelected = selectedIsoDay === c.iso;
               return (
                 <span
                   key={c.iso}
                   data-testid={testId ? `${testId}-day-${c.date}` : undefined}
                   onClick={() => {
                     if (c.disabled) return;
-                    onChange(c.iso);
+                    onChange(isoDateAtNoon(c.iso));
                     setOpen(false);
                   }}
                   style={{

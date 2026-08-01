@@ -65,8 +65,20 @@ export interface SeatMapCell {
   status: SeatStatus;
 }
 
+export interface SeatMapCabinLayout {
+  colsLeft: string[];
+  colsRight: string[];
+  aisleAfterIndex: number;
+}
+
 export interface SeatMapResult {
   flightInstanceId: string;
+  aircraftType?: string;
+  cabinLayout?: {
+    BUSINESS: SeatMapCabinLayout;
+    ECONOMY: SeatMapCabinLayout;
+  };
+  excludedSeatCodes?: string[];
   seats: SeatMapCell[];
 }
 

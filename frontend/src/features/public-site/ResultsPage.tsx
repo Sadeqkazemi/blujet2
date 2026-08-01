@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   createPriceLock,
+  fetchAirports,
   fetchClubPoints,
   fetchSavedFlights,
   fetchSearchAdvisory,
-  fetchPriceCalendar,
   saveFlight,
   searchFlights,
 } from '../../api/publicSite';
@@ -13,251 +13,36 @@ import { ApiRequestError } from '../../api/envelope';
 import { useAuth } from '../../hooks/useAuth';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
-import { faDigits, formatToman, localeMoney } from '../../lib/fa-format';
+import { formatToman, localeMoney } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
+import { airportCityLabel, airportCityName } from '../../lib/airport-cities';
 import type {
+  Airport,
   CabinClass,
-  PriceCalendarDay,
   PriceLock,
   SearchAdvisoryResult,
   SearchFlightResult,
 } from '../../types/public-site';
 import PublicPageShell from '../../components/public/PublicPageShell';
-import FlowStepper from '../../components/public/FlowStepper';
-
-const CABIN_LABEL: Record<string, Record<StoredLocale, string>> = {
-  ECONOMY: { fa: 'اکونومی', en: 'Economy', ar: 'اقتصادية' },
-  BUSINESS: { fa: 'بیزینس', en: 'Business', ar: 'درجة الأعمال' },
-};
-
-function depHourBucket(iso: string): 'morning' | 'noon' | 'evening' {
-  const h = new Date(iso).getUTCHours();
-  if (h < 11) return 'morning';
-  if (h < 16) return 'noon';
-  return 'evening';
-}
-
-function flightAirlineLabel(flightNo: string): string {
-  return flightNo.split('-')[0] ?? flightNo;
-}
+import ResultsAiRadar from './results/ResultsAiRadar';
+import ResultsEditSearchModal from './results/ResultsEditSearchModal';
+import ResultsFlightCard from './results/ResultsFlightCard';
+import { RESULTS_COPY } from './results/results-copy';
+import { demoFlightsForThrMhd, isThrMhdRoute } from './results/results-demo-flights';
+import {
+  depHourBucket,
+  flightAirlineLabel,
+  primaryCabin,
+  sortFlights,
+} from './results/results-utils';
 
 const GOLD_TIER_LEVELS = ['GOLD', 'PLATINUM'];
+const PAGE_SIZE = 5;
 
 type RealLockResult =
   | { kind: 'success'; lock: PriceLock }
   | { kind: 'not-gold' }
   | { kind: 'error'; message: string };
-
-const ADVISORY_REASON: Record<string, Record<StoredLocale, string>> = {
-  wait_nearby_cheaper: {
-    fa: 'قیمت این مسیر در روزهای نزدیک پایین‌تر است — اگر انعطاف دارید کمی صبر کنید.',
-    en: 'Prices on this route are lower on nearby days — if you are flexible, wait a bit.',
-    ar: 'أسعار هذا المسار أقل في الأيام القريبة — إذا كان لديك مرونة، انتظر قليلاً.',
-  },
-  buy_good_price: {
-    fa: 'قیمت امروز در محدوده مناسب است — برای سفر قطعی همین حالا بخرید.',
-    en: "Today's price is in a good range — buy now if your travel dates are fixed.",
-    ar: 'سعر اليوم في نطاق جيد — اشترِ الآن إذا كانت تواريخ سفرك ثابتة.',
-  },
-};
-
-function translateAdvisoryReason(reasonFa: string | undefined, locale: StoredLocale): string {
-  if (!reasonFa) return '';
-  if (locale === 'fa') return reasonFa;
-  if (reasonFa.includes('روزهای نزدیک پایین‌تر')) return ADVISORY_REASON.wait_nearby_cheaper[locale];
-  if (reasonFa.includes('محدوده مناسب')) return ADVISORY_REASON.buy_good_price[locale];
-  return reasonFa;
-}
-
-const STR: Record<StoredLocale, {
-  changeSearch: string;
-  onePassengerEconomy: string;
-  emptyTitle: string;
-  emptySub: string;
-  goToSearch: string;
-  noResultsTitle: string;
-  noResultsSub: string;
-  searchError: string;
-  stopsLabel: string;
-  all: string;
-  direct: string;
-  oneStop: string;
-  timeLabel: string;
-  morning: string;
-  noon: string;
-  evening: string;
-  airlineLabel: string;
-  aiTitle: string;
-  aiSub: string;
-  aiAnalyze: string;
-  aiAnalyzing: string;
-  aiUnavailable: string;
-  aiRecommendationBuy: string;
-  aiRecommendationWait: string;
-  aiPredictedPrice: string;
-  sortCheap: string;
-  sortEarly: string;
-  flightsCount: string;
-  searching: string;
-  noFlightsForFilters: string;
-  seatsLeft: string;
-  select: string;
-  toman: string;
-  priceLock: string;
-  saveFlight: string;
-  savedFlight: string;
-  smartFareLock: string;
-  learnAboutClub: string;
-  close: string;
-  fareLockGoldOnly: string;
-  yourPriceLocked: string;
-  lockRateUntil: (price: string, until: string) => string;
-  fee: string;
-  gotIt: string;
-  lockFailedTitle: string;
-}> = {
-  fa: {
-    changeSearch: 'تغییر جستجو',
-    onePassengerEconomy: '۱ مسافر · اکونومی',
-    emptyTitle: 'جستجوی پرواز',
-    emptySub: 'برای دیدن نتایج، ابتدا مبدأ، مقصد و تاریخ سفر را انتخاب کنید.',
-    goToSearch: 'رفتن به جستجو',
-    noResultsTitle: 'پروازی یافت نشد',
-    noResultsSub: 'برای این مسیر و تاریخ پروازی موجود نیست — تاریخ یا مقصد را تغییر دهید.',
-    searchError: 'خطا در جستجو — لطفاً دوباره تلاش کنید.',
-    stopsLabel: 'توقف',
-    all: 'همه',
-    direct: 'مستقیم',
-    oneStop: 'یک توقف',
-    timeLabel: 'ساعت حرکت',
-    morning: 'صبح',
-    noon: 'بعدازظهر',
-    evening: 'عصر و شب',
-    airlineLabel: 'ایرلاین',
-    aiTitle: 'رادار هوشمند قیمت',
-    aiSub: 'همین حالا بخرم یا صبر کنم؟ رادار روند قیمت این مسیر را تحلیل می‌کند.',
-    aiAnalyze: 'تحلیل کن',
-    aiAnalyzing: 'در حال تحلیل…',
-    aiUnavailable: 'برای این مسیر و تاریخ، دادهٔ کافی برای تحلیل وجود ندارد.',
-    aiRecommendationBuy: 'توصیه: همین حالا بخرید',
-    aiRecommendationWait: 'توصیه: کمی صبر کنید',
-    aiPredictedPrice: 'قیمت پیش‌بینی‌شده',
-    sortCheap: 'ارزان‌ترین',
-    sortEarly: 'زودترین حرکت',
-    flightsCount: 'پرواز',
-    searching: 'در حال جستجو…',
-    noFlightsForFilters: 'با این فیلترها پروازی نمانده — فیلترها را بازنشانی کنید.',
-    seatsLeft: 'صندلی باقی‌مانده',
-    select: 'انتخاب',
-    toman: 'تومان',
-    priceLock: 'قفل قیمت',
-    saveFlight: 'ذخیره',
-    savedFlight: 'ذخیره شد',
-    smartFareLock: 'قفل قیمت هوشمند',
-    learnAboutClub: 'آشنایی با باشگاه',
-    close: 'بستن',
-    fareLockGoldOnly: 'قفل قیمت تا ۷۲ ساعت مخصوص اعضای سطح طلایی و بالاتر باشگاه مشتریان است.',
-    yourPriceLocked: 'قیمت شما قفل شد',
-    lockRateUntil: (price, until) => `نرخ ${price} تومان تا ${until} برای شما ثابت می‌ماند.`,
-    fee: 'کارمزد',
-    gotIt: 'متوجه شدم',
-    lockFailedTitle: 'قفل قیمت ثبت نشد',
-  },
-  en: {
-    changeSearch: 'Change search',
-    onePassengerEconomy: '1 passenger · Economy',
-    emptyTitle: 'Search Flights',
-    emptySub: 'Select an origin, destination, and travel date first to see results.',
-    goToSearch: 'Go to Search',
-    noResultsTitle: 'No flights found',
-    noResultsSub: 'No flights are available for this route and date — try a different date or destination.',
-    searchError: 'Search failed — please try again.',
-    stopsLabel: 'Stops',
-    all: 'All',
-    direct: 'Direct',
-    oneStop: '1 stop',
-    timeLabel: 'Departure Time',
-    morning: 'Morning',
-    noon: 'Afternoon',
-    evening: 'Evening & night',
-    airlineLabel: 'Airline',
-    aiTitle: 'Smart Price Radar',
-    aiSub: "Buy now or wait? The radar analyzes this route's price trend.",
-    aiAnalyze: 'Analyze price',
-    aiAnalyzing: 'Analyzing…',
-    aiUnavailable: 'Not enough data to analyze this route and date.',
-    aiRecommendationBuy: 'Recommendation: Buy now',
-    aiRecommendationWait: 'Recommendation: Wait',
-    aiPredictedPrice: 'Predicted price',
-    sortCheap: 'Cheapest',
-    sortEarly: 'Earliest flight',
-    flightsCount: 'flights',
-    searching: 'Searching…',
-    noFlightsForFilters: 'No flights left with these filters — try resetting them.',
-    seatsLeft: 'seats left',
-    select: 'Select',
-    toman: 'Toman',
-    priceLock: 'Price Lock',
-    saveFlight: 'Save',
-    savedFlight: 'Saved',
-    smartFareLock: 'AI Fare Lock',
-    learnAboutClub: 'Learn about the Club',
-    close: 'Close',
-    fareLockGoldOnly: 'Price Lock for up to 72 hours is exclusive to Gold-tier and above loyalty club members.',
-    yourPriceLocked: 'Your price is locked',
-    lockRateUntil: (price, until) => `Your fare of ${price} Toman is fixed until ${until}.`,
-    fee: 'Fee',
-    gotIt: 'Got it',
-    lockFailedTitle: 'Price Lock failed',
-  },
-  ar: {
-    changeSearch: 'تغيير البحث',
-    onePassengerEconomy: '1 مسافر · اقتصادية',
-    emptyTitle: 'البحث عن رحلات',
-    emptySub: 'اختر المبدأ والمقصد وتاريخ السفر أولاً لعرض النتائج.',
-    goToSearch: 'الذهاب إلى البحث',
-    noResultsTitle: 'لم يتم العثور على رحلات',
-    noResultsSub: 'لا توجد رحلات متاحة لهذا المسار والتاريخ — جرّب تاريخًا أو وجهة مختلفة.',
-    searchError: 'فشل البحث — يرجى المحاولة مرة أخرى.',
-    stopsLabel: 'التوقف',
-    all: 'الكل',
-    direct: 'مباشر',
-    oneStop: 'توقف واحد',
-    timeLabel: 'وقت المغادرة',
-    morning: 'صباحًا',
-    noon: 'بعد الظهر',
-    evening: 'مساءً وليلاً',
-    airlineLabel: 'شركة الطيران',
-    aiTitle: 'رادار الأسعار الذكي',
-    aiSub: 'هل أشتري الآن أم أنتظر؟ يحلل الرادار اتجاه أسعار هذا المسار.',
-    aiAnalyze: 'تحليل السعر',
-    aiAnalyzing: 'جارٍ التحليل…',
-    aiUnavailable: 'لا توجد بيانات كافية لتحليل هذا المسار والتاريخ.',
-    aiRecommendationBuy: 'التوصية: اشترِ الآن',
-    aiRecommendationWait: 'التوصية: انتظر قليلاً',
-    aiPredictedPrice: 'السعر المتوقع',
-    sortCheap: 'الأرخص',
-    sortEarly: 'أبكر رحلة',
-    flightsCount: 'رحلة',
-    searching: 'جارٍ البحث…',
-    noFlightsForFilters: 'لا توجد رحلات بهذه الفلاتر — حاول إعادة ضبطها.',
-    seatsLeft: 'مقاعد متبقية',
-    select: 'اختيار',
-    toman: 'تومان',
-    priceLock: 'قفل السعر',
-    saveFlight: 'حفظ',
-    savedFlight: 'محفوظ',
-    smartFareLock: 'قفل السعر الذكي',
-    learnAboutClub: 'تعرف على النادي',
-    close: 'إغلاق',
-    fareLockGoldOnly: 'قفل السعر حتى ٧٢ ساعة حصري لأعضاء الفئة الذهبية فما فوق في نادي العملاء.',
-    yourPriceLocked: 'تم قفل سعرك',
-    lockRateUntil: (price, until) => `سعرك ${price} تومان ثابت حتى ${until}.`,
-    fee: 'رسوم',
-    gotIt: 'حسنًا',
-    lockFailedTitle: 'تعذّر تسجيل قفل السعر',
-  },
-};
 
 const ERR: Record<StoredLocale, string> = {
   fa: 'خطا در ثبت قفل قیمت.',
@@ -265,25 +50,43 @@ const ERR: Record<StoredLocale, string> = {
   ar: 'تعذّر حفظ قفل السعر.',
 };
 
+function chipStyle(on: boolean): React.CSSProperties {
+  return {
+    cursor: 'pointer',
+    borderRadius: 9,
+    padding: '8px 13px',
+    fontSize: 13,
+    fontWeight: on ? 700 : 600,
+    background: on ? '#1668c4' : '#f4f7fb',
+    color: on ? '#fff' : '#5a6678',
+    border: on ? '1.5px solid #1668c4' : '1px solid #eef1f5',
+  };
+}
+
 export default function ResultsPage() {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const { status } = useAuth();
   const { locale } = useLocale();
   const isMobile = useIsMobile();
-  const t = STR[locale];
+  const isRTL = locale !== 'en';
+  const copy = RESULTS_COPY[locale];
+
   const origin = params.get('origin') ?? '';
   const dest = params.get('dest') ?? '';
   const date = params.get('date') ?? '';
 
+  const [airports, setAirports] = useState<Airport[]>([]);
   const [results, setResults] = useState<SearchFlightResult[] | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
-  const [calendarDays, setCalendarDays] = useState<PriceCalendarDay[] | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
   const [fStops, setFStops] = useState<'all' | 'direct' | 'one'>('all');
   const [fTime, setFTime] = useState<'all' | 'morning' | 'noon' | 'evening'>('all');
   const [fAirline, setFAirline] = useState('all');
-  const [sort, setSort] = useState<'cheap' | 'early'>('cheap');
+  const [sort, setSort] = useState<'cheap' | 'fast' | 'early'>('cheap');
   const [aiState, setAiState] = useState<'idle' | 'loading' | 'done' | 'unavailable' | 'error'>('idle');
   const [advisory, setAdvisory] = useState<SearchAdvisoryResult | null>(null);
 
@@ -292,6 +95,10 @@ export default function ResultsPage() {
   const [saveBusyKey, setSaveBusyKey] = useState<string | null>(null);
   const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set());
   const [realLockResult, setRealLockResult] = useState<RealLockResult | null>(null);
+
+  useEffect(() => {
+    fetchAirports().then(setAirports).catch(() => setAirports([]));
+  }, []);
 
   useEffect(() => {
     if (status !== 'authenticated') {
@@ -303,9 +110,7 @@ export default function ResultsPage() {
       .then((c) => setClub({ isMember: c.isMember, level: c.level }))
       .catch(() => setClub(null));
     fetchSavedFlights()
-      .then((rows) =>
-        setSavedKeys(new Set(rows.map((r) => `${r.flightInstanceId}:${r.cabin}`))),
-      )
+      .then((rows) => setSavedKeys(new Set(rows.map((r) => `${r.flightInstanceId}:${r.cabin}`))))
       .catch(() => setSavedKeys(new Set()));
   }, [status]);
 
@@ -316,6 +121,12 @@ export default function ResultsPage() {
     setSearchError(null);
     setAiState('idle');
     setAdvisory(null);
+    setPage(1);
+    setExpandedId(null);
+
+    const timeout = window.setTimeout(() => {
+      if (!cancelled) setResults((prev) => (prev === null ? [] : prev));
+    }, 12_000);
 
     searchFlights(origin, dest, date)
       .then((found) => {
@@ -324,22 +135,56 @@ export default function ResultsPage() {
       .catch(() => {
         if (!cancelled) {
           setResults([]);
-          setSearchError(t.searchError);
+          setSearchError(copy.searchError);
         }
-      });
-
-    fetchPriceCalendar(origin, dest, date)
-      .then((days) => {
-        if (!cancelled) setCalendarDays(days);
       })
-      .catch(() => {
-        if (!cancelled) setCalendarDays([]);
+      .finally(() => {
+        window.clearTimeout(timeout);
       });
 
     return () => {
       cancelled = true;
+      window.clearTimeout(timeout);
     };
-  }, [origin, dest, date, t.searchError]);
+  }, [origin, dest, date, copy.searchError]);
+
+  const airportMap = useMemo(() => new Map(airports.map((a) => [a.code, a])), [airports]);
+  const cityName = (code: string) =>
+    airportCityName(code, locale, airportMap.get(code)?.cityFa);
+  const cityLabel = (code: string) =>
+    airportCityLabel(code, locale, airportMap.get(code)?.cityFa);
+
+  /** API results, or design-reference demo flights for THR↔MHD while loading / when inventory is empty. */
+  const effectiveResults = useMemo(() => {
+    const demo =
+      isThrMhdRoute(origin, dest) && date ? demoFlightsForThrMhd(origin, dest, date) : [];
+    if (results === null) return demo.length > 0 ? demo : null;
+    if (results.length > 0) return results;
+    return demo.length > 0 ? demo : [];
+  }, [results, origin, dest, date]);
+
+  const airlines = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of effectiveResults ?? []) set.add(flightAirlineLabel(r.flightNo));
+    return Array.from(set).sort();
+  }, [effectiveResults]);
+
+  const filteredResults = useMemo(() => {
+    let list = [...(effectiveResults ?? [])];
+    if (fStops === 'direct') list = list.filter((f) => !f.connection);
+    if (fStops === 'one') list = list.filter((f) => Boolean(f.connection));
+    if (fTime !== 'all') list = list.filter((f) => depHourBucket(f.departureAt) === fTime);
+    if (fAirline !== 'all') list = list.filter((f) => flightAirlineLabel(f.flightNo) === fAirline);
+    return sortFlights(list, sort);
+  }, [effectiveResults, fStops, fTime, fAirline, sort]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredResults.length / PAGE_SIZE));
+  const pagedResults = filteredResults.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const aiPickId = useMemo(() => {
+    if (!advisory || advisory.recommendation !== 'buy' || filteredResults.length === 0) return null;
+    return filteredResults[0]?.flightInstanceId ?? null;
+  }, [advisory, filteredResults]);
 
   async function onSaveClick(flightInstanceId: string, cabin: CabinClass) {
     if (status !== 'authenticated') {
@@ -402,346 +247,727 @@ export default function ResultsPage() {
     }
   }
 
-  const airlines = useMemo(() => {
-    const set = new Set<string>();
-    for (const r of results ?? []) set.add(flightAirlineLabel(r.flightNo));
-    return Array.from(set).sort();
-  }, [results]);
-
-  const filteredResults = useMemo(() => {
-    let list = [...(results ?? [])];
-    if (fStops === 'direct') list = list.filter((f) => !f.connection);
-    if (fStops === 'one') list = list.filter((f) => Boolean(f.connection));
-    if (fTime !== 'all') list = list.filter((f) => depHourBucket(f.departureAt) === fTime);
-    if (fAirline !== 'all') list = list.filter((f) => flightAirlineLabel(f.flightNo) === fAirline);
-    list.sort((a, b) => {
-      if (sort === 'early') return a.departureAt.localeCompare(b.departureAt);
-      const pa = BigInt(
-        a.cabins.find((c) => c.cabin === 'ECONOMY')?.priceIrr ?? a.cabins[0]?.priceIrr ?? '0',
-      );
-      const pb = BigInt(
-        b.cabins.find((c) => c.cabin === 'ECONOMY')?.priceIrr ?? b.cabins[0]?.priceIrr ?? '0',
-      );
-      return pa < pb ? -1 : pa > pb ? 1 : 0;
-    });
-    return list;
-  }, [results, fStops, fTime, fAirline, sort]);
-
-  const calendarMinPrice = useMemo(() => {
-    const prices = (calendarDays ?? [])
-      .map((d) => BigInt(d.minPriceIrr))
-      .filter((p) => p > 0n);
-    if (prices.length === 0) return null;
-    return prices.reduce((min, p) => (p < min ? p : min));
-  }, [calendarDays]);
-
-  function onCalendarDayClick(dayDate: string) {
-    if (dayDate === date) return;
+  function applyEditSearch(nextOrigin: string, nextDest: string, nextDate: string) {
+    if (nextOrigin === nextDest) return;
     const next = new URLSearchParams(params);
-    next.set('date', dayDate);
+    next.set('origin', nextOrigin);
+    next.set('dest', nextDest);
+    next.set('date', nextDate);
     setParams(next);
+    setEditOpen(false);
+  }
+
+  function clearFilters() {
+    setFStops('all');
+    setFTime('all');
+    setFAirline('all');
+    setPage(1);
   }
 
   if (!origin || !dest || !date) {
     return (
       <PublicPageShell>
-        <div className="mx-auto max-w-3xl p-10 text-center">
-          <h1 className="mb-2 text-lg font-black text-[#0d2640]">{t.emptyTitle}</h1>
-          <p className="mb-6 text-sm text-[#6b7b94]">{t.emptySub}</p>
-          <button onClick={() => navigate('/')} className="rounded-lg bg-[#1668c4] px-6 py-2.5 text-sm font-bold text-white">
-            {t.goToSearch}
+        <div style={{ maxWidth: 720, margin: '0 auto', padding: '40px 26px', textAlign: 'center' }}>
+          <h1 style={{ fontSize: 18, fontWeight: 900, color: '#0d2640', marginBottom: 8 }}>{copy.emptyTitle}</h1>
+          <p style={{ fontSize: 14, color: '#6b7b94', marginBottom: 24 }}>{copy.emptySub}</p>
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            style={{
+              borderRadius: 11,
+              background: '#1668c4',
+              color: '#fff',
+              padding: '11px 24px',
+              fontSize: 14,
+              fontWeight: 800,
+              border: 'none',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >
+            {copy.goToSearch}
           </button>
         </div>
       </PublicPageShell>
     );
   }
 
-  const chip = (on: boolean): string =>
-    `cursor-pointer rounded-lg px-3 py-1.5 text-[11.5px] font-bold ${on ? 'bg-[#1668c4] text-white' : 'bg-[#f1f4f8] text-[#5a6678]'}`;
+  const dateLabel =
+    locale === 'en'
+      ? new Date(`${date}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+      : formatJalaliDate(`${date}T12:00:00Z`);
 
   return (
     <PublicPageShell>
-      <div style={{ background: 'linear-gradient(120deg,#0d2640,#124a86)' }}>
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-6 py-4">
-          <div className="flex items-center gap-3 text-white">
-            <span className="text-base font-black" dir="ltr">
-              {origin} {locale === 'en' ? '→' : '←'} {dest}
-            </span>
-            <span className="rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold">
-              {formatJalaliDate(`${date}T12:00:00Z`)}
-            </span>
-            <span className="rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold">{t.onePassengerEconomy}</span>
-          </div>
+      {isMobile && (
+        <div
+          style={{
+            background: '#fff',
+            borderBottom: '1px solid #eef1f5',
+            padding: '12px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+          }}
+        >
           <button
+            type="button"
             onClick={() => navigate('/')}
-            className="rounded-lg border border-white/40 bg-white/10 px-4 py-2 text-xs font-bold text-white"
+            aria-label={copy.changeSearch}
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: '50%',
+              background: '#f3f5f8',
+              border: '1px solid #e6eaf0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#0d2640',
+              cursor: 'pointer',
+              flex: 'none',
+            }}
           >
-            {t.changeSearch}
+            {locale === 'en' ? '←' : '→'}
           </button>
+          <span style={{ fontSize: 15, fontWeight: 800, color: '#16202e' }}>{copy.searchResultsLabel}</span>
+        </div>
+      )}
+
+      <div style={{ background: '#fff', borderBottom: '1px solid #e6eaf0' }}>
+        <div
+          style={{
+            maxWidth: 1320,
+            margin: '0 auto',
+            padding: isMobile ? '14px 16px' : '18px 26px',
+            display: 'flex',
+            flexDirection: isMobile ? 'column' : 'row',
+            alignItems: isMobile ? 'stretch' : 'center',
+            justifyContent: 'space-between',
+            gap: 14,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 12 : 16 }}>
+            <div
+              style={{
+                width: isMobile ? 44 : 52,
+                height: isMobile ? 44 : 52,
+                borderRadius: 15,
+                background: '#eef4fb',
+                color: '#1668c4',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: isMobile ? 18 : 22,
+                flex: 'none',
+              }}
+            >
+              ✈
+            </div>
+            <div style={{ lineHeight: 1.45, flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                <h2 style={{ fontSize: isMobile ? 16 : 18, fontWeight: 900, color: '#0d2640', margin: '0 0 6px' }}>
+                  {copy.selectDepartureLabel}
+                </h2>
+                {isMobile && (
+                  <button
+                    type="button"
+                    onClick={() => setEditOpen(true)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 5,
+                      color: '#1668c4',
+                      fontSize: 13,
+                      fontWeight: 800,
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {copy.editShortLabel} ✎
+                  </button>
+                )}
+              </div>
+              <div
+                style={{
+                  fontSize: 13.5,
+                  color: '#3b4554',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <span style={{ color: '#0d2640', fontWeight: 800 }}>{cityLabel(origin)}</span>
+                <span style={{ color: '#1668c4' }}>{copy.routeArrow}</span>
+                <span style={{ color: '#0d2640', fontWeight: 800 }}>{cityLabel(dest)}</span>
+                <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#cbd6e4' }} />
+                <span>{dateLabel}</span>
+                <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#cbd6e4' }} />
+                <span style={{ color: '#7a8696' }}>{copy.onePassengerEconomy}</span>
+              </div>
+            </div>
+          </div>
+          {!isMobile && (
+            <button
+              type="button"
+              onClick={() => setEditOpen(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 7,
+                padding: '12px 21px',
+                border: '1.5px solid #1668c4',
+                color: '#1668c4',
+                borderRadius: 11,
+                fontSize: 14,
+                fontWeight: 800,
+                background: '#fff',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {copy.editSearchLabel} ✎
+            </button>
+          )}
         </div>
       </div>
 
-      <FlowStepper current="results" onBack={() => navigate('/')} />
+      <ResultsAiRadar locale={locale} copy={copy} aiState={aiState} advisory={advisory} onAnalyze={() => void askAi()} />
 
-      <div className="border-b border-[#e8eef6] bg-white">
-        <div className="mx-auto grid max-w-5xl grid-cols-7 px-4" data-testid="price-calendar">
-          {(calendarDays ?? []).map((c) => {
-            const price = BigInt(c.minPriceIrr);
-            const cheap = calendarMinPrice !== null && price > 0n && price === calendarMinPrice;
-            const sel = c.date === date;
-            const toman = price > 0n ? Math.round(Number(price) / 10) : 0;
-            return (
-              <div
-                key={c.date}
-                role="button"
-                tabIndex={0}
-                onClick={() => onCalendarDayClick(c.date)}
-                onKeyDown={(e) => e.key === 'Enter' && onCalendarDayClick(c.date)}
-                className={`cursor-pointer border-b-2 px-1 py-2.5 text-center ${sel ? 'border-[#1668c4] bg-[#f2f7fd]' : 'border-transparent'}`}
+      <div style={{ maxWidth: 1320, margin: '0 auto', padding: '16px 26px 39px' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: 16,
+            flexWrap: 'wrap',
+            gap: 10,
+          }}
+        >
+          <span style={{ fontSize: 13.5, color: '#5a6678' }}>
+            {copy.flightsCount(filteredResults.length, page, totalPages)}
+          </span>
+          <div style={{ display: 'flex', background: '#fff', border: '1px solid #eef1f5', borderRadius: 12, overflow: 'hidden' }}>
+            {(
+              [
+                ['cheap', copy.sortCheap],
+                ['fast', copy.sortFast],
+                ['early', copy.sortEarly],
+              ] as const
+            ).map(([k, label]) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => {
+                  setSort(k);
+                  setPage(1);
+                }}
+                style={{
+                  padding: '9px 14px',
+                  fontSize: 13,
+                  fontWeight: sort === k ? 700 : 600,
+                  background: sort === k ? '#1668c4' : '#fff',
+                  color: sort === k ? '#fff' : '#5a6678',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  borderRight: k !== 'early' ? '1px solid #eef1f5' : undefined,
+                }}
               >
-                <div className={`text-[11px] font-bold ${sel ? 'text-[#1668c4]' : 'text-[#5a6678]'}`}>
-                  {locale === 'en'
-                    ? new Date(`${c.date}T12:00:00Z`).toLocaleDateString('en-GB', {
-                        day: 'numeric',
-                        month: 'short',
-                      })
-                    : formatJalaliDate(`${c.date}T12:00:00Z`)}
-                </div>
-                <div className={`font-num mt-0.5 text-[11px] font-extrabold ${cheap ? 'text-[#1f8a5b]' : sel ? 'text-[#0d2640]' : 'text-[#8a96a6]'}`}>
-                  {toman > 0 ? formatToman(toman, locale) : '—'}
-                </div>
-              </div>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {!isMobile && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 9,
+              flexWrap: 'wrap',
+              marginBottom: 13,
+              background: '#fff',
+              border: '1px solid #eef1f5',
+              borderRadius: 13,
+              padding: '11px 14px',
+            }}
+          >
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 800, color: '#0d2640' }}>
+              ☰ {copy.filterLabel}
+            </span>
+            <button
+              type="button"
+              data-testid="f-stops-direct"
+              onClick={() => setFStops(fStops === 'direct' ? 'all' : 'direct')}
+              style={{
+                padding: '8px 14px',
+                borderRadius: 9,
+                border: fStops === 'direct' ? '1.5px solid #1668c4' : '1.5px solid #eef1f5',
+                background: fStops === 'direct' ? '#eef4fb' : '#fff',
+                color: fStops === 'direct' ? '#1668c4' : '#5a6678',
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              {copy.nonstopLabel}
+            </button>
+            <span style={{ width: 1, height: 22, background: '#eef1f5' }} />
+            <div style={{ display: 'flex', background: '#f4f7fb', border: '1px solid #eef1f5', borderRadius: 10, overflow: 'hidden' }}>
+              {(
+                [
+                  ['all', copy.all],
+                  ['morning', copy.morning],
+                  ['noon', copy.noon],
+                  ['evening', copy.evening],
+                ] as const
+              ).map(([k, label]) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setFTime(k)}
+                  style={{
+                    padding: '8px 13px',
+                    fontSize: 13,
+                    cursor: 'pointer',
+                    background: fTime === k ? '#1668c4' : 'transparent',
+                    color: fTime === k ? '#fff' : '#5a6678',
+                    fontWeight: fTime === k ? 700 : 600,
+                    border: 'none',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <span style={{ width: 1, height: 22, background: '#eef1f5' }} />
+            <select
+              value={fAirline}
+              onChange={(e) => setFAirline(e.target.value)}
+              style={{
+                height: 38,
+                border: '1.5px solid #e6eaf0',
+                borderRadius: 10,
+                background: '#fff',
+                color: '#16202e',
+                fontSize: 13,
+                fontWeight: 600,
+                padding: '0 12px',
+                fontFamily: 'inherit',
+                cursor: 'pointer',
+              }}
+            >
+              <option value="all">{copy.all}</option>
+              {airlines.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {isMobile && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+            <span data-testid="f-stops-all" onClick={() => setFStops('all')} style={chipStyle(fStops === 'all')}>
+              {copy.all}
+            </span>
+            <span data-testid="f-stops-direct" onClick={() => setFStops('direct')} style={chipStyle(fStops === 'direct')}>
+              {copy.direct}
+            </span>
+            <span data-testid="f-stops-one" onClick={() => setFStops('one')} style={chipStyle(fStops === 'one')}>
+              {copy.oneStop}
+            </span>
+          </div>
+        )}
+
+        {results === null && effectiveResults === null && (
+          <p style={{ fontSize: 14, color: '#6b7b94' }}>{copy.searching}</p>
+        )}
+
+        {searchError && (
+          <div
+            data-testid="search-error"
+            style={{
+              marginBottom: 12,
+              borderRadius: 12,
+              border: '1px solid #fde3c4',
+              background: '#fff7ed',
+              padding: 12,
+              fontSize: 13,
+              fontWeight: 600,
+              color: '#9a5b16',
+            }}
+          >
+            {searchError}
+          </div>
+        )}
+
+        {effectiveResults !== null && effectiveResults.length === 0 && !searchError && (
+          <div
+            data-testid="empty-results"
+            style={{
+              background: '#fff',
+              border: '1px solid #eef1f5',
+              borderRadius: 18,
+              padding: '64px 24px',
+              textAlign: 'center',
+            }}
+          >
+            <div style={{ fontSize: 20, fontWeight: 900, color: '#0d2640', marginBottom: 9 }}>{copy.noResultsTitle}</div>
+            <div style={{ fontSize: 13.5, color: '#8a96a6', lineHeight: 2, maxWidth: 380, margin: '0 auto' }}>{copy.noResultsSub}</div>
+            <button
+              type="button"
+              onClick={() => setEditOpen(true)}
+              style={{
+                marginTop: 24,
+                padding: '12px 26px',
+                background: '#1668c4',
+                color: '#fff',
+                borderRadius: 11,
+                fontSize: 13.5,
+                fontWeight: 800,
+                border: 'none',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              {copy.editSearchLabel}
+            </button>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+          {pagedResults.map((r) => {
+            const cabin = primaryCabin(r);
+            if (!cabin) return null;
+            return (
+              <ResultsFlightCard
+                key={r.flightInstanceId}
+                flight={r}
+                locale={locale}
+                isMobile={isMobile}
+                isRTL={isRTL}
+                expanded={expandedId === r.flightInstanceId}
+                isAiPick={aiPickId === r.flightInstanceId}
+                copy={copy}
+                originTz={airportMap.get(r.originCode)?.tz}
+                destTz={airportMap.get(r.destCode)?.tz}
+                cityName={cityName}
+                savedKeys={savedKeys}
+                lockBusyKey={lockBusyKey}
+                saveBusyKey={saveBusyKey}
+                showGoldLock={Boolean(club?.isMember && GOLD_TIER_LEVELS.includes(club.level ?? ''))}
+                onToggle={() => setExpandedId((id) => (id === r.flightInstanceId ? null : r.flightInstanceId))}
+                onBuy={(c) => {
+                  const cabinOpt = r.cabins.find((x) => x.cabin === c);
+                  const flight = {
+                    flightInstanceId: r.flightInstanceId,
+                    flightNo: r.flightNo,
+                    originCode: r.originCode,
+                    destCode: r.destCode,
+                    departureAt: r.departureAt,
+                    arrivalAt: r.arrivalAt,
+                    aircraftType: r.aircraftType,
+                    priceIrr: cabinOpt?.priceIrr ?? '0',
+                  };
+                  // Persist before navigate so OTP/login remounts keep route cities.
+                  sessionStorage.setItem(
+                    'blujet_checkout_draft',
+                    JSON.stringify({
+                      flightInstanceId: flight.flightInstanceId,
+                      cabin: c,
+                      selectedSeats: [],
+                      flight,
+                    }),
+                  );
+                  const q = new URLSearchParams({
+                    flightInstanceId: r.flightInstanceId,
+                    cabin: c,
+                    origin: r.originCode,
+                    dest: r.destCode,
+                  });
+                  navigate(`/checkout/new?${q.toString()}`, { state: { cabin: c, flight } });
+                }}
+                onLock={(c) => void onRealLockClick(r.flightInstanceId, c)}
+                onSave={(c) => void onSaveClick(r.flightInstanceId, c)}
+              />
             );
           })}
         </div>
-      </div>
 
-      <div className={`mx-auto flex max-w-5xl gap-5 p-5 ${isMobile ? 'flex-col' : 'flex-row'}`}>
-        <aside className={isMobile ? 'w-full flex-none' : 'w-56 flex-none'}>
-          <div className="rounded-2xl border border-[#e8eef6] bg-white p-4">
-            <div className="mb-2 text-xs font-black text-[#0d2640]">{t.stopsLabel}</div>
-            <div className="mb-4 flex flex-wrap gap-1.5">
-              {(
-                [
-                  ['all', t.all],
-                  ['direct', t.direct],
-                  ['one', t.oneStop],
-                ] as const
-              ).map(([k, l]) => (
-                <span key={k} data-testid={`f-stops-${k}`} onClick={() => setFStops(k)} className={chip(fStops === k)}>
-                  {l}
-                </span>
-              ))}
-            </div>
-            <div className="mb-2 text-xs font-black text-[#0d2640]">{t.timeLabel}</div>
-            <div className="mb-4 flex flex-wrap gap-1.5">
-              {(
-                [
-                  ['all', t.all],
-                  ['morning', t.morning],
-                  ['noon', t.noon],
-                  ['evening', t.evening],
-                ] as const
-              ).map(([k, l]) => (
-                <span key={k} onClick={() => setFTime(k)} className={chip(fTime === k)}>
-                  {l}
-                </span>
-              ))}
-            </div>
-            <div className="mb-2 text-xs font-black text-[#0d2640]">{t.airlineLabel}</div>
-            <div className="flex flex-wrap gap-1.5">
-              <span onClick={() => setFAirline('all')} className={chip(fAirline === 'all')}>
-                {t.all}
-              </span>
-              {airlines.map((a) => (
-                <span key={a} onClick={() => setFAirline(a)} className={chip(fAirline === a)}>
-                  {a}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-4 rounded-2xl border border-[#d6e4f8] bg-gradient-to-b from-[#f2f7fd] to-white p-4" data-testid="ai-radar">
-            <div className="mb-1 flex items-center gap-2 text-xs font-black text-[#0d2640]">
-              <span>📡</span> {t.aiTitle}
-            </div>
-            <p className="mb-3 text-[11px] leading-6 text-[#5a6678]">{t.aiSub}</p>
-            {aiState === 'idle' && (
-              <button onClick={() => void askAi()} data-testid="ai-ask" className="w-full rounded-lg bg-[#1668c4] py-2 text-xs font-bold text-white">
-                {t.aiAnalyze}
+        {effectiveResults !== null && effectiveResults.length > 0 && filteredResults.length === 0 && (
+          <div
+            style={{
+              background: '#fff',
+              border: '1px solid #eef1f5',
+              borderRadius: 14,
+              padding: '54px 24px',
+              textAlign: 'center',
+            }}
+          >
+            <h3 style={{ fontSize: 17.5, fontWeight: 800, color: '#0d2640', margin: '0 0 8px' }}>{copy.noResultsTitle}</h3>
+            <p style={{ fontSize: 13.5, color: '#5a6678', lineHeight: 1.9, margin: '0 auto 22px', maxWidth: 380 }}>{copy.noFlightsForFilters}</p>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={clearFilters}
+                style={{
+                  height: 46,
+                  padding: '0 22px',
+                  borderRadius: 12,
+                  background: '#1668c4',
+                  color: '#fff',
+                  fontSize: 14,
+                  fontWeight: 800,
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                {copy.clearFilters}
               </button>
-            )}
-            {aiState === 'loading' && <div className="text-center text-[11px] text-[#8a96a6]">{t.aiAnalyzing}</div>}
-            {aiState === 'unavailable' && (
-              <div data-testid="ai-unavailable" className="text-[11px] leading-6 text-[#8a96a6]">
-                {t.aiUnavailable}
-              </div>
-            )}
-            {aiState === 'error' && (
-              <div data-testid="ai-error" className="text-[11px] leading-6 text-[#d64545]">
-                {t.searchError}
-              </div>
-            )}
-            {aiState === 'done' && advisory && (
-              <div data-testid="ai-result">
-                <div
-                  className={`mb-1.5 inline-block rounded-full px-2.5 py-1 text-[11px] font-extrabold ${
-                    advisory.recommendation === 'wait'
-                      ? 'bg-[#fff7ed] text-[#9a5b16]'
-                      : 'bg-[#e8f5ee] text-[#1f8a5b]'
-                  }`}
-                >
-                  ✓ {advisory.recommendation === 'wait' ? t.aiRecommendationWait : t.aiRecommendationBuy}
-                </div>
-                <p className="text-[11px] leading-6 text-[#3f546b]">
-                  {translateAdvisoryReason(advisory.reasonFa, locale)}
-                </p>
-                {advisory.predictedPriceIrr && BigInt(advisory.predictedPriceIrr) > 0n && (
-                  <p className="mt-1 text-[11px] font-bold text-[#1668c4]">
-                    {t.aiPredictedPrice}: {localeMoney(advisory.predictedPriceIrr, locale)} {t.toman}
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-        </aside>
-
-        <main className="min-w-0 flex-1">
-          <div className="mb-3 flex items-center gap-2">
-            {(
-              [
-                ['cheap', t.sortCheap],
-                ['early', t.sortEarly],
-              ] as const
-            ).map(([k, l]) => (
-              <span key={k} onClick={() => setSort(k)} className={chip(sort === k)}>
-                {l}
-              </span>
-            ))}
-            <span className="mr-auto text-[11px] text-[#8a96a6]">
-              {formatToman(filteredResults.length, locale)} {t.flightsCount}
-            </span>
-          </div>
-
-          {results === null && <p className="text-sm text-[#6b7b94]">{t.searching}</p>}
-
-          {searchError && (
-            <div data-testid="search-error" className="mb-3 rounded-xl border border-[#fde3c4] bg-[#fff7ed] p-3 text-xs font-semibold text-[#9a5b16]">
-              {searchError}
+              <button
+                type="button"
+                onClick={() => setEditOpen(true)}
+                style={{
+                  height: 46,
+                  padding: '0 22px',
+                  borderRadius: 12,
+                  border: '1.5px solid #e6eaf0',
+                  color: '#5a6678',
+                  fontSize: 14,
+                  fontWeight: 700,
+                  background: '#fff',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                {copy.changeSearch}
+              </button>
             </div>
-          )}
-
-          {results !== null && results.length === 0 && !searchError && (
-            <div data-testid="empty-results" className="rounded-2xl border border-dashed border-[#e5e9f0] p-10 text-center">
-              <h2 className="mb-2 text-base font-black text-[#0d2640]">{t.noResultsTitle}</h2>
-              <p className="text-sm text-[#6b7b94]">{t.noResultsSub}</p>
-            </div>
-          )}
-
-          <div className="flex flex-col gap-3">
-            {filteredResults.map((r) => (
-              <div key={r.flightInstanceId} data-testid="result-card" className="rounded-2xl border border-[#e5e9f0] bg-white p-5 shadow-sm">
-                <div className="mb-3 flex items-center justify-between">
-                  <div>
-                    <div className="font-num text-sm font-extrabold text-[#0d2640]">{r.flightNo}</div>
-                    <div className="mt-1 text-xs text-[#6b7b94]">{formatJalaliDateTime(r.departureAt)}</div>
-                  </div>
-                  <div className="text-xs text-[#6b7b94]">{r.aircraftType}</div>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  {r.cabins.map((c) => (
-                    <div key={c.cabin} className="flex min-w-[160px] flex-1 items-center justify-between rounded-xl border border-[#e5e9f0] p-3">
-                      <div>
-                        <div className="text-[11px] text-[#6b7b94]">{CABIN_LABEL[c.cabin][locale]}</div>
-                        <div className="font-num text-sm font-extrabold text-[#1668c4]">{localeMoney(c.priceIrr, locale)} {t.toman}</div>
-                        <div className="text-[10px] text-[#6b7b94]">{faDigits(c.seatsLeft)} {t.seatsLeft}</div>
-                      </div>
-                      <div className="flex flex-col items-end gap-1.5">
-                        <button
-                          disabled={c.seatsLeft === 0}
-                          onClick={() => navigate(`/book/${r.flightInstanceId}?cabin=${c.cabin}`)}
-                          className="rounded-lg bg-[#1668c4] px-4 py-2 text-xs font-bold text-white disabled:opacity-40"
-                        >
-                          {t.select}
-                        </button>
-                        <button
-                          disabled={lockBusyKey === `${r.flightInstanceId}:${c.cabin}`}
-                          onClick={() => void onRealLockClick(r.flightInstanceId, c.cabin)}
-                          data-testid={`real-lock-${r.flightInstanceId}-${c.cabin}`}
-                          className="rounded-lg border border-[#d5e1f0] px-3 py-1 text-[10.5px] font-bold text-[#1668c4] disabled:opacity-40"
-                        >
-                          {lockBusyKey === `${r.flightInstanceId}:${c.cabin}` ? t.aiAnalyzing : `🔒 ${t.priceLock}`}
-                        </button>
-                        <button
-                          disabled={
-                            saveBusyKey === `${r.flightInstanceId}:${c.cabin}` ||
-                            savedKeys.has(`${r.flightInstanceId}:${c.cabin}`)
-                          }
-                          onClick={() => void onSaveClick(r.flightInstanceId, c.cabin)}
-                          data-testid={`real-save-${r.flightInstanceId}-${c.cabin}`}
-                          className="rounded-lg border border-[#d5e1f0] px-3 py-1 text-[10.5px] font-bold text-[#5a6678] disabled:opacity-60"
-                        >
-                          {saveBusyKey === `${r.flightInstanceId}:${c.cabin}`
-                            ? t.aiAnalyzing
-                            : savedKeys.has(`${r.flightInstanceId}:${c.cabin}`)
-                              ? `✓ ${t.savedFlight}`
-                              : `🔖 ${t.saveFlight}`}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-            {results !== null && results.length > 0 && filteredResults.length === 0 && (
-              <div className="rounded-2xl border border-dashed border-[#e5e9f0] p-8 text-center text-sm text-[#6b7b94]">
-                {t.noFlightsForFilters}
-              </div>
-            )}
           </div>
-        </main>
+        )}
+
+        {filteredResults.length > PAGE_SIZE && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 26 }}>
+            <button
+              type="button"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              style={{
+                height: 42,
+                padding: '0 15px',
+                border: '1px solid #e6eaf0',
+                borderRadius: 11,
+                background: '#fff',
+                color: '#5a6678',
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: page <= 1 ? 'default' : 'pointer',
+                opacity: page <= 1 ? 0.5 : 1,
+                fontFamily: 'inherit',
+              }}
+            >
+              {copy.prevLabel}
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setPage(p)}
+                style={{
+                  width: 42,
+                  height: 42,
+                  border: p === page ? '1px solid #1668c4' : '1px solid #e6eaf0',
+                  borderRadius: 11,
+                  background: p === page ? '#1668c4' : '#fff',
+                  color: p === page ? '#fff' : '#5a6678',
+                  fontSize: 13.5,
+                  fontWeight: p === page ? 800 : 600,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                {formatToman(p, locale)}
+              </button>
+            ))}
+            <button
+              type="button"
+              disabled={page >= totalPages}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              style={{
+                height: 42,
+                padding: '0 15px',
+                border: '1px solid #e6eaf0',
+                borderRadius: 11,
+                background: '#fff',
+                color: '#5a6678',
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: page >= totalPages ? 'default' : 'pointer',
+                opacity: page >= totalPages ? 0.5 : 1,
+                fontFamily: 'inherit',
+              }}
+            >
+              {copy.nextLabel}
+            </button>
+          </div>
+        )}
       </div>
+
+      <ResultsEditSearchModal
+        open={editOpen}
+        locale={locale}
+        copy={copy}
+        origin={origin}
+        dest={dest}
+        date={date}
+        onClose={() => setEditOpen(false)}
+        onApply={applyEditSearch}
+      />
 
       {realLockResult && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[#0d2640]/55 p-5" onClick={() => setRealLockResult(null)}>
-          <div onClick={(e) => e.stopPropagation()} data-testid="real-lock-modal" className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-2xl">
+        <div
+          role="presentation"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 200,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(13,38,64,.55)',
+            padding: 20,
+          }}
+          onClick={() => setRealLockResult(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            data-testid="real-lock-modal"
+            style={{
+              width: '100%',
+              maxWidth: 420,
+              borderRadius: 18,
+              background: '#fff',
+              padding: 24,
+              textAlign: 'center',
+              boxShadow: '0 30px 70px -20px rgba(0,0,0,.5)',
+            }}
+          >
             {realLockResult.kind === 'not-gold' && (
               <>
-                <div className="mb-2 text-2xl">🔒</div>
-                <h2 className="mb-1 text-sm font-black text-[#0d2640]">{t.smartFareLock}</h2>
-                <p className="mb-3 text-[11.5px] leading-6 text-[#5a6678]">{t.fareLockGoldOnly}</p>
-                <div className="flex gap-2">
-                  <button onClick={() => navigate('/club')} className="flex-1 rounded-lg bg-[#1668c4] py-2.5 text-xs font-bold text-white">
-                    {t.learnAboutClub}
+                <div style={{ fontSize: 28, marginBottom: 8 }}>🔒</div>
+                <h2 style={{ fontSize: 15, fontWeight: 900, color: '#0d2640', marginBottom: 8 }}>{copy.smartFareLock}</h2>
+                <p style={{ fontSize: 12, lineHeight: 1.8, color: '#5a6678', marginBottom: 16 }}>{copy.fareLockGoldOnly}</p>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/club')}
+                    style={{
+                      flex: 1,
+                      borderRadius: 10,
+                      background: '#1668c4',
+                      color: '#fff',
+                      padding: '10px 0',
+                      fontSize: 12,
+                      fontWeight: 800,
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    {copy.learnAboutClub}
                   </button>
-                  <button onClick={() => setRealLockResult(null)} className="flex-none rounded-lg border border-[#d5e1f0] px-5 py-2.5 text-xs font-bold text-[#5a6678]">
-                    {t.close}
+                  <button
+                    type="button"
+                    onClick={() => setRealLockResult(null)}
+                    style={{
+                      borderRadius: 10,
+                      border: '1px solid #d5e1f0',
+                      padding: '10px 18px',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: '#5a6678',
+                      background: '#fff',
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    {copy.close}
                   </button>
                 </div>
               </>
             )}
             {realLockResult.kind === 'success' && (
               <>
-                <div className="mb-2 text-2xl">✓</div>
-                <h2 className="mb-1 text-sm font-black text-[#0d2640]">{t.yourPriceLocked}</h2>
-                <p className="mb-1 text-[11.5px] leading-6 text-[#5a6678]">
-                  {t.lockRateUntil(localeMoney(realLockResult.lock.lockedPriceIrr, locale), formatJalaliDateTime(realLockResult.lock.expiresAt))}
+                <div style={{ fontSize: 28, marginBottom: 8 }}>✓</div>
+                <h2 style={{ fontSize: 15, fontWeight: 900, color: '#0d2640', marginBottom: 8 }}>{copy.yourPriceLocked}</h2>
+                <p style={{ fontSize: 12, lineHeight: 1.8, color: '#5a6678', marginBottom: 8 }}>
+                  {copy.lockRateUntil(
+                    localeMoney(realLockResult.lock.lockedPriceIrr, locale),
+                    formatJalaliDateTime(realLockResult.lock.expiresAt),
+                  )}
                 </p>
-                <p className="mb-3 text-[11px] leading-6 text-[#8a96a6]">{t.fee}: {localeMoney(realLockResult.lock.feeIrr, locale)} {t.toman}</p>
-                <button onClick={() => setRealLockResult(null)} className="w-full rounded-lg bg-[#1668c4] py-2.5 text-xs font-bold text-white">
-                  {t.gotIt}
+                <p style={{ fontSize: 11, color: '#8a96a6', marginBottom: 16 }}>
+                  {copy.fee}: {localeMoney(realLockResult.lock.feeIrr, locale)} {copy.toman}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setRealLockResult(null)}
+                  style={{
+                    width: '100%',
+                    borderRadius: 10,
+                    background: '#1668c4',
+                    color: '#fff',
+                    padding: '10px 0',
+                    fontSize: 12,
+                    fontWeight: 800,
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  {copy.gotIt}
                 </button>
               </>
             )}
             {realLockResult.kind === 'error' && (
               <>
-                <div className="mb-2 text-2xl">⚠</div>
-                <h2 className="mb-1 text-sm font-black text-[#0d2640]">{t.lockFailedTitle}</h2>
-                <p role="alert" className="mb-3 text-[11.5px] leading-6 text-[#5a6678]">
+                <div style={{ fontSize: 28, marginBottom: 8 }}>⚠</div>
+                <h2 style={{ fontSize: 15, fontWeight: 900, color: '#0d2640', marginBottom: 8 }}>{copy.lockFailedTitle}</h2>
+                <p role="alert" style={{ fontSize: 12, lineHeight: 1.8, color: '#5a6678', marginBottom: 16 }}>
                   {realLockResult.message}
                 </p>
-                <button onClick={() => setRealLockResult(null)} className="w-full rounded-lg border border-[#d5e1f0] py-2.5 text-xs font-bold text-[#5a6678]">
-                  {t.close}
+                <button
+                  type="button"
+                  onClick={() => setRealLockResult(null)}
+                  style={{
+                    width: '100%',
+                    borderRadius: 10,
+                    border: '1px solid #d5e1f0',
+                    padding: '10px 0',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: '#5a6678',
+                    background: '#fff',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  {copy.close}
                 </button>
               </>
             )}
