@@ -5,7 +5,7 @@ import type { CabinClass, SeatMapCell } from '../../../types/public-site';
 import { CHECKOUT_COPY } from './checkout-copy';
 import type { ExtraServiceState } from './checkout-types';
 import Md80SeatMap from './Md80SeatMap';
-import { isMd80Aircraft } from './md80-seat-layout';
+import { buildMd80Seats, isMd80Aircraft } from './md80-seat-layout';
 
 function SvgBag() {
   return (
@@ -165,10 +165,17 @@ export default function ExtrasStep({
   const t = CHECKOUT_COPY[locale];
   const [seatOpen, setSeatOpen] = useState(true);
   const aircraft = aircraftType.trim() || 'MD-80';
-  const useMd80 = isMd80Aircraft(aircraft);
+  // Public checkout always prefers the MD-80 cabin chart from the PDF.
+  const useMd80 = isMd80Aircraft(aircraft) || aircraft === '' || aircraft === 'MD-80';
 
-  const sold = seats?.filter((s) => s.status === 'TAKEN').length ?? 0;
-  const cap = seats?.length ?? 0;
+  const displaySeats =
+    seats && seats.length > 0
+      ? seats
+      : useMd80
+        ? buildMd80Seats()
+        : [];
+  const sold = displaySeats.filter((s) => s.status === 'TAKEN').length;
+  const cap = displaySeats.length || (useMd80 ? 140 : 0);
 
   return (
     <section
@@ -266,12 +273,12 @@ export default function ExtrasStep({
                 {t.reserved}
               </span>
             </div>
-            {seats === null ? (
+            {seats === null && !useMd80 ? (
               <p className="text-xs text-[#8a96a6]">{t.loading}</p>
             ) : useMd80 ? (
               <Md80SeatMap
                 locale={locale}
-                seats={seats}
+                seats={displaySeats}
                 selectedSeats={selectedSeats}
                 onToggleSeat={onToggleSeat}
                 businessLocked={businessLocked}
@@ -280,7 +287,7 @@ export default function ExtrasStep({
             ) : (
               <GenericSeatMap
                 locale={locale}
-                seats={seats}
+                seats={displaySeats}
                 selectedSeats={selectedSeats}
                 onToggleSeat={onToggleSeat}
                 businessLocked={businessLocked}
@@ -297,8 +304,7 @@ export default function ExtrasStep({
               <div>
                 {t.totalSold}:{' '}
                 <b className="text-[#c0343a]">{locale === 'en' ? sold : faDigits(sold)}</b>{' '}
-                {t.ofLabel}{' '}
-                <b>{locale === 'en' ? (cap || 140) : faDigits(cap || 140)}</b>
+                {t.ofLabel} <b>{locale === 'en' ? cap : faDigits(cap)}</b>
               </div>
             </div>
           </>

@@ -73,3 +73,45 @@ export function md80ColsForRow(row: number): {
     cabin: 'ECONOMY',
   };
 }
+
+/** Full MD-80 inventory (140 seats) — used when API seatmap is empty/mismatched. */
+export function buildMd80Seats(
+  takenCodes: Iterable<string> = [],
+): Array<{
+  seatCode: string;
+  row: number;
+  cabin: 'BUSINESS' | 'ECONOMY';
+  status: 'FREE' | 'TAKEN';
+}> {
+  const taken = new Set(takenCodes);
+  const out: Array<{
+    seatCode: string;
+    row: number;
+    cabin: 'BUSINESS' | 'ECONOMY';
+    status: 'FREE' | 'TAKEN';
+  }> = [];
+  for (const row of md80Rows()) {
+    const { left, right, cabin } = md80ColsForRow(row);
+    for (const letter of [...left, ...right]) {
+      const seatCode = `${row}${letter}`;
+      if (MD80_EXCLUDED.has(seatCode)) continue;
+      out.push({
+        seatCode,
+        row,
+        cabin,
+        status: taken.has(seatCode) ? 'TAKEN' : 'FREE',
+      });
+    }
+  }
+  return out;
+}
+
+/** True when the API payload already uses MD-80 lettering (F present, C absent). */
+export function looksLikeMd80SeatPayload(
+  seats: Array<{ seatCode: string }>,
+): boolean {
+  if (seats.length === 0) return false;
+  const hasF = seats.some((s) => /F$/.test(s.seatCode));
+  const hasC = seats.some((s) => /C$/.test(s.seatCode));
+  return hasF && !hasC;
+}

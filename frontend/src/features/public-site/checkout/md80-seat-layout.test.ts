@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildMd80Seats,
   isMd80Aircraft,
+  looksLikeMd80SeatPayload,
   md80ColsForRow,
   md80LeftAmenity,
   MD80_EXCLUDED,
@@ -33,5 +35,19 @@ describe('md80-seat-layout', () => {
     expect(MD80_EXCLUDED.has('28A')).toBe(true);
     expect(MD80_EXCLUDED.has('30B')).toBe(true);
     expect(MD80_EXCLUDED.has('31A')).toBe(false);
+  });
+
+  it('builds 140 selectable seats and marks taken codes', () => {
+    const seats = buildMd80Seats(['7A', '3E']);
+    expect(seats).toHaveLength(140);
+    expect(seats.find((s) => s.seatCode === '7A')?.status).toBe('TAKEN');
+    expect(seats.find((s) => s.seatCode === '7B')?.status).toBe('FREE');
+    expect(seats.find((s) => s.seatCode === '28A')).toBeUndefined();
+  });
+
+  it('detects MD-80 vs legacy A320 lettering', () => {
+    expect(looksLikeMd80SeatPayload([{ seatCode: '3F' }, { seatCode: '7D' }])).toBe(true);
+    expect(looksLikeMd80SeatPayload([{ seatCode: '3C' }, { seatCode: '7E' }])).toBe(false);
+    expect(looksLikeMd80SeatPayload([])).toBe(false);
   });
 });

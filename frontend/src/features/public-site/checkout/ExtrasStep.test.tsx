@@ -65,10 +65,32 @@ describe('ExtrasStep — design parity', () => {
     // Rear exit/galley rows omit A/B — amenity labels visible
     expect(screen.getAllByText('خروج').length).toBeGreaterThan(0);
     expect(screen.getAllByText('گالی').length).toBeGreaterThan(0);
-    // Column letters from the PDF
+    // Visible seat buttons for PDF letters
     expect(screen.getByTestId('checkout-seat-7D')).toBeInTheDocument();
     expect(screen.getByTestId('checkout-seat-3F')).toBeInTheDocument();
+    expect(screen.getByTestId('checkout-seat-3A')).toBeInTheDocument();
     expect(screen.queryByTestId('checkout-seat-28A')).not.toBeInTheDocument();
+  });
+
+  it('still shows all MD-80 seats when the API seat list is empty', () => {
+    render(
+      <ExtrasStep
+        locale="fa"
+        extras={defaultExtras()}
+        onToggleExtra={vi.fn()}
+        seats={[]}
+        selectedSeats={[]}
+        onToggleSeat={vi.fn()}
+        businessLocked={false}
+        bookedCabin="ECONOMY"
+        aircraftType="MD-80"
+      />,
+    );
+
+    expect(screen.getByTestId('checkout-seat-map')).toHaveAttribute('data-capacity', '140');
+    expect(screen.getByTestId('checkout-seat-7A')).toBeInTheDocument();
+    expect(screen.getByTestId('checkout-seat-12F')).toBeInTheDocument();
+    expect(screen.getByTestId('checkout-seat-32A')).toBeInTheDocument();
   });
 
   it('toggles an extra service when the card is clicked', async () => {
