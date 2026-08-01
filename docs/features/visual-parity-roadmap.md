@@ -30,8 +30,8 @@ Systematic page-by-page alignment with bundled HTML exports. Each phase = layout
 | 15 | پنل کاربر | `پنل کاربر.html` | High | [x] Sidebar + all primary tab content incl. profile hero/stats |
 | 16 | پنل آژانس | `پنل آژانس.html` | High | [x] Shell, dashboard, seats, credit, inbox, profile, sales; webservice/apidocs pre-styled |
 | 17 | پنل ادمین سایت + داشبوردها | `پنل ادمین سایت.dc.html` | High | [x] PanelShell dark + all role dashboards |
-| 18 | تب‌های داخلی staff (شروع) | bundled | High | [~] Cartable, Refunds, Agencies, Finance, Flights dark theme |
-| 19–24 | Staff panels (remaining tabs) | bundled | High each | [ ] Flights, Finance, IT tabs, etc. |
+| 18 | تب‌های داخلی staff | bundled | High | [~] Cartable, Refunds, Agencies, Finance, Flights, IT tabs done |
+| 19–24 | Staff panels (remaining) | bundled | High each | [ ] Pricing, agency detail, reservation, etc. |
 | 25 | ReservationSystem | `ReservationSystem.html` | Med | [ ] Embed in panel tabs |
 
 ## Shared components (build once, reuse)
