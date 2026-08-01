@@ -12,8 +12,8 @@ Systematic page-by-page alignment with bundled HTML exports. Each phase = layout
 
 | # | Page | Bundled ref | Est. | Status |
 |---|------|-------------|------|--------|
-| 1 | صفحه اصلی | `صفحه اصلی.html` | — | [~] Dual-month calendar, search overlay, hero — **this PR** |
-| 2 | نتایج پرواز | `نتایج پرواز.html` | High | [ ] Price calendar scroll, flight cards, AI radar modal |
+| 1 | صفحه اصلی | `صفحه اصلی.html` | — | [x] Dual-month calendar, search overlay, hero |
+| 2 | نتایج پرواز | `نتایج پرواز.html` | High | [~] Search summary, AI banner, filter bar, flight cards — **this PR** |
 | 3 | تکمیل خرید | `تکمیل خرید.html` | High | [ ] Full wizard, extras, boarding-pass preview |
 | 4 | پرداخت | `پرداخت.html` | High | [ ] Two-column layout @767px, discount/points |
 | 5 | مدیریت رزرو | `مدیریت رزرو.html` | Med | [ ] PNR lookup UI |

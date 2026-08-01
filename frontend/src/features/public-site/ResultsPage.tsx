@@ -14,7 +14,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { faDigits, formatToman, localeMoney } from '../../lib/fa-format';
-import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
+import { formatJalaliDateTime } from '../../lib/jalali';
 import type {
   CabinClass,
   PriceCalendarDay,
@@ -25,22 +25,17 @@ import type {
 import PublicPageShell from '../../components/public/PublicPageShell';
 import FlowStepper from '../../components/public/FlowStepper';
 import { parseResultsSearchParams } from '../../components/public/flight-search/search-url';
+import ResultsSearchSummary from '../../components/public/results/ResultsSearchSummary';
+import ResultsPriceCalendarStrip from '../../components/public/results/ResultsPriceCalendarStrip';
+import ResultsAiRadarBanner from '../../components/public/results/ResultsAiRadarBanner';
+import ResultsFilterBar from '../../components/public/results/ResultsFilterBar';
+import ResultsFlightCard from '../../components/public/results/ResultsFlightCard';
+import { depHourBucket, flightAirlineLabel } from '../../components/public/results/results-utils';
 
 const CABIN_LABEL: Record<string, Record<StoredLocale, string>> = {
   ECONOMY: { fa: 'اکونومی', en: 'Economy', ar: 'اقتصادية' },
   BUSINESS: { fa: 'بیزینس', en: 'Business', ar: 'درجة الأعمال' },
 };
-
-function depHourBucket(iso: string): 'morning' | 'noon' | 'evening' {
-  const h = new Date(iso).getUTCHours();
-  if (h < 11) return 'morning';
-  if (h < 16) return 'noon';
-  return 'evening';
-}
-
-function flightAirlineLabel(flightNo: string): string {
-  return flightNo.split('-')[0] ?? flightNo;
-}
 
 const GOLD_TIER_LEVELS = ['GOLD', 'PLATINUM'];
 
@@ -72,7 +67,8 @@ function translateAdvisoryReason(reasonFa: string | undefined, locale: StoredLoc
 
 const STR: Record<StoredLocale, {
   changeSearch: string;
-  onePassengerEconomy: string;
+  editShort: string;
+  selectDeparture: string;
   emptyTitle: string;
   emptySub: string;
   goToSearch: string;
@@ -80,6 +76,7 @@ const STR: Record<StoredLocale, {
   noResultsSub: string;
   searchError: string;
   stopsLabel: string;
+  filterLabel: string;
   all: string;
   direct: string;
   oneStop: string;
@@ -92,6 +89,7 @@ const STR: Record<StoredLocale, {
   aiSub: string;
   aiAnalyze: string;
   aiAnalyzing: string;
+  aiReanalyze: string;
   aiUnavailable: string;
   aiRecommendationBuy: string;
   aiRecommendationWait: string;
@@ -120,11 +118,17 @@ const STR: Record<StoredLocale, {
   returnTitle: string;
   legTitle: (n: number) => string;
   selectOutboundFirst: string;
+  detailsBook: string;
+  flightDetails: string;
+  flightNo: string;
+  aircraft: string;
+  lowSeats: string;
   paxSummary: (adults: number, cabin: string) => string;
 }> = {
   fa: {
     changeSearch: 'تغییر جستجو',
-    onePassengerEconomy: '۱ مسافر · اکونومی',
+    editShort: 'ویرایش',
+    selectDeparture: 'انتخاب پرواز رفت',
     emptyTitle: 'جستجوی پرواز',
     emptySub: 'برای دیدن نتایج، ابتدا مبدأ، مقصد و تاریخ سفر را انتخاب کنید.',
     goToSearch: 'رفتن به جستجو',
@@ -132,6 +136,7 @@ const STR: Record<StoredLocale, {
     noResultsSub: 'برای این مسیر و تاریخ پروازی موجود نیست — تاریخ یا مقصد را تغییر دهید.',
     searchError: 'خطا در جستجو — لطفاً دوباره تلاش کنید.',
     stopsLabel: 'توقف',
+    filterLabel: 'فیلتر',
     all: 'همه',
     direct: 'مستقیم',
     oneStop: 'یک توقف',
@@ -144,6 +149,7 @@ const STR: Record<StoredLocale, {
     aiSub: 'همین حالا بخرم یا صبر کنم؟ رادار روند قیمت این مسیر را تحلیل می‌کند.',
     aiAnalyze: 'تحلیل کن',
     aiAnalyzing: 'در حال تحلیل…',
+    aiReanalyze: 'تحلیل مجدد',
     aiUnavailable: 'برای این مسیر و تاریخ، دادهٔ کافی برای تحلیل وجود ندارد.',
     aiRecommendationBuy: 'توصیه: همین حالا بخرید',
     aiRecommendationWait: 'توصیه: کمی صبر کنید',
@@ -172,11 +178,17 @@ const STR: Record<StoredLocale, {
     returnTitle: 'پرواز برگشت',
     legTitle: (n) => `مسیر ${n}`,
     selectOutboundFirst: 'ابتدا پرواز رفت را انتخاب کنید',
+    detailsBook: 'جزئیات و رزرو',
+    flightDetails: 'جزئیات پرواز',
+    flightNo: 'شماره پرواز',
+    aircraft: 'هواپیما',
+    lowSeats: 'فقط {n} صندلی باقی مانده',
     paxSummary: (adults, cabin) => `${faDigits(adults)} مسافر · ${cabin === 'BUSINESS' ? 'بیزینس' : 'اکونومی'}`,
   },
   en: {
     changeSearch: 'Change search',
-    onePassengerEconomy: '1 passenger · Economy',
+    editShort: 'Edit',
+    selectDeparture: 'Select outbound flight',
     emptyTitle: 'Search Flights',
     emptySub: 'Select an origin, destination, and travel date first to see results.',
     goToSearch: 'Go to Search',
@@ -184,6 +196,7 @@ const STR: Record<StoredLocale, {
     noResultsSub: 'No flights are available for this route and date — try a different date or destination.',
     searchError: 'Search failed — please try again.',
     stopsLabel: 'Stops',
+    filterLabel: 'Filters',
     all: 'All',
     direct: 'Direct',
     oneStop: '1 stop',
@@ -196,6 +209,7 @@ const STR: Record<StoredLocale, {
     aiSub: "Buy now or wait? The radar analyzes this route's price trend.",
     aiAnalyze: 'Analyze price',
     aiAnalyzing: 'Analyzing…',
+    aiReanalyze: 'Re-analyze',
     aiUnavailable: 'Not enough data to analyze this route and date.',
     aiRecommendationBuy: 'Recommendation: Buy now',
     aiRecommendationWait: 'Recommendation: Wait',
@@ -224,11 +238,17 @@ const STR: Record<StoredLocale, {
     returnTitle: 'Return flight',
     legTitle: (n) => `Leg ${n}`,
     selectOutboundFirst: 'Select an outbound flight first',
+    detailsBook: 'Details & book',
+    flightDetails: 'Flight details',
+    flightNo: 'Flight no.',
+    aircraft: 'Aircraft',
+    lowSeats: 'Only {n} seats left',
     paxSummary: (adults, cabin) => `${adults} passenger${adults > 1 ? 's' : ''} · ${cabin === 'BUSINESS' ? 'Business' : 'Economy'}`,
   },
   ar: {
     changeSearch: 'تغيير البحث',
-    onePassengerEconomy: '1 مسافر · اقتصادية',
+    editShort: 'تعديل',
+    selectDeparture: 'اختر رحلة الذهاب',
     emptyTitle: 'البحث عن رحلات',
     emptySub: 'اختر المبدأ والمقصد وتاريخ السفر أولاً لعرض النتائج.',
     goToSearch: 'الذهاب إلى البحث',
@@ -236,6 +256,7 @@ const STR: Record<StoredLocale, {
     noResultsSub: 'لا توجد رحلات متاحة لهذا المسار والتاريخ — جرّب تاريخًا أو وجهة مختلفة.',
     searchError: 'فشل البحث — يرجى المحاولة مرة أخرى.',
     stopsLabel: 'التوقف',
+    filterLabel: 'تصفية',
     all: 'الكل',
     direct: 'مباشر',
     oneStop: 'توقف واحد',
@@ -248,6 +269,7 @@ const STR: Record<StoredLocale, {
     aiSub: 'هل أشتري الآن أم أنتظر؟ يحلل الرادار اتجاه أسعار هذا المسار.',
     aiAnalyze: 'تحليل السعر',
     aiAnalyzing: 'جارٍ التحليل…',
+    aiReanalyze: 'إعادة التحليل',
     aiUnavailable: 'لا توجد بيانات كافية لتحليل هذا المسار والتاريخ.',
     aiRecommendationBuy: 'التوصية: اشترِ الآن',
     aiRecommendationWait: 'التوصية: انتظر قليلاً',
@@ -276,6 +298,11 @@ const STR: Record<StoredLocale, {
     returnTitle: 'رحلة العودة',
     legTitle: (n) => `المسار ${n}`,
     selectOutboundFirst: 'اختر رحلة الذهاب أولاً',
+    detailsBook: 'التفاصيل والحجز',
+    flightDetails: 'تفاصيل الرحلة',
+    flightNo: 'رقم الرحلة',
+    aircraft: 'الطائرة',
+    lowSeats: 'متبقي {n} مقاعد فقط',
     paxSummary: (adults, cabin) => `${faDigits(adults)} مسافر · ${cabin === 'BUSINESS' ? 'درجة الأعمال' : 'اقتصادية'}`,
   },
 };
@@ -415,72 +442,6 @@ export default function ResultsPage() {
     }
   }
 
-  function renderFlightCards(
-    list: SearchFlightResult[],
-    leg: 'outbound' | 'return' | 'multi',
-    options?: { disabled?: boolean },
-  ) {
-    const disabled = options?.disabled ?? false;
-    return list.map((r) => (
-      <div key={`${leg}-${r.flightInstanceId}`} data-testid="result-card" className="rounded-2xl border border-[#e5e9f0] bg-white p-5 shadow-sm">
-        <div className="mb-3 flex items-center justify-between">
-          <div>
-            <div className="font-num text-sm font-extrabold text-[#0d2640]">{r.flightNo}</div>
-            <div className="mt-1 text-xs text-[#6b7b94]">{formatJalaliDateTime(r.departureAt)}</div>
-          </div>
-          <div className="text-xs text-[#6b7b94]">{r.aircraftType}</div>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          {r.cabins.map((c) => (
-              <div key={c.cabin} className="flex min-w-[160px] flex-1 items-center justify-between rounded-xl border border-[#e5e9f0] p-3">
-                <div>
-                  <div className="text-[11px] text-[#6b7b94]">{CABIN_LABEL[c.cabin][locale]}</div>
-                  <div className="font-num text-sm font-extrabold text-[#1668c4]">{localeMoney(c.priceIrr, locale)} {t.toman}</div>
-                  <div className="text-[10px] text-[#6b7b94]">{faDigits(c.seatsLeft)} {t.seatsLeft}</div>
-                </div>
-                <div className="flex flex-col items-end gap-1.5">
-                  <button
-                    disabled={c.seatsLeft === 0 || disabled}
-                    onClick={() => onSelectFlight(r.flightInstanceId, c.cabin, leg)}
-                    className="rounded-lg bg-[#1668c4] px-4 py-2 text-xs font-bold text-white disabled:opacity-40"
-                  >
-                    {t.select}
-                  </button>
-                  {leg !== 'return' && (
-                    <>
-                      <button
-                        disabled={lockBusyKey === `${r.flightInstanceId}:${c.cabin}`}
-                        onClick={() => void onRealLockClick(r.flightInstanceId, c.cabin)}
-                        data-testid={`real-lock-${r.flightInstanceId}-${c.cabin}`}
-                        className="rounded-lg border border-[#d5e1f0] px-3 py-1 text-[10.5px] font-bold text-[#1668c4] disabled:opacity-40"
-                      >
-                        {lockBusyKey === `${r.flightInstanceId}:${c.cabin}` ? t.aiAnalyzing : `🔒 ${t.priceLock}`}
-                      </button>
-                      <button
-                        disabled={
-                          saveBusyKey === `${r.flightInstanceId}:${c.cabin}` ||
-                          savedKeys.has(`${r.flightInstanceId}:${c.cabin}`)
-                        }
-                        onClick={() => void onSaveClick(r.flightInstanceId, c.cabin)}
-                        data-testid={`real-save-${r.flightInstanceId}-${c.cabin}`}
-                        className="rounded-lg border border-[#d5e1f0] px-3 py-1 text-[10.5px] font-bold text-[#5a6678] disabled:opacity-60"
-                      >
-                        {saveBusyKey === `${r.flightInstanceId}:${c.cabin}`
-                          ? t.aiAnalyzing
-                          : savedKeys.has(`${r.flightInstanceId}:${c.cabin}`)
-                            ? `✓ ${t.savedFlight}`
-                            : `🔖 ${t.saveFlight}`}
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            ))}
-        </div>
-      </div>
-    ));
-  }
-
   async function onSaveClick(flightInstanceId: string, cabin: CabinClass) {
     if (status !== 'authenticated') {
       navigate('/signin', { state: { from: `/results?${params.toString()}` } });
@@ -609,6 +570,34 @@ export default function ResultsPage() {
     setParams(next);
   }
 
+  const cabinLabels = useMemo(
+    () => ({
+      ECONOMY: CABIN_LABEL.ECONOMY[locale],
+      BUSINESS: CABIN_LABEL.BUSINESS[locale],
+    }),
+    [locale],
+  );
+
+  const cardLabels = useMemo(
+    () => ({
+      direct: t.direct,
+      oneStop: t.oneStop,
+      seatsLeft: t.seatsLeft,
+      select: t.select,
+      toman: t.toman,
+      priceLock: t.priceLock,
+      saveFlight: t.saveFlight,
+      savedFlight: t.savedFlight,
+      analyzing: t.aiAnalyzing,
+      detailsBook: t.detailsBook,
+      flightDetails: t.flightDetails,
+      flightNo: t.flightNo,
+      aircraft: t.aircraft,
+      lowSeats: t.lowSeats,
+    }),
+    [t],
+  );
+
   if (!parsed || !origin || !dest || !date) {
     return (
       <PublicPageShell>
@@ -623,229 +612,256 @@ export default function ResultsPage() {
     );
   }
 
-  const chip = (on: boolean): string =>
-    `cursor-pointer rounded-lg px-3 py-1.5 text-[11.5px] font-bold ${on ? 'bg-[#1668c4] text-white' : 'bg-[#f1f4f8] text-[#5a6678]'}`;
+  const summaryTitle =
+    trip === 'round' && selectedFlights[0]
+      ? t.returnTitle
+      : trip === 'multi' && parsed
+        ? t.legTitle(parsed.legIndex + 1)
+        : t.selectDeparture;
 
   return (
     <PublicPageShell>
-      <div style={{ background: 'linear-gradient(120deg,#0d2640,#124a86)' }}>
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-6 py-4">
-          <div className="flex items-center gap-3 text-white">
-            <span className="text-base font-black" dir="ltr">
-              {origin} {locale === 'en' ? '→' : '←'} {dest}
-            </span>
-            <span className="rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold">
-              {formatJalaliDate(`${date}T12:00:00Z`)}
-            </span>
-            <span className="rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold">
-              {t.paxSummary(parsed.adults, preferredCabin)}
-            </span>
-            {trip === 'round' && returnDate && (
-              <span className="rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold">
-                {formatJalaliDate(`${returnDate}T12:00:00Z`)} {locale === 'en' ? 'return' : locale === 'ar' ? 'عودة' : 'برگشت'}
-              </span>
-            )}
-          </div>
-          <button
-            onClick={() => navigate('/')}
-            className="rounded-lg border border-white/40 bg-white/10 px-4 py-2 text-xs font-bold text-white"
-          >
-            {t.changeSearch}
-          </button>
-        </div>
-      </div>
+      <ResultsSearchSummary
+        locale={locale}
+        origin={origin}
+        dest={dest}
+        date={date}
+        returnDate={trip === 'round' ? returnDate : undefined}
+        adults={parsed.adults}
+        cabinLabel={CABIN_LABEL[preferredCabin][locale]}
+        title={summaryTitle}
+        changeSearchLabel={t.changeSearch}
+        editShortLabel={t.editShort}
+        isMobile={isMobile}
+        onEdit={() => navigate('/')}
+      />
+
+      {calendarDays && calendarDays.length > 0 && (
+        <ResultsPriceCalendarStrip
+          days={calendarDays}
+          selectedDate={date}
+          calendarMinPrice={calendarMinPrice}
+          locale={locale}
+          isMobile={isMobile}
+          onDayClick={onCalendarDayClick}
+        />
+      )}
 
       <FlowStepper current="results" onBack={() => navigate('/')} />
 
-      <div className="border-b border-[#e8eef6] bg-white">
-        <div className="mx-auto grid max-w-5xl grid-cols-7 px-4" data-testid="price-calendar">
-          {(calendarDays ?? []).map((c) => {
-            const price = BigInt(c.minPriceIrr);
-            const cheap = calendarMinPrice !== null && price > 0n && price === calendarMinPrice;
-            const sel = c.date === date;
-            const toman = price > 0n ? Math.round(Number(price) / 10) : 0;
-            return (
-              <div
-                key={c.date}
-                role="button"
-                tabIndex={0}
-                onClick={() => onCalendarDayClick(c.date)}
-                onKeyDown={(e) => e.key === 'Enter' && onCalendarDayClick(c.date)}
-                className={`cursor-pointer border-b-2 px-1 py-2.5 text-center ${sel ? 'border-[#1668c4] bg-[#f2f7fd]' : 'border-transparent'}`}
-              >
-                <div className={`text-[11px] font-bold ${sel ? 'text-[#1668c4]' : 'text-[#5a6678]'}`}>
-                  {locale === 'en'
-                    ? new Date(`${c.date}T12:00:00Z`).toLocaleDateString('en-GB', {
-                        day: 'numeric',
-                        month: 'short',
-                      })
-                    : formatJalaliDate(`${c.date}T12:00:00Z`)}
-                </div>
-                <div className={`font-num mt-0.5 text-[11px] font-extrabold ${cheap ? 'text-[#1f8a5b]' : sel ? 'text-[#0d2640]' : 'text-[#8a96a6]'}`}>
-                  {toman > 0 ? formatToman(toman, locale) : '—'}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      <ResultsAiRadarBanner
+        locale={locale}
+        isMobile={isMobile}
+        aiState={aiState}
+        advisory={advisory}
+        title={t.aiTitle}
+        sub={t.aiSub}
+        analyzeLabel={t.aiAnalyze}
+        analyzingLabel={t.aiAnalyzing}
+        reanalyzeLabel={t.aiReanalyze}
+        unavailableLabel={t.aiUnavailable}
+        errorLabel={t.searchError}
+        recommendationBuy={t.aiRecommendationBuy}
+        recommendationWait={t.aiRecommendationWait}
+        predictedPriceLabel={t.aiPredictedPrice}
+        tomanLabel={t.toman}
+        reasonText={translateAdvisoryReason(advisory?.reasonFa, locale)}
+        onAsk={() => void askAi()}
+      />
 
-      <div className={`mx-auto flex max-w-5xl gap-5 p-5 ${isMobile ? 'flex-col' : 'flex-row'}`}>
-        <aside className={isMobile ? 'w-full flex-none' : 'w-56 flex-none'}>
-          <div className="rounded-2xl border border-[#e8eef6] bg-white p-4">
-            <div className="mb-2 text-xs font-black text-[#0d2640]">{t.stopsLabel}</div>
-            <div className="mb-4 flex flex-wrap gap-1.5">
-              {(
-                [
-                  ['all', t.all],
-                  ['direct', t.direct],
-                  ['one', t.oneStop],
-                ] as const
-              ).map(([k, l]) => (
-                <span key={k} data-testid={`f-stops-${k}`} onClick={() => setFStops(k)} className={chip(fStops === k)}>
-                  {l}
-                </span>
-              ))}
-            </div>
-            <div className="mb-2 text-xs font-black text-[#0d2640]">{t.timeLabel}</div>
-            <div className="mb-4 flex flex-wrap gap-1.5">
-              {(
-                [
-                  ['all', t.all],
-                  ['morning', t.morning],
-                  ['noon', t.noon],
-                  ['evening', t.evening],
-                ] as const
-              ).map(([k, l]) => (
-                <span key={k} onClick={() => setFTime(k)} className={chip(fTime === k)}>
-                  {l}
-                </span>
-              ))}
-            </div>
-            <div className="mb-2 text-xs font-black text-[#0d2640]">{t.airlineLabel}</div>
-            <div className="flex flex-wrap gap-1.5">
-              <span onClick={() => setFAirline('all')} className={chip(fAirline === 'all')}>
-                {t.all}
-              </span>
-              {airlines.map((a) => (
-                <span key={a} onClick={() => setFAirline(a)} className={chip(fAirline === a)}>
-                  {a}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-4 rounded-2xl border border-[#d6e4f8] bg-gradient-to-b from-[#f2f7fd] to-white p-4" data-testid="ai-radar">
-            <div className="mb-1 flex items-center gap-2 text-xs font-black text-[#0d2640]">
-              <span>📡</span> {t.aiTitle}
-            </div>
-            <p className="mb-3 text-[11px] leading-6 text-[#5a6678]">{t.aiSub}</p>
-            {aiState === 'idle' && (
-              <button onClick={() => void askAi()} data-testid="ai-ask" className="w-full rounded-lg bg-[#1668c4] py-2 text-xs font-bold text-white">
-                {t.aiAnalyze}
-              </button>
-            )}
-            {aiState === 'loading' && <div className="text-center text-[11px] text-[#8a96a6]">{t.aiAnalyzing}</div>}
-            {aiState === 'unavailable' && (
-              <div data-testid="ai-unavailable" className="text-[11px] leading-6 text-[#8a96a6]">
-                {t.aiUnavailable}
-              </div>
-            )}
-            {aiState === 'error' && (
-              <div data-testid="ai-error" className="text-[11px] leading-6 text-[#d64545]">
-                {t.searchError}
-              </div>
-            )}
-            {aiState === 'done' && advisory && (
-              <div data-testid="ai-result">
-                <div
-                  className={`mb-1.5 inline-block rounded-full px-2.5 py-1 text-[11px] font-extrabold ${
-                    advisory.recommendation === 'wait'
-                      ? 'bg-[#fff7ed] text-[#9a5b16]'
-                      : 'bg-[#e8f5ee] text-[#1f8a5b]'
-                  }`}
-                >
-                  ✓ {advisory.recommendation === 'wait' ? t.aiRecommendationWait : t.aiRecommendationBuy}
-                </div>
-                <p className="text-[11px] leading-6 text-[#3f546b]">
-                  {translateAdvisoryReason(advisory.reasonFa, locale)}
-                </p>
-                {advisory.predictedPriceIrr && BigInt(advisory.predictedPriceIrr) > 0n && (
-                  <p className="mt-1 text-[11px] font-bold text-[#1668c4]">
-                    {t.aiPredictedPrice}: {localeMoney(advisory.predictedPriceIrr, locale)} {t.toman}
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-        </aside>
-
-        <main className="min-w-0 flex-1">
-          <div className="mb-3 flex items-center gap-2">
+      <div style={{ maxWidth: 1320, margin: '0 auto', padding: isMobile ? '12px 16px 32px' : '16px 26px 39px' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: 16,
+            flexWrap: 'wrap',
+            gap: 10,
+          }}
+        >
+          <span style={{ fontSize: 13.5, color: '#5a6678' }}>
+            {formatToman(filteredResults.length, locale)} {t.flightsCount}
+          </span>
+          <div
+            style={{
+              display: 'flex',
+              background: '#fff',
+              border: '1px solid #eef1f5',
+              borderRadius: 12,
+              overflow: 'hidden',
+            }}
+          >
             {(
               [
                 ['cheap', t.sortCheap],
                 ['early', t.sortEarly],
               ] as const
-            ).map(([k, l]) => (
-              <span key={k} onClick={() => setSort(k)} className={chip(sort === k)}>
+            ).map(([k, l], i) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setSort(k)}
+                style={{
+                  padding: '9px 14px',
+                  fontSize: 13,
+                  fontWeight: sort === k ? 700 : 600,
+                  background: sort === k ? '#1668c4' : '#fff',
+                  color: sort === k ? '#fff' : '#5a6678',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  borderRight: i === 0 ? '1px solid #eef1f5' : undefined,
+                }}
+              >
                 {l}
-              </span>
+              </button>
             ))}
-            <span className="mr-auto text-[11px] text-[#8a96a6]">
-              {formatToman(filteredResults.length, locale)} {t.flightsCount}
-            </span>
           </div>
+        </div>
 
-          {results === null && <p className="text-sm text-[#6b7b94]">{t.searching}</p>}
+        <ResultsFilterBar
+          locale={locale}
+          isMobile={isMobile}
+          fStops={fStops}
+          fTime={fTime}
+          fAirline={fAirline}
+          airlines={airlines}
+          labels={{
+            filterLabel: t.filterLabel,
+            stopsLabel: t.stopsLabel,
+            all: t.all,
+            direct: t.direct,
+            oneStop: t.oneStop,
+            morning: t.morning,
+            noon: t.noon,
+            evening: t.evening,
+            airlineLabel: t.airlineLabel,
+          }}
+          onStops={setFStops}
+          onTime={setFTime}
+          onAirline={setFAirline}
+        />
 
-          {searchError && (
-            <div data-testid="search-error" className="mb-3 rounded-xl border border-[#fde3c4] bg-[#fff7ed] p-3 text-xs font-semibold text-[#9a5b16]">
-              {searchError}
-            </div>
+        {results === null && <p style={{ fontSize: 14, color: '#6b7b94' }}>{t.searching}</p>}
+
+        {searchError && (
+          <div
+            data-testid="search-error"
+            style={{
+              marginBottom: 12,
+              borderRadius: 12,
+              border: '1px solid #fde3c4',
+              background: '#fff7ed',
+              padding: 12,
+              fontSize: 12,
+              fontWeight: 600,
+              color: '#9a5b16',
+            }}
+          >
+            {searchError}
+          </div>
+        )}
+
+        {results !== null && results.length === 0 && !searchError && (
+          <div
+            data-testid="empty-results"
+            style={{
+              background: '#fff',
+              border: '1px dashed #e5e9f0',
+              borderRadius: 18,
+              padding: '48px 24px',
+              textAlign: 'center',
+            }}
+          >
+            <h2 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 900, color: '#0d2640' }}>{t.noResultsTitle}</h2>
+            <p style={{ margin: 0, fontSize: 14, color: '#6b7b94' }}>{t.noResultsSub}</p>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+          {trip === 'multi' && parsed && (
+            <h2 style={{ fontSize: 14, fontWeight: 900, color: '#0d2640', margin: 0 }}>{t.legTitle(parsed.legIndex + 1)}</h2>
+          )}
+          {trip === 'round' && (
+            <h2 style={{ fontSize: 14, fontWeight: 900, color: '#0d2640', margin: 0 }}>{t.outboundTitle}</h2>
+          )}
+          {filteredResults.map((r) => (
+            <ResultsFlightCard
+              key={`out-${r.flightInstanceId}`}
+              flight={r}
+              locale={locale}
+              isMobile={isMobile}
+              preferredCabin={preferredCabin}
+              leg={trip === 'multi' ? 'multi' : 'outbound'}
+              labels={cardLabels}
+              cabinLabels={cabinLabels}
+              lockBusyKey={lockBusyKey}
+              saveBusyKey={saveBusyKey}
+              savedKeys={savedKeys}
+              onSelect={(id, cabin) => onSelectFlight(id, cabin, trip === 'multi' ? 'multi' : 'outbound')}
+              onLock={(id, cabin) => void onRealLockClick(id, cabin)}
+              onSave={(id, cabin) => void onSaveClick(id, cabin)}
+            />
+          ))}
+
+          {trip === 'round' && (
+            <>
+              <h2 style={{ fontSize: 14, fontWeight: 900, color: '#0d2640', margin: '8px 0 0' }}>{t.returnTitle}</h2>
+              {!selectedFlights[0] && (
+                <p style={{ fontSize: 12, color: '#8a96a6', margin: 0 }}>{t.selectOutboundFirst}</p>
+              )}
+              {returnResults === null && <p style={{ fontSize: 14, color: '#6b7b94' }}>{t.searching}</p>}
+              {filteredReturnResults.map((r) => (
+                <ResultsFlightCard
+                  key={`ret-${r.flightInstanceId}`}
+                  flight={r}
+                  locale={locale}
+                  isMobile={isMobile}
+                  preferredCabin={preferredCabin}
+                  leg="return"
+                  disabled={!selectedFlights[0]}
+                  labels={cardLabels}
+                  cabinLabels={cabinLabels}
+                  lockBusyKey={lockBusyKey}
+                  saveBusyKey={saveBusyKey}
+                  savedKeys={savedKeys}
+                  onSelect={(id, cabin) => onSelectFlight(id, cabin, 'return')}
+                  onLock={(id, cabin) => void onRealLockClick(id, cabin)}
+                  onSave={(id, cabin) => void onSaveClick(id, cabin)}
+                />
+              ))}
+            </>
           )}
 
-          {results !== null && results.length === 0 && !searchError && (
-            <div data-testid="empty-results" className="rounded-2xl border border-dashed border-[#e5e9f0] p-10 text-center">
-              <h2 className="mb-2 text-base font-black text-[#0d2640]">{t.noResultsTitle}</h2>
-              <p className="text-sm text-[#6b7b94]">{t.noResultsSub}</p>
+          {results !== null && results.length > 0 && filteredResults.length === 0 && (
+            <div
+              style={{
+                background: '#fff',
+                border: '1px dashed #e5e9f0',
+                borderRadius: 14,
+                padding: '32px 24px',
+                textAlign: 'center',
+                fontSize: 14,
+                color: '#6b7b94',
+              }}
+            >
+              {t.noFlightsForFilters}
             </div>
           )}
-
-          <div className="flex flex-col gap-3">
-            {trip === 'multi' && parsed && (
-              <h2 className="text-sm font-black text-[#0d2640]">{t.legTitle(parsed.legIndex + 1)}</h2>
-            )}
-            {trip === 'round' && (
-              <h2 className="text-sm font-black text-[#0d2640]">{t.outboundTitle}</h2>
-            )}
-            {renderFlightCards(filteredResults, trip === 'multi' ? 'multi' : 'outbound')}
-
-            {trip === 'round' && (
-              <>
-                <h2 className="mt-4 text-sm font-black text-[#0d2640]">{t.returnTitle}</h2>
-                {!selectedFlights[0] && (
-                  <p className="text-xs text-[#8a96a6]">{t.selectOutboundFirst}</p>
-                )}
-                {returnResults === null && <p className="text-sm text-[#6b7b94]">{t.searching}</p>}
-                {renderFlightCards(filteredReturnResults, 'return', {
-                  disabled: !selectedFlights[0],
-                })}
-              </>
-            )}
-
-            {results !== null && results.length > 0 && filteredResults.length === 0 && (
-              <div className="rounded-2xl border border-dashed border-[#e5e9f0] p-8 text-center text-sm text-[#6b7b94]">
-                {t.noFlightsForFilters}
-              </div>
-            )}
-          </div>
-        </main>
+        </div>
       </div>
 
       {realLockResult && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[#0d2640]/55 p-5" onClick={() => setRealLockResult(null)}>
-          <div onClick={(e) => e.stopPropagation()} data-testid="real-lock-modal" className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-2xl">
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-[#0d2640]/55 p-5"
+          onClick={() => setRealLockResult(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            data-testid="real-lock-modal"
+            className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-2xl"
+          >
             {realLockResult.kind === 'not-gold' && (
               <>
                 <div className="mb-2 text-2xl">🔒</div>
@@ -868,7 +884,9 @@ export default function ResultsPage() {
                 <p className="mb-1 text-[11.5px] leading-6 text-[#5a6678]">
                   {t.lockRateUntil(localeMoney(realLockResult.lock.lockedPriceIrr, locale), formatJalaliDateTime(realLockResult.lock.expiresAt))}
                 </p>
-                <p className="mb-3 text-[11px] leading-6 text-[#8a96a6]">{t.fee}: {localeMoney(realLockResult.lock.feeIrr, locale)} {t.toman}</p>
+                <p className="mb-3 text-[11px] leading-6 text-[#8a96a6]">
+                  {t.fee}: {localeMoney(realLockResult.lock.feeIrr, locale)} {t.toman}
+                </p>
                 <button onClick={() => setRealLockResult(null)} className="w-full rounded-lg bg-[#1668c4] py-2.5 text-xs font-bold text-white">
                   {t.gotIt}
                 </button>
