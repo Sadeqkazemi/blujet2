@@ -2,11 +2,11 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import PanelShell from './PanelShell';
-import * as panelsApi from '../api/panels';
-import * as cartableApi from '../api/cartable';
-import * as refundsApi from '../api/refunds';
-import * as reportingApi from '../api/reporting';
-import * as useAuthModule from '../hooks/useAuth';
+import * as panelsApi from '../../api/panels';
+import * as cartableApi from '../../api/cartable';
+import * as refundsApi from '../../api/refunds';
+import * as reportingApi from '../../api/reporting';
+import * as useAuthModule from '../../hooks/useAuth';
 
 function renderShell() {
   return render(
@@ -105,6 +105,31 @@ describe('PanelShell', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('nav-badge-referrals')).toHaveTextContent('۱');
+    });
+  });
+
+  it('renders page title and subtitle from active nav item', async () => {
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      status: 'authenticated',
+      user: { id: 'u4', fullName: 'مدیر عامل', role: 'CEO', preferredLocale: 'FA' },
+      requestLogin: vi.fn(),
+      confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
+      signOut: vi.fn(),
+    });
+    vi.spyOn(panelsApi, 'fetchNav').mockResolvedValue([
+      { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
+    ]);
+
+    render(
+      <MemoryRouter initialEntries={['/panel']}>
+        <PanelShell />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('panel-page-title')).toHaveTextContent('داشبورد');
+      expect(screen.getByTestId('panel-page-sub')).toHaveTextContent('نمای کلی فروش و عملکرد پروازها');
     });
   });
 });

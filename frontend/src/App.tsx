@@ -3,7 +3,7 @@ import { AuthProvider } from './hooks/useAuth';
 import { LocaleProvider } from './hooks/useLocale';
 import ProtectedRoute from './components/ProtectedRoute';
 import AgencyProtectedRoute from './components/AgencyProtectedRoute';
-import PanelShell from './components/PanelShell';
+import PanelShell from './features/panel/PanelShell';
 import ComingSoonPage from './components/ComingSoonPage';
 import DashboardRouter from './components/DashboardRouter';
 import TabGate from './components/TabGate';

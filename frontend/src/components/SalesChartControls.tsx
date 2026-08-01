@@ -43,7 +43,7 @@ interface SalesChartControlsProps {
   flightNo: string;
   onFlightNoChange: (v: string) => void;
   onApplyFlightNo: () => void;
-  variant?: 'pill' | 'segmented';
+  variant?: 'pill' | 'segmented' | 'panel';
 }
 
 export default function SalesChartControls({
@@ -60,6 +60,7 @@ export default function SalesChartControls({
   variant = 'pill',
 }: SalesChartControlsProps) {
   const monthOptions = useMemo(() => recentJalaliMonths(), []);
+  const isPanel = variant === 'panel';
 
   const modeButtons = modes.map((m) => (
     <button
@@ -67,9 +68,15 @@ export default function SalesChartControls({
       type="button"
       onClick={() => onGranularityChange(m.key)}
       className={
-        variant === 'segmented'
+        variant === 'segmented' || isPanel
           ? `rounded-md px-3 py-1.5 text-[11px] transition ${
-              granularity === m.key ? 'bg-accent font-bold text-white' : 'text-muted hover:text-ink'
+              granularity === m.key
+                ? isPanel
+                  ? 'bg-[#3b82f6] font-bold text-white'
+                  : 'bg-accent font-bold text-white'
+                : isPanel
+                  ? 'text-[#6b7b94] hover:text-[#e7ecf3]'
+                  : 'text-muted hover:text-ink'
             }`
           : `rounded-full px-3 py-1.5 text-xs font-medium transition ${
               granularity === m.key ? 'bg-accent text-white' : 'bg-surface text-text-2 hover:bg-surface-2'
@@ -86,14 +93,22 @@ export default function SalesChartControls({
         className={
           variant === 'segmented'
             ? 'flex gap-1 rounded-lg border border-border bg-body p-1'
-            : 'flex flex-wrap gap-1.5'
+            : isPanel
+              ? 'flex gap-1 rounded-lg border border-[#28344c] bg-[#18223a] p-1'
+              : 'flex flex-wrap gap-1.5'
         }
       >
         {modeButtons}
       </div>
 
       {granularity === 'day' && (
-        <div className="max-w-xs rounded-lg border border-border bg-surface">
+        <div
+          className={
+            isPanel
+              ? 'max-w-xs rounded-lg border border-[#28344c] bg-[#18223a]'
+              : 'max-w-xs rounded-lg border border-border bg-surface'
+          }
+        >
           <JalaliDatePicker
             label="تاریخ"
             value={selectedDate}
@@ -112,8 +127,12 @@ export default function SalesChartControls({
               onClick={() => onSelectedMonthStartChange(m.periodStart)}
               className={`rounded-full px-3 py-1 text-[11px] font-medium transition ${
                 selectedMonthStart === m.periodStart
-                  ? 'bg-accent text-white'
-                  : 'bg-surface text-text-2 hover:bg-surface-2'
+                  ? isPanel
+                    ? 'bg-[#3b82f6] text-white'
+                    : 'bg-accent text-white'
+                  : isPanel
+                    ? 'border border-[#28344c] bg-[#18223a] text-[#9fb0c7] hover:text-[#e7ecf3]'
+                    : 'bg-surface text-text-2 hover:bg-surface-2'
               }`}
             >
               {m.label}
@@ -133,12 +152,20 @@ export default function SalesChartControls({
               if (e.key === 'Enter') onApplyFlightNo();
             }}
             placeholder="EP-821"
-            className="font-num h-10 flex-1 rounded-lg border border-border px-3 text-xs outline-none"
+            className={
+              isPanel
+                ? 'font-num h-10 flex-1 rounded-lg border border-[#28344c] bg-[#18223a] px-3 text-xs text-[#e7ecf3] outline-none'
+                : 'font-num h-10 flex-1 rounded-lg border border-border px-3 text-xs outline-none'
+            }
           />
           <button
             type="button"
             onClick={onApplyFlightNo}
-            className="rounded-lg bg-accent px-4 text-xs font-bold text-white"
+            className={
+              isPanel
+                ? 'rounded-lg bg-[#3b82f6] px-4 text-xs font-bold text-white'
+                : 'rounded-lg bg-accent px-4 text-xs font-bold text-white'
+            }
           >
             نمایش
           </button>
