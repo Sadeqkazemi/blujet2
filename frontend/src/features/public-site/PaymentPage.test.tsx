@@ -129,13 +129,13 @@ describe('PaymentPage', () => {
     expect(screen.queryByTestId('pay-submit')).not.toBeInTheDocument();
   });
 
-  it('uses sticky footer on mobile and hides the aside pay button', async () => {
+  it('shows pay button inside pricing aside on mobile without a sticky footer', async () => {
     vi.spyOn(useIsMobileModule, 'useIsMobile').mockReturnValue(true);
     vi.spyOn(publicSiteApi, 'fetchMyBooking').mockResolvedValue(BOOKING);
     renderPage();
 
-    expect(await screen.findByTestId('pay-submit-mobile')).toBeInTheDocument();
-    expect(screen.getByTestId('payment-mobile-sticky')).toBeInTheDocument();
-    expect(screen.queryByTestId('pay-submit')).not.toBeInTheDocument();
+    expect(await screen.findByTestId('pay-submit')).toBeInTheDocument();
+    expect(screen.getByTestId('payment-pricing-aside')).toBeInTheDocument();
+    expect(screen.queryByTestId('payment-mobile-sticky')).not.toBeInTheDocument();
   });
 });
