@@ -34,6 +34,22 @@ const ROLE_CASES = [
     dashboardMarkers: ['آژانس فعال', 'گزارش مالی', 'کارتابل'],
   },
   {
+    username: 'chair',
+    roleLabel: 'رئیس هیئت مدیره',
+    expectedTabs: [
+      'داشبورد',
+      'مدیران',
+      'مالی',
+      'کارتابل',
+      'تنظیمات سامانه',
+      'مشتریان VIP',
+      'هواپیما',
+      'گزارش مدیران',
+      'نظرسنجی مسافران',
+    ],
+    dashboardMarkers: ['آژانس فعال', 'گزارش مالی', 'کارتابل'],
+  },
+  {
     username: 'itadmin',
     roleLabel: 'مدیر فناوری اطلاعات',
     expectedTabs: [

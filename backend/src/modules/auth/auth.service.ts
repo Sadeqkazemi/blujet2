@@ -59,6 +59,15 @@ const STAFF_ROLES = [
   'SITE_ADMIN',
 ] as const;
 
+/** Design login uses «chairman»; seed account is «chair». */
+const STAFF_USERNAME_ALIASES: Record<string, string> = {
+  chairman: 'chair',
+};
+
+function resolveStaffUsername(username: string): string {
+  return STAFF_USERNAME_ALIASES[username] ?? username;
+}
+
 function generateSixDigitCode(): string {
   return generateOtpCode();
 }
@@ -357,7 +366,8 @@ export class AuthService {
     username: string,
     password: string,
   ): Promise<{ challengeId: string }> {
-    const user = await this.typeorm.user.findUnique({ where: { username } });
+    const resolved = resolveStaffUsername(username);
+    const user = await this.typeorm.user.findUnique({ where: { username: resolved } });
 
     if (
       !user ||
@@ -868,7 +878,8 @@ export class AuthService {
       !this.twoFactorProvider.getLastCode
     )
       return null;
-    const user = await this.typeorm.user.findUnique({ where: { username } });
+    const resolved = resolveStaffUsername(username);
+    const user = await this.typeorm.user.findUnique({ where: { username: resolved } });
     if (!user) return null;
     return this.twoFactorProvider.getLastCode(user.id) ?? null;
   }
