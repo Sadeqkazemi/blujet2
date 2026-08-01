@@ -37,11 +37,6 @@ const LANG_OPTIONS: { value: StoredLocale; label: string }[] = [
   { value: 'ar', label: 'العربية' },
 ];
 
-function initials(fullName: string) {
-  const parts = fullName.trim().split(/\s+/);
-  return parts.slice(0, 2).map((p) => p[0] ?? '').join('') || 'کا';
-}
-
 function GlobeIcon({ size = 15 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
