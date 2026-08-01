@@ -46,8 +46,9 @@ async function typeOtp(prefix: string, code: string) {
 }
 
 describe('CustomerLoginPage', () => {
-  it('walks through OTP login with resend countdown and visual panel', async () => {
+  it('walks through OTP login with resend countdown, site header, and visual panel', async () => {
     renderWithRouter(<CustomerLoginPage />);
+    expect(screen.getByTestId('public-lang-toggle')).toBeInTheDocument();
     expect(screen.getByTestId('signin-tab-login')).toBeInTheDocument();
     expect(screen.getByTestId('signin-acct-agency')).toBeInTheDocument();
     expect(screen.getByTestId('signin-visual-panel')).toBeInTheDocument();

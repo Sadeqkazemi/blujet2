@@ -3,11 +3,12 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import AuthVisualPanel from '../../components/auth/AuthVisualPanel';
 import { OtpCells, OTP_LEN } from '../../components/auth/OtpCells';
 import { AUTH_FOCUS_CSS, AUTH_INPUT, AUTH_LABEL, authBtn, segStyle } from '../../components/auth/auth-styles';
+import PublicPageShell from '../../components/public/PublicPageShell';
 import { useAuth } from '../../hooks/useAuth';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { ApiRequestError } from '../../api/envelope';
 import { faDigits } from '../../lib/fa-format';
-import { DIR, FONT } from '../../lib/i18n';
 
 const RESEND_SECONDS = 120;
 
@@ -313,37 +314,6 @@ const STR: Record<
   },
 };
 
-function LangSwitch({ locale, onCycle }: { locale: StoredLocale; onCycle: () => void }) {
-  const langLabel = locale === 'en' ? 'EN' : locale === 'ar' ? 'AR' : 'FA';
-  return (
-    <button
-      type="button"
-      data-testid="signin-lang-switch"
-      onClick={onCycle}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 6,
-        cursor: 'pointer',
-        color: '#5a6678',
-        border: '1.5px solid #e2e7ee',
-        borderRadius: 20,
-        padding: '7px 13px',
-        fontSize: 12,
-        fontWeight: 700,
-        background: '#fff',
-        fontFamily: 'inherit',
-      }}
-    >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="12" r="9" />
-        <path d="M3 12h18M12 3c2.5 2.5 4 5.7 4 9s-1.5 6.5-4 9c-2.5-2.5-4-5.7-4-9s1.5-6.5 4-9z" />
-      </svg>
-      {langLabel}
-    </button>
-  );
-}
-
 function OrDivider({ label }: { label: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#b7c0cd', fontSize: 11, fontWeight: 700 }}>
@@ -356,17 +326,12 @@ function OrDivider({ label }: { label: string }) {
 
 export default function CustomerLoginPage() {
   const { status, user, requestOtp, verifyOtp, agencyLogin } = useAuth();
-  const { locale, setLocale } = useLocale();
+  const { locale } = useLocale();
   const t = STR[locale];
-  const dir = DIR[locale];
-  const font = FONT[locale];
+  const isMobile = useIsMobile();
   const isEN = locale === 'en';
   const navigate = useNavigate();
   const location = useLocation() as { state?: { from?: string } };
-
-  const [isMobile, setIsMobile] = useState(() =>
-    typeof window !== 'undefined' ? window.matchMedia('(max-width:767px)').matches : false,
-  );
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [acct, setAcct] = useState<'user' | 'agency'>('user');
   const [phase, setPhase] = useState<'id' | 'otp'>('id');
@@ -392,14 +357,6 @@ export default function CustomerLoginPage() {
     if (status === 'authenticated' && user?.role === 'USER') navigate(destination, { replace: true });
   }, [status, user, navigate, destination]);
 
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width:767px)');
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    setIsMobile(mq.matches);
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, []);
-
   const isLogin = mode === 'login';
   const isAgency = acct === 'agency';
   const isOtp = phase === 'otp';
@@ -409,8 +366,6 @@ export default function CustomerLoginPage() {
   const phoneInfoOk = isLogin
     ? phoneOk(phone)
     : phoneOk(phone) && fullName.trim().length >= (isEN ? 2 : 3) && terms && (!isAgency || (agName.trim() && agLic.trim()));
-
-  const cycleLocale = () => setLocale(locale === 'fa' ? 'en' : locale === 'en' ? 'ar' : 'fa');
 
   function resetFlow() {
     setPhase('id');
@@ -533,19 +488,15 @@ export default function CustomerLoginPage() {
   const namePlaceholder = isAgency ? t.agManagerPlaceholder : t.namePlaceholder;
 
   return (
-    <>
+    <PublicPageShell>
       <style>{AUTH_FOCUS_CSS}</style>
       <div
-        dir={dir}
         style={{
-          fontFamily: font,
           color: '#16202e',
-          minHeight: '100vh',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: 26,
-          background: '#ffffff',
+          padding: '32px 26px 48px',
         }}
       >
         <div
@@ -568,66 +519,25 @@ export default function CustomerLoginPage() {
               flexDirection: 'column',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-              <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none', color: '#16202e' }}>
-                <div
+            {isLogin && !isAgency && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 18 }}>
+                <Link
+                  to="/forgot-password"
+                  data-testid="signin-forgot-link"
                   style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 11,
-                    background: '#1668c4',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#fff',
-                    fontSize: 18,
+                    textDecoration: 'none',
+                    fontSize: 11.5,
+                    color: '#8a96a6',
+                    fontWeight: 700,
+                    border: '1.5px solid #e6ebf2',
+                    borderRadius: 100,
+                    padding: '8px 15px',
                   }}
                 >
-                  ✈
-                </div>
-                <span style={{ fontWeight: 900, fontSize: 19 }}>blujet</span>
-              </Link>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <LangSwitch locale={locale} onCycle={cycleLocale} />
-                {isLogin && !isAgency && (
-                  <Link
-                    to="/forgot-password"
-                    data-testid="signin-forgot-link"
-                    style={{
-                      textDecoration: 'none',
-                      fontSize: 11.5,
-                      color: '#8a96a6',
-                      fontWeight: 700,
-                      border: '1.5px solid #e6ebf2',
-                      borderRadius: 100,
-                      padding: '8px 15px',
-                    }}
-                  >
-                    {t.forgotPassword}
-                  </Link>
-                )}
-                {isMobile && (
-                  <Link
-                    to="/"
-                    data-testid="signin-close"
-                    style={{
-                      display: 'flex',
-                      width: 36,
-                      height: 36,
-                      borderRadius: '50%',
-                      background: '#f3f5f8',
-                      color: '#5a6678',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 18,
-                      textDecoration: 'none',
-                    }}
-                  >
-                    ×
-                  </Link>
-                )}
+                  {t.forgotPassword}
+                </Link>
               </div>
-            </div>
+            )}
 
             <div style={{ display: 'flex', background: '#f1f5fa', borderRadius: 13, padding: 4, marginBottom: 22 }}>
               <span data-testid="signin-acct-user" onClick={() => switchAcct('user')} style={segStyle(!isAgency)}>
@@ -1083,6 +993,6 @@ export default function CustomerLoginPage() {
           {!isMobile && <AuthVisualPanel title={t.visualTitle} subtitle={t.visualSub} testId="signin-visual-panel" />}
         </div>
       </div>
-    </>
+    </PublicPageShell>
   );
 }
