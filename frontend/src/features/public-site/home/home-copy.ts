@@ -190,6 +190,7 @@ export function buildSearchCopy(
     originPlaceholder: string;
     destPlaceholder: string;
     destNeedOriginPlaceholder: string;
+    cityEmptyLabel: string;
     cityListLabel: string;
     popularRoutesTitle: string;
     popularRoutesSub: string;

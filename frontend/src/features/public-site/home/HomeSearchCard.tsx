@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import JalaliDatePicker from '../../../components/JalaliDatePicker';
 import type { Airport } from '../../../types/public-site';
 import type { StoredLocale } from '../../../hooks/useLocale';
-import { airportCityName } from '../../../lib/airport-cities';
+import { airportCityName, FALLBACK_AIRPORTS } from '../../../lib/airport-cities';
 import { formatToman } from '../../../lib/fa-format';
 import {
   DomesticFlightIcon,
@@ -40,6 +40,7 @@ export type HomeSearchCopy = {
   originPlaceholder: string;
   destPlaceholder: string;
   destNeedOriginPlaceholder: string;
+  cityEmptyLabel: string;
   cityListLabel: string;
   btnSearch: string;
   btnConfirm: string;
@@ -135,10 +136,14 @@ function AirportCell({
   fieldStyle,
   isRTL,
   locale,
+  isMobile,
   cityListLabel,
+  cityEmptyLabel,
   cellPadding = '10px 24px 10px 20px',
   compact = false,
   className,
+  disabled = false,
+  onDisabledClick,
 }: {
   label: string;
   value: string;
@@ -149,14 +154,19 @@ function AirportCell({
   fieldStyle?: React.CSSProperties;
   isRTL: boolean;
   locale: StoredLocale;
+  isMobile: boolean;
   cityListLabel: string;
+  cityEmptyLabel: string;
   cellPadding?: string;
   compact?: boolean;
   className?: string;
+  disabled?: boolean;
+  onDisabledClick?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const rootRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -167,45 +177,111 @@ function AirportCell({
     return () => document.removeEventListener('mousedown', onClickOutside);
   }, [open]);
 
+  useEffect(() => {
+    if (open) {
+      setQuery('');
+      const t = window.setTimeout(() => inputRef.current?.focus(), 0);
+      return () => window.clearTimeout(t);
+    }
+    return undefined;
+  }, [open]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return airports;
-    return airports.filter((a) => a.code.toLowerCase().includes(q) || a.cityFa.toLowerCase().includes(q));
-  }, [airports, query]);
+    return airports.filter((a) => {
+      const city = airportCityName(a.code, locale, a.cityFa);
+      return (
+        a.code.toLowerCase().includes(q) ||
+        a.cityFa.toLowerCase().includes(q) ||
+        city.toLowerCase().includes(q)
+      );
+    });
+  }, [airports, query, locale]);
+
+  function toggleOpen() {
+    if (disabled) {
+      onDisabledClick?.();
+      return;
+    }
+    setOpen((v) => !v);
+  }
+
+  const dropStyle: React.CSSProperties = isMobile
+    ? {
+        position: 'fixed',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        top: 'auto',
+        width: '100%',
+        maxWidth: '100vw',
+        borderRadius: '18px 18px 0 0',
+        padding: 13,
+        zIndex: 240,
+      }
+    : {
+        position: 'absolute',
+        top: '100%',
+        [isRTL ? 'right' : 'left']: 0,
+        marginTop: 4,
+        width: 280,
+        maxWidth: '88vw',
+        borderRadius: 14,
+        zIndex: 40,
+        padding: 13,
+      };
 
   return (
     <div ref={rootRef} className={className} style={{ flex: compact ? undefined : '1.5 1 165px', minWidth: compact ? 0 : 165, position: 'relative', ...fieldStyle }}>
       <div
         data-testid={testId}
-        onClick={() => setOpen((v) => !v)}
-        style={{ cursor: 'pointer', padding: cellPadding, display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}
+        onClick={toggleOpen}
+        style={{
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          padding: compact ? '8px 12px' : cellPadding,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          minHeight: compact ? 58 : undefined,
+          opacity: disabled ? 0.45 : 1,
+        }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#9aa4b2', fontWeight: 600, marginBottom: 3 }}>
           <PinIcon />
           {label}
         </div>
-        <div style={{ fontSize: '14.5px', fontWeight: 800, color: value ? '#16202e' : '#9aa4b2' }}>{display}</div>
+        <div
+          className="home-airport-display"
+          style={{
+            fontSize: '14.5px',
+            fontWeight: 800,
+            color: value ? '#16202e' : '#9aa4b2',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {display}
+        </div>
       </div>
       {open && (
         <>
-          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 38 }} />
           <div
+            onClick={() => setOpen(false)}
+            style={{ position: 'fixed', inset: 0, zIndex: isMobile ? 238 : 38, background: isMobile ? 'rgba(13,38,64,.55)' : undefined }}
+          />
+          <div
+            onMouseDown={(e) => e.stopPropagation()}
             style={{
-              position: 'absolute',
-              top: '100%',
-              [isRTL ? 'right' : 'left']: 0,
-              marginTop: 4,
-              width: 280,
-              maxWidth: '88vw',
+              ...dropStyle,
               background: '#fff',
               border: '1px solid #e6eaf0',
-              borderRadius: 14,
               boxShadow: '0 18px 44px -12px rgba(13,38,102,.30)',
-              padding: 13,
-              zIndex: 40,
             }}
           >
             <input
+              ref={inputRef}
               value={query}
               onChange={(ev) => setQuery(ev.target.value)}
               placeholder={label}
@@ -216,14 +292,14 @@ function AirportCell({
                 border: '1.5px solid #e2e7ee',
                 borderRadius: 10,
                 padding: '0 12px',
-                fontSize: '12.5px',
+                fontSize: isMobile ? '13.5px' : '12.5px',
                 fontFamily: 'inherit',
                 outline: 'none',
                 marginBottom: 9,
               }}
             />
-            <div style={{ fontSize: '10.5px', color: '#9aa4b2', fontWeight: 700, margin: '0 4px 6px' }}>{cityListLabel}</div>
-            <div style={{ maxHeight: 220, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ fontSize: isMobile ? '12.5px' : '10.5px', color: '#9aa4b2', fontWeight: 700, margin: '0 4px 6px' }}>{cityListLabel}</div>
+            <div style={{ maxHeight: isMobile ? '50vh' : 220, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
               {filtered.map((a) => (
                 <div
                   key={a.id}
@@ -250,11 +326,16 @@ function AirportCell({
                   >
                     <PlaneIcon size={15} />
                   </span>
-                  <div style={{ flex: 1, minWidth: 0, fontSize: '12.5px', fontWeight: 700, color: '#16202e' }}>
+                  <div style={{ flex: 1, minWidth: 0, fontSize: isMobile ? '13.5px' : '12.5px', fontWeight: 700, color: '#16202e' }}>
                     {airportCityName(a.code, locale, a.cityFa)}
                   </div>
                 </div>
               ))}
+              {filtered.length === 0 && (
+                <div style={{ padding: 15, textAlign: 'center', fontSize: isMobile ? '13.5px' : '11.5px', color: '#9aa4b2' }}>
+                  {cityEmptyLabel}
+                </div>
+              )}
             </div>
           </div>
         </>
@@ -317,15 +398,17 @@ export default function HomeSearchCard({
   ];
   const paxSummary = `${paxParts.join('، ')}، ${cabinLabel}`;
 
+  const airportOptions = airports.length > 0 ? airports : FALLBACK_AIRPORTS;
+
   function originDisplay() {
     if (!origin) return t.originPlaceholder;
-    const ap = airports.find((a) => a.code === origin);
+    const ap = airportOptions.find((a) => a.code === origin);
     return cityName(origin, ap?.cityFa);
   }
 
   function destDisplay() {
-    if (!dest) return origin ? t.destPlaceholder : t.destNeedOriginPlaceholder;
-    const ap = airports.find((a) => a.code === dest);
+    if (!dest) return t.destPlaceholder;
+    const ap = airportOptions.find((a) => a.code === dest);
     return cityName(dest, ap?.cityFa);
   }
 
@@ -362,6 +445,7 @@ export default function HomeSearchCard({
             gap: 10px !important;
             border: none !important;
             background: transparent !important;
+            align-items: start !important;
           }
           #search-card .home-field-card {
             background: #fff !important;
@@ -505,7 +589,7 @@ export default function HomeSearchCard({
                   display: isMobile ? 'grid' : 'flex',
                   gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'none',
                   gap: isMobile ? 10 : 0,
-                  alignItems: 'stretch',
+                  alignItems: isMobile ? 'start' : 'stretch',
                   position: 'relative',
                   border: isMobile ? 'none' : '1.5px solid #e3e9f1',
                   borderRadius: 14,
@@ -516,7 +600,7 @@ export default function HomeSearchCard({
                   label={t.lblOrigin}
                   value={origin}
                   display={originDisplay()}
-                  airports={airports}
+                  airports={airportOptions}
                   onPick={setOrigin}
                   testId="home-origin"
                   fieldStyle={{
@@ -527,15 +611,22 @@ export default function HomeSearchCard({
                   className="home-origin home-field-card"
                   isRTL={isRTL}
                   locale={locale}
+                  isMobile={isMobile}
                   cityListLabel={t.cityListLabel}
+                  cityEmptyLabel={t.cityEmptyLabel}
                   compact={isMobile}
                 />
 
                 <div
                   className="home-swap"
                   onClick={() => {
+                    if (!origin || !dest) {
+                      setError(t.destNeedOriginPlaceholder);
+                      return;
+                    }
                     setOrigin(dest);
                     setDest(origin);
+                    setError(null);
                   }}
                   style={{
                     alignSelf: 'center',
@@ -566,9 +657,11 @@ export default function HomeSearchCard({
                   label={t.lblDestination}
                   value={dest}
                   display={destDisplay()}
-                  airports={airports}
+                  airports={airportOptions}
                   onPick={setDest}
                   testId="home-dest"
+                  disabled={!origin}
+                  onDisabledClick={() => setError(t.destNeedOriginPlaceholder)}
                   fieldStyle={{
                     gridColumn: isMobile ? '2' : 'auto',
                     gridRow: isMobile ? '1' : 'auto',
@@ -578,7 +671,9 @@ export default function HomeSearchCard({
                   className="home-dest home-field-card"
                   isRTL={isRTL}
                   locale={locale}
+                  isMobile={isMobile}
                   cityListLabel={t.cityListLabel}
+                  cityEmptyLabel={t.cityEmptyLabel}
                   cellPadding="10px 24px 10px 32px"
                   compact={isMobile}
                 />
