@@ -44,6 +44,7 @@ interface SalesChartControlsProps {
   onFlightNoChange: (v: string) => void;
   onApplyFlightNo: () => void;
   variant?: 'pill' | 'segmented';
+  dark?: boolean;
 }
 
 export default function SalesChartControls({
@@ -58,8 +59,14 @@ export default function SalesChartControls({
   onFlightNoChange,
   onApplyFlightNo,
   variant = 'pill',
+  dark = false,
 }: SalesChartControlsProps) {
   const monthOptions = useMemo(() => recentJalaliMonths(), []);
+
+  const inactiveSegmented = dark ? 'text-[#9fb0c7] hover:text-white' : 'text-muted hover:text-ink';
+  const inactivePill = dark
+    ? 'bg-[#18223a] text-[#9fb0c7] hover:bg-[#1f2a3d]'
+    : 'bg-surface text-text-2 hover:bg-surface-2';
 
   const modeButtons = modes.map((m) => (
     <button
@@ -69,10 +76,10 @@ export default function SalesChartControls({
       className={
         variant === 'segmented'
           ? `rounded-md px-3 py-1.5 text-[11px] transition ${
-              granularity === m.key ? 'bg-accent font-bold text-white' : 'text-muted hover:text-ink'
+              granularity === m.key ? 'bg-accent font-bold text-white' : inactiveSegmented
             }`
           : `rounded-full px-3 py-1.5 text-xs font-medium transition ${
-              granularity === m.key ? 'bg-accent text-white' : 'bg-surface text-text-2 hover:bg-surface-2'
+              granularity === m.key ? 'bg-accent text-white' : inactivePill
             }`
       }
     >
@@ -85,7 +92,7 @@ export default function SalesChartControls({
       <div
         className={
           variant === 'segmented'
-            ? 'flex gap-1 rounded-lg border border-border bg-body p-1'
+            ? `flex gap-1 rounded-lg border p-1 ${dark ? 'border-[#28344c] bg-[#18223a]' : 'border-border bg-body'}`
             : 'flex flex-wrap gap-1.5'
         }
       >
@@ -93,7 +100,7 @@ export default function SalesChartControls({
       </div>
 
       {granularity === 'day' && (
-        <div className="max-w-xs rounded-lg border border-border bg-surface">
+        <div className={`max-w-xs rounded-lg border ${dark ? 'border-[#28344c] bg-[#18223a]' : 'border-border bg-surface'}`}>
           <JalaliDatePicker
             label="تاریخ"
             value={selectedDate}
@@ -113,7 +120,9 @@ export default function SalesChartControls({
               className={`rounded-full px-3 py-1 text-[11px] font-medium transition ${
                 selectedMonthStart === m.periodStart
                   ? 'bg-accent text-white'
-                  : 'bg-surface text-text-2 hover:bg-surface-2'
+                  : dark
+                    ? 'bg-[#18223a] text-[#9fb0c7] hover:bg-[#1f2a3d]'
+                    : 'bg-surface text-text-2 hover:bg-surface-2'
               }`}
             >
               {m.label}
@@ -133,7 +142,9 @@ export default function SalesChartControls({
               if (e.key === 'Enter') onApplyFlightNo();
             }}
             placeholder="EP-821"
-            className="font-num h-10 flex-1 rounded-lg border border-border px-3 text-xs outline-none"
+            className={`font-num h-10 flex-1 rounded-lg border px-3 text-xs outline-none ${
+              dark ? 'border-[#28344c] bg-[#18223a] text-[#e7ecf3]' : 'border-border'
+            }`}
           />
           <button
             type="button"

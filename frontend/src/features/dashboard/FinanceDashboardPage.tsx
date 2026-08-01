@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import {
   fetchCompletedFlightsSummary,
   fetchFinanceDashboardStats,
@@ -15,6 +14,16 @@ import type {
   SalesGranularity,
 } from '../../types/reporting';
 import SalesBarChart from '../../components/SalesBarChart';
+import {
+  StaffCartableWidget,
+  StaffFlightsSummaryGrid,
+  StaffKpiCard,
+  StaffPanelCard,
+  StaffPanelPageHeader,
+  staffSegmentedControl,
+} from '../../components/staff-panel-ui';
+import { STAFF_PANEL } from '../../lib/staff-panel-theme';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 const CHART_MODES: { key: SalesGranularity; label: string }[] = [
   { key: 'q3', label: '۳ ماهه' },
@@ -27,39 +36,8 @@ function trendLabel(pct: number): string {
   return `${pct > 0 ? '+' : '−'}${faDigits(Math.abs(pct))}٪`;
 }
 
-function StatCard({
-  label,
-  value,
-  trendPct,
-  icon,
-  iconClass,
-}: {
-  label: string;
-  value: string;
-  trendPct: number;
-  icon: React.ReactNode;
-  iconClass: string;
-}) {
-  const trendUp = trendPct >= 0;
-  return (
-    <div className="rounded-xl border border-border bg-white p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${iconClass}`}>{icon}</span>
-        <span
-          className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-            trendUp ? 'bg-[#10b98118] text-[#059669]' : 'bg-danger/10 text-danger'
-          }`}
-        >
-          {trendLabel(trendPct)}
-        </span>
-      </div>
-      <div className="font-num text-xl font-black text-ink">{value}</div>
-      <div className="mt-1 text-[11px] text-muted">{label}</div>
-    </div>
-  );
-}
-
 export default function FinanceDashboardPage() {
+  const isMobile = useIsMobile();
   const [stats, setStats] = useState<FinanceDashboardStats | null>(null);
   const [granularity, setGranularity] = useState<SalesGranularity>('q6');
   const [periodKey, setPeriodKey] = useState<string | null>(null);
@@ -112,32 +90,42 @@ export default function FinanceDashboardPage() {
   };
 
   return (
-    <div className="p-8">
-      <div className="mb-6">
-        <h1 className="text-xl font-black text-ink">داشبورد</h1>
-        <p className="mt-1 text-sm text-muted">نمای کلی فروش و کارهای در انتظار اقدام</p>
-      </div>
+    <div data-testid="finance-dashboard">
+      <StaffPanelPageHeader title="داشبورد" subtitle="نمای کلی فروش و کارهای در انتظار اقدام" />
 
-      {error && <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">{error}</p>}
+      {error && (
+        <p style={{ marginBottom: 16, fontSize: 13, color: STAFF_PANEL.danger }}>{error}</p>
+      )}
 
       {stats && (
-        <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-          <StatCard
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)',
+            gap: 13,
+            marginBottom: 24,
+          }}
+        >
+          <StaffKpiCard
             label="آژانس فعال"
             value={faDigits(stats.activeAgencies)}
-            trendPct={stats.activeAgenciesTrendPct}
-            iconClass="bg-accent/10 text-accent"
+            trend={trendLabel(stats.activeAgenciesTrendPct)}
+            trendUp={stats.activeAgenciesTrendPct >= 0}
+            iconBg={STAFF_PANEL.accentSoft}
+            iconColor={STAFF_PANEL.accent}
             icon={
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <path d="M3 21h18M6 21V5a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v16M19 21V10a1 1 0 0 0-1-1h-3" />
               </svg>
             }
           />
-          <StatCard
+          <StaffKpiCard
             label="مسافر این ماه"
             value={faDigits(stats.passengersThisMonth)}
-            trendPct={stats.passengersTrendPct}
-            iconClass="bg-[#a855f71a] text-[#a855f7]"
+            trend={trendLabel(stats.passengersTrendPct)}
+            trendUp={stats.passengersTrendPct >= 0}
+            iconBg="rgba(168,85,247,0.16)"
+            iconColor={STAFF_PANEL.purple}
             icon={
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <circle cx="9" cy="8" r="3.2" />
@@ -145,11 +133,13 @@ export default function FinanceDashboardPage() {
               </svg>
             }
           />
-          <StatCard
+          <StaffKpiCard
             label="بلیط فروخته‌شده"
             value={faDigits(stats.ticketsSoldThisMonth)}
-            trendPct={stats.ticketsTrendPct}
-            iconClass="bg-[#10b98118] text-[#059669]"
+            trend={trendLabel(stats.ticketsTrendPct)}
+            trendUp={stats.ticketsTrendPct >= 0}
+            iconBg="rgba(16,185,129,0.16)"
+            iconColor={STAFF_PANEL.success}
             icon={
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <path d="M3 9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2 2 2 0 0 0 0 4 2 2 0 0 1-2 2H5a2 2 0 0 1-2-2 2 2 0 0 0 0-4z" />
@@ -157,11 +147,13 @@ export default function FinanceDashboardPage() {
               </svg>
             }
           />
-          <StatCard
+          <StaffKpiCard
             label="درآمد (تومان)"
             value={faMoney(stats.revenueThisMonthIrr)}
-            trendPct={stats.revenueTrendPct}
-            iconClass="bg-[#f59e0b18] text-[#b45309]"
+            trend={trendLabel(stats.revenueTrendPct)}
+            trendUp={stats.revenueTrendPct >= 0}
+            iconBg="rgba(245,158,11,0.16)"
+            iconColor={STAFF_PANEL.warning}
             icon={
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <rect x="3" y="6" width="18" height="13" rx="2" />
@@ -172,116 +164,93 @@ export default function FinanceDashboardPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.7fr_1fr]">
-        <div className="rounded-xl border border-border bg-white p-5">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-bold text-ink">نمودار فروش</h2>
-              <p className="mt-0.5 text-[11px] text-muted">به تفکیک کانال · تومان</p>
-            </div>
-            <div className="flex gap-1 rounded-lg border border-border bg-body p-1">
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : '1.7fr 1fr',
+          gap: 15,
+          alignItems: 'start',
+        }}
+      >
+        <StaffPanelCard
+          title="نمودار فروش"
+          subtitle="به تفکیک کانال · تومان"
+          headerAction={
+            <div
+              style={{
+                display: 'flex',
+                gap: 4,
+                padding: 4,
+                borderRadius: 10,
+                border: `1px solid ${STAFF_PANEL.inputBorder}`,
+                background: STAFF_PANEL.inputBg,
+              }}
+            >
               {CHART_MODES.map((m) => (
                 <button
                   key={m.key}
+                  type="button"
                   onClick={() => setGranularity(m.key)}
-                  className={`rounded-md px-3 py-1.5 text-[11px] transition ${
-                    granularity === m.key ? 'bg-accent font-bold text-white' : 'text-muted hover:text-ink'
-                  }`}
+                  style={staffSegmentedControl(granularity === m.key)}
                 >
                   {m.label}
                 </button>
               ))}
             </div>
-          </div>
-
-          <div className="mb-4 grid grid-cols-3 gap-3">
-            <div className="rounded-lg bg-body p-3 text-xs">
-              <div className="mb-1 flex items-center gap-1.5 text-[10px] text-muted">
-                <span className="h-2 w-2 rounded-sm bg-[#1668c4]" />
-                سیستمی
+          }
+        >
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+              gap: 10,
+              marginBottom: 16,
+            }}
+          >
+            {(
+              [
+                ['سیستمی', channelSums.system, '#1668c4'],
+                ['چارتر', channelSums.charter, '#a855f7'],
+                ['آژانس', channelSums.agency, '#059669'],
+              ] as const
+            ).map(([label, sum, color]) => (
+              <div
+                key={label}
+                style={{
+                  background: STAFF_PANEL.inputBg,
+                  border: `1px solid ${STAFF_PANEL.inputBorder}`,
+                  borderRadius: 12,
+                  padding: 12,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: STAFF_PANEL.textMuted, marginBottom: 5 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: 2, background: color }} />
+                  {label}
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 900, color }}>{faMoney(sum)}</div>
               </div>
-              <div className="font-num font-black text-[#1668c4]">{faMoney(channelSums.system)}</div>
-            </div>
-            <div className="rounded-lg bg-body p-3 text-xs">
-              <div className="mb-1 flex items-center gap-1.5 text-[10px] text-muted">
-                <span className="h-2 w-2 rounded-sm bg-[#a855f7]" />
-                چارتر
-              </div>
-              <div className="font-num font-black text-[#a855f7]">{faMoney(channelSums.charter)}</div>
-            </div>
-            <div className="rounded-lg bg-body p-3 text-xs">
-              <div className="mb-1 flex items-center gap-1.5 text-[10px] text-muted">
-                <span className="h-2 w-2 rounded-sm bg-[#059669]" />
-                آژانس
-              </div>
-              <div className="font-num font-black text-[#059669]">{faMoney(channelSums.agency)}</div>
-            </div>
+            ))}
           </div>
 
           {loading ? (
-            <p className="py-10 text-center text-sm text-muted">در حال بارگذاری…</p>
+            <p style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: STAFF_PANEL.textMuted }}>
+              در حال بارگذاری…
+            </p>
           ) : (
-            <SalesBarChart periods={periods} selectedPeriodKey={periodKey} onSelectPeriod={setPeriodKey} />
+            <SalesBarChart dark periods={periods} selectedPeriodKey={periodKey} onSelectPeriod={setPeriodKey} />
           )}
 
           {flights && (
-            <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl border border-border bg-body/40 p-4 md:grid-cols-4">
-              <div>
-                <div className="font-num text-lg font-black text-ink">{faDigits(flights.flightCount)}</div>
-                <div className="text-xs text-muted">پروازهای انجام‌شده</div>
-              </div>
-              <div>
-                <div className="font-num text-lg font-black text-ink">{faDigits(flights.totalSeats)}</div>
-                <div className="text-xs text-muted">مجموع صندلی</div>
-              </div>
-              <div>
-                <div className="font-num text-lg font-black text-[#059669]">{faDigits(flights.soldSeats)}</div>
-                <div className="text-xs text-muted">فروخته‌شده</div>
-              </div>
-              <div>
-                <div className="font-num text-lg font-black text-danger">{faDigits(flights.unsoldSeats)}</div>
-                <div className="text-xs text-muted">فروش‌نرفته</div>
-              </div>
-            </div>
+            <StaffFlightsSummaryGrid
+              flightCount={flights.flightCount}
+              totalSeats={flights.totalSeats}
+              soldSeats={flights.soldSeats}
+              unsoldSeats={flights.unsoldSeats}
+            />
           )}
-        </div>
+        </StaffPanelCard>
 
-        {cartable && (
-          <section className="rounded-xl border border-border bg-white p-5">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-bold text-ink">
-                کارتابل
-                {cartable.totalOpen > 0 && (
-                  <span className="mr-2 rounded-full bg-danger/10 px-2.5 py-0.5 text-[11px] font-bold text-danger">
-                    {faDigits(cartable.totalOpen)}
-                  </span>
-                )}
-              </h2>
-            </div>
-            {cartable.tasks.length === 0 ? (
-              <p className="py-6 text-center text-xs text-muted">کارتابل خالی است ✓</p>
-            ) : (
-              <ul className="divide-y divide-border">
-                {cartable.tasks.slice(0, 4).map((t) => (
-                  <li key={t.id} className="flex items-start gap-3 py-3 text-xs">
-                    <span className="mt-0.5 flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-accent/10 text-accent">
-                      ✉
-                    </span>
-                    <div className="min-w-0">
-                      <div className="font-bold text-ink">{t.title}</div>
-                      <div className="mt-0.5 text-[10px] text-muted">
-                        {t.senderLabelFa ?? t.sender?.fullName ?? ''}
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <Link to="/panel/cartable" className="mt-4 block text-center text-xs font-bold text-accent">
-              مشاهده‌ی همه‌ی کارها ←
-            </Link>
-          </section>
-        )}
+        {cartable && <StaffCartableWidget cartable={cartable} />}
       </div>
     </div>
   );

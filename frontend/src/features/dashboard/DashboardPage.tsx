@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { fetchCompletedFlightsSummary, fetchKpis, fetchSalesChart } from '../../api/reporting';
 import { fetchCartable } from '../../api/cartable';
 import type { CartableListResult } from '../../types/cartable';
@@ -11,10 +10,44 @@ import type {
 } from '../../types/reporting';
 import SalesBarChart from '../../components/SalesBarChart';
 import SalesChartControls from '../../components/SalesChartControls';
-import StatTile from '../../components/StatTile';
+import {
+  StaffCartableWidget,
+  StaffFlightsSummaryGrid,
+  StaffKpiCard,
+  StaffPanelCard,
+  StaffPanelPageHeader,
+} from '../../components/staff-panel-ui';
+import { STAFF_PANEL } from '../../lib/staff-panel-theme';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import { useSalesChartQuery } from '../../hooks/useSalesChartQuery';
 
+const KPI_ICONS = {
+  revenue: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M3 3v18h18" />
+      <path d="M7 14l3.5-3.5 3 3L20 7" />
+    </svg>
+  ),
+  profit: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+    </svg>
+  ),
+  cost: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <rect x="3" y="6" width="18" height="13" rx="2" />
+      <path d="M3 10h18" />
+    </svg>
+  ),
+  debt: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+    </svg>
+  ),
+};
+
 export default function DashboardPage() {
+  const isMobile = useIsMobile();
   const chart = useSalesChartQuery({ includeFlightMode: true });
   const [periods, setPeriods] = useState<SalesChartPeriod[]>([]);
   const [kpis, setKpis] = useState<KpiResult | null>(null);
@@ -64,69 +97,65 @@ export default function DashboardPage() {
   }, [chart.query, chart.isQueryReady]);
 
   return (
-    <div className="p-8">
-      <div className="mb-6">
-        <h1 className="text-xl font-black text-ink">داشبورد</h1>
-        <p className="mt-1 text-sm text-muted">نمای کلی فروش و عملکرد پروازها</p>
-      </div>
+    <div data-testid="staff-dashboard">
+      <StaffPanelPageHeader title="داشبورد" subtitle="نمای کلی فروش و عملکرد پروازها" />
 
-      {error && <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">{error}</p>}
+      {error && (
+        <p style={{ marginBottom: 16, fontSize: 13, color: STAFF_PANEL.danger }}>{error}</p>
+      )}
 
-      {cartable && (
-        <section className="mb-6 rounded-xl border border-border bg-white p-5">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-bold text-ink">
-              کارتابل
-              {cartable.totalOpen > 0 && (
-                <span className="mr-2 rounded-full bg-danger/10 px-2.5 py-0.5 text-[11px] font-bold text-danger">
-                  {faDigits(cartable.totalOpen)}
-                </span>
-              )}
-            </h2>
-            <Link to="/panel/cartable" className="text-xs font-bold text-accent">
-              مشاهده‌ی همه‌ی کارها ←
-            </Link>
-          </div>
-          {cartable.tasks.length === 0 ? (
-            <p className="py-2 text-center text-xs text-muted">کارتابل خالی است ✓</p>
-          ) : (
-            <ul className="divide-y divide-border">
-              {cartable.tasks.slice(0, 3).map((t) => (
-                <li key={t.id} className="flex items-center justify-between gap-3 py-2.5 text-xs">
-                  <span className="font-bold text-ink">{t.title}</span>
-                  <span className="text-[10px] text-muted">
-                    {t.senderLabelFa ?? t.sender?.fullName ?? ''}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+      {cartable && cartable.totalOpen > 0 && (
+        <div style={{ marginBottom: 15 }}>
+          <StaffCartableWidget cartable={cartable} limit={3} />
+        </div>
       )}
 
       {kpis && (
-        <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-          <StatTile label="کل درآمد" value={`${faMoney(kpis.revenueIrr)} تومان`} tone="good" />
-          <StatTile
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)',
+            gap: 13,
+            marginBottom: 24,
+          }}
+        >
+          <StaffKpiCard
+            label="کل درآمد"
+            value={`${faMoney(kpis.revenueIrr)} تومان`}
+            icon={KPI_ICONS.revenue}
+            iconBg="rgba(16,185,129,0.16)"
+            iconColor={STAFF_PANEL.success}
+          />
+          <StaffKpiCard
             label="سود خالص"
             value={`${faMoney(kpis.profitIrr)} تومان`}
             sublabel={`حاشیه ${faPercent(kpis.marginPct)}`}
-            tone="accent"
+            icon={KPI_ICONS.profit}
+            iconBg={STAFF_PANEL.accentSoft}
+            iconColor={STAFF_PANEL.accent}
           />
-          <StatTile label="هزینه عملیاتی" value={`${faMoney(kpis.operatingCostIrr)} تومان`} tone="warning" />
-          <StatTile
+          <StaffKpiCard
+            label="هزینه عملیاتی"
+            value={`${faMoney(kpis.operatingCostIrr)} تومان`}
+            icon={KPI_ICONS.cost}
+            iconBg="rgba(245,158,11,0.16)"
+            iconColor={STAFF_PANEL.warning}
+          />
+          <StaffKpiCard
             label="مطالبات معوق آژانس‌ها"
             value={`${faMoney(kpis.agencyDebtIrr)} تومان`}
             sublabel={`${faDigits(kpis.agencyDebtCount)} آژانس`}
-            tone="critical"
+            icon={KPI_ICONS.debt}
+            iconBg="rgba(248,113,113,0.16)"
+            iconColor={STAFF_PANEL.danger}
           />
         </div>
       )}
 
-      <div className="rounded-xl border border-border bg-white p-5">
-        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-          <h2 className="text-sm font-bold text-ink">نمودار فروش</h2>
+      <StaffPanelCard title="نمودار فروش">
+        <div style={{ marginBottom: 16 }}>
           <SalesChartControls
+            dark
             modes={chart.modes}
             granularity={chart.granularity}
             onGranularityChange={chart.setGranularity}
@@ -141,38 +170,31 @@ export default function DashboardPage() {
         </div>
 
         {!chart.isQueryReady ? (
-          <p className="py-10 text-center text-sm text-muted">شماره پرواز را وارد کنید.</p>
+          <p style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: STAFF_PANEL.textMuted }}>
+            شماره پرواز را وارد کنید.
+          </p>
         ) : loading ? (
-          <p className="py-10 text-center text-sm text-muted">در حال بارگذاری…</p>
+          <p style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: STAFF_PANEL.textMuted }}>
+            در حال بارگذاری…
+          </p>
         ) : (
           <SalesBarChart
+            dark
             periods={periods}
             selectedPeriodKey={chart.periodKey}
             onSelectPeriod={chart.setPeriodKey}
           />
         )}
-      </div>
 
-      {flights && (
-        <div className="mt-6 grid grid-cols-2 gap-4 rounded-xl border border-border bg-white p-5 md:grid-cols-4">
-          <div>
-            <div className="font-num text-lg font-black text-ink">{faDigits(flights.flightCount)}</div>
-            <div className="text-xs text-muted">پروازهای انجام‌شده</div>
-          </div>
-          <div>
-            <div className="font-num text-lg font-black text-ink">{faDigits(flights.totalSeats)}</div>
-            <div className="text-xs text-muted">مجموع صندلی</div>
-          </div>
-          <div>
-            <div className="font-num text-lg font-black text-[#059669]">{faDigits(flights.soldSeats)}</div>
-            <div className="text-xs text-muted">صندلی فروخته‌شده</div>
-          </div>
-          <div>
-            <div className="font-num text-lg font-black text-danger">{faDigits(flights.unsoldSeats)}</div>
-            <div className="text-xs text-muted">صندلی فروش‌نرفته</div>
-          </div>
-        </div>
-      )}
+        {flights && (
+          <StaffFlightsSummaryGrid
+            flightCount={flights.flightCount}
+            totalSeats={flights.totalSeats}
+            soldSeats={flights.soldSeats}
+            unsoldSeats={flights.unsoldSeats}
+          />
+        )}
+      </StaffPanelCard>
     </div>
   );
 }

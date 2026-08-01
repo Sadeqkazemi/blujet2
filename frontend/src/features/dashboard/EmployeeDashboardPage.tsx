@@ -3,8 +3,10 @@ import { Link, useOutletContext } from 'react-router-dom';
 import { fetchCartable, fetchMyReferrals } from '../../api/cartable';
 import { fetchEmployeeContext } from '../../api/panels';
 import { faDigits } from '../../lib/fa-format';
-import type { EmployeeContext } from '../../types/panels';
-import type { PanelNavItem } from '../../types/panels';
+import { StaffPanelCard, StaffPanelPageHeader, StaffKpiCard } from '../../components/staff-panel-ui';
+import { STAFF_PANEL } from '../../lib/staff-panel-theme';
+import { useIsMobile } from '../../hooks/useIsMobile';
+import type { EmployeeContext, PanelNavItem } from '../../types/panels';
 
 interface PanelShellContext {
   nav: PanelNavItem[] | null;
@@ -20,11 +22,8 @@ const TAB_DESCRIPTIONS: Record<string, string> = {
   referrals: 'درخواست‌های ارجاع‌شده به شما توسط مدیران',
 };
 
-/**
- * پنل کارمند.dc.html's dashboard: KPI cards (open cartable + pending
- * referrals + unit), permission chips, and section link grid.
- */
 export default function EmployeeDashboardPage() {
+  const isMobile = useIsMobile();
   const { nav } = useOutletContext<PanelShellContext>();
   const sections = (nav ?? []).filter((item) => item.key !== 'dashboard');
   const grantedSections = sections.filter((item) => item.key !== 'referrals');
@@ -59,67 +58,98 @@ export default function EmployeeDashboardPage() {
   }, [hasCartable]);
 
   return (
-    <div className="p-6">
-      <h1 className="text-lg font-bold text-ink">داشبورد کارمند</h1>
-      <p className="mt-1 text-xs text-muted">نمای کلی کارها و ارجاعات واحد</p>
+    <div data-testid="employee-dashboard">
+      <StaffPanelPageHeader title="داشبورد کارمند" subtitle="نمای کلی کارها و ارجاعات واحد" />
 
-      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border border-border bg-white p-4">
-          <div className="mb-2 text-[11px] text-muted">کارهای باز کارتابل</div>
-          <div className="font-num text-2xl font-black text-[#f59e0b]">
-            {openTasks === null ? '—' : faDigits(openTasks)}
-          </div>
-        </div>
-        <div className="rounded-xl border border-border bg-white p-4">
-          <div className="mb-2 text-[11px] text-muted">ارجاعات در انتظار</div>
-          <div className="font-num text-2xl font-black text-[#a855f7]">
-            {openReferrals === null ? '—' : faDigits(openReferrals)}
-          </div>
-        </div>
-        <div className="rounded-xl border border-border bg-white p-4">
-          <div className="mb-2 text-[11px] text-muted">واحد سازمانی</div>
-          <div className="text-base font-bold text-ink">
-            {context?.deptLabelFa ?? '—'}
-          </div>
-        </div>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+          gap: 13,
+          marginBottom: 20,
+        }}
+      >
+        <StaffKpiCard
+          label="کارهای باز کارتابل"
+          value={openTasks === null ? '—' : faDigits(openTasks)}
+          iconBg="rgba(245,158,11,0.16)"
+          iconColor={STAFF_PANEL.warning}
+        />
+        <StaffKpiCard
+          label="ارجاعات در انتظار"
+          value={openReferrals === null ? '—' : faDigits(openReferrals)}
+          iconBg="rgba(168,85,247,0.16)"
+          iconColor={STAFF_PANEL.purple}
+        />
+        <StaffKpiCard
+          label="واحد سازمانی"
+          value={context?.deptLabelFa ?? '—'}
+          iconBg={STAFF_PANEL.accentSoft}
+          iconColor={STAFF_PANEL.accent}
+        />
       </div>
 
       {context && context.permissionLabelsFa.length > 0 && (
-        <section className="mt-5 rounded-xl border border-border bg-white p-4">
-          <h2 className="text-sm font-bold text-ink">دسترسی‌های شما در این واحد</h2>
-          <p className="mt-1 text-[11px] text-muted">
+        <StaffPanelCard title="دسترسی‌های شما در این واحد" style={{ marginBottom: 20 }}>
+          <p style={{ fontSize: 11, color: STAFF_PANEL.textMuted, margin: '0 0 12px' }}>
             این دسترسی‌ها توسط مدیر IT مطابق واحد سازمانی شما تعیین شده است.
           </p>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {context.permissionLabelsFa.map((label) => (
               <span
                 key={label}
-                className="flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-[11px] text-ink"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  borderRadius: 8,
+                  border: `1px solid ${STAFF_PANEL.inputBorder}`,
+                  background: STAFF_PANEL.inputBg,
+                  padding: '6px 12px',
+                  fontSize: 11,
+                  color: STAFF_PANEL.text,
+                }}
               >
-                <span className="text-[#059669]">✓</span>
+                <span style={{ color: STAFF_PANEL.success }}>✓</span>
                 {label}
               </span>
             ))}
           </div>
-        </section>
+        </StaffPanelCard>
       )}
 
-      {nav === null && <p className="mt-4 text-xs text-muted">در حال بارگذاری…</p>}
+      {nav === null && <p style={{ fontSize: 12, color: STAFF_PANEL.textMuted }}>در حال بارگذاری…</p>}
       {nav !== null && grantedSections.length === 0 && (
-        <p className="mt-4 text-xs text-muted">
+        <p style={{ fontSize: 12, color: STAFF_PANEL.textMuted, marginBottom: 16 }}>
           هنوز هیچ دسترسی برای شما توسط مدیر IT فعال نشده است.
         </p>
       )}
 
-      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+          gap: 13,
+        }}
+      >
         {sections.map((item) => (
           <Link
             key={item.key}
             to={`/panel/${item.key}`}
-            className="rounded-xl border border-border bg-white p-4 transition hover:border-accent"
+            style={{
+              background: STAFF_PANEL.cardBg,
+              border: `1px solid ${STAFF_PANEL.cardBorder}`,
+              borderRadius: 14,
+              padding: 16,
+              textDecoration: 'none',
+              color: 'inherit',
+              transition: 'border-color 0.15s',
+            }}
           >
-            <h2 className="text-sm font-bold text-ink">{item.labelFa}</h2>
-            <p className="mt-1 text-xs text-muted">{TAB_DESCRIPTIONS[item.key] ?? ''}</p>
+            <h2 style={{ fontSize: 13.5, fontWeight: 800, color: '#fff', margin: 0 }}>{item.labelFa}</h2>
+            <p style={{ marginTop: 6, fontSize: 11, color: STAFF_PANEL.textMuted, lineHeight: 1.6 }}>
+              {TAB_DESCRIPTIONS[item.key] ?? ''}
+            </p>
           </Link>
         ))}
       </div>

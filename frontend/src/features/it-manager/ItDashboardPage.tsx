@@ -3,17 +3,23 @@ import { useNavigate } from 'react-router-dom';
 import { fetchItDashboard } from '../../api/it-manager';
 import { faDigits, faPercent } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
+import { StaffPanelCard, StaffPanelPageHeader } from '../../components/staff-panel-ui';
+import { STAFF_PANEL } from '../../lib/staff-panel-theme';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import type { ItDashboardData } from '../../types/it-manager';
 
 const EVENT_DOT: Record<string, string> = {
-  SECURITY: 'bg-[#f59e0b]',
-  ACCOUNT: 'bg-accent',
-  SYSTEM: 'bg-[#059669]',
-  ACCESS: 'bg-[#a855f7]',
+  SECURITY: STAFF_PANEL.warning,
+  ACCOUNT: STAFF_PANEL.accent,
+  SYSTEM: STAFF_PANEL.success,
+  ACCESS: STAFF_PANEL.purple,
 };
+
+const RESOURCE_COLORS = [STAFF_PANEL.accent, STAFF_PANEL.purple, STAFF_PANEL.success, STAFF_PANEL.warning];
 
 export default function ItDashboardPage() {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [data, setData] = useState<ItDashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,15 +29,15 @@ export default function ItDashboardPage() {
       .catch(() => setError('خطا در دریافت داشبورد فنی.'));
   }, []);
 
-  if (error) return <p className="p-8 text-sm text-danger">{error}</p>;
-  if (!data) return <p className="p-8 text-sm text-muted">در حال بارگذاری…</p>;
+  if (error) return <p style={{ fontSize: 13, color: STAFF_PANEL.danger }}>{error}</p>;
+  if (!data) return <p style={{ fontSize: 13, color: STAFF_PANEL.textMuted }}>در حال بارگذاری…</p>;
 
   const kpis = [
     {
       label: 'سرویس فعال',
       value: `${data.kpis.servicesUp}/${data.kpis.servicesTotal}`,
       trend: 'پایدار',
-      trendClass: 'text-[#059669]',
+      trendColor: STAFF_PANEL.success,
       cta: 'مدیریت ←',
       onClick: () => navigate('/panel/services'),
     },
@@ -39,7 +45,7 @@ export default function ItDashboardPage() {
       label: 'آپ‌تایم ۳۰ روز',
       value: faPercent(data.kpis.uptime30dPct),
       trend: '+۰٫۰۲',
-      trendClass: 'text-[#059669]',
+      trendColor: STAFF_PANEL.success,
       cta: 'لاگ‌ها ←',
       onClick: () => navigate('/panel/logs'),
     },
@@ -47,7 +53,7 @@ export default function ItDashboardPage() {
       label: 'کاربر فعال سامانه',
       value: faDigits(data.kpis.activeSessions),
       trend: '+۳',
-      trendClass: 'text-[#059669]',
+      trendColor: STAFF_PANEL.success,
       cta: 'کاربران ←',
       onClick: () => navigate('/panel/users'),
     },
@@ -55,135 +61,189 @@ export default function ItDashboardPage() {
       label: 'هشدار امنیتی باز',
       value: faDigits(data.kpis.securityAlerts),
       trend: data.kpis.securityAlerts > 0 ? 'نیازمند بررسی' : 'بدون هشدار',
-      trendClass: data.kpis.securityAlerts > 0 ? 'text-[#f59e0b]' : 'text-[#059669]',
+      trendColor: data.kpis.securityAlerts > 0 ? STAFF_PANEL.warning : STAFF_PANEL.success,
       cta: 'بررسی ←',
       onClick: () => navigate('/panel/security'),
     },
   ];
 
   const resourceBars = [
-    { label: 'پردازنده (CPU)', pct: data.resources.cpuUsedPct, color: 'bg-accent' },
-    { label: 'حافظه (RAM)', pct: data.resources.memoryUsedPct, color: 'bg-[#a855f7]' },
-    ...(data.resources.diskUsedPct !== null
-      ? [{ label: 'دیسک', pct: data.resources.diskUsedPct, color: 'bg-[#059669]' }]
-      : []),
-    ...(data.resources.bandwidthUsedPct !== null
-      ? [{ label: 'پهنای باند', pct: data.resources.bandwidthUsedPct, color: 'bg-[#f59e0b]' }]
-      : []),
+    { label: 'پردازنده (CPU)', pct: data.resources.cpuUsedPct },
+    { label: 'حافظه (RAM)', pct: data.resources.memoryUsedPct },
+    ...(data.resources.diskUsedPct !== null ? [{ label: 'دیسک', pct: data.resources.diskUsedPct }] : []),
+    ...(data.resources.bandwidthUsedPct !== null ? [{ label: 'پهنای باند', pct: data.resources.bandwidthUsedPct }] : []),
   ];
 
   return (
-    <div className="p-8">
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-black text-ink">داشبورد فنی</h1>
-          <p className="mt-1 text-sm text-muted">نمای کلی سلامت زیرساخت و سرویس‌های blujet</p>
-        </div>
+    <div data-testid="it-dashboard">
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 24 }}>
+        <StaffPanelPageHeader title="داشبورد فنی" subtitle="نمای کلی سلامت زیرساخت و سرویس‌های blujet" />
         {data.kpis.allServicesHealthy && (
-          <div className="flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-[11.5px] font-bold text-[#059669]">
-            <span className="h-2 w-2 rounded-full bg-[#059669]" />
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              borderRadius: 10,
+              border: `1px solid ${STAFF_PANEL.inputBorder}`,
+              background: STAFF_PANEL.cardBg,
+              padding: '8px 12px',
+              fontSize: 11.5,
+              fontWeight: 700,
+              color: STAFF_PANEL.success,
+            }}
+          >
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: STAFF_PANEL.success }} />
             همه سامانه‌ها سالم
           </div>
         )}
       </div>
 
-      <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)',
+          gap: 13,
+          marginBottom: 24,
+        }}
+      >
         {kpis.map((k) => (
           <button
             key={k.label}
             type="button"
             onClick={k.onClick}
-            className="rounded-xl border border-border bg-white p-4 text-right transition hover:border-accent"
+            style={{
+              background: STAFF_PANEL.cardBg,
+              border: `1px solid ${STAFF_PANEL.cardBorder}`,
+              borderRadius: 14,
+              padding: 14,
+              textAlign: 'right',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              color: STAFF_PANEL.text,
+            }}
           >
-            <div className="mb-2 flex items-center justify-between">
-              <span className={`text-[11px] font-bold ${k.trendClass}`}>{k.trend}</span>
-            </div>
-            <div className="font-num text-lg font-black text-ink">{k.value}</div>
-            <div className="mt-1 flex items-center justify-between">
-              <span className="text-[11px] text-muted">{k.label}</span>
-              <span className="text-[10px] font-bold text-accent">{k.cta}</span>
+            <div style={{ fontSize: 11, fontWeight: 700, color: k.trendColor, marginBottom: 8 }}>{k.trend}</div>
+            <div style={{ fontSize: 20, fontWeight: 900, color: '#fff' }}>{k.value}</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+              <span style={{ fontSize: 11, color: STAFF_PANEL.textMuted }}>{k.label}</span>
+              <span style={{ fontSize: 10, fontWeight: 700, color: STAFF_PANEL.link }}>{k.cta}</span>
             </div>
           </button>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.3fr_1fr]">
-        <section className="rounded-xl border border-border bg-white p-5">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-bold text-ink">سلامت سرویس‌ها</h2>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : '1.3fr 1fr',
+          gap: 15,
+          alignItems: 'start',
+        }}
+      >
+        <StaffPanelCard
+          title="سلامت سرویس‌ها"
+          headerAction={
             <button
               type="button"
               onClick={() => navigate('/panel/services')}
-              className="text-[11px] font-bold text-accent"
+              style={{
+                border: 'none',
+                background: 'transparent',
+                fontSize: 11,
+                fontWeight: 700,
+                color: STAFF_PANEL.link,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
             >
               مدیریت سرویس‌ها ←
             </button>
-          </div>
-          <ul className="space-y-2.5">
+          }
+        >
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
             {data.serviceHealth.map((s) => (
-              <li key={s.name} className="flex items-center gap-2.5 text-xs">
+              <li key={s.name} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
                 <span
-                  className={`h-2 w-2 rounded-full ${s.enabled ? 'bg-[#059669]' : 'bg-danger'}`}
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    background: s.enabled ? STAFF_PANEL.success : STAFF_PANEL.danger,
+                    flex: 'none',
+                  }}
                 />
-                <span className="flex-1 text-text-2">{s.name}</span>
+                <span style={{ flex: 1, color: STAFF_PANEL.text }}>{s.name}</span>
                 {s.uptimePct !== null && (
-                  <span className="font-num text-muted">{faPercent(s.uptimePct)}</span>
+                  <span style={{ color: STAFF_PANEL.textMuted }}>{faPercent(s.uptimePct)}</span>
                 )}
                 <span
-                  className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                    s.enabled ? 'bg-[#10b98124] text-[#059669]' : 'bg-danger/15 text-danger'
-                  }`}
+                  style={{
+                    borderRadius: 14,
+                    padding: '3px 10px',
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: s.enabled ? STAFF_PANEL.success : STAFF_PANEL.danger,
+                    background: s.enabled ? 'rgba(16,185,129,0.14)' : 'rgba(248,113,113,0.14)',
+                  }}
                 >
                   {s.enabled ? 'سالم' : 'قطع'}
                 </span>
               </li>
             ))}
           </ul>
-        </section>
+        </StaffPanelCard>
 
-        <div className="flex flex-col gap-4">
-          <section className="rounded-xl border border-border bg-white p-5">
-            <h2 className="mb-3 text-sm font-bold text-ink">استفاده از منابع سرور</h2>
-            <div className="space-y-3 text-xs">
-              {resourceBars.map((r) => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
+          <StaffPanelCard title="استفاده از منابع سرور">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {resourceBars.map((r, i) => (
                 <div key={r.label}>
-                  <div className="mb-1 flex justify-between">
-                    <span className="text-text-2">{r.label}</span>
-                    <span className="font-num font-bold text-muted">{faPercent(r.pct)}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 12 }}>
+                    <span style={{ color: STAFF_PANEL.text }}>{r.label}</span>
+                    <span style={{ fontWeight: 700, color: STAFF_PANEL.textMuted }}>{faPercent(r.pct)}</span>
                   </div>
-                  <div className="h-2 rounded bg-surface">
+                  <div style={{ height: 8, borderRadius: 6, background: STAFF_PANEL.inputBg }}>
                     <div
-                      className={`h-2 rounded ${r.color}`}
-                      style={{ width: `${Math.min(100, r.pct)}%` }}
+                      style={{
+                        height: 8,
+                        borderRadius: 6,
+                        width: `${Math.min(100, r.pct)}%`,
+                        background: RESOURCE_COLORS[i % RESOURCE_COLORS.length],
+                      }}
                     />
                   </div>
                 </div>
               ))}
             </div>
-          </section>
+          </StaffPanelCard>
 
-          <section className="rounded-xl border border-border bg-white p-5">
-            <h2 className="mb-3 text-sm font-bold text-ink">رویدادهای اخیر</h2>
+          <StaffPanelCard title="رویدادهای اخیر">
             {data.recentEvents.length === 0 ? (
-              <p className="text-xs text-muted">رویدادی ثبت نشده است.</p>
+              <p style={{ fontSize: 12, color: STAFF_PANEL.textMuted, margin: 0 }}>رویدادی ثبت نشده است.</p>
             ) : (
-              <ul className="space-y-2.5">
+              <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {data.recentEvents.map((e) => (
-                  <li key={e.id} className="flex gap-2 text-[11px]">
+                  <li key={e.id} style={{ display: 'flex', gap: 8, fontSize: 11 }}>
                     <span
-                      className={`mt-1.5 h-2 w-2 flex-none rounded-full ${EVENT_DOT[e.category] ?? 'bg-muted'}`}
+                      style={{
+                        marginTop: 6,
+                        width: 8,
+                        height: 8,
+                        borderRadius: '50%',
+                        background: EVENT_DOT[e.category] ?? STAFF_PANEL.textMuted,
+                        flex: 'none',
+                      }}
                     />
                     <div>
-                      <div className="text-text-2">{e.text}</div>
-                      <div className="font-num mt-0.5 text-muted">
-                        {formatJalaliDateTime(e.createdAt)}
-                      </div>
+                      <div style={{ color: STAFF_PANEL.text }}>{e.text}</div>
+                      <div style={{ marginTop: 2, color: STAFF_PANEL.textMuted }}>{formatJalaliDateTime(e.createdAt)}</div>
                     </div>
                   </li>
                 ))}
               </ul>
             )}
-          </section>
+          </StaffPanelCard>
         </div>
       </div>
     </div>
