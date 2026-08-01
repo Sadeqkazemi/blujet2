@@ -187,6 +187,10 @@ export function buildSearchCopy(
     lblDestination: string;
     lblDepartDate: string;
     selectPlaceholder: string;
+    originPlaceholder: string;
+    destPlaceholder: string;
+    destNeedOriginPlaceholder: string;
+    cityEmptyLabel: string;
     cityListLabel: string;
     popularRoutesTitle: string;
     popularRoutesSub: string;

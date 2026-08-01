@@ -216,10 +216,10 @@ export default function PublicHeader() {
       >
         <div
           style={{
-            maxWidth: 1180,
+            maxWidth: 1320,
             margin: '0 auto',
             padding: '0 26px',
-            height: isMobile ? 62 : 86,
+            height: isMobile ? 62 : 70,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -269,7 +269,7 @@ export default function PublicHeader() {
           </Link>
 
           {!isMobile && (
-            <nav style={{ display: 'flex', gap: 30, fontSize: '14.5px', color: '#3b4554', fontWeight: 600, height: '100%', alignItems: 'center' }}>
+            <nav style={{ display: 'flex', gap: 30, fontSize: '16.5px', color: '#3b4554', fontWeight: 600, height: '100%', alignItems: 'center' }}>
               {navLinks.map((link) => (
                 <Link
                   key={link.to}
