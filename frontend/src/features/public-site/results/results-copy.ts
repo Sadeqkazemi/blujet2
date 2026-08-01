@@ -86,6 +86,15 @@ export type ResultsCopy = {
   fromLabel: string;
   toLabel: string;
   departureDateLabel: string;
+  returnDateLabel: string;
+  paxCountLabel: string;
+  flightClassLabel: string;
+  tripOneWay: string;
+  tripRoundTrip: string;
+  cityQueryPlaceholder: string;
+  citiesWithAirportLabel: string;
+  noCityFoundLabel: string;
+  updatingLabel: string;
   searchFlightsLabel: string;
   applySearchLabel: string;
 };
@@ -177,6 +186,15 @@ export const RESULTS_COPY: Record<StoredLocale, ResultsCopy> = {
     fromLabel: 'مبدا',
     toLabel: 'مقصد',
     departureDateLabel: 'تاریخ رفت',
+    returnDateLabel: 'تاریخ برگشت',
+    paxCountLabel: 'تعداد مسافر',
+    flightClassLabel: 'کلاس پروازی',
+    tripOneWay: 'یک‌طرفه',
+    tripRoundTrip: 'رفت و برگشت',
+    cityQueryPlaceholder: 'شهر یا کد فرودگاه را وارد کنید…',
+    citiesWithAirportLabel: 'شهرهای دارای فرودگاه',
+    noCityFoundLabel: 'شهری با این نام یافت نشد',
+    updatingLabel: 'در حال به‌روزرسانی…',
     searchFlightsLabel: 'جستجوی پرواز',
     applySearchLabel: 'جستجوی پرواز',
   },
@@ -266,6 +284,15 @@ export const RESULTS_COPY: Record<StoredLocale, ResultsCopy> = {
     fromLabel: 'From',
     toLabel: 'To',
     departureDateLabel: 'Departure date',
+    returnDateLabel: 'Return date',
+    paxCountLabel: 'Passenger count',
+    flightClassLabel: 'Flight class',
+    tripOneWay: 'One-way',
+    tripRoundTrip: 'Round trip',
+    cityQueryPlaceholder: 'Type a city or airport code…',
+    citiesWithAirportLabel: 'Cities with an airport',
+    noCityFoundLabel: 'No city found with that name',
+    updatingLabel: 'Updating…',
     searchFlightsLabel: 'Search Flights',
     applySearchLabel: 'Search Flights',
   },
@@ -355,6 +382,15 @@ export const RESULTS_COPY: Record<StoredLocale, ResultsCopy> = {
     fromLabel: 'من',
     toLabel: 'إلى',
     departureDateLabel: 'تاريخ المغادرة',
+    returnDateLabel: 'تاريخ العودة',
+    paxCountLabel: 'عدد المسافرين',
+    flightClassLabel: 'درجة الرحلة',
+    tripOneWay: 'ذهاب فقط',
+    tripRoundTrip: 'ذهاب وعودة',
+    cityQueryPlaceholder: 'اكتب اسم المدينة أو رمز المطار…',
+    citiesWithAirportLabel: 'مدن بها مطار',
+    noCityFoundLabel: 'لم يتم العثور على مدينة بهذا الاسم',
+    updatingLabel: 'جارٍ التحديث…',
     searchFlightsLabel: 'البحث عن رحلات',
     applySearchLabel: 'البحث عن رحلات',
   },

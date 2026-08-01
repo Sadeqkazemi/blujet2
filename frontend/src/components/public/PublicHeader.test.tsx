@@ -12,9 +12,9 @@ function mockLocale(locale: 'fa' | 'en' | 'ar' = 'fa') {
   vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale, setLocale: vi.fn() });
 }
 
-function renderHeader() {
+function renderHeader(initialPath = '/') {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[initialPath]}>
       <PublicHeader />
     </MemoryRouter>,
   );
@@ -37,9 +37,10 @@ describe('PublicHeader — logged-in user', () => {
     await userEvent.click(screen.getByTestId('public-notif-toggle'));
     expect(screen.getByText('اعلان‌ها')).toBeInTheDocument();
     expect(screen.getByText('یادآوری سفر')).toBeInTheDocument();
+    expect(screen.getByText('جدید')).toBeInTheDocument();
   });
 
-  it('shows the points balance and مشاهده پروفایل link in the user menu', async () => {
+  it('shows the points balance and profile/trips links in the user menu', async () => {
     mockLocale();
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
       status: 'authenticated',
@@ -55,10 +56,11 @@ describe('PublicHeader — logged-in user', () => {
     await userEvent.click(screen.getByTestId('public-user-menu-toggle'));
     expect(await screen.findByText('۱۲۴۵۰')).toBeInTheDocument();
     expect(screen.getByText('مشاهده پروفایل')).toHaveAttribute('href', '/account');
+    expect(screen.getAllByText('سفرها و مدیریت رزرو')[0]).toHaveAttribute('href', '/manage-booking');
     expect(screen.getByText('استرداد')).toHaveAttribute('href', '/manage-booking');
   });
 
-  it('shows English notifications and toman-formatted-as-latin points when locale is en', async () => {
+  it('shows English notifications and latin points when locale is en', async () => {
     mockLocale('en');
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
       status: 'authenticated',
@@ -76,6 +78,37 @@ describe('PublicHeader — logged-in user', () => {
     await userEvent.click(screen.getByTestId('public-user-menu-toggle'));
     expect(await screen.findByText('12450')).toBeInTheDocument();
     expect(screen.getByText('View Profile')).toHaveAttribute('href', '/account');
+  });
+
+  it('highlights Flights nav on the results route', () => {
+    mockLocale();
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      status: 'unauthenticated',
+      user: null,
+      requestLogin: vi.fn(),
+      confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
+      signOut: vi.fn(),
+    });
+
+    renderHeader('/results?from=THR&to=MHD');
+    const flightsLink = screen.getByRole('link', { name: 'پرواز' });
+    expect(flightsLink).toHaveStyle({ color: '#1668c4' });
+  });
+
+  it('does not show travel info in the nav', () => {
+    mockLocale();
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      status: 'unauthenticated',
+      user: null,
+      requestLogin: vi.fn(),
+      confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
+      signOut: vi.fn(),
+    });
+
+    renderHeader();
+    expect(screen.queryByText('اطلاعات سفر')).not.toBeInTheDocument();
   });
 
   it('switches locale via the language dropdown', async () => {

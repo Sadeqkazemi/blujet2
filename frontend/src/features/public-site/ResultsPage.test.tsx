@@ -34,19 +34,8 @@ const RESULT: SearchFlightResult = {
   ],
 };
 
-const CALENDAR = [
-  { date: '2026-07-29', minPriceIrr: '365000000', dateLabelFa: '2026-07-29', isCenter: false },
-  { date: '2026-07-30', minPriceIrr: '395000000', dateLabelFa: '2026-07-30', isCenter: false },
-  { date: '2026-07-31', minPriceIrr: '380000000', dateLabelFa: '2026-07-31', isCenter: false },
-  { date: '2026-08-01', minPriceIrr: '380000000', dateLabelFa: '2026-08-01', isCenter: true },
-  { date: '2026-08-02', minPriceIrr: '410000000', dateLabelFa: '2026-08-02', isCenter: false },
-  { date: '2026-08-03', minPriceIrr: '375000000', dateLabelFa: '2026-08-03', isCenter: false },
-  { date: '2026-08-04', minPriceIrr: '390000000', dateLabelFa: '2026-08-04', isCenter: false },
-];
-
 function mockSearchApis() {
   vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
-  vi.spyOn(publicSiteApi, 'fetchPriceCalendar').mockResolvedValue(CALENDAR);
 }
 
 function renderPage(status: 'unauthenticated' | 'authenticated' = 'unauthenticated') {
@@ -124,8 +113,7 @@ describe('ResultsPage', () => {
     expect(screen.queryByTestId('mock-result-card')).not.toBeInTheDocument();
   });
 
-  it('loads price calendar from API inside edit-search modal', async () => {
-    const calendarSpy = vi.spyOn(publicSiteApi, 'fetchPriceCalendar').mockResolvedValue(CALENDAR);
+  it('opens edit-search modal with trip type, airport pickers, and inline calendar', async () => {
     vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
     vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
     renderPage();
@@ -133,8 +121,14 @@ describe('ResultsPage', () => {
 
     await userEvent.click(screen.getByRole('button', { name: /ویرایش جستجو/ }));
 
-    expect(calendarSpy).toHaveBeenCalledWith('THR', 'MHD', '2026-08-01');
-    expect(screen.getByTestId('price-calendar').children).toHaveLength(7);
+    expect(screen.getByText('یک‌طرفه')).toBeInTheDocument();
+    expect(screen.getByText('رفت و برگشت')).toBeInTheDocument();
+    expect(screen.getByTestId('edit-search-origin')).toBeInTheDocument();
+    expect(screen.getByTestId('edit-search-dest')).toBeInTheDocument();
+    expect(screen.getByTestId('edit-search-date')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId('edit-search-date'));
+    expect(screen.getByTestId('edit-search-calendar')).toBeInTheDocument();
   });
 
   it('calls advisory API and shows buy recommendation', async () => {
