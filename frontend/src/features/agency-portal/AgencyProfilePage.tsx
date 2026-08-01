@@ -185,7 +185,7 @@ export default function AgencyProfilePage() {
           {fields.map(([label, value]) => (
             <div key={label}>
               <dt className="text-[11px] text-muted">{label}</dt>
-              <dd className="ltr font-num mt-1 text-sm font-bold text-ink">{value}</dd>
+              <dd className="ltr mt-1 text-sm font-bold text-ink">{value}</dd>
             </div>
           ))}
         </dl>
