@@ -5,6 +5,7 @@ import { getCabinPrice } from './pricing';
 import type { Irr } from '../../common/money';
 import { enumerateSeats } from '../reservation/seat-layout';
 import { resolveAircraftType } from '../flights/aircraft-type.util';
+import { filterPublicSearchAirports } from '../../common/public-airport-filter';
 import type { CabinClass } from '../../../generated/typeorm/enums';
 import type { TypeORM } from '../../../generated/typeorm/client';
 
@@ -37,9 +38,11 @@ export class SearchService {
     const cached = await this.redis.get<unknown>(cacheKey);
     if (cached) return cached;
 
-    const airports = await this.typeorm.airport.findMany({
-      orderBy: { cityFa: 'asc' },
-    });
+    const airports = filterPublicSearchAirports(
+      await this.typeorm.airport.findMany({
+        orderBy: { cityFa: 'asc' },
+      }),
+    );
     await this.redis.set(cacheKey, airports, AIRPORTS_TTL_SECONDS);
     return airports;
   }

@@ -70,6 +70,29 @@ describe('Phase 22 — flight status lookup (e2e)', () => {
     await app.close();
   });
 
+  afterAll(async () => {
+    const routes = await typeorm.route.findMany({
+      where: {
+        OR: [{ originCode }, { destCode }],
+      },
+    });
+    const routeIds = routes.map((r) => r.id);
+    const flights = routeIds.length
+      ? await typeorm.flight.findMany({ where: { routeId: { in: routeIds } } })
+      : [];
+    const flightIds = flights.map((f) => f.id);
+    if (flightIds.length) {
+      await typeorm.flightInstance.deleteMany({ where: { flightId: { in: flightIds } } });
+      await typeorm.flight.deleteMany({ where: { id: { in: flightIds } } });
+    }
+    if (routeIds.length) {
+      await typeorm.route.deleteMany({ where: { id: { in: routeIds } } });
+    }
+    await typeorm.airport.deleteMany({
+      where: { code: { in: [originCode, destCode] } },
+    });
+  });
+
   function dateParam() {
     return departureAt.toISOString().slice(0, 10);
   }

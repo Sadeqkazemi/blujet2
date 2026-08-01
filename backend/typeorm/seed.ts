@@ -1389,6 +1389,12 @@ async function main() {
   }
 
   // ── Phase 10: airport catalog + flight-management seed ────────────────
+  const { cleanupTestAirports } = await import('../src/common/cleanup-test-airports');
+  const removedTestAirports = await cleanupTestAirports(typeorm);
+  if (removedTestAirports > 0) {
+    console.log(`Removed ${removedTestAirports} e2e test airport(s) from catalog.`);
+  }
+
   const AIRPORTS: Array<[string, string, string]> = [
     ['THR', 'تهران', 'Asia/Tehran'],
     ['MHD', 'مشهد', 'Asia/Tehran'],
