@@ -35,9 +35,7 @@ Systematic page-by-page alignment with bundled HTML exports. Each phase = layout
 
 - [x] `FlightSearchForm` + airport/pax pickers
 - [x] `FlightSearchDateRangePicker` — dual-month Jalali/Gregorian calendar (design search box)
-- [ ] `FlowStepper` visual polish
-- [ ] `BoardingPassTicket` — `#bj-ticket` from تکمیل خرید
-- [ ] `PriceCalendarStrip` — horizontal scroll on mobile
+- [x] `ResultsSearchSummary`, `ResultsPriceCalendarStrip`, `ResultsAiRadarBanner`, `ResultsFilterBar`, `ResultsFlightCard`
 - [ ] Breakpoint utility: unify on `useIsMobile()` @767px (replace `lg:` @1024px on PaymentPage)
 
 ## Acceptance

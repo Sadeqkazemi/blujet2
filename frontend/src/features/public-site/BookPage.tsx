@@ -7,6 +7,8 @@ import { ApiRequestError } from '../../api/envelope';
 import type { CabinClass, SavedPassenger, SeatMapCell } from '../../types/public-site';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import FlowStepper from '../../components/public/FlowStepper';
+import BookSeatMap from '../../components/public/checkout/BookSeatMap';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import SavedPassengerAutofill, { savedPassengerToDraft } from './SavedPassengerAutofill';
 
 const BUSINESS_SEAT_MIN_POINTS = 15_000;
@@ -36,6 +38,11 @@ const STR: Record<
     submit: string;
     submitting: string;
     bookError: string;
+    business: string;
+    available: string;
+    reserved: string;
+    selectedSeat: string;
+    none: string;
   }
 > = {
   fa: {
@@ -61,6 +68,11 @@ const STR: Record<
     submit: 'ادامه به تکمیل خرید',
     submitting: 'در حال ثبت…',
     bookError: 'خطا در ثبت رزرو.',
+    business: 'بیزینس',
+    available: 'آزاد',
+    reserved: 'رزرو شده',
+    selectedSeat: 'صندلی انتخاب‌شده',
+    none: '—',
   },
   en: {
     loading: 'Loading…',
@@ -85,6 +97,11 @@ const STR: Record<
     submit: 'Continue to checkout',
     submitting: 'Saving…',
     bookError: 'Failed to create booking.',
+    business: 'Business',
+    available: 'Available',
+    reserved: 'Taken',
+    selectedSeat: 'Selected seat',
+    none: '—',
   },
   ar: {
     loading: 'جارٍ التحميل…',
@@ -109,6 +126,11 @@ const STR: Record<
     submit: 'المتابعة إلى إتمام الشراء',
     submitting: 'جارٍ الحفظ…',
     bookError: 'فشل إنشاء الحجز.',
+    business: 'درجة الأعمال',
+    available: 'متاح',
+    reserved: 'محجوز',
+    selectedSeat: 'المقعد المختار',
+    none: '—',
   },
 };
 
@@ -192,6 +214,7 @@ export default function BookPage() {
   const { locale } = useLocale();
   const t = STR[locale];
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
   const [seats, setSeats] = useState<SeatMapCell[] | null>(null);
   const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
@@ -310,47 +333,58 @@ export default function BookPage() {
   return (
     <PublicPageShell>
       <FlowStepper current="seat" onBack={() => navigate(-1)} />
-      <div className="mx-auto max-w-2xl p-6">
-        <h1 className="mb-1 text-lg font-extrabold text-[#0d2640]">{t.title}</h1>
+      <div
+        style={{
+          maxWidth: 1180,
+          margin: '0 auto',
+          padding: isMobile ? '12px 16px 32px' : '16px 26px 39px',
+        }}
+      >
+        <h1 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 900, color: '#0d2640' }}>{t.title}</h1>
         {cabin === 'BUSINESS' && businessLocked && (
-          <p data-testid="business-seat-lock" className="mb-4 text-[10.5px] font-semibold text-[#96701a]">
+          <p
+            data-testid="business-seat-lock"
+            style={{ margin: '0 0 16px', fontSize: 10.5, fontWeight: 600, color: '#96701a' }}
+          >
             {t.businessLock}
           </p>
         )}
-        {error && <p className="mb-4 rounded-lg bg-red-50 p-3 text-xs text-red-600">{error}</p>}
+        {error && (
+          <p style={{ marginBottom: 16, borderRadius: 10, background: '#fef2f2', padding: 12, fontSize: 12, color: '#dc2626' }}>
+            {error}
+          </p>
+        )}
 
         {seats === null ? (
-          <p className="text-sm text-[#6b7b94]">{t.seatMapLoading}</p>
+          <p style={{ fontSize: 14, color: '#6b7b94' }}>{t.seatMapLoading}</p>
         ) : (
-          <div
-            className="mb-6 rounded-2xl border border-[#eef1f5] bg-white p-4"
-            data-testid="seat-grid"
+          <section
+            style={{
+              marginBottom: 24,
+              background: '#fff',
+              border: '1px solid #eef1f5',
+              borderRadius: 15,
+              padding: '16px 17px',
+            }}
           >
-            <div className="flex flex-wrap gap-2">
-              {seats.map((s) => (
-                <button
-                  key={s.seatCode}
-                  type="button"
-                  disabled={s.status === 'TAKEN' || businessLocked}
-                  onClick={() => toggleSeat(s.seatCode)}
-                  data-testid={`seat-${s.seatCode}`}
-                  className={`font-num h-10 w-10 rounded-lg text-xs font-bold ${
-                    s.status === 'TAKEN'
-                      ? 'cursor-not-allowed bg-[#e5e9f0] text-[#9fb0c7]'
-                      : selectedSeats.includes(s.seatCode)
-                        ? 'bg-[#1668c4] text-white'
-                        : 'border border-[#eef1f5] bg-white text-[#0d2640] hover:border-[#1668c4]'
-                  }`}
-                >
-                  {s.seatCode}
-                </button>
-              ))}
-            </div>
-          </div>
+            <BookSeatMap
+              seats={seats}
+              selectedSeats={selectedSeats}
+              businessLocked={businessLocked}
+              labels={{
+                business: t.business,
+                available: t.available,
+                reserved: t.reserved,
+                selectedSeat: t.selectedSeat,
+                none: t.none,
+              }}
+              onToggle={toggleSeat}
+            />
+          </section>
         )}
 
         {selectedSeats.length > 0 && (
-          <form onSubmit={onSubmit} className="flex flex-col gap-4">
+          <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <SavedPassengerAutofill
               passengers={savedPassengers}
               activeIndex={activePassengerIndex}
@@ -360,18 +394,19 @@ export default function BookPage() {
             {passengers.map((p, i) => (
               <div
                 key={selectedSeats[i]}
-                className="rounded-2xl border border-[#eef1f5] bg-white p-4"
-                style={
-                  activePassengerIndex === i
-                    ? { borderColor: '#1668c4', boxShadow: '0 0 0 1px #1668c4' }
-                    : undefined
-                }
+                style={{
+                  borderRadius: 13,
+                  border: activePassengerIndex === i ? '1px solid #1668c4' : '1px solid #eef1f5',
+                  background: '#fff',
+                  padding: 16,
+                  boxShadow: activePassengerIndex === i ? '0 0 0 1px #1668c4' : undefined,
+                }}
                 onFocusCapture={() => setActivePassengerIndex(i)}
               >
-                <div className="mb-2 text-xs font-bold text-[#6b7b94]">
+                <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 700, color: '#6b7b94' }}>
                   {t.passengerSeat(selectedSeats[i])}
                 </div>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: 8 }}>
                   <input
                     data-testid={`pax-name-${i}`}
                     value={p.fullName}
@@ -382,7 +417,14 @@ export default function BookPage() {
                       setPassengerSourceIds((arr) => arr.map((id, j) => (j === i ? null : id)));
                     }}
                     placeholder={t.namePlaceholder}
-                    className="rounded-lg border border-[#eef1f5] px-3 py-2 text-sm outline-none focus:border-[#1668c4]"
+                    style={{
+                      borderRadius: 10,
+                      border: '1.5px solid #e2e7ee',
+                      padding: '10px 14px',
+                      fontSize: 14,
+                      outline: 'none',
+                      fontFamily: 'inherit',
+                    }}
                   />
                   <input
                     data-testid={`pax-national-id-${i}`}
@@ -394,7 +436,15 @@ export default function BookPage() {
                       setPassengerSourceIds((arr) => arr.map((id, j) => (j === i ? null : id)));
                     }}
                     placeholder={t.nationalIdPlaceholder}
-                    className="font-num rounded-lg border border-[#eef1f5] px-3 py-2 text-sm outline-none focus:border-[#1668c4]"
+                    className="font-num"
+                    style={{
+                      borderRadius: 10,
+                      border: '1.5px solid #e2e7ee',
+                      padding: '10px 14px',
+                      fontSize: 14,
+                      outline: 'none',
+                      fontFamily: 'inherit',
+                    }}
                   />
                   <input
                     data-testid={`pax-mobile-${i}`}
@@ -406,7 +456,15 @@ export default function BookPage() {
                       setPassengerSourceIds((arr) => arr.map((id, j) => (j === i ? null : id)));
                     }}
                     placeholder={t.mobilePlaceholder}
-                    className="font-num rounded-lg border border-[#eef1f5] px-3 py-2 text-sm outline-none focus:border-[#1668c4]"
+                    className="font-num"
+                    style={{
+                      borderRadius: 10,
+                      border: '1.5px solid #e2e7ee',
+                      padding: '10px 14px',
+                      fontSize: 14,
+                      outline: 'none',
+                      fontFamily: 'inherit',
+                    }}
                   />
                 </div>
               </div>
@@ -415,7 +473,19 @@ export default function BookPage() {
               type="submit"
               disabled={submitting}
               data-testid="book-submit"
-              className="rounded-xl bg-[#1668c4] px-6 py-3 text-sm font-bold text-white disabled:opacity-60"
+              style={{
+                borderRadius: 14,
+                background: '#1668c4',
+                color: '#fff',
+                border: 'none',
+                padding: '14px 24px',
+                fontSize: 15,
+                fontWeight: 800,
+                cursor: submitting ? 'not-allowed' : 'pointer',
+                opacity: submitting ? 0.6 : 1,
+                fontFamily: 'inherit',
+                boxShadow: '0 12px 24px -12px rgba(22,104,196,.55)',
+              }}
             >
               {submitting ? t.submitting : t.submit}
             </button>

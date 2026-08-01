@@ -2,11 +2,14 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { fetchMyBooking } from '../../api/publicSite';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
-import { localeMoney } from '../../lib/fa-format';
-import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import type { BookingDetail } from '../../types/public-site';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import FlowStepper from '../../components/public/FlowStepper';
+import CheckoutFlightSummary from '../../components/public/checkout/CheckoutFlightSummary';
+import CheckoutReviewSection from '../../components/public/checkout/CheckoutReviewSection';
+import CheckoutPriceSidebar from '../../components/public/checkout/CheckoutPriceSidebar';
+import CheckoutHoldBanner from '../../components/public/checkout/CheckoutHoldBanner';
 
 const CABIN_LABEL: Record<string, Record<StoredLocale, string>> = {
   ECONOMY: { fa: 'اکونومی', en: 'Economy', ar: 'اقتصادية' },
@@ -20,11 +23,25 @@ const STR: Record<
     notFound: string;
     expired: string;
     searchAgain: string;
-    title: string;
-    continueToPayment: string;
-    payable: string;
+    confirmDetails: string;
+    passenger: string;
+    seat: string;
+    nameChangeWarning: string;
+    paymentDetails: string;
+    description: string;
+    amountToman: string;
+    ticketPrice: string;
+    adult: string;
+    taxesFees: string;
+    total: string;
     toman: string;
-    passengers: string;
+    securePayment: string;
+    agreeTermsPrefix: string;
+    siteTerms: string;
+    agreeTermsSuffix: string;
+    continueToPayment: string;
+    holdLabel: string;
+    holdLowLabel: string;
   }
 > = {
   fa: {
@@ -32,56 +49,85 @@ const STR: Record<
     notFound: 'رزرو یافت نشد.',
     expired: 'مهلت نگهداری این رزرو به پایان رسیده است.',
     searchAgain: 'جستجوی مجدد',
-    title: 'تکمیل خرید',
-    continueToPayment: 'ادامه به پرداخت',
-    payable: 'مبلغ قابل پرداخت',
+    confirmDetails: 'تأیید اطلاعات',
+    passenger: 'مسافر',
+    seat: 'صندلی',
+    nameChangeWarning:
+      'پس از صدور بلیط، تغییر نام مسافر فقط با پرداخت جریمه و تأیید ایرلاین امکان‌پذیر است.',
+    paymentDetails: 'جزئیات پرداخت',
+    description: 'شرح',
+    amountToman: 'مبلغ (تومان)',
+    ticketPrice: 'قیمت بلیط',
+    adult: 'بزرگسال',
+    taxesFees: 'مالیات و عوارض',
+    total: 'جمع کل',
     toman: 'تومان',
-    passengers: 'مسافران',
+    securePayment: 'پرداخت امن با رمزنگاری SSL',
+    agreeTermsPrefix: 'با ادامه،',
+    siteTerms: 'قوانین و مقررات',
+    agreeTermsSuffix: 'سایت را می‌پذیرم.',
+    continueToPayment: 'ادامه به پرداخت',
+    holdLabel: 'صندلی رزرو شده ·',
+    holdLowLabel: 'زمان باقی‌مانده ·',
   },
   en: {
     loading: 'Loading…',
     notFound: 'Booking not found.',
     expired: 'The hold on this booking has expired.',
     searchAgain: 'Search again',
-    title: 'Review booking',
-    continueToPayment: 'Continue to payment',
-    payable: 'Amount due',
+    confirmDetails: 'Confirm details',
+    passenger: 'Passenger',
+    seat: 'Seat',
+    nameChangeWarning:
+      'After ticketing, name changes require airline approval and a penalty fee.',
+    paymentDetails: 'Payment details',
+    description: 'Description',
+    amountToman: 'Amount (Toman)',
+    ticketPrice: 'Ticket price',
+    adult: 'adult',
+    taxesFees: 'Taxes & fees',
+    total: 'Total',
     toman: 'Toman',
-    passengers: 'Passengers',
+    securePayment: 'Secure SSL-encrypted payment',
+    agreeTermsPrefix: 'By continuing, I accept the',
+    siteTerms: 'Terms & Conditions',
+    agreeTermsSuffix: 'of this site.',
+    continueToPayment: 'Continue to payment',
+    holdLabel: 'Seat held ·',
+    holdLowLabel: 'Time remaining ·',
   },
   ar: {
     loading: 'جارٍ التحميل…',
     notFound: 'لم يُعثر على الحجز.',
     expired: 'انتهت مهلة الاحتفاظ بهذا الحجز.',
     searchAgain: 'بحث مجدداً',
-    title: 'إتمام الشراء',
-    continueToPayment: 'المتابعة إلى الدفع',
-    payable: 'المبلغ المستحق',
+    confirmDetails: 'تأكيد البيانات',
+    passenger: 'المسافر',
+    seat: 'المقعد',
+    nameChangeWarning: 'بعد إصدار التذكرة، تغيير الاسم يتطلب موافقة شركة الطيران ورسوماً.',
+    paymentDetails: 'تفاصيل الدفع',
+    description: 'الوصف',
+    amountToman: 'المبلغ (تومان)',
+    ticketPrice: 'سعر التذكرة',
+    adult: 'بالغ',
+    taxesFees: 'الضرائب والرسوم',
+    total: 'الإجمالي',
     toman: 'تومان',
-    passengers: 'المسافرون',
+    securePayment: 'دفع آمن مشفر SSL',
+    agreeTermsPrefix: 'بالمتابعة، أوافق على',
+    siteTerms: 'الشروط والأحكام',
+    agreeTermsSuffix: 'الموقع.',
+    continueToPayment: 'المتابعة إلى الدفع',
+    holdLabel: 'المقعد محجوز ·',
+    holdLowLabel: 'الوقت المتبقي ·',
   },
 };
-
-function formatBookingDateTime(value: string, locale: StoredLocale) {
-  if (locale === 'en') {
-    return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(
-      new Date(value),
-    );
-  }
-  return formatJalaliDateTime(value);
-}
-
-function formatBookingDate(value: string, locale: StoredLocale) {
-  if (locale === 'en') {
-    return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium' }).format(new Date(value));
-  }
-  return formatJalaliDate(value);
-}
 
 export default function CheckoutPage() {
   const { bookingId } = useParams<{ bookingId: string }>();
   const navigate = useNavigate();
   const { locale } = useLocale();
+  const isMobile = useIsMobile();
   const t = STR[locale];
 
   const [booking, setBooking] = useState<BookingDetail | null>(null);
@@ -125,55 +171,90 @@ export default function CheckoutPage() {
     );
   }
 
+  const sidebarLabels = {
+    paymentDetails: t.paymentDetails,
+    description: t.description,
+    amountToman: t.amountToman,
+    ticketPrice: t.ticketPrice,
+    adult: t.adult,
+    taxesFees: t.taxesFees,
+    total: t.total,
+    toman: t.toman,
+    securePayment: t.securePayment,
+    agreeTermsPrefix: t.agreeTermsPrefix,
+    siteTerms: t.siteTerms,
+    agreeTermsSuffix: t.agreeTermsSuffix,
+    continueToPayment: t.continueToPayment,
+  };
+
   return (
     <PublicPageShell>
       <FlowStepper current="checkout" onBack={() => navigate(-1)} />
-      <div className="mx-auto max-w-lg p-6">
-        <h1 className="mb-4 text-lg font-extrabold text-[#0d2640]">{t.title}</h1>
 
-        <div className="mb-4 rounded-2xl border border-[#eef1f5] bg-white p-5">
-          <div className="mb-2 flex items-center justify-between text-sm">
-            <span className="font-bold text-[#0d2640]" dir="ltr">
-              {booking.flightNo}
-            </span>
-            <span className="text-[#6b7b94]" dir="ltr">
-              {booking.originCode} ← {booking.destCode}
-            </span>
-          </div>
-          <div className="mb-1 text-xs text-[#6b7b94]">
-            {formatBookingDate(booking.departureAt, locale)} ·{' '}
-            {CABIN_LABEL[booking.cabin]?.[locale] ?? booking.cabin}
-          </div>
-          <div className="mb-3 text-xs text-[#6b7b94]">{formatBookingDateTime(booking.departureAt, locale)}</div>
+      {booking.holdExpiresAt && booking.status === 'HELD' && (
+        <CheckoutHoldBanner
+          holdExpiresAt={booking.holdExpiresAt}
+          locale={locale}
+          label={t.holdLabel}
+          lowTimeLabel={t.holdLowLabel}
+        />
+      )}
 
-          <div className="mb-3 text-[11px] font-black text-[#0d2640]">{t.passengers}</div>
-          <div className="flex flex-col gap-1">
-            {booking.passengers.map((p) => (
-              <div key={p.seatCode} className="flex justify-between text-xs text-[#6b7b94]">
-                <span>{p.fullName}</span>
-                <span className="font-num" dir="ltr">
-                  {p.seatCode}
-                </span>
-              </div>
-            ))}
-          </div>
+      <main
+        style={{
+          flex: 1,
+          width: '100%',
+          maxWidth: 1180,
+          margin: '0 auto',
+          padding: isMobile ? '12px 16px 88px' : '16px 26px 39px',
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : '1fr 340px',
+          gap: 10,
+          alignItems: 'stretch',
+          boxSizing: 'border-box',
+        }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 15, minWidth: 0 }}>
+          <CheckoutFlightSummary
+            booking={booking}
+            locale={locale}
+            cabinLabel={CABIN_LABEL[booking.cabin]?.[locale] ?? booking.cabin}
+            isMobile={isMobile}
+          />
 
-          <div className="mt-4 flex items-center justify-between border-t border-[#eef1f5] pt-3">
-            <span className="text-xs text-[#6b7b94]">{t.payable}</span>
-            <span className="font-num text-lg font-black text-[#1668c4]">
-              {localeMoney(booking.priceIrr, locale)} {t.toman}
-            </span>
-          </div>
+          <CheckoutReviewSection
+            passengers={booking.passengers}
+            labels={{
+              title: t.confirmDetails,
+              passenger: t.passenger,
+              seat: t.seat,
+              nameChangeWarning: t.nameChangeWarning,
+            }}
+          />
         </div>
 
-        <button
-          onClick={() => navigate(`/payment/${bookingId}`)}
-          data-testid="continue-to-payment"
-          className="w-full rounded-xl bg-[#1668c4] px-6 py-3 text-sm font-bold text-white"
-        >
-          {t.continueToPayment}
-        </button>
-      </div>
+        {!isMobile && (
+          <CheckoutPriceSidebar
+            locale={locale}
+            isMobile={false}
+            priceIrr={booking.priceIrr}
+            passengerCount={booking.passengers.length}
+            labels={sidebarLabels}
+            onContinue={() => navigate(`/payment/${bookingId}`)}
+          />
+        )}
+      </main>
+
+      {isMobile && (
+        <CheckoutPriceSidebar
+          locale={locale}
+          isMobile
+          priceIrr={booking.priceIrr}
+          passengerCount={booking.passengers.length}
+          labels={sidebarLabels}
+          onContinue={() => navigate(`/payment/${bookingId}`)}
+        />
+      )}
     </PublicPageShell>
   );
 }
