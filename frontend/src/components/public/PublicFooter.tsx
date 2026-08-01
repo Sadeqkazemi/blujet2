@@ -172,7 +172,7 @@ export default function PublicFooter() {
         <>
           <div
             style={{
-              maxWidth: 1180,
+              maxWidth: 1320,
               margin: '0 auto',
               padding: '39px 26px 20px',
               display: 'grid',
@@ -196,7 +196,7 @@ export default function PublicFooter() {
             <FooterLinkColumn title={t('footerColSupport')} links={supportLinks} />
           </div>
           <div style={{ borderTop: '1px solid #ffffff12' }}>
-            <div style={{ maxWidth: 1180, margin: '0 auto', padding: '15px 26px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11.5px', color: '#7d92ad' }}>
+            <div style={{ maxWidth: 1320, margin: '0 auto', padding: '15px 26px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11.5px', color: '#7d92ad' }}>
               <span>{t('footerCopyright')}</span>
             </div>
           </div>

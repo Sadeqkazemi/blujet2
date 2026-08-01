@@ -44,6 +44,12 @@ body {
   font-family: var(--font-mono);
 }
 
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* Horizontal scroll without visible scrollbar (design bundle .hscroll) */
 .hscroll {
   scrollbar-width: none;

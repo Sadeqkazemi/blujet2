@@ -4370,6 +4370,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "idempotency-key",
+            "required": false,
+            "in": "header",
+            "description": "کلید یکتا برای جلوگیری از پرداخت تکراری",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -7901,8 +7910,9 @@
         "properties": {
           "newPassword": {
             "type": "string",
-            "description": "رمز عبور جدید — حداقل ۸ کاراکتر",
-            "minLength": 8
+            "description": "رمز عبور جدید — حداقل ۸ کاراکتر با حروف بزرگ/کوچک، عدد و نماد",
+            "minLength": 8,
+            "example": "Blujet@1404"
           }
         },
         "required": [
@@ -9723,7 +9733,8 @@
           "lastName": {
             "type": "string",
             "example": "رضایی",
-            "description": "نام خانوادگی مسافر"
+            "description": "نام خانوادگی مسافر — حداقل ۳ کاراکتر",
+            "minLength": 3
           }
         },
         "required": [
@@ -9742,7 +9753,8 @@
           "lastName": {
             "type": "string",
             "example": "رضایی",
-            "description": "نام خانوادگی مسافر"
+            "description": "نام خانوادگی مسافر — حداقل ۳ کاراکتر",
+            "minLength": 3
           },
           "iban": {
             "type": "string",

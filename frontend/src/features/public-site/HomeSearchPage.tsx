@@ -15,21 +15,11 @@ import HomeSearchCard from './home/HomeSearchCard';
 import HomePromoCarousel from './home/HomePromoCarousel';
 import { QUICK_LINK_ICONS } from './home/home-icons';
 import { HOME_EXTRA, buildSearchCopy } from './home/home-copy';
+import { AIRPORT_CITY_NAMES, airportCityName } from '../../lib/airport-cities';
 
 const TODAY_ISO = new Date().toISOString().slice(0, 10);
 
-// Raw route/airport data: kept locale-neutral (city names + numeric toman
-// amounts), formatted per-locale at render time so fa/en/ar all show the
-// same real underlying prices — no invented USD conversion like the design
-// mock's EN mode, since the real backend always charges in IRR/toman.
-const CITY_NAMES: Record<string, Record<StoredLocale, string>> = {
-  THR: { fa: 'تهران', en: 'Tehran', ar: 'طهران' },
-  MHD: { fa: 'مشهد', en: 'Mashhad', ar: 'مشهد' },
-  IST: { fa: 'استانبول', en: 'Istanbul', ar: 'إسطنبول' },
-  DXB: { fa: 'دبی', en: 'Dubai', ar: 'دبي' },
-  KIH: { fa: 'کیش', en: 'Kish', ar: 'كيش' },
-  SYZ: { fa: 'شیراز', en: 'Shiraz', ar: 'شيراز' },
-};
+const CITY_NAMES = AIRPORT_CITY_NAMES;
 
 const COUNTRY_NAMES: Record<string, Record<StoredLocale, string>> = {
   IST: { fa: 'ترکیه', en: 'Turkey', ar: 'تركيا' },
@@ -138,6 +128,10 @@ const STR: Record<StoredLocale, {
     lblDestination: 'مقصد',
     lblDepartDate: 'تاریخ رفت',
     selectPlaceholder: 'انتخاب کنید',
+    originPlaceholder: 'شهر مبدا',
+    destPlaceholder: 'شهر مقصد',
+    destNeedOriginPlaceholder: 'ابتدا مبدا را انتخاب کنید',
+    cityEmptyLabel: 'شهری با این نام یافت نشد',
     btnSearchFlight: 'جستجوی پرواز',
     popularRoutesTitle: 'مسیرهای پرتردد',
     popularRoutesSub: 'ارزان‌ترین نرخ در پرطرفدارترین مسیرها',
@@ -193,6 +187,10 @@ const STR: Record<StoredLocale, {
     lblDestination: 'To',
     lblDepartDate: 'Departure date',
     selectPlaceholder: 'Select',
+    originPlaceholder: 'Origin city',
+    destPlaceholder: 'Destination city',
+    destNeedOriginPlaceholder: 'Select origin first',
+    cityEmptyLabel: 'No city found with that name',
     btnSearchFlight: 'Search Flights',
     popularRoutesTitle: 'Popular Routes',
     popularRoutesSub: 'The best fares on the most popular routes',
@@ -248,6 +246,10 @@ const STR: Record<StoredLocale, {
     lblDestination: 'إلى',
     lblDepartDate: 'تاريخ المغادرة',
     selectPlaceholder: 'اختر',
+    originPlaceholder: 'مدينة المغادرة',
+    destPlaceholder: 'مدينة الوصول',
+    destNeedOriginPlaceholder: 'اختر المغادرة أولاً',
+    cityEmptyLabel: 'لم يتم العثور على مدينة بهذا الاسم',
     btnSearchFlight: 'البحث عن رحلات',
     popularRoutesTitle: 'المسارات الأكثر طلبًا',
     popularRoutesSub: 'أرخص الأسعار على أكثر المسارات طلبًا',
@@ -373,8 +375,7 @@ export default function HomeSearchPage() {
   }, [homeContent]);
 
   const cityName = useMemo(
-    () => (code: string, cityFa?: string) =>
-      CITY_NAMES[code]?.[locale] ?? cityFa ?? code,
+    () => (code: string, cityFa?: string) => airportCityName(code, locale, cityFa),
     [locale],
   );
 
@@ -386,6 +387,10 @@ export default function HomeSearchPage() {
     lblDestination: t.lblDestination,
     lblDepartDate: t.lblDepartDate,
     selectPlaceholder: t.selectPlaceholder,
+    originPlaceholder: t.originPlaceholder,
+    destPlaceholder: t.destPlaceholder,
+    destNeedOriginPlaceholder: t.destNeedOriginPlaceholder,
+    cityEmptyLabel: locale === 'en' ? 'No city found with that name' : locale === 'ar' ? 'لم يتم العثور على مدينة بهذا الاسم' : 'شهری با این نام یافت نشد',
     cityListLabel: locale === 'en' ? 'Cities with an airport' : locale === 'ar' ? 'مدن بها مطار' : 'شهرهای دارای فرودگاه',
     popularRoutesTitle: t.popularRoutesTitle,
     popularRoutesSub: t.popularRoutesSub,
@@ -496,8 +501,9 @@ export default function HomeSearchPage() {
         <HomeSearchCard locale={locale} isMobile={isMobile} isRTL={isRTL} copy={searchCopy} airports={airports} cityName={cityName} popularRoutes={popularRoutes} />
       </section>
 
-      <section style={{ maxWidth: 1180, margin: '0 auto', padding: '49px 26px 23px' }}>
+      <section style={{ maxWidth: 1180, margin: '0 auto', padding: isMobile ? '20px 26px 10px' : '28px 26px 14px' }}>
         <div
+          data-testid="home-services"
           className={isMobile ? 'hscroll' : undefined}
           style={{
             display: isMobile ? 'flex' : 'grid',
@@ -507,6 +513,7 @@ export default function HomeSearchPage() {
             borderRadius: 16,
             overflowX: isMobile ? 'auto' : 'visible',
             scrollSnapType: isMobile ? 'x mandatory' : undefined,
+            paddingBottom: isMobile ? 8 : 0,
           }}
         >
           {t.quickLinks.map((label, i) => {
@@ -541,7 +548,7 @@ export default function HomeSearchPage() {
       </section>
 
       {/* SPECIAL OFFERS */}
-      <section id="offers" style={{ maxWidth: 1180, margin: '0 auto', padding: '44px 26px 7px', scrollMarginTop: 96 }}>
+      <section id="offers" style={{ maxWidth: 1180, margin: '0 auto', padding: isMobile ? '14px 26px 7px' : '18px 26px 7px', scrollMarginTop: 96 }}>
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 10 }}>
           <div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#eaf6ef', color: '#1f8a5b', padding: '4px 10px', borderRadius: 20, fontSize: '11.5px', fontWeight: 700, marginBottom: 10 }}>
