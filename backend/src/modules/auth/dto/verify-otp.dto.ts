@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsString, Length } from 'class-validator';
-import { toLatinDigits } from '../../common/normalize-iran-phone';
+import { toLatinDigits } from '../../../common/normalize-iran-phone';
 
 export class VerifyOtpDto {
   @ApiProperty({
@@ -13,7 +13,7 @@ export class VerifyOtpDto {
 
   @ApiProperty({ example: '482913', description: '6-digit one-time code' })
   @Transform(({ value }) =>
-    typeof value === 'string' ? toLatinDigits(value).replace(/\s/g, '') : value,
+    typeof value === 'string' ? toLatinDigits(value).replace(/\D/g, '') : value,
   )
   @IsString()
   @Length(6, 6)

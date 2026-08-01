@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsOptional, IsString, Matches, MaxLength } from 'class-validator';
-import { toLatinDigits } from '../../common/normalize-iran-phone';
+import { toLatinDigits } from '../../../common/normalize-iran-phone';
 
 export class RequestOtpDto {
   @ApiProperty({ example: '09121234567', description: 'شماره موبایل مشتری' })

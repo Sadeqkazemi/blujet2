@@ -8,7 +8,7 @@ function normalizePhone(phone: string) {
 }
 
 function normalizeOtpCode(code: string) {
-  return latinDigits(code).replace(/\s/g, '');
+  return latinDigits(code).replace(/\D/g, '');
 }
 
 export function staffLogin(username: string, password: string) {
