@@ -17,6 +17,7 @@ import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { horizontalScrollStyle, useHorizontalDragScroll } from '../../hooks/useHorizontalDragScroll';
 import { formatLocalePercent, formatToman } from '../../lib/fa-format';
+import { destinationGradient } from './site-content-shared';
 
 const TODAY_ISO = new Date().toISOString().slice(0, 10);
 
@@ -33,7 +34,23 @@ const CITY_NAMES: Record<string, Record<StoredLocale, string>> = {
   SYZ: { fa: 'شیراز', en: 'Shiraz', ar: 'شيراز' },
 };
 
+const COUNTRY_NAMES: Record<string, Record<StoredLocale, string>> = {
+  IST: { fa: 'ترکیه', en: 'Turkey', ar: 'تركيا' },
+  DXB: { fa: 'امارات', en: 'UAE', ar: 'الإمارات' },
+  MHD: { fa: 'ایران', en: 'Iran', ar: 'إيران' },
+  KIH: { fa: 'ایران', en: 'Iran', ar: 'إيران' },
+};
+
 const APP_LINK_ORDER: AppLinkId[] = ['app_store', 'google_play', 'bazaar_myket'];
+
+const DEST_HOURS: Record<string, number> = {
+  IST: 3,
+  DXB: 2,
+  MHD: 1.5,
+  KIH: 1.5,
+  SYZ: 1.5,
+  THR: 1,
+};
 
 const POPULAR_ROUTES_FALLBACK: { fromCode: string; toCode: string; tomanPrice: number }[] = [
   { fromCode: 'THR', toCode: 'MHD', tomanPrice: 1_600_000 },
@@ -48,6 +65,13 @@ const OFFERS: { fromCode: string; toCode: string; was: number; now: number; offP
   { fromCode: 'THR', toCode: 'DXB', was: 4_900_000, now: 3_800_000, offPct: 22, deadlineDays: 3, grad: 'linear-gradient(160deg,#c8d9ec,#e8eef6)' },
   { fromCode: 'MHD', toCode: 'KIH', was: 2_800_000, now: 2_100_000, offPct: 25, deadlineDays: 'today', grad: 'linear-gradient(160deg,#bfe0d8,#e6f2ee)' },
   { fromCode: 'THR', toCode: 'MHD', was: 2_100_000, now: 1_600_000, offPct: 24, deadlineDays: 1, grad: 'linear-gradient(160deg,#cdd9ec,#eaeff7)' },
+];
+
+const POPULAR_DESTS_FALLBACK: { code: string; hours: number; tomanPrice: number; grad: string }[] = [
+  { code: 'IST', hours: 3, tomanPrice: 4_200_000, grad: 'linear-gradient(160deg,#bcd6f2,#e3eefb)' },
+  { code: 'DXB', hours: 2, tomanPrice: 3_800_000, grad: 'linear-gradient(160deg,#c8d9ec,#e8eef6)' },
+  { code: 'MHD', hours: 1.5, tomanPrice: 1_600_000, grad: 'linear-gradient(160deg,#bfe0d8,#e6f2ee)' },
+  { code: 'KIH', hours: 1.5, tomanPrice: 2_100_000, grad: 'linear-gradient(160deg,#cdd9ec,#eaeff7)' },
 ];
 
 const STR: Record<StoredLocale, {
@@ -92,6 +116,11 @@ const STR: Record<StoredLocale, {
   saleTitle: string;
   saleSub: string;
   saleBtn: string;
+  popularDestTitle: string;
+  popularDestSub: string;
+  viewAllDest: string;
+  flightHours: (h: number) => string;
+  from: string;
   loyaltyEyebrow: string;
   loyaltyTitle: string;
   loyaltySub: string;
@@ -151,6 +180,11 @@ const STR: Record<StoredLocale, {
     saleTitle: 'تا ۴۰٪ تخفیف روی پروازهای خارجی',
     saleSub: 'رزرو تا پایان مرداد برای سفرهای تابستان — صندلی‌ها محدودند، فرصت را از دست نده.',
     saleBtn: 'مشاهده پروازها',
+    popularDestTitle: 'مقصدهای محبوب',
+    popularDestSub: 'پرطرفدارترین پروازها با بهترین قیمت',
+    viewAllDest: 'مشاهده همه مقصدها',
+    flightHours: (h) => `${formatToman(h, 'fa')} ساعت پرواز`,
+    from: 'از',
     loyaltyEyebrow: 'کارت عضویت باشگاه',
     loyaltyTitle: 'با رسیدن به حد امتیاز، کارت عضویت بگیر',
     loyaltySub: 'از ۵٬۰۰۰ امتیاز واجد شرایط دریافت کارت می‌شوی؛ درخواست برای ادمین ارسال و پس از تأیید مدیران، کارت برایت صادر می‌شود.',
@@ -210,6 +244,11 @@ const STR: Record<StoredLocale, {
     saleTitle: 'Up to 40% off international flights',
     saleSub: "Book before summer ends — seats are limited, don't miss out.",
     saleBtn: 'View Flights',
+    popularDestTitle: 'Popular Destinations',
+    popularDestSub: 'The most popular flights at the best prices',
+    viewAllDest: 'View all destinations',
+    flightHours: (h) => `${formatToman(h, 'en')}h flight`,
+    from: 'From',
     loyaltyEyebrow: 'Loyalty Club Card',
     loyaltyTitle: 'Reach the points threshold, get your membership card',
     loyaltySub: 'You qualify for a card from 5,000 points; your request is sent to the admin and the card is issued once approved.',
@@ -269,6 +308,11 @@ const STR: Record<StoredLocale, {
     saleTitle: 'خصم حتى ٤٠٪ على الرحلات الدولية',
     saleSub: 'احجز قبل نهاية الموسم لرحلات الصيف — المقاعد محدودة، لا تفوّت الفرصة.',
     saleBtn: 'عرض الرحلات',
+    popularDestTitle: 'الوجهات الشائعة',
+    popularDestSub: 'أكثر الرحلات طلبًا بأفضل الأسعار',
+    viewAllDest: 'عرض جميع الوجهات',
+    flightHours: (h) => `${formatToman(h, 'ar')} ساعة طيران`,
+    from: 'من',
     loyaltyEyebrow: 'بطاقة عضوية النادي',
     loyaltyTitle: 'احصل على بطاقة العضوية عند بلوغ حد النقاط',
     loyaltySub: 'عند بلوغ ٥٬٠٠٠ نقطة تصبح مؤهلاً للحصول على البطاقة؛ يُرسل الطلب إلى الإدارة وتُصدر بطاقتك بعد الموافقة.',
@@ -323,6 +367,7 @@ export default function HomeSearchPage() {
   const { locale } = useLocale();
   const isMobile = useIsMobile();
   const { containerRef: offersScrollRef, dragScrollProps: offersDragScrollProps } = useHorizontalDragScroll();
+  const { containerRef: destsScrollRef, dragScrollProps: destsDragScrollProps } = useHorizontalDragScroll();
   const t = STR[locale];
   const e = ERR[locale];
   const [airports, setAirports] = useState<Airport[]>([]);
@@ -389,6 +434,19 @@ export default function HomeSearchPage() {
       }));
     }
     return POPULAR_ROUTES_FALLBACK;
+  }, [homeContent]);
+
+  const popularDests = useMemo(() => {
+    if (homeContent?.destinations?.length) {
+      return homeContent.destinations.map((d, i) => ({
+        code: d.airportCode,
+        hours: DEST_HOURS[d.airportCode] ?? 2,
+        tomanPrice: Math.round(Number(d.priceIrr) / 10),
+        grad: destinationGradient(i),
+        imageUrl: d.imageUrl,
+      }));
+    }
+    return POPULAR_DESTS_FALLBACK;
   }, [homeContent]);
 
   const cityName = useMemo(
@@ -835,6 +893,93 @@ export default function HomeSearchPage() {
                     {t.deadlinePrefix}{o.deadlineDays === 'today' ? t.today : `${formatToman(o.deadlineDays, locale)}${t.daySuffix}`}
                   </span>
                   <span style={{ fontSize: '11.5px', fontWeight: 800, color: '#fff', background: '#1668c4', padding: '6px 13px', borderRadius: 9 }}>{t.book}</span>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* POPULAR DESTINATIONS */}
+      <section style={{ maxWidth: 1180, margin: '0 auto', padding: '39px 26px 20px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 26 }}>
+          <div>
+            <h2 style={{ fontSize: 19, fontWeight: 800, margin: '0 0 6px', letterSpacing: '-.5px', color: '#16202e' }}>{t.popularDestTitle}</h2>
+            <p style={{ fontSize: 12, color: '#6b7585', margin: 0 }}>{t.popularDestSub}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/destinations')}
+            style={{ fontSize: '12.5px', color: '#1668c4', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', fontFamily: 'inherit' }}
+          >
+            <span>{locale === 'en' ? '→' : '←'}</span>{t.viewAllDest}
+          </button>
+        </div>
+        <div
+          ref={isMobile ? destsScrollRef : undefined}
+          className={isMobile ? 'hscroll' : undefined}
+          {...(isMobile ? destsDragScrollProps : {})}
+          style={{
+            display: isMobile ? 'flex' : 'grid',
+            gridTemplateColumns: isMobile ? undefined : 'repeat(4, 1fr)',
+            gap: 18,
+            ...(isMobile ? horizontalScrollStyle : {}),
+            paddingBottom: isMobile ? 8 : 0,
+          }}
+        >
+          {popularDests.map((d) => (
+            <button
+              type="button"
+              key={d.code}
+              data-testid={`popular-dest-${d.code}`}
+              onClick={() => navigate(`/results?origin=THR&dest=${d.code}&date=${TODAY_ISO}`)}
+              style={{
+                textAlign: locale === 'en' ? 'left' : 'right',
+                background: '#fff',
+                borderRadius: 16,
+                overflow: 'hidden',
+                boxShadow: '0 10px 30px -18px rgba(13,38,102,.25)',
+                flex: isMobile ? '0 0 calc(50% - 9px)' : undefined,
+                touchAction: isMobile ? 'pan-x' : undefined,
+                cursor: 'pointer',
+                border: 'none',
+                fontFamily: 'inherit',
+                padding: 0,
+              }}
+            >
+              <div
+                style={{
+                  height: isMobile ? 150 : 190,
+                  background: d.grad,
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'flex-end',
+                  padding: 11,
+                  ...(('imageUrl' in d && d.imageUrl)
+                    ? {
+                        backgroundImage: `linear-gradient(180deg, transparent 20%, rgba(13,38,64,.75)), url(${d.imageUrl})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                      }
+                    : {}),
+                }}
+              >
+                <span style={{ position: 'absolute', top: 14, right: 16, fontFamily: "'Roboto Mono',monospace", fontSize: 10, color: '#5e7fa8' }}>
+                  {photoTag(cityName(d.code), locale)}
+                </span>
+                <span style={{ background: '#ffffffe6', padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, color: '#0d3b66' }}>{t.flightHours(d.hours)}</span>
+              </div>
+              <div style={{ padding: '11px 12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <span style={{ fontSize: '13.5px', fontWeight: 800, color: '#16202e' }}>{cityName(d.code)}</span>
+                  <span style={{ fontSize: 11, color: '#6b7787' }}>{COUNTRY_NAMES[d.code]?.[locale]}</span>
+                </div>
+                <div style={{ fontSize: '11.5px', color: '#6b7585' }}>
+                  {t.from}{' '}
+                  <span style={{ fontSize: '12.5px', fontWeight: 800, color: '#1668c4' }}>
+                    {formatToman(d.tomanPrice, locale)}
+                  </span>{' '}
+                  {t.toman}
                 </div>
               </div>
             </button>

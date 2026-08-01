@@ -145,6 +145,7 @@ describe('HomeSearchPage', () => {
     expect(screen.getByText('عنوان CMS')).toBeInTheDocument();
     expect(screen.getByText('اطلاعیه CMS')).toBeInTheDocument();
     expect(screen.getByText('پromo CMS')).toBeInTheDocument();
+    expect(screen.getByTestId('popular-dest-DXB')).toBeInTheDocument();
     expect(screen.getByTestId('popular-route-MHD')).toBeInTheDocument();
     expect(screen.getByText('پیشنهادهای ویژه')).toBeInTheDocument();
     expect(screen.getByText('با رسیدن به حد امتیاز، کارت عضویت بگیر')).toBeInTheDocument();
@@ -163,6 +164,8 @@ describe('HomeSearchPage', () => {
     expect(screen.getByText('پیشنهادهای ویژه')).toBeInTheDocument();
     expect(screen.getByTestId('offer-THR-IST')).toBeInTheDocument();
     expect(screen.getByText('تا ۴۰٪ تخفیف روی پروازهای خارجی')).toBeInTheDocument();
+    expect(screen.getByText('مقصدهای محبوب')).toBeInTheDocument();
+    expect(screen.getByTestId('popular-dest-DXB')).toBeInTheDocument();
     expect(screen.getByTestId('popular-route-MHD')).toBeInTheDocument();
     expect(screen.getByText('با رسیدن به حد امتیاز، کارت عضویت بگیر')).toBeInTheDocument();
     expect(screen.getByText('سفرت را همراه خودت ببر')).toBeInTheDocument();
@@ -201,6 +204,7 @@ describe('HomeSearchPage', () => {
     expect(screen.getByText('Book your next flight with blujet')).toBeInTheDocument();
     expect(screen.getByText('Special Offers')).toBeInTheDocument();
     expect(screen.getByText('Up to 40% off international flights')).toBeInTheDocument();
+    expect(screen.getByText('Popular Destinations')).toBeInTheDocument();
     expect(screen.getByText('Take your trip with you')).toBeInTheDocument();
     expect(screen.getByTestId('offer-THR-IST')).toHaveTextContent('19% OFF');
     expect(screen.getByTestId('popular-route-MHD')).toHaveTextContent('1,600,000');
@@ -220,6 +224,7 @@ describe('HomeSearchPage', () => {
 
     expect(screen.getByText('احجز رحلتك القادمة مع blujet')).toBeInTheDocument();
     expect(screen.getByText('عروض خاصة')).toBeInTheDocument();
+    expect(screen.getByText('الوجهات الشائعة')).toBeInTheDocument();
     expect(screen.getByTestId('offer-THR-IST')).toHaveTextContent('١٩٪ خصم');
     expect(screen.getByTestId('popular-route-MHD')).toHaveTextContent('١٬٦٠٠٬٠٠٠');
   });
