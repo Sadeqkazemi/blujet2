@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import AuthVisualPanel from '../../components/auth/AuthVisualPanel';
-import { OtpCells, OTP_LEN } from '../../components/auth/OtpCells';
+import { OtpCells, OTP_LEN, isOtpComplete } from '../../components/auth/OtpCells';
 import { AUTH_FOCUS_CSS, AUTH_INPUT, AUTH_LABEL, authBtn, segStyle } from '../../components/auth/auth-styles';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import { useAuth } from '../../hooks/useAuth';
@@ -368,7 +368,7 @@ export default function CustomerLoginPage() {
   const isLogin = mode === 'login';
   const isAgency = acct === 'agency';
   const isOtp = phase === 'otp';
-  const code = otpDigits.join('');
+  const codeOk = isOtpComplete(otpDigits);
 
   const passwordOk = password.length >= 6;
   const phoneInfoOk = isLogin
@@ -1064,10 +1064,11 @@ export default function CustomerLoginPage() {
                   )}
                 </div>
                 <button
-                  type="submit"
+                  type="button"
                   data-testid="signin-verify"
-                  disabled={busy || code.length !== OTP_LEN}
-                  style={authBtn(!busy && code.length === OTP_LEN)}
+                  onClick={() => void verifyOtpFlow()}
+                  aria-disabled={busy || !codeOk}
+                  style={authBtn(codeOk && !busy)}
                 >
                   {isLogin ? t.confirmLogin : t.confirmSignup}
                 </button>

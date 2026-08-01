@@ -78,7 +78,8 @@ describe('CustomerLoginPage', () => {
     expect(await screen.findByTestId('signin-resend-timer')).toHaveTextContent('ارسال مجدد کد');
     await typeOtp('signin-code-cell', '123456');
     const verifyBtn = screen.getByTestId('signin-verify');
-    expect(verifyBtn).not.toBeDisabled();
+    expect(verifyBtn).not.toHaveAttribute('aria-disabled', 'true');
+    expect(verifyBtn).toHaveStyle({ background: '#1668c4' });
     await userEvent.click(verifyBtn);
     expect(verifyOtp).toHaveBeenCalledWith('challenge-1', '123456');
   });

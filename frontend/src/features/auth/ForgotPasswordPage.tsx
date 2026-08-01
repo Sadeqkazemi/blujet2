@@ -1,7 +1,7 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import AuthVisualPanel from '../../components/auth/AuthVisualPanel';
-import { OtpCells, OTP_LEN } from '../../components/auth/OtpCells';
+import { OtpCells, OTP_LEN, isOtpComplete } from '../../components/auth/OtpCells';
 import { AUTH_FOCUS_CSS, authBtn } from '../../components/auth/auth-styles';
 import { useAuth } from '../../hooks/useAuth';
 import { setPassword as apiSetPassword } from '../../api/auth';
@@ -322,7 +322,7 @@ export default function ForgotPasswordPage() {
   const timer = locale === 'fa' ? faDigits(rawTimer) : rawTimer;
 
   const idOk = method === 'phone' ? phoneOk(phone) : emailOk(email);
-  const otpOk = otpDigits.every((d) => d !== '');
+  const otpOk = isOtpComplete(otpDigits);
   const strength = passwordStrength(pass1);
   const passOk = pass1.length >= 8 && pass1 === pass2;
 
@@ -698,7 +698,13 @@ export default function ForgotPasswordPage() {
                     </span>
                   )}
                 </div>
-                <button type="submit" data-testid="fp-verify" disabled={!otpOk || submitting} style={authBtn(otpOk && !submitting)}>
+                <button
+                  type="button"
+                  data-testid="fp-verify"
+                  onClick={() => void confirmCode()}
+                  aria-disabled={!otpOk || submitting}
+                  style={authBtn(otpOk && !submitting)}
+                >
                   {t.confirmCode}
                 </button>
               </form>
