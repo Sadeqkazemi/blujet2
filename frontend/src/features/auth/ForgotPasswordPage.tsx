@@ -325,7 +325,6 @@ export default function ForgotPasswordPage() {
   const rawTimer = `${String(Math.floor(left / 60)).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}`;
   const timer = locale === 'fa' ? faDigits(rawTimer) : rawTimer;
 
-  const identifier = method === 'phone' ? phone.trim() : email.trim();
   const idOk = method === 'phone' ? phoneOk(phone) : emailOk(email);
   const otpOk = otpDigits.every((d) => d !== '');
   const strength = passwordStrength(pass1);
