@@ -38,8 +38,6 @@ const COUNTRY_NAMES: Record<string, Record<StoredLocale, string>> = {
   KIH: { fa: 'ایران', en: 'Iran', ar: 'إيران' },
 };
 
-const APP_LINK_ORDER: AppLinkId[] = ['app_store', 'google_play', 'bazaar_myket'];
-
 const DEST_HOURS: Record<string, number> = {
   IST: 3,
   DXB: 2,
@@ -293,12 +291,6 @@ const STR: Record<StoredLocale, {
   },
 };
 
-const APP_LINK_LABELS: Record<AppLinkId, 'appStore' | 'googlePlay' | 'bazaarMyket'> = {
-  app_store: 'appStore',
-  google_play: 'googlePlay',
-  bazaar_myket: 'bazaarMyket',
-};
-
 const ERR: Record<StoredLocale, { airports: string; missing: string; sameCity: string }> = {
   fa: {
     airports: 'خطا در دریافت فهرست فرودگاه‌ها.',
@@ -401,8 +393,6 @@ export default function HomeSearchPage() {
     missing: e.missing,
     sameCity: e.sameCity,
   });
-
-  const gridCols4 = isMobile ? 'repeat(2, 1fr)' : 'repeat(4,1fr)';
 
   const announcementBar =
     !annClosed && annBlock?.enabled !== false ? (
@@ -509,12 +499,11 @@ export default function HomeSearchPage() {
       <section style={{ maxWidth: 1180, margin: '0 auto', padding: '49px 26px 23px' }}>
         <div
           style={{
-            display: isMobile ? 'flex' : 'grid',
-            gridTemplateColumns: isMobile ? undefined : 'repeat(4,1fr)',
+            display: 'grid',
+            gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
             background: '#fff',
             border: '1px solid #eef2f7',
             borderRadius: 16,
-            overflowX: isMobile ? 'auto' : 'visible',
           }}
         >
           {t.quickLinks.map((label, i) => {
@@ -536,7 +525,6 @@ export default function HomeSearchPage() {
                   background: 'transparent',
                   border: 'none',
                   ...(!isMobile && i > 0 ? { borderLeft: '1px solid #eef2f7' } : {}),
-                  flex: isMobile ? '0 0 calc(50% - 6.5px)' : undefined,
                 }}
               >
                 <Icon />
@@ -566,14 +554,38 @@ export default function HomeSearchPage() {
             <span>{locale === 'en' ? '→' : '←'}</span>{t.viewAllOffers}
           </button>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: gridCols4, gap: 18 }}>
+        <div
+          data-testid="special-offers-scroll"
+          style={{
+            display: isMobile ? 'flex' : 'grid',
+            gridTemplateColumns: isMobile ? undefined : 'repeat(4, 1fr)',
+            gap: 18,
+            overflowX: isMobile ? 'auto' : 'visible',
+            scrollSnapType: isMobile ? 'x mandatory' : undefined,
+            paddingBottom: isMobile ? 8 : 0,
+          }}
+        >
           {OFFERS.map((o) => (
             <button
               type="button"
               key={`${o.fromCode}-${o.toCode}`}
               data-testid={`offer-${o.fromCode}-${o.toCode}`}
               onClick={() => navigate(`/results?origin=${o.fromCode}&dest=${o.toCode}&date=${TODAY_ISO}`)}
-              style={{ textAlign: locale === 'en' ? 'left' : 'right', background: '#fff', border: '1px solid #e8eef6', borderRadius: 16, overflow: 'hidden', boxShadow: '0 14px 34px -22px rgba(13,38,102,.4)', display: 'flex', flexDirection: 'column', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}
+              style={{
+                textAlign: locale === 'en' ? 'left' : 'right',
+                background: '#fff',
+                border: '1px solid #e8eef6',
+                borderRadius: 16,
+                overflow: 'hidden',
+                boxShadow: '0 14px 34px -22px rgba(13,38,102,.4)',
+                display: 'flex',
+                flexDirection: 'column',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                padding: 0,
+                flex: isMobile ? '0 0 calc(50% - 9px)' : undefined,
+                scrollSnapAlign: isMobile ? 'start' : undefined,
+              }}
             >
               <div style={{ position: 'relative', height: 100, background: o.grad, display: 'flex', alignItems: 'flex-end', padding: 8, width: '100%', boxSizing: 'border-box' }}>
                 <span style={{ position: 'absolute', top: 12, right: 12, background: '#1f8a5b', color: '#fff', fontSize: 11, fontWeight: 800, padding: '4px 9px', borderRadius: 9 }}>
@@ -636,7 +648,7 @@ export default function HomeSearchPage() {
       </section>
       )}
 
-      {/* POPULAR DESTINATIONS */}
+      {!isMobile && (
       <section style={{ maxWidth: 1180, margin: '0 auto', padding: '39px 26px 20px' }}>
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 26 }}>
           <div>
@@ -651,7 +663,7 @@ export default function HomeSearchPage() {
             <span>{locale === 'en' ? '→' : '←'}</span>{t.viewAllDest}
           </button>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: gridCols4, gap: 18 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 18 }}>
           {popularDests.map((d) => (
             <button
               type="button"
@@ -699,71 +711,10 @@ export default function HomeSearchPage() {
           ))}
         </div>
       </section>
+      )}
 
-      {!isMobile ? (
+      {!isMobile && (
         <HomePromoCarousel locale={locale} copy={{ ...t, appMockup: extra.appMockup }} appLinks={appLinks} onLoyaltyClick={() => navigate('/club')} />
-      ) : (
-        <>
-          <section style={{ maxWidth: 1180, margin: '28px auto 0', padding: '0 26px' }}>
-            <div style={{ borderRadius: 24, overflow: 'hidden', boxShadow: '0 18px 44px -28px rgba(13,38,102,.4)', background: 'linear-gradient(120deg,#1668c4,#0d3b66)', padding: '24px 22px', display: 'flex', flexDirection: 'column', gap: 33, position: 'relative' }}>
-              <div style={{ maxWidth: 440 }}>
-                <div style={{ display: 'inline-block', background: '#ffffff22', color: '#fff', padding: '5px 11px', borderRadius: 20, fontSize: '11.5px', fontWeight: 600, marginBottom: 14 }}>
-                  {t.loyaltyEyebrow}
-                </div>
-                <h2 style={{ fontSize: '22.5px', fontWeight: 800, color: '#fff', margin: '0 0 10px', letterSpacing: '-.5px' }}>{t.loyaltyTitle}</h2>
-                <p style={{ fontSize: 13, color: '#dce8f6', margin: '0 0 16px', lineHeight: 1.75 }}>{t.loyaltySub}</p>
-                <button type="button" onClick={() => navigate('/club')} style={{ display: 'inline-block', padding: '10px 21px', background: '#fff', color: '#1668c4', borderRadius: 11, fontSize: 13, fontWeight: 800, cursor: 'pointer', border: 'none', fontFamily: 'inherit' }}>
-                  {t.loyaltyCta}
-                </button>
-              </div>
-            </div>
-          </section>
-
-          <section style={{ maxWidth: 1180, margin: '28px auto 0', padding: '0 26px 49px' }}>
-            <div style={{ borderRadius: 24, overflow: 'hidden', boxShadow: '0 18px 44px -28px rgba(13,38,102,.2)', background: '#fff', border: '1px solid #eef1f5', padding: '22px 20px' }}>
-              <div style={{ fontSize: '11.5px', color: '#1668c4', fontWeight: 700, marginBottom: 10 }}>{t.appEyebrow}</div>
-              <h2 style={{ fontSize: '22.5px', fontWeight: 800, margin: '0 0 12px', color: '#0d2640', letterSpacing: '-.5px' }}>{t.appTitle}</h2>
-              <p style={{ fontSize: 13, color: '#3f546b', lineHeight: 1.8, margin: '0 0 20px' }}>{t.appSub}</p>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                {APP_LINK_ORDER.map((id) => {
-                  const link = appLinks.find((l) => l.id === id);
-                  const label = t[APP_LINK_LABELS[id]];
-                  const isBazaar = id === 'bazaar_myket';
-                  const style: React.CSSProperties = {
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 7,
-                    background: isBazaar ? '#fff' : '#0d2640',
-                    color: isBazaar ? '#0d2640' : '#fff',
-                    padding: '9px 16px',
-                    borderRadius: 12,
-                    fontSize: '12.5px',
-                    fontWeight: 600,
-                    border: isBazaar ? '1.5px solid #d5e1f0' : 'none',
-                    textDecoration: 'none',
-                    fontFamily: 'inherit',
-                    cursor: link ? 'pointer' : 'default',
-                    opacity: link ? 1 : 0.85,
-                  };
-                  if (link) {
-                    return (
-                      <a key={id} href={link.url} target="_blank" rel="noopener noreferrer" data-testid={`app-link-${id}`} style={style}>
-                        {!isBazaar && <span style={{ fontSize: '14.5px' }}>⬇</span>}
-                        {label}
-                      </a>
-                    );
-                  }
-                  return (
-                    <span key={id} data-testid={`app-link-${id}`} style={style}>
-                      {!isBazaar && <span style={{ fontSize: '14.5px' }}>⬇</span>}
-                      {label}
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-          </section>
-        </>
       )}
     </PublicPageShell>
   );
