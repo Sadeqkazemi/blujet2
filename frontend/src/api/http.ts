@@ -60,7 +60,11 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}, retry 
     );
   }
   if (!body.success || body.data == null) {
-    throw new ApiRequestError(body.error?.code ?? 'UNKNOWN', body.error?.message ?? 'خطای ناشناخته', res.status);
+    const rawMessage = body.error?.message;
+    const message = Array.isArray(rawMessage)
+      ? rawMessage.join(' ')
+      : (rawMessage ?? 'خطای ناشناخته');
+    throw new ApiRequestError(body.error?.code ?? 'UNKNOWN', message, res.status);
   }
   return body.data;
 }

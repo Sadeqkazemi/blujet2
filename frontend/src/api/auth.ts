@@ -1,5 +1,6 @@
 import { apiGet, apiPatch, apiPost } from './http';
 import { setAccessToken } from './token-store';
+import { normalizeIranMobile } from '../lib/fa-format';
 import type { AuthUser, Locale } from '../types/auth';
 
 export function staffLogin(username: string, password: string) {
@@ -47,7 +48,12 @@ export function updateMyLocale(locale: Locale) {
 }
 
 export function requestOtp(phone: string) {
-  return apiPost<{ challengeId: string }>('/auth/otp/request', { phone });
+  return apiPost<{ challengeId: string }>('/auth/otp/request', { phone: normalizeIranMobile(phone) });
+}
+
+/** Dev/E2E only — reads the mock OTP after requestOtp (404 in production). */
+export function fetchDevLastOtp(phone: string) {
+  return apiGet<{ code: string }>(`/auth/_test/last-otp/${encodeURIComponent(normalizeIranMobile(phone))}`);
 }
 
 export type StepUpScope =

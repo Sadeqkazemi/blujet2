@@ -3,7 +3,9 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { createBooking, fetchClubPoints, fetchSavedPassengers, fetchSeatMap } from '../../api/publicSite';
+import { fetchDevLastOtp } from '../../api/auth';
 import { ApiRequestError } from '../../api/envelope';
+import { faDigits, isValidIranMobile, normalizeIranMobile } from '../../lib/fa-format';
 import type { CabinClass, SavedPassenger, SeatMapCell } from '../../types/public-site';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import FlowStepper from '../../components/public/FlowStepper';
@@ -23,6 +25,11 @@ const STR: Record<
     otpCodePlaceholder: string;
     otpSendError: string;
     otpInvalid: string;
+    otpPhoneInvalid: string;
+    otpSent: (phone: string) => string;
+    otpRequesting: string;
+    otpResend: string;
+    otpDevHint: (code: string) => string;
     title: string;
     businessLock: string;
     seatMapLoading: string;
@@ -48,6 +55,11 @@ const STR: Record<
     otpCodePlaceholder: 'کد ۶ رقمی',
     otpSendError: 'خطا در ارسال کد.',
     otpInvalid: 'کد نامعتبر است.',
+    otpPhoneInvalid: 'شماره موبایل معتبر نیست (مثال: 09121234567).',
+    otpSent: (phone) => `کد تأیید به ${faDigits(phone)} ارسال شد.`,
+    otpRequesting: 'در حال ارسال…',
+    otpResend: 'ارسال مجدد کد',
+    otpDevHint: (code) => `محیط توسعه — کد: ${faDigits(code)}`,
     title: 'انتخاب صندلی و اطلاعات مسافران',
     businessLock: '🔒 انتخاب صندلی بیزینس نیازمند حداقل ۱۵٬۰۰۰ امتیاز باشگاه است',
     seatMapLoading: 'در حال بارگذاری نقشه صندلی…',
@@ -72,6 +84,11 @@ const STR: Record<
     otpCodePlaceholder: '6-digit code',
     otpSendError: 'Failed to send code.',
     otpInvalid: 'Invalid code.',
+    otpPhoneInvalid: 'Enter a valid mobile number (e.g. 09121234567).',
+    otpSent: (phone) => `Verification code sent to ${phone}.`,
+    otpRequesting: 'Sending…',
+    otpResend: 'Resend code',
+    otpDevHint: (code) => `Dev — code: ${code}`,
     title: 'Seat selection & passenger details',
     businessLock: '🔒 Business seat selection requires at least 15,000 club points',
     seatMapLoading: 'Loading seat map…',
@@ -96,6 +113,11 @@ const STR: Record<
     otpCodePlaceholder: 'رمز من ٦ أرقام',
     otpSendError: 'فشل إرسال الرمز.',
     otpInvalid: 'رمز غير صالح.',
+    otpPhoneInvalid: 'رقم جوال غير صالح (مثال: 09121234567).',
+    otpSent: (phone) => `تم إرسال الرمز إلى ${phone}.`,
+    otpRequesting: 'جارٍ الإرسال…',
+    otpResend: 'إعادة إرسال الرمز',
+    otpDevHint: (code) => `بيئة التطوير — الرمز: ${code}`,
     title: 'اختيار المقعد وبيانات المسافرين',
     businessLock: '🔒 اختيار مقعد درجة الأعمال يتطلب ١٥٬٠٠٠ نقطة على الأقل',
     seatMapLoading: 'جارٍ تحميل خريطة المقاعد…',
@@ -120,25 +142,62 @@ function OtpLoginInline() {
   const [challengeId, setChallengeId] = useState<string | null>(null);
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [devCode, setDevCode] = useState<string | null>(null);
+
+  const normalizedPhone = normalizeIranMobile(phone);
+  const phoneReady = isValidIranMobile(normalizedPhone);
+
+  async function sendOtp() {
+    setError(null);
+    setDevCode(null);
+    if (!phoneReady) {
+      setError(t.otpPhoneInvalid);
+      return;
+    }
+    if (!requestOtp) {
+      setError(t.otpSendError);
+      return;
+    }
+    setBusy(true);
+    try {
+      const id = await requestOtp(normalizedPhone);
+      setChallengeId(id);
+      setCode('');
+      if (import.meta.env.DEV) {
+        try {
+          const { code: mockCode } = await fetchDevLastOtp(normalizedPhone);
+          setDevCode(mockCode);
+        } catch {
+          /* mock endpoint unavailable in production builds */
+        }
+      }
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t.otpSendError);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function onRequest(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
-    try {
-      const id = await requestOtp!(phone);
-      setChallengeId(id);
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : t.otpSendError);
-    }
+    await sendOtp();
   }
 
   async function onVerify(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!verifyOtp) {
+      setError(t.otpInvalid);
+      return;
+    }
+    setBusy(true);
     try {
-      await verifyOtp!(challengeId!, code);
+      await verifyOtp(challengeId!, normalizeIranMobile(code));
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.otpInvalid);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -151,26 +210,59 @@ function OtpLoginInline() {
         <form onSubmit={onRequest} className="flex flex-col gap-3">
           <input
             data-testid="otp-phone"
+            type="tel"
+            dir="ltr"
+            inputMode="tel"
+            autoComplete="tel"
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            onChange={(e) => setPhone(normalizeIranMobile(e.target.value))}
             placeholder={t.otpPhonePlaceholder}
             className="rounded-lg border border-[#eef1f5] px-3.5 py-2.5 text-sm outline-none focus:border-[#1668c4]"
           />
-          <button type="submit" className="rounded-lg bg-[#1668c4] px-4 py-2.5 text-sm font-bold text-white">
-            {t.otpRequest}
+          <button
+            type="submit"
+            disabled={busy || !phoneReady}
+            className="rounded-lg bg-[#1668c4] px-4 py-2.5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {busy ? t.otpRequesting : t.otpRequest}
           </button>
         </form>
       ) : (
         <form onSubmit={onVerify} className="flex flex-col gap-3">
+          <p className="text-xs font-semibold text-[#059669]" data-testid="otp-sent-notice">
+            {t.otpSent(normalizedPhone)}
+          </p>
+          {devCode && (
+            <p className="rounded-lg bg-[#eff6ff] p-2.5 text-xs font-semibold text-[#1668c4]" data-testid="otp-dev-hint">
+              {t.otpDevHint(devCode)}
+            </p>
+          )}
           <input
             data-testid="otp-code"
+            type="tel"
+            dir="ltr"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={6}
             value={code}
-            onChange={(e) => setCode(e.target.value)}
+            onChange={(e) => setCode(normalizeIranMobile(e.target.value).slice(0, 6))}
             placeholder={t.otpCodePlaceholder}
             className="font-num rounded-lg border border-[#eef1f5] px-3.5 py-2.5 text-sm outline-none focus:border-[#1668c4]"
           />
-          <button type="submit" className="rounded-lg bg-[#1668c4] px-4 py-2.5 text-sm font-bold text-white">
-            {t.otpVerify}
+          <button
+            type="submit"
+            disabled={busy || code.length < 6}
+            className="rounded-lg bg-[#1668c4] px-4 py-2.5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {busy ? t.otpRequesting : t.otpVerify}
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void sendOtp()}
+            className="text-xs font-bold text-[#1668c4] disabled:opacity-60"
+          >
+            {t.otpResend}
           </button>
         </form>
       )}
