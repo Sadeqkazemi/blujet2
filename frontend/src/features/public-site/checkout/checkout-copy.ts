@@ -44,6 +44,8 @@ export const CHECKOUT_COPY: Record<
     year: string;
     passportNo: string;
     fromSaved: string;
+    selectSaved: string;
+    savedEmpty: string;
     addPax: string;
     remove: string;
     passenger: string;
@@ -99,6 +101,8 @@ export const CHECKOUT_COPY: Record<
     year: 'سال',
     passportNo: 'شماره گذرنامه',
     fromSaved: 'از مسافران ذخیره‌شده',
+    selectSaved: 'انتخاب از مسافران ذخیره‌شده:',
+    savedEmpty: 'هنوز مسافری در حساب شما ذخیره نشده است.',
     addPax: 'مسافر جدید',
     remove: 'حذف',
     passenger: 'مسافر',
@@ -162,6 +166,8 @@ export const CHECKOUT_COPY: Record<
     year: 'Year',
     passportNo: 'Passport number',
     fromSaved: 'From saved passengers',
+    selectSaved: 'Select from saved passengers:',
+    savedEmpty: 'You have no saved passengers yet.',
     addPax: 'New passenger',
     remove: 'Remove',
     passenger: 'Passenger',
@@ -179,8 +185,8 @@ export const CHECKOUT_COPY: Record<
       cip: { title: 'CIP lounge', desc: 'Private lounge access' },
     },
     months: [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
     ],
   },
   ar: {
@@ -225,6 +231,8 @@ export const CHECKOUT_COPY: Record<
     year: 'سنة',
     passportNo: 'رقم جواز السفر',
     fromSaved: 'من المسافرين المحفوظين',
+    selectSaved: 'اختر من المسافرين المحفوظين:',
+    savedEmpty: 'لا يوجد مسافرون محفوظون في حسابك بعد.',
     addPax: 'مسافر جديد',
     remove: 'حذف',
     passenger: 'مسافر',
