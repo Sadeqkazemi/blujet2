@@ -460,6 +460,7 @@ export default function CheckoutPage() {
               {error}
             </div>
           )}
+          {/* Design: full CTA in price card + sticky duplicate at bottom */}
           <PricingSidebar
             locale={locale}
             priceIrr={priceIrr}
@@ -467,9 +468,10 @@ export default function CheckoutPage() {
             extras={extras}
             nextLabel={nextLabel}
             onNext={goNext}
-            canBack={false}
+            onBack={goBack}
+            canBack={step !== 'pax'}
             busy={busy}
-            hideActions
+            error={error}
           />
         </div>
 
