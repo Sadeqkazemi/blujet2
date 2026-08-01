@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { dayjs } from '../lib/jalali';
+import { dayjs, isoDateAtNoon, toIsoDateOnly } from '../lib/jalali';
 import { faDigits } from '../lib/fa-format';
 
 const WEEKDAYS = ['ش', 'ی', 'د', 'س', 'چ', 'پ', 'ج'];
@@ -31,8 +31,8 @@ function buildMonthCells(viewMonth: ReturnType<typeof dayjs>, minIso: string | n
   const cells: (Cell | null)[] = Array.from({ length: offset }, () => null);
   for (let d = 1; d <= daysInMonth; d++) {
     const day = start.add(d - 1, 'day');
-    const iso = day.toDate().toISOString();
-    cells.push({ date: d, iso, disabled: minIso ? iso.slice(0, 10) < minIso.slice(0, 10) : false });
+    const iso = toIsoDateOnly(day);
+    cells.push({ date: d, iso, disabled: minIso ? iso < minIso.slice(0, 10) : false });
   }
   return cells;
 }
@@ -129,7 +129,7 @@ export default function JalaliDatePicker({
               onClick={() => {
                 const today = dayjs().calendar('jalali');
                 setViewMonth(today);
-                onChange(today.toDate().toISOString());
+                onChange(isoDateAtNoon(toIsoDateOnly(today)));
                 setOpen(false);
               }}
               style={{ padding: '7px 15px', border: '1.5px solid #1668c4', borderRadius: 22, color: '#1668c4', fontSize: '11.5px', fontWeight: 700, cursor: 'pointer' }}
@@ -165,14 +165,14 @@ export default function JalaliDatePicker({
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 2 }}>
             {cells.map((c, i) => {
               if (!c) return <span key={`blank-${i}`} />;
-              const isSelected = selectedIsoDay === c.iso.slice(0, 10);
+              const isSelected = selectedIsoDay === c.iso;
               return (
                 <span
                   key={c.iso}
                   data-testid={testId ? `${testId}-day-${c.date}` : undefined}
                   onClick={() => {
                     if (c.disabled) return;
-                    onChange(c.iso);
+                    onChange(isoDateAtNoon(c.iso));
                     setOpen(false);
                   }}
                   style={{

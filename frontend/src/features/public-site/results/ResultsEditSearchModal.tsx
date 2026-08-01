@@ -3,7 +3,7 @@ import { fetchAirports } from '../../../api/publicSite';
 import type { StoredLocale } from '../../../hooks/useLocale';
 import { faDigits } from '../../../lib/fa-format';
 import { airportCityLabel, airportCityName } from '../../../lib/airport-cities';
-import { dayjs, formatJalaliDate } from '../../../lib/jalali';
+import { dayjs, formatJalaliDate, toIsoDateOnly } from '../../../lib/jalali';
 import type { Airport } from '../../../types/public-site';
 import type { ResultsCopy } from './results-copy';
 
@@ -55,7 +55,7 @@ function buildCalendarCells(viewMonth: ReturnType<typeof dayjs>, selectedIso: st
 
   for (let d = 1; d <= daysInMonth; d++) {
     const day = start.add(d - 1, 'day');
-    const iso = day.toDate().toISOString().slice(0, 10);
+    const iso = toIsoDateOnly(day);
     const disabled = day.isBefore(today, 'day');
     cells.push({
       label: locale === 'en' ? String(d) : faDigits(d),
