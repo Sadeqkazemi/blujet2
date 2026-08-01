@@ -119,7 +119,7 @@ describe('HomeSearchPage', () => {
 
     expect(await screen.findByTestId('home-origin')).toBeInTheDocument();
     expect(screen.getByTestId('home-origin')).toHaveTextContent('شهر مبدا');
-    expect(screen.getByTestId('home-dest')).toHaveTextContent('ابتدا مبدا را انتخاب کنید');
+    expect(screen.getByTestId('home-dest')).toHaveTextContent('شهر مقصد');
     expect(screen.getByTestId('home-search-submit')).toBeInTheDocument();
     expect(document.getElementById('search-card')).toBeInTheDocument();
   });
@@ -185,6 +185,28 @@ describe('HomeSearchPage', () => {
 
     expect(screen.getByTestId('home-origin')).toHaveTextContent('تهران');
     expect(screen.getByTestId('home-dest')).toHaveTextContent('مشهد');
+  });
+
+  it('lists fallback cities when airports API has not loaded yet', async () => {
+    vi.spyOn(publicSiteApi, 'fetchAirports').mockReturnValue(new Promise(() => {}));
+    vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockResolvedValue(CMS_HOME);
+    vi.spyOn(settingsApi, 'fetchPublicAppLinks').mockResolvedValue({ links: [] });
+    renderPage();
+    await screen.findByTestId('home-origin');
+
+    await userEvent.click(screen.getByTestId('home-origin'));
+    expect(await screen.findByTestId('airport-option-THR')).toBeInTheDocument();
+    expect(screen.getByTestId('airport-option-MHD')).toBeInTheDocument();
+  });
+
+  it('blocks destination picker until origin is chosen', async () => {
+    mockHomeApis();
+    renderPage();
+    await screen.findByTestId('home-origin');
+
+    await userEvent.click(screen.getByTestId('home-dest'));
+    expect(screen.queryByTestId('airport-option-MHD')).not.toBeInTheDocument();
+    expect(screen.getByText('ابتدا مبدا را انتخاب کنید')).toBeInTheDocument();
   });
 
   it('rejects identical origin and destination', async () => {
