@@ -7,6 +7,8 @@ export type AccountNavItem = {
   key: TabKey;
   group: AccountNavGroup;
   label: Record<StoredLocale, string>;
+  /** Show in the account page sidebar */
+  showInSidebar: boolean;
   /** Show in the public-site mobile hamburger drawer */
   showInMobileMenu: boolean;
 };
@@ -17,84 +19,98 @@ export const ACCOUNT_NAV_ITEMS: AccountNavItem[] = [
     key: 'profile',
     group: 'primary',
     label: { fa: 'پروفایل من', en: 'My Profile', ar: 'ملفي الشخصي' },
+    showInSidebar: true,
     showInMobileMenu: true,
   },
   {
     key: 'account-info',
     group: 'primary',
     label: { fa: 'اطلاعات حساب', en: 'Account Information', ar: 'معلومات الحساب' },
+    showInSidebar: true,
     showInMobileMenu: true,
   },
   {
     key: 'trips',
     group: 'primary',
     label: { fa: 'سفرها و خریدها', en: 'Trips & Purchases', ar: 'الرحلات والمشتريات' },
+    showInSidebar: false,
     showInMobileMenu: true,
   },
   {
     key: 'refunds',
     group: 'primary',
     label: { fa: 'استرداد بلیط', en: 'Refund Ticket', ar: 'استرداد التذكرة' },
+    showInSidebar: false,
     showInMobileMenu: true,
   },
   {
     key: 'wallet',
     group: 'primary',
     label: { fa: 'کیف پول و امتیاز', en: 'Wallet & Points', ar: 'المحفظة والنقاط' },
+    showInSidebar: false,
     showInMobileMenu: true,
   },
   {
     key: 'club',
     group: 'primary',
     label: { fa: 'باشگاه مشتریان', en: 'Loyalty Club', ar: 'نادي الولاء' },
+    showInSidebar: false,
     showInMobileMenu: false,
   },
   {
     key: 'saved',
     group: 'account',
     label: { fa: 'نشان‌شده‌ها', en: 'Saved', ar: 'المحفوظة' },
+    showInSidebar: false,
     showInMobileMenu: true,
   },
   {
     key: 'price-locks',
     group: 'account',
     label: { fa: 'قفل قیمت', en: 'Price Lock', ar: 'قفل السعر' },
+    showInSidebar: false,
     showInMobileMenu: true,
   },
   {
     key: 'passengers',
     group: 'account',
     label: { fa: 'مسافران', en: 'Passengers', ar: 'المسافرون' },
+    showInSidebar: false,
     showInMobileMenu: true,
   },
   {
     key: 'tickets',
     group: 'account',
     label: { fa: 'پیام به پشتیبانی', en: 'Message Support', ar: 'رسالة للدعم' },
+    showInSidebar: false,
     showInMobileMenu: true,
   },
   {
     key: 'identity',
     group: 'account',
     label: { fa: 'احراز هویت', en: 'Identity Verification', ar: 'التحقق من الهوية' },
+    showInSidebar: false,
     showInMobileMenu: true,
   },
   {
     key: 'security',
     group: 'account',
     label: { fa: 'امنیت حساب', en: 'Account Security', ar: 'أمان الحساب' },
+    showInSidebar: false,
     showInMobileMenu: true,
   },
   {
     key: 'banks',
     group: 'account',
     label: { fa: 'حساب‌های بانکی', en: 'Bank Accounts', ar: 'الحسابات البنكية' },
+    showInSidebar: false,
     showInMobileMenu: true,
   },
   {
     key: 'referral',
     group: 'account',
     label: { fa: 'معرفی دوستان', en: 'Invite Friends', ar: 'دعوة الأصدقاء' },
+    showInSidebar: false,
     showInMobileMenu: true,
   },
 ];
@@ -111,6 +127,10 @@ export function accountTabHref(tab: TabKey): string {
 
 export function accountNavByGroup(group: AccountNavGroup): AccountNavItem[] {
   return ACCOUNT_NAV_ITEMS.filter((item) => item.group === group);
+}
+
+export function sidebarAccountNavItems(): AccountNavItem[] {
+  return ACCOUNT_NAV_ITEMS.filter((item) => item.showInSidebar);
 }
 
 export function mobileAccountNavItems(): AccountNavItem[] {
