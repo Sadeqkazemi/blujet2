@@ -7,6 +7,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { setPassword as apiSetPassword } from '../../api/auth';
 import { ApiRequestError } from '../../api/envelope';
 import { faDigits } from '../../lib/fa-format';
+import { normalizePhone, phoneOk } from '../../lib/phone';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { DIR, FONT } from '../../lib/i18n';
 
@@ -253,17 +254,6 @@ const STR: Record<
     p2Mismatch: 'كلمتا المرور غير متطابقتين',
   },
 };
-
-function normalizePhone(raw: string): string {
-  return raw
-    .replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
-    .replace(/\D/g, '')
-    .slice(0, 11);
-}
-
-function phoneOk(phone: string): boolean {
-  return /^09\d{9}$/.test(phone);
-}
 
 function emailOk(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);

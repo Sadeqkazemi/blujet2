@@ -9,19 +9,9 @@ import { useIsMobile } from '../../hooks/useIsMobile';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { ApiRequestError } from '../../api/envelope';
 import { faDigits } from '../../lib/fa-format';
+import { normalizePhone, phoneOk } from '../../lib/phone';
 
 const RESEND_SECONDS = 120;
-
-function normalizePhone(raw: string): string {
-  return raw
-    .replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
-    .replace(/\D/g, '')
-    .slice(0, 11);
-}
-
-function phoneOk(phone: string): boolean {
-  return /^09\d{9}$/.test(phone);
-}
 
 function emailOk(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -87,6 +77,9 @@ const STR: Record<
     errSendCode: string;
     errInvalidCode: string;
     errAgencyLoginFailed: string;
+    errNameRequired: string;
+    errTermsRequired: string;
+    sendingLabel: string;
     phoneHintExample: string;
     phoneHintOk: string;
     phoneHintBad: string;
@@ -155,6 +148,9 @@ const STR: Record<
     errSendCode: 'خطا در ارسال کد.',
     errInvalidCode: 'کد نامعتبر است.',
     errAgencyLoginFailed: 'ورود آژانس ناموفق بود.',
+    errNameRequired: 'نام و نام خانوادگی را کامل وارد کن.',
+    errTermsRequired: 'برای ادامه باید قوانین و مقررات را بپذیری.',
+    sendingLabel: 'در حال ارسال…',
     phoneHintExample: 'مثال: ۰۹۱۲۳۴۵۶۷۸۹',
     phoneHintOk: '✓ شماره معتبر است',
     phoneHintBad: 'شماره باید با ۰۹ شروع شود و ۱۱ رقم باشد',
@@ -222,6 +218,9 @@ const STR: Record<
     errSendCode: 'Error sending the code.',
     errInvalidCode: 'Invalid code.',
     errAgencyLoginFailed: 'Agency login failed.',
+    errNameRequired: 'Please enter your full name.',
+    errTermsRequired: 'You must accept the Terms & Conditions.',
+    sendingLabel: 'Sending…',
     phoneHintExample: 'e.g. 09123456789',
     phoneHintOk: '✓ Looks good',
     phoneHintBad: 'Number must start with 09 and be 11 digits',
@@ -290,6 +289,9 @@ const STR: Record<
     errSendCode: 'خطأ في إرسال الرمز.',
     errInvalidCode: 'رمز غير صالح.',
     errAgencyLoginFailed: 'فشل تسجيل دخول الوكالة.',
+    errNameRequired: 'أدخل اسمك الكامل.',
+    errTermsRequired: 'يجب الموافقة على الشروط والأحكام للمتابعة.',
+    sendingLabel: 'جارٍ الإرسال…',
     phoneHintExample: 'مثال: 09123456789',
     phoneHintOk: '✓ الرقم صحيح',
     phoneHintBad: 'يجب أن يبدأ الرقم بـ 09 ويتكون من 11 رقمًا',
@@ -422,8 +424,27 @@ export default function CustomerLoginPage() {
     password === '' ? t.passwordHintEmpty : passwordOk ? t.passwordHintOk : t.passwordHintBad;
   const passwordHintColor = password === '' ? '#9aa7b8' : passwordOk ? '#1f8a5b' : '#d64545';
 
+  function validatePhoneStep(): boolean {
+    if (!phoneOk(phone)) {
+      setError(t.phoneHintBad);
+      return false;
+    }
+    if (!isLogin) {
+      if (fullName.trim().length < (isEN ? 2 : 3)) {
+        setError(t.errNameRequired);
+        return false;
+      }
+      if (!terms) {
+        setError(t.errTermsRequired);
+        return false;
+      }
+    }
+    return true;
+  }
+
   async function sendOtp() {
-    if (!phoneInfoOk) return;
+    if (busy) return;
+    if (!validatePhoneStep()) return;
     setError(null);
     setBusy(true);
     try {
@@ -595,8 +616,10 @@ export default function CustomerLoginPage() {
                       dir="ltr"
                       value={phone}
                       onChange={(e) => setPhone(normalizePhone(e.target.value))}
+                      onInput={(e) => setPhone(normalizePhone(e.currentTarget.value))}
                       placeholder="0912 345 6789"
                       maxLength={11}
+                      autoComplete="tel"
                       style={{ ...AUTH_INPUT, paddingLeft: 52, fontSize: 16, fontWeight: 700, letterSpacing: 1 }}
                     />
                     <span
@@ -883,8 +906,10 @@ export default function CustomerLoginPage() {
                         dir="ltr"
                         value={phone}
                         onChange={(e) => setPhone(normalizePhone(e.target.value))}
+                        onInput={(e) => setPhone(normalizePhone(e.currentTarget.value))}
                         placeholder="0912 345 6789"
                         maxLength={11}
+                        autoComplete="tel"
                         style={{ ...AUTH_INPUT, paddingLeft: 52, fontSize: 16, fontWeight: 700, letterSpacing: 1 }}
                       />
                       <span
@@ -917,12 +942,13 @@ export default function CustomerLoginPage() {
                     </label>
                   )}
                   <button
-                    type="submit"
+                    type="button"
                     data-testid="signin-request"
-                    disabled={busy || !phoneInfoOk}
-                    style={authBtn(!busy && phoneInfoOk)}
+                    onClick={() => void sendOtp()}
+                    aria-disabled={busy || !phoneInfoOk}
+                    style={authBtn(phoneInfoOk && !busy)}
                   >
-                    {sendLabel}
+                    {busy ? t.sendingLabel : sendLabel}
                   </button>
                 </form>
               </>
@@ -938,6 +964,7 @@ export default function CustomerLoginPage() {
                     </span>
                   </div>
                   <OtpCells
+                    key={challengeId ?? 'otp'}
                     digits={otpDigits}
                     onChange={setOtpDigits}
                     testIdPrefix="signin-code-cell"

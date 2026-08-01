@@ -46,6 +46,19 @@ async function typeOtp(prefix: string, code: string) {
 }
 
 describe('CustomerLoginPage', () => {
+  it('enables send button on login when phone is valid', async () => {
+    renderWithRouter(<CustomerLoginPage />);
+    const sendBtn = screen.getByTestId('signin-request');
+
+    await userEvent.type(screen.getByTestId('signin-phone'), '09120000001');
+    expect(sendBtn).not.toHaveAttribute('aria-disabled', 'true');
+    expect(sendBtn).toHaveStyle({ background: '#1668c4' });
+
+    await userEvent.click(sendBtn);
+    expect(requestOtp).toHaveBeenCalledWith('09120000001');
+    expect(await screen.findByTestId('signin-code-cell-0')).toBeInTheDocument();
+  });
+
   it('walks through OTP login with resend countdown, site header, footer, and visual panel', async () => {
     renderWithRouter(<CustomerLoginPage />);
     expect(screen.getByTestId('public-lang-toggle')).toBeInTheDocument();
@@ -68,12 +81,21 @@ describe('CustomerLoginPage', () => {
     expect(verifyOtp).toHaveBeenCalledWith('challenge-1', '123456');
   });
 
-  it('signup tab requires name and terms; agency signup submits the mock request', async () => {
+  it('signup tab requires name and terms before sending OTP', async () => {
     renderWithRouter(<CustomerLoginPage />);
 
     await userEvent.click(screen.getByTestId('signin-tab-signup'));
     expect(screen.getByTestId('signup-name')).toBeInTheDocument();
-    expect(screen.getByTestId('signin-request')).toBeDisabled();
+
+    await userEvent.type(screen.getByTestId('signin-phone'), '09121234567');
+    await userEvent.click(screen.getByTestId('signin-request'));
+    expect(requestOtp).not.toHaveBeenCalled();
+    expect(screen.getByText('نام و نام خانوادگی را کامل وارد کن.')).toBeInTheDocument();
+
+    await userEvent.type(screen.getByTestId('signup-name'), 'نگار رضایی');
+    await userEvent.click(screen.getByTestId('signin-request'));
+    expect(requestOtp).not.toHaveBeenCalled();
+    expect(screen.getByText('برای ادامه باید قوانین و مقررات را بپذیری.')).toBeInTheDocument();
 
     await userEvent.click(screen.getByTestId('signin-acct-agency'));
     await userEvent.type(screen.getByTestId('agency-name'), 'آژانس سفر آبی');

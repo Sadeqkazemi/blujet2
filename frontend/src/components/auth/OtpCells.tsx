@@ -22,7 +22,6 @@ export function OtpCells({
   autoFocus?: boolean;
 }) {
   const refs = useRef<(HTMLInputElement | null)[]>([]);
-  const autofillRef = useRef<HTMLInputElement | null>(null);
 
   const applyDigits = useCallback(
     (startIndex: number, raw: string) => {
@@ -76,66 +75,48 @@ export function OtpCells({
 
   useEffect(() => {
     if (!autoFocus) return;
-    refs.current[0]?.focus({ preventScroll: true });
+    const id = window.requestAnimationFrame(() => {
+      refs.current[0]?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(id);
   }, [autoFocus]);
 
   return (
-    <div style={{ position: 'relative' }}>
-      {/* Captures iOS/Android SMS autofill (one-time-code) into all cells at once. */}
-      <input
-        ref={autofillRef}
-        data-testid={`${testIdPrefix}-autofill`}
-        type="text"
-        inputMode="numeric"
-        autoComplete="one-time-code"
-        tabIndex={-1}
-        aria-hidden
-        value={digits.join('')}
-        onChange={(e) => applyDigits(0, e.target.value)}
-        style={{
-          position: 'absolute',
-          opacity: 0,
-          width: 1,
-          height: 1,
-          padding: 0,
-          border: 'none',
-          pointerEvents: 'none',
-        }}
-      />
-      <div style={{ display: 'flex', gap: 10, direction: 'ltr' }}>
-        {digits.map((v, i) => (
-          <input
-            key={i}
-            ref={(el) => {
-              refs.current[i] = el;
-            }}
-            data-testid={`${testIdPrefix}-${i}`}
-            type="tel"
-            inputMode="numeric"
-            autoComplete="off"
-            dir="ltr"
-            value={v}
-            onChange={(e) => setDigit(i, e.target.value)}
-            onKeyDown={(e) => onKeyDown(i, e)}
-            onPaste={(e) => onPaste(i, e)}
-            style={{
-              flex: 1,
-              width: '100%',
-              height: 60,
-              border: `1.5px solid ${v ? '#1668c4' : '#dfe6ef'}`,
-              borderRadius: 13,
-              background: v ? '#f3f7fc' : '#fafbfd',
-              textAlign: 'center',
-              fontSize: 22,
-              fontWeight: 800,
-              color: '#16202e',
-              padding: 0,
-              outline: 'none',
-              fontFamily: 'inherit',
-            }}
-          />
-        ))}
-      </div>
+    <div style={{ display: 'flex', gap: 10, direction: 'ltr', position: 'relative', zIndex: 1 }}>
+      {digits.map((v, i) => (
+        <input
+          key={i}
+          ref={(el) => {
+            refs.current[i] = el;
+          }}
+          data-testid={`${testIdPrefix}-${i}`}
+          className="auth-input"
+          type="tel"
+          inputMode="numeric"
+          autoComplete={i === 0 ? 'one-time-code' : 'off'}
+          dir="ltr"
+          value={v}
+          onChange={(e) => setDigit(i, e.target.value)}
+          onKeyDown={(e) => onKeyDown(i, e)}
+          onPaste={(e) => onPaste(i, e)}
+          style={{
+            flex: 1,
+            width: '100%',
+            height: 60,
+            border: `1.5px solid ${v ? '#1668c4' : '#dfe6ef'}`,
+            borderRadius: 13,
+            background: v ? '#f3f7fc' : '#fafbfd',
+            textAlign: 'center',
+            fontSize: 22,
+            fontWeight: 800,
+            color: '#16202e',
+            padding: 0,
+            outline: 'none',
+            fontFamily: 'inherit',
+            touchAction: 'manipulation',
+          }}
+        />
+      ))}
     </div>
   );
 }
