@@ -2,7 +2,7 @@ import type { AuthUser } from '../../../types/auth';
 import { faDigits } from '../../../lib/fa-format';
 import { useLocale, type StoredLocale } from '../../../hooks/useLocale';
 import type { TabKey } from './account-types';
-import { accountNavByGroup } from './account-nav-items';
+import { sidebarAccountNavItems } from './account-nav-items';
 
 const TIER_LABEL: Record<string, Record<StoredLocale, string>> = {
   SILVER: { fa: 'عضو نقره‌ای باشگاه', en: 'Silver Club Member', ar: 'عضو فضية النادي' },
@@ -223,8 +223,7 @@ export default function AccountSidebar({
       ? (TIER_LABEL[club.level]?.[locale] ?? club.level)
       : t.newMember;
 
-  const primaryNav = accountNavByGroup('primary');
-  const accountNav = accountNavByGroup('account');
+  const sidebarNav = sidebarAccountNavItems();
 
   return (
     <aside
@@ -327,17 +326,7 @@ export default function AccountSidebar({
         </div>
       </div>
       <div style={{ padding: 9 }}>
-        {primaryNav.map((item) => (
-          <NavButton
-            key={item.key}
-            tabKey={item.key}
-            label={item.label[locale]}
-            active={tab === item.key}
-            onSelect={() => onTabChange(item.key)}
-          />
-        ))}
-        <div style={{ height: 6 }} />
-        {accountNav.map((item) => (
+        {sidebarNav.map((item) => (
           <NavButton
             key={item.key}
             tabKey={item.key}
