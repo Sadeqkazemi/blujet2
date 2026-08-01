@@ -247,12 +247,8 @@ export default function AgencyCreditPage() {
   if (!credit) return <p className="p-8 text-sm text-muted">{t.loading}</p>;
 
   return (
-    <div className="p-8">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="mb-1 text-xl font-black text-ink">{t.heading}</h1>
-          <p className="text-sm text-muted">{t.subtitle}</p>
-        </div>
+    <div>
+      <div className="mb-6 flex items-center justify-end">
         <button
           onClick={() => setRequestOpen(true)}
           className="rounded-lg bg-accent px-4 py-2 text-xs font-bold text-white transition hover:brightness-110"
