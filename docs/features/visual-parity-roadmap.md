@@ -26,7 +26,7 @@ Systematic page-by-page alignment with bundled HTML exports. Each phase = layout
 | 11 | پشتیبانی | `پشتیبانی.html` | Med | [x] Hero card, FAQ + dark ticket sidebar |
 | 12 | درباره ما / تماس / قوانین | bundled | Low | [x] Hero, stats cards, channels, TOC layout |
 | 13 | صفحه 404 / maintenance | bundled | Low | [x] Light 404 + maintenance layout, gear animation |
-| 14 | فرصت‌های شغلی + فرم | bundled | Low | [~] List page done; apply form pending |
+| 14 | فرصت‌های شغلی + فرم | bundled | Low | [x] List + apply form layout, resume drop zone |
 | 15 | پنل کاربر | `پنل کاربر.html` | High | [ ] |
 | 16 | پنل آژانس | `پنل آژانس.html` | High | [ ] Mobile shell |
 | 17–24 | Staff panels (8) | bundled | High each | [ ] Desktop fidelity pass |
