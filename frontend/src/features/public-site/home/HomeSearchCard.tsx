@@ -305,9 +305,7 @@ export default function HomeSearchCard({
     ...(children ? [`${formatToman(children, locale)} ${t.lblChildren}`] : []),
     ...(infants ? [`${formatToman(infants, locale)} ${t.lblInfants}`] : []),
   ];
-  const paxSummary = isMobile
-    ? `${paxParts.join('، ')}، ${cabinLabel}`
-    : `${paxParts.join('، ')}، ${cabinLabel}`;
+  const paxSummary = `${paxParts.join('، ')}، ${cabinLabel}`;
 
   function originDisplay() {
     if (!origin) return t.selectPlaceholder;
