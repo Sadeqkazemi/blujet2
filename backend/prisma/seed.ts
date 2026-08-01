@@ -1457,6 +1457,52 @@ async function main() {
     }
   }
 
+  // THR→MHD is the design's primary public search route (home popular routes,
+  // نتایج پرواز.dc.html). Seed a few weeks of SCHEDULED inventory so search
+  // returns real rows even before the frontend demo fallback kicks in.
+  const thrMhdRoute = await prisma.route.upsert({
+    where: { originCode_destCode: { originCode: 'THR', destCode: 'MHD' } },
+    update: {},
+    create: { originCode: 'THR', destCode: 'MHD', durationMin: 90 },
+  });
+  const thrMhdFlight = await prisma.flight.upsert({
+    where: { flightNo: 'BJ-100' },
+    update: { routeId: thrMhdRoute.id },
+    create: { flightNo: 'BJ-100', routeId: thrMhdRoute.id, aircraftType: 'Airbus A320' },
+  });
+  const thrMhdScheduled = await prisma.flightInstance.count({
+    where: {
+      flightId: thrMhdFlight.id,
+      status: 'SCHEDULED',
+      departureAt: { gt: new Date() },
+    },
+  });
+  if (thrMhdScheduled === 0) {
+    for (let d = 1; d <= 21; d++) {
+      for (const [hour, minute] of [
+        [5, 30],
+        [9, 0],
+        [13, 10],
+        [20, 0],
+      ] as const) {
+        const departureAt = new Date();
+        departureAt.setUTCDate(departureAt.getUTCDate() + d);
+        departureAt.setUTCHours(hour, minute, 0, 0);
+        await prisma.flightInstance.create({
+          data: {
+            flightId: thrMhdFlight.id,
+            departureAt,
+            arrivalAt: new Date(departureAt.getTime() + 90 * 60_000),
+            capacity: 180,
+            charterSeats: 60,
+            status: 'SCHEDULED',
+            basePriceIrr: 16_000_000,
+          },
+        });
+      }
+    }
+  }
+
   console.log('Seed complete.');
   console.log(`Staff dev password (all roles): ${STAFF_PASSWORD}`);
 }

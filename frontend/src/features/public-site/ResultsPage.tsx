@@ -27,6 +27,7 @@ import ResultsAiRadar from './results/ResultsAiRadar';
 import ResultsEditSearchModal from './results/ResultsEditSearchModal';
 import ResultsFlightCard from './results/ResultsFlightCard';
 import { RESULTS_COPY } from './results/results-copy';
+import { demoFlightsForThrMhd, isThrMhdRoute } from './results/results-demo-flights';
 import {
   depHourBucket,
   flightAirlineLabel,
@@ -141,20 +142,28 @@ export default function ResultsPage() {
   const airportMap = useMemo(() => new Map(airports.map((a) => [a.code, a])), [airports]);
   const cityName = (code: string) => airportMap.get(code)?.cityFa ?? code;
 
+  /** API results, or design-reference demo flights for THR↔MHD when inventory is empty. */
+  const effectiveResults = useMemo(() => {
+    if (results === null) return null;
+    if (results.length > 0) return results;
+    if (isThrMhdRoute(origin, dest)) return demoFlightsForThrMhd(origin, dest, date);
+    return [];
+  }, [results, origin, dest, date]);
+
   const airlines = useMemo(() => {
     const set = new Set<string>();
-    for (const r of results ?? []) set.add(flightAirlineLabel(r.flightNo));
+    for (const r of effectiveResults ?? []) set.add(flightAirlineLabel(r.flightNo));
     return Array.from(set).sort();
-  }, [results]);
+  }, [effectiveResults]);
 
   const filteredResults = useMemo(() => {
-    let list = [...(results ?? [])];
+    let list = [...(effectiveResults ?? [])];
     if (fStops === 'direct') list = list.filter((f) => !f.connection);
     if (fStops === 'one') list = list.filter((f) => Boolean(f.connection));
     if (fTime !== 'all') list = list.filter((f) => depHourBucket(f.departureAt) === fTime);
     if (fAirline !== 'all') list = list.filter((f) => flightAirlineLabel(f.flightNo) === fAirline);
     return sortFlights(list, sort);
-  }, [results, fStops, fTime, fAirline, sort]);
+  }, [effectiveResults, fStops, fTime, fAirline, sort]);
 
   const totalPages = Math.max(1, Math.ceil(filteredResults.length / PAGE_SIZE));
   const pagedResults = filteredResults.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -591,7 +600,7 @@ export default function ResultsPage() {
           </div>
         )}
 
-        {results !== null && results.length === 0 && !searchError && (
+        {effectiveResults !== null && effectiveResults.length === 0 && !searchError && (
           <div
             data-testid="empty-results"
             style={{
@@ -655,7 +664,7 @@ export default function ResultsPage() {
           })}
         </div>
 
-        {results !== null && results.length > 0 && filteredResults.length === 0 && (
+        {effectiveResults !== null && effectiveResults.length > 0 && filteredResults.length === 0 && (
           <div
             style={{
               background: '#fff',

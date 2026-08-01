@@ -38,7 +38,10 @@ function mockSearchApis() {
   vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
 }
 
-function renderPage(status: 'unauthenticated' | 'authenticated' = 'unauthenticated') {
+function renderPage(
+  status: 'unauthenticated' | 'authenticated' = 'unauthenticated',
+  search = 'origin=THR&dest=MHD&date=2026-08-01',
+) {
   vi.spyOn(useIsMobileModule, 'useIsMobile').mockReturnValue(false);
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status,
@@ -49,7 +52,7 @@ function renderPage(status: 'unauthenticated' | 'authenticated' = 'unauthenticat
     signOut: vi.fn(),
   });
   return render(
-    <MemoryRouter initialEntries={['/results?origin=THR&dest=MHD&date=2026-08-01']}>
+    <MemoryRouter initialEntries={[`/results?${search}`]}>
       <Routes>
         <Route path="/results" element={<ResultsPage />} />
         <Route path="/signin" element={<div>صفحه ورود</div>} />
@@ -91,17 +94,15 @@ describe('ResultsPage', () => {
     expect(screen.getByRole('button', { name: 'خرید بلیط' })).toBeDisabled();
   });
 
-  it('shows empty state when search returns no flights', async () => {
+  it('shows empty state when search returns no flights on an unsupported route', async () => {
     mockSearchApis();
     const spy = vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([]);
-    renderPage();
+    renderPage('unauthenticated', 'origin=THR&dest=DXB&date=2026-08-01');
 
     expect(await screen.findByTestId('empty-results')).toBeInTheDocument();
     expect(screen.getByText('پروازی یافت نشد')).toBeInTheDocument();
     expect(screen.queryByTestId('result-card')).not.toBeInTheDocument();
-    for (const call of spy.mock.calls) {
-      expect(call).toEqual(['THR', 'MHD', '2026-08-01']);
-    }
+    expect(spy).toHaveBeenCalledWith('THR', 'DXB', '2026-08-01');
   });
 
   it('shows search error banner on search failure', async () => {
@@ -111,6 +112,13 @@ describe('ResultsPage', () => {
 
     expect(await screen.findByTestId('search-error')).toBeInTheDocument();
     expect(screen.queryByTestId('mock-result-card')).not.toBeInTheDocument();
+  });
+
+  it('shows design demo flights for THR→MHD when the API returns no inventory', async () => {
+    vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
+    vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([]);
+    renderPage();
+    expect(await screen.findAllByTestId('result-card')).toHaveLength(5);
   });
 
   it('opens edit-search modal with trip type, airport pickers, and inline calendar', async () => {
@@ -286,7 +294,7 @@ describe('ResultsPage', () => {
     mockLocale('ar');
     mockSearchApis();
     vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([]);
-    renderPage();
+    renderPage('unauthenticated', 'origin=THR&dest=DXB&date=2026-08-01');
 
     expect(await screen.findByTestId('empty-results')).toBeInTheDocument();
     expect(screen.getByText('لم يتم العثور على رحلات')).toBeInTheDocument();
