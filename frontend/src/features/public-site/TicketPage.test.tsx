@@ -50,6 +50,7 @@ describe('TicketPage', () => {
     renderPage();
 
     expect(await screen.findByText('BJABC123')).toBeInTheDocument();
+    expect(screen.getByTestId('ticket-barcode')).toBeInTheDocument();
     expect(screen.getByText('علی رضایی')).toBeInTheDocument();
     expect(screen.getByTestId('open-refund-form')).toBeInTheDocument();
   });

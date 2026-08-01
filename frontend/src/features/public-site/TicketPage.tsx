@@ -7,6 +7,7 @@ import { formatLocalePercent, localeMoney } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import type { BookingDetail } from '../../types/public-site';
 import PublicPageShell from '../../components/public/PublicPageShell';
+import TicketBarcode from '../../components/public/TicketBarcode';
 
 const CABIN_LABEL: Record<string, Record<StoredLocale, string>> = {
   ECONOMY: { fa: 'اکونومی', en: 'Economy', ar: 'اقتصادية' },
@@ -248,11 +249,14 @@ export default function TicketPage() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between border-t border-[#f2f4f7] bg-[#fafbfd] px-6 py-3.5">
-            <span className="text-[10px] text-[#8a96a6]">{t.showAtCheckin}</span>
-            <span className="font-num text-lg tracking-[3px] text-[#0d2640]" aria-hidden>
-              ▮▯▮▮▯▮▯▮▮▯▮▮
-            </span>
+          <div className="flex items-center justify-between gap-3.5 border-t border-[#f2f4f7] bg-[#fafbfd] px-6 py-3.5">
+            <TicketBarcode value={booking.pnr} />
+            <div className="min-w-0 text-left" dir="ltr">
+              <div className="text-[10px] leading-relaxed text-[#9aa4b2]">
+                {booking.pnr} · {booking.flightNo}
+              </div>
+              <div className="mt-1 text-[10px] text-[#8a96a6]">{t.showAtCheckin}</div>
+            </div>
           </div>
         </div>
 
