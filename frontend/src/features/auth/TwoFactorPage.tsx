@@ -1,22 +1,36 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { fetchDevLastStaffCode } from '../../api/auth';
 import { useAuth } from '../../hooks/useAuth';
 import { ApiRequestError } from '../../api/envelope';
 import { StaffLoginLayout } from './StaffLoginLayout';
 
+const STORAGE_KEY = 'blujet_staff_2fa';
+
 interface LocationState {
   challengeId?: string;
   username?: string;
+}
+
+function readStored2fa(): LocationState | null {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as LocationState;
+  } catch {
+    return null;
+  }
 }
 
 export default function TwoFactorPage() {
   const { confirmTwoFactor } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const state = (location.state as LocationState | null) ?? {};
-  const challengeId = state.challengeId;
-  const username = state.username;
+  const routerState = (location.state as LocationState | null) ?? {};
+  const storedState = useMemo(readStored2fa, []);
+
+  const challengeId = routerState.challengeId ?? storedState?.challengeId;
+  const username = routerState.username ?? storedState?.username;
 
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -28,19 +42,28 @@ export default function TwoFactorPage() {
     if (!challengeId) navigate('/login', { replace: true });
   }, [challengeId, navigate]);
 
+  // Persist across refresh — React Router state is lost on reload.
   useEffect(() => {
-    if (!import.meta.env.DEV || !username) return;
+    if (routerState.challengeId && routerState.username) {
+      sessionStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ challengeId: routerState.challengeId, username: routerState.username }),
+      );
+    }
+  }, [routerState.challengeId, routerState.username]);
+
+  useEffect(() => {
+    if (!username) return;
     let cancelled = false;
     fetchDevLastStaffCode(username)
       .then(({ code: devCode }) => {
         if (cancelled) return;
         setCode(devCode);
         setDevCodeHint(devCode);
+        setDevCodeError(null);
       })
       .catch(() => {
-        if (!cancelled) {
-          setDevCodeError('کد تأیید در دسترس نیست — backend را اجرا کنید و دوباره از صفحه ورود تلاش کنید.');
-        }
+        if (!cancelled) setDevCodeHint(null);
       });
     return () => {
       cancelled = true;
@@ -60,7 +83,8 @@ export default function TwoFactorPage() {
     setError(null);
     setSubmitting(true);
     try {
-      const loggedIn = await confirmTwoFactor(challengeId!, code.trim());
+      const loggedIn = await confirmTwoFactor(challengeId, code.trim());
+      sessionStorage.removeItem(STORAGE_KEY);
       navigate(loggedIn.mustChangePassword ? '/required-password-change' : '/panel', { replace: true });
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : 'خطا در تأیید کد.');
@@ -91,19 +115,19 @@ export default function TwoFactorPage() {
       </div>
       <div className="mb-1.5 text-[19px] font-black text-[#0f172a]">تأیید هویت دومرحله‌ای</div>
       <div className="mb-5 text-[11.5px] leading-[1.9] text-[#64748b]">
-        {import.meta.env.DEV
-          ? 'در محیط توسعه، کد ۶ رقمی به‌صورت خودکار پر می‌شود. در production کد به موبایل ثبت‌شده ارسال می‌شود.'
+        {devCodeHint
+          ? 'کد تأیید به‌صورت خودکار پر شده است. در production کد به موبایل ثبت‌شده ارسال می‌شود.'
           : 'کد ۶ رقمی ارسال‌شده به موبایل ثبت‌شده را وارد کنید.'}
       </div>
 
-      {import.meta.env.DEV && (
+      {username && (
         <div
           data-testid="staff-2fa-dev-hint"
           className="mb-4 rounded-[10px] border border-[#bfdbfe] bg-[#eff6ff] px-3 py-2.5 text-[11px] leading-[1.9] text-[#1e40af]"
         >
           {devCodeHint ? (
             <p>
-              کد تأیید (محیط dev):{' '}
+              کد تأیید:{' '}
               <span dir="ltr" className="font-mono font-bold tracking-widest">
                 {devCodeHint}
               </span>
@@ -113,15 +137,13 @@ export default function TwoFactorPage() {
           ) : (
             <p>در حال دریافت کد تأیید از سرور…</p>
           )}
-          {username && (
-            <button
-              type="button"
-              onClick={() => void reloadDevCode()}
-              className="mt-1 text-[11px] font-bold text-accent"
-            >
-              دریافت مجدد کد
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => void reloadDevCode()}
+            className="mt-1 text-[11px] font-bold text-accent"
+          >
+            دریافت مجدد کد
+          </button>
         </div>
       )}
 
