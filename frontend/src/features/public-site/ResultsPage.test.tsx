@@ -8,11 +8,16 @@ import * as useAuthModule from '../../hooks/useAuth';
 import { mockAuthUser } from '../../test/mockAuthUser';
 import * as useLocaleModule from '../../hooks/useLocale';
 import { ApiRequestError } from '../../api/envelope';
-import type { PriceLock, SearchFlightResult } from '../../types/public-site';
+import type { Airport, PriceLock, SearchFlightResult } from '../../types/public-site';
 
 function mockLocale(locale: 'fa' | 'en' | 'ar') {
   vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale, setLocale: vi.fn() });
 }
+
+const AIRPORTS: Airport[] = [
+  { id: '1', code: 'THR', cityFa: 'تهران', tz: 'Asia/Tehran' },
+  { id: '2', code: 'MHD', cityFa: 'مشهد', tz: 'Asia/Tehran' },
+];
 
 const RESULT: SearchFlightResult = {
   flightInstanceId: 'fi-1',
@@ -39,7 +44,12 @@ const CALENDAR = [
 ];
 
 function mockSearchApis() {
+  vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
   vi.spyOn(publicSiteApi, 'fetchPriceCalendar').mockResolvedValue(CALENDAR);
+}
+
+async function expandFirstCard(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByTestId('expand-fi-1'));
 }
 
 function renderPage(status: 'unauthenticated' | 'authenticated' = 'unauthenticated') {
@@ -62,24 +72,42 @@ function renderPage(status: 'unauthenticated' | 'authenticated' = 'unauthenticat
 }
 
 describe('ResultsPage', () => {
-  it('renders flight cards with per-cabin price and seatsLeft', async () => {
+  it('renders collapsed flight cards and expands to show cabin actions', async () => {
     mockSearchApis();
     vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+    const user = userEvent.setup();
     renderPage();
 
     expect(await screen.findByTestId('result-card')).toBeInTheDocument();
     expect(screen.getByText('BJ-100')).toBeInTheDocument();
-    expect(screen.getAllByText('انتخاب')[0]).toBeInTheDocument();
+    expect(screen.queryByText('خرید بلیط')).not.toBeInTheDocument();
+
+    await expandFirstCard(user);
+
+    expect(screen.getByText('خرید بلیط')).toBeInTheDocument();
+    expect(screen.getByText('اکونومی')).toBeInTheDocument();
+    expect(screen.getByText('بیزینس')).toBeInTheDocument();
   });
 
-  it('disables selecting a sold-out cabin', async () => {
+  it('disables buying a sold-out cabin after expand', async () => {
     mockSearchApis();
     vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+    const user = userEvent.setup();
     renderPage();
-    await screen.findByTestId('result-card');
+    await expandFirstCard(user);
 
-    const buttons = screen.getAllByRole('button', { name: 'انتخاب' });
-    expect(buttons[1]).toBeDisabled();
+    await user.click(screen.getByText('بیزینس'));
+    expect(screen.getByText('خرید بلیط')).toBeDisabled();
+  });
+
+  it('shows skeleton while loading', async () => {
+    mockSearchApis();
+    vi.spyOn(publicSiteApi, 'searchFlights').mockImplementation(
+      () => new Promise(() => undefined),
+    );
+    renderPage();
+
+    expect(await screen.findByTestId('results-skeleton')).toBeInTheDocument();
   });
 
   it('shows empty state when search returns no flights', async () => {
@@ -105,6 +133,7 @@ describe('ResultsPage', () => {
   });
 
   it('loads price calendar from API', async () => {
+    mockSearchApis();
     const calendarSpy = vi.spyOn(publicSiteApi, 'fetchPriceCalendar').mockResolvedValue(CALENDAR);
     vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
     renderPage();
@@ -136,10 +165,11 @@ describe('ResultsPage', () => {
     it('redirects an unauthenticated visitor to /signin, remembering the search', async () => {
       mockSearchApis();
       vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+      const user = userEvent.setup();
       renderPage('unauthenticated');
-      await screen.findByTestId('result-card');
+      await expandFirstCard(user);
 
-      await userEvent.click(screen.getByTestId('real-lock-fi-1-ECONOMY'));
+      await user.click(screen.getByTestId('real-lock-fi-1-ECONOMY'));
 
       expect(await screen.findByText('صفحه ورود')).toBeInTheDocument();
     });
@@ -149,10 +179,11 @@ describe('ResultsPage', () => {
       vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
       vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({ isMember: false, level: null, balance: 0 });
       const createLock = vi.spyOn(publicSiteApi, 'createPriceLock');
+      const user = userEvent.setup();
       renderPage('authenticated');
-      await screen.findByTestId('result-card');
+      await expandFirstCard(user);
 
-      await userEvent.click(screen.getByTestId('real-lock-fi-1-ECONOMY'));
+      await user.click(screen.getByTestId('real-lock-fi-1-ECONOMY'));
 
       expect(await screen.findByTestId('real-lock-modal')).toHaveTextContent(
         'قفل قیمت تا ۷۲ ساعت مخصوص اعضای سطح طلایی و بالاتر باشگاه مشتریان است.',
@@ -177,10 +208,11 @@ describe('ResultsPage', () => {
         flight: { flightNo: 'BJ-100', originCode: 'THR', destCode: 'MHD', departureAt: '2026-08-01T05:00:00.000Z' },
       };
       const createLock = vi.spyOn(publicSiteApi, 'createPriceLock').mockResolvedValue(lock);
+      const user = userEvent.setup();
       renderPage('authenticated');
-      await screen.findByTestId('result-card');
+      await expandFirstCard(user);
 
-      await userEvent.click(screen.getByTestId('real-lock-fi-1-ECONOMY'));
+      await user.click(screen.getByTestId('real-lock-fi-1-ECONOMY'));
 
       expect(await screen.findByText('قیمت شما قفل شد')).toBeInTheDocument();
       expect(createLock).toHaveBeenCalledWith('fi-1', 'ECONOMY');
@@ -193,10 +225,11 @@ describe('ResultsPage', () => {
       vi.spyOn(publicSiteApi, 'createPriceLock').mockRejectedValue(
         new ApiRequestError('CONFLICT', 'شما قبلاً برای این پرواز و کلاس، قیمت را قفل کرده‌اید.', 409),
       );
+      const user = userEvent.setup();
       renderPage('authenticated');
-      await screen.findByTestId('result-card');
+      await expandFirstCard(user);
 
-      await userEvent.click(screen.getByTestId('real-lock-fi-1-ECONOMY'));
+      await user.click(screen.getByTestId('real-lock-fi-1-ECONOMY'));
 
       expect(await screen.findByRole('alert')).toHaveTextContent(
         'شما قبلاً برای این پرواز و کلاس، قیمت را قفل کرده‌اید.',
@@ -208,10 +241,11 @@ describe('ResultsPage', () => {
     it('redirects an unauthenticated visitor to /signin when saving', async () => {
       mockSearchApis();
       vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+      const user = userEvent.setup();
       renderPage('unauthenticated');
-      await screen.findByTestId('result-card');
+      await expandFirstCard(user);
 
-      await userEvent.click(screen.getByTestId('real-save-fi-1-ECONOMY'));
+      await user.click(screen.getByTestId('real-save-fi-1-ECONOMY'));
 
       expect(await screen.findByText('صفحه ورود')).toBeInTheDocument();
     });
@@ -236,10 +270,11 @@ describe('ResultsPage', () => {
         bookable: true,
         createdAt: '2026-07-01T00:00:00.000Z',
       });
+      const user = userEvent.setup();
       renderPage('authenticated');
-      await screen.findByTestId('result-card');
+      await expandFirstCard(user);
 
-      await userEvent.click(screen.getByTestId('real-save-fi-1-ECONOMY'));
+      await user.click(screen.getByTestId('real-save-fi-1-ECONOMY'));
 
       expect(save).toHaveBeenCalledWith('fi-1', 'ECONOMY');
       expect(await screen.findByTestId('real-save-fi-1-ECONOMY')).toHaveTextContent('ذخیره شد');
@@ -250,12 +285,14 @@ describe('ResultsPage', () => {
     mockLocale('en');
     mockSearchApis();
     vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+    const user = userEvent.setup();
     renderPage();
 
     expect(await screen.findByTestId('result-card')).toBeInTheDocument();
+    await expandFirstCard(user);
     expect(screen.getByText('Economy')).toBeInTheDocument();
     expect(screen.getByText('Business')).toBeInTheDocument();
-    expect(screen.getAllByText('Select')[0]).toBeInTheDocument();
+    expect(screen.getByText('Buy ticket')).toBeInTheDocument();
     expect(screen.getAllByText(/38,000,000/)[0]).toBeInTheDocument();
     expect(screen.getByText('Change search')).toBeInTheDocument();
   });

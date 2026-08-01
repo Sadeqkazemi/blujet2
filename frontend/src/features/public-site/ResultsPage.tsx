@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   createPriceLock,
+  fetchAirports,
   fetchClubPoints,
   fetchSavedFlights,
   fetchSearchAdvisory,
@@ -14,8 +15,9 @@ import { useAuth } from '../../hooks/useAuth';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { faDigits, formatToman, localeMoney } from '../../lib/fa-format';
-import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
+import { formatJalaliDateTime } from '../../lib/jalali';
 import type {
+  Airport,
   CabinClass,
   PriceCalendarDay,
   PriceLock,
@@ -23,23 +25,24 @@ import type {
   SearchFlightResult,
 } from '../../types/public-site';
 import PublicPageShell from '../../components/public/PublicPageShell';
-import FlowStepper from '../../components/public/FlowStepper';
+import ResultsSearchSummary from '../../components/public/results/ResultsSearchSummary';
+import ResultsMobileSubHeader from '../../components/public/results/ResultsMobileSubHeader';
+import ResultsPriceCalendarStrip from '../../components/public/results/ResultsPriceCalendarStrip';
+import ResultsAiRadarBanner from '../../components/public/results/ResultsAiRadarBanner';
+import ResultsFilterBar from '../../components/public/results/ResultsFilterBar';
+import ResultsFlightCard from '../../components/public/results/ResultsFlightCard';
+import ResultsSkeletonCards from '../../components/public/results/ResultsSkeletonCards';
+import ResultsEditSearchModal from '../../components/public/results/ResultsEditSearchModal';
+import {
+  depHourBucket,
+  flightAirlineLabel,
+  flightDurationMs,
+} from '../../components/public/results/results-utils';
 
 const CABIN_LABEL: Record<string, Record<StoredLocale, string>> = {
   ECONOMY: { fa: 'اکونومی', en: 'Economy', ar: 'اقتصادية' },
   BUSINESS: { fa: 'بیزینس', en: 'Business', ar: 'درجة الأعمال' },
 };
-
-function depHourBucket(iso: string): 'morning' | 'noon' | 'evening' {
-  const h = new Date(iso).getUTCHours();
-  if (h < 11) return 'morning';
-  if (h < 16) return 'noon';
-  return 'evening';
-}
-
-function flightAirlineLabel(flightNo: string): string {
-  return flightNo.split('-')[0] ?? flightNo;
-}
 
 const GOLD_TIER_LEVELS = ['GOLD', 'PLATINUM'];
 
@@ -69,67 +72,103 @@ function translateAdvisoryReason(reasonFa: string | undefined, locale: StoredLoc
   return reasonFa;
 }
 
-const STR: Record<StoredLocale, {
-  changeSearch: string;
-  onePassengerEconomy: string;
-  emptyTitle: string;
-  emptySub: string;
-  goToSearch: string;
-  noResultsTitle: string;
-  noResultsSub: string;
-  searchError: string;
-  stopsLabel: string;
-  all: string;
-  direct: string;
-  oneStop: string;
-  timeLabel: string;
-  morning: string;
-  noon: string;
-  evening: string;
-  airlineLabel: string;
-  aiTitle: string;
-  aiSub: string;
-  aiAnalyze: string;
-  aiAnalyzing: string;
-  aiUnavailable: string;
-  aiRecommendationBuy: string;
-  aiRecommendationWait: string;
-  aiPredictedPrice: string;
-  sortCheap: string;
-  sortEarly: string;
-  flightsCount: string;
-  searching: string;
-  noFlightsForFilters: string;
-  seatsLeft: string;
-  select: string;
-  toman: string;
-  priceLock: string;
-  saveFlight: string;
-  savedFlight: string;
-  smartFareLock: string;
-  learnAboutClub: string;
-  close: string;
-  fareLockGoldOnly: string;
-  yourPriceLocked: string;
-  lockRateUntil: (price: string, until: string) => string;
-  fee: string;
-  gotIt: string;
-  lockFailedTitle: string;
-}> = {
+function cityName(airports: Airport[], code: string, locale: StoredLocale): string | undefined {
+  const a = airports.find((ap) => ap.code === code);
+  if (!a) return undefined;
+  if (locale === 'en') {
+    const enNames: Record<string, string> = {
+      THR: 'Tehran',
+      MHD: 'Mashhad',
+      IST: 'Istanbul',
+      DXB: 'Dubai',
+      KIH: 'Kish',
+      SYZ: 'Shiraz',
+    };
+    return enNames[code] ?? a.cityFa;
+  }
+  return a.cityFa;
+}
+
+const STR: Record<
+  StoredLocale,
+  {
+    changeSearch: string;
+    editShort: string;
+    selectDeparture: string;
+    emptyTitle: string;
+    emptySub: string;
+    goToSearch: string;
+    noResultsTitle: string;
+    noResultsSub: string;
+    searchError: string;
+    filterLabel: string;
+    all: string;
+    direct: string;
+    oneStop: string;
+    morning: string;
+    noon: string;
+    evening: string;
+    airlineLabel: string;
+    aiTitle: string;
+    aiSub: string;
+    aiAnalyze: string;
+    aiAnalyzing: string;
+    aiReanalyze: string;
+    aiUnavailable: string;
+    aiRecommendationBuy: string;
+    aiRecommendationWait: string;
+    aiPredictedPrice: string;
+    sortCheap: string;
+    sortFast: string;
+    sortEarly: string;
+    flightsCount: string;
+    noFlightsForFilters: string;
+    noFlightsFiltersTitle: string;
+    clearFilters: string;
+    seatsLeft: string;
+    select: string;
+    buyTicket: string;
+    toman: string;
+    priceLock: string;
+    saveFlight: string;
+    savedFlight: string;
+    smartFareLock: string;
+    learnAboutClub: string;
+    close: string;
+    fareLockGoldOnly: string;
+    yourPriceLocked: string;
+    lockRateUntil: (price: string, until: string) => string;
+    fee: string;
+    gotIt: string;
+    lockFailedTitle: string;
+    detailsBook: string;
+    flightDetails: string;
+    flightNo: string;
+    aircraft: string;
+    lowSeats: string;
+    priceDetails: string;
+    adultPax: string;
+    total: string;
+    seatsRemaining: string;
+    outbound: string;
+    originAirport: string;
+    destAirport: string;
+  }
+> = {
   fa: {
     changeSearch: 'تغییر جستجو',
-    onePassengerEconomy: '۱ مسافر · اکونومی',
+    editShort: 'ویرایش',
+    selectDeparture: 'انتخاب پرواز رفت',
     emptyTitle: 'جستجوی پرواز',
     emptySub: 'برای دیدن نتایج، ابتدا مبدأ، مقصد و تاریخ سفر را انتخاب کنید.',
     goToSearch: 'رفتن به جستجو',
     noResultsTitle: 'پروازی یافت نشد',
     noResultsSub: 'برای این مسیر و تاریخ پروازی موجود نیست — تاریخ یا مقصد را تغییر دهید.',
     searchError: 'خطا در جستجو — لطفاً دوباره تلاش کنید.',
-    stopsLabel: 'توقف',
+    filterLabel: 'فیلتر',
     all: 'همه',
     direct: 'مستقیم',
     oneStop: 'یک توقف',
-    timeLabel: 'ساعت حرکت',
     morning: 'صبح',
     noon: 'بعدازظهر',
     evening: 'عصر و شب',
@@ -138,17 +177,21 @@ const STR: Record<StoredLocale, {
     aiSub: 'همین حالا بخرم یا صبر کنم؟ رادار روند قیمت این مسیر را تحلیل می‌کند.',
     aiAnalyze: 'تحلیل کن',
     aiAnalyzing: 'در حال تحلیل…',
+    aiReanalyze: 'تحلیل مجدد',
     aiUnavailable: 'برای این مسیر و تاریخ، دادهٔ کافی برای تحلیل وجود ندارد.',
     aiRecommendationBuy: 'توصیه: همین حالا بخرید',
     aiRecommendationWait: 'توصیه: کمی صبر کنید',
     aiPredictedPrice: 'قیمت پیش‌بینی‌شده',
     sortCheap: 'ارزان‌ترین',
-    sortEarly: 'زودترین حرکت',
+    sortFast: 'سریع‌ترین',
+    sortEarly: 'زودترین پرواز',
     flightsCount: 'پرواز',
-    searching: 'در حال جستجو…',
     noFlightsForFilters: 'با این فیلترها پروازی نمانده — فیلترها را بازنشانی کنید.',
+    noFlightsFiltersTitle: 'پروازی با این فیلترها نیست',
+    clearFilters: 'بازنشانی فیلترها',
     seatsLeft: 'صندلی باقی‌مانده',
     select: 'انتخاب',
+    buyTicket: 'خرید بلیط',
     toman: 'تومان',
     priceLock: 'قفل قیمت',
     saveFlight: 'ذخیره',
@@ -162,21 +205,33 @@ const STR: Record<StoredLocale, {
     fee: 'کارمزد',
     gotIt: 'متوجه شدم',
     lockFailedTitle: 'قفل قیمت ثبت نشد',
+    detailsBook: 'جزئیات و رزرو',
+    flightDetails: 'جزئیات پرواز',
+    flightNo: 'شماره پرواز',
+    aircraft: 'هواپیما',
+    lowSeats: 'فقط {n} صندلی باقی مانده',
+    priceDetails: 'جزئیات قیمت',
+    adultPax: 'بزرگسال',
+    total: 'جمع کل',
+    seatsRemaining: 'صندلی باقی‌مانده',
+    outbound: 'پرواز رفت',
+    originAirport: 'فرودگاه مبدأ',
+    destAirport: 'فرودگاه مقصد',
   },
   en: {
     changeSearch: 'Change search',
-    onePassengerEconomy: '1 passenger · Economy',
+    editShort: 'Edit',
+    selectDeparture: 'Select outbound flight',
     emptyTitle: 'Search Flights',
     emptySub: 'Select an origin, destination, and travel date first to see results.',
     goToSearch: 'Go to Search',
     noResultsTitle: 'No flights found',
     noResultsSub: 'No flights are available for this route and date — try a different date or destination.',
     searchError: 'Search failed — please try again.',
-    stopsLabel: 'Stops',
+    filterLabel: 'Filters',
     all: 'All',
     direct: 'Direct',
     oneStop: '1 stop',
-    timeLabel: 'Departure Time',
     morning: 'Morning',
     noon: 'Afternoon',
     evening: 'Evening & night',
@@ -185,17 +240,21 @@ const STR: Record<StoredLocale, {
     aiSub: "Buy now or wait? The radar analyzes this route's price trend.",
     aiAnalyze: 'Analyze price',
     aiAnalyzing: 'Analyzing…',
+    aiReanalyze: 'Re-analyze',
     aiUnavailable: 'Not enough data to analyze this route and date.',
     aiRecommendationBuy: 'Recommendation: Buy now',
     aiRecommendationWait: 'Recommendation: Wait',
     aiPredictedPrice: 'Predicted price',
     sortCheap: 'Cheapest',
+    sortFast: 'Fastest',
     sortEarly: 'Earliest flight',
     flightsCount: 'flights',
-    searching: 'Searching…',
     noFlightsForFilters: 'No flights left with these filters — try resetting them.',
+    noFlightsFiltersTitle: 'No flights match these filters',
+    clearFilters: 'Clear filters',
     seatsLeft: 'seats left',
     select: 'Select',
+    buyTicket: 'Buy ticket',
     toman: 'Toman',
     priceLock: 'Price Lock',
     saveFlight: 'Save',
@@ -209,21 +268,33 @@ const STR: Record<StoredLocale, {
     fee: 'Fee',
     gotIt: 'Got it',
     lockFailedTitle: 'Price Lock failed',
+    detailsBook: 'Details & book',
+    flightDetails: 'Flight details',
+    flightNo: 'Flight no.',
+    aircraft: 'Aircraft',
+    lowSeats: 'Only {n} seats left',
+    priceDetails: 'Price details',
+    adultPax: 'Adult',
+    total: 'Total',
+    seatsRemaining: 'Seats remaining',
+    outbound: 'Outbound',
+    originAirport: 'Origin airport',
+    destAirport: 'Destination airport',
   },
   ar: {
     changeSearch: 'تغيير البحث',
-    onePassengerEconomy: '1 مسافر · اقتصادية',
+    editShort: 'تعديل',
+    selectDeparture: 'اختر رحلة الذهاب',
     emptyTitle: 'البحث عن رحلات',
     emptySub: 'اختر المبدأ والمقصد وتاريخ السفر أولاً لعرض النتائج.',
     goToSearch: 'الذهاب إلى البحث',
     noResultsTitle: 'لم يتم العثور على رحلات',
     noResultsSub: 'لا توجد رحلات متاحة لهذا المسار والتاريخ — جرّب تاريخًا أو وجهة مختلفة.',
     searchError: 'فشل البحث — يرجى المحاولة مرة أخرى.',
-    stopsLabel: 'التوقف',
+    filterLabel: 'تصفية',
     all: 'الكل',
     direct: 'مباشر',
     oneStop: 'توقف واحد',
-    timeLabel: 'وقت المغادرة',
     morning: 'صباحًا',
     noon: 'بعد الظهر',
     evening: 'مساءً وليلاً',
@@ -232,17 +303,21 @@ const STR: Record<StoredLocale, {
     aiSub: 'هل أشتري الآن أم أنتظر؟ يحلل الرادار اتجاه أسعار هذا المسار.',
     aiAnalyze: 'تحليل السعر',
     aiAnalyzing: 'جارٍ التحليل…',
+    aiReanalyze: 'إعادة التحليل',
     aiUnavailable: 'لا توجد بيانات كافية لتحليل هذا المسار والتاريخ.',
     aiRecommendationBuy: 'التوصية: اشترِ الآن',
     aiRecommendationWait: 'التوصية: انتظر قليلاً',
     aiPredictedPrice: 'السعر المتوقع',
     sortCheap: 'الأرخص',
+    sortFast: 'الأسرع',
     sortEarly: 'أبكر رحلة',
     flightsCount: 'رحلة',
-    searching: 'جارٍ البحث…',
     noFlightsForFilters: 'لا توجد رحلات بهذه الفلاتر — حاول إعادة ضبطها.',
+    noFlightsFiltersTitle: 'لا توجد رحلات بهذه الفلاتر',
+    clearFilters: 'إعادة ضبط الفلاتر',
     seatsLeft: 'مقاعد متبقية',
     select: 'اختيار',
+    buyTicket: 'شراء التذكرة',
     toman: 'تومان',
     priceLock: 'قفل السعر',
     saveFlight: 'حفظ',
@@ -256,6 +331,18 @@ const STR: Record<StoredLocale, {
     fee: 'رسوم',
     gotIt: 'حسنًا',
     lockFailedTitle: 'تعذّر تسجيل قفل السعر',
+    detailsBook: 'التفاصيل والحجز',
+    flightDetails: 'تفاصيل الرحلة',
+    flightNo: 'رقم الرحلة',
+    aircraft: 'الطائرة',
+    lowSeats: 'متبقي {n} مقاعد فقط',
+    priceDetails: 'تفاصيل السعر',
+    adultPax: 'بالغ',
+    total: 'الإجمالي',
+    seatsRemaining: 'المقاعد المتبقية',
+    outbound: 'رحلة الذهاب',
+    originAirport: 'مطار المغادرة',
+    destAirport: 'مطار الوصول',
   },
 };
 
@@ -275,15 +362,20 @@ export default function ResultsPage() {
   const origin = params.get('origin') ?? '';
   const dest = params.get('dest') ?? '';
   const date = params.get('date') ?? '';
+  const adults = Math.max(1, Number(params.get('adults') ?? '1') || 1);
+  const cabinRaw = params.get('cabin') ?? 'ECONOMY';
+  const preferredCabin: CabinClass = cabinRaw === 'BUSINESS' ? 'BUSINESS' : 'ECONOMY';
 
+  const [airports, setAirports] = useState<Airport[]>([]);
   const [results, setResults] = useState<SearchFlightResult[] | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [calendarDays, setCalendarDays] = useState<PriceCalendarDay[] | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
 
   const [fStops, setFStops] = useState<'all' | 'direct' | 'one'>('all');
   const [fTime, setFTime] = useState<'all' | 'morning' | 'noon' | 'evening'>('all');
   const [fAirline, setFAirline] = useState('all');
-  const [sort, setSort] = useState<'cheap' | 'early'>('cheap');
+  const [sort, setSort] = useState<'cheap' | 'fast' | 'early'>('cheap');
   const [aiState, setAiState] = useState<'idle' | 'loading' | 'done' | 'unavailable' | 'error'>('idle');
   const [advisory, setAdvisory] = useState<SearchAdvisoryResult | null>(null);
 
@@ -292,6 +384,12 @@ export default function ResultsPage() {
   const [saveBusyKey, setSaveBusyKey] = useState<string | null>(null);
   const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set());
   const [realLockResult, setRealLockResult] = useState<RealLockResult | null>(null);
+
+  useEffect(() => {
+    fetchAirports()
+      .then(setAirports)
+      .catch(() => setAirports([]));
+  }, []);
 
   useEffect(() => {
     if (status !== 'authenticated') {
@@ -303,9 +401,7 @@ export default function ResultsPage() {
       .then((c) => setClub({ isMember: c.isMember, level: c.level }))
       .catch(() => setClub(null));
     fetchSavedFlights()
-      .then((rows) =>
-        setSavedKeys(new Set(rows.map((r) => `${r.flightInstanceId}:${r.cabin}`))),
-      )
+      .then((rows) => setSavedKeys(new Set(rows.map((r) => `${r.flightInstanceId}:${r.cabin}`))))
       .catch(() => setSavedKeys(new Set()));
   }, [status]);
 
@@ -416,21 +512,30 @@ export default function ResultsPage() {
     if (fAirline !== 'all') list = list.filter((f) => flightAirlineLabel(f.flightNo) === fAirline);
     list.sort((a, b) => {
       if (sort === 'early') return a.departureAt.localeCompare(b.departureAt);
+      if (sort === 'fast') {
+        return (
+          flightDurationMs(a.departureAt, a.arrivalAt) - flightDurationMs(b.departureAt, b.arrivalAt)
+        );
+      }
       const pa = BigInt(
-        a.cabins.find((c) => c.cabin === 'ECONOMY')?.priceIrr ?? a.cabins[0]?.priceIrr ?? '0',
+        a.cabins.find((c) => c.cabin === preferredCabin)?.priceIrr ??
+          a.cabins.find((c) => c.cabin === 'ECONOMY')?.priceIrr ??
+          a.cabins[0]?.priceIrr ??
+          '0',
       );
       const pb = BigInt(
-        b.cabins.find((c) => c.cabin === 'ECONOMY')?.priceIrr ?? b.cabins[0]?.priceIrr ?? '0',
+        b.cabins.find((c) => c.cabin === preferredCabin)?.priceIrr ??
+          b.cabins.find((c) => c.cabin === 'ECONOMY')?.priceIrr ??
+          b.cabins[0]?.priceIrr ??
+          '0',
       );
       return pa < pb ? -1 : pa > pb ? 1 : 0;
     });
     return list;
-  }, [results, fStops, fTime, fAirline, sort]);
+  }, [results, fStops, fTime, fAirline, sort, preferredCabin]);
 
   const calendarMinPrice = useMemo(() => {
-    const prices = (calendarDays ?? [])
-      .map((d) => BigInt(d.minPriceIrr))
-      .filter((p) => p > 0n);
+    const prices = (calendarDays ?? []).map((d) => BigInt(d.minPriceIrr)).filter((p) => p > 0n);
     if (prices.length === 0) return null;
     return prices.reduce((min, p) => (p < min ? p : min));
   }, [calendarDays]);
@@ -442,13 +547,66 @@ export default function ResultsPage() {
     setParams(next);
   }
 
+  function clearFilters() {
+    setFStops('all');
+    setFTime('all');
+    setFAirline('all');
+  }
+
+  function onEditSearchSubmit(newOrigin: string, newDest: string, newDate: string) {
+    const next = new URLSearchParams(params);
+    next.set('origin', newOrigin);
+    next.set('dest', newDest);
+    next.set('date', newDate);
+    setParams(next);
+  }
+
+  const cabinLabels = useMemo(
+    () => ({
+      ECONOMY: CABIN_LABEL.ECONOMY[locale],
+      BUSINESS: CABIN_LABEL.BUSINESS[locale],
+    }),
+    [locale],
+  );
+
+  const cardLabels = useMemo(
+    () => ({
+      direct: t.direct,
+      oneStop: t.oneStop,
+      seatsLeft: t.seatsLeft,
+      select: t.select,
+      buyTicket: t.buyTicket,
+      toman: t.toman,
+      priceLock: t.priceLock,
+      saveFlight: t.saveFlight,
+      savedFlight: t.savedFlight,
+      analyzing: t.aiAnalyzing,
+      detailsBook: t.detailsBook,
+      flightDetails: t.flightDetails,
+      flightNo: t.flightNo,
+      aircraft: t.aircraft,
+      lowSeats: t.lowSeats,
+      priceDetails: t.priceDetails,
+      adultPax: t.adultPax,
+      total: t.total,
+      seatsRemaining: t.seatsRemaining,
+      outbound: t.outbound,
+      originAirport: t.originAirport,
+      destAirport: t.destAirport,
+    }),
+    [t],
+  );
+
   if (!origin || !dest || !date) {
     return (
       <PublicPageShell>
         <div className="mx-auto max-w-3xl p-10 text-center">
           <h1 className="mb-2 text-lg font-black text-[#0d2640]">{t.emptyTitle}</h1>
           <p className="mb-6 text-sm text-[#6b7b94]">{t.emptySub}</p>
-          <button onClick={() => navigate('/')} className="rounded-lg bg-[#1668c4] px-6 py-2.5 text-sm font-bold text-white">
+          <button
+            onClick={() => navigate('/')}
+            className="rounded-lg bg-[#1668c4] px-6 py-2.5 text-sm font-bold text-white"
+          >
             {t.goToSearch}
           </button>
         </div>
@@ -456,265 +614,348 @@ export default function ResultsPage() {
     );
   }
 
-  const chip = (on: boolean): string =>
-    `cursor-pointer rounded-lg px-3 py-1.5 text-[11.5px] font-bold ${on ? 'bg-[#1668c4] text-white' : 'bg-[#f1f4f8] text-[#5a6678]'}`;
-
   return (
     <PublicPageShell>
-      <div style={{ background: 'linear-gradient(120deg,#0d2640,#124a86)' }}>
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-6 py-4">
-          <div className="flex items-center gap-3 text-white">
-            <span className="text-base font-black" dir="ltr">
-              {origin} {locale === 'en' ? '→' : '←'} {dest}
-            </span>
-            <span className="rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold">
-              {formatJalaliDate(`${date}T12:00:00Z`)}
-            </span>
-            <span className="rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold">{t.onePassengerEconomy}</span>
-          </div>
-          <button
-            onClick={() => navigate('/')}
-            className="rounded-lg border border-white/40 bg-white/10 px-4 py-2 text-xs font-bold text-white"
+      {isMobile && <ResultsMobileSubHeader locale={locale} onBack={() => navigate('/')} />}
+
+      <ResultsSearchSummary
+        locale={locale}
+        origin={origin}
+        dest={dest}
+        originCity={cityName(airports, origin, locale)}
+        destCity={cityName(airports, dest, locale)}
+        date={date}
+        adults={adults}
+        cabinLabel={CABIN_LABEL[preferredCabin][locale]}
+        title={t.selectDeparture}
+        changeSearchLabel={t.changeSearch}
+        editShortLabel={t.editShort}
+        isMobile={isMobile}
+        onEdit={() => setEditOpen(true)}
+      />
+
+      {calendarDays && calendarDays.length > 0 && (
+        <ResultsPriceCalendarStrip
+          days={calendarDays}
+          selectedDate={date}
+          calendarMinPrice={calendarMinPrice}
+          locale={locale}
+          isMobile={isMobile}
+          onDayClick={onCalendarDayClick}
+        />
+      )}
+
+      <ResultsAiRadarBanner
+        locale={locale}
+        isMobile={isMobile}
+        aiState={aiState}
+        advisory={advisory}
+        title={t.aiTitle}
+        sub={t.aiSub}
+        analyzeLabel={t.aiAnalyze}
+        analyzingLabel={t.aiAnalyzing}
+        reanalyzeLabel={t.aiReanalyze}
+        unavailableLabel={t.aiUnavailable}
+        errorLabel={t.searchError}
+        recommendationBuy={t.aiRecommendationBuy}
+        recommendationWait={t.aiRecommendationWait}
+        predictedPriceLabel={t.aiPredictedPrice}
+        tomanLabel={t.toman}
+        reasonText={translateAdvisoryReason(advisory?.reasonFa, locale)}
+        onAsk={() => void askAi()}
+      />
+
+      <div style={{ maxWidth: 1320, margin: '0 auto', padding: isMobile ? '12px 16px 32px' : '16px 26px 39px' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: 16,
+            flexWrap: 'wrap',
+            gap: 10,
+          }}
+        >
+          <span style={{ fontSize: 13.5, color: '#5a6678' }}>
+            {formatToman(filteredResults.length, locale)} {t.flightsCount}
+          </span>
+          <div
+            style={{
+              display: 'flex',
+              background: '#fff',
+              border: '1px solid #eef1f5',
+              borderRadius: 12,
+              overflow: 'hidden',
+            }}
           >
-            {t.changeSearch}
-          </button>
-        </div>
-      </div>
-
-      <FlowStepper current="results" onBack={() => navigate('/')} />
-
-      <div className="border-b border-[#e8eef6] bg-white">
-        <div className="mx-auto grid max-w-5xl grid-cols-7 px-4" data-testid="price-calendar">
-          {(calendarDays ?? []).map((c) => {
-            const price = BigInt(c.minPriceIrr);
-            const cheap = calendarMinPrice !== null && price > 0n && price === calendarMinPrice;
-            const sel = c.date === date;
-            const toman = price > 0n ? Math.round(Number(price) / 10) : 0;
-            return (
-              <div
-                key={c.date}
-                role="button"
-                tabIndex={0}
-                onClick={() => onCalendarDayClick(c.date)}
-                onKeyDown={(e) => e.key === 'Enter' && onCalendarDayClick(c.date)}
-                className={`cursor-pointer border-b-2 px-1 py-2.5 text-center ${sel ? 'border-[#1668c4] bg-[#f2f7fd]' : 'border-transparent'}`}
-              >
-                <div className={`text-[11px] font-bold ${sel ? 'text-[#1668c4]' : 'text-[#5a6678]'}`}>
-                  {locale === 'en'
-                    ? new Date(`${c.date}T12:00:00Z`).toLocaleDateString('en-GB', {
-                        day: 'numeric',
-                        month: 'short',
-                      })
-                    : formatJalaliDate(`${c.date}T12:00:00Z`)}
-                </div>
-                <div className={`font-num mt-0.5 text-[11px] font-extrabold ${cheap ? 'text-[#1f8a5b]' : sel ? 'text-[#0d2640]' : 'text-[#8a96a6]'}`}>
-                  {toman > 0 ? formatToman(toman, locale) : '—'}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className={`mx-auto flex max-w-5xl gap-5 p-5 ${isMobile ? 'flex-col' : 'flex-row'}`}>
-        <aside className={isMobile ? 'w-full flex-none' : 'w-56 flex-none'}>
-          <div className="rounded-2xl border border-[#e8eef6] bg-white p-4">
-            <div className="mb-2 text-xs font-black text-[#0d2640]">{t.stopsLabel}</div>
-            <div className="mb-4 flex flex-wrap gap-1.5">
-              {(
-                [
-                  ['all', t.all],
-                  ['direct', t.direct],
-                  ['one', t.oneStop],
-                ] as const
-              ).map(([k, l]) => (
-                <span key={k} data-testid={`f-stops-${k}`} onClick={() => setFStops(k)} className={chip(fStops === k)}>
-                  {l}
-                </span>
-              ))}
-            </div>
-            <div className="mb-2 text-xs font-black text-[#0d2640]">{t.timeLabel}</div>
-            <div className="mb-4 flex flex-wrap gap-1.5">
-              {(
-                [
-                  ['all', t.all],
-                  ['morning', t.morning],
-                  ['noon', t.noon],
-                  ['evening', t.evening],
-                ] as const
-              ).map(([k, l]) => (
-                <span key={k} onClick={() => setFTime(k)} className={chip(fTime === k)}>
-                  {l}
-                </span>
-              ))}
-            </div>
-            <div className="mb-2 text-xs font-black text-[#0d2640]">{t.airlineLabel}</div>
-            <div className="flex flex-wrap gap-1.5">
-              <span onClick={() => setFAirline('all')} className={chip(fAirline === 'all')}>
-                {t.all}
-              </span>
-              {airlines.map((a) => (
-                <span key={a} onClick={() => setFAirline(a)} className={chip(fAirline === a)}>
-                  {a}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-4 rounded-2xl border border-[#d6e4f8] bg-gradient-to-b from-[#f2f7fd] to-white p-4" data-testid="ai-radar">
-            <div className="mb-1 flex items-center gap-2 text-xs font-black text-[#0d2640]">
-              <span>📡</span> {t.aiTitle}
-            </div>
-            <p className="mb-3 text-[11px] leading-6 text-[#5a6678]">{t.aiSub}</p>
-            {aiState === 'idle' && (
-              <button onClick={() => void askAi()} data-testid="ai-ask" className="w-full rounded-lg bg-[#1668c4] py-2 text-xs font-bold text-white">
-                {t.aiAnalyze}
-              </button>
-            )}
-            {aiState === 'loading' && <div className="text-center text-[11px] text-[#8a96a6]">{t.aiAnalyzing}</div>}
-            {aiState === 'unavailable' && (
-              <div data-testid="ai-unavailable" className="text-[11px] leading-6 text-[#8a96a6]">
-                {t.aiUnavailable}
-              </div>
-            )}
-            {aiState === 'error' && (
-              <div data-testid="ai-error" className="text-[11px] leading-6 text-[#d64545]">
-                {t.searchError}
-              </div>
-            )}
-            {aiState === 'done' && advisory && (
-              <div data-testid="ai-result">
-                <div
-                  className={`mb-1.5 inline-block rounded-full px-2.5 py-1 text-[11px] font-extrabold ${
-                    advisory.recommendation === 'wait'
-                      ? 'bg-[#fff7ed] text-[#9a5b16]'
-                      : 'bg-[#e8f5ee] text-[#1f8a5b]'
-                  }`}
-                >
-                  ✓ {advisory.recommendation === 'wait' ? t.aiRecommendationWait : t.aiRecommendationBuy}
-                </div>
-                <p className="text-[11px] leading-6 text-[#3f546b]">
-                  {translateAdvisoryReason(advisory.reasonFa, locale)}
-                </p>
-                {advisory.predictedPriceIrr && BigInt(advisory.predictedPriceIrr) > 0n && (
-                  <p className="mt-1 text-[11px] font-bold text-[#1668c4]">
-                    {t.aiPredictedPrice}: {localeMoney(advisory.predictedPriceIrr, locale)} {t.toman}
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-        </aside>
-
-        <main className="min-w-0 flex-1">
-          <div className="mb-3 flex items-center gap-2">
             {(
               [
                 ['cheap', t.sortCheap],
+                ['fast', t.sortFast],
                 ['early', t.sortEarly],
               ] as const
-            ).map(([k, l]) => (
-              <span key={k} onClick={() => setSort(k)} className={chip(sort === k)}>
+            ).map(([k, l], i) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setSort(k)}
+                style={{
+                  padding: '9px 14px',
+                  fontSize: 13,
+                  fontWeight: sort === k ? 700 : 600,
+                  background: sort === k ? '#1668c4' : '#fff',
+                  color: sort === k ? '#fff' : '#5a6678',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  borderRight: i < 2 ? '1px solid #eef1f5' : undefined,
+                }}
+              >
                 {l}
-              </span>
+              </button>
             ))}
-            <span className="mr-auto text-[11px] text-[#8a96a6]">
-              {formatToman(filteredResults.length, locale)} {t.flightsCount}
-            </span>
           </div>
+        </div>
 
-          {results === null && <p className="text-sm text-[#6b7b94]">{t.searching}</p>}
+        {!isMobile && (
+          <ResultsFilterBar
+            locale={locale}
+            fStops={fStops}
+            fTime={fTime}
+            fAirline={fAirline}
+            airlines={airlines}
+            labels={{
+              filterLabel: t.filterLabel,
+              stopsLabel: t.filterLabel,
+              all: t.all,
+              direct: t.direct,
+              oneStop: t.oneStop,
+              morning: t.morning,
+              noon: t.noon,
+              evening: t.evening,
+              airlineLabel: t.airlineLabel,
+            }}
+            onStops={setFStops}
+            onTime={setFTime}
+            onAirline={setFAirline}
+          />
+        )}
 
-          {searchError && (
-            <div data-testid="search-error" className="mb-3 rounded-xl border border-[#fde3c4] bg-[#fff7ed] p-3 text-xs font-semibold text-[#9a5b16]">
-              {searchError}
+        {results === null && <ResultsSkeletonCards />}
+
+        {searchError && (
+          <div
+            data-testid="search-error"
+            style={{
+              marginBottom: 12,
+              borderRadius: 12,
+              border: '1px solid #fde3c4',
+              background: '#fff7ed',
+              padding: 12,
+              fontSize: 12,
+              fontWeight: 600,
+              color: '#9a5b16',
+            }}
+          >
+            {searchError}
+          </div>
+        )}
+
+        {results !== null && results.length === 0 && !searchError && (
+          <div
+            data-testid="empty-results"
+            style={{
+              background: '#fff',
+              border: '1px solid #eef1f5',
+              borderRadius: 18,
+              padding: '64px 24px 56px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              textAlign: 'center',
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                left: 0,
+                height: 4,
+                background: 'linear-gradient(90deg,#1668c4,#5ea3e8,#eef4fb)',
+              }}
+            />
+            <div style={{ fontSize: 20, fontWeight: 900, color: '#0d2640', marginBottom: 9 }}>
+              {t.noResultsTitle}
             </div>
-          )}
+            <p style={{ fontSize: 13.5, color: '#8a96a6', maxWidth: 380, lineHeight: 2, margin: 0 }}>
+              {t.noResultsSub}
+            </p>
+            <button
+              type="button"
+              onClick={() => setEditOpen(true)}
+              style={{
+                marginTop: 24,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 7,
+                padding: '12px 26px',
+                background: '#1668c4',
+                color: '#fff',
+                borderRadius: 11,
+                fontSize: 13.5,
+                fontWeight: 800,
+                border: 'none',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              {t.changeSearch}
+            </button>
+          </div>
+        )}
 
-          {results !== null && results.length === 0 && !searchError && (
-            <div data-testid="empty-results" className="rounded-2xl border border-dashed border-[#e5e9f0] p-10 text-center">
-              <h2 className="mb-2 text-base font-black text-[#0d2640]">{t.noResultsTitle}</h2>
-              <p className="text-sm text-[#6b7b94]">{t.noResultsSub}</p>
-            </div>
-          )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+          {filteredResults.map((r) => (
+            <ResultsFlightCard
+              key={r.flightInstanceId}
+              flight={r}
+              locale={locale}
+              isMobile={isMobile}
+              preferredCabin={preferredCabin}
+              labels={cardLabels}
+              cabinLabels={cabinLabels}
+              lockBusyKey={lockBusyKey}
+              saveBusyKey={saveBusyKey}
+              savedKeys={savedKeys}
+              onSelect={(id, cabin) => navigate(`/book/${id}?cabin=${cabin}`)}
+              onLock={(id, cabin) => void onRealLockClick(id, cabin)}
+              onSave={(id, cabin) => void onSaveClick(id, cabin)}
+            />
+          ))}
 
-          <div className="flex flex-col gap-3">
-            {filteredResults.map((r) => (
-              <div key={r.flightInstanceId} data-testid="result-card" className="rounded-2xl border border-[#e5e9f0] bg-white p-5 shadow-sm">
-                <div className="mb-3 flex items-center justify-between">
-                  <div>
-                    <div className="font-num text-sm font-extrabold text-[#0d2640]">{r.flightNo}</div>
-                    <div className="mt-1 text-xs text-[#6b7b94]">{formatJalaliDateTime(r.departureAt)}</div>
-                  </div>
-                  <div className="text-xs text-[#6b7b94]">{r.aircraftType}</div>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  {r.cabins.map((c) => (
-                    <div key={c.cabin} className="flex min-w-[160px] flex-1 items-center justify-between rounded-xl border border-[#e5e9f0] p-3">
-                      <div>
-                        <div className="text-[11px] text-[#6b7b94]">{CABIN_LABEL[c.cabin][locale]}</div>
-                        <div className="font-num text-sm font-extrabold text-[#1668c4]">{localeMoney(c.priceIrr, locale)} {t.toman}</div>
-                        <div className="text-[10px] text-[#6b7b94]">{faDigits(c.seatsLeft)} {t.seatsLeft}</div>
-                      </div>
-                      <div className="flex flex-col items-end gap-1.5">
-                        <button
-                          disabled={c.seatsLeft === 0}
-                          onClick={() => navigate(`/book/${r.flightInstanceId}?cabin=${c.cabin}`)}
-                          className="rounded-lg bg-[#1668c4] px-4 py-2 text-xs font-bold text-white disabled:opacity-40"
-                        >
-                          {t.select}
-                        </button>
-                        <button
-                          disabled={lockBusyKey === `${r.flightInstanceId}:${c.cabin}`}
-                          onClick={() => void onRealLockClick(r.flightInstanceId, c.cabin)}
-                          data-testid={`real-lock-${r.flightInstanceId}-${c.cabin}`}
-                          className="rounded-lg border border-[#d5e1f0] px-3 py-1 text-[10.5px] font-bold text-[#1668c4] disabled:opacity-40"
-                        >
-                          {lockBusyKey === `${r.flightInstanceId}:${c.cabin}` ? t.aiAnalyzing : `🔒 ${t.priceLock}`}
-                        </button>
-                        <button
-                          disabled={
-                            saveBusyKey === `${r.flightInstanceId}:${c.cabin}` ||
-                            savedKeys.has(`${r.flightInstanceId}:${c.cabin}`)
-                          }
-                          onClick={() => void onSaveClick(r.flightInstanceId, c.cabin)}
-                          data-testid={`real-save-${r.flightInstanceId}-${c.cabin}`}
-                          className="rounded-lg border border-[#d5e1f0] px-3 py-1 text-[10.5px] font-bold text-[#5a6678] disabled:opacity-60"
-                        >
-                          {saveBusyKey === `${r.flightInstanceId}:${c.cabin}`
-                            ? t.aiAnalyzing
-                            : savedKeys.has(`${r.flightInstanceId}:${c.cabin}`)
-                              ? `✓ ${t.savedFlight}`
-                              : `🔖 ${t.saveFlight}`}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+          {results !== null && results.length > 0 && filteredResults.length === 0 && (
+            <div
+              data-testid="filter-empty"
+              style={{
+                background: '#fff',
+                border: '1px solid #eef1f5',
+                borderRadius: 14,
+                padding: '54px 24px',
+                textAlign: 'center',
+              }}
+            >
+              <div
+                style={{
+                  width: 76,
+                  height: 76,
+                  borderRadius: '50%',
+                  background: '#eef4fb',
+                  color: '#1668c4',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 33,
+                  margin: '0 auto 18px',
+                }}
+              >
+                ⇄
               </div>
-            ))}
-            {results !== null && results.length > 0 && filteredResults.length === 0 && (
-              <div className="rounded-2xl border border-dashed border-[#e5e9f0] p-8 text-center text-sm text-[#6b7b94]">
+              <h3 style={{ fontSize: 17.5, fontWeight: 800, color: '#0d2640', margin: '0 0 8px' }}>
+                {t.noFlightsFiltersTitle}
+              </h3>
+              <p
+                style={{
+                  fontSize: 13.5,
+                  color: '#5a6678',
+                  lineHeight: 1.9,
+                  margin: '0 auto 22px',
+                  maxWidth: 380,
+                }}
+              >
                 {t.noFlightsForFilters}
+              </p>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  style={{
+                    height: 46,
+                    padding: '0 22px',
+                    borderRadius: 12,
+                    background: '#1668c4',
+                    color: '#fff',
+                    fontSize: 14,
+                    fontWeight: 800,
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  {t.clearFilters}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditOpen(true)}
+                  style={{
+                    height: 46,
+                    padding: '0 22px',
+                    borderRadius: 12,
+                    border: '1.5px solid #e6eaf0',
+                    color: '#5a6678',
+                    fontSize: 14,
+                    fontWeight: 700,
+                    background: '#fff',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  {t.changeSearch}
+                </button>
               </div>
-            )}
-          </div>
-        </main>
+            </div>
+          )}
+        </div>
       </div>
 
+      <ResultsEditSearchModal
+        open={editOpen}
+        locale={locale}
+        origin={origin}
+        dest={dest}
+        date={date}
+        onClose={() => setEditOpen(false)}
+        onSubmit={onEditSearchSubmit}
+      />
+
       {realLockResult && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[#0d2640]/55 p-5" onClick={() => setRealLockResult(null)}>
-          <div onClick={(e) => e.stopPropagation()} data-testid="real-lock-modal" className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-2xl">
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-[#0d2640]/55 p-5"
+          onClick={() => setRealLockResult(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            data-testid="real-lock-modal"
+            className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-2xl"
+          >
             {realLockResult.kind === 'not-gold' && (
               <>
                 <div className="mb-2 text-2xl">🔒</div>
                 <h2 className="mb-1 text-sm font-black text-[#0d2640]">{t.smartFareLock}</h2>
                 <p className="mb-3 text-[11.5px] leading-6 text-[#5a6678]">{t.fareLockGoldOnly}</p>
                 <div className="flex gap-2">
-                  <button onClick={() => navigate('/club')} className="flex-1 rounded-lg bg-[#1668c4] py-2.5 text-xs font-bold text-white">
+                  <button
+                    onClick={() => navigate('/club')}
+                    className="flex-1 rounded-lg bg-[#1668c4] py-2.5 text-xs font-bold text-white"
+                  >
                     {t.learnAboutClub}
                   </button>
-                  <button onClick={() => setRealLockResult(null)} className="flex-none rounded-lg border border-[#d5e1f0] px-5 py-2.5 text-xs font-bold text-[#5a6678]">
+                  <button
+                    onClick={() => setRealLockResult(null)}
+                    className="flex-none rounded-lg border border-[#d5e1f0] px-5 py-2.5 text-xs font-bold text-[#5a6678]"
+                  >
                     {t.close}
                   </button>
                 </div>
@@ -725,10 +966,18 @@ export default function ResultsPage() {
                 <div className="mb-2 text-2xl">✓</div>
                 <h2 className="mb-1 text-sm font-black text-[#0d2640]">{t.yourPriceLocked}</h2>
                 <p className="mb-1 text-[11.5px] leading-6 text-[#5a6678]">
-                  {t.lockRateUntil(localeMoney(realLockResult.lock.lockedPriceIrr, locale), formatJalaliDateTime(realLockResult.lock.expiresAt))}
+                  {t.lockRateUntil(
+                    localeMoney(realLockResult.lock.lockedPriceIrr, locale),
+                    formatJalaliDateTime(realLockResult.lock.expiresAt),
+                  )}
                 </p>
-                <p className="mb-3 text-[11px] leading-6 text-[#8a96a6]">{t.fee}: {localeMoney(realLockResult.lock.feeIrr, locale)} {t.toman}</p>
-                <button onClick={() => setRealLockResult(null)} className="w-full rounded-lg bg-[#1668c4] py-2.5 text-xs font-bold text-white">
+                <p className="mb-3 text-[11px] leading-6 text-[#8a96a6]">
+                  {t.fee}: {localeMoney(realLockResult.lock.feeIrr, locale)} {t.toman}
+                </p>
+                <button
+                  onClick={() => setRealLockResult(null)}
+                  className="w-full rounded-lg bg-[#1668c4] py-2.5 text-xs font-bold text-white"
+                >
                   {t.gotIt}
                 </button>
               </>
@@ -740,7 +989,10 @@ export default function ResultsPage() {
                 <p role="alert" className="mb-3 text-[11.5px] leading-6 text-[#5a6678]">
                   {realLockResult.message}
                 </p>
-                <button onClick={() => setRealLockResult(null)} className="w-full rounded-lg border border-[#d5e1f0] py-2.5 text-xs font-bold text-[#5a6678]">
+                <button
+                  onClick={() => setRealLockResult(null)}
+                  className="w-full rounded-lg border border-[#d5e1f0] py-2.5 text-xs font-bold text-[#5a6678]"
+                >
                   {t.close}
                 </button>
               </>
