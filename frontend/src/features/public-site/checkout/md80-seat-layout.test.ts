@@ -35,7 +35,7 @@ describe('md80-seat-layout', () => {
 
   it('labels cabin sections per PDF', () => {
     expect(md80SectionForRow(4)).toBe('FIRST');
-    expect(md80SectionForRow(9)).toBe('MAIN_EXTRA');
+    expect(md80SectionForRow(9)).toBe('BUSINESS');
     expect(md80SectionForRow(15)).toBe('ECONOMY');
     expect(md80IsExitRow(19)).toBe(true);
     expect(md80IsExitRow(21)).toBe(false);

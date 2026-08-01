@@ -3,7 +3,7 @@
  * (user-provided MD _ 80.pdf, Aug 2026)
  *
  * First Class (rows 3–6):     A B | aisle | E F          (2-2, 16 seats)
- * Main Cabin Extra (7–11):    A B | aisle | D E F        (2-3)
+ * Business / Main Cabin Extra (7–11): A B | aisle | D E F (2-3)
  * Economy (rows 12–32):       A B | aisle | D E F        (2-3)
  * Over-wing exit rows: 19–20
  * Rear exit/galley omits 28A/B, 29A/B, 30A/B on the left; D/E/F continue.
@@ -38,7 +38,7 @@ export const MD80_EXCLUDED = new Set([
 export const MD80_TOTAL_SEATS = 140;
 
 export type Md80Amenity = 'exit' | 'galley' | 'empty' | null;
-export type Md80CabinSection = 'FIRST' | 'MAIN_EXTRA' | 'ECONOMY';
+export type Md80CabinSection = 'FIRST' | 'BUSINESS' | 'ECONOMY';
 
 /** Left-side amenity when A/B seats are missing (rear of MD-80). */
 export function md80LeftAmenity(row: number): Md80Amenity {
@@ -50,7 +50,7 @@ export function md80LeftAmenity(row: number): Md80Amenity {
 
 export function md80SectionForRow(row: number): Md80CabinSection {
   if (row >= 3 && row <= 6) return 'FIRST';
-  if (row >= 7 && row <= 11) return 'MAIN_EXTRA';
+  if (row >= 7 && row <= 11) return 'BUSINESS';
   return 'ECONOMY';
 }
 
