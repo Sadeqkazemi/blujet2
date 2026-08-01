@@ -21,6 +21,17 @@
   --color-surface: #eef1f5;
   --color-surface-2: #eef4fb;
   --color-danger: #e5484d;
+
+  --color-panel-bg: #0f1623;
+  --color-panel-card: #141d2e;
+  --color-panel-elevated: #18223a;
+  --color-panel-border: #1f2a3d;
+  --color-panel-border-2: #28344c;
+  --color-panel-text: #e7ecf3;
+  --color-panel-muted: #6b7b94;
+  --color-panel-muted-2: #9fb0c7;
+  --color-panel-accent: #3b82f6;
+  --color-panel-link: #60a5fa;
 }
 
 html,

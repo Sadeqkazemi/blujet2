@@ -4,11 +4,15 @@ import { fetchItDashboard } from '../../api/it-manager';
 import { faDigits, faPercent } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import type { ItDashboardData } from '../../types/it-manager';
+import PanelAlert from '../panel/PanelAlert';
+import PanelCard from '../panel/PanelCard';
+import PanelStatCard from '../panel/PanelStatCard';
+import { panelLink, panelMuted, panelMuted2 } from '../panel/panel-theme';
 
 const EVENT_DOT: Record<string, string> = {
   SECURITY: 'bg-[#f59e0b]',
-  ACCOUNT: 'bg-accent',
-  SYSTEM: 'bg-[#059669]',
+  ACCOUNT: 'bg-panel-accent',
+  SYSTEM: 'bg-[#34d399]',
   ACCESS: 'bg-[#a855f7]',
 };
 
@@ -23,49 +27,48 @@ export default function ItDashboardPage() {
       .catch(() => setError('خطا در دریافت داشبورد فنی.'));
   }, []);
 
-  if (error) return <p className="p-8 text-sm text-danger">{error}</p>;
-  if (!data) return <p className="p-8 text-sm text-muted">در حال بارگذاری…</p>;
+  if (error) return <PanelAlert className="mb-0">{error}</PanelAlert>;
+  if (!data) return <p className={`text-sm ${panelMuted}`}>در حال بارگذاری…</p>;
 
   const kpis = [
     {
       label: 'سرویس فعال',
       value: `${data.kpis.servicesUp}/${data.kpis.servicesTotal}`,
-      trend: 'پایدار',
-      trendClass: 'text-[#059669]',
+      trend: { text: 'پایدار', up: true },
       cta: 'مدیریت ←',
       onClick: () => navigate('/panel/services'),
     },
     {
       label: 'آپ‌تایم ۳۰ روز',
       value: faPercent(data.kpis.uptime30dPct),
-      trend: '+۰٫۰۲',
-      trendClass: 'text-[#059669]',
+      trend: { text: '+۰٫۰۲', up: true },
       cta: 'لاگ‌ها ←',
       onClick: () => navigate('/panel/logs'),
     },
     {
       label: 'کاربر فعال سامانه',
       value: faDigits(data.kpis.activeSessions),
-      trend: '+۳',
-      trendClass: 'text-[#059669]',
+      trend: { text: '+۳', up: true },
       cta: 'کاربران ←',
       onClick: () => navigate('/panel/users'),
     },
     {
       label: 'هشدار امنیتی باز',
       value: faDigits(data.kpis.securityAlerts),
-      trend: data.kpis.securityAlerts > 0 ? 'نیازمند بررسی' : 'بدون هشدار',
-      trendClass: data.kpis.securityAlerts > 0 ? 'text-[#f59e0b]' : 'text-[#059669]',
+      trend: {
+        text: data.kpis.securityAlerts > 0 ? 'نیازمند بررسی' : 'بدون هشدار',
+        up: data.kpis.securityAlerts === 0,
+      },
       cta: 'بررسی ←',
       onClick: () => navigate('/panel/security'),
     },
   ];
 
   const resourceBars = [
-    { label: 'پردازنده (CPU)', pct: data.resources.cpuUsedPct, color: 'bg-accent' },
+    { label: 'پردازنده (CPU)', pct: data.resources.cpuUsedPct, color: 'bg-panel-accent' },
     { label: 'حافظه (RAM)', pct: data.resources.memoryUsedPct, color: 'bg-[#a855f7]' },
     ...(data.resources.diskUsedPct !== null
-      ? [{ label: 'دیسک', pct: data.resources.diskUsedPct, color: 'bg-[#059669]' }]
+      ? [{ label: 'دیسک', pct: data.resources.diskUsedPct, color: 'bg-[#34d399]' }]
       : []),
     ...(data.resources.bandwidthUsedPct !== null
       ? [{ label: 'پهنای باند', pct: data.resources.bandwidthUsedPct, color: 'bg-[#f59e0b]' }]
@@ -73,65 +76,54 @@ export default function ItDashboardPage() {
   ];
 
   return (
-    <div className="p-8">
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-black text-ink">داشبورد فنی</h1>
-          <p className="mt-1 text-sm text-muted">نمای کلی سلامت زیرساخت و سرویس‌های blujet</p>
-        </div>
-        {data.kpis.allServicesHealthy && (
-          <div className="flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-[11.5px] font-bold text-[#059669]">
-            <span className="h-2 w-2 rounded-full bg-[#059669]" />
+    <div>
+      {data.kpis.allServicesHealthy && (
+        <div className="mb-6 flex justify-end">
+          <div className="flex items-center gap-2 rounded-lg border border-panel-border-2 bg-panel-card px-3 py-2 text-[11.5px] font-bold text-[#34d399]">
+            <span className="h-2 w-2 rounded-full bg-[#34d399]" />
             همه سامانه‌ها سالم
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-[13px] md:grid-cols-4">
         {kpis.map((k) => (
-          <button
+          <PanelStatCard
             key={k.label}
-            type="button"
+            label={k.label}
+            value={k.value}
+            trend={k.trend}
             onClick={k.onClick}
-            className="rounded-xl border border-border bg-white p-4 text-right transition hover:border-accent"
-          >
-            <div className="mb-2 flex items-center justify-between">
-              <span className={`text-[11px] font-bold ${k.trendClass}`}>{k.trend}</span>
-            </div>
-            <div className="font-num text-lg font-black text-ink">{k.value}</div>
-            <div className="mt-1 flex items-center justify-between">
-              <span className="text-[11px] text-muted">{k.label}</span>
-              <span className="text-[10px] font-bold text-accent">{k.cta}</span>
-            </div>
-          </button>
+            footer={
+              <div className="mt-1 flex items-center justify-between">
+                <span />
+                <span className={`text-[10px] ${panelLink}`}>{k.cta}</span>
+              </div>
+            }
+          />
         ))}
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.3fr_1fr]">
-        <section className="rounded-xl border border-border bg-white p-5">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-bold text-ink">سلامت سرویس‌ها</h2>
-            <button
-              type="button"
-              onClick={() => navigate('/panel/services')}
-              className="text-[11px] font-bold text-accent"
-            >
+        <PanelCard
+          title="سلامت سرویس‌ها"
+          actions={
+            <button type="button" onClick={() => navigate('/panel/services')} className={`text-[11px] ${panelLink}`}>
               مدیریت سرویس‌ها ←
             </button>
-          </div>
+          }
+        >
           <ul className="space-y-2.5">
             {data.serviceHealth.map((s) => (
               <li key={s.name} className="flex items-center gap-2.5 text-xs">
-                <span
-                  className={`h-2 w-2 rounded-full ${s.enabled ? 'bg-[#059669]' : 'bg-danger'}`}
-                />
-                <span className="flex-1 text-text-2">{s.name}</span>
+                <span className={`h-2 w-2 rounded-full ${s.enabled ? 'bg-[#34d399]' : 'bg-[#f87171]'}`} />
+                <span className={`flex-1 ${panelMuted2}`}>{s.name}</span>
                 {s.uptimePct !== null && (
-                  <span className="font-num text-muted">{faPercent(s.uptimePct)}</span>
+                  <span className={panelMuted}>{faPercent(s.uptimePct)}</span>
                 )}
                 <span
                   className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                    s.enabled ? 'bg-[#10b98124] text-[#059669]' : 'bg-danger/15 text-danger'
+                    s.enabled ? 'bg-[rgba(52,211,153,.16)] text-[#34d399]' : 'bg-[rgba(248,113,113,.16)] text-[#f87171]'
                   }`}
                 >
                   {s.enabled ? 'سالم' : 'قطع'}
@@ -139,51 +131,44 @@ export default function ItDashboardPage() {
               </li>
             ))}
           </ul>
-        </section>
+        </PanelCard>
 
         <div className="flex flex-col gap-4">
-          <section className="rounded-xl border border-border bg-white p-5">
-            <h2 className="mb-3 text-sm font-bold text-ink">استفاده از منابع سرور</h2>
+          <PanelCard title="استفاده از منابع سرور">
             <div className="space-y-3 text-xs">
               {resourceBars.map((r) => (
                 <div key={r.label}>
                   <div className="mb-1 flex justify-between">
-                    <span className="text-text-2">{r.label}</span>
-                    <span className="font-num font-bold text-muted">{faPercent(r.pct)}</span>
+                    <span className={panelMuted2}>{r.label}</span>
+                    <span className={`font-bold ${panelMuted}`}>{faPercent(r.pct)}</span>
                   </div>
-                  <div className="h-2 rounded bg-surface">
-                    <div
-                      className={`h-2 rounded ${r.color}`}
-                      style={{ width: `${Math.min(100, r.pct)}%` }}
-                    />
+                  <div className="h-2 rounded bg-panel-elevated">
+                    <div className={`h-2 rounded ${r.color}`} style={{ width: `${Math.min(100, r.pct)}%` }} />
                   </div>
                 </div>
               ))}
             </div>
-          </section>
+          </PanelCard>
 
-          <section className="rounded-xl border border-border bg-white p-5">
-            <h2 className="mb-3 text-sm font-bold text-ink">رویدادهای اخیر</h2>
+          <PanelCard title="رویدادهای اخیر">
             {data.recentEvents.length === 0 ? (
-              <p className="text-xs text-muted">رویدادی ثبت نشده است.</p>
+              <p className={`text-xs ${panelMuted}`}>رویدادی ثبت نشده است.</p>
             ) : (
               <ul className="space-y-2.5">
                 {data.recentEvents.map((e) => (
                   <li key={e.id} className="flex gap-2 text-[11px]">
                     <span
-                      className={`mt-1.5 h-2 w-2 flex-none rounded-full ${EVENT_DOT[e.category] ?? 'bg-muted'}`}
+                      className={`mt-1.5 h-2 w-2 flex-none rounded-full ${EVENT_DOT[e.category] ?? 'bg-panel-muted'}`}
                     />
                     <div>
-                      <div className="text-text-2">{e.text}</div>
-                      <div className="font-num mt-0.5 text-muted">
-                        {formatJalaliDateTime(e.createdAt)}
-                      </div>
+                      <div className={panelMuted2}>{e.text}</div>
+                      <div className={`mt-0.5 ${panelMuted}`}>{formatJalaliDateTime(e.createdAt)}</div>
                     </div>
                   </li>
                 ))}
               </ul>
             )}
-          </section>
+          </PanelCard>
         </div>
       </div>
     </div>

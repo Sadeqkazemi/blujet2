@@ -8,6 +8,9 @@ import { formatJalaliDate } from '../../lib/jalali';
 import type { AgencyMembershipRequest } from '../../types/agencies';
 import type { RefundsResult } from '../../types/refunds';
 import type { ContactMessageRow } from '../../types/support-tickets';
+import PanelAlert from '../panel/PanelAlert';
+import PanelCard from '../panel/PanelCard';
+import { panelElevated, panelLink, panelMuted } from '../panel/panel-theme';
 
 /**
  * پنل ادمین سایت.dc.html's dashboard sub-title is "درخواست‌ها، استرداد
@@ -40,91 +43,89 @@ export default function SiteAdminDashboardPage() {
   ) ?? [];
 
   return (
-    <div className="p-6">
-      <h1 className="text-lg font-bold text-ink">داشبورد</h1>
-      <p className="mt-1 text-xs text-muted">درخواست‌ها، استرداد بلیط و کارهای در انتظار اقدام</p>
+    <div>
+      {error && <PanelAlert>{error}</PanelAlert>}
 
-      {error && <p className="mt-4 text-xs text-danger">{error}</p>}
-
-      <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
-        <div className="rounded-xl border border-border bg-white p-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-ink">درخواست‌های عضویت آژانس در انتظار</h2>
-            <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-bold text-accent">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <PanelCard
+          title="درخواست‌های عضویت آژانس در انتظار"
+          actions={
+            <span className="rounded-full bg-[rgba(59,130,246,.16)] px-2 py-0.5 text-xs font-bold text-panel-link">
               {faDigits(requests?.length ?? 0)}
             </span>
-          </div>
-          <ul className="mt-3 flex flex-col gap-2">
-            {requests === null && <li className="text-xs text-muted">در حال بارگذاری…</li>}
+          }
+        >
+          <ul className="flex flex-col gap-2">
+            {requests === null && <li className={`text-xs ${panelMuted}`}>در حال بارگذاری…</li>}
             {requests?.length === 0 && (
-              <li className="text-xs text-muted">درخواست در انتظاری وجود ندارد.</li>
+              <li className={`text-xs ${panelMuted}`}>درخواست در انتظاری وجود ندارد.</li>
             )}
             {requests?.map((r) => (
               <li key={r.id}>
                 <Link
                   to={`/panel/agencies/requests/${r.id}`}
-                  className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-xs transition hover:bg-surface"
+                  className={`flex items-center justify-between rounded-lg border border-panel-border-2 px-3 py-2 text-xs transition hover:bg-white/5 ${panelElevated}`}
                 >
-                  <span className="font-bold text-ink">{r.applicantName}</span>
-                  <span className="text-muted">{formatJalaliDate(r.createdAt)}</span>
+                  <span className="font-bold text-white">{r.applicantName}</span>
+                  <span className={panelMuted}>{formatJalaliDate(r.createdAt)}</span>
                 </Link>
               </li>
             ))}
           </ul>
-        </div>
+        </PanelCard>
 
-        <div className="rounded-xl border border-border bg-white p-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-ink">استرداد بلیط در انتظار بررسی</h2>
-            <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-bold text-accent">
+        <PanelCard
+          title="استرداد بلیط در انتظار بررسی"
+          actions={
+            <span className="rounded-full bg-[rgba(59,130,246,.16)] px-2 py-0.5 text-xs font-bold text-panel-link">
               {faDigits(awaitingRefunds.length)}
             </span>
-          </div>
-          <ul className="mt-3 flex flex-col gap-2">
-            {refunds === null && <li className="text-xs text-muted">در حال بارگذاری…</li>}
+          }
+        >
+          <ul className="flex flex-col gap-2">
+            {refunds === null && <li className={`text-xs ${panelMuted}`}>در حال بارگذاری…</li>}
             {refunds && awaitingRefunds.length === 0 && (
-              <li className="text-xs text-muted">درخواست استرداد در انتظاری وجود ندارد.</li>
+              <li className={`text-xs ${panelMuted}`}>درخواست استرداد در انتظاری وجود ندارد.</li>
             )}
             {awaitingRefunds.map((r) => (
               <li key={r.id}>
                 <Link
                   to="/panel/refund"
-                  className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-xs transition hover:bg-surface"
+                  className={`flex items-center justify-between rounded-lg border border-panel-border-2 px-3 py-2 text-xs transition hover:bg-white/5 ${panelElevated}`}
                 >
-                  <span className="font-bold text-ink">{r.passengerName}</span>
-                  <span className="text-muted">{formatJalaliDate(r.createdAt)}</span>
+                  <span className="font-bold text-white">{r.passengerName}</span>
+                  <span className={panelMuted}>{formatJalaliDate(r.createdAt)}</span>
                 </Link>
               </li>
             ))}
           </ul>
-        </div>
+        </PanelCard>
 
-        <div className="rounded-xl border border-border bg-white p-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-ink">آخرین پیام‌های تماس با ما</h2>
-            <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-bold text-accent">
+        <PanelCard
+          title="آخرین پیام‌های تماس با ما"
+          actions={
+            <span className="rounded-full bg-[rgba(59,130,246,.16)] px-2 py-0.5 text-xs font-bold text-panel-link">
               {faDigits(messages?.length ?? 0)}
             </span>
-          </div>
-          <ul className="mt-3 flex flex-col gap-2">
-            {messages === null && <li className="text-xs text-muted">در حال بارگذاری…</li>}
-            {messages?.length === 0 && (
-              <li className="text-xs text-muted">پیامی ثبت نشده است.</li>
-            )}
+          }
+        >
+          <ul className="flex flex-col gap-2">
+            {messages === null && <li className={`text-xs ${panelMuted}`}>در حال بارگذاری…</li>}
+            {messages?.length === 0 && <li className={`text-xs ${panelMuted}`}>پیامی ثبت نشده است.</li>}
             {messages?.map((m) => (
               <li
                 key={m.id}
-                className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-xs"
+                className={`flex items-center justify-between rounded-lg border border-panel-border-2 px-3 py-2 text-xs ${panelElevated}`}
               >
                 <span className="min-w-0 flex-1 truncate">
-                  <span className="font-bold text-ink">{m.name}</span>
-                  <span className="mr-1 text-muted">— {m.subject}</span>
+                  <span className="font-bold text-white">{m.name}</span>
+                  <span className={`mr-1 ${panelMuted}`}>— {m.subject}</span>
                 </span>
-                <span className="mr-2 shrink-0 text-muted">{formatJalaliDate(m.createdAt)}</span>
+                <span className={`mr-2 shrink-0 ${panelMuted}`}>{formatJalaliDate(m.createdAt)}</span>
               </li>
             ))}
           </ul>
-        </div>
+        </PanelCard>
       </div>
     </div>
   );

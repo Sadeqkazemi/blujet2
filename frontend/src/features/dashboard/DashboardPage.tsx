@@ -12,6 +12,7 @@ import type {
 import SalesBarChart from '../../components/SalesBarChart';
 import SalesChartControls from '../../components/SalesChartControls';
 import StatTile from '../../components/StatTile';
+import PanelAlert from '../panel/PanelAlert';
 import { useSalesChartQuery } from '../../hooks/useSalesChartQuery';
 
 export default function DashboardPage() {
@@ -65,11 +66,7 @@ export default function DashboardPage() {
 
   return (
     <div>
-      {error && (
-        <p className="mb-4 rounded-[14px] border border-[rgba(248,113,113,.35)] bg-[rgba(248,113,113,.08)] p-3 text-sm text-[#f87171]">
-          {error}
-        </p>
-      )}
+      {error && <PanelAlert>{error}</PanelAlert>}
 
       {cartable && (
         <section className="mb-6 rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-5">

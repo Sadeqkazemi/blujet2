@@ -14,6 +14,8 @@ import { formatJalaliDateTime } from '../../lib/jalali';
 import Modal from '../../components/Modal';
 import JalaliDatePicker from '../../components/JalaliDatePicker';
 import ComposeMessageModal from './ComposeMessageModal';
+import PanelAlert from '../panel/PanelAlert';
+import { panelBtnGhost, panelBtnPrimary, panelCard, panelMuted, panelMuted2 } from '../panel/panel-theme';
 import type {
   CartableCategory,
   CartableListResult,
@@ -123,48 +125,40 @@ export default function CartablePage() {
   const tasks = result?.tasks ?? [];
 
   return (
-    <div className="p-8">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-black text-ink">کارتابل من</h1>
-          <p className="mt-1 text-sm text-muted">درخواست‌های در انتظار بررسی شما</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="rounded-full bg-surface px-3 py-1.5 text-xs font-bold text-text-2">
-            {faDigits(result?.totalOpen ?? 0)} مورد
-          </span>
-          <button
-            onClick={() => setComposeOpen(true)}
-            className="rounded-lg bg-accent px-4 py-2 text-xs font-bold text-white transition hover:bg-accent/90"
-          >
-            ایجاد پیام
-          </button>
-        </div>
+    <div>
+      <div className="mb-6 flex flex-wrap items-center justify-end gap-2">
+        <span className="rounded-full bg-panel-elevated px-3 py-1.5 text-xs font-bold text-panel-muted-2">
+          {faDigits(result?.totalOpen ?? 0)} مورد
+        </span>
+        <button type="button" onClick={() => setComposeOpen(true)} className={panelBtnPrimary}>
+          ایجاد پیام
+        </button>
       </div>
 
-      {error && <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">{error}</p>}
-      {notice && <p className="mb-4 rounded-lg bg-[#10b98115] p-3 text-sm text-[#059669]">{notice}</p>}
+      {error && <PanelAlert>{error}</PanelAlert>}
+      {notice && <PanelAlert tone="success">{notice}</PanelAlert>}
 
       {hasChairGate && (
-        <section className="mb-6 rounded-xl border border-[#f59e0b40] bg-[#f59e0b0d] p-5">
-          <h2 className="text-sm font-bold text-[#92400e]">ارجاع و ارسال گزارش به رئیس هیئت مدیره</h2>
-          <p className="mt-1 text-[11px] leading-relaxed text-[#92400e]/80">
+        <section className="mb-6 rounded-[14px] border border-[rgba(245,158,11,.35)] bg-[rgba(245,158,11,.08)] p-5">
+          <h2 className="text-sm font-bold text-[#fbbf24]">ارجاع و ارسال گزارش به رئیس هیئت مدیره</h2>
+          <p className="mt-1 text-[11px] leading-relaxed text-[#fbbf24]/80">
             دسترسی کامل کارتابل و ارجاعات مخصوص مدیر ارشد و مدیر عامل است؛ ارسال گزارش به رئیس هیئت مدیره
             نیازمند مجوز ایشان است.
           </p>
           <div className="mt-3">
             {chairPerm?.status === 'APPROVED' ? (
-              <span className="rounded-full bg-[#10b98124] px-3 py-1.5 text-xs font-bold text-[#059669]">
+              <span className="rounded-full bg-[rgba(52,211,153,.16)] px-3 py-1.5 text-xs font-bold text-[#34d399]">
                 مجوز تأیید شد ✓
               </span>
             ) : chairPerm?.status === 'PENDING' ? (
-              <span className="rounded-full bg-[#f59e0b24] px-3 py-1.5 text-xs font-bold text-[#b45309]">
+              <span className="rounded-full bg-[rgba(245,158,11,.16)] px-3 py-1.5 text-xs font-bold text-[#f59e0b]">
                 درخواست ارسال شد — در انتظار تأیید
               </span>
             ) : (
               <button
+                type="button"
                 onClick={() => void onRequestChairPerm()}
-                className="rounded-lg bg-[#b45309] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#92400e]"
+                className="rounded-lg bg-[#f59e0b] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#d97706]"
               >
                 درخواست مجوز از رئیس هیئت مدیره
               </button>
@@ -178,10 +172,7 @@ export default function CartablePage() {
           <JalaliDatePicker label="فیلتر روز (شمسی)" value={filterDate} onChange={setFilterDate} />
         </div>
         {filterDate && (
-          <button
-            onClick={() => setFilterDate(null)}
-            className="rounded-lg border border-border px-3 py-2 text-xs font-bold text-muted transition hover:text-ink"
-          >
+          <button type="button" onClick={() => setFilterDate(null)} className={panelBtnGhost}>
             حذف فیلتر روز
           </button>
         )}
@@ -191,45 +182,41 @@ export default function CartablePage() {
         {CATEGORY_CARDS.map((c) => (
           <button
             key={c.key}
+            type="button"
             onClick={() => setCategory(category === c.key ? null : c.key)}
-            className={`rounded-xl border p-4 text-right transition ${
-              category === c.key ? 'border-accent bg-accent/5' : 'border-border bg-white hover:border-accent/40'
+            className={`${panelCard} p-4 text-right transition ${
+              category === c.key ? 'border-panel-accent bg-[rgba(59,130,246,.08)]' : 'hover:border-panel-accent/40'
             }`}
           >
-            <div className="text-[11px] text-muted">{c.label}</div>
-            <div className="font-num mt-1 text-lg font-black text-ink">
-              {faDigits(result?.counts[c.key] ?? 0)}
-            </div>
+            <div className={`text-[11px] ${panelMuted}`}>{c.label}</div>
+            <div className="mt-1 text-lg font-black text-white">{faDigits(result?.counts[c.key] ?? 0)}</div>
           </button>
         ))}
       </div>
 
       {loading ? (
-        <p className="py-10 text-center text-sm text-muted">در حال بارگذاری…</p>
+        <p className={`py-10 text-center text-sm ${panelMuted}`}>در حال بارگذاری…</p>
       ) : tasks.length === 0 ? (
-        <p className="py-10 text-center text-sm text-muted">
+        <p className={`py-10 text-center text-sm ${panelMuted}`}>
           {category ? 'موردی با این فیلتر یافت نشد ✓' : 'کارتابل خالی است ✓'}
         </p>
       ) : (
         <ul className="space-y-3">
           {tasks.map((t) => (
-            <li key={t.id} className="flex flex-wrap items-center gap-4 rounded-xl border border-border bg-white p-4">
+            <li key={t.id} className={`flex flex-wrap items-center gap-4 ${panelCard} p-4`}>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-bold text-ink">{t.title}</span>
-                  <span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-[10px] font-bold text-accent">
+                  <span className="text-sm font-bold text-white">{t.title}</span>
+                  <span className="rounded-full bg-panel-elevated px-2.5 py-0.5 text-[10px] font-bold text-panel-link">
                     {CATEGORY_BADGES[t.category]}
                   </span>
                 </div>
-                <div className="mt-1 text-[11px] text-muted">
+                <div className={`mt-1 text-[11px] ${panelMuted}`}>
                   ارسال از: {t.senderLabelFa ?? t.sender?.fullName ?? '—'}
                 </div>
               </div>
-              <span className="font-num text-[10px] text-muted-2">{formatJalaliDateTime(t.createdAt)}</span>
-              <button
-                onClick={() => openReview(t)}
-                className="rounded-lg bg-accent px-4 py-2 text-xs font-bold text-white transition hover:bg-accent/90"
-              >
+              <span className={`text-[10px] ${panelMuted2}`}>{formatJalaliDateTime(t.createdAt)}</span>
+              <button type="button" onClick={() => openReview(t)} className={panelBtnPrimary}>
                 بررسی
               </button>
             </li>

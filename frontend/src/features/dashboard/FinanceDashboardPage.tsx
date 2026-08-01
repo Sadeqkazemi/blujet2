@@ -15,6 +15,16 @@ import type {
   SalesGranularity,
 } from '../../types/reporting';
 import SalesBarChart from '../../components/SalesBarChart';
+import PanelAlert from '../panel/PanelAlert';
+import PanelCard from '../panel/PanelCard';
+import PanelStatCard from '../panel/PanelStatCard';
+import {
+  panelElevatedPadded,
+  panelLink,
+  panelMuted,
+  panelSegmentBtn,
+  panelSegmented,
+} from '../panel/panel-theme';
 
 const CHART_MODES: { key: SalesGranularity; label: string }[] = [
   { key: 'q3', label: '۳ ماهه' },
@@ -25,38 +35,6 @@ const CHART_MODES: { key: SalesGranularity; label: string }[] = [
 function trendLabel(pct: number): string {
   if (pct === 0) return '۰٪';
   return `${pct > 0 ? '+' : '−'}${faDigits(Math.abs(pct))}٪`;
-}
-
-function StatCard({
-  label,
-  value,
-  trendPct,
-  icon,
-  iconClass,
-}: {
-  label: string;
-  value: string;
-  trendPct: number;
-  icon: React.ReactNode;
-  iconClass: string;
-}) {
-  const trendUp = trendPct >= 0;
-  return (
-    <div className="rounded-xl border border-border bg-white p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${iconClass}`}>{icon}</span>
-        <span
-          className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-            trendUp ? 'bg-[#10b98118] text-[#059669]' : 'bg-danger/10 text-danger'
-          }`}
-        >
-          {trendLabel(trendPct)}
-        </span>
-      </div>
-      <div className="font-num text-xl font-black text-ink">{value}</div>
-      <div className="mt-1 text-[11px] text-muted">{label}</div>
-    </div>
-  );
 }
 
 export default function FinanceDashboardPage() {
@@ -112,32 +90,27 @@ export default function FinanceDashboardPage() {
   };
 
   return (
-    <div className="p-8">
-      <div className="mb-6">
-        <h1 className="text-xl font-black text-ink">داشبورد</h1>
-        <p className="mt-1 text-sm text-muted">نمای کلی فروش و کارهای در انتظار اقدام</p>
-      </div>
-
-      {error && <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">{error}</p>}
+    <div>
+      {error && <PanelAlert>{error}</PanelAlert>}
 
       {stats && (
-        <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-          <StatCard
+        <div className="mb-6 grid grid-cols-2 gap-[13px] md:grid-cols-4">
+          <PanelStatCard
             label="آژانس فعال"
             value={faDigits(stats.activeAgencies)}
-            trendPct={stats.activeAgenciesTrendPct}
-            iconClass="bg-accent/10 text-accent"
+            trend={{ text: trendLabel(stats.activeAgenciesTrendPct), up: stats.activeAgenciesTrendPct >= 0 }}
+            iconClass="bg-[rgba(59,130,246,.16)] text-panel-accent"
             icon={
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <path d="M3 21h18M6 21V5a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v16M19 21V10a1 1 0 0 0-1-1h-3" />
               </svg>
             }
           />
-          <StatCard
+          <PanelStatCard
             label="مسافر این ماه"
             value={faDigits(stats.passengersThisMonth)}
-            trendPct={stats.passengersTrendPct}
-            iconClass="bg-[#a855f71a] text-[#a855f7]"
+            trend={{ text: trendLabel(stats.passengersTrendPct), up: stats.passengersTrendPct >= 0 }}
+            iconClass="bg-[rgba(168,85,247,.16)] text-[#a855f7]"
             icon={
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <circle cx="9" cy="8" r="3.2" />
@@ -145,11 +118,11 @@ export default function FinanceDashboardPage() {
               </svg>
             }
           />
-          <StatCard
+          <PanelStatCard
             label="بلیط فروخته‌شده"
             value={faDigits(stats.ticketsSoldThisMonth)}
-            trendPct={stats.ticketsTrendPct}
-            iconClass="bg-[#10b98118] text-[#059669]"
+            trend={{ text: trendLabel(stats.ticketsTrendPct), up: stats.ticketsTrendPct >= 0 }}
+            iconClass="bg-[rgba(52,211,153,.16)] text-[#34d399]"
             icon={
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <path d="M3 9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2 2 2 0 0 0 0 4 2 2 0 0 1-2 2H5a2 2 0 0 1-2-2 2 2 0 0 0 0-4z" />
@@ -157,11 +130,11 @@ export default function FinanceDashboardPage() {
               </svg>
             }
           />
-          <StatCard
+          <PanelStatCard
             label="درآمد (تومان)"
             value={faMoney(stats.revenueThisMonthIrr)}
-            trendPct={stats.revenueTrendPct}
-            iconClass="bg-[#f59e0b18] text-[#b45309]"
+            trend={{ text: trendLabel(stats.revenueTrendPct), up: stats.revenueTrendPct >= 0 }}
+            iconClass="bg-[rgba(245,158,11,.16)] text-[#f59e0b]"
             icon={
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <rect x="3" y="6" width="18" height="13" rx="2" />
@@ -173,103 +146,100 @@ export default function FinanceDashboardPage() {
       )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.7fr_1fr]">
-        <div className="rounded-xl border border-border bg-white p-5">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-bold text-ink">نمودار فروش</h2>
-              <p className="mt-0.5 text-[11px] text-muted">به تفکیک کانال · تومان</p>
-            </div>
-            <div className="flex gap-1 rounded-lg border border-border bg-body p-1">
+        <PanelCard
+          title="نمودار فروش"
+          subtitle="به تفکیک کانال · تومان"
+          actions={
+            <div className={panelSegmented}>
               {CHART_MODES.map((m) => (
                 <button
                   key={m.key}
+                  type="button"
                   onClick={() => setGranularity(m.key)}
-                  className={`rounded-md px-3 py-1.5 text-[11px] transition ${
-                    granularity === m.key ? 'bg-accent font-bold text-white' : 'text-muted hover:text-ink'
-                  }`}
+                  className={panelSegmentBtn(granularity === m.key)}
                 >
                   {m.label}
                 </button>
               ))}
             </div>
-          </div>
-
+          }
+        >
           <div className="mb-4 grid grid-cols-3 gap-3">
-            <div className="rounded-lg bg-body p-3 text-xs">
-              <div className="mb-1 flex items-center gap-1.5 text-[10px] text-muted">
-                <span className="h-2 w-2 rounded-sm bg-[#1668c4]" />
-                سیستمی
+            {[
+              { label: 'سیستمی', color: '#1668c4', value: channelSums.system },
+              { label: 'چارتر', color: '#a855f7', value: channelSums.charter },
+              { label: 'آژانس', color: '#059669', value: channelSums.agency },
+            ].map((ch) => (
+              <div key={ch.label} className={panelElevatedPadded}>
+                <div className={`mb-1 flex items-center gap-1.5 text-[10px] ${panelMuted}`}>
+                  <span className="h-2 w-2 rounded-sm" style={{ background: ch.color }} />
+                  {ch.label}
+                </div>
+                <div className="font-black" style={{ color: ch.color }}>
+                  {faMoney(ch.value)}
+                </div>
               </div>
-              <div className="font-num font-black text-[#1668c4]">{faMoney(channelSums.system)}</div>
-            </div>
-            <div className="rounded-lg bg-body p-3 text-xs">
-              <div className="mb-1 flex items-center gap-1.5 text-[10px] text-muted">
-                <span className="h-2 w-2 rounded-sm bg-[#a855f7]" />
-                چارتر
-              </div>
-              <div className="font-num font-black text-[#a855f7]">{faMoney(channelSums.charter)}</div>
-            </div>
-            <div className="rounded-lg bg-body p-3 text-xs">
-              <div className="mb-1 flex items-center gap-1.5 text-[10px] text-muted">
-                <span className="h-2 w-2 rounded-sm bg-[#059669]" />
-                آژانس
-              </div>
-              <div className="font-num font-black text-[#059669]">{faMoney(channelSums.agency)}</div>
-            </div>
+            ))}
           </div>
 
           {loading ? (
-            <p className="py-10 text-center text-sm text-muted">در حال بارگذاری…</p>
+            <p className={`py-10 text-center text-sm ${panelMuted}`}>در حال بارگذاری…</p>
           ) : (
-            <SalesBarChart periods={periods} selectedPeriodKey={periodKey} onSelectPeriod={setPeriodKey} />
+            <SalesBarChart
+              periods={periods}
+              selectedPeriodKey={periodKey}
+              onSelectPeriod={setPeriodKey}
+              variant="panel"
+            />
           )}
 
           {flights && (
-            <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl border border-border bg-body/40 p-4 md:grid-cols-4">
+            <div className={`mt-4 grid grid-cols-2 gap-3 rounded-[14px] border border-panel-border bg-panel-elevated/50 p-4 md:grid-cols-4`}>
               <div>
-                <div className="font-num text-lg font-black text-ink">{faDigits(flights.flightCount)}</div>
-                <div className="text-xs text-muted">پروازهای انجام‌شده</div>
+                <div className="text-lg font-black text-white">{faDigits(flights.flightCount)}</div>
+                <div className={`text-xs ${panelMuted}`}>پروازهای انجام‌شده</div>
               </div>
               <div>
-                <div className="font-num text-lg font-black text-ink">{faDigits(flights.totalSeats)}</div>
-                <div className="text-xs text-muted">مجموع صندلی</div>
+                <div className="text-lg font-black text-white">{faDigits(flights.totalSeats)}</div>
+                <div className={`text-xs ${panelMuted}`}>مجموع صندلی</div>
               </div>
               <div>
-                <div className="font-num text-lg font-black text-[#059669]">{faDigits(flights.soldSeats)}</div>
-                <div className="text-xs text-muted">فروخته‌شده</div>
+                <div className="text-lg font-black text-[#34d399]">{faDigits(flights.soldSeats)}</div>
+                <div className={`text-xs ${panelMuted}`}>فروخته‌شده</div>
               </div>
               <div>
-                <div className="font-num text-lg font-black text-danger">{faDigits(flights.unsoldSeats)}</div>
-                <div className="text-xs text-muted">فروش‌نرفته</div>
+                <div className="text-lg font-black text-[#f87171]">{faDigits(flights.unsoldSeats)}</div>
+                <div className={`text-xs ${panelMuted}`}>فروش‌نرفته</div>
               </div>
             </div>
           )}
-        </div>
+        </PanelCard>
 
         {cartable && (
-          <section className="rounded-xl border border-border bg-white p-5">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-bold text-ink">
+          <PanelCard
+            title={
+              <>
                 کارتابل
                 {cartable.totalOpen > 0 && (
-                  <span className="mr-2 rounded-full bg-danger/10 px-2.5 py-0.5 text-[11px] font-bold text-danger">
+                  <span className="mr-2 rounded-full bg-[rgba(248,113,113,.16)] px-2.5 py-0.5 text-[11px] font-bold text-[#f87171]">
                     {faDigits(cartable.totalOpen)}
                   </span>
                 )}
-              </h2>
-            </div>
+              </>
+            }
+          >
             {cartable.tasks.length === 0 ? (
-              <p className="py-6 text-center text-xs text-muted">کارتابل خالی است ✓</p>
+              <p className={`py-6 text-center text-xs ${panelMuted}`}>کارتابل خالی است ✓</p>
             ) : (
-              <ul className="divide-y divide-border">
+              <ul className="divide-y divide-panel-border">
                 {cartable.tasks.slice(0, 4).map((t) => (
                   <li key={t.id} className="flex items-start gap-3 py-3 text-xs">
-                    <span className="mt-0.5 flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-accent/10 text-accent">
+                    <span className="mt-0.5 flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-[rgba(59,130,246,.16)] text-panel-accent">
                       ✉
                     </span>
                     <div className="min-w-0">
-                      <div className="font-bold text-ink">{t.title}</div>
-                      <div className="mt-0.5 text-[10px] text-muted">
+                      <div className="font-bold text-white">{t.title}</div>
+                      <div className={`mt-0.5 text-[10px] ${panelMuted}`}>
                         {t.senderLabelFa ?? t.sender?.fullName ?? ''}
                       </div>
                     </div>
@@ -277,10 +247,10 @@ export default function FinanceDashboardPage() {
                 ))}
               </ul>
             )}
-            <Link to="/panel/cartable" className="mt-4 block text-center text-xs font-bold text-accent">
+            <Link to="/panel/cartable" className={`mt-4 block text-center text-xs ${panelLink}`}>
               مشاهده‌ی همه‌ی کارها ←
             </Link>
-          </section>
+          </PanelCard>
         )}
       </div>
     </div>

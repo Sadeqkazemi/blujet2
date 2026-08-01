@@ -36,8 +36,7 @@ describe('ItDashboardPage', () => {
 
     render(<ItDashboardPage />);
 
-    expect(await screen.findByText('داشبورد فنی')).toBeInTheDocument();
-    expect(screen.getByText('همه سامانه‌ها سالم')).toBeInTheDocument();
+    expect(await screen.findByText('همه سامانه‌ها سالم')).toBeInTheDocument();
     expect(screen.getByText('سرویس فعال')).toBeInTheDocument();
     expect(screen.getByText('آپ‌تایم ۳۰ روز')).toBeInTheDocument();
     expect(screen.getByText('موتور جستجوی پرواز')).toBeInTheDocument();
