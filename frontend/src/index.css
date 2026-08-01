@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "@fontsource-variable/vazirmatn";
+@import "@fontsource/roboto-mono/400.css";
 
 @theme {
   --font-sans: 'Vazirmatn Variable', Vazirmatn, sans-serif;
@@ -40,6 +41,8 @@ body {
   unicode-bidi: isolate;
 }
 
+/* Roboto Mono for booking codes, seat rows, Latin numeric inputs — not fa/ar prices/times. */
 .font-num {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }

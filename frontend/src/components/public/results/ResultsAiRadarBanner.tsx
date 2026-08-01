@@ -217,7 +217,7 @@ export default function ResultsAiRadarBanner({
                 }}
               >
                 <span style={{ fontSize: 13, color: '#5a6678', fontWeight: 600 }}>{predictedPriceLabel}</span>
-                <span className="font-num" style={{ fontSize: 19, fontWeight: 900, color: '#1668c4' }}>
+                <span style={{ fontSize: 19, fontWeight: 900, color: '#1668c4' }}>
                   {localeMoney(advisory.predictedPriceIrr, locale)} {tomanLabel}
                 </span>
               </div>

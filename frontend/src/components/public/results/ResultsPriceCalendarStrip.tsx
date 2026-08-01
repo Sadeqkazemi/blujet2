@@ -71,7 +71,6 @@ export default function ResultsPriceCalendarStrip({
                   : formatJalaliDate(`${c.date}T12:00:00Z`)}
               </div>
               <div
-                className="font-num"
                 style={{
                   marginTop: 2,
                   fontSize: 11,

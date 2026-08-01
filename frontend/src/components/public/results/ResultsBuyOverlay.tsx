@@ -206,7 +206,7 @@ export default function ResultsBuyOverlay({
               </div>
               <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 700, color: '#16202e' }}>{t.total}</span>
-                <span className="font-num" style={{ fontSize: 18, fontWeight: 900, color: '#1668c4' }}>
+                <span style={{ fontSize: 18, fontWeight: 900, color: '#1668c4' }}>
                   {localeMoney(priceIrr, locale)} {t.toman}
                 </span>
               </div>

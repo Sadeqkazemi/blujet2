@@ -144,7 +144,7 @@ export default function ResultsFlightCard({
           }}
         >
           <div style={{ textAlign: 'center', minWidth: 70 }}>
-            <div className="font-num" style={{ fontSize: isMobile ? 19 : 23.5, fontWeight: 800 }} dir="ltr">
+            <div style={{ fontSize: isMobile ? 19 : 23.5, fontWeight: 800 }} dir="ltr">
               {formatFlightClock(flight.departureAt, locale)}
             </div>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#5a6678' }} dir="ltr">
@@ -176,7 +176,7 @@ export default function ResultsFlightCard({
             </div>
           </div>
           <div style={{ textAlign: 'center', minWidth: 70 }}>
-            <div className="font-num" style={{ fontSize: isMobile ? 19 : 23.5, fontWeight: 800 }} dir="ltr">
+            <div style={{ fontSize: isMobile ? 19 : 23.5, fontWeight: 800 }} dir="ltr">
               {formatFlightClock(flight.arrivalAt, locale)}
             </div>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#5a6678' }} dir="ltr">
@@ -202,7 +202,6 @@ export default function ResultsFlightCard({
             }}
           >
             <div
-              className="font-num"
               style={{
                 display: 'flex',
                 alignItems: 'baseline',
@@ -270,7 +269,7 @@ export default function ResultsFlightCard({
               fontFamily: 'inherit',
             }}
           >
-            <span className="font-num">{prefPrice}</span> {labels.toman}
+            <span>{prefPrice}</span> {labels.toman}
           </button>
         )}
       </div>
@@ -317,7 +316,7 @@ export default function ResultsFlightCard({
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 13 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
-                    <div className="font-num" style={{ fontSize: 17, fontWeight: 800 }} dir="ltr">
+                    <div style={{ fontSize: 17, fontWeight: 800 }} dir="ltr">
                       {formatFlightClock(flight.departureAt, locale)}
                     </div>
                     <div style={{ fontSize: 13, color: '#6b7787' }}>
@@ -330,7 +329,7 @@ export default function ResultsFlightCard({
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
-                    <div className="font-num" style={{ fontSize: 17, fontWeight: 800 }} dir="ltr">
+                    <div style={{ fontSize: 17, fontWeight: 800 }} dir="ltr">
                       {formatFlightClock(flight.arrivalAt, locale)}
                     </div>
                     <div style={{ fontSize: 13, color: '#6b7787' }}>
@@ -415,7 +414,7 @@ export default function ResultsFlightCard({
               }}
             >
               <span style={{ fontWeight: 700, color: '#16202e' }}>{labels.total}</span>
-              <span className="font-num" style={{ fontSize: 18, fontWeight: 900, color: '#1668c4' }}>
+              <span style={{ fontSize: 18, fontWeight: 900, color: '#1668c4' }}>
                 {localeMoney(cabin.priceIrr, locale)} {labels.toman}
               </span>
             </div>
