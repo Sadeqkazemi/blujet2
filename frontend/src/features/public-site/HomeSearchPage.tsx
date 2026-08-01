@@ -496,7 +496,7 @@ export default function HomeSearchPage() {
         <HomeSearchCard locale={locale} isMobile={isMobile} isRTL={isRTL} copy={searchCopy} airports={airports} cityName={cityName} popularRoutes={popularRoutes} />
       </section>
 
-      <section style={{ maxWidth: 1180, margin: '0 auto', padding: '49px 26px 23px' }}>
+      <section style={{ maxWidth: 1180, margin: '0 auto', padding: isMobile ? '20px 26px 10px' : '28px 26px 14px' }}>
         <div
           data-testid="home-services"
           className={isMobile ? 'hscroll' : undefined}
@@ -543,7 +543,7 @@ export default function HomeSearchPage() {
       </section>
 
       {/* SPECIAL OFFERS */}
-      <section id="offers" style={{ maxWidth: 1180, margin: '0 auto', padding: '44px 26px 7px', scrollMarginTop: 96 }}>
+      <section id="offers" style={{ maxWidth: 1180, margin: '0 auto', padding: isMobile ? '14px 26px 7px' : '18px 26px 7px', scrollMarginTop: 96 }}>
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 10 }}>
           <div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#eaf6ef', color: '#1f8a5b', padding: '4px 10px', borderRadius: 20, fontSize: '11.5px', fontWeight: 700, marginBottom: 10 }}>

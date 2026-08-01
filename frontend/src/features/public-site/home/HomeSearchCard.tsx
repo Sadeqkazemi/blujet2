@@ -343,7 +343,7 @@ export default function HomeSearchCard({
   ];
 
   return (
-    <div style={{ maxWidth: 1180, margin: '0 auto', padding: '0 26px 38px', position: 'relative' }}>
+    <div style={{ maxWidth: 1180, margin: '0 auto', padding: isMobile ? '0 26px 18px' : '0 26px 26px', position: 'relative' }}>
       <style>{`
         @media (max-width: 767px) {
           #search-card { margin-top: -46px !important; }
