@@ -436,7 +436,7 @@ export default function CheckoutPage() {
           onToggleSeat={toggleSeat}
           businessLocked={businessLocked}
           bookedCabin={draft?.cabin ?? 'ECONOMY'}
-          aircraftType={draft?.flight.aircraftType ?? 'MD-88'}
+          aircraftType={draft?.flight.aircraftType ?? 'MD-80'}
         />
       )}
       {step === 'review' && (

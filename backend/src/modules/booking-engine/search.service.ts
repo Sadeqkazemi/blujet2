@@ -323,6 +323,20 @@ export class SearchService {
 
     return {
       flightInstanceId,
+      aircraftType: resolveAircraftType(instance),
+      cabinLayout: {
+        BUSINESS: {
+          colsLeft: map.businessColsLeft,
+          colsRight: map.businessColsRight,
+          aisleAfterIndex: map.businessColsLeft.length,
+        },
+        ECONOMY: {
+          colsLeft: map.economyColsLeft,
+          colsRight: map.economyColsRight,
+          aisleAfterIndex: map.economyColsLeft.length,
+        },
+      },
+      excludedSeatCodes: map.excludedSeatCodes ?? [],
       seats: seats.map((s) => ({
         ...s,
         status: taken.has(s.seatCode) ? 'TAKEN' : 'FREE',
