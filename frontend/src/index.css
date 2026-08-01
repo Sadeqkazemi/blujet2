@@ -43,3 +43,7 @@ body {
 .font-num {
   font-family: var(--font-mono);
 }
+
+.hscroll::-webkit-scrollbar {
+  display: none;
+}

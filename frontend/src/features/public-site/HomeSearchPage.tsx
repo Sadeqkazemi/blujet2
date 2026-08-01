@@ -15,6 +15,7 @@ import FeatureQuickLinks from '../../components/public/home/FeatureQuickLinks';
 import PromoSlider from '../../components/public/home/PromoSlider';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import { horizontalScrollStyle, useHorizontalDragScroll } from '../../hooks/useHorizontalDragScroll';
 import { formatLocalePercent, formatToman } from '../../lib/fa-format';
 
 const TODAY_ISO = new Date().toISOString().slice(0, 10);
@@ -321,6 +322,7 @@ export default function HomeSearchPage() {
   const navigate = useNavigate();
   const { locale } = useLocale();
   const isMobile = useIsMobile();
+  const { containerRef: offersScrollRef, dragScrollProps: offersDragScrollProps } = useHorizontalDragScroll();
   const t = STR[locale];
   const e = ERR[locale];
   const [airports, setAirports] = useState<Airport[]>([]);
@@ -776,12 +778,14 @@ export default function HomeSearchPage() {
           </button>
         </div>
         <div
+          ref={isMobile ? offersScrollRef : undefined}
+          className={isMobile ? 'hscroll' : undefined}
+          {...(isMobile ? offersDragScrollProps : {})}
           style={{
             display: isMobile ? 'flex' : 'grid',
             gridTemplateColumns: isMobile ? undefined : 'repeat(4, 1fr)',
             gap: 18,
-            overflowX: isMobile ? 'auto' : 'visible',
-            scrollSnapType: isMobile ? 'x mandatory' : 'none',
+            ...(isMobile ? horizontalScrollStyle : {}),
             paddingBottom: isMobile ? 8 : 0,
           }}
         >
@@ -801,7 +805,7 @@ export default function HomeSearchPage() {
                 display: 'flex',
                 flexDirection: 'column',
                 flex: isMobile ? '0 0 calc(50% - 9px)' : undefined,
-                scrollSnapAlign: isMobile ? 'start' : undefined,
+                touchAction: isMobile ? 'pan-x' : undefined,
                 cursor: 'pointer',
                 fontFamily: 'inherit',
                 padding: 0,

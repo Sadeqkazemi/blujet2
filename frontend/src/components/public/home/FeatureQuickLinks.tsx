@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { StoredLocale } from '../../../hooks/useLocale';
 import { useIsMobile } from '../../../hooks/useIsMobile';
+import { horizontalScrollStyle, useHorizontalDragScroll } from '../../../hooks/useHorizontalDragScroll';
 
 const ICONS: ReactNode[] = [
   <svg key="seat" width="28" height="28" viewBox="0 0 24 24" fill="#8a96a6">
@@ -34,18 +35,21 @@ interface FeatureQuickLinksProps {
 export default function FeatureQuickLinks({ locale, labels, hrefs }: FeatureQuickLinksProps) {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const { containerRef, dragScrollProps } = useHorizontalDragScroll();
 
   return (
     <section style={{ maxWidth: 1180, margin: '0 auto', padding: isMobile ? '20px 26px 0' : '49px 26px 23px' }}>
       <div
+        ref={isMobile ? containerRef : undefined}
+        className={isMobile ? 'hscroll' : undefined}
+        {...(isMobile ? dragScrollProps : {})}
         style={{
           display: isMobile ? 'flex' : 'grid',
           gridTemplateColumns: isMobile ? undefined : 'repeat(4, 1fr)',
           background: '#fff',
           border: '1px solid #eef2f7',
           borderRadius: 16,
-          overflowX: isMobile ? 'auto' : 'hidden',
-          scrollSnapType: isMobile ? 'x mandatory' : 'none',
+          ...(isMobile ? horizontalScrollStyle : { overflow: 'hidden' }),
         }}
       >
         {labels.map((label, i) => (
@@ -59,7 +63,7 @@ export default function FeatureQuickLinks({ locale, labels, hrefs }: FeatureQuic
               border: 'none',
               borderLeft: i > 0 && !isMobile ? '1px solid #eef2f7' : undefined,
               flex: isMobile ? '0 0 calc(50% - 6.5px)' : undefined,
-              scrollSnapAlign: isMobile ? 'start' : undefined,
+              touchAction: isMobile ? 'pan-x' : undefined,
               padding: '22px 14px',
               display: 'flex',
               flexDirection: 'column',
