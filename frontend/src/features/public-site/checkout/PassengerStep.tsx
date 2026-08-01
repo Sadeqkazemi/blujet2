@@ -171,6 +171,14 @@ export default function PassengerStep({
               />
             </div>
             <div className="flex items-center gap-3.5">
+              <button
+                type="button"
+                className="flex items-center gap-1 text-[11.5px] font-bold text-[#1668c4]"
+                data-testid={`checkout-scan-doc-${i}`}
+                onClick={() => undefined}
+              >
+                {t.scanDocument}
+              </button>
               {savedPassengers.length > 0 && (
                 <button
                   type="button"

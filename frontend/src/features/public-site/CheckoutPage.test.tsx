@@ -93,8 +93,31 @@ describe('CheckoutPage', () => {
 
     expect(await screen.findByTestId('checkout-pax-step')).toBeInTheDocument();
     expect(screen.getByTestId('checkout-flight-summary')).toBeInTheDocument();
+    expect(screen.getByTestId('checkout-route-label')).toHaveTextContent('تهران به مشهد');
     expect(screen.getByTestId('checkout-pricing-sidebar')).toBeInTheDocument();
     expect(screen.getByTestId('checkout-step-pax')).toBeInTheDocument();
+  });
+
+  it('keeps origin/destination from sessionStorage after auth remount', async () => {
+    sessionStorage.setItem(
+      'blujet_checkout_draft',
+      JSON.stringify({
+        flightInstanceId: 'fi-1',
+        cabin: 'ECONOMY',
+        selectedSeats: [],
+        flight: FLIGHT_STATE.flight,
+      }),
+    );
+    mockAuth();
+    render(
+      <MemoryRouter initialEntries={['/checkout/new?flightInstanceId=fi-1&cabin=ECONOMY&origin=THR&dest=MHD']}>
+        <Routes>
+          <Route path="/checkout/:bookingId" element={<CheckoutPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByTestId('checkout-route-label')).toHaveTextContent('تهران به مشهد');
   });
 
   it('advances pax → extras → review and creates a booking', async () => {
