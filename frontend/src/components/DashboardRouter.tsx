@@ -30,7 +30,11 @@ export default function DashboardRouter() {
   const { user } = useAuth();
   const dashboardEntry = nav?.find((item) => item.key === 'dashboard');
 
-  if (nav !== null && dashboardEntry && !dashboardEntry.implemented) {
+  if (nav === null) {
+    return <p className="text-sm text-panel-muted">در حال بارگذاری…</p>;
+  }
+
+  if (dashboardEntry && !dashboardEntry.implemented) {
     return <ComingSoonPage />;
   }
 

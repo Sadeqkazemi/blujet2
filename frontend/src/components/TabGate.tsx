@@ -13,7 +13,11 @@ export default function TabGate({ tabKey }: { tabKey: string }) {
   const { nav } = useOutletContext<PanelShellContext>();
   const entry = nav?.find((item) => item.key === tabKey);
 
-  if (nav !== null && (!entry || !entry.implemented)) {
+  if (nav === null) {
+    return <p className="text-sm text-panel-muted">در حال بارگذاری…</p>;
+  }
+
+  if (!entry || !entry.implemented) {
     return <ComingSoonPage />;
   }
 

@@ -139,6 +139,24 @@ describe('PanelShell', () => {
     });
   });
 
+  it('falls back to BOARD_CHAIR nav when fetchNav fails', async () => {
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      status: 'authenticated',
+      user: { id: 'u6', fullName: 'رئیس هیئت مدیره', role: 'BOARD_CHAIR', preferredLocale: 'FA' },
+      requestLogin: vi.fn(),
+      confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
+      signOut: vi.fn(),
+    });
+    vi.spyOn(panelsApi, 'fetchNav').mockRejectedValue(new Error('network'));
+
+    renderShell();
+
+    expect(await screen.findByRole('link', { name: 'مدیران' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'داشبورد' })).toBeInTheDocument();
+    expect(screen.queryByText('تبی برای این نقش تعریف نشده است.')).not.toBeInTheDocument();
+  });
+
   it('renders page title and subtitle from active nav item', async () => {
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
       status: 'authenticated',
@@ -160,7 +178,7 @@ describe('PanelShell', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('panel-page-title')).toHaveTextContent('داشبورد');
-      expect(screen.getByTestId('panel-page-sub')).toHaveTextContent('نمای کلی فروش و عملکرد پروازها');
+      expect(screen.getByTestId('panel-page-sub')).toHaveTextContent('نمای کلی فروش و کارهای در انتظار اقدام');
     });
   });
 });

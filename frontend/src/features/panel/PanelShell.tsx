@@ -10,6 +10,7 @@ import { faDigits } from '../../lib/fa-format';
 import type { PanelNavItem } from '../../types/panels';
 import PanelNavIcon from './PanelNavIcon';
 import { PANEL_PAGE_SUBTITLES, panelInitials } from './panel-nav-icons';
+import { resolvePanelNav } from './panel-nav.config';
 
 const ROLE_LABELS: Record<string, string> = {
   CEO: 'مدیر عامل',
@@ -46,9 +47,11 @@ export default function PanelShell() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [nav, setNav] = useState<PanelNavItem[] | null>(null);
+  const [apiNav, setApiNav] = useState<PanelNavItem[] | null>(null);
   const [panelEnabled, setPanelEnabled] = useState<boolean | null>(null);
   const [badges, setBadges] = useState<Record<string, NavBadge>>({});
+
+  const nav = useMemo(() => resolvePanelNav(apiNav, user?.role), [apiNav, user?.role]);
 
   const currentKey = activeNavKey(location.pathname);
   const activeNav = nav?.find((item) => item.key === currentKey);
@@ -58,11 +61,11 @@ export default function PanelShell() {
   useEffect(() => {
     Promise.all([fetchNav(), fetchPanelSelfStatus()])
       .then(([navItems, status]) => {
-        setNav(navItems);
+        setApiNav(navItems);
         setPanelEnabled(status.enabled);
       })
       .catch(() => {
-        setNav([]);
+        setApiNav([]);
         setPanelEnabled(true);
       });
   }, []);
