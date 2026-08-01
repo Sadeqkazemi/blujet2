@@ -65,11 +65,12 @@ export function passengerFullName(p: PassengerFormDraft): string {
   return `${p.firstNameLatin.trim()} ${p.lastNameLatin.trim()}`.trim();
 }
 
+/** Prices from design-reference-v2/تکمیل خرید.dc.html (تومان). */
 export function defaultExtras(): ExtraServiceState[] {
   return [
-    { id: 'baggage', selected: false, priceToman: 890_000 },
-    { id: 'meal', selected: false, priceToman: 350_000 },
+    { id: 'baggage', selected: false, priceToman: 450_000 },
+    { id: 'meal', selected: false, priceToman: 280_000 },
     { id: 'insurance', selected: false, priceToman: 120_000 },
-    { id: 'cip', selected: false, priceToman: 2_500_000 },
+    { id: 'cip', selected: false, priceToman: 900_000 },
   ];
 }
