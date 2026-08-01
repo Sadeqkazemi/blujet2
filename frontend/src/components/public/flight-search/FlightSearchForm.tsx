@@ -4,6 +4,7 @@ import { useIsMobile } from '../../../hooks/useIsMobile';
 import JalaliDatePicker from '../../JalaliDatePicker';
 import type { Airport } from '../../../types/public-site';
 import AirportCityPicker from './AirportCityPicker';
+import FlightSearchDateRangePicker from './FlightSearchDateRangePicker';
 import PassengerCabinPicker, { type PassengerCabinState, uiCabinLabel } from './PassengerCabinPicker';
 import { filterAirportsByService } from './airport-utils';
 import { buildResultsUrl, type SearchLeg, type TripType, type UiCabinClass } from './search-url';
@@ -608,44 +609,36 @@ export default function FlightSearchForm({
 
             <div
               style={{
-                flex: '1.1 1 120px',
-                minWidth: isMobile ? 0 : 120,
-                borderRight: isMobile ? 'none' : '1px solid #eef1f5',
-                opacity: dest ? 1 : 0.45,
-                ...(isMobile ? { ...MOBILE_CARD, gridColumn: '1', padding: '6px 0' } : {}),
+                display: 'contents',
+                ...(isMobile
+                  ? {
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(2, 1fr)',
+                      gridColumn: '1 / -1',
+                      gap: 10,
+                    }
+                  : {}),
               }}
             >
-              <JalaliDatePicker
-                label={t.lblDepartDate}
-                value={dateIso}
-                onChange={setDateIso}
+              <FlightSearchDateRangePicker
+                locale={locale}
+                trip={trip === 'round' ? 'round' : 'oneway'}
+                onTripChange={(calTrip) => {
+                  setTrip(calTrip === 'round' ? 'round' : 'oneway');
+                  if (calTrip === 'oneway') setReturnDateIso(null);
+                }}
+                depIso={dateIso}
+                retIso={returnDateIso}
+                onDepChange={setDateIso}
+                onRetChange={setReturnDateIso}
+                depLabel={t.lblDepartDate}
+                retLabel={t.lblReturnDate}
                 minDate={TODAY_ISO}
-                testId="home-date"
-                mobileSheet
+                destSelected={Boolean(dest)}
+                showReturnField={trip === 'round' || isMobile}
+                testIdPrefix="home"
               />
             </div>
-
-            {(trip === 'round' || isMobile) && (
-              <div
-                style={{
-                  flex: '1.1 1 120px',
-                  minWidth: isMobile ? 0 : 120,
-                  borderRight: isMobile ? 'none' : '1px solid #eef1f5',
-                  opacity: trip !== 'round' ? 0.45 : dateIso ? 1 : 0.45,
-                  pointerEvents: trip === 'round' ? 'auto' : 'none',
-                  ...(isMobile ? { ...MOBILE_CARD, gridColumn: '2', padding: '6px 0' } : {}),
-                }}
-              >
-                <JalaliDatePicker
-                  label={t.lblReturnDate}
-                  value={returnDateIso}
-                  onChange={setReturnDateIso}
-                  minDate={dateIso?.slice(0, 10) ?? TODAY_ISO}
-                  testId="home-return-date"
-                  mobileSheet
-                />
-              </div>
-            )}
 
             <PassengerCabinPicker
               value={pax}
