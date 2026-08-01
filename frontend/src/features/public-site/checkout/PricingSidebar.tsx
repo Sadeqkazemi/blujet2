@@ -15,6 +15,8 @@ export default function PricingSidebar({
   canBack,
   busy,
   error,
+  /** When true, omit primary CTA (mobile sticky bar owns it). */
+  hideActions = false,
 }: {
   locale: StoredLocale;
   priceIrr: string;
@@ -26,6 +28,7 @@ export default function PricingSidebar({
   canBack: boolean;
   busy?: boolean;
   error?: string | null;
+  hideActions?: boolean;
 }) {
   const t = CHECKOUT_COPY[locale];
   const taxesIrr = Math.round(Number(priceIrr) * 0.084);
@@ -81,32 +84,36 @@ export default function PricingSidebar({
         🔒 {t.securePayment}
       </div>
 
-      <p className="mb-4 text-xs leading-relaxed text-[#9aa4b2]">
-        {t.agreeTerms}{' '}
-        <Link to="/terms" className="text-[#1668c4] no-underline">
-          {t.termsLink}
-        </Link>
-      </p>
+      {!hideActions && (
+        <>
+          <p className="mb-4 text-xs leading-relaxed text-[#9aa4b2]">
+            {t.agreeTerms}{' '}
+            <Link to="/terms" className="text-[#1668c4] no-underline">
+              {t.termsLink}
+            </Link>
+          </p>
 
-      <button
-        type="button"
-        disabled={busy}
-        onClick={onNext}
-        data-testid="checkout-next"
-        className="flex h-14 items-center justify-center rounded-[14px] bg-[#1668c4] text-[15px] font-extrabold text-white shadow-[0_12px_24px_-12px_rgba(22,104,196,.55)] disabled:opacity-60"
-      >
-        {busy ? t.loading : nextLabel}
-      </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onNext}
+            data-testid="checkout-next"
+            className="flex h-14 items-center justify-center rounded-[14px] bg-[#1668c4] text-[15px] font-extrabold text-white shadow-[0_12px_24px_-12px_rgba(22,104,196,.55)] disabled:opacity-60"
+          >
+            {busy ? t.loading : nextLabel}
+          </button>
 
-      {canBack && onBack && (
-        <button
-          type="button"
-          onClick={onBack}
-          data-testid="checkout-back-step"
-          className="mt-2.5 flex h-12 items-center justify-center rounded-[14px] border border-[#e6eaf0] bg-[#f2f5f9] text-[13.5px] font-bold text-[#0d2640]"
-        >
-          {t.backStep}
-        </button>
+          {canBack && onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              data-testid="checkout-back-step"
+              className="mt-2.5 flex h-12 items-center justify-center rounded-[14px] border border-[#e6eaf0] bg-[#f2f5f9] text-[13.5px] font-bold text-[#0d2640]"
+            >
+              {t.backStep}
+            </button>
+          )}
+        </>
       )}
 
       {error && (
