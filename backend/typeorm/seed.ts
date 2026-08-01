@@ -708,15 +708,24 @@ async function main() {
         data: [
           {
             userId: testUser.id,
-            fullName: 'محمد رضایی',
-            latinName: 'MOHAMMAD REZAEI',
-            passportNoEnc: encryptPii('A22113344'),
+            fullName: 'نگار رضایی',
+            latinName: 'NEGAR REZAEI',
+            nationalIdEnc: encryptPii('0074185969'),
+            nationalIdHash: hashPii('0074185969'),
           },
           {
             userId: testUser.id,
-            fullName: 'سارا احمدی',
-            latinName: 'SARA AHMADI',
-            passportNoEnc: encryptPii('B99887766'),
+            fullName: 'صادق کاظمی',
+            latinName: 'SADEQ KAZEMI',
+            nationalIdEnc: encryptPii('0060326786'),
+            nationalIdHash: hashPii('0060326786'),
+          },
+          {
+            userId: testUser.id,
+            fullName: 'محمد رضایی',
+            latinName: 'MOHAMMAD REZAEI',
+            nationalIdEnc: encryptPii('0012345679'),
+            nationalIdHash: hashPii('0012345679'),
           },
         ],
       });

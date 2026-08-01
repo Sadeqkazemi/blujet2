@@ -1,8 +1,13 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { StoredLocale } from '../../../hooks/useLocale';
 import { faDigits, normalizeIranMobile } from '../../../lib/fa-format';
 import type { SavedPassenger } from '../../../types/public-site';
 import { CHECKOUT_COPY } from './checkout-copy';
+import {
+  resolveCheckoutSavedPassengers,
+  savedOptionToPassengerPatch,
+  type CheckoutSavedPaxOption,
+} from './checkout-saved-pax';
 import { emptyPassenger, type PassengerFormDraft } from './checkout-types';
 
 const inputCls =
@@ -10,13 +15,6 @@ const inputCls =
 
 function latinOnly(value: string): string {
   return value.replace(/[^A-Za-z\s'-]/g, '').toUpperCase();
-}
-
-function splitLatinName(latinName: string): { first: string; last: string } {
-  const parts = latinName.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return { first: '', last: '' };
-  if (parts.length === 1) return { first: parts[0]!, last: '' };
-  return { first: parts[0]!, last: parts.slice(1).join(' ') };
 }
 
 function DocRadio({
@@ -46,6 +44,25 @@ function DocRadio({
   );
 }
 
+function UserIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <circle cx="9" cy="8" r="3.2" />
+      <path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" />
+    </svg>
+  );
+}
+
 function JalaliDobSelects({
   locale,
   day,
@@ -65,7 +82,11 @@ function JalaliDobSelects({
 }) {
   const t = CHECKOUT_COPY[locale];
   const days = Array.from({ length: 31 }, (_, i) => String(i + 1));
-  const years = Array.from({ length: 80 }, (_, i) => String(1405 - i));
+  // fa: Jalali years; en/ar: Gregorian — matches تکمیل خرید.dc.html
+  const years =
+    locale === 'fa'
+      ? Array.from({ length: 80 }, (_, i) => String(1405 - i))
+      : Array.from({ length: 60 }, (_, i) => String(1946 + i));
   return (
     <div className="grid grid-cols-[1fr_1.2fr_1fr] overflow-hidden rounded-[10px] border-[1.5px] border-[#e2e7ee] bg-white">
       <select
@@ -121,20 +142,17 @@ export default function PassengerStep({
 }) {
   const t = CHECKOUT_COPY[locale];
   const [openSavedFor, setOpenSavedFor] = useState<number | null>(null);
+  const savedOptions = useMemo(
+    () => resolveCheckoutSavedPassengers(savedPassengers, locale),
+    [savedPassengers, locale],
+  );
 
   function update(i: number, patch: Partial<PassengerFormDraft>) {
     onChange(passengers.map((p, j) => (j === i ? { ...p, ...patch } : p)));
   }
 
-  function applySaved(i: number, saved: SavedPassenger) {
-    const { first, last } = splitLatinName(saved.latinName || '');
-    update(i, {
-      firstNameLatin: first,
-      lastNameLatin: last,
-      nationalId: saved.nationalId ?? '',
-      passportNo: saved.passportNo ?? '',
-      docType: saved.passportNo && !saved.nationalId ? 'PASSPORT' : 'NATIONAL_ID',
-    });
+  function applySaved(i: number, opt: CheckoutSavedPaxOption) {
+    update(i, savedOptionToPassengerPatch(opt));
     setOpenSavedFor(null);
   }
 
@@ -179,16 +197,16 @@ export default function PassengerStep({
               >
                 {t.scanDocument}
               </button>
-              {savedPassengers.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setOpenSavedFor(openSavedFor === i ? null : i)}
-                  className="text-[11.5px] font-bold text-[#1668c4]"
-                  data-testid={`checkout-from-saved-${i}`}
-                >
-                  {t.fromSaved}
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => setOpenSavedFor(openSavedFor === i ? null : i)}
+                className="flex items-center gap-1.5 text-[11.5px] font-bold text-[#1668c4]"
+                data-testid={`checkout-from-saved-${i}`}
+                aria-expanded={openSavedFor === i}
+              >
+                <UserIcon />
+                {t.fromSaved}
+              </button>
               {passengers.length > 1 && (
                 <button
                   type="button"
@@ -202,20 +220,28 @@ export default function PassengerStep({
           </div>
 
           {openSavedFor === i && (
-            <div className="mb-3 rounded-[11px] border border-[#dce8f7] bg-[#f6faff] px-3 py-2.5">
-              <div className="mb-2 text-[11px] font-bold text-[#0d2640]">{t.fromSaved}</div>
-              <div className="flex flex-wrap gap-1.5">
-                {savedPassengers.map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => applySaved(i, s)}
-                    className="cursor-pointer rounded-[18px] border-[1.5px] border-[#cfe0f2] bg-white px-3 py-1.5 text-[11.5px] font-semibold text-[#0d2640]"
-                  >
-                    {s.fullName}
-                  </button>
-                ))}
-              </div>
+            <div
+              className="mb-3 rounded-[11px] border border-[#dce8f7] bg-[#f6faff] px-3 py-2.5"
+              data-testid={`checkout-saved-panel-${i}`}
+            >
+              <div className="mb-2 text-[11px] font-bold text-[#0d2640]">{t.selectSaved}</div>
+              {savedOptions.length === 0 ? (
+                <p className="m-0 text-[11.5px] text-[#5a6678]">{t.savedEmpty}</p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {savedOptions.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => applySaved(i, s)}
+                      data-testid={`checkout-saved-chip-${s.id}`}
+                      className="cursor-pointer rounded-[18px] border-[1.5px] border-[#cfe0f2] bg-white px-3 py-1.5 text-[11.5px] font-semibold text-[#0d2640] hover:border-[#1668c4] hover:text-[#1668c4]"
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

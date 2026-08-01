@@ -98,6 +98,34 @@ describe('CheckoutPage', () => {
     expect(screen.getByTestId('checkout-route-label')).toHaveTextContent('تهران به مشهد');
     expect(screen.getByTestId('checkout-pricing-sidebar')).toBeInTheDocument();
     expect(screen.getByTestId('checkout-step-pax')).toBeInTheDocument();
+    expect(screen.getByTestId('checkout-from-saved-0')).toHaveTextContent(
+      'از مسافران ذخیره‌شده',
+    );
+  });
+
+  it('opens saved-passenger chips from the passenger step', async () => {
+    mockAuth();
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: '/checkout/new',
+            search: '?flightInstanceId=fi-1&cabin=ECONOMY',
+            state: FLIGHT_STATE,
+          },
+        ]}
+      >
+        <Routes>
+          <Route path="/checkout/:bookingId" element={<CheckoutPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await screen.findByTestId('checkout-from-saved-0');
+    await user.click(screen.getByTestId('checkout-from-saved-0'));
+    expect(await screen.findByTestId('checkout-saved-panel-0')).toBeInTheDocument();
+    expect(screen.getByTestId('checkout-saved-chip-demo-negar')).toBeInTheDocument();
   });
 
   it('mobile layout shows flight route + passenger form above pricing', async () => {
