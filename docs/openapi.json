@@ -950,6 +950,21 @@
         ]
       }
     },
+    "/reporting/executive-dashboard-stats": {
+      "get": {
+        "operationId": "ReportingController_executiveDashboardStats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "کارت‌های داشبورد مدیر عامل/ارشد/رئیس — آژانس/مسافر/بلیط/درآمد ماه جاری با روند",
+        "tags": [
+          "reporting"
+        ]
+      }
+    },
     "/reporting/commercial-overview": {
       "get": {
         "operationId": "ReportingController_commercialOverview",

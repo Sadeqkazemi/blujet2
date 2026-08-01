@@ -74,6 +74,17 @@ export class ReportingController {
     return { success: true, data };
   }
 
+  @Get('executive-dashboard-stats')
+  @Roles('CEO', 'BOARD_CHAIR', 'SENIOR_MANAGER')
+  @ApiOperation({
+    summary:
+      'کارت‌های داشبورد مدیر عامل/ارشد/رئیس — آژانس/مسافر/بلیط/درآمد ماه جاری با روند',
+  })
+  async executiveDashboardStats() {
+    const data = await this.reporting.financeDashboardStats();
+    return { success: true, data };
+  }
+
   @Get('commercial-overview')
   @Roles('COMMERCIAL_MANAGER')
   @ApiOperation({

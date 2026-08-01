@@ -44,6 +44,10 @@ export function fetchFinanceDashboardStats() {
   return apiGet<FinanceDashboardStats>('/reporting/finance-dashboard-stats');
 }
 
+export function fetchExecutiveDashboardStats() {
+  return apiGet<FinanceDashboardStats>('/reporting/executive-dashboard-stats');
+}
+
 export function fetchCommercialOverview() {
   return apiGet<CommercialOverview>('/reporting/commercial-overview');
 }

@@ -14,7 +14,7 @@ const ROLE_CASES = [
     username: 'finance.karimi',
     roleLabel: 'مدیر مالی',
     expectedTabs: ['داشبورد', 'آژانس‌ها', 'گزارش مسافران', 'گزارش کارمندان', 'مالی', 'استرداد بلیط', 'کارتابل'],
-    dashboardMarkers: ['کل درآمد', 'نمودار فروش'],
+    dashboardMarkers: ['آژانس فعال', 'نمودار فروش'],
   },
   {
     username: 'ceo',
@@ -31,7 +31,7 @@ const ROLE_CASES = [
       'امنیت و رمز عبور',
       'لاگ و رویدادها',
     ],
-    dashboardMarkers: ['کل درآمد', 'نمودار فروش'],
+    dashboardMarkers: ['آژانس فعال', 'گزارش مالی', 'کارتابل'],
   },
   {
     username: 'itadmin',
