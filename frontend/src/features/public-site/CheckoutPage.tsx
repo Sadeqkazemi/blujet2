@@ -38,6 +38,11 @@ import {
   type FlightSnapshot,
   type PassengerFormDraft,
 } from './checkout/checkout-types';
+import {
+  buildMd80Seats,
+  isMd80Aircraft,
+  looksLikeMd80SeatPayload,
+} from './checkout/md80-seat-layout';
 
 const BUSINESS_SEAT_MIN_POINTS = 15_000;
 const STEP_ORDER: CheckoutWizardStep[] = ['pax', 'extras', 'review'];
@@ -167,10 +172,19 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     if (!draft) return;
-    // Full aircraft map (business + economy) — matches تکمیل خرید seat legend.
+    // Full aircraft map. For MD-80, if the API is empty or still on legacy
+    // lettering, fall back to the PDF chart inventory so the picker is never blank.
+    const useMd80 = isMd80Aircraft(draft.flight.aircraftType ?? 'MD-80');
     fetchSeatMap(draft.flightInstanceId)
-      .then((m) => setSeats(m.seats))
-      .catch(() => setSeats([]));
+      .then((m) => {
+        if (useMd80 && !looksLikeMd80SeatPayload(m.seats)) {
+          const taken = m.seats.filter((s) => s.status === 'TAKEN').map((s) => s.seatCode);
+          setSeats(buildMd80Seats(taken));
+          return;
+        }
+        setSeats(m.seats.length ? m.seats : useMd80 ? buildMd80Seats() : []);
+      })
+      .catch(() => setSeats(useMd80 ? buildMd80Seats() : []));
   }, [draft]);
 
   useEffect(() => {

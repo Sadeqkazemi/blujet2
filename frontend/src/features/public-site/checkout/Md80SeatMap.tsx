@@ -2,19 +2,60 @@ import type { StoredLocale } from '../../../hooks/useLocale';
 import { faDigits } from '../../../lib/fa-format';
 import type { CabinClass, SeatMapCell } from '../../../types/public-site';
 import {
+  buildMd80Seats,
   md80ColsForRow,
   md80LeftAmenity,
   md80Rows,
   MD80_EXCLUDED,
 } from './md80-seat-layout';
 
-function AmenityCell({
+/** Top-down seat icon matching MD-80-seatmap.pdf (chair with letter). */
+function SeatIcon({
+  letter,
+  fill,
+  stroke,
+  text,
+  large,
+}: {
+  letter: string;
+  fill: string;
+  stroke: string;
+  text: string;
+  large?: boolean;
+}) {
+  const w = large ? 34 : 28;
+  const h = large ? 36 : 30;
+  return (
+    <svg width={w} height={h} viewBox="0 0 28 30" aria-hidden>
+      {/* backrest */}
+      <rect x="4" y="2" width="20" height="8" rx="3" fill={fill} stroke={stroke} strokeWidth="1.5" />
+      {/* seat cushion */}
+      <rect x="3" y="10" width="22" height="16" rx="4" fill={fill} stroke={stroke} strokeWidth="1.5" />
+      <text
+        x="14"
+        y="21"
+        textAnchor="middle"
+        fill={text}
+        fontSize="10"
+        fontWeight="700"
+        fontFamily="Inter, Vazirmatn, sans-serif"
+      >
+        {letter}
+      </text>
+    </svg>
+  );
+}
+
+function AmenityIcon({
   kind,
   locale,
 }: {
   kind: 'exit' | 'galley' | 'empty' | 'lav' | 'closet';
   locale: StoredLocale;
 }) {
+  if (kind === 'empty') {
+    return <div className="h-9 w-[62px]" aria-hidden />;
+  }
   const label =
     kind === 'exit'
       ? locale === 'en'
@@ -28,17 +69,40 @@ function AmenityCell({
           ? locale === 'en'
             ? 'LAV'
             : 'سرویس'
-          : kind === 'closet'
-            ? locale === 'en'
-              ? 'CLOSET'
-              : 'کمد'
-            : '';
+          : locale === 'en'
+            ? 'CLOSET'
+            : 'کمد';
   return (
     <div
-      className="flex h-[30px] min-w-[64px] items-center justify-center rounded-[7px] border border-dashed border-[#c5d0de] bg-[#f0f4f8] px-1 text-[8px] font-bold text-[#6b7b94]"
+      className="flex h-9 min-w-[62px] flex-col items-center justify-center gap-0.5 rounded-md border border-[#b9c9dc] bg-[#eef4fb] px-1 text-[8px] font-bold text-[#4a6a8a]"
       aria-hidden
     >
-      {label}
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        {kind === 'exit' && <path d="M9 6H5v12h4M13 12H5M15 8l4 4-4 4" />}
+        {kind === 'galley' && (
+          <>
+            <path d="M8 3v7a4 4 0 0 0 8 0V3" />
+            <path d="M12 14v7" />
+            <path d="M8 21h8" />
+          </>
+        )}
+        {kind === 'lav' && (
+          <>
+            <circle cx="9" cy="7" r="2.2" />
+            <circle cx="15" cy="7" r="2.2" />
+            <path d="M5 20c0-2.5 1.8-4.5 4-4.5s4 2 4 4.5" />
+            <path d="M11 20c0-2.5 1.8-4.5 4-4.5s4 2 4 4.5" />
+          </>
+        )}
+        {kind === 'closet' && (
+          <>
+            <path d="M6 21V8l6-4 6 4v13" />
+            <path d="M12 4v6" />
+            <path d="M9 11h6" />
+          </>
+        )}
+      </svg>
+      <span>{label}</span>
     </div>
   );
 }
@@ -49,49 +113,55 @@ function SeatButton({
   cabin,
   status,
   selected,
-  disabled,
+  locked,
   onToggle,
 }: {
   seatCode: string;
   letter: string;
   cabin: CabinClass;
-  status: 'FREE' | 'TAKEN' | 'MISSING';
+  status: 'FREE' | 'TAKEN';
   selected: boolean;
-  disabled: boolean;
+  locked: boolean;
   onToggle: (code: string) => void;
 }) {
-  if (status === 'MISSING') {
-    return <div className="h-[30px] w-[30px]" aria-hidden />;
-  }
   const biz = cabin === 'BUSINESS';
-  let bg = biz ? '#fff6e3' : '#eaf4ff';
-  let border = biz ? '#e6c368' : '#bcd9f5';
-  let color = biz ? '#a9781a' : '#1668c4';
+  let fill = biz ? '#f4f6f8' : '#d8f3f1';
+  let stroke = biz ? '#7aa7d4' : '#3aa8a0';
+  let text = '#1a3a55';
   if (status === 'TAKEN') {
-    bg = '#e6eaf0';
-    border = '#e6eaf0';
-    color = '#c2c9d3';
+    fill = '#f3c4d4';
+    stroke = '#e091a8';
+    text = '#8a4a5c';
   } else if (selected) {
-    bg = '#1668c4';
-    border = '#1668c4';
-    color = '#fff';
-  } else if (disabled) {
-    bg = biz ? '#f3f0e6' : '#f0f3f7';
-    border = biz ? '#ddd6c0' : '#d5dbe5';
-    color = biz ? '#b3a679' : '#9aa4b2';
+    fill = '#1668c4';
+    stroke = '#0d4f96';
+    text = '#ffffff';
+  } else if (locked) {
+    fill = '#ece7d8';
+    stroke = '#cfc4a0';
+    text = '#9a8b5a';
   }
+
   return (
     <button
       type="button"
-      disabled={disabled || status === 'TAKEN'}
+      disabled={status === 'TAKEN' || locked}
       onClick={() => onToggle(seatCode)}
       data-testid={`checkout-seat-${seatCode}`}
-      className="flex h-[30px] w-[30px] items-center justify-center rounded-[7px] border-[1.5px] text-[9.5px] font-bold disabled:cursor-not-allowed"
-      style={{ background: bg, borderColor: border, color }}
+      className="inline-flex cursor-pointer items-center justify-center rounded p-0 disabled:cursor-not-allowed"
       title={seatCode}
+      aria-label={seatCode}
     >
-      {letter}
+      <SeatIcon letter={letter} fill={fill} stroke={stroke} text={text} large={biz} />
     </button>
+  );
+}
+
+function RowNum({ n, locale }: { n: number; locale: StoredLocale }) {
+  return (
+    <span className="w-5 flex-none text-center text-[10px] font-semibold text-[#6b7b94]">
+      {locale === 'en' ? n : faDigits(n)}
+    </span>
   );
 }
 
@@ -110,21 +180,33 @@ export default function Md80SeatMap({
   businessLocked: boolean;
   bookedCabin: CabinClass;
 }) {
-  const byCode = new Map(seats.map((s) => [s.seatCode, s]));
-  const excluded = MD80_EXCLUDED;
-
-  function cellStatus(code: string): 'FREE' | 'TAKEN' | 'MISSING' {
-    if (excluded.has(code)) return 'MISSING';
-    const cell = byCode.get(code);
-    if (!cell) {
-      // Partial/empty API payload: keep the MD-80 silhouette but non-selectable.
-      return 'MISSING';
+  // Always paint the full MD-80 chart. Overlay TAKEN from API when codes match;
+  // if API is empty/mismatched, every chart seat stays FREE and selectable.
+  const takenFromApi = seats.filter((s) => s.status === 'TAKEN').map((s) => s.seatCode);
+  const inventory = buildMd80Seats(takenFromApi);
+  const byCode = new Map(inventory.map((s) => [s.seatCode, s]));
+  // Also honour API FREE/TAKEN for matching codes even if inventory was rebuilt
+  for (const s of seats) {
+    if (MD80_EXCLUDED.has(s.seatCode)) continue;
+    if (byCode.has(s.seatCode)) {
+      byCode.set(s.seatCode, {
+        seatCode: s.seatCode,
+        row: s.row,
+        cabin: s.cabin,
+        status: s.status,
+      });
     }
-    return cell.status === 'TAKEN' ? 'TAKEN' : 'FREE';
   }
 
-  function isDisabled(code: string, cabin: CabinClass, status: 'FREE' | 'TAKEN' | 'MISSING') {
-    if (status !== 'FREE') return true;
+  const sold = [...byCode.values()].filter((s) => s.status === 'TAKEN').length;
+  const cap = byCode.size;
+
+  function seatState(code: string): 'FREE' | 'TAKEN' {
+    return byCode.get(code)?.status === 'TAKEN' ? 'TAKEN' : 'FREE';
+  }
+
+  function isLocked(cabin: CabinClass, status: 'FREE' | 'TAKEN') {
+    if (status === 'TAKEN') return true;
     if (cabin !== bookedCabin) return true;
     if (cabin === 'BUSINESS' && businessLocked) return true;
     return false;
@@ -132,73 +214,98 @@ export default function Md80SeatMap({
 
   return (
     <div
-      className="flex max-h-[360px] flex-col gap-1 overflow-auto rounded-[13px] border border-[#eef1f5] bg-[#f8fafc] p-3"
+      className="max-h-[380px] overflow-auto rounded-[13px] border border-[#d5e2f0] bg-white p-3"
       data-testid="checkout-seat-map"
       data-aircraft="MD-80"
+      data-capacity={cap}
+      data-sold={sold}
     >
-      {/* Nose amenities */}
-      <div className="mb-1 flex items-center justify-center gap-2 px-6">
-        <AmenityCell kind="closet" locale={locale} />
-        <AmenityCell kind="lav" locale={locale} />
-        <div className="w-6" />
-        <AmenityCell kind="galley" locale={locale} />
-      </div>
-      <div className="mb-2 text-center text-[9px] font-bold tracking-wide text-[#9aa4b2]">
-        {locale === 'en' ? 'FRONT · MD-80' : 'جلو هواپیما · MD-80'}
-      </div>
+      {/* Force LTR so A/B stay port-side like the PDF, even on RTL pages */}
+      <div dir="ltr" className="mx-auto w-fit min-w-[280px]">
+        {/* Nose amenities */}
+        <div className="mb-1 flex items-end justify-between gap-3 px-1">
+          <div className="flex gap-1">
+            <AmenityIcon kind="closet" locale={locale} />
+            <AmenityIcon kind="lav" locale={locale} />
+          </div>
+          <div className="pb-1 text-[10px] font-bold text-[#1668c4]">▲</div>
+          <AmenityIcon kind="galley" locale={locale} />
+        </div>
+        <div className="mb-2 text-center text-[9px] font-bold tracking-wide text-[#8a96a6]">
+          {locale === 'en' ? 'FRONT · MD-80' : 'جلو هواپیما · MD-80'}
+        </div>
 
-      {/* Column headers */}
-      <div className="mb-1 flex items-center justify-center gap-[5px] text-[9px] font-bold text-[#8a96a6]">
-        <span className="w-5" />
-        {(['A', 'B'] as const).map((c) => (
-          <span key={`h-l-${c}`} className="w-[30px] text-center">
-            {c}
-          </span>
-        ))}
-        <span className="w-[14px]" />
-        {(['D', 'E', 'F'] as const).map((c) => (
-          <span key={`h-r-${c}`} className="w-[30px] text-center">
-            {c}
-          </span>
-        ))}
-        <span className="w-5" />
-      </div>
+        {/* Column headers A B | D E F */}
+        <div className="mb-1.5 flex items-center justify-center gap-1 text-[9px] font-bold text-[#5a6678]">
+          <span className="w-5" />
+          {(['A', 'B'] as const).map((c) => (
+            <span key={`hl-${c}`} className="w-[34px] text-center">
+              {c}
+            </span>
+          ))}
+          <span className="w-4" />
+          {(['D', 'E', 'F'] as const).map((c) => (
+            <span key={`hr-${c}`} className="w-[34px] text-center">
+              {c}
+            </span>
+          ))}
+          <span className="w-5" />
+        </div>
 
-      {md80Rows().map((row) => {
-        const { left, right, cabin } = md80ColsForRow(row);
-        const amenity = md80LeftAmenity(row);
-        const showFirstLabel = row === 3;
-        const showEcoLabel = row === 7;
+        {md80Rows().map((row) => {
+          const { left, right, cabin } = md80ColsForRow(row);
+          const amenity = md80LeftAmenity(row);
+          const biz = cabin === 'BUSINESS';
 
-        return (
-          <div key={row}>
-            {showFirstLabel && (
-              <div className="mb-1 mt-0.5 text-[9px] font-extrabold text-[#a9781a]">
-                {locale === 'en' ? 'FIRST CLASS' : 'فرست کلاس'}
-              </div>
-            )}
-            {showEcoLabel && (
-              <div className="mb-1 mt-1.5 text-[9px] font-extrabold text-[#1668c4]">
-                {locale === 'en' ? 'ECONOMY CLASS' : 'اکونومی'}
-              </div>
-            )}
-            {(row === 20 || row === 19) && (
-              <div className="my-1 h-px bg-[#cfe0f2]" />
-            )}
-            <div className="flex items-center justify-center gap-[5px]">
-              <span className="w-5 flex-none text-center text-[9.5px] text-[#9aa4b2]">
-                {locale === 'en' ? row : faDigits(row)}
-              </span>
-
-              {amenity ? (
-                <div className="flex w-[65px] justify-center">
-                  <AmenityCell kind={amenity} locale={locale} />
+          return (
+            <div key={row} className="relative">
+              {row === 3 && (
+                <div className="mb-0.5 text-[9px] font-extrabold text-[#a9781a]">
+                  {locale === 'en' ? 'FIRST CLASS' : 'فرست کلاس'}
                 </div>
-              ) : (
-                left.map((letter) => {
-                  // Business right uses E/F; header shows D E F — pad D for biz rows
+              )}
+              {row === 7 && (
+                <div className="mb-0.5 mt-1 text-[9px] font-extrabold text-[#1668c4]">
+                  {locale === 'en' ? 'ECONOMY CLASS' : 'اکونومی'}
+                </div>
+              )}
+              {(row === 19 || row === 20) && <div className="my-1 border-t border-[#cfe0f2]" />}
+
+              <div className="flex items-center justify-center gap-1 py-[2px]">
+                <RowNum n={row} locale={locale} />
+
+                {amenity ? (
+                  <div className="flex w-[70px] justify-center">
+                    <AmenityIcon kind={amenity} locale={locale} />
+                  </div>
+                ) : (
+                  left.map((letter) => {
+                    const code = `${row}${letter}`;
+                    const status = seatState(code);
+                    return (
+                      <SeatButton
+                        key={code}
+                        seatCode={code}
+                        letter={letter}
+                        cabin={cabin}
+                        status={status}
+                        selected={selectedSeats.includes(code)}
+                        locked={isLocked(cabin, status)}
+                        onToggle={onToggleSeat}
+                      />
+                    );
+                  })
+                )}
+
+                {/* aisle */}
+                <span className="w-4 flex-none" aria-hidden />
+
+                {/* First class has no D — spacer under header D */}
+                {biz && <span className="inline-block w-[34px]" aria-hidden />}
+
+                {right.map((letter) => {
                   const code = `${row}${letter}`;
-                  const status = cellStatus(code);
+                  const status = seatState(code);
                   return (
                     <SeatButton
                       key={code}
@@ -207,53 +314,32 @@ export default function Md80SeatMap({
                       cabin={cabin}
                       status={status}
                       selected={selectedSeats.includes(code)}
-                      disabled={isDisabled(code, cabin, status)}
+                      locked={isLocked(cabin, status)}
                       onToggle={onToggleSeat}
                     />
                   );
-                })
-              )}
+                })}
 
-              <span className="w-[14px] flex-none" aria-hidden />
-
-              {/* Business rows only have E,F — pad a blank under header D */}
-              {cabin === 'BUSINESS' && <div className="h-[30px] w-[30px]" aria-hidden />}
-
-              {right.map((letter) => {
-                const code = `${row}${letter}`;
-                const status = cellStatus(code);
-                return (
-                  <SeatButton
-                    key={code}
-                    seatCode={code}
-                    letter={letter}
-                    cabin={cabin}
-                    status={status}
-                    selected={selectedSeats.includes(code)}
-                    disabled={isDisabled(code, cabin, status)}
-                    onToggle={onToggleSeat}
-                  />
-                );
-              })}
-
-              <span className="w-5 flex-none text-center text-[9.5px] text-[#9aa4b2]">
-                {locale === 'en' ? row : faDigits(row)}
-              </span>
+                <RowNum n={row} locale={locale} />
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
 
-      {/* Tail amenities */}
-      <div className="mt-2 flex items-center justify-center gap-2 px-6">
-        <AmenityCell kind="closet" locale={locale} />
-        <AmenityCell kind="lav" locale={locale} />
-        <div className="w-6" />
-        <AmenityCell kind="closet" locale={locale} />
-        <AmenityCell kind="lav" locale={locale} />
-      </div>
-      <div className="mt-1 text-center text-[9px] font-bold tracking-wide text-[#9aa4b2]">
-        {locale === 'en' ? 'REAR · MD-80' : 'عقب هواپیما · MD-80'}
+        {/* Tail amenities */}
+        <div className="mt-2 flex items-start justify-between gap-3 px-1">
+          <div className="flex gap-1">
+            <AmenityIcon kind="closet" locale={locale} />
+            <AmenityIcon kind="lav" locale={locale} />
+          </div>
+          <div className="flex gap-1">
+            <AmenityIcon kind="closet" locale={locale} />
+            <AmenityIcon kind="lav" locale={locale} />
+          </div>
+        </div>
+        <div className="mt-1 text-center text-[9px] font-bold tracking-wide text-[#8a96a6]">
+          {locale === 'en' ? 'REAR · MD-80' : 'عقب هواپیما · MD-80'}
+        </div>
       </div>
     </div>
   );
