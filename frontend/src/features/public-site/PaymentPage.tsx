@@ -296,11 +296,7 @@ function PaymentPricingAside({
             data-testid={priceChange ? 'confirm-new-price' : 'pay-submit'}
             className="flex h-14 items-center justify-center rounded-[14px] bg-[#1668c4] text-[15px] font-extrabold text-white shadow-[0_12px_24px_-12px_rgba(22,104,196,.55)] disabled:opacity-60"
           >
-            {paying
-              ? t.paying
-              : priceChange
-                ? t.confirmNewPrice
-                : t.payWithAmount(priceDisplay)}
+            {paying ? t.paying : priceChange ? t.confirmNewPrice : t.payFinal}
           </button>
         </>
       )}
@@ -528,7 +524,7 @@ export default function PaymentPage() {
       afterDisplay={afterDisplay}
       holdSecs={holdSecs}
       holdUrgent={holdUrgent}
-      hideActions={isMobile}
+      hideActions={false}
       priceChange={priceChange}
       paying={paying}
       holdExpired={holdExpired}
@@ -563,15 +559,13 @@ export default function PaymentPage() {
             data-testid="payment-mobile-back"
             className="flex h-9 w-9 flex-none items-center justify-center rounded-full border border-[#e6eaf0] bg-[#f3f5f8] text-[#0d2640]"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M15 18l-6-6 6-6" />
-            </svg>
+            →
           </button>
           <span className="text-sm font-extrabold text-[#16202e]">{t.title}</span>
         </div>
 
         <div
-          className="mx-auto flex w-full max-w-[1180px] flex-col gap-[15px] px-3.5 py-3.5 pb-[90px]"
+          className="mx-auto flex w-full max-w-[1180px] flex-col gap-[15px] px-3.5 py-3.5"
           data-testid="payment-mobile-main"
         >
           {error && (
@@ -582,40 +576,6 @@ export default function PaymentPage() {
           <FlightSummaryCard flight={flight} cabin={booking.cabin} locale={locale} />
           {paymentMethods}
           {pricingAside}
-        </div>
-
-        <div
-          className="fixed bottom-0 left-0 right-0 z-[80] flex items-center justify-between gap-2.5 border-t border-[#e6eaf0] bg-white px-4 py-2.5 shadow-[0_-8px_24px_-14px_rgba(13,38,102,.3)]"
-          data-testid="payment-mobile-sticky"
-        >
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="flex h-12 w-12 flex-none items-center justify-center rounded-xl border border-[#e6eaf0] bg-[#f2f5f9]"
-            aria-label="back"
-          >
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M15 18l-6-6 6-6" />
-            </svg>
-          </button>
-          <div className="min-w-0">
-            <div className="text-[10.5px] text-[#9aa4b2]">{t.total}</div>
-            <div className="whitespace-nowrap text-[15px] font-black text-[#1668c4]">
-              {priceDisplay} {t.toman}
-            </div>
-          </div>
-          <button
-            disabled={paying || holdExpired}
-            onClick={() => onPay(priceChange?.currentPriceIrr)}
-            data-testid={priceChange ? 'confirm-new-price-mobile' : 'pay-submit-mobile'}
-            className="flex h-12 max-w-[220px] flex-1 items-center justify-center rounded-xl bg-[#1668c4] text-[12.5px] font-extrabold text-white disabled:opacity-60"
-          >
-            {paying
-              ? t.paying
-              : priceChange
-                ? t.confirmNewPrice
-                : t.payWithAmount(priceDisplay)}
-          </button>
         </div>
       </PublicPageShell>
     );
