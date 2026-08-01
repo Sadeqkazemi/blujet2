@@ -40,7 +40,7 @@ import FinancePage from './features/finance/FinancePage';
 import PassengerReportsPage from './features/passenger-reports/PassengerReportsPage';
 import StaffReportsPage from './features/staff-reports/StaffReportsPage';
 import ManagerReportsPage from './features/manager-reports/ManagerReportsPage';
-import AdminsPage from './features/admins/AdminsPage';
+import AdminsRouter from './components/AdminsRouter';
 import SettingsPage from './features/settings/SettingsPage';
 import CommercialWebservicePage from './features/webservice/CommercialWebservicePage';
 import SecurityRouter from './components/SecurityRouter';
@@ -215,7 +215,7 @@ export default function App() {
                 <Route index element={<PanelsAccessPage />} />
               </Route>
               <Route path="admins" element={<TabGate tabKey="admins" />}>
-                <Route index element={<AdminsPage />} />
+                <Route index element={<AdminsRouter />} />
               </Route>
               <Route path="settings" element={<TabGate tabKey="settings" />}>
                 <Route index element={<SettingsPage />} />

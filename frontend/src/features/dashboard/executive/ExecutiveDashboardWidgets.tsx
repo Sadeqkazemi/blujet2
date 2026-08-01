@@ -4,7 +4,7 @@ import type { LowSalesAlert, RevenueMixResult } from '../../../types/reporting';
 import { faDigits, faMoney, faPercent } from '../../../lib/fa-format';
 import { formatJalaliDateTime } from '../../../lib/jalali';
 import PanelCard from '../../panel/PanelCard';
-import { panelElevatedPadded, panelLink, panelMuted, panelMuted2 } from '../../panel/panel-theme';
+import { panelElevatedPadded, panelLink, panelMuted, panelMuted2, panelValueMd } from '../../panel/panel-theme';
 
 const MIX_COLORS = { SYSTEM: '#3b82f6', CHARTER: '#a855f7', AGENCY: '#34d399' };
 
@@ -29,10 +29,11 @@ export function LowSalesAlertBanner({ alerts }: { alerts: LowSalesAlert[] }) {
           هشدار فروش ضعیف — کمتر از ۷۲ ساعت تا پرواز
         </div>
         <div className="text-[11.5px] text-[#cdd7e5]">
-          پرواز <span className="ltr font-mono">{a.flightNo}</span> {a.originCode} ← {a.destCode} (
-          {formatJalaliDateTime(a.departureAt).split(' ')[0]}) تنها {faDigits(a.soldSeats)} از{' '}
-          {faDigits(a.capacity)} صندلی فروخته شده است. این هشدار برای مدیر عامل، مدیر ارشد، مدیر مالی و
-          مدیر بازرگانی ارسال شد.
+          پرواز <span className="font-num ltr">{a.flightNo}</span> {a.originCode} ← {a.destCode} (
+          {formatJalaliDateTime(a.departureAt).split(' ')[0]}) تنها{' '}
+          <span className="font-num">{faDigits(a.soldSeats)}</span> از{' '}
+          <span className="font-num">{faDigits(a.capacity)}</span> صندلی فروخته شده است. این هشدار برای
+          مدیر عامل، رئیس هیئت مدیره، مدیر ارشد، مدیر مالی و مدیر بازرگانی ارسال شد.
         </div>
       </div>
     </div>
@@ -66,21 +67,21 @@ export function RevenueMixSummary({ mix }: { mix: RevenueMixResult }) {
       <div className={`mb-[13px] flex flex-wrap gap-[11px] text-[10px] ${panelMuted2}`}>
         <span className="flex items-center gap-1.5">
           <span className="h-[9px] w-[9px] rounded-sm" style={{ background: MIX_COLORS.SYSTEM }} />
-          سیستمی {faPercent(sysPct)}
+          سیستمی <span className="font-num">{faPercent(sysPct)}</span>
         </span>
         <span className="flex items-center gap-1.5">
           <span className="h-[9px] w-[9px] rounded-sm" style={{ background: MIX_COLORS.CHARTER }} />
-          چارتر {faPercent(chPct)}
+          چارتر <span className="font-num">{faPercent(chPct)}</span>
         </span>
         <span className="flex items-center gap-1.5">
           <span className="h-[9px] w-[9px] rounded-sm" style={{ background: MIX_COLORS.AGENCY }} />
-          آژانس {faPercent(agPct)}
+          آژانس <span className="font-num">{faPercent(agPct)}</span>
         </span>
       </div>
       <div className="grid grid-cols-2 gap-2.5">
         <div className={panelElevatedPadded}>
           <div className={`mb-[5px] text-[10.5px] ${panelMuted}`}>جمع فروش سال</div>
-          <div className="text-base font-black text-white">{faMoney(total)}</div>
+          <div className={panelValueMd}>{faMoney(total)}</div>
         </div>
         {mix.channels.map((c) => (
           <div key={c.channel} className={panelElevatedPadded}>
@@ -92,7 +93,7 @@ export function RevenueMixSummary({ mix }: { mix: RevenueMixResult }) {
               فروش {c.labelFa.replace('فروش ', '')}
             </div>
             <div
-              className="text-[13.5px] font-extrabold"
+              className="font-num text-[13.5px] font-extrabold"
               style={{ color: MIX_COLORS[c.channel as keyof typeof MIX_COLORS] }}
             >
               {faMoney(c.amountIrr)}
@@ -128,7 +129,7 @@ export function ExecutiveCartablePanel({ cartable }: { cartable: CartableListRes
         </span>
         <h3 className="m-0 flex-1 text-[13.5px] font-extrabold text-white">کارتابل</h3>
         {cartable.totalOpen > 0 && (
-          <span className="flex h-[22px] min-w-[22px] items-center justify-center rounded-[11px] bg-[#f87171] px-1.5 text-[10px] font-extrabold text-white">
+          <span className="font-num flex h-[22px] min-w-[22px] items-center justify-center rounded-[11px] bg-[#f87171] px-1.5 text-[10px] font-extrabold text-white">
             {faDigits(cartable.totalOpen)}
           </span>
         )}

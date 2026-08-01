@@ -11,8 +11,9 @@ export const panelMuted = 'text-panel-muted';
 export const panelMuted2 = 'text-panel-muted-2';
 export const panelText = 'text-panel-text';
 export const panelLink = 'text-panel-link font-bold';
-export const panelValue = 'text-[22.5px] font-black text-white';
-export const panelValueSm = 'text-lg font-black text-white';
+export const panelValue = 'font-num text-[22.5px] font-black text-white';
+export const panelValueSm = 'font-num text-lg font-black text-white';
+export const panelValueMd = 'font-num text-base font-black text-white';
 
 export const panelBtnPrimary =
   'rounded-lg bg-panel-accent px-4 py-2 text-xs font-bold text-white transition hover:bg-panel-accent/90';

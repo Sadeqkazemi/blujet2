@@ -38,7 +38,7 @@ export default function PanelStatCard({
           )}
           {trend && (
             <span
-              className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+              className={`font-num rounded-full px-2 py-0.5 text-[10px] font-bold ${
                 trend.up !== false
                   ? 'bg-[rgba(52,211,153,.16)] text-[#34d399]'
                   : 'bg-[rgba(248,113,113,.16)] text-[#f87171]'

@@ -92,6 +92,7 @@ describe('ExecutiveDashboardPage', () => {
     );
 
     expect(await screen.findByText(/هشدار فروش ضعیف/)).toBeInTheDocument();
+    expect(screen.getByText(/رئیس هیئت مدیره/)).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText(/IR-655/)).toBeInTheDocument());
   });
 });

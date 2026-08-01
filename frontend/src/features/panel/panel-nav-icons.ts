@@ -65,11 +65,11 @@ export const PANEL_NAV_ICON_PATHS: Record<string, string> = {
 };
 
 export const PANEL_PAGE_SUBTITLES: Record<string, string> = {
-  dashboard: 'نمای کلی فروش و عملکرد پروازها',
+  dashboard: 'نمای کلی فروش و کارهای در انتظار اقدام',
   agencies: 'مدیریت آژانس‌های همکار و درخواست‌های عضویت',
   flights: 'برنامه‌ریزی، ظرفیت و قیمت‌گذاری پروازها',
   flightops: 'وضعیت پروازها و ارسال مانیفست',
-  admins: 'مدیریت حساب‌های مدیران و ادمین‌ها',
+  admins: 'افزودن و تعیین سطح دسترسی مدیران',
   reports: 'جستجو و گزارش مسافران',
   staff: 'فعالیت و گزارش‌های کارمندان',
   finance: 'گزارش‌های مالی، درآمد و تسویه',
