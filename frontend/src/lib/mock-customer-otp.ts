@@ -6,7 +6,7 @@ export const MOCK_CUSTOMER_OTP_CODE = '123456';
 
 const challenges = new Map<string, { phone: string; code: string }>();
 
-/** Dev-only mock OTP. Enabled by default in Vite dev unless VITE_MOCK_OTP=false. */
+/** Dev OTP hint flag — shows the fixed test code in UI; auth always uses real /auth/otp/*. */
 export function isMockOtpEnabled(): boolean {
   if (import.meta.env.VITE_MOCK_OTP === 'true') return true;
   if (import.meta.env.VITE_MOCK_OTP === 'false') return false;

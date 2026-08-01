@@ -324,6 +324,15 @@ export default function CheckoutPage() {
       clearCheckoutDraft();
       navigate(`/payment/${booking.id}`);
     } catch (err) {
+      if (err instanceof ApiRequestError && err.code === 'UNAUTHORIZED') {
+        setError(
+          locale === 'en'
+            ? 'Your session expired. Please sign in again.'
+            : 'نشست شما منقضی شده است. لطفاً دوباره وارد شوید.',
+        );
+        navigate('/signin', { state: { from: location.pathname + location.search } });
+        return;
+      }
       setError(err instanceof ApiRequestError ? err.message : t.notFound);
     } finally {
       setBusy(false);
