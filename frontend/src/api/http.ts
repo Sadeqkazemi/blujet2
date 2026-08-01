@@ -2,7 +2,7 @@ import type { ApiEnvelope } from './envelope';
 import { ApiRequestError } from './envelope';
 import { getAccessToken, setAccessToken } from './token-store';
 
-const BASE_URL = import.meta.env.VITE_API_URL;
+const BASE_URL = import.meta.env.VITE_API_URL ?? '';
 const REQUEST_TIMEOUT_MS = 15_000;
 
 let refreshInFlight: Promise<boolean> | null = null;
