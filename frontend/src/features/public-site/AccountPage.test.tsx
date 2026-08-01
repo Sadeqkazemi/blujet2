@@ -9,6 +9,7 @@ import * as useLocaleModule from '../../hooks/useLocale';
 import * as publicSiteApi from '../../api/publicSite';
 import * as supportTicketsApi from '../../api/support-tickets';
 import * as authApi from '../../api/auth';
+import * as useIsMobileModule from '../../hooks/useIsMobile';
 import type { BookingDetail, PriceLock, RefundRequestView, SavedFlight, SavedPassenger, SavedBankAccount, CustomerReferralDashboard, CustomerIdentityView, ActiveSession, UserProfile } from '../../types/public-site';
 import type { ClubMembershipView } from '../../types/club-membership';
 import type { MySupportTicketRow } from '../../types/support-tickets';
@@ -246,6 +247,7 @@ function renderPage() {
 }
 
 beforeEach(() => {
+  vi.spyOn(useIsMobileModule, 'useIsMobile').mockReturnValue(false);
   vi.spyOn(publicSiteApi, 'fetchMyBookings').mockResolvedValue([BOOKING]);
   vi.spyOn(publicSiteApi, 'fetchWallet').mockResolvedValue({ balanceIrr: '2500000' });
   vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({ isMember: true, level: 'GOLD', balance: 12450 });
@@ -469,6 +471,7 @@ describe('AccountPage', () => {
     expect(await screen.findByTestId('profile-incomplete-banner')).toHaveTextContent('۲۰٪');
 
     await userEvent.click(screen.getByTestId('account-tab-profile'));
+    await userEvent.click(await screen.findByTestId('profile-edit-toggle'));
     const nationalIdInput = await screen.findByLabelText('کد ملی');
     await userEvent.type(nationalIdInput, '0012345679');
     await userEvent.click(screen.getByRole('button', { name: 'ذخیره اطلاعات' }));
@@ -584,7 +587,7 @@ describe('AccountPage', () => {
     mockAuth('authenticated');
     renderPage();
     expect(screen.getByTestId('account-tab-club')).toHaveTextContent('Loyalty Club');
-    expect(screen.getByTestId('account-tab-refunds')).toHaveTextContent('Refunds');
+    expect(screen.getByTestId('account-tab-refunds')).toHaveTextContent('Refund Ticket');
     await userEvent.click(screen.getByTestId('account-tab-club'));
     expect(await screen.findByText('Gold Member')).toBeInTheDocument();
   });
@@ -597,5 +600,16 @@ describe('AccountPage', () => {
     expect(screen.getByTestId('account-tab-wallet')).toHaveTextContent('المحفظة');
     await userEvent.click(screen.getByTestId('account-tab-club'));
     expect(await screen.findByText('عضو ذهبية')).toBeInTheDocument();
+  });
+
+  it('renders profile stats in a 2-column grid on mobile', async () => {
+    vi.spyOn(useIsMobileModule, 'useIsMobile').mockReturnValue(true);
+    mockAuth('authenticated');
+    renderPage();
+    await userEvent.click(screen.getByTestId('account-tab-profile'));
+    const grid = await screen.findByTestId('profile-stats-grid');
+    expect(grid).toHaveStyle({ gridTemplateColumns: 'repeat(2, 1fr)' });
+    expect(screen.getByTestId('account-sidebar')).toBeInTheDocument();
+    expect(screen.getByTestId('profile-incomplete-notice')).toBeInTheDocument();
   });
 });

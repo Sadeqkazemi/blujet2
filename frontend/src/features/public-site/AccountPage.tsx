@@ -49,8 +49,11 @@ import AccountPassengersTab, { type SavedPassengerForm } from './AccountPassenge
 import AccountBankAccountsTab, { type BankAccountForm } from './AccountBankAccountsTab';
 import AccountReferralTab from './AccountReferralTab';
 import AccountIdentityTab from './AccountIdentityTab';
-import AccountProfileSavedPax from './AccountProfileSavedPax';
 import AccountRefundsTab from './AccountRefundsTab';
+import AccountSidebar from './account/AccountSidebar';
+import AccountProfileTab from './account/AccountProfileTab';
+import type { TabKey } from './account/account-types';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 // پنل کاربر — real data from the existing bookings/wallet/club-points/refunds
 // endpoints (none of this is mock). Matches design-reference/پنل کاربر.dc.html's
@@ -78,46 +81,6 @@ const STATUS_LABEL: Record<string, StatusEntry> = {
   EXPIRED: { label: { fa: 'منقضی شده', en: 'Expired', ar: 'منتهي الصلاحية' }, bg: '#fbf0ef', color: '#d64545' },
   REFUNDED: { label: { fa: 'مسترد شده', en: 'Refunded', ar: 'تم الاسترداد' }, bg: '#f1f4f8', color: '#8a96a6' },
 };
-
-const TIER_LABEL: Record<string, Tr> = {
-  SILVER: { fa: 'نقره‌ای', en: 'Silver', ar: 'فضية' },
-  GOLD: { fa: 'طلایی', en: 'Gold', ar: 'ذهبية' },
-  PLATINUM: { fa: 'پلاتین', en: 'Platinum', ar: 'بلاتينية' },
-};
-
-type TabKey = 'trips' | 'wallet' | 'club' | 'saved' | 'price-locks' | 'passengers' | 'refunds' | 'tickets' | 'security' | 'banks' | 'referral' | 'identity' | 'profile';
-
-const TAB_LABEL: Record<TabKey, Tr> = {
-  profile: { fa: 'پروفایل من', en: 'My Profile', ar: 'ملفي الشخصي' },
-  trips: { fa: 'سفرها', en: 'Trips', ar: 'رحلاتي' },
-  wallet: { fa: 'کیف پول', en: 'Wallet', ar: 'المحفظة' },
-  club: { fa: 'باشگاه مشتریان', en: 'Loyalty Club', ar: 'نادي الولاء' },
-  saved: { fa: 'نشان‌شده‌ها', en: 'Saved', ar: 'المحفوظة' },
-  'price-locks': { fa: 'قفل قیمت', en: 'Price Lock', ar: 'قفل السعر' },
-  passengers: { fa: 'مسافران', en: 'Passengers', ar: 'المسافرون' },
-  refunds: { fa: 'استرداد‌ها', en: 'Refunds', ar: 'الاستردادات' },
-  tickets: { fa: 'پیام به پشتیبانی', en: 'Message Support', ar: 'رسالة للدعم' },
-  security: { fa: 'امنیت حساب', en: 'Account Security', ar: 'أمان الحساب' },
-  banks: { fa: 'حساب‌های بانکی', en: 'Bank Accounts', ar: 'الحسابات البنكية' },
-  referral: { fa: 'معرفی دوستان', en: 'Invite Friends', ar: 'دعوة الأصدقاء' },
-  identity: { fa: 'احراز هویت', en: 'Identity Verification', ar: 'التحقق من الهوية' },
-};
-
-const TABS: { key: TabKey; icon: string }[] = [
-  { key: 'profile', icon: '🪪' },
-  { key: 'trips', icon: '🧳' },
-  { key: 'wallet', icon: '💳' },
-  { key: 'club', icon: '★' },
-  { key: 'saved', icon: '🔖' },
-  { key: 'price-locks', icon: '🔒' },
-  { key: 'passengers', icon: '👤' },
-  { key: 'refunds', icon: '↺' },
-  { key: 'tickets', icon: '💬' },
-  { key: 'security', icon: '🛡️' },
-  { key: 'banks', icon: '🏦' },
-  { key: 'referral', icon: '🎁' },
-  { key: 'identity', icon: '🛡️' },
-];
 
 const TICKET_STATUS_LABEL: Record<SupportTicketStatus, Tr> = {
   OPEN: { fa: 'باز', en: 'Open', ar: 'مفتوح' },
@@ -496,6 +459,7 @@ export default function AccountPage() {
   const { status, user, signOut } = useAuth();
   const { locale } = useLocale();
   const t = STR[locale];
+  const isMobile = useIsMobile();
   const navigate = useNavigate();
   const [tab, setTab] = useState<TabKey>('trips');
   const [bookings, setBookings] = useState<BookingDetail[] | null>(null);
@@ -922,53 +886,27 @@ export default function AccountPage() {
 
   return (
     <PublicPageShell>
-      <section style={{ background: 'linear-gradient(150deg,#0d2640,#124a86)', color: '#fff', padding: '36px 22px 30px' }}>
-        <div style={{ maxWidth: 1080, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(255,255,255,.16)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 18 }}>
-            {(user?.fullName ?? t.defaultUserName).trim().split(/\s+/).slice(0, 2).map((p) => p[0]).join('')}
-          </div>
-          <div>
-            <h1 style={{ fontSize: 20, fontWeight: 900, margin: '0 0 4px' }}>{user?.fullName ?? t.defaultUserName}</h1>
-            {club?.isMember && club.level && (
-              <div style={{ fontSize: 12.5, color: '#e7c66b', fontWeight: 700 }}>
-                {t.memberPrefix}
-                {TIER_LABEL[club.level]?.[locale] ?? club.level}
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
+      <div
+        style={{
+          maxWidth: 1320,
+          margin: '0 auto',
+          padding: '20px 22px 44px',
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : '262px 1fr',
+          gap: 20,
+          alignItems: 'start',
+        }}
+      >
+        <AccountSidebar
+          tab={tab}
+          onTabChange={setTab}
+          user={user}
+          club={club}
+          onSignOut={() => void signOut().then(() => navigate('/', { replace: true }))}
+          isMobile={isMobile}
+        />
 
-      <div style={{ maxWidth: 1080, margin: '0 auto', padding: '0 22px 60px' }}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: -20, marginBottom: 24 }}>
-          {TABS.map((tb) => (
-            <button
-              key={tb.key}
-              type="button"
-              data-testid={`account-tab-${tb.key}`}
-              onClick={() => setTab(tb.key)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 7,
-                border: '1px solid #e6eaf0',
-                background: tab === tb.key ? '#1668c4' : '#fff',
-                color: tab === tb.key ? '#fff' : '#3b4554',
-                borderRadius: 12,
-                padding: '10px 16px',
-                fontSize: 12.5,
-                fontWeight: 700,
-                cursor: 'pointer',
-                boxShadow: tab === tb.key ? '0 10px 24px -12px rgba(22,104,196,.5)' : '0 6px 16px -12px rgba(13,38,102,.3)',
-                fontFamily: 'inherit',
-              }}
-            >
-              <span>{tb.icon}</span>
-              {TAB_LABEL[tb.key][locale]}
-            </button>
-          ))}
-        </div>
-
+        <main style={{ minWidth: 0 }}>
         {error && <p style={{ marginBottom: 16, borderRadius: 10, background: '#fef2f2', padding: 10, fontSize: 12, color: '#e5484d' }}>{error}</p>}
 
         {profile && profile.completionPct < 100 && !bannerDismissed && tab !== 'profile' && (
@@ -1010,183 +948,40 @@ export default function AccountPage() {
         )}
 
         {tab === 'profile' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ background: 'linear-gradient(135deg,#0d2640,#16406e)', color: '#fff', borderRadius: 18, padding: '18px 20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, marginBottom: 8 }}>
-                <span style={{ color: '#aac4e2' }}>{t.completionLabel}</span>
-                <span style={{ fontWeight: 800, color: '#f2d98a' }}>
-                  {profile ? faDigits(profile.completionPct) : '—'}٪
-                </span>
-              </div>
-              <div style={{ height: 7, borderRadius: 6, background: '#ffffff1c', overflow: 'hidden' }}>
-                <div
-                  style={{
-                    height: '100%',
-                    width: `${profile?.completionPct ?? 0}%`,
-                    borderRadius: 6,
-                    background: 'linear-gradient(90deg,#f2d98a,#caa53a)',
-                  }}
-                />
-              </div>
-            </div>
-
-            {profileNotice && <p style={{ fontSize: 12, color: '#1f8a5b' }}>{profileNotice}</p>}
-            {profileError && <p role="alert" style={{ fontSize: 12, color: '#e5484d' }}>{profileError}</p>}
-
-            <form onSubmit={onSaveProfile} style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 16, padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <h3 style={{ fontSize: 14, fontWeight: 800, margin: 0 }}>{t.accountInfoHeading}</h3>
-              <div>
-                <label htmlFor="profile-fullName" style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#5a6678', marginBottom: 6 }}>
-                  {t.fullNameLabel}
-                </label>
-                <input
-                  id="profile-fullName"
-                  value={profileForm.fullName}
-                  onChange={(e) => setProfileForm((f) => ({ ...f, fullName: e.target.value }))}
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '10px 13px', border: '1.5px solid #e3e9f1', borderRadius: 10, fontFamily: 'inherit', fontSize: 13 }}
-                />
-              </div>
-              <div>
-                <label htmlFor="profile-nationalId" style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#5a6678', marginBottom: 6 }}>
-                  {t.nationalIdLabel}
-                </label>
-                <input
-                  id="profile-nationalId"
-                  dir="ltr"
-                  value={profileForm.nationalId}
-                  onChange={(e) => setProfileForm((f) => ({ ...f, nationalId: e.target.value }))}
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '10px 13px', border: '1.5px solid #e3e9f1', borderRadius: 10, fontFamily: 'inherit', fontSize: 13 }}
-                />
-              </div>
-              <div>
-                <label htmlFor="profile-passportNo" style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#5a6678', marginBottom: 6 }}>
-                  {t.passportLabel}
-                </label>
-                <input
-                  id="profile-passportNo"
-                  dir="ltr"
-                  value={profileForm.passportNo}
-                  onChange={(e) => setProfileForm((f) => ({ ...f, passportNo: e.target.value }))}
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '10px 13px', border: '1.5px solid #e3e9f1', borderRadius: 10, fontFamily: 'inherit', fontSize: 13 }}
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={profileSaving}
-                style={{ border: 'none', borderRadius: 10, background: '#1668c4', color: '#fff', padding: '11px 22px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', alignSelf: 'flex-start' }}
-              >
-                {profileSaving ? t.savingButton : t.saveButton}
-              </button>
-            </form>
-
-            {savedPassengers && (
-              <AccountProfileSavedPax
-                passengers={savedPassengers}
-                onAdd={() => {
-                  setPassengersAddPending(true);
-                  setTab('passengers');
-                }}
-              />
-            )}
-
-            <div style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 16, padding: '18px 20px' }}>
-              <h3 style={{ fontSize: 14, fontWeight: 800, margin: '0 0 12px' }}>{t.emailHeading}</h3>
-              <p style={{ fontSize: 12, color: '#5a6678', marginBottom: 12 }}>
-                {profile?.email ?? t.emailNotSet}{' '}
-                {profile?.emailVerifiedAt && <span style={{ color: '#1f8a5b', fontWeight: 700 }}>{t.emailVerifiedTag}</span>}
-              </p>
-              {profile?.email && !profile.emailVerifiedAt && (
-                <>
-                  {!emailChallengeId ? (
-                    <button
-                      type="button"
-                      onClick={() => void onRequestEmailVerify()}
-                      style={{ border: '1px solid #1668c4', borderRadius: 10, background: 'transparent', color: '#1668c4', padding: '9px 18px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
-                    >
-                      {t.sendVerifyCodeBtn}
-                    </button>
-                  ) : (
-                    <form onSubmit={onVerifyEmail} style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                      <div>
-                        <label htmlFor="email-code" style={{ display: 'block', fontSize: 11, color: '#5a6678', marginBottom: 6 }}>
-                          {t.codeLabel}
-                        </label>
-                        <input
-                          id="email-code"
-                          dir="ltr"
-                          inputMode="numeric"
-                          maxLength={6}
-                          value={emailCode}
-                          onChange={(e) => setEmailCode(e.target.value.replace(/\D/g, ''))}
-                          style={{ width: 140, boxSizing: 'border-box', padding: '10px 13px', border: '1.5px solid #e3e9f1', borderRadius: 10, fontFamily: 'inherit', fontSize: 13, textAlign: 'center', letterSpacing: 4 }}
-                        />
-                      </div>
-                      <button
-                        type="submit"
-                        style={{ border: 'none', borderRadius: 10, background: '#1668c4', color: '#fff', padding: '11px 18px', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
-                      >
-                        {t.verifyBtn}
-                      </button>
-                    </form>
-                  )}
-                </>
-              )}
-            </div>
-
-            <div style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 16, padding: '18px 20px' }}>
-              <h3 style={{ fontSize: 14, fontWeight: 800, margin: '0 0 12px' }}>{t.privacyHeading}</h3>
-              {exportError && <p role="alert" style={{ fontSize: 12, color: '#e5484d', marginBottom: 10 }}>{exportError}</p>}
-              <p style={{ fontSize: 12, color: '#5a6678', marginBottom: 12 }}>{t.privacyDesc}</p>
-              <button
-                type="button"
-                data-testid="privacy-export-button"
-                disabled={exportBusy}
-                onClick={() => void onExportData()}
-                style={{ border: '1px solid #1668c4', borderRadius: 10, background: 'transparent', color: '#1668c4', padding: '9px 18px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 18 }}
-              >
-                {exportBusy ? t.exportBusyBtn : t.exportBtn}
-              </button>
-
-              <div style={{ borderTop: '1px solid #f1f4f8', paddingTop: 16 }}>
-                <h4 style={{ fontSize: 12.5, fontWeight: 800, color: '#e5484d', margin: '0 0 8px' }}>{t.deleteHeading}</h4>
-                {!deleteConfirmOpen ? (
-                  <button
-                    type="button"
-                    data-testid="privacy-delete-open"
-                    onClick={() => setDeleteConfirmOpen(true)}
-                    style={{ border: '1px solid #e5484d', borderRadius: 10, background: 'transparent', color: '#e5484d', padding: '9px 18px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
-                  >
-                    {t.deleteHeading}
-                  </button>
-                ) : (
-                  <div style={{ background: '#fef2f2', border: '1px solid #fbd0d0', borderRadius: 12, padding: '14px 16px' }}>
-                    <p style={{ fontSize: 12, color: '#8a2c2c', marginBottom: 12 }}>{t.deleteWarning}</p>
-                    {deleteError && <p role="alert" style={{ fontSize: 12, color: '#e5484d', marginBottom: 10 }}>{deleteError}</p>}
-                    <div style={{ display: 'flex', gap: 10 }}>
-                      <button
-                        type="button"
-                        data-testid="privacy-delete-confirm"
-                        disabled={deleteBusy}
-                        onClick={() => void onConfirmDelete()}
-                        style={{ border: 'none', borderRadius: 10, background: '#e5484d', color: '#fff', padding: '9px 18px', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
-                      >
-                        {deleteBusy ? t.deleteBusyBtn : t.deleteConfirmBtn}
-                      </button>
-                      <button
-                        type="button"
-                        data-testid="privacy-delete-cancel"
-                        disabled={deleteBusy}
-                        onClick={() => setDeleteConfirmOpen(false)}
-                        style={{ border: '1px solid #e3e9f1', borderRadius: 10, background: '#fff', color: '#5a6678', padding: '9px 18px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
-                      >
-                        {t.deleteCancelBtn}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+          <AccountProfileTab
+            user={user}
+            profile={profile}
+            profileForm={profileForm}
+            onProfileFormChange={setProfileForm}
+            onSaveProfile={onSaveProfile}
+            profileSaving={profileSaving}
+            profileError={profileError}
+            profileNotice={profileNotice}
+            bookings={bookings}
+            clubBalance={club?.balance ?? 0}
+            walletBalanceIrr={wallet?.balanceIrr ?? null}
+            savedPassengers={savedPassengers}
+            isMobile={isMobile}
+            onGoSecurity={() => setTab('security')}
+            onAddPassenger={() => {
+              setPassengersAddPending(true);
+              setTab('passengers');
+            }}
+            emailChallengeId={emailChallengeId}
+            emailCode={emailCode}
+            onEmailCodeChange={setEmailCode}
+            onRequestEmailVerify={onRequestEmailVerify}
+            onVerifyEmail={onVerifyEmail}
+            exportBusy={exportBusy}
+            exportError={exportError}
+            onExportData={onExportData}
+            deleteConfirmOpen={deleteConfirmOpen}
+            deleteBusy={deleteBusy}
+            deleteError={deleteError}
+            onDeleteOpen={() => setDeleteConfirmOpen(true)}
+            onDeleteCancel={() => setDeleteConfirmOpen(false)}
+            onDeleteConfirm={onConfirmDelete}
+          />
         )}
 
         {tab === 'trips' && (
@@ -1523,6 +1318,7 @@ export default function AccountPage() {
             )}
           </div>
         )}
+        </main>
       </div>
     </PublicPageShell>
   );
