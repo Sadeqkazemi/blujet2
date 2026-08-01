@@ -556,6 +556,7 @@ export default function HomeSearchPage() {
         </div>
         <div
           data-testid="special-offers-scroll"
+          className={isMobile ? 'hscroll' : undefined}
           style={{
             display: isMobile ? 'flex' : 'grid',
             gridTemplateColumns: isMobile ? undefined : 'repeat(4, 1fr)',
