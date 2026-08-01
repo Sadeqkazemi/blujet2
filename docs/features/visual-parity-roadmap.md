@@ -19,7 +19,7 @@ Systematic page-by-page alignment with bundled HTML exports. Each phase = layout
 | 4 | پرداخت | `پرداخت.html` | High | [-] **Deferred** — user requested no changes |
 | 5 | مدیریت رزرو | `مدیریت رزرو.html` | Med | [x] Lookup card, discover section, ticket card, action grid |
 | 6 | وضعیت پرواز | `وضعیت پرواز.html` | Med | [x] Live badge hero, grid search, progress timeline, help links |
-| 7 | ورود و ثبتنام | `ورود و ثبتنام.html` | Med | [ ] |
+| 7 | ورود و ثبتنام | `ورود و ثبتنام.html` | Med | [x] Two-column card, visual panel, OTP layout |
 | 8 | فراموشی رمز | `فراموشی رمز.html` | Low | [ ] |
 | 9 | مقاصد | `مقاصد.html` | Med | [~] i18n done; pixel pass pending |
 | 10 | باشگاه مشتریان | `باشگاه مشتریان.html` | Med | [~] i18n done |
@@ -40,6 +40,7 @@ Systematic page-by-page alignment with bundled HTML exports. Each phase = layout
 - [x] `CheckoutFlightSummary`, `CheckoutReviewSection`, `CheckoutPriceSidebar`, `CheckoutHoldBanner`, `BookSeatMap`
 - [x] `ManageBookingLookupForm`, `ManageBookingDiscoverSection`, `ManageBookingTicketCard`, `ManageBookingPassengersCard`, `ManageBookingActionGrid`
 - [x] `FlightStatusSearchForm`, `FlightStatusResultCard`, `FlightStatusNotFound`, `FlightStatusHelpLinks`
+- [x] `CustomerLoginVisualPanel`, `CustomerLoginCardHeader`, customer-login shared styles
 - [ ] Breakpoint utility: unify on `useIsMobile()` @767px (replace `lg:` @1024px on PaymentPage — deferred with payment phase)
 
 ## Acceptance

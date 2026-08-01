@@ -95,7 +95,7 @@ describe('CustomerLoginPage', () => {
     renderWithRouter(<CustomerLoginPage />);
 
     await userEvent.click(screen.getByTestId('signin-use-password'));
-    expect(screen.getByText('فراموشی رمز عبور؟')).toHaveAttribute('href', '/forgot-password');
+    expect(screen.getByRole('link', { name: 'فراموشی رمز' })).toHaveAttribute('href', '/forgot-password');
 
     await userEvent.type(screen.getByTestId('signin-pw-phone'), '09121234567');
     await userEvent.type(screen.getByTestId('signin-pw-password'), 'MyPass1234');
@@ -109,10 +109,10 @@ describe('CustomerLoginPage', () => {
     renderWithRouter(<CustomerLoginPage />);
     expect(screen.getByTestId('signin-tab-login')).toHaveTextContent('Log in');
     expect(screen.getByTestId('signin-tab-signup')).toHaveTextContent('Sign up');
-    expect(screen.getByTestId('signin-acct-agency')).toHaveTextContent('Agency');
+    expect(screen.getByTestId('signin-acct-agency')).toHaveTextContent('Partner Agency');
 
     await userEvent.click(screen.getByTestId('signin-use-password'));
-    expect(screen.getByText('Forgot password?')).toHaveAttribute('href', '/forgot-password');
+    expect(screen.getByRole('link', { name: 'Forgot password?' })).toHaveAttribute('href', '/forgot-password');
   });
 
   it('renders translated tabs and labels in Arabic', () => {
@@ -120,7 +120,7 @@ describe('CustomerLoginPage', () => {
     renderWithRouter(<CustomerLoginPage />);
     expect(screen.getByTestId('signin-tab-login')).toHaveTextContent('تسجيل الدخول');
     expect(screen.getByTestId('signin-tab-signup')).toHaveTextContent('إنشاء حساب');
-    expect(screen.getByTestId('signin-acct-agency')).toHaveTextContent('وكالة');
+    expect(screen.getByTestId('signin-acct-agency')).toHaveTextContent('وكالة شريكة');
   });
 });
 
