@@ -60,8 +60,11 @@ describe('ExtrasStep — design parity', () => {
     const map = screen.getByTestId('checkout-seat-map');
     expect(map).toHaveAttribute('data-aircraft', 'MD-80');
     expect(screen.getByTestId('checkout-seat-toggle')).toHaveTextContent('MD-80');
+    expect(screen.getByTestId('checkout-seat-toggle')).toHaveTextContent('فرست‌کلاس');
+    expect(screen.getByTestId('checkout-seat-toggle')).toHaveTextContent('بیزینس');
+    expect(screen.getByTestId('checkout-seat-toggle')).toHaveTextContent('اکونومی');
     expect(screen.getByText('فرست کلاس')).toBeInTheDocument();
-    expect(screen.getByText('Main Cabin Extra')).toBeInTheDocument();
+    expect(screen.getByText('بیزینس')).toBeInTheDocument();
     expect(screen.getByText('اکونومی')).toBeInTheDocument();
     expect(screen.getAllByText('خروج').length).toBeGreaterThan(0);
     expect(screen.getAllByText('گالی').length).toBeGreaterThan(0);

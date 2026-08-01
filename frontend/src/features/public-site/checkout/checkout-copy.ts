@@ -118,7 +118,7 @@ export const CHECKOUT_COPY: Record<
     document: 'مدرک',
     seat: 'صندلی',
     seatMapCaption: (aircraft) =>
-      `انتخاب صندلی (اختیاری) — ${aircraft} · فرست‌کلاس ردیف ۳ تا ۶ (۲-۲) · اکونومی ردیف ۷ تا ۳۲ (۲-۳)`,
+      `انتخاب صندلی (اختیاری) — ${aircraft} · فرست‌کلاس ردیف ۳ تا ۶ (۲-۲) · بیزینس ردیف ۷ تا ۱۱ (۲-۳) · اکونومی ردیف ۱۲ تا ۳۲ (۲-۳)`,
     bizLockedHint: 'انتخاب صندلی بیزنس نیازمند حداقل ۱۵٬۰۰۰ امتیاز باشگاه است',
     business: 'بیزنس',
     available: 'موجود',
@@ -192,7 +192,7 @@ export const CHECKOUT_COPY: Record<
     document: 'Document',
     seat: 'Seat',
     seatMapCaption: (aircraft) =>
-      `Seat selection (optional) — ${aircraft} · First Class rows 3–6 (2-2) · Economy rows 7–32 (2-3)`,
+      `Seat selection (optional) — ${aircraft} · First Class rows 3–6 (2-2) · Business rows 7–11 (2-3) · Economy rows 12–32 (2-3)`,
     bizLockedHint: 'Selecting a Business seat requires at least 15,000 loyalty points',
     business: 'Business',
     available: 'Available',
@@ -266,7 +266,7 @@ export const CHECKOUT_COPY: Record<
     document: 'الوثيقة',
     seat: 'المقعد',
     seatMapCaption: (aircraft) =>
-      `اختيار المقعد (اختياري) — ${aircraft} · الدرجة الأولى صفوف 3–6 (2-2) · الاقتصادية صفوف 7–32 (2-3)`,
+      `اختيار المقعد (اختياري) — ${aircraft} · الدرجة الأولى صفوف 3–6 (2-2) · درجة الأعمال صفوف 7–11 (2-3) · الاقتصادية صفوف 12–32 (2-3)`,
     bizLockedHint: 'يتطلب اختيار مقعد درجة الأعمال 15,000 نقطة ولاء على الأقل',
     business: 'درجة الأعمال',
     available: 'متاح',

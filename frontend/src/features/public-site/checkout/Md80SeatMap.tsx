@@ -15,23 +15,23 @@ import {
 
 const SECTION_LABEL: Record<
   StoredLocale,
-  Record<'FIRST' | 'MAIN_EXTRA' | 'ECONOMY' | 'EXIT', string>
+  Record<'FIRST' | 'BUSINESS' | 'ECONOMY' | 'EXIT', string>
 > = {
   fa: {
     FIRST: 'فرست کلاس',
-    MAIN_EXTRA: 'Main Cabin Extra',
+    BUSINESS: 'بیزینس',
     ECONOMY: 'اکونومی',
     EXIT: 'ردیف خروج اضطراری',
   },
   en: {
     FIRST: 'First Class',
-    MAIN_EXTRA: 'Main Cabin Extra',
+    BUSINESS: 'Business',
     ECONOMY: 'Economy Class',
     EXIT: 'Emergency exit row',
   },
   ar: {
     FIRST: 'الدرجة الأولى',
-    MAIN_EXTRA: 'Main Cabin Extra',
+    BUSINESS: 'درجة الأعمال',
     ECONOMY: 'الدرجة الاقتصادية',
     EXIT: 'صف مخرج الطوارئ',
   },
@@ -217,7 +217,7 @@ function RowNum({ n, locale }: { n: number; locale: StoredLocale }) {
 function ColumnHeaders({
   section,
 }: {
-  section: 'FIRST' | 'MAIN_EXTRA' | 'ECONOMY';
+  section: 'FIRST' | 'BUSINESS' | 'ECONOMY';
 }) {
   const isFirst = section === 'FIRST';
   const rightCols = isFirst ? (['E', 'F'] as const) : (['D', 'E', 'F'] as const);
@@ -286,7 +286,7 @@ export default function Md80SeatMap({
     return false;
   }
 
-  let lastHeaderSection: 'FIRST' | 'MAIN_EXTRA' | 'ECONOMY' | null = null;
+  let lastHeaderSection: 'FIRST' | 'BUSINESS' | 'ECONOMY' | null = null;
 
   return (
     <div
@@ -328,8 +328,8 @@ export default function Md80SeatMap({
                     className={`mb-0.5 text-[9px] font-extrabold ${
                       section === 'FIRST'
                         ? 'text-[#a9781a]'
-                        : section === 'MAIN_EXTRA'
-                          ? 'text-[#1668c4]'
+                        : section === 'BUSINESS'
+                          ? 'text-[#96701a]'
                           : 'text-[#1668c4]'
                     }`}
                     data-testid={`checkout-section-${section.toLowerCase()}`}
