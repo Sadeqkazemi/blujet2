@@ -76,15 +76,44 @@ export class PriceLockService {
     );
     const feeIrr = roundIrrTo(pctOfIrr(priceIrr, LOCK_FEE_PCT), 10_000n);
 
-    return this.typeorm.priceLock.create({
-      data: {
-        userId: user.id,
-        flightInstanceId: dto.flightInstanceId,
-        cabin: dto.cabin,
-        lockedPriceIrr: priceIrr,
-        feeIrr,
-        expiresAt: new Date(Date.now() + LOCK_TTL_MS),
-      },
+    // The fee is billed immediately from the member's wallet (CLAUDE.md:
+    // "lock a fare for up to 72h for a fee"; every balance change is a
+    // ledger row, never a mutable column). Non-refundable on cancel — the
+    // fee buys the 72h option itself, exercised or not.
+    return this.typeorm.$transaction(async (tx) => {
+      const sum = await tx.walletEntry.aggregate({
+        where: { userId: user.id },
+        _sum: { signedAmountIrr: true },
+      });
+      const balance = sum._sum.signedAmountIrr ?? 0n;
+      if (balance < feeIrr) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message:
+            'موجودی کیف پول برای پرداخت کارمزد قفل قیمت کافی نیست — ابتدا کیف پول خود را شارژ کنید.',
+        });
+      }
+
+      const lock = await tx.priceLock.create({
+        data: {
+          userId: user.id,
+          flightInstanceId: dto.flightInstanceId,
+          cabin: dto.cabin,
+          lockedPriceIrr: priceIrr,
+          feeIrr,
+          expiresAt: new Date(Date.now() + LOCK_TTL_MS),
+        },
+      });
+
+      await tx.walletEntry.create({
+        data: {
+          userId: user.id,
+          type: 'PURCHASE',
+          signedAmountIrr: -feeIrr,
+        },
+      });
+
+      return lock;
     });
   }
 

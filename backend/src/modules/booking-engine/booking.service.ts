@@ -388,6 +388,98 @@ export class BookingService {
     );
   }
 
+  /** Anonymous seat change (مدیریت رزرو): moves the credential-matching
+   * passenger to a free seat in the booking's own cabin. Same FOR UPDATE
+   * row-lock discipline as createBooking so two concurrent movers of the
+   * same target seat can't both win. */
+  async changeSeatByPnr(pnr: string, lastName: string, newSeatCode: string) {
+    const booking = await this.typeorm.booking.findUnique({
+      where: { pnr: pnr.trim().toUpperCase() },
+      include: BOOKING_INCLUDE,
+    });
+    if (
+      !booking ||
+      !booking.passengers.some((p) => matchesLastName(p.fullName, lastName))
+    ) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'رزرو یافت نشد.',
+      });
+    }
+    if (booking.status !== 'PAID' && booking.status !== 'TICKETED') {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'تغییر صندلی فقط برای بلیط‌های پرداخت‌شده ممکن است.',
+      });
+    }
+    if (booking.flightInstance.departureAt <= new Date()) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'این پرواز انجام شده است.',
+      });
+    }
+
+    const passenger = booking.passengers.find((p) =>
+      matchesLastName(p.fullName, lastName),
+    )!;
+    if (passenger.seatCode === newSeatCode) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'صندلی انتخابی همان صندلی فعلی شماست.',
+      });
+    }
+
+    const map = await this.typeorm.aircraftSeatMap.findUnique({
+      where: { aircraftType: resolveAircraftType(booking.flightInstance) },
+    });
+    if (!map) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'نقشه صندلی برای این هواپیما تعریف نشده است.',
+      });
+    }
+    const seat = enumerateSeats(map).find((s) => s.seatCode === newSeatCode);
+    if (!seat || seat.cabin !== booking.cabin) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: `صندلی ${newSeatCode} در کلاس بلیط شما معتبر نیست.`,
+      });
+    }
+
+    await this.typeorm.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM flight_instances WHERE id = ${booking.flightInstanceId} FOR UPDATE`;
+      const taken = await this.search.takenSeatCodes(booking.flightInstanceId);
+      if (taken.has(newSeatCode)) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: `صندلی ${newSeatCode} هم‌اکنون در دسترس نیست.`,
+        });
+      }
+      await tx.passenger.update({
+        where: { id: passenger.id },
+        data: { seatCode: newSeatCode },
+      });
+    });
+
+    if (booking.userId) {
+      await this.audit.record({
+        actorId: booking.userId,
+        actorRole: 'USER',
+        category: 'RESERVATION',
+        action: 'تغییر صندلی',
+        detail: `صندلی مسافر «${passenger.fullName}» در رزرو ${booking.pnr} از ${passenger.seatCode ?? '—'} به ${newSeatCode} تغییر کرد.`,
+        entityType: 'Booking',
+        entityId: booking.id,
+      });
+    }
+
+    const updated = await this.typeorm.booking.findUniqueOrThrow({
+      where: { id: booking.id },
+      include: BOOKING_INCLUDE,
+    });
+    return this.toAnonymousDetail(updated, lastName);
+  }
+
   async listMine(user: AuthenticatedUser) {
     const bookings = await this.typeorm.booking.findMany({
       where: { userId: user.id },

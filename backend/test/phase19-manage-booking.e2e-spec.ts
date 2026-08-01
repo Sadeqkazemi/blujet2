@@ -275,4 +275,80 @@ describe('Phase 19 — anonymous manage-booking self-service (e2e)', () => {
       expect(authRes.body.data.penaltyPct).toBe(anonRes.body.data.penaltyPct);
     });
   });
+
+  describe('POST /manage-booking/change-seat', () => {
+    it('moves the matching passenger to a free same-cabin seat and reflects it in a fresh lookup', async () => {
+      const { pnr } = await bookAndPay('09150000010', 'بهرام رستمی', '1A');
+
+      const res = await request(app.getHttpServer())
+        .post('/manage-booking/change-seat')
+        .send({ pnr, lastName: 'رستمی', seatCode: '2C' });
+
+      expect(res.status).toBe(201);
+      expect(res.body.data.passengers).toEqual([
+        { fullName: 'بهرام رستمی', seatCode: '2C' },
+      ]);
+
+      const lookup = await request(app.getHttpServer())
+        .post('/manage-booking/lookup')
+        .send({ pnr, lastName: 'رستمی' });
+      expect(lookup.body.data.passengers[0].seatCode).toBe('2C');
+    });
+
+    it('409s when the target seat is already taken by another booking', async () => {
+      // Two paying customers on the SAME instance: build it manually.
+      const departureAt = new Date(Date.now() + 9 * 24 * 60 * 60 * 1000);
+      const instance = await typeorm.flightInstance.create({
+        data: {
+          flightId,
+          departureAt,
+          arrivalAt: new Date(departureAt.getTime() + 85 * 60 * 1000),
+          capacity: 6,
+          status: 'SCHEDULED',
+        },
+      });
+      async function payFor(phone: string, fullName: string, seatCode: string) {
+        const { accessToken } = await loginAsCustomer(app, phone);
+        const createRes = await request(app.getHttpServer())
+          .post('/bookings')
+          .set('Authorization', `Bearer ${accessToken}`)
+          .send({
+            flightInstanceId: instance.id,
+            cabin: 'ECONOMY',
+            passengers: [{ fullName, seatCode }],
+          });
+        const payRes = await request(app.getHttpServer())
+          .post(`/bookings/${createRes.body.data.id}/pay`)
+          .set('Authorization', `Bearer ${accessToken}`)
+          .send({});
+        return payRes.body.data.booking.pnr as string;
+      }
+      const pnrA = await payFor('09150000011', 'شقایق مرادی', '1A');
+      await payFor('09150000012', 'کاوه صادقی', '1C');
+
+      const res = await request(app.getHttpServer())
+        .post('/manage-booking/change-seat')
+        .send({ pnr: pnrA, lastName: 'مرادی', seatCode: '1C' });
+      expect(res.status).toBe(409);
+    });
+
+    it('400s for a seat outside the booking cabin or identical to the current seat; 404s on a wrong last name', async () => {
+      const { pnr } = await bookAndPay('09150000013', 'نازنین شریفی', '3A');
+
+      const sameSeat = await request(app.getHttpServer())
+        .post('/manage-booking/change-seat')
+        .send({ pnr, lastName: 'شریفی', seatCode: '3A' });
+      expect(sameSeat.status).toBe(400);
+
+      const bogusSeat = await request(app.getHttpServer())
+        .post('/manage-booking/change-seat')
+        .send({ pnr, lastName: 'شریفی', seatCode: '99Z' });
+      expect(bogusSeat.status).toBe(400);
+
+      const wrongName = await request(app.getHttpServer())
+        .post('/manage-booking/change-seat')
+        .send({ pnr, lastName: 'رضایی', seatCode: '2A' });
+      expect(wrongName.status).toBe(404);
+    });
+  });
 });

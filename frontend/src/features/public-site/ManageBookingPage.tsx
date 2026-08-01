@@ -1,18 +1,23 @@
 import { useState } from 'react';
 import PublicPageShell from '../../components/public/PublicPageShell';
-import { lookupBookingByPnrAndLastName, submitAnonymousRefund } from '../../api/publicSite';
+import {
+  changeSeatByPnr,
+  fetchSeatMap,
+  lookupBookingByPnrAndLastName,
+  submitAnonymousRefund,
+} from '../../api/publicSite';
 import { ApiRequestError } from '../../api/envelope';
 import { faDigits, faMoney } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
-import type { BookingDetail } from '../../types/public-site';
+import type { BookingDetail, SeatMapCell } from '../../types/public-site';
 
 // مدیریت رزرو — real PNR + last-name self-service (no login), matching
-// مدیریت رزرو.dc.html's anonymous lookup UX. تغییر صندلی/دانلود بلیط stay
-// disabled this phase (see docs/API.md's Phase 19 for the deferral
-// reasoning); refund uses the same real IBAN-then-submit flow as
-// TicketPage.tsx's authenticated refund form, not a pre-submission
-// per-passenger preview.
+// مدیریت رزرو.dc.html's anonymous lookup UX. تغییر صندلی uses the real
+// POST /manage-booking/change-seat endpoint (same-cabin free seat picked
+// off the live seat map); دانلود بلیط opens a print-ready boarding-pass
+// window (print → save as PDF). Refund uses the same real
+// IBAN-then-submit flow as TicketPage.tsx's authenticated refund form.
 //
 // Most labels below reuse design-reference-v2/مدیریت رزرو.dc.html's own
 // isEN vocabulary for this exact page (heroTitle, lblPnr, lblLastName,
@@ -56,6 +61,14 @@ const STR: Record<StoredLocale, {
   downloadTicketBtn: string;
   soonSuffix: string;
   soonTooltip: string;
+  seatModalTitle: string;
+  seatModalSub: string;
+  seatChangedMsg: string;
+  seatLegendFree: string;
+  seatLegendTaken: string;
+  seatLegendCurrent: string;
+  seatChangeErrorFallback: string;
+  seatMapLoading: string;
   refundDoneHeading: string;
   refundDoneSub: string;
   penaltyLabel: string;
@@ -91,6 +104,14 @@ const STR: Record<StoredLocale, {
     downloadTicketBtn: 'دانلود بلیط',
     soonSuffix: '(به‌زودی)',
     soonTooltip: 'این قابلیت به‌زودی اضافه می‌شود.',
+    seatModalTitle: 'تغییر صندلی',
+    seatModalSub: 'یک صندلی آزاد در همان کلاس بلیط انتخاب کنید — صندلی مسافرِ تطبیق‌داده‌شده با نام خانوادگی تغییر می‌کند.',
+    seatChangedMsg: 'صندلی با موفقیت تغییر کرد ✓',
+    seatLegendFree: 'آزاد',
+    seatLegendTaken: 'پر',
+    seatLegendCurrent: 'صندلی فعلی',
+    seatChangeErrorFallback: 'خطا در تغییر صندلی.',
+    seatMapLoading: 'در حال دریافت نقشه صندلی…',
     refundDoneHeading: 'درخواست استرداد ثبت شد',
     refundDoneSub: 'مبلغ قابل استرداد پس از کسر جریمه، طی ۳ تا ۷ روز کاری به کارت پرداخت‌کننده بازگردانده می‌شود.',
     penaltyLabel: 'جریمه',
@@ -126,6 +147,14 @@ const STR: Record<StoredLocale, {
     downloadTicketBtn: 'Download Ticket',
     soonSuffix: '(coming soon)',
     soonTooltip: 'This feature will be added soon.',
+    seatModalTitle: 'Change Seat',
+    seatModalSub: 'Pick a free seat in the same cabin — the seat of the passenger matching the last name will change.',
+    seatChangedMsg: 'Seat changed successfully ✓',
+    seatLegendFree: 'Free',
+    seatLegendTaken: 'Taken',
+    seatLegendCurrent: 'Current seat',
+    seatChangeErrorFallback: 'Error changing the seat.',
+    seatMapLoading: 'Loading seat map…',
     refundDoneHeading: 'Refund request submitted',
     refundDoneSub: 'The refundable amount after penalty will be returned to your card within 3–7 business days.',
     penaltyLabel: 'Penalty',
@@ -161,6 +190,14 @@ const STR: Record<StoredLocale, {
     downloadTicketBtn: 'تنزيل التذكرة',
     soonSuffix: '(قريبًا)',
     soonTooltip: 'ستتم إضافة هذه الميزة قريبًا.',
+    seatModalTitle: 'تغيير المقعد',
+    seatModalSub: 'اختر مقعدًا شاغرًا في نفس الدرجة — سيتغير مقعد المسافر المطابق لاسم العائلة.',
+    seatChangedMsg: 'تم تغيير المقعد بنجاح ✓',
+    seatLegendFree: 'شاغر',
+    seatLegendTaken: 'محجوز',
+    seatLegendCurrent: 'المقعد الحالي',
+    seatChangeErrorFallback: 'خطأ في تغيير المقعد.',
+    seatMapLoading: 'جارٍ تحميل خريطة المقاعد…',
     refundDoneHeading: 'تم تسجيل طلب الاسترداد',
     refundDoneSub: 'سيتم إرجاع المبلغ القابل للاسترداد بعد خصم الغرامة إلى بطاقة الدفع خلال ٣ إلى ٧ أيام عمل.',
     penaltyLabel: 'الغرامة',
@@ -189,6 +226,12 @@ export default function ManageBookingPage() {
   const [refundError, setRefundError] = useState<string | null>(null);
   const [refundResult, setRefundResult] = useState<{ penaltyPct: number; refundableIrr: string; penaltyAmountIrr: string } | null>(null);
 
+  const [seatOpen, setSeatOpen] = useState(false);
+  const [seatMap, setSeatMap] = useState<SeatMapCell[] | null>(null);
+  const [seatError, setSeatError] = useState<string | null>(null);
+  const [seatBusy, setSeatBusy] = useState(false);
+  const [seatChanged, setSeatChanged] = useState(false);
+
   async function lookup(e: React.FormEvent) {
     e.preventDefault();
     setLookupError(null);
@@ -202,6 +245,7 @@ export default function ManageBookingPage() {
       setBooking(data);
       setRefundResult(null);
       setRefundOpen(false);
+      setSeatChanged(false);
     } catch (err) {
       setBooking(null);
       setLookupError(err instanceof ApiRequestError ? err.message : t.lookupErrorFallback);
@@ -225,6 +269,73 @@ export default function ManageBookingPage() {
     } catch (err) {
       setRefundError(err instanceof ApiRequestError ? err.message : t.refundSubmitErrorFallback);
     }
+  }
+
+  function openSeatModal() {
+    if (!booking) return;
+    setSeatOpen(true);
+    setSeatError(null);
+    setSeatMap(null);
+    fetchSeatMap(booking.flightInstanceId)
+      .then((res) => setSeatMap(res.seats))
+      .catch(() => setSeatError(t.seatChangeErrorFallback));
+  }
+
+  async function onPickSeat(seatCode: string) {
+    if (!booking || seatBusy) return;
+    setSeatBusy(true);
+    setSeatError(null);
+    try {
+      const updated = await changeSeatByPnr(booking.pnr, lastName.trim(), seatCode);
+      setBooking(updated);
+      setSeatOpen(false);
+      setSeatChanged(true);
+    } catch (err) {
+      setSeatError(err instanceof ApiRequestError ? err.message : t.seatChangeErrorFallback);
+    } finally {
+      setSeatBusy(false);
+    }
+  }
+
+  /** «دانلود بلیط» — opens a print-ready boarding-pass window; the browser's
+   * print dialog covers save-as-PDF. All values come from the looked-up
+   * booking, no extra endpoint needed. */
+  function downloadTicket() {
+    if (!booking) return;
+    const w = window.open('', '_blank', 'width=840,height=640');
+    if (!w) return;
+    const dir = locale === 'en' ? 'ltr' : 'rtl';
+    const paxRows = booking.passengers
+      .map(
+        (p) =>
+          `<tr><td style="padding:7px 10px;border-bottom:1px solid #eef1f5;font-weight:700;">${p.fullName}</td><td dir="ltr" style="padding:7px 10px;border-bottom:1px solid #eef1f5;text-align:center;">${p.seatCode ?? '—'}</td></tr>`,
+      )
+      .join('');
+    w.document.write(`<!doctype html><html dir="${dir}"><head><meta charset="utf-8"><title>blujet — ${booking.pnr}</title></head>
+<body style="font-family:Vazirmatn,Tahoma,sans-serif;background:#f6f8fb;margin:0;padding:24px;color:#16202e;">
+  <div style="max-width:640px;margin:0 auto;background:#fff;border:1px solid #e6eaf0;border-radius:18px;overflow:hidden;">
+    <div style="background:linear-gradient(120deg,#1668c4,#0d3b66);color:#fff;padding:16px 22px;display:flex;justify-content:space-between;align-items:center;">
+      <b style="font-size:16px;">✈ blujet</b>
+      <span>${t.pnrLabel}: <b dir="ltr" style="letter-spacing:1px;">${booking.pnr}</b></span>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:22px;gap:14px;">
+      <div style="text-align:center;"><div style="font-size:24px;font-weight:900;" dir="ltr">${booking.originCode}</div><div style="color:#1668c4;font-weight:800;margin-top:4px;">${formatJalaliDateTime(booking.departureAt)}</div></div>
+      <div style="flex:1;text-align:center;color:#8a96a6;font-size:12px;border-top:2px dashed #d5e1f0;padding-top:8px;" dir="ltr">${booking.flightNo}</div>
+      <div style="text-align:center;"><div style="font-size:24px;font-weight:900;" dir="ltr">${booking.destCode}</div><div style="color:#1668c4;font-weight:800;margin-top:4px;">${formatJalaliDateTime(booking.arrivalAt)}</div></div>
+    </div>
+    <div style="display:flex;border-top:1px solid #f2f4f7;">
+      <div style="flex:1;padding:11px 14px;text-align:center;border-inline-end:1px solid #f2f4f7;"><div style="font-size:11px;color:#8a96a6;">${t.classLabel}</div><b>${CABIN_LABEL[booking.cabin]?.[locale] ?? booking.cabin}</b></div>
+      <div style="flex:1;padding:11px 14px;text-align:center;border-inline-end:1px solid #f2f4f7;"><div style="font-size:11px;color:#8a96a6;">${t.statusLabel}</div><b>${booking.status}</b></div>
+      <div style="flex:1;padding:11px 14px;text-align:center;"><div style="font-size:11px;color:#8a96a6;">${t.priceLabel}</div><b>${faMoney(booking.priceIrr)} ${t.toman}</b></div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;border-top:1px solid #f2f4f7;font-size:13px;">
+      <thead><tr><th style="text-align:start;padding:9px 10px;color:#8a96a6;font-size:11px;">${t.passengersHeading}</th><th style="padding:9px 10px;color:#8a96a6;font-size:11px;">${t.seatLabel}</th></tr></thead>
+      <tbody>${paxRows}</tbody>
+    </table>
+  </div>
+  <script>window.onload = function(){ window.print(); };</script>
+</body></html>`);
+    w.document.close();
   }
 
   return (
@@ -366,22 +477,51 @@ export default function ManageBookingPage() {
                 </button>
                 <button
                   type="button"
-                  disabled
-                  title={t.soonTooltip}
-                  style={{ border: '1.5px solid #e3e9f1', background: '#f6f8fb', color: '#aab8c8', padding: '10px 18px', borderRadius: 11, fontSize: 12.5, fontWeight: 700, cursor: 'not-allowed', fontFamily: 'inherit' }}
+                  data-testid="mb-change-seat"
+                  onClick={openSeatModal}
+                  disabled={booking.status !== 'TICKETED' && booking.status !== 'PAID'}
+                  style={{
+                    border: '1.5px solid #d5e1f0',
+                    background: booking.status === 'TICKETED' || booking.status === 'PAID' ? '#fff' : '#f6f8fb',
+                    color: booking.status === 'TICKETED' || booking.status === 'PAID' ? '#1668c4' : '#aab8c8',
+                    padding: '10px 18px',
+                    borderRadius: 11,
+                    fontSize: 12.5,
+                    fontWeight: 700,
+                    cursor: booking.status === 'TICKETED' || booking.status === 'PAID' ? 'pointer' : 'not-allowed',
+                    fontFamily: 'inherit',
+                  }}
                 >
-                  {t.changeSeatBtn} <span style={{ fontSize: 10 }}>{t.soonSuffix}</span>
+                  {t.changeSeatBtn}
                 </button>
                 <button
                   type="button"
-                  disabled
-                  title={t.soonTooltip}
-                  style={{ marginRight: 'auto', border: 'none', background: '#e3e9f1', color: '#8a96a6', padding: '10px 20px', borderRadius: 11, fontSize: 12.5, fontWeight: 800, cursor: 'not-allowed', fontFamily: 'inherit' }}
+                  data-testid="mb-download-ticket"
+                  onClick={downloadTicket}
+                  disabled={booking.status !== 'TICKETED'}
+                  style={{
+                    marginRight: 'auto',
+                    border: 'none',
+                    background: booking.status === 'TICKETED' ? '#1668c4' : '#e3e9f1',
+                    color: booking.status === 'TICKETED' ? '#fff' : '#8a96a6',
+                    padding: '10px 20px',
+                    borderRadius: 11,
+                    fontSize: 12.5,
+                    fontWeight: 800,
+                    cursor: booking.status === 'TICKETED' ? 'pointer' : 'not-allowed',
+                    fontFamily: 'inherit',
+                  }}
                 >
-                  {t.downloadTicketBtn} <span style={{ fontSize: 10 }}>{t.soonSuffix}</span>
+                  {t.downloadTicketBtn}
                 </button>
               </div>
             </div>
+
+            {seatChanged && (
+              <div data-testid="mb-seat-changed" style={{ marginTop: 12, background: '#eef9f1', border: '1px solid #bfe6cc', borderRadius: 12, padding: '11px 15px', fontSize: 12.5, fontWeight: 700, color: '#1f8a5b' }}>
+                {t.seatChangedMsg}
+              </div>
+            )}
 
             {/* REFUND DONE */}
             {refundResult && (
@@ -471,6 +611,99 @@ export default function ManageBookingPage() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* SEAT-CHANGE MODAL */}
+      {seatOpen && booking && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(13,38,64,.55)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+          onClick={() => setSeatOpen(false)}
+        >
+          <div
+            data-testid="mb-seat-modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: '#fff', borderRadius: 18, width: '100%', maxWidth: 460, maxHeight: '86vh', overflowY: 'auto', padding: '22px 22px 18px', boxShadow: '0 30px 70px -20px rgba(0,0,0,.45)' }}
+          >
+            <h2 style={{ fontSize: 16, fontWeight: 900, color: '#0d2640', margin: '0 0 6px' }}>{t.seatModalTitle}</h2>
+            <p style={{ fontSize: 11.5, color: '#6b7585', margin: '0 0 14px', lineHeight: 1.8 }}>{t.seatModalSub}</p>
+
+            <div style={{ display: 'flex', gap: 14, marginBottom: 12, fontSize: 11, color: '#5a6678' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span style={{ width: 14, height: 14, borderRadius: 4, background: '#eef4fb', border: '1.5px solid #1668c4' }} /> {t.seatLegendFree}
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span style={{ width: 14, height: 14, borderRadius: 4, background: '#e3e9f1' }} /> {t.seatLegendTaken}
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span style={{ width: 14, height: 14, borderRadius: 4, background: '#1668c4' }} /> {t.seatLegendCurrent}
+              </span>
+            </div>
+
+            {seatError && (
+              <div data-testid="mb-seat-error" style={{ borderRadius: 10, background: '#fef2f2', padding: 10, fontSize: 12, color: '#e5484d', marginBottom: 12 }}>
+                {seatError}
+              </div>
+            )}
+
+            {seatMap === null && !seatError && (
+              <p style={{ fontSize: 12, color: '#8a96a6', textAlign: 'center', padding: '18px 0' }}>{t.seatMapLoading}</p>
+            )}
+
+            {seatMap !== null && (() => {
+              const cabinSeats = seatMap.filter((s) => s.cabin === booking.cabin);
+              const currentSeats = new Set(
+                booking.passengers.map((p) => p.seatCode).filter(Boolean) as string[],
+              );
+              const rows = Array.from(new Set(cabinSeats.map((s) => s.row))).sort((a, b) => a - b);
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {rows.map((row) => (
+                    <div key={row} style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                      {cabinSeats
+                        .filter((s) => s.row === row)
+                        .map((s) => {
+                          const mine = currentSeats.has(s.seatCode);
+                          const free = s.status === 'FREE';
+                          return (
+                            <button
+                              key={s.seatCode}
+                              type="button"
+                              data-testid={`mb-seat-${s.seatCode}`}
+                              disabled={!free || seatBusy}
+                              onClick={() => void onPickSeat(s.seatCode)}
+                              dir="ltr"
+                              style={{
+                                width: 44,
+                                height: 34,
+                                borderRadius: 7,
+                                fontSize: 10.5,
+                                fontWeight: 800,
+                                fontFamily: 'inherit',
+                                cursor: free && !seatBusy ? 'pointer' : 'not-allowed',
+                                border: mine ? 'none' : free ? '1.5px solid #1668c4' : 'none',
+                                background: mine ? '#1668c4' : free ? '#eef4fb' : '#e3e9f1',
+                                color: mine ? '#fff' : free ? '#1668c4' : '#aab8c8',
+                              }}
+                            >
+                              {s.seatCode}
+                            </button>
+                          );
+                        })}
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+
+            <button
+              type="button"
+              onClick={() => setSeatOpen(false)}
+              style={{ marginTop: 16, width: '100%', border: '1.5px solid #d5e1f0', borderRadius: 11, background: '#fff', color: '#5a6678', padding: '11px 0', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              {t.cancelBtn}
+            </button>
+          </div>
         </div>
       )}
     </PublicPageShell>
