@@ -130,6 +130,7 @@ function AirportCell({
   isRTL,
   cityListLabel,
   cellPadding = '10px 24px 10px 20px',
+  compact = false,
 }: {
   label: string;
   value: string;
@@ -141,6 +142,7 @@ function AirportCell({
   isRTL: boolean;
   cityListLabel: string;
   cellPadding?: string;
+  compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -162,7 +164,7 @@ function AirportCell({
   }, [airports, query]);
 
   return (
-    <div ref={rootRef} style={{ flex: '1.5 1 165px', minWidth: 165, position: 'relative', ...fieldStyle }}>
+    <div ref={rootRef} style={{ flex: compact ? undefined : '1.5 1 165px', minWidth: compact ? 0 : 165, position: 'relative', ...fieldStyle }}>
       <div
         data-testid={testId}
         onClick={() => setOpen((v) => !v)}
@@ -298,7 +300,14 @@ export default function HomeSearchCard({
   const searchBtnRadius = isMobile ? '13px' : isRTL ? '13px 0 0 13px' : '0 13px 13px 0';
 
   const cabinLabel = cabin === 'economy' ? t.cabinEconomy : t.cabinBusiness;
-  const paxSummary = `${formatToman(adults, locale)} ${t.lblAdults}${children ? `، ${formatToman(children, locale)} ${t.lblChildren}` : ''}${infants ? `، ${formatToman(infants, locale)} ${t.lblInfants}` : ''}، ${cabinLabel}`;
+  const paxParts = [
+    `${formatToman(adults, locale)} ${t.lblAdults}`,
+    ...(children ? [`${formatToman(children, locale)} ${t.lblChildren}`] : []),
+    ...(infants ? [`${formatToman(infants, locale)} ${t.lblInfants}`] : []),
+  ];
+  const paxSummary = isMobile
+    ? `${paxParts.join('، ')}، ${cabinLabel}`
+    : `${paxParts.join('، ')}، ${cabinLabel}`;
 
   function originDisplay() {
     if (!origin) return t.selectPlaceholder;
@@ -396,13 +405,15 @@ export default function HomeSearchCard({
                           cursor: 'pointer',
                           border: 'none',
                           fontFamily: 'inherit',
-                          color: active ? (isMobile ? '#1668c4' : '#1668c4') : isMobile ? '#fff' : '#5a6678',
+                          color: active ? '#1668c4' : isMobile ? '#fff' : '#5a6678',
                           fontWeight: active ? 700 : 500,
                           background: active ? '#fff' : 'transparent',
                           boxShadow: active ? '0 2px 6px rgba(13,38,102,.12)' : 'none',
                         }}
                       >
-                        {svc === 'domestic' ? <DomesticFlightIcon size={18} /> : <IntlFlightIcon size={18} />}
+                        <span style={{ display: 'flex', color: active ? '#1668c4' : isMobile ? '#fff' : '#5a6678' }}>
+                          {svc === 'domestic' ? <DomesticFlightIcon size={18} /> : <IntlFlightIcon size={18} />}
+                        </span>
                         {svc === 'domestic' ? t.svcDomestic : t.svcIntl}
                       </button>
                     );
@@ -439,9 +450,14 @@ export default function HomeSearchCard({
                   airports={airports}
                   onPick={setOrigin}
                   testId="home-origin"
-                  fieldStyle={{ gridColumn: isMobile ? '1' : 'auto', ...fieldCardExtra }}
+                  fieldStyle={{
+                    gridColumn: isMobile ? '1' : 'auto',
+                    gridRow: isMobile ? '1' : 'auto',
+                    ...fieldCardExtra,
+                  }}
                   isRTL={isRTL}
                   cityListLabel={t.cityListLabel}
+                  compact={isMobile}
                 />
 
                 <div
@@ -452,7 +468,8 @@ export default function HomeSearchCard({
                   style={{
                     alignSelf: 'center',
                     justifySelf: 'center',
-                    gridColumn: isMobile ? '1 / -1' : 'auto',
+                    gridArea: isMobile ? '1 / 1 / 2 / -1' : undefined,
+                    gridColumn: isMobile ? undefined : 'auto',
                     width: 40,
                     height: 40,
                     flex: 'none',
@@ -482,35 +499,72 @@ export default function HomeSearchCard({
                   testId="home-dest"
                   fieldStyle={{
                     gridColumn: isMobile ? '2' : 'auto',
+                    gridRow: isMobile ? '1' : 'auto',
                     borderRight: isMobile ? 'none' : '1px solid #eef1f5',
                     ...fieldCardExtra,
                   }}
                   isRTL={isRTL}
                   cityListLabel={t.cityListLabel}
                   cellPadding="10px 24px 10px 32px"
+                  compact={isMobile}
                 />
 
-                <div style={{ flex: '1.1 1 120px', minWidth: 120, borderRight: isMobile ? 'none' : '1px solid #eef1f5', gridColumn: isMobile ? '1 / -1' : 'auto', ...fieldCardExtra }}>
-                  <JalaliDatePicker label={t.lblDepartDate} value={dateIso} onChange={setDateIso} minDate={TODAY_ISO} testId="home-date" />
+                <div
+                  style={{
+                    flex: '1.1 1 120px',
+                    minWidth: isMobile ? 0 : 120,
+                    borderRight: isMobile ? 'none' : '1px solid #eef1f5',
+                    gridColumn: isMobile ? '1' : 'auto',
+                    ...fieldCardExtra,
+                  }}
+                >
+                  <JalaliDatePicker
+                    label={t.lblDepartDate}
+                    value={dateIso}
+                    onChange={setDateIso}
+                    minDate={TODAY_ISO}
+                    testId="home-date"
+                    placeholder={t.selectPlaceholder}
+                    subLabel={dateIso ? undefined : t.lblDepartDate}
+                    isRTL={isRTL}
+                  />
                 </div>
 
                 {showReturn && (
                   <div
                     style={{
                       flex: '1.1 1 120px',
-                      minWidth: 120,
+                      minWidth: isMobile ? 0 : 120,
                       borderRight: isMobile ? 'none' : '1px solid #eef1f5',
-                      gridColumn: isMobile ? '1 / -1' : 'auto',
+                      gridColumn: isMobile ? '2' : 'auto',
                       opacity: returnInteractive ? 1 : 0.45,
                       pointerEvents: returnInteractive ? 'auto' : 'none',
                       ...fieldCardExtra,
                     }}
                   >
-                    <JalaliDatePicker label={t.lblReturnDate} value={returnIso} onChange={setReturnIso} minDate={dateIso ?? TODAY_ISO} testId="home-return-date" />
+                    <JalaliDatePicker
+                      label={t.lblReturnDate}
+                      value={returnIso}
+                      onChange={setReturnIso}
+                      minDate={dateIso ?? TODAY_ISO}
+                      testId="home-return-date"
+                      placeholder={t.selectPlaceholder}
+                      subLabel={returnIso ? undefined : t.lblReturnDate}
+                      isRTL={isRTL}
+                    />
                   </div>
                 )}
 
-                <div style={{ flex: '1.2 1 150px', minWidth: 150, position: 'relative', borderRight: isMobile ? 'none' : '1px solid #eef1f5', gridColumn: isMobile ? '1' : 'auto', ...fieldCardExtra }}>
+                <div
+                  style={{
+                    flex: '1.2 1 150px',
+                    minWidth: isMobile ? 0 : 150,
+                    position: 'relative',
+                    borderRight: isMobile ? 'none' : '1px solid #eef1f5',
+                    gridColumn: isMobile ? '1' : 'auto',
+                    ...fieldCardExtra,
+                  }}
+                >
                   <div onClick={() => setPaxOpen((v) => !v)} style={{ cursor: 'pointer', padding: '5px 13px', display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#9aa4b2', fontWeight: 600, marginBottom: 3 }}>
                       <UserIcon />
@@ -576,7 +630,15 @@ export default function HomeSearchCard({
                 </div>
 
                 {isMobile && (
-                  <div style={{ flex: '1.2 1 150px', minWidth: 150, position: 'relative', gridColumn: '2', ...fieldCardExtra }}>
+                  <div
+                    style={{
+                      flex: '1.2 1 150px',
+                      minWidth: 0,
+                      position: 'relative',
+                      gridColumn: '2',
+                      ...fieldCardExtra,
+                    }}
+                  >
                     <div onClick={() => setClassBoxOpen((v) => !v)} style={{ cursor: 'pointer', padding: '5px 13px', display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#9aa4b2', fontWeight: 600, marginBottom: 3 }}>
                         <PlaneIcon size={14} />

@@ -43,10 +43,22 @@ interface JalaliDatePickerProps {
   onChange: (iso: string) => void;
   minDate?: string;
   testId?: string;
+  placeholder?: string;
+  subLabel?: string;
+  isRTL?: boolean;
 }
 
 /** Jalali (شمسی) date picker — CLAUDE.md requires Jalali everywhere users pick dates. */
-export default function JalaliDatePicker({ label, value, onChange, minDate, testId }: JalaliDatePickerProps) {
+export default function JalaliDatePicker({
+  label,
+  value,
+  onChange,
+  minDate,
+  testId,
+  placeholder = 'انتخاب کنید',
+  subLabel,
+  isRTL = true,
+}: JalaliDatePickerProps) {
   const [open, setOpen] = useState(false);
   const [viewMonth, setViewMonth] = useState(() => (value ? dayjs(value).calendar('jalali') : dayjs().calendar('jalali')));
   const rootRef = useRef<HTMLDivElement>(null);
@@ -66,10 +78,18 @@ export default function JalaliDatePicker({ label, value, onChange, minDate, test
 
   const displayValue = value
     ? faDigits(dayjs(value).calendar('jalali').format('YYYY/MM/DD'))
-    : 'انتخاب کنید';
+    : placeholder;
+
+  const weekdaySub =
+    subLabel ??
+    (value
+      ? faDigits(dayjs(value).calendar('jalali').format('dddd')) +
+        ' ' +
+        faDigits(String(dayjs(value).calendar('jalali').year()))
+      : label);
 
   return (
-    <div ref={rootRef} style={{ position: 'relative' }}>
+    <div ref={rootRef} style={{ position: 'relative', height: '100%' }}>
       <div
         data-testid={testId}
         onClick={() => setOpen((v) => !v)}
@@ -83,6 +103,7 @@ export default function JalaliDatePicker({ label, value, onChange, minDate, test
           {label}
         </div>
         <div style={{ fontSize: '13.5px', fontWeight: 800, color: value ? '#0d2640' : '#aeb6c2' }}>{displayValue}</div>
+        <div style={{ fontSize: '10.5px', color: '#aeb6c2', marginTop: 1 }}>{weekdaySub}</div>
       </div>
 
       {open && (
@@ -91,7 +112,7 @@ export default function JalaliDatePicker({ label, value, onChange, minDate, test
             position: 'absolute',
             top: '100%',
             marginTop: 8,
-            right: 0,
+            [isRTL ? 'right' : 'left']: 0,
             width: 300,
             maxWidth: '92vw',
             background: '#fff',
