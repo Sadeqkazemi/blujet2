@@ -78,7 +78,7 @@ describe('ManageBookingPage', () => {
     await userEvent.type(screen.getByTestId('mb-lastname'), 'ناشناس');
     await userEvent.click(screen.getByTestId('mb-lookup'));
 
-    expect(await screen.findByTestId('mb-lookup-error')).toHaveTextContent('رزرو یافت نشد.');
+    expect(await screen.findByTestId('mb-not-found')).toHaveTextContent('رزروی یافت نشد');
   });
 
   it('submits a real anonymous refund and shows the real computed penalty breakdown', async () => {
@@ -212,6 +212,6 @@ describe('ManageBookingPage', () => {
     await userEvent.type(screen.getByTestId('mb-lastname'), 'ناشناس');
     await userEvent.click(screen.getByTestId('mb-lookup'));
 
-    expect(await screen.findByTestId('mb-lookup-error')).toHaveTextContent('لم يتم العثور على الحجز.');
+    expect(await screen.findByTestId('mb-not-found')).toHaveTextContent('لم يتم العثور على الحجز');
   });
 });

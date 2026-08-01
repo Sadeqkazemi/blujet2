@@ -7,16 +7,17 @@ Systematic page-by-page alignment with bundled HTML exports. Each phase = layout
 - [x] Done (this PR or prior phases)
 - [~] In progress
 - [ ] Pending
+- [-] Deferred (explicit user request)
 
 ## Phase order
 
 | # | Page | Bundled ref | Est. | Status |
 |---|------|-------------|------|--------|
 | 1 | صفحه اصلی | `صفحه اصلی.html` | — | [x] Dual-month calendar, search overlay, hero |
-| 2 | نتایج پرواز | `نتایج پرواز.html` | High | [~] Search summary, AI banner, filter bar, flight cards — **this PR** |
-| 3 | تکمیل خرید | `تکمیل خرید.html` | High | [ ] Full wizard, extras, boarding-pass preview |
-| 4 | پرداخت | `پرداخت.html` | High | [ ] Two-column layout @767px, discount/points |
-| 5 | مدیریت رزرو | `مدیریت رزرو.html` | Med | [ ] PNR lookup UI |
+| 2 | نتایج پرواز | `نتایج پرواز.html` | High | [x] Search summary, AI banner, filter bar, flight cards |
+| 3 | تکمیل خرید | `تکمیل خرید.html` | High | [x] Two-column checkout, hold timer, seat map |
+| 4 | پرداخت | `پرداخت.html` | High | [-] **Deferred** — user requested no changes |
+| 5 | مدیریت رزرو | `مدیریت رزرو.html` | Med | [x] Lookup card, discover section, ticket card, action grid |
 | 6 | وضعیت پرواز | `وضعیت پرواز.html` | Med | [ ] |
 | 7 | ورود و ثبتنام | `ورود و ثبتنام.html` | Med | [ ] |
 | 8 | فراموشی رمز | `فراموشی رمز.html` | Low | [ ] |
@@ -36,7 +37,9 @@ Systematic page-by-page alignment with bundled HTML exports. Each phase = layout
 - [x] `FlightSearchForm` + airport/pax pickers
 - [x] `FlightSearchDateRangePicker` — dual-month Jalali/Gregorian calendar (design search box)
 - [x] `ResultsSearchSummary`, `ResultsPriceCalendarStrip`, `ResultsAiRadarBanner`, `ResultsFilterBar`, `ResultsFlightCard`
-- [ ] Breakpoint utility: unify on `useIsMobile()` @767px (replace `lg:` @1024px on PaymentPage)
+- [x] `CheckoutFlightSummary`, `CheckoutReviewSection`, `CheckoutPriceSidebar`, `CheckoutHoldBanner`, `BookSeatMap`
+- [x] `ManageBookingLookupForm`, `ManageBookingDiscoverSection`, `ManageBookingTicketCard`, `ManageBookingPassengersCard`, `ManageBookingActionGrid`
+- [ ] Breakpoint utility: unify on `useIsMobile()` @767px (replace `lg:` @1024px on PaymentPage — deferred with payment phase)
 
 ## Acceptance
 
