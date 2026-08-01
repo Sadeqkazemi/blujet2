@@ -50,7 +50,6 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, on
   const { locale, setLocale } = useLocale();
   const t = useT();
   const at = STR[locale];
-  const navigate = useNavigate();
   const isRTL = locale !== 'en';
   const [langOpen, setLangOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
