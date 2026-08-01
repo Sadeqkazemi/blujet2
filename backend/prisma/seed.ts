@@ -1191,7 +1191,7 @@ async function main() {
     update: {},
     create: {
       aircraftType: 'Airbus A320',
-      // Matches ReservationSystem.dc.html's MD-88 mock numbers verbatim:
+      // Legacy reservation-panel layout (kept for existing e2e fixtures):
       // rows 3-6 business 2-2 (16 seats), rows 7-32 economy 2-3 (130 seats).
       businessRowStart: 3,
       businessRowEnd: 6,
@@ -1201,6 +1201,36 @@ async function main() {
       economyRowEnd: 32,
       economyColsLeft: ['A', 'B'],
       economyColsRight: ['C', 'D', 'E'],
+    },
+  });
+
+  // Public checkout seat map — design-reference-v2/MD-80-seatmap.pdf
+  // First Class 3–6: A B | E F; Economy 7–32: A B | D E F;
+  // rear exit/galley omits 28A/B, 29A/B, 30A/B → 140 seats.
+  await prisma.aircraftSeatMap.upsert({
+    where: { aircraftType: 'MD-80' },
+    update: {
+      businessRowStart: 3,
+      businessRowEnd: 6,
+      businessColsLeft: ['A', 'B'],
+      businessColsRight: ['E', 'F'],
+      economyRowStart: 7,
+      economyRowEnd: 32,
+      economyColsLeft: ['A', 'B'],
+      economyColsRight: ['D', 'E', 'F'],
+      excludedSeatCodes: ['28A', '28B', '29A', '29B', '30A', '30B'],
+    },
+    create: {
+      aircraftType: 'MD-80',
+      businessRowStart: 3,
+      businessRowEnd: 6,
+      businessColsLeft: ['A', 'B'],
+      businessColsRight: ['E', 'F'],
+      economyRowStart: 7,
+      economyRowEnd: 32,
+      economyColsLeft: ['A', 'B'],
+      economyColsRight: ['D', 'E', 'F'],
+      excludedSeatCodes: ['28A', '28B', '29A', '29B', '30A', '30B'],
     },
   });
 
@@ -1476,8 +1506,8 @@ async function main() {
   });
   const thrMhdFlight = await prisma.flight.upsert({
     where: { flightNo: 'BJ-100' },
-    update: { routeId: thrMhdRoute.id },
-    create: { flightNo: 'BJ-100', routeId: thrMhdRoute.id, aircraftType: 'Airbus A320' },
+    update: { routeId: thrMhdRoute.id, aircraftType: 'MD-80' },
+    create: { flightNo: 'BJ-100', routeId: thrMhdRoute.id, aircraftType: 'MD-80' },
   });
   const thrMhdScheduled = await prisma.flightInstance.count({
     where: {

@@ -29,7 +29,7 @@ export default function FlightSummaryCard({
       return '';
     }
   })();
-  const meta = [flight.aircraftType || 'MD-88', flight.flightNo, timePart].filter(Boolean).join(' · ');
+  const meta = [flight.aircraftType || 'MD-80', flight.flightNo, timePart].filter(Boolean).join(' · ');
 
   return (
     <section

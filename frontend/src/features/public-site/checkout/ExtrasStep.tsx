@@ -4,6 +4,8 @@ import { faDigits, formatToman } from '../../../lib/fa-format';
 import type { CabinClass, SeatMapCell } from '../../../types/public-site';
 import { CHECKOUT_COPY } from './checkout-copy';
 import type { ExtraServiceState } from './checkout-types';
+import Md80SeatMap from './Md80SeatMap';
+import { isMd80Aircraft } from './md80-seat-layout';
 
 function SvgBag() {
   return (
@@ -50,8 +52,94 @@ const EXTRA_ICONS: Record<ExtraServiceState['id'], ReactNode> = {
   cip: <SvgCip />,
 };
 
-/** Left block is always 2 seats (business 2-2 / economy 2-3); aisle before index 2. */
+/** Left block is always 2 seats for generic maps; aisle before index 2. */
 const AISLE_BEFORE_INDEX = 2;
+
+function GenericSeatMap({
+  locale,
+  seats,
+  selectedSeats,
+  onToggleSeat,
+  businessLocked,
+  bookedCabin,
+}: {
+  locale: StoredLocale;
+  seats: SeatMapCell[];
+  selectedSeats: string[];
+  onToggleSeat: (seatCode: string) => void;
+  businessLocked: boolean;
+  bookedCabin: CabinClass;
+}) {
+  const rows = (() => {
+    const byRow = new Map<number, SeatMapCell[]>();
+    for (const s of seats) {
+      const list = byRow.get(s.row) ?? [];
+      list.push(s);
+      byRow.set(s.row, list);
+    }
+    return [...byRow.entries()]
+      .sort(([a], [b]) => a - b)
+      .map(([num, rowSeats]) => ({
+        num,
+        seats: rowSeats.sort((a, b) => a.seatCode.localeCompare(b.seatCode)),
+      }));
+  })();
+
+  return (
+    <div
+      className="flex max-h-[300px] flex-col gap-[5px] overflow-auto rounded-[13px] border border-[#eef1f5] bg-[#f8fafc] p-[13px]"
+      data-testid="checkout-seat-map"
+    >
+      {rows.map((r) => (
+        <div key={r.num} className="flex items-center gap-[5px]">
+          <span className="w-5 flex-none text-center text-[9.5px] text-[#9aa4b2]">
+            {locale === 'en' ? r.num : faDigits(r.num)}
+          </span>
+          {r.seats.map((st, idx) => {
+            const selected = selectedSeats.includes(st.seatCode);
+            const taken = st.status === 'TAKEN';
+            const biz = st.cabin === 'BUSINESS';
+            const locked = (biz && businessLocked) || st.cabin !== bookedCabin;
+            let bg = biz ? '#fff6e3' : '#eaf4ff';
+            let border = biz ? '#e6c368' : '#bcd9f5';
+            let color = biz ? '#a9781a' : '#1668c4';
+            if (taken) {
+              bg = '#e6eaf0';
+              border = '#e6eaf0';
+              color = '#c2c9d3';
+            } else if (selected) {
+              bg = '#1668c4';
+              border = '#1668c4';
+              color = '#fff';
+            } else if (locked) {
+              bg = biz ? '#f3f0e6' : '#f0f3f7';
+              border = biz ? '#ddd6c0' : '#d5dbe5';
+              color = biz ? '#b3a679' : '#9aa4b2';
+            }
+            return (
+              <button
+                key={st.seatCode}
+                type="button"
+                disabled={taken || locked}
+                onClick={() => onToggleSeat(st.seatCode)}
+                data-testid={`checkout-seat-${st.seatCode}`}
+                className="flex h-[30px] w-[30px] items-center justify-center rounded-[7px] border-[1.5px] text-[9.5px] font-bold disabled:cursor-not-allowed"
+                style={{
+                  background: bg,
+                  borderColor: border,
+                  color,
+                  marginInlineStart: idx === AISLE_BEFORE_INDEX ? 14 : 0,
+                }}
+              >
+                {st.seatCode.replace(/^\d+/, '')}
+              </button>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function ExtrasStep({
   locale,
@@ -76,33 +164,11 @@ export default function ExtrasStep({
 }) {
   const t = CHECKOUT_COPY[locale];
   const [seatOpen, setSeatOpen] = useState(true);
-
-  const rows = (() => {
-    if (!seats) return [] as { num: number; seats: SeatMapCell[] }[];
-    const byRow = new Map<number, SeatMapCell[]>();
-    for (const s of seats) {
-      const list = byRow.get(s.row) ?? [];
-      list.push(s);
-      byRow.set(s.row, list);
-    }
-    return [...byRow.entries()]
-      .sort(([a], [b]) => a - b)
-      .map(([num, rowSeats]) => ({
-        num,
-        seats: rowSeats.sort((a, b) => a.seatCode.localeCompare(b.seatCode)),
-      }));
-  })();
+  const aircraft = aircraftType.trim() || 'MD-80';
+  const useMd80 = isMd80Aircraft(aircraft);
 
   const sold = seats?.filter((s) => s.status === 'TAKEN').length ?? 0;
   const cap = seats?.length ?? 0;
-  const aircraft = aircraftType.trim() || 'MD-88';
-
-  function seatDisabled(st: SeatMapCell): boolean {
-    if (st.status === 'TAKEN') return true;
-    if (st.cabin !== bookedCabin) return true;
-    if (st.cabin === 'BUSINESS' && businessLocked) return true;
-    return false;
-  }
 
   return (
     <section
@@ -170,7 +236,7 @@ export default function ExtrasStep({
         >
           <div>
             <div className="text-[13px] font-extrabold text-[#0d2640]">
-              {t.seatMapCaption(aircraft)}
+              {t.seatMapCaption(useMd80 ? 'MD-80' : aircraft)}
             </div>
             {businessLocked && (
               <div className="mt-1 text-[10.5px] text-[#96701a]">🔒 {t.bizLockedHint}</div>
@@ -202,60 +268,24 @@ export default function ExtrasStep({
             </div>
             {seats === null ? (
               <p className="text-xs text-[#8a96a6]">{t.loading}</p>
+            ) : useMd80 ? (
+              <Md80SeatMap
+                locale={locale}
+                seats={seats}
+                selectedSeats={selectedSeats}
+                onToggleSeat={onToggleSeat}
+                businessLocked={businessLocked}
+                bookedCabin={bookedCabin}
+              />
             ) : (
-              <div
-                className="flex max-h-[300px] flex-col gap-[5px] overflow-auto rounded-[13px] border border-[#eef1f5] bg-[#f8fafc] p-[13px]"
-                data-testid="checkout-seat-map"
-              >
-                {rows.map((r) => (
-                    <div key={r.num} className="flex items-center gap-[5px]">
-                      <span className="w-5 flex-none text-center text-[9.5px] text-[#9aa4b2]">
-                        {locale === 'en' ? r.num : faDigits(r.num)}
-                      </span>
-                      {r.seats.map((st, idx) => {
-                        const selected = selectedSeats.includes(st.seatCode);
-                        const taken = st.status === 'TAKEN';
-                        const biz = st.cabin === 'BUSINESS';
-                        const locked =
-                          (biz && businessLocked) || st.cabin !== bookedCabin;
-                        let bg = biz ? '#fff6e3' : '#eaf4ff';
-                        let border = biz ? '#e6c368' : '#bcd9f5';
-                        let color = biz ? '#a9781a' : '#1668c4';
-                        if (taken) {
-                          bg = '#e6eaf0';
-                          border = '#e6eaf0';
-                          color = '#c2c9d3';
-                        } else if (selected) {
-                          bg = '#1668c4';
-                          border = '#1668c4';
-                          color = '#fff';
-                        } else if (locked) {
-                          bg = biz ? '#f3f0e6' : '#f0f3f7';
-                          border = biz ? '#ddd6c0' : '#d5dbe5';
-                          color = biz ? '#b3a679' : '#9aa4b2';
-                        }
-                        return (
-                          <button
-                            key={st.seatCode}
-                            type="button"
-                            disabled={seatDisabled(st)}
-                            onClick={() => onToggleSeat(st.seatCode)}
-                            data-testid={`checkout-seat-${st.seatCode}`}
-                            className="flex h-[30px] w-[30px] items-center justify-center rounded-[7px] border-[1.5px] text-[9.5px] font-bold disabled:cursor-not-allowed"
-                            style={{
-                              background: bg,
-                              borderColor: border,
-                              color,
-                              marginInlineStart: idx === AISLE_BEFORE_INDEX ? 14 : 0,
-                            }}
-                          >
-                            {st.seatCode.replace(/^\d+/, '')}
-                          </button>
-                        );
-                      })}
-                    </div>
-                ))}
-              </div>
+              <GenericSeatMap
+                locale={locale}
+                seats={seats}
+                selectedSeats={selectedSeats}
+                onToggleSeat={onToggleSeat}
+                businessLocked={businessLocked}
+                bookedCabin={bookedCabin}
+              />
             )}
             <div className="mt-2 flex flex-wrap items-center justify-between gap-2.5 text-[11px] text-[#5a6678]">
               <div>
@@ -267,7 +297,8 @@ export default function ExtrasStep({
               <div>
                 {t.totalSold}:{' '}
                 <b className="text-[#c0343a]">{locale === 'en' ? sold : faDigits(sold)}</b>{' '}
-                {t.ofLabel} <b>{locale === 'en' ? cap : faDigits(cap)}</b>
+                {t.ofLabel}{' '}
+                <b>{locale === 'en' ? (cap || 140) : faDigits(cap || 140)}</b>
               </div>
             </div>
           </>
