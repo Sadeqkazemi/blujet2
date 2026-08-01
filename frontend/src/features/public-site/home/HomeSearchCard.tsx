@@ -90,6 +90,7 @@ function TripRadio({
   const inactiveBorder = isMobile ? '2px solid rgba(255,255,255,.4)' : '2px solid #c5cedb';
   return (
     <span
+      className={active ? 'home-trip-active' : 'home-trip-inactive'}
       onClick={onClick}
       style={{
         display: 'flex',
@@ -102,6 +103,7 @@ function TripRadio({
       }}
     >
       <span
+        className="home-trip-ring"
         style={{
           width: 20,
           height: 20,
@@ -131,6 +133,7 @@ function AirportCell({
   cityListLabel,
   cellPadding = '10px 24px 10px 20px',
   compact = false,
+  className,
 }: {
   label: string;
   value: string;
@@ -143,6 +146,7 @@ function AirportCell({
   cityListLabel: string;
   cellPadding?: string;
   compact?: boolean;
+  className?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -164,7 +168,7 @@ function AirportCell({
   }, [airports, query]);
 
   return (
-    <div ref={rootRef} style={{ flex: compact ? undefined : '1.5 1 165px', minWidth: compact ? 0 : 165, position: 'relative', ...fieldStyle }}>
+    <div ref={rootRef} className={className} style={{ flex: compact ? undefined : '1.5 1 165px', minWidth: compact ? 0 : 165, position: 'relative', ...fieldStyle }}>
       <div
         data-testid={testId}
         onClick={() => setOpen((v) => !v)}
@@ -340,6 +344,65 @@ export default function HomeSearchCard({
 
   return (
     <div style={{ maxWidth: 1180, margin: '0 auto', padding: '0 26px 38px', position: 'relative' }}>
+      <style>{`
+        @media (max-width: 767px) {
+          #search-card { margin-top: -46px !important; }
+          #search-card .home-search-panel {
+            background: linear-gradient(135deg, #0d2640, #16406e) !important;
+          }
+          #search-card .home-search-fields {
+            display: grid !important;
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 10px !important;
+            border: none !important;
+            background: transparent !important;
+          }
+          #search-card .home-field-card {
+            background: #fff !important;
+            border-radius: 12px !important;
+            box-shadow: 0 8px 20px -14px rgba(0, 0, 0, 0.4) !important;
+            min-width: 0 !important;
+            flex: none !important;
+          }
+          #search-card .home-origin { grid-column: 1; grid-row: 1; }
+          #search-card .home-dest { grid-column: 2; grid-row: 1; }
+          #search-card .home-swap {
+            grid-area: 1 / 1 / 2 / -1;
+            justify-self: center;
+            align-self: center;
+            margin: 6px auto;
+            z-index: 3;
+          }
+          #search-card .home-date-dep { grid-column: 1; }
+          #search-card .home-date-ret { grid-column: 2; }
+          #search-card .home-pax { grid-column: 1; }
+          #search-card .home-class { grid-column: 2; }
+          #search-card .home-submit {
+            grid-column: 1 / -1;
+            border-radius: 13px !important;
+            width: 100%;
+          }
+          #search-card .home-svc-track { background: rgba(255, 255, 255, 0.14) !important; }
+          #search-card .home-svc-btn.is-active {
+            background: #fff !important;
+            color: #1668c4 !important;
+            box-shadow: 0 2px 6px rgba(13, 38, 102, 0.12) !important;
+          }
+          #search-card .home-svc-btn:not(.is-active) {
+            background: transparent !important;
+            color: #fff !important;
+          }
+          #search-card .home-svc-btn.is-active .home-svc-icon { color: #1668c4 !important; }
+          #search-card .home-svc-btn:not(.is-active) .home-svc-icon { color: #fff !important; }
+          #search-card .home-trip-active { color: #fff !important; }
+          #search-card .home-trip-inactive { color: rgba(255, 255, 255, 0.68) !important; }
+          #search-card .home-trip-inactive .home-trip-ring { border-color: rgba(255, 255, 255, 0.4) !important; }
+          #search-card .home-panel-muted { color: rgba(255, 255, 255, 0.75) !important; }
+        }
+        @media (min-width: 768px) {
+          #search-card { margin-top: -72px !important; }
+        }
+      `}</style>
       <div
         id="search-card"
         style={{
@@ -381,17 +444,18 @@ export default function HomeSearchCard({
           })}
         </div>
 
-        <div style={{ padding: 16, background: panelBg, borderRadius: '0 0 17px 17px' }}>
+        <div className="home-search-panel" style={{ padding: 16, background: panelBg, borderRadius: '0 0 17px 17px' }}>
           {topTab === 'book' && (
             <>
               <div style={{ display: 'flex', alignItems: 'center', marginBottom: 18, gap: 10, flexWrap: 'wrap' }}>
-                <div style={{ display: 'inline-flex', background: svcTrackBg, borderRadius: 11, padding: 3 }}>
+                <div className="home-svc-track" style={{ display: 'inline-flex', background: svcTrackBg, borderRadius: 11, padding: 3 }}>
                   {(['domestic', 'intl'] as ServiceType[]).map((svc) => {
                     const active = service === svc;
                     return (
                       <button
                         key={svc}
                         type="button"
+                        className={`home-svc-btn${active ? ' is-active' : ''}`}
                         onClick={() => setService(svc)}
                         style={{
                           display: 'flex',
@@ -409,7 +473,7 @@ export default function HomeSearchCard({
                           boxShadow: active ? '0 2px 6px rgba(13,38,102,.12)' : 'none',
                         }}
                       >
-                        <span style={{ display: 'flex', color: active ? '#1668c4' : isMobile ? '#fff' : '#5a6678' }}>
+                        <span className="home-svc-icon" style={{ display: 'flex', color: active ? '#1668c4' : isMobile ? '#fff' : '#5a6678' }}>
                           {svc === 'domestic' ? <DomesticFlightIcon size={18} /> : <IntlFlightIcon size={18} />}
                         </span>
                         {svc === 'domestic' ? t.svcDomestic : t.svcIntl}
@@ -430,6 +494,7 @@ export default function HomeSearchCard({
               )}
 
               <div
+                className="home-search-fields"
                 style={{
                   display: isMobile ? 'grid' : 'flex',
                   gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'none',
@@ -453,12 +518,14 @@ export default function HomeSearchCard({
                     gridRow: isMobile ? '1' : 'auto',
                     ...fieldCardExtra,
                   }}
+                  className="home-origin home-field-card"
                   isRTL={isRTL}
                   cityListLabel={t.cityListLabel}
                   compact={isMobile}
                 />
 
                 <div
+                  className="home-swap"
                   onClick={() => {
                     setOrigin(dest);
                     setDest(origin);
@@ -501,6 +568,7 @@ export default function HomeSearchCard({
                     borderRight: isMobile ? 'none' : '1px solid #eef1f5',
                     ...fieldCardExtra,
                   }}
+                  className="home-dest home-field-card"
                   isRTL={isRTL}
                   cityListLabel={t.cityListLabel}
                   cellPadding="10px 24px 10px 32px"
@@ -508,6 +576,7 @@ export default function HomeSearchCard({
                 />
 
                 <div
+                  className="home-date-dep home-field-card"
                   style={{
                     flex: '1.1 1 120px',
                     minWidth: isMobile ? 0 : 120,
@@ -530,6 +599,7 @@ export default function HomeSearchCard({
 
                 {showReturn && (
                   <div
+                    className="home-date-ret home-field-card"
                     style={{
                       flex: '1.1 1 120px',
                       minWidth: isMobile ? 0 : 120,
@@ -554,6 +624,7 @@ export default function HomeSearchCard({
                 )}
 
                 <div
+                  className="home-pax home-field-card"
                   style={{
                     flex: '1.2 1 150px',
                     minWidth: isMobile ? 0 : 150,
@@ -629,6 +700,7 @@ export default function HomeSearchCard({
 
                 {isMobile && (
                   <div
+                    className="home-class home-field-card"
                     style={{
                       flex: '1.2 1 150px',
                       minWidth: 0,
@@ -680,6 +752,7 @@ export default function HomeSearchCard({
 
                 <button
                   type="button"
+                  className="home-submit"
                   data-testid="home-search-submit"
                   onClick={onSearch}
                   style={{
@@ -737,7 +810,7 @@ export default function HomeSearchCard({
 
           {topTab === 'manage' && (
             <div style={{ padding: '6px 2px 4px' }}>
-              <div style={{ fontSize: '12.5px', color: isMobile ? '#cfe0f5' : '#5a6678', marginBottom: 16, lineHeight: 1.9 }}>{t.manageIntro}</div>
+              <div className="home-panel-muted" style={{ fontSize: '12.5px', color: isMobile ? '#cfe0f5' : '#5a6678', marginBottom: 16, lineHeight: 1.9 }}>{t.manageIntro}</div>
               <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 11 }}>
                 <div style={{ flex: 1, background: fieldBoxBg, borderRadius: 12, padding: '13px 15px', boxShadow: isMobile ? '0 8px 20px -12px rgba(0,0,0,.3)' : 'none' }}>
                   <div style={{ fontSize: 11, color: '#9aa4b2', fontWeight: 600, marginBottom: 3 }}>{t.lblBookingCode}</div>
@@ -760,7 +833,7 @@ export default function HomeSearchCard({
 
           {topTab === 'checkin' && (
             <div style={{ padding: '6px 2px 4px' }}>
-              <div style={{ fontSize: '12.5px', color: isMobile ? '#cfe0f5' : '#5a6678', marginBottom: 16, lineHeight: 1.9 }}>{t.checkinIntro}</div>
+              <div className="home-panel-muted" style={{ fontSize: '12.5px', color: isMobile ? '#cfe0f5' : '#5a6678', marginBottom: 16, lineHeight: 1.9 }}>{t.checkinIntro}</div>
               <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 11 }}>
                 <div style={{ flex: 1, background: fieldBoxBg, borderRadius: 12, padding: '13px 15px', boxShadow: isMobile ? '0 8px 20px -12px rgba(0,0,0,.3)' : 'none' }}>
                   <div style={{ fontSize: 11, color: '#9aa4b2', fontWeight: 600, marginBottom: 3 }}>{t.lblFlightNo}</div>
