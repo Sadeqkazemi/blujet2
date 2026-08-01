@@ -52,7 +52,7 @@ export default function AgencyPortalShell() {
     <div
       dir={locale === 'en' ? 'ltr' : 'rtl'}
       style={{
-        fontFamily: locale === 'en' ? 'Inter, sans-serif' : 'Vazirmatn, sans-serif',
+        fontFamily: locale === 'en' ? 'Inter, sans-serif' : 'var(--font-sans)',
         background: '#f6f8fb',
         color: '#16202e',
         minHeight: '100vh',

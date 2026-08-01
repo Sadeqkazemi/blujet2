@@ -95,7 +95,7 @@ export default function AgencyPortalSidebar({
             >
               {agencyName}
             </div>
-            <div className="font-num" style={{ fontSize: 10, color: '#1f8a5b', fontWeight: 700 }}>{t.activeCode(codeSuffix)}</div>
+            <div style={{ fontSize: 10, color: '#1f8a5b', fontWeight: 700 }}>{t.activeCode(codeSuffix)}</div>
           </div>
         </div>
       </div>
@@ -129,7 +129,6 @@ export default function AgencyPortalSidebar({
             <span style={{ flex: 1 }}>{item.label[locale]}</span>
             {badge && (
               <span
-                className="font-num"
                 style={{
                   fontSize: 10,
                   fontWeight: 800,

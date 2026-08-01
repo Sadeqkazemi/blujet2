@@ -193,7 +193,7 @@ export default function AgencySalesPage() {
         {kpis.map((k) => (
           <div key={k.label} className="rounded-xl border border-border bg-white p-4">
             <div className="text-[11px] text-muted">{k.label}</div>
-            <div className="font-num mt-1 text-lg font-black text-ink">{k.value}</div>
+            <div className="mt-1 text-lg font-black text-ink">{k.value}</div>
           </div>
         ))}
       </div>
@@ -216,10 +216,10 @@ export default function AgencySalesPage() {
               <tbody>
                 {data.perFlight.map((f) => (
                   <tr key={f.flightNo} className="border-b border-border/60">
-                    <td className="ltr font-num py-2.5">{f.flightNo}</td>
-                    <td className="ltr font-num py-2.5">{f.route}</td>
-                    <td className="font-num py-2.5">{faDigits(f.ticketsCount)}</td>
-                    <td className="font-num py-2.5 font-bold">{faMoney(f.salesIrr)} {t.toman}</td>
+                    <td className="ltr py-2.5">{f.flightNo}</td>
+                    <td className="ltr py-2.5">{f.route}</td>
+                    <td className="py-2.5">{faDigits(f.ticketsCount)}</td>
+                    <td className="py-2.5 font-bold">{faMoney(f.salesIrr)} {t.toman}</td>
                   </tr>
                 ))}
               </tbody>
@@ -247,12 +247,12 @@ export default function AgencySalesPage() {
               <tbody>
                 {data.tickets.map((t2) => (
                   <tr key={t2.pnr} className="border-b border-border/60">
-                    <td className="ltr font-num py-2.5">{t2.pnr}</td>
-                    <td className="ltr font-num py-2.5">
+                    <td className="ltr py-2.5">{t2.pnr}</td>
+                    <td className="ltr py-2.5">
                       {t2.flightNo} — {t2.route}
                     </td>
-                    <td className="font-num py-2.5">{formatJalaliDate(t2.departureAt)}</td>
-                    <td className="font-num py-2.5 font-bold">{faMoney(t2.priceIrr)} {t.toman}</td>
+                    <td className="py-2.5">{formatJalaliDate(t2.departureAt)}</td>
+                    <td className="py-2.5 font-bold">{faMoney(t2.priceIrr)} {t.toman}</td>
                     <td className="py-2.5">{BOOKING_STATUS_LABEL[t2.status]?.[locale] ?? t2.status}</td>
                   </tr>
                 ))}
