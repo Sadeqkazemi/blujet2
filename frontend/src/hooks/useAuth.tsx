@@ -1,5 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import * as authApi from '../api/auth';
+import { ApiRequestError } from '../api/envelope';
+import {
+  isMockOtpChallenge,
+  isMockOtpEnabled,
+  mockRequestOtp,
+  mockVerifyOtp,
+} from '../lib/mock-customer-otp';
 import type { AuthUser } from '../types/auth';
 
 type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
@@ -33,6 +40,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      if (isMockOtpEnabled()) {
+        if (!cancelled) setStatus('unauthenticated');
+        return;
+      }
       try {
         await authApi.refreshSession();
         const me = await authApi.fetchMe();
@@ -69,11 +80,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const requestOtp = useCallback(async (phone: string) => {
+    if (isMockOtpEnabled()) {
+      return mockRequestOtp(phone);
+    }
     const { challengeId } = await authApi.requestOtp(phone);
     return challengeId;
   }, []);
 
   const verifyOtp = useCallback(async (challengeId: string, code: string) => {
+    if (isMockOtpEnabled() || isMockOtpChallenge(challengeId)) {
+      try {
+        const loggedInUser = mockVerifyOtp(challengeId, code);
+        setUser(loggedInUser);
+        setStatus('authenticated');
+        return loggedInUser;
+      } catch {
+        throw new ApiRequestError('TWO_FACTOR_INVALID', 'کد نامعتبر است.', 401);
+      }
+    }
     const { user: loggedInUser } = await authApi.verifyOtp(challengeId, code);
     setUser(loggedInUser);
     setStatus('authenticated');
