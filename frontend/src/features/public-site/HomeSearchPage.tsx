@@ -498,12 +498,15 @@ export default function HomeSearchPage() {
 
       <section style={{ maxWidth: 1180, margin: '0 auto', padding: '49px 26px 23px' }}>
         <div
+          className={isMobile ? 'hscroll' : undefined}
           style={{
-            display: 'grid',
-            gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
+            display: isMobile ? 'flex' : 'grid',
+            gridTemplateColumns: isMobile ? undefined : 'repeat(4, 1fr)',
             background: '#fff',
             border: '1px solid #eef2f7',
             borderRadius: 16,
+            overflowX: isMobile ? 'auto' : 'visible',
+            scrollSnapType: isMobile ? 'x mandatory' : undefined,
           }}
         >
           {t.quickLinks.map((label, i) => {
@@ -524,6 +527,8 @@ export default function HomeSearchPage() {
                   fontFamily: 'inherit',
                   background: 'transparent',
                   border: 'none',
+                  flex: isMobile ? '0 0 calc(50% - 6.5px)' : undefined,
+                  scrollSnapAlign: isMobile ? 'start' : undefined,
                   ...(!isMobile && i > 0 ? { borderLeft: '1px solid #eef2f7' } : {}),
                 }}
               >
@@ -649,7 +654,6 @@ export default function HomeSearchPage() {
       </section>
       )}
 
-      {!isMobile && (
       <section style={{ maxWidth: 1180, margin: '0 auto', padding: '39px 26px 20px' }}>
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 26 }}>
           <div>
@@ -664,14 +668,36 @@ export default function HomeSearchPage() {
             <span>{locale === 'en' ? '→' : '←'}</span>{t.viewAllDest}
           </button>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 18 }}>
+        <div
+          className={isMobile ? 'hscroll' : undefined}
+          style={{
+            display: isMobile ? 'flex' : 'grid',
+            gridTemplateColumns: isMobile ? undefined : 'repeat(4, 1fr)',
+            gap: 18,
+            overflowX: isMobile ? 'auto' : 'visible',
+            scrollSnapType: isMobile ? 'x mandatory' : undefined,
+            paddingBottom: isMobile ? 8 : 0,
+          }}
+        >
           {popularDests.map((d) => (
             <button
               type="button"
               key={d.code}
               data-testid={`popular-dest-${d.code}`}
               onClick={() => navigate(`/results?origin=THR&dest=${d.code}&date=${TODAY_ISO}`)}
-              style={{ textAlign: locale === 'en' ? 'left' : 'right', background: '#fff', borderRadius: 16, overflow: 'hidden', boxShadow: '0 10px 30px -18px rgba(13,38,102,.25)', cursor: 'pointer', border: 'none', fontFamily: 'inherit', padding: 0 }}
+              style={{
+                textAlign: locale === 'en' ? 'left' : 'right',
+                background: '#fff',
+                borderRadius: 16,
+                overflow: 'hidden',
+                boxShadow: '0 10px 30px -18px rgba(13,38,102,.25)',
+                cursor: 'pointer',
+                border: 'none',
+                fontFamily: 'inherit',
+                padding: 0,
+                flex: isMobile ? '0 0 calc(50% - 9px)' : undefined,
+                scrollSnapAlign: isMobile ? 'start' : undefined,
+              }}
             >
               <div
                 style={{
@@ -712,7 +738,6 @@ export default function HomeSearchPage() {
           ))}
         </div>
       </section>
-      )}
 
       {!isMobile && (
         <HomePromoCarousel locale={locale} copy={{ ...t, appMockup: extra.appMockup }} appLinks={appLinks} onLoyaltyClick={() => navigate('/club')} />
