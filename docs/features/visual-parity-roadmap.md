@@ -25,7 +25,7 @@ Systematic page-by-page alignment with bundled HTML exports. Each phase = layout
 | 10 | باشگاه مشتریان | `باشگاه مشتریان.html` | Med | [~] i18n done |
 | 11 | پشتیبانی | `پشتیبانی.html` | Med | [~] i18n done |
 | 12 | درباره ما / تماس / قوانین | bundled | Low | [~] i18n done |
-| 13 | صفحه 404 / maintenance | bundled | Low | [ ] |
+| 13 | صفحه 404 / maintenance | bundled | Low | [x] Light layout, header, gradient 404, plane path |
 | 14 | فرصت‌های شغلی + فرم | bundled | Low | [ ] |
 | 15 | پنل کاربر | `پنل کاربر.html` | High | [ ] |
 | 16 | پنل آژانس | `پنل آژانس.html` | High | [ ] Mobile shell |
