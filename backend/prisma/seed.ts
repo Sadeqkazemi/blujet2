@@ -1245,7 +1245,7 @@ async function main() {
     if (existingPax === 0) {
       const demoPassengers: { name: string; seat: string }[] = [
         { name: 'نگار رضایی', seat: '3A' },
-        { name: 'سارا احمدی', seat: '3C' },
+        { name: 'سارا احمدی', seat: '3E' },
         { name: 'کیوان حسینی', seat: '9A' },
         { name: 'یاسمن مرادی', seat: '9D' },
         { name: 'رضا احمدی', seat: '12B' },
