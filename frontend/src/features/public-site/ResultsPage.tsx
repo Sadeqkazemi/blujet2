@@ -6,7 +6,6 @@ import {
   fetchClubPoints,
   fetchSavedFlights,
   fetchSearchAdvisory,
-  fetchPriceCalendar,
   saveFlight,
   searchFlights,
 } from '../../api/publicSite';
@@ -14,12 +13,11 @@ import { ApiRequestError } from '../../api/envelope';
 import { useAuth } from '../../hooks/useAuth';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
-import { faDigits, formatToman, localeMoney } from '../../lib/fa-format';
+import { formatToman, localeMoney } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import type {
   Airport,
   CabinClass,
-  PriceCalendarDay,
   PriceLock,
   SearchAdvisoryResult,
   SearchFlightResult,
@@ -27,12 +25,12 @@ import type {
 import PublicPageShell from '../../components/public/PublicPageShell';
 import ResultsSearchSummary from '../../components/public/results/ResultsSearchSummary';
 import ResultsMobileSubHeader from '../../components/public/results/ResultsMobileSubHeader';
-import ResultsPriceCalendarStrip from '../../components/public/results/ResultsPriceCalendarStrip';
 import ResultsAiRadarBanner from '../../components/public/results/ResultsAiRadarBanner';
 import ResultsFilterBar from '../../components/public/results/ResultsFilterBar';
 import ResultsFlightCard from '../../components/public/results/ResultsFlightCard';
 import ResultsSkeletonCards from '../../components/public/results/ResultsSkeletonCards';
 import ResultsEditSearchModal from '../../components/public/results/ResultsEditSearchModal';
+import ResultsBuyOverlay from '../../components/public/results/ResultsBuyOverlay';
 import {
   depHourBucket,
   flightAirlineLabel,
@@ -118,6 +116,11 @@ const STR: Record<
     aiRecommendationBuy: string;
     aiRecommendationWait: string;
     aiPredictedPrice: string;
+    probLabel: string;
+    cheaperDayLabel: string;
+    bestPickLabel: string;
+    buyNowLabel: string;
+    waitLabel: string;
     sortCheap: string;
     sortFast: string;
     sortEarly: string;
@@ -182,6 +185,11 @@ const STR: Record<
     aiRecommendationBuy: 'توصیه: همین حالا بخرید',
     aiRecommendationWait: 'توصیه: کمی صبر کنید',
     aiPredictedPrice: 'قیمت پیش‌بینی‌شده',
+    probLabel: 'احتمال افزایش قیمت:',
+    cheaperDayLabel: 'ارزان‌ترین روز نزدیک:',
+    bestPickLabel: 'پیشنهاد رادار',
+    buyNowLabel: 'همین حالا بخر',
+    waitLabel: 'صبر کن',
     sortCheap: 'ارزان‌ترین',
     sortFast: 'سریع‌ترین',
     sortEarly: 'زودترین پرواز',
@@ -245,6 +253,11 @@ const STR: Record<
     aiRecommendationBuy: 'Recommendation: Buy now',
     aiRecommendationWait: 'Recommendation: Wait',
     aiPredictedPrice: 'Predicted price',
+    probLabel: 'Price increase chance:',
+    cheaperDayLabel: 'Cheapest nearby day:',
+    bestPickLabel: 'Radar pick',
+    buyNowLabel: 'Buy now',
+    waitLabel: 'Wait',
     sortCheap: 'Cheapest',
     sortFast: 'Fastest',
     sortEarly: 'Earliest flight',
@@ -308,6 +321,11 @@ const STR: Record<
     aiRecommendationBuy: 'التوصية: اشترِ الآن',
     aiRecommendationWait: 'التوصية: انتظر قليلاً',
     aiPredictedPrice: 'السعر المتوقع',
+    probLabel: 'احتمال زيادة السعر:',
+    cheaperDayLabel: 'أرخص يوم قريب:',
+    bestPickLabel: 'اقتراح الرادار',
+    buyNowLabel: 'اشترِ الآن',
+    waitLabel: 'انتظر',
     sortCheap: 'الأرخص',
     sortFast: 'الأسرع',
     sortEarly: 'أبكر رحلة',
@@ -369,8 +387,12 @@ export default function ResultsPage() {
   const [airports, setAirports] = useState<Airport[]>([]);
   const [results, setResults] = useState<SearchFlightResult[] | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
-  const [calendarDays, setCalendarDays] = useState<PriceCalendarDay[] | null>(null);
   const [editOpen, setEditOpen] = useState(false);
+  const [buyTarget, setBuyTarget] = useState<{
+    flight: SearchFlightResult;
+    cabin: CabinClass;
+    priceIrr: string;
+  } | null>(null);
 
   const [fStops, setFStops] = useState<'all' | 'direct' | 'one'>('all');
   const [fTime, setFTime] = useState<'all' | 'morning' | 'noon' | 'evening'>('all');
@@ -422,14 +444,6 @@ export default function ResultsPage() {
           setResults([]);
           setSearchError(t.searchError);
         }
-      });
-
-    fetchPriceCalendar(origin, dest, date)
-      .then((days) => {
-        if (!cancelled) setCalendarDays(days);
-      })
-      .catch(() => {
-        if (!cancelled) setCalendarDays([]);
       });
 
     return () => {
@@ -534,19 +548,6 @@ export default function ResultsPage() {
     return list;
   }, [results, fStops, fTime, fAirline, sort, preferredCabin]);
 
-  const calendarMinPrice = useMemo(() => {
-    const prices = (calendarDays ?? []).map((d) => BigInt(d.minPriceIrr)).filter((p) => p > 0n);
-    if (prices.length === 0) return null;
-    return prices.reduce((min, p) => (p < min ? p : min));
-  }, [calendarDays]);
-
-  function onCalendarDayClick(dayDate: string) {
-    if (dayDate === date) return;
-    const next = new URLSearchParams(params);
-    next.set('date', dayDate);
-    setParams(next);
-  }
-
   function clearFilters() {
     setFStops('all');
     setFTime('all');
@@ -634,17 +635,6 @@ export default function ResultsPage() {
         onEdit={() => setEditOpen(true)}
       />
 
-      {calendarDays && calendarDays.length > 0 && (
-        <ResultsPriceCalendarStrip
-          days={calendarDays}
-          selectedDate={date}
-          calendarMinPrice={calendarMinPrice}
-          locale={locale}
-          isMobile={isMobile}
-          onDayClick={onCalendarDayClick}
-        />
-      )}
-
       <ResultsAiRadarBanner
         locale={locale}
         isMobile={isMobile}
@@ -660,6 +650,11 @@ export default function ResultsPage() {
         recommendationBuy={t.aiRecommendationBuy}
         recommendationWait={t.aiRecommendationWait}
         predictedPriceLabel={t.aiPredictedPrice}
+        probLabel={t.probLabel}
+        cheaperDayLabel={t.cheaperDayLabel}
+        bestPickLabel={t.bestPickLabel}
+        buyNowLabel={t.buyNowLabel}
+        waitLabel={t.waitLabel}
         tomanLabel={t.toman}
         reasonText={translateAdvisoryReason(advisory?.reasonFa, locale)}
         onAsk={() => void askAi()}
@@ -830,7 +825,12 @@ export default function ResultsPage() {
               lockBusyKey={lockBusyKey}
               saveBusyKey={saveBusyKey}
               savedKeys={savedKeys}
-              onSelect={(id, cabin) => navigate(`/book/${id}?cabin=${cabin}`)}
+              onSelect={(id, cabin) => {
+                const flight = results?.find((r) => r.flightInstanceId === id);
+                const c = flight?.cabins.find((x) => x.cabin === cabin);
+                if (!flight || !c) return;
+                setBuyTarget({ flight, cabin, priceIrr: c.priceIrr });
+              }}
               onLock={(id, cabin) => void onRealLockClick(id, cabin)}
               onSave={(id, cabin) => void onSaveClick(id, cabin)}
             />
@@ -928,6 +928,19 @@ export default function ResultsPage() {
         date={date}
         onClose={() => setEditOpen(false)}
         onSubmit={onEditSearchSubmit}
+      />
+
+      <ResultsBuyOverlay
+        open={buyTarget !== null}
+        locale={locale}
+        flight={buyTarget?.flight ?? null}
+        cabin={buyTarget?.cabin ?? null}
+        priceIrr={buyTarget?.priceIrr ?? null}
+        onClose={() => setBuyTarget(null)}
+        onContinue={() => {
+          if (!buyTarget) return;
+          navigate(`/book/${buyTarget.flight.flightInstanceId}?cabin=${buyTarget.cabin}`);
+        }}
       />
 
       {realLockResult && (

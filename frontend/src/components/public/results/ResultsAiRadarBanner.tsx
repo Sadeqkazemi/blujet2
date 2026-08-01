@@ -1,5 +1,5 @@
 import type { StoredLocale } from '../../../hooks/useLocale';
-import { localeMoney } from '../../../lib/fa-format';
+import { faDigits, localeMoney } from '../../../lib/fa-format';
 import type { SearchAdvisoryResult } from '../../../types/public-site';
 
 export type AiRadarState = 'idle' | 'loading' | 'done' | 'unavailable' | 'error';
@@ -19,6 +19,11 @@ export interface ResultsAiRadarBannerProps {
   recommendationBuy: string;
   recommendationWait: string;
   predictedPriceLabel: string;
+  probLabel: string;
+  cheaperDayLabel: string;
+  bestPickLabel: string;
+  buyNowLabel: string;
+  waitLabel: string;
   tomanLabel: string;
   reasonText: string;
   onAsk: () => void;
@@ -39,12 +44,20 @@ export default function ResultsAiRadarBanner({
   recommendationBuy,
   recommendationWait,
   predictedPriceLabel,
+  probLabel,
+  cheaperDayLabel,
+  bestPickLabel,
+  buyNowLabel,
+  waitLabel,
   tomanLabel,
   reasonText,
   onAsk,
 }: ResultsAiRadarBannerProps) {
-  const ctaLabel =
-    aiState === 'loading' ? analyzingLabel : aiState === 'done' ? reanalyzeLabel : analyzeLabel;
+  const isBuy = advisory?.recommendation === 'buy';
+  const probPct =
+    advisory?.priceIncreaseProbPct != null
+      ? faDigits(String(advisory.priceIncreaseProbPct))
+      : null;
 
   return (
     <div style={{ maxWidth: 1320, margin: '0 auto', padding: isMobile ? '12px 16px 0' : '16px 26px 0' }}>
@@ -82,29 +95,74 @@ export default function ResultsAiRadarBanner({
             </div>
             <div>
               <div style={{ fontSize: isMobile ? 13.5 : 15, fontWeight: 800, color: '#fff' }}>{title}</div>
-              <div style={{ fontSize: isMobile ? 12 : 13, color: '#dbe7f7', marginTop: 2 }}>{sub}</div>
+              <div style={{ fontSize: isMobile ? 12 : 13, color: '#d6ece7', marginTop: 2 }}>{sub}</div>
             </div>
           </div>
-          {(aiState === 'idle' || aiState === 'loading' || aiState === 'done') && (
+          {aiState === 'idle' && (
             <button
               type="button"
               data-testid="ai-ask"
-              disabled={aiState === 'loading'}
               onClick={onAsk}
               style={{
-                padding: '9px 16px',
-                borderRadius: 10,
+                padding: '7px 13px',
+                borderRadius: 8,
                 background: '#fff',
                 color: '#1668c4',
                 fontSize: 13,
                 fontWeight: 800,
                 border: 'none',
-                cursor: aiState === 'loading' ? 'wait' : 'pointer',
+                cursor: 'pointer',
                 fontFamily: 'inherit',
                 flex: 'none',
               }}
             >
-              {ctaLabel}
+              {analyzeLabel}
+            </button>
+          )}
+          {aiState === 'loading' && (
+            <span
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                color: '#fff',
+                fontSize: 13,
+                fontWeight: 600,
+              }}
+            >
+              <span
+                style={{
+                  width: 14,
+                  height: 14,
+                  border: '2px solid #ffffff55',
+                  borderTopColor: '#fff',
+                  borderRadius: '50%',
+                  display: 'inline-block',
+                  animation: 'spin 0.8s linear infinite',
+                }}
+              />
+              {analyzingLabel}
+            </span>
+          )}
+          {aiState === 'done' && (
+            <button
+              type="button"
+              data-testid="ai-ask"
+              onClick={onAsk}
+              style={{
+                padding: '6px 11px',
+                borderRadius: 8,
+                border: '1.5px solid #ffffff66',
+                color: '#fff',
+                fontSize: 12.5,
+                fontWeight: 700,
+                background: 'transparent',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                flex: 'none',
+              }}
+            >
+              {reanalyzeLabel}
             </button>
           )}
         </div>
@@ -118,7 +176,18 @@ export default function ResultsAiRadarBanner({
           </div>
         )}
         {aiState === 'error' && (
-          <div data-testid="ai-error" style={{ marginTop: 8, fontSize: 12.5, color: '#d64545', padding: '0 4px' }}>
+          <div
+            data-testid="ai-error"
+            style={{
+              marginTop: 16,
+              background: '#fff4e8',
+              border: '1px solid #f6dcbb',
+              color: '#c2410c',
+              borderRadius: 12,
+              padding: '10px 11px',
+              fontSize: 13.5,
+            }}
+          >
             {errorLabel}
           </div>
         )}
@@ -126,38 +195,88 @@ export default function ResultsAiRadarBanner({
           <div
             data-testid="ai-result"
             style={{
-              marginTop: 10,
+              marginTop: 16,
               background: '#fff',
-              border: '1px solid #eef1f5',
+              border: '1px solid #e0e9f5',
               borderRadius: 12,
-              padding: '12px 14px',
+              padding: 12,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 11,
             }}
           >
+            {advisory.predictedPriceIrr && BigInt(advisory.predictedPriceIrr) > 0n && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  background: '#eef4fb',
+                  borderRadius: 10,
+                  padding: '11px 14px',
+                }}
+              >
+                <span style={{ fontSize: 13, color: '#5a6678', fontWeight: 600 }}>{predictedPriceLabel}</span>
+                <span className="font-num" style={{ fontSize: 19, fontWeight: 900, color: '#1668c4' }}>
+                  {localeMoney(advisory.predictedPriceIrr, locale)} {tomanLabel}
+                </span>
+              </div>
+            )}
             <div
               style={{
-                display: 'inline-block',
-                marginBottom: 6,
-                borderRadius: 14,
-                padding: '4px 10px',
-                fontSize: 12,
-                fontWeight: 800,
-                background: advisory.recommendation === 'wait' ? '#fff7ed' : '#e8f5ee',
-                color: advisory.recommendation === 'wait' ? '#9a5b16' : '#1f8a5b',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 11,
+                flexWrap: 'wrap',
+                paddingBottom: 11,
+                borderBottom: '1px solid #eef1f5',
               }}
             >
-              {advisory.recommendation === 'wait' ? recommendationWait : recommendationBuy}
+              <span
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 7,
+                  background: isBuy ? '#e8f5ee' : '#fff4e8',
+                  color: isBuy ? '#1f8a5b' : '#d9730d',
+                  padding: '8px 14px',
+                  borderRadius: 28,
+                  fontSize: 14.5,
+                  fontWeight: 800,
+                }}
+              >
+                ● {isBuy ? buyNowLabel : waitLabel}
+              </span>
+              {probPct && (
+                <span style={{ fontSize: 13.5, color: '#5a6678' }}>
+                  {probLabel}{' '}
+                  <b style={{ color: '#d9730d' }}>{probPct}٪</b>
+                </span>
+              )}
+              {advisory.cheapestDayLabel && (
+                <span style={{ fontSize: 13.5, color: '#5a6678' }}>
+                  {cheaperDayLabel}{' '}
+                  <b style={{ color: '#1668c4' }}>{advisory.cheapestDayLabel}</b>
+                </span>
+              )}
             </div>
             {reasonText && (
-              <p style={{ margin: '0 0 4px', fontSize: 13, lineHeight: 1.7, color: '#3f546b' }}>{reasonText}</p>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13, lineHeight: 1.8 }}>
+                <span style={{ color: '#1668c4', fontWeight: 800, whiteSpace: 'nowrap' }}>
+                  ✓ {bestPickLabel}
+                </span>
+                <span style={{ color: '#16202e' }}>{reasonText}</span>
+              </div>
             )}
-            {advisory.predictedPriceIrr && BigInt(advisory.predictedPriceIrr) > 0n && (
-              <p style={{ margin: 0, fontSize: 12.5, fontWeight: 700, color: '#1668c4' }}>
-                {predictedPriceLabel}: {localeMoney(advisory.predictedPriceIrr, locale)} {tomanLabel}
-              </p>
+            {!reasonText && (
+              <div style={{ fontSize: 13, color: '#16202e' }}>
+                {isBuy ? recommendationBuy : recommendationWait}
+              </div>
             )}
           </div>
         )}
       </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

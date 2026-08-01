@@ -33,19 +33,9 @@ const RESULT: SearchFlightResult = {
   ],
 };
 
-const CALENDAR = [
-  { date: '2026-07-29', minPriceIrr: '365000000', dateLabelFa: '2026-07-29', isCenter: false },
-  { date: '2026-07-30', minPriceIrr: '395000000', dateLabelFa: '2026-07-30', isCenter: false },
-  { date: '2026-07-31', minPriceIrr: '380000000', dateLabelFa: '2026-07-31', isCenter: false },
-  { date: '2026-08-01', minPriceIrr: '380000000', dateLabelFa: '2026-08-01', isCenter: true },
-  { date: '2026-08-02', minPriceIrr: '410000000', dateLabelFa: '2026-08-02', isCenter: false },
-  { date: '2026-08-03', minPriceIrr: '375000000', dateLabelFa: '2026-08-03', isCenter: false },
-  { date: '2026-08-04', minPriceIrr: '390000000', dateLabelFa: '2026-08-04', isCenter: false },
-];
 
 function mockSearchApis() {
   vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
-  vi.spyOn(publicSiteApi, 'fetchPriceCalendar').mockResolvedValue(CALENDAR);
 }
 
 async function expandFirstCard(user: ReturnType<typeof userEvent.setup>) {
@@ -60,6 +50,7 @@ function renderPage(status: 'unauthenticated' | 'authenticated' = 'unauthenticat
     confirmTwoFactor: vi.fn(),
     agencyLogin: vi.fn(),
     signOut: vi.fn(),
+    refreshMe: vi.fn(),
   });
   return render(
     <MemoryRouter initialEntries={['/results?origin=THR&dest=MHD&date=2026-08-01']}>
@@ -132,18 +123,18 @@ describe('ResultsPage', () => {
     expect(screen.queryByTestId('mock-result-card')).not.toBeInTheDocument();
   });
 
-  it('loads price calendar from API', async () => {
+  it('opens buy overlay when purchasing from expanded card', async () => {
     mockSearchApis();
-    const calendarSpy = vi.spyOn(publicSiteApi, 'fetchPriceCalendar').mockResolvedValue(CALENDAR);
     vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+    const user = userEvent.setup();
     renderPage();
-    await screen.findByTestId('price-calendar');
-
-    expect(calendarSpy).toHaveBeenCalledWith('THR', 'MHD', '2026-08-01');
-    expect(screen.getByTestId('price-calendar').children).toHaveLength(7);
+    await expandFirstCard(user);
+    await user.click(screen.getByText('خرید بلیط'));
+    expect(await screen.findByTestId('buy-overlay')).toBeInTheDocument();
+    expect(screen.getByText('تکمیل خرید')).toBeInTheDocument();
   });
 
-  it('calls advisory API and shows buy recommendation', async () => {
+  it('calls advisory API and shows buy recommendation with probability', async () => {
     mockSearchApis();
     vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
     const advisorySpy = vi.spyOn(publicSiteApi, 'fetchSearchAdvisory').mockResolvedValue({
@@ -151,6 +142,8 @@ describe('ResultsPage', () => {
       recommendation: 'buy',
       reasonFa: 'قیمت امروز در محدوده مناسب است — برای سفر قطعی همین حالا بخرید.',
       predictedPriceIrr: '380000000',
+      priceIncreaseProbPct: 72,
+      cheapestDayLabel: '۱۴ مرداد',
     });
     renderPage();
     await screen.findByTestId('result-card');
@@ -158,7 +151,8 @@ describe('ResultsPage', () => {
     await userEvent.click(screen.getByTestId('ai-ask'));
 
     expect(advisorySpy).toHaveBeenCalledWith('THR', 'MHD', '2026-08-01');
-    expect(await screen.findByTestId('ai-result')).toHaveTextContent('توصیه: همین حالا بخرید');
+    expect(await screen.findByTestId('ai-result')).toHaveTextContent('پیشنهاد رادار');
+    expect(screen.getByText(/احتمال افزایش قیمت/)).toBeInTheDocument();
   });
 
   describe('real قفل قیمت (price lock)', () => {
