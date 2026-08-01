@@ -15,6 +15,7 @@ import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { formatToman, localeMoney } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
+import { airportCityLabel, airportCityName } from '../../lib/airport-cities';
 import type {
   Airport,
   CabinClass,
@@ -140,7 +141,10 @@ export default function ResultsPage() {
   }, [origin, dest, date, copy.searchError]);
 
   const airportMap = useMemo(() => new Map(airports.map((a) => [a.code, a])), [airports]);
-  const cityName = (code: string) => airportMap.get(code)?.cityFa ?? code;
+  const cityName = (code: string) =>
+    airportCityName(code, locale, airportMap.get(code)?.cityFa);
+  const cityLabel = (code: string) =>
+    airportCityLabel(code, locale, airportMap.get(code)?.cityFa);
 
   /** API results, or design-reference demo flights for THR↔MHD when inventory is empty. */
   const effectiveResults = useMemo(() => {
@@ -389,9 +393,9 @@ export default function ResultsPage() {
                   flexWrap: 'wrap',
                 }}
               >
-                <span style={{ color: '#0d2640', fontWeight: 800 }}>{cityName(origin)}</span>
+                <span style={{ color: '#0d2640', fontWeight: 800 }}>{cityLabel(origin)}</span>
                 <span style={{ color: '#1668c4' }}>{copy.routeArrow}</span>
-                <span style={{ color: '#0d2640', fontWeight: 800 }}>{cityName(dest)}</span>
+                <span style={{ color: '#0d2640', fontWeight: 800 }}>{cityLabel(dest)}</span>
                 <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#cbd6e4' }} />
                 <span>{dateLabel}</span>
                 <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#cbd6e4' }} />

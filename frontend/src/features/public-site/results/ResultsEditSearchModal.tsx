@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { fetchAirports } from '../../../api/publicSite';
 import type { StoredLocale } from '../../../hooks/useLocale';
 import { faDigits } from '../../../lib/fa-format';
+import { airportCityLabel, airportCityName } from '../../../lib/airport-cities';
 import { dayjs, formatJalaliDate } from '../../../lib/jalali';
 import type { Airport } from '../../../types/public-site';
 import type { ResultsCopy } from './results-copy';
@@ -26,8 +27,8 @@ type Props = {
 
 type CalCell = { label: string; iso: string | null; disabled: boolean; selected: boolean };
 
-function airportCityLabel(airport: Airport, locale: StoredLocale) {
-  return locale === 'en' ? `${airport.cityFa} (${airport.code})` : airport.cityFa;
+function airportDisplayLabel(airport: Airport, locale: StoredLocale) {
+  return airportCityLabel(airport.code, locale, airport.cityFa);
 }
 
 function formatDateDisplay(isoDay: string, locale: StoredLocale) {
@@ -93,7 +94,8 @@ function AirportPicker({
       (a) =>
         a.code.toLowerCase().includes(q) ||
         a.cityFa.includes(query.trim()) ||
-        airportCityLabel(a, locale).toLowerCase().includes(q),
+        airportCityName(a.code, locale, a.cityFa).toLowerCase().includes(q) ||
+        airportDisplayLabel(a, locale).toLowerCase().includes(q),
     );
   }, [airports, query, locale]);
 
@@ -120,7 +122,7 @@ function AirportPicker({
         }}
       >
         <span style={{ fontSize: 13.5, fontWeight: 700, color: '#16202e' }}>
-          {selected ? airportCityLabel(selected, locale) : '—'}
+          {selected ? airportDisplayLabel(selected, locale) : '—'}
         </span>
         <span style={{ fontSize: 12, color: '#6b7787' }}>▼</span>
       </button>
@@ -208,7 +210,7 @@ function AirportPicker({
                     ✈
                   </span>
                   <div style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 700, color: '#16202e' }}>
-                    {airportCityLabel(a, locale)}
+                    {airportCityName(a.code, locale, a.cityFa)}
                   </div>
                 </button>
               ))}

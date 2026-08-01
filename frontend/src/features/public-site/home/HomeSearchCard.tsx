@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import JalaliDatePicker from '../../../components/JalaliDatePicker';
 import type { Airport } from '../../../types/public-site';
 import type { StoredLocale } from '../../../hooks/useLocale';
+import { airportCityName } from '../../../lib/airport-cities';
 import { formatToman } from '../../../lib/fa-format';
 import {
   DomesticFlightIcon,
@@ -36,6 +37,9 @@ export type HomeSearchCopy = {
   lblPaxClass: string;
   lblFlightType: string;
   selectPlaceholder: string;
+  originPlaceholder: string;
+  destPlaceholder: string;
+  destNeedOriginPlaceholder: string;
   cityListLabel: string;
   btnSearch: string;
   btnConfirm: string;
@@ -130,6 +134,7 @@ function AirportCell({
   testId,
   fieldStyle,
   isRTL,
+  locale,
   cityListLabel,
   cellPadding = '10px 24px 10px 20px',
   compact = false,
@@ -143,6 +148,7 @@ function AirportCell({
   testId: string;
   fieldStyle?: React.CSSProperties;
   isRTL: boolean;
+  locale: StoredLocale;
   cityListLabel: string;
   cellPadding?: string;
   compact?: boolean;
@@ -245,7 +251,7 @@ function AirportCell({
                     <PlaneIcon size={15} />
                   </span>
                   <div style={{ flex: 1, minWidth: 0, fontSize: '12.5px', fontWeight: 700, color: '#16202e' }}>
-                    {a.cityFa} ({a.code})
+                    {airportCityName(a.code, locale, a.cityFa)}
                   </div>
                 </div>
               ))}
@@ -312,13 +318,13 @@ export default function HomeSearchCard({
   const paxSummary = `${paxParts.join('، ')}، ${cabinLabel}`;
 
   function originDisplay() {
-    if (!origin) return t.selectPlaceholder;
+    if (!origin) return t.originPlaceholder;
     const ap = airports.find((a) => a.code === origin);
     return cityName(origin, ap?.cityFa);
   }
 
   function destDisplay() {
-    if (!dest) return t.selectPlaceholder;
+    if (!dest) return origin ? t.destPlaceholder : t.destNeedOriginPlaceholder;
     const ap = airports.find((a) => a.code === dest);
     return cityName(dest, ap?.cityFa);
   }
@@ -520,6 +526,7 @@ export default function HomeSearchCard({
                   }}
                   className="home-origin home-field-card"
                   isRTL={isRTL}
+                  locale={locale}
                   cityListLabel={t.cityListLabel}
                   compact={isMobile}
                 />
@@ -570,6 +577,7 @@ export default function HomeSearchCard({
                   }}
                   className="home-dest home-field-card"
                   isRTL={isRTL}
+                  locale={locale}
                   cityListLabel={t.cityListLabel}
                   cellPadding="10px 24px 10px 32px"
                   compact={isMobile}

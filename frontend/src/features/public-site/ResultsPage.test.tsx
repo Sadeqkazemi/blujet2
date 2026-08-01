@@ -79,6 +79,16 @@ describe('ResultsPage', () => {
     expect(screen.getByRole('button', { name: 'خرید بلیط' })).toBeInTheDocument();
   });
 
+  it('shows origin and destination city names in the search summary', async () => {
+    mockSearchApis();
+    vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+    renderPage();
+
+    expect(await screen.findByTestId('result-card')).toBeInTheDocument();
+    expect(screen.getByText('تهران (THR)')).toBeInTheDocument();
+    expect(screen.getByText('مشهد (MHD)')).toBeInTheDocument();
+  });
+
   it('disables buying when the primary cabin is sold out', async () => {
     mockSearchApis();
     vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([
