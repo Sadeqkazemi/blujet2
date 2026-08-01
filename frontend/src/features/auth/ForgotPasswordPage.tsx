@@ -634,7 +634,7 @@ export default function ForgotPasswordPage() {
                       {method === 'phone' ? displayPhone : email}
                     </span>
                   </div>
-                  <OtpCells digits={otpDigits} onChange={setOtpDigits} testIdPrefix="fp-code-cell" />
+                  <OtpCells digits={otpDigits} onChange={setOtpDigits} testIdPrefix="fp-code-cell" autoFocus />
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12 }}>
                   <span

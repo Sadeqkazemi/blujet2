@@ -937,7 +937,12 @@ export default function CustomerLoginPage() {
                       {displayPhone}
                     </span>
                   </div>
-                  <OtpCells digits={otpDigits} onChange={setOtpDigits} testIdPrefix="signin-code-cell" />
+                  <OtpCells
+                    digits={otpDigits}
+                    onChange={setOtpDigits}
+                    testIdPrefix="signin-code-cell"
+                    autoFocus
+                  />
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12 }}>
                   <span
