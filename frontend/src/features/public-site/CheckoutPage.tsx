@@ -1,107 +1,351 @@
-import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { fetchMyBooking } from '../../api/publicSite';
-import { useLocale, type StoredLocale } from '../../hooks/useLocale';
-import { localeMoney } from '../../lib/fa-format';
-import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
-import type { BookingDetail } from '../../types/public-site';
+import { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import {
+  createBooking,
+  fetchClubPoints,
+  fetchMyBooking,
+  fetchSavedPassengers,
+  fetchSeatMap,
+} from '../../api/publicSite';
+import { ApiRequestError } from '../../api/envelope';
+import { useAuth } from '../../hooks/useAuth';
+import { useLocale } from '../../hooks/useLocale';
+import type { BookingDetail, CabinClass, SavedPassenger, SeatMapCell } from '../../types/public-site';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import FlowStepper from '../../components/public/FlowStepper';
+import { CHECKOUT_COPY } from './checkout/checkout-copy';
+import {
+  clearCheckoutDraft,
+  loadCheckoutDraft,
+  saveCheckoutDraft,
+} from './checkout/checkout-draft';
+import CheckoutStepBar from './checkout/CheckoutStepBar';
+import ExtrasStep from './checkout/ExtrasStep';
+import FlightSummaryCard from './checkout/FlightSummaryCard';
+import PassengerStep from './checkout/PassengerStep';
+import PricingSidebar from './checkout/PricingSidebar';
+import ReviewStep from './checkout/ReviewStep';
+import OtpLoginInline from './OtpLoginInline';
+import {
+  defaultExtras,
+  emptyPassenger,
+  passengerFullName,
+  type CheckoutDraft,
+  type CheckoutWizardStep,
+  type ExtraServiceState,
+  type FlightSnapshot,
+  type PassengerFormDraft,
+} from './checkout/checkout-types';
 
-const CABIN_LABEL: Record<string, Record<StoredLocale, string>> = {
-  ECONOMY: { fa: 'اکونومی', en: 'Economy', ar: 'اقتصادية' },
-  BUSINESS: { fa: 'بیزینس', en: 'Business', ar: 'درجة الأعمال' },
-};
+const BUSINESS_SEAT_MIN_POINTS = 15_000;
+const STEP_ORDER: CheckoutWizardStep[] = ['pax', 'extras', 'review'];
 
-const STR: Record<
-  StoredLocale,
-  {
-    loading: string;
-    notFound: string;
-    expired: string;
-    searchAgain: string;
-    title: string;
-    continueToPayment: string;
-    payable: string;
-    toman: string;
-    passengers: string;
-  }
-> = {
-  fa: {
-    loading: 'در حال بارگذاری…',
-    notFound: 'رزرو یافت نشد.',
-    expired: 'مهلت نگهداری این رزرو به پایان رسیده است.',
-    searchAgain: 'جستجوی مجدد',
-    title: 'تکمیل خرید',
-    continueToPayment: 'ادامه به پرداخت',
-    payable: 'مبلغ قابل پرداخت',
-    toman: 'تومان',
-    passengers: 'مسافران',
-  },
-  en: {
-    loading: 'Loading…',
-    notFound: 'Booking not found.',
-    expired: 'The hold on this booking has expired.',
-    searchAgain: 'Search again',
-    title: 'Review booking',
-    continueToPayment: 'Continue to payment',
-    payable: 'Amount due',
-    toman: 'Toman',
-    passengers: 'Passengers',
-  },
-  ar: {
-    loading: 'جارٍ التحميل…',
-    notFound: 'لم يُعثر على الحجز.',
-    expired: 'انتهت مهلة الاحتفاظ بهذا الحجز.',
-    searchAgain: 'بحث مجدداً',
-    title: 'إتمام الشراء',
-    continueToPayment: 'المتابعة إلى الدفع',
-    payable: 'المبلغ المستحق',
-    toman: 'تومان',
-    passengers: 'المسافرون',
-  },
-};
-
-function formatBookingDateTime(value: string, locale: StoredLocale) {
-  if (locale === 'en') {
-    return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(
-      new Date(value),
-    );
-  }
-  return formatJalaliDateTime(value);
-}
-
-function formatBookingDate(value: string, locale: StoredLocale) {
-  if (locale === 'en') {
-    return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium' }).format(new Date(value));
-  }
-  return formatJalaliDate(value);
+function isPassengerComplete(p: PassengerFormDraft): boolean {
+  if (!p.firstNameLatin.trim() || !p.lastNameLatin.trim() || !p.gender) return false;
+  if (!p.birthDay || !p.birthMonth || !p.birthYear) return false;
+  if (p.docType === 'NATIONAL_ID') return p.nationalId.trim().length >= 10;
+  return p.passportNo.trim().length >= 5;
 }
 
 export default function CheckoutPage() {
   const { bookingId } = useParams<{ bookingId: string }>();
+  const [params] = useSearchParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const { locale } = useLocale();
-  const t = STR[locale];
+  const { status } = useAuth();
+  const t = CHECKOUT_COPY[locale];
 
-  const [booking, setBooking] = useState<BookingDetail | null>(null);
+  const isWizard = bookingId === 'new';
+
+  const [heldBooking, setHeldBooking] = useState<BookingDetail | null>(null);
+  const [draft, setDraft] = useState<CheckoutDraft | null>(null);
+  const [step, setStep] = useState<CheckoutWizardStep>('pax');
+  const [passengers, setPassengers] = useState<PassengerFormDraft[]>([emptyPassenger('')]);
+  const [extras, setExtras] = useState<ExtraServiceState[]>(defaultExtras());
+  const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
+  const [seats, setSeats] = useState<SeatMapCell[] | null>(null);
+  const [savedPassengers, setSavedPassengers] = useState<SavedPassenger[]>([]);
+  const [clubBalance, setClubBalance] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
+  // Load held booking (legacy /payment-bound path)
   useEffect(() => {
-    if (!bookingId) return;
+    if (!bookingId || bookingId === 'new') return;
     fetchMyBooking(bookingId)
-      .then(setBooking)
-      .catch(() => setError(t.notFound));
+      .then(setHeldBooking)
+      .catch(() => setLoadError(t.notFound));
   }, [bookingId, t.notFound]);
 
-  if (error) {
+  // Resolve wizard draft from location state, query, or sessionStorage
+  useEffect(() => {
+    if (!isWizard) return;
+    const stateFlight = (location.state as { flight?: FlightSnapshot; cabin?: CabinClass } | null)
+      ?.flight;
+    const stateCabin = (location.state as { cabin?: CabinClass } | null)?.cabin;
+    const fromStorage = loadCheckoutDraft();
+    const flightInstanceId =
+      params.get('flightInstanceId') || stateFlight?.flightInstanceId || fromStorage?.flightInstanceId;
+    const cabin =
+      (params.get('cabin') as CabinClass | null) ||
+      stateCabin ||
+      fromStorage?.cabin ||
+      'ECONOMY';
+
+    if (stateFlight) {
+      const d: CheckoutDraft = {
+        flightInstanceId: stateFlight.flightInstanceId,
+        cabin,
+        selectedSeats: fromStorage?.selectedSeats ?? [],
+        flight: stateFlight,
+      };
+      setDraft(d);
+      saveCheckoutDraft(d);
+      setSelectedSeats(d.selectedSeats);
+      return;
+    }
+    if (fromStorage && fromStorage.flightInstanceId === flightInstanceId) {
+      setDraft(fromStorage);
+      setSelectedSeats(fromStorage.selectedSeats);
+      return;
+    }
+    if (flightInstanceId) {
+      // Minimal snapshot when only IDs are known (saved flights / deep link)
+      const d: CheckoutDraft = {
+        flightInstanceId,
+        cabin,
+        selectedSeats: [],
+        flight: {
+          flightInstanceId,
+          flightNo: '—',
+          originCode: '—',
+          destCode: '—',
+          departureAt: new Date().toISOString(),
+          arrivalAt: new Date().toISOString(),
+          priceIrr: '0',
+        },
+      };
+      setDraft(d);
+      return;
+    }
+    setLoadError(t.notFound);
+  }, [isWizard, location.state, params, t.notFound]);
+
+  useEffect(() => {
+    if (!draft) return;
+    fetchSeatMap(draft.flightInstanceId)
+      .then((m) => setSeats(m.seats.filter((s) => s.cabin === draft.cabin)))
+      .catch(() => setSeats([]));
+  }, [draft]);
+
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    fetchSavedPassengers()
+      .then(setSavedPassengers)
+      .catch(() => setSavedPassengers([]));
+    fetchClubPoints()
+      .then((c) => setClubBalance(c.balance))
+      .catch(() => setClubBalance(0));
+  }, [status]);
+
+  // Keep passenger seat codes in sync with selected seats
+  useEffect(() => {
+    if (!isWizard) return;
+    setPassengers((prev) => {
+      if (selectedSeats.length === 0) {
+        return prev.length ? prev : [emptyPassenger('')];
+      }
+      return selectedSeats.map((seat, i) => ({
+        ...(prev[i] ?? emptyPassenger(seat)),
+        seatCode: seat,
+      }));
+    });
+  }, [selectedSeats, isWizard]);
+
+  const businessLocked =
+    draft?.cabin === 'BUSINESS' && clubBalance < BUSINESS_SEAT_MIN_POINTS;
+
+  const nextLabel = useMemo(() => {
+    if (step === 'pax') return t.nextPax;
+    if (step === 'extras') return t.nextExtras;
+    return t.nextReview;
+  }, [step, t]);
+
+  function toggleSeat(seatCode: string) {
+    setSelectedSeats((prev) => {
+      const next = prev.includes(seatCode)
+        ? prev.filter((s) => s !== seatCode)
+        : [...prev, seatCode];
+      if (draft) {
+        const updated = { ...draft, selectedSeats: next };
+        setDraft(updated);
+        saveCheckoutDraft(updated);
+      }
+      return next;
+    });
+  }
+
+  function toggleExtra(id: ExtraServiceState['id']) {
+    setExtras((arr) => arr.map((e) => (e.id === id ? { ...e, selected: !e.selected } : e)));
+  }
+
+  function goNext() {
+    setError(null);
+    if (step === 'pax') {
+      if (passengers.some((p) => !isPassengerComplete(p))) {
+        setError(t.completePaxError);
+        return;
+      }
+      setStep('extras');
+      return;
+    }
+    if (step === 'extras') {
+      if (selectedSeats.length === 0) {
+        setError(locale === 'en' ? 'Select at least one seat.' : 'حداقل یک صندلی انتخاب کنید.');
+        return;
+      }
+      if (selectedSeats.length !== passengers.length) {
+        // Align seat↔pax: trim or pad
+        if (selectedSeats.length < passengers.length) {
+          setPassengers((p) => p.slice(0, selectedSeats.length));
+        }
+      }
+      setStep('review');
+      return;
+    }
+    void submitBooking();
+  }
+
+  function goBack() {
+    setError(null);
+    const idx = STEP_ORDER.indexOf(step);
+    if (idx > 0) setStep(STEP_ORDER[idx - 1]!);
+  }
+
+  async function submitBooking() {
+    if (!draft) return;
+    if (status !== 'authenticated') {
+      navigate('/signin', { state: { from: location.pathname + location.search } });
+      return;
+    }
+    if (selectedSeats.length === 0 || passengers.some((p) => !isPassengerComplete(p))) {
+      setError(t.completePaxError);
+      setStep('pax');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const booking = await createBooking({
+        flightInstanceId: draft.flightInstanceId,
+        cabin: draft.cabin,
+        passengers: passengers.map((p, i) => ({
+          fullName: passengerFullName(p),
+          nationalId: p.docType === 'NATIONAL_ID' ? p.nationalId || undefined : undefined,
+          seatCode: selectedSeats[i] ?? p.seatCode,
+        })),
+      });
+      clearCheckoutDraft();
+      navigate(`/payment/${booking.id}`);
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t.notFound);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Auth gate for wizard — design requires login before passenger entry
+  if (isWizard && status === 'loading') {
     return (
       <PublicPageShell>
-        <p className="p-8 text-sm text-red-600">{error}</p>
+        <p className="p-8 text-sm text-[#6b7b94]">{t.loading}</p>
       </PublicPageShell>
     );
   }
-  if (!booking) {
+  if (isWizard && status === 'unauthenticated') {
+    return (
+      <PublicPageShell>
+        <div className="p-6">
+          <OtpLoginInline />
+        </div>
+      </PublicPageShell>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <PublicPageShell>
+        <p className="p-8 text-sm text-red-600">{loadError}</p>
+      </PublicPageShell>
+    );
+  }
+
+  // Legacy held-booking summary (after booking already created)
+  if (!isWizard) {
+    if (!heldBooking) {
+      return (
+        <PublicPageShell>
+          <p className="p-8 text-sm text-[#6b7b94]">{t.loading}</p>
+        </PublicPageShell>
+      );
+    }
+    if (heldBooking.status === 'EXPIRED') {
+      return (
+        <PublicPageShell>
+          <div className="mx-auto max-w-md p-8 text-center">
+            <p className="mb-4 text-sm text-red-600">{t.expired}</p>
+            <button
+              onClick={() => navigate('/')}
+              className="rounded-lg bg-[#1668c4] px-6 py-2.5 text-sm font-bold text-white"
+            >
+              {t.searchAgain}
+            </button>
+          </div>
+        </PublicPageShell>
+      );
+    }
+    // Redirect held bookings straight into payment — wizard already happened
+    return (
+      <PublicPageShell>
+        <FlowStepper current="checkout" onBack={() => navigate(-1)} />
+        <div className="mx-auto max-w-lg p-6">
+          <FlightSummaryCard
+            flight={{
+              flightInstanceId: heldBooking.flightInstanceId,
+              flightNo: heldBooking.flightNo,
+              originCode: heldBooking.originCode,
+              destCode: heldBooking.destCode,
+              departureAt: heldBooking.departureAt,
+              arrivalAt: heldBooking.arrivalAt,
+              priceIrr: heldBooking.priceIrr,
+            }}
+            cabin={heldBooking.cabin}
+            locale={locale}
+          />
+          <div className="mt-4 rounded-2xl border border-[#eef1f5] bg-white p-5">
+            <div className="mb-3 text-[11px] font-black text-[#0d2640]">{t.enterPax}</div>
+            {heldBooking.passengers.map((p) => (
+              <div key={p.seatCode} className="mb-1 flex justify-between text-xs text-[#6b7b94]">
+                <span>{p.fullName}</span>
+                <span dir="ltr">{p.seatCode}</span>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={() => navigate(`/payment/${bookingId}`)}
+            data-testid="continue-to-payment"
+            className="mt-4 w-full rounded-xl bg-[#1668c4] px-6 py-3 text-sm font-bold text-white"
+          >
+            {t.nextPay}
+          </button>
+        </div>
+      </PublicPageShell>
+    );
+  }
+
+  if (!draft) {
     return (
       <PublicPageShell>
         <p className="p-8 text-sm text-[#6b7b94]">{t.loading}</p>
@@ -109,69 +353,80 @@ export default function CheckoutPage() {
     );
   }
 
-  if (booking.status === 'EXPIRED') {
-    return (
-      <PublicPageShell>
-        <div className="mx-auto max-w-md p-8 text-center">
-          <p className="mb-4 text-sm text-red-600">{t.expired}</p>
-          <button
-            onClick={() => navigate('/')}
-            className="rounded-lg bg-[#1668c4] px-6 py-2.5 text-sm font-bold text-white"
-          >
-            {t.searchAgain}
-          </button>
-        </div>
-      </PublicPageShell>
-    );
-  }
+  const priceIrr = draft.flight.priceIrr && draft.flight.priceIrr !== '0'
+    ? draft.flight.priceIrr
+    : String(380_000_000 * Math.max(1, passengers.length));
 
   return (
     <PublicPageShell>
       <FlowStepper current="checkout" onBack={() => navigate(-1)} />
-      <div className="mx-auto max-w-lg p-6">
-        <h1 className="mb-4 text-lg font-extrabold text-[#0d2640]">{t.title}</h1>
+      <CheckoutStepBar current={step} locale={locale} />
 
-        <div className="mb-4 rounded-2xl border border-[#eef1f5] bg-white p-5">
-          <div className="mb-2 flex items-center justify-between text-sm">
-            <span className="font-bold text-[#0d2640]" dir="ltr">
-              {booking.flightNo}
-            </span>
-            <span className="text-[#6b7b94]" dir="ltr">
-              {booking.originCode} ← {booking.destCode}
-            </span>
-          </div>
-          <div className="mb-1 text-xs text-[#6b7b94]">
-            {formatBookingDate(booking.departureAt, locale)} ·{' '}
-            {CABIN_LABEL[booking.cabin]?.[locale] ?? booking.cabin}
-          </div>
-          <div className="mb-3 text-xs text-[#6b7b94]">{formatBookingDateTime(booking.departureAt, locale)}</div>
-
-          <div className="mb-3 text-[11px] font-black text-[#0d2640]">{t.passengers}</div>
-          <div className="flex flex-col gap-1">
-            {booking.passengers.map((p) => (
-              <div key={p.seatCode} className="flex justify-between text-xs text-[#6b7b94]">
-                <span>{p.fullName}</span>
-                <span className="font-num" dir="ltr">
-                  {p.seatCode}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-4 flex items-center justify-between border-t border-[#eef1f5] pt-3">
-            <span className="text-xs text-[#6b7b94]">{t.payable}</span>
-            <span className="font-num text-lg font-black text-[#1668c4]">
-              {localeMoney(booking.priceIrr, locale)} {t.toman}
-            </span>
-          </div>
+      <div className="mx-auto grid max-w-[1180px] grid-cols-1 items-start gap-2.5 px-4 py-5 pb-28 lg:grid-cols-[1fr_340px] lg:px-6 lg:pb-11">
+        <div className="flex min-w-0 flex-col gap-[15px]">
+          <FlightSummaryCard flight={draft.flight} cabin={draft.cabin} locale={locale} />
+          {step === 'pax' && (
+            <PassengerStep
+              locale={locale}
+              passengers={passengers}
+              onChange={setPassengers}
+              savedPassengers={savedPassengers}
+            />
+          )}
+          {step === 'extras' && (
+            <ExtrasStep
+              locale={locale}
+              extras={extras}
+              onToggleExtra={toggleExtra}
+              seats={seats}
+              selectedSeats={selectedSeats}
+              onToggleSeat={toggleSeat}
+              businessLocked={businessLocked}
+            />
+          )}
+          {step === 'review' && (
+            <ReviewStep
+              locale={locale}
+              passengers={passengers}
+              extras={extras}
+              selectedSeats={selectedSeats}
+            />
+          )}
         </div>
 
+        <PricingSidebar
+          locale={locale}
+          priceIrr={priceIrr}
+          paxCount={Math.max(1, passengers.length)}
+          extras={extras}
+          nextLabel={nextLabel}
+          onNext={goNext}
+          onBack={goBack}
+          canBack={step !== 'pax'}
+          busy={busy}
+          error={error}
+        />
+      </div>
+
+      {/* Mobile sticky bar */}
+      <div className="fixed bottom-0 left-0 right-0 z-[80] flex items-center gap-2.5 border-t border-[#e6eaf0] bg-white px-4 py-2.5 shadow-[0_-8px_24px_-14px_rgba(13,38,102,.3)] lg:hidden">
+        {step !== 'pax' && (
+          <button
+            type="button"
+            onClick={goBack}
+            className="flex h-12 w-12 flex-none items-center justify-center rounded-xl border border-[#e6eaf0] bg-[#f2f5f9]"
+          >
+            →
+          </button>
+        )}
         <button
-          onClick={() => navigate(`/payment/${bookingId}`)}
-          data-testid="continue-to-payment"
-          className="w-full rounded-xl bg-[#1668c4] px-6 py-3 text-sm font-bold text-white"
+          type="button"
+          disabled={busy}
+          onClick={goNext}
+          data-testid="checkout-next-mobile"
+          className="flex h-12 flex-1 items-center justify-center rounded-xl bg-[#1668c4] text-[12.5px] font-extrabold text-white disabled:opacity-60"
         >
-          {t.continueToPayment}
+          {busy ? t.loading : nextLabel}
         </button>
       </div>
     </PublicPageShell>
