@@ -10,6 +10,7 @@ import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { ApiRequestError } from '../../api/envelope';
 import { faDigits } from '../../lib/fa-format';
 import { normalizePhone, phoneOk } from '../../lib/phone';
+import { DEV_OTP_CODE, isDevOtpMockSend } from '../../lib/dev-otp';
 
 const RESEND_SECONDS = 120;
 
@@ -80,6 +81,7 @@ const STR: Record<
     errNameRequired: string;
     errTermsRequired: string;
     sendingLabel: string;
+    devOtpHint: string;
     phoneHintExample: string;
     phoneHintOk: string;
     phoneHintBad: string;
@@ -151,6 +153,7 @@ const STR: Record<
     errNameRequired: 'نام و نام خانوادگی را کامل وارد کن.',
     errTermsRequired: 'برای ادامه باید قوانین و مقررات را بپذیری.',
     sendingLabel: 'در حال ارسال…',
+    devOtpHint: 'کد تست (محیط توسعه): ',
     phoneHintExample: 'مثال: ۰۹۱۲۳۴۵۶۷۸۹',
     phoneHintOk: '✓ شماره معتبر است',
     phoneHintBad: 'شماره باید با ۰۹ شروع شود و ۱۱ رقم باشد',
@@ -221,6 +224,7 @@ const STR: Record<
     errNameRequired: 'Please enter your full name.',
     errTermsRequired: 'You must accept the Terms & Conditions.',
     sendingLabel: 'Sending…',
+    devOtpHint: 'Dev test code: ',
     phoneHintExample: 'e.g. 09123456789',
     phoneHintOk: '✓ Looks good',
     phoneHintBad: 'Number must start with 09 and be 11 digits',
@@ -292,6 +296,7 @@ const STR: Record<
     errNameRequired: 'أدخل اسمك الكامل.',
     errTermsRequired: 'يجب الموافقة على الشروط والأحكام للمتابعة.',
     sendingLabel: 'جارٍ الإرسال…',
+    devOtpHint: 'رمز الاختبار (بيئة التطوير): ',
     phoneHintExample: 'مثال: 09123456789',
     phoneHintOk: '✓ الرقم صحيح',
     phoneHintBad: 'يجب أن يبدأ الرقم بـ 09 ويتكون من 11 رقمًا',
@@ -346,6 +351,7 @@ export default function CustomerLoginPage() {
   const [agLic, setAgLic] = useState('');
   const [terms, setTerms] = useState(false);
   const [challengeId, setChallengeId] = useState<string | null>(null);
+  const [otpSendMocked, setOtpSendMocked] = useState(false);
   const [otpDigits, setOtpDigits] = useState<string[]>(() => Array(OTP_LEN).fill(''));
   const [agencyPass, setAgencyPass] = useState('');
   const [agencySubmitted, setAgencySubmitted] = useState(false);
@@ -372,6 +378,7 @@ export default function CustomerLoginPage() {
   function resetFlow() {
     setPhase('id');
     setChallengeId(null);
+    setOtpSendMocked(false);
     setOtpDigits(Array(OTP_LEN).fill(''));
     setError(null);
   }
@@ -448,6 +455,15 @@ export default function CustomerLoginPage() {
     setError(null);
     setBusy(true);
     try {
+      if (isDevOtpMockSend()) {
+        setOtpSendMocked(true);
+        setChallengeId(null);
+        setPhase('otp');
+        setOtpDigits(Array(OTP_LEN).fill(''));
+        timer.start();
+        return;
+      }
+      setOtpSendMocked(false);
       const id = await requestOtp!(phone.trim());
       setChallengeId(id);
       setPhase('otp');
@@ -466,7 +482,13 @@ export default function CustomerLoginPage() {
     setError(null);
     setBusy(true);
     try {
-      await verifyOtp!(challengeId!, code.trim());
+      let cid = challengeId;
+      if (otpSendMocked && !cid) {
+        cid = await requestOtp!(phone.trim());
+        setChallengeId(cid);
+        setOtpSendMocked(false);
+      }
+      await verifyOtp!(cid!, code.trim());
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.errInvalidCode);
     } finally {
@@ -964,12 +986,30 @@ export default function CustomerLoginPage() {
                     </span>
                   </div>
                   <OtpCells
-                    key={challengeId ?? 'otp'}
+                    key={challengeId ?? (otpSendMocked ? 'mock-otp' : 'otp')}
                     digits={otpDigits}
                     onChange={setOtpDigits}
                     testIdPrefix="signin-code-cell"
                     autoFocus
                   />
+                  {isDevOtpMockSend() && (
+                    <div
+                      data-testid="signin-dev-otp-hint"
+                      style={{
+                        marginTop: 10,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: '#1668c4',
+                        background: '#eef4fb',
+                        border: '1px solid #dce8f7',
+                        borderRadius: 10,
+                        padding: '8px 10px',
+                      }}
+                    >
+                      {t.devOtpHint}
+                      {locale === 'fa' ? faDigits(DEV_OTP_CODE) : DEV_OTP_CODE}
+                    </div>
+                  )}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12 }}>
                   <span

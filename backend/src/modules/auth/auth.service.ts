@@ -17,6 +17,7 @@ import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import { CustomerReferralsService } from '../customer-referrals/customer-referrals.service';
 import type { Locale, Role } from '../../../generated/typeorm/enums';
 import { normalizeIranPhone } from '../../common/normalize-iran-phone';
+import { generateOtpCode } from '../../common/generate-otp-code';
 
 export interface AuthUserView {
   id: string;
@@ -57,10 +58,6 @@ const STAFF_ROLES = [
   'BOARD_CHAIR',
   'SITE_ADMIN',
 ] as const;
-
-function generateSixDigitCode(): string {
-  return crypto.randomInt(0, 1_000_000).toString().padStart(6, '0');
-}
 
 function hashToken(token: string): string {
   return hashRefreshToken(token);
@@ -260,7 +257,7 @@ export class AuthService {
       });
     }
 
-    const code = generateSixDigitCode();
+    const code = generateOtpCode();
     const challenge = await this.typeorm.twoFactorChallenge.create({
       data: {
         userId: user.id,
@@ -383,7 +380,7 @@ export class AuthService {
       });
     }
 
-    const code = generateSixDigitCode();
+    const code = generateOtpCode();
     const challenge = await this.typeorm.twoFactorChallenge.create({
       data: {
         userId: user.id,
@@ -550,7 +547,7 @@ export class AuthService {
       });
     }
 
-    const code = generateSixDigitCode();
+    const code = generateOtpCode();
     const challenge = await this.typeorm.twoFactorChallenge.create({
       data: {
         userId: user.id,
@@ -657,7 +654,7 @@ export class AuthService {
       });
     }
 
-    const code = generateSixDigitCode();
+    const code = generateOtpCode();
     const challenge = await this.typeorm.twoFactorChallenge.create({
       data: {
         userId: user.id,

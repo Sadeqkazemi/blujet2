@@ -8,6 +8,7 @@ import { setPassword as apiSetPassword } from '../../api/auth';
 import { ApiRequestError } from '../../api/envelope';
 import { faDigits } from '../../lib/fa-format';
 import { normalizePhone, phoneOk } from '../../lib/phone';
+import { DEV_OTP_CODE, isDevOtpMockSend } from '../../lib/dev-otp';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { DIR, FONT } from '../../lib/i18n';
 
@@ -89,6 +90,7 @@ const STR: Record<
     errCode: string;
     errSave: string;
     p2Mismatch: string;
+    devOtpHint: string;
   }
 > = {
   fa: {
@@ -144,6 +146,7 @@ const STR: Record<
     errCode: 'کد وارد شده نادرست است.',
     errSave: 'خطا در ذخیره رمز عبور.',
     p2Mismatch: 'رمزها یکسان نیستند',
+    devOtpHint: 'کد تست (محیط توسعه): ',
   },
   en: {
     stepPhone: 'Mobile',
@@ -198,6 +201,7 @@ const STR: Record<
     errCode: 'The code entered is incorrect.',
     errSave: 'Error saving the new password.',
     p2Mismatch: "Passwords don't match",
+    devOtpHint: 'Dev test code: ',
   },
   ar: {
     stepPhone: 'رقم الجوال',
@@ -252,6 +256,7 @@ const STR: Record<
     errCode: 'الرمز المُدخل غير صحيح.',
     errSave: 'خطأ في حفظ كلمة المرور الجديدة.',
     p2Mismatch: 'كلمتا المرور غير متطابقتين',
+    devOtpHint: 'رمز الاختبار (بيئة التطوير): ',
   },
 };
 
@@ -289,6 +294,7 @@ export default function ForgotPasswordPage() {
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [challengeId, setChallengeId] = useState('');
+  const [otpSendMocked, setOtpSendMocked] = useState(false);
   const [otpDigits, setOtpDigits] = useState<string[]>(() => Array(OTP_LEN).fill(''));
   const [pass1, setPass1] = useState('');
   const [pass2, setPass2] = useState('');
@@ -354,6 +360,15 @@ export default function ForgotPasswordPage() {
     setError(null);
     setSubmitting(true);
     try {
+      if (method === 'phone' && isDevOtpMockSend()) {
+        setOtpSendMocked(true);
+        setChallengeId('');
+        setOtpDigits(Array(OTP_LEN).fill(''));
+        setStep('code');
+        setLeft(RESEND_SECONDS);
+        return;
+      }
+      setOtpSendMocked(false);
       const id =
         method === 'phone' ? await requestOtp!(phone.trim()) : await requestPasswordResetEmail!(email.trim());
       setChallengeId(id);
@@ -375,7 +390,13 @@ export default function ForgotPasswordPage() {
     setSubmitting(true);
     try {
       if (method === 'phone') {
-        await verifyOtp!(challengeId, code.trim());
+        let cid = challengeId;
+        if (otpSendMocked && !cid) {
+          cid = await requestOtp!(phone.trim());
+          setChallengeId(cid);
+          setOtpSendMocked(false);
+        }
+        await verifyOtp!(cid, code.trim());
       } else {
         await verifyPasswordResetEmail!(challengeId, code.trim());
       }
@@ -624,13 +645,39 @@ export default function ForgotPasswordPage() {
                       {method === 'phone' ? displayPhone : email}
                     </span>
                   </div>
-                  <OtpCells digits={otpDigits} onChange={setOtpDigits} testIdPrefix="fp-code-cell" autoFocus />
+                  <OtpCells
+                    key={challengeId || (otpSendMocked ? 'mock-otp' : 'otp')}
+                    digits={otpDigits}
+                    onChange={setOtpDigits}
+                    testIdPrefix="fp-code-cell"
+                    autoFocus
+                  />
+                  {method === 'phone' && isDevOtpMockSend() && (
+                    <div
+                      data-testid="fp-dev-otp-hint"
+                      style={{
+                        marginTop: 10,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: '#1668c4',
+                        background: '#eef4fb',
+                        border: '1px solid #dce8f7',
+                        borderRadius: 10,
+                        padding: '8px 10px',
+                      }}
+                    >
+                      {t.devOtpHint}
+                      {locale === 'fa' ? faDigits(DEV_OTP_CODE) : DEV_OTP_CODE}
+                    </div>
+                  )}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12 }}>
                   <span
                     data-testid="fp-edit-id"
                     onClick={() => {
                       setStep('id');
+                      setOtpSendMocked(false);
+                      setChallengeId('');
                       setOtpDigits(Array(OTP_LEN).fill(''));
                     }}
                     style={{ color: '#8a96a6', fontWeight: 700, cursor: 'pointer' }}
