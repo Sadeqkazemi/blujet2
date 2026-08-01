@@ -1,6 +1,15 @@
 import { apiGet, apiPatch, apiPost } from './http';
 import { setAccessToken } from './token-store';
+import { latinDigits, normalizeIranMobile } from '../lib/fa-format';
 import type { AuthUser, Locale } from '../types/auth';
+
+function normalizePhone(phone: string) {
+  return normalizeIranMobile(latinDigits(phone).replace(/\s/g, ''));
+}
+
+function normalizeOtpCode(code: string) {
+  return latinDigits(code).replace(/\D/g, '');
+}
 
 export function staffLogin(username: string, password: string) {
   return apiPost<{ challengeId: string }>('/auth/staff/login', { username, password });
@@ -47,7 +56,12 @@ export function updateMyLocale(locale: Locale) {
 }
 
 export function requestOtp(phone: string) {
-  return apiPost<{ challengeId: string }>('/auth/otp/request', { phone });
+  return apiPost<{ challengeId: string }>('/auth/otp/request', { phone: normalizePhone(phone) });
+}
+
+/** Dev/E2E only — reads the mock OTP after requestOtp (404 in production). */
+export function fetchDevLastOtp(phone: string) {
+  return apiGet<{ code: string }>(`/auth/_test/last-otp/${encodeURIComponent(normalizePhone(phone))}`);
 }
 
 export type StepUpScope =
@@ -64,7 +78,7 @@ export function requestStepUp(scope: StepUpScope) {
 export async function verifyOtp(challengeId: string, code: string) {
   const result = await apiPost<{ accessToken: string; user: AuthUser }>('/auth/otp/verify', {
     challengeId,
-    code,
+    code: normalizeOtpCode(code),
   });
   setAccessToken(result.accessToken);
   return result;
@@ -97,7 +111,7 @@ export async function verifyPasswordResetEmail(challengeId: string, code: string
 
 export async function customerPasswordLogin(phone: string, password: string) {
   const result = await apiPost<{ accessToken: string; user: AuthUser }>('/auth/customer/login-password', {
-    phone,
+    phone: normalizePhone(phone),
     password,
   });
   setAccessToken(result.accessToken);
