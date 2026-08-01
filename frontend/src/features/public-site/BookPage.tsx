@@ -160,22 +160,22 @@ function OtpLoginInline() {
       return;
     }
     setBusy(true);
+    let issuedChallengeId: string | null = null;
     try {
-      const id = await requestOtp(normalizedPhone);
-      setChallengeId(id);
+      issuedChallengeId = await requestOtp(normalizedPhone);
+      setChallengeId(issuedChallengeId);
       setCode('');
-      if (import.meta.env.DEV) {
-        try {
-          const { code: mockCode } = await fetchDevLastOtp(normalizedPhone);
-          setDevCode(mockCode);
-        } catch {
-          /* mock endpoint unavailable in production builds */
-        }
-      }
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.otpSendError);
     } finally {
       setBusy(false);
+    }
+    if (issuedChallengeId && import.meta.env.DEV) {
+      void fetchDevLastOtp(normalizedPhone)
+        .then(({ code: mockCode }) => setDevCode(mockCode))
+        .catch(() => {
+          /* mock endpoint unavailable outside dev */
+        });
     }
   }
 

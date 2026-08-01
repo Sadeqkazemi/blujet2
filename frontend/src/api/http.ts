@@ -3,14 +3,34 @@ import { ApiRequestError } from './envelope';
 import { getAccessToken, setAccessToken } from './token-store';
 
 const BASE_URL = import.meta.env.VITE_API_URL;
+const REQUEST_TIMEOUT_MS = 15_000;
 
 let refreshInFlight: Promise<boolean> | null = null;
+
+async function fetchWithTimeout(path: string, init: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(`${BASE_URL}${path}`, { ...init, signal: controller.signal });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new ApiRequestError(
+        'TIMEOUT',
+        'سرور پاسخ نداد. لطفاً چند لحظه بعد دوباره تلاش کنید.',
+        408,
+      );
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 
 async function refreshAccessToken(): Promise<boolean> {
   if (!refreshInFlight) {
     refreshInFlight = (async () => {
       try {
-        const res = await fetch(`${BASE_URL}/auth/refresh`, { method: 'POST', credentials: 'include' });
+        const res = await fetchWithTimeout('/auth/refresh', { method: 'POST', credentials: 'include' });
         const body = (await res.json()) as ApiEnvelope<{ accessToken: string }>;
         if (body.success && body.data) {
           setAccessToken(body.data.accessToken);
@@ -36,14 +56,14 @@ async function doFetch(path: string, init: RequestInit): Promise<Response> {
     headers.set('Content-Type', 'application/json');
   }
 
-  return fetch(`${BASE_URL}${path}`, { ...init, headers, credentials: 'include' });
+  return fetchWithTimeout(path, { ...init, headers, credentials: 'include' });
 }
 
 /** All frontend HTTP calls go through here — components never call fetch directly. */
 export async function apiRequest<T>(path: string, init: RequestInit = {}, retry = true): Promise<T> {
   const res = await doFetch(path, init);
 
-  if (res.status === 401 && retry) {
+  if (res.status === 401 && retry && getAccessToken()) {
     const refreshed = await refreshAccessToken();
     if (refreshed) return apiRequest<T>(path, init, false);
   }
@@ -78,7 +98,7 @@ export function apiGet<T>(path: string): Promise<T> {
 export async function apiGetBlob(path: string, retry = true): Promise<Blob> {
   const res = await doFetch(path, { method: 'GET' });
 
-  if (res.status === 401 && retry) {
+  if (res.status === 401 && retry && getAccessToken()) {
     const refreshed = await refreshAccessToken();
     if (refreshed) return apiGetBlob(path, false);
   }
