@@ -498,12 +498,17 @@ export default function HomeSearchPage() {
 
       <section style={{ maxWidth: 1180, margin: '0 auto', padding: '49px 26px 23px' }}>
         <div
+          data-testid="home-services"
+          className={isMobile ? 'hscroll' : undefined}
           style={{
-            display: 'grid',
-            gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
+            display: isMobile ? 'flex' : 'grid',
+            gridTemplateColumns: isMobile ? undefined : 'repeat(4, 1fr)',
             background: '#fff',
             border: '1px solid #eef2f7',
             borderRadius: 16,
+            overflowX: isMobile ? 'auto' : 'visible',
+            scrollSnapType: isMobile ? 'x mandatory' : undefined,
+            paddingBottom: isMobile ? 8 : 0,
           }}
         >
           {t.quickLinks.map((label, i) => {
@@ -524,6 +529,8 @@ export default function HomeSearchPage() {
                   fontFamily: 'inherit',
                   background: 'transparent',
                   border: 'none',
+                  flex: isMobile ? '0 0 calc(50% - 6.5px)' : undefined,
+                  scrollSnapAlign: isMobile ? 'start' : undefined,
                   ...(!isMobile && i > 0 ? { borderLeft: '1px solid #eef2f7' } : {}),
                 }}
               >
