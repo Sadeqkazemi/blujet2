@@ -20,7 +20,12 @@ async function fetchWithTimeout(path: string, init: RequestInit): Promise<Respon
         408,
       );
     }
-    throw err;
+    if (err instanceof ApiRequestError) throw err;
+    throw new ApiRequestError(
+      'NETWORK_ERROR',
+      'سرور در دسترس نیست. backend را اجرا کنید (cd backend && npm run start:dev) و دوباره تلاش کنید.',
+      0,
+    );
   } finally {
     clearTimeout(timeoutId);
   }

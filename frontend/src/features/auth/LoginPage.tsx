@@ -7,6 +7,9 @@ import { StaffLoginLayout } from './StaffLoginLayout';
 const FORGOT_TOAST =
   'برای بازیابی رمز عبور، با واحد فناوری اطلاعات (مدیر IT) تماس بگیرید';
 
+const BACKEND_DOWN_MSG =
+  'سرور backend در دسترس نیست. ابتدا docker compose up -d و سپس cd backend && npm run start:dev را اجرا کنید.';
+
 export default function LoginPage() {
   const { requestLogin } = useAuth();
   const navigate = useNavigate();
@@ -15,8 +18,23 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [backendOk, setBackendOk] = useState<boolean | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/health')
+      .then((res) => {
+        if (!cancelled) setBackendOk(res.ok);
+      })
+      .catch(() => {
+        if (!cancelled) setBackendOk(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!toast) return;
@@ -39,13 +57,19 @@ export default function LoginPage() {
       if (err instanceof ApiRequestError) {
         if (err.code === 'RATE_LIMITED' || err.status === 429) {
           setError('تعداد تلاش‌های ورود زیاد است. لطفاً یک دقیقه صبر کنید و دوباره تلاش کنید.');
-        } else if (err.code === 'BAD_GATEWAY' || err.code === 'TIMEOUT' || err.status === 502 || err.status === 408) {
-          setError('سرور در دسترس نیست. backend را اجرا کنید (npm run start:dev) و دوباره تلاش کنید.');
+        } else if (
+          err.code === 'BAD_GATEWAY' ||
+          err.code === 'TIMEOUT' ||
+          err.code === 'NETWORK_ERROR' ||
+          err.status === 502 ||
+          err.status === 408
+        ) {
+          setError(BACKEND_DOWN_MSG);
         } else {
           setError(err.message);
         }
       } else {
-        setError('خطا در ورود. دوباره تلاش کنید.');
+        setError(BACKEND_DOWN_MSG);
       }
     } finally {
       setSubmitting(false);
@@ -64,6 +88,16 @@ export default function LoginPage() {
       <div className="mb-5 text-[11.5px] leading-[1.9] text-[#64748b]">
         با نام کاربری و رمز عبوری که واحد فناوری اطلاعات برای شما ایجاد کرده است وارد شوید.
       </div>
+
+      {backendOk === false && (
+        <p
+          role="alert"
+          data-testid="staff-login-backend-down"
+          className="mb-4 rounded-[10px] border border-amber-200 bg-amber-50 px-3 py-2.5 text-[11.5px] leading-[1.9] text-amber-800"
+        >
+          {BACKEND_DOWN_MSG}
+        </p>
+      )}
 
       <form onSubmit={onSubmit} className="flex flex-col gap-3" noValidate>
         <div>

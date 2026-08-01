@@ -1,10 +1,23 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import LoginPage from './LoginPage';
 import { ApiRequestError } from '../../api/envelope';
 import * as useAuthModule from '../../hooks/useAuth';
+
+function mockHealthFetch() {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/health')) {
+        return Promise.resolve({ ok: true } as Response);
+      }
+      return Promise.reject(new Error(`unmocked fetch: ${url}`));
+    }),
+  );
+}
 
 function renderLoginPage() {
   return render(
@@ -30,6 +43,14 @@ const baseAuth = {
 };
 
 describe('LoginPage', () => {
+  beforeEach(() => {
+    mockHealthFetch();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('renders RTL with Persian labels', () => {
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue(baseAuth);
     renderLoginPage();
