@@ -20,8 +20,8 @@ Systematic page-by-page alignment with bundled HTML exports. Each phase = layout
 | 5 | مدیریت رزرو | `مدیریت رزرو.html` | Med | [x] Lookup card, discover section, ticket card, action grid |
 | 6 | وضعیت پرواز | `وضعیت پرواز.html` | Med | [x] Live badge hero, grid search, progress timeline, help links |
 | 7 | ورود و ثبتنام | `ورود و ثبتنام.html` | Med | [x] Two-column card, visual panel, OTP layout |
-| 8 | فراموشی رمز | `فراموشی رمز.html` | Low | [ ] |
-| 9 | مقاصد | `مقاصد.html` | Med | [~] i18n done; pixel pass pending |
+| 8 | فراموشی رمز | `فراموشی رمز.html` | Low | [x] Two-column card, stepper, OTP cells, visual panel |
+| 9 | مقاصد | `مقاصد.html` | Med | [x] Route cards, map pins pulse, mobile map hide |
 | 10 | باشگاه مشتریان | `باشگاه مشتریان.html` | Med | [~] i18n done |
 | 11 | پشتیبانی | `پشتیبانی.html` | Med | [~] i18n done |
 | 12 | درباره ما / تماس / قوانین | bundled | Low | [~] i18n done |

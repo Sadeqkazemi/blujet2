@@ -279,6 +279,12 @@ export default function DestinationsPage() {
 
   return (
     <PublicPageShell>
+      <style>{`
+        @keyframes destPinPulse {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.5); opacity: 0.4; }
+        }
+      `}</style>
       {/* HERO + SEARCH */}
       <section style={{ background: 'linear-gradient(160deg,#0d2640 30%,#124a86)', color: '#fff', padding: '53px 22px 49px', position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: -120, left: -80, width: 340, height: 340, borderRadius: '50%', background: 'rgba(255,255,255,.05)' }} />
@@ -292,7 +298,7 @@ export default function DestinationsPage() {
             {t.heroSub}
           </p>
           <div style={{ maxWidth: 640, margin: '0 auto', background: '#fff', borderRadius: 16, boxShadow: '0 26px 60px -20px rgba(0,0,0,.45)', padding: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6b7787" strokeWidth="2.2" strokeLinecap="round" style={{ marginRight: 9, flex: 'none' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9aa4b2" strokeWidth="2.2" strokeLinecap="round" style={{ marginRight: 9, flex: 'none' }}>
               <circle cx="11" cy="11" r="7" />
               <path d="M21 21l-4-4" />
             </svg>
@@ -368,7 +374,7 @@ export default function DestinationsPage() {
                     {d.badge[locale]}
                   </span>
                 )}
-                <span style={{ position: 'absolute', top: 12, left: 12, background: 'rgba(255,255,255,.16)', color: '#fff', fontSize: '9.5px', fontWeight: 700, padding: '3px 9px', borderRadius: 12, pointerEvents: 'none' }}>
+                <span style={{ position: 'absolute', top: 12, left: 12, background: 'rgba(255,255,255,.16)', backdropFilter: 'blur(4px)', color: '#fff', fontSize: '9.5px', fontWeight: 700, padding: '3px 9px', borderRadius: 12, pointerEvents: 'none' }}>
                   {d.region === 'dom' ? t.domestic : t.international}
                 </span>
                 <div style={{ position: 'absolute', right: 0, left: 0, bottom: 0, padding: '13px 15px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10, pointerEvents: 'none' }}>
@@ -430,26 +436,48 @@ export default function DestinationsPage() {
               ))}
             </div>
           </div>
-          <div style={{ position: 'relative', background: '#fff', borderRadius: 16, padding: 10 }}>
-            <div style={{ position: 'relative', width: '100%', height: 390, background: 'linear-gradient(150deg,#eaf2fb,#d7e6f7)', borderRadius: 12 }}>
-              {PINS.map((p, i) => (
-                <div
-                  key={p.fa}
-                  onClick={() => {
-                    setQ(p[locale]);
-                    setTab('all');
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
-                  style={{ position: 'absolute', top: PIN_POS[i].top, right: PIN_POS[i].right, transform: 'translate(50%,-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, cursor: 'pointer' }}
-                >
-                  <span style={{ width: 14, height: 14, borderRadius: '50%', background: '#1668c4', border: '3px solid #fff', boxShadow: '0 2px 7px rgba(13,38,102,.45)' }} />
-                  <span style={{ fontSize: 11, fontWeight: 800, color: '#0d2640', background: '#fff', padding: '2px 7px', borderRadius: 9, whiteSpace: 'nowrap', boxShadow: '0 1px 4px rgba(13,38,102,.12)' }}>
-                    {p[locale]}
-                  </span>
-                </div>
-              ))}
+          {!isMobile && (
+            <div style={{ position: 'relative', background: '#fff', borderRadius: 16, padding: 10 }}>
+              <div style={{ position: 'relative', width: '100%', height: 390, background: 'linear-gradient(150deg,#eaf2fb,#d7e6f7)', borderRadius: 12 }}>
+                {PINS.map((p, i) => (
+                  <div
+                    key={p.fa}
+                    onClick={() => {
+                      setQ(p[locale]);
+                      setTab('all');
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    style={{ position: 'absolute', top: PIN_POS[i].top, right: PIN_POS[i].right, transform: 'translate(50%,-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, cursor: 'pointer' }}
+                  >
+                    <span
+                      style={{
+                        width: 14,
+                        height: 14,
+                        borderRadius: '50%',
+                        background: '#1668c4',
+                        border: '3px solid #fff',
+                        boxShadow: '0 2px 7px rgba(13,38,102,.45)',
+                        position: 'relative',
+                      }}
+                    >
+                      <span
+                        style={{
+                          position: 'absolute',
+                          inset: -5,
+                          borderRadius: '50%',
+                          border: '2px solid #1668c4',
+                          animation: 'destPinPulse 2s infinite',
+                        }}
+                      />
+                    </span>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#0d2640', background: '#fff', padding: '2px 7px', borderRadius: 9, whiteSpace: 'nowrap', boxShadow: '0 1px 4px rgba(13,38,102,.12)' }}>
+                      {p[locale]}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </section>
 
@@ -461,6 +489,7 @@ export default function DestinationsPage() {
           {routes.map((r) => (
             <a
               key={`${r.fromCode}-${r.toCode}`}
+              data-testid={`dest-route-${r.fromCode}-${r.toCode}`}
               onClick={(e) => {
                 e.preventDefault();
                 navigate(`/results?origin=${r.fromCode}&dest=${r.toCode}&date=${TODAY_ISO}`);
@@ -468,28 +497,44 @@ export default function DestinationsPage() {
               href={`/results?origin=${r.fromCode}&dest=${r.toCode}&date=${TODAY_ISO}`}
               style={{ textDecoration: 'none', background: '#fff', border: '1px solid #eef1f5', borderRadius: 14, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 13, cursor: 'pointer' }}
             >
-              <span style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ lineHeight: 1.6 }}>
-                  <span style={{ display: 'block', fontSize: '13.5px', fontWeight: 800, color: '#0d2640' }}>
-                    {r.fromName[locale]}{' '}
-                    <span style={{ fontSize: 10, color: '#8a96a6' }} dir="ltr">
-                      {r.fromCode}
-                    </span>
-                  </span>
-                  <span style={{ display: 'block', fontSize: '10.5px', color: '#8a96a6' }}>{r.freq[locale]}</span>
-                </span>
-                <span style={{ color: '#1668c4', fontSize: 15 }}>✈</span>
-                <span style={{ lineHeight: 1.6, textAlign: 'left' }}>
-                  <span style={{ display: 'block', fontSize: '13.5px', fontWeight: 800, color: '#0d2640' }}>
-                    {r.toName[locale]}{' '}
-                    <span style={{ fontSize: 10, color: '#8a96a6' }} dir="ltr">
-                      {r.toCode}
-                    </span>
-                  </span>
-                  <span style={{ display: 'block', fontSize: '11.5px', fontWeight: 800, color: '#1668c4' }}>
-                    {formatToman(r.tomanPrice, locale)} <span style={{ fontSize: 9, fontWeight: 400, color: '#8a96a6' }}>{t.toman}</span>
+              <span style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, minWidth: 0 }}>
+                <span style={{ lineHeight: 1.5, textAlign: 'inherit' }}>
+                  <span style={{ display: 'block', fontSize: 14, fontWeight: 900, color: '#0d2640' }}>{r.fromName[locale]}</span>
+                  <span style={{ display: 'block', fontSize: '9.5px', color: '#9aa4b2' }} dir="ltr">
+                    {r.fromCode}
                   </span>
                 </span>
+                <span style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '0 5px', minWidth: 0 }}>
+                  <span style={{ fontSize: 9, color: '#9aa4b2', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
+                    {r.freq[locale]}
+                  </span>
+                  <span style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span style={{ flex: 1, borderTop: '1.5px dashed #d5dde8' }} />
+                    <span style={{ color: '#1668c4', fontSize: 12 }}>✈</span>
+                    <span style={{ flex: 1, borderTop: '1.5px dashed #d5dde8' }} />
+                  </span>
+                </span>
+                <span style={{ lineHeight: 1.5, textAlign: locale === 'en' ? 'right' : 'left' }}>
+                  <span style={{ display: 'block', fontSize: 14, fontWeight: 900, color: '#0d2640' }}>{r.toName[locale]}</span>
+                  <span style={{ display: 'block', fontSize: '9.5px', color: '#9aa4b2' }} dir="ltr">
+                    {r.toCode}
+                  </span>
+                </span>
+              </span>
+              <span
+                style={{
+                  flex: 'none',
+                  borderInlineStart: '1.5px dashed #e6eaf0',
+                  paddingInlineStart: 13,
+                  textAlign: locale === 'en' ? 'right' : 'left',
+                  lineHeight: 1.55,
+                }}
+              >
+                <span style={{ display: 'block', fontSize: 9, color: '#9aa4b2' }}>{t.startingFrom}</span>
+                <span style={{ display: 'block', fontSize: 14, fontWeight: 900, color: '#1668c4' }}>
+                  {formatToman(r.tomanPrice, locale)}
+                </span>
+                <span style={{ display: 'block', fontSize: '8.5px', color: '#9aa4b2' }}>{t.toman}</span>
               </span>
             </a>
           ))}
