@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { fetchClubPoints, fetchMyBooking, fetchWallet, payBooking } from '../../api/publicSite';
 import { ApiRequestError } from '../../api/envelope';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import { faDigits, localeMoney } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
 import type { BookingDetail, PayResultPriceChanged } from '../../types/public-site';
@@ -278,6 +279,7 @@ export default function PaymentPage() {
   const { bookingId } = useParams<{ bookingId: string }>();
   const navigate = useNavigate();
   const { locale } = useLocale();
+  const isMobile = useIsMobile();
   const t = STR[locale];
 
   const [booking, setBooking] = useState<BookingDetail | null>(null);
@@ -457,22 +459,26 @@ export default function PaymentPage() {
         </span>
       </div>
 
-      {priceChange ? (
+      {priceChange && (
         <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4">
           <p className="mb-2 text-xs text-amber-800">{t.priceChanged}</p>
-          <p className="font-num mb-3 text-sm font-extrabold text-amber-900">
+          <p className="font-num text-sm font-extrabold text-amber-900">
             {t.newPrice(localeMoney(priceChange.currentPriceIrr, locale))}
           </p>
-          <button
-            disabled={paying || holdExpired}
-            onClick={() => onPay(priceChange.currentPriceIrr)}
-            data-testid="confirm-new-price"
-            className="w-full rounded-xl bg-[#1668c4] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-60"
-          >
-            {t.confirmNewPrice}
-          </button>
+          {!isMobile && (
+            <button
+              disabled={paying || holdExpired}
+              onClick={() => onPay(priceChange.currentPriceIrr)}
+              data-testid="confirm-new-price"
+              className="mt-3 w-full rounded-xl bg-[#1668c4] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-60"
+            >
+              {t.confirmNewPrice}
+            </button>
+          )}
         </div>
-      ) : (
+      )}
+
+      {!isMobile && !priceChange && (
         <>
           <button
             disabled={paying || holdExpired}
@@ -491,10 +497,12 @@ export default function PaymentPage() {
   return (
     <PublicPageShell>
       <FlowStepper current="payment" onBack={() => navigate(-1)} />
-      <div className="mx-auto max-w-[1320px] px-[22px] pb-11 pt-5 lg:pb-[44px]">
+      <div
+        className={`mx-auto max-w-[1320px] ${isMobile ? 'px-3.5 pb-[90px] pt-3.5' : 'px-[22px] pb-11 pt-5 lg:pb-[44px]'}`}
+      >
         {error && <p className="mb-4 rounded-lg bg-red-50 p-3 text-xs text-red-600">{error}</p>}
 
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
+        <div className={`flex flex-col ${isMobile ? 'gap-4' : 'gap-5 lg:flex-row lg:items-start'}`}>
           <main className="flex min-w-0 flex-1 flex-col gap-4">
             <section
               className="rounded-[14px] border border-[#eef1f5] bg-white p-4"
@@ -583,24 +591,27 @@ export default function PaymentPage() {
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 z-[80] flex items-center justify-between gap-3 border-t border-[#e6eaf0] bg-white px-4 py-2.5 shadow-[0_-8px_24px_-14px_rgba(13,38,102,.3)] lg:hidden">
-        <div className="min-w-0">
-          <div className="text-[10.5px] text-[#9aa4b2]">{t.payable}</div>
-          <div className="font-num whitespace-nowrap text-[15px] font-black text-[#1668c4]">
-            {priceDisplay} {t.toman}
+      {isMobile && (
+        <div
+          className="fixed bottom-0 left-0 right-0 z-[80] flex items-center justify-between gap-3 border-t border-[#e6eaf0] bg-white px-4 py-2.5 shadow-[0_-8px_24px_-14px_rgba(13,38,102,.3)]"
+          data-testid="payment-mobile-sticky"
+        >
+          <div className="min-w-0">
+            <div className="text-[10.5px] text-[#9aa4b2]">{t.payable}</div>
+            <div className="font-num whitespace-nowrap text-[15px] font-black text-[#1668c4]">
+              {priceDisplay} {t.toman}
+            </div>
           </div>
-        </div>
-        {!priceChange && (
           <button
             disabled={paying || holdExpired}
-            onClick={() => onPay()}
-            data-testid="pay-submit-mobile"
+            onClick={() => (priceChange ? onPay(priceChange.currentPriceIrr) : onPay())}
+            data-testid={priceChange ? 'confirm-new-price-mobile' : 'pay-submit-mobile'}
             className="flex h-12 max-w-[200px] flex-1 items-center justify-center rounded-xl bg-[#1668c4] text-[12.5px] font-extrabold text-white disabled:opacity-60"
           >
-            {paying ? t.paying : t.payFinal}
+            {paying ? t.paying : priceChange ? t.confirmNewPrice : t.payFinal}
           </button>
-        )}
-      </div>
+        </div>
+      )}
     </PublicPageShell>
   );
 }
