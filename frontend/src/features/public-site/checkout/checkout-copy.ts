@@ -51,6 +51,14 @@ export const CHECKOUT_COPY: Record<
     passenger: string;
     document: string;
     seat: string;
+    seatMapCaption: (aircraft: string) => string;
+    bizLockedHint: string;
+    business: string;
+    available: string;
+    reserved: string;
+    selectedSeat: string;
+    totalSold: string;
+    ofLabel: string;
     selectedExtras: string;
     nameChangeWarning: string;
     noneSelected: string;
@@ -67,8 +75,9 @@ export const CHECKOUT_COPY: Record<
     searchAgain: 'جستجوی مجدد',
     steps: { pax: 'اطلاعات مسافر', extras: 'خدمات جانبی', review: 'بازبینی' },
     enterPax: 'وارد کردن اطلاعات مسافر',
-    travelExtras: 'خدمات سفر',
-    pickServices: 'خدمات اضافی مورد نیاز خود را انتخاب کنید.',
+    travelExtras: 'خدمات جانبی سفر',
+    pickServices:
+      'خدماتی که می‌خواهید انتخاب کنید — هزینه به مجموع شما اضافه می‌شود',
     confirmDetails: 'تأیید اطلاعات',
     flightSummary: 'خلاصه پرواز',
     paymentDetails: 'جزئیات پرداخت',
@@ -108,16 +117,25 @@ export const CHECKOUT_COPY: Record<
     passenger: 'مسافر',
     document: 'مدرک',
     seat: 'صندلی',
-    selectedExtras: 'خدمات انتخاب‌شده',
+    seatMapCaption: (aircraft) =>
+      `انتخاب صندلی (اختیاری) — ${aircraft} · ردیف‌های بیزنس ۳ تا ۶ (۱۶ صندلی) · اکونومی ردیف ۷ تا ۳۲`,
+    bizLockedHint: 'انتخاب صندلی بیزنس نیازمند حداقل ۱۵٬۰۰۰ امتیاز باشگاه است',
+    business: 'بیزنس',
+    available: 'موجود',
+    reserved: 'رزرو شده',
+    selectedSeat: 'صندلی انتخابی',
+    totalSold: 'مجموع صندلی‌های فروخته‌شده',
+    ofLabel: 'از',
+    selectedExtras: 'خدمات جانبی انتخابی',
     nameChangeWarning:
       'پس از پرداخت، امکان تغییر نام مسافران وجود ندارد. لطفاً املای نام را با دقت بررسی کنید.',
-    noneSelected: '—',
+    noneSelected: 'انتخاب نشده',
     toman: 'تومان',
     extras: {
-      baggage: { title: 'بار اضافه (+۲۳ کیلو)', desc: '۲۳ کیلوگرم بار اضافه' },
-      meal: { title: 'غذای ویژه', desc: 'انتخاب منوی غذایی' },
-      insurance: { title: 'بیمه مسافرتی', desc: 'پوشش تا ۵۰۰ میلیون ریال' },
-      cip: { title: 'سالن تشریفات CIP', desc: 'ورود از سالن اختصاصی' },
+      baggage: { title: 'بار اضافه (۱۰ کیلوگرم)', desc: 'علاوه بر مجاز ۲۰ کیلوگرمی' },
+      meal: { title: 'غذای گرم داخل پرواز', desc: 'منوی ایرانی / بین‌المللی' },
+      insurance: { title: 'بیمه مسافرتی', desc: 'پوشش کامل تأخیر و خسارت' },
+      cip: { title: 'خدمات CIP فرودگاهی', desc: 'پذیرش و گیت اختصاصی' },
     },
     months: [
       'فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور',
@@ -132,8 +150,8 @@ export const CHECKOUT_COPY: Record<
     searchAgain: 'Search again',
     steps: { pax: 'Passenger info', extras: 'Travel extras', review: 'Review' },
     enterPax: 'Enter passenger details',
-    travelExtras: 'Travel extras',
-    pickServices: 'Select any additional services you need.',
+    travelExtras: 'Travel Extras',
+    pickServices: "Pick the services you'd like — the cost is added to your total",
     confirmDetails: 'Confirm details',
     flightSummary: 'Flight summary',
     paymentDetails: 'Payment details',
@@ -173,16 +191,25 @@ export const CHECKOUT_COPY: Record<
     passenger: 'Passenger',
     document: 'Document',
     seat: 'Seat',
+    seatMapCaption: (aircraft) =>
+      `Seat selection (optional) — ${aircraft} · Business rows 3–6 (16 seats) · Economy rows 7–32`,
+    bizLockedHint: 'Selecting a Business seat requires at least 15,000 loyalty points',
+    business: 'Business',
+    available: 'Available',
+    reserved: 'Reserved',
+    selectedSeat: 'Selected seat',
+    totalSold: 'Total seats sold',
+    ofLabel: 'of',
     selectedExtras: 'Selected extras',
     nameChangeWarning:
       'Passenger names cannot be changed after payment. Please verify spelling carefully.',
-    noneSelected: '—',
+    noneSelected: 'Not selected',
     toman: 'Toman',
     extras: {
-      baggage: { title: 'Extra baggage (+23 kg)', desc: '23 kg additional baggage' },
-      meal: { title: 'Special meal', desc: 'Choose a meal option' },
-      insurance: { title: 'Travel insurance', desc: 'Coverage up to 500M IRR' },
-      cip: { title: 'CIP lounge', desc: 'Private lounge access' },
+      baggage: { title: 'Extra baggage (10 kg)', desc: 'On top of the 20 kg allowance' },
+      meal: { title: 'Hot in-flight meal', desc: 'Iranian / international menu' },
+      insurance: { title: 'Travel insurance', desc: 'Full delay & damage coverage' },
+      cip: { title: 'Airport CIP services', desc: 'Dedicated check-in & gate' },
     },
     months: [
       'January', 'February', 'March', 'April', 'May', 'June',
@@ -197,8 +224,8 @@ export const CHECKOUT_COPY: Record<
     searchAgain: 'بحث مجدداً',
     steps: { pax: 'بيانات المسافر', extras: 'خدمات إضافية', review: 'مراجعة' },
     enterPax: 'إدخال بيانات المسافر',
-    travelExtras: 'خدمات السفر',
-    pickServices: 'اختر الخدمات الإضافية التي تحتاجها.',
+    travelExtras: 'الخدمات الإضافية للسفر',
+    pickServices: 'اختر الخدمات التي ترغب بها — تُضاف التكلفة إلى إجمالي الفاتورة',
     confirmDetails: 'تأكيد البيانات',
     flightSummary: 'ملخص الرحلة',
     paymentDetails: 'تفاصيل الدفع',
@@ -238,15 +265,24 @@ export const CHECKOUT_COPY: Record<
     passenger: 'مسافر',
     document: 'الوثيقة',
     seat: 'المقعد',
-    selectedExtras: 'الخدمات المختارة',
+    seatMapCaption: (aircraft) =>
+      `اختيار المقعد (اختياري) — ${aircraft} · درجة الأعمال صفوف 3–6 (16 مقعدًا) · الاقتصادية صفوف 7–32`,
+    bizLockedHint: 'يتطلب اختيار مقعد درجة الأعمال 15,000 نقطة ولاء على الأقل',
+    business: 'درجة الأعمال',
+    available: 'متاح',
+    reserved: 'محجوز',
+    selectedSeat: 'المقعد المختار',
+    totalSold: 'إجمالي المقاعد المباعة',
+    ofLabel: 'من',
+    selectedExtras: 'الخدمات الإضافية المختارة',
     nameChangeWarning: 'لا يمكن تغيير أسماء المسافرين بعد الدفع. يرجى التحقق من الإملاء.',
-    noneSelected: '—',
+    noneSelected: 'لم يتم الاختيار',
     toman: 'تومان',
     extras: {
-      baggage: { title: 'أمتعة إضافية (+23 كغ)', desc: '23 كغ أمتعة إضافية' },
-      meal: { title: 'وجبة خاصة', desc: 'اختيار قائمة الوجبات' },
-      insurance: { title: 'تأمين سفر', desc: 'تغطية حتى 500 مليون ريال' },
-      cip: { title: 'صالة CIP', desc: 'دخول من الصالة الخاصة' },
+      baggage: { title: 'أمتعة إضافية (10 كجم)', desc: 'إضافة إلى الحد المسموح 20 كجم' },
+      meal: { title: 'وجبة ساخنة على متن الرحلة', desc: 'قائمة إيرانية / عالمية' },
+      insurance: { title: 'تأمين السفر', desc: 'تغطية كاملة للتأخير والأضرار' },
+      cip: { title: 'خدمات CIP في المطار', desc: 'تسجيل وصول وبوابة مخصصة' },
     },
     months: [
       'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',

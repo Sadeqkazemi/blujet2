@@ -167,8 +167,9 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     if (!draft) return;
+    // Full aircraft map (business + economy) — matches تکمیل خرید seat legend.
     fetchSeatMap(draft.flightInstanceId)
-      .then((m) => setSeats(m.seats.filter((s) => s.cabin === draft.cabin)))
+      .then((m) => setSeats(m.seats))
       .catch(() => setSeats([]));
   }, [draft]);
 
@@ -196,8 +197,8 @@ export default function CheckoutPage() {
     });
   }, [selectedSeats, isWizard]);
 
-  const businessLocked =
-    draft?.cabin === 'BUSINESS' && clubBalance < BUSINESS_SEAT_MIN_POINTS;
+  // Design: business seats need ≥15,000 club points (hint + locked styling).
+  const businessLocked = clubBalance < BUSINESS_SEAT_MIN_POINTS;
 
   const nextLabel = useMemo(() => {
     if (step === 'pax') return t.nextPax;
@@ -234,16 +235,7 @@ export default function CheckoutPage() {
       return;
     }
     if (step === 'extras') {
-      if (selectedSeats.length === 0) {
-        setError(locale === 'en' ? 'Select at least one seat.' : 'حداقل یک صندلی انتخاب کنید.');
-        return;
-      }
-      if (selectedSeats.length !== passengers.length) {
-        // Align seat↔pax: trim or pad
-        if (selectedSeats.length < passengers.length) {
-          setPassengers((p) => p.slice(0, selectedSeats.length));
-        }
-      }
+      // Seat selection is optional per design («انتخاب صندلی (اختیاری)»).
       setStep('review');
       return;
     }
@@ -256,15 +248,45 @@ export default function CheckoutPage() {
     if (idx > 0) setStep(STEP_ORDER[idx - 1]!);
   }
 
+  function resolveSeatCodesForBooking(): string[] | null {
+    if (!draft) return null;
+    const needed = passengers.length;
+    const picked = selectedSeats.filter((code) => {
+      const cell = seats?.find((s) => s.seatCode === code);
+      return cell?.cabin === draft.cabin && cell.status === 'FREE';
+    });
+    if (picked.length >= needed) return picked.slice(0, needed);
+    const used = new Set(picked);
+    const free = (seats ?? [])
+      .filter((s) => s.cabin === draft.cabin && s.status === 'FREE' && !used.has(s.seatCode))
+      .map((s) => s.seatCode);
+    const result = [...picked];
+    for (const code of free) {
+      if (result.length >= needed) break;
+      result.push(code);
+    }
+    return result.length >= needed ? result : null;
+  }
+
   async function submitBooking() {
     if (!draft) return;
     if (status !== 'authenticated') {
       navigate('/signin', { state: { from: location.pathname + location.search } });
       return;
     }
-    if (selectedSeats.length === 0 || passengers.some((p) => !isPassengerComplete(p))) {
+    if (passengers.some((p) => !isPassengerComplete(p))) {
       setError(t.completePaxError);
       setStep('pax');
+      return;
+    }
+    const seatCodes = resolveSeatCodesForBooking();
+    if (!seatCodes) {
+      setError(
+        locale === 'en'
+          ? 'No free seats left for this cabin.'
+          : 'صندلی خالی برای این کلاس باقی نمانده است.',
+      );
+      setStep('extras');
       return;
     }
     setBusy(true);
@@ -276,7 +298,7 @@ export default function CheckoutPage() {
         passengers: passengers.map((p, i) => ({
           fullName: passengerFullName(p),
           nationalId: p.docType === 'NATIONAL_ID' ? p.nationalId || undefined : undefined,
-          seatCode: selectedSeats[i] ?? p.seatCode,
+          seatCode: seatCodes[i]!,
         })),
       });
       clearCheckoutDraft();
@@ -413,6 +435,8 @@ export default function CheckoutPage() {
           selectedSeats={selectedSeats}
           onToggleSeat={toggleSeat}
           businessLocked={businessLocked}
+          bookedCabin={draft?.cabin ?? 'ECONOMY'}
+          aircraftType={draft?.flight.aircraftType ?? 'MD-88'}
         />
       )}
       {step === 'review' && (
