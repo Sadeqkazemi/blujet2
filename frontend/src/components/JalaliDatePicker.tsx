@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { dayjs } from '../lib/jalali';
 import { faDigits } from '../lib/fa-format';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 const WEEKDAYS = ['ش', 'ی', 'د', 'س', 'چ', 'پ', 'ج'];
 const MONTH_NAMES = [
@@ -43,10 +44,15 @@ interface JalaliDatePickerProps {
   onChange: (iso: string) => void;
   minDate?: string;
   testId?: string;
+  /** Opt-in: open the calendar as a full-width bottom sheet on mobile
+   * (design-reference-v2 search box behavior). Off for panel usages. */
+  mobileSheet?: boolean;
 }
 
 /** Jalali (شمسی) date picker — CLAUDE.md requires Jalali everywhere users pick dates. */
-export default function JalaliDatePicker({ label, value, onChange, minDate, testId }: JalaliDatePickerProps) {
+export default function JalaliDatePicker({ label, value, onChange, minDate, testId, mobileSheet = false }: JalaliDatePickerProps) {
+  const isMobile = useIsMobile();
+  const asSheet = mobileSheet && isMobile;
   const [open, setOpen] = useState(false);
   const [viewMonth, setViewMonth] = useState(() => (value ? dayjs(value).calendar('jalali') : dayjs().calendar('jalali')));
   const rootRef = useRef<HTMLDivElement>(null);
@@ -86,22 +92,44 @@ export default function JalaliDatePicker({ label, value, onChange, minDate, test
       </div>
 
       {open && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '100%',
-            marginTop: 8,
-            right: 0,
-            width: 300,
-            maxWidth: '92vw',
-            background: '#fff',
-            border: '1px solid #e6eaf0',
-            borderRadius: 18,
-            boxShadow: '0 24px 56px -14px rgba(13,38,102,.34)',
-            padding: '18px 20px',
-            zIndex: 50,
-          }}
-        >
+        <>
+          {asSheet && (
+            <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 44, background: 'rgba(13,38,64,.35)' }} />
+          )}
+          <div
+            style={
+              asSheet
+                ? {
+                    position: 'fixed',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    width: '100%',
+                    maxWidth: '100vw',
+                    boxSizing: 'border-box',
+                    background: '#fff',
+                    border: '1px solid #e6eaf0',
+                    borderRadius: '18px 18px 0 0',
+                    boxShadow: '0 -12px 44px -14px rgba(13,38,102,.4)',
+                    padding: '18px 20px calc(18px + env(safe-area-inset-bottom))',
+                    zIndex: 50,
+                  }
+                : {
+                    position: 'absolute',
+                    top: '100%',
+                    marginTop: 8,
+                    right: 0,
+                    width: 300,
+                    maxWidth: '92vw',
+                    background: '#fff',
+                    border: '1px solid #e6eaf0',
+                    borderRadius: 18,
+                    boxShadow: '0 24px 56px -14px rgba(13,38,102,.34)',
+                    padding: '18px 20px',
+                    zIndex: 50,
+                  }
+            }
+          >
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
             <span
               data-testid={testId ? `${testId}-today` : undefined}
@@ -172,7 +200,8 @@ export default function JalaliDatePicker({ label, value, onChange, minDate, test
               );
             })}
           </div>
-        </div>
+          </div>
+        </>
       )}
     </div>
   );

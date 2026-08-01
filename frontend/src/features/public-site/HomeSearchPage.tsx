@@ -78,6 +78,9 @@ const STR: Record<StoredLocale, {
   tripOneWay: string;
   tripRoundTrip: string;
   tripMultiCity: string;
+  tabBook: string;
+  tabManage: string;
+  tabStatus: string;
   lblOrigin: string;
   lblDestination: string;
   lblDepartDate: string;
@@ -133,6 +136,9 @@ const STR: Record<StoredLocale, {
     tripOneWay: 'یک‌طرفه',
     tripRoundTrip: 'رفت و برگشت',
     tripMultiCity: 'چندمسیره',
+    tabBook: 'رزرو پرواز',
+    tabManage: 'مدیریت رزرو',
+    tabStatus: 'وضعیت پرواز',
     lblOrigin: 'مبدا',
     lblDestination: 'مقصد',
     lblDepartDate: 'تاریخ رفت',
@@ -188,6 +194,9 @@ const STR: Record<StoredLocale, {
     tripOneWay: 'One-way',
     tripRoundTrip: 'Round-trip',
     tripMultiCity: 'Multi-city',
+    tabBook: 'Book Flight',
+    tabManage: 'Manage Booking',
+    tabStatus: 'Flight Status',
     lblOrigin: 'From',
     lblDestination: 'To',
     lblDepartDate: 'Departure date',
@@ -243,6 +252,9 @@ const STR: Record<StoredLocale, {
     tripOneWay: 'ذهاب فقط',
     tripRoundTrip: 'ذهاب وإياب',
     tripMultiCity: 'متعدد المدن',
+    tabBook: 'حجز الرحلة',
+    tabManage: 'إدارة الحجز',
+    tabStatus: 'حالة الرحلة',
     lblOrigin: 'من',
     lblDestination: 'إلى',
     lblDepartDate: 'تاريخ المغادرة',
@@ -472,7 +484,45 @@ export default function HomeSearchPage() {
               zIndex: 30,
             }}
           >
-            <div style={{ padding: '13px 16px 16px' }}>
+            <div style={{ display: 'flex', borderBottom: '1px solid #eef1f5', borderRadius: '18px 18px 0 0', overflow: 'hidden' }}>
+              {([
+                ['book', t.tabBook, null],
+                ['manage', t.tabManage, '/manage-booking'],
+                ['status', t.tabStatus, '/flight-status'],
+              ] as const).map(([key, label, href]) => {
+                const active = key === 'book';
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    data-testid={`top-tab-${key}`}
+                    onClick={() => href && navigate(href)}
+                    style={{
+                      flex: 1,
+                      textAlign: 'center',
+                      padding: '15px 6px 12px',
+                      fontSize: 13,
+                      fontWeight: active ? 800 : 600,
+                      cursor: 'pointer',
+                      color: active ? '#0d2640' : '#8a96a6',
+                      border: 'none',
+                      borderBottom: active ? '3px solid #1668c4' : '3px solid transparent',
+                      background: 'transparent',
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+            <div
+              style={{
+                padding: '16px 16px 16px',
+                background: isMobile ? 'linear-gradient(135deg,#0d2640,#16406e)' : '#fff',
+                borderRadius: '0 0 17px 17px',
+              }}
+            >
               {error && (
                 <p style={{ marginBottom: 12, borderRadius: 10, background: '#fef2f2', padding: 10, fontSize: 12, color: '#e5484d' }}>{error}</p>
               )}
@@ -483,40 +533,40 @@ export default function HomeSearchPage() {
                 onError={setError}
                 onSubmit={(url) => navigate(url)}
               />
+            </div>
+          </div>
 
-              <div style={{ marginTop: 36 }}>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 15 }}>
-                  <span style={{ fontSize: '14.5px', color: '#0d2640', fontWeight: 800 }}>{t.popularRoutesTitle}</span>
-                  <span style={{ fontSize: '11.5px', color: '#5a6678' }}>{t.popularRoutesSub}</span>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: gridColsRoutes, gap: 10 }}>
-                  {popularRoutes.map((r) => (
-                    <button
-                      type="button"
-                      key={`${r.fromCode}-${r.toCode}`}
-                      data-testid={`popular-route-${r.toCode}`}
-                      onClick={() => navigate(`/results?origin=${r.fromCode}&dest=${r.toCode}&date=${TODAY_ISO}`)}
-                      style={{
-                        textAlign: locale === 'en' ? 'left' : 'right',
-                        background: '#fff',
-                        border: '1px solid #e8eef6',
-                        borderRadius: 12,
-                        padding: '10px 11px',
-                        boxShadow: '0 12px 28px -20px rgba(13,38,102,.45)',
-                        cursor: 'pointer',
-                        fontFamily: 'inherit',
-                      }}
-                    >
-                      <span style={{ display: 'block', fontSize: 13, fontWeight: 800, color: '#16202e', marginBottom: 3 }}>
-                        {cityName(r.fromCode)} <span style={{ color: '#b9c2cf', fontWeight: 600 }}>{locale === 'en' ? '→' : '←'}</span> {cityName(r.toCode)}
-                      </span>
-                      <span style={{ fontSize: '11.5px', color: '#1668c4', fontWeight: 800 }}>
-                        {formatToman(r.tomanPrice, locale)} <span style={{ fontSize: 9, fontWeight: 400, color: '#8a96a6' }}>{t.toman}</span>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
+          <div style={{ marginTop: 36 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 15 }}>
+              <span style={{ fontSize: '14.5px', color: '#0d2640', fontWeight: 800 }}>{t.popularRoutesTitle}</span>
+              <span style={{ fontSize: '11.5px', color: '#5a6678' }}>{t.popularRoutesSub}</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: gridColsRoutes, gap: 10 }}>
+              {popularRoutes.map((r) => (
+                <button
+                  type="button"
+                  key={`${r.fromCode}-${r.toCode}`}
+                  data-testid={`popular-route-${r.toCode}`}
+                  onClick={() => navigate(`/results?origin=${r.fromCode}&dest=${r.toCode}&date=${TODAY_ISO}`)}
+                  style={{
+                    textAlign: locale === 'en' ? 'left' : 'right',
+                    background: '#fff',
+                    border: '1px solid #e8eef6',
+                    borderRadius: 12,
+                    padding: '10px 11px',
+                    boxShadow: '0 12px 28px -20px rgba(13,38,102,.45)',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  <span style={{ display: 'block', fontSize: 13, fontWeight: 800, color: '#16202e', marginBottom: 3 }}>
+                    {cityName(r.fromCode)} <span style={{ color: '#b9c2cf', fontWeight: 600 }}>{locale === 'en' ? '→' : '←'}</span> {cityName(r.toCode)}
+                  </span>
+                  <span style={{ fontSize: '11.5px', color: '#1668c4', fontWeight: 800 }}>
+                    {formatToman(r.tomanPrice, locale)} <span style={{ fontSize: 9, fontWeight: 400, color: '#8a96a6' }}>{t.toman}</span>
+                  </span>
+                </button>
+              ))}
             </div>
           </div>
         </div>

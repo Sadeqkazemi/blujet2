@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { StoredLocale } from '../../../hooks/useLocale';
+import { useIsMobile } from '../../../hooks/useIsMobile';
 import type { Airport } from '../../../types/public-site';
 import { airportCityLabel, airportDisplayName } from './airport-utils';
 
@@ -38,6 +39,8 @@ interface AirportCityPickerProps {
   requireOriginFirst?: boolean;
   originSelected?: boolean;
   testId?: string;
+  /** Extra root styles (grid placement / mobile white-card look). */
+  rootStyle?: React.CSSProperties;
 }
 
 export default function AirportCityPicker({
@@ -51,8 +54,10 @@ export default function AirportCityPicker({
   requireOriginFirst = false,
   originSelected = true,
   testId,
+  rootStyle,
 }: AirportCityPickerProps) {
   const t = STR[locale];
+  const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const rootRef = useRef<HTMLDivElement>(null);
@@ -94,7 +99,7 @@ export default function AirportCityPicker({
   const dim = requireOriginFirst && !originSelected ? 0.45 : 1;
 
   return (
-    <div ref={rootRef} style={{ position: 'relative', flex: '1.5 1 165px', minWidth: 165 }}>
+    <div ref={rootRef} style={{ position: 'relative', flex: '1.5 1 165px', minWidth: 165, ...rootStyle }}>
       <div
         data-testid={testId}
         onClick={openPicker}
@@ -146,19 +151,37 @@ export default function AirportCityPicker({
             style={{ position: 'fixed', inset: 0, zIndex: 38 }}
           />
           <div
-            style={{
-              position: 'absolute',
-              top: 74,
-              right: 0,
-              width: 318,
-              maxWidth: '88vw',
-              background: '#fff',
-              border: '1px solid #e6eaf0',
-              borderRadius: 14,
-              boxShadow: '0 18px 44px -12px rgba(13,38,102,.30)',
-              padding: 13,
-              zIndex: 40,
-            }}
+            style={
+              isMobile
+                ? {
+                    position: 'fixed',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    width: '100%',
+                    maxWidth: '100vw',
+                    boxSizing: 'border-box',
+                    background: '#fff',
+                    border: '1px solid #e6eaf0',
+                    borderRadius: '18px 18px 0 0',
+                    boxShadow: '0 -12px 44px -14px rgba(13,38,102,.4)',
+                    padding: '13px 13px calc(13px + env(safe-area-inset-bottom))',
+                    zIndex: 40,
+                  }
+                : {
+                    position: 'absolute',
+                    top: 74,
+                    right: 0,
+                    width: 318,
+                    maxWidth: '88vw',
+                    background: '#fff',
+                    border: '1px solid #e6eaf0',
+                    borderRadius: 14,
+                    boxShadow: '0 18px 44px -12px rgba(13,38,102,.30)',
+                    padding: 13,
+                    zIndex: 40,
+                  }
+            }
           >
             <input
               value={query}
@@ -181,7 +204,7 @@ export default function AirportCityPicker({
             <div style={{ fontSize: '10.5px', color: '#9aa4b2', fontWeight: 700, margin: '0 4px 6px' }}>
               {t.listLabel}
             </div>
-            <div style={{ maxHeight: 248, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ maxHeight: isMobile ? '50vh' : 248, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
               {filtered.map((a) => (
                 <button
                   type="button"

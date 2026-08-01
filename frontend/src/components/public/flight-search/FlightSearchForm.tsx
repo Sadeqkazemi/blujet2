@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import type { StoredLocale } from '../../../hooks/useLocale';
 import { useIsMobile } from '../../../hooks/useIsMobile';
 import JalaliDatePicker from '../../JalaliDatePicker';
-import type { Airport } from '../../../types/public-site';
+import type { Airport, CabinClass } from '../../../types/public-site';
 import AirportCityPicker from './AirportCityPicker';
 import PassengerCabinPicker, { type PassengerCabinState } from './PassengerCabinPicker';
 import { filterAirportsByService } from './airport-utils';
@@ -27,6 +27,8 @@ const STR: Record<
     systemFlight: string;
     charterFlight: string;
     charterNotice: string;
+    cabinEconomy: string;
+    cabinBusiness: string;
     legLabel: (n: number) => string;
     addLeg: string;
     removeLeg: string;
@@ -52,6 +54,8 @@ const STR: Record<
     charterFlight: 'چارتری',
     charterNotice:
       'پروازهای چارتری با ظرفیت محدود و قیمت مقطوع؛ امکان استرداد بر اساس قوانین چارترکننده متفاوت است.',
+    cabinEconomy: 'اکونومی',
+    cabinBusiness: 'بیزینس',
     legLabel: (n) => `مسیر ${n}`,
     addLeg: '+ افزودن مسیر',
     removeLeg: 'حذف مسیر',
@@ -76,6 +80,8 @@ const STR: Record<
     charterFlight: 'Charter',
     charterNotice:
       'Charter flights have limited capacity and fixed fares; refund rules differ from scheduled flights.',
+    cabinEconomy: 'Economy',
+    cabinBusiness: 'Business',
     legLabel: (n) => `Leg ${n}`,
     addLeg: '+ Add leg',
     removeLeg: 'Remove leg',
@@ -99,6 +105,8 @@ const STR: Record<
     systemFlight: 'مجدولة',
     charterFlight: 'تشارتر',
     charterNotice: 'رحلات التشارتر بسعة محدودة وأسعار ثابتة؛ قواعد الاسترداد مختلفة.',
+    cabinEconomy: 'اقتصادية',
+    cabinBusiness: 'درجة الأعمال',
     legLabel: (n) => `المسار ${n}`,
     addLeg: '+ إضافة مسار',
     removeLeg: 'حذف المسار',
@@ -120,13 +128,18 @@ function TripRadio({
   active,
   label,
   onClick,
+  onDark,
   testId,
 }: {
   active: boolean;
   label: string;
   onClick: () => void;
+  onDark: boolean;
   testId?: string;
 }) {
+  const activeColor = onDark ? '#fff' : '#16202e';
+  const inactiveColor = onDark ? 'rgba(255,255,255,.68)' : '#5a6678';
+  const inactiveBorder = onDark ? '2px solid rgba(255,255,255,.4)' : '2px solid #c5cedb';
   return (
     <button
       type="button"
@@ -137,7 +150,7 @@ function TripRadio({
         alignItems: 'center',
         gap: 7,
         cursor: 'pointer',
-        color: active ? '#16202e' : '#5a6678',
+        color: active ? activeColor : inactiveColor,
         fontWeight: active ? 700 : 500,
         fontSize: 13,
         border: 'none',
@@ -151,10 +164,11 @@ function TripRadio({
           width: 20,
           height: 20,
           borderRadius: '50%',
-          border: `2px solid ${active ? '#1668c4' : '#c5cedb'}`,
+          border: active ? '2px solid #1668c4' : inactiveBorder,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
+          background: active && onDark ? '#fff' : 'transparent',
         }}
       >
         {active && (
@@ -165,6 +179,13 @@ function TripRadio({
     </button>
   );
 }
+
+/** design-reference-v2 mobile: white field cards on the navy panel. */
+const MOBILE_CARD: React.CSSProperties = {
+  background: '#fff',
+  borderRadius: 12,
+  boxShadow: '0 8px 20px -14px rgba(0,0,0,.4)',
+};
 
 export default function FlightSearchForm({
   airports,
@@ -182,6 +203,7 @@ export default function FlightSearchForm({
   const [dest, setDest] = useState('');
   const [dateIso, setDateIso] = useState<string | null>(null);
   const [returnDateIso, setReturnDateIso] = useState<string | null>(null);
+  const [classBoxOpen, setClassBoxOpen] = useState(false);
   const [multiLegs, setMultiLegs] = useState<SearchLeg[]>([
     { origin: '', dest: '', date: '' },
     { origin: '', dest: '', date: '' },
@@ -198,7 +220,7 @@ export default function FlightSearchForm({
     [airports, service],
   );
 
-  const dateReady = trip === 'multi'
+  const paxEnabled = trip === 'multi'
     ? multiLegs.every((l) => l.date)
     : Boolean(dateIso) && (trip !== 'round' || Boolean(returnDateIso));
 
@@ -271,13 +293,47 @@ export default function FlightSearchForm({
     setMultiLegs(multiLegs.filter((_, i) => i !== index));
   }
 
-  const fieldsBorder = isMobile ? 'none' : '1.5px solid #e3e9f1';
-  const fieldsBg = isMobile ? 'transparent' : '#fff';
+  const cabinLabel = pax.cabin === 'BUSINESS' ? t.cabinBusiness : t.cabinEconomy;
+
+  const searchBtnStyle: React.CSSProperties = {
+    flex: 'none',
+    margin: isMobile ? 0 : 8,
+    border: 'none',
+    borderRadius: isMobile ? 13 : locale === 'en' ? '0 13px 13px 0' : '13px 0 0 13px',
+    background: '#1668c4',
+    color: '#fff',
+    padding: '0 21px',
+    fontSize: '12.5px',
+    fontWeight: 800,
+    cursor: 'pointer',
+    gridColumn: isMobile ? '1 / -1' : undefined,
+    minHeight: isMobile ? 48 : undefined,
+    alignSelf: 'stretch',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 7,
+    justifyContent: 'center',
+    fontFamily: 'inherit',
+  };
+
+  const searchIcon = (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="7" />
+      <path d="M21 21l-4-4" />
+    </svg>
+  );
 
   return (
     <form onSubmit={handleSubmit}>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 18, gap: 10, flexWrap: 'wrap' }}>
-        <div style={{ display: 'inline-flex', background: '#eef1f5', borderRadius: 11, padding: 3 }}>
+        <div
+          style={{
+            display: 'inline-flex',
+            background: isMobile ? 'rgba(255,255,255,.14)' : '#eef1f5',
+            borderRadius: 11,
+            padding: 3,
+          }}
+        >
           {(['domestic', 'intl'] as const).map((key) => {
             const active = service === key;
             const label = key === 'domestic' ? t.domestic : t.intl;
@@ -295,7 +351,7 @@ export default function FlightSearchForm({
                   borderRadius: 8,
                   fontSize: '12.5px',
                   cursor: 'pointer',
-                  color: active ? '#1668c4' : '#5a6678',
+                  color: active ? '#1668c4' : isMobile ? '#cfe0f2' : '#5a6678',
                   fontWeight: active ? 800 : 600,
                   background: active ? '#fff' : 'transparent',
                   boxShadow: active ? '0 2px 7px rgba(13,38,102,.14)' : 'none',
@@ -338,18 +394,21 @@ export default function FlightSearchForm({
           active={trip === 'round'}
           label={t.tripRoundTrip}
           onClick={() => setTrip('round')}
+          onDark={isMobile}
           testId="trip-round"
         />
         <TripRadio
           active={trip === 'oneway'}
           label={t.tripOneWay}
           onClick={() => setTrip('oneway')}
+          onDark={isMobile}
           testId="trip-oneway"
         />
         <TripRadio
           active={trip === 'multi'}
           label={t.tripMultiCity}
           onClick={() => setTrip('multi')}
+          onDark={isMobile}
           testId="trip-multi"
         />
       </div>
@@ -361,10 +420,11 @@ export default function FlightSearchForm({
               key={`leg-${index}`}
               data-testid={`multi-leg-${index}`}
               style={{
-                border: '1.5px solid #e3e9f1',
+                border: isMobile ? 'none' : '1.5px solid #e3e9f1',
                 borderRadius: 14,
                 background: '#fff',
                 padding: isMobile ? 10 : 0,
+                boxShadow: isMobile ? MOBILE_CARD.boxShadow : undefined,
               }}
             >
               <div
@@ -433,6 +493,7 @@ export default function FlightSearchForm({
                     onChange={(iso) => updateMultiLeg(index, { date: iso.slice(0, 10) })}
                     minDate={index === 0 ? TODAY_ISO : multiLegs[index - 1]?.date || TODAY_ISO}
                     testId={`leg-${index}-date`}
+                    mobileSheet
                   />
                 </div>
               </div>
@@ -445,9 +506,9 @@ export default function FlightSearchForm({
               data-testid="add-leg"
               style={{
                 alignSelf: 'flex-start',
-                border: '1.5px dashed #c5cedb',
-                background: '#f8fafc',
-                color: '#1668c4',
+                border: isMobile ? '1.5px dashed rgba(255,255,255,.45)' : '1.5px dashed #c5cedb',
+                background: isMobile ? 'rgba(255,255,255,.1)' : '#f8fafc',
+                color: isMobile ? '#fff' : '#1668c4',
                 padding: '8px 14px',
                 borderRadius: 10,
                 fontSize: 12,
@@ -462,48 +523,25 @@ export default function FlightSearchForm({
           <div
             style={{
               display: isMobile ? 'grid' : 'flex',
+              gridTemplateColumns: isMobile ? '1fr' : undefined,
               alignItems: 'stretch',
-              border: fieldsBorder,
+              border: isMobile ? 'none' : '1.5px solid #e3e9f1',
               borderRadius: 14,
-              background: fieldsBg,
+              background: isMobile ? 'transparent' : '#fff',
               flexWrap: 'wrap',
+              gap: isMobile ? 10 : 0,
             }}
           >
             <PassengerCabinPicker
               value={pax}
               onChange={setPax}
               locale={locale}
-              enabled={dateReady}
+              enabled={paxEnabled}
               testId="home-pax"
+              rootStyle={isMobile ? { ...MOBILE_CARD, padding: '6px 0' } : undefined}
             />
-            <button
-              type="submit"
-              data-testid="home-search-submit"
-              style={{
-                flex: 'none',
-                margin: isMobile ? 0 : 8,
-                border: 'none',
-                borderRadius: isMobile ? 11 : '13px 0 0 13px',
-                background: '#1668c4',
-                color: '#fff',
-                padding: isMobile ? '0 28px' : '0 21px',
-                fontSize: '12.5px',
-                fontWeight: 800,
-                cursor: 'pointer',
-                gridColumn: isMobile ? '1 / -1' : undefined,
-                height: isMobile ? 44 : 'auto',
-                alignSelf: 'stretch',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 7,
-                justifyContent: 'center',
-                fontFamily: 'inherit',
-              }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="7" />
-                <path d="M21 21l-4-4" />
-              </svg>
+            <button type="submit" data-testid="home-search-submit" style={searchBtnStyle}>
+              {searchIcon}
               {t.btnSearch}
             </button>
           </div>
@@ -516,9 +554,9 @@ export default function FlightSearchForm({
               gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'none',
               alignItems: 'stretch',
               position: 'relative',
-              border: fieldsBorder,
+              border: isMobile ? 'none' : '1.5px solid #e3e9f1',
               borderRadius: 14,
-              background: fieldsBg,
+              background: isMobile ? 'transparent' : '#fff',
               flexWrap: 'wrap',
               gap: isMobile ? 10 : 0,
             }}
@@ -531,12 +569,18 @@ export default function FlightSearchForm({
               locale={locale}
               excludeCode={dest}
               testId="home-origin"
+              rootStyle={
+                isMobile
+                  ? { ...MOBILE_CARD, gridColumn: '1', gridRow: '1', minWidth: 0, padding: '6px 0' }
+                  : undefined
+              }
             />
 
             <div
               onClick={swap}
               style={{
                 alignSelf: 'center',
+                justifySelf: 'center',
                 width: 40,
                 height: 40,
                 flex: 'none',
@@ -550,9 +594,9 @@ export default function FlightSearchForm({
                 fontSize: '15.5px',
                 cursor: 'pointer',
                 zIndex: 3,
-                margin: isMobile ? '6px auto' : '0 -20px',
+                margin: isMobile ? 0 : '0 -20px',
                 boxShadow: '0 3px 10px rgba(13,38,102,.12)',
-                gridColumn: isMobile ? '1 / -1' : 'auto',
+                gridArea: isMobile ? '1 / 1 / 2 / -1' : undefined,
               }}
             >
               ⇄
@@ -568,15 +612,20 @@ export default function FlightSearchForm({
               requireOriginFirst
               originSelected={Boolean(origin)}
               testId="home-dest"
+              rootStyle={
+                isMobile
+                  ? { ...MOBILE_CARD, gridColumn: '2', gridRow: '1', minWidth: 0, padding: '6px 0' }
+                  : undefined
+              }
             />
 
             <div
               style={{
                 flex: '1.1 1 120px',
-                minWidth: 120,
+                minWidth: isMobile ? 0 : 120,
                 borderRight: isMobile ? 'none' : '1px solid #eef1f5',
-                gridColumn: isMobile ? '1' : 'auto',
                 opacity: dest ? 1 : 0.45,
+                ...(isMobile ? { ...MOBILE_CARD, gridColumn: '1', padding: '6px 0' } : {}),
               }}
             >
               <JalaliDatePicker
@@ -585,17 +634,19 @@ export default function FlightSearchForm({
                 onChange={setDateIso}
                 minDate={TODAY_ISO}
                 testId="home-date"
+                mobileSheet
               />
             </div>
 
-            {trip === 'round' && (
+            {(trip === 'round' || isMobile) && (
               <div
                 style={{
                   flex: '1.1 1 120px',
-                  minWidth: 120,
+                  minWidth: isMobile ? 0 : 120,
                   borderRight: isMobile ? 'none' : '1px solid #eef1f5',
-                  gridColumn: isMobile ? '2' : 'auto',
-                  opacity: dateIso ? 1 : 0.45,
+                  opacity: trip !== 'round' ? 0.45 : dateIso ? 1 : 0.45,
+                  pointerEvents: trip === 'round' ? 'auto' : 'none',
+                  ...(isMobile ? { ...MOBILE_CARD, gridColumn: '2', padding: '6px 0' } : {}),
                 }}
               >
                 <JalaliDatePicker
@@ -604,6 +655,7 @@ export default function FlightSearchForm({
                   onChange={setReturnDateIso}
                   minDate={dateIso?.slice(0, 10) ?? TODAY_ISO}
                   testId="home-return-date"
+                  mobileSheet
                 />
               </div>
             )}
@@ -612,72 +664,132 @@ export default function FlightSearchForm({
               value={pax}
               onChange={setPax}
               locale={locale}
-              enabled={Boolean(dateIso) && (trip !== 'round' || Boolean(returnDateIso))}
+              enabled={paxEnabled}
               testId="home-pax"
+              rootStyle={
+                isMobile
+                  ? { ...MOBILE_CARD, gridColumn: '1', minWidth: 0, padding: '6px 0' }
+                  : undefined
+              }
             />
 
-            <button
-              type="submit"
-              data-testid="home-search-submit"
-              style={{
-                flex: 'none',
-                margin: isMobile ? 0 : 8,
-                border: 'none',
-                borderRadius: isMobile ? 11 : '13px 0 0 13px',
-                background: '#1668c4',
-                color: '#fff',
-                padding: isMobile ? '0 28px' : '0 21px',
-                fontSize: '12.5px',
-                fontWeight: 800,
-                cursor: 'pointer',
-                gridColumn: isMobile ? '1 / -1' : 'auto',
-                height: isMobile ? 44 : 'auto',
-                alignSelf: 'stretch',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 7,
-                justifyContent: 'center',
-                fontFamily: 'inherit',
-              }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="7" />
-                <path d="M21 21l-4-4" />
-              </svg>
+            {isMobile && (
+              <div style={{ ...MOBILE_CARD, gridColumn: '2', position: 'relative', minWidth: 0, padding: '6px 0' }}>
+                <div
+                  data-testid="mobile-class-box"
+                  onClick={() => setClassBoxOpen((v) => !v)}
+                  style={{
+                    cursor: 'pointer',
+                    padding: '5px 13px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    height: '100%',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#9aa4b2', fontWeight: 600, marginBottom: 3 }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z" />
+                    </svg>
+                    {t.flightTypeLabel}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, fontWeight: 700, color: '#16202e', whiteSpace: 'nowrap' }}>
+                    {cabinLabel}
+                    <span style={{ color: '#9aa4b2', fontSize: 10 }}>▾</span>
+                  </div>
+                </div>
+                {classBoxOpen && (
+                  <>
+                    <div onClick={() => setClassBoxOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 38 }} />
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: 74,
+                        right: 0,
+                        width: 190,
+                        maxWidth: '80vw',
+                        background: '#fff',
+                        border: '1px solid #e6eaf0',
+                        borderRadius: 14,
+                        boxShadow: '0 18px 44px -12px rgba(13,38,102,.30)',
+                        padding: 10,
+                        zIndex: 40,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 6,
+                      }}
+                    >
+                      {([['ECONOMY', t.cabinEconomy], ['BUSINESS', t.cabinBusiness]] as const).map(([cab, lbl]) => {
+                        const active = pax.cabin === cab;
+                        return (
+                          <button
+                            key={cab}
+                            type="button"
+                            onClick={() => {
+                              setPax({ ...pax, cabin: cab as CabinClass });
+                              setClassBoxOpen(false);
+                            }}
+                            style={{
+                              padding: '9px 10px',
+                              borderRadius: 9,
+                              border: active ? '1.5px solid #1668c4' : '1.5px solid #e2e7ee',
+                              background: active ? '#eef4fb' : '#fff',
+                              color: active ? '#1668c4' : '#5a6678',
+                              fontSize: '12.5px',
+                              fontWeight: active ? 700 : 500,
+                              cursor: 'pointer',
+                              fontFamily: 'inherit',
+                              textAlign: locale === 'en' ? 'left' : 'right',
+                            }}
+                          >
+                            {lbl}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            <button type="submit" data-testid="home-search-submit" style={searchBtnStyle}>
+              {searchIcon}
               {t.btnSearch}
             </button>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 18 }}>
-            <span style={{ fontSize: '11.5px', color: '#8a96a6', fontWeight: 600 }}>{t.flightTypeLabel}</span>
-            <div style={{ display: 'inline-flex', background: '#eef1f5', borderRadius: 10, padding: 3 }}>
-              {(['system', 'charter'] as const).map((kind) => {
-                const active = flightKind === kind;
-                return (
-                  <button
-                    key={kind}
-                    type="button"
-                    data-testid={`flight-kind-${kind}`}
-                    onClick={() => setFlightKind(kind)}
-                    style={{
-                      padding: '7px 17px',
-                      borderRadius: 8,
-                      fontSize: '11.5px',
-                      fontWeight: active ? 800 : 600,
-                      color: active ? '#1668c4' : '#5a6678',
-                      background: active ? '#fff' : 'transparent',
-                      boxShadow: active ? '0 2px 6px rgba(13,38,102,.12)' : 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontFamily: 'inherit',
-                    }}
-                  >
-                    {kind === 'system' ? t.systemFlight : t.charterFlight}
-                  </button>
-                );
-              })}
+          {!isMobile && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 18 }}>
+              <span style={{ fontSize: '11.5px', color: '#8a96a6', fontWeight: 600 }}>{t.flightTypeLabel}</span>
+              <div style={{ display: 'inline-flex', background: '#eef1f5', borderRadius: 10, padding: 3 }}>
+                {(['system', 'charter'] as const).map((kind) => {
+                  const active = flightKind === kind;
+                  return (
+                    <button
+                      key={kind}
+                      type="button"
+                      data-testid={`flight-kind-${kind}`}
+                      onClick={() => setFlightKind(kind)}
+                      style={{
+                        padding: '7px 17px',
+                        borderRadius: 8,
+                        fontSize: '11.5px',
+                        fontWeight: active ? 800 : 600,
+                        color: active ? '#1668c4' : '#5a6678',
+                        background: active ? '#fff' : 'transparent',
+                        boxShadow: active ? '0 2px 6px rgba(13,38,102,.12)' : 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                      }}
+                    >
+                      {kind === 'system' ? t.systemFlight : t.charterFlight}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
         </>
       )}
     </form>

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { StoredLocale } from '../../../hooks/useLocale';
+import { useIsMobile } from '../../../hooks/useIsMobile';
 import { formatToman } from '../../../lib/fa-format';
 import type { CabinClass } from '../../../types/public-site';
 
@@ -77,6 +78,8 @@ interface PassengerCabinPickerProps {
   locale: StoredLocale;
   enabled: boolean;
   testId?: string;
+  /** Extra root styles (grid placement / mobile white-card look). */
+  rootStyle?: React.CSSProperties;
 }
 
 function CounterRow({
@@ -144,8 +147,10 @@ export default function PassengerCabinPicker({
   locale,
   enabled,
   testId,
+  rootStyle,
 }: PassengerCabinPickerProps) {
   const t = STR[locale];
+  const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -173,7 +178,13 @@ export default function PassengerCabinPicker({
   return (
     <div
       ref={rootRef}
-      style={{ flex: '1.2 1 150px', minWidth: 150, position: 'relative', borderRight: '1px solid #eef1f5' }}
+      style={{
+        flex: '1.2 1 150px',
+        minWidth: 150,
+        position: 'relative',
+        borderRight: isMobile ? 'none' : '1px solid #eef1f5',
+        ...rootStyle,
+      }}
     >
       <div
         data-testid={testId}
@@ -227,19 +238,37 @@ export default function PassengerCabinPicker({
         <>
           <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 38 }} />
           <div
-            style={{
-              position: 'absolute',
-              top: 74,
-              left: 0,
-              width: 312,
-              maxWidth: '88vw',
-              background: '#fff',
-              border: '1px solid #e6eaf0',
-              borderRadius: 14,
-              boxShadow: '0 18px 44px -12px rgba(13,38,102,.30)',
-              padding: '5px 15px 15px',
-              zIndex: 40,
-            }}
+            style={
+              isMobile
+                ? {
+                    position: 'fixed',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    width: '100%',
+                    maxWidth: '100vw',
+                    boxSizing: 'border-box',
+                    background: '#fff',
+                    border: '1px solid #e6eaf0',
+                    borderRadius: '18px 18px 0 0',
+                    boxShadow: '0 -12px 44px -14px rgba(13,38,102,.4)',
+                    padding: '5px 15px calc(15px + env(safe-area-inset-bottom))',
+                    zIndex: 40,
+                  }
+                : {
+                    position: 'absolute',
+                    top: 74,
+                    left: 0,
+                    width: 312,
+                    maxWidth: '88vw',
+                    background: '#fff',
+                    border: '1px solid #e6eaf0',
+                    borderRadius: 14,
+                    boxShadow: '0 18px 44px -12px rgba(13,38,102,.30)',
+                    padding: '5px 15px 15px',
+                    zIndex: 40,
+                  }
+            }
           >
             <CounterRow
               label={t.adults}
