@@ -394,6 +394,7 @@ export default function HomeSearchPage() {
     lblDestination: t.lblDestination,
     lblDepartDate: t.lblDepartDate,
     selectPlaceholder: t.selectPlaceholder,
+    cityListLabel: locale === 'en' ? 'Cities with an airport' : locale === 'ar' ? 'مدن بها مطار' : 'شهرهای دارای فرودگاه',
     popularRoutesTitle: t.popularRoutesTitle,
     popularRoutesSub: t.popularRoutesSub,
     toman: t.toman,

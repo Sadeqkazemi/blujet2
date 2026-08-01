@@ -187,6 +187,7 @@ export function buildSearchCopy(
     lblDestination: string;
     lblDepartDate: string;
     selectPlaceholder: string;
+    cityListLabel: string;
     popularRoutesTitle: string;
     popularRoutesSub: string;
     toman: string;

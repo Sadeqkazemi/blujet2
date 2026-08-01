@@ -36,6 +36,7 @@ export type HomeSearchCopy = {
   lblPaxClass: string;
   lblFlightType: string;
   selectPlaceholder: string;
+  cityListLabel: string;
   btnSearch: string;
   btnConfirm: string;
   lblAdults: string;
@@ -127,6 +128,8 @@ function AirportCell({
   testId,
   fieldStyle,
   isRTL,
+  cityListLabel,
+  cellPadding = '10px 24px 10px 20px',
 }: {
   label: string;
   value: string;
@@ -136,6 +139,8 @@ function AirportCell({
   testId: string;
   fieldStyle?: React.CSSProperties;
   isRTL: boolean;
+  cityListLabel: string;
+  cellPadding?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -161,7 +166,7 @@ function AirportCell({
       <div
         data-testid={testId}
         onClick={() => setOpen((v) => !v)}
-        style={{ cursor: 'pointer', padding: '10px 24px 10px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}
+        style={{ cursor: 'pointer', padding: cellPadding, display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#9aa4b2', fontWeight: 600, marginBottom: 3 }}>
           <PinIcon />
@@ -205,6 +210,7 @@ function AirportCell({
                 marginBottom: 9,
               }}
             />
+            <div style={{ fontSize: '10.5px', color: '#9aa4b2', fontWeight: 700, margin: '0 4px 6px' }}>{cityListLabel}</div>
             <div style={{ maxHeight: 220, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
               {filtered.map((a) => (
                 <div
@@ -282,6 +288,7 @@ export default function HomeSearchCard({
   const [flightNo, setFlightNo] = useState('');
 
   const showReturn = tripType === 'round' || isMobile;
+  const returnInteractive = tripType === 'round';
   const panelBg = isMobile ? 'linear-gradient(135deg,#0d2640,#16406e)' : '#fff';
   const svcTrackBg = isMobile ? 'rgba(255,255,255,.14)' : '#eef1f5';
   const fieldCardExtra: React.CSSProperties = isMobile
@@ -423,7 +430,6 @@ export default function HomeSearchCard({
                   border: isMobile ? 'none' : '1.5px solid #e3e9f1',
                   borderRadius: 14,
                   background: isMobile ? 'transparent' : '#fff',
-                  flexWrap: 'wrap',
                 }}
               >
                 <AirportCell
@@ -435,6 +441,7 @@ export default function HomeSearchCard({
                   testId="home-origin"
                   fieldStyle={{ gridColumn: isMobile ? '1' : 'auto', ...fieldCardExtra }}
                   isRTL={isRTL}
+                  cityListLabel={t.cityListLabel}
                 />
 
                 <div
@@ -479,6 +486,8 @@ export default function HomeSearchCard({
                     ...fieldCardExtra,
                   }}
                   isRTL={isRTL}
+                  cityListLabel={t.cityListLabel}
+                  cellPadding="10px 24px 10px 32px"
                 />
 
                 <div style={{ flex: '1.1 1 120px', minWidth: 120, borderRight: isMobile ? 'none' : '1px solid #eef1f5', gridColumn: isMobile ? '1 / -1' : 'auto', ...fieldCardExtra }}>
@@ -486,7 +495,17 @@ export default function HomeSearchCard({
                 </div>
 
                 {showReturn && (
-                  <div style={{ flex: '1.1 1 120px', minWidth: 120, borderRight: isMobile ? 'none' : '1px solid #eef1f5', gridColumn: isMobile ? '1 / -1' : 'auto', opacity: tripType === 'round' ? 1 : 0.45, ...fieldCardExtra }}>
+                  <div
+                    style={{
+                      flex: '1.1 1 120px',
+                      minWidth: 120,
+                      borderRight: isMobile ? 'none' : '1px solid #eef1f5',
+                      gridColumn: isMobile ? '1 / -1' : 'auto',
+                      opacity: returnInteractive ? 1 : 0.45,
+                      pointerEvents: returnInteractive ? 'auto' : 'none',
+                      ...fieldCardExtra,
+                    }}
+                  >
                     <JalaliDatePicker label={t.lblReturnDate} value={returnIso} onChange={setReturnIso} minDate={dateIso ?? TODAY_ISO} testId="home-return-date" />
                   </div>
                 )}
