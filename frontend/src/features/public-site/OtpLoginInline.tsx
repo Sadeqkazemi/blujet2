@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
+import { fetchDevLastOtp } from '../../api/auth';
 import { ApiRequestError } from '../../api/envelope';
 import { faDigits, isValidIranMobile, normalizeIranMobile } from '../../lib/fa-format';
 import { isMockOtpEnabled, MOCK_CUSTOMER_OTP_CODE } from '../../lib/mock-customer-otp';
@@ -100,7 +101,14 @@ export default function OtpLoginInline() {
       const issuedChallengeId = await requestOtp(normalizedPhone);
       setChallengeId(issuedChallengeId);
       setCode('');
-      if (isMockOtpEnabled()) setDevCode(MOCK_CUSTOMER_OTP_CODE);
+      if (isMockOtpEnabled()) {
+        try {
+          const { code: devOtp } = await fetchDevLastOtp(normalizedPhone);
+          setDevCode(devOtp);
+        } catch {
+          setDevCode(MOCK_CUSTOMER_OTP_CODE);
+        }
+      }
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.otpSendError);
     } finally {
