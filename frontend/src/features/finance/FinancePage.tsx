@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import {
@@ -15,7 +16,16 @@ import { faDigits, faMoney, faPercent } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
 import SalesBarChart from '../../components/SalesBarChart';
 import SalesChartControls from '../../components/SalesChartControls';
-import StatTile from '../../components/StatTile';
+import {
+  StaffAlert,
+  StaffFlightsSummaryGrid,
+  StaffKpiCard,
+  StaffPanelCard,
+  StaffPanelPageHeader,
+  StaffPrimaryButton,
+} from '../../components/staff-panel-ui';
+import { STAFF_PANEL } from '../../lib/staff-panel-theme';
+import { staffCard, staffInnerTile, staffInput, staffStatusStyle } from '../../lib/staff-panel-styles';
 import { useSalesChartQuery } from '../../hooks/useSalesChartQuery';
 import type {
   AgencySettlementsResult,
@@ -29,103 +39,138 @@ import type {
 } from '../../types/reporting';
 import type { ReconciliationItem } from '../../types/reconciliation';
 
-const SETTLEMENT_STATUS: Record<SettlementStatus, { label: string; className: string }> = {
-  SETTLED: { label: 'تسویه شد', className: 'bg-[#10b98124] text-[#059669]' },
-  PENDING: { label: 'در انتظار پرداخت', className: 'bg-[#f59e0b24] text-[#b45309]' },
-  OVERDUE: { label: 'معوق', className: 'bg-danger/15 text-danger' },
+const SETTLEMENT_STATUS: Record<SettlementStatus, { label: string; tone: 'success' | 'warning' | 'danger' }> = {
+  SETTLED: { label: 'تسویه شد', tone: 'success' },
+  PENDING: { label: 'در انتظار پرداخت', tone: 'warning' },
+  OVERDUE: { label: 'معوق', tone: 'danger' },
 };
 
 const MIX_COLORS: Record<string, string> = {
-  SYSTEM: '#1668c4',
+  SYSTEM: '#3b82f6',
   CHARTER: '#a855f7',
-  AGENCY: '#059669',
+  AGENCY: '#34d399',
 };
+
+const TX_STATUS_TONE: Record<string, 'success' | 'warning' | 'danger'> = {
+  success: 'success',
+  warning: 'warning',
+  danger: 'danger',
+};
+
+const TX_ICON: Record<string, { bg: string; color: string }> = {
+  SALE: { bg: STAFF_PANEL.accentSoft, color: STAFF_PANEL.accent },
+  SETTLEMENT: { bg: 'rgba(52,211,153,0.12)', color: STAFF_PANEL.success },
+  COMMISSION: { bg: 'rgba(245,158,11,0.12)', color: STAFF_PANEL.warning },
+  REFUND: { bg: 'rgba(248,113,113,0.12)', color: STAFF_PANEL.danger },
+};
+
+function trendLabel(pct: number): string {
+  if (pct === 0) return '۰٪';
+  return `${pct > 0 ? '+' : '−'}${faDigits(Math.abs(pct))}٪`;
+}
 
 function RevenueMixCard({ mix }: { mix: RevenueMixResult }) {
   const [c0, c1] = [mix.channels[0]?.pct ?? 0, (mix.channels[0]?.pct ?? 0) + (mix.channels[1]?.pct ?? 0)];
   const gradient = `conic-gradient(${MIX_COLORS.SYSTEM} 0% ${c0}%, ${MIX_COLORS.CHARTER} ${c0}% ${c1}%, ${MIX_COLORS.AGENCY} ${c1}% 100%)`;
   return (
-    <div className="rounded-xl border border-border bg-white p-5">
-      <div className="mb-1 text-sm font-bold text-ink">ترکیب درآمد</div>
-      <div className="mb-4 text-[11px] text-muted">بر اساس کانال فروش</div>
-      <div className="mb-4 flex items-center justify-center">
+    <StaffPanelCard title="ترکیب درآمد" subtitle="بر اساس کانال فروش">
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
         <div
-          className="flex h-36 w-36 items-center justify-center rounded-full"
-          style={{ background: gradient }}
+          style={{
+            display: 'flex',
+            width: 144,
+            height: 144,
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '50%',
+            background: gradient,
+          }}
           role="img"
           aria-label="نمودار ترکیب درآمد"
         >
-          <div className="flex h-[88px] w-[88px] flex-col items-center justify-center rounded-full bg-white">
-            <span className="font-num text-xs font-black text-ink">{faMoney(mix.totalIrr)}</span>
-            <span className="text-[9px] text-muted">کل (تومان)</span>
+          <div
+            style={{
+              display: 'flex',
+              width: 88,
+              height: 88,
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '50%',
+              background: STAFF_PANEL.cardBg,
+            }}
+          >
+            <span style={{ fontSize: 11, fontWeight: 900, color: '#fff' }}>{faMoney(mix.totalIrr)}</span>
+            <span style={{ fontSize: 9, color: STAFF_PANEL.textMuted }}>کل (تومان)</span>
           </div>
         </div>
       </div>
-      <div className="flex flex-col gap-2.5">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {mix.channels.map((c) => (
-          <div key={c.channel} className="flex items-center justify-between gap-2 text-xs">
-            <span className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: MIX_COLORS[c.channel] }} />
+          <div key={c.channel} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 11 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8, color: STAFF_PANEL.text }}>
+              <span style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: MIX_COLORS[c.channel] }} />
               {c.labelFa}
             </span>
-            <span className="flex items-center gap-2">
-              <span className="font-num font-bold">{faMoney(c.amountIrr)}</span>
-              <span className="rounded-full bg-body px-2 py-0.5 text-[10px] font-bold text-muted">
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontWeight: 800 }}>{faMoney(c.amountIrr)}</span>
+              <span
+                style={{
+                  borderRadius: 20,
+                  background: STAFF_PANEL.inputBg,
+                  padding: '2px 8px',
+                  fontSize: 10,
+                  fontWeight: 800,
+                  color: STAFF_PANEL.textMuted,
+                }}
+              >
                 {faPercent(c.pct)}
               </span>
             </span>
           </div>
         ))}
       </div>
-    </div>
-  );
-}
-
-function CompletedFlightsCard({ flights }: { flights: CompletedFlightsSummary }) {
-  return (
-    <div className="rounded-xl border border-border bg-white p-5">
-      <div className="mb-4 flex items-center justify-between">
-        <div className="text-sm font-bold text-ink">پروازهای انجام‌شده</div>
-        <span className="font-num text-lg font-black text-ink">
-          {faDigits(flights.flightCount)} <span className="text-[10px] font-normal text-muted">پرواز</span>
-        </span>
-      </div>
-      <div className="grid grid-cols-3 gap-3 text-center">
-        <div className="rounded-lg bg-body p-3">
-          <div className="text-[10px] text-muted">مجموع صندلی</div>
-          <div className="font-num mt-1 text-sm font-black text-ink">{faDigits(flights.totalSeats)}</div>
-        </div>
-        <div className="rounded-lg bg-body p-3">
-          <div className="text-[10px] text-muted">فروخته‌شده</div>
-          <div className="font-num mt-1 text-sm font-black text-[#059669]">{faDigits(flights.soldSeats)}</div>
-        </div>
-        <div className="rounded-lg bg-body p-3">
-          <div className="text-[10px] text-muted">فروش‌نرفته</div>
-          <div className="font-num mt-1 text-sm font-black text-danger">{faDigits(flights.unsoldSeats)}</div>
-        </div>
-      </div>
-    </div>
+    </StaffPanelCard>
   );
 }
 
 function LowSalesBanner({ alerts }: { alerts: LowSalesAlert[] }) {
   if (alerts.length === 0) return null;
   return (
-    <div className="mb-6 flex flex-col gap-3">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
       {alerts.map((a) => (
         <div
           key={`${a.flightNo}-${a.departureAt}`}
-          className="flex items-center gap-3 rounded-xl border border-[#f59e0b59] bg-[#f59e0b14] p-4"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            borderRadius: 14,
+            border: '1px solid rgba(245,158,11,0.35)',
+            background: 'rgba(245,158,11,0.08)',
+            padding: 14,
+          }}
         >
-          <span className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-[#f59e0b29] text-[#b45309]">
+          <span
+            style={{
+              display: 'flex',
+              width: 36,
+              height: 36,
+              flexShrink: 0,
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 10,
+              background: 'rgba(245,158,11,0.16)',
+              color: STAFF_PANEL.warning,
+            }}
+          >
             ⚠
           </span>
-          <div className="text-xs leading-6">
-            <div className="font-extrabold text-[#b45309]">هشدار فروش ضعیف — کمتر از ۷۲ ساعت تا پرواز</div>
-            <div className="text-text-2">
-              پرواز <span className="ltr font-num inline-block">{a.flightNo}</span> {a.originCode} ← {a.destCode} (
-              {formatJalaliDate(a.departureAt)}) تنها {faDigits(a.soldSeats)} از {faDigits(a.capacity)} صندلی فروخته
-              شده است.
+          <div style={{ fontSize: 11, lineHeight: 1.6 }}>
+            <div style={{ fontWeight: 900, color: STAFF_PANEL.warning }}>هشدار فروش ضعیف — کمتر از ۷۲ ساعت تا پرواز</div>
+            <div style={{ color: STAFF_PANEL.navMuted }}>
+              پرواز <span dir="ltr">{a.flightNo}</span> {a.originCode} ← {a.destCode} ({formatJalaliDate(a.departureAt)}) تنها{' '}
+              {faDigits(a.soldSeats)} از {faDigits(a.capacity)} صندلی فروخته شده است.
             </div>
           </div>
         </div>
@@ -134,65 +179,6 @@ function LowSalesBanner({ alerts }: { alerts: LowSalesAlert[] }) {
   );
 }
 
-const TX_STATUS_CLASS: Record<string, string> = {
-  success: 'bg-[#10b98124] text-[#059669]',
-  warning: 'bg-[#f59e0b24] text-[#b45309]',
-  danger: 'bg-danger/15 text-danger',
-};
-
-const TX_ICON_CLASS: Record<string, string> = {
-  SALE: 'bg-accent/10 text-accent',
-  SETTLEMENT: 'bg-[#10b98118] text-[#059669]',
-  COMMISSION: 'bg-[#f59e0b18] text-[#b45309]',
-  REFUND: 'bg-danger/10 text-danger',
-};
-
-function trendBadge(pct: number): string {
-  if (pct === 0) return '۰٪';
-  return `${pct > 0 ? '+' : '−'}${faDigits(Math.abs(pct))}٪`;
-}
-
-function FinanceKpiCard({
-  label,
-  value,
-  sublabel,
-  trendPct,
-  countBadge,
-  iconClass,
-}: {
-  label: string;
-  value: string;
-  sublabel?: string;
-  trendPct?: number;
-  countBadge?: string;
-  iconClass: string;
-}) {
-  return (
-    <div className="rounded-xl border border-border bg-white p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${iconClass}`}>●</span>
-        {countBadge ? (
-          <span className="rounded-full bg-danger/10 px-2 py-0.5 text-[10px] font-bold text-danger">{countBadge}</span>
-        ) : trendPct !== undefined ? (
-          <span className="rounded-full bg-[#10b98118] px-2 py-0.5 text-[10px] font-bold text-[#059669]">
-            {trendBadge(trendPct)}
-          </span>
-        ) : null}
-      </div>
-      <div className="font-num text-lg font-black text-ink">{value}</div>
-      <div className="mt-1 text-[11px] text-muted">
-        {label}
-        {sublabel ? ` · ${sublabel}` : ''}
-      </div>
-    </div>
-  );
-}
-
-/** صف مغایرت‌های پرداخت — no design mock exists for this (it's a Phase 13
- * backend-only addition: a real "payment succeeded, ticket not issued"
- * queue), so this is a new, functionally-styled card rather than a
- * redesign of an existing one — same approach as other un-mocked
- * backend-only controls added later in this project. */
 function ReconciliationQueueCard({
   items,
   onResolve,
@@ -224,83 +210,89 @@ function ReconciliationQueueCard({
   }
 
   return (
-    <div className="mb-6 rounded-xl border border-border bg-white p-5">
-      <div className="mb-1 flex items-center justify-between gap-2">
-        <div className="text-sm font-bold text-ink">صف مغایرت‌های پرداخت</div>
-        <span className="rounded-full bg-danger/10 px-3 py-1 text-[11px] font-extrabold text-danger">
-          {faDigits(items.length)} مورد
-        </span>
-      </div>
-      <div className="mb-4 text-[11px] text-muted">
-        پرداخت‌هایی که با موفقیت انجام شده‌اند اما صدور بلیط آن‌ها کامل نشده است
-      </div>
-      {items.length === 0 && (
-        <p className="text-xs text-muted">موردی برای بررسی وجود ندارد.</p>
-      )}
-      <div className="flex flex-col gap-3">
+    <StaffPanelCard
+      title="صف مغایرت‌های پرداخت"
+      subtitle="پرداخت‌هایی که با موفقیت انجام شده‌اند اما صدور بلیط آن‌ها کامل نشده است"
+      headerAction={
+        <span style={{ ...staffStatusStyle('danger'), padding: '4px 12px' }}>{faDigits(items.length)} مورد</span>
+      }
+      style={{ marginBottom: 24 }}
+    >
+      {items.length === 0 && <p style={{ fontSize: 11, color: STAFF_PANEL.textMuted }}>موردی برای بررسی وجود ندارد.</p>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {items.map((item) => (
-          <div
-            key={item.id}
-            data-testid="reconciliation-item"
-            className="rounded-xl border border-border/70 bg-body/50 px-4 py-3"
-          >
-            <div className="flex flex-wrap items-center gap-4">
-              <div className="min-w-[110px] text-xs">
-                <div className="text-[9px] text-muted">کد رزرو</div>
-                <div className="font-num font-extrabold text-ink">{item.pnr}</div>
+          <div key={item.id} data-testid="reconciliation-item" style={{ ...staffInnerTile, padding: '12px 14px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 14 }}>
+              <div style={{ minWidth: 110, fontSize: 11 }}>
+                <div style={{ fontSize: 9, color: STAFF_PANEL.textMuted }}>کد رزرو</div>
+                <div style={{ fontWeight: 900, color: STAFF_PANEL.text }}>{item.pnr}</div>
               </div>
-              <div className="min-w-[110px] text-xs">
-                <div className="text-[9px] text-muted">شناسه درگاه</div>
-                <div className="font-num font-bold">{item.gatewayRefId}</div>
+              <div style={{ minWidth: 110, fontSize: 11 }}>
+                <div style={{ fontSize: 9, color: STAFF_PANEL.textMuted }}>شناسه درگاه</div>
+                <div style={{ fontWeight: 800 }}>{item.gatewayRefId}</div>
               </div>
-              <div className="min-w-[110px] text-xs">
-                <div className="text-[9px] text-muted">مبلغ</div>
-                <div className="font-num font-bold">{faMoney(item.amountIrr)} تومان</div>
+              <div style={{ minWidth: 110, fontSize: 11 }}>
+                <div style={{ fontSize: 9, color: STAFF_PANEL.textMuted }}>مبلغ</div>
+                <div style={{ fontWeight: 800 }}>{faMoney(item.amountIrr)} تومان</div>
               </div>
-              <div className="min-w-[110px] text-xs">
-                <div className="text-[9px] text-muted">تاریخ</div>
+              <div style={{ minWidth: 110, fontSize: 11 }}>
+                <div style={{ fontSize: 9, color: STAFF_PANEL.textMuted }}>تاریخ</div>
                 <div>{formatJalaliDateTime(item.createdAt)}</div>
               </div>
               <button
+                type="button"
                 onClick={() => {
                   setOpenId(openId === item.id ? null : item.id);
                   setError(null);
                   setNote('');
                 }}
-                className="mr-auto rounded-lg border border-accent/30 bg-accent/10 px-3 py-1.5 text-[11px] font-extrabold text-accent transition hover:bg-accent/20"
+                style={{
+                  marginRight: 'auto',
+                  borderRadius: 10,
+                  border: `1px solid ${STAFF_PANEL.accent}`,
+                  background: STAFF_PANEL.accentSoft,
+                  padding: '6px 12px',
+                  fontSize: 11,
+                  fontWeight: 800,
+                  color: STAFF_PANEL.accent,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
               >
                 رفع مغایرت
               </button>
             </div>
             {openId === item.id && (
-              <div className="mt-3 flex flex-col gap-2 border-t border-border/60 pt-3">
-                {error && <p role="alert" className="text-[11px] text-danger">{error}</p>}
+              <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${STAFF_PANEL.sidebarBorder}` }}>
+                {error && (
+                  <p role="alert" style={{ fontSize: 11, color: STAFF_PANEL.danger }}>
+                    {error}
+                  </p>
+                )}
                 <textarea
                   data-testid="reconciliation-note"
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   placeholder="توضیح رفع مغایرت (مثلاً: بلیط دستی صادر و مغایرت رفع شد.)"
-                  className="w-full rounded-lg border border-border p-2 text-xs"
+                  style={{ ...staffInput, width: '100%', padding: 8, fontSize: 11, boxSizing: 'border-box' }}
                   rows={2}
                 />
-                <button
-                  disabled={busy}
+                <StaffPrimaryButton
                   onClick={() => void submit(item.id)}
-                  className="self-start rounded-lg bg-accent px-4 py-1.5 text-[11px] font-extrabold text-white disabled:opacity-50"
+                  disabled={busy}
+                  style={{ marginTop: 8 }}
                 >
                   {busy ? 'در حال ثبت…' : 'ثبت رفع مغایرت'}
-                </button>
+                </StaffPrimaryButton>
               </div>
             )}
           </div>
         ))}
       </div>
-    </div>
+    </StaffPanelCard>
   );
 }
 
-/** FINANCE_MANAGER's finance-ops layout — the only panel with transactions
- * and agency settlements, per the design. */
 function FinanceOpsView() {
   const chart = useSalesChartQuery({ includeFlightMode: false });
   const [kpis, setKpis] = useState<KpiResult | null>(null);
@@ -352,9 +344,9 @@ function FinanceOpsView() {
     }
   }
 
-  if (error) return <p className="p-8 text-sm text-danger">{error}</p>;
+  if (error) return <StaffAlert tone="error">{error}</StaffAlert>;
   if (!chart.isQueryReady || !kpis || !flights || !tx || !mix || !settlements || !reconciliation)
-    return <p className="p-8 text-sm text-muted">در حال بارگذاری…</p>;
+    return <p style={{ fontSize: 12, color: STAFF_PANEL.textMuted }}>در حال بارگذاری…</p>;
 
   const periodLabel =
     chart.granularity === 'year'
@@ -369,41 +361,12 @@ function FinanceOpsView() {
               ? 'روزانه'
               : '';
 
-  const kpiCards = [
-    {
-      label: `کل درآمد · ${periodLabel}`,
-      value: faMoney(kpis.revenueIrr),
-      trendPct: kpis.trends.revenuePct,
-      iconClass: 'bg-[#10b98118] text-[#059669]',
-    },
-    {
-      label: `سود خالص · حاشیه ${faPercent(kpis.marginPct)}`,
-      value: faMoney(kpis.profitIrr),
-      trendPct: kpis.trends.profitPct,
-      iconClass: 'bg-accent/10 text-accent',
-    },
-    {
-      label: 'هزینه عملیاتی',
-      value: faMoney(kpis.operatingCostIrr),
-      trendPct: kpis.trends.operatingCostPct,
-      iconClass: 'bg-[#f59e0b18] text-[#b45309]',
-    },
-    {
-      label: 'مطالبات معوق آژانس‌ها',
-      value: faMoney(kpis.agencyDebtIrr),
-      countBadge: faDigits(kpis.agencyDebtCount),
-      iconClass: 'bg-danger/10 text-danger',
-    },
-  ];
-
   return (
     <>
-      {notice && (
-        <p className="mb-4 rounded-lg bg-[#10b98118] p-3 text-xs font-bold text-[#059669]">{notice}</p>
-      )}
+      {notice && <StaffAlert tone="success">{notice}</StaffAlert>}
 
-      <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
-        <span className="text-[11px] text-muted">بازهٔ گزارش:</span>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end', gap: 8, marginBottom: 16 }}>
+        <span style={{ fontSize: 11, color: STAFF_PANEL.textMuted }}>بازهٔ گزارش:</span>
         <SalesChartControls
           modes={chart.modes}
           granularity={chart.granularity}
@@ -416,131 +379,162 @@ function FinanceOpsView() {
           onFlightNoChange={chart.setFlightNo}
           onApplyFlightNo={chart.applyFlightNo}
           variant="segmented"
+          dark
         />
       </div>
 
-      <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-        {kpiCards.map((k) => (
-          <FinanceKpiCard key={k.label} {...k} />
-        ))}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 24 }}>
+        <StaffKpiCard label={`کل درآمد · ${periodLabel}`} value={faMoney(kpis.revenueIrr)} trend={trendLabel(kpis.trends.revenuePct)} trendUp={kpis.trends.revenuePct >= 0} iconColor={STAFF_PANEL.success} />
+        <StaffKpiCard label={`سود خالص · حاشیه ${faPercent(kpis.marginPct)}`} value={faMoney(kpis.profitIrr)} trend={trendLabel(kpis.trends.profitPct)} trendUp={kpis.trends.profitPct >= 0} iconColor={STAFF_PANEL.accent} />
+        <StaffKpiCard label="هزینه عملیاتی" value={faMoney(kpis.operatingCostIrr)} trend={trendLabel(kpis.trends.operatingCostPct)} trendUp={kpis.trends.operatingCostPct <= 0} iconColor={STAFF_PANEL.warning} />
+        <StaffKpiCard label="مطالبات معوق آژانس‌ها" value={faMoney(kpis.agencyDebtIrr)} sublabel={`${faDigits(kpis.agencyDebtCount)} آژانس`} iconColor={STAFF_PANEL.danger} />
       </div>
 
       <LowSalesBanner alerts={alerts} />
-
       <ReconciliationQueueCard items={reconciliation} onResolve={onResolveReconciliation} />
 
-      <div className="mb-6">
-        <CompletedFlightsCard flights={flights} />
-      </div>
+      <StaffPanelCard title="پروازهای انجام‌شده" style={{ marginBottom: 24 }} padding={0}>
+        <StaffFlightsSummaryGrid
+          flightCount={flights.flightCount}
+          totalSeats={flights.totalSeats}
+          soldSeats={flights.soldSeats}
+          unsoldSeats={flights.unsoldSeats}
+        />
+      </StaffPanelCard>
 
-      <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-[1.7fr_1fr]">
-        <div className="rounded-xl border border-border bg-white p-5">
-          <div className="mb-1 flex items-center justify-between">
-            <div className="text-sm font-bold text-ink">تراکنش‌های مالی اخیر</div>
-            <span className="rounded-lg bg-body px-3 py-1 text-[11px] font-bold text-muted">
+      <div style={{ display: 'grid', gridTemplateColumns: '1.7fr 1fr', gap: 12, marginBottom: 24 }}>
+        <StaffPanelCard
+          title="تراکنش‌های مالی اخیر"
+          subtitle="فروش، تسویه، کمیسیون و استرداد"
+          headerAction={
+            <span style={{ borderRadius: 10, background: STAFF_PANEL.inputBg, padding: '4px 10px', fontSize: 11, fontWeight: 800, color: STAFF_PANEL.textMuted }}>
               {faDigits(tx.totalCount)} تراکنش
             </span>
-          </div>
-          <div className="mb-3 text-[11px] text-muted">فروش، تسویه، کمیسیون و استرداد</div>
-          <div className="flex flex-col divide-y divide-border/60">
-            {tx.rows.map((t) => (
-              <div key={t.id} className="flex items-center gap-3 py-2.5 text-xs">
-                <span
-                  className={`flex h-9 w-9 flex-none items-center justify-center rounded-lg text-sm ${TX_ICON_CLASS[t.type] ?? 'bg-body text-muted'}`}
+          }
+        >
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {tx.rows.map((t, idx) => {
+              const icon = TX_ICON[t.type] ?? { bg: STAFF_PANEL.inputBg, color: STAFF_PANEL.textMuted };
+              return (
+                <div
+                  key={t.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: '10px 0',
+                    fontSize: 11,
+                    borderTop: idx > 0 ? `1px solid ${STAFF_PANEL.sidebarBorder}` : undefined,
+                  }}
                 >
-                  {t.type === 'REFUND' ? '↩' : t.type === 'COMMISSION' ? '₪' : '✓'}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="font-extrabold text-ink">{t.titleFa}</div>
-                  <div className="mt-0.5 text-[10px] text-muted">
-                    {t.party} · {formatJalaliDateTime(t.occurredAt)}
+                  <span
+                    style={{
+                      display: 'flex',
+                      width: 36,
+                      height: 36,
+                      flexShrink: 0,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: 10,
+                      background: icon.bg,
+                      color: icon.color,
+                      fontSize: 14,
+                    }}
+                  >
+                    {t.type === 'REFUND' ? '↩' : t.type === 'COMMISSION' ? '₪' : '✓'}
+                  </span>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontWeight: 900, color: STAFF_PANEL.text }}>{t.titleFa}</div>
+                    <div style={{ marginTop: 2, fontSize: 10, color: STAFF_PANEL.textMuted }}>
+                      {t.party} · {formatJalaliDateTime(t.occurredAt)}
+                    </div>
                   </div>
+                  <span style={staffStatusStyle(TX_STATUS_TONE[t.statusTone] ?? 'warning')}>{t.statusFa}</span>
+                  <span
+                    style={{
+                      fontWeight: 900,
+                      whiteSpace: 'nowrap',
+                      color: Number(t.signedAmountIrr) >= 0 && t.type !== 'REFUND' ? STAFF_PANEL.success : STAFF_PANEL.danger,
+                    }}
+                  >
+                    {Number(t.signedAmountIrr) >= 0 ? '+' : '−'} {faMoney(Math.abs(Number(t.signedAmountIrr)))}
+                  </span>
                 </div>
-                <span
-                  className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${TX_STATUS_CLASS[t.statusTone]}`}
-                >
-                  {t.statusFa}
-                </span>
-                <span
-                  className={`font-num font-black whitespace-nowrap ${
-                    Number(t.signedAmountIrr) >= 0 && t.type !== 'REFUND' ? 'text-[#059669]' : 'text-danger'
-                  }`}
-                >
-                  {Number(t.signedAmountIrr) >= 0 ? '+' : '−'} {faMoney(Math.abs(Number(t.signedAmountIrr)))}
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
-        </div>
+        </StaffPanelCard>
         <RevenueMixCard mix={mix} />
       </div>
 
-      <div className="rounded-xl border border-border bg-white p-5">
-        <div className="mb-1 flex items-center justify-between gap-2">
-          <div className="text-sm font-bold text-ink">تسویه‌حساب آژانس‌های همکار</div>
-          <span className="rounded-full bg-danger/10 px-3 py-1 text-[11px] font-extrabold text-danger">
+      <StaffPanelCard
+        title="تسویه‌حساب آژانس‌های همکار"
+        subtitle="وضعیت پرداخت دوره‌ای و مطالبات معوق"
+        headerAction={
+          <span style={{ ...staffStatusStyle('danger'), padding: '4px 12px' }}>
             مجموع مطالبات: {faMoney(settlements.outstandingIrr)} تومان
           </span>
-        </div>
-        <div className="mb-4 text-[11px] text-muted">وضعیت پرداخت دوره‌ای و مطالبات معوق</div>
-        <div className="flex flex-col gap-3">
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {settlements.rows.map((s) => {
             const st = SETTLEMENT_STATUS[s.status];
+            const barColor = s.status === 'SETTLED' ? STAFF_PANEL.success : s.status === 'OVERDUE' ? STAFF_PANEL.danger : STAFF_PANEL.warning;
             return (
-              <div
-                key={s.agencyId}
-                className="flex flex-wrap items-center gap-4 rounded-xl border border-border/70 bg-body/50 px-4 py-3"
-              >
-                <div className="min-w-[140px]">
-                  <div className="text-xs font-extrabold text-ink">{s.agencyName}</div>
-                  {s.dueAt && (
-                    <div className="mt-0.5 text-[10px] text-muted">سررسید: {formatJalaliDate(s.dueAt)}</div>
+              <div key={s.agencyId} style={{ ...staffInnerTile, padding: '12px 14px' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 14 }}>
+                  <div style={{ minWidth: 140 }}>
+                    <div style={{ fontSize: 11, fontWeight: 900, color: STAFF_PANEL.text }}>{s.agencyName}</div>
+                    {s.dueAt && (
+                      <div style={{ marginTop: 2, fontSize: 10, color: STAFF_PANEL.textMuted }}>سررسید: {formatJalaliDate(s.dueAt)}</div>
+                    )}
+                  </div>
+                  <div style={{ minWidth: 110, fontSize: 11 }}>
+                    <div style={{ fontSize: 9, color: STAFF_PANEL.textMuted }}>مبلغ دوره</div>
+                    <div style={{ fontWeight: 800 }}>{faMoney(s.totalIrr)} تومان</div>
+                  </div>
+                  <div style={{ minWidth: 140, flex: 1 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 10, color: STAFF_PANEL.textMuted }}>
+                      <span>پرداخت‌شده</span>
+                      <span style={{ fontWeight: 900 }}>{faPercent(s.paidPct)}</span>
+                    </div>
+                    <div style={{ height: 6, overflow: 'hidden', borderRadius: 4, background: STAFF_PANEL.inputBg }}>
+                      <div style={{ height: '100%', borderRadius: 4, background: barColor, width: `${s.paidPct}%` }} />
+                    </div>
+                  </div>
+                  <span style={staffStatusStyle(st.tone)}>
+                    {st.label}
+                    {s.status === 'OVERDUE' && ` — ${faDigits(s.overdueDays)} روز`}
+                  </span>
+                  {s.remindInvoiceId && (
+                    <button
+                      type="button"
+                      onClick={() => void onRemind(s.agencyId, s.remindInvoiceId!, s.agencyName)}
+                      style={{
+                        borderRadius: 10,
+                        border: `1px solid ${STAFF_PANEL.accent}`,
+                        background: STAFF_PANEL.accentSoft,
+                        padding: '6px 12px',
+                        fontSize: 11,
+                        fontWeight: 800,
+                        color: STAFF_PANEL.accent,
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                      }}
+                    >
+                      ارسال یادآوری
+                    </button>
                   )}
                 </div>
-                <div className="min-w-[110px] text-xs">
-                  <div className="text-[9px] text-muted">مبلغ دوره</div>
-                  <div className="font-num font-bold">{faMoney(s.totalIrr)} تومان</div>
-                </div>
-                <div className="min-w-[140px] flex-1">
-                  <div className="mb-1 flex items-center justify-between text-[10px]">
-                    <span className="text-muted">پرداخت‌شده</span>
-                    <span className="font-num font-extrabold">{faPercent(s.paidPct)}</span>
-                  </div>
-                  <div className="h-1.5 overflow-hidden rounded bg-border/60">
-                    <div
-                      className={`h-full rounded ${
-                        s.status === 'SETTLED'
-                          ? 'bg-[#059669]'
-                          : s.status === 'OVERDUE'
-                            ? 'bg-danger'
-                            : 'bg-[#f59e0b]'
-                      }`}
-                      style={{ width: `${s.paidPct}%` }}
-                    />
-                  </div>
-                </div>
-                <span className={`rounded-full px-3 py-1 text-[10px] font-extrabold ${st.className}`}>
-                  {st.label}
-                  {s.status === 'OVERDUE' && ` — ${faDigits(s.overdueDays)} روز`}
-                </span>
-                {s.remindInvoiceId && (
-                  <button
-                    onClick={() => void onRemind(s.agencyId, s.remindInvoiceId!, s.agencyName)}
-                    className="rounded-lg border border-accent/30 bg-accent/10 px-3 py-1.5 text-[11px] font-extrabold text-accent transition hover:bg-accent/20"
-                  >
-                    ارسال یادآوری
-                  </button>
-                )}
               </div>
             );
           })}
         </div>
-      </div>
+      </StaffPanelCard>
     </>
   );
 }
 
-/** Analytic مالی view for CEO / Board Chair / Senior / Commercial. */
 function FinanceAnalyticView() {
   const chart = useSalesChartQuery({ includeFlightMode: false });
   const [periods, setPeriods] = useState<SalesChartPeriod[]>([]);
@@ -574,12 +568,9 @@ function FinanceAnalyticView() {
     };
   }, [chart.query, chart.isQueryReady]);
 
-  if (error) return <p className="p-8 text-sm text-danger">{error}</p>;
-  if (!flights || !mix) return <p className="p-8 text-sm text-muted">در حال بارگذاری…</p>;
+  if (error) return <StaffAlert tone="error">{error}</StaffAlert>;
+  if (!flights || !mix) return <p style={{ fontSize: 12, color: STAFF_PANEL.textMuted }}>در حال بارگذاری…</p>;
 
-  // Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON on
-  // the backend) — parsed here for this display-only sum; period totals are
-  // far below 2^53 so Number() loses no precision.
   const sums = {
     system: periods.reduce((s, p) => s + Number(p.systemIrr), 0),
     charter: periods.reduce((s, p) => s + Number(p.charterIrr), 0),
@@ -589,30 +580,16 @@ function FinanceAnalyticView() {
   return (
     <>
       {kpis && (
-        <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-          <StatTile label="کل درآمد" value={`${faMoney(kpis.revenueIrr)} تومان`} tone="good" />
-          <StatTile
-            label="سود خالص"
-            value={`${faMoney(kpis.profitIrr)} تومان`}
-            sublabel={`حاشیه ${faPercent(kpis.marginPct)}`}
-            tone="accent"
-          />
-          <StatTile label="هزینه عملیاتی" value={`${faMoney(kpis.operatingCostIrr)} تومان`} tone="warning" />
-          <StatTile
-            label="مطالبات معوق آژانس‌ها"
-            value={`${faMoney(kpis.agencyDebtIrr)} تومان`}
-            sublabel={`${faDigits(kpis.agencyDebtCount)} آژانس`}
-            tone="critical"
-          />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 24 }}>
+          <StaffKpiCard label="کل درآمد" value={`${faMoney(kpis.revenueIrr)} تومان`} iconColor={STAFF_PANEL.success} />
+          <StaffKpiCard label="سود خالص" value={`${faMoney(kpis.profitIrr)} تومان`} sublabel={`حاشیه ${faPercent(kpis.marginPct)}`} iconColor={STAFF_PANEL.accent} />
+          <StaffKpiCard label="هزینه عملیاتی" value={`${faMoney(kpis.operatingCostIrr)} تومان`} iconColor={STAFF_PANEL.warning} />
+          <StaffKpiCard label="مطالبات معوق آژانس‌ها" value={`${faMoney(kpis.agencyDebtIrr)} تومان`} sublabel={`${faDigits(kpis.agencyDebtCount)} آژانس`} iconColor={STAFF_PANEL.danger} />
         </div>
       )}
 
-      <div className="mb-6 rounded-xl border border-border bg-white p-5">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-sm font-bold text-ink">نمودار فروش</div>
-            <div className="mt-0.5 text-[11px] text-muted">به تفکیک کانال فروش · تومان</div>
-          </div>
+      <StaffPanelCard title="نمودار فروش" subtitle="به تفکیک کانال فروش · تومان" style={{ marginBottom: 24 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
           <SalesChartControls
             modes={chart.modes}
             granularity={chart.granularity}
@@ -625,42 +602,40 @@ function FinanceAnalyticView() {
             onFlightNoChange={chart.setFlightNo}
             onApplyFlightNo={chart.applyFlightNo}
             variant="segmented"
+            dark
           />
         </div>
 
-        <div className="mb-4 grid grid-cols-3 gap-3">
-          <div className="rounded-lg bg-body p-3 text-xs">
-            <div className="mb-1 flex items-center gap-1.5 text-[10px] text-muted">
-              <span className="h-2 w-2 rounded-sm bg-[#1668c4]" />
-              سیستمی
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>
+          {(
+            [
+              ['سیستمی', sums.system, MIX_COLORS.SYSTEM],
+              ['چارتر', sums.charter, MIX_COLORS.CHARTER],
+              ['آژانس', sums.agency, MIX_COLORS.AGENCY],
+            ] as const
+          ).map(([label, amount, color]) => (
+            <div key={label} style={staffInnerTile}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, fontSize: 10, color: STAFF_PANEL.textMuted }}>
+                <span style={{ width: 8, height: 8, borderRadius: 2, background: color }} />
+                {label}
+              </div>
+              <div style={{ fontWeight: 900, color }}>{faMoney(amount)}</div>
             </div>
-            <div className="font-num font-black text-[#1668c4]">{faMoney(sums.system)}</div>
-          </div>
-          <div className="rounded-lg bg-body p-3 text-xs">
-            <div className="mb-1 flex items-center gap-1.5 text-[10px] text-muted">
-              <span className="h-2 w-2 rounded-sm bg-[#a855f7]" />
-              چارتر
-            </div>
-            <div className="font-num font-black text-[#a855f7]">{faMoney(sums.charter)}</div>
-          </div>
-          <div className="rounded-lg bg-body p-3 text-xs">
-            <div className="mb-1 flex items-center gap-1.5 text-[10px] text-muted">
-              <span className="h-2 w-2 rounded-sm bg-[#059669]" />
-              آژانس
-            </div>
-            <div className="font-num font-black text-[#059669]">{faMoney(sums.agency)}</div>
-          </div>
+          ))}
         </div>
 
-        <SalesBarChart
-          periods={periods}
-          selectedPeriodKey={chart.periodKey}
-          onSelectPeriod={chart.setPeriodKey}
-        />
-      </div>
+        <SalesBarChart periods={periods} selectedPeriodKey={chart.periodKey} onSelectPeriod={chart.setPeriodKey} dark />
+      </StaffPanelCard>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.7fr_1fr]">
-        <CompletedFlightsCard flights={flights} />
+      <div style={{ display: 'grid', gridTemplateColumns: '1.7fr 1fr', gap: 12 }}>
+        <StaffPanelCard title="پروازهای انجام‌شده" padding={0}>
+          <StaffFlightsSummaryGrid
+            flightCount={flights.flightCount}
+            totalSeats={flights.totalSeats}
+            soldSeats={flights.soldSeats}
+            unsoldSeats={flights.unsoldSeats}
+          />
+        </StaffPanelCard>
         <RevenueMixCard mix={mix} />
       </div>
     </>
@@ -672,13 +647,15 @@ export default function FinancePage() {
   const isFinanceOps = user?.role === 'FINANCE_MANAGER';
 
   return (
-    <div className="p-8">
-      <h1 className="mb-1 text-xl font-black text-ink">مالی</h1>
-      <p className="mb-6 text-sm text-muted">
-        {isFinanceOps
-          ? 'تراکنش‌ها، ترکیب درآمد و تسویه‌حساب آژانس‌های همکار'
-          : 'نمای تحلیلی فروش و ترکیب درآمد'}
-      </p>
+    <div style={{ padding: '24px 28px' }}>
+      <StaffPanelPageHeader
+        title="مالی"
+        subtitle={
+          isFinanceOps
+            ? 'تراکنش‌ها، ترکیب درآمد و تسویه‌حساب آژانس‌های همکار'
+            : 'نمای تحلیلی فروش و ترکیب درآمد'
+        }
+      />
       {isFinanceOps ? <FinanceOpsView /> : <FinanceAnalyticView />}
     </div>
   );
