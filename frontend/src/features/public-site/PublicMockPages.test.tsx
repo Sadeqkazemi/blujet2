@@ -14,7 +14,7 @@ function mockLocale(locale: 'fa' | 'en' | 'ar') {
 
 const requestOtp = vi.fn().mockResolvedValue('challenge-1');
 const verifyOtp = vi.fn().mockResolvedValue({ id: 'u1', fullName: 'نگار رضایی', role: 'USER' });
-const passwordLogin = vi.fn().mockResolvedValue({ id: 'u1', fullName: 'نگار رضایی', role: 'USER' });
+const agencyLogin = vi.fn().mockResolvedValue({ id: 'a1', fullName: 'آژانس blujet', role: 'AGENCY' });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -23,10 +23,10 @@ beforeEach(() => {
     user: null,
     requestLogin: vi.fn(),
     confirmTwoFactor: vi.fn(),
-    agencyLogin: vi.fn(),
+    agencyLogin,
     requestOtp,
     verifyOtp,
-    passwordLogin,
+    passwordLogin: vi.fn(),
     signOut: vi.fn(),
   });
 });
@@ -39,18 +39,26 @@ function renderWithRouter(node: React.ReactNode) {
   return render(<MemoryRouter>{node}</MemoryRouter>);
 }
 
+async function typeOtp(prefix: string, code: string) {
+  for (let i = 0; i < code.length; i++) {
+    await userEvent.type(screen.getByTestId(`${prefix}-${i}`), code[i]!);
+  }
+}
+
 describe('CustomerLoginPage', () => {
-  it('walks through the two OTP steps with a resend countdown', async () => {
+  it('walks through OTP login with resend countdown and visual panel', async () => {
     renderWithRouter(<CustomerLoginPage />);
     expect(screen.getByTestId('signin-tab-login')).toBeInTheDocument();
     expect(screen.getByTestId('signin-acct-agency')).toBeInTheDocument();
+    expect(screen.getByTestId('signin-visual-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('signin-forgot-link')).toHaveAttribute('href', '/forgot-password');
 
     await userEvent.type(screen.getByTestId('signin-phone'), '09121234567');
     await userEvent.click(screen.getByTestId('signin-request'));
     expect(requestOtp).toHaveBeenCalledWith('09121234567');
 
     expect(await screen.findByTestId('signin-resend-timer')).toHaveTextContent('ارسال مجدد کد');
-    await userEvent.type(screen.getByTestId('signin-code'), '123456');
+    await typeOtp('signin-code-cell', '123456');
     await userEvent.click(screen.getByTestId('signin-verify'));
     expect(verifyOtp).toHaveBeenCalledWith('challenge-1', '123456');
   });
@@ -69,28 +77,25 @@ describe('CustomerLoginPage', () => {
     expect(screen.getByTestId('agency-signup-done')).toBeInTheDocument();
   });
 
-  it('toggles to real password login and links to forgot-password', async () => {
+  it('agency login uses phone and password', async () => {
     renderWithRouter(<CustomerLoginPage />);
+    await userEvent.click(screen.getByTestId('signin-acct-agency'));
 
-    await userEvent.click(screen.getByTestId('signin-use-password'));
-    expect(screen.getByText('فراموشی رمز عبور؟')).toHaveAttribute('href', '/forgot-password');
+    await userEvent.type(screen.getByTestId('agency-phone'), '09120000002');
+    await userEvent.type(screen.getByTestId('agency-pass'), 'MyPass1234');
+    await userEvent.click(screen.getByTestId('agency-login-btn'));
 
-    await userEvent.type(screen.getByTestId('signin-pw-phone'), '09121234567');
-    await userEvent.type(screen.getByTestId('signin-pw-password'), 'MyPass1234');
-    await userEvent.click(screen.getByTestId('signin-pw-submit'));
-
-    expect(passwordLogin).toHaveBeenCalledWith('09121234567', 'MyPass1234');
+    expect(agencyLogin).toHaveBeenCalledWith('09120000002', 'MyPass1234');
   });
 
-  it('renders translated tabs, labels, and forgot-password link in English', async () => {
+  it('renders translated tabs, EN email section, and forgot-password link in English', async () => {
     mockLocale('en');
     renderWithRouter(<CustomerLoginPage />);
     expect(screen.getByTestId('signin-tab-login')).toHaveTextContent('Log in');
     expect(screen.getByTestId('signin-tab-signup')).toHaveTextContent('Sign up');
-    expect(screen.getByTestId('signin-acct-agency')).toHaveTextContent('Agency');
-
-    await userEvent.click(screen.getByTestId('signin-use-password'));
-    expect(screen.getByText('Forgot password?')).toHaveAttribute('href', '/forgot-password');
+    expect(screen.getByTestId('signin-acct-agency')).toHaveTextContent('Partner Agency');
+    expect(screen.getByTestId('signin-google')).toBeInTheDocument();
+    expect(screen.getByTestId('signin-forgot-link')).toHaveAttribute('href', '/forgot-password');
   });
 
   it('renders translated tabs and labels in Arabic', () => {
@@ -98,7 +103,7 @@ describe('CustomerLoginPage', () => {
     renderWithRouter(<CustomerLoginPage />);
     expect(screen.getByTestId('signin-tab-login')).toHaveTextContent('تسجيل الدخول');
     expect(screen.getByTestId('signin-tab-signup')).toHaveTextContent('إنشاء حساب');
-    expect(screen.getByTestId('signin-acct-agency')).toHaveTextContent('وكالة');
+    expect(screen.getByTestId('signin-acct-agency')).toHaveTextContent('وكالة شريكة');
   });
 });
 
