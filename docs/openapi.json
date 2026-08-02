@@ -782,6 +782,21 @@
         ]
       }
     },
+    "/reporting/flight-sales": {
+      "get": {
+        "operationId": "ReportingController_flightSales",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Departed flights with per-channel sales — «شماره پرواز» picker on analytic مالی",
+        "tags": [
+          "reporting"
+        ]
+      }
+    },
     "/reporting/kpis": {
       "get": {
         "operationId": "ReportingController_kpis",
