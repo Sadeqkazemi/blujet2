@@ -1,11 +1,17 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import ReservationPage from './ReservationPage';
 import * as reservationApi from '../../api/reservation';
 import * as useAuthModule from '../../hooks/useAuth';
 import { mockAuthUserWithRole } from '../../test/mockAuthUser';
-import type { PnrDetail, PnrGroup, ReservationDashboardStats, SeatMap } from '../../types/reservation';
+import type {
+  AgencyApiAccessRow,
+  PnrDetail,
+  PnrGroup,
+  ReservationDashboardStats,
+  ReservationFlightRow,
+} from '../../types/reservation';
 import type { Role } from '../../types/auth';
 
 const GROUPS: PnrGroup[] = [
@@ -37,7 +43,47 @@ const STATS: ReservationDashboardStats = {
   activePnrs: 5,
   seatsSold: 12,
   revenueIrr: '1000000000',
+  channels: [
+    { key: 'SYSTEM', label: 'فروش مستقیم سایت', color: '#3b82f6', count: 8, pct: 66.7 },
+    { key: 'AGENCY', label: 'API آژانس‌های همکار', color: '#34d399', count: 4, pct: 33.3 },
+  ],
+  services: [
+    {
+      name: 'reservation-api',
+      fa: 'سرویس رزرواسیون مرکزی',
+      ok: true,
+      latencyMs: 12,
+      statusLabel: 'سالم',
+    },
+  ],
+  servicesStable: true,
 };
+
+const AGENCIES: AgencyApiAccessRow[] = [
+  {
+    id: 'k1',
+    agencyId: 'a1',
+    name: 'آژانس blujet',
+    initials: 'آج',
+    keyHint: 'bjk_••••abcd',
+    callCount: 12,
+    status: 'ACTIVE',
+  },
+];
+
+const FLIGHTS: ReservationFlightRow[] = [
+  {
+    flightInstanceId: 'fi1',
+    route: 'THR → DXB',
+    flightNo: 'EP-821',
+    departureAt: '2026-08-01T05:00:00.000Z',
+    aircraftType: 'MD-80',
+    sold: 10,
+    capacity: 155,
+    occupancyPct: 6,
+    statusKey: 'SELLING',
+  },
+];
 
 function mockRole(role: Role) {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
@@ -51,23 +97,42 @@ function mockRole(role: Role) {
 }
 
 describe('ReservationPage', () => {
-  it('BOARD_CHAIR sees the PNR list and change-seat/cancel controls in the detail modal', async () => {
+  it('renders the design four-tab shell and dashboard KPIs/services/channels', async () => {
+    mockRole('IT_MANAGER');
+    vi.spyOn(reservationApi, 'fetchReservationDashboardStats').mockResolvedValue(STATS);
+
+    render(<ReservationPage />);
+    expect(await screen.findByText('سامانه رزرواسیون پرواز')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /داشبورد/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /مدیریت رزروها/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /دسترسی آژانس‌ها/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /پروازها/ })).toBeInTheDocument();
+
+    expect(await screen.findByText('رزروهای امروز')).toBeInTheDocument();
+    expect(screen.getByText('وضعیت سرویس‌های سامانه')).toBeInTheDocument();
+    expect(screen.getByText('reservation-api')).toBeInTheDocument();
+    expect(screen.getByText('فروش مستقیم سایت')).toBeInTheDocument();
+  });
+
+  it('PNR tab lists recent bookings and opens detail controls for canLock roles', async () => {
     mockRole('BOARD_CHAIR');
     vi.spyOn(reservationApi, 'fetchReservationDashboardStats').mockResolvedValue(STATS);
     vi.spyOn(reservationApi, 'fetchPnrList').mockResolvedValue(GROUPS);
     vi.spyOn(reservationApi, 'fetchPnrDetail').mockResolvedValue(DETAIL);
 
     render(<ReservationPage />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /مدیریت رزروها/ }));
+
+    expect(await screen.findByText('آخرین رزروهای ثبت‌شده')).toBeInTheDocument();
     expect(await screen.findByText('نگار رضایی')).toBeInTheDocument();
 
-    const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'BJDEMO1' }));
-
     expect(await screen.findByRole('button', { name: 'ثبت تغییر' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'لغو رزرو' })).toBeInTheDocument();
   });
 
-  it('SENIOR_MANAGER is view-only: no change-seat/cancel controls in the detail modal', async () => {
+  it('SENIOR_MANAGER is view-only in the detail modal', async () => {
     mockRole('SENIOR_MANAGER');
     vi.spyOn(reservationApi, 'fetchReservationDashboardStats').mockResolvedValue(STATS);
     vi.spyOn(reservationApi, 'fetchPnrList').mockResolvedValue(GROUPS);
@@ -75,6 +140,7 @@ describe('ReservationPage', () => {
 
     render(<ReservationPage />);
     const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /مدیریت رزروها/ }));
     await user.click(await screen.findByRole('button', { name: 'BJDEMO1' }));
 
     await waitFor(() => expect(screen.getByText('رزرو BJDEMO1')).toBeInTheDocument());
@@ -82,73 +148,64 @@ describe('ReservationPage', () => {
     expect(screen.queryByRole('button', { name: 'لغو رزرو' })).not.toBeInTheDocument();
   });
 
-  it('searches PNRs by query', async () => {
+  it('searches by PNR on the bookings tab', async () => {
     mockRole('IT_MANAGER');
     vi.spyOn(reservationApi, 'fetchReservationDashboardStats').mockResolvedValue(STATS);
-    const listSpy = vi.spyOn(reservationApi, 'fetchPnrList').mockResolvedValue(GROUPS);
-
-    render(<ReservationPage />);
-    await screen.findByText('نگار رضایی');
-
-    const user = userEvent.setup();
-    await user.type(screen.getByPlaceholderText('جستجو با کد PNR یا نام مسافر…'), 'نگار');
-
-    await waitFor(() => expect(listSpy).toHaveBeenCalledWith('نگار'));
-  });
-
-  it('renders the aisle gap from cabinLayout.aisleAfterIndex per row, not a fixed seat position', async () => {
-    mockRole('BOARD_CHAIR');
-    vi.spyOn(reservationApi, 'fetchReservationDashboardStats').mockResolvedValue(STATS);
     vi.spyOn(reservationApi, 'fetchPnrList').mockResolvedValue(GROUPS);
-    // Deliberately non-2/2 splits — a component still assuming a fixed
-    // "gap after the 2nd seat" would place these wrong.
-    const seatMap: SeatMap = {
-      flightInstanceId: 'fi1',
-      aircraftType: 'CUSTOM',
-      cabinLayout: { BUSINESS: { aisleAfterIndex: 1 }, ECONOMY: { aisleAfterIndex: 3 } },
-      capacity: 9,
-      soldCount: 0,
-      lockedCount: 0,
-      occupancyPct: 0,
-      rows: [
-        {
-          row: 3,
-          cabin: 'BUSINESS',
-          seats: [
-            { seatCode: '3A', status: 'FREE', lockId: null },
-            { seatCode: '3B', status: 'FREE', lockId: null },
-            { seatCode: '3C', status: 'FREE', lockId: null },
-            { seatCode: '3D', status: 'FREE', lockId: null },
-          ],
-        },
-        {
-          row: 10,
-          cabin: 'ECONOMY',
-          seats: [
-            { seatCode: '10A', status: 'FREE', lockId: null },
-            { seatCode: '10B', status: 'FREE', lockId: null },
-            { seatCode: '10C', status: 'FREE', lockId: null },
-            { seatCode: '10D', status: 'FREE', lockId: null },
-            { seatCode: '10E', status: 'FREE', lockId: null },
-          ],
-        },
-      ],
-    };
-    vi.spyOn(reservationApi, 'fetchSeatMap').mockResolvedValue(seatMap);
+    const detailSpy = vi.spyOn(reservationApi, 'fetchPnrDetail').mockResolvedValue(DETAIL);
 
     render(<ReservationPage />);
-    await screen.findByText('نگار رضایی');
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'نقشهٔ صندلی EP-821' }));
+    await user.click(screen.getByRole('button', { name: /مدیریت رزروها/ }));
+    await screen.findByText('آخرین رزروهای ثبت‌شده');
 
-    const businessGap = await screen.findByTestId('aisle-gap-3');
-    expect(businessGap.parentElement!.querySelector('button')).toHaveAttribute('aria-label', '3A');
+    await user.type(screen.getByPlaceholderText('مثلاً AS-88421'), 'BJDEMO1');
+    await user.click(screen.getByRole('button', { name: 'جستجو' }));
 
-    const economyGap = screen.getByTestId('aisle-gap-10');
-    expect(economyGap.parentElement!.querySelector('button')).toHaveAttribute('aria-label', '10C');
+    await waitFor(() => expect(detailSpy).toHaveBeenCalledWith('BJDEMO1'));
+    expect(await screen.findByText('صندلی 3A')).toBeInTheDocument();
   });
 
-  it('a canLock role can mark a TICKETED booking as no-show, and the detail refreshes', async () => {
+  it('agency tab shows empty state when no API keys exist', async () => {
+    mockRole('IT_MANAGER');
+    vi.spyOn(reservationApi, 'fetchReservationDashboardStats').mockResolvedValue(STATS);
+    vi.spyOn(reservationApi, 'fetchAgencyApiAccess').mockResolvedValue([]);
+
+    render(<ReservationPage />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /دسترسی آژانس‌ها/ }));
+
+    expect(await screen.findByText('آژانسی با دسترسی API ثبت نشده است.')).toBeInTheDocument();
+  });
+
+  it('agency tab lists agencies with API access', async () => {
+    mockRole('IT_MANAGER');
+    vi.spyOn(reservationApi, 'fetchReservationDashboardStats').mockResolvedValue(STATS);
+    vi.spyOn(reservationApi, 'fetchAgencyApiAccess').mockResolvedValue(AGENCIES);
+
+    render(<ReservationPage />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /دسترسی آژانس‌ها/ }));
+
+    expect(await screen.findByText('آژانس blujet')).toBeInTheDocument();
+    expect(screen.getByText('bjk_••••abcd')).toBeInTheDocument();
+  });
+
+  it('flights tab renders occupancy rows or empty state', async () => {
+    mockRole('IT_MANAGER');
+    vi.spyOn(reservationApi, 'fetchReservationDashboardStats').mockResolvedValue(STATS);
+    vi.spyOn(reservationApi, 'fetchReservationFlights').mockResolvedValue(FLIGHTS);
+
+    render(<ReservationPage />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /پروازها/ }));
+
+    expect(await screen.findByText('EP-821')).toBeInTheDocument();
+    expect(screen.getByText('در حال فروش')).toBeInTheDocument();
+    expect(screen.getByText('MD-80')).toBeInTheDocument();
+  });
+
+  it('a canLock role can mark a TICKETED booking as no-show', async () => {
     mockRole('BOARD_CHAIR');
     vi.spyOn(reservationApi, 'fetchReservationDashboardStats').mockResolvedValue(STATS);
     vi.spyOn(reservationApi, 'fetchPnrList').mockResolvedValue(GROUPS);
@@ -159,8 +216,8 @@ describe('ReservationPage', () => {
 
     render(<ReservationPage />);
     const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /مدیریت رزروها/ }));
     await user.click(await screen.findByRole('button', { name: 'BJDEMO1' }));
-
     await user.click(await screen.findByRole('button', { name: 'ثبت عدم حضور مسافر' }));
 
     await waitFor(() => expect(noShowSpy).toHaveBeenCalledWith('BJDEMO1'));
@@ -175,9 +232,10 @@ describe('ReservationPage', () => {
 
     render(<ReservationPage />);
     const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /مدیریت رزروها/ }));
     await user.click(await screen.findByRole('button', { name: 'BJDEMO1' }));
 
-    await waitFor(() => expect(screen.getByText('رزرو BJDEMO1')).toBeInTheDocument());
-    expect(screen.queryByRole('button', { name: 'ثبت عدم حضور مسافر' })).not.toBeInTheDocument();
+    const dialog = await screen.findByRole('dialog', { name: 'رزرو BJDEMO1' });
+    expect(within(dialog).queryByRole('button', { name: 'ثبت عدم حضور مسافر' })).not.toBeInTheDocument();
   });
 });

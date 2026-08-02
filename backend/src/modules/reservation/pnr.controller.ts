@@ -111,9 +111,28 @@ export class PnrController {
   }
 
   @Get('dashboard-stats')
-  @ApiOperation({ summary: 'آمار واقعی رزروها — بدون داده جعلی سلامت سرویس' })
+  @ApiOperation({
+    summary:
+      'آمار واقعی رزروها + تفکیک کانال + وضعیت سرویس‌های وابسته (بر اساس toggle/latency واقعی)',
+  })
   async dashboardStats() {
     return { success: true, data: await this.pnr.dashboardStats() };
+  }
+
+  @Get('agency-api-access')
+  @ApiOperation({
+    summary: 'فهرست آژانس‌هایی که کلید API دارند — تب دسترسی آژانس‌ها',
+  })
+  async agencyApiAccess() {
+    return { success: true, data: await this.pnr.agencyApiAccess() };
+  }
+
+  @Get('flights')
+  @ApiOperation({
+    summary: 'فهرست پروازهای SCHEDULED با ظرفیت/فروش — تب پروازها',
+  })
+  async listFlights(@Query('q') q?: string) {
+    return { success: true, data: await this.pnr.listFlights(q) };
   }
 
   @Post('_test/flight-instance')

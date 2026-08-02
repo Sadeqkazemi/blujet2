@@ -39,22 +39,25 @@ seed's ambiguous historical/demo instances).
 - [x] FINANCE_MANAGER/COMMERCIAL_MANAGER 403 on every endpoint — `'FINANCE_MANAGER and COMMERCIAL_MANAGER get 403 on every /reservation/* endpoint'`
 - [x] SENIOR_MANAGER: reads 200, every write 403 — `'SENIOR_MANAGER: reads succeed, every write is 403 (view-only)'`
 
-### Frontend
-- [x] Seat map: free/sold/locked/business-vs-economy visual states, click-to-lock (canLock roles), release chips — `ReservationPage.test.tsx` + `reservation-journey.spec.ts`
-- [x] PNR list + detail modal: boarding-pass-style card, change-seat form, cancel action — `'BOARD_CHAIR sees the PNR list and change-seat/cancel controls in the detail modal'`
-- [x] Manual "رزرو جدید" form with flight search + seat pick + issue — `reservation-journey.spec.ts`
-- [x] SENIOR_MANAGER sees the seat map read-only (disabled seat buttons) and the PNR detail modal has no change/cancel controls — `'SENIOR_MANAGER is view-only: no change-seat/cancel controls in the detail modal'` + E2E
-- [x] Role isolation: FINANCE_MANAGER/COMMERCIAL_MANAGER have no reservation nav entry — `'Non-reservation role has no reservation nav entry (role isolation)'`
+### Frontend (design-reference-v2 `ReservationSystem` shell)
+- [x] Four sub-tabs: داشبورد / مدیریت رزروها / دسترسی آژانس‌ها / پروازها — `ReservationPage.test.tsx` + `reservation-journey.spec.ts`
+- [x] Dashboard KPIs + channel mix + dependent service health (real toggles/latencies) — `'renders the design four-tab shell and dashboard KPIs/services/channels'`
+- [x] PNR search (PNR + last name) + recent table + detail modal (change/cancel/no-show for canLock) — `'PNR tab lists recent bookings…'` / no-show tests
+- [x] Agency API access list or empty state — `'agency tab shows empty state…'` / `'agency tab lists agencies…'`
+- [x] Flights occupancy table — `'flights tab renders occupancy rows or empty state'`
+- [x] SENIOR_MANAGER view-only detail modal — `'SENIOR_MANAGER is view-only in the detail modal'`
+- [x] Role isolation: FINANCE_MANAGER/COMMERCIAL_MANAGER have no reservation nav entry — E2E
 
 ### E2E
-- [x] BOARD_CHAIR locks a seat, sees it reflected on the map, releases it — `'BOARD_CHAIR locks a seat on the seat map, sees it reflected, then releases it'`
-- [x] IT_MANAGER searches, issues a manual PNR, finds it in PNR management, cancels it — `'IT Manager issues a manual PNR, finds it in PNR management, then cancels it'`
-- [x] SENIOR_MANAGER sees the seat map but has no lock/issue controls (view-only) — `'SENIOR_MANAGER sees the seat map read-only — no lock or issue controls'`
+- [x] IT Manager sees the four-tab shell — `'IT Manager sees the design four-tab reservation shell'`
+- [x] IT Manager finds an API-issued PNR and cancels it in مدیریت رزروها — `'IT Manager finds an issued PNR in مدیریت رزروها and cancels it'`
+- [x] BOARD_CHAIR opens PNR detail with change/cancel — `'BOARD_CHAIR can open PNR detail with change/cancel controls'`
+- [x] SENIOR_MANAGER view-only on PNR detail — `'SENIOR_MANAGER is view-only on PNR detail'`
 - [x] Non-reservation role has no reservation nav entry — `'Non-reservation role has no reservation nav entry (role isolation)'`
 
 ### Phase 30 — data-driven seat-map aisle gap
 - [x] `GET /reservation/seatmap/:id` returns `cabinLayout.{BUSINESS,ECONOMY}.aisleAfterIndex`, computed from that flight's real `AircraftSeatMap.{business,economy}ColsLeft.length` (via `resolveAircraftType`, so an aircraft-type override is respected) instead of the frontend assuming a fixed seat position — proven against both the seeded 2-2/2-3 config AND a distinct custom aircraft type with a reversed 3-2 economy split, so the test can't pass by coincidence — `backend/test/reservation.e2e-spec.ts: 'GET /reservation/seatmap/:id returns cabinLayout.aisleAfterIndex reflecting the real per-aircraft column split, not a fixed assumption'`
-- [x] `ReservationPage.tsx`'s seat grid renders the aisle gap at `cabinLayout[row.cabin].aisleAfterIndex` per row instead of the previous hardcoded `idx === 1` — proven with a non-2/2-2/3 fixture that a fixed-index component would place wrong — `ReservationPage.test.tsx: 'renders the aisle gap from cabinLayout.aisleAfterIndex per row, not a fixed seat position'`
+- [x] Seat-map aisle gap rendering lived in the Phase 9 operational UI; v2 shell no longer embeds the seat grid (APIs still return `cabinLayout.aisleAfterIndex` for any future consumer)
 
 ### Phase 36 — عدم حضور مسافر (mark no-show)
 
@@ -82,9 +85,8 @@ a new screen.
 
 ### Deferred (scoped out with reasons, not silently dropped)
 - Ticket print/PDF generation — no «چاپ بلیط» button wired this phase; a real PDF pipeline needs the public-site track's e-ticket template.
-- Agency API access sub-tab — already covered by Phase 3's `AgencyApiKey`; not duplicated here.
-- Flight/schedule/capacity creation ("پروازها" sub-tab) — Phase 10's own scope.
-- The design's fabricated "microservices health" dashboard cards — replaced with real booking/seat/revenue stats instead (see `docs/DB_SCHEMA.md`'s Phase 9 note); not ported verbatim since no such infrastructure exists in this monolith.
+- Flight/schedule/capacity **creation** UI («+ تعریف پرواز جدید») — Phase 10 `/flights/*`; the reservation shell only lists SCHEDULED occupancy.
+- In-panel seat-map / «رزرو جدید» operational chrome from Phase 9 frontend — superseded by v2 `ReservationSystem` tabs; seatmap/issue APIs remain for backend/E2E helpers.
 - Managerial seat-lock request/approval queue (`PATCH
   /reservation/seatmap/locks/:id/approve`/`reject`, `POST
   /reservation/pnr/from-lock/:lockId`) — still deliberately backend-only;
