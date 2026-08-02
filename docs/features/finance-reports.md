@@ -24,7 +24,7 @@ journeys).
 - [x] New-employee banner rows come from real `AuditLog(category=ACCOUNT)` events — verified by inspection of `StaffReportsService.reports` (query filters `category: 'ACCOUNT', entityType: 'User'`) + the frontend banner test below
 
 ### Frontend — مالی tab
-- [x] Analytic view (CEO/Chair/Senior/Commercial): sales chart with mode switcher, channel sum tiles, completed-flights box, «ترکیب درآمد» donut — `FinancePage.test.tsx`: `'CEO gets the analytic view: sales chart + revenue mix, no transactions/settlements'` (mode switcher ships the three granularities the shared `SalesBarChart` already supports — روز/ماه/پرواز stay deferred exactly as Phase 1's dashboard deferred them, one shared limitation, not a new one)
+- [x] Analytic view (CEO/Chair/Senior/Commercial): dark design (subtitle «فروش هر پرواز…», chips روزانه→شماره پرواز, channel tiles + inline flights, KPI trend cards, flights strip, «ترکیب درآمد» donut) — `FinancePage.test.tsx`: `'CEO gets the analytic view: sales chart + revenue mix, no transactions/settlements'`
 - [x] Finance-ops view (FINANCE_MANAGER): KPI row, low-sales alert, completed-flights box, transactions list, donut, settlements rows with paid-ratio bars and «ارسال یادآوری» wired to the real Phase 3 remind endpoint — `'FINANCE_MANAGER gets the finance-ops view: transactions, settlements, remind action'`
 - [x] nav flags flipped to `implemented: true` for `finance` in all 5 roles — E2E journeys click the real nav link
 
