@@ -5,10 +5,12 @@ import {
   Index,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryColumn,
 } from 'typeorm';
 import { ReferralPriority, ReferralStatus } from '../enums';
 import type { JsonValue } from '../json-types';
+import { ManagerReferralRecipient } from './manager-referral-recipient.entity';
 import { User } from './user.entity';
 
 @Index('manager_referrals_fromId_status_idx', ['fromId', 'status'])
@@ -60,4 +62,7 @@ export class ManagerReferral {
 
   @CreateDateColumn({ precision: 3, default: () => 'CURRENT_TIMESTAMP' })
   createdAt!: Date;
+
+  @OneToMany(() => ManagerReferralRecipient, (r) => r.referral)
+  recipients!: ManagerReferralRecipient[];
 }

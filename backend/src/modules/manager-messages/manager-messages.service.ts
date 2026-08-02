@@ -1,11 +1,14 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { TypeORMService } from '../../typeorm/typeorm.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { In, Repository } from 'typeorm';
+import { ManagerMessage } from '../../database/entities/manager-message.entity';
+import { StoredFile } from '../../database/entities/stored-file.entity';
 import { AuditService } from '../audit/audit.service';
 import { CartableService } from '../cartable/cartable.service';
 import { ErrorCode } from '../../common/errors';
 import { EXEC_ROLES } from '../../common/exec-roles';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import type { ManagerMessageDept, Role } from '../../../generated/typeorm/enums';
+import type { ManagerMessageDept, Role } from '../../database/enums';
 
 /** Dept option → recipient role(s). SUPPORT/AGENCIES have no backing staff
  * role until Phase 8's employee/department model — accepted but flagged. */
@@ -30,7 +33,10 @@ export const DEPT_LABELS_FA: Record<ManagerMessageDept, string> = {
 @Injectable()
 export class ManagerMessagesService {
   constructor(
-    private readonly typeorm: TypeORMService,
+    @InjectRepository(ManagerMessage)
+    private readonly messageRepo: Repository<ManagerMessage>,
+    @InjectRepository(StoredFile)
+    private readonly storedFileRepo: Repository<StoredFile>,
     private readonly audit: AuditService,
     private readonly cartable: CartableService,
   ) {}
@@ -45,8 +51,8 @@ export class ManagerMessagesService {
     },
   ) {
     if (dto.attachmentIds && dto.attachmentIds.length > 0) {
-      const owned = await this.typeorm.storedFile.count({
-        where: { id: { in: dto.attachmentIds }, ownerId: actor.id },
+      const owned = await this.storedFileRepo.count({
+        where: { id: In(dto.attachmentIds), ownerId: actor.id },
       });
       if (owned !== dto.attachmentIds.length) {
         throw new BadRequestException({
@@ -56,15 +62,15 @@ export class ManagerMessagesService {
       }
     }
 
-    const message = await this.typeorm.managerMessage.create({
-      data: {
+    const message = await this.messageRepo.save(
+      this.messageRepo.create({
         fromId: actor.id,
         toDept: dto.toDept,
         subject: dto.subject,
         body: dto.body,
         attachments: dto.attachmentIds ?? [],
-      },
-    });
+      }),
+    );
 
     // Delivery wiring (⚑): the design has no inbox — recipients get the
     // message as a cartable item.
@@ -105,9 +111,9 @@ export class ManagerMessagesService {
   }
 
   async sent(actor: AuthenticatedUser) {
-    const messages = await this.typeorm.managerMessage.findMany({
+    const messages = await this.messageRepo.find({
       where: { fromId: actor.id },
-      orderBy: { createdAt: 'desc' },
+      order: { createdAt: 'DESC' },
     });
     return messages.map((m) => ({
       ...m,
