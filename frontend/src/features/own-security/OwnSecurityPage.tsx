@@ -37,7 +37,16 @@ export default function OwnSecurityPage() {
 
   function reload() {
     fetchAdmins()
-      .then((rows) => setManaged(rows.filter((r) => r.managedByCaller)))
+      .then((rows) =>
+        setManaged(
+          rows.filter((r) => {
+            if (!r.managedByCaller) return false;
+            // Design: CEO manages finance/commercial/site/IT — not مدیر ارشد.
+            if (user?.role === 'CEO' && r.role === 'SENIOR_MANAGER') return false;
+            return true;
+          }),
+        ),
+      )
       .catch(() => setManaged([]));
   }
 
