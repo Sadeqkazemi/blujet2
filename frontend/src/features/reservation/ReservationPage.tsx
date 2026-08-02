@@ -395,16 +395,16 @@ export default function ReservationPage() {
           title={seatFormMode === 'lock' ? `لاک مدیریتی صندلی ${selectedSeat}` : `صدور PNR — صندلی ${selectedSeat}`}
           onClose={() => setSeatFormOpen(false)}
         >
-          <label className="mb-1 block text-xs font-bold text-ink" htmlFor="seat-pname">
+          <label className="mb-1 block text-xs font-bold text-panel-ink" htmlFor="seat-pname">
             نام و نام خانوادگی{seatFormMode === 'issue' ? '' : ' (اختیاری)'}
           </label>
           <input
             id="seat-pname"
             value={seatForm.name}
             onChange={(e) => setSeatForm({ ...seatForm, name: e.target.value })}
-            className="mb-3 w-full rounded-lg border border-border p-3 text-xs outline-none focus:border-accent"
+            className="mb-3 w-full rounded-lg border border-panel-border-2 bg-panel-canvas p-3 text-xs text-panel-ink outline-none focus:border-accent"
           />
-          <label className="mb-1 block text-xs font-bold text-ink" htmlFor="seat-nid">
+          <label className="mb-1 block text-xs font-bold text-panel-ink" htmlFor="seat-nid">
             کد ملی (اختیاری)
           </label>
           <input
@@ -412,10 +412,13 @@ export default function ReservationPage() {
             dir="ltr"
             value={seatForm.nid}
             onChange={(e) => setSeatForm({ ...seatForm, nid: e.target.value })}
-            className="font-num mb-3 w-full rounded-lg border border-border p-3 text-xs outline-none focus:border-accent"
+            className="font-num mb-3 w-full rounded-lg border border-panel-border-2 bg-panel-canvas p-3 text-xs text-panel-ink outline-none focus:border-accent"
           />
           <div className="mt-4 flex justify-end gap-2">
-            <button onClick={() => setSeatFormOpen(false)} className="rounded-lg bg-surface px-4 py-2 text-xs font-bold text-text-2">
+            <button
+              onClick={() => setSeatFormOpen(false)}
+              className="rounded-lg bg-panel-surface-2 px-4 py-2 text-xs font-bold text-panel-muted"
+            >
               انصراف
             </button>
             <button onClick={() => void onSubmitSeatForm()} className="rounded-lg bg-accent px-4 py-2 text-xs font-bold text-white">
@@ -467,7 +470,7 @@ export default function ReservationPage() {
                   onChange={(e) => setChangeSeatInput(e.target.value)}
                   placeholder="شماره صندلی جدید"
                   dir="ltr"
-                  className="font-num flex-1 rounded-lg border border-border p-2.5 text-xs outline-none focus:border-accent"
+                  className="font-num flex-1 rounded-lg border border-panel-border-2 bg-panel-canvas p-2.5 text-xs text-panel-ink outline-none focus:border-accent"
                 />
                 <button onClick={() => void onChangeSeat()} className="rounded-lg bg-[#f59e0b] px-4 py-2 text-xs font-bold text-white">
                   ثبت تغییر
@@ -479,7 +482,7 @@ export default function ReservationPage() {
               {(detail.status === 'TICKETED' || detail.status === 'FLOWN') && (
                 <button
                   onClick={() => void onMarkNoShow()}
-                  className="rounded-lg bg-surface px-4 py-2 text-xs font-bold text-text-2"
+                  className="rounded-lg bg-panel-surface-2 px-4 py-2 text-xs font-bold text-panel-muted"
                 >
                   ثبت عدم حضور مسافر
                 </button>

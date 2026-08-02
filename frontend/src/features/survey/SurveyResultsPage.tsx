@@ -43,8 +43,8 @@ export default function SurveyResultsPage() {
   return (
     <div className="p-8">
       <div className="mb-6">
-        <h1 className="text-xl font-black text-ink">نظرسنجی مسافران</h1>
-        <p className="mt-1 text-sm text-muted">
+        <h1 className="text-xl font-black text-panel-ink">نظرسنجی مسافران</h1>
+        <p className="mt-1 text-sm text-panel-muted">
           نتایج نظرسنجی رضایت مسافران پس از پرواز و خلاصهٔ هوش مصنوعی نظرات هر پرواز
         </p>
       </div>
@@ -52,13 +52,13 @@ export default function SurveyResultsPage() {
       {error && <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">{error}</p>}
 
       {disabled && (
-        <div className="rounded-xl border border-[#f59e0b4d] bg-[#f59e0b14] p-4 text-xs text-ink">
+        <div className="rounded-xl border border-[#f59e0b4d] bg-[#f59e0b14] p-4 text-xs text-panel-ink">
           نظرسنجی پس از پرواز توسط مدیر IT غیرفعال است.
         </div>
       )}
 
       {!disabled && flights.length === 0 && (
-        <div className="rounded-xl border border-border bg-white p-8 text-center text-xs text-muted">
+        <div className="rounded-xl border border-panel-border bg-panel-surface p-8 text-center text-xs text-panel-muted">
           هنوز نظرسنجی برای هیچ پروازی ثبت نشده است.
         </div>
       )}
@@ -66,20 +66,20 @@ export default function SurveyResultsPage() {
       {!disabled && (
         <div className="flex flex-col gap-3">
           {flights.map((f) => (
-            <div key={f.flightInstanceId} data-testid="survey-result-row" className="rounded-xl border border-border bg-white p-4">
+            <div key={f.flightInstanceId} data-testid="survey-result-row" className="rounded-xl border border-panel-border bg-panel-surface p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <div className="text-sm font-bold text-ink">{f.flightNo}</div>
-                  <div className="mt-0.5 text-[10.5px] text-muted">
+                  <div className="text-sm font-bold text-panel-ink">{f.flightNo}</div>
+                  <div className="mt-0.5 text-[10.5px] text-panel-muted">
                     {f.originCityFa} ← {f.destCityFa} · {formatJalaliDate(f.departureAt)}
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="text-xs">
                     <span className="font-num font-black text-[#f59e0b]">{faDigits(f.avgRating)}</span>
-                    <span className="text-muted"> / {faDigits(5)} · </span>
-                    <span className="font-num font-black text-ink">{faDigits(f.count)}</span>
-                    <span className="text-muted"> پاسخ</span>
+                    <span className="text-panel-muted"> / {faDigits(5)} · </span>
+                    <span className="font-num font-black text-panel-ink">{faDigits(f.count)}</span>
+                    <span className="text-panel-muted"> پاسخ</span>
                   </div>
                   <button
                     onClick={() => void onAnalyze(f.flightInstanceId)}
@@ -91,7 +91,7 @@ export default function SurveyResultsPage() {
                 </div>
               </div>
               {summaries[f.flightInstanceId] && (
-                <p data-testid="survey-ai-summary" className="mt-3 rounded-lg bg-surface p-3 text-xs text-ink">
+                <p data-testid="survey-ai-summary" className="mt-3 rounded-lg bg-panel-surface-2 p-3 text-xs text-panel-ink">
                   {summaries[f.flightInstanceId]}
                 </p>
               )}

@@ -64,6 +64,8 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'mgrreports', labelFa: 'گزارش مدیران', implemented: true },
     { key: 'survey', labelFa: 'نظرسنجی مسافران', implemented: true },
   ],
+  // Order matches design-reference-v2/پنل مدیر ارشد.dc.html sidebar
+  // (vip → survey → panels → security → reservation at the end).
   SENIOR_MANAGER: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
     { key: 'agencies', labelFa: 'آژانس‌ها', implemented: true },
@@ -75,10 +77,10 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'referrals', labelFa: 'ارجاعات', implemented: true },
     { key: 'mgrreports', labelFa: 'گزارش مدیران', implemented: true },
     { key: 'vip', labelFa: 'مشتریان VIP', implemented: true },
+    { key: 'survey', labelFa: 'نظرسنجی مسافران', implemented: true },
     { key: 'panels', labelFa: 'دسترسی به پنل‌ها', implemented: true },
     { key: 'security', labelFa: 'امنیت و رمز عبور', implemented: true },
     { key: 'reservation', labelFa: 'سامانه رزرواسیون', implemented: true },
-    { key: 'survey', labelFa: 'نظرسنجی مسافران', implemented: true },
   ],
   FINANCE_MANAGER: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
