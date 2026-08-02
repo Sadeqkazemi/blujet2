@@ -658,6 +658,92 @@ export class ReportingService {
     };
   }
 
+  /** مالی «شماره پرواز» card picker — one row per flightNo with channel
+   * sums from real SALE ledger rows that have a booking. */
+  async flightSalesList() {
+    const entries = await this.typeorm.ledgerEntry.findMany({
+      where: { type: 'SALE', bookingId: { not: null } },
+      select: {
+        signedAmountIrr: true,
+        booking: {
+          select: {
+            channel: true,
+            flightInstance: {
+              select: {
+                departureAt: true,
+                flight: {
+                  select: {
+                    flightNo: true,
+                    route: {
+                      select: { originCode: true, destCode: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    type Acc = {
+      flightNo: string;
+      originCode: string;
+      destCode: string;
+      departureAt: Date;
+      tickets: number;
+      systemIrr: Irr;
+      charterIrr: Irr;
+      agencyIrr: Irr;
+    };
+    const byFlight = new Map<string, Acc>();
+    for (const e of entries) {
+      const inst = e.booking?.flightInstance;
+      const channel = e.booking?.channel;
+      if (!inst || !channel) continue;
+      const flightNo = inst.flight.flightNo;
+      let acc = byFlight.get(flightNo);
+      if (!acc) {
+        acc = {
+          flightNo,
+          originCode: inst.flight.route.originCode,
+          destCode: inst.flight.route.destCode,
+          departureAt: inst.departureAt,
+          tickets: 0,
+          systemIrr: ZERO_IRR,
+          charterIrr: ZERO_IRR,
+          agencyIrr: ZERO_IRR,
+        };
+        byFlight.set(flightNo, acc);
+      }
+      acc.tickets += 1;
+      if (inst.departureAt > acc.departureAt) acc.departureAt = inst.departureAt;
+      if (channel === 'SYSTEM')
+        acc.systemIrr = addIrr(acc.systemIrr, e.signedAmountIrr);
+      else if (channel === 'CHARTER')
+        acc.charterIrr = addIrr(acc.charterIrr, e.signedAmountIrr);
+      else if (channel === 'AGENCY')
+        acc.agencyIrr = addIrr(acc.agencyIrr, e.signedAmountIrr);
+    }
+
+    return Array.from(byFlight.values())
+      .map((a) => ({
+        flightNo: a.flightNo,
+        originCode: a.originCode,
+        destCode: a.destCode,
+        departureAt: a.departureAt.toISOString(),
+        tickets: a.tickets,
+        systemIrr: a.systemIrr,
+        charterIrr: a.charterIrr,
+        agencyIrr: a.agencyIrr,
+        totalIrr: addIrr(a.systemIrr, a.charterIrr, a.agencyIrr),
+      }))
+      .sort(
+        (x, y) =>
+          new Date(y.departureAt).getTime() - new Date(x.departureAt).getTime(),
+      );
+  }
+
   /** «تسویه‌حساب آژانس‌های همکار» — per-agency settlement status derived
    * from Phase 3 invoices; presentation only, no new write path. */
   async agencySettlements() {

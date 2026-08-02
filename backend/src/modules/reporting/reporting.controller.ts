@@ -113,6 +113,16 @@ export class ReportingController {
     return { success: true, data };
   }
 
+  @Get('flight-sales')
+  @ApiOperation({
+    summary:
+      'لیست فروش به‌ازای شماره پرواز — کارت‌های حالت «شماره پرواز» در مالی',
+  })
+  async flightSales() {
+    const data = await this.reporting.flightSalesList();
+    return { success: true, data };
+  }
+
   @Get('agency-settlements')
   @Roles('FINANCE_MANAGER')
   @ApiOperation({

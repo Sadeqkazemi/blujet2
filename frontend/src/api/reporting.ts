@@ -3,6 +3,7 @@ import type {
   AgencySettlementsResult,
   CompletedFlightsSummary,
   FinanceDashboardStats,
+  FlightSalesRow,
   KpiResult,
   LowSalesAlert,
   PassengerReportHit,
@@ -34,6 +35,10 @@ export function fetchKpis(query: PeriodQuery) {
 
 export function fetchCompletedFlightsSummary(query: PeriodQuery) {
   return apiGet<CompletedFlightsSummary>(`/reporting/completed-flights-summary?${toQueryString(query)}`);
+}
+
+export function fetchFlightSales() {
+  return apiGet<FlightSalesRow[]>('/reporting/flight-sales');
 }
 
 export function fetchLowSalesAlerts() {

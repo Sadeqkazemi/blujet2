@@ -54,10 +54,21 @@ const FREE_SEAT_MAP: SeatMap = {
       row: 3,
       cabin: 'BUSINESS',
       seats: [
-        { seatCode: '3A', status: 'SOLD', lockId: null },
-        { seatCode: '3B', status: 'FREE', lockId: null },
-        { seatCode: '3E', status: 'FREE', lockId: null },
-        { seatCode: '3F', status: 'FREE', lockId: null },
+        {
+          seatCode: '3A',
+          status: 'SOLD',
+          lockId: null,
+          occupant: {
+            passengerName: 'یاسمن قاسمی',
+            maskedNationalId: '100******7',
+            pnr: 'BJDEMO1',
+            statusFa: 'رزرو قطعی',
+            departureAt: '2026-08-01T05:00:00.000Z',
+          },
+        },
+        { seatCode: '3B', status: 'FREE', lockId: null, occupant: null },
+        { seatCode: '3E', status: 'FREE', lockId: null, occupant: null },
+        { seatCode: '3F', status: 'FREE', lockId: null, occupant: null },
       ],
     },
   ],
@@ -138,6 +149,42 @@ describe('ReservationPage', () => {
         expect.objectContaining({ seatCode: '3B', classification: 'FREE' }),
       ),
     );
+  });
+
+  it('BOARD_CHAIR clicking a reserved seat shows passenger info in the seat map', async () => {
+    mockRole('BOARD_CHAIR');
+    vi.spyOn(reservationApi, 'fetchReservationDashboardStats').mockResolvedValue(STATS);
+    vi.spyOn(reservationApi, 'fetchPnrList').mockResolvedValue(GROUPS);
+    vi.spyOn(flightsApi, 'fetchFlightsOverview').mockResolvedValue({
+      kpis: { activeCount: 1, soldSeats: 1, meanOccupancyPct: 10 },
+      active: [
+        {
+          id: 'fi1',
+          flightNo: 'EP-821',
+          originCode: 'THR',
+          destCode: 'DXB',
+          departureAt: '2026-08-01T05:00:00.000Z',
+          capacity: 146,
+          charterSeats: 0,
+          sold: 10,
+          basePriceIrr: '380000000',
+          derivedStatus: 'SELLING',
+        },
+      ],
+      completed: { rows: [], kpis: { totalSalesIrr: '0', totalProfitIrr: '0', totalTickets: 0, flightCount: 0 } },
+      future: [],
+    });
+    vi.spyOn(reservationApi, 'fetchSeatMap').mockResolvedValue(FREE_SEAT_MAP);
+
+    render(<ReservationPage />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'پروازها' }));
+    await user.click(await screen.findByText('تهران ← دبی'));
+    await user.click(await screen.findByRole('button', { name: '3A' }));
+    expect(await screen.findByTestId('seat-occupant-panel')).toBeInTheDocument();
+    expect(screen.getByText('یاسمن قاسمی')).toBeInTheDocument();
+    expect(screen.getByText('رزرو قطعی')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'قفل کردن این صندلی و ایجاد PNR' })).not.toBeInTheDocument();
   });
 
   it('BOARD_CHAIR sees PNR list and change-seat/cancel controls in the detail modal', async () => {

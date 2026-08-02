@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import {
   fetchAgencySettlements,
   fetchCompletedFlightsSummary,
+  fetchFlightSales,
   fetchKpis,
   fetchLowSalesAlerts,
   fetchRecentTransactions,
@@ -11,6 +12,7 @@ import {
 } from '../../api/reporting';
 import { remindAgencyInvoice } from '../../api/agencies';
 import { fetchReconciliationQueue, resolveReconciliation } from '../../api/reconciliation';
+import { airportCityName } from '../../lib/airport-cities';
 import { faDigits, faMoney, faPercent } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
 import SalesBarChart from '../../components/SalesBarChart';
@@ -37,6 +39,7 @@ import {
 import type {
   AgencySettlementsResult,
   CompletedFlightsSummary,
+  FlightSalesRow,
   KpiResult,
   LowSalesAlert,
   RecentTransactionsResult,
@@ -45,6 +48,23 @@ import type {
   SettlementStatus,
 } from '../../types/reporting';
 import type { ReconciliationItem } from '../../types/reconciliation';
+
+/** Compact تومان for flight cards (میلیون / میلیارد) — display only. */
+function faMoneyCompact(amountRial: string | number): string {
+  const toman = Math.round(Number(amountRial) / 10);
+  if (toman >= 1_000_000_000) {
+    const v = (toman / 1_000_000_000).toFixed(1).replace(/\.0$/, '');
+    return `${faDigits(v)} میلیارد`;
+  }
+  if (toman >= 1_000_000) {
+    return `${faDigits(Math.round(toman / 1_000_000))} میلیون`;
+  }
+  return faMoney(amountRial);
+}
+
+function flightRouteFa(originCode: string, destCode: string): string {
+  return `${airportCityName(originCode, 'fa')} ↔ ${airportCityName(destCode, 'fa')}`;
+}
 
 const SETTLEMENT_STATUS: Record<SettlementStatus, { label: string; className: string }> = {
   SETTLED: { label: 'تسویه شد', className: 'bg-[rgba(52,211,153,.16)] text-[#34d399]' },
@@ -329,7 +349,7 @@ function ReconciliationQueueCard({
 /** FINANCE_MANAGER's finance-ops layout — the only panel with transactions
  * and agency settlements, per the design. */
 function FinanceOpsView() {
-  const chart = useSalesChartQuery({ includeFlightMode: false });
+  const chart = useSalesChartQuery({ includeFlightMode: true });
   const [kpis, setKpis] = useState<KpiResult | null>(null);
   const [alerts, setAlerts] = useState<LowSalesAlert[]>([]);
   const [flights, setFlights] = useState<CompletedFlightsSummary | null>(null);
@@ -339,6 +359,21 @@ function FinanceOpsView() {
   const [reconciliation, setReconciliation] = useState<ReconciliationItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  // Auto-pick a flight when entering «شماره پرواز» so KPIs don't stay unloaded.
+  useEffect(() => {
+    if (chart.granularity !== 'flight' || chart.query.flightNo) return;
+    let cancelled = false;
+    fetchFlightSales()
+      .then((rows) => {
+        if (!cancelled && rows[0]) chart.selectFlightNo(rows[0].flightNo);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chart.granularity]);
 
   useEffect(() => {
     if (!chart.isQueryReady) return;
@@ -567,12 +602,35 @@ function FinanceOpsView() {
 
 /** Analytic مالی view for CEO / Board Chair / Senior / Commercial. */
 function FinanceAnalyticView() {
-  const chart = useSalesChartQuery({ includeFlightMode: false });
+  const chart = useSalesChartQuery({ includeFlightMode: true });
   const [periods, setPeriods] = useState<SalesChartPeriod[]>([]);
   const [kpis, setKpis] = useState<KpiResult | null>(null);
   const [flights, setFlights] = useState<CompletedFlightsSummary | null>(null);
   const [mix, setMix] = useState<RevenueMixResult | null>(null);
+  const [flightSales, setFlightSales] = useState<FlightSalesRow[]>([]);
+  const [flightQ, setFlightQ] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const isFlightMode = chart.granularity === 'flight';
+
+  useEffect(() => {
+    if (!isFlightMode) return;
+    let cancelled = false;
+    fetchFlightSales()
+      .then((rows) => {
+        if (cancelled) return;
+        setFlightSales(rows);
+        if (rows.length > 0 && !chart.query.flightNo) {
+          chart.selectFlightNo(rows[0].flightNo);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setError('خطا در دریافت لیست پروازها.');
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load list when entering flight mode
+  }, [isFlightMode]);
 
   useEffect(() => {
     if (!chart.isQueryReady) return;
@@ -599,17 +657,40 @@ function FinanceAnalyticView() {
     };
   }, [chart.query, chart.isQueryReady]);
 
+  const filteredFlightSales = useMemo(() => {
+    const q = flightQ.trim().toLowerCase();
+    if (!q) return flightSales;
+    return flightSales.filter((r) => {
+      const route = flightRouteFa(r.originCode, r.destCode);
+      return (
+        r.flightNo.toLowerCase().includes(q) ||
+        route.includes(flightQ.trim()) ||
+        r.originCode.toLowerCase().includes(q) ||
+        r.destCode.toLowerCase().includes(q)
+      );
+    });
+  }, [flightSales, flightQ]);
+
+  const selectedFlight =
+    flightSales.find((r) => r.flightNo === chart.query.flightNo) ?? filteredFlightSales[0] ?? null;
+
   if (error) return <p className="text-sm text-[#f87171]">{error}</p>;
   if (!flights || !mix) return <p className={`text-sm ${panelMuted}`}>در حال بارگذاری…</p>;
 
   // Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON on
   // the backend) — parsed here for this display-only sum; period totals are
   // far below 2^53 so Number() loses no precision.
-  const sums = {
-    system: periods.reduce((s, p) => s + Number(p.systemIrr), 0),
-    charter: periods.reduce((s, p) => s + Number(p.charterIrr), 0),
-    agency: periods.reduce((s, p) => s + Number(p.agencyIrr), 0),
-  };
+  const sums = isFlightMode && selectedFlight
+    ? {
+        system: Number(selectedFlight.systemIrr),
+        charter: Number(selectedFlight.charterIrr),
+        agency: Number(selectedFlight.agencyIrr),
+      }
+    : {
+        system: periods.reduce((s, p) => s + Number(p.systemIrr), 0),
+        charter: periods.reduce((s, p) => s + Number(p.charterIrr), 0),
+        agency: periods.reduce((s, p) => s + Number(p.agencyIrr), 0),
+      };
 
   return (
     <>
@@ -638,7 +719,11 @@ function FinanceAnalyticView() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className={panelTitle}>نمودار فروش</div>
-            <div className={panelSubtitle}>به تفکیک کانال فروش · تومان</div>
+            <div className={panelSubtitle}>
+              {isFlightMode
+                ? 'گزارش مالی بر اساس شماره پرواز · تومان'
+                : 'به تفکیک کانال فروش · تومان'}
+            </div>
           </div>
           <SalesChartControls
             modes={chart.modes}
@@ -655,36 +740,124 @@ function FinanceAnalyticView() {
           />
         </div>
 
+        {isFlightMode && selectedFlight && (
+          <div className="mb-4 rounded-[12px] border border-[#28344c] bg-[#18223a] px-4 py-3">
+            <div className="text-[12.5px] font-extrabold text-white">
+              پرواز{' '}
+              <span className="font-num" dir="ltr">
+                {selectedFlight.flightNo}
+              </span>{' '}
+              — {faMoneyCompact(selectedFlight.totalIrr)} تومان
+            </div>
+            <div className={`mt-1 text-[11px] ${panelMuted}`}>
+              {flightRouteFa(selectedFlight.originCode, selectedFlight.destCode)} ·{' '}
+              {formatJalaliDate(selectedFlight.departureAt)} · {faDigits(selectedFlight.tickets)} بلیط
+            </div>
+          </div>
+        )}
+
         <div className="mb-4 grid grid-cols-3 gap-3">
           <div className={panelElevatedPadded}>
             <div className={`mb-1 flex items-center gap-1.5 text-[10px] ${panelMuted}`}>
               <span className="h-2 w-2 rounded-sm bg-[#3b82f6]" />
               سیستمی
             </div>
-            <div className="font-num font-black text-[#3b82f6]">{faMoney(sums.system)}</div>
+            <div className="font-num font-black text-[#3b82f6]">
+              {isFlightMode ? faMoneyCompact(sums.system) : faMoney(sums.system)}
+            </div>
           </div>
           <div className={panelElevatedPadded}>
             <div className={`mb-1 flex items-center gap-1.5 text-[10px] ${panelMuted}`}>
               <span className="h-2 w-2 rounded-sm bg-[#a855f7]" />
               چارتر
             </div>
-            <div className="font-num font-black text-[#a855f7]">{faMoney(sums.charter)}</div>
+            <div className="font-num font-black text-[#a855f7]">
+              {isFlightMode ? faMoneyCompact(sums.charter) : faMoney(sums.charter)}
+            </div>
           </div>
           <div className={panelElevatedPadded}>
             <div className={`mb-1 flex items-center gap-1.5 text-[10px] ${panelMuted}`}>
               <span className="h-2 w-2 rounded-sm bg-[#34d399]" />
               آژانس
             </div>
-            <div className="font-num font-black text-[#34d399]">{faMoney(sums.agency)}</div>
+            <div className="font-num font-black text-[#34d399]">
+              {isFlightMode ? faMoneyCompact(sums.agency) : faMoney(sums.agency)}
+            </div>
           </div>
         </div>
 
-        <SalesBarChart
-          periods={periods}
-          selectedPeriodKey={chart.periodKey}
-          onSelectPeriod={chart.setPeriodKey}
-          variant="panel"
-        />
+        {isFlightMode ? (
+          <div className="pt-1">
+            {flightSales.length === 0 ? (
+              <div className={`py-8 text-center text-[11.5px] ${panelMuted}`}>
+                پرواز انجام‌شده‌ای ثبت نشده است.
+              </div>
+            ) : (
+              <>
+                <div className="relative mb-3 max-w-[430px]">
+                  <input
+                    value={flightQ}
+                    onChange={(e) => setFlightQ(e.target.value)}
+                    placeholder="جستجوی شماره پرواز یا مسیر…"
+                    aria-label="جستجوی شماره پرواز یا مسیر"
+                    className="h-10 w-full rounded-[11px] border border-[#28344c] bg-[#141d2e] px-3 text-[11.5px] text-[#e7ecf3] outline-none"
+                  />
+                </div>
+                {filteredFlightSales.length === 0 ? (
+                  <div className={`py-6 text-center text-[11.5px] ${panelMuted}`}>
+                    پروازی با این مشخصات یافت نشد.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                    {filteredFlightSales.map((r) => {
+                      const on = r.flightNo === (chart.query.flightNo ?? selectedFlight?.flightNo);
+                      return (
+                        <button
+                          key={r.flightNo}
+                          type="button"
+                          onClick={() => chart.selectFlightNo(r.flightNo)}
+                          className={`flex items-center justify-between gap-2.5 rounded-xl border px-3.5 py-2.5 text-right transition ${
+                            on
+                              ? 'border-[#3b82f6] bg-[rgba(59,130,246,.16)]'
+                              : 'border-[#1f2a3d] bg-[#141d2e] hover:border-[#28344c]'
+                          }`}
+                        >
+                          <div className="min-w-0 leading-relaxed">
+                            <div
+                              className={`truncate text-[12.5px] font-extrabold ${on ? 'text-white' : 'text-[#e7ecf3]'}`}
+                            >
+                              {flightRouteFa(r.originCode, r.destCode)}
+                            </div>
+                            <div className={`text-[10px] ${panelMuted}`}>
+                              پرواز{' '}
+                              <span className="font-num" dir="ltr">
+                                {r.flightNo}
+                              </span>{' '}
+                              · {formatJalaliDate(r.departureAt)}
+                            </div>
+                          </div>
+                          <div className="shrink-0 text-left whitespace-nowrap">
+                            <div className="font-num text-[12px] font-extrabold text-[#60a5fa]">
+                              {faMoneyCompact(r.totalIrr)}
+                            </div>
+                            <div className={`text-[9px] ${panelMuted}`}>فروش</div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        ) : (
+          <SalesBarChart
+            periods={periods}
+            selectedPeriodKey={chart.periodKey}
+            onSelectPeriod={chart.setPeriodKey}
+            variant="panel"
+          />
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.7fr_1fr]">

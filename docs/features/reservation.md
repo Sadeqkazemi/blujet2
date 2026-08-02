@@ -43,6 +43,7 @@ seed's ambiguous historical/demo instances).
 - [x] BOARD_CHAIR ReservationSystem matches design-reference-v2 / user screenshots: tabs داشبورد / مدیریت رزروها / دسترسی آژانس‌ها / پروازها — `'BOARD_CHAIR sees the full 4-tab ReservationSystem…'`
 - [x] پروازها: click a flight opens MD seat-map modal (search, legend, cabin bands, countdown locks, manual-lock dialog) — `'BOARD_CHAIR opens seat map from the پروازها tab and can lock a seat'` + E2E
 - [x] Seat map: free/sold/locked/business-vs-economy visual states, click-to-lock (canLock roles), release chips — `ReservationPage.test.tsx` + `reservation-journey.spec.ts`
+- [x] Clicking a reserved/locked seat shows passenger info panel (name, masked national ID, flight date, statusFa) from seatmap `occupant` — `'BOARD_CHAIR clicking a reserved seat shows passenger info in the seat map'`
 - [x] PNR list + detail modal: boarding-pass-style card, change-seat form, cancel action — BOARD_CHAIR «مدیریت رزروها»; other roles via tabbed shell
 - [x] Manual "رزرو جدید" form with flight search + seat pick + issue — `reservation-journey.spec.ts` (IT_MANAGER)
 - [x] SENIOR_MANAGER sees the seat map read-only (disabled seat buttons) and the PNR detail modal has no change/cancel controls — `'SENIOR_MANAGER is view-only: no change-seat/cancel controls in the detail modal'` + E2E

@@ -8,6 +8,7 @@ import {
 } from '../../api/reservation';
 import { airportCityName } from '../../lib/airport-cities';
 import { faDigits, faMoney } from '../../lib/fa-format';
+import { formatJalaliDateTime } from '../../lib/jalali';
 import {
   md80SectionForRow,
   MD80_MAIN_CABIN_EXTRA_ROW_END,
@@ -84,6 +85,7 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
   const [highlightCode, setHighlightCode] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
   const [lockSeatCode, setLockSeatCode] = useState<string | null>(null);
+  const [infoSeat, setInfoSeat] = useState<SeatCell | null>(null);
   const [paxName, setPaxName] = useState('');
   const [paxNid, setPaxNid] = useState('');
   const [lockWithoutName, setLockWithoutName] = useState(false);
@@ -173,11 +175,13 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
   }
 
   function onSeatClick(seat: SeatCell) {
-    if (seat.status === 'SOLD') return;
-    if (seat.status === 'LOCKED') {
-      setHighlightCode(seat.seatCode);
+    setHighlightCode(seat.seatCode);
+    if (seat.status === 'SOLD' || seat.status === 'LOCKED') {
+      setLockSeatCode(null);
+      setInfoSeat(seat);
       return;
     }
+    setInfoSeat(null);
     setLockSeatCode(seat.seatCode);
     setPaxName('');
     setPaxNid('');
@@ -243,6 +247,7 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
   async function onRelease(lockId: string) {
     try {
       await releaseLock(lockId);
+      setInfoSeat(null);
       await reload();
       onChanged();
     } catch {
@@ -352,7 +357,8 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
                     )}
                     <div className="mb-1.5 flex items-center justify-center gap-1.5">
                       {row.seats.map((s, idx) => {
-                        const selected = lockSeatCode === s.seatCode;
+                        const selected =
+                          lockSeatCode === s.seatCode || infoSeat?.seatCode === s.seatCode;
                         const highlight = highlightCode === s.seatCode;
                         const v = seatVisual(s.status, s.lockClassification, selected, highlight);
                         return (
@@ -360,11 +366,14 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
                             <button
                               type="button"
                               aria-label={s.seatCode}
-                              disabled={s.status === 'SOLD'}
                               onClick={() => onSeatClick(s)}
-                              className="h-[28px] w-[28px] rounded-[7px] border-[1.5px] disabled:cursor-default"
+                              className="h-[28px] w-[28px] rounded-[7px] border-[1.5px]"
                               style={{ background: v.bg, borderColor: v.border }}
-                              title={s.seatCode}
+                              title={
+                                s.occupant?.passengerName
+                                  ? `${s.seatCode} — ${s.occupant.passengerName}`
+                                  : s.seatCode
+                              }
                             />
                             {idx === aisleAfter - 1 && (
                               <span
@@ -390,6 +399,77 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
             </div>
           )}
 
+          {infoSeat && (
+            <div
+              className="mt-4 rounded-[12px] border border-[#22304a] bg-[#0b1220] p-3"
+              data-testid="seat-occupant-panel"
+            >
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <h3 className="m-0 text-[13.5px] font-extrabold text-white">
+                  لاک دستی صندلی{' '}
+                  <span className="font-num" dir="ltr">
+                    {infoSeat.seatCode}
+                  </span>
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setInfoSeat(null)}
+                  aria-label="بستن اطلاعات مسافر"
+                  className="text-base leading-none text-[#6b7b94] hover:text-white"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <div className="rounded-[10px] border border-[#1f2a3d] bg-[#141d2e] px-3 py-2">
+                  <div className="text-[10px] text-[#6b7b94]">نام مسافر</div>
+                  <div className="mt-0.5 text-[12.5px] font-extrabold text-white">
+                    {infoSeat.occupant?.passengerName?.trim() || '—'}
+                  </div>
+                </div>
+                <div className="rounded-[10px] border border-[#1f2a3d] bg-[#141d2e] px-3 py-2">
+                  <div className="text-[10px] text-[#6b7b94]">کد ملی</div>
+                  <div className="font-num mt-0.5 text-[12.5px] font-extrabold text-white" dir="ltr">
+                    {infoSeat.occupant?.maskedNationalId
+                      ? faDigits(infoSeat.occupant.maskedNationalId)
+                      : '—'}
+                  </div>
+                </div>
+                <div className="rounded-[10px] border border-[#1f2a3d] bg-[#141d2e] px-3 py-2">
+                  <div className="text-[10px] text-[#6b7b94]">تاریخ پرواز</div>
+                  <div className="font-num mt-0.5 text-[12.5px] font-extrabold text-white">
+                    {infoSeat.occupant?.departureAt
+                      ? formatJalaliDateTime(infoSeat.occupant.departureAt)
+                      : '—'}
+                  </div>
+                </div>
+                <div className="rounded-[10px] border border-[#1f2a3d] bg-[#141d2e] px-3 py-2">
+                  <div className="text-[10px] text-[#6b7b94]">وضعیت</div>
+                  <div className="mt-0.5 text-[12.5px] font-extrabold text-[#60a5fa]">
+                    {infoSeat.occupant?.statusFa ?? '—'}
+                  </div>
+                </div>
+              </div>
+              {infoSeat.occupant?.pnr && (
+                <div className="mt-2 text-[11px] text-[#9fb0c7]">
+                  PNR:{' '}
+                  <span className="font-num font-bold text-white" dir="ltr">
+                    {infoSeat.occupant.pnr}
+                  </span>
+                </div>
+              )}
+              {infoSeat.status === 'LOCKED' && infoSeat.lockId && (
+                <button
+                  type="button"
+                  onClick={() => void onRelease(infoSeat.lockId!)}
+                  className="mt-3 h-10 w-full rounded-[10px] border border-[#f87171] text-[12px] font-extrabold text-[#fca5a5]"
+                >
+                  آزادسازی این صندلی
+                </button>
+              )}
+            </div>
+          )}
+
           {lockedList.length > 0 && (
             <div className="mt-4 rounded-[12px] border border-[#22304a] bg-[#0b1220] p-3">
               <div className="mb-2 text-[11.5px] font-extrabold text-white">
@@ -412,9 +492,14 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
                     <span className="font-num text-[13px] font-extrabold text-[#fcd34d]" dir="ltr">
                       {formatCountdown(s.lockExpiresAt, now)}
                     </span>
-                    <span className="font-num text-[12px] font-extrabold text-white" dir="ltr">
+                    <button
+                      type="button"
+                      onClick={() => onSeatClick(s)}
+                      className="font-num text-[12px] font-extrabold text-white"
+                      dir="ltr"
+                    >
                       {s.seatCode}
-                    </span>
+                    </button>
                   </div>
                 ))}
               </div>

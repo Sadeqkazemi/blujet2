@@ -52,6 +52,19 @@ export interface CompletedFlightsSummary {
   unsoldSeats: number;
 }
 
+/** مالی «شماره پرواز» card row — money fields are decimal STRINGs. */
+export interface FlightSalesRow {
+  flightNo: string;
+  originCode: string;
+  destCode: string;
+  departureAt: string;
+  tickets: number;
+  systemIrr: string;
+  charterIrr: string;
+  agencyIrr: string;
+  totalIrr: string;
+}
+
 export interface LowSalesAlert {
   flightNo: string;
   originCode: string;

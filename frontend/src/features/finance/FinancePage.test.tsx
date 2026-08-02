@@ -183,6 +183,7 @@ describe('FinancePage', () => {
 
   it('CEO gets the analytic view: sales chart + revenue mix, no transactions/settlements', async () => {
     mockRole('CEO');
+    vi.spyOn(reportingApi, 'fetchKpis').mockResolvedValue(KPIS);
     vi.spyOn(reportingApi, 'fetchSalesChart').mockResolvedValue([
       {
         periodKey: '2026-07-01',
@@ -199,7 +200,57 @@ describe('FinancePage', () => {
     render(<FinancePage />);
     expect(await screen.findByText('نمودار فروش')).toBeInTheDocument();
     expect(screen.getByText('ترکیب درآمد')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'شماره پرواز' })).toBeInTheDocument();
     expect(screen.queryByText('تراکنش‌های مالی اخیر')).not.toBeInTheDocument();
     expect(screen.queryByText('تسویه‌حساب آژانس‌های همکار')).not.toBeInTheDocument();
+  });
+
+  it('CEO شماره پرواز mode shows flight sales cards from /reporting/flight-sales', async () => {
+    mockRole('CEO');
+    vi.spyOn(reportingApi, 'fetchKpis').mockResolvedValue(KPIS);
+    vi.spyOn(reportingApi, 'fetchSalesChart').mockResolvedValue([
+      {
+        periodKey: 'EP-805',
+        startDate: '1970-01-01T00:00:00.000Z',
+        endDate: '2026-08-01T00:00:00.000Z',
+        systemIrr: '4120000000',
+        charterIrr: '1980000000',
+        agencyIrr: '2430000000',
+      },
+    ]);
+    vi.spyOn(reportingApi, 'fetchCompletedFlightsSummary').mockResolvedValue(FLIGHTS);
+    vi.spyOn(reportingApi, 'fetchRevenueMix').mockResolvedValue(MIX);
+    vi.spyOn(reportingApi, 'fetchFlightSales').mockResolvedValue([
+      {
+        flightNo: 'EP-805',
+        originCode: 'THR',
+        destCode: 'DXB',
+        departureAt: '2026-07-12T05:00:00.000Z',
+        tickets: 120,
+        systemIrr: '4120000000',
+        charterIrr: '1980000000',
+        agencyIrr: '2430000000',
+        totalIrr: '8530000000',
+      },
+      {
+        flightNo: 'W5-098',
+        originCode: 'MHD',
+        destCode: 'THR',
+        departureAt: '2026-07-11T05:00:00.000Z',
+        tickets: 80,
+        systemIrr: '2000000000',
+        charterIrr: '1000000000',
+        agencyIrr: '1340000000',
+        totalIrr: '4340000000',
+      },
+    ]);
+
+    render(<FinancePage />);
+    expect(await screen.findByText('نمودار فروش')).toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'شماره پرواز' }));
+    expect(await screen.findByText('تهران ↔ دبی')).toBeInTheDocument();
+    expect(screen.getByText('مشهد ↔ تهران')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('جستجوی شماره پرواز یا مسیر…')).toBeInTheDocument();
   });
 });

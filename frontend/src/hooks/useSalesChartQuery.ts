@@ -2,15 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { dayjs } from '../lib/jalali';
 import type { PeriodQuery, SalesGranularity } from '../types/reporting';
 
-const STANDARD_MODES: { key: SalesGranularity; label: string }[] = [
+/** Design order: روزانه / ماهانه / ۳ ماهه / ۶ ماهه / سالانه / شماره پرواز */
+const ALL_MODES: { key: SalesGranularity; label: string }[] = [
+  { key: 'day', label: 'روزانه' },
+  { key: 'month', label: 'ماهانه' },
   { key: 'q3', label: '۳ ماهه' },
   { key: 'q6', label: '۶ ماهه' },
   { key: 'year', label: 'سالانه' },
-];
-
-const EXTENDED_MODES: { key: SalesGranularity; label: string }[] = [
-  { key: 'day', label: 'روزانه' },
-  { key: 'month', label: 'ماهانه' },
   { key: 'flight', label: 'شماره پرواز' },
 ];
 
@@ -29,7 +27,10 @@ export function useSalesChartQuery(options: { includeFlightMode?: boolean } = {}
   const [appliedFlightNo, setAppliedFlightNo] = useState('');
 
   const modes = useMemo(
-    () => [...STANDARD_MODES, ...(includeFlightMode ? EXTENDED_MODES : EXTENDED_MODES.filter((m) => m.key !== 'flight'))],
+    () =>
+      includeFlightMode
+        ? ALL_MODES
+        : ALL_MODES.filter((m) => m.key !== 'flight'),
     [includeFlightMode],
   );
 
@@ -56,6 +57,14 @@ export function useSalesChartQuery(options: { includeFlightMode?: boolean } = {}
     setPeriodKey(null);
   }
 
+  /** Set + apply in one step (flight card click / auto-select). */
+  function selectFlightNo(next: string) {
+    const normalized = next.trim().toUpperCase();
+    setFlightNo(normalized);
+    setAppliedFlightNo(normalized);
+    setPeriodKey(null);
+  }
+
   return {
     modes,
     granularity,
@@ -71,5 +80,6 @@ export function useSalesChartQuery(options: { includeFlightMode?: boolean } = {}
     flightNo,
     setFlightNo,
     applyFlightNo,
+    selectFlightNo,
   };
 }

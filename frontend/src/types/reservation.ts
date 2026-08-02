@@ -2,6 +2,15 @@ export type SeatStatus = 'FREE' | 'SOLD' | 'LOCKED';
 export type LockClassification = 'FREE' | 'DISCOUNTED' | 'PAYABLE';
 export type LockApprovalStatus = 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
 
+/** Staff-display occupant on a sold/locked seat (national ID always masked). */
+export interface SeatOccupant {
+  passengerName: string | null;
+  maskedNationalId: string | null;
+  pnr: string | null;
+  statusFa: string;
+  departureAt: string;
+}
+
 export interface SeatCell {
   seatCode: string;
   status: SeatStatus;
@@ -10,6 +19,8 @@ export interface SeatCell {
   lockExpiresAt?: string | null;
   /** Present when status is LOCKED — FREE ≈ company block; else temp managerial hold. */
   lockClassification?: LockClassification | null;
+  /** Present when status is SOLD or LOCKED — passenger / lock display info. */
+  occupant?: SeatOccupant | null;
 }
 
 export interface SeatRow {

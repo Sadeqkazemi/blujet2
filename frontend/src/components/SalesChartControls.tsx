@@ -141,7 +141,7 @@ export default function SalesChartControls({
         </div>
       )}
 
-      {granularity === 'flight' && (
+      {granularity === 'flight' && !isPanel && (
         <div className="flex max-w-sm gap-2">
           <input
             dir="ltr"
@@ -152,20 +152,12 @@ export default function SalesChartControls({
               if (e.key === 'Enter') onApplyFlightNo();
             }}
             placeholder="EP-821"
-            className={
-              isPanel
-                ? 'font-num h-10 flex-1 rounded-lg border border-[#28344c] bg-[#18223a] px-3 text-xs text-[#e7ecf3] outline-none'
-                : 'font-num h-10 flex-1 rounded-lg border border-border px-3 text-xs outline-none'
-            }
+            className="font-num h-10 flex-1 rounded-lg border border-border px-3 text-xs outline-none"
           />
           <button
             type="button"
             onClick={onApplyFlightNo}
-            className={
-              isPanel
-                ? 'rounded-lg bg-[#3b82f6] px-4 text-xs font-bold text-white'
-                : 'rounded-lg bg-accent px-4 text-xs font-bold text-white'
-            }
+            className="rounded-lg bg-accent px-4 text-xs font-bold text-white"
           >
             نمایش
           </button>

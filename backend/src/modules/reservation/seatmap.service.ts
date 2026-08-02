@@ -8,11 +8,27 @@ import { TypeORMService } from '../../typeorm/typeorm.service';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
 import {
+  decryptPii,
   encryptPii,
   hashPii,
   isValidIranianNationalId,
   normalizeNationalId,
 } from '../../common/pii-crypto';
+
+/** Staff seat-map display only — never return a full national ID. */
+function maskNationalId(nid: string): string {
+  if (nid.length < 4) return '*'.repeat(nid.length);
+  return `${nid.slice(0, 3)}${'*'.repeat(nid.length - 4)}${nid.slice(-1)}`;
+}
+
+function safeMaskedNationalId(enc: string | null | undefined): string | null {
+  if (!enc) return null;
+  try {
+    return maskNationalId(decryptPii(enc));
+  } catch {
+    return null;
+  }
+}
 import { enumerateSeats, isKnownSeat } from './seat-layout';
 import { resolveAircraftType } from '../flights/aircraft-type.util';
 import { TypeORM } from '../../../generated/typeorm/client';
@@ -99,19 +115,29 @@ export class SeatmapService {
     );
     const seats = enumerateSeats(map);
 
+    const departureAt = instance.departureAt.toISOString();
     const [soldPassengers, activeLocks] = await Promise.all([
       this.typeorm.passenger.findMany({
         where: {
           seatCode: { not: null },
           booking: { flightInstanceId, status: { not: 'CANCELLED' } },
         },
-        select: { seatCode: true },
+        select: {
+          seatCode: true,
+          fullName: true,
+          nationalIdEnc: true,
+          booking: { select: { pnr: true, status: true } },
+        },
       }),
       this.typeorm.seatLock.findMany({
         where: { flightInstanceId, ...this.activeLockWhere() },
       }),
     ]);
-    const soldCodes = new Set(soldPassengers.map((p) => p.seatCode!));
+    const soldByCode = new Map(
+      soldPassengers
+        .filter((p) => p.seatCode)
+        .map((p) => [p.seatCode!, p] as const),
+    );
     const lockedByCode = new Map(activeLocks.map((l) => [l.seatCode, l]));
 
     const rowsMap = new Map<
@@ -122,12 +148,34 @@ export class SeatmapService {
       if (!rowsMap.has(seat.row)) {
         rowsMap.set(seat.row, { row: seat.row, cabin: seat.cabin, seats: [] });
       }
+      const sold = soldByCode.get(seat.seatCode);
       const lock = lockedByCode.get(seat.seatCode);
-      const status = soldCodes.has(seat.seatCode)
-        ? 'SOLD'
-        : lock
-          ? 'LOCKED'
-          : 'FREE';
+      const status = sold ? 'SOLD' : lock ? 'LOCKED' : 'FREE';
+      let occupant: {
+        passengerName: string | null;
+        maskedNationalId: string | null;
+        pnr: string | null;
+        statusFa: string;
+        departureAt: string;
+      } | null = null;
+      if (sold) {
+        occupant = {
+          passengerName: sold.fullName,
+          maskedNationalId: safeMaskedNationalId(sold.nationalIdEnc),
+          pnr: sold.booking.pnr,
+          statusFa: 'رزرو قطعی',
+          departureAt,
+        };
+      } else if (lock) {
+        const companyBlock = lock.classification === 'FREE';
+        occupant = {
+          passengerName: lock.passengerName,
+          maskedNationalId: safeMaskedNationalId(lock.passengerNationalIdEnc),
+          pnr: null,
+          statusFa: companyBlock ? 'مسدود توسط شرکت' : 'قفل موقت',
+          departureAt,
+        };
+      }
       rowsMap.get(seat.row)!.seats.push({
         seatCode: seat.seatCode,
         status,
@@ -135,6 +183,7 @@ export class SeatmapService {
         // Board Chair MD seat-map modal: countdown + «مسدود توسط شرکت» vs «قفل موقت».
         lockExpiresAt: lock?.expiresAt?.toISOString() ?? null,
         lockClassification: lock?.classification ?? null,
+        occupant,
       });
     }
 
@@ -151,13 +200,13 @@ export class SeatmapService {
         ECONOMY: { aisleAfterIndex: map.economyColsLeft.length },
       },
       capacity: seats.length,
-      soldCount: soldCodes.size,
+      soldCount: soldByCode.size,
       lockedCount: activeLocks.length,
       occupancyPct:
         seats.length === 0
           ? 0
           : Math.round(
-              ((soldCodes.size + activeLocks.length) / seats.length) * 1000,
+              ((soldByCode.size + activeLocks.length) / seats.length) * 1000,
             ) / 10,
     };
   }
