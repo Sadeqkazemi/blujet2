@@ -778,8 +778,73 @@ function ChannelSummaryTiles({
   );
 }
 
-/** Filter flight rows by number/route — never re-sort the full list. */
-function filterFlightSalesRows(rows: FlightSalesRow[], search: string): FlightSalesRow[] {
+/** One card per flight number (design: unique EP-805 / W5-098…), not per date. */
+export type AggregatedFlightSales = {
+  flightNo: string;
+  originCode: string;
+  destCode: string;
+  originCityFa: string;
+  destCityFa: string;
+  /** Newest departure among instances — used when flightCount === 1. */
+  departureAt: string;
+  systemIrr: string;
+  charterIrr: string;
+  agencyIrr: string;
+  totalIrr: string;
+  capacity: number;
+  soldSeats: number;
+  flightCount: number;
+};
+
+function sumIrrStrings(amounts: string[]): string {
+  let total = 0n;
+  for (const a of amounts) {
+    const whole = String(a).split('.')[0] || '0';
+    total += BigInt(whole);
+  }
+  return total.toString();
+}
+
+/** Collapse instance rows → one row per flightNo (newest-first order preserved). */
+export function aggregateFlightSalesByFlightNo(rows: FlightSalesRow[]): AggregatedFlightSales[] {
+  const order: string[] = [];
+  const groups = new Map<string, FlightSalesRow[]>();
+  for (const row of rows) {
+    const key = row.flightNo;
+    const list = groups.get(key);
+    if (list) list.push(row);
+    else {
+      groups.set(key, [row]);
+      order.push(key);
+    }
+  }
+  return order.map((flightNo) => {
+    const group = groups.get(flightNo)!;
+    // API returns newest departure first; keep that as the representative date.
+    const newest = group[0];
+    return {
+      flightNo,
+      originCode: newest.originCode,
+      destCode: newest.destCode,
+      originCityFa: newest.originCityFa,
+      destCityFa: newest.destCityFa,
+      departureAt: newest.departureAt,
+      systemIrr: sumIrrStrings(group.map((r) => r.systemIrr)),
+      charterIrr: sumIrrStrings(group.map((r) => r.charterIrr)),
+      agencyIrr: sumIrrStrings(group.map((r) => r.agencyIrr)),
+      totalIrr: sumIrrStrings(group.map((r) => r.totalIrr)),
+      capacity: group.reduce((s, r) => s + r.capacity, 0),
+      soldSeats: group.reduce((s, r) => s + r.soldSeats, 0),
+      flightCount: group.length,
+    };
+  });
+}
+
+/** Filter aggregated flights by number/route — never re-sort the full list. */
+export function filterFlightSalesRows(
+  rows: AggregatedFlightSales[],
+  search: string,
+): AggregatedFlightSales[] {
   const raw = search.trim();
   if (!raw) return rows;
   const q = latinDigits(raw).toLowerCase();
@@ -792,14 +857,14 @@ function filterFlightSalesRows(rows: FlightSalesRow[], search: string): FlightSa
 
 function FlightSalesPicker({
   rows,
-  selectedId,
+  selectedFlightNo,
   onSelect,
   search,
   onSearchChange,
 }: {
-  rows: FlightSalesRow[];
-  selectedId: string | null;
-  onSelect: (row: FlightSalesRow) => void;
+  rows: AggregatedFlightSales[];
+  selectedFlightNo: string | null;
+  onSelect: (row: AggregatedFlightSales) => void;
   search: string;
   onSearchChange: (v: string) => void;
 }) {
@@ -848,10 +913,14 @@ function FlightSalesPicker({
           data-testid="flight-sales-list"
         >
           {filtered.map((r) => {
-            const on = r.flightInstanceId === selectedId;
+            const on = r.flightNo === selectedFlightNo;
+            const meta =
+              r.flightCount > 1
+                ? `${faDigits(r.flightCount)} پرواز`
+                : formatJalaliDate(r.departureAt);
             return (
               <button
-                key={r.flightInstanceId}
+                key={r.flightNo}
                 type="button"
                 onClick={() => onSelect(r)}
                 aria-pressed={on}
@@ -866,7 +935,7 @@ function FlightSalesPicker({
                     {r.originCityFa} ← {r.destCityFa}
                   </div>
                   <div className="text-[10px] text-[#6b7b94]">
-                    پرواز <span dir="ltr">{r.flightNo}</span> · {formatJalaliDate(r.departureAt)}
+                    پرواز <span dir="ltr">{r.flightNo}</span> · {meta}
                   </div>
                 </div>
                 <div className="shrink-0 text-left whitespace-nowrap">
@@ -892,8 +961,8 @@ function FinanceAnalyticView() {
   const [kpis, setKpis] = useState<KpiResult | null>(null);
   const [flights, setFlights] = useState<CompletedFlightsSummary | null>(null);
   const [mix, setMix] = useState<RevenueMixResult | null>(null);
-  const [flightRows, setFlightRows] = useState<FlightSalesRow[]>([]);
-  const [selectedFlightId, setSelectedFlightId] = useState<string | null>(null);
+  const [flightRows, setFlightRows] = useState<AggregatedFlightSales[]>([]);
+  const [selectedFlightNo, setSelectedFlightNo] = useState<string | null>(null);
   const [flightSearch, setFlightSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -932,7 +1001,7 @@ function FinanceAnalyticView() {
   useEffect(() => {
     if (!isFlightMode) {
       setFlightRows([]);
-      setSelectedFlightId(null);
+      setSelectedFlightNo(null);
       setFlightSearch('');
       return;
     }
@@ -946,13 +1015,15 @@ function FinanceAnalyticView() {
     ])
       .then(([sales, kpiData, mixData, yearFlights]) => {
         if (cancelled) return;
-        setFlightRows(sales.rows);
+        // One card per flight number (not per departure date).
+        const aggregated = aggregateFlightSalesByFlightNo(sales.rows);
+        setFlightRows(aggregated);
         setKpis(kpiData);
         setMix(mixData);
         setFlights(yearFlights);
-        setSelectedFlightId((prev) => {
-          if (prev && sales.rows.some((r) => r.flightInstanceId === prev)) return prev;
-          return sales.rows[0]?.flightInstanceId ?? null;
+        setSelectedFlightNo((prev) => {
+          if (prev && aggregated.some((r) => r.flightNo === prev)) return prev;
+          return aggregated[0]?.flightNo ?? null;
         });
         setError(null);
       })
@@ -970,9 +1041,9 @@ function FinanceAnalyticView() {
     if (!isFlightMode || flightRows.length === 0) return;
     const matches = filterFlightSalesRows(flightRows, flightSearch);
     if (matches.length === 0) return;
-    setSelectedFlightId((prev) => {
-      if (prev && matches.some((r) => r.flightInstanceId === prev)) return prev;
-      return matches[0].flightInstanceId;
+    setSelectedFlightNo((prev) => {
+      if (prev && matches.some((r) => r.flightNo === prev)) return prev;
+      return matches[0].flightNo;
     });
   }, [isFlightMode, flightRows, flightSearch]);
 
@@ -980,7 +1051,7 @@ function FinanceAnalyticView() {
   if (!flights || !mix) return <p className="text-sm text-[#6b7b94]">در حال بارگذاری…</p>;
 
   const selectedFlight =
-    flightRows.find((r) => r.flightInstanceId === selectedFlightId) ?? flightRows[0] ?? null;
+    flightRows.find((r) => r.flightNo === selectedFlightNo) ?? flightRows[0] ?? null;
 
   const barSums = {
     system: periods.reduce((s, p) => s + Number(p.systemIrr), 0),
@@ -989,23 +1060,14 @@ function FinanceAnalyticView() {
   };
   const barTotal = barSums.system + barSums.charter + barSums.agency;
 
-  // Seat strip aggregates every departed instance of the selected flightNo
-  // (design: «۳ پرواز / ۵۰۴ صندلی» for EP-805), while channel tiles follow
-  // the clicked card's own sales.
-  const siblingFlights = selectedFlight
-    ? flightRows.filter((r) => r.flightNo === selectedFlight.flightNo)
-    : [];
+  // Seat strip uses the aggregated card (all departed instances of that flightNo).
   const flightSeats: CompletedFlightsSummary | null = selectedFlight
-    ? (() => {
-        const totalSeats = siblingFlights.reduce((s, r) => s + r.capacity, 0);
-        const soldSeats = siblingFlights.reduce((s, r) => s + r.soldSeats, 0);
-        return {
-          flightCount: siblingFlights.length,
-          totalSeats,
-          soldSeats,
-          unsoldSeats: Math.max(0, totalSeats - soldSeats),
-        };
-      })()
+    ? {
+        flightCount: selectedFlight.flightCount,
+        totalSeats: selectedFlight.capacity,
+        soldSeats: selectedFlight.soldSeats,
+        unsoldSeats: Math.max(0, selectedFlight.capacity - selectedFlight.soldSeats),
+      }
     : null;
 
   return (
@@ -1047,8 +1109,8 @@ function FinanceAnalyticView() {
               />
               <FlightSalesPicker
                 rows={flightRows}
-                selectedId={selectedFlight.flightInstanceId}
-                onSelect={(row) => setSelectedFlightId(row.flightInstanceId)}
+                selectedFlightNo={selectedFlight.flightNo}
+                onSelect={(row) => setSelectedFlightNo(row.flightNo)}
                 search={flightSearch}
                 onSearchChange={setFlightSearch}
               />
@@ -1056,8 +1118,8 @@ function FinanceAnalyticView() {
           ) : (
             <FlightSalesPicker
               rows={flightRows}
-              selectedId={null}
-              onSelect={(row) => setSelectedFlightId(row.flightInstanceId)}
+              selectedFlightNo={null}
+              onSelect={(row) => setSelectedFlightNo(row.flightNo)}
               search={flightSearch}
               onSearchChange={setFlightSearch}
             />

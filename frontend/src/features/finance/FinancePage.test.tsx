@@ -226,22 +226,53 @@ describe('FinancePage', () => {
     vi.spyOn(reportingApi, 'fetchKpis').mockResolvedValue(KPIS);
     vi.spyOn(reportingApi, 'fetchCompletedFlightsSummary').mockResolvedValue(FLIGHTS);
     vi.spyOn(reportingApi, 'fetchRevenueMix').mockResolvedValue(MIX);
+    // Multiple departed instances of the same flightNo must collapse to ONE card.
     vi.spyOn(reportingApi, 'fetchFlightSales').mockResolvedValue({
       rows: [
         {
-          flightInstanceId: 'fi-1',
+          flightInstanceId: 'fi-1a',
           flightNo: 'EP-805',
           originCode: 'THR',
           destCode: 'DXB',
           originCityFa: 'تهران',
           destCityFa: 'دبی',
-          departureAt: '2026-06-29T06:00:00.000Z',
-          systemIrr: '4120000000',
-          charterIrr: '1980000000',
-          agencyIrr: '2430000000',
-          totalIrr: '8530000000',
+          departureAt: '2026-08-23T06:00:00.000Z',
+          systemIrr: '2000000000',
+          charterIrr: '1000000000',
+          agencyIrr: '1000000000',
+          totalIrr: '4000000000',
           capacity: 168,
           soldSeats: 120,
+        },
+        {
+          flightInstanceId: 'fi-1b',
+          flightNo: 'EP-805',
+          originCode: 'THR',
+          destCode: 'DXB',
+          originCityFa: 'تهران',
+          destCityFa: 'دبی',
+          departureAt: '2026-08-16T06:00:00.000Z',
+          systemIrr: '2120000000',
+          charterIrr: '980000000',
+          agencyIrr: '1430000000',
+          totalIrr: '4530000000',
+          capacity: 168,
+          soldSeats: 110,
+        },
+        {
+          flightInstanceId: 'fi-1c',
+          flightNo: 'EP-805',
+          originCode: 'THR',
+          destCode: 'DXB',
+          originCityFa: 'تهران',
+          destCityFa: 'دبی',
+          departureAt: '2026-08-09T06:00:00.000Z',
+          systemIrr: '1000000000',
+          charterIrr: '500000000',
+          agencyIrr: '500000000',
+          totalIrr: '2000000000',
+          capacity: 168,
+          soldSeats: 90,
         },
         {
           flightInstanceId: 'fi-2',
@@ -273,6 +304,12 @@ describe('FinancePage', () => {
     expect(screen.getByText('پرواز EP-805')).toBeInTheDocument();
     expect(screen.getByTestId('flight-sales-list').className).toContain('flex-col');
 
+    // Exactly one card per flight number (3 EP-805 instances → 1 box).
+    expect(screen.getAllByRole('button', { name: /تهران ← دبی/ })).toHaveLength(1);
+    expect(screen.getByRole('button', { name: /تهران ← دبی/ })).toHaveTextContent('۳ پرواز');
+    // Aggregated sales: 4.0B + 4.53B + 2.0B rial = 10.53B → 1.053B toman → «۱٫۱ میلیارد»
+    expect(screen.getByRole('button', { name: /تهران ← دبی/ })).toHaveTextContent('۱٫۱ میلیارد');
+
     // Clicking another flight updates the selected-flight summary tiles.
     const w5Card = screen.getByRole('button', { name: /مشهد ← تهران/ });
     await user.click(w5Card);
@@ -280,12 +317,11 @@ describe('FinancePage', () => {
     expect(screen.getByText('پرواز W5-098')).toBeInTheDocument();
     expect(screen.getAllByText('۴۳۴ میلیون').length).toBeGreaterThanOrEqual(1);
 
-    // Search filters to matching flights only (does not keep/sort the full list)
-    // and selects the hit so its summary is displayed.
+    // Search filters to matching flights only — still a single box for EP-805.
     await user.clear(screen.getByLabelText('جستجوی شماره پرواز یا مسیر'));
     await user.type(screen.getByLabelText('جستجوی شماره پرواز یا مسیر'), 'EP-805');
     expect(screen.queryByText('مشهد ← تهران')).not.toBeInTheDocument();
-    expect(screen.getByText('تهران ← دبی')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /تهران ← دبی/ })).toHaveLength(1);
     expect(screen.getByText('پرواز EP-805')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /تهران ← دبی/ })).toHaveAttribute(
       'aria-pressed',
