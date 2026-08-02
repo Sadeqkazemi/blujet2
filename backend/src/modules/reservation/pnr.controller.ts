@@ -8,7 +8,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { PnrService } from './pnr.service';
 import {
   ChangeSeatDto,
@@ -131,6 +131,7 @@ export class PnrController {
   @ApiOperation({
     summary: 'فهرست پروازهای SCHEDULED با ظرفیت/فروش — تب پروازها',
   })
+  @ApiQuery({ name: 'q', required: false, description: 'مسیر یا شماره پرواز' })
   async listFlights(@Query('q') q?: string) {
     return { success: true, data: await this.pnr.listFlights(q) };
   }
