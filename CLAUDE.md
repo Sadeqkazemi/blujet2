@@ -158,6 +158,29 @@ Management panels (one per role — shared shell, role-scoped tabs):
 └── docker-compose.yml   # local dev: db + redis + backend + ml-service + frontend
 ```
 
+## Panel Data Rules (NON-NEGOTIABLE)
+- **No mock / filler display data** in management panels — starting with
+  **پنل مدیر عامل** and **پنل رئیس هیئت مدیره**, and the **same standard
+  for every panel we add or restyle going forward** (senior, finance,
+  commercial, IT, agency, user, etc.).
+- Lists, tables, KPI cards, charts, logs, cartable items, VIP members,
+  pricing proposals, reservation PNRs, surveys, and reports must come
+  **only from real API responses** backed by the database (or honest
+  zeros from real aggregates).
+- When there is no data: show the design empty state
+  (e.g. «اطلاعاتی یافت نشد» / «کارتابل خالی است») — **never** invent
+  sample rows, fake names, fake timestamps, or design-reference demo
+  arrays in React to “fill” the page.
+- Backend endpoints must not fabricate record-shaped payloads when the
+  DB is empty just to make the UI look busy. Graceful-degradation
+  messages (e.g. «سرویس AI در دسترس نیست») are allowed; fake business
+  records are not.
+- `design-reference/` / `design-reference-v2/` sample arrays are for
+  visual reference only — do **not** copy them into production UI code.
+- `backend/typeorm/seed.ts` remains for **local/dev/E2E** only (never
+  production). Seeded rows are real DB rows for testing; they are not
+  a license to hardcode the same content in the frontend.
+
 ## Workflow Rules
 1. NEVER write feature code before `docs/API.md` and `docs/DB_SCHEMA.md`
    cover that feature and the user has approved them.
