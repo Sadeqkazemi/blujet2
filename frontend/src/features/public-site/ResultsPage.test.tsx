@@ -124,19 +124,20 @@ describe('ResultsPage', () => {
     expect(screen.queryByTestId('mock-result-card')).not.toBeInTheDocument();
   });
 
-  it('shows design demo flights for THR→MHD when the API returns no inventory', async () => {
+  it('shows empty state for THR→MHD when the API returns no inventory (no demo flights)', async () => {
     vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
     vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([]);
     renderPage();
-    expect(await screen.findAllByTestId('result-card')).toHaveLength(5);
+    expect(await screen.findByTestId('empty-results')).toBeInTheDocument();
+    expect(screen.queryByTestId('result-card')).not.toBeInTheDocument();
   });
 
-  it('shows THR→MHD demo flights immediately while the search request is still pending', async () => {
+  it('shows loading state while the search request is still pending', async () => {
     vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
     vi.spyOn(publicSiteApi, 'searchFlights').mockReturnValue(new Promise(() => {}));
     renderPage();
-    expect(await screen.findAllByTestId('result-card')).toHaveLength(5);
-    expect(screen.queryByText('در حال جستجو…')).not.toBeInTheDocument();
+    expect(await screen.findByText('در حال جستجو…')).toBeInTheDocument();
+    expect(screen.queryByTestId('result-card')).not.toBeInTheDocument();
   });
 
   it('opens edit-search modal with trip type, airport pickers, and inline calendar', async () => {

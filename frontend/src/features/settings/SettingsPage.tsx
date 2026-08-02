@@ -44,7 +44,8 @@ function Toggle({ on, onToggle, label }: { on: boolean; onToggle: () => void; la
 
 export default function SettingsPage() {
   const { user } = useAuth();
-  const isChair = user?.role === 'BOARD_CHAIR';
+  /** System-wide company/gateway/refund editors — IT owns this after chair settings tab was removed. */
+  const isSystemEditor = user?.role === 'IT_MANAGER';
   const isSiteAdmin = user?.role === 'SITE_ADMIN';
   const [data, setData] = useState<SettingsResult | null>(null);
   const [draft, setDraft] = useState<Record<string, unknown>>({});
@@ -112,7 +113,7 @@ export default function SettingsPage() {
         : draft;
       const result = await updateSettings(patch);
 
-      if (isChair && data && !isSiteAdmin) {
+      if (isSystemEditor && data && !isSiteAdmin) {
         const changed: { id: string; penaltyPct: number }[] = [];
         for (const rule of data.refundRules) {
           const parsed = parseInt(latinDigits(ruleDraft[rule.id] ?? ''), 10);
@@ -151,7 +152,7 @@ export default function SettingsPage() {
       )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {isChair && (
+        {isSystemEditor && (
           <div className="rounded-xl border border-border bg-white p-5">
             <div className="mb-4 text-sm font-bold text-ink">اطلاعات شرکت</div>
             <div className="flex flex-col gap-3">
@@ -178,7 +179,7 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {isChair && (
+        {isSystemEditor && (
           <div className="rounded-xl border border-border bg-white p-5">
             <div className="mb-1 text-sm font-bold text-ink">محتوای سایت</div>
             <p className="mb-4 text-[11px] text-muted">متن صفحات عمومی — بدون نیاز به انتشار نسخهٔ جدید</p>
@@ -209,7 +210,7 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {isChair && (
+        {isSystemEditor && (
           <div className="rounded-xl border border-border bg-white p-5">
             <div className="mb-4 text-sm font-bold text-ink">درگاه پرداخت</div>
             <div className="flex flex-col divide-y divide-border/60">
@@ -230,7 +231,7 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {isChair && (
+        {isSystemEditor && (
           <div className="rounded-xl border border-border bg-white p-5">
             <div className="mb-1 text-sm font-bold text-ink">قوانین استرداد</div>
             <p className="mb-4 text-[11px] leading-6 text-muted">
