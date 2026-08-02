@@ -25,21 +25,21 @@ total); frontend by the new `*.test.tsx` files (7 tests, 95 total); E2E by
 - [x] `POST /auth/change-password` — `'POST /auth/change-password: wrong current password → 401; success rotates the hash both ways'`
 - [x] `GET /audit/system-events` — `'GET /audit/system-events: CEO gets real rows with the level mapping; others 403'`
 - [x] `GET /settings` + `PATCH /settings` round-trip, unknown keys rejected, finance 403 — `'settings round-trip: defaults come back, a patch persists, unknown keys are rejected; finance 403'`
-- [x] `PATCH /settings/refund-rules` writes the REAL Phase 7 rows (verified in the DB table the engine reads), chair-only — `'PATCH /settings/refund-rules writes the REAL Phase 7 engine rows (chair only, IT 403)'`
+- [x] `PATCH /settings/refund-rules` writes the REAL Phase 7 rows (verified in the DB table the engine reads), IT-only — `'PATCH /settings/refund-rules writes the REAL Phase 7 engine rows (IT only; chair 403)'`
 - [x] `GET /panels/access` readable by IT, PATCH still 403 — `'IT_MANAGER can read /panels/access but PATCH stays 403'`
 
 ### Frontend
 - [x] AdminsPage: list + real status + detail with block/reset + validated add-admin modal — `AdminsPage.test.tsx` (2 tests)
 - [x] SecurityRouter → OwnSecurityPage: confirm-mismatch validation, real change call, managed reset with one-time temp password — `OwnSecurityPage.test.tsx` (2 tests); IT keeps its Phase 8 page (router branch)
 - [x] LogsRouter → CeoLogsPage: real rows + level chips — `CeoLogsPage.test.tsx`
-- [x] SettingsPage: chair vs IT sections, save persists — `SettingsPage.test.tsx` (2 tests)
+- [x] SettingsPage: IT owns company/gateway/refund + global toggles; SITE_ADMIN site chrome — `SettingsPage.test.tsx`
 - [x] PanelsAccessPage read-only for IT — `'IT_MANAGER gets the read-only view: informational copy + disabled switches'`
 - [x] nav flags flipped — **every tab in every panel now reads `implemented: true`; the «به‌زودی» placeholder no longer appears anywhere in any sidebar**
 
 ### Tests
 - [x] Backend e2e — the 9 tests above
 - [x] Frontend unit — the 7 tests above
-- [x] Playwright — `'CEO admins journey: list with real status → open detail → block → unblock'`, `'Senior changes their own password and reverts it'`, `'CEO opens لاگ و رویدادها…'`, `'Chair saves تنظیمات سامانه (toggle round-trip persists across reload)'`, `'IT opens دسترسی به پنل‌ها read-only'`
+- [x] Playwright — `'CEO admins journey: list with real status → open detail → block → unblock'`, `'Senior changes their own password and reverts it'`, `'CEO opens لاگ و رویدادها…'`, `'IT saves تنظیمات سامانه (toggle round-trip persists across reload)'`, `'IT opens دسترسی به پنل‌ها read-only'`
 
 ## Deferred (scoped out with reasons, not silently dropped)
 - Per-admin permission toggle matrix — would be stored-but-unenforced (violates «never by hiding UI alone») or requires a dynamic-authorization redesign; open item.

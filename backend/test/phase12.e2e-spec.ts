@@ -233,18 +233,18 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
 
   // ── settings ──────────────────────────────────────────────────────────
 
-  it('settings round-trip: defaults come back, a patch persists, unknown keys are rejected; finance 403', async () => {
-    const chair = await loginAs(app, 'chair');
+  it('settings round-trip: defaults come back, a patch persists, unknown keys are rejected; finance/chair 403', async () => {
+    const it = await loginAs(app, 'itadmin');
     const getRes = await request(app.getHttpServer())
       .get('/settings')
-      .set('Authorization', auth(chair.accessToken));
+      .set('Authorization', auth(it.accessToken));
     expect(getRes.status).toBe(200);
     expect(getRes.body.data.settings).toHaveProperty('companyName');
     expect(getRes.body.data.refundRules.length).toBeGreaterThan(0);
 
     const patchRes = await request(app.getHttpServer())
       .patch('/settings')
-      .set('Authorization', auth(chair.accessToken))
+      .set('Authorization', auth(it.accessToken))
       .send({ patch: { maintenance: true, supportPhone: '021-99999' } });
     expect(patchRes.status).toBe(200);
     expect(patchRes.body.data.settings.maintenance).toBe(true);
@@ -252,28 +252,34 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
 
     const badRes = await request(app.getHttpServer())
       .patch('/settings')
-      .set('Authorization', auth(chair.accessToken))
+      .set('Authorization', auth(it.accessToken))
       .send({ patch: { totallyUnknown: 1 } });
     expect(badRes.status).toBe(400);
 
     // Restore for repeatable runs.
     await request(app.getHttpServer())
       .patch('/settings')
-      .set('Authorization', auth(chair.accessToken))
+      .set('Authorization', auth(it.accessToken))
       .send({ patch: { maintenance: false } });
 
     const finance = await loginAs(app, 'finance.karimi');
-    const forbidden = await request(app.getHttpServer())
+    const financeForbidden = await request(app.getHttpServer())
       .get('/settings')
       .set('Authorization', auth(finance.accessToken));
-    expect(forbidden.status).toBe(403);
-  });
+    expect(financeForbidden.status).toBe(403);
 
-  it('PATCH /settings/refund-rules writes the REAL Phase 7 engine rows (chair only, IT 403)', async () => {
     const chair = await loginAs(app, 'chair');
-    const getRes = await request(app.getHttpServer())
+    const chairForbidden = await request(app.getHttpServer())
       .get('/settings')
       .set('Authorization', auth(chair.accessToken));
+    expect(chairForbidden.status).toBe(403);
+  });
+
+  it('PATCH /settings/refund-rules writes the REAL Phase 7 engine rows (IT only; chair 403)', async () => {
+    const it = await loginAs(app, 'itadmin');
+    const getRes = await request(app.getHttpServer())
+      .get('/settings')
+      .set('Authorization', auth(it.accessToken));
     const rule = getRes.body.data.refundRules[0] as {
       id: string;
       penaltyPct: number;
@@ -282,7 +288,7 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
 
     const patchRes = await request(app.getHttpServer())
       .patch('/settings/refund-rules')
-      .set('Authorization', auth(chair.accessToken))
+      .set('Authorization', auth(it.accessToken))
       .send({ rules: [{ id: rule.id, penaltyPct: newPct }] });
     expect(patchRes.status).toBe(200);
 
@@ -295,13 +301,13 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
     // Restore the original percentage.
     await request(app.getHttpServer())
       .patch('/settings/refund-rules')
-      .set('Authorization', auth(chair.accessToken))
+      .set('Authorization', auth(it.accessToken))
       .send({ rules: [{ id: rule.id, penaltyPct: rule.penaltyPct }] });
 
-    const it = await loginAs(app, 'itadmin');
+    const chair = await loginAs(app, 'chair');
     const forbidden = await request(app.getHttpServer())
       .patch('/settings/refund-rules')
-      .set('Authorization', auth(it.accessToken))
+      .set('Authorization', auth(chair.accessToken))
       .send({ rules: [{ id: rule.id, penaltyPct: 50 }] });
     expect(forbidden.status).toBe(403);
   });

@@ -28,7 +28,6 @@ import ResultsAiRadar from './results/ResultsAiRadar';
 import ResultsEditSearchModal from './results/ResultsEditSearchModal';
 import ResultsFlightCard from './results/ResultsFlightCard';
 import { RESULTS_COPY } from './results/results-copy';
-import { demoFlightsForThrMhd, isThrMhdRoute } from './results/results-demo-flights';
 import {
   depHourBucket,
   flightAirlineLabel,
@@ -154,14 +153,8 @@ export default function ResultsPage() {
   const cityLabel = (code: string) =>
     airportCityLabel(code, locale, airportMap.get(code)?.cityFa);
 
-  /** API results, or design-reference demo flights for THR↔MHD while loading / when inventory is empty. */
-  const effectiveResults = useMemo(() => {
-    const demo =
-      isThrMhdRoute(origin, dest) && date ? demoFlightsForThrMhd(origin, dest, date) : [];
-    if (results === null) return demo.length > 0 ? demo : null;
-    if (results.length > 0) return results;
-    return demo.length > 0 ? demo : [];
-  }, [results, origin, dest, date]);
+  /** Real search API only — never invent demo flights when inventory is empty. */
+  const effectiveResults = results;
 
   const airlines = useMemo(() => {
     const set = new Set<string>();

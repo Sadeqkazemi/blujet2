@@ -62,7 +62,6 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'admins', labelFa: 'مدیران', implemented: true },
     { key: 'finance', labelFa: 'مالی', implemented: true },
     { key: 'cartable', labelFa: 'کارتابل', implemented: true },
-    { key: 'settings', labelFa: 'تنظیمات سامانه', implemented: true },
     { key: 'club', labelFa: 'مشتریان VIP', implemented: true },
     { key: 'reservation', labelFa: 'هواپیما', implemented: true },
     { key: 'mgrreports', labelFa: 'گزارش مدیران', implemented: true },

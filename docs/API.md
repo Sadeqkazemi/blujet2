@@ -677,13 +677,14 @@ panels. Key ⚑ decisions:
 |---|---|---|---|
 | GET | `/audit/system-events` | CEO | «لاگ‌ها و رویدادهای سامانه» — latest 100 real `AuditLog` rows (all actors incl. CEO itself, unlike `/audit/manager-reports`) with the presentational level mapping above. |
 
-### `backend/src/modules/settings/` (new) — BOARD_CHAIR, IT_MANAGER
+### `backend/src/modules/settings/` — IT_MANAGER, SITE_ADMIN
+(BOARD_CHAIR no longer has the تنظیمات سامانه tab or settings API access.)
 
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/settings` | All `SystemSetting` key-values with server defaults (companyName, supportEmail, supportPhone, gateway toggles mellat/saman/zarin, global toggles maintenance/registration/charterSale/apiPublic/sandbox, brandColor, **socialLinks** — five fixed networks: instagram/telegram/whatsapp/linkedin/x, each `{ id, name, url, enabled }`) + the real `RefundPenaltyRule` brackets. |
 | PATCH | `/settings` | Partial key-value update; validated per key; audited (SYSTEM). `socialLinks` patch: array of partial entries; enabled links require non-empty URL (max 500 chars); unknown network ids rejected. |
-| PATCH | `/settings/refund-rules` | BOARD_CHAIR only — updates the REAL Phase 7 `RefundPenaltyRule.penaltyPct` per bracket (0–100 validated); audited. The refund engine keeps reading these same rows. |
+| PATCH | `/settings/refund-rules` | IT_MANAGER only — updates the REAL Phase 7 `RefundPenaltyRule.penaltyPct` per bracket (0–100 validated); audited. The refund engine keeps reading these same rows. |
 | GET | `/settings/social-links` | **Public** (no auth) — returns `{ links: [{ id, name, url }] }` for enabled networks with non-empty URLs; bare hostnames normalized to `https://`. Rate-limited. |
 
 ### `backend/src/modules/panels/` (change)
@@ -1260,7 +1261,7 @@ All endpoints below are `JwtAuthGuard` + `RolesGuard`,
 - `GET /my/refunds/rules` (new) — the current four customer-readable
   brackets sorted by `minHoursBeforeDeparture DESC`:
   `{ minHoursBeforeDeparture, penaltyPct, labelFa, isRefundable }[]`.
-  This is read-only; BOARD_CHAIR's existing settings endpoint remains the
+  This is read-only; IT_MANAGER's settings endpoint remains the
   only rule editor.
 - `POST /my/refunds/preview` (new) — body `{ bookingId }`; repeats
   ownership/status/no-prior-request checks and returns
