@@ -8,6 +8,8 @@ import { fetchStaffReports } from '../api/reporting';
 import { fetchLogsBadgeCount } from '../api/audit';
 import { faDigits } from '../lib/fa-format';
 import type { PanelNavItem } from '../types/panels';
+import PanelNotificationBell, { type PanelNotificationItem } from './PanelNotificationBell';
+import PanelSearchBox from './PanelSearchBox';
 
 const ROLE_LABELS: Record<string, string> = {
   CEO: 'مدیر عامل',
@@ -27,6 +29,7 @@ export default function PanelShell() {
   const navigate = useNavigate();
   const [nav, setNav] = useState<PanelNavItem[] | null>(null);
   const [badges, setBadges] = useState<Record<string, NavBadge>>({});
+  const [notifications, setNotifications] = useState<PanelNotificationItem[]>([]);
 
   useEffect(() => {
     fetchNav()
@@ -40,6 +43,7 @@ export default function PanelShell() {
     if (!nav || nav.length === 0) return;
 
     const next: Record<string, NavBadge> = {};
+    const nextNotifications: PanelNotificationItem[] = [];
     const tasks: Promise<void>[] = [];
 
     if (navKeys.has('cartable')) {
@@ -51,6 +55,15 @@ export default function PanelShell() {
                 count: r.totalOpen,
                 className: 'bg-danger text-white',
               };
+              for (const t of r.tasks.slice(0, 5)) {
+                nextNotifications.push({
+                  key: `cartable-${t.id}`,
+                  title: t.title,
+                  sublabel: t.senderLabelFa ?? t.sender?.fullName ?? undefined,
+                  to: '/panel/cartable',
+                  tone: 'danger',
+                });
+              }
             }
           })
           .catch(() => undefined),
@@ -66,6 +79,13 @@ export default function PanelShell() {
                 count: r.kpis.payoutQueue,
                 className: 'bg-[#a855f7] text-white',
               };
+              nextNotifications.push({
+                key: 'refund-queue',
+                title: 'استرداد در صف پرداخت',
+                sublabel: `${faDigits(r.kpis.payoutQueue)} مورد`,
+                to: '/panel/refund',
+                tone: 'purple',
+              });
             }
           })
           .catch(() => undefined),
@@ -81,6 +101,13 @@ export default function PanelShell() {
                 count: r.newEmployeeEvents.length,
                 className: 'bg-danger text-white',
               };
+              nextNotifications.push({
+                key: 'staff-events',
+                title: 'رویدادهای جدید کارمندان',
+                sublabel: `${faDigits(r.newEmployeeEvents.length)} مورد`,
+                to: '/panel/staff',
+                tone: 'danger',
+              });
             }
           })
           .catch(() => undefined),
@@ -93,6 +120,13 @@ export default function PanelShell() {
           .then((r) => {
             if (r.count > 0) {
               next.logs = { count: r.count, className: 'bg-danger text-white' };
+              nextNotifications.push({
+                key: 'logs-alerts',
+                title: 'رویدادهای امنیتی جدید',
+                sublabel: `${faDigits(r.count)} مورد`,
+                to: '/panel/logs',
+                tone: 'danger',
+              });
             }
           })
           .catch(() => undefined),
@@ -109,6 +143,13 @@ export default function PanelShell() {
                   count: r.counts.awaitingMyReport,
                   className: 'bg-[#a855f7] text-white',
                 };
+                nextNotifications.push({
+                  key: 'referrals-awaiting',
+                  title: 'ارجاعات در انتظار گزارش',
+                  sublabel: `${faDigits(r.counts.awaitingMyReport)} مورد`,
+                  to: '/panel/referrals',
+                  tone: 'purple',
+                });
               }
             })
             .catch(() => undefined),
@@ -122,6 +163,13 @@ export default function PanelShell() {
                   count: r.kpis.awaitingReport,
                   className: 'bg-[#a855f7] text-white',
                 };
+                nextNotifications.push({
+                  key: 'referrals-awaiting',
+                  title: 'ارجاعات در انتظار گزارش',
+                  sublabel: `${faDigits(r.kpis.awaitingReport)} مورد`,
+                  to: '/panel/referrals',
+                  tone: 'purple',
+                });
               }
             })
             .catch(() => undefined),
@@ -129,7 +177,10 @@ export default function PanelShell() {
       }
     }
 
-    void Promise.all(tasks).then(() => setBadges(next));
+    void Promise.all(tasks).then(() => {
+      setBadges(next);
+      setNotifications(nextNotifications);
+    });
   }, [nav, navKeys, user?.role]);
 
   async function onSignOut() {
@@ -198,6 +249,10 @@ export default function PanelShell() {
       </aside>
 
       <main className="flex-1 overflow-y-auto">
+        <div className="flex items-center justify-end gap-3 border-b border-white/10 px-8 py-3">
+          <PanelNotificationBell items={notifications} />
+          <PanelSearchBox nav={nav ?? []} />
+        </div>
         <Outlet context={{ nav }} />
       </main>
     </div>

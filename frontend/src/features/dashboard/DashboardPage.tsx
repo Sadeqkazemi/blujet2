@@ -1,25 +1,19 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { fetchCompletedFlightsSummary, fetchKpis, fetchSalesChart } from '../../api/reporting';
+import { fetchCompletedFlightsSummary, fetchKpis, fetchRevenueMix } from '../../api/reporting';
 import { fetchCartable } from '../../api/cartable';
 import type { CartableListResult } from '../../types/cartable';
 import { faDigits, faMoney, faPercent } from '../../lib/fa-format';
-import type {
-  CompletedFlightsSummary,
-  KpiResult,
-  SalesChartPeriod,
-} from '../../types/reporting';
-import SalesBarChart from '../../components/SalesBarChart';
-import SalesChartControls from '../../components/SalesChartControls';
+import type { CompletedFlightsSummary, KpiResult, RevenueMixResult } from '../../types/reporting';
+import FinancialSummaryCard from '../../components/FinancialSummaryCard';
 import StatTile from '../../components/StatTile';
-import { useSalesChartQuery } from '../../hooks/useSalesChartQuery';
+
+const YEAR_QUERY = { granularity: 'year' as const };
 
 export default function DashboardPage() {
-  const chart = useSalesChartQuery({ includeFlightMode: true });
-  const [periods, setPeriods] = useState<SalesChartPeriod[]>([]);
+  const [mix, setMix] = useState<RevenueMixResult | null>(null);
   const [kpis, setKpis] = useState<KpiResult | null>(null);
   const [flights, setFlights] = useState<CompletedFlightsSummary | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [cartable, setCartable] = useState<CartableListResult | null>(null);
 
@@ -30,38 +24,18 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    if (!chart.isQueryReady) {
-      setPeriods([]);
-      setLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-
     Promise.all([
-      fetchSalesChart(chart.query),
-      fetchKpis(chart.query),
-      fetchCompletedFlightsSummary(chart.query),
+      fetchRevenueMix(YEAR_QUERY),
+      fetchKpis(YEAR_QUERY),
+      fetchCompletedFlightsSummary(YEAR_QUERY),
     ])
-      .then(([chartData, kpiData, flightsData]) => {
-        if (cancelled) return;
-        setPeriods(chartData);
+      .then(([mixData, kpiData, flightsData]) => {
+        setMix(mixData);
         setKpis(kpiData);
         setFlights(flightsData);
       })
-      .catch(() => {
-        if (!cancelled) setError('خطا در دریافت اطلاعات داشبورد.');
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [chart.query, chart.isQueryReady]);
+      .catch(() => setError('خطا در دریافت اطلاعات داشبورد.'));
+  }, []);
 
   return (
     <div className="p-8">
@@ -123,35 +97,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="rounded-xl border border-white/10 bg-panel-surface p-5">
-        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-          <h2 className="text-sm font-bold text-panel-ink">نمودار فروش</h2>
-          <SalesChartControls
-            modes={chart.modes}
-            granularity={chart.granularity}
-            onGranularityChange={chart.setGranularity}
-            selectedDate={chart.selectedDate}
-            onSelectedDateChange={chart.setSelectedDate}
-            selectedMonthStart={chart.selectedMonthStart}
-            onSelectedMonthStartChange={chart.setSelectedMonthStart}
-            flightNo={chart.flightNo}
-            onFlightNoChange={chart.setFlightNo}
-            onApplyFlightNo={chart.applyFlightNo}
-          />
-        </div>
-
-        {!chart.isQueryReady ? (
-          <p className="py-10 text-center text-sm text-panel-muted">شماره پرواز را وارد کنید.</p>
-        ) : loading ? (
-          <p className="py-10 text-center text-sm text-panel-muted">در حال بارگذاری…</p>
-        ) : (
-          <SalesBarChart
-            periods={periods}
-            selectedPeriodKey={chart.periodKey}
-            onSelectPeriod={chart.setPeriodKey}
-          />
-        )}
-      </div>
+      {mix && <FinancialSummaryCard mix={mix} />}
 
       {flights && (
         <div className="mt-6 grid grid-cols-2 gap-4 rounded-xl border border-white/10 bg-panel-surface p-5 md:grid-cols-4">
