@@ -80,9 +80,52 @@ export interface FlightSearchResult {
   seatsLeft: number;
 }
 
+export interface ReservationChannelShare {
+  key: string;
+  label: string;
+  color: string;
+  count: number;
+  pct: number;
+}
+
+export interface ReservationServiceHealth {
+  name: string;
+  fa: string;
+  ok: boolean;
+  latencyMs: number | null;
+  statusLabel: string;
+}
+
 export interface ReservationDashboardStats {
   todayBookings: number;
   activePnrs: number;
   seatsSold: number;
   revenueIrr: string;
+  channels: ReservationChannelShare[];
+  services: ReservationServiceHealth[];
+  servicesStable: boolean;
+}
+
+export interface AgencyApiAccessRow {
+  id: string;
+  agencyId: string;
+  name: string;
+  initials: string;
+  keyHint: string;
+  callCount: number;
+  status: 'ACTIVE' | 'SUSPENDED';
+}
+
+export type ReservationFlightStatusKey = 'SELLING' | 'NEAR_FULL' | 'FULL';
+
+export interface ReservationFlightRow {
+  flightInstanceId: string;
+  route: string;
+  flightNo: string;
+  departureAt: string;
+  aircraftType: string;
+  sold: number;
+  capacity: number;
+  occupancyPct: number;
+  statusKey: ReservationFlightStatusKey;
 }

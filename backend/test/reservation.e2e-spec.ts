@@ -492,6 +492,34 @@ describe('Reservation (e2e)', () => {
     // — a JS number can't safely hold IRR amounts above 2^53.
     expect(typeof res.body.data.revenueIrr).toBe('string');
     expect(/^-?\d+$/.test(String(res.body.data.revenueIrr))).toBe(true);
+    expect(Array.isArray(res.body.data.channels)).toBe(true);
+    expect(Array.isArray(res.body.data.services)).toBe(true);
+    expect(typeof res.body.data.servicesStable).toBe('boolean');
+  });
+
+  it('GET /reservation/agency-api-access lists agencies that hold API keys', async () => {
+    const { accessToken } = await loginAs(app, 'itadmin');
+    const res = await request(app.getHttpServer())
+      .get('/reservation/agency-api-access')
+      .set(auth(accessToken));
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  it('GET /reservation/flights returns SCHEDULED instances with occupancy', async () => {
+    const { accessToken } = await loginAs(app, 'itadmin');
+    const res = await request(app.getHttpServer())
+      .get('/reservation/flights')
+      .set(auth(accessToken));
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+    if (res.body.data.length > 0) {
+      const row = res.body.data[0];
+      expect(row).toHaveProperty('flightNo');
+      expect(row).toHaveProperty('sold');
+      expect(row).toHaveProperty('capacity');
+      expect(['SELLING', 'NEAR_FULL', 'FULL']).toContain(row.statusKey);
+    }
   });
 
   // ── Role isolation ──────────────────────────────────────────────────
