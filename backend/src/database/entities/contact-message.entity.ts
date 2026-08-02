@@ -6,14 +6,13 @@ import {
   PrimaryColumn,
 } from 'typeorm';
 
-/**
- * Phase 0 spike entity #1 — baseline sanity check. Plain columns, a
- * `createdAt` default, one index, no relations. If this doesn't produce an
- * empty schema-parity diff, nothing else will either.
- */
+@Index('contact_messages_createdAt_idx', ['createdAt'])
 @Entity('contact_messages')
 export class ContactMessage {
-  @PrimaryColumn({ type: 'text' })
+  @PrimaryColumn({
+    type: 'text',
+    primaryKeyConstraintName: 'contact_messages_pkey',
+  })
   id!: string;
 
   @Column({ type: 'text' })
@@ -28,11 +27,6 @@ export class ContactMessage {
   @Column({ type: 'text' })
   body!: string;
 
-  @Index('contact_messages_createdAt_idx')
-  @CreateDateColumn({
-    type: 'timestamp',
-    precision: 3,
-    default: () => 'CURRENT_TIMESTAMP',
-  })
+  @CreateDateColumn({ precision: 3, default: () => 'CURRENT_TIMESTAMP' })
   createdAt!: Date;
 }
