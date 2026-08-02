@@ -92,11 +92,11 @@ describe('ReservationPage', () => {
       destCityFa: 'دبی',
       aircraftType: 'MD-80',
       cabinLayout: { BUSINESS: { aisleAfterIndex: 2 }, ECONOMY: { aisleAfterIndex: 2 } },
-      capacity: 4,
+      capacity: 140,
       soldCount: 1,
       lockedCount: 0,
-      freeCount: 3,
-      occupancyPct: 25,
+      freeCount: 139,
+      occupancyPct: 0.7,
       rows: [
         {
           row: 3,
@@ -109,6 +109,8 @@ describe('ReservationPage', () => {
               occupant: { pnr: 'BJDEMO1', passengerName: 'نگار رضایی', bookingStatus: 'TICKETED' },
             },
             { seatCode: '3B', status: 'FREE', lockId: null },
+            { seatCode: '3E', status: 'FREE', lockId: null },
+            { seatCode: '3F', status: 'FREE', lockId: null },
           ],
         },
       ],
@@ -118,6 +120,8 @@ describe('ReservationPage', () => {
     render(<ReservationPage />);
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: 'نقشهٔ صندلی EP-821' }));
+    expect(await screen.findByTestId('reservation-md80-seat-map')).toBeInTheDocument();
+    expect(screen.getByTestId('reservation-section-first')).toBeInTheDocument();
     await user.click(await screen.findByRole('button', { name: '3A' }));
     expect(await screen.findByText(/مسافر:/)).toHaveTextContent('نگار رضایی');
     await user.click(screen.getByRole('button', { name: 'مشاهده جزئیات رزرو' }));

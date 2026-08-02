@@ -26,6 +26,9 @@ import type {
   SeatCell,
   SeatMap,
 } from '../../types/reservation';
+import ReservationMd80SeatMap, {
+  isMd80Aircraft,
+} from './ReservationMd80SeatMap';
 
 type SubTab = 'dash' | 'pnr' | 'flights' | 'new';
 
@@ -910,6 +913,16 @@ function SeatMapModal({
       ? `${seatMap.originCityFa} ← ${seatMap.destCityFa}`
       : `${seatMap.originCode ?? ''} ← ${seatMap.destCode ?? ''}`;
 
+  const useMd80 = isMd80Aircraft(seatMap.aircraftType);
+
+  const seatsByCode = useMemo(() => {
+    const map = new Map<string, SeatCell>();
+    for (const row of seatMap.rows) {
+      for (const s of row.seats) map.set(s.seatCode, s);
+    }
+    return map;
+  }, [seatMap.rows]);
+
   const cabinSections = useMemo(() => {
     const sections: { cabin: 'BUSINESS' | 'ECONOMY'; label: string; rows: SeatMap['rows'] }[] = [];
     for (const row of seatMap.rows) {
@@ -972,47 +985,58 @@ function SeatMapModal({
             <Legend chip="sold" label={`رزرو قطعی (${faDigits(seatMap.soldCount)})`} />
           </div>
 
-          <div className="mb-4 max-h-[350px] overflow-auto">
-            {cabinSections.map((section) => (
-              <div key={section.cabin} className="mb-3">
-                <div className="mb-2 text-[11px] font-bold text-[#9fb0c7]">{section.label}</div>
-                <div className="flex flex-col gap-1.5">
-                  {section.rows.map((row) => {
-                    const aisleAfterIndex = seatMap.cabinLayout[row.cabin].aisleAfterIndex;
-                    return (
-                      <div key={row.row} className="flex items-center justify-center gap-1.5">
-                        <span className="font-num w-5 text-center text-[9px] font-bold text-[#6b7b94]">
-                          {faDigits(row.row)}
-                        </span>
-                        {row.seats.map((s, idx) => {
-                          const selected = selectedSeat?.seatCode === s.seatCode;
-                          return (
-                            <span key={s.seatCode} className="flex items-center gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() => onSeatClick(s)}
-                                disabled={s.status !== 'SOLD' && !canLock}
-                                aria-label={s.seatCode}
-                                className={`ltr font-num flex h-[30px] w-[30px] items-center justify-center rounded-[8px] border-[1.5px] text-[8.5px] font-bold transition ${seatTone(s.status, selected)} ${
-                                  s.status === 'SOLD' || canLock
-                                    ? 'cursor-pointer'
-                                    : 'cursor-default'
-                                }`}
-                              >
-                                {s.seatCode.replace(String(row.row), '')}
-                              </button>
-                              {idx === aisleAfterIndex - 1 && (
-                                <span data-testid={`aisle-gap-${row.row}`} className="w-4" />
-                              )}
+          <div className="mb-4">
+            {useMd80 ? (
+              <ReservationMd80SeatMap
+                seatsByCode={seatsByCode}
+                selectedSeatCode={selectedSeat?.seatCode ?? null}
+                canLock={canLock}
+                onSeatClick={onSeatClick}
+              />
+            ) : (
+              <div className="max-h-[350px] overflow-auto">
+                {cabinSections.map((section) => (
+                  <div key={section.cabin} className="mb-3">
+                    <div className="mb-2 text-[11px] font-bold text-[#9fb0c7]">{section.label}</div>
+                    <div className="flex flex-col gap-1.5">
+                      {section.rows.map((row) => {
+                        const aisleAfterIndex = seatMap.cabinLayout[row.cabin].aisleAfterIndex;
+                        return (
+                          <div key={row.row} className="flex items-center justify-center gap-1.5">
+                            <span className="font-num w-5 text-center text-[9px] font-bold text-[#6b7b94]">
+                              {faDigits(row.row)}
                             </span>
-                          );
-                        })}
-                      </div>
-                    );
-                  })}
-                </div>
+                            {row.seats.map((s, idx) => {
+                              const selected = selectedSeat?.seatCode === s.seatCode;
+                              return (
+                                <span key={s.seatCode} className="flex items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => onSeatClick(s)}
+                                    disabled={s.status !== 'SOLD' && !canLock}
+                                    aria-label={s.seatCode}
+                                    className={`ltr font-num flex h-[30px] w-[30px] items-center justify-center rounded-[8px] border-[1.5px] text-[8.5px] font-bold transition ${seatTone(s.status, selected)} ${
+                                      s.status === 'SOLD' || canLock
+                                        ? 'cursor-pointer'
+                                        : 'cursor-default'
+                                    }`}
+                                  >
+                                    {s.seatCode.replace(String(row.row), '')}
+                                  </button>
+                                  {idx === aisleAfterIndex - 1 && (
+                                    <span data-testid={`aisle-gap-${row.row}`} className="w-4" />
+                                  )}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
 
           {selectedSeat && seatFormMode === 'sold' && selectedSeat.occupant && (
