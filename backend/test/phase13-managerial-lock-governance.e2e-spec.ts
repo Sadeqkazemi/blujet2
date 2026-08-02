@@ -194,9 +194,15 @@ describe('Phase 13 Part D — managerial lock governance', () => {
     expect(rejected.body.data.approvalStatus).toBe('REJECTED');
     expect(rejected.body.data.releasedAt).not.toBeNull();
 
-    const relock = await request(app.getHttpServer())
+    const itForbidden = await request(app.getHttpServer())
       .post(`/reservation/seatmap/${instanceId}/lock`)
       .set(auth(itToken))
+      .send({ seatCode: '2A', reason: 'رزرو مجدد IT', classification: 'PAYABLE' });
+    expect(itForbidden.status).toBe(403);
+
+    const relock = await request(app.getHttpServer())
+      .post(`/reservation/seatmap/${instanceId}/lock`)
+      .set(auth(ceoToken))
       .send({ seatCode: '2A', reason: 'رزرو مجدد', classification: 'PAYABLE' });
     expect(relock.status).toBe(201);
   });
@@ -291,7 +297,7 @@ describe('Phase 13 Part D — managerial lock governance', () => {
 
     const relock = await request(app.getHttpServer())
       .post(`/reservation/seatmap/${instanceId}/lock`)
-      .set(auth(itToken))
+      .set(auth(chairToken))
       .send({
         seatCode: '4A',
         reason: 'رزرو پس از انقضا',
@@ -305,7 +311,7 @@ describe('Phase 13 Part D — managerial lock governance', () => {
       where: {
         lockedById: (
           await prisma.user.findUniqueOrThrow({
-            where: { username: 'itadmin' },
+            where: { username: 'chair' },
           })
         ).id,
         releasedAt: null,
@@ -321,7 +327,7 @@ describe('Phase 13 Part D — managerial lock governance', () => {
     for (const seatCode of seatCodes) {
       const res = await request(app.getHttpServer())
         .post(`/reservation/seatmap/${instanceId}/lock`)
-        .set(auth(itToken))
+        .set(auth(chairToken))
         .send({
           seatCode,
           reason: 'تست سقف درخواست',
@@ -336,7 +342,7 @@ describe('Phase 13 Part D — managerial lock governance', () => {
     // conflict check.
     const overCap = await request(app.getHttpServer())
       .post(`/reservation/seatmap/${instanceId}/lock`)
-      .set(auth(itToken))
+      .set(auth(chairToken))
       .send({
         seatCode: '1A',
         reason: 'باید رد شود',

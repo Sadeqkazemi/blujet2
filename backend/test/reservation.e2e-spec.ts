@@ -137,10 +137,37 @@ describe('Reservation (e2e)', () => {
     });
   });
 
+  it('GET /reservation/seatmap/:id includes sold-seat passenger details for staff', async () => {
+    const instance = await createScheduledInstance();
+    const chair = await loginAs(app, 'chair');
+    const issued = await request(app.getHttpServer())
+      .post('/reservation/pnr')
+      .set(auth(chair.accessToken))
+      .send({
+        flightInstanceId: instance.id,
+        seatCode: '3A',
+        passengerName: 'لیلا صادقی',
+        passengerNationalId: '0499370899',
+      });
+    expect(issued.status).toBe(201);
+
+    const res = await request(app.getHttpServer())
+      .get(`/reservation/seatmap/${instance.id}`)
+      .set(auth((await loginAs(app, 'itadmin')).accessToken));
+    expect(res.status).toBe(200);
+    expect(res.body.data.flightNo).toBeTruthy();
+    const sold = res.body.data.rows
+      .flatMap((r: { seats: { seatCode: string; passenger?: { fullName: string } }[] }) => r.seats)
+      .find((s: { seatCode: string }) => s.seatCode === '3A');
+    expect(sold.passenger.fullName).toBe('لیلا صادقی');
+    expect(sold.passenger.nationalId).toBe('0499370899');
+  });
+
   it('POST lock: canLock roles only, 409 on already-locked, encrypted PII never returned, audited', async () => {
     const instance = await createScheduledInstance();
     const chair = await loginAs(app, 'chair');
     const senior = await loginAs(app, 'senior.rahimi');
+    const it = await loginAs(app, 'itadmin');
 
     const forbidden = await request(app.getHttpServer())
       .post(`/reservation/seatmap/${instance.id}/lock`)
@@ -153,6 +180,16 @@ describe('Reservation (e2e)', () => {
         passengerNationalId: '0499370899',
       });
     expect(forbidden.status).toBe(403);
+
+    const itForbidden = await request(app.getHttpServer())
+      .post(`/reservation/seatmap/${instance.id}/lock`)
+      .set(auth(it.accessToken))
+      .send({
+        seatCode: '3B',
+        reason: 'تست IT',
+        classification: 'PAYABLE',
+      });
+    expect(itForbidden.status).toBe(403);
 
     const ok = await request(app.getHttpServer())
       .post(`/reservation/seatmap/${instance.id}/lock`)

@@ -1,9 +1,19 @@
 export type SeatStatus = 'FREE' | 'SOLD' | 'LOCKED';
 
+export interface SeatPassengerInfo {
+  fullName: string;
+  pnr: string;
+  bookingStatus: BookingStatus;
+  nationalId: string | null;
+  priceIrr: string;
+}
+
 export interface SeatCell {
   seatCode: string;
   status: SeatStatus;
   lockId: string | null;
+  passenger: SeatPassengerInfo | null;
+  lockExpiresAt: string | null;
 }
 
 export interface SeatRow {
@@ -15,11 +25,18 @@ export interface SeatRow {
 export interface SeatMap {
   flightInstanceId: string;
   aircraftType: string;
+  flightNo: string;
+  originCode: string;
+  destCode: string;
+  originCityFa: string;
+  destCityFa: string;
+  departureAt: string;
   rows: SeatRow[];
   cabinLayout: Record<'BUSINESS' | 'ECONOMY', { aisleAfterIndex: number }>;
   capacity: number;
   soldCount: number;
   lockedCount: number;
+  freeCount: number;
   occupancyPct: number;
 }
 

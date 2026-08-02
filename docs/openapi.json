@@ -3711,7 +3711,7 @@
             "description": ""
           }
         },
-        "summary": "نقشهٔ صندلی — آزاد/بیزینس/فروخته‌شده/لاک‌شده",
+        "summary": "نقشهٔ صندلی — آزاد/فروخته/قفل + مشخصات مسافر روی صندلی فروخته‌شده (staff)",
         "tags": [
           "reservation"
         ]
@@ -3745,7 +3745,7 @@
             "description": ""
           }
         },
-        "summary": "درخواست لاک مدیریتی صندلی — در انتظار تأیید یک نقش دیگر",
+        "summary": "درخواست لاک مدیریتی صندلی — در انتظار تأیید یک نقش دیگر (نه IT)",
         "tags": [
           "reservation"
         ]
@@ -4074,6 +4074,46 @@
           }
         },
         "summary": "آمار واقعی رزروها + تفکیک کانال + وضعیت سرویس‌های وابسته (بر اساس toggle/latency واقعی)",
+        "tags": [
+          "reservation"
+        ]
+      }
+    },
+    "/reservation/agency-api-access": {
+      "get": {
+        "operationId": "PnrController_agencyApiAccess",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست آژانس‌هایی که کلید API دارند — تب دسترسی آژانس‌ها",
+        "tags": [
+          "reservation"
+        ]
+      }
+    },
+    "/reservation/flights": {
+      "get": {
+        "operationId": "PnrController_listFlights",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "مسیر یا شماره پرواز",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست پروازهای SCHEDULED با ظرفیت/فروش — تب پروازها",
         "tags": [
           "reservation"
         ]
@@ -7727,46 +7767,6 @@
         "summary": "دریافت تصویر محتوای سایت",
         "tags": [
           "site-content"
-        ]
-      }
-    },
-    "/reservation/agency-api-access": {
-      "get": {
-        "operationId": "PnrController_agencyApiAccess",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "فهرست آژانس‌هایی که کلید API دارند — تب دسترسی آژانس‌ها",
-        "tags": [
-          "reservation"
-        ]
-      }
-    },
-    "/reservation/flights": {
-      "get": {
-        "operationId": "PnrController_listFlights",
-        "parameters": [
-          {
-            "name": "q",
-            "required": false,
-            "in": "query",
-            "description": "مسیر یا شماره پرواز",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "فهرست پروازهای SCHEDULED با ظرفیت/فروش — تب پروازها",
-        "tags": [
-          "reservation"
         ]
       }
     }

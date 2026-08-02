@@ -10,11 +10,17 @@ export const RESERVATION_ROLES = [
   'IT_MANAGER',
 ] as const satisfies readonly Role[];
 
-/** ⚑ Product decision: only these may lock/release seats, change a PNR's
- * seat, cancel a booking, or manually issue one. SENIOR_MANAGER is
- * view-only, matching the design's confirmed behavior. */
+/** ⚑ Product decision: only these may change a PNR's seat, cancel a
+ * booking, or manually issue one. SENIOR_MANAGER is view-only. */
 export const CAN_LOCK_ROLES = [
   'CEO',
   'BOARD_CHAIR',
   'IT_MANAGER',
+] as const satisfies readonly Role[];
+
+/** Managerial seat lock/release/approve — IT Manager is view-only on the
+ * seat map (may inspect sold-seat passengers, cannot lock). */
+export const CAN_SEAT_LOCK_ROLES = [
+  'CEO',
+  'BOARD_CHAIR',
 ] as const satisfies readonly Role[];
