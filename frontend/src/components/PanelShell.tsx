@@ -6,6 +6,7 @@ import { fetchCartable, fetchMyReferrals, fetchReferrals } from '../api/cartable
 import { fetchRefunds } from '../api/refunds';
 import { fetchLowSalesAlerts, fetchStaffReports } from '../api/reporting';
 import { fetchLogsBadgeCount } from '../api/audit';
+import { fetchCeoPricing } from '../api/pricing';
 import { faDigits } from '../lib/fa-format';
 import type { PanelNavItem } from '../types/panels';
 import type { LowSalesAlert } from '../types/reporting';
@@ -142,6 +143,21 @@ export default function PanelShell() {
             .catch(() => undefined),
         );
       }
+    }
+
+    if (navKeys.has('pricing') && user?.role === 'CEO') {
+      tasks.push(
+        fetchCeoPricing()
+          .then((r) => {
+            if (r.pending.length > 0) {
+              next.pricing = {
+                count: r.pending.length,
+                className: 'bg-[#a78bfa] text-white',
+              };
+            }
+          })
+          .catch(() => undefined),
+      );
     }
 
     void Promise.all(tasks).then(() => setBadges(next));
