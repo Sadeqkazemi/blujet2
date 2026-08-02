@@ -140,8 +140,8 @@ export default function PanelShell() {
   const roleLabel = user ? (ROLE_LABELS[user.role] ?? user.role) : '';
 
   return (
-    <div dir="rtl" className="flex min-h-screen bg-body font-sans text-ink">
-      <aside className="flex w-[248px] flex-none flex-col bg-[#141d2e] text-[#e7ecf3]">
+    <div dir="rtl" className="flex min-h-screen bg-panel-canvas font-sans text-panel-ink">
+      <aside className="flex w-[248px] flex-none flex-col bg-panel-surface text-panel-ink">
         <div className="flex items-center gap-2.5 border-b border-white/10 px-5 py-6">
           <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-accent text-lg text-white">
             ✈

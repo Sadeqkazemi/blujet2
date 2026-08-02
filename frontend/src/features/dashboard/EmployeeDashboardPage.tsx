@@ -60,41 +60,41 @@ export default function EmployeeDashboardPage() {
 
   return (
     <div className="p-6">
-      <h1 className="text-lg font-bold text-ink">داشبورد کارمند</h1>
-      <p className="mt-1 text-xs text-muted">نمای کلی کارها و ارجاعات واحد</p>
+      <h1 className="text-lg font-bold text-panel-ink">داشبورد کارمند</h1>
+      <p className="mt-1 text-xs text-panel-muted">نمای کلی کارها و ارجاعات واحد</p>
 
       <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border border-border bg-white p-4">
-          <div className="mb-2 text-[11px] text-muted">کارهای باز کارتابل</div>
+        <div className="rounded-xl border border-white/10 bg-panel-surface p-4">
+          <div className="mb-2 text-[11px] text-panel-muted">کارهای باز کارتابل</div>
           <div className="font-num text-2xl font-black text-[#f59e0b]">
             {openTasks === null ? '—' : faDigits(openTasks)}
           </div>
         </div>
-        <div className="rounded-xl border border-border bg-white p-4">
-          <div className="mb-2 text-[11px] text-muted">ارجاعات در انتظار</div>
+        <div className="rounded-xl border border-white/10 bg-panel-surface p-4">
+          <div className="mb-2 text-[11px] text-panel-muted">ارجاعات در انتظار</div>
           <div className="font-num text-2xl font-black text-[#a855f7]">
             {openReferrals === null ? '—' : faDigits(openReferrals)}
           </div>
         </div>
-        <div className="rounded-xl border border-border bg-white p-4">
-          <div className="mb-2 text-[11px] text-muted">واحد سازمانی</div>
-          <div className="text-base font-bold text-ink">
+        <div className="rounded-xl border border-white/10 bg-panel-surface p-4">
+          <div className="mb-2 text-[11px] text-panel-muted">واحد سازمانی</div>
+          <div className="text-base font-bold text-panel-ink">
             {context?.deptLabelFa ?? '—'}
           </div>
         </div>
       </div>
 
       {context && context.permissionLabelsFa.length > 0 && (
-        <section className="mt-5 rounded-xl border border-border bg-white p-4">
-          <h2 className="text-sm font-bold text-ink">دسترسی‌های شما در این واحد</h2>
-          <p className="mt-1 text-[11px] text-muted">
+        <section className="mt-5 rounded-xl border border-white/10 bg-panel-surface p-4">
+          <h2 className="text-sm font-bold text-panel-ink">دسترسی‌های شما در این واحد</h2>
+          <p className="mt-1 text-[11px] text-panel-muted">
             این دسترسی‌ها توسط مدیر IT مطابق واحد سازمانی شما تعیین شده است.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             {context.permissionLabelsFa.map((label) => (
               <span
                 key={label}
-                className="flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-[11px] text-ink"
+                className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] text-panel-ink"
               >
                 <span className="text-[#059669]">✓</span>
                 {label}
@@ -104,9 +104,9 @@ export default function EmployeeDashboardPage() {
         </section>
       )}
 
-      {nav === null && <p className="mt-4 text-xs text-muted">در حال بارگذاری…</p>}
+      {nav === null && <p className="mt-4 text-xs text-panel-muted">در حال بارگذاری…</p>}
       {nav !== null && grantedSections.length === 0 && (
-        <p className="mt-4 text-xs text-muted">
+        <p className="mt-4 text-xs text-panel-muted">
           هنوز هیچ دسترسی برای شما توسط مدیر IT فعال نشده است.
         </p>
       )}
@@ -116,10 +116,10 @@ export default function EmployeeDashboardPage() {
           <Link
             key={item.key}
             to={`/panel/${item.key}`}
-            className="rounded-xl border border-border bg-white p-4 transition hover:border-accent"
+            className="rounded-xl border border-white/10 bg-panel-surface p-4 transition hover:border-accent"
           >
-            <h2 className="text-sm font-bold text-ink">{item.labelFa}</h2>
-            <p className="mt-1 text-xs text-muted">{TAB_DESCRIPTIONS[item.key] ?? ''}</p>
+            <h2 className="text-sm font-bold text-panel-ink">{item.labelFa}</h2>
+            <p className="mt-1 text-xs text-panel-muted">{TAB_DESCRIPTIONS[item.key] ?? ''}</p>
           </Link>
         ))}
       </div>

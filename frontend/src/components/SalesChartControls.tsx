@@ -69,10 +69,10 @@ export default function SalesChartControls({
       className={
         variant === 'segmented'
           ? `rounded-md px-3 py-1.5 text-[11px] transition ${
-              granularity === m.key ? 'bg-accent font-bold text-white' : 'text-muted hover:text-ink'
+              granularity === m.key ? 'bg-accent font-bold text-white' : 'text-panel-muted hover:text-panel-ink'
             }`
           : `rounded-full px-3 py-1.5 text-xs font-medium transition ${
-              granularity === m.key ? 'bg-accent text-white' : 'bg-surface text-text-2 hover:bg-surface-2'
+              granularity === m.key ? 'bg-accent text-white' : 'bg-white/5 text-panel-muted hover:bg-white/10'
             }`
       }
     >
@@ -85,7 +85,7 @@ export default function SalesChartControls({
       <div
         className={
           variant === 'segmented'
-            ? 'flex gap-1 rounded-lg border border-border bg-body p-1'
+            ? 'flex gap-1 rounded-lg border border-white/10 bg-panel-canvas p-1'
             : 'flex flex-wrap gap-1.5'
         }
       >
@@ -93,7 +93,7 @@ export default function SalesChartControls({
       </div>
 
       {granularity === 'day' && (
-        <div className="max-w-xs rounded-lg border border-border bg-surface">
+        <div className="max-w-xs rounded-lg border border-white/10 bg-white/5">
           <JalaliDatePicker
             label="تاریخ"
             value={selectedDate}
@@ -113,7 +113,7 @@ export default function SalesChartControls({
               className={`rounded-full px-3 py-1 text-[11px] font-medium transition ${
                 selectedMonthStart === m.periodStart
                   ? 'bg-accent text-white'
-                  : 'bg-surface text-text-2 hover:bg-surface-2'
+                  : 'bg-white/5 text-panel-muted hover:bg-white/10'
               }`}
             >
               {m.label}
@@ -133,7 +133,7 @@ export default function SalesChartControls({
               if (e.key === 'Enter') onApplyFlightNo();
             }}
             placeholder="EP-821"
-            className="font-num h-10 flex-1 rounded-lg border border-border px-3 text-xs outline-none"
+            className="font-num h-10 flex-1 rounded-lg border border-white/10 bg-white/5 px-3 text-xs text-panel-ink outline-none placeholder:text-panel-muted-2"
           />
           <button
             type="button"

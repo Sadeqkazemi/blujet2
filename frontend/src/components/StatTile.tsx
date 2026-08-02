@@ -14,13 +14,13 @@ const TONE_CLASSES: Record<NonNullable<StatTileProps['tone']>, string> = {
 
 export default function StatTile({ label, value, sublabel, tone = 'accent' }: StatTileProps) {
   return (
-    <div className="rounded-xl border border-border bg-white p-4">
+    <div className="rounded-xl border border-white/10 bg-panel-surface p-4">
       <div className={`mb-3 inline-flex h-9 w-9 items-center justify-center rounded-lg text-sm font-bold ${TONE_CLASSES[tone]}`}>
         ٪
       </div>
-      <div className="font-num text-xl font-black text-ink">{value}</div>
-      <div className="mt-1 text-xs text-muted">{label}</div>
-      {sublabel && <div className="mt-1 text-[11px] text-muted-2">{sublabel}</div>}
+      <div className="font-num text-xl font-black text-panel-ink">{value}</div>
+      <div className="mt-1 text-xs text-panel-muted">{label}</div>
+      {sublabel && <div className="mt-1 text-[11px] text-panel-muted-2">{sublabel}</div>}
     </div>
   );
 }

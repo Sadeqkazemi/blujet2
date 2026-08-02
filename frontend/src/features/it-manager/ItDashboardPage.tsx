@@ -24,7 +24,7 @@ export default function ItDashboardPage() {
   }, []);
 
   if (error) return <p className="p-8 text-sm text-danger">{error}</p>;
-  if (!data) return <p className="p-8 text-sm text-muted">در حال بارگذاری…</p>;
+  if (!data) return <p className="p-8 text-sm text-panel-muted">در حال بارگذاری…</p>;
 
   const kpis = [
     {
@@ -76,11 +76,11 @@ export default function ItDashboardPage() {
     <div className="p-8">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-black text-ink">داشبورد فنی</h1>
-          <p className="mt-1 text-sm text-muted">نمای کلی سلامت زیرساخت و سرویس‌های blujet</p>
+          <h1 className="text-xl font-black text-panel-ink">داشبورد فنی</h1>
+          <p className="mt-1 text-sm text-panel-muted">نمای کلی سلامت زیرساخت و سرویس‌های blujet</p>
         </div>
         {data.kpis.allServicesHealthy && (
-          <div className="flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-[11.5px] font-bold text-[#059669]">
+          <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-panel-surface px-3 py-2 text-[11.5px] font-bold text-[#059669]">
             <span className="h-2 w-2 rounded-full bg-[#059669]" />
             همه سامانه‌ها سالم
           </div>
@@ -93,14 +93,14 @@ export default function ItDashboardPage() {
             key={k.label}
             type="button"
             onClick={k.onClick}
-            className="rounded-xl border border-border bg-white p-4 text-right transition hover:border-accent"
+            className="rounded-xl border border-white/10 bg-panel-surface p-4 text-right transition hover:border-accent"
           >
             <div className="mb-2 flex items-center justify-between">
               <span className={`text-[11px] font-bold ${k.trendClass}`}>{k.trend}</span>
             </div>
-            <div className="font-num text-lg font-black text-ink">{k.value}</div>
+            <div className="font-num text-lg font-black text-panel-ink">{k.value}</div>
             <div className="mt-1 flex items-center justify-between">
-              <span className="text-[11px] text-muted">{k.label}</span>
+              <span className="text-[11px] text-panel-muted">{k.label}</span>
               <span className="text-[10px] font-bold text-accent">{k.cta}</span>
             </div>
           </button>
@@ -108,9 +108,9 @@ export default function ItDashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.3fr_1fr]">
-        <section className="rounded-xl border border-border bg-white p-5">
+        <section className="rounded-xl border border-white/10 bg-panel-surface p-5">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-bold text-ink">سلامت سرویس‌ها</h2>
+            <h2 className="text-sm font-bold text-panel-ink">سلامت سرویس‌ها</h2>
             <button
               type="button"
               onClick={() => navigate('/panel/services')}
@@ -125,9 +125,9 @@ export default function ItDashboardPage() {
                 <span
                   className={`h-2 w-2 rounded-full ${s.enabled ? 'bg-[#059669]' : 'bg-danger'}`}
                 />
-                <span className="flex-1 text-text-2">{s.name}</span>
+                <span className="flex-1 text-panel-ink">{s.name}</span>
                 {s.uptimePct !== null && (
-                  <span className="font-num text-muted">{faPercent(s.uptimePct)}</span>
+                  <span className="font-num text-panel-muted">{faPercent(s.uptimePct)}</span>
                 )}
                 <span
                   className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
@@ -142,16 +142,16 @@ export default function ItDashboardPage() {
         </section>
 
         <div className="flex flex-col gap-4">
-          <section className="rounded-xl border border-border bg-white p-5">
-            <h2 className="mb-3 text-sm font-bold text-ink">استفاده از منابع سرور</h2>
+          <section className="rounded-xl border border-white/10 bg-panel-surface p-5">
+            <h2 className="mb-3 text-sm font-bold text-panel-ink">استفاده از منابع سرور</h2>
             <div className="space-y-3 text-xs">
               {resourceBars.map((r) => (
                 <div key={r.label}>
                   <div className="mb-1 flex justify-between">
-                    <span className="text-text-2">{r.label}</span>
-                    <span className="font-num font-bold text-muted">{faPercent(r.pct)}</span>
+                    <span className="text-panel-ink">{r.label}</span>
+                    <span className="font-num font-bold text-panel-muted">{faPercent(r.pct)}</span>
                   </div>
-                  <div className="h-2 rounded bg-surface">
+                  <div className="h-2 rounded bg-white/10">
                     <div
                       className={`h-2 rounded ${r.color}`}
                       style={{ width: `${Math.min(100, r.pct)}%` }}
@@ -162,10 +162,10 @@ export default function ItDashboardPage() {
             </div>
           </section>
 
-          <section className="rounded-xl border border-border bg-white p-5">
-            <h2 className="mb-3 text-sm font-bold text-ink">رویدادهای اخیر</h2>
+          <section className="rounded-xl border border-white/10 bg-panel-surface p-5">
+            <h2 className="mb-3 text-sm font-bold text-panel-ink">رویدادهای اخیر</h2>
             {data.recentEvents.length === 0 ? (
-              <p className="text-xs text-muted">رویدادی ثبت نشده است.</p>
+              <p className="text-xs text-panel-muted">رویدادی ثبت نشده است.</p>
             ) : (
               <ul className="space-y-2.5">
                 {data.recentEvents.map((e) => (
@@ -174,8 +174,8 @@ export default function ItDashboardPage() {
                       className={`mt-1.5 h-2 w-2 flex-none rounded-full ${EVENT_DOT[e.category] ?? 'bg-muted'}`}
                     />
                     <div>
-                      <div className="text-text-2">{e.text}</div>
-                      <div className="font-num mt-0.5 text-muted">
+                      <div className="text-panel-ink">{e.text}</div>
+                      <div className="font-num mt-0.5 text-panel-muted">
                         {formatJalaliDateTime(e.createdAt)}
                       </div>
                     </div>
