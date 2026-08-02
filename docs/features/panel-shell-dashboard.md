@@ -69,6 +69,7 @@ remains on dashboard/analytic views only (flight search input). See
 - [x] KPI cards render Persian digits + تومان formatting — `frontend/src/lib/fa-format.test.ts`; rendered end-to-end in `frontend/src/features/dashboard/DashboardPage.test.tsx`
 - [x] Sales chart renders legend/bars, selection toggles, table-view fallback — `frontend/src/components/SalesBarChart.test.tsx`
 - [x] Dashboard loading/error states render — `DashboardPage.test.tsx` › the success and error-message cases
+- [x] Executive `DashboardPage` (CEO/Chair/Senior) shows the design's low-sales 72h banner + chart/cartable side-by-side layout — `DashboardPage.test.tsx` › `'shows the low-sales alert banner from the reporting API'`
 - [x] Day/month/flight modes show the deferred-scope message rather than a broken fetch — superseded: day/month now use `SalesChartControls` + `JalaliDatePicker` (Phase C, `panel-sidebar-badges-day-picker.md`); flight mode uses flight-no input on dashboard/analytic finance views
 - [x] 2FA step component test (renders after password submit, not before) — `frontend/src/features/auth/TwoFactorPage.test.tsx` (Phase 32). Writing the "not before" case caught a real bug: `TwoFactorPage` called `navigate('/login')` during render instead of in a `useEffect`, so React Router's own guard silently dropped the navigation — visiting `/login/2fa` directly with no `challengeId` in location state rendered a blank page instead of redirecting. Fixed by moving the call into a `useEffect` keyed on `challengeId`; see PLAN.md's Phase 32 entry.
 

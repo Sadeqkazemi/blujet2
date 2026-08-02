@@ -38,20 +38,23 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'kyc', labelFa: 'احراز هویت مشتریان', implemented: true },
     { key: 'settings', labelFa: 'تنظیمات سامانه', implemented: true },
   ],
+  // Order matches design-reference-v2/پنل مدیر عامل.dc.html sidebar
+  // (settings is display:none there). Extras kept: clubrules (Phase 65),
+  // flightops (ops surface — not in CEO design sidebar; after pricing).
   CEO: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
-    { key: 'flightops', labelFa: 'پروازها', implemented: true },
     { key: 'admins', labelFa: 'مدیران', implemented: true },
     { key: 'finance', labelFa: 'مالی', implemented: true },
     { key: 'cartable', labelFa: 'کارتابل', implemented: true },
     { key: 'club', labelFa: 'مشتریان VIP', implemented: true },
+    { key: 'clubrules', labelFa: 'قوانین باشگاه مشتریان', implemented: true },
+    { key: 'survey', labelFa: 'نظرسنجی مسافران', implemented: true },
     { key: 'mgrreports', labelFa: 'گزارش مدیران', implemented: true },
     { key: 'pricing', labelFa: 'تعیین قیمت بلیط', implemented: true },
-    { key: 'clubrules', labelFa: 'قوانین باشگاه مشتریان', implemented: true },
+    { key: 'flightops', labelFa: 'پروازها', implemented: true },
     { key: 'panels', labelFa: 'دسترسی به پنل‌ها', implemented: true },
     { key: 'security', labelFa: 'امنیت و رمز عبور', implemented: true },
     { key: 'logs', labelFa: 'لاگ و رویدادها', implemented: true },
-    { key: 'survey', labelFa: 'نظرسنجی مسافران', implemented: true },
   ],
   BOARD_CHAIR: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
