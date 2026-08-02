@@ -217,9 +217,21 @@ describe('Flights (e2e)', () => {
 
   it('POST /flights/airports creates a new airport and rejects duplicates', async () => {
     const { accessToken } = await loginAs(app, 'comm.abbasi');
-    const suffix = Date.now().toString(36).slice(-4).toUpperCase();
-    const code = `Z${suffix[0]}${suffix[1]}`.replace(/[^A-Z]/g, 'X');
-    const cityFa = `شهر تست ${suffix}`;
+    // A timestamp-derived 2-letter suffix has too little entropy (only ~1300
+    // combinations) not to occasionally collide with a real seeded IATA code
+    // (e.g. it once landed on "ZAH" — Zahedan) — pick against the DB instead.
+    const existing = new Set(
+      (await typeorm.airport.findMany({ select: { code: true } })).map(
+        (a) => a.code,
+      ),
+    );
+    let code: string;
+    do {
+      code = Array.from({ length: 3 }, () =>
+        String.fromCharCode(65 + crypto.randomInt(0, 26)),
+      ).join('');
+    } while (existing.has(code));
+    const cityFa = `شهر تست ${code}`;
     const created = await request(app.getHttpServer())
       .post('/flights/airports')
       .set('Authorization', `Bearer ${accessToken}`)

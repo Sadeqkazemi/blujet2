@@ -8,6 +8,7 @@ import { TypeORMService } from '../../typeorm/typeorm.service';
 import { AuditService } from '../audit/audit.service';
 import { StaffDirectoryService } from '../staff-directory/staff-directory.module';
 import { ErrorCode } from '../../common/errors';
+import { normalizeIranPhone } from '../../common/normalize-iran-phone';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type {
   TypeORM,
@@ -43,7 +44,7 @@ export class SupportTicketsService {
       data: {
         trackingCode: generateTrackingCode(),
         requesterName: dto.requesterName,
-        requesterPhone: dto.requesterPhone,
+        requesterPhone: normalizeIranPhone(dto.requesterPhone),
         subject: dto.subject,
         body: dto.body,
         history: [
@@ -64,7 +65,7 @@ export class SupportTicketsService {
         userId: actor.id,
         trackingCode: generateTrackingCode(),
         requesterName: dto.requesterName,
-        requesterPhone: dto.requesterPhone,
+        requesterPhone: normalizeIranPhone(dto.requesterPhone),
         subject: dto.subject,
         body: dto.body,
         history: [
