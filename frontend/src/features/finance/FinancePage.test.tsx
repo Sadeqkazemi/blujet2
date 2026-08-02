@@ -280,9 +280,16 @@ describe('FinancePage', () => {
     expect(screen.getByText('پرواز W5-098')).toBeInTheDocument();
     expect(screen.getAllByText('۴۳۴ میلیون').length).toBeGreaterThanOrEqual(1);
 
+    // Search filters to matching flights only (does not keep/sort the full list)
+    // and selects the hit so its summary is displayed.
     await user.clear(screen.getByLabelText('جستجوی شماره پرواز یا مسیر'));
-    await user.type(screen.getByLabelText('جستجوی شماره پرواز یا مسیر'), 'W5');
-    expect(screen.queryByText('تهران ← دبی')).not.toBeInTheDocument();
-    expect(screen.getByText('مشهد ← تهران')).toBeInTheDocument();
+    await user.type(screen.getByLabelText('جستجوی شماره پرواز یا مسیر'), 'EP-805');
+    expect(screen.queryByText('مشهد ← تهران')).not.toBeInTheDocument();
+    expect(screen.getByText('تهران ← دبی')).toBeInTheDocument();
+    expect(screen.getByText('پرواز EP-805')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /تهران ← دبی/ })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
   });
 });
