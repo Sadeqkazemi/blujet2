@@ -34,7 +34,7 @@ const ROLE_CASES = [
       'امنیت و رمز عبور',
       'لاگ و رویدادها',
     ],
-    dashboardMarkers: ['کل درآمد', 'گزارش مالی'],
+    dashboardMarkers: ['آژانس فعال', 'گزارش مالی'],
   },
   {
     username: 'itadmin',

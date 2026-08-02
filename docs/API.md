@@ -55,6 +55,7 @@ set and chart shape across every panel report.
 | GET | `/reporting/completed-flights-summary` | same | Same `granularity`/`periodKey` filter → `{ flightCount, totalSeats, soldSeats, unsoldSeats }`, synced to the same period as the chart. |
 | GET | `/reporting/low-sales-alerts` | CEO, BOARD_CHAIR, SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | Flights &lt;72h out with occupancy below threshold — the design's recurring amber banner, currently hardcoded in every panel; this endpoint replaces the hardcoded copy with a real query. |
 | GET | `/reporting/commercial-overview` | COMMERCIAL_MANAGER | Commercial dashboard KPI row: `{ activeAgencies, passengersThisMonth, pendingAgencyRequests }`. |
+| GET | `/reporting/finance-dashboard-stats` | CEO, BOARD_CHAIR, SENIOR_MANAGER, FINANCE_MANAGER | Dashboard KPI row matching the design cards: `{ activeAgencies, activeAgenciesTrendPct, passengersThisMonth, passengersTrendPct, ticketsSoldThisMonth, ticketsTrendPct, revenueThisMonthIrr, revenueTrendPct }`. Widened beyond FINANCE_MANAGER so CEO/Chair/Senior dashboards can render آژانس فعال / مسافر این ماه / بلیط فروخته‌شده / درآمد without a duplicate endpoint. |
 
 ### Manager activity / audit feed (`backend/src/modules/audit/`)
 
