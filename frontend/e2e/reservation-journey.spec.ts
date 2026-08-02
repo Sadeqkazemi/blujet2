@@ -35,17 +35,14 @@ async function createFreshInstanceDate(page: Page): Promise<string> {
 test('BOARD_CHAIR locks a seat on the seat map, sees it reflected, then releases it', async ({ page }) => {
   await loginAs(page, 'chair');
   await page.getByRole('link', { name: 'هواپیما' }).click();
-  await expect(page.getByRole('heading', { name: 'سامانه رزرواسیون' })).toBeVisible();
+  // Design: BOARD_CHAIR uses lock-only plane mode (no tab strip).
+  await expect(page.getByRole('heading', { name: 'هواپیما — رزرو صندلی' })).toBeVisible();
+  await expect(page.getByText(/اشغال/)).toBeVisible({ timeout: 15000 });
 
-  await page.getByRole('button', { name: 'مدیریت رزروها' }).click();
-  await expect(page.getByText('THR', { exact: false }).first()).toBeVisible({ timeout: 15000 });
-  await page.getByRole('button', { name: /^نقشهٔ صندلی EP-/ }).first().click();
-
-  await expect(page.getByText(/اشغال/)).toBeVisible();
   // Seat 3B is free in the seed data (3A/3C are sold, 4A is locked).
   const seat = page.getByRole('button', { name: '3B', exact: true });
   await seat.click();
-  await page.getByRole('button', { name: 'لاک صندلی' }).click();
+  await page.getByRole('button', { name: 'لاک صندلی 3B' }).click();
   await expect(page.getByText(/لاک شد/)).toBeVisible();
 
   const chip = page.getByRole('button', { name: '3B ×' });

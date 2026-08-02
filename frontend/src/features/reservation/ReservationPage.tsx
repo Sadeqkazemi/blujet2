@@ -41,6 +41,7 @@ import type {
   ReservationDashboardStats,
   SeatMap,
 } from '../../types/reservation';
+import BoardChairPlaneMode from './BoardChairPlaneMode';
 
 type SubTab = 'dashboard' | 'pnr' | 'seatmap' | 'new';
 
@@ -71,8 +72,15 @@ const SUB_TABS: [SubTab, string][] = [
 
 export default function ReservationPage() {
   const { user } = useAuth();
-  const canLock = user?.role === 'CEO' || user?.role === 'BOARD_CHAIR' || user?.role === 'IT_MANAGER';
+  // Design: BOARD_CHAIR embeds ReservationSystem with lock-only=true → plane view only.
+  if (user?.role === 'BOARD_CHAIR') {
+    return <BoardChairPlaneMode />;
+  }
 
+  return <ReservationTabs canLock={user?.role === 'CEO' || user?.role === 'IT_MANAGER'} />;
+}
+
+function ReservationTabs({ canLock }: { canLock: boolean }) {
   const [subTab, setSubTab] = useState<SubTab>('pnr');
   const [stats, setStats] = useState<ReservationDashboardStats | null>(null);
   const [error, setError] = useState<string | null>(null);

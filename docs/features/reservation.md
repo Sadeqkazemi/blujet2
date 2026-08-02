@@ -40,9 +40,10 @@ seed's ambiguous historical/demo instances).
 - [x] SENIOR_MANAGER: reads 200, every write 403 — `'SENIOR_MANAGER: reads succeed, every write is 403 (view-only)'`
 
 ### Frontend
+- [x] BOARD_CHAIR uses design `lock-only` plane mode (no tab strip): flight chips, inline lock/issue form, passenger search, fuselage seat map — `'BOARD_CHAIR sees lock-only plane mode…'` + `'BOARD_CHAIR locks a free seat from the plane-mode form'`
 - [x] Seat map: free/sold/locked/business-vs-economy visual states, click-to-lock (canLock roles), release chips — `ReservationPage.test.tsx` + `reservation-journey.spec.ts`
-- [x] PNR list + detail modal: boarding-pass-style card, change-seat form, cancel action — `'BOARD_CHAIR sees the PNR list and change-seat/cancel controls in the detail modal'`
-- [x] Manual "رزرو جدید" form with flight search + seat pick + issue — `reservation-journey.spec.ts`
+- [x] PNR list + detail modal: boarding-pass-style card, change-seat form, cancel action — BOARD_CHAIR via passenger-search → detail; other roles via «مدیریت رزروها»
+- [x] Manual "رزرو جدید" form with flight search + seat pick + issue — `reservation-journey.spec.ts` (IT_MANAGER / non–lock-only roles)
 - [x] SENIOR_MANAGER sees the seat map read-only (disabled seat buttons) and the PNR detail modal has no change/cancel controls — `'SENIOR_MANAGER is view-only: no change-seat/cancel controls in the detail modal'` + E2E
 - [x] Role isolation: FINANCE_MANAGER/COMMERCIAL_MANAGER have no reservation nav entry — `'Non-reservation role has no reservation nav entry (role isolation)'`
 

@@ -39,6 +39,28 @@ const STATS: ReservationDashboardStats = {
   revenueIrr: '1000000000',
 };
 
+const FREE_SEAT_MAP: SeatMap = {
+  flightInstanceId: 'fi1',
+  aircraftType: 'MD-88',
+  cabinLayout: { BUSINESS: { aisleAfterIndex: 2 }, ECONOMY: { aisleAfterIndex: 2 } },
+  capacity: 10,
+  soldCount: 1,
+  lockedCount: 0,
+  occupancyPct: 10,
+  rows: [
+    {
+      row: 3,
+      cabin: 'BUSINESS',
+      seats: [
+        { seatCode: '3A', status: 'SOLD', lockId: null },
+        { seatCode: '3B', status: 'FREE', lockId: null },
+        { seatCode: '3E', status: 'FREE', lockId: null },
+        { seatCode: '3F', status: 'FREE', lockId: null },
+      ],
+    },
+  ],
+};
+
 function mockRole(role: Role) {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status: 'authenticated',
@@ -51,17 +73,34 @@ function mockRole(role: Role) {
 }
 
 describe('ReservationPage', () => {
-  it('BOARD_CHAIR sees the PNR list and change-seat/cancel controls in the detail modal', async () => {
+  it('BOARD_CHAIR sees lock-only plane mode (not the tabbed reservation shell)', async () => {
     mockRole('BOARD_CHAIR');
-    vi.spyOn(reservationApi, 'fetchReservationDashboardStats').mockResolvedValue(STATS);
     vi.spyOn(reservationApi, 'fetchPnrList').mockResolvedValue(GROUPS);
+    vi.spyOn(reservationApi, 'fetchSeatMap').mockResolvedValue(FREE_SEAT_MAP);
+
+    render(<ReservationPage />);
+    expect(await screen.findByText('هواپیما — رزرو صندلی')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'مدیریت رزروها' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'داشبورد' })).not.toBeInTheDocument();
+    expect(await screen.findByText('THR → DXB')).toBeInTheDocument();
+  });
+
+  it('BOARD_CHAIR sees passenger search results and change-seat/cancel controls in the detail modal', async () => {
+    mockRole('BOARD_CHAIR');
+    vi.spyOn(reservationApi, 'fetchPnrList').mockResolvedValue(GROUPS);
+    vi.spyOn(reservationApi, 'fetchSeatMap').mockResolvedValue(FREE_SEAT_MAP);
     vi.spyOn(reservationApi, 'fetchPnrDetail').mockResolvedValue(DETAIL);
 
     render(<ReservationPage />);
-    expect(await screen.findByText('نگار رضایی')).toBeInTheDocument();
+    await screen.findByText('هواپیما — رزرو صندلی');
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'BJDEMO1' }));
+    await user.type(
+      screen.getByPlaceholderText('مثلاً: نگار رضایی، BJ-4X2K9 یا 12D…'),
+      'نگار',
+    );
+    expect(await screen.findByText('نگار رضایی')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /نگار رضایی/ }));
 
     expect(await screen.findByRole('button', { name: 'ثبت تغییر' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'لغو رزرو' })).toBeInTheDocument();
@@ -98,7 +137,6 @@ describe('ReservationPage', () => {
 
   it('renders the aisle gap from cabinLayout.aisleAfterIndex per row, not a fixed seat position', async () => {
     mockRole('BOARD_CHAIR');
-    vi.spyOn(reservationApi, 'fetchReservationDashboardStats').mockResolvedValue(STATS);
     vi.spyOn(reservationApi, 'fetchPnrList').mockResolvedValue(GROUPS);
     // Deliberately non-2/2 splits — a component still assuming a fixed
     // "gap after the 2nd seat" would place these wrong.
@@ -137,9 +175,7 @@ describe('ReservationPage', () => {
     vi.spyOn(reservationApi, 'fetchSeatMap').mockResolvedValue(seatMap);
 
     render(<ReservationPage />);
-    await screen.findByText('نگار رضایی');
-    const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'نقشهٔ صندلی EP-821' }));
+    await screen.findByText('هواپیما — رزرو صندلی');
 
     const businessGap = await screen.findByTestId('aisle-gap-3');
     expect(businessGap.parentElement!.querySelector('button')).toHaveAttribute('aria-label', '3A');
@@ -150,8 +186,8 @@ describe('ReservationPage', () => {
 
   it('a canLock role can mark a TICKETED booking as no-show, and the detail refreshes', async () => {
     mockRole('BOARD_CHAIR');
-    vi.spyOn(reservationApi, 'fetchReservationDashboardStats').mockResolvedValue(STATS);
     vi.spyOn(reservationApi, 'fetchPnrList').mockResolvedValue(GROUPS);
+    vi.spyOn(reservationApi, 'fetchSeatMap').mockResolvedValue(FREE_SEAT_MAP);
     vi.spyOn(reservationApi, 'fetchPnrDetail').mockResolvedValue(DETAIL);
     const noShowSpy = vi
       .spyOn(reservationApi, 'markNoShow')
@@ -159,8 +195,11 @@ describe('ReservationPage', () => {
 
     render(<ReservationPage />);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'BJDEMO1' }));
-
+    await user.type(
+      await screen.findByPlaceholderText('مثلاً: نگار رضایی، BJ-4X2K9 یا 12D…'),
+      'نگار',
+    );
+    await user.click(await screen.findByRole('button', { name: /نگار رضایی/ }));
     await user.click(await screen.findByRole('button', { name: 'ثبت عدم حضور مسافر' }));
 
     await waitFor(() => expect(noShowSpy).toHaveBeenCalledWith('BJDEMO1'));
@@ -169,15 +208,47 @@ describe('ReservationPage', () => {
 
   it('no-show is not offered for a CANCELLED booking', async () => {
     mockRole('BOARD_CHAIR');
-    vi.spyOn(reservationApi, 'fetchReservationDashboardStats').mockResolvedValue(STATS);
     vi.spyOn(reservationApi, 'fetchPnrList').mockResolvedValue(GROUPS);
+    vi.spyOn(reservationApi, 'fetchSeatMap').mockResolvedValue(FREE_SEAT_MAP);
     vi.spyOn(reservationApi, 'fetchPnrDetail').mockResolvedValue({ ...DETAIL, status: 'CANCELLED' });
 
     render(<ReservationPage />);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'BJDEMO1' }));
+    await user.type(
+      await screen.findByPlaceholderText('مثلاً: نگار رضایی، BJ-4X2K9 یا 12D…'),
+      'نگار',
+    );
+    await user.click(await screen.findByRole('button', { name: /نگار رضایی/ }));
 
     await waitFor(() => expect(screen.getByText('رزرو BJDEMO1')).toBeInTheDocument());
     expect(screen.queryByRole('button', { name: 'ثبت عدم حضور مسافر' })).not.toBeInTheDocument();
+  });
+
+  it('BOARD_CHAIR locks a free seat from the plane-mode form', async () => {
+    mockRole('BOARD_CHAIR');
+    vi.spyOn(reservationApi, 'fetchPnrList').mockResolvedValue(GROUPS);
+    const seatMapSpy = vi.spyOn(reservationApi, 'fetchSeatMap').mockResolvedValue(FREE_SEAT_MAP);
+    const lockSpy = vi.spyOn(reservationApi, 'lockSeat').mockResolvedValue({
+      id: 'lock1',
+      flightInstanceId: 'fi1',
+      seatCode: '3B',
+      lockedById: 'u1',
+      passengerName: null,
+      releasedById: null,
+      releasedAt: null,
+      createdAt: '2026-08-01T05:00:00.000Z',
+    });
+
+    render(<ReservationPage />);
+    await screen.findByText('هواپیما — رزرو صندلی');
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: '3B' }));
+    await user.click(screen.getByRole('button', { name: 'لاک صندلی 3B' }));
+
+    await waitFor(() =>
+      expect(lockSpy).toHaveBeenCalledWith('fi1', expect.objectContaining({ seatCode: '3B' })),
+    );
+    expect(await screen.findByText(/لاک شد/)).toBeInTheDocument();
+    expect(seatMapSpy).toHaveBeenCalled();
   });
 });
