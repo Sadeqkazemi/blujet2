@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { fetchNav } from '../api/panels';
 import { fetchCartable, fetchMyReferrals, fetchReferrals } from '../api/cartable';
 import { fetchRefunds } from '../api/refunds';
-import { fetchStaffReports } from '../api/reporting';
+import { fetchLowSalesAlerts, fetchStaffReports } from '../api/reporting';
 import { fetchLogsBadgeCount } from '../api/audit';
 import { faDigits } from '../lib/fa-format';
 import type { PanelNavItem } from '../types/panels';
+import type { LowSalesAlert } from '../types/reporting';
+import { isLowSalesRole } from '../types/panel-shell';
+import PanelNotifBell from './PanelNotifBell';
 
 const ROLE_LABELS: Record<string, string> = {
   CEO: 'مدیر عامل',
@@ -25,14 +28,26 @@ type NavBadge = { count: number; className: string };
 export default function PanelShell() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [nav, setNav] = useState<PanelNavItem[] | null>(null);
   const [badges, setBadges] = useState<Record<string, NavBadge>>({});
+  const [lowSalesAlerts, setLowSalesAlerts] = useState<LowSalesAlert[]>([]);
 
   useEffect(() => {
     fetchNav()
       .then(setNav)
       .catch(() => setNav([]));
   }, []);
+
+  useEffect(() => {
+    if (!isLowSalesRole(user?.role)) {
+      setLowSalesAlerts([]);
+      return;
+    }
+    fetchLowSalesAlerts()
+      .then(setLowSalesAlerts)
+      .catch(() => setLowSalesAlerts([]));
+  }, [user?.role]);
 
   const navKeys = useMemo(() => new Set(nav?.map((item) => item.key) ?? []), [nav]);
 
@@ -152,6 +167,11 @@ export default function PanelShell() {
           ? 'ما'
           : roleLabel.slice(0, 1);
 
+  const onDashboard = /^\/panel\/?$/.test(location.pathname);
+  const showNotifChrome = isLowSalesRole(user?.role) && !onDashboard;
+  const notifAlerts = lowSalesAlerts.slice(1);
+  const chromeVariant = darkShell ? 'dark' : 'light';
+
   return (
     <div
       dir="rtl"
@@ -225,7 +245,29 @@ export default function PanelShell() {
       </aside>
 
       <main className="flex-1 overflow-y-auto">
-        <Outlet context={{ nav }} />
+        {showNotifChrome && (
+          <div
+            className={`flex items-center justify-end gap-2.5 px-[21px] pt-[18px] ${
+              darkShell ? '' : 'px-8 pt-6'
+            }`}
+          >
+            <div
+              className={
+                darkShell
+                  ? 'flex h-[42px] w-[230px] items-center gap-2 rounded-[10px] border border-[#28344c] bg-[#18223a] px-3 text-[12px] text-[#6b7b94]'
+                  : 'flex h-[42px] w-[230px] items-center gap-2 rounded-[10px] border border-border bg-white px-3 text-[12px] text-muted'
+              }
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="7" />
+                <path d="M21 21l-4.3-4.3" />
+              </svg>
+              <span>جستجو…</span>
+            </div>
+            <PanelNotifBell alerts={notifAlerts} variant={chromeVariant} />
+          </div>
+        )}
+        <Outlet context={{ nav, lowSalesAlerts }} />
       </main>
     </div>
   );

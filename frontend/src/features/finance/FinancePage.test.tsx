@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, Outlet, Route, Routes } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import FinancePage from './FinancePage';
@@ -16,6 +17,18 @@ import type {
   RevenueMixResult,
 } from '../../types/reporting';
 import type { ReconciliationItem } from '../../types/reconciliation';
+
+function renderFinancePage() {
+  return render(
+    <MemoryRouter>
+      <Routes>
+        <Route element={<Outlet context={{ nav: [], lowSalesAlerts: [] }} />}>
+          <Route index element={<FinancePage />} />
+        </Route>
+      </Routes>
+    </MemoryRouter>,
+  );
+}
 
 // Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON on
 // the backend — a JS number can't safely hold IRR amounts above 2^53).
@@ -107,7 +120,6 @@ describe('FinancePage', () => {
   it('FINANCE_MANAGER gets the finance-ops view: transactions, settlements, remind action', async () => {
     mockRole('FINANCE_MANAGER');
     vi.spyOn(reportingApi, 'fetchKpis').mockResolvedValue(KPIS);
-    vi.spyOn(reportingApi, 'fetchLowSalesAlerts').mockResolvedValue([]);
     vi.spyOn(reportingApi, 'fetchCompletedFlightsSummary').mockResolvedValue(FLIGHTS);
     vi.spyOn(reportingApi, 'fetchRecentTransactions').mockResolvedValue(TX);
     vi.spyOn(reportingApi, 'fetchRevenueMix').mockResolvedValue(MIX);
@@ -115,7 +127,7 @@ describe('FinancePage', () => {
     vi.spyOn(reconciliationApi, 'fetchReconciliationQueue').mockResolvedValue([]);
     const remindSpy = vi.spyOn(agenciesApi, 'remindAgencyInvoice').mockResolvedValue({ queued: true });
 
-    render(<FinancePage />);
+    renderFinancePage();
     expect(await screen.findByText('تراکنش‌های مالی اخیر')).toBeInTheDocument();
     expect(screen.getByText('تسویه حساب')).toBeInTheDocument();
     expect(screen.getByText('تسویه‌حساب آژانس‌های همکار')).toBeInTheDocument();
@@ -130,7 +142,6 @@ describe('FinancePage', () => {
   it('shows the payment-reconciliation queue and resolves an item with a required note', async () => {
     mockRole('FINANCE_MANAGER');
     vi.spyOn(reportingApi, 'fetchKpis').mockResolvedValue(KPIS);
-    vi.spyOn(reportingApi, 'fetchLowSalesAlerts').mockResolvedValue([]);
     vi.spyOn(reportingApi, 'fetchCompletedFlightsSummary').mockResolvedValue(FLIGHTS);
     vi.spyOn(reportingApi, 'fetchRecentTransactions').mockResolvedValue(TX);
     vi.spyOn(reportingApi, 'fetchRevenueMix').mockResolvedValue(MIX);
@@ -140,7 +151,7 @@ describe('FinancePage', () => {
       .spyOn(reconciliationApi, 'resolveReconciliation')
       .mockResolvedValue({ ...RECONCILIATION_ITEM, bookingStatus: 'TICKETED' });
 
-    render(<FinancePage />);
+    renderFinancePage();
     expect(await screen.findByTestId('reconciliation-item')).toHaveTextContent('BJ9K2L');
     expect(screen.getByTestId('reconciliation-item')).toHaveTextContent('GW-88213');
 
@@ -162,14 +173,13 @@ describe('FinancePage', () => {
   it('FINANCE_MANAGER finance-ops view loads day granularity with Jalali date picker', async () => {
     mockRole('FINANCE_MANAGER');
     const kpiSpy = vi.spyOn(reportingApi, 'fetchKpis').mockResolvedValue(KPIS);
-    vi.spyOn(reportingApi, 'fetchLowSalesAlerts').mockResolvedValue([]);
     vi.spyOn(reportingApi, 'fetchCompletedFlightsSummary').mockResolvedValue(FLIGHTS);
     vi.spyOn(reportingApi, 'fetchRecentTransactions').mockResolvedValue(TX);
     vi.spyOn(reportingApi, 'fetchRevenueMix').mockResolvedValue(MIX);
     vi.spyOn(reportingApi, 'fetchAgencySettlements').mockResolvedValue(SETTLEMENTS);
     vi.spyOn(reconciliationApi, 'fetchReconciliationQueue').mockResolvedValue([]);
 
-    render(<FinancePage />);
+    renderFinancePage();
     await screen.findByText('تراکنش‌های مالی اخیر');
 
     const user = userEvent.setup();
@@ -196,7 +206,7 @@ describe('FinancePage', () => {
     vi.spyOn(reportingApi, 'fetchCompletedFlightsSummary').mockResolvedValue(FLIGHTS);
     vi.spyOn(reportingApi, 'fetchRevenueMix').mockResolvedValue(MIX);
 
-    render(<FinancePage />);
+    renderFinancePage();
     expect(await screen.findByText('نمودار فروش')).toBeInTheDocument();
     expect(screen.getByText('ترکیب درآمد')).toBeInTheDocument();
     expect(screen.queryByText('تراکنش‌های مالی اخیر')).not.toBeInTheDocument();

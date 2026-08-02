@@ -1,15 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useOutletContext } from 'react-router-dom';
 import { fetchCartable } from '../../api/cartable';
-import {
-  fetchCommercialOverview,
-  fetchLowSalesAlerts,
-  fetchRevenueMix,
-} from '../../api/reporting';
+import { fetchCommercialOverview, fetchRevenueMix } from '../../api/reporting';
 import type { CartableListResult } from '../../types/cartable';
-import type { CommercialOverview, LowSalesAlert, RevenueMixResult } from '../../types/reporting';
+import type { CommercialOverview, RevenueMixResult } from '../../types/reporting';
+import type { PanelShellContext } from '../../types/panel-shell';
 import { faDigits, faMoney, faPercent } from '../../lib/fa-format';
-import { formatJalaliDateTime } from '../../lib/jalali';
+import LowSalesBanner from '../../components/LowSalesBanner';
+import PanelNotifBell from '../../components/PanelNotifBell';
 
 const MIX_COLORS = { SYSTEM: '#1668c4', CHARTER: '#a855f7', AGENCY: '#059669' };
 
@@ -34,29 +32,6 @@ function KpiCard({
       </div>
       <div className="font-num text-2xl font-black text-ink">{value}</div>
       <div className="mt-1 text-[11.5px] text-muted">{label}</div>
-    </div>
-  );
-}
-
-function LowSalesBanner({ alerts }: { alerts: LowSalesAlert[] }) {
-  if (alerts.length === 0) return null;
-  const a = alerts[0];
-  return (
-    <div className="mb-6 flex items-center gap-3 rounded-xl border border-[#f59e0b59] bg-[#f59e0b14] p-4">
-      <span className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-[#f59e0b29] text-[#b45309]">
-        ⚠
-      </span>
-      <div className="min-w-0 flex-1 leading-relaxed">
-        <div className="text-xs font-extrabold text-[#b45309]">
-          هشدار فروش ضعیف — کمتر از ۷۲ ساعت تا پرواز
-        </div>
-        <div className="mt-0.5 text-[11.5px] text-text-2">
-          پرواز{' '}
-          <span className="ltr font-num">{a.flightNo}</span> {a.originCode} ← {a.destCode} (
-          {formatJalaliDateTime(a.departureAt).split(' ')[0]}) تنها {faDigits(a.soldSeats)} از{' '}
-          {faDigits(a.capacity)} صندلی فروخته شده است.
-        </div>
-      </div>
     </div>
   );
 }
@@ -167,23 +142,19 @@ function CartableWidget({ cartable }: { cartable: CartableListResult }) {
 }
 
 export default function CommercialDashboardPage() {
+  const { lowSalesAlerts = [] } = useOutletContext<PanelShellContext>();
+  const bannerAlert = lowSalesAlerts[0] ?? null;
+  const notifAlerts = lowSalesAlerts.slice(1);
   const [overview, setOverview] = useState<CommercialOverview | null>(null);
   const [mix, setMix] = useState<RevenueMixResult | null>(null);
-  const [alerts, setAlerts] = useState<LowSalesAlert[]>([]);
   const [cartable, setCartable] = useState<CartableListResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([
-      fetchCommercialOverview(),
-      fetchRevenueMix({ granularity: 'year' }),
-      fetchLowSalesAlerts(),
-      fetchCartable(),
-    ])
-      .then(([ov, mixData, alertData, cartableData]) => {
+    Promise.all([fetchCommercialOverview(), fetchRevenueMix({ granularity: 'year' }), fetchCartable()])
+      .then(([ov, mixData, cartableData]) => {
         setOverview(ov);
         setMix(mixData);
-        setAlerts(alertData);
         setCartable(cartableData);
       })
       .catch(() => setError('خطا در دریافت اطلاعات داشبورد.'));
@@ -196,9 +167,12 @@ export default function CommercialDashboardPage() {
 
   return (
     <div className="p-8">
-      <div className="mb-6">
-        <h1 className="text-xl font-black text-ink">داشبورد</h1>
-        <p className="mt-1 text-sm text-muted">نمای کلی فروش و کارهای در انتظار اقدام</p>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-black text-ink">داشبورد</h1>
+          <p className="mt-1 text-sm text-muted">نمای کلی فروش و کارهای در انتظار اقدام</p>
+        </div>
+        <PanelNotifBell alerts={notifAlerts} variant="light" />
       </div>
 
       <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -219,7 +193,7 @@ export default function CommercialDashboardPage() {
         />
       </div>
 
-      <LowSalesBanner alerts={alerts} />
+      <LowSalesBanner alert={bannerAlert} variant="light" />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.7fr_1fr]">
         <ChannelSummary mix={mix} />

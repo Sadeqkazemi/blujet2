@@ -1,19 +1,13 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
-import {
-  fetchFinanceDashboardStats,
-  fetchLowSalesAlerts,
-  fetchRevenueMix,
-} from '../../api/reporting';
+import { Link, useOutletContext } from 'react-router-dom';
+import { fetchFinanceDashboardStats, fetchRevenueMix } from '../../api/reporting';
 import { fetchCartable } from '../../api/cartable';
 import type { CartableListResult } from '../../types/cartable';
 import { faDigits, faMoney, faPercent } from '../../lib/fa-format';
-import { formatJalaliDate } from '../../lib/jalali';
-import type {
-  FinanceDashboardStats,
-  LowSalesAlert,
-  RevenueMixResult,
-} from '../../types/reporting';
+import type { FinanceDashboardStats, RevenueMixResult } from '../../types/reporting';
+import type { PanelShellContext } from '../../types/panel-shell';
+import LowSalesBanner from '../../components/LowSalesBanner';
+import PanelNotifBell from '../../components/PanelNotifBell';
 
 function trendLabel(pct: number): string {
   if (pct === 0) return '۰٪';
@@ -43,38 +37,6 @@ function StatCard({
       </div>
       <div className="font-num text-[22.5px] font-black text-white">{value}</div>
       <div className="mt-1 text-[11.5px] text-[#6b7b94]">{label}</div>
-    </div>
-  );
-}
-
-function LowSalesBanner({ alerts }: { alerts: LowSalesAlert[] }) {
-  if (alerts.length === 0) return null;
-  return (
-    <div className="mb-4 flex flex-col gap-3">
-      {alerts.map((a) => (
-        <div
-          key={`${a.flightNo}-${a.departureAt}`}
-          className="flex items-center gap-[11px] rounded-[14px] border border-[rgba(245,158,11,.35)] bg-[rgba(245,158,11,.08)] px-[15px] py-[13px]"
-        >
-          <span className="flex h-9 w-9 flex-none items-center justify-center rounded-[10px] bg-[rgba(245,158,11,.16)] text-[#f59e0b]">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
-              <path d="M12 9v4M12 17h.01" />
-            </svg>
-          </span>
-          <div className="min-w-0 flex-1 leading-relaxed">
-            <div className="text-[12.5px] font-extrabold text-[#fbbf24]">
-              هشدار فروش ضعیف — کمتر از ۷۲ ساعت تا پرواز
-            </div>
-            <div className="text-[11.5px] text-[#cdd7e5]">
-              پرواز <span className="ltr font-num inline-block">{a.flightNo}</span> {a.originCode} ←{' '}
-              {a.destCode} ({formatJalaliDate(a.departureAt)}) تنها {faDigits(a.soldSeats)} از{' '}
-              {faDigits(a.capacity)} صندلی فروخته شده است. این هشدار برای مدیر عامل، مدیر ارشد، مدیر مالی و
-              مدیر بازرگانی ارسال شد.
-            </div>
-          </div>
-        </div>
-      ))}
     </div>
   );
 }
@@ -214,9 +176,11 @@ function CartableWidget({ cartable }: { cartable: CartableListResult }) {
 }
 
 export default function DashboardPage() {
+  const { lowSalesAlerts = [] } = useOutletContext<PanelShellContext>();
+  const bannerAlert = lowSalesAlerts[0] ?? null;
+  const notifAlerts = lowSalesAlerts.slice(1);
   const [stats, setStats] = useState<FinanceDashboardStats | null>(null);
   const [mix, setMix] = useState<RevenueMixResult | null>(null);
-  const [alerts, setAlerts] = useState<LowSalesAlert[]>([]);
   const [cartable, setCartable] = useState<CartableListResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -227,14 +191,12 @@ export default function DashboardPage() {
     Promise.all([
       fetchFinanceDashboardStats(),
       fetchRevenueMix({ granularity: 'year' }),
-      fetchLowSalesAlerts(),
       fetchCartable(),
     ])
-      .then(([statsData, mixData, alertData, cartableData]) => {
+      .then(([statsData, mixData, cartableData]) => {
         if (cancelled) return;
         setStats(statsData);
         setMix(mixData);
-        setAlerts(alertData);
         setCartable(cartableData);
       })
       .catch(() => {
@@ -263,12 +225,7 @@ export default function DashboardPage() {
             </svg>
             <span>جستجو…</span>
           </div>
-          <div className="flex h-[42px] w-[42px] items-center justify-center rounded-[10px] border border-[#28344c] bg-[#18223a] text-[#9fb0c7]">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-              <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-              <path d="M13.5 21a2 2 0 0 1-3 0" />
-            </svg>
-          </div>
+          <PanelNotifBell alerts={notifAlerts} variant="dark" />
         </div>
       </div>
 
@@ -335,7 +292,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <LowSalesBanner alerts={alerts} />
+      <LowSalesBanner alert={bannerAlert} variant="dark" />
 
       {mix && cartable && (
         <div className="grid grid-cols-1 items-start gap-[15px] lg:grid-cols-[1.7fr_1fr]">

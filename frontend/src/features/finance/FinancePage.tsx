@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
+import { useOutletContext } from 'react-router-dom';
 import {
   fetchAgencySettlements,
   fetchCompletedFlightsSummary,
   fetchKpis,
-  fetchLowSalesAlerts,
   fetchRecentTransactions,
   fetchRevenueMix,
   fetchSalesChart,
 } from '../../api/reporting';
+import LowSalesBanner from '../../components/LowSalesBanner';
+import type { PanelShellContext } from '../../types/panel-shell';
 import { remindAgencyInvoice } from '../../api/agencies';
 import { fetchReconciliationQueue, resolveReconciliation } from '../../api/reconciliation';
 import { faDigits, faMoney, faPercent } from '../../lib/fa-format';
@@ -21,7 +23,6 @@ import type {
   AgencySettlementsResult,
   CompletedFlightsSummary,
   KpiResult,
-  LowSalesAlert,
   RecentTransactionsResult,
   RevenueMixResult,
   SalesChartPeriod,
@@ -104,32 +105,6 @@ function CompletedFlightsCard({ flights }: { flights: CompletedFlightsSummary })
           <div className="font-num mt-1 text-sm font-black text-danger">{faDigits(flights.unsoldSeats)}</div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function LowSalesBanner({ alerts }: { alerts: LowSalesAlert[] }) {
-  if (alerts.length === 0) return null;
-  return (
-    <div className="mb-6 flex flex-col gap-3">
-      {alerts.map((a) => (
-        <div
-          key={`${a.flightNo}-${a.departureAt}`}
-          className="flex items-center gap-3 rounded-xl border border-[#f59e0b59] bg-[#f59e0b14] p-4"
-        >
-          <span className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-[#f59e0b29] text-[#b45309]">
-            ⚠
-          </span>
-          <div className="text-xs leading-6">
-            <div className="font-extrabold text-[#b45309]">هشدار فروش ضعیف — کمتر از ۷۲ ساعت تا پرواز</div>
-            <div className="text-text-2">
-              پرواز <span className="ltr font-num inline-block">{a.flightNo}</span> {a.originCode} ← {a.destCode} (
-              {formatJalaliDate(a.departureAt)}) تنها {faDigits(a.soldSeats)} از {faDigits(a.capacity)} صندلی فروخته
-              شده است.
-            </div>
-          </div>
-        </div>
-      ))}
     </div>
   );
 }
@@ -302,9 +277,10 @@ function ReconciliationQueueCard({
 /** FINANCE_MANAGER's finance-ops layout — the only panel with transactions
  * and agency settlements, per the design. */
 function FinanceOpsView() {
+  const { lowSalesAlerts = [] } = useOutletContext<PanelShellContext>();
+  const bannerAlert = lowSalesAlerts[0] ?? null;
   const chart = useSalesChartQuery({ includeFlightMode: false });
   const [kpis, setKpis] = useState<KpiResult | null>(null);
-  const [alerts, setAlerts] = useState<LowSalesAlert[]>([]);
   const [flights, setFlights] = useState<CompletedFlightsSummary | null>(null);
   const [tx, setTx] = useState<RecentTransactionsResult | null>(null);
   const [mix, setMix] = useState<RevenueMixResult | null>(null);
@@ -318,16 +294,14 @@ function FinanceOpsView() {
 
     Promise.all([
       fetchKpis(chart.query),
-      fetchLowSalesAlerts(),
       fetchCompletedFlightsSummary(chart.query),
       fetchRecentTransactions(),
       fetchRevenueMix(chart.query),
       fetchAgencySettlements(),
       fetchReconciliationQueue(),
     ])
-      .then(([k, a, f, t, m, s, r]) => {
+      .then(([k, f, t, m, s, r]) => {
         setKpis(k);
-        setAlerts(a);
         setFlights(f);
         setTx(t);
         setMix(m);
@@ -425,7 +399,7 @@ function FinanceOpsView() {
         ))}
       </div>
 
-      <LowSalesBanner alerts={alerts} />
+      <LowSalesBanner alert={bannerAlert} variant="light" />
 
       <ReconciliationQueueCard items={reconciliation} onResolve={onResolveReconciliation} />
 
