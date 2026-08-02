@@ -14,7 +14,14 @@ import LowSalesBanner from '../../components/LowSalesBanner';
 import type { PanelShellContext } from '../../types/panel-shell';
 import { remindAgencyInvoice } from '../../api/agencies';
 import { fetchReconciliationQueue, resolveReconciliation } from '../../api/reconciliation';
-import { faDigits, faMoney, faMoneyCompact, faMoneyCompactNumber, faPercent } from '../../lib/fa-format';
+import {
+  faDigits,
+  faMoney,
+  faMoneyCompact,
+  faMoneyCompactNumber,
+  faPercent,
+  latinDigits,
+} from '../../lib/fa-format';
 import { dayjs, formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
 import SalesBarChart from '../../components/SalesBarChart';
 import SalesChartControls from '../../components/SalesChartControls';
@@ -771,6 +778,18 @@ function ChannelSummaryTiles({
   );
 }
 
+/** Filter flight rows by number/route — never re-sort the full list. */
+function filterFlightSalesRows(rows: FlightSalesRow[], search: string): FlightSalesRow[] {
+  const raw = search.trim();
+  if (!raw) return rows;
+  const q = latinDigits(raw).toLowerCase();
+  return rows.filter((r) => {
+    const flightNo = latinDigits(r.flightNo).toLowerCase();
+    const route = `${r.originCityFa} ${r.destCityFa} ${r.originCode} ${r.destCode}`.toLowerCase();
+    return flightNo.includes(q) || route.includes(q) || r.originCityFa.includes(raw) || r.destCityFa.includes(raw);
+  });
+}
+
 function FlightSalesPicker({
   rows,
   selectedId,
@@ -784,17 +803,8 @@ function FlightSalesPicker({
   search: string;
   onSearchChange: (v: string) => void;
 }) {
-  const q = search.trim().toLowerCase();
-  const filtered = q
-    ? rows.filter(
-        (r) =>
-          r.flightNo.toLowerCase().includes(q) ||
-          r.originCityFa.includes(search.trim()) ||
-          r.destCityFa.includes(search.trim()) ||
-          r.originCode.toLowerCase().includes(q) ||
-          r.destCode.toLowerCase().includes(q),
-      )
-    : rows;
+  // Search filters to matching flights only (does not sort the master list).
+  const filtered = filterFlightSalesRows(rows, search);
 
   if (rows.length === 0) {
     return (
@@ -953,6 +963,18 @@ function FinanceAnalyticView() {
       cancelled = true;
     };
   }, [isFlightMode]);
+
+  // Search shows matching flights only and selects the first hit so its
+  // summary tiles update — never keeps a hidden selection or re-sorts.
+  useEffect(() => {
+    if (!isFlightMode || flightRows.length === 0) return;
+    const matches = filterFlightSalesRows(flightRows, flightSearch);
+    if (matches.length === 0) return;
+    setSelectedFlightId((prev) => {
+      if (prev && matches.some((r) => r.flightInstanceId === prev)) return prev;
+      return matches[0].flightInstanceId;
+    });
+  }, [isFlightMode, flightRows, flightSearch]);
 
   if (error) return <p className="text-sm text-[#f87171]">{error}</p>;
   if (!flights || !mix) return <p className="text-sm text-[#6b7b94]">در حال بارگذاری…</p>;
