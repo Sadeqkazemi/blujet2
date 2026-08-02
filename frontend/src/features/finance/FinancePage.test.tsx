@@ -298,34 +298,42 @@ describe('FinancePage', () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'شماره پرواز' }));
 
-    expect(await screen.findByText('تهران ← دبی')).toBeInTheDocument();
-    expect(screen.getByText('مشهد ← تهران')).toBeInTheDocument();
-    expect(screen.getByLabelText('جستجوی شماره پرواز یا مسیر')).toBeInTheDocument();
-    expect(screen.getByText('پرواز EP-805')).toBeInTheDocument();
-    expect(screen.getByTestId('flight-sales-list').className).toContain('flex-col');
+    // No flight cards by default — only the search box + prompt.
+    expect(await screen.findByLabelText('جستجوی شماره پرواز یا مسیر')).toBeInTheDocument();
+    expect(screen.getByText('شماره پرواز یا مسیر را جستجو کنید.')).toBeInTheDocument();
+    expect(screen.queryByTestId('flight-sales-list')).not.toBeInTheDocument();
+    expect(screen.queryByText('تهران ← دبی')).not.toBeInTheDocument();
+    expect(screen.queryByText('مشهد ← تهران')).not.toBeInTheDocument();
 
-    // Exactly one card per flight number (3 EP-805 instances → 1 box).
+    // Search reveals matching flights (one card per flightNo).
+    await user.type(screen.getByLabelText('جستجوی شماره پرواز یا مسیر'), 'EP-805');
+    expect(screen.queryByText('شماره پرواز یا مسیر را جستجو کنید.')).not.toBeInTheDocument();
+    expect(screen.getByTestId('flight-sales-list').className).toContain('flex-col');
     expect(screen.getAllByRole('button', { name: /تهران ← دبی/ })).toHaveLength(1);
+    expect(screen.queryByText('مشهد ← تهران')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /تهران ← دبی/ })).toHaveTextContent('۳ پرواز');
     // Aggregated sales: 4.0B + 4.53B + 2.0B rial = 10.53B → 1.053B toman → «۱٫۱ میلیارد»
     expect(screen.getByRole('button', { name: /تهران ← دبی/ })).toHaveTextContent('۱٫۱ میلیارد');
+    expect(screen.getByText('پرواز EP-805')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /تهران ← دبی/ })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
 
-    // Clicking another flight updates the selected-flight summary tiles.
+    // Broader search can show multiple cards; clicking updates the summary.
+    await user.clear(screen.getByLabelText('جستجوی شماره پرواز یا مسیر'));
+    await user.type(screen.getByLabelText('جستجوی شماره پرواز یا مسیر'), 'تهران');
+    expect(screen.getByText('تهران ← دبی')).toBeInTheDocument();
+    expect(screen.getByText('مشهد ← تهران')).toBeInTheDocument();
     const w5Card = screen.getByRole('button', { name: /مشهد ← تهران/ });
     await user.click(w5Card);
     expect(w5Card).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByText('پرواز W5-098')).toBeInTheDocument();
     expect(screen.getAllByText('۴۳۴ میلیون').length).toBeGreaterThanOrEqual(1);
 
-    // Search filters to matching flights only — still a single box for EP-805.
+    // Clearing search hides cards again (no default box).
     await user.clear(screen.getByLabelText('جستجوی شماره پرواز یا مسیر'));
-    await user.type(screen.getByLabelText('جستجوی شماره پرواز یا مسیر'), 'EP-805');
-    expect(screen.queryByText('مشهد ← تهران')).not.toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: /تهران ← دبی/ })).toHaveLength(1);
-    expect(screen.getByText('پرواز EP-805')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /تهران ← دبی/ })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    expect(screen.getByText('شماره پرواز یا مسیر را جستجو کنید.')).toBeInTheDocument();
+    expect(screen.queryByTestId('flight-sales-list')).not.toBeInTheDocument();
   });
 });
