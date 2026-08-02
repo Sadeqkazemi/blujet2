@@ -271,7 +271,16 @@ describe('FinancePage', () => {
     expect(screen.getByText('مشهد ← تهران')).toBeInTheDocument();
     expect(screen.getByLabelText('جستجوی شماره پرواز یا مسیر')).toBeInTheDocument();
     expect(screen.getByText('پرواز EP-805')).toBeInTheDocument();
+    expect(screen.getByTestId('flight-sales-list').className).toContain('flex-col');
 
+    // Clicking another flight updates the selected-flight summary tiles.
+    const w5Card = screen.getByRole('button', { name: /مشهد ← تهران/ });
+    await user.click(w5Card);
+    expect(w5Card).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('پرواز W5-098')).toBeInTheDocument();
+    expect(screen.getAllByText('۴۳۴ میلیون').length).toBeGreaterThanOrEqual(1);
+
+    await user.clear(screen.getByLabelText('جستجوی شماره پرواز یا مسیر'));
     await user.type(screen.getByLabelText('جستجوی شماره پرواز یا مسیر'), 'W5');
     expect(screen.queryByText('تهران ← دبی')).not.toBeInTheDocument();
     expect(screen.getByText('مشهد ← تهران')).toBeInTheDocument();

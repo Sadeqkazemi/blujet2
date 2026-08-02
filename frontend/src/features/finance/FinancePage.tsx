@@ -833,7 +833,10 @@ function FlightSalesPicker({
           پروازی با این مشخصات یافت نشد.
         </div>
       ) : (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(228px,1fr))] gap-[9px]">
+        <div
+          className="flex max-h-[320px] max-w-[430px] flex-col gap-[9px] overflow-y-auto pe-1"
+          data-testid="flight-sales-list"
+        >
           {filtered.map((r) => {
             const on = r.flightInstanceId === selectedId;
             return (
@@ -841,9 +844,10 @@ function FlightSalesPicker({
                 key={r.flightInstanceId}
                 type="button"
                 onClick={() => onSelect(r)}
-                className={`flex items-center justify-between gap-2.5 rounded-xl border px-[13px] py-[11px] text-start transition ${
+                aria-pressed={on}
+                className={`flex w-full items-center justify-between gap-2.5 rounded-xl border px-[13px] py-[11px] text-start transition ${
                   on
-                    ? 'border-[#3b82f6] bg-[rgba(59,130,246,.16)]'
+                    ? 'border-[#3b82f6] bg-[rgba(59,130,246,.16)] shadow-[0_0_0_1px_rgba(59,130,246,.35)]'
                     : 'border-[#1f2a3d] bg-[#141d2e] hover:border-[#28344c]'
                 }`}
               >
@@ -963,13 +967,23 @@ function FinanceAnalyticView() {
   };
   const barTotal = barSums.system + barSums.charter + barSums.agency;
 
+  // Seat strip aggregates every departed instance of the selected flightNo
+  // (design: «۳ پرواز / ۵۰۴ صندلی» for EP-805), while channel tiles follow
+  // the clicked card's own sales.
+  const siblingFlights = selectedFlight
+    ? flightRows.filter((r) => r.flightNo === selectedFlight.flightNo)
+    : [];
   const flightSeats: CompletedFlightsSummary | null = selectedFlight
-    ? {
-        flightCount: 1,
-        totalSeats: selectedFlight.capacity,
-        soldSeats: selectedFlight.soldSeats,
-        unsoldSeats: Math.max(0, selectedFlight.capacity - selectedFlight.soldSeats),
-      }
+    ? (() => {
+        const totalSeats = siblingFlights.reduce((s, r) => s + r.capacity, 0);
+        const soldSeats = siblingFlights.reduce((s, r) => s + r.soldSeats, 0);
+        return {
+          flightCount: siblingFlights.length,
+          totalSeats,
+          soldSeats,
+          unsoldSeats: Math.max(0, totalSeats - soldSeats),
+        };
+      })()
     : null;
 
   return (
