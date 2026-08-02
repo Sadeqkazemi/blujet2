@@ -50,7 +50,7 @@ export default function OwnSecurityPage() {
       .catch(() => setManaged([]));
   }
 
-  useEffect(reload, []);
+  useEffect(reload, [user?.role]);
 
   async function onSubmitOwn(e: FormEvent) {
     e.preventDefault();
