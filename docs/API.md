@@ -1502,11 +1502,12 @@ sc-if blocks: **not** gate/baggage/delay tracking — the design's own copy
 is "فروش هر پرواز ۵ ساعت مانده به زمان پرواز به‌صورت خودکار بسته می‌شود و
 لیست کامل مسافران به‌صورت اتومات در سامانه نیرا بارگذاری می‌گردد" (sale
 auto-closes 5h before departure; the full passenger list auto-uploads to
-سامانه نیرا, Iran's civil aviation manifest system). Only `super`(CEO)/
-`siteAdmin`/`finance`/`commercial` have `flightops` in that file's
-`roleDefs` — no other design file references the key at all.
+سامانه نیرا, Iran's civil aviation manifest system). The CEO design
+sidebar has no `flightops` entry — API access is
+`SITE_ADMIN` / `FINANCE_MANAGER` / `COMMERCIAL_MANAGER` (SITE_ADMIN nav
+exposes the tab).
 
-- `GET /flightops` (new; `CEO`, `SITE_ADMIN`, `FINANCE_MANAGER`,
+- `GET /flightops` (new; `SITE_ADMIN`, `FINANCE_MANAGER`,
   `COMMERCIAL_MANAGER`) — KPI counts (کل پروازها / باز / بسته‌شده-در‌نیرا /
   مجموع مسافران) + row list, scoped to `SCHEDULED` instances only, ordered
   by soonest departure. Each read lazily materializes any instance that
@@ -2457,13 +2458,8 @@ pass unmodified; 2 new tests (en, ar). See
 Found during the earlier design-bundle audit: `design-reference-v2/پنل
 مدیر بازرگانی.dc.html` has a `clubrules` tab
 ("تعیین حد نصاب امتیاز برای هر سطح عضویت باشگاه مشتریان — برای همه اعضا
-یکسان اعمال می‌شود") that was never built. Per that same design file's
-own `roleDefs.access` arrays, only `super` (CEO) and `commercial`
-(COMMERCIAL_MANAGER) list `clubrules` — `finance` (FINANCE_MANAGER) and
-`siteAdmin` (SITE_ADMIN) do not, and no other executive-panel design file
-(`پنل مدیر ارشد.dc.html`, `پنل رئیس هیئت مدیره.dc.html`, etc.) mentions
-`clubrules` at all — so this stays CEO + COMMERCIAL_MANAGER only, not the
-broader access pattern some other tabs use.
+یکسان اعمال می‌شود"). The CEO design sidebar (`پنل مدیر عامل.dc.html`)
+has no `clubrules` entry — so this tab/API is COMMERCIAL_MANAGER only.
 
 Today `ClubMember.level` (SILVER/GOLD/PLATINUM) is set once at creation
 and only ever changed by an explicit `PATCH /club/members/:id/level`
@@ -2480,7 +2476,7 @@ balance changes (a real purchase earning points, or a redemption) — not
 just a passive settings screen.
 
 ### New: `GET /club/tier-rules`, `PATCH /club/tier-rules`
-- Roles: `CEO`, `COMMERCIAL_MANAGER` only (see access-list note above).
+- Roles: `COMMERCIAL_MANAGER` only (see access-list note above).
 - `GET` returns the single `ClubTierRule` row (seeded once via
   `typeorm/seed.ts`, lazily created on first read if somehow absent):
   `{ goldMinPoints, platinumMinPoints, cardRequestMinPoints, updatedAt,

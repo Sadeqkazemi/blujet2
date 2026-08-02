@@ -75,15 +75,15 @@ describe('Panels (e2e)', () => {
       'finance',
       'cartable',
       'club',
-      'clubrules',
       'survey',
       'mgrreports',
       'pricing',
-      'flightops',
       'panels',
       'security',
       'logs',
     ]);
+    expect(keys).not.toContain('clubrules');
+    expect(keys).not.toContain('flightops');
   });
 
   it('an EMPLOYEE with no granted permissions still gets dashboard + referrals, not an error', async () => {
