@@ -13,6 +13,7 @@ import { faDigits, faMoney } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
 import Modal from '../../components/Modal';
 import { useAuth } from '../../hooks/useAuth';
+import FlightSeatMapModal from './FlightSeatMapModal';
 import type {
   AgencyApiAccessRow,
   BookingStatus,
@@ -128,6 +129,7 @@ export default function ReservationPage() {
   const [agencies, setAgencies] = useState<AgencyApiAccessRow[] | null>(null);
   const [flights, setFlights] = useState<ReservationFlightRow[] | null>(null);
   const [flightQ, setFlightQ] = useState('');
+  const [seatMapFlightId, setSeatMapFlightId] = useState<string | null>(null);
 
   const loadStats = useCallback(async () => {
     try {
@@ -621,9 +623,11 @@ export default function ReservationPage() {
             flights.map((f) => {
               const st = FLIGHT_STATUS[f.statusKey];
               return (
-                <div
+                <button
                   key={f.flightInstanceId}
-                  className="grid grid-cols-[1.4fr_0.9fr_1.1fr_0.9fr_0.9fr_0.9fr] items-center border-b border-[#16202e] px-[15px] py-3 text-xs last:border-0"
+                  type="button"
+                  onClick={() => setSeatMapFlightId(f.flightInstanceId)}
+                  className="grid w-full grid-cols-[1.4fr_0.9fr_1.1fr_0.9fr_0.9fr_0.9fr] items-center border-b border-[#16202e] px-[15px] py-3 text-right text-xs transition last:border-0 hover:bg-[#18223a]"
                 >
                   <span className="font-bold text-[#e7ecf3]">{f.route}</span>
                   <span className="font-num ltr text-[#9fb0c7]">{f.flightNo}</span>
@@ -643,11 +647,23 @@ export default function ReservationPage() {
                   <span className={`w-max rounded-[14px] px-2.5 py-1 text-[10.5px] font-bold ${st.className}`}>
                     {st.label}
                   </span>
-                </div>
+                </button>
               );
             })
           )}
         </section>
+      )}
+
+      {seatMapFlightId && (
+        <FlightSeatMapModal
+          flightInstanceId={seatMapFlightId}
+          onClose={() => setSeatMapFlightId(null)}
+          lockDisabledNote={
+            user?.role === 'IT_MANAGER'
+              ? 'مدیر فناوری اطلاعات امکان قفل دستی صندلی را ندارد؛ فقط مشاهدهٔ وضعیت و مشخصات رزروکننده.'
+              : 'در این نما فقط مشاهدهٔ نقشه و رزرو فعال است؛ قفل دستی از این پاپ‌آپ انجام نمی‌شود.'
+          }
+        />
       )}
 
       {detailPnr && detail && (

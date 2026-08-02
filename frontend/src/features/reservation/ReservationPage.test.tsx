@@ -191,10 +191,41 @@ describe('ReservationPage', () => {
     expect(screen.getByText('bjk_••••abcd')).toBeInTheDocument();
   });
 
-  it('flights tab renders occupancy rows or empty state', async () => {
+  it('flights tab renders occupancy rows and opens the seat-map modal on row click', async () => {
     mockRole('IT_MANAGER');
     vi.spyOn(reservationApi, 'fetchReservationDashboardStats').mockResolvedValue(STATS);
     vi.spyOn(reservationApi, 'fetchReservationFlights').mockResolvedValue(FLIGHTS);
+    vi.spyOn(reservationApi, 'fetchSeatMap').mockResolvedValue({
+      flightInstanceId: 'fi1',
+      aircraftType: 'MD-80',
+      flightNo: 'EP-821',
+      originCode: 'THR',
+      destCode: 'DXB',
+      originCityFa: 'تهران',
+      destCityFa: 'دبی',
+      departureAt: '2026-08-01T05:00:00.000Z',
+      capacity: 1,
+      soldCount: 0,
+      lockedCount: 0,
+      freeCount: 1,
+      occupancyPct: 0,
+      cabinLayout: { BUSINESS: { aisleAfterIndex: 2 }, ECONOMY: { aisleAfterIndex: 2 } },
+      rows: [
+        {
+          row: 3,
+          cabin: 'BUSINESS',
+          seats: [
+            {
+              seatCode: '3A',
+              status: 'FREE',
+              lockId: null,
+              lockExpiresAt: null,
+              passenger: null,
+            },
+          ],
+        },
+      ],
+    });
 
     render(<ReservationPage />);
     const user = userEvent.setup();
@@ -203,6 +234,10 @@ describe('ReservationPage', () => {
     expect(await screen.findByText('EP-821')).toBeInTheDocument();
     expect(screen.getByText('در حال فروش')).toBeInTheDocument();
     expect(screen.getByText('MD-80')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /EP-821/ }));
+    expect(await screen.findByRole('dialog', { name: 'نقشه صندلی‌ها' })).toBeInTheDocument();
+    expect(screen.getByText(/امکان قفل دستی صندلی را ندارد/)).toBeInTheDocument();
   });
 
   it('a canLock role can mark a TICKETED booking as no-show', async () => {

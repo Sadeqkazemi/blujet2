@@ -20,9 +20,10 @@ seed's ambiguous historical/demo instances).
 
 ### Seat map & locking
 - [x] `GET /reservation/seatmap/:flightInstanceId` computed from `AircraftSeatMap` + sold `Passenger.seatCode` + active `SeatLock`s; correct row/column layout — `'GET /reservation/seatmap/:id computes rows from AircraftSeatMap with correct capacity'`
-- [x] `POST /reservation/seatmap/:id/lock`: canLock roles only (403 for SENIOR_MANAGER); 409 on already-sold/-locked seat; PII encrypted+hashed, never returned in plaintext; audited (RESERVATION) — `'POST lock: canLock roles only, 409 on already-locked, encrypted PII never returned, audited'`
+- [x] `POST /reservation/seatmap/:id/lock`: canSeatLock roles only (`CEO`/`BOARD_CHAIR`; 403 for SENIOR_MANAGER and IT_MANAGER); 409 on already-sold/-locked seat; PII encrypted+hashed, never returned in plaintext; audited (RESERVATION) — `'POST lock: canLock roles only, 409 on already-locked, encrypted PII never returned, audited'` (includes IT → 403)
 - [x] Concurrent lock attempts on the same seat: exactly one succeeds (DB partial-unique-index enforced) — `'concurrent lock attempts on the same seat: exactly one succeeds (DB-enforced)'` (5 parallel requests, 1×201/4×409)
-- [x] `PATCH /reservation/seatmap/locks/:id/release`: canLock only; 409 on already-released; seat relockable after release — `'PATCH release: canLock only, 409 on already-released, seat becomes lockable again'`
+- [x] `PATCH /reservation/seatmap/locks/:id/release`: canSeatLock only; 409 on already-released; seat relockable after release — `'PATCH release: canLock only, 409 on already-released, seat becomes lockable again'`
+- [x] `GET /reservation/seatmap/:id` includes sold-seat passenger `{ fullName, pnr, nationalId, bookingStatus, priceIrr }` for staff panels — `'GET /reservation/seatmap/:id includes sold-seat passenger details for staff'`
 
 ### PNR management
 - [x] `GET /reservation/pnr` grouped-by-flight, `q=` filters PNR/passenger name — `'GET /reservation/pnr lists grouped by flight and q= filters by PNR/passenger'`
@@ -45,6 +46,7 @@ seed's ambiguous historical/demo instances).
 - [x] PNR search (PNR + last name) + recent table + detail modal (change/cancel/no-show for canLock) — `'PNR tab lists recent bookings…'` / no-show tests
 - [x] Agency API access list or empty state — `'agency tab shows empty state…'` / `'agency tab lists agencies…'`
 - [x] Flights occupancy table — `'flights tab renders occupancy rows or empty state'`
+- [x] Flights tab: click a flight → seat-map popup; sold seat shows reserver name; IT cannot lock — `FlightSeatMapModal.test.tsx` + `'clicking a flight opens the seat-map popup (IT cannot lock)'`
 - [x] SENIOR_MANAGER view-only detail modal — `'SENIOR_MANAGER is view-only in the detail modal'`
 - [x] Role isolation: FINANCE_MANAGER/COMMERCIAL_MANAGER have no reservation nav entry — E2E
 
@@ -85,8 +87,8 @@ a new screen.
 
 ### Deferred (scoped out with reasons, not silently dropped)
 - Ticket print/PDF generation — no «چاپ بلیط» button wired this phase; a real PDF pipeline needs the public-site track's e-ticket template.
-- Flight/schedule/capacity **creation** UI («+ تعریف پرواز جدید») — Phase 10 `/flights/*`; the reservation shell only lists SCHEDULED occupancy.
-- In-panel seat-map / «رزرو جدید» operational chrome from Phase 9 frontend — superseded by v2 `ReservationSystem` tabs; seatmap/issue APIs remain for backend/E2E helpers.
+- Flight/schedule/capacity **creation** UI («+ تعریف پرواز جدید») — Phase 10 `/flights/*`; the reservation shell lists SCHEDULED occupancy and opens a view-only seat-map popup (no create-flight control in this tab).
+- Operational «رزرو جدید» chrome from Phase 9 — superseded by v2 tabs; seatmap/issue APIs remain (seat map is now the پروازها popup, view-only for IT).
 - Managerial seat-lock request/approval queue (`PATCH
   /reservation/seatmap/locks/:id/approve`/`reject`, `POST
   /reservation/pnr/from-lock/:lockId`) — still deliberately backend-only;
