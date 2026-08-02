@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { Controller, Get, Module, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { PrismaService } from '../../prisma/prisma.service';
+import { InjectRepository, TypeOrmModule } from '@nestjs/typeorm';
+import { In, Not, Repository } from 'typeorm';
+import { User } from '../../database/entities/user.entity';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -14,29 +16,31 @@ import {
   STAFF_ROLES,
 } from '../../common/exec-roles';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import type { Role } from '../../../generated/prisma/enums';
+import type { Role } from '../../database/enums';
 
 @Injectable()
 export class StaffDirectoryService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @InjectRepository(User) private readonly userRepo: Repository<User>,
+  ) {}
 
   /** Active staff accounts for the transfer/refer/recipient pickers — never
    * includes customers/agencies, never includes the caller themselves.
    * EMPLOYEE callers only see exec managers (message-to-manager picker). */
   async list(excludeUserId: string, actorRole?: AuthenticatedUser['role']) {
-    const roleFilter =
+    const roles: Role[] =
       actorRole === 'EMPLOYEE'
-        ? { in: [...EXEC_ROLES, 'IT_MANAGER', 'SITE_ADMIN'] as Role[] }
-        : { in: [...STAFF_ROLES] as Role[] };
+        ? [...EXEC_ROLES, 'IT_MANAGER', 'SITE_ADMIN']
+        : [...STAFF_ROLES];
 
-    const users = await this.prisma.user.findMany({
+    const users = await this.userRepo.find({
       where: {
-        role: roleFilter,
+        role: In(roles),
         isActive: true,
-        id: { not: excludeUserId },
+        id: Not(excludeUserId),
       },
       select: { id: true, fullName: true, role: true },
-      orderBy: { fullName: 'asc' },
+      order: { fullName: 'ASC' },
     });
     return users.map((u) => ({ ...u, roleLabelFa: ROLE_LABELS_FA[u.role] }));
   }
@@ -59,6 +63,7 @@ export class StaffDirectoryController {
 }
 
 @Module({
+  imports: [TypeOrmModule.forFeature([User])],
   controllers: [StaffDirectoryController],
   providers: [StaffDirectoryService],
   exports: [StaffDirectoryService],

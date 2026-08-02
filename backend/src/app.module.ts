@@ -6,6 +6,7 @@ import { LoggerModule } from 'nestjs-pino';
 import { randomUUID } from 'node:crypto';
 import { validateEnv } from './config/env.validation';
 import { PrismaModule } from './prisma/prisma.module';
+import { DatabaseModule } from './database/database.module';
 import { RedisModule } from './redis/redis.module';
 import { HealthModule } from './health/health.module';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
@@ -82,6 +83,7 @@ import { WebservicePricingModule } from './modules/webservice-pricing/webservice
     }),
     CommonModule,
     PrismaModule,
+    DatabaseModule,
     RedisModule,
     HealthModule,
     AuthModule,
