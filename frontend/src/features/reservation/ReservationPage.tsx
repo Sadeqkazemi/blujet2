@@ -210,11 +210,13 @@ export default function ReservationPage() {
   }
 
   return (
-    <div className="p-8">
+    <div className="px-[21px] pb-[34px] pt-[18px]">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-black text-panel-ink">سامانه رزرواسیون</h1>
-          <p className="mt-1 text-sm text-panel-muted">مدیریت رزروها، نقشهٔ صندلی و صدور دستی PNR</p>
+          <h1 className="text-[20.5px] font-black text-white">سامانه رزرواسیون پرواز</h1>
+          <p className="mt-1 text-[11.5px] text-[#6b7b94]">
+            جستجو و رزرو، مدیریت PNRها، صدور بلیط و دسترسی API آژانس‌ها
+          </p>
         </div>
         {stats && (
           <div className="flex gap-3 text-xs">
@@ -392,19 +394,20 @@ export default function ReservationPage() {
 
       {seatFormOpen && (
         <Modal
+          variant="dark"
           title={seatFormMode === 'lock' ? `لاک مدیریتی صندلی ${selectedSeat}` : `صدور PNR — صندلی ${selectedSeat}`}
           onClose={() => setSeatFormOpen(false)}
         >
-          <label className="mb-1 block text-xs font-bold text-ink" htmlFor="seat-pname">
+          <label className="mb-1 block text-xs font-bold text-[#e7ecf3]" htmlFor="seat-pname">
             نام و نام خانوادگی{seatFormMode === 'issue' ? '' : ' (اختیاری)'}
           </label>
           <input
             id="seat-pname"
             value={seatForm.name}
             onChange={(e) => setSeatForm({ ...seatForm, name: e.target.value })}
-            className="mb-3 w-full rounded-lg border border-border p-3 text-xs outline-none focus:border-accent"
+            className="mb-3 w-full rounded-lg border border-[#1f2a3d] bg-[#0f1726] p-3 text-xs text-[#e7ecf3] outline-none focus:border-[#3b82f6]"
           />
-          <label className="mb-1 block text-xs font-bold text-ink" htmlFor="seat-nid">
+          <label className="mb-1 block text-xs font-bold text-[#e7ecf3]" htmlFor="seat-nid">
             کد ملی (اختیاری)
           </label>
           <input
@@ -412,13 +415,19 @@ export default function ReservationPage() {
             dir="ltr"
             value={seatForm.nid}
             onChange={(e) => setSeatForm({ ...seatForm, nid: e.target.value })}
-            className="font-num mb-3 w-full rounded-lg border border-border p-3 text-xs outline-none focus:border-accent"
+            className="font-num mb-3 w-full rounded-lg border border-[#1f2a3d] bg-[#0f1726] p-3 text-xs text-[#e7ecf3] outline-none focus:border-[#3b82f6]"
           />
           <div className="mt-4 flex justify-end gap-2">
-            <button onClick={() => setSeatFormOpen(false)} className="rounded-lg bg-surface px-4 py-2 text-xs font-bold text-text-2">
+            <button
+              onClick={() => setSeatFormOpen(false)}
+              className="rounded-lg bg-[#18223a] px-4 py-2 text-xs font-bold text-[#cdd6e3]"
+            >
               انصراف
             </button>
-            <button onClick={() => void onSubmitSeatForm()} className="rounded-lg bg-accent px-4 py-2 text-xs font-bold text-white">
+            <button
+              onClick={() => void onSubmitSeatForm()}
+              className="rounded-lg bg-[#3b82f6] px-4 py-2 text-xs font-bold text-white"
+            >
               {seatFormMode === 'lock' ? 'لاک صندلی' : 'صدور PNR و بلیط'}
             </button>
           </div>
@@ -426,8 +435,8 @@ export default function ReservationPage() {
       )}
 
       {detailPnr && detail && (
-        <Modal title={`رزرو ${detail.pnr}`} onClose={() => setDetailPnr(null)}>
-          <div className="mb-4 rounded-xl bg-[#0f1726] p-4 text-white">
+        <Modal variant="dark" title={`رزرو ${detail.pnr}`} onClose={() => setDetailPnr(null)}>
+          <div className="mb-4 rounded-xl border border-[#1f2a3d] bg-[#0f1726] p-4 text-white">
             <div className="mb-2 flex items-center justify-between">
               <span className="ltr font-num text-xs">PNR {detail.pnr}</span>
               <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${STATUS_LABEL[detail.status]?.className}`}>
@@ -467,19 +476,19 @@ export default function ReservationPage() {
                   onChange={(e) => setChangeSeatInput(e.target.value)}
                   placeholder="شماره صندلی جدید"
                   dir="ltr"
-                  className="font-num flex-1 rounded-lg border border-border p-2.5 text-xs outline-none focus:border-accent"
+                  className="font-num flex-1 rounded-lg border border-[#1f2a3d] bg-[#0f1726] p-2.5 text-xs text-[#e7ecf3] outline-none placeholder:text-[#6b7b94] focus:border-[#3b82f6]"
                 />
                 <button onClick={() => void onChangeSeat()} className="rounded-lg bg-[#f59e0b] px-4 py-2 text-xs font-bold text-white">
                   ثبت تغییر
                 </button>
               </div>
-              <button onClick={() => void onCancel()} className="rounded-lg bg-danger/10 px-4 py-2 text-xs font-bold text-danger">
+              <button onClick={() => void onCancel()} className="rounded-lg bg-[rgba(248,113,113,.12)] px-4 py-2 text-xs font-bold text-[#f87171]">
                 لغو رزرو
               </button>
               {(detail.status === 'TICKETED' || detail.status === 'FLOWN') && (
                 <button
                   onClick={() => void onMarkNoShow()}
-                  className="rounded-lg bg-surface px-4 py-2 text-xs font-bold text-text-2"
+                  className="rounded-lg bg-[#18223a] px-4 py-2 text-xs font-bold text-[#cdd6e3]"
                 >
                   ثبت عدم حضور مسافر
                 </button>
@@ -487,7 +496,7 @@ export default function ReservationPage() {
             </div>
           )}
           {detail.status === 'CANCELLED' && (
-            <p className="rounded-lg bg-danger/10 p-3 text-xs font-bold text-danger">این رزرو لغو شده است.</p>
+            <p className="rounded-lg bg-[rgba(248,113,113,.12)] p-3 text-xs font-bold text-[#f87171]">این رزرو لغو شده است.</p>
           )}
         </Modal>
       )}
