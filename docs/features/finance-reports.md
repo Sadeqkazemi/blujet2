@@ -25,6 +25,7 @@ journeys).
 
 ### Frontend — مالی tab
 - [x] Analytic view (CEO/Chair/Senior/Commercial): dark design (subtitle «فروش هر پرواز…», chips روزانه→شماره پرواز, channel tiles + inline flights, KPI trend cards, flights strip, «ترکیب درآمد» donut) — `FinancePage.test.tsx`: `'CEO gets the analytic view: sales chart + revenue mix, no transactions/settlements'`
+- [x] «شماره پرواز» mode: `GET /reporting/flight-sales` picker (search + cards), selected-flight channel tiles, year-scoped KPIs/donut — `FinancePage.test.tsx`: `'CEO شماره پرواز mode shows searchable flight cards and selected-flight summary'` + `reporting.e2e-spec.ts`: `'flight-sales lists departed instances…'`
 - [x] Finance-ops view (FINANCE_MANAGER): KPI row, low-sales alert, completed-flights box, transactions list, donut, settlements rows with paid-ratio bars and «ارسال یادآوری» wired to the real Phase 3 remind endpoint — `'FINANCE_MANAGER gets the finance-ops view: transactions, settlements, remind action'`
 - [x] nav flags flipped to `implemented: true` for `finance` in all 5 roles — E2E journeys click the real nav link
 

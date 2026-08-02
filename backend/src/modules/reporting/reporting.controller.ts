@@ -33,6 +33,16 @@ export class ReportingController {
     return { success: true, data };
   }
 
+  @Get('flight-sales')
+  @ApiOperation({
+    summary:
+      'Departed flights with per-channel sales — «شماره پرواز» picker on analytic مالی',
+  })
+  async flightSales() {
+    const data = await this.reporting.flightSales();
+    return { success: true, data };
+  }
+
   @Get('kpis')
   @ApiOperation({
     summary:

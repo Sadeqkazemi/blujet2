@@ -3,6 +3,7 @@ import type {
   AgencySettlementsResult,
   CompletedFlightsSummary,
   FinanceDashboardStats,
+  FlightSalesResult,
   KpiResult,
   LowSalesAlert,
   PassengerReportHit,
@@ -26,6 +27,10 @@ function toQueryString(query: PeriodQuery): string {
 
 export function fetchSalesChart(query: PeriodQuery) {
   return apiGet<SalesChartPeriod[]>(`/reporting/sales-chart?${toQueryString(query)}`);
+}
+
+export function fetchFlightSales() {
+  return apiGet<FlightSalesResult>('/reporting/flight-sales');
 }
 
 export function fetchKpis(query: PeriodQuery) {
