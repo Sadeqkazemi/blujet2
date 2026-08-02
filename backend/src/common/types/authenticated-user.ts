@@ -1,4 +1,4 @@
-import { Role } from '../../../generated/prisma/enums';
+import { Role } from '../../database/enums';
 
 export interface AuthenticatedUser {
   id: string;

@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
-import { Role } from '../../../generated/prisma/enums';
+import { Role } from '../../database/enums';
 import { SKIP_MUST_CHANGE_PASSWORD } from '../decorators/skip-must-change-password.decorator';
 import type { AuthenticatedUser } from '../types/authenticated-user';
 import { PrismaService } from '../../prisma/prisma.service';
