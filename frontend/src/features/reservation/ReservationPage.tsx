@@ -630,7 +630,7 @@ export default function ReservationPage() {
                   <span className="text-[#9fb0c7]">{formatJalaliDateTime(f.departureAt)}</span>
                   <span className="font-num ltr text-[#9fb0c7]">{f.aircraftType}</span>
                   <div className="flex flex-col gap-1">
-                    <div className="font-num text-[10.5px] text-[#9fb0c7]">
+                    <div className="font-num ltr text-[10.5px] text-[#9fb0c7]" dir="ltr">
                       {faDigits(f.sold)} / {faDigits(f.capacity)}
                     </div>
                     <div className="h-1.5 overflow-hidden rounded bg-[#0f1623]">
