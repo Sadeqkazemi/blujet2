@@ -1,8 +1,7 @@
 import type { Role } from '../../../generated/prisma/enums';
 
-/** Reachable per Phase 1's confirmed nav extraction: BOARD_CHAIR,
- * SENIOR_MANAGER, IT_MANAGER. CEO is API-authorized (⚑ product decision,
- * see docs/DB_SCHEMA.md Phase 9) but has no reachable nav entry. */
+/** Reachable nav: CEO + BOARD_CHAIR (label هواپیما), SENIOR_MANAGER +
+ * IT_MANAGER (سامانه رزرواسیون). See docs/DB_SCHEMA.md Phase 9. */
 export const RESERVATION_ROLES = [
   'CEO',
   'BOARD_CHAIR',

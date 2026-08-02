@@ -104,3 +104,20 @@ test('Non-reservation role has no reservation nav entry (role isolation)', async
   await expect(page.getByRole('link', { name: 'سامانه رزرواسیون' })).not.toBeVisible();
   await expect(page.getByRole('link', { name: 'هواپیما' })).not.toBeVisible();
 });
+
+test('CEO opens هواپیما, lists پروازها, and opens a seat map', async ({ page }) => {
+  await loginAs(page, 'ceo');
+  await page.getByRole('link', { name: 'هواپیما' }).click();
+  await expect(page.getByRole('heading', { name: /سامانه رزرواسیون پرواز/ })).toBeVisible();
+  await page.getByRole('button', { name: 'پروازها' }).click();
+  await expect(page.getByPlaceholder('جستجوی پرواز — مسیر یا شماره پرواز')).toBeVisible();
+  const row = page.locator('button').filter({ hasText: 'در حال فروش' }).first();
+  if (await row.count()) {
+    await row.click();
+  } else {
+    await page.getByRole('button', { name: 'مدیریت رزروها' }).click();
+    await page.getByRole('button', { name: /^نقشهٔ صندلی/ }).first().click();
+  }
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(page.getByText(/آزاد|رزرو قطعی|قفل موقت/)).toBeVisible();
+});

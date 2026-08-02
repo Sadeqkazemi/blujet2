@@ -25,6 +25,7 @@ import type {
   FinalizeLockDto,
   IssuePnrDto,
   ListPnrQueryDto,
+  ListReservationFlightsQueryDto,
   SearchFlightsQueryDto,
 } from './dto/reservation.dtos';
 
@@ -599,6 +600,89 @@ export class PnrService {
     });
 
     return this.detail(booking.pnr);
+  }
+
+  /**
+   * «پروازها» sub-tab of سامانه رزرواسیون/هواپیما — upcoming SCHEDULED
+   * instances with sold/locked/free counts so staff can open a seat map.
+   */
+  async listFlights(query: ListReservationFlightsQueryDto) {
+    const q = query.q?.trim();
+    const airports = await this.prisma.airport.findMany({
+      select: { code: true, cityFa: true },
+    });
+    const cityByCode = new Map(airports.map((a) => [a.code, a.cityFa]));
+
+    // Include past-dated SCHEDULED rows too — the seed (and some E2E
+    // fixtures) keep deliberately-past "SCHEDULED" instances for demos;
+    // staff still need to open their seat maps. Prefer soonest first.
+    const instances = await this.prisma.flightInstance.findMany({
+      where: { status: 'SCHEDULED' },
+      include: {
+        flight: { include: { route: true } },
+      },
+      orderBy: { departureAt: 'asc' },
+      take: 120,
+    });
+
+    const qLower = q?.toLowerCase();
+    const filtered = qLower
+      ? instances.filter((instance) => {
+          const originCode = instance.flight.route.originCode;
+          const destCode = instance.flight.route.destCode;
+          const origin = cityByCode.get(originCode) ?? originCode;
+          const dest = cityByCode.get(destCode) ?? destCode;
+          const hay =
+            `${instance.flight.flightNo} ${originCode} ${destCode} ${origin} ${dest}`.toLowerCase();
+          return hay.includes(qLower);
+        })
+      : instances;
+    const limited = filtered.slice(0, 60);
+
+    const now = new Date();
+    const rows = await Promise.all(
+      limited.map(async (instance) => {
+        const map = await this.prisma.aircraftSeatMap.findUnique({
+          where: { aircraftType: resolveAircraftType(instance) },
+        });
+        const capacity = map ? enumerateSeats(map).length : instance.capacity;
+        const [soldCount, lockedCount] = await Promise.all([
+          this.prisma.passenger.count({
+            where: {
+              seatCode: { not: null },
+              booking: {
+                flightInstanceId: instance.id,
+                status: { not: 'CANCELLED' },
+              },
+            },
+          }),
+          this.prisma.seatLock.count({
+            where: {
+              flightInstanceId: instance.id,
+              releasedAt: null,
+              expiresAt: { gt: now },
+            },
+          }),
+        ]);
+        const originCode = instance.flight.route.originCode;
+        const destCode = instance.flight.route.destCode;
+        return {
+          flightInstanceId: instance.id,
+          flightNo: instance.flight.flightNo,
+          aircraftType: resolveAircraftType(instance),
+          originCode,
+          destCode,
+          originCityFa: cityByCode.get(originCode) ?? originCode,
+          destCityFa: cityByCode.get(destCode) ?? destCode,
+          departureAt: instance.departureAt,
+          capacity,
+          soldCount,
+          lockedCount,
+          freeCount: Math.max(0, capacity - soldCount - lockedCount),
+        };
+      }),
+    );
+    return rows;
   }
 
   async dashboardStats() {

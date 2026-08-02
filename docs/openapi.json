@@ -4002,6 +4002,31 @@
         ]
       }
     },
+    "/reservation/flights": {
+      "get": {
+        "operationId": "PnrController_listFlights",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "جستجو در شماره پرواز، کد فرودگاه یا نام شهر",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست پروازهای آینده برای تب پروازها / باز کردن نقشهٔ صندلی",
+        "tags": [
+          "reservation"
+        ]
+      }
+    },
     "/reservation/search": {
       "get": {
         "operationId": "PnrController_search",

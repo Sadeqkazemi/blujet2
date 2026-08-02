@@ -15,6 +15,7 @@ import {
   FinalizeLockDto,
   IssuePnrDto,
   ListPnrQueryDto,
+  ListReservationFlightsQueryDto,
   SearchFlightsQueryDto,
 } from './dto/reservation.dtos';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -76,6 +77,14 @@ export class PnrController {
     @Param('pnr') pnr: string,
   ) {
     return { success: true, data: await this.pnr.markNoShow(actor, pnr) };
+  }
+
+  @Get('flights')
+  @ApiOperation({
+    summary: 'فهرست پروازهای آینده برای تب پروازها / باز کردن نقشهٔ صندلی',
+  })
+  async listFlights(@Query() query: ListReservationFlightsQueryDto) {
+    return { success: true, data: await this.pnr.listFlights(query) };
   }
 
   @Get('search')

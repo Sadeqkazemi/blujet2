@@ -232,18 +232,18 @@ tabs to them; no new backend endpoints.
 
 ## Phase 9 — Reservation system (seat lock / PNR)
 
-Roles: `BOARD_CHAIR`, `SENIOR_MANAGER`, `IT_MANAGER` have the reachable
-سامانه رزرواسیون/هواپیما nav entry (per `panel-nav.config.ts`); `CEO` is
-authorized at the API level too (⚑ product decision, see `docs/DB_SCHEMA.md`
-→ Phase 9) but has no reachable nav entry, matching Phase 1's confirmed
-extraction. `canLock` = `CEO`/`BOARD_CHAIR`/`IT_MANAGER`; `SENIOR_MANAGER`
-is view-only on every endpoint below (403 on the write ones).
+Roles: `CEO`, `BOARD_CHAIR`, `SENIOR_MANAGER`, `IT_MANAGER` have the
+reachable سامانه رزرواسیون/هواپیما nav entry (CEO/Chair label: **هواپیما**;
+Senior/IT: سامانه رزرواسیون — per `panel-nav.config.ts`). `canLock` =
+`CEO`/`BOARD_CHAIR`/`IT_MANAGER`; `SENIOR_MANAGER` is view-only on every
+endpoint below (403 on the write ones).
 
 ### `backend/src/modules/reservation/`
 
 | Method | Path | Roles | Notes |
 |---|---|---|---|
-| GET | `/reservation/seatmap/:flightInstanceId` | BOARD_CHAIR, SENIOR_MANAGER, IT_MANAGER, CEO | Computed from `AircraftSeatMap` (by the instance's `Flight.aircraftType`) + sold seats (`Passenger.seatCode` on non-CANCELLED bookings) + active `SeatLock`s. Returns `{ rows[], cabinLayout, soldCount, lockedCount, capacity, occupancyPct }` (`cabinLayout` added Phase 30); PII never included. |
+| GET | `/reservation/flights` | all 4 reservation roles | Upcoming `SCHEDULED` instances (`q?` on flightNo/airport code/city). Each row: route cities, capacity, sold/locked/free counts — the «پروازها» tab; click opens seat map. |
+| GET | `/reservation/seatmap/:flightInstanceId` | BOARD_CHAIR, SENIOR_MANAGER, IT_MANAGER, CEO | Computed from `AircraftSeatMap` (by the instance's `Flight.aircraftType`) + sold seats (`Passenger.seatCode` on non-CANCELLED bookings) + active `SeatLock`s. Returns `{ flightNo, origin/dest (+ cityFa), departureAt, rows[], cabinLayout, soldCount, lockedCount, freeCount, capacity, occupancyPct }`. Each seat may include `occupant: { pnr, passengerName, bookingStatus }` (sold) or `lockExpiresAt` / `lockPassengerName` (locked) so staff can open passenger info or show the lock countdown — no national-ID decryption on this surface. |
 | POST | `/reservation/seatmap/:flightInstanceId/lock` | canLock only | `{ seatCode, passengerName?, passengerNationalId?, passengerMobile? }` — 409 if the seat is already sold or actively locked (DB partial-unique-index-backed). PII encrypted+hashed like `ClubMember`. `AuditLog(category=RESERVATION)`. |
 | PATCH | `/reservation/seatmap/locks/:id/release` | canLock only | Any canLock role may release any active lock (the design's «×» chip shows no per-locker ownership filter). Sets `releasedAt`; 409 if already released. Audited. |
 | GET | `/reservation/pnr` | all 4 reservation roles | `q?` (PNR or passenger name). Grouped by flight instance, newest first — the design's «مدیریت رزروها» list. |
