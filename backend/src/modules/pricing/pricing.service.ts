@@ -13,8 +13,8 @@ import {
 } from '../ai/price-suggestion.provider';
 import { StepUpService } from '../auth/step-up.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import type { TypeORM } from '../../../generated/typeorm/client';
-import { addIrr, pctOfIrr, roundIrrTo, toIrr } from '../../common/money';
+import { TypeORM } from '../../../generated/typeorm/client';
+import { addIrr, compareIrr, pctOfIrr, roundIrrTo, toIrr } from '../../common/money';
 import type { Irr } from '../../common/money';
 
 const LOCKED_MESSAGE =
@@ -135,6 +135,10 @@ export class PricingService {
         legalRateIrr: dto.legalRateIrr,
         note: dto.note,
         proposedById: actor.id,
+        // Any edit to the proposal's inputs invalidates a previously
+        // generated AI suggestion — it was computed against the old
+        // price/legal-rate and must not be registerable anymore.
+        aiSuggestion: TypeORM.JsonNull,
       },
       include: this.proposalInclude(),
     });
@@ -234,6 +238,16 @@ export class PricingService {
       // far below 2^53, so converting the advisory JSON number to Irr here
       // loses no precision.
       price = toIrr(suggestion.priceIrr);
+      // AI output is advisory only (CLAUDE.md: an ML suggestion can never
+      // set a bookable price by itself) — it must never exceed the CEO's
+      // own approved legal/regulatory ceiling for this flight.
+      if (proposal.legalRateIrr != null && compareIrr(price, proposal.legalRateIrr) > 0) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message:
+            'قیمت پیشنهادی هوش مصنوعی از نرخ قانونی (مصوب) بیشتر است و قابل ثبت نیست.',
+        });
+      }
     }
 
     // Conditional update guards against a concurrent double-register.

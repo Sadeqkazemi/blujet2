@@ -7,6 +7,8 @@ import { TypeORMService } from '../src/typeorm/typeorm.service';
 import { loginAs, stepUpFor } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 import type { Role } from '../generated/typeorm/enums';
+import { TWO_FACTOR_PROVIDER } from '../src/modules/auth/providers/two-factor-provider.interface';
+import { MockTwoFactorProvider } from '../src/modules/auth/providers/mock-two-factor.provider';
 
 describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', () => {
   let app: INestApplication<App>;
@@ -153,6 +155,36 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
     expect(blockCeo.status).toBe(403);
   });
 
+  it('blocking an account revokes its live session — a pre-existing refresh cookie stops working immediately', async () => {
+    const target = await createManagedAdmin();
+    const agent = request.agent(app.getHttpServer());
+    const loginRes = await agent
+      .post('/auth/staff/login')
+      .send({ username: target.username, password: 'Blujet@1404' });
+    const code = app
+      .get<MockTwoFactorProvider>(TWO_FACTOR_PROVIDER)
+      .getLastCode(target.id)!;
+    await agent
+      .post('/auth/staff/login/verify')
+      .send({ challengeId: loginRes.body.data.challengeId, code });
+
+    // The refresh token issued above is still valid at this point.
+    const refreshBeforeBlock = await agent.post('/auth/refresh');
+    expect(refreshBeforeBlock.status).toBe(200);
+
+    const ceo = await loginAs(app, 'ceo');
+    const blockRes = await request(app.getHttpServer())
+      .patch(`/admins/${target.id}/block`)
+      .set('Authorization', auth(ceo.accessToken));
+    expect(blockRes.status).toBe(200);
+
+    // The already-issued (and just-rotated) refresh cookie must now fail —
+    // blocking must not require a global logout-all to take effect.
+    const refreshAfterBlock = await agent.post('/auth/refresh');
+    expect(refreshAfterBlock.status).toBe(401);
+    expect(refreshAfterBlock.body.success).toBe(false);
+  });
+
   it('POST /admins/:id/reset-password returns a temp password once that actually logs in; Senior cannot reset a SENIOR_MANAGER', async () => {
     const target = await createManagedAdmin();
     const chair = await loginAs(app, 'chair');
@@ -267,6 +299,42 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
       .get('/settings')
       .set('Authorization', auth(finance.accessToken));
     expect(forbidden.status).toBe(403);
+  });
+
+  it('IT_MANAGER can only write its own operational keys — payment-gateway/brand keys are Board Chair-only', async () => {
+    const it = await loginAs(app, 'itadmin');
+
+    const allowed = await request(app.getHttpServer())
+      .patch('/settings')
+      .set('Authorization', auth(it.accessToken))
+      .send({ patch: { maintenance: true, sandbox: false } });
+    expect(allowed.status).toBe(200);
+    expect(allowed.body.data.settings.maintenance).toBe(true);
+
+    const outOfScope = await request(app.getHttpServer())
+      .patch('/settings')
+      .set('Authorization', auth(it.accessToken))
+      .send({ patch: { gatewayZarin: true } });
+    expect(outOfScope.status).toBe(403);
+
+    const mixed = await request(app.getHttpServer())
+      .patch('/settings')
+      .set('Authorization', auth(it.accessToken))
+      .send({ patch: { companyName: 'شرکت جعلی', supportPhone: '021-00000' } });
+    expect(mixed.status).toBe(403);
+
+    // The rejected patch must not have partially applied.
+    const after = await request(app.getHttpServer())
+      .get('/settings')
+      .set('Authorization', auth(it.accessToken));
+    expect(after.body.data.settings.companyName).not.toBe('شرکت جعلی');
+    expect(after.body.data.settings.gatewayZarin).not.toBe(true);
+
+    // Restore for repeatable runs.
+    await request(app.getHttpServer())
+      .patch('/settings')
+      .set('Authorization', auth(it.accessToken))
+      .send({ patch: { maintenance: false, sandbox: true } });
   });
 
   it('PATCH /settings/refund-rules writes the REAL Phase 7 engine rows (chair only, IT 403)', async () => {

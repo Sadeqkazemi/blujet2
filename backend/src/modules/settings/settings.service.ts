@@ -94,6 +94,21 @@ export const SETTING_DEFAULTS: Record<string, unknown> = {
   appDownloadLinks: DEFAULT_APP_DOWNLOAD_LINKS,
 };
 
+/** IT_MANAGER's settings screen only ever shows these operational toggles
+ * plus site-services links (design: پنل مدیر IT — «سرویس‌های سایت»).
+ * Payment gateways and brand/company identity are Board Chair-only — the
+ * controller shares the endpoint between both roles, so per-key scoping is
+ * enforced here, server-side, not by hiding UI alone. */
+const IT_MANAGER_WRITABLE_KEYS = new Set([
+  'maintenance',
+  'registration',
+  'charterSale',
+  'apiPublic',
+  'sandbox',
+  'socialLinks',
+  'appDownloadLinks',
+]);
+
 @Injectable()
 export class SettingsService {
   constructor(
@@ -176,6 +191,15 @@ export class SettingsService {
         throw new BadRequestException({
           code: ErrorCode.VALIDATION_FAILED,
           message: `مقدار «${key}» نامعتبر است.`,
+        });
+      }
+    }
+    if (actor.role === 'IT_MANAGER') {
+      const outOfScope = keys.filter((k) => !IT_MANAGER_WRITABLE_KEYS.has(k));
+      if (outOfScope.length > 0) {
+        throw new ForbiddenException({
+          code: ErrorCode.FORBIDDEN,
+          message: `کلید (${outOfScope.join('، ')}) در اختیار مدیر IT نیست.`,
         });
       }
     }

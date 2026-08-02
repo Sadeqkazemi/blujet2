@@ -128,6 +128,32 @@ describe('Agency Portal (e2e)', () => {
     expect(res.status).toBe(403);
   });
 
+  it('suspending an agency revokes its live session — a pre-existing refresh cookie stops working immediately', async () => {
+    const agency = await createFreshAgency();
+    const agent = request.agent(app.getHttpServer());
+    const loginRes = await agent
+      .post('/auth/agency/login')
+      .send({ phone: agency.phone, password: AGENCY_PASSWORD });
+    expect(loginRes.status).toBe(200);
+
+    // The refresh token issued above is still valid at this point.
+    const refreshBeforeSuspend = await agent.post('/auth/refresh');
+    expect(refreshBeforeSuspend.status).toBe(200);
+
+    const senior = await loginAs(app, 'senior.rahimi');
+    const suspendRes = await request(app.getHttpServer())
+      .patch(`/agencies/${agency.id}/suspend`)
+      .set('Authorization', auth(senior.accessToken))
+      .send({ reason: 'تست امنیتی' });
+    expect(suspendRes.status).toBe(200);
+
+    // The already-issued (and just-rotated) refresh cookie must now fail —
+    // suspension must not require a global logout-all to take effect.
+    const refreshAfterSuspend = await agent.post('/auth/refresh');
+    expect(refreshAfterSuspend.status).toBe(401);
+    expect(refreshAfterSuspend.body.success).toBe(false);
+  });
+
   it('approving a membership request issues a one-time temp password that logs in', async () => {
     const commercial = await loginAs(app, 'comm.abbasi');
     const suffix = crypto.randomUUID().slice(0, 6);

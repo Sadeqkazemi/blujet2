@@ -160,36 +160,43 @@ export class PnrService {
       });
     }
 
-    const [soldConflict, lockConflict] = await Promise.all([
-      this.typeorm.passenger.findFirst({
-        where: {
-          seatCode,
-          bookingId: { not: booking.id },
-          booking: {
-            flightInstanceId: booking.flightInstanceId,
-            status: { not: 'CANCELLED' },
-          },
-        },
-      }),
-      this.typeorm.seatLock.findFirst({
-        where: {
-          flightInstanceId: booking.flightInstanceId,
-          seatCode,
-          releasedAt: null,
-          expiresAt: { gt: new Date() },
-        },
-      }),
-    ]);
-    if (soldConflict || lockConflict) {
-      throw new ConflictException({
-        code: ErrorCode.CONFLICT,
-        message: 'این صندلی در حال حاضر در دسترس نیست.',
-      });
-    }
+    await this.typeorm.$transaction(async (tx) => {
+      // Lock this flight instance's row so two concurrent changeSeat calls
+      // targeting it can't both pass the conflict check before either
+      // commits — mirrors the same pattern used in issue().
+      await tx.$queryRaw`SELECT "id" FROM "flight_instances" WHERE "id" = ${booking.flightInstanceId} FOR UPDATE`;
 
-    await this.typeorm.passenger.updateMany({
-      where: { bookingId: booking.id },
-      data: { seatCode },
+      const [soldConflict, lockConflict] = await Promise.all([
+        tx.passenger.findFirst({
+          where: {
+            seatCode,
+            bookingId: { not: booking.id },
+            booking: {
+              flightInstanceId: booking.flightInstanceId,
+              status: { not: 'CANCELLED' },
+            },
+          },
+        }),
+        tx.seatLock.findFirst({
+          where: {
+            flightInstanceId: booking.flightInstanceId,
+            seatCode,
+            releasedAt: null,
+            expiresAt: { gt: new Date() },
+          },
+        }),
+      ]);
+      if (soldConflict || lockConflict) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'این صندلی در حال حاضر در دسترس نیست.',
+        });
+      }
+
+      await tx.passenger.updateMany({
+        where: { bookingId: booking.id },
+        data: { seatCode },
+      });
     });
 
     await this.audit.record({
@@ -432,6 +439,36 @@ export class PnrService {
     }
 
     const booking = await this.typeorm.$transaction(async (tx) => {
+      // Lock this flight instance's row so two concurrent seat-issuance
+      // requests for it can't both pass the sold/lock check below before
+      // either has committed — the check + insert must be atomic per seat.
+      await tx.$queryRaw`SELECT "id" FROM "flight_instances" WHERE "id" = ${dto.flightInstanceId} FOR UPDATE`;
+
+      const [sold, lock] = await Promise.all([
+        tx.passenger.findFirst({
+          where: {
+            seatCode: dto.seatCode,
+            booking: {
+              flightInstanceId: dto.flightInstanceId,
+              status: { not: 'CANCELLED' },
+            },
+          },
+        }),
+        tx.seatLock.findFirst({
+          where: {
+            flightInstanceId: dto.flightInstanceId,
+            seatCode: dto.seatCode,
+            releasedAt: null,
+          },
+        }),
+      ]);
+      if (sold || lock) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'این صندلی در دسترس نیست.',
+        });
+      }
+
       const created = await tx.booking.create({
         data: {
           pnr: generatePnr(),
