@@ -23,7 +23,7 @@ function KpiCard({
   accent: string;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-white p-4">
+    <div className="rounded-xl border border-white/10 bg-panel-surface p-4">
       <div className="mb-3 flex items-center justify-between">
         <span
           className="flex h-10 w-10 items-center justify-center rounded-[11px] text-lg"
@@ -32,8 +32,8 @@ function KpiCard({
           ●
         </span>
       </div>
-      <div className="font-num text-2xl font-black text-ink">{value}</div>
-      <div className="mt-1 text-[11.5px] text-muted">{label}</div>
+      <div className="font-num text-2xl font-black text-panel-ink">{value}</div>
+      <div className="mt-1 text-[11.5px] text-panel-muted">{label}</div>
     </div>
   );
 }
@@ -68,11 +68,11 @@ function ChannelSummary({ mix }: { mix: RevenueMixResult }) {
   const agPct = mix.channels.find((c) => c.channel === 'AGENCY')?.pct ?? 0;
 
   return (
-    <div className="rounded-xl border border-border bg-white p-5">
+    <div className="rounded-xl border border-white/10 bg-panel-surface p-5">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="text-sm font-bold text-ink">گزارش مالی</h2>
-          <p className="mt-0.5 text-[11px] text-muted">
+          <h2 className="text-sm font-bold text-panel-ink">گزارش مالی</h2>
+          <p className="mt-0.5 text-[11px] text-panel-muted">
             خلاصه فروش سال جاری — جزئیات و فیلترها در صفحه مالی
           </p>
         </div>
@@ -84,12 +84,12 @@ function ChannelSummary({ mix }: { mix: RevenueMixResult }) {
         </Link>
       </div>
 
-      <div className="mb-2 flex h-4 overflow-hidden rounded-lg bg-body">
+      <div className="mb-2 flex h-4 overflow-hidden rounded-lg bg-white/5">
         <div style={{ width: `${sysPct}%`, background: MIX_COLORS.SYSTEM }} />
         <div style={{ width: `${chPct}%`, background: MIX_COLORS.CHARTER }} />
         <div style={{ width: `${agPct}%`, background: MIX_COLORS.AGENCY }} />
       </div>
-      <div className="mb-4 flex flex-wrap gap-3 text-[10px] text-muted">
+      <div className="mb-4 flex flex-wrap gap-3 text-[10px] text-panel-muted">
         <span className="flex items-center gap-1">
           <span className="h-2 w-2 rounded-sm" style={{ background: MIX_COLORS.SYSTEM }} />
           سیستمی {faPercent(sysPct)}
@@ -105,13 +105,13 @@ function ChannelSummary({ mix }: { mix: RevenueMixResult }) {
       </div>
 
       <div className="grid grid-cols-2 gap-2.5">
-        <div className="rounded-xl bg-body p-3">
-          <div className="text-[10.5px] text-muted">جمع فروش سال</div>
-          <div className="font-num mt-1 text-base font-black text-ink">{faMoney(total)}</div>
+        <div className="rounded-xl bg-white/5 p-3">
+          <div className="text-[10.5px] text-panel-muted">جمع فروش سال</div>
+          <div className="font-num mt-1 text-base font-black text-panel-ink">{faMoney(total)}</div>
         </div>
         {mix.channels.map((c) => (
-          <div key={c.channel} className="rounded-xl bg-body p-3">
-            <div className="mb-1 flex items-center gap-1.5 text-[10.5px] text-muted">
+          <div key={c.channel} className="rounded-xl bg-white/5 p-3">
+            <div className="mb-1 flex items-center gap-1.5 text-[10.5px] text-panel-muted">
               <span
                 className="h-2 w-2 rounded-sm"
                 style={{ background: MIX_COLORS[c.channel as keyof typeof MIX_COLORS] }}
@@ -133,9 +133,9 @@ function ChannelSummary({ mix }: { mix: RevenueMixResult }) {
 
 function CartableWidget({ cartable }: { cartable: CartableListResult }) {
   return (
-    <div className="rounded-xl border border-border bg-white overflow-hidden">
-      <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-        <span className="text-sm font-bold text-ink">کارتابل</span>
+    <div className="rounded-xl border border-white/10 bg-panel-surface overflow-hidden">
+      <div className="flex items-center gap-2 border-b border-white/10 px-4 py-3">
+        <span className="text-sm font-bold text-panel-ink">کارتابل</span>
         {cartable.totalOpen > 0 && (
           <span className="font-num rounded-full bg-danger px-2 py-0.5 text-[10px] font-bold text-white">
             {faDigits(cartable.totalOpen)}
@@ -144,12 +144,12 @@ function CartableWidget({ cartable }: { cartable: CartableListResult }) {
       </div>
       <div className="p-2">
         {cartable.tasks.length === 0 ? (
-          <p className="py-4 text-center text-xs text-muted">کارتابل خالی است ✓</p>
+          <p className="py-4 text-center text-xs text-panel-muted">کارتابل خالی است ✓</p>
         ) : (
           cartable.tasks.slice(0, 4).map((t) => (
             <div key={t.id} className="rounded-lg px-2.5 py-2.5 text-xs">
-              <div className="font-bold text-ink">{t.title}</div>
-              <div className="mt-0.5 text-[10px] text-muted">
+              <div className="font-bold text-panel-ink">{t.title}</div>
+              <div className="mt-0.5 text-[10px] text-panel-muted">
                 {t.senderLabelFa ?? t.sender?.fullName ?? ''}
               </div>
             </div>
@@ -158,7 +158,7 @@ function CartableWidget({ cartable }: { cartable: CartableListResult }) {
       </div>
       <Link
         to="/panel/cartable"
-        className="block border-t border-border py-3 text-center text-[11.5px] font-bold text-accent"
+        className="block border-t border-white/10 py-3 text-center text-[11.5px] font-bold text-accent"
       >
         مشاهده‌ی همه‌ی کارها ←
       </Link>
@@ -191,14 +191,14 @@ export default function CommercialDashboardPage() {
 
   if (error) return <p className="p-8 text-sm text-danger">{error}</p>;
   if (!overview || !mix || !cartable) {
-    return <p className="p-8 text-sm text-muted">در حال بارگذاری…</p>;
+    return <p className="p-8 text-sm text-panel-muted">در حال بارگذاری…</p>;
   }
 
   return (
     <div className="p-8">
       <div className="mb-6">
-        <h1 className="text-xl font-black text-ink">داشبورد</h1>
-        <p className="mt-1 text-sm text-muted">نمای کلی فروش و کارهای در انتظار اقدام</p>
+        <h1 className="text-xl font-black text-panel-ink">داشبورد</h1>
+        <p className="mt-1 text-sm text-panel-muted">نمای کلی فروش و کارهای در انتظار اقدام</p>
       </div>
 
       <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">

@@ -41,86 +41,86 @@ export default function SiteAdminDashboardPage() {
 
   return (
     <div className="p-6">
-      <h1 className="text-lg font-bold text-ink">داشبورد</h1>
-      <p className="mt-1 text-xs text-muted">درخواست‌ها، استرداد بلیط و کارهای در انتظار اقدام</p>
+      <h1 className="text-lg font-bold text-panel-ink">داشبورد</h1>
+      <p className="mt-1 text-xs text-panel-muted">درخواست‌ها، استرداد بلیط و کارهای در انتظار اقدام</p>
 
       {error && <p className="mt-4 text-xs text-danger">{error}</p>}
 
       <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
-        <div className="rounded-xl border border-border bg-white p-4">
+        <div className="rounded-xl border border-white/10 bg-panel-surface p-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-ink">درخواست‌های عضویت آژانس در انتظار</h2>
+            <h2 className="text-sm font-bold text-panel-ink">درخواست‌های عضویت آژانس در انتظار</h2>
             <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-bold text-accent">
               {faDigits(requests?.length ?? 0)}
             </span>
           </div>
           <ul className="mt-3 flex flex-col gap-2">
-            {requests === null && <li className="text-xs text-muted">در حال بارگذاری…</li>}
+            {requests === null && <li className="text-xs text-panel-muted">در حال بارگذاری…</li>}
             {requests?.length === 0 && (
-              <li className="text-xs text-muted">درخواست در انتظاری وجود ندارد.</li>
+              <li className="text-xs text-panel-muted">درخواست در انتظاری وجود ندارد.</li>
             )}
             {requests?.map((r) => (
               <li key={r.id}>
                 <Link
                   to={`/panel/agencies/requests/${r.id}`}
-                  className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-xs transition hover:bg-surface"
+                  className="flex items-center justify-between rounded-lg border border-white/10 px-3 py-2 text-xs transition hover:bg-white/5"
                 >
-                  <span className="font-bold text-ink">{r.applicantName}</span>
-                  <span className="text-muted">{formatJalaliDate(r.createdAt)}</span>
+                  <span className="font-bold text-panel-ink">{r.applicantName}</span>
+                  <span className="text-panel-muted">{formatJalaliDate(r.createdAt)}</span>
                 </Link>
               </li>
             ))}
           </ul>
         </div>
 
-        <div className="rounded-xl border border-border bg-white p-4">
+        <div className="rounded-xl border border-white/10 bg-panel-surface p-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-ink">استرداد بلیط در انتظار بررسی</h2>
+            <h2 className="text-sm font-bold text-panel-ink">استرداد بلیط در انتظار بررسی</h2>
             <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-bold text-accent">
               {faDigits(awaitingRefunds.length)}
             </span>
           </div>
           <ul className="mt-3 flex flex-col gap-2">
-            {refunds === null && <li className="text-xs text-muted">در حال بارگذاری…</li>}
+            {refunds === null && <li className="text-xs text-panel-muted">در حال بارگذاری…</li>}
             {refunds && awaitingRefunds.length === 0 && (
-              <li className="text-xs text-muted">درخواست استرداد در انتظاری وجود ندارد.</li>
+              <li className="text-xs text-panel-muted">درخواست استرداد در انتظاری وجود ندارد.</li>
             )}
             {awaitingRefunds.map((r) => (
               <li key={r.id}>
                 <Link
                   to="/panel/refund"
-                  className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-xs transition hover:bg-surface"
+                  className="flex items-center justify-between rounded-lg border border-white/10 px-3 py-2 text-xs transition hover:bg-white/5"
                 >
-                  <span className="font-bold text-ink">{r.passengerName}</span>
-                  <span className="text-muted">{formatJalaliDate(r.createdAt)}</span>
+                  <span className="font-bold text-panel-ink">{r.passengerName}</span>
+                  <span className="text-panel-muted">{formatJalaliDate(r.createdAt)}</span>
                 </Link>
               </li>
             ))}
           </ul>
         </div>
 
-        <div className="rounded-xl border border-border bg-white p-4">
+        <div className="rounded-xl border border-white/10 bg-panel-surface p-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-ink">آخرین پیام‌های تماس با ما</h2>
+            <h2 className="text-sm font-bold text-panel-ink">آخرین پیام‌های تماس با ما</h2>
             <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-bold text-accent">
               {faDigits(messages?.length ?? 0)}
             </span>
           </div>
           <ul className="mt-3 flex flex-col gap-2">
-            {messages === null && <li className="text-xs text-muted">در حال بارگذاری…</li>}
+            {messages === null && <li className="text-xs text-panel-muted">در حال بارگذاری…</li>}
             {messages?.length === 0 && (
-              <li className="text-xs text-muted">پیامی ثبت نشده است.</li>
+              <li className="text-xs text-panel-muted">پیامی ثبت نشده است.</li>
             )}
             {messages?.map((m) => (
               <li
                 key={m.id}
-                className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-xs"
+                className="flex items-center justify-between rounded-lg border border-white/10 px-3 py-2 text-xs"
               >
                 <span className="min-w-0 flex-1 truncate">
-                  <span className="font-bold text-ink">{m.name}</span>
-                  <span className="mr-1 text-muted">— {m.subject}</span>
+                  <span className="font-bold text-panel-ink">{m.name}</span>
+                  <span className="mr-1 text-panel-muted">— {m.subject}</span>
                 </span>
-                <span className="mr-2 shrink-0 text-muted">{formatJalaliDate(m.createdAt)}</span>
+                <span className="mr-2 shrink-0 text-panel-muted">{formatJalaliDate(m.createdAt)}</span>
               </li>
             ))}
           </ul>

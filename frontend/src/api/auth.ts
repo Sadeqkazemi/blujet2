@@ -1,4 +1,4 @@
-import { apiGet, apiPatch, apiPost } from './http';
+import { apiGet, apiPatch, apiPost, refreshAccessToken } from './http';
 import { setAccessToken } from './token-store';
 import { latinDigits, normalizeIranMobile } from '../lib/fa-format';
 import type { AuthUser, Locale } from '../types/auth';
@@ -34,9 +34,16 @@ export async function verifyTwoFactor(challengeId: string, code: string) {
 }
 
 export async function refreshSession() {
-  const result = await apiPost<{ accessToken: string }>('/auth/refresh');
-  setAccessToken(result.accessToken);
-  return result;
+  // Routed through the same deduped in-flight request the API-retry
+  // interceptor uses (see http.ts) instead of posting directly — firing a
+  // second, independent /auth/refresh here would race the interceptor's
+  // (or another concurrent caller's) request for the same not-yet-rotated
+  // refresh-token cookie, which the backend's reuse-detection treats as a
+  // stolen-token replay and revokes the whole session for.
+  const ok = await refreshAccessToken();
+  if (!ok) {
+    throw new Error('refresh failed');
+  }
 }
 
 export async function logout() {

@@ -29,17 +29,17 @@ type SubTab = 'pnr' | 'seatmap' | 'new';
 const STATUS_LABEL: Record<string, { label: string; className: string }> = {
   TICKETED: { label: 'صادرشده', className: 'bg-[#10b98124] text-[#059669]' },
   CANCELLED: { label: 'لغوشده', className: 'bg-danger/15 text-danger' },
-  DRAFT: { label: 'پیش‌نویس', className: 'bg-surface text-text-2' },
+  DRAFT: { label: 'پیش‌نویس', className: 'bg-white/10 text-panel-ink' },
   HELD: { label: 'در انتظار', className: 'bg-[#f59e0b24] text-[#b45309]' },
   PAID: { label: 'پرداخت‌شده', className: 'bg-[#3b82f624] text-[#1d4ed8]' },
-  EXPIRED: { label: 'منقضی', className: 'bg-surface text-muted' },
-  REFUNDED: { label: 'مستردشده', className: 'bg-surface text-muted' },
+  EXPIRED: { label: 'منقضی', className: 'bg-white/10 text-panel-muted' },
+  REFUNDED: { label: 'مستردشده', className: 'bg-white/10 text-panel-muted' },
   FLOWN: { label: 'پرواز شده', className: 'bg-[#3b82f624] text-[#1d4ed8]' },
   NO_SHOW: { label: 'عدم حضور', className: 'bg-danger/15 text-danger' },
 };
 
 const SEAT_STATUS_STYLE: Record<string, string> = {
-  FREE: 'bg-surface-2 text-text-2 border-border',
+  FREE: 'bg-white/10 text-panel-ink border-white/10',
   SOLD: 'bg-[#8a3d4d] text-white border-[#8a3d4d]',
   LOCKED: 'bg-[#f59e0b] text-[#1a1305] border-[#f59e0b]',
 };
@@ -213,22 +213,22 @@ export default function ReservationPage() {
     <div className="p-8">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-black text-ink">سامانه رزرواسیون</h1>
-          <p className="mt-1 text-sm text-muted">مدیریت رزروها، نقشهٔ صندلی و صدور دستی PNR</p>
+          <h1 className="text-xl font-black text-panel-ink">سامانه رزرواسیون</h1>
+          <p className="mt-1 text-sm text-panel-muted">مدیریت رزروها، نقشهٔ صندلی و صدور دستی PNR</p>
         </div>
         {stats && (
           <div className="flex gap-3 text-xs">
-            <div className="rounded-lg border border-border bg-white px-3 py-2 text-center">
-              <div className="font-num font-black text-ink">{faDigits(stats.todayBookings)}</div>
-              <div className="text-[10px] text-muted">رزرو امروز</div>
+            <div className="rounded-lg border border-white/10 bg-panel-surface px-3 py-2 text-center">
+              <div className="font-num font-black text-panel-ink">{faDigits(stats.todayBookings)}</div>
+              <div className="text-[10px] text-panel-muted">رزرو امروز</div>
             </div>
-            <div className="rounded-lg border border-border bg-white px-3 py-2 text-center">
+            <div className="rounded-lg border border-white/10 bg-panel-surface px-3 py-2 text-center">
               <div className="font-num font-black text-accent">{faDigits(stats.activePnrs)}</div>
-              <div className="text-[10px] text-muted">PNR فعال</div>
+              <div className="text-[10px] text-panel-muted">PNR فعال</div>
             </div>
-            <div className="rounded-lg border border-border bg-white px-3 py-2 text-center">
+            <div className="rounded-lg border border-white/10 bg-panel-surface px-3 py-2 text-center">
               <div className="font-num font-black text-[#059669]">{faDigits(stats.seatsSold)}</div>
-              <div className="text-[10px] text-muted">صندلی فروخته‌شده</div>
+              <div className="text-[10px] text-panel-muted">صندلی فروخته‌شده</div>
             </div>
           </div>
         )}
@@ -241,7 +241,7 @@ export default function ReservationPage() {
       )}
       {notice && <p className="mb-4 rounded-lg bg-[#10b98115] p-3 text-sm text-[#059669]">{notice}</p>}
 
-      <div className="mb-6 flex w-max gap-1 rounded-xl border border-border bg-surface p-1">
+      <div className="mb-6 flex w-max gap-1 rounded-xl border border-white/10 bg-panel-canvas p-1">
         {(
           [
             ['pnr', 'مدیریت رزروها'],
@@ -253,7 +253,7 @@ export default function ReservationPage() {
             key={key}
             onClick={() => setSubTab(key)}
             className={`rounded-lg px-4 py-2 text-xs font-bold transition ${
-              subTab === key ? 'bg-white text-ink shadow-sm' : 'text-text-2'
+              subTab === key ? 'bg-accent text-white shadow-sm' : 'text-panel-muted'
             }`}
           >
             {label}
@@ -262,42 +262,42 @@ export default function ReservationPage() {
       </div>
 
       {subTab === 'pnr' && (
-        <section className="rounded-xl border border-border bg-white p-5">
+        <section className="rounded-xl border border-white/10 bg-panel-surface p-5">
           <input
             value={pnrQuery}
             onChange={(e) => setPnrQuery(e.target.value)}
             placeholder="جستجو با کد PNR یا نام مسافر…"
-            className="mb-4 h-[42px] w-full rounded-xl border border-border bg-white px-4 text-xs outline-none transition focus:border-accent"
+            className="mb-4 h-[42px] w-full rounded-xl border border-white/10 bg-white/5 px-4 text-xs text-panel-ink outline-none transition placeholder:text-panel-muted-2 focus:border-accent"
           />
           {pnrGroups.length === 0 ? (
-            <p className="py-6 text-center text-xs text-muted">رزروی یافت نشد.</p>
+            <p className="py-6 text-center text-xs text-panel-muted">رزروی یافت نشد.</p>
           ) : (
             <div className="flex flex-col gap-4">
               {pnrGroups.map((g) => (
-                <div key={g.flightInstanceId} className="overflow-hidden rounded-xl border border-border">
-                  <div className="flex items-center gap-3 bg-surface px-4 py-2.5 text-xs">
+                <div key={g.flightInstanceId} className="overflow-hidden rounded-xl border border-white/10">
+                  <div className="flex items-center gap-3 bg-white/5 px-4 py-2.5 text-xs">
                     <span className="ltr font-num font-bold text-accent">{g.flightNo}</span>
-                    <span className="flex-1 font-bold text-ink">{g.route}</span>
+                    <span className="flex-1 font-bold text-panel-ink">{g.route}</span>
                     <button
                       onClick={() => { void loadSeatMap(g.flightInstanceId); setSubTab('seatmap'); }}
                       className="text-[11px] font-bold text-accent"
                     >
                       نقشهٔ صندلی {g.flightNo}
                     </button>
-                    <span className="text-muted">{formatJalaliDate(g.departureAt)}</span>
+                    <span className="text-panel-muted">{formatJalaliDate(g.departureAt)}</span>
                   </div>
-                  <ul className="divide-y divide-border">
+                  <ul className="divide-y divide-white/10">
                     {g.rows.map((r) => {
-                      const st = STATUS_LABEL[r.status] ?? { label: r.status, className: 'bg-surface text-text-2' };
+                      const st = STATUS_LABEL[r.status] ?? { label: r.status, className: 'bg-white/10 text-panel-ink' };
                       return (
                         <li key={r.pnr} className="flex items-center gap-3 px-4 py-2.5 text-xs">
                           <button
                             onClick={() => void openPnrDetail(r.pnr)}
-                            className="ltr font-num font-bold text-text-2 underline decoration-dashed underline-offset-4"
+                            className="ltr font-num font-bold text-panel-ink underline decoration-dashed underline-offset-4"
                           >
                             {r.pnr}
                           </button>
-                          <span className="flex-1 text-ink">{r.passenger}</span>
+                          <span className="flex-1 text-panel-ink">{r.passenger}</span>
                           <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${st.className}`}>{st.label}</span>
                         </li>
                       );
@@ -311,9 +311,9 @@ export default function ReservationPage() {
       )}
 
       {subTab === 'seatmap' && (
-        <section className="rounded-xl border border-border bg-white p-5">
+        <section className="rounded-xl border border-white/10 bg-panel-surface p-5">
           {!activeFlightInstanceId || !seatMap ? (
-            <p className="py-6 text-center text-xs text-muted">
+            <p className="py-6 text-center text-xs text-panel-muted">
               یک پرواز را از «مدیریت رزروها» یا «رزرو جدید» انتخاب کنید.
             </p>
           ) : (
@@ -329,26 +329,26 @@ export default function ReservationPage() {
 
       {subTab === 'new' && (
         <div className="flex flex-col gap-4">
-          <section className="rounded-xl border border-border bg-white p-5">
-            <h2 className="mb-4 text-sm font-bold text-ink">جستجوی پرواز</h2>
+          <section className="rounded-xl border border-white/10 bg-panel-surface p-5">
+            <h2 className="mb-4 text-sm font-bold text-panel-ink">جستجوی پرواز</h2>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
               <input
                 value={searchForm.origin}
                 onChange={(e) => setSearchForm({ ...searchForm, origin: e.target.value })}
                 placeholder="مبدأ"
-                className="h-[42px] rounded-lg border border-border px-3 text-xs outline-none focus:border-accent"
+                className="h-[42px] rounded-lg border border-white/10 bg-white/5 px-3 text-xs text-panel-ink outline-none placeholder:text-panel-muted-2 focus:border-accent"
               />
               <input
                 value={searchForm.dest}
                 onChange={(e) => setSearchForm({ ...searchForm, dest: e.target.value })}
                 placeholder="مقصد"
-                className="h-[42px] rounded-lg border border-border px-3 text-xs outline-none focus:border-accent"
+                className="h-[42px] rounded-lg border border-white/10 bg-white/5 px-3 text-xs text-panel-ink outline-none placeholder:text-panel-muted-2 focus:border-accent"
               />
               <input
                 value={searchForm.date}
                 onChange={(e) => setSearchForm({ ...searchForm, date: e.target.value })}
                 placeholder="۱۴۰۵/۰۵/۱۲"
-                className="font-num h-[42px] rounded-lg border border-border px-3 text-xs outline-none focus:border-accent"
+                className="font-num h-[42px] rounded-lg border border-white/10 bg-white/5 px-3 text-xs text-panel-ink outline-none placeholder:text-panel-muted-2 focus:border-accent"
               />
               <button onClick={() => void onSearch()} className="rounded-lg bg-accent px-4 text-xs font-bold text-white">
                 جستجو
@@ -359,13 +359,13 @@ export default function ReservationPage() {
           {searchResults.length > 0 && (
             <section className="flex flex-col gap-2">
               {searchResults.map((f) => (
-                <div key={f.flightInstanceId} className="flex items-center gap-4 rounded-xl border border-border bg-white p-4 text-xs">
+                <div key={f.flightInstanceId} className="flex items-center gap-4 rounded-xl border border-white/10 bg-panel-surface p-4 text-xs">
                   <span className="ltr font-num font-bold text-accent">{f.flightNo}</span>
-                  <span className="flex-1 text-ink">
+                  <span className="flex-1 text-panel-ink">
                     {f.originCode} → {f.destCode} · {formatJalaliDateTime(f.departureAt)}
                   </span>
                   <span className="font-bold text-[#059669]">{faMoney(f.priceIrr)} تومان</span>
-                  <span className="text-muted">{faDigits(f.seatsLeft)} صندلی</span>
+                  <span className="text-panel-muted">{faDigits(f.seatsLeft)} صندلی</span>
                   <button
                     onClick={() => void loadSeatMap(f.flightInstanceId)}
                     className="rounded-lg bg-accent px-3 py-1.5 text-[11px] font-bold text-white"
@@ -378,7 +378,7 @@ export default function ReservationPage() {
           )}
 
           {activeFlightInstanceId && seatMap && (
-            <section className="rounded-xl border border-border bg-white p-5">
+            <section className="rounded-xl border border-white/10 bg-panel-surface p-5">
               <SeatMapView
                 seatMap={seatMap}
                 canLock={canLock}
@@ -511,10 +511,10 @@ function SeatMapView({
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center gap-4 text-[11px]">
-        <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-surface-2 border border-border" />آزاد</span>
+        <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-white/10 border border-white/10" />آزاد</span>
         <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-[#8a3d4d]" />فروخته‌شده</span>
         <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-[#f59e0b]" />لاک مدیریتی</span>
-        <span className="mr-auto font-num text-muted">
+        <span className="mr-auto font-num text-panel-muted">
           {faDigits(seatMap.soldCount + seatMap.lockedCount)}/{faDigits(seatMap.capacity)} اشغال ({faDigits(seatMap.occupancyPct)}٪)
         </span>
       </div>
@@ -527,7 +527,7 @@ function SeatMapView({
           const aisleAfterIndex = seatMap.cabinLayout[row.cabin].aisleAfterIndex;
           return (
             <div key={row.row} className="flex items-center justify-center gap-1.5">
-              <span className="font-num w-6 text-center text-[10px] font-bold text-muted">{faDigits(row.row)}</span>
+              <span className="font-num w-6 text-center text-[10px] font-bold text-panel-muted">{faDigits(row.row)}</span>
               {row.seats.map((s, idx) => (
                 <span key={s.seatCode} className="flex items-center gap-1.5">
                   <button
@@ -549,8 +549,8 @@ function SeatMapView({
       </div>
 
       {canLock && lockedChips.length > 0 && (
-        <div className="mt-4 border-t border-border pt-3">
-          <div className="mb-2 text-[10.5px] font-bold text-muted">صندلی‌های رزرو مدیریتی ({faDigits(lockedChips.length)})</div>
+        <div className="mt-4 border-t border-white/10 pt-3">
+          <div className="mb-2 text-[10.5px] font-bold text-panel-muted">صندلی‌های رزرو مدیریتی ({faDigits(lockedChips.length)})</div>
           <div className="flex flex-wrap gap-2">
             {lockedChips.map((s) => (
               <button

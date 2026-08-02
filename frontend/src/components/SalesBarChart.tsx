@@ -34,7 +34,7 @@ export default function SalesBarChart({ periods, selectedPeriodKey, onSelectPeri
       <div className="mb-3 flex items-center justify-between">
         <div className="flex flex-wrap gap-4">
           {SERIES.map((s) => (
-            <div key={s.key} className="flex items-center gap-1.5 text-xs text-text-2">
+            <div key={s.key} className="flex items-center gap-1.5 text-xs text-panel-muted">
               <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: s.color }} />
               {s.label}
             </div>
@@ -42,7 +42,7 @@ export default function SalesBarChart({ periods, selectedPeriodKey, onSelectPeri
         </div>
         <button
           onClick={() => setTableView((v) => !v)}
-          className="text-[11px] text-muted underline decoration-dotted"
+          className="text-[11px] text-panel-muted underline decoration-dotted"
         >
           {tableView ? 'نمایش نموداری' : 'نمایش جدولی'}
         </button>
@@ -50,9 +50,9 @@ export default function SalesBarChart({ periods, selectedPeriodKey, onSelectPeri
 
       {tableView ? (
         <div className="overflow-x-auto">
-          <table className="w-full text-start text-xs">
+          <table className="w-full text-start text-xs text-panel-ink">
             <thead>
-              <tr className="border-b border-border text-muted">
+              <tr className="border-b border-white/10 text-panel-muted">
                 <th className="py-2 text-start font-medium">دوره</th>
                 {SERIES.map((s) => (
                   <th key={s.key} className="py-2 text-start font-medium">
@@ -64,7 +64,7 @@ export default function SalesBarChart({ periods, selectedPeriodKey, onSelectPeri
             </thead>
             <tbody>
               {periods.map((p) => (
-                <tr key={p.periodKey} className="border-b border-border/60 font-num">
+                <tr key={p.periodKey} className="border-b border-white/10 font-num">
                   <td className="py-2">{formatJalaliDate(p.startDate)}</td>
                   <td className="py-2">{faMoney(p.systemIrr)}</td>
                   <td className="py-2">{faMoney(p.charterIrr)}</td>
@@ -86,7 +86,7 @@ export default function SalesBarChart({ periods, selectedPeriodKey, onSelectPeri
             return (
               <div key={p.periodKey} className="relative flex flex-1 flex-col items-center justify-end">
                 {isHovered && (
-                  <div className="absolute -top-20 z-10 w-max rounded-lg border border-border bg-white p-2 text-[11px] shadow-lg">
+                  <div className="absolute -top-20 z-10 w-max rounded-lg border border-white/10 bg-panel-surface-2 p-2 text-[11px] text-panel-ink shadow-lg">
                     <div className="mb-1 font-bold">{formatJalaliDate(p.startDate)}</div>
                     {SERIES.map((s) => (
                       <div key={s.key} className="flex items-center gap-1.5">
@@ -105,7 +105,7 @@ export default function SalesBarChart({ periods, selectedPeriodKey, onSelectPeri
                   style={{
                     height: `${Math.max(barHeightPct, 2)}%`,
                     opacity: selectedPeriodKey && !isSelected ? 0.4 : 1,
-                    outline: isSelected ? '2px solid #16202e' : undefined,
+                    outline: isSelected ? '2px solid #e7ecf3' : undefined,
                     outlineOffset: isSelected ? '2px' : undefined,
                   }}
                   aria-pressed={isSelected}

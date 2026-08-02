@@ -66,16 +66,16 @@ export default function DashboardPage() {
   return (
     <div className="p-8">
       <div className="mb-6">
-        <h1 className="text-xl font-black text-ink">داشبورد</h1>
-        <p className="mt-1 text-sm text-muted">نمای کلی فروش و عملکرد پروازها</p>
+        <h1 className="text-xl font-black text-panel-ink">داشبورد</h1>
+        <p className="mt-1 text-sm text-panel-muted">نمای کلی فروش و عملکرد پروازها</p>
       </div>
 
       {error && <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">{error}</p>}
 
       {cartable && (
-        <section className="mb-6 rounded-xl border border-border bg-white p-5">
+        <section className="mb-6 rounded-xl border border-white/10 bg-panel-surface p-5">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-bold text-ink">
+            <h2 className="text-sm font-bold text-panel-ink">
               کارتابل
               {cartable.totalOpen > 0 && (
                 <span className="mr-2 rounded-full bg-danger/10 px-2.5 py-0.5 text-[11px] font-bold text-danger">
@@ -88,13 +88,13 @@ export default function DashboardPage() {
             </Link>
           </div>
           {cartable.tasks.length === 0 ? (
-            <p className="py-2 text-center text-xs text-muted">کارتابل خالی است ✓</p>
+            <p className="py-2 text-center text-xs text-panel-muted">کارتابل خالی است ✓</p>
           ) : (
-            <ul className="divide-y divide-border">
+            <ul className="divide-y divide-white/10">
               {cartable.tasks.slice(0, 3).map((t) => (
                 <li key={t.id} className="flex items-center justify-between gap-3 py-2.5 text-xs">
-                  <span className="font-bold text-ink">{t.title}</span>
-                  <span className="text-[10px] text-muted">
+                  <span className="font-bold text-panel-ink">{t.title}</span>
+                  <span className="text-[10px] text-panel-muted">
                     {t.senderLabelFa ?? t.sender?.fullName ?? ''}
                   </span>
                 </li>
@@ -123,9 +123,9 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="rounded-xl border border-border bg-white p-5">
+      <div className="rounded-xl border border-white/10 bg-panel-surface p-5">
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-          <h2 className="text-sm font-bold text-ink">نمودار فروش</h2>
+          <h2 className="text-sm font-bold text-panel-ink">نمودار فروش</h2>
           <SalesChartControls
             modes={chart.modes}
             granularity={chart.granularity}
@@ -141,9 +141,9 @@ export default function DashboardPage() {
         </div>
 
         {!chart.isQueryReady ? (
-          <p className="py-10 text-center text-sm text-muted">شماره پرواز را وارد کنید.</p>
+          <p className="py-10 text-center text-sm text-panel-muted">شماره پرواز را وارد کنید.</p>
         ) : loading ? (
-          <p className="py-10 text-center text-sm text-muted">در حال بارگذاری…</p>
+          <p className="py-10 text-center text-sm text-panel-muted">در حال بارگذاری…</p>
         ) : (
           <SalesBarChart
             periods={periods}
@@ -154,22 +154,22 @@ export default function DashboardPage() {
       </div>
 
       {flights && (
-        <div className="mt-6 grid grid-cols-2 gap-4 rounded-xl border border-border bg-white p-5 md:grid-cols-4">
+        <div className="mt-6 grid grid-cols-2 gap-4 rounded-xl border border-white/10 bg-panel-surface p-5 md:grid-cols-4">
           <div>
-            <div className="font-num text-lg font-black text-ink">{faDigits(flights.flightCount)}</div>
-            <div className="text-xs text-muted">پروازهای انجام‌شده</div>
+            <div className="font-num text-lg font-black text-panel-ink">{faDigits(flights.flightCount)}</div>
+            <div className="text-xs text-panel-muted">پروازهای انجام‌شده</div>
           </div>
           <div>
-            <div className="font-num text-lg font-black text-ink">{faDigits(flights.totalSeats)}</div>
-            <div className="text-xs text-muted">مجموع صندلی</div>
+            <div className="font-num text-lg font-black text-panel-ink">{faDigits(flights.totalSeats)}</div>
+            <div className="text-xs text-panel-muted">مجموع صندلی</div>
           </div>
           <div>
             <div className="font-num text-lg font-black text-[#059669]">{faDigits(flights.soldSeats)}</div>
-            <div className="text-xs text-muted">صندلی فروخته‌شده</div>
+            <div className="text-xs text-panel-muted">صندلی فروخته‌شده</div>
           </div>
           <div>
             <div className="font-num text-lg font-black text-danger">{faDigits(flights.unsoldSeats)}</div>
-            <div className="text-xs text-muted">صندلی فروش‌نرفته</div>
+            <div className="text-xs text-panel-muted">صندلی فروش‌نرفته</div>
           </div>
         </div>
       )}

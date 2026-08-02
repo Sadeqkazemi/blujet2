@@ -26,7 +26,11 @@ async function fetchWithTimeout(path: string, init: RequestInit): Promise<Respon
   }
 }
 
-async function refreshAccessToken(): Promise<boolean> {
+// Exported so the auth bootstrap effect (useAuth.tsx) can share this same
+// in-flight request instead of firing its own — two concurrent /auth/refresh
+// calls both racing to consume the same not-yet-rotated refresh-token cookie
+// trip the server's reuse-detection and revoke the whole session.
+export async function refreshAccessToken(): Promise<boolean> {
   if (!refreshInFlight) {
     refreshInFlight = (async () => {
       try {
