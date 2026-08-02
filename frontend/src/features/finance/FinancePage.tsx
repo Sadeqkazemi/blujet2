@@ -840,13 +840,16 @@ export function aggregateFlightSalesByFlightNo(rows: FlightSalesRow[]): Aggregat
   });
 }
 
-/** Filter aggregated flights by number/route — never re-sort the full list. */
+/**
+ * Search-driven list: empty query → no cards; with query → matching flights only.
+ * Never dumps the full catalog by default.
+ */
 export function filterFlightSalesRows(
   rows: AggregatedFlightSales[],
   search: string,
 ): AggregatedFlightSales[] {
   const raw = search.trim();
-  if (!raw) return rows;
+  if (!raw) return [];
   const q = latinDigits(raw).toLowerCase();
   return rows.filter((r) => {
     const flightNo = latinDigits(r.flightNo).toLowerCase();
@@ -868,7 +871,7 @@ function FlightSalesPicker({
   search: string;
   onSearchChange: (v: string) => void;
 }) {
-  // Search filters to matching flights only (does not sort the master list).
+  const hasQuery = search.trim().length > 0;
   const filtered = filterFlightSalesRows(rows, search);
 
   if (rows.length === 0) {
@@ -903,7 +906,11 @@ function FlightSalesPicker({
           className="w-full rounded-[11px] border border-[#28344c] bg-[#141d2e] py-2.5 pl-3 pr-[34px] text-[11.5px] text-[#e7ecf3] outline-none placeholder:text-[#6b7b94] focus:border-[#3b82f6]"
         />
       </div>
-      {filtered.length === 0 ? (
+      {!hasQuery ? (
+        <div className="px-3.5 py-[18px] text-center text-[11.5px] text-[#6b7b94]">
+          شماره پرواز یا مسیر را جستجو کنید.
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="px-3.5 py-[18px] text-center text-[11.5px] text-[#6b7b94]">
           پروازی با این مشخصات یافت نشد.
         </div>
@@ -1021,10 +1028,8 @@ function FinanceAnalyticView() {
         setKpis(kpiData);
         setMix(mixData);
         setFlights(yearFlights);
-        setSelectedFlightNo((prev) => {
-          if (prev && aggregated.some((r) => r.flightNo === prev)) return prev;
-          return aggregated[0]?.flightNo ?? null;
-        });
+        // No default selection — cards appear only after search.
+        setSelectedFlightNo(null);
         setError(null);
       })
       .catch(() => {
@@ -1035,12 +1040,20 @@ function FinanceAnalyticView() {
     };
   }, [isFlightMode]);
 
-  // Search shows matching flights only and selects the first hit so its
-  // summary tiles update — never keeps a hidden selection or re-sorts.
+  // Search-driven: empty query clears selection; a query selects the first match
+  // so channel tiles follow the shown flight.
   useEffect(() => {
-    if (!isFlightMode || flightRows.length === 0) return;
+    if (!isFlightMode) return;
+    if (!flightSearch.trim()) {
+      setSelectedFlightNo(null);
+      return;
+    }
+    if (flightRows.length === 0) return;
     const matches = filterFlightSalesRows(flightRows, flightSearch);
-    if (matches.length === 0) return;
+    if (matches.length === 0) {
+      setSelectedFlightNo(null);
+      return;
+    }
     setSelectedFlightNo((prev) => {
       if (prev && matches.some((r) => r.flightNo === prev)) return prev;
       return matches[0].flightNo;
@@ -1051,7 +1064,9 @@ function FinanceAnalyticView() {
   if (!flights || !mix) return <p className="text-sm text-[#6b7b94]">در حال بارگذاری…</p>;
 
   const selectedFlight =
-    flightRows.find((r) => r.flightNo === selectedFlightNo) ?? flightRows[0] ?? null;
+    selectedFlightNo != null
+      ? (flightRows.find((r) => r.flightNo === selectedFlightNo) ?? null)
+      : null;
 
   const barSums = {
     system: periods.reduce((s, p) => s + Number(p.systemIrr), 0),
