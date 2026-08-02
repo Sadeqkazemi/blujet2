@@ -52,6 +52,26 @@ export interface CompletedFlightsSummary {
   unsoldSeats: number;
 }
 
+export interface FlightSalesRow {
+  flightInstanceId: string;
+  flightNo: string;
+  originCode: string;
+  destCode: string;
+  originCityFa: string;
+  destCityFa: string;
+  departureAt: string;
+  systemIrr: string;
+  charterIrr: string;
+  agencyIrr: string;
+  totalIrr: string;
+  capacity: number;
+  soldSeats: number;
+}
+
+export interface FlightSalesResult {
+  rows: FlightSalesRow[];
+}
+
 export interface LowSalesAlert {
   flightNo: string;
   originCode: string;

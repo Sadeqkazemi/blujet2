@@ -4,6 +4,7 @@ import { useOutletContext } from 'react-router-dom';
 import {
   fetchAgencySettlements,
   fetchCompletedFlightsSummary,
+  fetchFlightSales,
   fetchKpis,
   fetchRecentTransactions,
   fetchRevenueMix,
@@ -21,6 +22,7 @@ import { useSalesChartQuery } from '../../hooks/useSalesChartQuery';
 import type {
   AgencySettlementsResult,
   CompletedFlightsSummary,
+  FlightSalesRow,
   KpiResult,
   RecentTransactionsResult,
   RevenueMixResult,
@@ -677,16 +679,213 @@ function FlightsStrip({ flights }: { flights: CompletedFlightsSummary }) {
   );
 }
 
+function ChannelSummaryTiles({
+  viewLabel,
+  totalIrr,
+  systemIrr,
+  charterIrr,
+  agencyIrr,
+  flights,
+}: {
+  viewLabel: string;
+  totalIrr: number | string;
+  systemIrr: number | string;
+  charterIrr: number | string;
+  agencyIrr: number | string;
+  flights: CompletedFlightsSummary;
+}) {
+  const total = Number(totalIrr);
+  const useBillionUnit = total >= 10_000_000_000;
+  const viewUnit = useBillionUnit ? 'میلیارد تومان' : 'تومان';
+  const totalDisplay = useBillionUnit ? faMoneyCompactNumber(total) : faMoneyCompact(total);
+  const channelDisplay = (n: number | string) =>
+    useBillionUnit ? faMoneyCompactNumber(n) : faMoneyCompact(n);
+
+  return (
+    <div className="mb-3.5 flex flex-wrap gap-2.5">
+      <div className="min-w-[150px] rounded-xl border border-[#28344c] bg-gradient-to-br from-[#1a2740] to-[#141d2e] px-3.5 py-2.5">
+        <div className="text-[9.5px] text-[#6b7b94]">{viewLabel}</div>
+        <div className="font-num mt-[3px] text-[19px] font-black text-white">
+          {totalDisplay} <span className="text-[9.5px] font-normal text-[#7c8aa2]">{viewUnit}</span>
+        </div>
+      </div>
+      <div className="grid min-w-[230px] flex-1 grid-cols-3 gap-2">
+        <div className="rounded-xl border border-[#28344c] bg-[#18223a] px-[11px] py-[9px]">
+          <div className="mb-1 flex items-center gap-1.5 text-[9.5px] text-[#6b7b94]">
+            <span className="h-2 w-2 rounded-sm bg-[#3b82f6]" />
+            سیستمی
+          </div>
+          <div className="font-num text-[12.5px] font-extrabold text-[#60a5fa]">
+            {channelDisplay(systemIrr)}
+          </div>
+        </div>
+        <div className="rounded-xl border border-[#28344c] bg-[#18223a] px-[11px] py-[9px]">
+          <div className="mb-1 flex items-center gap-1.5 text-[9.5px] text-[#6b7b94]">
+            <span className="h-2 w-2 rounded-sm bg-[#a855f7]" />
+            چارتر
+          </div>
+          <div className="font-num text-[12.5px] font-extrabold text-[#c084fc]">
+            {channelDisplay(charterIrr)}
+          </div>
+        </div>
+        <div className="rounded-xl border border-[#28344c] bg-[#18223a] px-[11px] py-[9px]">
+          <div className="mb-1 flex items-center gap-1.5 text-[9.5px] text-[#6b7b94]">
+            <span className="h-2 w-2 rounded-sm bg-[#34d399]" />
+            آژانس
+          </div>
+          <div className="font-num text-[12.5px] font-extrabold text-[#34d399]">
+            {channelDisplay(agencyIrr)}
+          </div>
+        </div>
+      </div>
+      <div className="min-w-[280px] rounded-xl border border-[#28344c] bg-gradient-to-br from-[#1a2740] to-[#141d2e] px-3.5 py-2.5">
+        <div className="flex items-baseline justify-between gap-2.5">
+          <div className="text-[9.5px] text-[#6b7b94]">پروازهای انجام‌شده</div>
+          <div className="font-num text-base font-black text-white">
+            {faDigits(flights.flightCount)}{' '}
+            <span className="text-[9px] font-normal text-[#7c8aa2]">پرواز</span>
+          </div>
+        </div>
+        <div className="mt-[7px] grid grid-cols-3 gap-2">
+          <div>
+            <div className="text-[9px] text-[#6b7b94]">مجموع صندلی</div>
+            <div className="font-num mt-0.5 text-xs font-extrabold text-[#e7ecf3]">
+              {faDigits(flights.totalSeats)}
+            </div>
+          </div>
+          <div>
+            <div className="text-[9px] text-[#6b7b94]">فروخته‌شده</div>
+            <div className="font-num mt-0.5 text-xs font-extrabold text-[#34d399]">
+              {faDigits(flights.soldSeats)}
+            </div>
+          </div>
+          <div>
+            <div className="text-[9px] text-[#6b7b94]">فروش‌نرفته</div>
+            <div className="font-num mt-0.5 text-xs font-extrabold text-[#f87171]">
+              {faDigits(flights.unsoldSeats)}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FlightSalesPicker({
+  rows,
+  selectedId,
+  onSelect,
+  search,
+  onSearchChange,
+}: {
+  rows: FlightSalesRow[];
+  selectedId: string | null;
+  onSelect: (row: FlightSalesRow) => void;
+  search: string;
+  onSearchChange: (v: string) => void;
+}) {
+  const q = search.trim().toLowerCase();
+  const filtered = q
+    ? rows.filter(
+        (r) =>
+          r.flightNo.toLowerCase().includes(q) ||
+          r.originCityFa.includes(search.trim()) ||
+          r.destCityFa.includes(search.trim()) ||
+          r.originCode.toLowerCase().includes(q) ||
+          r.destCode.toLowerCase().includes(q),
+      )
+    : rows;
+
+  if (rows.length === 0) {
+    return (
+      <div className="px-3.5 py-[22px] text-center text-[11.5px] text-[#6b7b94]">
+        پرواز انجام‌شده‌ای ثبت نشده است.
+      </div>
+    );
+  }
+
+  return (
+    <div className="pt-[13px]">
+      <div className="relative mb-[13px] max-w-[430px]">
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#5b6b84"
+          strokeWidth="2"
+          className="pointer-events-none absolute right-[11px] top-1/2 -translate-y-1/2"
+          aria-hidden
+        >
+          <circle cx="11" cy="11" r="7" />
+          <path d="M21 21l-4.3-4.3" />
+        </svg>
+        <input
+          value={search}
+          onChange={(e) => onSearchChange(e.target.value)}
+          placeholder="جستجوی شماره پرواز یا مسیر…"
+          aria-label="جستجوی شماره پرواز یا مسیر"
+          className="w-full rounded-[11px] border border-[#28344c] bg-[#141d2e] py-2.5 pl-3 pr-[34px] text-[11.5px] text-[#e7ecf3] outline-none placeholder:text-[#6b7b94] focus:border-[#3b82f6]"
+        />
+      </div>
+      {filtered.length === 0 ? (
+        <div className="px-3.5 py-[18px] text-center text-[11.5px] text-[#6b7b94]">
+          پروازی با این مشخصات یافت نشد.
+        </div>
+      ) : (
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(228px,1fr))] gap-[9px]">
+          {filtered.map((r) => {
+            const on = r.flightInstanceId === selectedId;
+            return (
+              <button
+                key={r.flightInstanceId}
+                type="button"
+                onClick={() => onSelect(r)}
+                className={`flex items-center justify-between gap-2.5 rounded-xl border px-[13px] py-[11px] text-start transition ${
+                  on
+                    ? 'border-[#3b82f6] bg-[rgba(59,130,246,.16)]'
+                    : 'border-[#1f2a3d] bg-[#141d2e] hover:border-[#28344c]'
+                }`}
+              >
+                <div className="min-w-0 leading-normal">
+                  <div className={`text-[12.5px] font-extrabold ${on ? 'text-white' : 'text-[#e7ecf3]'}`}>
+                    {r.originCityFa} ← {r.destCityFa}
+                  </div>
+                  <div className="text-[10px] text-[#6b7b94]">
+                    پرواز <span dir="ltr">{r.flightNo}</span> · {formatJalaliDate(r.departureAt)}
+                  </div>
+                </div>
+                <div className="shrink-0 text-left whitespace-nowrap">
+                  <div className="font-num text-xs font-extrabold text-[#60a5fa]">
+                    {faMoneyCompact(r.totalIrr)}
+                  </div>
+                  <div className="text-[9px] text-[#6b7b94]">فروش</div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Analytic مالی view for CEO / Board Chair / Senior / Commercial. */
 function FinanceAnalyticView() {
   const chart = useSalesChartQuery({ includeFlightMode: true });
+  const isFlightMode = chart.granularity === 'flight';
   const [periods, setPeriods] = useState<SalesChartPeriod[]>([]);
   const [kpis, setKpis] = useState<KpiResult | null>(null);
   const [flights, setFlights] = useState<CompletedFlightsSummary | null>(null);
   const [mix, setMix] = useState<RevenueMixResult | null>(null);
+  const [flightRows, setFlightRows] = useState<FlightSalesRow[]>([]);
+  const [selectedFlightId, setSelectedFlightId] = useState<string | null>(null);
+  const [flightSearch, setFlightSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
 
+  // Bar / day / month modes: existing chart + period-scoped KPIs.
   useEffect(() => {
+    if (isFlightMode) return;
     if (!chart.isQueryReady) {
       setPeriods([]);
       return;
@@ -705,6 +904,7 @@ function FinanceAnalyticView() {
         setKpis(kpiData);
         setFlights(flightsData);
         setMix(mixData);
+        setError(null);
       })
       .catch(() => {
         if (!cancelled) setError('خطا در دریافت اطلاعات مالی.');
@@ -712,24 +912,65 @@ function FinanceAnalyticView() {
     return () => {
       cancelled = true;
     };
-  }, [chart.query, chart.isQueryReady]);
+  }, [chart.query, chart.isQueryReady, isFlightMode]);
+
+  // Flight mode: picker list + year-scoped KPIs/donut (matches design).
+  useEffect(() => {
+    if (!isFlightMode) {
+      setFlightRows([]);
+      setSelectedFlightId(null);
+      setFlightSearch('');
+      return;
+    }
+
+    let cancelled = false;
+    Promise.all([
+      fetchFlightSales(),
+      fetchKpis({ granularity: 'year' }),
+      fetchRevenueMix({ granularity: 'year' }),
+      fetchCompletedFlightsSummary({ granularity: 'year' }),
+    ])
+      .then(([sales, kpiData, mixData, yearFlights]) => {
+        if (cancelled) return;
+        setFlightRows(sales.rows);
+        setKpis(kpiData);
+        setMix(mixData);
+        setFlights(yearFlights);
+        setSelectedFlightId((prev) => {
+          if (prev && sales.rows.some((r) => r.flightInstanceId === prev)) return prev;
+          return sales.rows[0]?.flightInstanceId ?? null;
+        });
+        setError(null);
+      })
+      .catch(() => {
+        if (!cancelled) setError('خطا در دریافت اطلاعات مالی.');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isFlightMode]);
 
   if (error) return <p className="text-sm text-[#f87171]">{error}</p>;
   if (!flights || !mix) return <p className="text-sm text-[#6b7b94]">در حال بارگذاری…</p>;
 
-  const sums = {
+  const selectedFlight =
+    flightRows.find((r) => r.flightInstanceId === selectedFlightId) ?? flightRows[0] ?? null;
+
+  const barSums = {
     system: periods.reduce((s, p) => s + Number(p.systemIrr), 0),
     charter: periods.reduce((s, p) => s + Number(p.charterIrr), 0),
     agency: periods.reduce((s, p) => s + Number(p.agencyIrr), 0),
   };
-  const total = sums.system + sums.charter + sums.agency;
+  const barTotal = barSums.system + barSums.charter + barSums.agency;
 
-  // Capation unit: billions when the period total is ≥ ۱ میلیارد تومان (۱۰¹⁰ IRR).
-  const useBillionUnit = chart.granularity !== 'flight' && total >= 10_000_000_000;
-  const viewUnit = useBillionUnit ? 'میلیارد تومان' : 'تومان';
-  const totalDisplay = useBillionUnit ? faMoneyCompactNumber(total) : faMoneyCompact(total);
-  const channelDisplay = (n: number) =>
-    useBillionUnit ? faMoneyCompactNumber(n) : faMoneyCompact(n);
+  const flightSeats: CompletedFlightsSummary | null = selectedFlight
+    ? {
+        flightCount: 1,
+        totalSeats: selectedFlight.capacity,
+        soldSeats: selectedFlight.soldSeats,
+        unsoldSeats: Math.max(0, selectedFlight.capacity - selectedFlight.soldSeats),
+      }
+    : null;
 
   return (
     <div className="flex flex-col gap-[15px]">
@@ -738,7 +979,7 @@ function FinanceAnalyticView() {
           <div>
             <h2 className="m-0 text-[14.5px] font-extrabold text-white">نمودار فروش</h2>
             <p className="mt-[3px] text-[11px] text-[#6b7b94]">
-              {chartCaption(chart.granularity)} · {viewUnit === 'میلیارد تومان' ? 'میلیارد تومان' : 'تومان'}
+              {chartCaption(chart.granularity)} · میلیارد تومان
             </p>
           </div>
           <SalesChartControls
@@ -757,80 +998,48 @@ function FinanceAnalyticView() {
           />
         </div>
 
-        {!chart.isQueryReady ? (
+        {isFlightMode ? (
+          selectedFlight && flightSeats ? (
+            <>
+              <ChannelSummaryTiles
+                viewLabel={`پرواز ${selectedFlight.flightNo}`}
+                totalIrr={selectedFlight.totalIrr}
+                systemIrr={selectedFlight.systemIrr}
+                charterIrr={selectedFlight.charterIrr}
+                agencyIrr={selectedFlight.agencyIrr}
+                flights={flightSeats}
+              />
+              <FlightSalesPicker
+                rows={flightRows}
+                selectedId={selectedFlight.flightInstanceId}
+                onSelect={(row) => setSelectedFlightId(row.flightInstanceId)}
+                search={flightSearch}
+                onSearchChange={setFlightSearch}
+              />
+            </>
+          ) : (
+            <FlightSalesPicker
+              rows={flightRows}
+              selectedId={null}
+              onSelect={(row) => setSelectedFlightId(row.flightInstanceId)}
+              search={flightSearch}
+              onSearchChange={setFlightSearch}
+            />
+          )
+        ) : !chart.isQueryReady ? (
           <p className="py-10 text-center text-sm text-[#6b7b94]">شماره پرواز را وارد کنید.</p>
         ) : periods.length === 0 && chart.granularity !== 'day' ? (
           <p className="py-[60px] text-center text-[12.5px] text-[#6b7b94]">اطلاعاتی وجود ندارد</p>
         ) : (
           <>
-            <div className="mb-3.5 flex flex-wrap gap-2.5">
-              <div className="min-w-[150px] rounded-xl border border-[#28344c] bg-gradient-to-br from-[#1a2740] to-[#141d2e] px-3.5 py-2.5">
-                <div className="text-[9.5px] text-[#6b7b94]">{chartCaption(chart.granularity)}</div>
-                <div className="font-num mt-[3px] text-[19px] font-black text-white">
-                  {totalDisplay}{' '}
-                  <span className="text-[9.5px] font-normal text-[#7c8aa2]">{viewUnit}</span>
-                </div>
-              </div>
-              <div className="grid min-w-[230px] flex-1 grid-cols-3 gap-2">
-                <div className="rounded-xl border border-[#28344c] bg-[#18223a] px-[11px] py-[9px]">
-                  <div className="mb-1 flex items-center gap-1.5 text-[9.5px] text-[#6b7b94]">
-                    <span className="h-2 w-2 rounded-sm bg-[#3b82f6]" />
-                    سیستمی
-                  </div>
-                  <div className="font-num text-[12.5px] font-extrabold text-[#60a5fa]">
-                    {channelDisplay(sums.system)}
-                  </div>
-                </div>
-                <div className="rounded-xl border border-[#28344c] bg-[#18223a] px-[11px] py-[9px]">
-                  <div className="mb-1 flex items-center gap-1.5 text-[9.5px] text-[#6b7b94]">
-                    <span className="h-2 w-2 rounded-sm bg-[#a855f7]" />
-                    چارتر
-                  </div>
-                  <div className="font-num text-[12.5px] font-extrabold text-[#c084fc]">
-                    {channelDisplay(sums.charter)}
-                  </div>
-                </div>
-                <div className="rounded-xl border border-[#28344c] bg-[#18223a] px-[11px] py-[9px]">
-                  <div className="mb-1 flex items-center gap-1.5 text-[9.5px] text-[#6b7b94]">
-                    <span className="h-2 w-2 rounded-sm bg-[#34d399]" />
-                    آژانس
-                  </div>
-                  <div className="font-num text-[12.5px] font-extrabold text-[#34d399]">
-                    {channelDisplay(sums.agency)}
-                  </div>
-                </div>
-              </div>
-              <div className="min-w-[280px] rounded-xl border border-[#28344c] bg-gradient-to-br from-[#1a2740] to-[#141d2e] px-3.5 py-2.5">
-                <div className="flex items-baseline justify-between gap-2.5">
-                  <div className="text-[9.5px] text-[#6b7b94]">پروازهای انجام‌شده</div>
-                  <div className="font-num text-base font-black text-white">
-                    {faDigits(flights.flightCount)}{' '}
-                    <span className="text-[9px] font-normal text-[#7c8aa2]">پرواز</span>
-                  </div>
-                </div>
-                <div className="mt-[7px] grid grid-cols-3 gap-2">
-                  <div>
-                    <div className="text-[9px] text-[#6b7b94]">مجموع صندلی</div>
-                    <div className="font-num mt-0.5 text-xs font-extrabold text-[#e7ecf3]">
-                      {faDigits(flights.totalSeats)}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[9px] text-[#6b7b94]">فروخته‌شده</div>
-                    <div className="font-num mt-0.5 text-xs font-extrabold text-[#34d399]">
-                      {faDigits(flights.soldSeats)}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[9px] text-[#6b7b94]">فروش‌نرفته</div>
-                    <div className="font-num mt-0.5 text-xs font-extrabold text-[#f87171]">
-                      {faDigits(flights.unsoldSeats)}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
+            <ChannelSummaryTiles
+              viewLabel={chartCaption(chart.granularity)}
+              totalIrr={barTotal}
+              systemIrr={barSums.system}
+              charterIrr={barSums.charter}
+              agencyIrr={barSums.agency}
+              flights={flights}
+            />
             <SalesBarChart
               periods={periods}
               selectedPeriodKey={chart.periodKey}
@@ -844,7 +1053,7 @@ function FinanceAnalyticView() {
       {kpis && (
         <div className="grid grid-cols-2 gap-[13px] md:grid-cols-4">
           <AnalyticKpiCard
-            label={`کل درآمد · ${kpiPeriodLabel(chart.granularity)}`}
+            label={`کل درآمد · ${kpiPeriodLabel(isFlightMode ? 'year' : chart.granularity)}`}
             value={faMoneyCompact(kpis.revenueIrr)}
             badge={trendBadge(kpis.trends.revenuePct)}
             badgeTone="good"
@@ -898,7 +1107,7 @@ function FinanceAnalyticView() {
         </div>
       )}
 
-      <FlightsStrip flights={flights} />
+      <FlightsStrip flights={isFlightMode && flightSeats ? flightSeats : flights} />
       <RevenueMixCard mix={mix} theme="dark" />
     </div>
   );

@@ -147,7 +147,8 @@ export default function SalesChartControls({
         </div>
       )}
 
-      {granularity === 'flight' && (
+      {/* Dark analytic مالی owns its own flight search+cards (design). */}
+      {granularity === 'flight' && !dark && (
         <div className="flex max-w-md gap-2">
           <input
             dir="ltr"
@@ -158,20 +159,12 @@ export default function SalesChartControls({
               if (e.key === 'Enter') onApplyFlightNo();
             }}
             placeholder="جستجوی شماره پرواز یا مسیر…"
-            className={
-              dark
-                ? 'font-num h-[42px] flex-1 rounded-[11px] border border-[#28344c] bg-[#0f1623] px-3 text-left text-xs text-[#e7ecf3] outline-none placeholder:text-[#6b7b94] focus:border-[#3b82f6]'
-                : 'font-num h-10 flex-1 rounded-lg border border-border px-3 text-xs outline-none'
-            }
+            className="font-num h-10 flex-1 rounded-lg border border-border px-3 text-xs outline-none"
           />
           <button
             type="button"
             onClick={onApplyFlightNo}
-            className={
-              dark
-                ? 'rounded-[11px] bg-[#3b82f6] px-4 text-xs font-bold text-white'
-                : 'rounded-lg bg-accent px-4 text-xs font-bold text-white'
-            }
+            className="rounded-lg bg-accent px-4 text-xs font-bold text-white"
           >
             نمایش
           </button>

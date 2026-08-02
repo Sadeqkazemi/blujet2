@@ -219,4 +219,61 @@ describe('FinancePage', () => {
     expect(screen.queryByText('تراکنش‌های مالی اخیر')).not.toBeInTheDocument();
     expect(screen.queryByText('تسویه‌حساب آژانس‌های همکار')).not.toBeInTheDocument();
   });
+
+  it('CEO شماره پرواز mode shows searchable flight cards and selected-flight summary', async () => {
+    mockRole('CEO');
+    vi.spyOn(reportingApi, 'fetchSalesChart').mockResolvedValue([]);
+    vi.spyOn(reportingApi, 'fetchKpis').mockResolvedValue(KPIS);
+    vi.spyOn(reportingApi, 'fetchCompletedFlightsSummary').mockResolvedValue(FLIGHTS);
+    vi.spyOn(reportingApi, 'fetchRevenueMix').mockResolvedValue(MIX);
+    vi.spyOn(reportingApi, 'fetchFlightSales').mockResolvedValue({
+      rows: [
+        {
+          flightInstanceId: 'fi-1',
+          flightNo: 'EP-805',
+          originCode: 'THR',
+          destCode: 'DXB',
+          originCityFa: 'تهران',
+          destCityFa: 'دبی',
+          departureAt: '2026-06-29T06:00:00.000Z',
+          systemIrr: '4120000000',
+          charterIrr: '1980000000',
+          agencyIrr: '2430000000',
+          totalIrr: '8530000000',
+          capacity: 168,
+          soldSeats: 120,
+        },
+        {
+          flightInstanceId: 'fi-2',
+          flightNo: 'W5-098',
+          originCode: 'MHD',
+          destCode: 'THR',
+          originCityFa: 'مشهد',
+          destCityFa: 'تهران',
+          departureAt: '2026-06-29T09:00:00.000Z',
+          systemIrr: '1880000000',
+          charterIrr: '1420000000',
+          agencyIrr: '1040000000',
+          totalIrr: '4340000000',
+          capacity: 150,
+          soldSeats: 100,
+        },
+      ],
+    });
+
+    renderFinancePage();
+    await screen.findByText('نمودار فروش');
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'شماره پرواز' }));
+
+    expect(await screen.findByText('تهران ← دبی')).toBeInTheDocument();
+    expect(screen.getByText('مشهد ← تهران')).toBeInTheDocument();
+    expect(screen.getByLabelText('جستجوی شماره پرواز یا مسیر')).toBeInTheDocument();
+    expect(screen.getByText('پرواز EP-805')).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('جستجوی شماره پرواز یا مسیر'), 'W5');
+    expect(screen.queryByText('تهران ← دبی')).not.toBeInTheDocument();
+    expect(screen.getByText('مشهد ← تهران')).toBeInTheDocument();
+  });
 });
