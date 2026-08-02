@@ -128,9 +128,10 @@ describe('ReservationPage', () => {
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: 'پروازها' }));
     await user.click(await screen.findByText('تهران ← دبی'));
-    expect(await screen.findByText('نقشهٔ صندلی هواپیما')).toBeInTheDocument();
+    expect(await screen.findByText(/نقشه صندلی‌ها/)).toBeInTheDocument();
     await user.click(await screen.findByRole('button', { name: '3B' }));
-    await user.click(screen.getByRole('button', { name: 'لاک صندلی 3B' }));
+    expect(await screen.findByText(/لاک دستی صندلی/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'مسدود کردن توسط شرکت هواپیمایی (بدون PNR)' }));
     await waitFor(() =>
       expect(lockSpy).toHaveBeenCalledWith(
         'fi1',

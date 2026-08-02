@@ -132,6 +132,9 @@ export class SeatmapService {
         seatCode: seat.seatCode,
         status,
         lockId: lock?.id ?? null,
+        // Board Chair MD seat-map modal: countdown + «مسدود توسط شرکت» vs «قفل موقت».
+        lockExpiresAt: lock?.expiresAt?.toISOString() ?? null,
+        lockClassification: lock?.classification ?? null,
       });
     }
 

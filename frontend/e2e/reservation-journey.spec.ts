@@ -40,17 +40,18 @@ test('BOARD_CHAIR locks a seat on the seat map, sees it reflected, then releases
   await page.getByRole('button', { name: 'پروازها' }).click();
   await expect(page.getByText('شماره پرواز')).toBeVisible({ timeout: 15000 });
   await page.getByRole('button', { name: /EP-821|تهران/ }).first().click();
-  await expect(page.getByText('نقشهٔ صندلی هواپیما')).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText(/نقشه صندلی‌ها/)).toBeVisible({ timeout: 15000 });
 
   const seat = page.getByRole('button', { name: '3B', exact: true });
   await expect(seat).toBeVisible();
   await seat.click();
-  await page.getByRole('button', { name: 'لاک صندلی 3B' }).click();
-  await expect(page.getByText(/لاک شد/)).toBeVisible();
+  await expect(page.getByText(/لاک دستی صندلی/)).toBeVisible();
+  await page.getByLabel('لاک بدون نام مسافر').check();
+  await page.getByRole('button', { name: 'قفل کردن این صندلی و ایجاد PNR' }).click();
+  await expect(page.getByText(/قفل شد|رزرو شد/)).toBeVisible();
 
-  const chip = page.getByRole('button', { name: '3B ×' });
-  await expect(chip).toBeVisible();
-  await chip.click();
+  await expect(page.getByText('صندلی‌های قفل‌شده', { exact: false })).toBeVisible();
+  await page.getByRole('button', { name: 'آزادسازی' }).first().click();
 });
 
 test('IT Manager issues a manual PNR, finds it in PNR management, then cancels it', async ({ page }) => {

@@ -1,9 +1,15 @@
 export type SeatStatus = 'FREE' | 'SOLD' | 'LOCKED';
+export type LockClassification = 'FREE' | 'DISCOUNTED' | 'PAYABLE';
+export type LockApprovalStatus = 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
 
 export interface SeatCell {
   seatCode: string;
   status: SeatStatus;
   lockId: string | null;
+  /** Present when status is LOCKED — ISO UTC for auto-release countdown. */
+  lockExpiresAt?: string | null;
+  /** Present when status is LOCKED — FREE ≈ company block; else temp managerial hold. */
+  lockClassification?: LockClassification | null;
 }
 
 export interface SeatRow {
@@ -22,9 +28,6 @@ export interface SeatMap {
   lockedCount: number;
   occupancyPct: number;
 }
-
-export type LockClassification = 'FREE' | 'DISCOUNTED' | 'PAYABLE';
-export type LockApprovalStatus = 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
 
 export interface SeatLockView {
   id: string;

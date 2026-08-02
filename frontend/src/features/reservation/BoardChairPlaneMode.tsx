@@ -5,12 +5,7 @@ import {
   fetchPnrDetail,
   fetchPnrList,
   fetchReservationDashboardStats,
-  fetchSeatMap,
-  issuePnr,
-  lockSeat,
   markNoShow,
-  releaseLock,
-  type LockClassification,
 } from '../../api/reservation';
 import { fetchAgencies, fetchAgencyApiKeys } from '../../api/agencies';
 import { fetchFlightsOverview } from '../../api/flights';
@@ -19,6 +14,7 @@ import { faDigits, faMoney } from '../../lib/fa-format';
 import { dayjs, formatJalaliDateTime } from '../../lib/jalali';
 import PanelAlert from '../panel/PanelAlert';
 import PanelModal from '../panel/PanelModal';
+import MdSeatMapModal from './MdSeatMapModal';
 import {
   panelBtnGhost,
   panelInput,
@@ -28,13 +24,7 @@ import {
 } from '../panel/panel-theme';
 import type { AgencyApiKey, AgencyListRow } from '../../types/agencies';
 import type { FlightRow } from '../../types/flights';
-import type {
-  PnrDetail,
-  PnrGroup,
-  ReservationDashboardStats,
-  SeatMap,
-  SeatStatus,
-} from '../../types/reservation';
+import type { PnrDetail, PnrGroup, ReservationDashboardStats } from '../../types/reservation';
 
 type Tab = 'dash' | 'pnr' | 'agency' | 'flights';
 
@@ -115,14 +105,6 @@ function normalizeSeatCode(raw: string): string {
   return toLatinDigits(raw).toUpperCase().replace(/\s/g, '');
 }
 
-function findSeat(seatMap: SeatMap, seatCode: string) {
-  for (const row of seatMap.rows) {
-    const seat = row.seats.find((s) => s.seatCode === seatCode);
-    if (seat) return { seat, cabin: row.cabin, row: row.row };
-  }
-  return null;
-}
-
 function routeFa(originCode: string, destCode: string): string {
   return `${airportCityName(originCode, 'fa')} ← ${airportCityName(destCode, 'fa')}`;
 }
@@ -193,14 +175,6 @@ export default function BoardChairPlaneMode() {
   const [changeSeatInput, setChangeSeatInput] = useState('');
 
   const [seatFlight, setSeatFlight] = useState<FlightRow | null>(null);
-  const [seatMap, setSeatMap] = useState<SeatMap | null>(null);
-  const [lockInput, setLockInput] = useState('');
-  const [lockReason, setLockReason] = useState('لاک مدیریتی رئیس هیئت مدیره');
-  const [classification, setClassification] = useState<LockClassification>('FREE');
-  const [discountPct, setDiscountPct] = useState('20');
-  const [passengerName, setPassengerName] = useState('');
-  const [passengerNid, setPassengerNid] = useState('');
-  const [passengerMobile, setPassengerMobile] = useState('');
 
   const loadStats = useCallback(() => {
     fetchReservationDashboardStats()
@@ -327,111 +301,8 @@ export default function BoardChairPlaneMode() {
     }
   }
 
-  async function openSeatMap(flight: FlightRow) {
+  function openSeatMap(flight: FlightRow) {
     setSeatFlight(flight);
-    setLockInput('');
-    setPassengerName('');
-    setPassengerNid('');
-    setPassengerMobile('');
-    try {
-      setSeatMap(await fetchSeatMap(flight.id));
-    } catch {
-      setError('خطا در دریافت نقشهٔ صندلی.');
-      setSeatMap(null);
-    }
-  }
-
-  const selectedSeatCode = normalizeSeatCode(lockInput);
-  const selectedSeatInfo = seatMap && selectedSeatCode ? findSeat(seatMap, selectedSeatCode) : null;
-
-  const primaryBtn = useMemo(() => {
-    if (!selectedSeatCode || !selectedSeatInfo) {
-      return { label: 'لاک / آزادسازی', bg: 'bg-[#2a3346]', color: 'text-[#6b7b94]', disabled: true };
-    }
-    if (selectedSeatInfo.seat.status === 'SOLD') {
-      return { label: 'فروخته‌شده', bg: 'bg-[#2a3346]', color: 'text-[#6b7b94]', disabled: true };
-    }
-    if (selectedSeatInfo.seat.status === 'LOCKED') {
-      return {
-        label: `آزادسازی ${selectedSeatCode}`,
-        bg: 'bg-[#34d399]',
-        color: 'text-[#06231a]',
-        disabled: false,
-      };
-    }
-    if (passengerName.trim()) {
-      return {
-        label: `رزرو صندلی ${selectedSeatCode}`,
-        bg: 'bg-[#1668c4]',
-        color: 'text-white',
-        disabled: false,
-      };
-    }
-    return {
-      label: `لاک صندلی ${selectedSeatCode}`,
-      bg: 'bg-[#f59e0b]',
-      color: 'text-[#1a1206]',
-      disabled: false,
-    };
-  }, [selectedSeatCode, selectedSeatInfo, passengerName]);
-
-  async function onPrimaryLockAction() {
-    if (!seatFlight || !selectedSeatInfo || !selectedSeatCode) return;
-    try {
-      if (selectedSeatInfo.seat.status === 'LOCKED' && selectedSeatInfo.seat.lockId) {
-        await releaseLock(selectedSeatInfo.seat.lockId);
-        setNotice(`صندلی ${selectedSeatCode} آزاد شد ✓`);
-        setLockInput('');
-      } else if (passengerName.trim()) {
-        const pnr = await issuePnr({
-          flightInstanceId: seatFlight.id,
-          seatCode: selectedSeatCode,
-          passengerName: passengerName.trim(),
-          passengerNationalId: passengerNid || undefined,
-          passengerMobile: passengerMobile || undefined,
-        });
-        setNotice(`صندلی ${selectedSeatCode} برای ${passengerName.trim()} رزرو شد ✓ (PNR ${pnr.pnr})`);
-        setLockInput('');
-        setPassengerName('');
-        setPassengerNid('');
-        setPassengerMobile('');
-        await loadPnrList();
-        loadStats();
-      } else {
-        const reason = lockReason.trim();
-        if (reason.length < 3) {
-          setError('دلیل لاک باید حداقل ۳ نویسه باشد.');
-          return;
-        }
-        const pct =
-          classification === 'DISCOUNTED' ? Number(toLatinDigits(discountPct)) : undefined;
-        if (classification === 'DISCOUNTED' && (!pct || pct < 1 || pct > 100)) {
-          setError('درصد تخفیف باید بین ۱ تا ۱۰۰ باشد.');
-          return;
-        }
-        await lockSeat(seatFlight.id, {
-          seatCode: selectedSeatCode,
-          reason,
-          classification,
-          discountPct: pct,
-        });
-        setNotice(`صندلی ${selectedSeatCode} لاک شد ✓`);
-        setLockInput('');
-      }
-      setSeatMap(await fetchSeatMap(seatFlight.id));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'خطا در ثبت.');
-    }
-  }
-
-  async function onReleaseChip(lockId: string) {
-    if (!seatFlight) return;
-    try {
-      await releaseLock(lockId);
-      setSeatMap(await fetchSeatMap(seatFlight.id));
-    } catch {
-      setError('خطا در آزادسازی صندلی.');
-    }
   }
 
   async function onCancel() {
@@ -478,9 +349,6 @@ export default function BoardChairPlaneMode() {
       departureAt: g.departureAt,
     })),
   );
-
-  const lockedChips =
-    seatMap?.rows.flatMap((r) => r.seats.filter((s) => s.status === 'LOCKED' && s.lockId)) ?? [];
 
   return (
     <div className="flex flex-col gap-[13px]">
@@ -800,48 +668,16 @@ export default function BoardChairPlaneMode() {
       )}
 
       {seatFlight && (
-        <PanelModal
-          title="نقشهٔ صندلی هواپیما"
-          onClose={() => {
-            setSeatFlight(null);
-            setSeatMap(null);
+        <MdSeatMapModal
+          flight={seatFlight}
+          onClose={() => setSeatFlight(null)}
+          onNotice={setNotice}
+          onError={setError}
+          onChanged={() => {
+            void loadPnrList();
+            loadStats();
           }}
-          wide
-        >
-          <div className="mb-3 text-[11px] text-[#9fb0c7]">
-            {routeFa(seatFlight.originCode, seatFlight.destCode)} · پرواز{' '}
-            <span className="font-num" dir="ltr">
-              {seatFlight.flightNo}
-            </span>
-            {seatMap ? ` · ${seatMap.aircraftType}` : ''}
-          </div>
-          {!seatMap ? (
-            <p className={`py-8 text-center text-xs ${panelMuted}`}>در حال بارگذاری نقشهٔ صندلی…</p>
-          ) : (
-            <SeatMapLockPanel
-              seatMap={seatMap}
-              lockInput={lockInput}
-              setLockInput={setLockInput}
-              lockReason={lockReason}
-              setLockReason={setLockReason}
-              classification={classification}
-              setClassification={setClassification}
-              discountPct={discountPct}
-              setDiscountPct={setDiscountPct}
-              passengerName={passengerName}
-              setPassengerName={setPassengerName}
-              passengerNid={passengerNid}
-              setPassengerNid={setPassengerNid}
-              passengerMobile={passengerMobile}
-              setPassengerMobile={setPassengerMobile}
-              primaryBtn={primaryBtn}
-              onPrimary={() => void onPrimaryLockAction()}
-              lockedChips={lockedChips}
-              onReleaseChip={(id) => void onReleaseChip(id)}
-              selectedSeatCode={selectedSeatCode}
-            />
-          )}
-        </PanelModal>
+        />
       )}
 
       {detailPnr && detail && (
@@ -939,200 +775,3 @@ function Kpi({
   );
 }
 
-function SeatMapLockPanel({
-  seatMap,
-  lockInput,
-  setLockInput,
-  lockReason,
-  setLockReason,
-  classification,
-  setClassification,
-  discountPct,
-  setDiscountPct,
-  passengerName,
-  setPassengerName,
-  passengerNid,
-  setPassengerNid,
-  passengerMobile,
-  setPassengerMobile,
-  primaryBtn,
-  onPrimary,
-  lockedChips,
-  onReleaseChip,
-  selectedSeatCode,
-}: {
-  seatMap: SeatMap;
-  lockInput: string;
-  setLockInput: (v: string) => void;
-  lockReason: string;
-  setLockReason: (v: string) => void;
-  classification: LockClassification;
-  setClassification: (v: LockClassification) => void;
-  discountPct: string;
-  setDiscountPct: (v: string) => void;
-  passengerName: string;
-  setPassengerName: (v: string) => void;
-  passengerNid: string;
-  setPassengerNid: (v: string) => void;
-  passengerMobile: string;
-  setPassengerMobile: (v: string) => void;
-  primaryBtn: { label: string; bg: string; color: string; disabled: boolean };
-  onPrimary: () => void;
-  lockedChips: { seatCode: string; lockId: string | null }[];
-  onReleaseChip: (lockId: string) => void;
-  selectedSeatCode: string;
-}) {
-  return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(260px,320px)_1fr]">
-      <div className="rounded-[14px] border border-[#22304a] bg-[#0f1623] p-3">
-        <div className="mb-2 text-[10.5px] font-bold text-[#8ea3c4]">شماره صندلی</div>
-        <input
-          value={lockInput}
-          onChange={(e) => setLockInput(e.target.value)}
-          placeholder="مثل 12D یا 4A"
-          dir="ltr"
-          className="font-num mb-3 h-11 w-full rounded-[10px] border border-[#28344c] bg-[#0b1220] px-3 text-sm text-white outline-none"
-        />
-        <div className="mb-2 grid grid-cols-3 gap-1">
-          {(
-            [
-              ['FREE', 'رایگان'],
-              ['DISCOUNTED', 'تخفیف‌دار'],
-              ['PAYABLE', 'قابل پرداخت'],
-            ] as const
-          ).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setClassification(key)}
-              className={`rounded-lg px-1 py-2 text-[10px] font-bold ${
-                classification === key
-                  ? 'bg-[#1668c4] text-white'
-                  : 'border border-[#28344c] bg-[#141d2e] text-[#9fb0c7]'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        {classification === 'DISCOUNTED' && (
-          <input
-            value={discountPct}
-            onChange={(e) => setDiscountPct(e.target.value)}
-            placeholder="درصد تخفیف"
-            dir="ltr"
-            className="font-num mb-2 h-10 w-full rounded-[10px] border border-[#28344c] bg-[#141d2e] px-3 text-xs text-white outline-none"
-          />
-        )}
-        <input
-          value={lockReason}
-          onChange={(e) => setLockReason(e.target.value)}
-          placeholder="دلیل لاک"
-          className="mb-2 h-10 w-full rounded-[10px] border border-[#28344c] bg-[#141d2e] px-3 text-xs text-white outline-none"
-        />
-        <input
-          value={passengerName}
-          onChange={(e) => setPassengerName(e.target.value)}
-          placeholder="نام و نام خانوادگی"
-          className="mb-2 h-10 w-full rounded-[10px] border border-[#28344c] bg-[#141d2e] px-3 text-xs text-white outline-none"
-        />
-        <div className="mb-3 grid grid-cols-2 gap-2">
-          <input
-            value={passengerNid}
-            onChange={(e) => setPassengerNid(e.target.value)}
-            placeholder="کد ملی"
-            dir="ltr"
-            className="font-num h-10 rounded-[10px] border border-[#28344c] bg-[#141d2e] px-3 text-xs text-white outline-none"
-          />
-          <input
-            value={passengerMobile}
-            onChange={(e) => setPassengerMobile(e.target.value)}
-            placeholder="شماره همراه"
-            dir="ltr"
-            className="font-num h-10 rounded-[10px] border border-[#28344c] bg-[#141d2e] px-3 text-xs text-white outline-none"
-          />
-        </div>
-        <button
-          type="button"
-          disabled={primaryBtn.disabled}
-          onClick={onPrimary}
-          className={`flex h-11 w-full items-center justify-center gap-2 rounded-xl text-xs font-extrabold ${primaryBtn.bg} ${primaryBtn.color} disabled:cursor-not-allowed`}
-        >
-          {primaryBtn.label}
-        </button>
-        {lockedChips.length > 0 && (
-          <div className="mt-3">
-            <div className="mb-1.5 text-[10.5px] font-bold text-[#8ea3c4]">
-              صندلی‌های رزرو مدیریتی ({faDigits(lockedChips.length)})
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {lockedChips.map((s) => (
-                <button
-                  key={s.seatCode}
-                  type="button"
-                  onClick={() => s.lockId && onReleaseChip(s.lockId)}
-                  className="font-num rounded-[9px] bg-[#f59e0b] px-2.5 py-1 text-[11px] font-extrabold text-[#1a1206]"
-                  dir="ltr"
-                >
-                  {s.seatCode} ×
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div>
-        <div className="mb-2 flex flex-wrap gap-1.5 text-[10px] text-[#9fb0c7]">
-          <span>آزاد</span>
-          <span className="text-[#9db8e0]">بیزینس</span>
-          <span className="text-[#f0a8b4]">فروخته‌شده</span>
-          <span className="text-[#f59e0b]">رزرو مدیریتی</span>
-          <span className="mr-auto font-num">
-            {faDigits(seatMap.soldCount + seatMap.lockedCount)}/{faDigits(seatMap.capacity)} اشغال (
-            {faDigits(seatMap.occupancyPct)}٪)
-          </span>
-        </div>
-        <div className="flex max-h-[420px] flex-col gap-1.5 overflow-auto">
-          {seatMap.rows.map((row) => {
-            const aisleAfterIndex = seatMap.cabinLayout[row.cabin].aisleAfterIndex;
-            return (
-              <div key={row.row} className="flex items-center justify-center gap-1.5">
-                <span className="font-num w-5 text-center text-[9px] font-bold text-[#5b6b83]">
-                  {faDigits(row.row)}
-                </span>
-                {row.seats.map((s, idx) => {
-                  const selected = selectedSeatCode === s.seatCode && s.status !== 'SOLD';
-                  return (
-                    <span key={s.seatCode} className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        aria-label={s.seatCode}
-                        disabled={s.status === 'SOLD'}
-                        onClick={() => setLockInput(s.seatCode)}
-                        className={`font-num flex h-7 w-7 items-center justify-center rounded border text-[8.5px] font-bold ${seatButtonClass(s.status, selected, row.cabin)}`}
-                      >
-                        {s.seatCode.replace(String(row.row), '')}
-                      </button>
-                      {idx === aisleAfterIndex - 1 && (
-                        <span data-testid={`aisle-gap-${row.row}`} className="w-3" />
-                      )}
-                    </span>
-                  );
-                })}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function seatButtonClass(status: SeatStatus, selected: boolean, cabin: 'BUSINESS' | 'ECONOMY'): string {
-  if (selected) return 'border-[#60a5fa] bg-[#1668c4] text-white cursor-pointer';
-  if (status === 'SOLD') return 'border-[#8a3d4d] bg-[#3a2330] text-[#f0a8b4] cursor-default';
-  if (status === 'LOCKED') return 'border-[#f59e0b] bg-[#f59e0b] text-[#1a1206] cursor-pointer';
-  if (cabin === 'BUSINESS') return 'border-[#33507e] bg-[#16233f] text-[#9db8e0] cursor-pointer';
-  return 'border-[#28344c] bg-[#18223a] text-[#9fb0c7] cursor-pointer';
-}
