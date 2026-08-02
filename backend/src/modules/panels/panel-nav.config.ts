@@ -39,19 +39,17 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'settings', labelFa: 'تنظیمات سامانه', implemented: true },
   ],
   // Order matches design-reference-v2/پنل مدیر عامل.dc.html sidebar
-  // (settings is display:none there). Extras kept: clubrules (Phase 65),
-  // flightops (ops surface — not in CEO design sidebar; after pricing).
+  // (settings is display:none there). clubrules stays on COMMERCIAL_MANAGER;
+  // flightops stays on SITE_ADMIN — neither appears in the CEO design sidebar.
   CEO: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
     { key: 'admins', labelFa: 'مدیران', implemented: true },
     { key: 'finance', labelFa: 'مالی', implemented: true },
     { key: 'cartable', labelFa: 'کارتابل', implemented: true },
     { key: 'club', labelFa: 'مشتریان VIP', implemented: true },
-    { key: 'clubrules', labelFa: 'قوانین باشگاه مشتریان', implemented: true },
     { key: 'survey', labelFa: 'نظرسنجی مسافران', implemented: true },
     { key: 'mgrreports', labelFa: 'گزارش مدیران', implemented: true },
     { key: 'pricing', labelFa: 'تعیین قیمت بلیط', implemented: true },
-    { key: 'flightops', labelFa: 'پروازها', implemented: true },
     { key: 'panels', labelFa: 'دسترسی به پنل‌ها', implemented: true },
     { key: 'security', labelFa: 'امنیت و رمز عبور', implemented: true },
     { key: 'logs', labelFa: 'لاگ و رویدادها', implemented: true },
