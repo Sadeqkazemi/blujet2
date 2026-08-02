@@ -40,7 +40,9 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
   ],
   // Order matches design-reference-v2/پنل مدیر عامل.dc.html sidebar
   // (settings is display:none there). clubrules stays on COMMERCIAL_MANAGER;
-  // flightops stays on SITE_ADMIN — neither appears in the CEO design sidebar.
+  // flightops stays on SITE_ADMIN. `reservation` (label هواپیما) is in
+  // roleDefs.ceo.access and the approved CEO screenshots — same key/label
+  // as BOARD_CHAIR.
   CEO: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
     { key: 'admins', labelFa: 'مدیران', implemented: true },
@@ -49,6 +51,7 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'club', labelFa: 'مشتریان VIP', implemented: true },
     { key: 'survey', labelFa: 'نظرسنجی مسافران', implemented: true },
     { key: 'mgrreports', labelFa: 'گزارش مدیران', implemented: true },
+    { key: 'reservation', labelFa: 'هواپیما', implemented: true },
     { key: 'pricing', labelFa: 'تعیین قیمت بلیط', implemented: true },
     { key: 'panels', labelFa: 'دسترسی به پنل‌ها', implemented: true },
     { key: 'security', labelFa: 'امنیت و رمز عبور', implemented: true },

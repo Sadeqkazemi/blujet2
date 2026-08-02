@@ -68,7 +68,7 @@ export class SeatmapService {
   private async getFlightInstanceOrThrow(id: string) {
     const instance = await this.typeorm.flightInstance.findUnique({
       where: { id },
-      include: { flight: true },
+      include: { flight: { include: { route: true } } },
     });
     if (!instance) {
       throw new NotFoundException({
@@ -105,13 +105,26 @@ export class SeatmapService {
           seatCode: { not: null },
           booking: { flightInstanceId, status: { not: 'CANCELLED' } },
         },
-        select: { seatCode: true },
+        select: {
+          seatCode: true,
+          fullName: true,
+          booking: { select: { pnr: true, status: true } },
+        },
       }),
       this.typeorm.seatLock.findMany({
         where: { flightInstanceId, ...this.activeLockWhere() },
       }),
     ]);
-    const soldCodes = new Set(soldPassengers.map((p) => p.seatCode!));
+    const soldByCode = new Map(
+      soldPassengers.map((p) => [
+        p.seatCode!,
+        {
+          pnr: p.booking.pnr,
+          passengerName: p.fullName,
+          bookingStatus: p.booking.status,
+        },
+      ]),
+    );
     const lockedByCode = new Map(activeLocks.map((l) => [l.seatCode, l]));
 
     const rowsMap = new Map<
@@ -123,20 +136,43 @@ export class SeatmapService {
         rowsMap.set(seat.row, { row: seat.row, cabin: seat.cabin, seats: [] });
       }
       const lock = lockedByCode.get(seat.seatCode);
-      const status = soldCodes.has(seat.seatCode)
-        ? 'SOLD'
-        : lock
-          ? 'LOCKED'
-          : 'FREE';
+      const occupant = soldByCode.get(seat.seatCode);
+      const status = occupant ? 'SOLD' : lock ? 'LOCKED' : 'FREE';
       rowsMap.get(seat.row)!.seats.push({
         seatCode: seat.seatCode,
         status,
         lockId: lock?.id ?? null,
+        lockExpiresAt: lock?.expiresAt?.toISOString() ?? null,
+        lockPassengerName: lock?.passengerName ?? null,
+        occupant: occupant ?? null,
       });
     }
 
+    const airports = await this.typeorm.airport.findMany({
+      where: {
+        code: {
+          in: [
+            instance.flight.route.originCode,
+            instance.flight.route.destCode,
+          ],
+        },
+      },
+      select: { code: true, cityFa: true },
+    });
+    const cityByCode = new Map(airports.map((a) => [a.code, a.cityFa]));
+
     return {
       flightInstanceId,
+      flightNo: instance.flight.flightNo,
+      originCode: instance.flight.route.originCode,
+      destCode: instance.flight.route.destCode,
+      originCityFa:
+        cityByCode.get(instance.flight.route.originCode) ??
+        instance.flight.route.originCode,
+      destCityFa:
+        cityByCode.get(instance.flight.route.destCode) ??
+        instance.flight.route.destCode,
+      departureAt: instance.departureAt,
       aircraftType: resolveAircraftType(instance),
       rows: Array.from(rowsMap.values()).sort((a, b) => a.row - b.row),
       // CLAUDE.md: "seat map config lives per aircraft type in the DB, not
@@ -148,13 +184,14 @@ export class SeatmapService {
         ECONOMY: { aisleAfterIndex: map.economyColsLeft.length },
       },
       capacity: seats.length,
-      soldCount: soldCodes.size,
+      soldCount: soldByCode.size,
       lockedCount: activeLocks.length,
+      freeCount: Math.max(0, seats.length - soldByCode.size - activeLocks.length),
       occupancyPct:
         seats.length === 0
           ? 0
           : Math.round(
-              ((soldCodes.size + activeLocks.length) / seats.length) * 1000,
+              ((soldByCode.size + activeLocks.length) / seats.length) * 1000,
             ) / 10,
     };
   }
