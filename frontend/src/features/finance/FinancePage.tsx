@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useOutletContext } from 'react-router-dom';
 import {
@@ -13,11 +13,10 @@ import LowSalesBanner from '../../components/LowSalesBanner';
 import type { PanelShellContext } from '../../types/panel-shell';
 import { remindAgencyInvoice } from '../../api/agencies';
 import { fetchReconciliationQueue, resolveReconciliation } from '../../api/reconciliation';
-import { faDigits, faMoney, faPercent } from '../../lib/fa-format';
-import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
+import { faDigits, faMoney, faMoneyCompact, faMoneyCompactNumber, faPercent } from '../../lib/fa-format';
+import { dayjs, formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
 import SalesBarChart from '../../components/SalesBarChart';
 import SalesChartControls from '../../components/SalesChartControls';
-import StatTile from '../../components/StatTile';
 import { useSalesChartQuery } from '../../hooks/useSalesChartQuery';
 import type {
   AgencySettlementsResult,
@@ -36,19 +35,33 @@ const SETTLEMENT_STATUS: Record<SettlementStatus, { label: string; className: st
   OVERDUE: { label: 'معوق', className: 'bg-danger/15 text-danger' },
 };
 
-const MIX_COLORS: Record<string, string> = {
+const MIX_COLORS_LIGHT: Record<string, string> = {
   SYSTEM: '#1668c4',
   CHARTER: '#a855f7',
   AGENCY: '#059669',
 };
 
-function RevenueMixCard({ mix }: { mix: RevenueMixResult }) {
+const MIX_COLORS_DARK: Record<string, string> = {
+  SYSTEM: '#3b82f6',
+  CHARTER: '#a855f7',
+  AGENCY: '#34d399',
+};
+
+function RevenueMixCard({ mix, theme = 'light' }: { mix: RevenueMixResult; theme?: 'light' | 'dark' }) {
+  const colors = theme === 'dark' ? MIX_COLORS_DARK : MIX_COLORS_LIGHT;
+  const dark = theme === 'dark';
   const [c0, c1] = [mix.channels[0]?.pct ?? 0, (mix.channels[0]?.pct ?? 0) + (mix.channels[1]?.pct ?? 0)];
-  const gradient = `conic-gradient(${MIX_COLORS.SYSTEM} 0% ${c0}%, ${MIX_COLORS.CHARTER} ${c0}% ${c1}%, ${MIX_COLORS.AGENCY} ${c1}% 100%)`;
+  const gradient = `conic-gradient(${colors.SYSTEM} 0% ${c0}%, ${colors.CHARTER} ${c0}% ${c1}%, ${colors.AGENCY} ${c1}% 100%)`;
   return (
-    <div className="rounded-xl border border-border bg-white p-5">
-      <div className="mb-1 text-sm font-bold text-ink">ترکیب درآمد</div>
-      <div className="mb-4 text-[11px] text-muted">بر اساس کانال فروش</div>
+    <div
+      className={
+        dark
+          ? 'rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-5'
+          : 'rounded-xl border border-border bg-white p-5'
+      }
+    >
+      <div className={`mb-1 text-sm font-bold ${dark ? 'text-white' : 'text-ink'}`}>ترکیب درآمد</div>
+      <div className={`mb-4 text-[11px] ${dark ? 'text-[#6b7b94]' : 'text-muted'}`}>بر اساس کانال فروش</div>
       <div className="mb-4 flex items-center justify-center">
         <div
           className="flex h-36 w-36 items-center justify-center rounded-full"
@@ -56,22 +69,41 @@ function RevenueMixCard({ mix }: { mix: RevenueMixResult }) {
           role="img"
           aria-label="نمودار ترکیب درآمد"
         >
-          <div className="flex h-[88px] w-[88px] flex-col items-center justify-center rounded-full bg-white">
-            <span className="font-num text-xs font-black text-ink">{faMoney(mix.totalIrr)}</span>
-            <span className="text-[9px] text-muted">کل (تومان)</span>
+          <div
+            className={`flex h-[88px] w-[88px] flex-col items-center justify-center rounded-full ${
+              dark ? 'bg-[#141d2e]' : 'bg-white'
+            }`}
+          >
+            <span className={`font-num text-xs font-black ${dark ? 'text-white' : 'text-ink'}`}>
+              {dark ? faMoneyCompact(mix.totalIrr) : faMoney(mix.totalIrr)}
+            </span>
+            <span className={`text-[9px] ${dark ? 'text-[#6b7b94]' : 'text-muted'}`}>
+              {dark ? 'کل' : 'کل (تومان)'}
+            </span>
           </div>
         </div>
       </div>
       <div className="flex flex-col gap-2.5">
         {mix.channels.map((c) => (
-          <div key={c.channel} className="flex items-center justify-between gap-2 text-xs">
+          <div
+            key={c.channel}
+            className={`flex items-center justify-between gap-2 text-xs ${dark ? 'text-[#e7ecf3]' : ''}`}
+          >
             <span className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: MIX_COLORS[c.channel] }} />
+              <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: colors[c.channel] }} />
               {c.labelFa}
             </span>
             <span className="flex items-center gap-2">
-              <span className="font-num font-bold">{faMoney(c.amountIrr)}</span>
-              <span className="rounded-full bg-body px-2 py-0.5 text-[10px] font-bold text-muted">
+              <span className={`font-num font-bold ${dark ? 'text-white' : ''}`}>
+                {dark ? faMoneyCompact(c.amountIrr) : faMoney(c.amountIrr)}
+              </span>
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                  dark
+                    ? 'border border-[#28344c] bg-[#18223a] text-[#9fb0c7]'
+                    : 'bg-body text-muted'
+                }`}
+              >
                 {faPercent(c.pct)}
               </span>
             </span>
@@ -82,27 +114,43 @@ function RevenueMixCard({ mix }: { mix: RevenueMixResult }) {
   );
 }
 
-function CompletedFlightsCard({ flights }: { flights: CompletedFlightsSummary }) {
+function CompletedFlightsCard({
+  flights,
+  theme = 'light',
+}: {
+  flights: CompletedFlightsSummary;
+  theme?: 'light' | 'dark';
+}) {
+  const dark = theme === 'dark';
   return (
-    <div className="rounded-xl border border-border bg-white p-5">
+    <div
+      className={
+        dark
+          ? 'rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-5'
+          : 'rounded-xl border border-border bg-white p-5'
+      }
+    >
       <div className="mb-4 flex items-center justify-between">
-        <div className="text-sm font-bold text-ink">پروازهای انجام‌شده</div>
-        <span className="font-num text-lg font-black text-ink">
-          {faDigits(flights.flightCount)} <span className="text-[10px] font-normal text-muted">پرواز</span>
+        <div className={`text-sm font-bold ${dark ? 'text-white' : 'text-ink'}`}>پروازهای انجام‌شده</div>
+        <span className={`font-num text-lg font-black ${dark ? 'text-white' : 'text-ink'}`}>
+          {faDigits(flights.flightCount)}{' '}
+          <span className={`text-[10px] font-normal ${dark ? 'text-[#6b7b94]' : 'text-muted'}`}>پرواز</span>
         </span>
       </div>
       <div className="grid grid-cols-3 gap-3 text-center">
-        <div className="rounded-lg bg-body p-3">
-          <div className="text-[10px] text-muted">مجموع صندلی</div>
-          <div className="font-num mt-1 text-sm font-black text-ink">{faDigits(flights.totalSeats)}</div>
+        <div className={dark ? 'rounded-xl bg-[#18223a] p-3' : 'rounded-lg bg-body p-3'}>
+          <div className={`text-[10px] ${dark ? 'text-[#6b7b94]' : 'text-muted'}`}>مجموع صندلی</div>
+          <div className={`font-num mt-1 text-sm font-black ${dark ? 'text-[#e7ecf3]' : 'text-ink'}`}>
+            {faDigits(flights.totalSeats)}
+          </div>
         </div>
-        <div className="rounded-lg bg-body p-3">
-          <div className="text-[10px] text-muted">فروخته‌شده</div>
-          <div className="font-num mt-1 text-sm font-black text-[#059669]">{faDigits(flights.soldSeats)}</div>
+        <div className={dark ? 'rounded-xl bg-[#18223a] p-3' : 'rounded-lg bg-body p-3'}>
+          <div className={`text-[10px] ${dark ? 'text-[#6b7b94]' : 'text-muted'}`}>فروخته‌شده</div>
+          <div className="font-num mt-1 text-sm font-black text-[#34d399]">{faDigits(flights.soldSeats)}</div>
         </div>
-        <div className="rounded-lg bg-body p-3">
-          <div className="text-[10px] text-muted">فروش‌نرفته</div>
-          <div className="font-num mt-1 text-sm font-black text-danger">{faDigits(flights.unsoldSeats)}</div>
+        <div className={dark ? 'rounded-xl bg-[#18223a] p-3' : 'rounded-lg bg-body p-3'}>
+          <div className={`text-[10px] ${dark ? 'text-[#6b7b94]' : 'text-muted'}`}>فروش‌نرفته</div>
+          <div className="font-num mt-1 text-sm font-black text-[#f87171]">{faDigits(flights.unsoldSeats)}</div>
         </div>
       </div>
     </div>
@@ -514,9 +562,124 @@ function FinanceOpsView() {
   );
 }
 
+function chartCaption(granularity: string): string {
+  switch (granularity) {
+    case 'q3':
+      return '۳ ماه اخیر';
+    case 'q6':
+      return '۶ ماه اخیر';
+    case 'year':
+      return 'سال جاری';
+    case 'month':
+      return 'گزارش ماهانه';
+    case 'day':
+      return 'گزارش روزانه — انتخاب از تقویم';
+    case 'flight':
+      return 'گزارش مالی بر اساس شماره پرواز';
+    default:
+      return 'خلاصه فروش';
+  }
+}
+
+function kpiPeriodLabel(granularity: string): string {
+  const year = faDigits(dayjs().calendar('jalali').year());
+  switch (granularity) {
+    case 'year':
+      return `سال ${year}`;
+    case 'q6':
+      return '۶ ماهه';
+    case 'q3':
+      return '۳ ماهه';
+    case 'month':
+      return 'ماهانه';
+    case 'day':
+      return 'روزانه';
+    case 'flight':
+      return 'پرواز';
+    default:
+      return `سال ${year}`;
+  }
+}
+
+function AnalyticKpiCard({
+  label,
+  value,
+  badge,
+  badgeTone,
+  iconClass,
+  icon,
+}: {
+  label: string;
+  value: string;
+  badge: string;
+  badgeTone: 'good' | 'warn' | 'danger';
+  iconClass: string;
+  icon: ReactNode;
+}) {
+  const badgeClass =
+    badgeTone === 'good'
+      ? 'bg-[rgba(52,211,153,.12)] text-[#34d399]'
+      : badgeTone === 'warn'
+        ? 'bg-[rgba(245,158,11,.12)] text-[#f59e0b]'
+        : 'bg-[rgba(248,113,113,.12)] text-[#f87171]';
+  return (
+    <div className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-3">
+      <div className="mb-3 flex items-center justify-between">
+        <span className={`flex h-10 w-10 items-center justify-center rounded-[11px] ${iconClass}`}>
+          {icon}
+        </span>
+        <span className={`rounded-full px-[7px] py-0.5 text-[10.5px] font-bold ${badgeClass}`}>{badge}</span>
+      </div>
+      <div className="font-num text-[21.5px] font-black leading-tight text-white">{value}</div>
+      <div className="mt-1 text-[11px] text-[#6b7b94]">{label}</div>
+    </div>
+  );
+}
+
+function FlightsStrip({ flights }: { flights: CompletedFlightsSummary }) {
+  return (
+    <div className="flex flex-wrap items-center gap-5 rounded-[14px] border border-[#28344c] bg-gradient-to-br from-[#1a2740] to-[#141d2e] px-4 py-[13px]">
+      <div className="flex min-w-[200px] items-center gap-[11px]">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] bg-[rgba(59,130,246,.14)] text-[#60a5fa]">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
+            <path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z" />
+          </svg>
+        </span>
+        <div>
+          <div className="text-[11px] text-[#6b7b94]">پروازهای انجام‌شده</div>
+          <div className="font-num mt-0.5 text-[19px] font-black text-white">
+            {faDigits(flights.flightCount)}{' '}
+            <span className="text-[10px] font-normal text-[#7c8aa2]">پرواز</span>
+          </div>
+        </div>
+      </div>
+      <div className="grid min-w-[300px] flex-1 grid-cols-3 gap-2.5">
+        <div className="rounded-xl border border-[#28344c] bg-[#18223a] px-[13px] py-[9px]">
+          <div className="text-[9.5px] text-[#6b7b94]">مجموع صندلی پروازها</div>
+          <div className="font-num mt-[3px] text-sm font-extrabold text-[#e7ecf3]">
+            {faDigits(flights.totalSeats)}
+          </div>
+        </div>
+        <div className="rounded-xl border border-[#28344c] bg-[#18223a] px-[13px] py-[9px]">
+          <div className="text-[9.5px] text-[#6b7b94]">صندلی فروخته‌شده</div>
+          <div className="font-num mt-[3px] text-sm font-extrabold text-[#34d399]">
+            {faDigits(flights.soldSeats)}
+          </div>
+        </div>
+        <div className="rounded-xl border border-[#28344c] bg-[#18223a] px-[13px] py-[9px]">
+          <div className="text-[9.5px] text-[#6b7b94]">صندلی فروش‌نرفته</div>
+          <div className="font-num mt-[3px] text-sm font-extrabold text-[#f87171]">
+            {faDigits(flights.unsoldSeats)}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Analytic مالی view for CEO / Board Chair / Senior / Commercial. */
 function FinanceAnalyticView() {
-  const chart = useSalesChartQuery({ includeFlightMode: false });
+  const chart = useSalesChartQuery({ includeFlightMode: true });
   const [periods, setPeriods] = useState<SalesChartPeriod[]>([]);
   const [kpis, setKpis] = useState<KpiResult | null>(null);
   const [flights, setFlights] = useState<CompletedFlightsSummary | null>(null);
@@ -524,7 +687,10 @@ function FinanceAnalyticView() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!chart.isQueryReady) return;
+    if (!chart.isQueryReady) {
+      setPeriods([]);
+      return;
+    }
 
     let cancelled = false;
     Promise.all([
@@ -548,44 +714,32 @@ function FinanceAnalyticView() {
     };
   }, [chart.query, chart.isQueryReady]);
 
-  if (error) return <p className="p-8 text-sm text-danger">{error}</p>;
-  if (!flights || !mix) return <p className="p-8 text-sm text-muted">در حال بارگذاری…</p>;
+  if (error) return <p className="text-sm text-[#f87171]">{error}</p>;
+  if (!flights || !mix) return <p className="text-sm text-[#6b7b94]">در حال بارگذاری…</p>;
 
-  // Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON on
-  // the backend) — parsed here for this display-only sum; period totals are
-  // far below 2^53 so Number() loses no precision.
   const sums = {
     system: periods.reduce((s, p) => s + Number(p.systemIrr), 0),
     charter: periods.reduce((s, p) => s + Number(p.charterIrr), 0),
     agency: periods.reduce((s, p) => s + Number(p.agencyIrr), 0),
   };
+  const total = sums.system + sums.charter + sums.agency;
+
+  // Capation unit: billions when the period total is ≥ ۱ میلیارد تومان (۱۰¹⁰ IRR).
+  const useBillionUnit = chart.granularity !== 'flight' && total >= 10_000_000_000;
+  const viewUnit = useBillionUnit ? 'میلیارد تومان' : 'تومان';
+  const totalDisplay = useBillionUnit ? faMoneyCompactNumber(total) : faMoneyCompact(total);
+  const channelDisplay = (n: number) =>
+    useBillionUnit ? faMoneyCompactNumber(n) : faMoneyCompact(n);
 
   return (
-    <>
-      {kpis && (
-        <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-          <StatTile label="کل درآمد" value={`${faMoney(kpis.revenueIrr)} تومان`} tone="good" />
-          <StatTile
-            label="سود خالص"
-            value={`${faMoney(kpis.profitIrr)} تومان`}
-            sublabel={`حاشیه ${faPercent(kpis.marginPct)}`}
-            tone="accent"
-          />
-          <StatTile label="هزینه عملیاتی" value={`${faMoney(kpis.operatingCostIrr)} تومان`} tone="warning" />
-          <StatTile
-            label="مطالبات معوق آژانس‌ها"
-            value={`${faMoney(kpis.agencyDebtIrr)} تومان`}
-            sublabel={`${faDigits(kpis.agencyDebtCount)} آژانس`}
-            tone="critical"
-          />
-        </div>
-      )}
-
-      <div className="mb-6 rounded-xl border border-border bg-white p-5">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div className="flex flex-col gap-[15px]">
+      <div className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[15px]">
+        <div className="mb-3.5 flex flex-wrap items-start justify-between gap-2.5">
           <div>
-            <div className="text-sm font-bold text-ink">نمودار فروش</div>
-            <div className="mt-0.5 text-[11px] text-muted">به تفکیک کانال فروش · تومان</div>
+            <h2 className="m-0 text-[14.5px] font-extrabold text-white">نمودار فروش</h2>
+            <p className="mt-[3px] text-[11px] text-[#6b7b94]">
+              {chartCaption(chart.granularity)} · {viewUnit === 'میلیارد تومان' ? 'میلیارد تومان' : 'تومان'}
+            </p>
           </div>
           <SalesChartControls
             modes={chart.modes}
@@ -599,45 +753,154 @@ function FinanceAnalyticView() {
             onFlightNoChange={chart.setFlightNo}
             onApplyFlightNo={chart.applyFlightNo}
             variant="segmented"
+            theme="dark"
           />
         </div>
 
-        <div className="mb-4 grid grid-cols-3 gap-3">
-          <div className="rounded-lg bg-body p-3 text-xs">
-            <div className="mb-1 flex items-center gap-1.5 text-[10px] text-muted">
-              <span className="h-2 w-2 rounded-sm bg-[#1668c4]" />
-              سیستمی
+        {!chart.isQueryReady ? (
+          <p className="py-10 text-center text-sm text-[#6b7b94]">شماره پرواز را وارد کنید.</p>
+        ) : periods.length === 0 && chart.granularity !== 'day' ? (
+          <p className="py-[60px] text-center text-[12.5px] text-[#6b7b94]">اطلاعاتی وجود ندارد</p>
+        ) : (
+          <>
+            <div className="mb-3.5 flex flex-wrap gap-2.5">
+              <div className="min-w-[150px] rounded-xl border border-[#28344c] bg-gradient-to-br from-[#1a2740] to-[#141d2e] px-3.5 py-2.5">
+                <div className="text-[9.5px] text-[#6b7b94]">{chartCaption(chart.granularity)}</div>
+                <div className="font-num mt-[3px] text-[19px] font-black text-white">
+                  {totalDisplay}{' '}
+                  <span className="text-[9.5px] font-normal text-[#7c8aa2]">{viewUnit}</span>
+                </div>
+              </div>
+              <div className="grid min-w-[230px] flex-1 grid-cols-3 gap-2">
+                <div className="rounded-xl border border-[#28344c] bg-[#18223a] px-[11px] py-[9px]">
+                  <div className="mb-1 flex items-center gap-1.5 text-[9.5px] text-[#6b7b94]">
+                    <span className="h-2 w-2 rounded-sm bg-[#3b82f6]" />
+                    سیستمی
+                  </div>
+                  <div className="font-num text-[12.5px] font-extrabold text-[#60a5fa]">
+                    {channelDisplay(sums.system)}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-[#28344c] bg-[#18223a] px-[11px] py-[9px]">
+                  <div className="mb-1 flex items-center gap-1.5 text-[9.5px] text-[#6b7b94]">
+                    <span className="h-2 w-2 rounded-sm bg-[#a855f7]" />
+                    چارتر
+                  </div>
+                  <div className="font-num text-[12.5px] font-extrabold text-[#c084fc]">
+                    {channelDisplay(sums.charter)}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-[#28344c] bg-[#18223a] px-[11px] py-[9px]">
+                  <div className="mb-1 flex items-center gap-1.5 text-[9.5px] text-[#6b7b94]">
+                    <span className="h-2 w-2 rounded-sm bg-[#34d399]" />
+                    آژانس
+                  </div>
+                  <div className="font-num text-[12.5px] font-extrabold text-[#34d399]">
+                    {channelDisplay(sums.agency)}
+                  </div>
+                </div>
+              </div>
+              <div className="min-w-[280px] rounded-xl border border-[#28344c] bg-gradient-to-br from-[#1a2740] to-[#141d2e] px-3.5 py-2.5">
+                <div className="flex items-baseline justify-between gap-2.5">
+                  <div className="text-[9.5px] text-[#6b7b94]">پروازهای انجام‌شده</div>
+                  <div className="font-num text-base font-black text-white">
+                    {faDigits(flights.flightCount)}{' '}
+                    <span className="text-[9px] font-normal text-[#7c8aa2]">پرواز</span>
+                  </div>
+                </div>
+                <div className="mt-[7px] grid grid-cols-3 gap-2">
+                  <div>
+                    <div className="text-[9px] text-[#6b7b94]">مجموع صندلی</div>
+                    <div className="font-num mt-0.5 text-xs font-extrabold text-[#e7ecf3]">
+                      {faDigits(flights.totalSeats)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] text-[#6b7b94]">فروخته‌شده</div>
+                    <div className="font-num mt-0.5 text-xs font-extrabold text-[#34d399]">
+                      {faDigits(flights.soldSeats)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] text-[#6b7b94]">فروش‌نرفته</div>
+                    <div className="font-num mt-0.5 text-xs font-extrabold text-[#f87171]">
+                      {faDigits(flights.unsoldSeats)}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="font-num font-black text-[#1668c4]">{faMoney(sums.system)}</div>
-          </div>
-          <div className="rounded-lg bg-body p-3 text-xs">
-            <div className="mb-1 flex items-center gap-1.5 text-[10px] text-muted">
-              <span className="h-2 w-2 rounded-sm bg-[#a855f7]" />
-              چارتر
-            </div>
-            <div className="font-num font-black text-[#a855f7]">{faMoney(sums.charter)}</div>
-          </div>
-          <div className="rounded-lg bg-body p-3 text-xs">
-            <div className="mb-1 flex items-center gap-1.5 text-[10px] text-muted">
-              <span className="h-2 w-2 rounded-sm bg-[#059669]" />
-              آژانس
-            </div>
-            <div className="font-num font-black text-[#059669]">{faMoney(sums.agency)}</div>
-          </div>
+
+            <SalesBarChart
+              periods={periods}
+              selectedPeriodKey={chart.periodKey}
+              onSelectPeriod={chart.setPeriodKey}
+              theme="dark"
+            />
+          </>
+        )}
+      </div>
+
+      {kpis && (
+        <div className="grid grid-cols-2 gap-[13px] md:grid-cols-4">
+          <AnalyticKpiCard
+            label={`کل درآمد · ${kpiPeriodLabel(chart.granularity)}`}
+            value={faMoneyCompact(kpis.revenueIrr)}
+            badge={trendBadge(kpis.trends.revenuePct)}
+            badgeTone="good"
+            iconClass="bg-[rgba(52,211,153,.14)] text-[#34d399]"
+            icon={
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
+                <path d="M12 3v18" />
+                <path d="M16.5 7.5C16.5 6 14.7 5 12.5 5S8.5 6 8.5 7.8 10.2 10 12.5 10.4 16.5 11.5 16.5 13.5 14.7 16 12.5 16 8.5 15 8.5 13.5" />
+              </svg>
+            }
+          />
+          <AnalyticKpiCard
+            label={`سود خالص · حاشیه ${faPercent(kpis.marginPct)}`}
+            value={faMoneyCompact(kpis.profitIrr)}
+            badge={trendBadge(kpis.trends.profitPct)}
+            badgeTone="good"
+            iconClass="bg-[rgba(59,130,246,.14)] text-[#60a5fa]"
+            icon={
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
+                <path d="M3 17l6-6 4 4 8-8" />
+                <path d="M17 7h4v4" />
+              </svg>
+            }
+          />
+          <AnalyticKpiCard
+            label="هزینه عملیاتی"
+            value={faMoneyCompact(kpis.operatingCostIrr)}
+            badge={trendBadge(kpis.trends.operatingCostPct)}
+            badgeTone="warn"
+            iconClass="bg-[rgba(245,158,11,.14)] text-[#f59e0b]"
+            icon={
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
+                <path d="M3 7l9-4 9 4-9 4-9-4z" />
+                <path d="M3 7v10l9 4 9-4V7" />
+              </svg>
+            }
+          />
+          <AnalyticKpiCard
+            label="مطالبات معوق آژانس‌ها"
+            value={faMoneyCompact(kpis.agencyDebtIrr)}
+            badge={`${faDigits(kpis.agencyDebtCount)} آژانس`}
+            badgeTone="danger"
+            iconClass="bg-[rgba(248,113,113,.14)] text-[#f87171]"
+            icon={
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
+                <path d="M12 8v4l3 2" />
+                <circle cx="12" cy="12" r="9" />
+              </svg>
+            }
+          />
         </div>
+      )}
 
-        <SalesBarChart
-          periods={periods}
-          selectedPeriodKey={chart.periodKey}
-          onSelectPeriod={chart.setPeriodKey}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.7fr_1fr]">
-        <CompletedFlightsCard flights={flights} />
-        <RevenueMixCard mix={mix} />
-      </div>
-    </>
+      <FlightsStrip flights={flights} />
+      <RevenueMixCard mix={mix} theme="dark" />
+    </div>
   );
 }
 
@@ -645,15 +908,25 @@ export default function FinancePage() {
   const { user } = useAuth();
   const isFinanceOps = user?.role === 'FINANCE_MANAGER';
 
+  if (isFinanceOps) {
+    return (
+      <div className="p-8">
+        <h1 className="mb-1 text-xl font-black text-ink">مالی</h1>
+        <p className="mb-6 text-sm text-muted">تراکنش‌ها، ترکیب درآمد و تسویه‌حساب آژانس‌های همکار</p>
+        <FinanceOpsView />
+      </div>
+    );
+  }
+
   return (
-    <div className="p-8">
-      <h1 className="mb-1 text-xl font-black text-ink">مالی</h1>
-      <p className="mb-6 text-sm text-muted">
-        {isFinanceOps
-          ? 'تراکنش‌ها، ترکیب درآمد و تسویه‌حساب آژانس‌های همکار'
-          : 'نمای تحلیلی فروش و ترکیب درآمد'}
-      </p>
-      {isFinanceOps ? <FinanceOpsView /> : <FinanceAnalyticView />}
+    <div className="px-[21px] pb-[34px] pt-[18px]">
+      <div className="mb-6">
+        <h1 className="text-[20.5px] font-black text-white">مالی</h1>
+        <p className="mt-1 text-[11.5px] text-[#6b7b94]">
+          فروش هر پرواز بر اساس کانال و پیشنهاد قیمت هوش مصنوعی
+        </p>
+      </div>
+      <FinanceAnalyticView />
     </div>
   );
 }

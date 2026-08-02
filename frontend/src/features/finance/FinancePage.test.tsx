@@ -198,17 +198,24 @@ describe('FinancePage', () => {
         periodKey: '2026-07-01',
         startDate: '2026-07-01T00:00:00.000Z',
         endDate: '2026-08-01T00:00:00.000Z',
-        systemIrr: '2300000000',
-        charterIrr: '1550000000',
-        agencyIrr: '1150000000',
+        systemIrr: '2300000000000',
+        charterIrr: '1550000000000',
+        agencyIrr: '1150000000000',
       },
     ]);
+    vi.spyOn(reportingApi, 'fetchKpis').mockResolvedValue(KPIS);
     vi.spyOn(reportingApi, 'fetchCompletedFlightsSummary').mockResolvedValue(FLIGHTS);
     vi.spyOn(reportingApi, 'fetchRevenueMix').mockResolvedValue(MIX);
 
     renderFinancePage();
+    expect(
+      await screen.findByText('فروش هر پرواز بر اساس کانال و پیشنهاد قیمت هوش مصنوعی'),
+    ).toBeInTheDocument();
     expect(await screen.findByText('نمودار فروش')).toBeInTheDocument();
     expect(screen.getByText('ترکیب درآمد')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '۶ ماهه' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'شماره پرواز' })).toBeInTheDocument();
+    expect(screen.getByText('مطالبات معوق آژانس‌ها')).toBeInTheDocument();
     expect(screen.queryByText('تراکنش‌های مالی اخیر')).not.toBeInTheDocument();
     expect(screen.queryByText('تسویه‌حساب آژانس‌های همکار')).not.toBeInTheDocument();
   });
