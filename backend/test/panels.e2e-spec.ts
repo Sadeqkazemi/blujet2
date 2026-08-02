@@ -86,6 +86,31 @@ describe('Panels (e2e)', () => {
     ]);
   });
 
+  it('returns the confirmed tab set for Senior Manager in design sidebar order', async () => {
+    const { accessToken } = await loginAs(app, 'senior.rahimi');
+    const res = await request(app.getHttpServer())
+      .get('/panels/nav')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(res.status).toBe(200);
+    const keys = res.body.data.map((t: { key: string }) => t.key);
+    expect(keys).toEqual([
+      'dashboard',
+      'agencies',
+      'flights',
+      'admins',
+      'reports',
+      'finance',
+      'cartable',
+      'referrals',
+      'mgrreports',
+      'vip',
+      'survey',
+      'panels',
+      'security',
+      'reservation',
+    ]);
+  });
+
   it('an EMPLOYEE with no granted permissions still gets dashboard + referrals, not an error', async () => {
     const { accessToken } = await loginAs(app, 'com.ahmadi');
     const res = await request(app.getHttpServer())

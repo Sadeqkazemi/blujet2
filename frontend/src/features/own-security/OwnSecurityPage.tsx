@@ -74,18 +74,18 @@ export default function OwnSecurityPage() {
 
   return (
     <div className="p-8">
-      <h1 className="mb-1 text-xl font-black text-ink">امنیت و رمز عبور</h1>
-      <p className="mb-6 text-sm text-muted">مدیریت رمز حساب خود و رمز مدیران زیرمجموعه</p>
+      <h1 className="mb-1 text-xl font-black text-panel-ink">امنیت و رمز عبور</h1>
+      <p className="mb-6 text-sm text-panel-muted">مدیریت رمز حساب خود و رمز مدیران زیرمجموعه</p>
 
       {notice && <p className="mb-4 rounded-lg bg-danger/10 p-3 text-xs text-danger">{notice}</p>}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="rounded-xl border border-border bg-white p-5">
-          <div className="mb-1 text-sm font-bold text-ink">تغییر رمز عبور من</div>
-          <p className="mb-4 text-[11.5px] text-muted">رمز عبور حساب مدیریتی خود را به‌روزرسانی کنید.</p>
+        <div className="rounded-xl border border-panel-border bg-panel-surface p-5">
+          <div className="mb-1 text-sm font-bold text-panel-ink">تغییر رمز عبور من</div>
+          <p className="mb-4 text-[11.5px] text-panel-muted">رمز عبور حساب مدیریتی خود را به‌روزرسانی کنید.</p>
           <form onSubmit={onSubmitOwn} className="flex flex-col gap-3" noValidate>
             <div>
-              <label htmlFor="pw-cur" className="mb-1.5 block text-[11px] text-muted">
+              <label htmlFor="pw-cur" className="mb-1.5 block text-[11px] text-panel-muted">
                 رمز عبور فعلی
               </label>
               <input
@@ -93,11 +93,11 @@ export default function OwnSecurityPage() {
                 type="password"
                 value={pwCur}
                 onChange={(e) => setPwCur(e.target.value)}
-                className="ltr w-full rounded-lg border border-border px-3.5 py-2.5 text-sm outline-none focus:border-accent"
+                className="ltr w-full rounded-lg border border-panel-border-2 bg-panel-canvas px-3.5 py-2.5 text-sm text-panel-ink outline-none placeholder:text-panel-muted focus:border-accent"
               />
             </div>
             <div>
-              <label htmlFor="pw-new" className="mb-1.5 block text-[11px] text-muted">
+              <label htmlFor="pw-new" className="mb-1.5 block text-[11px] text-panel-muted">
                 رمز عبور جدید
               </label>
               <input
@@ -106,11 +106,11 @@ export default function OwnSecurityPage() {
                 placeholder="حداقل ۶ کاراکتر"
                 value={pwNew}
                 onChange={(e) => setPwNew(e.target.value)}
-                className="ltr w-full rounded-lg border border-border px-3.5 py-2.5 text-sm outline-none focus:border-accent"
+                className="ltr w-full rounded-lg border border-panel-border-2 bg-panel-canvas px-3.5 py-2.5 text-sm text-panel-ink outline-none placeholder:text-panel-muted focus:border-accent"
               />
             </div>
             <div>
-              <label htmlFor="pw-confirm" className="mb-1.5 block text-[11px] text-muted">
+              <label htmlFor="pw-confirm" className="mb-1.5 block text-[11px] text-panel-muted">
                 تکرار رمز عبور جدید
               </label>
               <input
@@ -118,7 +118,7 @@ export default function OwnSecurityPage() {
                 type="password"
                 value={pwConfirm}
                 onChange={(e) => setPwConfirm(e.target.value)}
-                className="ltr w-full rounded-lg border border-border px-3.5 py-2.5 text-sm outline-none focus:border-accent"
+                className="ltr w-full rounded-lg border border-panel-border-2 bg-panel-canvas px-3.5 py-2.5 text-sm text-panel-ink outline-none placeholder:text-panel-muted focus:border-accent"
               />
             </div>
             {pwError && (
@@ -139,19 +139,19 @@ export default function OwnSecurityPage() {
         </div>
 
         {managed.length > 0 && (
-          <div className="rounded-xl border border-border bg-white p-5">
-            <div className="mb-1 text-sm font-bold text-ink">مدیریت رمز سایر مدیران</div>
-            <p className="mb-4 text-[11.5px] text-muted">
+          <div className="rounded-xl border border-panel-border bg-panel-surface p-5">
+            <div className="mb-1 text-sm font-bold text-panel-ink">مدیریت رمز سایر مدیران</div>
+            <p className="mb-4 text-[11.5px] text-panel-muted">
               بازنشانی رمز عبور مدیران زیرمجموعه و تولید رمز موقت.
             </p>
             <div className="flex flex-col gap-2.5">
               {managed.map((m) => (
                 <div
                   key={m.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/70 bg-body/50 px-3.5 py-3"
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-panel-border bg-panel-surface-2 px-3.5 py-3"
                 >
                   <div>
-                    <div className="flex items-center gap-2 text-xs font-extrabold text-ink">
+                    <div className="flex items-center gap-2 text-xs font-extrabold text-panel-ink">
                       {m.fullName}
                       <span
                         className={`rounded-full px-2 py-0.5 text-[9.5px] font-bold ${
@@ -161,7 +161,7 @@ export default function OwnSecurityPage() {
                         {m.isActive ? 'فعال' : 'مسدود'}
                       </span>
                     </div>
-                    <div className="ltr font-num text-[10px] text-muted">{m.username}</div>
+                    <div className="ltr font-num text-[10px] text-panel-muted">{m.username}</div>
                   </div>
                   <div className="flex gap-2">
                     <button
@@ -172,7 +172,7 @@ export default function OwnSecurityPage() {
                     </button>
                     <button
                       onClick={() => void onToggleSuspend(m)}
-                      className="rounded-lg border border-border px-3 py-1.5 text-[11px] font-bold text-muted transition hover:text-ink"
+                      className="rounded-lg border border-panel-border px-3 py-1.5 text-[11px] font-bold text-panel-muted transition hover:text-panel-ink"
                     >
                       {m.isActive ? 'تعلیق' : 'رفع تعلیق'}
                     </button>
@@ -186,12 +186,12 @@ export default function OwnSecurityPage() {
 
       {tempPassword && (
         <Modal title="بازنشانی رمز عبور" onClose={() => setTempPassword(null)}>
-          <p className="mb-2 text-xs text-muted">{tempPassword.name}</p>
-          <p className="mb-3 text-[11px] text-muted">رمز موقت تولیدشده — فقط همین یک بار نمایش داده می‌شود:</p>
-          <div className="ltr font-num mb-4 rounded-lg bg-body p-3 text-center text-base font-black text-[#059669]">
+          <p className="mb-2 text-xs text-panel-muted">{tempPassword.name}</p>
+          <p className="mb-3 text-[11px] text-panel-muted">رمز موقت تولیدشده — فقط همین یک بار نمایش داده می‌شود:</p>
+          <div className="ltr font-num mb-4 rounded-lg bg-panel-canvas p-3 text-center text-base font-black text-[#059669]">
             {tempPassword.value}
           </div>
-          <p className="mb-4 text-[11px] leading-6 text-muted">
+          <p className="mb-4 text-[11px] leading-6 text-panel-muted">
             این رمز موقت برای مدیر ارسال می‌شود و در اولین ورود باید تغییر کند.
           </p>
           <button

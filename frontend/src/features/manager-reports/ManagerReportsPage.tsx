@@ -58,20 +58,20 @@ export default function ManagerReportsPage() {
 
   return (
     <div className="p-8">
-      <h1 className="mb-1 text-xl font-black text-ink">گزارش مدیران</h1>
-      <p className="mb-6 text-sm text-muted">فعالیت‌های ثبت‌شدهٔ مدیران و ادمین‌ها — از دفتر رویدادهای واقعی سامانه</p>
+      <h1 className="mb-1 text-xl font-black text-panel-ink">گزارش مدیران</h1>
+      <p className="mb-6 text-sm text-panel-muted">فعالیت‌های ثبت‌شدهٔ مدیران و ادمین‌ها — از دفتر رویدادهای واقعی سامانه</p>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="جستجو در اقدامات…"
-          className="w-64 rounded-lg border border-border bg-white px-3.5 py-2 text-xs outline-none focus:border-accent"
+          className="w-64 rounded-lg border border-panel-border-2 bg-panel-canvas px-3.5 py-2 text-xs text-panel-ink outline-none placeholder:text-panel-muted focus:border-accent"
         />
         <button
           onClick={() => setActorRole(null)}
           className={`rounded-lg px-3 py-2 text-[11px] transition ${
-            actorRole === null ? 'bg-accent font-bold text-white' : 'bg-body text-muted hover:text-ink'
+            actorRole === null ? 'bg-accent font-bold text-white' : 'bg-panel-canvas text-panel-muted hover:text-panel-ink'
           }`}
         >
           همه نقش‌ها
@@ -81,7 +81,7 @@ export default function ManagerReportsPage() {
             key={r}
             onClick={() => setActorRole(actorRole === r ? null : r)}
             className={`rounded-lg px-3 py-2 text-[11px] transition ${
-              actorRole === r ? 'bg-accent font-bold text-white' : 'bg-body text-muted hover:text-ink'
+              actorRole === r ? 'bg-accent font-bold text-white' : 'bg-panel-canvas text-panel-muted hover:text-panel-ink'
             }`}
           >
             {ROLE_LABEL[r]}
@@ -90,29 +90,29 @@ export default function ManagerReportsPage() {
       </div>
 
       {rows === null ? (
-        <p className="text-sm text-muted">در حال بارگذاری…</p>
+        <p className="text-sm text-panel-muted">در حال بارگذاری…</p>
       ) : rows.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border p-6 text-center text-xs text-muted">
+        <div className="rounded-xl border border-dashed border-panel-border p-6 text-center text-xs text-panel-muted">
           گزارشی با این فیلتر یافت نشد.
         </div>
       ) : (
         <div className="flex flex-col gap-3">
-          <div className="text-xs text-muted">
-            <span className="font-num font-bold text-ink">{faDigits(rows.length)}</span> گزارش
+          <div className="text-xs text-panel-muted">
+            <span className="font-num font-bold text-panel-ink">{faDigits(rows.length)}</span> گزارش
           </div>
           {rows.map((r) => (
-            <div key={r.id} className="rounded-xl border border-border bg-white p-4">
+            <div key={r.id} className="rounded-xl border border-panel-border bg-panel-surface p-4">
               <div className="mb-1.5 flex flex-wrap items-center gap-2">
-                <span className="text-[13px] font-extrabold text-ink">{r.action}</span>
+                <span className="text-[13px] font-extrabold text-panel-ink">{r.action}</span>
                 <span className="rounded-full bg-accent/10 px-2.5 py-0.5 text-[10px] font-bold text-accent">
                   {CATEGORY_LABEL[r.category] ?? r.category}
                 </span>
-                <span className="rounded-full bg-body px-2.5 py-0.5 text-[10px] font-bold text-muted">
+                <span className="rounded-full bg-panel-canvas px-2.5 py-0.5 text-[10px] font-bold text-panel-muted">
                   {ROLE_LABEL[r.actorRole] ?? r.actorRole}
                 </span>
               </div>
-              <div className="text-[11.5px] leading-6 text-text-2">{r.detail}</div>
-              <div className="font-num mt-2 text-[10.5px] text-muted">{formatJalaliDateTime(r.createdAt)}</div>
+              <div className="text-[11.5px] leading-6 text-panel-muted">{r.detail}</div>
+              <div className="font-num mt-2 text-[10.5px] text-panel-muted">{formatJalaliDateTime(r.createdAt)}</div>
             </div>
           ))}
         </div>

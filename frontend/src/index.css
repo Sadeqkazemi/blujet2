@@ -33,6 +33,8 @@
   --color-panel-ink: #e7ecf3;
   --color-panel-muted: #9fb0c7;
   --color-panel-muted-2: #8fa1bb;
+  --color-panel-border: #1f2a3d;
+  --color-panel-border-2: #28344c;
 }
 
 html,
