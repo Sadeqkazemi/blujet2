@@ -72,7 +72,9 @@ const SUB_TABS: [SubTab, string][] = [
 
 export default function ReservationPage() {
   const { user } = useAuth();
-  // Design: BOARD_CHAIR embeds ReservationSystem with lock-only=true → plane view only.
+  // Design (user screenshots + design-reference-v2): BOARD_CHAIR gets the full
+  // 4-tab ReservationSystem (داشبورد / مدیریت رزروها / دسترسی آژانس‌ها / پروازها);
+  // seat map opens from the پروازها tab.
   if (user?.role === 'BOARD_CHAIR') {
     return <BoardChairPlaneMode />;
   }

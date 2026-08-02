@@ -35,18 +35,15 @@ async function createFreshInstanceDate(page: Page): Promise<string> {
 test('BOARD_CHAIR locks a seat on the seat map, sees it reflected, then releases it', async ({ page }) => {
   await loginAs(page, 'chair');
   await page.getByRole('link', { name: 'هواپیما' }).click();
-  // Design: BOARD_CHAIR uses lock-only plane mode (no tab strip).
-  await expect(page.getByRole('heading', { name: 'هواپیما — رزرو صندلی' })).toBeVisible();
+  // Design screenshots: full 4-tab ReservationSystem; seat map opens from پروازها.
+  await expect(page.getByRole('button', { name: 'داشبورد' })).toBeVisible();
+  await page.getByRole('button', { name: 'پروازها' }).click();
+  await expect(page.getByText('شماره پرواز')).toBeVisible({ timeout: 15000 });
+  await page.getByRole('button', { name: /EP-821|تهران/ }).first().click();
+  await expect(page.getByText('نقشهٔ صندلی هواپیما')).toBeVisible({ timeout: 15000 });
+
   const seat = page.getByRole('button', { name: '3B', exact: true });
-  await expect(seat).toBeVisible({ timeout: 15000 });
-
-  // Prefer a flight chip that has seed demo inventory if several are listed.
-  const demoChip = page.getByRole('button', { name: /EP-821/ }).first();
-  if (await demoChip.isVisible().catch(() => false)) {
-    await demoChip.click();
-    await expect(seat).toBeVisible({ timeout: 15000 });
-  }
-
+  await expect(seat).toBeVisible();
   await seat.click();
   await page.getByRole('button', { name: 'لاک صندلی 3B' }).click();
   await expect(page.getByText(/لاک شد/)).toBeVisible();

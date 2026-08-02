@@ -348,7 +348,10 @@ both — Commercial's tab already hosts Phase 6's pricing section, which
 stays untouched on the same page).
 
 - GET `/flights/overview` — the tab's data in one call: KPI row (پرواز
-  فعال / صندلی فروخته‌شده / میانگین ضریب اشغال) + the three lists:
+  فعال / صندلی فروخته‌شده / میانگین ضریب اشغال) + the three lists
+  (read also allowed for `BOARD_CHAIR` / `CEO` / `IT_MANAGER` so the
+  ReservationSystem «پروازها» tab can list active instances; writes stay
+  on Senior/Commercial/Employee):
   - `active`: SCHEDULED instances — route label, flightNo, Jalali
     date/time, sold/capacity (+ derived status فعال/در حال فروش/تکمیل/لغو
     شده), basePriceIrr.
