@@ -37,10 +37,16 @@ test('BOARD_CHAIR locks a seat on the seat map, sees it reflected, then releases
   await page.getByRole('link', { name: 'هواپیما' }).click();
   // Design: BOARD_CHAIR uses lock-only plane mode (no tab strip).
   await expect(page.getByRole('heading', { name: 'هواپیما — رزرو صندلی' })).toBeVisible();
-  await expect(page.getByText(/اشغال/)).toBeVisible({ timeout: 15000 });
-
-  // Seat 3B is free in the seed data (3A/3C are sold, 4A is locked).
   const seat = page.getByRole('button', { name: '3B', exact: true });
+  await expect(seat).toBeVisible({ timeout: 15000 });
+
+  // Prefer a flight chip that has seed demo inventory if several are listed.
+  const demoChip = page.getByRole('button', { name: /EP-821/ }).first();
+  if (await demoChip.isVisible().catch(() => false)) {
+    await demoChip.click();
+    await expect(seat).toBeVisible({ timeout: 15000 });
+  }
+
   await seat.click();
   await page.getByRole('button', { name: 'لاک صندلی 3B' }).click();
   await expect(page.getByText(/لاک شد/)).toBeVisible();

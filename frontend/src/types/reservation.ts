@@ -23,11 +23,18 @@ export interface SeatMap {
   occupancyPct: number;
 }
 
+export type LockClassification = 'FREE' | 'DISCOUNTED' | 'PAYABLE';
+export type LockApprovalStatus = 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
+
 export interface SeatLockView {
   id: string;
   flightInstanceId: string;
   seatCode: string;
   lockedById: string;
+  reason?: string;
+  classification?: LockClassification;
+  discountPct?: number | null;
+  approvalStatus?: LockApprovalStatus;
   passengerName: string | null;
   releasedById: string | null;
   releasedAt: string | null;

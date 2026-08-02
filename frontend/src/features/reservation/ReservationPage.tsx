@@ -201,11 +201,13 @@ function ReservationTabs({ canLock }: { canLock: boolean }) {
       if (seatFormMode === 'lock') {
         await lockSeat(activeFlightInstanceId, {
           seatCode: selectedSeat,
+          reason: 'لاک مدیریتی از سامانه رزرواسیون',
+          classification: 'FREE',
           passengerName: seatForm.name || undefined,
           passengerNationalId: seatForm.nid || undefined,
           passengerMobile: seatForm.mobile || undefined,
         });
-        setNotice(`صندلی ${selectedSeat} لاک شد ✓`);
+        setNotice(`درخواست لاک صندلی ${selectedSeat} ثبت شد ✓`);
       } else {
         if (!seatForm.name.trim()) {
           setError('نام مسافر الزامی است.');

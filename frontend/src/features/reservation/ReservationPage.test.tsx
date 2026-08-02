@@ -246,7 +246,14 @@ describe('ReservationPage', () => {
     await user.click(screen.getByRole('button', { name: 'لاک صندلی 3B' }));
 
     await waitFor(() =>
-      expect(lockSpy).toHaveBeenCalledWith('fi1', expect.objectContaining({ seatCode: '3B' })),
+      expect(lockSpy).toHaveBeenCalledWith(
+        'fi1',
+        expect.objectContaining({
+          seatCode: '3B',
+          reason: expect.any(String),
+          classification: 'FREE',
+        }),
+      ),
     );
     expect(await screen.findByText(/لاک شد/)).toBeInTheDocument();
     expect(seatMapSpy).toHaveBeenCalled();

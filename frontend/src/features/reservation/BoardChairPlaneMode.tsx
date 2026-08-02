@@ -10,6 +10,7 @@ import {
   markNoShow,
   releaseLock,
   searchFlights,
+  type LockClassification,
 } from '../../api/reservation';
 import { faDigits, faMoney } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime, parseJalaliDateToIso } from '../../lib/jalali';
@@ -70,6 +71,9 @@ export default function BoardChairPlaneMode() {
   const [seatMap, setSeatMap] = useState<SeatMap | null>(null);
 
   const [lockInput, setLockInput] = useState('');
+  const [lockReason, setLockReason] = useState('لاک مدیریتی رئیس هیئت مدیره');
+  const [classification, setClassification] = useState<LockClassification>('FREE');
+  const [discountPct, setDiscountPct] = useState('20');
   const [passengerName, setPassengerName] = useState('');
   const [passengerNid, setPassengerNid] = useState('');
   const [passengerMobile, setPassengerMobile] = useState('');
@@ -244,8 +248,22 @@ export default function BoardChairPlaneMode() {
         setPassengerMobile('');
         await loadFlights();
       } else {
+        const reason = lockReason.trim();
+        if (reason.length < 3) {
+          setError('دلیل لاک باید حداقل ۳ نویسه باشد.');
+          return;
+        }
+        const pct =
+          classification === 'DISCOUNTED' ? Number(toLatinDigits(discountPct)) : undefined;
+        if (classification === 'DISCOUNTED' && (!pct || pct < 1 || pct > 100)) {
+          setError('درصد تخفیف باید بین ۱ تا ۱۰۰ باشد.');
+          return;
+        }
         await lockSeat(activeFlightInstanceId, {
           seatCode: selectedSeatCode,
+          reason,
+          classification,
+          discountPct: pct,
           passengerName: passengerName || undefined,
           passengerNationalId: passengerNid || undefined,
           passengerMobile: passengerMobile || undefined,
@@ -515,6 +533,44 @@ export default function BoardChairPlaneMode() {
             )}
 
             <div className="mt-3 rounded-xl border border-[#22304a] bg-[#0b1220] p-3">
+              <div className="mb-2 text-[10.5px] font-bold text-[#8ea3c4]">نوع لاک مدیریتی</div>
+              <div className="mb-2 grid grid-cols-3 gap-1.5">
+                {(
+                  [
+                    ['FREE', 'رایگان'],
+                    ['DISCOUNTED', 'تخفیف‌دار'],
+                    ['PAYABLE', 'قابل پرداخت'],
+                  ] as const
+                ).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setClassification(key)}
+                    className={`rounded-lg px-2 py-2 text-[10.5px] font-bold ${
+                      classification === key
+                        ? 'bg-[#1668c4] text-white'
+                        : 'bg-[#0f1725] text-[#9fb0c7] border border-[#28344c]'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {classification === 'DISCOUNTED' && (
+                <input
+                  value={discountPct}
+                  onChange={(e) => setDiscountPct(e.target.value)}
+                  placeholder="درصد تخفیف"
+                  dir="ltr"
+                  className="font-num mb-2 h-[42px] w-full rounded-[10px] border-[1.5px] border-[#28344c] bg-[#0f1725] px-3 text-xs text-white outline-none"
+                />
+              )}
+              <input
+                value={lockReason}
+                onChange={(e) => setLockReason(e.target.value)}
+                placeholder="دلیل لاک"
+                className="mb-3 h-[42px] w-full rounded-[10px] border-[1.5px] border-[#28344c] bg-[#0f1725] px-3 text-xs text-white outline-none"
+              />
               <div className="mb-2 text-[10.5px] font-bold text-[#8ea3c4]">اطلاعات مسافر</div>
               <div className="flex flex-col gap-2">
                 <input
