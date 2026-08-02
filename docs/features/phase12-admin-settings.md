@@ -11,6 +11,10 @@ Backend items proven by `backend/test/phase12.e2e-spec.ts` (9 tests, 178
 total); frontend by the new `*.test.tsx` files (7 tests, 95 total); E2E by
 `frontend/e2e/phase12-journey.spec.ts` (5 journeys).
 
+### Frontend — admins (CEO design alignment)
+- [x] Dark list card matching `پنل مدیر عامل`: title/sub, avatar rows, role pills, status dots, empty copy `هنوز اطلاعاتی وارد نشده است.` — `AdminsPage.test.tsx`
+- [x] Add button lives in the card header; add modal uses dark chrome + generate-password — `AdminsPage.test.tsx`
+
 ### Backend — admins
 - [x] `GET /admins`: hierarchy scoping + real online derivation + 403 — `'GET /admins: hierarchy scoping — Senior never gets a manageable SENIOR_MANAGER row; roles without the tab get 403'`
 - [x] `POST /admins`: real staff account that can actually log in; 409 duplicate — `'POST /admins creates a real staff account that can log in; duplicate username → 409'`
