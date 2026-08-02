@@ -833,6 +833,27 @@ export class AuthService {
         message: 'نشست شما منقضی شده است.',
       });
     }
+    // Re-check the account's current status on every refresh — isActive
+    // is only checked at login otherwise, so a blocked/suspended account
+    // could keep extending an already-issued refresh token forever.
+    if (!stored.user.isActive) {
+      throw new UnauthorizedException({
+        code: ErrorCode.UNAUTHORIZED,
+        message: 'این حساب مسدود شده است.',
+      });
+    }
+    if (stored.user.role === 'AGENCY') {
+      const profile = await this.prisma.agencyProfile.findUnique({
+        where: { userId: stored.userId },
+        select: { suspendedAt: true },
+      });
+      if (profile?.suspendedAt) {
+        throw new UnauthorizedException({
+          code: ErrorCode.UNAUTHORIZED,
+          message: 'این حساب مسدود شده است.',
+        });
+      }
+    }
 
     await this.prisma.refreshToken.update({
       where: { id: stored.id },

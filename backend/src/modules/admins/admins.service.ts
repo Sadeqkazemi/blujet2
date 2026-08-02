@@ -214,6 +214,16 @@ export class AdminsService {
       data: { isActive: !blocked },
     });
 
+    if (blocked) {
+      // Revoke this account's outstanding sessions immediately — isActive
+      // alone doesn't kill an already-issued refresh token until its next
+      // use, and a global logout-all would affect every other user too.
+      await this.prisma.refreshToken.updateMany({
+        where: { userId: id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+    }
+
     await this.audit.record({
       actorId: actor.id,
       actorRole: actor.role,

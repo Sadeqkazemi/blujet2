@@ -564,6 +564,14 @@ export class AgenciesService {
       data: { suspendedAt: new Date(), suspendReason: reason },
     });
 
+    // Revoke this agency's outstanding sessions immediately — otherwise an
+    // already-issued refresh token keeps working until it happens to be
+    // used again and rechecked.
+    await this.prisma.refreshToken.updateMany({
+      where: { userId: id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+
     await this.audit.record({
       actorId: actor.id,
       actorRole: actor.role,
@@ -640,22 +648,36 @@ export class AgenciesService {
 
   async settle(actor: AuthenticatedUser, id: string) {
     await this.getProfileOrThrow(id);
-    const usedByAgency = await this.computeUsedIrr([id]);
-    const outstanding = maxIrr(usedByAgency.get(id) ?? ZERO_IRR, ZERO_IRR);
-    if (!isPositiveIrr(outstanding)) {
-      throw new ConflictException({
-        code: ErrorCode.CONFLICT,
-        message: 'بدهی معوقی برای تسویه وجود ندارد.',
-      });
-    }
 
-    const entry = await this.prisma.ledgerEntry.create({
-      data: {
-        agencyId: id,
-        type: 'SETTLEMENT',
-        signedAmountIrr: negateIrr(outstanding),
-        createdById: actor.id,
-      },
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Lock this agency's profile row so two concurrent settlements can't
+      // both read the same "outstanding" figure before either writes —
+      // the aggregate below has no row of its own to lock, so we serialize
+      // on the agency's own profile row instead.
+      await tx.$queryRaw`SELECT "userId" FROM "agency_profiles" WHERE "userId" = ${id} FOR UPDATE`;
+
+      const sum = await tx.ledgerEntry.aggregate({
+        where: { agencyId: id, type: { in: ['SALE', 'SETTLEMENT'] } },
+        _sum: { signedAmountIrr: true },
+      });
+      const outstanding = maxIrr(sum._sum.signedAmountIrr ?? ZERO_IRR, ZERO_IRR);
+      if (!isPositiveIrr(outstanding)) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'بدهی معوقی برای تسویه وجود ندارد.',
+        });
+      }
+
+      const entry = await tx.ledgerEntry.create({
+        data: {
+          agencyId: id,
+          type: 'SETTLEMENT',
+          signedAmountIrr: negateIrr(outstanding),
+          createdById: actor.id,
+        },
+      });
+
+      return { settledIrr: outstanding, ledgerEntryId: entry.id };
     });
 
     await this.audit.record({
@@ -663,13 +685,13 @@ export class AgenciesService {
       actorRole: actor.role,
       category: 'AGENCY',
       action: 'ثبت تسویه آژانس',
-      detail: `مبلغ ${outstanding} ریال توسط ${actor.fullName} تسویه شد.`,
+      detail: `مبلغ ${result.settledIrr} ریال توسط ${actor.fullName} تسویه شد.`,
       entityType: 'AgencyProfile',
       entityId: id,
-      metadata: { amountIrr: outstanding },
+      metadata: { amountIrr: result.settledIrr },
     });
 
-    return { settledIrr: outstanding, ledgerEntryId: entry.id };
+    return result;
   }
 
   // ── Membership requests ──────────────────────────────────────────────

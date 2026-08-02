@@ -258,6 +258,109 @@ describe('Pricing (e2e)', () => {
     expect(registered.body.data.registeredPriceIrr).toBe('39200000');
   });
 
+  it('editing a PENDING proposal after AI analysis clears the stale suggestion — register {source:AI} then 409s', async () => {
+    const instance = await createScheduledInstance();
+    const commercial = await loginAs(app, 'comm.abbasi');
+    const created = await request(app.getHttpServer())
+      .put(`/pricing/flights/${instance.id}/proposal`)
+      .set('Authorization', `Bearer ${commercial.accessToken}`)
+      .send({ proposedPriceIrr: 38_500_000 });
+    const proposalId = created.body.data.id as string;
+
+    fakeMl.nextResult = {
+      model_version: 'heuristic-test',
+      suggestions: [
+        {
+          proposal_id: proposalId,
+          price_irr: 39_200_000,
+          reason_fa: 'دلیل تستی',
+          factors_fa: ['فاکتور ۱'],
+          season_fa: 'فصل عادی',
+          occasion_fa: 'بدون مناسبت خاص',
+          confidence: 0.8,
+        },
+      ],
+    };
+    const ceo = await loginAs(app, 'ceo');
+    await request(app.getHttpServer())
+      .post('/pricing/proposals/ai-analysis')
+      .set('Authorization', `Bearer ${ceo.accessToken}`);
+
+    // Commercial edits the still-PENDING proposal's price after the AI
+    // suggestion was computed against the old figure.
+    const edited = await request(app.getHttpServer())
+      .put(`/pricing/flights/${instance.id}/proposal`)
+      .set('Authorization', `Bearer ${commercial.accessToken}`)
+      .send({ proposedPriceIrr: 30_000_000 });
+    expect(edited.status).toBe(200);
+
+    const stored = await prisma.farePricingProposal.findUniqueOrThrow({
+      where: { id: proposalId },
+    });
+    expect(stored.aiSuggestion).toBeNull();
+
+    const stepUp = await stepUpFor(
+      app,
+      ceo.accessToken!,
+      'ceo',
+      'PRICE_CAPACITY_CHANGE',
+    );
+    const registered = await request(app.getHttpServer())
+      .patch(`/pricing/proposals/${proposalId}/register`)
+      .set('Authorization', `Bearer ${ceo.accessToken}`)
+      .send({ source: 'AI', ...stepUp });
+    expect(registered.status).toBe(409);
+    expect(registered.body.error.message).toContain('هوش مصنوعی');
+  });
+
+  it('register {source:AI} rejects a suggestion above the CEO-approved legal rate', async () => {
+    const instance = await createScheduledInstance();
+    const commercial = await loginAs(app, 'comm.abbasi');
+    const created = await request(app.getHttpServer())
+      .put(`/pricing/flights/${instance.id}/proposal`)
+      .set('Authorization', `Bearer ${commercial.accessToken}`)
+      .send({ proposedPriceIrr: 38_500_000, legalRateIrr: 40_000_000 });
+    const proposalId = created.body.data.id as string;
+
+    fakeMl.nextResult = {
+      model_version: 'heuristic-test',
+      suggestions: [
+        {
+          proposal_id: proposalId,
+          price_irr: 55_000_000, // above the 40,000,000 legal ceiling
+          reason_fa: 'دلیل تستی',
+          factors_fa: ['فاکتور ۱'],
+          season_fa: 'فصل عادی',
+          occasion_fa: 'بدون مناسبت خاص',
+          confidence: 0.8,
+        },
+      ],
+    };
+    const ceo = await loginAs(app, 'ceo');
+    await request(app.getHttpServer())
+      .post('/pricing/proposals/ai-analysis')
+      .set('Authorization', `Bearer ${ceo.accessToken}`);
+
+    const stepUp = await stepUpFor(
+      app,
+      ceo.accessToken!,
+      'ceo',
+      'PRICE_CAPACITY_CHANGE',
+    );
+    const registered = await request(app.getHttpServer())
+      .patch(`/pricing/proposals/${proposalId}/register`)
+      .set('Authorization', `Bearer ${ceo.accessToken}`)
+      .send({ source: 'AI', ...stepUp });
+    expect(registered.status).toBe(409);
+    expect(registered.body.error.message).toContain('نرخ قانونی');
+
+    const stored = await prisma.farePricingProposal.findUniqueOrThrow({
+      where: { id: proposalId },
+    });
+    expect(stored.status).toBe('PENDING');
+    expect(stored.registeredPriceIrr).toBeNull();
+  });
+
   it('ml-service down: ai-analysis degrades gracefully (available:false, no 500) and register-by-proposed still works', async () => {
     const instance = await createScheduledInstance();
     const commercial = await loginAs(app, 'comm.abbasi');

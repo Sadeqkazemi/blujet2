@@ -302,6 +302,32 @@ describe('Reservation (e2e)', () => {
     expect(audit).not.toBeNull();
   });
 
+  it('concurrent POST /reservation/pnr for the same seat: exactly one TICKETED booking is created', async () => {
+    const instance = await createScheduledInstance();
+    const chair = await loginAs(app, 'chair');
+
+    const attempts = await Promise.all(
+      Array.from({ length: 5 }, (_, i) =>
+        issuePnr(chair.accessToken, instance.id, '16A', `مسافر ${i}`),
+      ),
+    );
+    const succeeded = attempts.filter((r) => r.status === 201);
+    const conflicted = attempts.filter((r) => r.status === 409);
+    expect(succeeded.length).toBe(1);
+    expect(conflicted.length).toBe(4);
+
+    const ticketedForSeat = await prisma.passenger.count({
+      where: {
+        seatCode: '16A',
+        booking: {
+          flightInstanceId: instance.id,
+          status: { not: 'CANCELLED' },
+        },
+      },
+    });
+    expect(ticketedForSeat).toBe(1);
+  });
+
   it('GET /reservation/pnr lists grouped by flight and q= filters by PNR/passenger', async () => {
     const instance = await createScheduledInstance();
     const it = await loginAs(app, 'itadmin');
@@ -376,6 +402,37 @@ describe('Reservation (e2e)', () => {
       .set(auth(chair.accessToken))
       .send({ seatCode: '12A' });
     expect(onCancelled.status).toBe(409);
+  });
+
+  it('concurrent PATCH .../seat from two different PNRs targeting the same free seat: exactly one succeeds', async () => {
+    const instance = await createScheduledInstance();
+    const chair = await loginAs(app, 'chair');
+    const a = await issuePnr(chair.accessToken, instance.id, '17A', 'مسافر آ');
+    const b = await issuePnr(chair.accessToken, instance.id, '17B', 'مسافر ب');
+
+    const [resA, resB] = await Promise.all([
+      request(app.getHttpServer())
+        .patch(`/reservation/pnr/${a.body.data.pnr}/seat`)
+        .set(auth(chair.accessToken))
+        .send({ seatCode: '18A' }),
+      request(app.getHttpServer())
+        .patch(`/reservation/pnr/${b.body.data.pnr}/seat`)
+        .set(auth(chair.accessToken))
+        .send({ seatCode: '18A' }),
+    ]);
+    const statuses = [resA.status, resB.status].sort();
+    expect(statuses).toEqual([200, 409]);
+
+    const holdersOfSeat = await prisma.passenger.count({
+      where: {
+        seatCode: '18A',
+        booking: {
+          flightInstanceId: instance.id,
+          status: { not: 'CANCELLED' },
+        },
+      },
+    });
+    expect(holdersOfSeat).toBe(1);
   });
 
   it('PATCH /reservation/pnr/:pnr/cancel frees the seat for resale; 409 if already cancelled', async () => {

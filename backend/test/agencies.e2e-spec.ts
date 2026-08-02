@@ -303,6 +303,36 @@ describe('Agencies (e2e)', () => {
     expect(sum._sum.signedAmountIrr).toBe(0n);
   });
 
+  it('two concurrent POST /settle calls on the same agency settle exactly once — no phantom credit from a double-settlement race', async () => {
+    const agencyId = await createFreshAgency();
+    await addAgencySale(agencyId, 500_000_000);
+
+    const { accessToken } = await loginAs(app, 'finance.karimi');
+    const [first, second] = await Promise.all([
+      request(app.getHttpServer())
+        .post(`/agencies/${agencyId}/settle`)
+        .set('Authorization', `Bearer ${accessToken}`),
+      request(app.getHttpServer())
+        .post(`/agencies/${agencyId}/settle`)
+        .set('Authorization', `Bearer ${accessToken}`),
+    ]);
+
+    const statuses = [first.status, second.status].sort();
+    expect(statuses).toEqual([201, 409]);
+
+    const settlementCount = await prisma.ledgerEntry.count({
+      where: { agencyId, type: 'SETTLEMENT' },
+    });
+    expect(settlementCount).toBe(1);
+
+    // The critical invariant: outstanding never goes negative (phantom credit).
+    const sum = await prisma.ledgerEntry.aggregate({
+      where: { agencyId, type: { in: ['SALE', 'SETTLEMENT'] } },
+      _sum: { signedAmountIrr: true },
+    });
+    expect(sum._sum.signedAmountIrr).toBe(0n);
+  });
+
   // Money columns are now BigInt (no Int32 ceiling by design — that's the
   // whole point of this migration), so a large limit like 3,000,000,000 is
   // legitimately accepted now. The validation guard itself (MinIrrAmount /
