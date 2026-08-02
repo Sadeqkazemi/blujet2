@@ -194,7 +194,9 @@ export class AuthService {
     refreshToken: string;
     user: AuthUserView;
   }> {
-    const user = await this.prisma.user.findUnique({ where: { phone } });
+    const user = await this.prisma.user.findUnique({
+      where: { phone: normalizeIranPhone(phone) },
+    });
     if (!user || user.role !== 'USER' || !user.passwordHash) {
       throw new UnauthorizedException({
         code: ErrorCode.UNAUTHORIZED,
@@ -779,7 +781,9 @@ export class AuthService {
       !this.twoFactorProvider.getLastCode
     )
       return null;
-    const user = await this.prisma.user.findUnique({ where: { phone } });
+    const user = await this.prisma.user.findUnique({
+      where: { phone: normalizeIranPhone(phone) },
+    });
     if (!user) return null;
     return this.twoFactorProvider.getLastCode(user.id) ?? null;
   }

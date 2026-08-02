@@ -142,7 +142,9 @@ describe('Phase 20 — contact + support tickets (e2e)', () => {
         });
       const id = other.body.data.id as string;
 
-      const { accessToken } = await loginAsCustomer(app, '09120000002');
+      // Not 09120000002 — that phone is claimed by prisma/seed.ts's AGENCY
+      // fixture ("آژانس blujet"), and this route is USER-only (@Roles('USER')).
+      const { accessToken } = await loginAsCustomer(app, '09120000102');
       const res = await request(app.getHttpServer())
         .get(`/my/support-tickets/${id}`)
         .set('Authorization', `Bearer ${accessToken}`);

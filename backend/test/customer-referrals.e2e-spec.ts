@@ -4,6 +4,7 @@ import { App } from 'supertest/types';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { loginAs, loginAsCustomer } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
+import { normalizeIranPhone } from '../src/common/normalize-iran-phone';
 
 describe('Customer referrals (e2e)', () => {
   let app: INestApplication<App>;
@@ -59,7 +60,7 @@ describe('Customer referrals (e2e)', () => {
     expect(verify.status).toBe(200);
 
     const referred = await prisma.user.findUniqueOrThrow({
-      where: { phone: newPhone },
+      where: { phone: normalizeIranPhone(newPhone) },
     });
     const row = await prisma.customerReferral.findUnique({
       where: { referredUserId: referred.id },

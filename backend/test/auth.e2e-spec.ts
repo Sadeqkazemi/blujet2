@@ -7,6 +7,7 @@ import { TWO_FACTOR_PROVIDER } from '../src/modules/auth/providers/two-factor-pr
 import { MockTwoFactorProvider } from '../src/modules/auth/providers/mock-two-factor.provider';
 import { loginAs } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
+import { normalizeIranPhone } from '../src/common/normalize-iran-phone';
 
 describe('Auth (e2e)', () => {
   let app: INestApplication<App>;
@@ -384,14 +385,18 @@ describe('Auth (e2e)', () => {
     expect(first.status).toBe(200);
     expect(first.body.data.challengeId).toBeDefined();
 
-    const user1 = await prisma.user.findUniqueOrThrow({ where: { phone } });
+    const user1 = await prisma.user.findUniqueOrThrow({
+      where: { phone: normalizeIranPhone(phone) },
+    });
     expect(user1.role).toBe('USER');
 
     const second = await request(app.getHttpServer())
       .post('/auth/otp/request')
       .send({ phone });
     expect(second.status).toBe(200);
-    const user2 = await prisma.user.findUniqueOrThrow({ where: { phone } });
+    const user2 = await prisma.user.findUniqueOrThrow({
+      where: { phone: normalizeIranPhone(phone) },
+    });
     expect(user2.id).toBe(user1.id);
   });
 
@@ -403,7 +408,10 @@ describe('Auth (e2e)', () => {
   });
 
   it('logs a customer in with the correct OTP code and issues USER-role tokens', async () => {
-    const phone = '09120000002';
+    // Not 0912000000[1-3]/0913000000[1-3] — those phones are claimed by
+    // prisma/seed.ts's fixture agencies/users, so a "fresh USER" test using
+    // one of them would actually hit a pre-existing, differently-roled account.
+    const phone = '09120000102';
     const requestRes = await request(app.getHttpServer())
       .post('/auth/otp/request')
       .send({ phone });

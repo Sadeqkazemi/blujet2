@@ -4,6 +4,7 @@ import { App } from 'supertest/types';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { loginAsCustomer } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
+import { normalizeIranPhone } from '../src/common/normalize-iran-phone';
 
 const RUN = Date.now().toString().slice(-6);
 function phoneFor(n: number): string {
@@ -106,7 +107,12 @@ describe('Privacy / GDPR export & delete (e2e)', () => {
     expect(exportRes.body.data.bookings[0].passengers[0].nationalId).toBe(
       '0012345679',
     );
-    expect(exportRes.body.data.user.phone).toBe(phoneFor(1));
+    // The API stores/returns phone numbers normalized to E.164 everywhere
+    // (see normalizeIranPhone) — the export mirrors that, not the raw local
+    // format the user typed.
+    expect(exportRes.body.data.user.phone).toBe(
+      normalizeIranPhone(phoneFor(1)),
+    );
   });
 
   it('rejects export without login', async () => {
@@ -175,7 +181,9 @@ describe('Privacy / GDPR export & delete (e2e)', () => {
       .post('/auth/otp/request')
       .send({ phone });
     expect(reLoginRes.status).toBe(200);
-    const newUser = await prisma.user.findUniqueOrThrow({ where: { phone } });
+    const newUser = await prisma.user.findUniqueOrThrow({
+      where: { phone: normalizeIranPhone(phone) },
+    });
     expect(newUser.id).not.toBe(userId);
   });
 });

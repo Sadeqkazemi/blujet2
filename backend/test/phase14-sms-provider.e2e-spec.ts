@@ -5,6 +5,7 @@ import { PrismaClient } from '../generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { createTestApp } from './helpers/app.helper';
 import { loginAs, loginAsCustomer, stepUpFor } from './helpers/login.helper';
+import { normalizeIranPhone } from '../src/common/normalize-iran-phone';
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
@@ -39,7 +40,7 @@ describe('Phase 14 — SMS provider + management log', () => {
     expect(accessToken).toBeDefined();
 
     const log = await prisma.smsLog.findFirst({
-      where: { phone, messageType: 'OTP' },
+      where: { phone: normalizeIranPhone(phone), messageType: 'OTP' },
       orderBy: { createdAt: 'desc' },
     });
     expect(log).not.toBeNull();
