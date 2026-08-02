@@ -71,7 +71,7 @@ Design reference: `design-reference-v2/پنل مدیر مالی.dc.html`. Nav fo
 `FINANCE_MANAGER` matches design exactly (7 tabs — `flightops` removed).
 
 ### Backend
-- [x] `GET /reporting/finance-dashboard-stats` (FINANCE_MANAGER only): active agencies, passengers/tickets/revenue this month with month-over-month trend pct — `'GET /reporting/finance-dashboard-stats: finance manager gets real dashboard cards; other roles 403'`
+- [x] `GET /reporting/finance-dashboard-stats` (CEO, BOARD_CHAIR, SENIOR_MANAGER, FINANCE_MANAGER): active agencies, passengers/tickets/revenue this month with month-over-month trend pct — `'GET /reporting/finance-dashboard-stats: executive + finance roles get real dashboard cards; others 403'`
 - [x] `GET /reporting/kpis` now includes `trends` (revenue/profit/cost/debt pct vs previous period) — `'GET /reporting/kpis: returns trend percentages alongside KPI values'`
 - [x] `GET /reporting/recent-transactions` rows include `statusFa` + `statusTone` — extended assertion in existing recent-transactions test
 

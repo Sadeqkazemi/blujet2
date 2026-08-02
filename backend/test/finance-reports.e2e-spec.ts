@@ -70,7 +70,7 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
     expect(trends).toHaveProperty('agencyDebtPct');
   });
 
-  it('GET /reporting/finance-dashboard-stats: finance manager gets real dashboard cards; other roles 403', async () => {
+  it('GET /reporting/finance-dashboard-stats: executive + finance roles get real dashboard cards; others 403', async () => {
     const finance = await loginAs(app, 'finance.karimi');
     const res = await request(app.getHttpServer())
       .get('/reporting/finance-dashboard-stats')
@@ -90,9 +90,16 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
     expect(typeof data.activeAgenciesTrendPct).toBe('number');
 
     const ceo = await loginAs(app, 'ceo');
-    const forbidden = await request(app.getHttpServer())
+    const ceoRes = await request(app.getHttpServer())
       .get('/reporting/finance-dashboard-stats')
       .set('Authorization', auth(ceo.accessToken));
+    expect(ceoRes.status).toBe(200);
+    expect(ceoRes.body.data.activeAgencies).toBeGreaterThan(0);
+
+    const commercial = await loginAs(app, 'comm.abbasi');
+    const forbidden = await request(app.getHttpServer())
+      .get('/reporting/finance-dashboard-stats')
+      .set('Authorization', auth(commercial.accessToken));
     expect(forbidden.status).toBe(403);
   });
 

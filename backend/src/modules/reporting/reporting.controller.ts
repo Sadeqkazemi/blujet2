@@ -64,10 +64,10 @@ export class ReportingController {
   }
 
   @Get('finance-dashboard-stats')
-  @Roles('FINANCE_MANAGER')
+  @Roles('CEO', 'BOARD_CHAIR', 'SENIOR_MANAGER', 'FINANCE_MANAGER')
   @ApiOperation({
     summary:
-      'کارت‌های داشبورد مدیر مالی — آژانس/مسافر/بلیط/درآمد ماه جاری با روند',
+      'کارت‌های داشبورد اجرایی/مالی — آژانس/مسافر/بلیط/درآمد ماه جاری با روند (پنل مدیر عامل و هم‌ترازها + مدیر مالی)',
   })
   async financeDashboardStats() {
     const data = await this.reporting.financeDashboardStats();
