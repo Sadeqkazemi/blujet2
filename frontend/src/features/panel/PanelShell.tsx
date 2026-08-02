@@ -9,7 +9,7 @@ import { fetchLogsBadgeCount } from '../../api/audit';
 import { faDigits } from '../../lib/fa-format';
 import type { PanelNavItem } from '../../types/panels';
 import PanelNavIcon from './PanelNavIcon';
-import { PANEL_PAGE_SUBTITLES, panelInitials } from './panel-nav-icons';
+import { PANEL_PAGE_SUBTITLES, PANEL_PAGE_TITLES, panelInitials } from './panel-nav-icons';
 import { resolvePanelNav } from './panel-nav.config';
 
 const ROLE_LABELS: Record<string, string> = {
@@ -25,7 +25,7 @@ const ROLE_LABELS: Record<string, string> = {
 
 const ROLE_SUB: Record<string, string> = {
   CEO: 'دسترسی کامل مدیریتی',
-  BOARD_CHAIR: 'نظارت هیئت مدیره',
+  BOARD_CHAIR: 'دسترسی کامل',
   SENIOR_MANAGER: 'مدیریت عملیاتی',
   FINANCE_MANAGER: 'واحد مالی',
   COMMERCIAL_MANAGER: 'واحد بازرگانی',
@@ -55,7 +55,7 @@ export default function PanelShell() {
 
   const currentKey = activeNavKey(location.pathname);
   const activeNav = nav?.find((item) => item.key === currentKey);
-  const pageTitle = activeNav?.labelFa ?? 'پنل مدیریت';
+  const pageTitle = PANEL_PAGE_TITLES[currentKey] ?? activeNav?.labelFa ?? 'پنل مدیریت';
   const pageSub = PANEL_PAGE_SUBTITLES[currentKey] ?? '';
 
   useEffect(() => {

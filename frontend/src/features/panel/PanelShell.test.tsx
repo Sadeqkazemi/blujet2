@@ -154,6 +154,9 @@ describe('PanelShell', () => {
 
     expect(await screen.findByRole('link', { name: 'مدیران' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'داشبورد' })).toBeInTheDocument();
+    expect(screen.getByText('دسترسی کامل')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'مشتریان VIP' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'نظرسنجی مسافران' })).toBeInTheDocument();
     expect(screen.queryByText('تبی برای این نقش تعریف نشده است.')).not.toBeInTheDocument();
   });
 

@@ -37,6 +37,7 @@ export const CLIENT_PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'logs', labelFa: 'لاگ و رویدادها', implemented: true },
     { key: 'survey', labelFa: 'نظرسنجی مسافران', implemented: true },
   ],
+  // Order matches design-reference-v2/پنل رئیس هیئت مدیره.dc.html sidebar.
   BOARD_CHAIR: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
     { key: 'admins', labelFa: 'مدیران', implemented: true },
@@ -44,9 +45,9 @@ export const CLIENT_PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'cartable', labelFa: 'کارتابل', implemented: true },
     { key: 'settings', labelFa: 'تنظیمات سامانه', implemented: true },
     { key: 'club', labelFa: 'مشتریان VIP', implemented: true },
+    { key: 'survey', labelFa: 'نظرسنجی مسافران', implemented: true },
     { key: 'reservation', labelFa: 'هواپیما', implemented: true },
     { key: 'mgrreports', labelFa: 'گزارش مدیران', implemented: true },
-    { key: 'survey', labelFa: 'نظرسنجی مسافران', implemented: true },
   ],
   SENIOR_MANAGER: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },

@@ -64,6 +64,11 @@ export const PANEL_NAV_ICON_PATHS: Record<string, string> = {
     '<path d="M8 8l-4 4 4 4"/><path d="M16 8l4 4-4 4"/><path d="M13.5 6l-3 12"/>',
 };
 
+/** Page header titles that differ from the sidebar nav label (e.g. BOARD_CHAIR «هواپیما» → «سامانه رزرواسیون پرواز»). */
+export const PANEL_PAGE_TITLES: Record<string, string> = {
+  reservation: 'سامانه رزرواسیون پرواز',
+};
+
 export const PANEL_PAGE_SUBTITLES: Record<string, string> = {
   dashboard: 'نمای کلی فروش و کارهای در انتظار اقدام',
   agencies: 'مدیریت آژانس‌های همکار و درخواست‌های عضویت',
@@ -74,18 +79,18 @@ export const PANEL_PAGE_SUBTITLES: Record<string, string> = {
   staff: 'فعالیت و گزارش‌های کارمندان',
   finance: 'گزارش‌های مالی، درآمد و تسویه',
   refund: 'بررسی و پرداخت درخواست‌های استرداد',
-  cartable: 'وظایف و پیام‌های سازمانی',
+  cartable: 'کارهای در انتظار اقدام شما',
   settings: 'تنظیمات کلی سامانه',
-  club: 'باشگاه مشتریان VIP',
-  vip: 'باشگاه مشتریان VIP',
-  mgrreports: 'فعالیت مدیران و رویدادهای سیستم',
+  club: 'تأیید درخواست‌های ارجاع‌شده و صدور کارت عضویت',
+  vip: 'تأیید درخواست‌های ارجاع‌شده و صدور کارت عضویت',
+  mgrreports: 'اقدامات کلیدی مدیران که برای هیئت مدیره ثبت و ارسال شده',
   pricing: 'پیشنهادات قیمت و تأیید نرخ',
   clubrules: 'قوانین امتیاز و سطوح باشگاه',
   panels: 'فعال/غیرفعال کردن دسترسی نقش‌ها',
   security: 'رمز عبور و تنظیمات امنیتی',
   logs: 'لاگ و رویدادهای سیستم',
-  survey: 'نظرسنجی مسافران',
-  reservation: 'سامانه رزرواسیون و قفل صندلی',
+  survey: 'نتایج نظرسنجی رضایت مسافران پس از پرواز و خلاصه هوش مصنوعی نظرات هر پرواز',
+  reservation: 'جستجو و رزرو، مدیریت PNRها، صدور بلیط و دسترسی API آژانس‌ها',
   referrals: 'ارجاعات و گزارش‌های پیگیری',
   users: 'کاربران، دسترسی‌ها و مجوزها',
   services: 'سرویس‌های داخلی و خارجی',

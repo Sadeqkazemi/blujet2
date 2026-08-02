@@ -2,7 +2,33 @@ import { useCallback, useEffect, useState } from 'react';
 import { analyzeSurveyFlight, fetchSurveyResults } from '../../api/survey';
 import { faDigits } from '../../lib/fa-format';
 import { formatJalaliDate } from '../../lib/jalali';
+import PanelAlert from '../panel/PanelAlert';
+import {
+  panelAlertWarning,
+  panelBtnPrimary,
+  panelCard,
+  panelMuted,
+  panelMuted2,
+  panelTitle,
+} from '../panel/panel-theme';
 import type { SurveyResultRow } from '../../types/survey';
+
+function RatingStars({ rating }: { rating: number }) {
+  const rounded = Math.round(rating);
+  return (
+    <div className="flex justify-end gap-0.5" aria-label={`امتیاز ${faDigits(rating)} از ۵`}>
+      {[1, 2, 3, 4, 5].map((i) => (
+        <span
+          key={i}
+          className="text-sm leading-none"
+          style={{ color: i <= rounded ? '#f59e0b' : '#3a4a63' }}
+        >
+          ★
+        </span>
+      ))}
+    </div>
+  );
+}
 
 /** CEO/SENIOR_MANAGER/BOARD_CHAIR — «نظرسنجی مسافران»: نتایج فقط‌خواندنی
  * به تفکیک پرواز + خلاصهٔ هوش مصنوعی نظرات هر پرواز. پیکربندی نزد مدیر
@@ -41,64 +67,69 @@ export default function SurveyResultsPage() {
   }
 
   return (
-    <div className="p-8">
-      <div className="mb-6">
-        <h1 className="text-xl font-black text-ink">نظرسنجی مسافران</h1>
-        <p className="mt-1 text-sm text-muted">
-          نتایج نظرسنجی رضایت مسافران پس از پرواز و خلاصهٔ هوش مصنوعی نظرات هر پرواز
-        </p>
-      </div>
-
-      {error && <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">{error}</p>}
+    <div className="flex flex-col gap-3">
+      {error && <PanelAlert className="mb-0">{error}</PanelAlert>}
 
       {disabled && (
-        <div className="rounded-xl border border-[#f59e0b4d] bg-[#f59e0b14] p-4 text-xs text-ink">
-          نظرسنجی پس از پرواز توسط مدیر IT غیرفعال است.
-        </div>
+        <div className={panelAlertWarning}>نظرسنجی پس از پرواز توسط مدیر IT غیرفعال است.</div>
       )}
 
       {!disabled && flights.length === 0 && (
-        <div className="rounded-xl border border-border bg-white p-8 text-center text-xs text-muted">
+        <div className={`${panelCard} px-8 py-9 text-center text-xs ${panelMuted}`}>
           هنوز نظرسنجی برای هیچ پروازی ثبت نشده است.
         </div>
       )}
 
-      {!disabled && (
-        <div className="flex flex-col gap-3">
-          {flights.map((f) => (
-            <div key={f.flightInstanceId} data-testid="survey-result-row" className="rounded-xl border border-border bg-white p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <div className="text-sm font-bold text-ink">{f.flightNo}</div>
-                  <div className="mt-0.5 text-[10.5px] text-muted">
-                    {f.originCityFa} ← {f.destCityFa} · {formatJalaliDate(f.departureAt)}
-                  </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="text-xs">
-                    <span className="font-num font-black text-[#f59e0b]">{faDigits(f.avgRating)}</span>
-                    <span className="text-muted"> / {faDigits(5)} · </span>
-                    <span className="font-num font-black text-ink">{faDigits(f.count)}</span>
-                    <span className="text-muted"> پاسخ</span>
-                  </div>
-                  <button
-                    onClick={() => void onAnalyze(f.flightInstanceId)}
-                    disabled={loadingId === f.flightInstanceId}
-                    className="rounded-lg bg-accent px-3 py-1.5 text-[11px] font-bold text-white transition hover:bg-accent/90 disabled:opacity-60"
-                  >
-                    {loadingId === f.flightInstanceId ? 'در حال تحلیل…' : 'تحلیل با هوش مصنوعی'}
-                  </button>
+      {!disabled &&
+        flights.map((f) => (
+          <div key={f.flightInstanceId} data-testid="survey-result-row" className={`${panelCard} p-4`}>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className={panelTitle}>{f.flightNo}</div>
+                <div className={`mt-0.5 text-[10.5px] ${panelMuted}`}>
+                  {f.originCityFa} ← {f.destCityFa} · {formatJalaliDate(f.departureAt)}
                 </div>
               </div>
-              {summaries[f.flightInstanceId] && (
-                <p data-testid="survey-ai-summary" className="mt-3 rounded-lg bg-surface p-3 text-xs text-ink">
-                  {summaries[f.flightInstanceId]}
-                </p>
+              <div className="text-center">
+                <RatingStars rating={f.avgRating} />
+                <div className={`mt-0.5 text-[10px] ${panelMuted}`}>
+                  <span className="font-num font-black text-[#f59e0b]">{faDigits(f.avgRating)}</span>
+                  {' از '}
+                  {faDigits(5)}
+                  {' · '}
+                  <span className="font-num font-black text-white">{faDigits(f.count)}</span> پاسخ
+                </div>
+              </div>
+            </div>
+
+            {summaries[f.flightInstanceId] && (
+              <div
+                data-testid="survey-ai-summary"
+                className="mt-3 flex items-start gap-2 rounded-[11px] border border-[rgba(59,130,246,.25)] bg-[rgba(59,130,246,.08)] p-3"
+              >
+                <span className="text-sm">✨</span>
+                <p className={`text-xs leading-relaxed ${panelMuted2}`}>{summaries[f.flightInstanceId]}</p>
+              </div>
+            )}
+
+            <div className="mt-3">
+              {loadingId === f.flightInstanceId ? (
+                <span className={`inline-flex items-center gap-2 text-[11.5px] font-bold ${panelMuted2}`}>
+                  <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-panel-border-2 border-t-panel-accent" />
+                  در حال تحلیل نظرات…
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void onAnalyze(f.flightInstanceId)}
+                  className={panelBtnPrimary}
+                >
+                  ✨ تحلیل با هوش مصنوعی
+                </button>
               )}
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        ))}
     </div>
   );
 }

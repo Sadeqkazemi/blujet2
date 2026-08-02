@@ -9,6 +9,17 @@ import { SOCIAL_LINK_IDS } from '../../types/social-links';
 import type { AppDownloadLinkEntry, AppLinkId } from '../../types/app-links';
 import { APP_LINK_IDS } from '../../types/app-links';
 import { SocialIcon, socialBrandColor } from '../../components/public/SocialIcon';
+import PanelAlert from '../panel/PanelAlert';
+import {
+  panelBtnPrimary,
+  panelCard,
+  panelCardPadded,
+  panelInput,
+  panelMuted,
+  panelSubtitle,
+  panelText,
+  panelTitle,
+} from '../panel/panel-theme';
 
 const GATEWAYS: { key: string; name: string; desc: string }[] = [
   { key: 'gatewayMellat', name: 'درگاه بانک ملت', desc: 'درگاه اصلی پرداخت' },
@@ -27,11 +38,12 @@ const GLOBAL_TOGGLES: { key: string; title: string; desc: string }[] = [
 function Toggle({ on, onToggle, label }: { on: boolean; onToggle: () => void; label: string }) {
   return (
     <button
+      type="button"
       role="switch"
       aria-checked={on}
       aria-label={label}
       onClick={onToggle}
-      className={`relative h-6.5 w-12 flex-none rounded-full transition ${on ? 'bg-accent' : 'bg-border'}`}
+      className={`relative h-6.5 w-12 flex-none rounded-full transition ${on ? 'bg-panel-accent' : 'bg-[#28344c]'}`}
     >
       <span
         className={`absolute top-0.5 h-5.5 w-5.5 rounded-full bg-white shadow transition-all ${
@@ -65,8 +77,8 @@ export default function SettingsPage() {
       .catch(() => setError('خطا در دریافت تنظیمات.'));
   }, []);
 
-  if (error) return <p className="p-8 text-sm text-danger">{error}</p>;
-  if (!data) return <p className="p-8 text-sm text-muted">در حال بارگذاری…</p>;
+  if (error && !data) return <PanelAlert className="mb-0">{error}</PanelAlert>;
+  if (!data) return <p className={`text-sm ${panelMuted}`}>در حال بارگذاری…</p>;
 
   const setKey = (key: string, value: unknown) => setDraft((d) => ({ ...d, [key]: value }));
   const boolOf = (key: string) => Boolean(draft[key]);
@@ -101,6 +113,7 @@ export default function SettingsPage() {
   async function onSave() {
     setSaving(true);
     setNotice(null);
+    setError(null);
     try {
       const patch = isSiteAdmin
         ? {
@@ -138,23 +151,15 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="p-8">
-      <h1 className="mb-1 text-xl font-black text-ink">تنظیمات سامانه</h1>
-      <p className="mb-6 text-sm text-muted">
-        {isSiteAdmin
-          ? 'مدیریت لینک‌های اجتماعی، تماس پشتیبانی و دانلود اپلیکیشن در سایت'
-          : 'پیکربندی سراسری — هر تغییر در دفتر رویدادها ثبت می‌شود'}
-      </p>
-
-      {notice && (
-        <p className="mb-4 rounded-lg bg-[#10b98118] p-3 text-xs font-bold text-[#059669]">{notice}</p>
-      )}
+    <div className="flex flex-col gap-4">
+      {error && <PanelAlert>{error}</PanelAlert>}
+      {notice && <PanelAlert tone="success">{notice}</PanelAlert>}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {isChair && (
-          <div className="rounded-xl border border-border bg-white p-5">
-            <div className="mb-4 text-sm font-bold text-ink">اطلاعات شرکت</div>
-            <div className="flex flex-col gap-3">
+          <div className={panelCardPadded}>
+            <div className={panelTitle}>اطلاعات شرکت</div>
+            <div className="mt-4 flex flex-col gap-3">
               {(
                 [
                   ['companyName', 'نام شرکت'],
@@ -163,14 +168,14 @@ export default function SettingsPage() {
                 ] as const
               ).map(([key, label]) => (
                 <div key={key}>
-                  <label htmlFor={`set-${key}`} className="mb-1.5 block text-[11.5px] text-muted">
+                  <label htmlFor={`set-${key}`} className={`mb-1.5 block text-[11.5px] ${panelMuted}`}>
                     {label}
                   </label>
                   <input
                     id={`set-${key}`}
                     value={strOf(key)}
                     onChange={(e) => setKey(key, e.target.value)}
-                    className="w-full rounded-lg border border-border px-3.5 py-2.5 text-sm outline-none focus:border-accent"
+                    className={`w-full px-3.5 py-2.5 text-sm ${panelInput}`}
                   />
                 </div>
               ))}
@@ -179,10 +184,10 @@ export default function SettingsPage() {
         )}
 
         {isChair && (
-          <div className="rounded-xl border border-border bg-white p-5">
-            <div className="mb-1 text-sm font-bold text-ink">محتوای سایت</div>
-            <p className="mb-4 text-[11px] text-muted">متن صفحات عمومی — بدون نیاز به انتشار نسخهٔ جدید</p>
-            <div className="flex flex-col gap-3">
+          <div className={panelCardPadded}>
+            <div className={panelTitle}>محتوای سایت</div>
+            <p className={panelSubtitle}>متن صفحات عمومی — بدون نیاز به انتشار نسخهٔ جدید</p>
+            <div className="mt-4 flex flex-col gap-3">
               {(
                 [
                   ['homeHeroTitle', 'عنوان صفحهٔ اصلی'],
@@ -193,7 +198,7 @@ export default function SettingsPage() {
                 ] as const
               ).map(([key, label]) => (
                 <div key={key}>
-                  <label htmlFor={`set-${key}`} className="mb-1.5 block text-[11.5px] text-muted">
+                  <label htmlFor={`set-${key}`} className={`mb-1.5 block text-[11.5px] ${panelMuted}`}>
                     {label}
                   </label>
                   <textarea
@@ -201,7 +206,7 @@ export default function SettingsPage() {
                     value={strOf(key)}
                     onChange={(e) => setKey(key, e.target.value)}
                     rows={2}
-                    className="w-full resize-y rounded-lg border border-border px-3.5 py-2.5 text-sm outline-none focus:border-accent"
+                    className={`w-full resize-y px-3.5 py-2.5 text-sm ${panelInput}`}
                   />
                 </div>
               ))}
@@ -210,14 +215,14 @@ export default function SettingsPage() {
         )}
 
         {isChair && (
-          <div className="rounded-xl border border-border bg-white p-5">
-            <div className="mb-4 text-sm font-bold text-ink">درگاه پرداخت</div>
-            <div className="flex flex-col divide-y divide-border/60">
+          <div className={panelCardPadded}>
+            <div className={panelTitle}>درگاه پرداخت</div>
+            <div className="mt-4 flex flex-col divide-y divide-panel-border">
               {GATEWAYS.map((g) => (
                 <div key={g.key} className="flex items-center justify-between py-3">
                   <div>
-                    <div className="text-xs font-bold text-ink">{g.name}</div>
-                    <div className="text-[10.5px] text-muted">{g.desc}</div>
+                    <div className={`text-xs font-bold ${panelText}`}>{g.name}</div>
+                    <div className={`text-[10.5px] ${panelMuted}`}>{g.desc}</div>
                   </div>
                   <Toggle
                     on={boolOf(g.key)}
@@ -231,16 +236,16 @@ export default function SettingsPage() {
         )}
 
         {isChair && (
-          <div className="rounded-xl border border-border bg-white p-5">
-            <div className="mb-1 text-sm font-bold text-ink">قوانین استرداد</div>
-            <p className="mb-4 text-[11px] leading-6 text-muted">
+          <div className={panelCardPadded}>
+            <div className={panelTitle}>قوانین استرداد</div>
+            <p className={`${panelSubtitle} leading-6`}>
               این درصدها همان بازه‌های واقعی موتور استرداد (فاز ۷) هستند — تغییر اینجا مستقیماً در محاسبهٔ
               جریمهٔ استرداد اعمال می‌شود.
             </p>
-            <div className="flex flex-col gap-3">
+            <div className="mt-4 flex flex-col gap-3">
               {data.refundRules.map((r: RefundRuleRow) => (
                 <div key={r.id}>
-                  <label htmlFor={`rule-${r.id}`} className="mb-1.5 block text-[11.5px] text-muted">
+                  <label htmlFor={`rule-${r.id}`} className={`mb-1.5 block text-[11.5px] ${panelMuted}`}>
                     {r.labelFa} (٪)
                   </label>
                   <input
@@ -250,7 +255,7 @@ export default function SettingsPage() {
                       setRuleDraft((d) => ({ ...d, [r.id]: latinDigits(e.target.value) }))
                     }
                     inputMode="numeric"
-                    className="font-num w-full rounded-lg border border-border px-3.5 py-2.5 text-sm outline-none focus:border-accent"
+                    className={`font-num w-full px-3.5 py-2.5 text-sm ${panelInput}`}
                   />
                 </div>
               ))}
@@ -259,12 +264,12 @@ export default function SettingsPage() {
         )}
 
         {isSiteAdmin && (
-          <div className="rounded-xl border border-border bg-white p-5">
-            <div className="mb-1 text-sm font-bold text-ink">تماس پشتیبانی</div>
-            <p className="mb-4 text-[11px] text-muted">شماره تلفن و ایمیل نمایش‌داده‌شده در سایت</p>
-            <div className="flex flex-col gap-3">
+          <div className={panelCardPadded}>
+            <div className={panelTitle}>تماس پشتیبانی</div>
+            <p className={panelSubtitle}>شماره تلفن و ایمیل نمایش‌داده‌شده در سایت</p>
+            <div className="mt-4 flex flex-col gap-3">
               <div>
-                <label htmlFor="set-support-phone" className="mb-1.5 block text-[11.5px] text-muted">
+                <label htmlFor="set-support-phone" className={`mb-1.5 block text-[11.5px] ${panelMuted}`}>
                   شماره تلفن پشتیبانی
                 </label>
                 <input
@@ -272,11 +277,11 @@ export default function SettingsPage() {
                   dir="ltr"
                   value={strOf('supportPhone')}
                   onChange={(e) => setKey('supportPhone', e.target.value)}
-                  className="font-num w-full rounded-lg border border-border px-3.5 py-2.5 text-sm outline-none focus:border-accent"
+                  className={`font-num w-full px-3.5 py-2.5 text-sm ${panelInput}`}
                 />
               </div>
               <div>
-                <label htmlFor="set-support-email" className="mb-1.5 block text-[11.5px] text-muted">
+                <label htmlFor="set-support-email" className={`mb-1.5 block text-[11.5px] ${panelMuted}`}>
                   ایمیل پشتیبانی
                 </label>
                 <input
@@ -284,7 +289,7 @@ export default function SettingsPage() {
                   dir="ltr"
                   value={strOf('supportEmail')}
                   onChange={(e) => setKey('supportEmail', e.target.value)}
-                  className="font-num w-full rounded-lg border border-border px-3.5 py-2.5 text-sm outline-none focus:border-accent"
+                  className={`font-num w-full px-3.5 py-2.5 text-sm ${panelInput}`}
                 />
               </div>
             </div>
@@ -292,20 +297,20 @@ export default function SettingsPage() {
         )}
 
         {isSiteAdmin && (
-          <div className="rounded-xl border border-border bg-white p-5">
-            <div className="mb-1 text-sm font-bold text-ink">لینک دانلود اپلیکیشن</div>
-            <p className="mb-4 text-[11px] text-muted">دکمه‌های بخش اپلیکیشن در صفحهٔ اصلی</p>
-            <div className="flex flex-col gap-3">
+          <div className={panelCardPadded}>
+            <div className={panelTitle}>لینک دانلود اپلیکیشن</div>
+            <p className={panelSubtitle}>دکمه‌های بخش اپلیکیشن در صفحهٔ اصلی</p>
+            <div className="mt-4 flex flex-col gap-3">
               {APP_LINK_IDS.map((id) => {
                 const entry = appLinks().find((l) => l.id === id);
                 if (!entry) return null;
                 return (
-                  <div key={id} className="rounded-lg border border-border/70 p-3">
+                  <div key={id} className={`${panelCard} p-3`}>
                     <input
                       aria-label={`نام ${entry.name}`}
                       value={entry.name}
                       onChange={(e) => updateAppLink(id, { name: e.target.value })}
-                      className="mb-1.5 w-full rounded-md border border-border px-2.5 py-1.5 text-xs font-bold text-ink outline-none focus:border-accent"
+                      className={`mb-1.5 w-full rounded-md border border-panel-border-2 bg-panel-elevated px-2.5 py-1.5 text-xs font-bold ${panelText} outline-none focus:border-panel-accent`}
                     />
                     <input
                       aria-label={`آدرس ${entry.name}`}
@@ -313,7 +318,7 @@ export default function SettingsPage() {
                       value={entry.url}
                       onChange={(e) => updateAppLink(id, { url: e.target.value })}
                       placeholder="apps.apple.com/..."
-                      className="font-num w-full rounded-md border border-border px-2.5 py-1.5 text-[11px] text-muted outline-none focus:border-accent"
+                      className={`font-num w-full rounded-md border border-panel-border-2 bg-panel-elevated px-2.5 py-1.5 text-[11px] ${panelMuted} outline-none focus:border-panel-accent`}
                     />
                   </div>
                 );
@@ -322,17 +327,17 @@ export default function SettingsPage() {
           </div>
         )}
 
-        <div className="rounded-xl border border-border bg-white p-5">
-          <div className="mb-1 text-sm font-bold text-ink">شبکه‌های اجتماعی</div>
-          <p className="mb-4 text-[11px] text-muted">لینک‌های نمایش‌داده‌شده در فوتر سایت</p>
-          <div className="flex flex-col gap-3">
+        <div className={panelCardPadded}>
+          <div className={panelTitle}>شبکه‌های اجتماعی</div>
+          <p className={panelSubtitle}>لینک‌های نمایش‌داده‌شده در فوتر سایت</p>
+          <div className="mt-4 flex flex-col gap-3">
             {SOCIAL_LINK_IDS.map((id) => {
               const entry = socialLinks().find((l) => l.id === id);
               if (!entry) return null;
               return (
-                <div key={id} className="flex items-center gap-3 rounded-lg border border-border/70 p-3">
+                <div key={id} className={`flex items-center gap-3 ${panelCard} p-3`}>
                   <span
-                    className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-[#f4f7fb]"
+                    className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-panel-elevated"
                     style={{ color: socialBrandColor(id) }}
                   >
                     <SocialIcon id={id} size={18} />
@@ -342,7 +347,7 @@ export default function SettingsPage() {
                       aria-label={`نام ${entry.name}`}
                       value={entry.name}
                       onChange={(e) => updateSocialLink(id, { name: e.target.value })}
-                      className="mb-1.5 w-full rounded-md border border-border px-2.5 py-1.5 text-xs font-bold text-ink outline-none focus:border-accent"
+                      className={`mb-1.5 w-full rounded-md border border-panel-border-2 bg-panel-elevated px-2.5 py-1.5 text-xs font-bold ${panelText} outline-none focus:border-panel-accent`}
                     />
                     <input
                       aria-label={`آدرس ${entry.name}`}
@@ -350,7 +355,7 @@ export default function SettingsPage() {
                       value={entry.url}
                       onChange={(e) => updateSocialLink(id, { url: e.target.value })}
                       placeholder="example.com/blujet"
-                      className="font-num w-full rounded-md border border-border px-2.5 py-1.5 text-[11px] text-muted outline-none focus:border-accent"
+                      className={`font-num w-full rounded-md border border-panel-border-2 bg-panel-elevated px-2.5 py-1.5 text-[11px] ${panelMuted} outline-none focus:border-panel-accent`}
                     />
                   </div>
                   <Toggle
@@ -365,34 +370,33 @@ export default function SettingsPage() {
         </div>
 
         {!isSiteAdmin && (
-        <div className="rounded-xl border border-border bg-white p-5">
-          <div className="mb-1 text-sm font-bold text-ink">تنظیمات کلی سامانه</div>
-          <p className="mb-4 text-[11px] text-muted">
-            پیکربندی سراسری سایت — تغییرات روی کل سرویس اعمال می‌شود
-          </p>
-          <div className="flex flex-col divide-y divide-border/60">
-            {GLOBAL_TOGGLES.map((t) => (
-              <div key={t.key} className="flex items-center justify-between gap-3 py-3">
-                <div>
-                  <div className="text-xs font-bold text-ink">{t.title}</div>
-                  <div className="text-[10.5px] text-muted">{t.desc}</div>
+          <div className={panelCardPadded}>
+            <div className={panelTitle}>تنظیمات کلی سامانه</div>
+            <p className={panelSubtitle}>پیکربندی سراسری سایت — تغییرات روی کل سرویس اعمال می‌شود</p>
+            <div className="mt-4 flex flex-col divide-y divide-panel-border">
+              {GLOBAL_TOGGLES.map((t) => (
+                <div key={t.key} className="flex items-center justify-between gap-3 py-3">
+                  <div>
+                    <div className={`text-xs font-bold ${panelText}`}>{t.title}</div>
+                    <div className={`text-[10.5px] ${panelMuted}`}>{t.desc}</div>
+                  </div>
+                  <Toggle
+                    on={boolOf(t.key)}
+                    onToggle={() => setKey(t.key, !boolOf(t.key))}
+                    label={t.title}
+                  />
                 </div>
-                <Toggle
-                  on={boolOf(t.key)}
-                  onToggle={() => setKey(t.key, !boolOf(t.key))}
-                  label={t.title}
-                />
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
         )}
       </div>
 
       <button
+        type="button"
         disabled={saving}
         onClick={() => void onSave()}
-        className="mt-6 rounded-lg bg-accent px-6 py-2.5 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-60"
+        className={`${panelBtnPrimary} py-2.5 text-sm disabled:opacity-60`}
       >
         {saving ? 'در حال ذخیره…' : 'ذخیره تنظیمات'}
       </button>

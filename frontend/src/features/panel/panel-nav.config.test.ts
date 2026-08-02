@@ -11,9 +11,9 @@ describe('panel-nav.config', () => {
       'cartable',
       'settings',
       'club',
+      'survey',
       'reservation',
       'mgrreports',
-      'survey',
     ]);
     expect(nav.every((i) => i.implemented)).toBe(true);
   });

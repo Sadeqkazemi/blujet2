@@ -116,7 +116,7 @@ describe('ClubPage', () => {
     expect(screen.getByText('کارت‌های صادرشده')).toBeInTheDocument();
     expect(screen.getByText('درخواست در انتظار')).toBeInTheDocument();
     expect(screen.getByText('توزیع سطوح عضویت')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'تعریف مشتری VIP جدید' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /تعریف مشتری VIP جدید/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'همه سطوح' })).toBeInTheDocument();
     expect(screen.getByPlaceholderText('جستجو در نام، ایمیل، شماره ملی یا کارت…')).toBeInTheDocument();
 
@@ -139,7 +139,7 @@ describe('ClubPage', () => {
 
     expect(await screen.findByText('درخواست‌های صدور کارت (ارجاع‌شده)')).toBeInTheDocument();
     expect(screen.queryByText('کل اعضای باشگاه')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'تعریف مشتری VIP جدید' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /تعریف مشتری VIP جدید/ })).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText('جستجو در نام، ایمیل، شماره ملی یا کارت…')).not.toBeInTheDocument();
 
     expect(await screen.findByRole('button', { name: 'تأیید و صدور کارت' })).toBeInTheDocument();
@@ -185,7 +185,7 @@ describe('ClubPage', () => {
 
     expect(await screen.findByText('درخواست‌های در انتظار ارجاع')).toBeInTheDocument();
     expect(screen.getByText('ارجاع‌شده به مدیران')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'تعریف مشتری VIP جدید' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /تعریف مشتری VIP جدید/ })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'بررسی و ارجاع' })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'بررسی و ارجاع' }));
@@ -206,7 +206,7 @@ describe('ClubPage', () => {
     const { default: userEvent } = await import('@testing-library/user-event');
     renderPage();
 
-    await userEvent.click(await screen.findByRole('button', { name: 'تعریف مشتری VIP جدید' }));
+    await userEvent.click(await screen.findByRole('button', { name: /تعریف مشتری VIP جدید/ }));
     await userEvent.click(screen.getByRole('button', { name: 'افزودن به باشگاه' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('نام، ایمیل و شماره ملی الزامی است.');
     expect(create).not.toHaveBeenCalled();

@@ -11,11 +11,20 @@ import {
 } from '../../api/cartable';
 import { faDigits } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
-import Modal from '../../components/Modal';
 import JalaliDatePicker from '../../components/JalaliDatePicker';
 import ComposeMessageModal from './ComposeMessageModal';
 import PanelAlert from '../panel/PanelAlert';
-import { panelBtnGhost, panelBtnPrimary, panelCard, panelMuted, panelMuted2 } from '../panel/panel-theme';
+import PanelModal from '../panel/PanelModal';
+import {
+  panelBtnGhost,
+  panelBtnPrimary,
+  panelCard,
+  panelInput,
+  panelMuted,
+  panelMuted2,
+  panelText,
+  panelTitle,
+} from '../panel/panel-theme';
 import type {
   CartableCategory,
   CartableListResult,
@@ -24,17 +33,51 @@ import type {
   StaffDirectoryEntry,
 } from '../../types/cartable';
 
-const CATEGORY_CARDS: { key: CartableCategory; label: string }[] = [
-  { key: 'ADMIN', label: 'درخواست اداری' },
-  { key: 'AGENCY', label: 'همکاری آژانس' },
-  { key: 'MANAGER', label: 'درخواست مدیران' },
+const CATEGORY_CARDS: {
+  key: CartableCategory;
+  label: string;
+  iconBg: string;
+  iconColor: string;
+  icon: string;
+}[] = [
+  {
+    key: 'ADMIN',
+    label: 'درخواست اداری',
+    iconBg: 'rgba(59,130,246,.16)',
+    iconColor: '#3b82f6',
+    icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h8"/>',
+  },
+  {
+    key: 'AGENCY',
+    label: 'همکاری آژانس',
+    iconBg: 'rgba(245,158,11,.16)',
+    iconColor: '#f59e0b',
+    icon: '<path d="M3 21h18"/><path d="M6 21V5a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v16"/><path d="M19 21V10a1 1 0 0 0-1-1h-3"/>',
+  },
+  {
+    key: 'MANAGER',
+    label: 'درخواست مدیران',
+    iconBg: 'rgba(168,85,247,.16)',
+    iconColor: '#a855f7',
+    icon: '<path d="M12 3l7 3v5.5c0 4.2-2.9 7.4-7 8.5-4.1-1.1-7-4.3-7-8.5V6l7-3z"/><path d="M9 12l2 2 4-4"/>',
+  },
 ];
 
-const CATEGORY_BADGES: Record<CartableCategory, string> = {
-  ADMIN: 'اداری',
-  AGENCY: 'همکاری آژانس',
-  MANAGER: 'درخواست مدیر',
+const CATEGORY_BADGES: Record<CartableCategory, { label: string; className: string }> = {
+  ADMIN: { label: 'اداری', className: 'bg-[rgba(59,130,246,.16)] text-[#60a5fa]' },
+  AGENCY: { label: 'همکاری آژانس', className: 'bg-[rgba(245,158,11,.16)] text-[#fbbf24]' },
+  MANAGER: { label: 'درخواست مدیر', className: 'bg-[rgba(168,85,247,.16)] text-[#c084fc]' },
 };
+
+function relativeFa(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  if (diffMs < 60_000) return 'همین الان';
+  const mins = Math.floor(diffMs / 60_000);
+  if (mins < 60) return `${faDigits(mins)} دقیقه پیش`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${faDigits(hours)} ساعت پیش`;
+  return formatJalaliDateTime(iso);
+}
 
 export default function CartablePage() {
   const { user } = useAuth();
@@ -123,18 +166,10 @@ export default function CartablePage() {
   }
 
   const tasks = result?.tasks ?? [];
+  const badge = reviewTask ? CATEGORY_BADGES[reviewTask.category] : null;
 
   return (
     <div>
-      <div className="mb-6 flex flex-wrap items-center justify-end gap-2">
-        <span className="rounded-full bg-panel-elevated px-3 py-1.5 text-xs font-bold text-panel-muted-2">
-          {faDigits(result?.totalOpen ?? 0)} مورد
-        </span>
-        <button type="button" onClick={() => setComposeOpen(true)} className={panelBtnPrimary}>
-          ایجاد پیام
-        </button>
-      </div>
-
       {error && <PanelAlert>{error}</PanelAlert>}
       {notice && <PanelAlert tone="success">{notice}</PanelAlert>}
 
@@ -142,8 +177,8 @@ export default function CartablePage() {
         <section className="mb-6 rounded-[14px] border border-[rgba(245,158,11,.35)] bg-[rgba(245,158,11,.08)] p-5">
           <h2 className="text-sm font-bold text-[#fbbf24]">ارجاع و ارسال گزارش به رئیس هیئت مدیره</h2>
           <p className="mt-1 text-[11px] leading-relaxed text-[#fbbf24]/80">
-            دسترسی کامل کارتابل و ارجاعات مخصوص مدیر ارشد و مدیر عامل است؛ ارسال گزارش به رئیس هیئت مدیره
-            نیازمند مجوز ایشان است.
+            دسترسی کامل کارتابل و ارجاعات مخصوص مدیر ارشد و مدیر عامل است؛ ارسال گزارش به رئیس هیئت مدیره نیازمند مجوز
+            ایشان است.
           </p>
           <div className="mt-3">
             {chairPerm?.status === 'APPROVED' ? (
@@ -167,62 +202,105 @@ export default function CartablePage() {
         </section>
       )}
 
-      <div className="mb-4 flex flex-wrap items-end gap-3">
-        <div>
-          <JalaliDatePicker label="فیلتر روز (شمسی)" value={filterDate} onChange={setFilterDate} />
-        </div>
-        {filterDate && (
-          <button type="button" onClick={() => setFilterDate(null)} className={panelBtnGhost}>
-            حذف فیلتر روز
-          </button>
-        )}
-      </div>
-
-      <div className="mb-6 grid grid-cols-3 gap-4">
+      <div className="mb-6 grid grid-cols-1 gap-[13px] sm:grid-cols-3">
         {CATEGORY_CARDS.map((c) => (
           <button
             key={c.key}
             type="button"
             onClick={() => setCategory(category === c.key ? null : c.key)}
-            className={`${panelCard} p-4 text-right transition ${
+            className={`${panelCard} flex items-center justify-between p-4 text-right transition ${
               category === c.key ? 'border-panel-accent bg-[rgba(59,130,246,.08)]' : 'hover:border-panel-accent/40'
             }`}
           >
-            <div className={`text-[11px] ${panelMuted}`}>{c.label}</div>
-            <div className="mt-1 text-lg font-black text-white">{faDigits(result?.counts[c.key] ?? 0)}</div>
+            <div>
+              <div className="font-num text-[22px] font-black text-white">{faDigits(result?.counts[c.key] ?? 0)}</div>
+              <div className={`mt-1 text-[11.5px] ${panelMuted}`}>{c.label}</div>
+            </div>
+            <span
+              className="flex h-10 w-10 items-center justify-center rounded-[11px]"
+              style={{ background: c.iconBg, color: c.iconColor }}
+              dangerouslySetInnerHTML={{
+                __html: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">${c.icon}</svg>`,
+              }}
+            />
           </button>
         ))}
       </div>
 
-      {loading ? (
-        <p className={`py-10 text-center text-sm ${panelMuted}`}>در حال بارگذاری…</p>
-      ) : tasks.length === 0 ? (
-        <p className={`py-10 text-center text-sm ${panelMuted}`}>
-          {category ? 'موردی با این فیلتر یافت نشد ✓' : 'کارتابل خالی است ✓'}
-        </p>
-      ) : (
-        <ul className="space-y-3">
-          {tasks.map((t) => (
-            <li key={t.id} className={`flex flex-wrap items-center gap-4 ${panelCard} p-4`}>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-bold text-white">{t.title}</span>
-                  <span className="rounded-full bg-panel-elevated px-2.5 py-0.5 text-[10px] font-bold text-panel-link">
-                    {CATEGORY_BADGES[t.category]}
-                  </span>
-                </div>
-                <div className={`mt-1 text-[11px] ${panelMuted}`}>
-                  ارسال از: {t.senderLabelFa ?? t.sender?.fullName ?? '—'}
-                </div>
-              </div>
-              <span className={`text-[10px] ${panelMuted2}`}>{formatJalaliDateTime(t.createdAt)}</span>
-              <button type="button" onClick={() => openReview(t)} className={panelBtnPrimary}>
-                بررسی
+      <div className={`${panelCard} overflow-hidden`}>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-panel-border px-[15px] py-3">
+          <div className="flex items-center gap-2">
+            <h3 className={`m-0 text-[14.5px] ${panelTitle}`}>کارتابل من</h3>
+            <span className="rounded-full bg-[#f87171] px-2 py-0.5 text-[10px] font-extrabold text-white">
+              {faDigits(result?.totalOpen ?? 0)} مورد
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <JalaliDatePicker label="" value={filterDate} onChange={setFilterDate} />
+            {filterDate && (
+              <button type="button" onClick={() => setFilterDate(null)} className={panelBtnGhost}>
+                حذف تاریخ
               </button>
-            </li>
-          ))}
-        </ul>
-      )}
+            )}
+            <button
+              type="button"
+              onClick={() => setComposeOpen(true)}
+              className={`flex items-center gap-1.5 ${panelBtnPrimary}`}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden>
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              ایجاد پیام
+            </button>
+          </div>
+        </div>
+
+        <div className="px-2 py-2">
+          {loading ? (
+            <p className={`py-10 text-center text-sm ${panelMuted}`}>در حال بارگذاری…</p>
+          ) : tasks.length === 0 ? (
+            <p className={`py-10 text-center text-sm ${panelMuted}`}>
+              {category ? 'موردی با این فیلتر یافت نشد ✓' : 'کارتابل خالی است ✓'}
+            </p>
+          ) : (
+            <ul className="m-0 list-none p-0">
+              {tasks.map((t) => {
+                const cat = CATEGORY_BADGES[t.category];
+                return (
+                  <li
+                    key={t.id}
+                    className="flex flex-wrap items-center gap-3 border-b border-[#1b2536] px-[11px] py-3.5 last:border-b-0"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`text-[12.5px] font-bold ${panelText}`}>{t.title}</span>
+                        <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${cat.className}`}>
+                          {cat.label}
+                        </span>
+                      </div>
+                      <div className={`mt-1 text-[11px] ${panelMuted}`}>
+                        ارسال از: {t.senderLabelFa ?? t.sender?.fullName ?? '—'}
+                      </div>
+                    </div>
+                    <span className={`text-[10.5px] ${panelMuted2}`}>{relativeFa(t.createdAt)}</span>
+                    <button
+                      type="button"
+                      onClick={() => openReview(t)}
+                      className={`flex items-center gap-1.5 ${panelBtnPrimary}`}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                        <circle cx="11" cy="11" r="7" />
+                        <path d="M21 21l-4-4" />
+                      </svg>
+                      بررسی
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </div>
 
       {composeOpen && (
         <ComposeMessageModal
@@ -231,21 +309,62 @@ export default function CartablePage() {
         />
       )}
 
-      {reviewTask && (
-        <Modal title="بررسی درخواست" onClose={() => setReviewTask(null)}>
-          <div className="mb-3">
-            <div className="text-sm font-bold text-ink">{reviewTask.title}</div>
-            <p className="mt-1 text-xs leading-relaxed text-text-2">{reviewTask.description}</p>
-          </div>
-          <div className="mb-4 rounded-lg bg-surface p-3">
-            <div className="text-[10px] text-muted">ارسال‌کننده‌ی درخواست</div>
-            <div className="mt-0.5 text-xs font-bold text-ink">
-              {reviewTask.senderLabelFa ?? reviewTask.sender?.fullName ?? '—'}
+      {reviewTask && badge && (
+        <PanelModal
+          title="بررسی درخواست"
+          onClose={() => setReviewTask(null)}
+          wide
+          footer={
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void onDecide('approve')}
+                className="flex h-[46px] flex-1 items-center justify-center gap-1.5 rounded-[11px] bg-[#16a34a] text-[12.5px] font-extrabold text-white transition hover:brightness-110"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden>
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+                تأیید
+              </button>
+              <button
+                type="button"
+                onClick={() => void onDecide('reject')}
+                className="flex h-[46px] items-center justify-center gap-1.5 rounded-[11px] border border-[rgba(248,113,113,.4)] bg-[rgba(248,113,113,.12)] px-5 text-[12.5px] font-extrabold text-[#f87171]"
+              >
+                انصراف
+              </button>
+              <button
+                type="button"
+                onClick={() => void onDecide('transfer')}
+                disabled={!transferTo}
+                className={`flex h-[46px] items-center justify-center gap-1.5 px-5 disabled:opacity-50 ${panelBtnGhost}`}
+              >
+                انتقال
+              </button>
             </div>
+          }
+        >
+          <div className="mb-3 flex items-center gap-2">
+            <span className={`rounded-full px-2.5 py-0.5 text-[10.5px] font-bold ${badge.className}`}>{badge.label}</span>
+          </div>
+          <div className="mb-1 text-[15px] font-extrabold text-white">{reviewTask.title}</div>
+          <p className={`mb-4 text-[11.5px] leading-relaxed ${panelMuted}`}>{reviewTask.description}</p>
+
+          <div className="mb-4 flex items-center gap-3 rounded-[11px] bg-[#0f1726] px-[13px] py-[11px]">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#28344c] text-[11px] font-extrabold text-white">
+              {(reviewTask.sender?.fullName ?? '؟').slice(0, 2)}
+            </span>
+            <div className="min-w-0 flex-1 leading-snug">
+              <div className={`text-[10px] ${panelMuted}`}>ارسال‌کننده‌ی درخواست</div>
+              <div className={`text-xs font-bold ${panelText}`}>
+                {reviewTask.senderLabelFa ?? reviewTask.sender?.fullName ?? '—'}
+              </div>
+            </div>
+            <span className={`text-[10.5px] ${panelMuted2}`}>{relativeFa(reviewTask.createdAt)}</span>
           </div>
 
-          <label className="mb-1 block text-xs font-bold text-ink" htmlFor="review-note">
-            نظر مدیر *
+          <label className={`mb-2 block text-[11.5px] font-bold ${panelText}`} htmlFor="review-note">
+            نظر مدیر <span className="text-[#f87171]">*</span>
           </label>
           <textarea
             id="review-note"
@@ -253,17 +372,17 @@ export default function CartablePage() {
             onChange={(e) => setNote(e.target.value)}
             placeholder="توضیح یا دلیل تصمیم خود را بنویسید…"
             rows={3}
-            className="w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent"
+            className={`mb-3 min-h-[90px] w-full resize-y px-[11px] py-2.5 ${panelInput}`}
           />
 
-          <label className="mb-1 mt-3 block text-xs font-bold text-ink" htmlFor="review-transfer">
+          <label className={`mb-2 block text-[11.5px] font-bold ${panelText}`} htmlFor="review-transfer">
             انتقال به مدیر دیگر (اختیاری)
           </label>
           <select
             id="review-transfer"
             value={transferTo}
             onChange={(e) => setTransferTo(e.target.value)}
-            className="w-full rounded-lg border border-border bg-white p-3 text-xs outline-none transition focus:border-accent"
+            className={`h-[46px] w-full cursor-pointer px-[11px] ${panelInput}`}
           >
             <option value="">— انتخاب مدیر —</option>
             {staff.map((s) => (
@@ -274,33 +393,11 @@ export default function CartablePage() {
           </select>
 
           {reviewError && (
-            <p role="alert" className="mt-2 text-xs text-danger">
+            <p role="alert" className="mt-3 text-[11.5px] font-semibold text-[#f87171]">
               {reviewError}
             </p>
           )}
-
-          <div className="mt-4 flex justify-end gap-2">
-            <button
-              onClick={() => void onDecide('transfer')}
-              disabled={!transferTo}
-              className="rounded-lg border border-accent/40 px-4 py-2 text-xs font-bold text-accent transition hover:bg-accent/5 disabled:opacity-50"
-            >
-              انتقال
-            </button>
-            <button
-              onClick={() => void onDecide('reject')}
-              className="rounded-lg bg-danger px-4 py-2 text-xs font-bold text-white transition hover:bg-danger/90"
-            >
-              انصراف
-            </button>
-            <button
-              onClick={() => void onDecide('approve')}
-              className="rounded-lg bg-[#059669] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#047857]"
-            >
-              تأیید
-            </button>
-          </div>
-        </Modal>
+        </PanelModal>
       )}
     </div>
   );

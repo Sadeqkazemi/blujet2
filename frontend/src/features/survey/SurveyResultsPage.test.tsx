@@ -50,7 +50,7 @@ describe('SurveyResultsPage', () => {
     render(<SurveyResultsPage />);
     await screen.findByText('EP-821');
 
-    await userEvent.click(screen.getByText('تحلیل با هوش مصنوعی'));
+    await userEvent.click(screen.getByRole('button', { name: /تحلیل با هوش مصنوعی/ }));
 
     await waitFor(() => expect(analyze).toHaveBeenCalledWith('fi-1'));
     expect(await screen.findByTestId('survey-ai-summary')).toHaveTextContent(
