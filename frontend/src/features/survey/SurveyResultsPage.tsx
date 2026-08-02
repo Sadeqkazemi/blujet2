@@ -111,6 +111,9 @@ export default function SurveyResultsPage() {
   );
 }
 
+/** Server degradation copy — not an AI-generated summary; never style as mock insight. */
+const AI_UNAVAILABLE = 'خلاصه‌ای از نظرات این پرواز در دسترس نیست.';
+
 function SurveyFlightCard({
   flight,
   dark,
@@ -125,6 +128,8 @@ function SurveyFlightCard({
   onAnalyze: () => void;
 }) {
   const filled = Math.round(flight.avgRating);
+  const summaryUnavailable = summary === AI_UNAVAILABLE;
+  const hasRealSummary = !!summary && !summaryUnavailable;
 
   if (!dark) {
     return (
@@ -153,7 +158,12 @@ function SurveyFlightCard({
             </button>
           </div>
         </div>
-        {summary && (
+        {summaryUnavailable && (
+          <p data-testid="survey-ai-unavailable" className="mt-3 text-xs text-muted">
+            {AI_UNAVAILABLE}
+          </p>
+        )}
+        {hasRealSummary && (
           <p data-testid="survey-ai-summary" className="mt-3 rounded-lg bg-surface p-3 text-xs text-ink">
             {summary}
           </p>
@@ -194,7 +204,12 @@ function SurveyFlightCard({
         </div>
       </div>
 
-      {summary && (
+      {summaryUnavailable && (
+        <p data-testid="survey-ai-unavailable" className="mt-[13px] text-[11.5px] text-[#6b7b94]">
+          {AI_UNAVAILABLE}
+        </p>
+      )}
+      {hasRealSummary && (
         <div
           data-testid="survey-ai-summary"
           className="mt-[13px] flex items-start gap-2 rounded-[11px] border border-[rgba(59,130,246,.25)] bg-[rgba(59,130,246,.08)] px-[13px] py-[11px]"
@@ -218,7 +233,7 @@ function SurveyFlightCard({
             onClick={onAnalyze}
             className="text-[11.5px] font-extrabold text-[#60a5fa] transition hover:text-[#93c5fd]"
           >
-            ✨ {summary ? 'بازتحلیل نظرات' : 'تحلیل نظرات'}
+            ✨ {hasRealSummary ? 'بازتحلیل نظرات' : 'تحلیل نظرات'}
           </button>
         )}
       </div>
