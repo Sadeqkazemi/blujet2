@@ -93,48 +93,48 @@ export default function AdminsPage() {
   }
 
   if (error) return <p className="p-8 text-sm text-danger">{error}</p>;
-  if (!rows) return <p className="p-8 text-sm text-muted">در حال بارگذاری…</p>;
+  if (!rows) return <p className="p-8 text-sm text-panel-muted">در حال بارگذاری…</p>;
 
   if (selected) {
     return (
       <div className="p-8">
-        <button onClick={() => setSelected(null)} className="mb-4 text-xs font-bold text-muted hover:text-ink">
+        <button onClick={() => setSelected(null)} className="mb-4 text-xs font-bold text-panel-muted hover:text-panel-ink">
           → بازگشت به فهرست ادمین‌ها
         </button>
-        <div className="mb-6 flex flex-wrap items-center gap-4 rounded-2xl border border-border bg-white p-5">
+        <div className="mb-6 flex flex-wrap items-center gap-4 rounded-2xl border border-panel-border bg-panel-surface p-5">
           <div>
-            <div className="text-lg font-black text-ink">{selected.fullName}</div>
-            <div className="ltr font-num text-[11.5px] text-muted">{selected.email}</div>
+            <div className="text-lg font-black text-panel-ink">{selected.fullName}</div>
+            <div className="ltr font-num text-[11.5px] text-panel-muted">{selected.email}</div>
           </div>
           <span className="mr-auto rounded-full bg-accent/10 px-3 py-1 text-[11.5px] font-bold text-accent">
             {selected.roleLabelFa}
           </span>
         </div>
 
-        <div className="max-w-xl rounded-xl border border-border bg-white p-5">
-          <div className="mb-1 text-sm font-bold text-ink">امنیت و دسترسی ورود</div>
-          <p className="mb-4 text-[11.5px] text-muted">
+        <div className="max-w-xl rounded-xl border border-panel-border bg-panel-surface p-5">
+          <div className="mb-1 text-sm font-bold text-panel-ink">امنیت و دسترسی ورود</div>
+          <p className="mb-4 text-[11.5px] text-panel-muted">
             رمز عبور این مدیر را تغییر دهید یا ورود او به پنل را مسدود/فعال کنید.
           </p>
 
-          <div className="mb-4 flex items-center justify-between rounded-lg bg-body px-3.5 py-3">
-            <div className="text-xs font-bold text-ink">وضعیت ورود به پنل</div>
+          <div className="mb-4 flex items-center justify-between rounded-lg bg-panel-canvas px-3.5 py-3">
+            <div className="text-xs font-bold text-panel-ink">وضعیت ورود به پنل</div>
             <span
               className={`rounded-full px-3 py-1 text-[11px] font-extrabold ${
-                selected.isActive ? 'bg-[#10b98124] text-[#059669]' : 'bg-danger/15 text-danger'
+                selected.isActive ? 'bg-[#34d39924] text-[#34d399]' : 'bg-danger/15 text-danger'
               }`}
             >
               {selected.isActive ? 'فعال' : 'مسدود'}
             </span>
           </div>
 
-          <label className="mb-2 block text-[11.5px] font-bold text-ink">تغییر رمز عبور</label>
+          <label className="mb-2 block text-[11.5px] font-bold text-panel-ink">تغییر رمز عبور</label>
           <div className="mb-4 flex gap-2">
             <input
               value={newPass}
               onChange={(e) => setNewPass(e.target.value)}
               placeholder="رمز جدید (حداقل ۶ کاراکتر)"
-              className="ltr flex-1 rounded-lg border border-border bg-white px-3.5 py-2.5 text-sm outline-none focus:border-accent"
+              className="ltr flex-1 rounded-lg border border-panel-border-2 bg-panel-canvas px-3.5 py-2.5 text-sm text-panel-ink outline-none focus:border-accent"
             />
             <button
               disabled={newPass.length < 6}
@@ -155,7 +155,7 @@ export default function AdminsPage() {
             <button
               onClick={() => void onToggleBlock(selected)}
               className={`w-full rounded-lg py-2.5 text-xs font-extrabold text-white transition hover:brightness-110 ${
-                selected.isActive ? 'bg-danger' : 'bg-[#059669]'
+                selected.isActive ? 'bg-danger' : 'bg-[#34d399]'
               }`}
             >
               {selected.isActive ? 'مسدودسازی ورود به پنل' : 'فعال‌سازی ورود به پنل'}
@@ -165,11 +165,11 @@ export default function AdminsPage() {
 
         {tempPassword && (
           <Modal title="بازنشانی رمز عبور" onClose={() => setTempPassword(null)}>
-            <p className="mb-3 text-xs text-muted">رمز موقت تولیدشده — فقط همین یک بار نمایش داده می‌شود:</p>
-            <div className="ltr font-num mb-4 rounded-lg bg-body p-3 text-center text-base font-black text-[#059669]">
+            <p className="mb-3 text-xs text-panel-muted">رمز موقت تولیدشده — فقط همین یک بار نمایش داده می‌شود:</p>
+            <div className="ltr font-num mb-4 rounded-lg bg-panel-canvas p-3 text-center text-base font-black text-[#34d399]">
               {tempPassword}
             </div>
-            <p className="mb-4 text-[11px] leading-6 text-muted">
+            <p className="mb-4 text-[11px] leading-6 text-panel-muted">
               این رمز برای مدیر ارسال می‌شود و در اولین ورود باید تغییر کند.
             </p>
             <button
@@ -188,8 +188,8 @@ export default function AdminsPage() {
     <div className="p-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="mb-1 text-xl font-black text-ink">مدیران و ادمین‌ها</h1>
-          <p className="text-sm text-muted">حساب‌های مدیریتی واقعی سامانه — وضعیت آنلاین از نشست‌های فعال</p>
+          <h1 className="mb-1 text-xl font-black text-panel-ink">مدیران و ادمین‌ها</h1>
+          <p className="text-sm text-panel-muted">حساب‌های مدیریتی واقعی سامانه — وضعیت آنلاین از نشست‌های فعال</p>
         </div>
         <button
           onClick={() => {
@@ -203,13 +203,13 @@ export default function AdminsPage() {
       </div>
 
       {notice && (
-        <p className="mb-4 rounded-lg bg-[#10b98118] p-3 text-xs font-bold text-[#059669]">{notice}</p>
+        <p className="mb-4 rounded-lg bg-[#34d39918] p-3 text-xs font-bold text-[#34d399]">{notice}</p>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-border bg-white">
+      <div className="overflow-hidden rounded-xl border border-panel-border bg-panel-surface">
         <table className="w-full text-right text-xs">
           <thead>
-            <tr className="border-b border-border text-[10px] text-muted">
+            <tr className="border-b border-panel-border text-[10px] text-panel-muted">
               <th className="p-3 font-bold">نام</th>
               <th className="p-3 font-bold">نقش</th>
               <th className="p-3 font-bold">آخرین ورود</th>
@@ -221,29 +221,29 @@ export default function AdminsPage() {
               <tr
                 key={r.id}
                 onClick={() => setSelected(r)}
-                className="cursor-pointer border-b border-border/60 transition hover:bg-body/60"
+                className="cursor-pointer border-b border-panel-border/60 transition hover:bg-panel-canvas/60"
               >
                 <td className="p-3">
-                  <div className="font-bold text-ink">{r.fullName}</div>
-                  <div className="ltr font-num text-[10px] text-muted">{r.email}</div>
+                  <div className="font-bold text-panel-ink">{r.fullName}</div>
+                  <div className="ltr font-num text-[10px] text-panel-muted">{r.email}</div>
                 </td>
                 <td className="p-3">
                   <span className="rounded-full bg-accent/10 px-2.5 py-0.5 text-[10px] font-bold text-accent">
                     {r.roleLabelFa}
                   </span>
                 </td>
-                <td className="font-num p-3 text-muted">
+                <td className="font-num p-3 text-panel-muted">
                   {r.lastLoginAt ? formatJalaliDateTime(r.lastLoginAt) : '—'}
                 </td>
                 <td className="p-3">
                   <span
                     className={`inline-flex items-center gap-1.5 text-[11px] font-bold ${
-                      !r.isActive ? 'text-danger' : r.online ? 'text-[#059669]' : 'text-muted'
+                      !r.isActive ? 'text-danger' : r.online ? 'text-[#34d399]' : 'text-panel-muted'
                     }`}
                   >
                     <span
                       className={`h-1.5 w-1.5 rounded-full ${
-                        !r.isActive ? 'bg-danger' : r.online ? 'bg-[#059669]' : 'bg-muted'
+                        !r.isActive ? 'bg-danger' : r.online ? 'bg-[#34d399]' : 'bg-muted'
                       }`}
                     />
                     {!r.isActive ? 'مسدود' : r.online ? 'آنلاین' : 'آفلاین'}
@@ -259,47 +259,47 @@ export default function AdminsPage() {
         <Modal title="افزودن مدیر / ادمین" onClose={() => setAddOpen(false)}>
           <div className="flex flex-col gap-3">
             <div>
-              <label htmlFor="na-name" className="mb-1.5 block text-[11.5px] text-muted">
+              <label htmlFor="na-name" className="mb-1.5 block text-[11.5px] text-panel-muted">
                 نام و نام خانوادگی
               </label>
               <input
                 id="na-name"
                 value={addForm.fullName}
                 onChange={(e) => setAddForm((f) => ({ ...f, fullName: e.target.value }))}
-                className="w-full rounded-lg border border-border px-3.5 py-2.5 text-sm outline-none focus:border-accent"
+                className="w-full rounded-lg border border-panel-border-2 bg-panel-canvas px-3.5 py-2.5 text-sm text-panel-ink outline-none focus:border-accent"
               />
             </div>
             <div>
-              <label htmlFor="na-email" className="mb-1.5 block text-[11.5px] text-muted">
+              <label htmlFor="na-email" className="mb-1.5 block text-[11.5px] text-panel-muted">
                 ایمیل سازمانی
               </label>
               <input
                 id="na-email"
                 value={addForm.email}
                 onChange={(e) => setAddForm((f) => ({ ...f, email: e.target.value }))}
-                className="ltr w-full rounded-lg border border-border px-3.5 py-2.5 text-sm outline-none focus:border-accent"
+                className="ltr w-full rounded-lg border border-panel-border-2 bg-panel-canvas px-3.5 py-2.5 text-sm text-panel-ink outline-none focus:border-accent"
               />
             </div>
             <div>
-              <label htmlFor="na-username" className="mb-1.5 block text-[11.5px] text-muted">
+              <label htmlFor="na-username" className="mb-1.5 block text-[11.5px] text-panel-muted">
                 نام کاربری
               </label>
               <input
                 id="na-username"
                 value={addForm.username}
                 onChange={(e) => setAddForm((f) => ({ ...f, username: e.target.value }))}
-                className="ltr w-full rounded-lg border border-border px-3.5 py-2.5 text-sm outline-none focus:border-accent"
+                className="ltr w-full rounded-lg border border-panel-border-2 bg-panel-canvas px-3.5 py-2.5 text-sm text-panel-ink outline-none focus:border-accent"
               />
             </div>
             <div>
-              <label htmlFor="na-role" className="mb-1.5 block text-[11.5px] text-muted">
+              <label htmlFor="na-role" className="mb-1.5 block text-[11.5px] text-panel-muted">
                 نقش
               </label>
               <select
                 id="na-role"
                 value={addForm.role}
                 onChange={(e) => setAddForm((f) => ({ ...f, role: e.target.value as AdminCreatableRole }))}
-                className="w-full rounded-lg border border-border bg-white px-3 py-2.5 text-sm"
+                className="w-full rounded-lg border border-panel-border-2 bg-panel-canvas px-3 py-2.5 text-sm text-panel-ink"
               >
                 {CREATABLE_ROLES.map((r) => (
                   <option key={r.value} value={r.value}>
@@ -309,17 +309,17 @@ export default function AdminsPage() {
               </select>
             </div>
             <div>
-              <label htmlFor="na-pass" className="mb-1.5 block text-[11.5px] text-muted">
+              <label htmlFor="na-pass" className="mb-1.5 block text-[11.5px] text-panel-muted">
                 رمز عبور اولیه (حداقل ۶ کاراکتر)
               </label>
               <input
                 id="na-pass"
                 value={addForm.password}
                 onChange={(e) => setAddForm((f) => ({ ...f, password: e.target.value }))}
-                className="ltr w-full rounded-lg border border-border px-3.5 py-2.5 text-sm outline-none focus:border-accent"
+                className="ltr w-full rounded-lg border border-panel-border-2 bg-panel-canvas px-3.5 py-2.5 text-sm text-panel-ink outline-none focus:border-accent"
               />
             </div>
-            <div className="flex items-center gap-2 text-[11px] text-muted">
+            <div className="flex items-center gap-2 text-[11px] text-panel-muted">
               ارسال از طریق:
               {(['sms', 'email'] as const).map((d) => (
                 <button
@@ -329,7 +329,7 @@ export default function AdminsPage() {
                   className={`rounded-lg border px-3 py-1.5 text-[11px] font-bold transition ${
                     addForm.delivery === d
                       ? 'border-accent bg-accent/10 text-accent'
-                      : 'border-border text-muted'
+                      : 'border-panel-border text-panel-muted'
                   }`}
                 >
                   {d === 'sms' ? 'پیامک' : 'ایمیل سازمانی'}

@@ -126,11 +126,11 @@ export default function CartablePage() {
     <div className="p-8">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-black text-ink">کارتابل من</h1>
-          <p className="mt-1 text-sm text-muted">درخواست‌های در انتظار بررسی شما</p>
+          <h1 className="text-xl font-black text-panel-ink">کارتابل من</h1>
+          <p className="mt-1 text-sm text-panel-muted">درخواست‌های در انتظار بررسی شما</p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="rounded-full bg-surface px-3 py-1.5 text-xs font-bold text-text-2">
+          <span className="rounded-full bg-panel-canvas px-3 py-1.5 text-xs font-bold text-panel-muted">
             {faDigits(result?.totalOpen ?? 0)} مورد
           </span>
           <button
@@ -143,7 +143,7 @@ export default function CartablePage() {
       </div>
 
       {error && <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">{error}</p>}
-      {notice && <p className="mb-4 rounded-lg bg-[#10b98115] p-3 text-sm text-[#059669]">{notice}</p>}
+      {notice && <p className="mb-4 rounded-lg bg-[#34d39915] p-3 text-sm text-[#34d399]">{notice}</p>}
 
       {hasChairGate && (
         <section className="mb-6 rounded-xl border border-[#f59e0b40] bg-[#f59e0b0d] p-5">
@@ -154,7 +154,7 @@ export default function CartablePage() {
           </p>
           <div className="mt-3">
             {chairPerm?.status === 'APPROVED' ? (
-              <span className="rounded-full bg-[#10b98124] px-3 py-1.5 text-xs font-bold text-[#059669]">
+              <span className="rounded-full bg-[#34d39924] px-3 py-1.5 text-xs font-bold text-[#34d399]">
                 مجوز تأیید شد ✓
               </span>
             ) : chairPerm?.status === 'PENDING' ? (
@@ -180,7 +180,7 @@ export default function CartablePage() {
         {filterDate && (
           <button
             onClick={() => setFilterDate(null)}
-            className="rounded-lg border border-border px-3 py-2 text-xs font-bold text-muted transition hover:text-ink"
+            className="rounded-lg border border-panel-border px-3 py-2 text-xs font-bold text-panel-muted transition hover:text-panel-ink"
           >
             حذف فیلتر روز
           </button>
@@ -193,11 +193,11 @@ export default function CartablePage() {
             key={c.key}
             onClick={() => setCategory(category === c.key ? null : c.key)}
             className={`rounded-xl border p-4 text-right transition ${
-              category === c.key ? 'border-accent bg-accent/5' : 'border-border bg-white hover:border-accent/40'
+              category === c.key ? 'border-accent bg-accent/5' : 'border-panel-border bg-panel-surface hover:border-accent/40'
             }`}
           >
-            <div className="text-[11px] text-muted">{c.label}</div>
-            <div className="font-num mt-1 text-lg font-black text-ink">
+            <div className="text-[11px] text-panel-muted">{c.label}</div>
+            <div className="font-num mt-1 text-lg font-black text-panel-ink">
               {faDigits(result?.counts[c.key] ?? 0)}
             </div>
           </button>
@@ -205,27 +205,27 @@ export default function CartablePage() {
       </div>
 
       {loading ? (
-        <p className="py-10 text-center text-sm text-muted">در حال بارگذاری…</p>
+        <p className="py-10 text-center text-sm text-panel-muted">در حال بارگذاری…</p>
       ) : tasks.length === 0 ? (
-        <p className="py-10 text-center text-sm text-muted">
+        <p className="py-10 text-center text-sm text-panel-muted">
           {category ? 'موردی با این فیلتر یافت نشد ✓' : 'کارتابل خالی است ✓'}
         </p>
       ) : (
         <ul className="space-y-3">
           {tasks.map((t) => (
-            <li key={t.id} className="flex flex-wrap items-center gap-4 rounded-xl border border-border bg-white p-4">
+            <li key={t.id} className="flex flex-wrap items-center gap-4 rounded-xl border border-panel-border bg-panel-surface p-4">
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-bold text-ink">{t.title}</span>
-                  <span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-[10px] font-bold text-accent">
+                  <span className="text-sm font-bold text-panel-ink">{t.title}</span>
+                  <span className="rounded-full bg-panel-surface-2 px-2.5 py-0.5 text-[10px] font-bold text-accent">
                     {CATEGORY_BADGES[t.category]}
                   </span>
                 </div>
-                <div className="mt-1 text-[11px] text-muted">
+                <div className="mt-1 text-[11px] text-panel-muted">
                   ارسال از: {t.senderLabelFa ?? t.sender?.fullName ?? '—'}
                 </div>
               </div>
-              <span className="font-num text-[10px] text-muted-2">{formatJalaliDateTime(t.createdAt)}</span>
+              <span className="font-num text-[10px] text-panel-muted-2">{formatJalaliDateTime(t.createdAt)}</span>
               <button
                 onClick={() => openReview(t)}
                 className="rounded-lg bg-accent px-4 py-2 text-xs font-bold text-white transition hover:bg-accent/90"
@@ -247,17 +247,17 @@ export default function CartablePage() {
       {reviewTask && (
         <Modal title="بررسی درخواست" onClose={() => setReviewTask(null)}>
           <div className="mb-3">
-            <div className="text-sm font-bold text-ink">{reviewTask.title}</div>
-            <p className="mt-1 text-xs leading-relaxed text-text-2">{reviewTask.description}</p>
+            <div className="text-sm font-bold text-panel-ink">{reviewTask.title}</div>
+            <p className="mt-1 text-xs leading-relaxed text-panel-muted">{reviewTask.description}</p>
           </div>
-          <div className="mb-4 rounded-lg bg-surface p-3">
-            <div className="text-[10px] text-muted">ارسال‌کننده‌ی درخواست</div>
-            <div className="mt-0.5 text-xs font-bold text-ink">
+          <div className="mb-4 rounded-lg bg-panel-canvas p-3">
+            <div className="text-[10px] text-panel-muted">ارسال‌کننده‌ی درخواست</div>
+            <div className="mt-0.5 text-xs font-bold text-panel-ink">
               {reviewTask.senderLabelFa ?? reviewTask.sender?.fullName ?? '—'}
             </div>
           </div>
 
-          <label className="mb-1 block text-xs font-bold text-ink" htmlFor="review-note">
+          <label className="mb-1 block text-xs font-bold text-panel-ink" htmlFor="review-note">
             نظر مدیر *
           </label>
           <textarea
@@ -266,17 +266,17 @@ export default function CartablePage() {
             onChange={(e) => setNote(e.target.value)}
             placeholder="توضیح یا دلیل تصمیم خود را بنویسید…"
             rows={3}
-            className="w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent"
+            className="w-full rounded-lg border border-panel-border-2 bg-panel-canvas p-3 text-xs text-panel-ink outline-none transition focus:border-accent"
           />
 
-          <label className="mb-1 mt-3 block text-xs font-bold text-ink" htmlFor="review-transfer">
+          <label className="mb-1 mt-3 block text-xs font-bold text-panel-ink" htmlFor="review-transfer">
             انتقال به مدیر دیگر (اختیاری)
           </label>
           <select
             id="review-transfer"
             value={transferTo}
             onChange={(e) => setTransferTo(e.target.value)}
-            className="w-full rounded-lg border border-border bg-white p-3 text-xs outline-none transition focus:border-accent"
+            className="w-full rounded-lg border border-panel-border-2 bg-panel-canvas p-3 text-xs text-panel-ink outline-none transition focus:border-accent"
           >
             <option value="">— انتخاب مدیر —</option>
             {staff.map((s) => (
@@ -308,7 +308,7 @@ export default function CartablePage() {
             </button>
             <button
               onClick={() => void onDecide('approve')}
-              className="rounded-lg bg-[#059669] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#047857]"
+              className="rounded-lg bg-[#34d399] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#2bb583]"
             >
               تأیید
             </button>
