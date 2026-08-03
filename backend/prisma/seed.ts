@@ -32,10 +32,14 @@ async function main() {
     { username: 'site.admin', fullName: 'ادمین سایت', role: 'SITE_ADMIN' },
   ];
 
-  // Rename legacy seed username so re-seed on existing DBs picks up `finance`.
+  // Rename legacy seed usernames so re-seed on existing DBs picks up short logins.
   await prisma.user.updateMany({
     where: { username: 'finance.karimi' },
     data: { username: 'finance' },
+  });
+  await prisma.user.updateMany({
+    where: { username: 'comm.abbasi' },
+    data: { username: 'comm' },
   });
 
   const staffByUsername = new Map<string, { id: string }>();
@@ -1139,6 +1143,29 @@ async function main() {
             { step: 'paid', labelFa: 'تأیید، واریز وجه و بستن پرونده توسط مدیر مالی', at: '۵ روز پیش' },
           ],
         },
+        // Extra rows so the finance refunds list can exercise 5-per-page pagination.
+        {
+          passengerName: 'علی نوری',
+          status: 'FINANCE' as const,
+          totalPaidIrr: 28_000_000,
+          penaltyPct: 30,
+          assigneeLabel: financeStaffName,
+          history: [
+            { step: 'submitted', labelFa: 'ثبت درخواست کنسلی توسط مشتری — جریمه ٪۳۰', at: '۳ روز پیش · ۱۰:۰۰' },
+            { step: 'review', labelFa: 'بررسی توسط ادمین سایت', at: '۳ روز پیش · ۱۲:۲۰' },
+            { step: 'finance', labelFa: `ارجاع به ${financeStaffName} (کارشناس مالی) توسط ادمین سایت`, at: '۲ روز پیش · ۰۹:۱۰' },
+          ],
+        },
+        {
+          passengerName: 'فاطمه حسینی',
+          status: 'REVIEW' as const,
+          totalPaidIrr: 35_000_000,
+          penaltyPct: 50,
+          history: [
+            { step: 'submitted', labelFa: 'ثبت درخواست کنسلی توسط مشتری — جریمه ٪۵۰', at: '۴ روز پیش · ۱۵:۴۵' },
+            { step: 'review', labelFa: 'بررسی توسط ادمین سایت', at: 'دیروز · ۱۱:۰۰' },
+          ],
+        },
       ];
       for (const [index, r] of refundSeeds.entries()) {
         const penaltyAmountIrr = Math.round((r.totalPaidIrr * r.penaltyPct) / 100);
@@ -1185,6 +1212,70 @@ async function main() {
             },
           });
         }
+      }
+    }
+  }
+
+  // Backfill extra refund seeds on DBs that already had the original 4 rows,
+  // so the finance panel can demo 5-per-page pagination.
+  {
+    const someBooking = await prisma.booking.findFirst({ where: { status: 'TICKETED' } });
+    if (someBooking) {
+      const extras = [
+        {
+          pnr: 'RFSEED05',
+          trackingCode: 'RF-00000005',
+          passengerName: 'علی نوری',
+          status: 'FINANCE' as const,
+          totalPaidIrr: 28_000_000,
+          penaltyPct: 30,
+        },
+        {
+          pnr: 'RFSEED06',
+          trackingCode: 'RF-00000006',
+          passengerName: 'فاطمه حسینی',
+          status: 'REVIEW' as const,
+          totalPaidIrr: 35_000_000,
+          penaltyPct: 50,
+        },
+      ];
+      for (const r of extras) {
+        const exists = await prisma.booking.findUnique({ where: { pnr: r.pnr } });
+        if (exists) continue;
+        const penaltyAmountIrr = Math.round((r.totalPaidIrr * r.penaltyPct) / 100);
+        const refundBooking = await prisma.booking.create({
+          data: {
+            pnr: r.pnr,
+            flightInstanceId: someBooking.flightInstanceId,
+            channel: someBooking.channel,
+            status: 'TICKETED',
+            priceIrr: r.totalPaidIrr,
+            taxIrr: someBooking.taxIrr,
+            userId: someBooking.userId,
+            contactPhone: someBooking.contactPhone,
+            cabin: someBooking.cabin,
+            fareClassCode: someBooking.fareClassCode,
+          },
+        });
+        await prisma.refundRequest.create({
+          data: {
+            trackingCode: r.trackingCode,
+            bookingId: refundBooking.id,
+            passengerName: r.passengerName,
+            nidEnc: encryptPii('0012345679'),
+            mobileEnc: encryptPii('09121112233'),
+            ibanEnc: encryptPii('IR820170000000332211009900'),
+            totalPaidIrr: r.totalPaidIrr,
+            penaltyPct: r.penaltyPct,
+            penaltyAmountIrr,
+            refundableIrr: r.totalPaidIrr - penaltyAmountIrr,
+            status: r.status,
+            history: [
+              { step: 'submitted', labelFa: `ثبت درخواست کنسلی توسط مشتری — جریمه ٪${r.penaltyPct}`, at: 'اخیراً' },
+              { step: 'review', labelFa: 'بررسی توسط ادمین سایت', at: 'اخیراً' },
+            ],
+          },
+        });
       }
     }
   }
