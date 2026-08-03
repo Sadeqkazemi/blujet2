@@ -102,6 +102,7 @@ describe('Panels (e2e)', () => {
       'mgrreports',
       'vip',
       'survey',
+      'reservation',
       'panels',
       'security',
     ]);

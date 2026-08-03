@@ -115,7 +115,7 @@ describe('ReservationPage', () => {
     expect(screen.getByText('فروش مستقیم سایت')).toBeInTheDocument();
   });
 
-  it('CEO dark shell shows سامانه رزرواسیون پرواز and پروازها tab', async () => {
+  it('CEO dark shell shows سامانه رزرواسیون پرواز and پروازها table matching design', async () => {
     mockRole('CEO');
     vi.spyOn(reservationApi, 'fetchReservationDashboardStats').mockResolvedValue(STATS);
     vi.spyOn(reservationApi, 'fetchPnrList').mockResolvedValue(GROUPS);
@@ -141,7 +141,45 @@ describe('ReservationPage', () => {
 
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'پروازها' }));
-    expect(await screen.findByText('تهران ↔ دبی')).toBeInTheDocument();
+    expect(await screen.findByText('تهران ← دبی')).toBeInTheDocument();
+    expect(screen.getByText('شماره پرواز')).toBeInTheDocument();
+    expect(screen.getByText('مسیر')).toBeInTheDocument();
+  });
+
+  it('SENIOR_MANAGER uses the same هواپیما ExecReservationView as CEO', async () => {
+    mockRole('SENIOR_MANAGER');
+    vi.spyOn(reservationApi, 'fetchReservationDashboardStats').mockResolvedValue(STATS);
+    vi.spyOn(reservationApi, 'fetchPnrList').mockResolvedValue(GROUPS);
+    vi.spyOn(reservationApi, 'fetchReservationFlights').mockResolvedValue([
+      {
+        flightInstanceId: 'fi1',
+        flightNo: 'BJ-100',
+        aircraftType: 'MD-80',
+        originCode: 'THR',
+        destCode: 'MHD',
+        originCityFa: 'تهران',
+        destCityFa: 'مشهد',
+        route: 'تهران ← مشهد',
+        departureAt: '2026-08-01T05:00:00.000Z',
+        capacity: 180,
+        soldCount: 0,
+        sold: 0,
+        lockedCount: 0,
+        freeCount: 180,
+        occupancyPct: 0,
+        statusKey: 'SELLING',
+      },
+    ]);
+
+    render(<ReservationPage />);
+    expect(await screen.findByRole('heading', { name: /سامانه رزرواسیون پرواز/ })).toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'پروازها' }));
+    expect(await screen.findByText('تهران ← مشهد')).toBeInTheDocument();
+    expect(screen.getByText('BJ-100')).toBeInTheDocument();
+    expect(screen.getByText('در حال فروش')).toBeInTheDocument();
+    expect(screen.queryByText('مک‌دانل داگلاس MD-80')).not.toBeInTheDocument();
   });
 
   it('clicking a sold seat shows occupant info and opens PNR detail', async () => {

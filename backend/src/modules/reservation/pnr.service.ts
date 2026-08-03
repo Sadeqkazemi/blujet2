@@ -640,11 +640,14 @@ export class PnrService {
   }
 
   /**
-   * «پروازها» sub-tab of سامانه رزرواسیون/هواپیما — upcoming SCHEDULED
-   * instances with sold/locked/free counts so staff can open a seat map.
+   * «پروازها» sub-tab of سامانه رزرواسیون/هواپیما — SCHEDULED instances
+   * with sold/locked/free counts so staff can open a seat map.
+   * Returns one shape covering CEO/Senior/IT/Board Chair tables:
+   * Persian `route`, city fields, and IT occupancy/status keys.
    */
-  async listFlights(query: ListReservationFlightsQueryDto) {
-    const q = query.q?.trim();
+  async listFlights(query: ListReservationFlightsQueryDto | string = {}) {
+    const q = (typeof query === 'string' ? query : query.q)?.trim();
+    await materializeFlownBookings(this.typeorm);
     const airports = await this.typeorm.airport.findMany({
       select: { code: true, cityFa: true },
     });
@@ -670,7 +673,7 @@ export class PnrService {
           const origin = cityByCode.get(originCode) ?? originCode;
           const dest = cityByCode.get(destCode) ?? destCode;
           const hay =
-            `${instance.flight.flightNo} ${originCode} ${destCode} ${origin} ${dest}`.toLowerCase();
+            `${instance.flight.flightNo} ${originCode} ${destCode} ${origin} ${dest} ${instance.aircraftTypeOverride ?? instance.flight.aircraftType}`.toLowerCase();
           return hay.includes(qLower);
         })
       : instances;
@@ -679,8 +682,9 @@ export class PnrService {
     const now = new Date();
     const rows = await Promise.all(
       limited.map(async (instance) => {
+        const aircraftType = resolveAircraftType(instance);
         const map = await this.typeorm.aircraftSeatMap.findUnique({
-          where: { aircraftType: resolveAircraftType(instance) },
+          where: { aircraftType },
         });
         const capacity = map ? enumerateSeats(map).length : instance.capacity;
         const [soldCount, lockedCount] = await Promise.all([
@@ -703,19 +707,33 @@ export class PnrService {
         ]);
         const originCode = instance.flight.route.originCode;
         const destCode = instance.flight.route.destCode;
+        const originCityFa = cityByCode.get(originCode) ?? originCode;
+        const destCityFa = cityByCode.get(destCode) ?? destCode;
+        const occupancyPct =
+          capacity > 0 ? Math.round((soldCount / capacity) * 100) : 0;
+        const statusKey =
+          occupancyPct >= 100
+            ? 'FULL'
+            : occupancyPct >= 90
+              ? 'NEAR_FULL'
+              : 'SELLING';
         return {
           flightInstanceId: instance.id,
           flightNo: instance.flight.flightNo,
-          aircraftType: resolveAircraftType(instance),
+          aircraftType,
           originCode,
           destCode,
-          originCityFa: cityByCode.get(originCode) ?? originCode,
-          destCityFa: cityByCode.get(destCode) ?? destCode,
+          originCityFa,
+          destCityFa,
+          route: `${originCityFa} ← ${destCityFa}`,
           departureAt: instance.departureAt,
           capacity,
+          sold: soldCount,
           soldCount,
           lockedCount,
           freeCount: Math.max(0, capacity - soldCount - lockedCount),
+          occupancyPct,
+          statusKey,
         };
       }),
     );
@@ -859,57 +877,6 @@ export class PnrService {
         status: k.status,
       };
     });
-  }
-
-  /** Upcoming/active flight instances for the design «پروازها» table. */
-  async listFlights(q?: string) {
-    await materializeFlownBookings(this.typeorm);
-    const instances = await this.typeorm.flightInstance.findMany({
-      where: { status: 'SCHEDULED' },
-      include: {
-        flight: { include: { route: true } },
-        bookings: {
-          where: { status: { notIn: ['CANCELLED', 'EXPIRED'] } },
-          include: { passengers: { select: { seatCode: true } } },
-        },
-      },
-      orderBy: { departureAt: 'asc' },
-      take: 150,
-    });
-
-    const needle = q?.trim().toLowerCase();
-    return instances
-      .map((i) => {
-        const sold = i.bookings.reduce(
-          (n, b) => n + b.passengers.filter((p) => p.seatCode).length,
-          0,
-        );
-        const aircraftType =
-          i.aircraftTypeOverride ?? i.flight.aircraftType;
-        const occupancyPct =
-          i.capacity > 0 ? Math.round((sold / i.capacity) * 100) : 0;
-        const statusKey =
-          occupancyPct >= 100 ? 'FULL' : occupancyPct >= 90 ? 'NEAR_FULL' : 'SELLING';
-        return {
-          flightInstanceId: i.id,
-          route: `${i.flight.route.originCode} → ${i.flight.route.destCode}`,
-          flightNo: i.flight.flightNo,
-          departureAt: i.departureAt,
-          aircraftType,
-          sold,
-          capacity: i.capacity,
-          occupancyPct,
-          statusKey,
-        };
-      })
-      .filter((f) => {
-        if (!needle) return true;
-        return (
-          f.route.toLowerCase().includes(needle) ||
-          f.flightNo.toLowerCase().includes(needle) ||
-          f.aircraftType.toLowerCase().includes(needle)
-        );
-      });
   }
 
   /**
