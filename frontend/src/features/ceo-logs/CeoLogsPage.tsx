@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { fetchSystemEvents } from '../../api/admins';
+import Pagination from '../../components/Pagination';
+import { usePagination } from '../../hooks/usePagination';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import type { SystemEventRow } from '../../types/admins';
 
@@ -34,6 +36,8 @@ export default function CeoLogsPage() {
       .catch(() => setError('خطا در دریافت لاگ‌ها.'));
   }, []);
 
+  const rowsPager = usePagination(rows ?? []);
+
   if (error) return <p className="px-[21px] pt-[18px] text-sm text-[#f87171]">{error}</p>;
   if (!rows) return <p className="px-[21px] pt-[18px] text-sm text-[#6b7b94]">در حال بارگذاری…</p>;
 
@@ -62,7 +66,7 @@ export default function CeoLogsPage() {
           {rows.length === 0 ? (
             <div className="px-[13px] py-7 text-center text-xs text-[#6b7b94]">اطلاعاتی یافت نشد</div>
           ) : (
-            rows.map((r) => {
+            rowsPager.pageItems.map((r) => {
               const meta = LEVEL_META[r.level];
               return (
                 <div
@@ -86,6 +90,12 @@ export default function CeoLogsPage() {
             })
           )}
         </div>
+        <Pagination
+          page={rowsPager.page}
+          totalPages={rowsPager.totalPages}
+          onChange={rowsPager.setPage}
+          variant="dark"
+        />
       </div>
     </div>
   );

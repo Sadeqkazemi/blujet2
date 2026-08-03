@@ -10,6 +10,8 @@ import { faDigits } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import type { ForwardTarget, SupportTicketRow, SupportTicketStatus } from '../../types/support-tickets';
 import Modal from '../../components/Modal';
+import Pagination from '../../components/Pagination';
+import { usePagination } from '../../hooks/usePagination';
 
 const STATUS_META: Record<SupportTicketStatus, { label: string; className: string }> = {
   OPEN: { label: 'باز', className: 'bg-[#f59e0b24] text-[#b45309]' },
@@ -78,6 +80,7 @@ export default function SupportTicketsPage() {
   }
 
   const rows = tickets ?? [];
+  const rowsPager = usePagination(rows);
 
   return (
     <div className="p-8">
@@ -103,7 +106,7 @@ export default function SupportTicketsPage() {
           <p className="py-6 text-center text-xs text-muted">تیکتی ثبت نشده است.</p>
         ) : (
           <ul className="divide-y divide-border">
-            {rows.map((t) => {
+            {rowsPager.pageItems.map((t) => {
               const st = STATUS_META[t.status];
               return (
                 <li key={t.id} className="flex flex-wrap items-center gap-3 py-3">
@@ -135,6 +138,12 @@ export default function SupportTicketsPage() {
             })}
           </ul>
         )}
+        <Pagination
+          page={rowsPager.page}
+          totalPages={rowsPager.totalPages}
+          onChange={rowsPager.setPage}
+          variant="light"
+        />
       </section>
 
       {detail && (

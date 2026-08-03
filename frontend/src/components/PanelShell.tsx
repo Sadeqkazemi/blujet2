@@ -242,9 +242,12 @@ export default function PanelShell() {
   const brandSub =
     (user?.role ? ROLE_BRAND_SUB[user.role] : undefined) ?? 'پنل مدیریت';
 
-  /** CEO / Board / Senior use the executive shell chrome from #78. */
+  /** Dark executive chrome: CEO / Board / Senior / Commercial (design v2 shells). */
   const executiveShell =
-    user?.role === 'CEO' || user?.role === 'BOARD_CHAIR' || user?.role === 'SENIOR_MANAGER';
+    user?.role === 'CEO' ||
+    user?.role === 'BOARD_CHAIR' ||
+    user?.role === 'SENIOR_MANAGER' ||
+    user?.role === 'COMMERCIAL_MANAGER';
   /** Finance (and executives) get the avatar footer chrome. */
   const avatarShell = executiveShell || user?.role === 'FINANCE_MANAGER';
   const roleInitial =
@@ -256,7 +259,9 @@ export default function PanelShell() {
           ? 'ما'
           : user?.role === 'FINANCE_MANAGER'
             ? 'مم'
-            : roleLabel.slice(0, 1);
+            : user?.role === 'COMMERCIAL_MANAGER'
+              ? 'مب'
+              : roleLabel.slice(0, 1);
   const onDashboard = /^\/panel\/?$/.test(location.pathname);
   const showExecNotifChrome = executiveShell && isLowSalesRole(user?.role) && !onDashboard;
   const notifAlerts = lowSalesAlerts.slice(1);
