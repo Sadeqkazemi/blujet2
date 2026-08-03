@@ -210,18 +210,18 @@ export default function PanelsAccessPage() {
   if (readOnly) {
     return (
       <div className="p-8">
-        <h1 className="mb-1 text-xl font-black text-panel-ink">دسترسی به پنل‌ها</h1>
-        <p className="mb-6 text-sm text-panel-muted">
+        <h1 className="mb-1 text-xl font-black text-ink">دسترسی به پنل‌ها</h1>
+        <p className="mb-6 text-sm text-muted">
           ورود به پنل‌های عملیاتی تحت مدیریت واحد IT — تعیین سطح دسترسی ورود در اختیار مدیر عامل است.
         </p>
 
-        <div className="mb-6 flex items-start gap-3 rounded-xl border border-panel-border bg-panel-surface p-4 text-xs leading-6 text-panel-muted">
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-border bg-white p-4 text-xs leading-6 text-text-2">
           <span className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-accent/15 text-accent">
             🛡
           </span>
           <p>
             واحد IT برای پشتیبانی فنی می‌تواند وارد پنل‌های عملیاتی و کارمندان شود. تعیین سطح دسترسی
-            ورود در اختیار <strong className="text-panel-ink">مدیر عامل</strong> است؛ پنل‌های خارج از حوزهٔ
+            ورود در اختیار <strong className="text-ink">مدیر عامل</strong> است؛ پنل‌های خارج از حوزهٔ
             واحد IT با قفل مشخص شده‌اند.
           </p>
         </div>
@@ -230,35 +230,35 @@ export default function PanelsAccessPage() {
           {IT_PANEL_CARDS.map((p) => (
             <div
               key={p.title}
-              className={`flex flex-col rounded-xl border bg-panel-surface p-4 ${
-                p.allowed ? 'border-panel-border' : 'border-panel-border opacity-55'
+              className={`flex flex-col rounded-xl border bg-white p-4 ${
+                p.allowed ? 'border-border' : 'border-border opacity-55'
               }`}
             >
               <div className="mb-3 flex items-center justify-between">
                 <span className="text-2xl">{p.allowed ? '🔓' : '🔒'}</span>
                 <span
                   className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                    p.allowed ? 'bg-[#10b98124] text-[#059669]' : 'bg-panel-surface-2 text-panel-muted'
+                    p.allowed ? 'bg-[#10b98124] text-[#059669]' : 'bg-surface text-muted'
                   }`}
                 >
                   {p.allowed ? 'مجاز' : 'بدون دسترسی'}
                 </span>
               </div>
-              <div className="text-sm font-bold text-panel-ink">{p.title}</div>
-              <div className="mt-1 text-[11px] leading-5 text-panel-muted">{p.desc}</div>
+              <div className="text-sm font-bold text-ink">{p.title}</div>
+              <div className="mt-1 text-[11px] leading-5 text-muted">{p.desc}</div>
               {p.access.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {p.access.map((a) => (
                     <span
                       key={a}
-                      className="rounded-full border border-panel-border bg-panel-surface-2 px-2 py-0.5 text-[9.5px] text-panel-muted"
+                      className="rounded-full border border-border bg-surface px-2 py-0.5 text-[9.5px] text-text-2"
                     >
                       {a}
                     </span>
                   ))}
                 </div>
               )}
-              <div className="mt-auto border-t border-panel-border pt-3 text-[11.5px] font-bold text-accent">
+              <div className="mt-auto border-t border-border pt-3 text-[11.5px] font-bold text-accent">
                 {p.allowed ? 'ورود به پنل ←' : 'بدون دسترسی'}
               </div>
             </div>
@@ -360,8 +360,8 @@ export default function PanelsAccessPage() {
 
   return (
     <div className="p-8">
-      <h1 className="mb-1 text-xl font-black text-panel-ink">دسترسی به پنل‌ها</h1>
-      <p className="mb-6 text-sm text-panel-muted">
+      <h1 className="mb-1 text-xl font-black text-ink">دسترسی به پنل‌ها</h1>
+      <p className="mb-6 text-sm text-muted">
         فعال/غیرفعال‌کردن پنل نقش‌های دیگر — هر تغییر در دفتر رویدادها ثبت می‌شود.
       </p>
 
@@ -370,9 +370,9 @@ export default function PanelsAccessPage() {
           {ordered.map((f) => (
             <div key={f.panelKey} className="flex items-center justify-between gap-3 py-3.5">
               <div>
-                <div className="text-sm font-bold text-panel-ink">{PANEL_LABEL[f.panelKey] ?? f.panelKey}</div>
+                <div className="text-sm font-bold text-ink">{PANEL_LABEL[f.panelKey] ?? f.panelKey}</div>
                 {f.updatedAt && (
-                  <div className="font-num mt-0.5 text-[10px] text-panel-muted">
+                  <div className="font-num mt-0.5 text-[10px] text-muted">
                     آخرین تغییر: {formatJalaliDateTime(f.updatedAt)}
                   </div>
                 )}
