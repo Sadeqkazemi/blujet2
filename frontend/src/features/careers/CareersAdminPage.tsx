@@ -215,8 +215,8 @@ export default function CareersAdminPage() {
       setFooterEnabled(next.enabled);
       setNotice(
         next.enabled
-          ? 'نمایش فرصت‌های شغلی در فوتر فعال شد ✓'
-          : 'نمایش فرصت‌های شغلی در فوتر غیرفعال شد.',
+          ? 'لینک فرصت‌های شغلی در فوتر فعال شد ✓'
+          : 'لینک فرصت‌های شغلی در فوتر غیرفعال شد.',
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : 'خطا در تغییر نمایش فوتر.');
@@ -469,8 +469,8 @@ export default function CareersAdminPage() {
                   className={`h-1.5 w-1.5 rounded-full ${footerEnabled ? 'bg-[#34d399]' : 'bg-[#6b7280]'}`}
                 />
                 {footerEnabled
-                  ? 'نمایش آگهی در فوتر سایت فعال است'
-                  : 'نمایش آگهی در فوتر سایت غیرفعال است'}
+                  ? 'لینک «فرصت‌های شغلی» در بخش خدمات فوتر فعال است'
+                  : 'لینک «فرصت‌های شغلی» در فوتر غیرفعال است'}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -478,7 +478,7 @@ export default function CareersAdminPage() {
                 type="button"
                 role="switch"
                 aria-checked={footerEnabled}
-                aria-label="نمایش آگهی در فوتر"
+                aria-label="نمایش لینک فرصت‌های شغلی در فوتر"
                 onClick={() => void onToggleFooter()}
                 className={`inline-flex items-center gap-2 rounded-[10px] border px-3 py-2 text-[11.5px] font-bold transition ${
                   footerEnabled
@@ -495,7 +495,7 @@ export default function CareersAdminPage() {
                     }`}
                   />
                 </span>
-                نمایش آگهی در فوتر
+                نمایش لینک در فوتر
               </button>
               <button
                 type="button"

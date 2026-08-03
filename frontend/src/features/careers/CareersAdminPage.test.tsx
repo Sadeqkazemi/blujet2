@@ -84,7 +84,7 @@ describe('CareersAdminPage', () => {
     expect(screen.getByRole('button', { name: 'آگهی‌ها' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'درخواست‌های استخدام' })).toBeInTheDocument();
     expect(await screen.findByText('کارشناس پشتیبانی مسافران')).toBeInTheDocument();
-    expect(screen.getByRole('switch', { name: 'نمایش آگهی در فوتر' })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'نمایش لینک فرصت‌های شغلی در فوتر' })).toBeInTheDocument();
   });
 
   it('creates a posting from the create tab with description', async () => {
@@ -114,7 +114,7 @@ describe('CareersAdminPage', () => {
     );
   });
 
-  it('toggles footer visibility (نمایش آگهی در فوتر)', async () => {
+  it('toggles footer visibility (نمایش لینک در فوتر)', async () => {
     mockLists();
     const update = vi
       .spyOn(careersApi, 'updateCareersSettings')
@@ -123,7 +123,9 @@ describe('CareersAdminPage', () => {
     const { default: userEvent } = await import('@testing-library/user-event');
     render(<CareersAdminPage />);
 
-    await userEvent.click(await screen.findByRole('switch', { name: 'نمایش آگهی در فوتر' }));
+    await userEvent.click(
+      await screen.findByRole('switch', { name: 'نمایش لینک فرصت‌های شغلی در فوتر' }),
+    );
     expect(update).toHaveBeenCalledWith(true);
   });
 
