@@ -18,6 +18,7 @@ import {
 import { faDigits, faMoney } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime, parseJalaliDateToIso } from '../../lib/jalali';
 import Modal from '../../components/Modal';
+import BoardChairPlaneMode from './BoardChairPlaneMode';
 import FlightSeatMapModal from './FlightSeatMapModal';
 import ReservationMd80SeatMap, {
   isMd80Aircraft,
@@ -36,20 +37,18 @@ import type {
 } from '../../types/reservation';
 
 /**
- * Merge of two reservation panels:
- *  - IT_MANAGER gets the four-tab «سامانه رزرواسیون» IA (dashboard / PNRs /
- *    agency API access / flights) with the view-only FlightSeatMapModal.
- *  - CEO / BOARD_CHAIR / SENIOR_MANAGER get the executive «هواپیما» dark
- *    shell with the inline seat-map modal (lock / issue / occupant lookup).
- * Both are role-gated so neither side is lost.
+ * Merge of three reservation panels:
+ *  - IT_MANAGER: four-tab «سامانه رزرواسیون» + view-only FlightSeatMapModal
+ *  - BOARD_CHAIR: design four-tab ReservationSystem (BoardChairPlaneMode)
+ *  - CEO / SENIOR_MANAGER: executive «هواپیما» dark shell
  */
 export default function ReservationPage() {
   const { user } = useAuth();
-  const isExec =
-    user?.role === 'CEO' ||
-    user?.role === 'BOARD_CHAIR' ||
-    user?.role === 'SENIOR_MANAGER';
-  return isExec ? <ExecReservationView /> : <ItReservationView />;
+  if (user?.role === 'BOARD_CHAIR') return <BoardChairPlaneMode />;
+  if (user?.role === 'CEO' || user?.role === 'SENIOR_MANAGER') {
+    return <ExecReservationView />;
+  }
+  return <ItReservationView />;
 }
 
 /* ------------------------------------------------------------------ *
