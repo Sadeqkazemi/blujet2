@@ -1,26 +1,38 @@
-# EMPLOYEE panel dark-align (design-reference-v2)
+# EMPLOYEE panel dark-align (design-reference-v2 + screenshots)
 
-Acceptance checklist for پنل کارمند parity with
-`design-reference-v2/پنل کارمند.dc.html`.
+Acceptance checklist for پنل کارمند parity with user screenshots
+(سمیرا احمدی / واحد بازرگانی) and `design-reference-v2/پنل کارمند.dc.html`.
 
 ## Nav
-- [x] Labels match design: مدیریت آژانس‌ها / نرخ‌گذاری / گزارش‌ها — `EMPLOYEE_SECTION_NAV`
-- [x] Order: agencies → flights → pricing → refund → reports → cartable (+ referrals always) — `panels.e2e-spec.ts`
-- [x] Zero-perm employee still gets dashboard + referrals — `emp.none` in `panels.e2e-spec.ts`
-- [x] Design demo `com.ahmadi` gets agencies + reports + cartable — `panels.e2e-spec.ts`
+- [x] «مدیریت پروازها» removed from employee sidebar — no `flights` in `EMPLOYEE_SECTION_NAV`
+- [x] Labels: مدیریت آژانس‌ها / گزارش‌ها / کارتابل / ارجاعات — `panels.e2e-spec.ts`
+- [x] `com.ahmadi` gets agencies + reports + cartable + referrals, never flights
+- [x] `sales.moradi` gets agencies + cartable + referrals, never flights
+- [x] Zero-perm `emp.none` still gets dashboard + referrals
 
 ## Shell
 - [x] Brand subtitle «پنل کارمند» — `PanelShell` ROLE_BRAND_SUB
-- [x] No «نقش این پنل» chip for EMPLOYEE — `PanelShell.tsx`
-- [x] Footer: name initials + fullName + واحد · رتبه + logout icon — `PanelShell.tsx`
+- [x] No «نقش این پنل» chip for EMPLOYEE
+- [x] Footer: initials + fullName + واحد · رتبه + logout
 
 ## Dashboard
-- [x] Title «داشبورد کارمند» + واحد pill — `EmployeeDashboardPage.test.tsx`
-- [x] KPI row: کارهای باز / ارجاعات در انتظار / واحد سازمانی — same test
+- [x] Title «داشبورد کارمند» + green واحد pill — `EmployeeDashboardPage`
+- [x] KPI row: کارهای باز / ارجاعات در انتظار / واحد سازمانی
+- [x] Permissions card with green check chips (no flights)
 
-- [x] Dark employee cartable (کارتابل من) — `EmployeeCartablePage.tsx`
+## Agencies
+- [x] Employee table view آژانس / شهر / مجوز / وضعیت — `EmployeeAgenciesPage` via `AgenciesRouter`
+
+## Reports
+- [x] «گزارش‌های من» activity feed — `EmployeeReportsPage` + `GET /staff-reports/mine`
+
+## Referrals
+- [x] Dark cards + شروع بررسی / تکمیل و بستن / ارجاع این کار — `MyReferralsPage`
+
+## Cartable
+- [x] Dark employee cartable — `EmployeeCartablePage`
 
 ## Seed logins
-- `com.ahmadi` / `Blujet@1404` — design demo (agencies, reports, cartable)
-- `sales.moradi` / `Blujet@1404` — commercial demo (+ flights)
+- `com.ahmadi` / `Blujet@1404` — سمیرا احمدی (agencies, reports, cartable, referrals)
+- `sales.moradi` / `Blujet@1404` — commercial demo (no flights)
 - `emp.none` / `Blujet@1404` — zero permissions

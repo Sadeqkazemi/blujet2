@@ -148,8 +148,10 @@ export const EMPLOYEE_SECTION_NAV: Record<
   string,
   { labelFa: string; wiredKeys: string[] }
 > = {
-  // Order + labels match design-reference-v2/پنل کارمند.dc.html permOrder
-  // (finance / IT sections stay unwired — no dead tabs).
+  // Order + labels match design-reference-v2/پنل کارمند.dc.html + user
+  // screenshots (سمیرا احمدی). «مدیریت پروازها» removed from employee
+  // sidebar per product — fl_* stays permission-catalog only, no tab.
+  // finance / IT sections stay unwired — no dead tabs.
   agencies: {
     labelFa: 'مدیریت آژانس‌ها',
     wiredKeys: [
@@ -160,7 +162,6 @@ export const EMPLOYEE_SECTION_NAV: Record<
       'fn_invoices',
     ],
   },
-  flights: { labelFa: 'مدیریت پروازها', wiredKeys: ['fl_view', 'fl_manage'] },
   pricing: { labelFa: 'نرخ‌گذاری', wiredKeys: ['pr_propose'] },
   refund: {
     labelFa: 'استرداد بلیط',

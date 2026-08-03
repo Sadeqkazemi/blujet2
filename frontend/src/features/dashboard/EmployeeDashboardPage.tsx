@@ -1,20 +1,11 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Link, useOutletContext } from 'react-router-dom';
+import { useOutletContext } from 'react-router-dom';
 import { fetchCartable, fetchMyReferrals } from '../../api/cartable';
 import { fetchEmployeeContext } from '../../api/panels';
+import EmployeeUnitPill from '../../components/EmployeeUnitPill';
 import { faDigits } from '../../lib/fa-format';
 import type { EmployeeContext } from '../../types/panels';
 import type { PanelShellContext } from '../../types/panel-shell';
-
-const TAB_DESCRIPTIONS: Record<string, string> = {
-  agencies: 'مشاهده و بررسی آژانس‌های همکار و درخواست‌های عضویت',
-  flights: 'مشاهده فهرست و جزئیات پروازها',
-  pricing: 'ثبت نرخ پیشنهادی برای پروازهای آینده',
-  reports: 'گزارش فعالیت‌ها و جستجوی مسافر',
-  refund: 'بررسی و ارجاع درخواست‌های استرداد بلیط',
-  cartable: 'کارهای در انتظار اقدام و ارسال پیام به مدیر',
-  referrals: 'درخواست‌های ارجاع‌شده به شما توسط مدیران',
-};
 
 function KpiIcon({ children, bg, color }: { children: ReactNode; bg: string; color: string }) {
   return (
@@ -28,12 +19,13 @@ function KpiIcon({ children, bg, color }: { children: ReactNode; bg: string; col
 }
 
 /**
- * پنل کارمند.dc.html dashboard — KPI cards + permission chips + section grid.
+ * پنل کارمند dashboard — KPI cards + permission chips (screenshot).
  */
 export default function EmployeeDashboardPage() {
   const { nav } = useOutletContext<PanelShellContext>();
-  const sections = (nav ?? []).filter((item) => item.key !== 'dashboard');
-  const grantedSections = sections.filter((item) => item.key !== 'referrals');
+  const grantedSections = (nav ?? []).filter(
+    (item) => item.key !== 'dashboard' && item.key !== 'referrals',
+  );
 
   const [context, setContext] = useState<EmployeeContext | null>(null);
   const [openTasks, setOpenTasks] = useState<number | null>(null);
@@ -77,11 +69,7 @@ export default function EmployeeDashboardPage() {
             نمای کلی کارها و ارجاعات واحد {unitLabel !== '—' ? unitLabel : ''}
           </p>
         </div>
-        {unitLabel !== '—' && (
-          <span className="rounded-full border border-[rgba(52,211,153,.28)] bg-[rgba(52,211,153,.12)] px-3 py-1.5 text-[11.5px] font-bold text-[#34d399]">
-            واحد {unitLabel}
-          </span>
-        )}
+        <EmployeeUnitPill />
       </div>
 
       <div className="mb-5 grid grid-cols-1 gap-[13px] sm:grid-cols-3">
@@ -132,7 +120,15 @@ export default function EmployeeDashboardPage() {
 
       {context && context.permissionLabelsFa.length > 0 && (
         <section className="mb-5 rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[15px]">
-          <h2 className="m-0 text-[14.5px] font-extrabold text-white">دسترسی‌های شما در این واحد</h2>
+          <div className="mb-1 flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-[9px] bg-[rgba(59,130,246,.16)] text-[#60a5fa]">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <rect x="3" y="11" width="18" height="11" rx="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+            </span>
+            <h2 className="m-0 text-[14.5px] font-extrabold text-white">دسترسی‌های شما در این واحد</h2>
+          </div>
           <p className="mt-1 text-[11px] text-[#6b7b94]">
             این دسترسی‌ها توسط مدیر IT مطابق واحد سازمانی شما تعیین شده است.
           </p>
@@ -140,9 +136,9 @@ export default function EmployeeDashboardPage() {
             {context.permissionLabelsFa.map((label) => (
               <span
                 key={label}
-                className="flex items-center gap-1.5 rounded-[9px] border border-[#28344c] bg-[#18223a] px-3 py-1.5 text-[11px] text-[#e7ecf3]"
+                className="flex items-center gap-1.5 rounded-[9px] border border-[rgba(52,211,153,.35)] bg-[rgba(52,211,153,.08)] px-3 py-1.5 text-[11px] text-[#34d399]"
               >
-                <span className="text-[#34d399]">✓</span>
+                <span aria-hidden>✓</span>
                 {label}
               </span>
             ))}
@@ -152,23 +148,13 @@ export default function EmployeeDashboardPage() {
 
       {nav === null && <p className="text-xs text-[#6b7b94]">در حال بارگذاری…</p>}
       {nav !== null && grantedSections.length === 0 && (
-        <p className="rounded-[14px] border border-dashed border-[#28344c] px-4 py-5 text-center text-xs text-[#6b7b94]">
+        <p
+          className="rounded-[14px] border border-dashed border-[#28344c] px-4 py-5 text-center text-xs text-[#6b7b94]"
+          data-testid="employee-no-access"
+        >
           هنوز هیچ دسترسی برای شما توسط مدیر IT فعال نشده است.
         </p>
       )}
-
-      <div className="grid grid-cols-1 gap-[13px] sm:grid-cols-2 lg:grid-cols-3">
-        {sections.map((item) => (
-          <Link
-            key={item.key}
-            to={`/panel/${item.key}`}
-            className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[15px] transition hover:border-[#3b82f6]"
-          >
-            <h2 className="m-0 text-[14px] font-extrabold text-white">{item.labelFa}</h2>
-            <p className="mt-1.5 text-[11.5px] text-[#6b7b94]">{TAB_DESCRIPTIONS[item.key] ?? ''}</p>
-          </Link>
-        ))}
-      </div>
     </div>
   );
 }

@@ -621,6 +621,7 @@ panels that carry these tabs. Design findings that scope this phase:
 
 | Method | Path | Roles | Notes |
 |---|---|---|---|
+| GET | `/staff-reports/mine` | EMPLOYEE | «گزارش‌های من» — فید فعالیت خود کارمند از `AuditLog` (`{ items: [{ id, title, detail, category, at }] }`). |
 | GET | `/staff-reports` | FINANCE_MANAGER, COMMERCIAL_MANAGER | «گزارش عملکرد کارمندان»: EMPLOYEE-role users whose `dept` maps to the caller (finance→FINANCE_MANAGER, sales/commercial→COMMERCIAL_MANAGER) + their `AuditLog` action feed (action, category, detail, at), `staffId?` filter for the per-employee tabs. Also returns the «کارمند جدید توسط مدیر IT اضافه شد» banner rows — real `AuditLog(category=ACCOUNT)` employee-creation events for the caller's dept, not a fabricated notification. |
 
 Deliberately not in scope (documented, not dropped): Excel/PDF exports

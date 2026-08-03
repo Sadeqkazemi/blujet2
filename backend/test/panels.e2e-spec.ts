@@ -120,7 +120,7 @@ describe('Panels (e2e)', () => {
     ]);
   });
 
-  it('EMPLOYEE nav is computed dynamically from real EmployeePermission grants (sales.moradi: ag_list + fl_view)', async () => {
+  it('EMPLOYEE nav is computed dynamically from real EmployeePermission grants (sales.moradi: ag_list, no flights)', async () => {
     const { accessToken } = await loginAs(app, 'sales.moradi');
     const res = await request(app.getHttpServer())
       .get('/panels/nav')
@@ -129,13 +129,13 @@ describe('Panels (e2e)', () => {
     expect(res.body.data).toEqual([
       { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
       { key: 'agencies', labelFa: 'مدیریت آژانس‌ها', implemented: true },
-      { key: 'flights', labelFa: 'مدیریت پروازها', implemented: true },
       { key: 'cartable', labelFa: 'کارتابل', implemented: true },
       { key: 'referrals', labelFa: 'ارجاعات', implemented: true },
     ]);
+    expect(res.body.data.map((t: { key: string }) => t.key)).not.toContain('flights');
   });
 
-  it('com.ahmadi (design demo employee) gets agencies + reports + cartable + referrals', async () => {
+  it('com.ahmadi (design demo employee) gets agencies + reports + cartable + referrals, never flights', async () => {
     const { accessToken } = await loginAs(app, 'com.ahmadi');
     const res = await request(app.getHttpServer())
       .get('/panels/nav')
@@ -149,6 +149,7 @@ describe('Panels (e2e)', () => {
       'cartable',
       'referrals',
     ]);
+    expect(keys).not.toContain('flights');
   });
 
   it('returns the confirmed tab set for SITE_ADMIN', async () => {
