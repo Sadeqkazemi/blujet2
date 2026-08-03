@@ -24,7 +24,8 @@ import type {
 import type { AirportEntry } from '../../types/flights';
 
 /** Design hint-placeholder-count for commercial pricing rows = 5. */
-const COMMERCIAL_PRICING_PAGE_SIZE = 5;
+/** Global panel list rule: 10 records per page. */
+const COMMERCIAL_PRICING_PAGE_SIZE = 10;
 
 function routeCodes(p: {
   flight: { flightNo?: string; route: { originCode: string; destCode: string } };

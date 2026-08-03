@@ -79,6 +79,19 @@ export class AgenciesController {
     return { success: true, data };
   }
 
+  @Get('webservice-requests')
+  @Roles('SITE_ADMIN', 'COMMERCIAL_MANAGER', 'SENIOR_MANAGER')
+  @ApiOperation({
+    summary:
+      'صف درخواست‌های خرید وب‌سرویس همه آژانس‌ها (تب «درخواست وب‌سرویس» پنل ادمین سایت)',
+  })
+  async listAllWebserviceRequests(
+    @Query('status') status?: 'PENDING' | 'APPROVED' | 'REJECTED',
+  ) {
+    const data = await this.agencies.listAllWebserviceRequests(status);
+    return { success: true, data };
+  }
+
   @Patch('requests/:id/approve')
   @Roles('COMMERCIAL_MANAGER')
   @ApiOperation({

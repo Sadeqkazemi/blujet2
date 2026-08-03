@@ -123,8 +123,8 @@ describe('RefundsPage', () => {
     expect(await screen.findByText('درخواستی با این عبارت یافت نشد.')).toBeInTheDocument();
   });
 
-  it('paginates at 5 requests per page', async () => {
-    const many: RefundListRow[] = Array.from({ length: 6 }, (_, i) =>
+  it('paginates at 10 requests per page', async () => {
+    const many: RefundListRow[] = Array.from({ length: 12 }, (_, i) =>
       row({
         id: `r${i + 1}`,
         bookingId: `b${i + 1}`,
@@ -142,20 +142,20 @@ describe('RefundsPage', () => {
     );
     mockList({
       requests: many,
-      kpis: { payoutQueue: 3, paid: 0, awaitingAdmin: 3 },
+      kpis: { payoutQueue: 6, paid: 0, awaitingAdmin: 6 },
     });
 
     const { default: userEvent } = await import('@testing-library/user-event');
     render(<RefundsPage />);
 
-    expect(await screen.findByText('۶ درخواست')).toBeInTheDocument();
+    expect(await screen.findByText('۱۲ درخواست')).toBeInTheDocument();
     expect(screen.getByText('مسافر 1')).toBeInTheDocument();
-    expect(screen.getByText('مسافر 5')).toBeInTheDocument();
-    expect(screen.queryByText('مسافر 6')).not.toBeInTheDocument();
+    expect(screen.getByText('مسافر 10')).toBeInTheDocument();
+    expect(screen.queryByText('مسافر 11')).not.toBeInTheDocument();
 
     const pager = screen.getByTestId('pagination');
     await userEvent.click(within(pager).getByRole('button', { name: 'بعدی' }));
-    expect(await screen.findByText('مسافر 6')).toBeInTheDocument();
+    expect(await screen.findByText('مسافر 11')).toBeInTheDocument();
     expect(screen.queryByText('مسافر 1')).not.toBeInTheDocument();
   });
 

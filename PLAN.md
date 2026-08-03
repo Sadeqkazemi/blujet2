@@ -1589,10 +1589,11 @@ before the next phase starts, per `CLAUDE.md` workflow rules. A phase is
 a passing test — see `docs/features/panel-shell-dashboard.md` for Phase 1.
 
 - [x] **SITE_ADMIN panel dark-align (2026-08-03)** — nav order/labels to
-  `پنل ادمین سایت.dc.html`; brand subtitle «مدیریت عملیاتی» + avatar «اس»;
+  `پنل ادمین سایت.dc.html`; brand subtitle «پنل مدیریت» + avatar «اس»;
   refund/tickets nav badges; dark cartable; dashboard 4-KPI + agency/refund/
-  cartable widgets; `GET /reporting/site-admin-overview`. See
-  `docs/features/site-admin-panel-align.md`.
+  cartable widgets; `GET /reporting/site-admin-overview`; dark Agencies +
+  Flights (flightops) pages; global **10 records/page** panel pagination.
+  See `docs/features/site-admin-panel-align.md`.
 
 ## Notable findings from design extraction (informs later phases)
 

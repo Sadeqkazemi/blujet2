@@ -227,10 +227,10 @@ describe('PricingPage', () => {
     expect(await screen.findByText('نرخ پیشنهادی برای تأیید به مدیر عامل ارسال شد ✓')).toBeInTheDocument();
   });
 
-  it('Commercial pricing list paginates at 5 rows per page (design hint-placeholder-count)', async () => {
+  it('Commercial pricing list paginates at 10 rows per page', async () => {
     mockRole('COMMERCIAL_MANAGER');
     const many: CommercialPricingResult = {
-      flights: Array.from({ length: 7 }, (_, i) => ({
+      flights: Array.from({ length: 12 }, (_, i) => ({
         id: `fi-page-${i + 1}`,
         departureAt: '2026-08-06T08:30:00.000Z',
         capacity: 180,
@@ -249,7 +249,7 @@ describe('PricingPage', () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getAllByRole('button', { name: 'تعیین قیمت' })).toHaveLength(5);
+      expect(screen.getAllByRole('button', { name: 'تعیین قیمت' })).toHaveLength(10);
     });
     expect(screen.getByTestId('pagination')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'بعدی' }));
