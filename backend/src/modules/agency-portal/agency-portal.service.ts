@@ -3,7 +3,16 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { In, MoreThanOrEqual, Not, IsNull, Repository } from 'typeorm';
+import { AgencyProfile } from '../../database/entities/agency-profile.entity';
+import { AgencyDocument } from '../../database/entities/agency-document.entity';
+import { AgencyCreditRequest } from '../../database/entities/agency-credit-request.entity';
+import { AgencyWebserviceRequest } from '../../database/entities/agency-webservice-request.entity';
+import { AgencyAllotment } from '../../database/entities/agency-allotment.entity';
+import { LedgerEntry } from '../../database/entities/ledger-entry.entity';
+import { Booking } from '../../database/entities/booking.entity';
+import { Passenger } from '../../database/entities/passenger.entity';
 import { AuditService } from '../audit/audit.service';
 import { CartableService } from '../cartable/cartable.service';
 import { AgenciesService } from '../agencies/agencies.service';
@@ -33,7 +42,22 @@ const SOLD_STATUSES = ['PAID', 'TICKETED'] as const;
 @Injectable()
 export class AgencyPortalService {
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectRepository(AgencyProfile)
+    private readonly profileRepo: Repository<AgencyProfile>,
+    @InjectRepository(AgencyDocument)
+    private readonly documentRepo: Repository<AgencyDocument>,
+    @InjectRepository(AgencyCreditRequest)
+    private readonly creditRequestRepo: Repository<AgencyCreditRequest>,
+    @InjectRepository(AgencyWebserviceRequest)
+    private readonly webserviceRequestRepo: Repository<AgencyWebserviceRequest>,
+    @InjectRepository(AgencyAllotment)
+    private readonly allotmentRepo: Repository<AgencyAllotment>,
+    @InjectRepository(LedgerEntry)
+    private readonly ledgerRepo: Repository<LedgerEntry>,
+    @InjectRepository(Booking)
+    private readonly bookingRepo: Repository<Booking>,
+    @InjectRepository(Passenger)
+    private readonly passengerRepo: Repository<Passenger>,
     private readonly audit: AuditService,
     private readonly cartable: CartableService,
     private readonly agencies: AgenciesService,
@@ -42,9 +66,9 @@ export class AgencyPortalService {
   ) {}
 
   private async getOwnProfileOrThrow(actor: AuthenticatedUser) {
-    const profile = await this.prisma.agencyProfile.findUnique({
+    const profile = await this.profileRepo.findOne({
       where: { userId: actor.id },
-      include: { user: true },
+      relations: { user: true },
     });
     if (!profile) {
       throw new NotFoundException({
@@ -66,42 +90,38 @@ export class AgencyPortalService {
 
     const [
       credit,
-      salesThisMonth,
+      salesThisMonthRow,
       ticketsIssuedTotal,
       seatsSoldThisMonth,
       salesRows,
     ] = await Promise.all([
       this.agencies.getCredit(id),
-      this.prisma.ledgerEntry.aggregate({
-        // Real ticket sales only — excludes AgenciesService.resetTestDebt's
-        // bookingless debt-line calibration rows (see ReportingService's
-        // kpis() for the full explanation).
+      this.ledgerRepo
+        .createQueryBuilder('l')
+        .select('SUM(l."signedAmountIrr")', 'sum')
+        .where('l."agencyId" = :id', { id })
+        .andWhere('l.type = :type', { type: 'SALE' })
+        .andWhere('l."bookingId" IS NOT NULL')
+        .andWhere('l."occurredAt" >= :startOfMonth', { startOfMonth })
+        .getRawOne<{ sum: string | null }>(),
+      this.bookingRepo.count({
+        where: { agencyId: id, status: In([...SOLD_STATUSES]) },
+      }),
+      this.passengerRepo
+        .createQueryBuilder('p')
+        .innerJoin('p.booking', 'b')
+        .where('b."agencyId" = :id', { id })
+        .andWhere('b.status IN (:...statuses)', {
+          statuses: [...SOLD_STATUSES],
+        })
+        .andWhere('b."createdAt" >= :startOfMonth', { startOfMonth })
+        .getCount(),
+      this.ledgerRepo.find({
         where: {
           agencyId: id,
-          type: 'SALE',
-          bookingId: { not: null },
-          occurredAt: { gte: startOfMonth },
-        },
-        _sum: { signedAmountIrr: true },
-      }),
-      this.prisma.booking.count({
-        where: { agencyId: id, status: { in: [...SOLD_STATUSES] } },
-      }),
-      this.prisma.passenger.count({
-        where: {
-          booking: {
-            agencyId: id,
-            status: { in: [...SOLD_STATUSES] },
-            createdAt: { gte: startOfMonth },
-          },
-        },
-      }),
-      this.prisma.ledgerEntry.findMany({
-        where: {
-          agencyId: id,
-          type: 'SALE',
-          bookingId: { not: null },
-          occurredAt: { gte: sixMonthsAgo },
+          type: 'SALE' as never,
+          bookingId: Not(IsNull()),
+          occurredAt: MoreThanOrEqual(sixMonthsAgo),
         },
         select: { signedAmountIrr: true, occurredAt: true },
       }),
@@ -128,7 +148,9 @@ export class AgencyPortalService {
     return {
       credit,
       kpis: {
-        salesThisMonthIrr: salesThisMonth._sum.signedAmountIrr ?? ZERO_IRR,
+        salesThisMonthIrr: salesThisMonthRow?.sum
+          ? BigInt(salesThisMonthRow.sum)
+          : ZERO_IRR,
         ticketsIssuedTotal,
         seatsSoldThisMonth,
       },
@@ -143,9 +165,9 @@ export class AgencyPortalService {
 
   async ledger(actor: AuthenticatedUser) {
     await this.getOwnProfileOrThrow(actor);
-    return this.prisma.ledgerEntry.findMany({
+    return this.ledgerRepo.find({
       where: { agencyId: actor.id },
-      orderBy: { occurredAt: 'desc' },
+      order: { occurredAt: 'DESC' },
       take: 20,
     });
   }
@@ -180,13 +202,13 @@ export class AgencyPortalService {
       });
     }
 
-    const request = await this.prisma.agencyCreditRequest.create({
-      data: {
+    const request = await this.creditRequestRepo.save(
+      this.creditRequestRepo.create({
         agencyId: actor.id,
         requestedLimitIrr: dto.requestedLimitIrr,
-        note: dto.note,
-      },
-    });
+        note: dto.note ?? null,
+      }),
+    );
 
     await this.cartable.createTasksForRoles([...CREDIT_REVIEW_ROLES], {
       category: 'AGENCY',
@@ -210,9 +232,9 @@ export class AgencyPortalService {
 
   async myCreditRequests(actor: AuthenticatedUser) {
     await this.getOwnProfileOrThrow(actor);
-    return this.prisma.agencyCreditRequest.findMany({
+    return this.creditRequestRepo.find({
       where: { agencyId: actor.id },
-      orderBy: { createdAt: 'desc' },
+      order: { createdAt: 'DESC' },
     });
   }
 
@@ -222,14 +244,28 @@ export class AgencyPortalService {
     await this.getOwnProfileOrThrow(actor);
     const id = actor.id;
 
-    const bookings = await this.prisma.booking.findMany({
+    const bookings = await this.bookingRepo.find({
       where: { agencyId: id },
-      include: {
-        passengers: { select: { id: true } },
-        flightInstance: { include: { flight: { include: { route: true } } } },
+      relations: {
+        flightInstance: { flight: { route: true } },
       },
-      orderBy: { createdAt: 'desc' },
+      order: { createdAt: 'DESC' },
     });
+
+    const passengerCounts = bookings.length
+      ? await this.passengerRepo
+          .createQueryBuilder('p')
+          .select('p."bookingId"', 'bookingId')
+          .addSelect('COUNT(*)', 'count')
+          .where('p."bookingId" IN (:...ids)', {
+            ids: bookings.map((b) => b.id),
+          })
+          .groupBy('p."bookingId"')
+          .getRawMany<{ bookingId: string; count: string }>()
+      : [];
+    const passengerCountByBooking = new Map<string, number>(
+      passengerCounts.map((row) => [row.bookingId, Number(row.count)]),
+    );
 
     const tickets = bookings.map((b) => ({
       pnr: b.pnr,
@@ -238,7 +274,7 @@ export class AgencyPortalService {
       route: `${b.flightInstance.flight.route.originCode} → ${b.flightInstance.flight.route.destCode}`,
       departureAt: b.flightInstance.departureAt,
       priceIrr: b.priceIrr,
-      passengerCount: b.passengers.length,
+      passengerCount: passengerCountByBooking.get(b.id) ?? 0,
     }));
 
     const perFlightMap = new Map<
@@ -342,13 +378,19 @@ export class AgencyPortalService {
 
   async documents(actor: AuthenticatedUser) {
     await this.getOwnProfileOrThrow(actor);
-    return this.prisma.agencyDocument.findMany({
+    const docs = await this.documentRepo.find({
       where: { agencyId: actor.id },
-      include: {
-        file: { select: { fileName: true, sizeBytes: true, mimeType: true } },
-      },
-      orderBy: { createdAt: 'desc' },
+      relations: { file: true },
+      order: { createdAt: 'DESC' },
     });
+    return docs.map((d) => ({
+      ...d,
+      file: {
+        fileName: d.file.fileName,
+        sizeBytes: d.file.sizeBytes,
+        mimeType: d.file.mimeType,
+      },
+    }));
   }
 
   async uploadDocument(
@@ -358,12 +400,31 @@ export class AgencyPortalService {
   ) {
     await this.getOwnProfileOrThrow(actor);
     const stored = await this.files.store(actor, file);
-    return this.prisma.agencyDocument.create({
-      data: { agencyId: actor.id, fileId: stored.id, docType: dto.docType },
-      include: {
-        file: { select: { fileName: true, sizeBytes: true, mimeType: true } },
-      },
+    const saved = await this.documentRepo.save(
+      this.documentRepo.create({
+        agencyId: actor.id,
+        fileId: stored.id,
+        docType: dto.docType,
+      }),
+    );
+    const doc = await this.documentRepo.findOne({
+      where: { id: saved.id },
+      relations: { file: true },
     });
+    if (!doc) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'مدرک یافت نشد.',
+      });
+    }
+    return {
+      ...doc,
+      file: {
+        fileName: doc.file.fileName,
+        sizeBytes: doc.file.sizeBytes,
+        mimeType: doc.file.mimeType,
+      },
+    };
   }
 
   // ── Phase 16: real seat allotments (replaces AgencySeatsPage mock) ─────
@@ -372,12 +433,10 @@ export class AgencyPortalService {
     await this.getOwnProfileOrThrow(actor);
     const id = actor.id;
 
-    const rows = await this.prisma.agencyAllotment.findMany({
+    const rows = await this.allotmentRepo.find({
       where: { agencyId: id },
-      include: {
-        flightInstance: { include: { flight: { include: { route: true } } } },
-      },
-      orderBy: { createdAt: 'desc' },
+      relations: { flightInstance: { flight: { route: true } } },
+      order: { createdAt: 'DESC' },
     });
 
     const now = new Date();
@@ -386,11 +445,11 @@ export class AgencyPortalService {
         // No allotmentId FK on Booking (see docs/DB_SCHEMA.md Phase 16 ⚑ —
         // "book against own allotment" isn't built yet) — consumed is
         // derived from this agency's real bookings on the same flight.
-        const usedSeats = await this.prisma.booking.count({
+        const usedSeats = await this.bookingRepo.count({
           where: {
             agencyId: id,
             flightInstanceId: r.flightInstanceId,
-            status: { in: [...SOLD_STATUSES] },
+            status: In([...SOLD_STATUSES]),
           },
         });
         return {
@@ -442,15 +501,15 @@ export class AgencyPortalService {
       });
     }
 
-    const request = await this.prisma.agencyWebserviceRequest.create({
-      data: {
+    const request = await this.webserviceRequestRepo.save(
+      this.webserviceRequestRepo.create({
         agencyId: actor.id,
         scope: dto.scope,
         months: dto.months,
         priceIrr: toIrr(planPriceIrr),
-        note: dto.note,
-      },
-    });
+        note: dto.note ?? null,
+      }),
+    );
 
     const scopeFa =
       dto.scope === 'FULL' ? 'فروش کامل (صدور بلیط)' : 'جستجو و رزرو';
@@ -476,9 +535,9 @@ export class AgencyPortalService {
 
   async myWebserviceRequests(actor: AuthenticatedUser) {
     await this.getOwnProfileOrThrow(actor);
-    return this.prisma.agencyWebserviceRequest.findMany({
+    return this.webserviceRequestRepo.find({
       where: { agencyId: actor.id },
-      orderBy: { createdAt: 'desc' },
+      order: { createdAt: 'DESC' },
     });
   }
 
