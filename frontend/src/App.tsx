@@ -26,6 +26,7 @@ import AgencyDetailPage from './features/agencies/AgencyDetailPage';
 import RequestDetailPage from './features/agencies/RequestDetailPage';
 import ReportsRouter from './components/ReportsRouter';
 import CartableRouter from './components/CartableRouter';
+import ClubRouter from './features/club/ClubRouter';
 import ClubPage from './features/club/ClubPage';
 import ClubTierRulesPage from './features/club/ClubTierRulesPage';
 import EmployeesPage from './features/it-manager/EmployeesPage';
@@ -139,7 +140,7 @@ export default function App() {
                 <Route index element={<ReferralsRouter />} />
               </Route>
               <Route path="club" element={<TabGate tabKey="club" />}>
-                <Route index element={<ClubPage />} />
+                <Route index element={<ClubRouter />} />
               </Route>
               <Route path="vip" element={<TabGate tabKey="vip" />}>
                 <Route index element={<ClubPage />} />

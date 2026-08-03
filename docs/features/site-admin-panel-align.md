@@ -32,6 +32,20 @@ Acceptance checklist for پنل ادمین سایت parity with
 - [x] Status + Nira color coding (open green / closed grey / pending amber) — same test
 - [x] 10 records per page on flight list (+ passenger manifest) — same test
 
+## Club («باشگاه مشتریان»)
+- [x] Dark 3 KPIs: اعضای باشگاه / درخواست‌های در انتظار / کارت‌های صادرشده — `SiteAdminClubPage.test.tsx`
+- [x] Card-request queue (all statuses) + refer modal — same test
+- [x] Member profiles click-to-open — same test
+- [x] VIP ready-for-card list + «دانلود اکسل» — same test
+- [x] 10/page on requests, members, VIP lists — same test
+- [x] SITE_ADMIN members list includes decrypted `nationalId` for profiles/Excel
+
+## Refunds («استرداد بلیط»)
+- [x] SITE_ADMIN copy/KPIs: در انتظار بررسی / ارجاع‌شده به مالی / پرداخت‌شده — `RefundsPage.test.tsx`
+- [x] Row action «مشاهده و ارجاع ←» (no pay on admin surface) — same test
+- [x] Dedicated search box above the list — same test
+- [x] 10 records per page — same test
+
 ## Global panel pagination rule
 - [x] Default `PANEL_PAGE_SIZE = 10` via `usePagination` — `Pagination.test.tsx`
 - [x] Overrides removed: refunds + commercial pricing now 10/page — `RefundsPage.test.tsx`, `PricingPage.test.tsx`

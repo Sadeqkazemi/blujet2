@@ -40,8 +40,11 @@ export class ClubController {
   @Get('members')
   @Roles('CEO', 'BOARD_CHAIR', 'SENIOR_MANAGER', 'SITE_ADMIN')
   @ApiOperation({ summary: 'اعضای باشگاه + کارت‌های KPI (فیلتر سطح/جستجو)' })
-  async listMembers(@Query() query: ListMembersQueryDto) {
-    const data = await this.club.listMembers(query);
+  async listMembers(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Query() query: ListMembersQueryDto,
+  ) {
+    const data = await this.club.listMembers(query, actor);
     return { success: true, data };
   }
 
@@ -93,7 +96,8 @@ export class ClubController {
   @Get('submitted-card-requests')
   @Roles('SITE_ADMIN')
   @ApiOperation({
-    summary: 'درخواست‌های SUBMITTED در انتظار ارجاع — فقط ادمین سایت',
+    summary:
+      'صف درخواست‌های صدور کارت برای ادمین سایت (همه وضعیت‌ها؛ ارجاع فقط روی SUBMITTED)',
   })
   async listSubmittedRequests() {
     const data = await this.club.listSubmittedRequests();
