@@ -6,9 +6,26 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
 import * as argon2 from 'argon2';
 import * as crypto from 'node:crypto';
-import { TypeORMService } from '../../typeorm/typeorm.service';
+import { In, IsNull, Not, Repository } from 'typeorm';
+import { AgencyProfile } from '../../database/entities/agency-profile.entity';
+import { AgencyCreditLine } from '../../database/entities/agency-credit-line.entity';
+import { AgencyRequestOtp } from '../../database/entities/agency-request-otp.entity';
+import { AgencyMembershipRequest } from '../../database/entities/agency-membership-request.entity';
+import { AgencyApiKey } from '../../database/entities/agency-api-key.entity';
+import { AgencyInvoice } from '../../database/entities/agency-invoice.entity';
+import { AgencyMessage } from '../../database/entities/agency-message.entity';
+import { AgencyCreditRequest } from '../../database/entities/agency-credit-request.entity';
+import { AgencyWebserviceRequest } from '../../database/entities/agency-webservice-request.entity';
+import { AgencyDocument } from '../../database/entities/agency-document.entity';
+import { User } from '../../database/entities/user.entity';
+import { LedgerEntry } from '../../database/entities/ledger-entry.entity';
+import { Booking } from '../../database/entities/booking.entity';
+import { Passenger } from '../../database/entities/passenger.entity';
+import { AuditLog } from '../../database/entities/audit-log.entity';
+import { RefreshToken } from '../../database/entities/refresh-token.entity';
 import { AuditService } from '../audit/audit.service';
 import { CartableService } from '../cartable/cartable.service';
 import { ErrorCode } from '../../common/errors';
@@ -35,7 +52,7 @@ import type {
   AgencyDocumentStatus,
   AgencyMembershipStatus,
   AgencyWebserviceRequestStatus,
-} from '../../../generated/typeorm/enums';
+} from '../../database/enums';
 
 function hashSecret(raw: string): string {
   return crypto.createHash('sha256').update(raw).digest('hex');
@@ -60,7 +77,38 @@ const REQUEST_OTP_MAX_ATTEMPTS = 5;
 @Injectable()
 export class AgenciesService {
   constructor(
-    private readonly typeorm: TypeORMService,
+    @InjectRepository(AgencyProfile)
+    private readonly profileRepo: Repository<AgencyProfile>,
+    @InjectRepository(AgencyCreditLine)
+    private readonly creditLineRepo: Repository<AgencyCreditLine>,
+    @InjectRepository(AgencyRequestOtp)
+    private readonly requestOtpRepo: Repository<AgencyRequestOtp>,
+    @InjectRepository(AgencyMembershipRequest)
+    private readonly membershipRequestRepo: Repository<AgencyMembershipRequest>,
+    @InjectRepository(AgencyApiKey)
+    private readonly apiKeyRepo: Repository<AgencyApiKey>,
+    @InjectRepository(AgencyInvoice)
+    private readonly invoiceRepo: Repository<AgencyInvoice>,
+    @InjectRepository(AgencyMessage)
+    private readonly messageRepo: Repository<AgencyMessage>,
+    @InjectRepository(AgencyCreditRequest)
+    private readonly creditRequestRepo: Repository<AgencyCreditRequest>,
+    @InjectRepository(AgencyWebserviceRequest)
+    private readonly webserviceRequestRepo: Repository<AgencyWebserviceRequest>,
+    @InjectRepository(AgencyDocument)
+    private readonly documentRepo: Repository<AgencyDocument>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
+    @InjectRepository(LedgerEntry)
+    private readonly ledgerEntryRepo: Repository<LedgerEntry>,
+    @InjectRepository(Booking)
+    private readonly bookingRepo: Repository<Booking>,
+    @InjectRepository(Passenger)
+    private readonly passengerRepo: Repository<Passenger>,
+    @InjectRepository(AuditLog)
+    private readonly auditLogRepo: Repository<AuditLog>,
+    @InjectRepository(RefreshToken)
+    private readonly refreshTokenRepo: Repository<RefreshToken>,
     private readonly audit: AuditService,
     private readonly cartable: CartableService,
     private readonly stepUp: StepUpService,
@@ -77,13 +125,13 @@ export class AgenciesService {
    * for why this doesn't reuse TwoFactorChallenge. */
   async requestPublicOtp(phone: string): Promise<{ challengeId: string }> {
     const code = generateSixDigitCode();
-    const challenge = await this.typeorm.agencyRequestOtp.create({
-      data: {
+    const challenge = await this.requestOtpRepo.save(
+      this.requestOtpRepo.create({
         phone,
         codeHash: await argon2.hash(code),
         expiresAt: new Date(Date.now() + REQUEST_OTP_TTL_MS),
-      },
-    });
+      }),
+    );
     await this.twoFactorProvider.sendCode(
       { id: challenge.id, fullName: 'متقاضی همکاری آژانس', email: null, phone },
       code,
@@ -101,8 +149,8 @@ export class AgenciesService {
     challengeId: string;
     code: string;
   }): Promise<{ id: string }> {
-    const challenge = await this.typeorm.agencyRequestOtp.findUnique({
-      where: { id: dto.challengeId },
+    const challenge = await this.requestOtpRepo.findOneBy({
+      id: dto.challengeId,
     });
     if (!challenge || challenge.phone !== dto.phone) {
       throw new UnauthorizedException({
@@ -131,30 +179,27 @@ export class AgenciesService {
 
     const codeValid = await argon2.verify(challenge.codeHash, dto.code);
     if (!codeValid) {
-      await this.typeorm.agencyRequestOtp.update({
-        where: { id: challenge.id },
-        data: { attempts: { increment: 1 } },
-      });
+      await this.requestOtpRepo.increment({ id: challenge.id }, 'attempts', 1);
       throw new UnauthorizedException({
         code: 'TWO_FACTOR_INVALID',
         message: 'کد وارد شده نادرست است.',
       });
     }
 
-    await this.typeorm.agencyRequestOtp.update({
-      where: { id: challenge.id },
-      data: { consumedAt: new Date() },
-    });
+    await this.requestOtpRepo.update(
+      { id: challenge.id },
+      { consumedAt: new Date() },
+    );
 
-    const request = await this.typeorm.agencyMembershipRequest.create({
-      data: {
+    const request = await this.membershipRequestRepo.save(
+      this.membershipRequestRepo.create({
         applicantName: dto.applicantName,
         managerName: dto.managerName,
         licenseNo: dto.licenseNo,
         phone: dto.phone,
         status: 'PENDING',
-      },
-    });
+      }),
+    );
 
     return { id: request.id };
   }
@@ -176,21 +221,15 @@ export class AgenciesService {
    * (see LedgerEntry.agencyId note in docs/DB_SCHEMA.md). */
   private async computeUsedIrr(agencyIds: string[]): Promise<Map<string, Irr>> {
     if (agencyIds.length === 0) return new Map();
-    const rows = await this.typeorm.ledgerEntry.groupBy({
-      by: ['agencyId'],
-      where: {
-        agencyId: { in: agencyIds },
-        type: { in: ['SALE', 'SETTLEMENT'] },
-      },
-      _sum: { signedAmountIrr: true },
-    });
-    return new Map(
-      rows
-        .filter(
-          (r): r is typeof r & { agencyId: string } => r.agencyId !== null,
-        )
-        .map((r) => [r.agencyId, r._sum.signedAmountIrr ?? ZERO_IRR]),
-    );
+    const rows = await this.ledgerEntryRepo
+      .createQueryBuilder('e')
+      .select('e.agencyId', 'agencyId')
+      .addSelect('SUM(e.signedAmountIrr)', 'sum')
+      .where('e.agencyId IN (:...ids)', { ids: agencyIds })
+      .andWhere('e.type IN (:...types)', { types: ['SALE', 'SETTLEMENT'] })
+      .groupBy('e.agencyId')
+      .getRawMany<{ agencyId: string; sum: string }>();
+    return new Map(rows.map((r) => [r.agencyId, BigInt(r.sum ?? '0')]));
   }
 
   /** Design's exact formula (extraction confirmed verbatim) — presentational
@@ -212,10 +251,11 @@ export class AgenciesService {
   }
 
   private async getProfileOrThrow(id: string) {
-    const profile = await this.typeorm.agencyProfile.findUnique({
-      where: { userId: id },
-      include: { user: true, creditLine: true },
-    });
+    const profile = await this.profileRepo
+      .createQueryBuilder('a')
+      .leftJoinAndSelect('a.user', 'user')
+      .where('a.userId = :id', { id })
+      .getOne();
     if (!profile) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -226,9 +266,10 @@ export class AgenciesService {
   }
 
   private async getRequestOrThrow(id: string) {
-    const request = await this.typeorm.agencyMembershipRequest.findUnique({
-      where: { id },
-    });
+    const request = await this.membershipRequestRepo
+      .createQueryBuilder('r')
+      .where('r.id = :id', { id })
+      .getOne();
     if (!request) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -245,9 +286,8 @@ export class AgenciesService {
     agencyDebtIrr: Irr;
     agencyDebtCount: number;
   }> {
-    const agencyIds = (
-      await this.typeorm.agencyProfile.findMany({ select: { userId: true } })
-    ).map((p) => p.userId);
+    const profiles = await this.profileRepo.find({ select: { userId: true } });
+    const agencyIds = profiles.map((p) => p.userId);
     const usedByAgency = await this.computeUsedIrr(agencyIds);
 
     let agencyDebtIrr: Irr = ZERO_IRR;
@@ -264,30 +304,39 @@ export class AgenciesService {
   // ── Listing & detail ────────────────────────────────────────────────
 
   async list(query: { q?: string; debtorsOnly?: boolean }) {
-    const profiles = await this.typeorm.agencyProfile.findMany({
-      include: { user: true, creditLine: true },
-      orderBy: { joinedAt: 'desc' },
-    });
+    const profiles = await this.profileRepo
+      .createQueryBuilder('a')
+      .leftJoinAndSelect('a.user', 'user')
+      .orderBy('a.joinedAt', 'DESC')
+      .getMany();
     const agencyIds = profiles.map((p) => p.userId);
 
-    const [usedByAgency, unpaidCounts] = await Promise.all([
+    const [usedByAgency, unpaidCounts, creditLines] = await Promise.all([
       this.computeUsedIrr(agencyIds),
-      this.typeorm.agencyInvoice.groupBy({
-        by: ['agencyId'],
-        where: {
-          agencyId: { in: agencyIds },
-          status: { in: ['UNPAID', 'OVERDUE'] },
-        },
-        _count: { _all: true },
-      }),
+      agencyIds.length
+        ? this.invoiceRepo
+            .createQueryBuilder('i')
+            .select('i.agencyId', 'agencyId')
+            .addSelect('COUNT(*)', 'count')
+            .where('i.agencyId IN (:...ids)', { ids: agencyIds })
+            .andWhere('i.status IN (:...statuses)', {
+              statuses: ['UNPAID', 'OVERDUE'],
+            })
+            .groupBy('i.agencyId')
+            .getRawMany<{ agencyId: string; count: string }>()
+        : Promise.resolve<{ agencyId: string; count: string }[]>([]),
+      agencyIds.length
+        ? this.creditLineRepo.find({ where: { agencyId: In(agencyIds) } })
+        : Promise.resolve<AgencyCreditLine[]>([]),
     ]);
     const unpaidByAgency = new Map(
-      unpaidCounts.map((r) => [r.agencyId, r._count._all]),
+      unpaidCounts.map((r) => [r.agencyId, Number(r.count)]),
     );
+    const creditLineByAgency = new Map(creditLines.map((c) => [c.agencyId, c]));
 
     const rows = profiles.map((p) => {
       const usedIrr = maxIrr(usedByAgency.get(p.userId) ?? ZERO_IRR, ZERO_IRR);
-      const limitIrr = p.creditLine?.limitIrr ?? ZERO_IRR;
+      const limitIrr = creditLineByAgency.get(p.userId)?.limitIrr ?? ZERO_IRR;
       return {
         id: p.userId,
         fullName: p.user.fullName,
@@ -341,47 +390,53 @@ export class AgenciesService {
 
     const [
       usedByAgency,
+      creditLine,
       ticketCount,
       passengerCount,
-      salesAgg,
+      salesRows,
       paidInvoiceCount,
       unpaidInvoiceCount,
       recentActivity,
     ] = await Promise.all([
       this.computeUsedIrr([id]),
-      this.typeorm.booking.count({
-        where: { agencyId: id, status: { in: ['PAID', 'TICKETED'] } },
+      this.creditLineRepo.findOneBy({ agencyId: id }),
+      this.bookingRepo.count({
+        where: { agencyId: id, status: In(['PAID', 'TICKETED']) },
       }),
-      this.typeorm.passenger.count({
-        where: { booking: { agencyId: id } },
+      this.passengerRepo
+        .createQueryBuilder('p')
+        .leftJoin('p.booking', 'booking')
+        .where('booking.agencyId = :id', { id })
+        .getCount(),
+      // Real ticket sales only — excludes this same service's own
+      // resetTestDebt() calibration rows (bookingId null; see
+      // ReportingService.kpis() for the full explanation).
+      this.ledgerEntryRepo.find({
+        where: { agencyId: id, type: 'SALE', bookingId: Not(IsNull()) },
+        select: { signedAmountIrr: true },
       }),
-      this.typeorm.ledgerEntry.aggregate({
-        // Real ticket sales only — excludes this same service's own
-        // resetTestDebt() calibration rows (bookingId null; see
-        // ReportingService.kpis() for the full explanation).
-        where: { agencyId: id, type: 'SALE', bookingId: { not: null } },
-        _sum: { signedAmountIrr: true },
+      this.invoiceRepo.count({ where: { agencyId: id, status: 'PAID' } }),
+      this.invoiceRepo.count({
+        where: { agencyId: id, status: In(['UNPAID', 'OVERDUE']) },
       }),
-      this.typeorm.agencyInvoice.count({
-        where: { agencyId: id, status: 'PAID' },
-      }),
-      this.typeorm.agencyInvoice.count({
-        where: { agencyId: id, status: { in: ['UNPAID', 'OVERDUE'] } },
-      }),
-      this.typeorm.auditLog.findMany({
+      this.auditLogRepo.find({
         where: {
           category: 'AGENCY',
           entityType: 'AgencyProfile',
           entityId: id,
         },
-        orderBy: { createdAt: 'desc' },
+        order: { createdAt: 'DESC' },
         take: 20,
       }),
     ]);
 
     const usedIrr = maxIrr(usedByAgency.get(id) ?? ZERO_IRR, ZERO_IRR);
-    const limitIrr = profile.creditLine?.limitIrr ?? ZERO_IRR;
+    const limitIrr = creditLine?.limitIrr ?? ZERO_IRR;
     const isActive = !profile.suspendedAt;
+    const totalSalesIrr = salesRows.reduce(
+      (s, r) => addIrr(s, r.signedAmountIrr),
+      ZERO_IRR,
+    );
 
     // Senior Manager's detail view never showed this — presentational only.
     const includeScore =
@@ -408,7 +463,7 @@ export class AgenciesService {
       joinedAt: profile.joinedAt,
       credit: { limitIrr, usedIrr, remainingIrr: subIrr(limitIrr, usedIrr) },
       stats: {
-        totalSalesIrr: salesAgg._sum.signedAmountIrr ?? ZERO_IRR,
+        totalSalesIrr,
         ticketsIssued: ticketCount,
         passengers: passengerCount,
       },
@@ -442,60 +497,64 @@ export class AgenciesService {
 
     const [bookings, wsApproved, apiKeys, invoiceAggs, ledgerRows] =
       await Promise.all([
-        this.typeorm.booking.findMany({
-          where: { agencyId: id, status: { in: ['PAID', 'TICKETED'] } },
-          orderBy: { createdAt: 'desc' },
-          take: 10,
-          select: {
-            priceIrr: true,
-            createdAt: true,
-            flightInstance: {
-              select: {
-                departureAt: true,
-                flight: {
-                  select: {
-                    flightNo: true,
-                    route: { select: { originCode: true, destCode: true } },
-                  },
-                },
-              },
-            },
-            _count: { select: { passengers: true } },
-          },
-        }),
-        this.typeorm.agencyWebserviceRequest.findMany({
+        this.bookingRepo
+          .createQueryBuilder('b')
+          .leftJoinAndSelect('b.flightInstance', 'fi')
+          .leftJoinAndSelect('fi.flight', 'flight')
+          .leftJoinAndSelect('flight.route', 'route')
+          .where('b.agencyId = :id', { id })
+          .andWhere('b.status IN (:...statuses)', {
+            statuses: ['PAID', 'TICKETED'],
+          })
+          .orderBy('b.createdAt', 'DESC')
+          .take(10)
+          .getMany(),
+        this.webserviceRequestRepo.find({
           where: { agencyId: id, status: 'APPROVED' },
-          orderBy: { decidedAt: 'desc' },
+          order: { decidedAt: 'DESC' },
           take: 10,
         }),
-        this.typeorm.agencyApiKey.findMany({
+        this.apiKeyRepo.find({
           where: { agencyId: id, status: 'ACTIVE' },
-          orderBy: { activatedAt: 'desc' },
+          order: { activatedAt: 'DESC' },
         }),
-        this.typeorm.agencyInvoice.groupBy({
-          by: ['status'],
-          where: { agencyId: id },
-          _sum: { amountIrr: true },
-        }),
-        this.typeorm.ledgerEntry.findMany({
-          where: { agencyId: id },
-          orderBy: { occurredAt: 'desc' },
-          take: 10,
-          select: {
-            id: true,
-            type: true,
-            signedAmountIrr: true,
-            occurredAt: true,
-            booking: { select: { pnr: true } },
-          },
-        }),
+        this.invoiceRepo
+          .createQueryBuilder('i')
+          .select('i.status', 'status')
+          .addSelect('SUM(i.amountIrr)', 'sum')
+          .where('i.agencyId = :id', { id })
+          .groupBy('i.status')
+          .getRawMany<{ status: string; sum: string }>(),
+        this.ledgerEntryRepo
+          .createQueryBuilder('e')
+          .leftJoin('e.booking', 'booking')
+          .select(['e.id', 'e.type', 'e.signedAmountIrr', 'e.occurredAt'])
+          .addSelect(['booking.id', 'booking.pnr'])
+          .where('e.agencyId = :id', { id })
+          .orderBy('e.occurredAt', 'DESC')
+          .take(10)
+          .getMany(),
       ]);
 
+    const passengerCounts = bookings.length
+      ? await this.passengerRepo
+          .createQueryBuilder('p')
+          .select('p.bookingId', 'bookingId')
+          .addSelect('COUNT(*)', 'count')
+          .where('p.bookingId IN (:...ids)', {
+            ids: bookings.map((b) => b.id),
+          })
+          .groupBy('p.bookingId')
+          .getRawMany<{ bookingId: string; count: string }>()
+      : [];
+    const passengerCountByBookingId = new Map(
+      passengerCounts.map((r) => [r.bookingId, Number(r.count)]),
+    );
     const flightsSold = bookings.map((b) => ({
       routeFa: `${b.flightInstance.flight.route.originCode} ← ${b.flightInstance.flight.route.destCode}`,
       flightNo: b.flightInstance.flight.flightNo,
       departAt: b.flightInstance.departureAt.toISOString(),
-      seatCount: b._count.passengers,
+      seatCount: passengerCountByBookingId.get(b.id) ?? 0,
       salesIrr: b.priceIrr,
     }));
 
@@ -527,7 +586,7 @@ export class AgenciesService {
     let paidTotalIrr: Irr = ZERO_IRR;
     let unpaidTotalIrr: Irr = ZERO_IRR;
     for (const row of invoiceAggs) {
-      const amount = row._sum.amountIrr ?? ZERO_IRR;
+      const amount = BigInt(row.sum ?? '0');
       if (row.status === 'PAID') paidTotalIrr = addIrr(paidTotalIrr, amount);
       else unpaidTotalIrr = addIrr(unpaidTotalIrr, amount);
     }
@@ -559,18 +618,17 @@ export class AgenciesService {
 
   async suspend(actor: AuthenticatedUser, id: string, reason: string) {
     const profile = await this.getProfileOrThrow(id);
-    const updated = await this.typeorm.agencyProfile.update({
-      where: { userId: id },
-      data: { suspendedAt: new Date(), suspendReason: reason },
-    });
+    profile.suspendedAt = new Date();
+    profile.suspendReason = reason;
+    const updated = await this.profileRepo.save(profile);
 
     // Revoke this agency's outstanding sessions immediately — otherwise an
     // already-issued refresh token keeps working until it happens to be
     // used again and rechecked.
-    await this.typeorm.refreshToken.updateMany({
-      where: { userId: id, revokedAt: null },
-      data: { revokedAt: new Date() },
-    });
+    await this.refreshTokenRepo.update(
+      { userId: id, revokedAt: IsNull() },
+      { revokedAt: new Date() },
+    );
 
     await this.audit.record({
       actorId: actor.id,
@@ -587,10 +645,9 @@ export class AgenciesService {
 
   async reactivate(actor: AuthenticatedUser, id: string) {
     const profile = await this.getProfileOrThrow(id);
-    const updated = await this.typeorm.agencyProfile.update({
-      where: { userId: id },
-      data: { suspendedAt: null, suspendReason: null },
-    });
+    profile.suspendedAt = null;
+    profile.suspendReason = null;
+    const updated = await this.profileRepo.save(profile);
 
     await this.audit.record({
       actorId: actor.id,
@@ -610,7 +667,7 @@ export class AgenciesService {
   async getCredit(id: string) {
     await this.getProfileOrThrow(id);
     const [creditLine, usedByAgency] = await Promise.all([
-      this.typeorm.agencyCreditLine.findUnique({ where: { agencyId: id } }),
+      this.creditLineRepo.findOneBy({ agencyId: id }),
       this.computeUsedIrr([id]),
     ]);
     const limitIrr = creditLine?.limitIrr ?? ZERO_IRR;
@@ -620,11 +677,23 @@ export class AgenciesService {
 
   async updateCredit(actor: AuthenticatedUser, id: string, limitIrr: Irr) {
     await this.getProfileOrThrow(id);
-    const updated = await this.typeorm.agencyCreditLine.upsert({
-      where: { agencyId: id },
-      update: { limitIrr, updatedById: actor.id },
-      create: { agencyId: id, limitIrr, updatedById: actor.id },
-    });
+    const existing = await this.creditLineRepo.findOneBy({ agencyId: id });
+    let updated: AgencyCreditLine;
+    if (existing) {
+      existing.limitIrr = limitIrr;
+      existing.updatedById = actor.id;
+      existing.updatedAt = new Date();
+      updated = await this.creditLineRepo.save(existing);
+    } else {
+      updated = await this.creditLineRepo.save(
+        this.creditLineRepo.create({
+          agencyId: id,
+          limitIrr,
+          updatedById: actor.id,
+          updatedAt: new Date(),
+        }),
+      );
+    }
 
     await this.audit.record({
       actorId: actor.id,
@@ -649,18 +718,24 @@ export class AgenciesService {
   async settle(actor: AuthenticatedUser, id: string) {
     await this.getProfileOrThrow(id);
 
-    const result = await this.typeorm.$transaction(async (tx) => {
+    const result = await this.profileRepo.manager.transaction(async (tx) => {
       // Lock this agency's profile row so two concurrent settlements can't
       // both read the same "outstanding" figure before either writes —
       // the aggregate below has no row of its own to lock, so we serialize
       // on the agency's own profile row instead.
-      await tx.$queryRaw`SELECT "userId" FROM "agency_profiles" WHERE "userId" = ${id} FOR UPDATE`;
+      await tx
+        .createQueryBuilder(AgencyProfile, 'a')
+        .setLock('pessimistic_write')
+        .where('a.userId = :id', { id })
+        .getOne();
 
-      const sum = await tx.ledgerEntry.aggregate({
-        where: { agencyId: id, type: { in: ['SALE', 'SETTLEMENT'] } },
-        _sum: { signedAmountIrr: true },
-      });
-      const outstanding = maxIrr(sum._sum.signedAmountIrr ?? ZERO_IRR, ZERO_IRR);
+      const sumRow = await tx
+        .createQueryBuilder(LedgerEntry, 'e')
+        .select('SUM(e.signedAmountIrr)', 'sum')
+        .where('e.agencyId = :id', { id })
+        .andWhere('e.type IN (:...types)', { types: ['SALE', 'SETTLEMENT'] })
+        .getRawOne<{ sum: string | null }>();
+      const outstanding = maxIrr(BigInt(sumRow?.sum ?? '0'), ZERO_IRR);
       if (!isPositiveIrr(outstanding)) {
         throw new ConflictException({
           code: ErrorCode.CONFLICT,
@@ -668,14 +743,14 @@ export class AgenciesService {
         });
       }
 
-      const entry = await tx.ledgerEntry.create({
-        data: {
+      const entry = await tx.save(
+        tx.create(LedgerEntry, {
           agencyId: id,
           type: 'SETTLEMENT',
           signedAmountIrr: negateIrr(outstanding),
           createdById: actor.id,
-        },
-      });
+        }),
+      );
 
       return { settledIrr: outstanding, ledgerEntryId: entry.id };
     });
@@ -697,21 +772,21 @@ export class AgenciesService {
   // ── Membership requests ──────────────────────────────────────────────
 
   async listRequests(status?: AgencyMembershipStatus) {
-    return this.typeorm.agencyMembershipRequest.findMany({
-      where: status ? { status } : undefined,
-      orderBy: { createdAt: 'desc' },
+    return this.membershipRequestRepo.find({
+      where: status ? { status } : {},
+      order: { createdAt: 'DESC' },
     });
   }
 
   async getRequest(id: string) {
     const request = await this.getRequestOrThrow(id);
-    const history = await this.typeorm.auditLog.findMany({
+    const history = await this.auditLogRepo.find({
       where: {
         category: 'AGENCY',
         entityType: 'AgencyMembershipRequest',
         entityId: id,
       },
-      orderBy: { createdAt: 'desc' },
+      order: { createdAt: 'DESC' },
     });
     return { ...request, history };
   }
@@ -730,47 +805,56 @@ export class AgenciesService {
     const tempPassword = generateTempPassword();
     const passwordHash = await argon2.hash(tempPassword);
 
-    const { agencyUserId } = await this.typeorm.$transaction(async (tx) => {
-      const user = await tx.user.create({
-        data: {
-          role: 'AGENCY',
-          phone: request.phone,
-          email: request.email,
-          fullName: request.applicantName,
-          passwordHash,
-          mustChangePassword: true,
-          isActive: true,
-        },
-      });
-      await tx.agencyProfile.create({
-        data: {
-          userId: user.id,
-          licenseNo: request.licenseNo,
-          managerName: request.managerName,
-          phone: request.phone,
-          // Public pre-registration (Phase 16) collects neither — staff
-          // fill these in during onboarding, same as the street address.
-          email: request.email ?? '',
-          city: request.city ?? '',
-          // Full street address isn't captured on the request form — collected
-          // during the agency's own onboarding once the agency-portal track exists.
-          address: '',
-          tier: 'NORMAL',
-        },
-      });
-      await tx.agencyCreditLine.create({
-        data: { agencyId: user.id, limitIrr: 0, updatedById: actor.id },
-      });
-      await tx.agencyMembershipRequest.update({
-        where: { id },
-        data: {
-          status: 'APPROVED',
-          reviewedById: actor.id,
-          reviewedAt: new Date(),
-        },
-      });
-      return { agencyUserId: user.id };
-    });
+    const { agencyUserId } = await this.profileRepo.manager.transaction(
+      async (tx) => {
+        const user = await tx.save(
+          tx.create(User, {
+            role: 'AGENCY',
+            phone: request.phone,
+            email: request.email,
+            fullName: request.applicantName,
+            passwordHash,
+            mustChangePassword: true,
+            isActive: true,
+            updatedAt: new Date(),
+          }),
+        );
+        await tx.save(
+          tx.create(AgencyProfile, {
+            userId: user.id,
+            licenseNo: request.licenseNo,
+            managerName: request.managerName,
+            phone: request.phone,
+            // Public pre-registration (Phase 16) collects neither — staff
+            // fill these in during onboarding, same as the street address.
+            email: request.email ?? '',
+            city: request.city ?? '',
+            // Full street address isn't captured on the request form — collected
+            // during the agency's own onboarding once the agency-portal track exists.
+            address: '',
+            tier: 'NORMAL',
+          }),
+        );
+        await tx.save(
+          tx.create(AgencyCreditLine, {
+            agencyId: user.id,
+            limitIrr: 0n,
+            updatedById: actor.id,
+            updatedAt: new Date(),
+          }),
+        );
+        await tx.update(
+          AgencyMembershipRequest,
+          { id },
+          {
+            status: 'APPROVED',
+            reviewedById: actor.id,
+            reviewedAt: new Date(),
+          },
+        );
+        return { agencyUserId: user.id };
+      },
+    );
 
     // Phase 16: a real SMS now confirms approval + delivers access instead
     // of the temp password only ever appearing in the API response.
@@ -808,15 +892,11 @@ export class AgenciesService {
       });
     }
 
-    const updated = await this.typeorm.agencyMembershipRequest.update({
-      where: { id },
-      data: {
-        status: 'REJECTED',
-        reviewNote,
-        reviewedById: actor.id,
-        reviewedAt: new Date(),
-      },
-    });
+    request.status = 'REJECTED';
+    request.reviewNote = reviewNote ?? null;
+    request.reviewedById = actor.id;
+    request.reviewedAt = new Date();
+    const updated = await this.membershipRequestRepo.save(request);
 
     await this.audit.record({
       actorId: actor.id,
@@ -845,9 +925,7 @@ export class AgenciesService {
       });
     }
 
-    const target = await this.typeorm.user.findUnique({
-      where: { id: referredToId },
-    });
+    const target = await this.userRepo.findOneBy({ id: referredToId });
     if (!target) {
       throw new BadRequestException({
         code: ErrorCode.VALIDATION_FAILED,
@@ -855,16 +933,12 @@ export class AgenciesService {
       });
     }
 
-    const updated = await this.typeorm.agencyMembershipRequest.update({
-      where: { id },
-      data: {
-        status: 'REFERRED',
-        referredToId,
-        reviewNote: note,
-        reviewedById: actor.id,
-        reviewedAt: new Date(),
-      },
-    });
+    request.status = 'REFERRED';
+    request.referredToId = referredToId;
+    request.reviewNote = note ?? null;
+    request.reviewedById = actor.id;
+    request.reviewedAt = new Date();
+    const updated = await this.membershipRequestRepo.save(request);
 
     // Phase 4 wiring (⚑): the referred-to manager receives the request in
     // their cartable — that IS the delivery surface for referrals.
@@ -897,9 +971,9 @@ export class AgenciesService {
 
   async listApiKeys(id: string) {
     await this.getProfileOrThrow(id);
-    return this.typeorm.agencyApiKey.findMany({
+    return this.apiKeyRepo.find({
       where: { agencyId: id },
-      orderBy: { activatedAt: 'desc' },
+      order: { activatedAt: 'DESC' },
     });
   }
 
@@ -918,14 +992,14 @@ export class AgenciesService {
     );
     await this.getProfileOrThrow(id);
     const rawKey = generateApiKeySecret();
-    const created = await this.typeorm.agencyApiKey.create({
-      data: {
+    const created = await this.apiKeyRepo.save(
+      this.apiKeyRepo.create({
         agencyId: id,
         keyHash: hashSecret(rawKey),
         scope,
         status: 'ACTIVE',
-      },
-    });
+      }),
+    );
 
     await this.audit.record({
       actorId: actor.id,
@@ -952,9 +1026,7 @@ export class AgenciesService {
       stepUpCode?: string;
     },
   ) {
-    const key = await this.typeorm.agencyApiKey.findUnique({
-      where: { id: keyId },
-    });
+    const key = await this.apiKeyRepo.findOneBy({ id: keyId });
     if (!key || key.agencyId !== id) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -970,15 +1042,11 @@ export class AgenciesService {
         'API_KEY_ROTATE',
       );
       const rawKey = generateApiKeySecret();
-      const updated = await this.typeorm.agencyApiKey.update({
-        where: { id: keyId },
-        data: {
-          keyHash: hashSecret(rawKey),
-          activatedAt: new Date(),
-          lastUsedAt: null,
-          callCount: 0,
-        },
-      });
+      key.keyHash = hashSecret(rawKey);
+      key.activatedAt = new Date();
+      key.lastUsedAt = null;
+      key.callCount = 0;
+      const updated = await this.apiKeyRepo.save(key);
       await this.audit.record({
         actorId: actor.id,
         actorRole: actor.role,
@@ -992,10 +1060,8 @@ export class AgenciesService {
     }
 
     if (dto.status) {
-      const updated = await this.typeorm.agencyApiKey.update({
-        where: { id: keyId },
-        data: { status: dto.status },
-      });
+      key.status = dto.status;
+      const updated = await this.apiKeyRepo.save(key);
       await this.audit.record({
         actorId: actor.id,
         actorRole: actor.role,
@@ -1021,9 +1087,9 @@ export class AgenciesService {
 
   async listInvoices(id: string) {
     await this.getProfileOrThrow(id);
-    return this.typeorm.agencyInvoice.findMany({
+    return this.invoiceRepo.find({
       where: { agencyId: id },
-      orderBy: { issuedAt: 'desc' },
+      order: { issuedAt: 'DESC' },
     });
   }
 
@@ -1033,16 +1099,16 @@ export class AgenciesService {
     dto: { amountIrr: Irr; dueAt: string },
   ) {
     await this.getProfileOrThrow(id);
-    const created = await this.typeorm.agencyInvoice.create({
-      data: {
+    const created = await this.invoiceRepo.save(
+      this.invoiceRepo.create({
         agencyId: id,
         invoiceNo: generateInvoiceNo(),
         issuedById: actor.id,
         dueAt: new Date(dto.dueAt),
         amountIrr: dto.amountIrr,
         status: 'UNPAID',
-      },
-    });
+      }),
+    );
 
     await this.audit.record({
       actorId: actor.id,
@@ -1067,9 +1133,7 @@ export class AgenciesService {
         message: 'یافت نشد.',
       });
     }
-    const profile = await this.typeorm.agencyProfile.findUnique({
-      where: { userId: id },
-    });
+    const profile = await this.profileRepo.findOneBy({ userId: id });
     if (!profile) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -1080,22 +1144,20 @@ export class AgenciesService {
     const usedIrr = (await this.computeUsedIrr([id])).get(id) ?? ZERO_IRR;
     const deltaIrr = subIrr(targetIrr, usedIrr);
     if (!isZeroIrr(deltaIrr)) {
-      await this.typeorm.ledgerEntry.create({
-        data: {
+      await this.ledgerEntryRepo.save(
+        this.ledgerEntryRepo.create({
           agencyId: id,
           type: 'SALE',
           signedAmountIrr: deltaIrr,
           createdById: actor.id,
-        },
-      });
+        }),
+      );
     }
     return { usedIrr: targetIrr };
   }
 
   async payInvoice(actor: AuthenticatedUser, id: string, invoiceId: string) {
-    const invoice = await this.typeorm.agencyInvoice.findUnique({
-      where: { id: invoiceId },
-    });
+    const invoice = await this.invoiceRepo.findOneBy({ id: invoiceId });
     if (!invoice || invoice.agencyId !== id) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -1103,28 +1165,32 @@ export class AgenciesService {
       });
     }
 
-    const updated = await this.typeorm.$transaction(async (tx) => {
+    const updated = await this.invoiceRepo.manager.transaction(async (tx) => {
       // Conditional update guards against a concurrent double-pay race —
-      // count===0 means another request already marked it PAID first.
-      const result = await tx.agencyInvoice.updateMany({
-        where: { id: invoiceId, status: { not: 'PAID' } },
-        data: { status: 'PAID', paidAt: new Date() },
-      });
-      if (result.count === 0) {
+      // affected===0 means another request already marked it PAID first.
+      const result = await tx.update(
+        AgencyInvoice,
+        { id: invoiceId, status: Not('PAID') },
+        { status: 'PAID', paidAt: new Date() },
+      );
+      if ((result.affected ?? 0) === 0) {
         throw new ConflictException({
           code: ErrorCode.CONFLICT,
           message: 'این فاکتور قبلاً تسویه شده است.',
         });
       }
-      await tx.ledgerEntry.create({
-        data: {
+      await tx.save(
+        tx.create(LedgerEntry, {
           agencyId: id,
           type: 'SETTLEMENT',
           signedAmountIrr: negateIrr(invoice.amountIrr),
           createdById: actor.id,
-        },
-      });
-      return tx.agencyInvoice.findUniqueOrThrow({ where: { id: invoiceId } });
+        }),
+      );
+      return tx
+        .createQueryBuilder(AgencyInvoice, 'i')
+        .where('i.id = :id', { id: invoiceId })
+        .getOneOrFail();
     });
 
     await this.audit.record({
@@ -1141,9 +1207,7 @@ export class AgenciesService {
   }
 
   async remindInvoice(actor: AuthenticatedUser, id: string, invoiceId: string) {
-    const invoice = await this.typeorm.agencyInvoice.findUnique({
-      where: { id: invoiceId },
-    });
+    const invoice = await this.invoiceRepo.findOneBy({ id: invoiceId });
     if (!invoice || invoice.agencyId !== id) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -1167,9 +1231,9 @@ export class AgenciesService {
 
   async listMessages(id: string) {
     await this.getProfileOrThrow(id);
-    return this.typeorm.agencyMessage.findMany({
+    return this.messageRepo.find({
       where: { agencyId: id },
-      orderBy: { createdAt: 'asc' },
+      order: { createdAt: 'ASC' },
     });
   }
 
@@ -1180,9 +1244,14 @@ export class AgenciesService {
     senderIsAgency = false,
   ) {
     await this.getProfileOrThrow(id);
-    return this.typeorm.agencyMessage.create({
-      data: { agencyId: id, senderId: actor.id, senderIsAgency, body },
-    });
+    return this.messageRepo.save(
+      this.messageRepo.create({
+        agencyId: id,
+        senderId: actor.id,
+        senderIsAgency,
+        body,
+      }),
+    );
   }
 
   async notifyAllDebtors(actor: AuthenticatedUser) {
@@ -1203,9 +1272,9 @@ export class AgenciesService {
 
   async listCreditRequests(id: string) {
     await this.getProfileOrThrow(id);
-    return this.typeorm.agencyCreditRequest.findMany({
+    return this.creditRequestRepo.find({
       where: { agencyId: id },
-      orderBy: { createdAt: 'desc' },
+      order: { createdAt: 'DESC' },
     });
   }
 
@@ -1215,9 +1284,7 @@ export class AgenciesService {
     requestId: string,
     approve: boolean,
   ) {
-    const request = await this.typeorm.agencyCreditRequest.findUnique({
-      where: { id: requestId },
-    });
+    const request = await this.creditRequestRepo.findOneBy({ id: requestId });
     if (!request || request.agencyId !== id) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -1236,11 +1303,11 @@ export class AgenciesService {
       : 'REJECTED';
 
     // Conditional update guards a concurrent double-decision race.
-    const updated = await this.typeorm.agencyCreditRequest.updateMany({
-      where: { id: requestId, status: 'PENDING' },
-      data: { status: decision, decidedById: actor.id, decidedAt: new Date() },
-    });
-    if (updated.count === 0) {
+    const updated = await this.creditRequestRepo.update(
+      { id: requestId, status: 'PENDING' },
+      { status: decision, decidedById: actor.id, decidedAt: new Date() },
+    );
+    if ((updated.affected ?? 0) === 0) {
       throw new ConflictException({
         code: ErrorCode.CONFLICT,
         message: 'این درخواست قبلاً بررسی شده است.',
@@ -1265,9 +1332,10 @@ export class AgenciesService {
       entityId: requestId,
     });
 
-    return this.typeorm.agencyCreditRequest.findUniqueOrThrow({
-      where: { id: requestId },
-    });
+    return this.creditRequestRepo
+      .createQueryBuilder('r')
+      .where('r.id = :id', { id: requestId })
+      .getOneOrFail();
   }
 
   // ── Agency Portal: webservice purchase requests (staff-side review) ────
@@ -1306,9 +1374,9 @@ export class AgenciesService {
 
   async listWebserviceRequests(id: string) {
     await this.getProfileOrThrow(id);
-    return this.typeorm.agencyWebserviceRequest.findMany({
+    return this.webserviceRequestRepo.find({
       where: { agencyId: id },
-      orderBy: { createdAt: 'desc' },
+      order: { createdAt: 'DESC' },
     });
   }
 
@@ -1320,8 +1388,8 @@ export class AgenciesService {
     stepUpChallengeId?: string,
     stepUpCode?: string,
   ) {
-    const request = await this.typeorm.agencyWebserviceRequest.findUnique({
-      where: { id: requestId },
+    const request = await this.webserviceRequestRepo.findOneBy({
+      id: requestId,
     });
     if (!request || request.agencyId !== id) {
       throw new NotFoundException({
@@ -1366,11 +1434,11 @@ export class AgenciesService {
 
     // Conditional update guards a concurrent double-decision race — same
     // pattern as decideCreditRequest above.
-    const updated = await this.typeorm.agencyWebserviceRequest.updateMany({
-      where: { id: requestId, status: 'PENDING' },
-      data: { status: decision, decidedById: actor.id, decidedAt: new Date() },
-    });
-    if (updated.count === 0) {
+    const updated = await this.webserviceRequestRepo.update(
+      { id: requestId, status: 'PENDING' },
+      { status: decision, decidedById: actor.id, decidedAt: new Date() },
+    );
+    if ((updated.affected ?? 0) === 0) {
       throw new ConflictException({
         code: ErrorCode.CONFLICT,
         message: 'این درخواست قبلاً بررسی شده است.',
@@ -1389,21 +1457,23 @@ export class AgenciesService {
       entityId: requestId,
     });
 
-    return this.typeorm.agencyWebserviceRequest.findUniqueOrThrow({
-      where: { id: requestId },
-    });
+    return this.webserviceRequestRepo
+      .createQueryBuilder('r')
+      .where('r.id = :id', { id: requestId })
+      .getOneOrFail();
   }
 
   // ── Agency Portal: uploaded document review (staff-side) ───────────────
 
   async listDocuments(id: string) {
     await this.getProfileOrThrow(id);
-    return this.typeorm.agencyDocument.findMany({
+    return this.documentRepo.find({
       where: { agencyId: id },
-      include: {
-        file: { select: { fileName: true, sizeBytes: true, mimeType: true } },
+      relations: { file: true },
+      select: {
+        file: { fileName: true, sizeBytes: true, mimeType: true },
       },
-      orderBy: { createdAt: 'desc' },
+      order: { createdAt: 'DESC' },
     });
   }
 
@@ -1413,9 +1483,7 @@ export class AgenciesService {
     documentId: string,
     approve: boolean,
   ) {
-    const document = await this.typeorm.agencyDocument.findUnique({
-      where: { id: documentId },
-    });
+    const document = await this.documentRepo.findOneBy({ id: documentId });
     if (!document || document.agencyId !== id) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -1433,11 +1501,11 @@ export class AgenciesService {
 
     // Conditional update guards a concurrent double-decision race — same
     // pattern as decideCreditRequest/decideWebserviceRequest above.
-    const updated = await this.typeorm.agencyDocument.updateMany({
-      where: { id: documentId, status: 'PENDING' },
-      data: { status: decision },
-    });
-    if (updated.count === 0) {
+    const updated = await this.documentRepo.update(
+      { id: documentId, status: 'PENDING' },
+      { status: decision },
+    );
+    if ((updated.affected ?? 0) === 0) {
       throw new ConflictException({
         code: ErrorCode.CONFLICT,
         message: 'این مدرک قبلاً بررسی شده است.',
@@ -1454,10 +1522,11 @@ export class AgenciesService {
       entityId: documentId,
     });
 
-    return this.typeorm.agencyDocument.findUniqueOrThrow({
+    return this.documentRepo.findOne({
       where: { id: documentId },
-      include: {
-        file: { select: { fileName: true, sizeBytes: true, mimeType: true } },
+      relations: { file: true },
+      select: {
+        file: { fileName: true, sizeBytes: true, mimeType: true },
       },
     });
   }
