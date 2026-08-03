@@ -25,12 +25,18 @@ async function main() {
     { username: 'com.ahmadi', fullName: 'رضا احمدی', role: 'EMPLOYEE' },
     { username: 'itadmin', fullName: 'مهندس علی صدر', role: 'IT_MANAGER' },
     { username: 'comm.abbasi', fullName: 'رضا مرادی', role: 'COMMERCIAL_MANAGER' },
-    { username: 'finance.karimi', fullName: 'سحر کاظمی', role: 'FINANCE_MANAGER' },
+    { username: 'finance', fullName: 'سحر کاظمی', role: 'FINANCE_MANAGER' },
     { username: 'senior.rahimi', fullName: 'محمد رحیمی', role: 'SENIOR_MANAGER' },
     { username: 'ceo', fullName: 'محمد رحیمی', role: 'CEO' },
     { username: 'chair', fullName: 'رئیس هیئت مدیره', role: 'BOARD_CHAIR' },
     { username: 'site.admin', fullName: 'ادمین سایت', role: 'SITE_ADMIN' },
   ];
+
+  // Rename legacy seed username so re-seed on existing DBs picks up `finance`.
+  await typeorm.user.updateMany({
+    where: { username: 'finance.karimi' },
+    data: { username: 'finance' },
+  });
 
   const staffByUsername = new Map<string, { id: string }>();
   for (const s of staff) {
@@ -50,7 +56,7 @@ async function main() {
   }
   const seniorManager = staffByUsername.get('senior.rahimi')!;
   const commercialManager = staffByUsername.get('comm.abbasi')!;
-  const financeManager = staffByUsername.get('finance.karimi')!;
+  const financeManager = staffByUsername.get('finance')!;
 
   await typeorm.user.upsert({
     where: { phone: '+989120000001' },

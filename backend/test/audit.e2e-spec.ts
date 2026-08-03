@@ -22,14 +22,14 @@ describe('Audit (e2e)', () => {
     const setupTypeORM = setupApp.get(TypeORMService);
 
     const users = await setupTypeORM.user.findMany({
-      where: { username: { in: ['finance.karimi', 'senior.rahimi', 'ceo'] } },
+      where: { username: { in: ['finance', 'senior.rahimi', 'ceo'] } },
     });
     const byUsername = Object.fromEntries(users.map((u) => [u.username, u]));
 
     await setupTypeORM.auditLog.createMany({
       data: [
         {
-          actorId: byUsername['finance.karimi'].id,
+          actorId: byUsername['finance'].id,
           actorRole: 'FINANCE_MANAGER',
           category: 'REFUND',
           action: 'تأیید استرداد',
@@ -83,7 +83,7 @@ describe('Audit (e2e)', () => {
   });
 
   it('a non-CEO/Chair/Senior role gets 403 on manager-reports', async () => {
-    const { accessToken } = await loginAs(app, 'finance.karimi');
+    const { accessToken } = await loginAs(app, 'finance');
     const res = await request(app.getHttpServer())
       .get('/audit/manager-reports')
       .set('Authorization', `Bearer ${accessToken}`);

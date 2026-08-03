@@ -78,6 +78,6 @@ test('CEO adds a new VIP member and finds them in the directory', async ({ page 
 });
 
 test('Finance Manager has no مشتریان VIP nav entry (role isolation)', async ({ page }) => {
-  await loginAs(page, 'finance.karimi');
+  await loginAs(page, 'finance');
   await expect(page.getByRole('link', { name: /^مشتریان VIP/ })).toHaveCount(0);
 });

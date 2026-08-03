@@ -104,7 +104,7 @@ describe('Webservice pricing (e2e)', () => {
   });
 
   it('FINANCE_MANAGER cannot patch webservice pricing (403)', async () => {
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const res = await request(app.getHttpServer())
       .patch('/webservice/pricing')
       .set('Authorization', `Bearer ${finance.accessToken}`)

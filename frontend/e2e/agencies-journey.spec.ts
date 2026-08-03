@@ -29,7 +29,7 @@ async function openAgenciesTab(page: Page) {
 
 // One journey per role: open آژانس‌ها → search → open an agency →
 // change the credit limit → see it reflected.
-for (const username of ['senior.rahimi', 'finance.karimi', 'comm.abbasi']) {
+for (const username of ['senior.rahimi', 'finance', 'comm.abbasi']) {
   test(`agencies journey for ${username}: search, open detail, change credit limit`, async ({ page }) => {
     await loginAs(page, username);
     await openAgenciesTab(page);
@@ -54,7 +54,7 @@ for (const username of ['senior.rahimi', 'finance.karimi', 'comm.abbasi']) {
     // updates. Values stay under the Int32 rial ceiling (~214M toman) noted
     // as pre-launch tech debt in PLAN.md.
     const newLimitToman =
-      username === 'senior.rahimi' ? '150000000' : username === 'finance.karimi' ? '160000000' : '170000000';
+      username === 'senior.rahimi' ? '150000000' : username === 'finance' ? '160000000' : '170000000';
     await page.getByRole('button', { name: 'تعیین اعتبار' }).click();
     await page.fill('#credit-input', newLimitToman);
     await page.getByRole('button', { name: 'ثبت اعتبار' }).click();

@@ -131,7 +131,7 @@ describe('Club (e2e)', () => {
       members.every((m) => !('nationalIdEnc' in m) && !('nationalIdHash' in m)),
     ).toBe(true);
 
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const forbidden = await request(app.getHttpServer())
       .get('/club/members')
       .set('Authorization', `Bearer ${finance.accessToken}`);
@@ -418,7 +418,7 @@ describe('Club (e2e)', () => {
         .set('Authorization', `Bearer ${commercial.accessToken}`);
       expect(commercialRes.status).toBe(200);
 
-      for (const username of ['finance.karimi', 'senior.rahimi', 'chair']) {
+      for (const username of ['finance', 'senior.rahimi', 'chair']) {
         const { accessToken } = await loginAs(app, username);
         const res = await request(app.getHttpServer())
           .get('/club/tier-rules')

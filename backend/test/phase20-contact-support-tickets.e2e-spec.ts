@@ -66,7 +66,7 @@ describe('Phase 20 — contact + support tickets (e2e)', () => {
     });
 
     it('403s for a non-SITE_ADMIN staff role', async () => {
-      const { accessToken } = await loginAs(app, 'finance.karimi');
+      const { accessToken } = await loginAs(app, 'finance');
       const res = await request(app.getHttpServer())
         .get('/contact')
         .set('Authorization', `Bearer ${accessToken}`);
@@ -171,7 +171,7 @@ describe('Phase 20 — contact + support tickets (e2e)', () => {
     });
 
     it('403s the list endpoint for a non-SITE_ADMIN staff role', async () => {
-      const { accessToken } = await loginAs(app, 'finance.karimi');
+      const { accessToken } = await loginAs(app, 'finance');
       const res = await request(app.getHttpServer())
         .get('/support-tickets')
         .set('Authorization', `Bearer ${accessToken}`);

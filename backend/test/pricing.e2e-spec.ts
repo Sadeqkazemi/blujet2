@@ -407,7 +407,7 @@ describe('Pricing (e2e)', () => {
     expect(legal.status).toBe(200);
     expect(legal.body.data.legalRateIrr).toBe('45000000');
 
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const listForbidden = await request(app.getHttpServer())
       .get('/pricing/proposals')
       .set('Authorization', `Bearer ${finance.accessToken}`);

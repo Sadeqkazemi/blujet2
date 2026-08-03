@@ -56,7 +56,7 @@ frontend work (tasks #15–16) hasn't started yet.
 - [x] Money fields render via `faMoney`; dates via the Jalali util — no raw Latin digits/ISO strings in the UI — asserted inline (Persian ٬-separated toman strings, absence of raw ISO dates) in `AgenciesListPage.test.tsx` + `AgencyDetailPage.test.tsx`; toman→rial input parsing proven by `'the credit modal parses a toman amount (Persian digits allowed) into rial'`
 
 ### E2E — `frontend/e2e/agencies-journey.spec.ts` (Playwright, real stack)
-- [x] One journey per role: open آژانس‌ها → search → open an agency → change credit limit → see it reflected — `'agencies journey for <senior.rahimi|finance.karimi|comm.abbasi>: search, open detail, change credit limit'` (3 tests)
+- [x] One journey per role: open آژانس‌ها → search → open an agency → change credit limit → see it reflected — `'agencies journey for <senior.rahimi|finance|comm.abbasi>: search, open detail, change credit limit'` (3 tests)
 - [x] Commercial Manager: issue an invoice → mark it paid → credit-used figure drops by that amount — `'Commercial Manager: issue an invoice, pay it, and watch the credit-used figure drop'`
 - [x] Concurrency: two simultaneous `PATCH .../credit` calls on the same agency — last-write-wins on `limitIrr`, no crash, both audited — `backend/test/agencies.e2e-spec.ts: 'two simultaneous PATCH .../credit calls do not crash, last write wins, and both are audited'`
 

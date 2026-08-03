@@ -7,7 +7,7 @@ test.setTimeout(240_000);
 test('Finance Manager opens مالی and sees real transactions, revenue mix, and agency settlements', async ({
   page,
 }) => {
-  await loginAs(page, 'finance.karimi');
+  await loginAs(page, 'finance');
   await page.getByRole('link', { name: 'مالی' }).click();
   await page.waitForURL('**/panel/finance');
 
@@ -46,7 +46,7 @@ test('Senior searches گزارش مسافران and sees the ticket card with a 
 });
 
 test('Finance Manager sees گزارش کارمندان with only its own dept employees', async ({ page }) => {
-  await loginAs(page, 'finance.karimi');
+  await loginAs(page, 'finance');
   await page.getByRole('link', { name: 'گزارش کارمندان' }).click();
   await page.waitForURL('**/panel/staff');
 

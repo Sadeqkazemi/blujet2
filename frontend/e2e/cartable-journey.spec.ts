@@ -24,7 +24,7 @@ test('message loop: CEO composes to واحد مالی → it appears in Finance�
 
   const finCtx = await browser.newContext();
   const finPage = await finCtx.newPage();
-  await loginAs(finPage, 'finance.karimi');
+  await loginAs(finPage, 'finance');
   await finPage.getByRole('link', { name: /^کارتابل/ }).click();
   const row = finPage.locator('li', { hasText: subject });
   await expect(row).toBeVisible();

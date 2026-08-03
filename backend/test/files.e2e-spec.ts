@@ -85,7 +85,7 @@ describe('Files (e2e)', () => {
 
     // Attach it to a referral addressed to Finance — Finance can now read it.
     const finance = await typeorm.user.findUniqueOrThrow({
-      where: { username: 'finance.karimi' },
+      where: { username: 'finance' },
     });
     await request(app.getHttpServer())
       .post('/referrals')
@@ -97,7 +97,7 @@ describe('Files (e2e)', () => {
         attachmentIds: [fileId],
       });
 
-    const financeLogin = await loginAs(app, 'finance.karimi');
+    const financeLogin = await loginAs(app, 'finance');
     const asRecipient = await request(app.getHttpServer())
       .get(`/files/${fileId}`)
       .set('Authorization', `Bearer ${financeLogin.accessToken}`);

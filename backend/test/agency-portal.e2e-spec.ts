@@ -288,7 +288,7 @@ describe('Agency Portal (e2e)', () => {
     expect(createRes.status).toBe(201);
     const requestId = createRes.body.data.id;
 
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const approveRes = await request(app.getHttpServer())
       .patch(`/agencies/${agency.id}/credit-requests/${requestId}/decide`)
       .set('Authorization', auth(finance.accessToken))
@@ -316,7 +316,7 @@ describe('Agency Portal (e2e)', () => {
       .set('Authorization', auth(accessToken))
       .send({ requestedLimitIrr: 900_000_000 });
 
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const rejectRes = await request(app.getHttpServer())
       .patch(
         `/agencies/${agency.id}/credit-requests/${createRes.body.data.id}/decide`,
@@ -418,7 +418,7 @@ describe('Agency Portal (e2e)', () => {
     expect(mineRes.body.data).toHaveLength(1);
     expect(mineRes.body.data[0].id).toBe(createRes.body.data.id);
 
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const staffRes = await request(app.getHttpServer())
       .get(`/agencies/${agency.id}/webservice-requests`)
       .set('Authorization', auth(finance.accessToken));

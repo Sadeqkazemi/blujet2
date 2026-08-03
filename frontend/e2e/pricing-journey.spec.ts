@@ -116,7 +116,7 @@ test.describe.serial('pricing', () => {
 });
 
 test('Finance Manager gets no pricing surfaces (role isolation)', async ({ page }) => {
-  await loginAs(page, 'finance.karimi');
+  await loginAs(page, 'finance');
   await expect(page.getByRole('link', { name: /^تعیین قیمت بلیط/ })).toHaveCount(0);
   await expect(page.getByRole('link', { name: /^مدیریت پروازها/ })).toHaveCount(0);
 });

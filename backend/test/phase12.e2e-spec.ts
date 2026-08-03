@@ -63,7 +63,7 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
     // (real refresh-token derivation).
     expect(rows.some((r) => r.online)).toBe(true);
 
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const forbidden = await request(app.getHttpServer())
       .get('/admins')
       .set('Authorization', auth(finance.accessToken));
@@ -294,7 +294,7 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
       .set('Authorization', auth(chair.accessToken))
       .send({ patch: { maintenance: false } });
 
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const forbidden = await request(app.getHttpServer())
       .get('/settings')
       .set('Authorization', auth(finance.accessToken));

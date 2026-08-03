@@ -7753,7 +7753,7 @@
         "properties": {
           "username": {
             "type": "string",
-            "example": "finance.karimi",
+            "example": "finance",
             "description": "Staff username"
           },
           "password": {

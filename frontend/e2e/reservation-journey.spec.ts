@@ -100,7 +100,7 @@ test('SENIOR_MANAGER sees the seat map read-only — no lock or issue controls',
 });
 
 test('Non-reservation role has no reservation nav entry (role isolation)', async ({ page }) => {
-  await loginAs(page, 'finance.karimi');
+  await loginAs(page, 'finance');
   await expect(page.getByRole('link', { name: 'سامانه رزرواسیون' })).not.toBeVisible();
   await expect(page.getByRole('link', { name: 'هواپیما' })).not.toBeVisible();
 });

@@ -27,7 +27,7 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
   // ── recent transactions ────────────────────────────────────────────────
 
   it('GET /reporting/recent-transactions: finance manager gets real ledger rows with party labels; other roles 403', async () => {
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const res = await request(app.getHttpServer())
       .get('/reporting/recent-transactions')
       .set('Authorization', auth(finance.accessToken));
@@ -49,7 +49,7 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
   });
 
   it('GET /reporting/kpis: returns trend percentages alongside KPI values', async () => {
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const res = await request(app.getHttpServer())
       .get('/reporting/kpis?granularity=q6')
       .set('Authorization', auth(finance.accessToken));
@@ -71,7 +71,7 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
   });
 
   it('GET /reporting/finance-dashboard-stats: finance manager gets real dashboard cards; other roles 403', async () => {
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const res = await request(app.getHttpServer())
       .get('/reporting/finance-dashboard-stats')
       .set('Authorization', auth(finance.accessToken));
@@ -121,7 +121,7 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
   // ── agency settlements ─────────────────────────────────────────────────
 
   it('GET /reporting/agency-settlements: per-agency paid ratio + status from real invoices; finance only', async () => {
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const res = await request(app.getHttpServer())
       .get('/reporting/agency-settlements')
       .set('Authorization', auth(finance.accessToken));
@@ -150,7 +150,7 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
   });
 
   it('FINANCE_MANAGER can now trigger the Phase 3 invoice remind (design: settlements row action)', async () => {
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const settleRes = await request(app.getHttpServer())
       .get('/reporting/agency-settlements')
       .set('Authorization', auth(finance.accessToken));
@@ -245,7 +245,7 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
       },
     });
 
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const res = await request(app.getHttpServer())
       .get(`/passenger-reports/search?q=${nationalId}`)
       .set('Authorization', auth(finance.accessToken));
@@ -280,7 +280,7 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
       },
     });
 
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const res = await request(app.getHttpServer())
       .get('/staff-reports')
       .set('Authorization', auth(finance.accessToken));
@@ -308,7 +308,7 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
       where: { role: 'EMPLOYEE', dept: { in: ['commercial', 'sales'] } },
     });
 
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const res = await request(app.getHttpServer())
       .get(`/staff-reports?staffId=${commEmployee.id}`)
       .set('Authorization', auth(finance.accessToken));

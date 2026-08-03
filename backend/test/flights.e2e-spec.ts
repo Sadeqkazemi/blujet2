@@ -208,7 +208,7 @@ describe('Flights (e2e)', () => {
     expect(codes).toEqual(expect.arrayContaining(['THR', 'DXB', 'IST', 'NJF']));
     expect(codes.length).toBeGreaterThanOrEqual(23);
 
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const denied = await request(app.getHttpServer())
       .get('/flights/overview')
       .set('Authorization', `Bearer ${finance.accessToken}`);

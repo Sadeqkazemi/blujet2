@@ -9,7 +9,7 @@ const ROWS: AdminRow[] = [
   {
     id: 'a1',
     fullName: 'سحر کاظمی',
-    username: 'finance.karimi',
+    username: 'finance',
     email: 'finance@blujet.example',
     role: 'FINANCE_MANAGER',
     roleLabelFa: 'مدیر مالی',
