@@ -4,12 +4,15 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
-import { PrismaService } from '../../prisma/prisma.service';
+import { IsNull, LessThanOrEqual, Not, Repository } from 'typeorm';
+import { BlogPost } from '../../database/entities/blog-post.entity';
+import { StoredFile } from '../../database/entities/stored-file.entity';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
-import type { BlogPostStatus, Prisma } from '../../../generated/prisma/client';
+import { BlogPostStatus } from '../../database/enums';
 import type {
   CreateBlogPostDto,
   ListBlogPostsQueryDto,
@@ -54,7 +57,10 @@ function isPubliclyVisible(
 @Injectable()
 export class BlogService {
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectRepository(BlogPost)
+    private readonly blogPostRepo: Repository<BlogPost>,
+    @InjectRepository(StoredFile)
+    private readonly storedFileRepo: Repository<StoredFile>,
     private readonly audit: AuditService,
   ) {}
 
@@ -62,7 +68,7 @@ export class BlogService {
     let slug = preferred;
     let attempt = 0;
     while (attempt < 10) {
-      const existing = await this.prisma.blogPost.findUnique({
+      const existing = await this.blogPostRepo.findOne({
         where: { slug },
         select: { id: true },
       });
@@ -78,9 +84,7 @@ export class BlogService {
     coverFileId: string,
     excludePostId?: string,
   ) {
-    const file = await this.prisma.storedFile.findUnique({
-      where: { id: coverFileId },
-    });
+    const file = await this.storedFileRepo.findOneBy({ id: coverFileId });
     if (!file) {
       throw new BadRequestException({
         code: ErrorCode.VALIDATION_FAILED,
@@ -93,11 +97,11 @@ export class BlogService {
         message: 'فقط فایل‌های آپلودشده توسط شما قابل استفاده است.',
       });
     }
-    const usedElsewhere = await this.prisma.blogPost.findFirst({
+    const usedElsewhere = await this.blogPostRepo.findOne({
       where: {
         coverFileId,
-        deletedAt: null,
-        ...(excludePostId ? { id: { not: excludePostId } } : {}),
+        deletedAt: IsNull(),
+        ...(excludePostId ? { id: Not(excludePostId) } : {}),
       },
     });
     if (usedElsewhere) {
@@ -134,21 +138,7 @@ export class BlogService {
     return { publishedAt: null, scheduledAt: null };
   }
 
-  private toAdminRow(post: {
-    id: string;
-    title: string;
-    slug: string;
-    body: string;
-    category: string;
-    status: BlogPostStatus;
-    viewCount: number;
-    publishedAt: Date | null;
-    scheduledAt: Date | null;
-    createdAt: Date;
-    updatedAt: Date;
-    coverFileId: string | null;
-    author: { fullName: string };
-  }) {
+  private toAdminRow(post: BlogPost) {
     return {
       id: post.id,
       title: post.title,
@@ -169,45 +159,45 @@ export class BlogService {
   }
 
   async getAdminStats() {
-    const [published, draft, viewsAgg] = await Promise.all([
-      this.prisma.blogPost.count({
-        where: { deletedAt: null, status: 'PUBLISHED' },
+    const [published, draft, viewsRow] = await Promise.all([
+      this.blogPostRepo.count({
+        where: { deletedAt: IsNull(), status: BlogPostStatus.PUBLISHED },
       }),
-      this.prisma.blogPost.count({
-        where: { deletedAt: null, status: 'DRAFT' },
+      this.blogPostRepo.count({
+        where: { deletedAt: IsNull(), status: BlogPostStatus.DRAFT },
       }),
-      this.prisma.blogPost.aggregate({
-        where: { deletedAt: null },
-        _sum: { viewCount: true },
-      }),
+      this.blogPostRepo
+        .createQueryBuilder('p')
+        .select('SUM(p."viewCount")', 'sum')
+        .where('p."deletedAt" IS NULL')
+        .getRawOne<{ sum: string | null }>(),
     ]);
     return {
       publishedCount: published,
       draftCount: draft,
-      totalViews: viewsAgg._sum.viewCount ?? 0,
+      totalViews: viewsRow?.sum ? Number(viewsRow.sum) : 0,
       commentCount: 0,
     };
   }
 
   async listAdminPosts(query: ListBlogPostsQueryDto) {
-    const where: Prisma.BlogPostWhereInput = {
-      deletedAt: null,
-      ...(query.category && query.category !== 'all'
-        ? { category: query.category }
-        : {}),
-    };
-    const posts = await this.prisma.blogPost.findMany({
-      where,
-      include: { author: { select: { fullName: true } } },
-      orderBy: [{ updatedAt: 'desc' }],
+    const posts = await this.blogPostRepo.find({
+      where: {
+        deletedAt: IsNull(),
+        ...(query.category && query.category !== 'all'
+          ? { category: query.category }
+          : {}),
+      },
+      relations: { author: true },
+      order: { updatedAt: 'DESC' },
     });
     return posts.map((p) => this.toAdminRow(p));
   }
 
   async getAdminPost(id: string) {
-    const post = await this.prisma.blogPost.findFirst({
-      where: { id, deletedAt: null },
-      include: { author: { select: { fullName: true } } },
+    const post = await this.blogPostRepo.findOne({
+      where: { id, deletedAt: IsNull() },
+      relations: { author: true },
     });
     if (!post) {
       throw new NotFoundException({
@@ -222,36 +212,39 @@ export class BlogService {
     if (dto.coverFileId) {
       await this.assertCoverFile(actor.id, dto.coverFileId);
     }
-    const status = dto.status ?? 'DRAFT';
+    const status = dto.status ?? BlogPostStatus.DRAFT;
     const statusFields = this.resolveStatusFields(status, dto.scheduledAt);
     const preferredSlug = dto.slug?.trim() || slugify(dto.title);
     const slug = await this.uniqueSlug(preferredSlug);
 
-    const post = await this.prisma.blogPost.create({
-      data: {
-        title: dto.title.trim(),
-        slug,
-        body: dto.body,
-        category: dto.category,
-        status,
-        coverFileId: dto.coverFileId,
-        authorId: actor.id,
-        ...statusFields,
-      },
-      include: { author: { select: { fullName: true } } },
+    const entity = this.blogPostRepo.create({
+      title: dto.title.trim(),
+      slug,
+      body: dto.body,
+      category: dto.category,
+      status,
+      coverFileId: dto.coverFileId ?? null,
+      authorId: actor.id,
+      updatedAt: new Date(),
+      ...statusFields,
     });
+    const saved = await this.blogPostRepo.save(entity);
 
     await this.audit.record({
       actorId: actor.id,
       actorRole: actor.role,
       category: 'CONTENT',
       action: 'ایجاد مقالهٔ بلاگ',
-      detail: `${actor.fullName} مقالهٔ «${post.title}» را ایجاد کرد.`,
+      detail: `${actor.fullName} مقالهٔ «${saved.title}» را ایجاد کرد.`,
       entityType: 'BlogPost',
-      entityId: post.id,
+      entityId: saved.id,
     });
 
-    return this.toAdminRow(post);
+    const withAuthor = await this.blogPostRepo.findOne({
+      where: { id: saved.id },
+      relations: { author: true },
+    });
+    return this.toAdminRow(withAuthor!);
   }
 
   async updatePost(
@@ -259,8 +252,8 @@ export class BlogService {
     id: string,
     dto: UpdateBlogPostDto,
   ) {
-    const existing = await this.prisma.blogPost.findFirst({
-      where: { id, deletedAt: null },
+    const existing = await this.blogPostRepo.findOne({
+      where: { id, deletedAt: IsNull() },
     });
     if (!existing) {
       throw new NotFoundException({
@@ -275,7 +268,9 @@ export class BlogService {
 
     const nextStatus = dto.status ?? existing.status;
     const scheduledInput =
-      dto.scheduledAt !== undefined ? dto.scheduledAt : existing.scheduledAt?.toISOString();
+      dto.scheduledAt !== undefined
+        ? dto.scheduledAt
+        : existing.scheduledAt?.toISOString();
     const statusFields =
       dto.status !== undefined || dto.scheduledAt !== undefined
         ? this.resolveStatusFields(nextStatus, scheduledInput)
@@ -286,21 +281,19 @@ export class BlogService {
       slug = await this.uniqueSlug(dto.slug.trim());
     }
 
-    const updated = await this.prisma.blogPost.update({
-      where: { id },
-      data: {
-        ...(dto.title !== undefined ? { title: dto.title.trim() } : {}),
-        ...(dto.body !== undefined ? { body: dto.body } : {}),
-        ...(dto.category !== undefined ? { category: dto.category } : {}),
-        ...(dto.status !== undefined ? { status: dto.status } : {}),
-        ...(dto.coverFileId !== undefined
-          ? { coverFileId: dto.coverFileId }
-          : {}),
-        ...(dto.slug !== undefined ? { slug } : {}),
-        ...statusFields,
-      },
-      include: { author: { select: { fullName: true } } },
-    });
+    if (dto.title !== undefined) existing.title = dto.title.trim();
+    if (dto.body !== undefined) existing.body = dto.body;
+    if (dto.category !== undefined) existing.category = dto.category;
+    if (dto.status !== undefined) existing.status = dto.status;
+    if (dto.coverFileId !== undefined) existing.coverFileId = dto.coverFileId;
+    if (dto.slug !== undefined) existing.slug = slug;
+    if (statusFields.publishedAt !== undefined)
+      existing.publishedAt = statusFields.publishedAt;
+    if (statusFields.scheduledAt !== undefined)
+      existing.scheduledAt = statusFields.scheduledAt;
+    existing.updatedAt = new Date();
+
+    const updated = await this.blogPostRepo.save(existing);
 
     await this.audit.record({
       actorId: actor.id,
@@ -312,12 +305,16 @@ export class BlogService {
       entityId: updated.id,
     });
 
-    return this.toAdminRow(updated);
+    const withAuthor = await this.blogPostRepo.findOne({
+      where: { id: updated.id },
+      relations: { author: true },
+    });
+    return this.toAdminRow(withAuthor!);
   }
 
   async deletePost(actor: AuthenticatedUser, id: string) {
-    const existing = await this.prisma.blogPost.findFirst({
-      where: { id, deletedAt: null },
+    const existing = await this.blogPostRepo.findOne({
+      where: { id, deletedAt: IsNull() },
     });
     if (!existing) {
       throw new NotFoundException({
@@ -325,10 +322,8 @@ export class BlogService {
         message: 'مقاله یافت نشد.',
       });
     }
-    await this.prisma.blogPost.update({
-      where: { id },
-      data: { deletedAt: new Date() },
-    });
+    existing.deletedAt = new Date();
+    await this.blogPostRepo.save(existing);
     await this.audit.record({
       actorId: actor.id,
       actorRole: actor.role,
@@ -341,25 +336,26 @@ export class BlogService {
     return { id };
   }
 
-  private publicWhere(
-    query: ListPublicBlogPostsQueryDto,
-    now = new Date(),
-  ): Prisma.BlogPostWhereInput {
-    return {
-      deletedAt: null,
+  private publicWhere(query: ListPublicBlogPostsQueryDto, now = new Date()) {
+    const common = {
+      deletedAt: IsNull(),
       ...(query.category ? { category: query.category } : {}),
-      OR: [
-        { status: 'PUBLISHED' },
-        { status: 'SCHEDULED', scheduledAt: { lte: now } },
-      ],
     };
+    return [
+      { ...common, status: BlogPostStatus.PUBLISHED },
+      {
+        ...common,
+        status: BlogPostStatus.SCHEDULED,
+        scheduledAt: LessThanOrEqual(now),
+      },
+    ];
   }
 
   async listPublicPosts(query: ListPublicBlogPostsQueryDto) {
-    const posts = await this.prisma.blogPost.findMany({
+    const posts = await this.blogPostRepo.find({
       where: this.publicWhere(query),
-      include: { author: { select: { fullName: true } } },
-      orderBy: [{ publishedAt: 'desc' }, { scheduledAt: 'desc' }],
+      relations: { author: true },
+      order: { publishedAt: 'DESC', scheduledAt: 'DESC' },
     });
     return posts.map((p) => ({
       slug: p.slug,
@@ -375,9 +371,9 @@ export class BlogService {
   }
 
   async getPublicPost(slug: string) {
-    const post = await this.prisma.blogPost.findFirst({
-      where: { slug, deletedAt: null },
-      include: { author: { select: { fullName: true } } },
+    const post = await this.blogPostRepo.findOne({
+      where: { slug, deletedAt: IsNull() },
+      relations: { author: true },
     });
     if (!post || !isPubliclyVisible(post.status, post.scheduledAt)) {
       throw new NotFoundException({
@@ -386,30 +382,36 @@ export class BlogService {
       });
     }
 
-    const updated = await this.prisma.blogPost.update({
+    await this.blogPostRepo
+      .createQueryBuilder()
+      .update(BlogPost)
+      .set({ viewCount: () => '"viewCount" + 1' })
+      .where('id = :id', { id: post.id })
+      .execute();
+    const updated = await this.blogPostRepo.findOne({
       where: { id: post.id },
-      data: { viewCount: { increment: 1 } },
-      include: { author: { select: { fullName: true } } },
+      relations: { author: true },
     });
 
     return {
-      slug: updated.slug,
-      title: updated.title,
-      body: updated.body,
-      category: updated.category,
-      categoryLabelFa: CATEGORY_LABELS_FA[updated.category] ?? updated.category,
-      authorName: updated.author.fullName,
-      publishedAt: updated.publishedAt ?? updated.scheduledAt,
-      viewCount: updated.viewCount,
-      coverFileId: updated.coverFileId,
+      slug: updated!.slug,
+      title: updated!.title,
+      body: updated!.body,
+      category: updated!.category,
+      categoryLabelFa:
+        CATEGORY_LABELS_FA[updated!.category] ?? updated!.category,
+      authorName: updated!.author.fullName,
+      publishedAt: updated!.publishedAt ?? updated!.scheduledAt,
+      viewCount: updated!.viewCount,
+      coverFileId: updated!.coverFileId,
     };
   }
 
   async readPublicCover(fileId: string) {
-    const post = await this.prisma.blogPost.findFirst({
+    const post = await this.blogPostRepo.findOne({
       where: {
         coverFileId: fileId,
-        deletedAt: null,
+        deletedAt: IsNull(),
       },
     });
     if (
@@ -422,9 +424,7 @@ export class BlogService {
         message: 'تصویر یافت نشد.',
       });
     }
-    const file = await this.prisma.storedFile.findUnique({
-      where: { id: fileId },
-    });
+    const file = await this.storedFileRepo.findOneBy({ id: fileId });
     if (!file || !fs.existsSync(file.path)) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,

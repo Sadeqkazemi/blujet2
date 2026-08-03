@@ -22,7 +22,7 @@ import {
   UpdateTicketStatusDto,
 } from './dto/support-ticket.dtos';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import type { SupportTicketStatus } from '../../../generated/prisma/client';
+import type { SupportTicketStatus } from '../../database/enums';
 
 /** پشتیبانی — public ticket submission (no login), SITE_ADMIN-gated
  * review/forward/status endpoints (see docs/API.md's Phase 20 for the

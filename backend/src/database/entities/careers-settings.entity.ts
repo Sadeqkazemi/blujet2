@@ -1,4 +1,11 @@
-import { Column, CreateDateColumn, Entity, PrimaryColumn } from 'typeorm';
+import { randomUUID } from 'node:crypto';
+import {
+  BeforeInsert,
+  Column,
+  CreateDateColumn,
+  Entity,
+  PrimaryColumn,
+} from 'typeorm';
 
 @Entity('careers_settings')
 export class CareersSettings {
@@ -7,6 +14,11 @@ export class CareersSettings {
     primaryKeyConstraintName: 'careers_settings_pkey',
   })
   id!: string;
+
+  @BeforeInsert()
+  generateId() {
+    this.id ??= randomUUID();
+  }
 
   @Column({ type: 'boolean', default: true })
   enabled!: boolean;

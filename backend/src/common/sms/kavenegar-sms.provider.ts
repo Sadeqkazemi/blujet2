@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { ExternalServiceConfig } from '../../database/entities/external-service-config.entity';
 import { decryptPii } from '../pii-crypto';
 import { MockSmsProvider } from './mock-sms.provider';
 import type {
@@ -24,7 +26,8 @@ export class KavenegarSmsProvider implements SmsProvider {
   private readonly logger = new Logger(KavenegarSmsProvider.name);
 
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectRepository(ExternalServiceConfig)
+    private readonly configRepo: Repository<ExternalServiceConfig>,
     private readonly mock: MockSmsProvider,
   ) {}
 
@@ -33,8 +36,8 @@ export class KavenegarSmsProvider implements SmsProvider {
     message: string,
     messageType: SmsMessageType,
   ): Promise<SmsSendResult> {
-    const config = await this.prisma.externalServiceConfig.findUnique({
-      where: { key: KAVENEGAR_SERVICE_KEY },
+    const config = await this.configRepo.findOneBy({
+      key: KAVENEGAR_SERVICE_KEY,
     });
     if (!config?.enabled || !config.apiKeyEncrypted) {
       return this.mock.send(phone, message, messageType);

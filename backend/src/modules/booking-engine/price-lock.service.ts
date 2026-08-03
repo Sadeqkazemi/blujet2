@@ -52,9 +52,10 @@ export class PriceLockService {
       });
     }
 
-    const instance = await this.flightInstanceRepo.findOneBy({
-      id: dto.flightInstanceId,
-    });
+    const instance = await this.flightInstanceRepo
+      .createQueryBuilder('fi')
+      .where('fi.id = :id', { id: dto.flightInstanceId })
+      .getOne();
     if (!instance || instance.status !== 'SCHEDULED') {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,

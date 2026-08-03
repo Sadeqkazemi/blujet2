@@ -1,4 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import {
+  BeforeInsert,
   Column,
   CreateDateColumn,
   Entity,
@@ -15,6 +17,11 @@ export class ClubTierRule {
     primaryKeyConstraintName: 'club_tier_rules_pkey',
   })
   id!: string;
+
+  @BeforeInsert()
+  generateId() {
+    this.id ??= randomUUID();
+  }
 
   @Column({ type: 'int', default: 5000 })
   goldMinPoints!: number;

@@ -1,4 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import {
+  BeforeInsert,
   Column,
   CreateDateColumn,
   Entity,
@@ -12,6 +14,11 @@ import { SmsMessageType, SmsStatus } from '../enums';
 export class SmsLog {
   @PrimaryColumn({ type: 'text', primaryKeyConstraintName: 'sms_logs_pkey' })
   id!: string;
+
+  @BeforeInsert()
+  generateId() {
+    this.id ??= randomUUID();
+  }
 
   @Column({ type: 'text', nullable: true })
   phone!: string | null;
