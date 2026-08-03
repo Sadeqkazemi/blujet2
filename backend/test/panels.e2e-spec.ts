@@ -43,7 +43,7 @@ describe('Panels (e2e)', () => {
   });
 
   it('returns the confirmed tab set for Commercial Manager (includes webservice + flights)', async () => {
-    const { accessToken } = await loginAs(app, 'comm.abbasi');
+    const { accessToken } = await loginAs(app, 'comm');
     const res = await request(app.getHttpServer())
       .get('/panels/nav')
       .set('Authorization', `Bearer ${accessToken}`);

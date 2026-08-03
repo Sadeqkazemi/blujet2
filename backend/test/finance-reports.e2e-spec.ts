@@ -96,7 +96,7 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
     expect(ceoRes.status).toBe(200);
     expect(ceoRes.body.data.activeAgencies).toBeGreaterThan(0);
 
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
     const forbidden = await request(app.getHttpServer())
       .get('/reporting/finance-dashboard-stats')
       .set('Authorization', auth(commercial.accessToken));
@@ -149,7 +149,7 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
     expect(overdue!.overdueDays).toBeGreaterThan(0);
     expect(Number(outstandingIrr)).toBeGreaterThan(0);
 
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
     const forbidden = await request(app.getHttpServer())
       .get('/reporting/agency-settlements')
       .set('Authorization', auth(commercial.accessToken));

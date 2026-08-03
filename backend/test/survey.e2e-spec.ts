@@ -392,7 +392,7 @@ describe('Survey (e2e)', () => {
     });
 
     it('GET /survey/results — 403 for IT_MANAGER/FINANCE_MANAGER/COMMERCIAL_MANAGER', async () => {
-      for (const username of ['itadmin', 'finance.karimi', 'comm.abbasi']) {
+      for (const username of ['itadmin', 'finance.karimi', 'comm']) {
         const { accessToken } = await loginAs(app, username);
         const res = await request(app.getHttpServer())
           .get('/survey/results')

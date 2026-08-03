@@ -29,7 +29,7 @@ async function openAgenciesTab(page: Page) {
 
 // One journey per role: open آژانس‌ها → search → open an agency →
 // change the credit limit → see it reflected.
-for (const username of ['senior', 'finance.karimi', 'comm.abbasi']) {
+for (const username of ['senior', 'finance.karimi', 'comm']) {
   test(`agencies journey for ${username}: search, open detail, change credit limit`, async ({ page }) => {
     await loginAs(page, username);
     await openAgenciesTab(page);
@@ -45,7 +45,7 @@ for (const username of ['senior', 'finance.karimi', 'comm.abbasi']) {
     // For Commercial the finance content (credit card) lives in the مالی sub-tab.
     await agencyRow.click();
     await page.waitForURL(/\/panel\/agencies\/[0-9a-f-]+$/);
-    if (username === 'comm.abbasi') {
+    if (username === 'comm') {
       await page.getByRole('button', { name: 'مالی', exact: true }).click();
     }
     await expect(page.getByRole('heading', { name: 'اعتبار آژانس' })).toBeVisible();
@@ -68,7 +68,7 @@ for (const username of ['senior', 'finance.karimi', 'comm.abbasi']) {
 }
 
 test('Commercial Manager: issue an invoice, pay it, and watch the credit-used figure drop', async ({ page }) => {
-  await loginAs(page, 'comm.abbasi');
+  await loginAs(page, 'comm');
   await openAgenciesTab(page);
 
   await page.getByRole('button', { name: /آژانس blujet/ }).click();

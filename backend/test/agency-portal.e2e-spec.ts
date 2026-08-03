@@ -155,7 +155,7 @@ describe('Agency Portal (e2e)', () => {
   });
 
   it('approving a membership request issues a one-time temp password that logs in', async () => {
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
     const suffix = crypto.randomUUID().slice(0, 6);
     const reqRow = await prisma.agencyMembershipRequest.create({
       data: {
@@ -196,7 +196,7 @@ describe('Agency Portal (e2e)', () => {
   it('agency A cannot pay agency B invoice (404, ownership implicit via JWT)', async () => {
     const a = await createFreshAgency();
     const b = await createFreshAgency();
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
     const issueRes = await request(app.getHttpServer())
       .post(`/agencies/${b.id}/invoices`)
       .set('Authorization', auth(commercial.accessToken))
@@ -246,7 +246,7 @@ describe('Agency Portal (e2e)', () => {
 
   it('POST /agency-portal/invoices/:id/pay: settles via the same transactional logic, 409 on double-pay', async () => {
     const agency = await createFreshAgency();
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
     const issueRes = await request(app.getHttpServer())
       .post(`/agencies/${agency.id}/invoices`)
       .set('Authorization', auth(commercial.accessToken))
@@ -359,7 +359,7 @@ describe('Agency Portal (e2e)', () => {
     expect(postRes.status).toBe(201);
     expect(postRes.body.data.senderIsAgency).toBe(true);
 
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
     const staffRes = await request(app.getHttpServer())
       .get(`/agencies/${agency.id}/messages`)
       .set('Authorization', auth(commercial.accessToken));
@@ -505,7 +505,7 @@ describe('Agency Portal (e2e)', () => {
       .set('Authorization', auth(accessToken))
       .send({ scope: 'FULL', months: 1 });
 
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
     const rejectRes = await request(app.getHttpServer())
       .patch(
         `/agencies/${agency.id}/webservice-requests/${createRes.body.data.id}/decide`,

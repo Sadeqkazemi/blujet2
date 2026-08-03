@@ -138,7 +138,7 @@ describe('Flightops (e2e)', () => {
   });
 
   it('200s for SITE_ADMIN / FINANCE / COMMERCIAL; CEO is outside the set', async () => {
-    for (const username of ['site.admin', 'finance.karimi', 'comm.abbasi']) {
+    for (const username of ['site.admin', 'finance.karimi', 'comm']) {
       const { accessToken } = await loginAs(app, username);
       const res = await request(app.getHttpServer())
         .get('/flightops')

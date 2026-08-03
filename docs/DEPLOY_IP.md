@@ -68,7 +68,7 @@ apt-get install -y docker-compose-plugin   # اگر با اسکریپت بالا
 
 رمز مشترک همه نقش‌ها: `Blujet@1404` (نام کاربری‌ها در
 `backend/prisma/seed.ts` — مثل `ceo`, `chair`, `senior`,
-`finance.karimi`, `comm.abbasi`, `itadmin`, `site.admin`).
+`finance.karimi`, `comm`, `itadmin`, `site.admin`).
 
 **قبل از استفاده واقعی و در دسترس عموم قرار دادن سرور، این حساب‌های نمونه
 را حذف یا رمزشان را عوض کنید** — این‌ها فقط برای تست اولیه‌اند.

@@ -308,7 +308,7 @@ describe('Careers (e2e)', () => {
       for (const username of [
         'ceo',
         'itadmin',
-        'comm.abbasi',
+        'comm',
         'finance.karimi',
       ]) {
         const { accessToken } = await loginAs(app, username);
@@ -367,7 +367,7 @@ describe('Careers (e2e)', () => {
       const appId = await applyDirect(posting.id);
       const admin = await loginAs(app, 'site.admin');
       const commercial = await prisma.user.findUniqueOrThrow({
-        where: { username: 'comm.abbasi' },
+        where: { username: 'comm' },
       });
 
       const referred = await request(app.getHttpServer())
