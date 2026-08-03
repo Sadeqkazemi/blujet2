@@ -412,7 +412,7 @@ describe('Club (e2e)', () => {
         { tier: 'PLATINUM', minPoints: 15000, maxPoints: null },
       ]);
 
-      const commercial = await loginAs(app, 'comm.abbasi');
+      const commercial = await loginAs(app, 'comm');
       const commercialRes = await request(app.getHttpServer())
         .get('/club/tier-rules')
         .set('Authorization', `Bearer ${commercial.accessToken}`);
@@ -442,7 +442,7 @@ describe('Club (e2e)', () => {
     });
 
     it('PATCH updates the singleton row, is reflected on the next GET, and is audited', async () => {
-      const { accessToken } = await loginAs(app, 'comm.abbasi');
+      const { accessToken } = await loginAs(app, 'comm');
       const patchRes = await request(app.getHttpServer())
         .patch('/club/tier-rules')
         .set('Authorization', `Bearer ${accessToken}`)

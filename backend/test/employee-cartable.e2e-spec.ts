@@ -38,7 +38,7 @@ describe('EMPLOYEE cartable (e2e)', () => {
 
   async function seedTaskFor(assigneeId: string) {
     const commercial = await typeorm.user.findUniqueOrThrow({
-      where: { username: 'comm.abbasi' },
+      where: { username: 'comm' },
     });
     return typeorm.cartableTask.create({
       data: {
@@ -108,7 +108,7 @@ describe('EMPLOYEE cartable (e2e)', () => {
   it('POST /cartable/manager-message delivers a cartable task to the manager', async () => {
     const { username } = await createEmployeeWithPermissions(['ct_list', 'ct_process']);
     const manager = await typeorm.user.findUniqueOrThrow({
-      where: { username: 'comm.abbasi' },
+      where: { username: 'comm' },
     });
     const { accessToken } = await loginAs(app, username);
 
@@ -121,7 +121,7 @@ describe('EMPLOYEE cartable (e2e)', () => {
 
     const mgrCartable = await request(app.getHttpServer())
       .get('/cartable')
-      .set('Authorization', `Bearer ${(await loginAs(app, 'comm.abbasi')).accessToken}`);
+      .set('Authorization', `Bearer ${(await loginAs(app, 'comm')).accessToken}`);
     expect(mgrCartable.body.data.tasks.some((t: { title: string }) => t.title.includes('پیام'))).toBe(
       true,
     );

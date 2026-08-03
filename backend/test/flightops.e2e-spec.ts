@@ -142,7 +142,7 @@ describe('Flightops (e2e)', () => {
       'ceo',
       'site.admin',
       'finance',
-      'comm.abbasi',
+      'comm',
     ]) {
       const { accessToken } = await loginAs(app, username);
       const res = await request(app.getHttpServer())

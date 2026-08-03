@@ -55,7 +55,7 @@ test('referral loop: Senior creates a referral to Commercial → Commercial repo
 
   const commCtx = await browser.newContext();
   const commPage = await commCtx.newPage();
-  await loginAs(commPage, 'comm.abbasi');
+  await loginAs(commPage, 'comm');
   await commPage.getByRole('link', { name: /^کارتابل/ }).click();
   const row = commPage.locator('li', { hasText: title });
   await expect(row).toBeVisible();
