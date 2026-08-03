@@ -397,28 +397,22 @@ describe('Club (e2e)', () => {
   });
 
   describe('tier rules (Phase 65)', () => {
-    it('GET returns the seeded defaults + computed preview for CEO and COMMERCIAL_MANAGER; other roles get 403', async () => {
-      const ceo = await loginAs(app, 'ceo');
-      const ceoRes = await request(app.getHttpServer())
-        .get('/club/tier-rules')
-        .set('Authorization', `Bearer ${ceo.accessToken}`);
-      expect(ceoRes.status).toBe(200);
-      expect(ceoRes.body.data.goldMinPoints).toBe(5000);
-      expect(ceoRes.body.data.platinumMinPoints).toBe(15000);
-      expect(ceoRes.body.data.cardRequestMinPoints).toBe(5000);
-      expect(ceoRes.body.data.preview).toEqual([
-        { tier: 'SILVER', minPoints: 0, maxPoints: 4999 },
-        { tier: 'GOLD', minPoints: 5000, maxPoints: 14999 },
-        { tier: 'PLATINUM', minPoints: 15000, maxPoints: null },
-      ]);
-
+    it('GET returns the seeded defaults + computed preview for COMMERCIAL_MANAGER; other roles get 403', async () => {
       const commercial = await loginAs(app, 'comm.abbasi');
       const commercialRes = await request(app.getHttpServer())
         .get('/club/tier-rules')
         .set('Authorization', `Bearer ${commercial.accessToken}`);
       expect(commercialRes.status).toBe(200);
+      expect(commercialRes.body.data.goldMinPoints).toBe(5000);
+      expect(commercialRes.body.data.platinumMinPoints).toBe(15000);
+      expect(commercialRes.body.data.cardRequestMinPoints).toBe(5000);
+      expect(commercialRes.body.data.preview).toEqual([
+        { tier: 'SILVER', minPoints: 0, maxPoints: 4999 },
+        { tier: 'GOLD', minPoints: 5000, maxPoints: 14999 },
+        { tier: 'PLATINUM', minPoints: 15000, maxPoints: null },
+      ]);
 
-      for (const username of ['finance.karimi', 'senior', 'chair']) {
+      for (const username of ['ceo', 'finance.karimi', 'senior', 'chair']) {
         const { accessToken } = await loginAs(app, username);
         const res = await request(app.getHttpServer())
           .get('/club/tier-rules')
@@ -428,7 +422,7 @@ describe('Club (e2e)', () => {
     });
 
     it('PATCH rejects goldMinPoints >= platinumMinPoints with VALIDATION_FAILED', async () => {
-      const { accessToken } = await loginAs(app, 'ceo');
+      const { accessToken } = await loginAs(app, 'comm.abbasi');
       const res = await request(app.getHttpServer())
         .patch('/club/tier-rules')
         .set('Authorization', `Bearer ${accessToken}`)

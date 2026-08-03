@@ -1,5 +1,6 @@
 export type SeatStatus = 'FREE' | 'SOLD' | 'LOCKED';
 
+/** Rich sold-seat passenger info surfaced in the IT reservation seat map. */
 export interface SeatPassengerInfo {
   fullName: string;
   pnr: string;
@@ -8,12 +9,21 @@ export interface SeatPassengerInfo {
   priceIrr: string;
 }
 
+/** Lighter sold-seat occupant shape used by the CEO/Board «هواپیما» modal. */
+export interface SeatOccupant {
+  pnr: string;
+  passengerName: string;
+  bookingStatus: BookingStatus;
+}
+
 export interface SeatCell {
   seatCode: string;
   status: SeatStatus;
   lockId: string | null;
-  passenger: SeatPassengerInfo | null;
-  lockExpiresAt: string | null;
+  passenger?: SeatPassengerInfo | null;
+  occupant?: SeatOccupant | null;
+  lockExpiresAt?: string | null;
+  lockPassengerName?: string | null;
 }
 
 export interface SeatRow {
@@ -26,10 +36,10 @@ export interface SeatMap {
   flightInstanceId: string;
   aircraftType: string;
   flightNo: string;
-  originCode: string;
-  destCode: string;
-  originCityFa: string;
-  destCityFa: string;
+  originCode?: string;
+  destCode?: string;
+  originCityFa?: string;
+  destCityFa?: string;
   departureAt: string;
   rows: SeatRow[];
   cabinLayout: Record<'BUSINESS' | 'ECONOMY', { aisleAfterIndex: number }>;
@@ -135,14 +145,29 @@ export interface AgencyApiAccessRow {
 
 export type ReservationFlightStatusKey = 'SELLING' | 'NEAR_FULL' | 'FULL';
 
+/**
+ * Superset of the two reservation flight-row shapes the panels consume:
+ *  - IT «پروازها» table: route / sold / occupancyPct / statusKey.
+ *  - CEO «هواپیما» flights tab: origin/dest city + soldCount/lockedCount/freeCount.
+ * A given API response only fills one set, so the other is optional.
+ */
 export interface ReservationFlightRow {
   flightInstanceId: string;
-  route: string;
   flightNo: string;
-  departureAt: string;
   aircraftType: string;
-  sold: number;
+  departureAt: string;
   capacity: number;
-  occupancyPct: number;
-  statusKey: ReservationFlightStatusKey;
+  // IT reservation flights table
+  route?: string;
+  sold?: number;
+  occupancyPct?: number;
+  statusKey?: ReservationFlightStatusKey;
+  // CEO/Board «هواپیما» flights tab
+  originCode?: string;
+  destCode?: string;
+  originCityFa?: string;
+  destCityFa?: string;
+  soldCount?: number;
+  lockedCount?: number;
+  freeCount?: number;
 }

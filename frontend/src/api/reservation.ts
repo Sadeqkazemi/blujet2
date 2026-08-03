@@ -54,6 +54,11 @@ export function markNoShow(pnr: string) {
   return apiPatch<PnrDetail>(`/reservation/pnr/${pnr}/no-show`);
 }
 
+export function fetchReservationFlights(q?: string) {
+  const qs = q ? `?q=${encodeURIComponent(q)}` : '';
+  return apiGet<ReservationFlightRow[]>(`/reservation/flights${qs}`);
+}
+
 export function searchFlights(origin: string, dest: string, date: string) {
   const params = new URLSearchParams({ origin, dest, date });
   return apiGet<FlightSearchResult[]>(`/reservation/search?${params.toString()}`);
@@ -75,9 +80,4 @@ export function fetchReservationDashboardStats() {
 
 export function fetchAgencyApiAccess() {
   return apiGet<AgencyApiAccessRow[]>('/reservation/agency-api-access');
-}
-
-export function fetchReservationFlights(q?: string) {
-  const qs = q ? `?q=${encodeURIComponent(q)}` : '';
-  return apiGet<ReservationFlightRow[]>(`/reservation/flights${qs}`);
 }

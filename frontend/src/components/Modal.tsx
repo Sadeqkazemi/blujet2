@@ -6,23 +6,30 @@ interface ModalProps {
   children: ReactNode;
   /** Staff panels use the dark chrome by default. Pass "light" only for rare light surfaces. */
   variant?: 'dark' | 'light';
+  /** Tailwind max-width class, default max-w-md */
+  maxWidthClass?: string;
 }
 
-export default function Modal({ title, onClose, children, variant = 'dark' }: ModalProps) {
+export default function Modal({
+  title,
+  onClose,
+  children,
+  variant = 'dark',
+  maxWidthClass = 'max-w-md',
+}: ModalProps) {
   const dark = variant === 'dark';
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#070b14]/70 p-4 backdrop-blur-[3px]"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#070b14]/72 p-4 backdrop-blur-[3px]"
       role="presentation"
       onClick={onClose}
     >
       <div
         role="dialog"
         aria-label={title}
-        className={`w-full max-w-md rounded-2xl border shadow-2xl ${
-          dark
-            ? 'border-panel-border bg-panel-surface'
-            : 'border-border bg-white'
+        className={`w-full ${maxWidthClass} rounded-2xl border shadow-2xl ${
+          dark ? 'border-panel-border bg-panel-surface' : 'border-border bg-white'
         }`}
         onClick={(e) => e.stopPropagation()}
       >

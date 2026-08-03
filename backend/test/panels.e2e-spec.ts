@@ -71,19 +71,20 @@ describe('Panels (e2e)', () => {
     const keys = res.body.data.map((t: { key: string }) => t.key);
     expect(keys).toEqual([
       'dashboard',
-      'flightops',
       'admins',
       'finance',
       'cartable',
       'club',
+      'survey',
       'mgrreports',
+      'reservation',
       'pricing',
-      'clubrules',
       'panels',
       'security',
       'logs',
-      'survey',
     ]);
+    expect(keys).not.toContain('clubrules');
+    expect(keys).not.toContain('flightops');
   });
 
   it('returns the confirmed tab set for Senior Manager in design sidebar order', async () => {

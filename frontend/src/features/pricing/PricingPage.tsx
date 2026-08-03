@@ -105,196 +105,281 @@ function CeoPricing() {
   const pending = data?.pending ?? [];
   const registered = data?.registered ?? [];
 
+  function vsColor(proposed: string | number, competitor: string | number): string {
+    const delta = ((Number(proposed) - Number(competitor)) / Number(competitor)) * 100;
+    if (Math.abs(delta) < 1) return '#9fb0c7';
+    return delta < 0 ? '#34d399' : '#f87171';
+  }
+
   return (
-    <div className="p-8">
-      <div className="mb-6">
-        <h1 className="text-xl font-black text-ink">تعیین قیمت بلیط</h1>
-        <p className="mt-1 text-sm text-muted">
+    <div className="px-[21px] pb-[34px] pt-[18px]">
+      <div className="mb-5">
+        <h1 className="text-[20.5px] font-black text-white">تعیین قیمت بلیط</h1>
+        <p className="mt-1 text-[11.5px] text-[#6b7b94]">
           قیمت پیشنهادی مدیر بازرگانی، تحلیل هوش مصنوعی و تأیید نهایی مدیر عامل برای ثبت قیمت پرواز
         </p>
       </div>
 
-      {error && <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">{error}</p>}
-      {notice && <p className="mb-4 rounded-lg bg-[#10b98115] p-3 text-sm text-[#059669]">{notice}</p>}
+      {error && (
+        <p className="mb-4 rounded-lg bg-[rgba(248,113,113,.12)] p-3 text-sm text-[#f87171]">{error}</p>
+      )}
+      {notice && (
+        <p className="mb-4 rounded-lg bg-[rgba(16,185,129,.12)] p-3 text-sm text-[#34d399]">{notice}</p>
+      )}
 
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-white p-4">
-        <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold text-text-2">
-          <span className="rounded-full bg-surface px-3 py-1.5">۱ پیشنهاد مدیر بازرگانی</span>
-          <span className="text-muted">←</span>
-          <span className="rounded-full bg-surface px-3 py-1.5">۲ تحلیل هوش مصنوعی</span>
-          <span className="text-muted">←</span>
-          <span className="rounded-full bg-surface px-3 py-1.5">۳ تأیید و ثبت مدیر عامل</span>
+      <div className="mb-[15px] flex flex-wrap items-center justify-between gap-3.5 rounded-2xl border border-[#26324a] bg-gradient-to-br from-[#1a2740] to-[#141d2e] px-[18px] py-4">
+        <div className="flex flex-wrap items-center gap-3.5">
+          <div className="flex items-center gap-2">
+            <span className="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-[rgba(59,130,246,.18)] text-[11px] font-extrabold text-[#60a5fa]">
+              ۱
+            </span>
+            <span className="text-xs text-[#cdd9ec]">۱ پیشنهاد مدیر بازرگانی</span>
+          </div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#41506b" strokeWidth="2">
+            <path d="M15 6l-6 6 6 6" />
+          </svg>
+          <div className="flex items-center gap-2">
+            <span className="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-[rgba(167,139,250,.18)] text-[11px] font-extrabold text-[#a78bfa]">
+              ۲
+            </span>
+            <span className="text-xs text-[#cdd9ec]">۲ تحلیل هوش مصنوعی</span>
+          </div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#41506b" strokeWidth="2">
+            <path d="M15 6l-6 6 6 6" />
+          </svg>
+          <div className="flex items-center gap-2">
+            <span className="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-[rgba(16,185,129,.18)] text-[11px] font-extrabold text-[#34d399]">
+              ۳
+            </span>
+            <span className="text-xs text-[#cdd9ec]">۳ تأیید و ثبت مدیر عامل</span>
+          </div>
         </div>
         <button
+          type="button"
           onClick={() => void onRunAi()}
           disabled={aiRunning}
-          className="rounded-lg bg-[#7c3aed] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#6d28d9] disabled:opacity-60"
+          className="inline-flex items-center gap-2 rounded-[11px] bg-gradient-to-br from-[#7c3aed] to-[#6d28d9] px-[18px] py-[11px] text-xs font-extrabold text-white transition disabled:opacity-60"
         >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M12 3l1.9 4.6L18.5 9l-4.6 1.4L12 15l-1.9-4.6L5.5 9l4.6-1.4z" />
+            <path d="M19 14l.8 2 .2.8-2-.8-.8.8" />
+          </svg>
           {aiRunning ? 'در حال تحلیل قیمت رقبا…' : 'تحلیل و پیشنهاد قیمت هوش مصنوعی'}
         </button>
       </div>
 
-      <section className="mb-6">
-        <h2 className="mb-3 text-sm font-bold text-ink">
-          در انتظار تأیید مدیر عامل
-          <span className="font-num mr-2 rounded-full bg-[#f59e0b1f] px-2.5 py-0.5 text-[11px] text-[#b45309]">
-            {faDigits(pending.length)}
-          </span>
-        </h2>
-        {pending.length === 0 ? (
-          <p className="rounded-xl border border-border bg-white py-8 text-center text-sm text-muted">
-            قیمت بلیطی در انتظار تأیید نیست.
-          </p>
-        ) : (
-          <div className="space-y-4">
-            {pending.map((p) => (
-              <div key={p.id} className="rounded-xl border border-border bg-white p-5">
-                <div className="mb-3 flex flex-wrap items-center gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-bold text-ink">
-                      {routeLabel(p.flightInstance)}{' '}
-                      <span className="ltr font-num text-xs text-muted">{p.flightInstance.flight.flightNo}</span>
-                    </div>
-                    <div className="font-num mt-0.5 text-[11px] text-muted">
-                      {formatJalaliDate(p.flightInstance.departureAt)} · ظرفیت {faDigits(p.flightInstance.capacity)} ·
-                      چارتری {faDigits(p.flightInstance.charterSeats)} · {p.proposedBy.fullName}
-                    </div>
+      <div className="mb-3 flex items-center gap-2.5">
+        <span className="h-2 w-2 rounded-full bg-[#a78bfa]" />
+        <h2 className="m-0 text-sm font-extrabold text-white">در انتظار تأیید مدیر عامل</h2>
+        <span className="font-num rounded-xl bg-[rgba(167,139,250,.16)] px-2.5 py-0.5 text-[11px] font-extrabold text-[#a78bfa]">
+          {faDigits(pending.length)}
+        </span>
+      </div>
+
+      {pending.length === 0 ? (
+        <div className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] px-3 py-7 text-center text-xs text-[#6b7b94]">
+          اطلاعاتی یافت نشد
+        </div>
+      ) : (
+        <div className="mb-4 flex flex-col gap-2.5">
+          {pending.map((p) => (
+            <div
+              key={p.id}
+              className="rounded-[13px] border border-[#1f2a3d] bg-[#141d2e] px-[17px] py-[15px]"
+            >
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="min-w-[180px] flex-1">
+                  <div className="mb-1 flex flex-wrap items-center gap-2">
+                    <span className="text-[17px] font-black text-white">
+                      {routeLabel(p.flightInstance)}
+                    </span>
+                    <span className="ltr font-num rounded-[7px] bg-[#0f1726] px-2.5 py-0.5 text-[11.5px] font-bold text-[#9fb0c7]">
+                      {p.flightInstance.flight.flightNo}
+                    </span>
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => void onRegister(p, 'PROPOSED')}
-                      className="rounded-lg bg-[#059669] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#047857]"
-                    >
-                      تأیید بازرگانی
-                    </button>
-                    {p.aiSuggestion && (
-                      <button
-                        onClick={() => void onRegister(p, 'AI')}
-                        className="rounded-lg bg-[#7c3aed] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#6d28d9]"
-                      >
-                        ثبت با AI
-                      </button>
-                    )}
+                  <div className="font-num text-xs text-[#8494ac]">
+                    {formatJalaliDate(p.flightInstance.departureAt)} · ظرفیت{' '}
+                    {faDigits(p.flightInstance.capacity)} · چارتری{' '}
+                    {faDigits(p.flightInstance.charterSeats)} · {p.proposedBy.fullName}
                   </div>
                 </div>
-
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="rounded-lg bg-surface p-3">
-                    <div className="text-[10px] text-muted">رقبا</div>
-                    <div className="font-num mt-1 text-sm font-black text-ink">{faMoney(p.competitorPriceIrr)} تومان</div>
+                <div className="flex-none text-center">
+                  <div className="mb-0.5 text-[11px] text-[#8494ac]">رقبا</div>
+                  <div className="font-num whitespace-nowrap text-[15px] font-extrabold text-[#f59e0b]">
+                    {faMoney(p.competitorPriceIrr)} تومان
                   </div>
-                  <div className="rounded-lg bg-surface p-3">
-                    <div className="text-[10px] text-muted">پیشنهاد بازرگانی</div>
-                    <div className="font-num mt-1 text-sm font-black text-accent">{faMoney(p.proposedPriceIrr)} تومان</div>
-                    <div className="mt-0.5 text-[10px] text-muted">{vsCompetitorLabel(p.proposedPriceIrr, p.competitorPriceIrr)}</div>
+                </div>
+                <div className="flex-none text-center">
+                  <div className="mb-0.5 text-[11px] text-[#8fb4f5]">پیشنهاد بازرگانی</div>
+                  <div className="font-num whitespace-nowrap text-[15px] font-black text-white">
+                    {faMoney(p.proposedPriceIrr)} تومان
                   </div>
-                  {p.aiSuggestion && (
-                    <div className="rounded-lg bg-[#7c3aed0f] p-3">
-                      <div className="text-[10px] text-[#6d28d9]">هوش مصنوعی</div>
-                      <div className="font-num mt-1 text-sm font-black text-[#6d28d9]">
-                        {faMoney(p.aiSuggestion.priceIrr)} تومان
-                      </div>
+                  <div
+                    className="mt-0.5 text-[10.5px] font-bold"
+                    style={{ color: vsColor(p.proposedPriceIrr, p.competitorPriceIrr) }}
+                  >
+                    {vsCompetitorLabel(p.proposedPriceIrr, p.competitorPriceIrr)}
+                  </div>
+                </div>
+                {p.aiSuggestion && (
+                  <div className="flex-none border-s border-[#24304a] ps-[15px] text-center">
+                    <div className="mb-0.5 text-[11px] text-[#a78bfa]">هوش مصنوعی</div>
+                    <div className="font-num whitespace-nowrap text-[15px] font-black text-[#c4b5fd]">
+                      {faMoney(p.aiSuggestion.priceIrr)} تومان
                     </div>
+                  </div>
+                )}
+                <div className="flex flex-none gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void onRegister(p, 'PROPOSED')}
+                    className="whitespace-nowrap rounded-[10px] bg-[#16a34a] px-[15px] py-2.5 text-[12.5px] font-extrabold text-white"
+                  >
+                    تأیید بازرگانی
+                  </button>
+                  {p.aiSuggestion && (
+                    <button
+                      type="button"
+                      onClick={() => void onRegister(p, 'AI')}
+                      className="whitespace-nowrap rounded-[10px] border-[1.5px] border-[rgba(124,58,237,.5)] px-[15px] py-2.5 text-[12.5px] font-extrabold text-[#c4b5fd]"
+                    >
+                      ثبت با AI
+                    </button>
                   )}
                 </div>
+              </div>
 
-                {p.aiSuggestion ? (
-                  <div className="mt-3 rounded-lg border border-[#7c3aed33] bg-[#7c3aed08] p-3">
-                    <div className="mb-2 flex flex-wrap items-center gap-2 text-[10px] font-bold">
-                      <span className="text-[#6d28d9]">تحلیل کامل هوش مصنوعی</span>
-                      <span className="rounded-full bg-[#7c3aed1a] px-2 py-0.5 text-[#6d28d9]">فصل: {p.aiSuggestion.season}</span>
-                      <span className="rounded-full bg-[#7c3aed1a] px-2 py-0.5 text-[#6d28d9]">مناسبت: {p.aiSuggestion.occasion}</span>
-                      <span className="font-num rounded-full bg-[#7c3aed1a] px-2 py-0.5 text-[#6d28d9]">
-                        اطمینان: {faDigits(Math.round(p.aiSuggestion.confidence * 100))}٪
-                      </span>
-                    </div>
-                    <p className="text-[11px] leading-relaxed text-text-2">{p.aiSuggestion.reason}</p>
-                    <button
-                      onClick={() => setFactorsOpen({ ...factorsOpen, [p.id]: !factorsOpen[p.id] })}
-                      className="mt-2 text-[10px] font-bold text-[#6d28d9]"
-                    >
-                      {factorsOpen[p.id] ? 'بستن جزئیات تحلیل' : 'مشاهدهٔ کامل عوامل تحلیل'}
-                    </button>
-                    {factorsOpen[p.id] && (
-                      <ul className="mt-2 list-disc space-y-1 pr-5 text-[11px] text-text-2">
-                        {p.aiSuggestion.factors.map((f, i) => (
-                          <li key={i}>{f}</li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                ) : (
-                  p.note && (
-                    <p className="mt-3 rounded-lg bg-surface p-3 text-[11px] text-text-2">
-                      یادداشت مدیر بازرگانی: {p.note}
-                    </p>
-                  )
-                )}
-
-                <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-surface p-3">
-                  <span className="text-[11px] font-bold text-ink">نرخ قانونی (مصوب سازمان هواپیمایی)</span>
+              <div className="mt-[13px] flex flex-wrap items-center gap-3 rounded-[11px] border border-[#1c2740] bg-[#0f1726] px-3.5 py-[11px]">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-[26px] w-[26px] flex-none items-center justify-center rounded-lg bg-[rgba(37,99,235,.16)] text-[#60a5fa]">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M3 21h18M6 21V10M10 21V10M14 21V10M18 21V10M4 10h16L12 3z" />
+                    </svg>
+                  </span>
+                  <span className="text-[12.5px] font-bold text-[#cdd9ec]">
+                    نرخ قانونی (مصوب سازمان هواپیمایی)
+                  </span>
+                </div>
+                <div className="flex min-w-[200px] flex-1 items-center gap-1.5">
                   <input
                     dir="ltr"
                     value={legalInputs[p.id] ?? ''}
                     onChange={(e) => setLegalInputs({ ...legalInputs, [p.id]: e.target.value })}
                     placeholder="مبلغ به تومان"
-                    className="font-num h-9 w-40 rounded-lg border border-border bg-white px-3 text-xs outline-none transition focus:border-accent"
+                    className="font-num h-9 min-w-[120px] flex-1 rounded-[9px] border border-[#2a3550] bg-[#141d2e] px-3 text-[12.5px] text-[#e7ecf3] outline-none focus:border-[#3b82f6]"
                   />
                   <button
+                    type="button"
                     onClick={() => void onSaveLegal(p)}
-                    className="rounded-lg bg-accent px-3 py-2 text-xs font-bold text-white transition hover:bg-accent/90"
+                    className="whitespace-nowrap rounded-[9px] bg-[#2563eb] px-[15px] py-2 text-xs font-extrabold text-white"
                   >
                     ثبت نرخ قانونی
                   </button>
-                  {p.legalRateIrr && (
-                    <span className="font-num text-[11px] text-muted">
-                      ثبت‌شده: {faMoney(p.legalRateIrr)} تومان
-                    </span>
-                  )}
                 </div>
+                <span className="font-num text-[11.5px] text-[#8494ac]">
+                  ثبت‌شده:{' '}
+                  <span className="font-extrabold text-[#93c5fd]">
+                    {p.legalRateIrr ? `${faMoney(p.legalRateIrr)} تومان` : '—'}
+                  </span>
+                </span>
               </div>
-            ))}
-          </div>
-        )}
-      </section>
 
-      <section>
-        <h2 className="mb-3 text-sm font-bold text-ink">
-          قیمت‌های ثبت‌شده
-          <span className="font-num mr-2 rounded-full bg-[#10b9811f] px-2.5 py-0.5 text-[11px] text-[#059669]">
-            {faDigits(registered.length)}
-          </span>
-        </h2>
-        {registered.length === 0 ? (
-          <p className="rounded-xl border border-border bg-white py-6 text-center text-xs text-muted">
-            هنوز قیمتی ثبت نشده است.
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {registered.map((p) => (
-              <div key={p.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-white p-4">
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-bold text-ink">
-                    {routeLabel(p.flightInstance)}{' '}
-                    <span className="ltr font-num text-xs text-muted">{p.flightInstance.flight.flightNo}</span>
+              {p.aiSuggestion ? (
+                <div className="mt-[13px] rounded-xl border border-[rgba(124,58,237,.32)] bg-[rgba(124,58,237,.08)] px-3.5 py-[13px]">
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2">
+                      <path d="M12 3l1.9 4.6L18.5 9l-4.6 1.4L12 15l-1.9-4.6L5.5 9l4.6-1.4z" />
+                    </svg>
+                    <span className="text-[13px] font-extrabold text-[#c4b5fd]">تحلیل کامل هوش مصنوعی</span>
+                    <span className="rounded-xl bg-[rgba(59,130,246,.14)] px-2.5 py-0.5 text-[10.5px] font-bold text-[#93c5fd]">
+                      فصل: {p.aiSuggestion.season}
+                    </span>
+                    <span className="rounded-xl bg-[rgba(202,165,58,.16)] px-2.5 py-0.5 text-[10.5px] font-bold text-[#fcd34d]">
+                      مناسبت: {p.aiSuggestion.occasion}
+                    </span>
+                    <span className="font-num rounded-xl bg-[rgba(16,185,129,.14)] px-2.5 py-0.5 text-[10.5px] font-bold text-[#34d399]">
+                      اطمینان: {faDigits(Math.round(p.aiSuggestion.confidence * 100))}٪
+                    </span>
                   </div>
-                  <div className="font-num mt-0.5 text-[11px] text-muted">
+                  <p className="text-[12.5px] leading-[2] text-[#dbe3f0]">{p.aiSuggestion.reason}</p>
+                  {factorsOpen[p.id] && (
+                    <div className="mt-[11px] flex flex-col gap-1.5 border-t border-[rgba(124,58,237,.25)] pt-[11px]">
+                      {p.aiSuggestion.factors.map((f, i) => (
+                        <div key={i} className="flex items-start gap-2 text-xs leading-[1.8] text-[#aebbd0]">
+                          <span className="mt-[7px] h-1.5 w-1.5 flex-none rounded-full bg-[#a78bfa]" />
+                          <span>{f}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setFactorsOpen({ ...factorsOpen, [p.id]: !factorsOpen[p.id] })}
+                    className="mt-[11px] inline-flex items-center gap-1.5 text-[11.5px] font-bold text-[#c4b5fd]"
+                  >
+                    {factorsOpen[p.id] ? 'بستن جزئیات تحلیل' : 'مشاهدهٔ کامل عوامل تحلیل'}
+                  </button>
+                </div>
+              ) : (
+                p.note && (
+                  <p className="mt-[11px] text-xs leading-[1.9] text-[#8494ac]">
+                    یادداشت مدیر بازرگانی: {p.note}
+                  </p>
+                )
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {registered.length > 0 && (
+        <section className="mt-1">
+          <div className="mb-3 flex items-center gap-2.5">
+            <span className="h-2 w-2 rounded-full bg-[#34d399]" />
+            <h2 className="m-0 text-sm font-extrabold text-white">قیمت‌های ثبت‌شده</h2>
+            <span className="font-num rounded-xl bg-[rgba(16,185,129,.14)] px-2.5 py-0.5 text-[11px] font-extrabold text-[#34d399]">
+              {faDigits(registered.length)}
+            </span>
+          </div>
+          <div className="flex flex-col gap-2">
+            {registered.map((p) => (
+              <div
+                key={p.id}
+                className="flex flex-wrap items-center gap-3 rounded-[13px] border border-[#1f2a3d] bg-[#141d2e] px-[15px] py-[13px]"
+              >
+                <span className="flex h-[34px] w-[34px] flex-none items-center justify-center rounded-[10px] bg-[rgba(16,185,129,.14)] text-[#34d399]">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
+                    <path d="M20 6L9 17l-5-5" />
+                  </svg>
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[13px] font-extrabold text-white">
+                      {routeLabel(p.flightInstance)}
+                    </span>
+                    <span className="ltr font-num text-[10px] text-[#6b7b94]">
+                      {p.flightInstance.flight.flightNo} · {formatJalaliDate(p.flightInstance.departureAt)}
+                    </span>
+                    <span className="rounded-[10px] bg-[rgba(59,130,246,.14)] px-2 py-0.5 text-[9.5px] font-extrabold text-[#93c5fd]">
+                      قفل‌شده
+                    </span>
+                  </div>
+                  <div className="font-num mt-0.5 text-[10.5px] text-[#6b7b94]">
                     پیشنهاد بازرگانی: {faMoney(p.proposedPriceIrr)} تومان
                     {p.legalRateIrr ? ` · نرخ قانونی: ${faMoney(p.legalRateIrr)} تومان` : ''}
                   </div>
                 </div>
-                <span className="rounded-full bg-surface px-3 py-1 text-[10px] font-bold text-muted">قفل‌شده</span>
-                <div className="text-left">
-                  <div className="text-[10px] text-muted">قیمت ثبت‌شدهٔ پرواز</div>
-                  <div className="font-num text-sm font-black text-[#059669]">
+                <div className="flex-none text-start">
+                  <div className="text-[9.5px] text-[#6b7b94]">قیمت ثبت‌شدهٔ پرواز</div>
+                  <div className="font-num text-sm font-black text-[#34d399]">
                     {faMoney(p.registeredPriceIrr ?? p.proposedPriceIrr)} تومان
                   </div>
                 </div>
               </div>
             ))}
           </div>
-        )}
-      </section>
+        </section>
+      )}
       {stepUp.modal}
     </div>
   );

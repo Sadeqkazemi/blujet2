@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useOutletContext } from 'react-router-dom';
 import {
   fetchCompletedFlightsSummary,
   fetchFinanceDashboardStats,
@@ -14,7 +14,10 @@ import type {
   SalesChartPeriod,
   SalesGranularity,
 } from '../../types/reporting';
+import type { PanelShellContext } from '../../types/panel-shell';
 import SalesBarChart from '../../components/SalesBarChart';
+import LowSalesBanner from '../../components/LowSalesBanner';
+import PanelNotifBell from '../../components/PanelNotifBell';
 
 const CHART_MODES: { key: SalesGranularity; label: string }[] = [
   { key: 'q3', label: '۳ ماهه' },
@@ -60,6 +63,9 @@ function StatCard({
 }
 
 export default function FinanceDashboardPage() {
+  const { lowSalesAlerts = [] } = useOutletContext<PanelShellContext>();
+  const bannerAlert = lowSalesAlerts[0] ?? null;
+  const notifAlerts = lowSalesAlerts.slice(1);
   const [stats, setStats] = useState<FinanceDashboardStats | null>(null);
   const [granularity, setGranularity] = useState<SalesGranularity>('q6');
   const [periodKey, setPeriodKey] = useState<string | null>(null);
@@ -113,12 +119,17 @@ export default function FinanceDashboardPage() {
 
   return (
     <div className="p-8">
-      <div className="mb-6">
-        <h1 className="text-xl font-black text-panel-ink">داشبورد</h1>
-        <p className="mt-1 text-sm text-panel-muted">نمای کلی فروش و کارهای در انتظار اقدام</p>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-black text-ink">داشبورد</h1>
+          <p className="mt-1 text-sm text-muted">نمای کلی فروش و کارهای در انتظار اقدام</p>
+        </div>
+        <PanelNotifBell alerts={notifAlerts} variant="light" />
       </div>
 
       {error && <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">{error}</p>}
+
+      <LowSalesBanner alert={bannerAlert} variant="light" />
 
       {stats && (
         <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">

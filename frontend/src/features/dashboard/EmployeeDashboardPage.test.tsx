@@ -7,7 +7,7 @@ import * as panelsApi from '../../api/panels';
 import type { PanelNavItem } from '../../types/panels';
 
 function Shell({ nav }: { nav: PanelNavItem[] | null }) {
-  return <Outlet context={{ nav }} />;
+  return <Outlet context={{ nav, lowSalesAlerts: [] }} />;
 }
 
 function renderWithNav(nav: PanelNavItem[] | null) {

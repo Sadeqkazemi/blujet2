@@ -55,10 +55,12 @@ describe('CartablePage', () => {
 
     renderPage();
 
-    expect(await screen.findByText('درخواست اداری')).toBeInTheDocument();
+    expect(await screen.findByText('کارهای در انتظار اقدام شما')).toBeInTheDocument();
+    expect(screen.getByText('درخواست اداری')).toBeInTheDocument();
     expect(screen.getByText('همکاری آژانس')).toBeInTheDocument();
     expect(screen.getByText('درخواست مدیران')).toBeInTheDocument();
     expect(screen.getByText('۴ مورد')).toBeInTheDocument();
+    expect(screen.getByText('کارتابل من')).toBeInTheDocument();
     expect(screen.getByText('درخواست گزارش فروش سه‌ماهه')).toBeInTheDocument();
     expect(screen.getByText('ارسال از: محمد رحیمی · مدیر ارشد')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'ایجاد پیام' })).toBeInTheDocument();

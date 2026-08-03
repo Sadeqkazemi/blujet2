@@ -46,6 +46,9 @@ interface JalaliDatePickerProps {
   placeholder?: string;
   subLabel?: string;
   isRTL?: boolean;
+  theme?: 'light' | 'dark';
+  /** Compact single-line trigger (toolbar chips in dark panels). */
+  compact?: boolean;
 }
 
 /** Jalali (شمسی) date picker — CLAUDE.md requires Jalali everywhere users pick dates. */
@@ -58,6 +61,8 @@ export default function JalaliDatePicker({
   placeholder = 'انتخاب کنید',
   subLabel,
   isRTL = true,
+  theme = 'light',
+  compact = false,
 }: JalaliDatePickerProps) {
   const [open, setOpen] = useState(false);
   const [viewMonth, setViewMonth] = useState(() => (value ? dayjs(value).calendar('jalali') : dayjs().calendar('jalali')));
@@ -88,22 +93,61 @@ export default function JalaliDatePicker({
         faDigits(String(dayjs(value).calendar('jalali').year()))
       : label);
 
+  const dark = theme === 'dark';
+  const valueColor = dark ? (value ? '#e7ecf3' : '#9fb0c7') : value ? '#0d2640' : '#aeb6c2';
+  const mutedColor = dark ? '#6b7b94' : '#9aa4b2';
+  const popupBg = dark ? '#141d2e' : '#fff';
+  const popupBorder = dark ? '#2a3550' : '#e6eaf0';
+
   return (
     <div ref={rootRef} style={{ position: 'relative', height: '100%' }}>
       <div
         data-testid={testId}
         onClick={() => setOpen((v) => !v)}
-        style={{ cursor: 'pointer', padding: '5px 13px', display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}
+        style={{
+          cursor: 'pointer',
+          padding: compact ? '0 10px' : '5px 13px',
+          display: 'flex',
+          flexDirection: compact ? 'row' : 'column',
+          alignItems: compact ? 'center' : undefined,
+          justifyContent: 'center',
+          gap: compact ? 6 : undefined,
+          height: compact ? 38 : '100%',
+        }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#9aa4b2', fontWeight: 600, marginBottom: 3 }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="4" width="18" height="18" rx="2" />
-            <path d="M3 9h18M8 2v4M16 2v4" />
-          </svg>
-          {label}
-        </div>
-        <div style={{ fontSize: '13.5px', fontWeight: 800, color: value ? '#0d2640' : '#aeb6c2' }}>{displayValue}</div>
-        <div style={{ fontSize: '10.5px', color: '#aeb6c2', marginTop: 1 }}>{weekdaySub}</div>
+        {compact ? (
+          <>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={mutedColor} strokeWidth="1.9">
+              <rect x="3" y="4" width="18" height="17" rx="2" />
+              <path d="M3 9h18M8 2v4M16 2v4" />
+            </svg>
+            <span style={{ fontSize: 11.5, fontWeight: 600, color: valueColor, whiteSpace: 'nowrap' }}>
+              {value ? displayValue : placeholder}
+            </span>
+          </>
+        ) : (
+          <>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                fontSize: 11,
+                color: mutedColor,
+                fontWeight: 600,
+                marginBottom: 3,
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" />
+                <path d="M3 9h18M8 2v4M16 2v4" />
+              </svg>
+              {label}
+            </div>
+            <div style={{ fontSize: '13.5px', fontWeight: 800, color: valueColor }}>{displayValue}</div>
+            <div style={{ fontSize: '10.5px', color: mutedColor, marginTop: 1 }}>{weekdaySub}</div>
+          </>
+        )}
       </div>
 
       {open && (
@@ -115,12 +159,15 @@ export default function JalaliDatePicker({
             [isRTL ? 'right' : 'left']: 0,
             width: 300,
             maxWidth: '92vw',
-            background: '#fff',
-            border: '1px solid #e6eaf0',
+            background: popupBg,
+            border: `1px solid ${popupBorder}`,
             borderRadius: 18,
-            boxShadow: '0 24px 56px -14px rgba(13,38,102,.34)',
+            boxShadow: dark
+              ? '0 24px 60px -16px rgba(0,0,0,.6)'
+              : '0 24px 56px -14px rgba(13,38,102,.34)',
             padding: '18px 20px',
             zIndex: 50,
+            color: dark ? '#e7ecf3' : undefined,
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>

@@ -67,6 +67,8 @@ describe('Audit (e2e)', () => {
     expect(roles).not.toContain('SENIOR_MANAGER');
     expect(roles).not.toContain('BOARD_CHAIR');
     expect(roles).toContain('FINANCE_MANAGER');
+    expect(res.body.data[0]).toHaveProperty('actorName');
+    expect(typeof res.body.data[0].actorName).toBe('string');
   });
 
   it("Senior Manager's manager-reports includes every role, unfiltered", async () => {

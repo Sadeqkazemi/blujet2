@@ -4,11 +4,7 @@ import { fetchCartable, fetchMyReferrals } from '../../api/cartable';
 import { fetchEmployeeContext } from '../../api/panels';
 import { faDigits } from '../../lib/fa-format';
 import type { EmployeeContext } from '../../types/panels';
-import type { PanelNavItem } from '../../types/panels';
-
-interface PanelShellContext {
-  nav: PanelNavItem[] | null;
-}
+import type { PanelShellContext } from '../../types/panel-shell';
 
 const TAB_DESCRIPTIONS: Record<string, string> = {
   agencies: 'مشاهده و بررسی آژانس‌های همکار و درخواست‌های عضویت',

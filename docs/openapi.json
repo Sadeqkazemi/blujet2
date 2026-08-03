@@ -782,6 +782,21 @@
         ]
       }
     },
+    "/reporting/flight-sales": {
+      "get": {
+        "operationId": "ReportingController_flightSales",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Departed flights with per-channel sales — «شماره پرواز» picker on analytic مالی",
+        "tags": [
+          "reporting"
+        ]
+      }
+    },
     "/reporting/kpis": {
       "get": {
         "operationId": "ReportingController_kpis",
@@ -944,7 +959,7 @@
             "description": ""
           }
         },
-        "summary": "کارت‌های داشبورد مدیر مالی — آژانس/مسافر/بلیط/درآمد ماه جاری با روند",
+        "summary": "کارت‌های داشبورد اجرایی/مالی — آژانس/مسافر/بلیط/درآمد ماه جاری با روند (پنل مدیر عامل و هم‌ترازها + مدیر مالی)",
         "tags": [
           "reporting"
         ]
@@ -3987,6 +4002,31 @@
         ]
       }
     },
+    "/reservation/flights": {
+      "get": {
+        "operationId": "PnrController_listFlights",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "مسیر یا شماره پرواز",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست پروازهای SCHEDULED با ظرفیت/فروش — تب پروازها",
+        "tags": [
+          "reservation"
+        ]
+      }
+    },
     "/reservation/search": {
       "get": {
         "operationId": "PnrController_search",
@@ -4089,31 +4129,6 @@
           }
         },
         "summary": "فهرست آژانس‌هایی که کلید API دارند — تب دسترسی آژانس‌ها",
-        "tags": [
-          "reservation"
-        ]
-      }
-    },
-    "/reservation/flights": {
-      "get": {
-        "operationId": "PnrController_listFlights",
-        "parameters": [
-          {
-            "name": "q",
-            "required": false,
-            "in": "query",
-            "description": "مسیر یا شماره پرواز",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "فهرست پروازهای SCHEDULED با ظرفیت/فروش — تب پروازها",
         "tags": [
           "reservation"
         ]
