@@ -1,4 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import {
+  BeforeInsert,
   Column,
   Entity,
   Index,
@@ -13,6 +15,11 @@ import { Route } from './route.entity';
 export class Flight {
   @PrimaryColumn({ type: 'text', primaryKeyConstraintName: 'flights_pkey' })
   id!: string;
+
+  @BeforeInsert()
+  generateId() {
+    this.id ??= randomUUID();
+  }
 
   @Column({ type: 'text' })
   flightNo!: string;

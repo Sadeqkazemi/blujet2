@@ -3,8 +3,6 @@ import { enumerateSeats } from './seat-layout';
 describe('enumerateSeats', () => {
   it('applies MD-80 column letters and excluded rear seats', () => {
     const seats = enumerateSeats({
-      id: 'm',
-      aircraftType: 'MD-80',
       businessRowStart: 3,
       businessRowEnd: 6,
       businessColsLeft: ['A', 'B'],
@@ -14,7 +12,6 @@ describe('enumerateSeats', () => {
       economyColsLeft: ['A', 'B'],
       economyColsRight: ['D', 'E', 'F'],
       excludedSeatCodes: ['28A', '28B', '29A', '29B', '30A', '30B'],
-      updatedAt: new Date(),
     });
 
     expect(seats).toHaveLength(140);
