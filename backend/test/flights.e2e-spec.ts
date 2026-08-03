@@ -287,6 +287,30 @@ describe('Flights (e2e)', () => {
     expect(ok.body.data.derivedStatus).toBe('ACTIVE');
     expect(ok.body.data.sold).toBe(0);
 
+    const withExtras = await request(app.getHttpServer())
+      .post('/flights')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        ...base,
+        flightNo: uniqueFlightNo(),
+        capacity: 180,
+        charterSeats: 40,
+        aircraftType: 'Airbus A320',
+      });
+    expect(withExtras.status).toBe(201);
+    const extrasInstance = await typeorm.flightInstance.findUniqueOrThrow({
+      where: { id: withExtras.body.data.id },
+      include: { flight: true },
+    });
+    expect(extrasInstance.charterSeats).toBe(40);
+    expect(extrasInstance.flight.aircraftType).toBe('Airbus A320');
+
+    const badCharter = await request(app.getHttpServer())
+      .post('/flights')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ ...base, flightNo: uniqueFlightNo(), capacity: 100, charterSeats: 100 });
+    expect(badCharter.status).toBe(400);
+
     const instance = await typeorm.flightInstance.findUniqueOrThrow({
       where: { id: ok.body.data.id },
       include: { flight: { include: { route: true } } },
