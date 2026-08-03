@@ -20,7 +20,7 @@ describe('Panels (e2e)', () => {
   });
 
   it('returns the confirmed tab set for Finance Manager (flights/flightops/admins/settings excluded)', async () => {
-    const { accessToken } = await loginAs(app, 'finance.karimi');
+    const { accessToken } = await loginAs(app, 'finance');
     const res = await request(app.getHttpServer())
       .get('/panels/nav')
       .set('Authorization', `Bearer ${accessToken}`);
@@ -139,7 +139,7 @@ describe('Panels (e2e)', () => {
   });
 
   it('non-CEO/Senior roles get 403 on /panels/access', async () => {
-    const { accessToken } = await loginAs(app, 'finance.karimi');
+    const { accessToken } = await loginAs(app, 'finance');
     const res = await request(app.getHttpServer())
       .get('/panels/access')
       .set('Authorization', `Bearer ${accessToken}`);
@@ -148,7 +148,7 @@ describe('Panels (e2e)', () => {
 
   it('CEO can toggle a sibling panel off, it audits the action, and the affected role is blocked server-side', async () => {
     const ceo = await loginAs(app, 'ceo');
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
 
     const before = await request(app.getHttpServer())
       .get('/reporting/kpis?granularity=q6')

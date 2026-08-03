@@ -73,7 +73,7 @@ remains on dashboard/analytic views only (flight search input). See
 - [x] 2FA step component test (renders after password submit, not before) — `frontend/src/features/auth/TwoFactorPage.test.tsx` (Phase 32). Writing the "not before" case caught a real bug: `TwoFactorPage` called `navigate('/login')` during render instead of in a `useEffect`, so React Router's own guard silently dropped the navigation — visiting `/login/2fa` directly with no `challengeId` in location state rendered a blank page instead of redirecting. Fixed by moving the call into a `useEffect` keyed on `challengeId`; see PLAN.md's Phase 32 entry.
 
 ### E2E (Playwright)
-- [x] Full staff login journey (password → 2FA → dashboard) per role, landing on that role's dashboard with only its permitted tabs — `frontend/e2e/staff-login-journey.spec.ts`, parametrized over finance.karimi/ceo/itadmin
+- [x] Full staff login journey (password → 2FA → dashboard) per role, landing on that role's dashboard with only its permitted tabs — `frontend/e2e/staff-login-journey.spec.ts`, parametrized over finance/ceo/itadmin
 - [x] A role whose dashboard isn't implemented (IT) gets the coming-soon placeholder honestly, not an error — same spec, `hasSalesDashboard: false` case
 - [x] An unauthenticated visitor is redirected to `/login` — same spec
 - [x] A "coming soon" tab renders without crashing — same spec

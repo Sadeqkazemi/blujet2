@@ -24,7 +24,7 @@ async function seedRefundRequest(page: Page): Promise<{ passengerName: string }>
 test('finance journey: KPI cards → detail (شبا + penalty breakdown) → refer → pay → closed case', async ({
   page,
 }) => {
-  await loginAs(page, 'finance.karimi');
+  await loginAs(page, 'finance');
   const { passengerName } = await seedRefundRequest(page);
 
   await page.getByRole('link', { name: /^استرداد بلیط/ }).click();

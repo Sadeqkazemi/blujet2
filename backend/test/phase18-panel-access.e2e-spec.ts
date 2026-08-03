@@ -122,7 +122,7 @@ describe('Phase 18 — SITE_ADMIN + EMPLOYEE panel access (e2e)', () => {
       const refund = await createRefundRequest();
       const member = await createClubMember();
       const finance = await prisma.user.findUniqueOrThrow({
-        where: { username: 'finance.karimi' },
+        where: { username: 'finance' },
       });
 
       const checks: Array<[string, () => Promise<request.Response>]> = [
@@ -324,7 +324,7 @@ describe('Phase 18 — SITE_ADMIN + EMPLOYEE panel access (e2e)', () => {
       const { accessToken } = await loginAs(app, username);
       const refund = await createRefundRequest();
       const finance = await prisma.user.findUniqueOrThrow({
-        where: { username: 'finance.karimi' },
+        where: { username: 'finance' },
       });
 
       const list = await request(app.getHttpServer())
@@ -386,7 +386,7 @@ describe('Phase 18 — SITE_ADMIN + EMPLOYEE panel access (e2e)', () => {
     });
 
     it("doesn't affect non-EMPLOYEE roles: FINANCE_MANAGER still has full refunds access despite holding zero EmployeePermission rows", async () => {
-      const { accessToken } = await loginAs(app, 'finance.karimi');
+      const { accessToken } = await loginAs(app, 'finance');
       const refund = await createRefundRequest();
 
       const res = await request(app.getHttpServer())

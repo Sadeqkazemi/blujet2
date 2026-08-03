@@ -256,7 +256,7 @@ describe('Phase 13 Part E — PNR lifecycle + payment reconciliation', () => {
     expect(reconciliation).not.toBeNull();
     expect(reconciliation!.status).toBe('PENDING');
 
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const queue = await request(app.getHttpServer())
       .get('/reconciliation')
       .set(auth(finance.accessToken!));

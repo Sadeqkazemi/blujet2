@@ -498,7 +498,7 @@ describe('Reservation (e2e)', () => {
 
   it('FINANCE_MANAGER and COMMERCIAL_MANAGER get 403 on every /reservation/* endpoint', async () => {
     const instance = await createScheduledInstance();
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const commercial = await loginAs(app, 'comm.abbasi');
 
     for (const { accessToken } of [finance, commercial]) {

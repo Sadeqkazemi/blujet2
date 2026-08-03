@@ -98,7 +98,7 @@ describe('Agencies (e2e)', () => {
   // ── Listing & detail ────────────────────────────────────────────────
 
   it('GET /agencies returns the same 4 KPI cards for all 3 agency-tab roles', async () => {
-    for (const username of ['senior.rahimi', 'finance.karimi', 'comm.abbasi']) {
+    for (const username of ['senior.rahimi', 'finance', 'comm.abbasi']) {
       const { accessToken } = await loginAs(app, username);
       const res = await request(app.getHttpServer())
         .get('/agencies')
@@ -190,7 +190,7 @@ describe('Agencies (e2e)', () => {
       .set('Authorization', `Bearer ${senior.accessToken}`);
     expect(seniorRes.body.data.activityScore).toBeUndefined();
 
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const financeRes = await request(app.getHttpServer())
       .get(`/agencies/${agencyId}`)
       .set('Authorization', `Bearer ${finance.accessToken}`);
@@ -245,7 +245,7 @@ describe('Agencies (e2e)', () => {
       },
     });
 
-    const { accessToken } = await loginAs(app, 'finance.karimi');
+    const { accessToken } = await loginAs(app, 'finance');
     const res = await request(app.getHttpServer())
       .get(`/agencies/${agencyId}`)
       .set('Authorization', `Bearer ${accessToken}`);
@@ -262,7 +262,7 @@ describe('Agencies (e2e)', () => {
     const agencyId = await createFreshAgency();
     await addAgencySale(agencyId, 400_000_000);
 
-    const { accessToken } = await loginAs(app, 'finance.karimi');
+    const { accessToken } = await loginAs(app, 'finance');
     const res = await request(app.getHttpServer())
       .patch(`/agencies/${agencyId}/credit`)
       .set('Authorization', `Bearer ${accessToken}`)
@@ -288,7 +288,7 @@ describe('Agencies (e2e)', () => {
     const agencyId = await createFreshAgency();
     await addAgencySale(agencyId, 700_000_000);
 
-    const { accessToken } = await loginAs(app, 'finance.karimi');
+    const { accessToken } = await loginAs(app, 'finance');
     const res = await request(app.getHttpServer())
       .post(`/agencies/${agencyId}/settle`)
       .set('Authorization', `Bearer ${accessToken}`);
@@ -307,7 +307,7 @@ describe('Agencies (e2e)', () => {
     const agencyId = await createFreshAgency();
     await addAgencySale(agencyId, 500_000_000);
 
-    const { accessToken } = await loginAs(app, 'finance.karimi');
+    const { accessToken } = await loginAs(app, 'finance');
     const [first, second] = await Promise.all([
       request(app.getHttpServer())
         .post(`/agencies/${agencyId}/settle`)
@@ -340,7 +340,7 @@ describe('Agencies (e2e)', () => {
   // that guard against a genuinely invalid input (negative) instead.
   it('PATCH credit rejects a negative limit with 400, not a DB 500', async () => {
     const agencyId = await createFreshAgency();
-    const { accessToken } = await loginAs(app, 'finance.karimi');
+    const { accessToken } = await loginAs(app, 'finance');
     const res = await request(app.getHttpServer())
       .patch(`/agencies/${agencyId}/credit`)
       .set('Authorization', `Bearer ${accessToken}`)
@@ -430,7 +430,7 @@ describe('Agencies (e2e)', () => {
     const senior = await prisma.user.findFirstOrThrow({
       where: { username: 'senior.rahimi' },
     });
-    const { accessToken } = await loginAs(app, 'finance.karimi');
+    const { accessToken } = await loginAs(app, 'finance');
 
     const res = await request(app.getHttpServer())
       .patch(`/agencies/requests/${reqRow.id}/refer`)
@@ -458,7 +458,7 @@ describe('Agencies (e2e)', () => {
 
   it('POST .../api-key for a non-Senior-Manager role -> 403', async () => {
     const agencyId = await createFreshAgency();
-    const { accessToken } = await loginAs(app, 'finance.karimi');
+    const { accessToken } = await loginAs(app, 'finance');
     const res = await request(app.getHttpServer())
       .post(`/agencies/${agencyId}/api-key`)
       .set('Authorization', `Bearer ${accessToken}`)
@@ -545,7 +545,7 @@ describe('Agencies (e2e)', () => {
       .send(body);
     expect(seniorRes.status).toBe(403);
 
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const financeRes = await request(app.getHttpServer())
       .post(`/agencies/${agencyId}/invoices`)
       .set('Authorization', `Bearer ${finance.accessToken}`)
@@ -562,7 +562,7 @@ describe('Agencies (e2e)', () => {
 
   it('GET .../invoices is 200 (read) for all 3 roles', async () => {
     const agencyId = await createFreshAgency();
-    for (const username of ['senior.rahimi', 'finance.karimi', 'comm.abbasi']) {
+    for (const username of ['senior.rahimi', 'finance', 'comm.abbasi']) {
       const { accessToken } = await loginAs(app, username);
       const res = await request(app.getHttpServer())
         .get(`/agencies/${agencyId}/invoices`)
@@ -583,7 +583,7 @@ describe('Agencies (e2e)', () => {
       });
     const invoiceId = issued.body.data.id as string;
 
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const pay1 = await request(app.getHttpServer())
       .patch(`/agencies/${agencyId}/invoices/${invoiceId}/pay`)
       .set('Authorization', `Bearer ${finance.accessToken}`);
@@ -609,7 +609,7 @@ describe('Agencies (e2e)', () => {
       .set('Authorization', `Bearer ${senior.accessToken}`);
     expect(seniorGet.status).toBe(403);
 
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const financePost = await request(app.getHttpServer())
       .post(`/agencies/${agencyId}/messages`)
       .set('Authorization', `Bearer ${finance.accessToken}`)
@@ -629,7 +629,7 @@ describe('Agencies (e2e)', () => {
   it('two simultaneous PATCH .../credit calls do not crash, last write wins, and both are audited', async () => {
     const agencyId = await createFreshAgency();
     const seniorA = await loginAs(app, 'senior.rahimi');
-    const financeB = await loginAs(app, 'finance.karimi');
+    const financeB = await loginAs(app, 'finance');
 
     const [resA, resB] = await Promise.all([
       request(app.getHttpServer())

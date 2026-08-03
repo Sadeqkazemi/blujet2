@@ -309,7 +309,7 @@ describe('Careers (e2e)', () => {
         'ceo',
         'itadmin',
         'comm.abbasi',
-        'finance.karimi',
+        'finance',
       ]) {
         const { accessToken } = await loginAs(app, username);
         const forbidden = await request(app.getHttpServer())

@@ -141,7 +141,7 @@ describe('Flightops (e2e)', () => {
     for (const username of [
       'ceo',
       'site.admin',
-      'finance.karimi',
+      'finance',
       'comm.abbasi',
     ]) {
       const { accessToken } = await loginAs(app, username);
