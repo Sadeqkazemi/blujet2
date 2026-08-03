@@ -7,7 +7,17 @@ describe('ReportingService (unit)', () => {
   let service: ReportingService;
 
   beforeEach(() => {
-    service = new ReportingService({} as TypeORMService, {} as AgenciesService);
+    service = new ReportingService(
+      {} as TypeORMService,
+      {} as AgenciesService,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
   });
 
   describe('buildBuckets', () => {
