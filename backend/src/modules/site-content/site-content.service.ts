@@ -5,10 +5,19 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as fs from 'node:fs';
-import { PrismaService } from '../../prisma/prisma.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { IsNull, Repository } from 'typeorm';
+import { StoredFile } from '../../database/entities/stored-file.entity';
+import { SiteMediaAsset } from '../../database/entities/site-media-asset.entity';
+import { SiteContentBlock } from '../../database/entities/site-content-block.entity';
+import { SiteDestinationHighlight } from '../../database/entities/site-destination-highlight.entity';
+import { SiteRouteHighlight } from '../../database/entities/site-route-highlight.entity';
+import { Airport } from '../../database/entities/airport.entity';
+import { BlogPost } from '../../database/entities/blog-post.entity';
+import { BlogPostStatus, type SiteContentBlockKey } from '../../database/enums';
+import { findOneOrThrow } from '../../database/utils/find-one-or-throw';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
-import type { SiteContentBlockKey } from '../../../generated/prisma/client';
 import type {
   AddLibraryAssetDto,
   CreateDestinationDto,
@@ -110,14 +119,25 @@ const BLOCK_LOCALE_DEFAULTS: Record<
 @Injectable()
 export class SiteContentService {
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectRepository(StoredFile)
+    private readonly storedFileRepo: Repository<StoredFile>,
+    @InjectRepository(SiteMediaAsset)
+    private readonly siteMediaAssetRepo: Repository<SiteMediaAsset>,
+    @InjectRepository(SiteContentBlock)
+    private readonly siteContentBlockRepo: Repository<SiteContentBlock>,
+    @InjectRepository(SiteDestinationHighlight)
+    private readonly siteDestinationHighlightRepo: Repository<SiteDestinationHighlight>,
+    @InjectRepository(SiteRouteHighlight)
+    private readonly siteRouteHighlightRepo: Repository<SiteRouteHighlight>,
+    @InjectRepository(Airport)
+    private readonly airportRepo: Repository<Airport>,
+    @InjectRepository(BlogPost)
+    private readonly blogPostRepo: Repository<BlogPost>,
     private readonly audit: AuditService,
   ) {}
 
   private async assertImageFile(actorId: string, fileId: string) {
-    const file = await this.prisma.storedFile.findUnique({
-      where: { id: fileId },
-    });
+    const file = await this.storedFileRepo.findOneBy({ id: fileId });
     if (!file) {
       throw new BadRequestException({
         code: ErrorCode.VALIDATION_FAILED,
@@ -166,21 +186,21 @@ export class SiteContentService {
   }
 
   async listLibrary() {
-    const rows = await this.prisma.siteMediaAsset.findMany({
-      where: { deletedAt: null },
-      include: { storedFile: true },
-      orderBy: { createdAt: 'desc' },
+    const rows = await this.siteMediaAssetRepo.find({
+      where: { deletedAt: IsNull() },
+      relations: { storedFile: true },
+      order: { createdAt: 'DESC' },
     });
     return rows.map((r) => this.toLibraryRow(r));
   }
 
   async addLibraryAsset(actor: AuthenticatedUser, dto: AddLibraryAssetDto) {
     await this.assertImageFile(actor.id, dto.storedFileId);
-    const file = await this.prisma.storedFile.findUniqueOrThrow({
+    const file = await findOneOrThrow(this.storedFileRepo, {
       where: { id: dto.storedFileId },
     });
-    const existing = await this.prisma.siteMediaAsset.findUnique({
-      where: { storedFileId: dto.storedFileId },
+    const existing = await this.siteMediaAssetRepo.findOneBy({
+      storedFileId: dto.storedFileId,
     });
     if (existing && !existing.deletedAt) {
       throw new ConflictException({
@@ -189,26 +209,34 @@ export class SiteContentService {
       });
     }
     const label = dto.label?.trim() || file.fileName;
-    const asset = existing
-      ? await this.prisma.siteMediaAsset.update({
-          where: { id: existing.id },
-          data: { label, deletedAt: null, uploadedById: actor.id },
-          include: { storedFile: true },
-        })
-      : await this.prisma.siteMediaAsset.create({
-          data: {
-            storedFileId: dto.storedFileId,
-            label,
-            uploadedById: actor.id,
-          },
-          include: { storedFile: true },
-        });
+    let assetId: string;
+    if (existing) {
+      await this.siteMediaAssetRepo.update(
+        { id: existing.id },
+        { label, deletedAt: null, uploadedById: actor.id },
+      );
+      assetId = existing.id;
+    } else {
+      const saved = await this.siteMediaAssetRepo.save(
+        this.siteMediaAssetRepo.create({
+          storedFileId: dto.storedFileId,
+          label,
+          uploadedById: actor.id,
+        }),
+      );
+      assetId = saved.id;
+    }
+    const asset = await findOneOrThrow(this.siteMediaAssetRepo, {
+      where: { id: assetId },
+      relations: { storedFile: true },
+    });
     return this.toLibraryRow(asset);
   }
 
   async deleteLibraryAsset(actor: AuthenticatedUser, id: string) {
-    const asset = await this.prisma.siteMediaAsset.findFirst({
-      where: { id, deletedAt: null },
+    const asset = await this.siteMediaAssetRepo.findOneBy({
+      id,
+      deletedAt: IsNull(),
     });
     if (!asset) {
       throw new NotFoundException({
@@ -216,10 +244,7 @@ export class SiteContentService {
         message: 'تصویر یافت نشد.',
       });
     }
-    await this.prisma.siteMediaAsset.update({
-      where: { id },
-      data: { deletedAt: new Date() },
-    });
+    await this.siteMediaAssetRepo.update({ id }, { deletedAt: new Date() });
     await this.audit.record({
       actorId: actor.id,
       actorRole: actor.role,
@@ -233,14 +258,16 @@ export class SiteContentService {
   }
 
   private async ensureBlock(key: SiteContentBlockKey) {
-    const existing = await this.prisma.siteContentBlock.findUnique({
-      where: { key },
-    });
+    const existing = await this.siteContentBlockRepo.findOneBy({ key });
     if (existing) return existing;
     const defaults = BLOCK_DEFAULTS[key];
-    return this.prisma.siteContentBlock.create({
-      data: { key, ...defaults },
-    });
+    return this.siteContentBlockRepo.save(
+      this.siteContentBlockRepo.create({
+        key,
+        ...defaults,
+        updatedAt: new Date(),
+      }),
+    );
   }
 
   private toBlockRow(row: {
@@ -283,9 +310,9 @@ export class SiteContentService {
     if (dto.imageFileId) {
       await this.assertImageFile(actor.id, dto.imageFileId);
     }
-    const updated = await this.prisma.siteContentBlock.update({
-      where: { key },
-      data: {
+    await this.siteContentBlockRepo.update(
+      { key },
+      {
         ...(dto.enabled !== undefined ? { enabled: dto.enabled } : {}),
         ...(dto.title !== undefined ? { title: dto.title } : {}),
         ...(dto.subtitle !== undefined ? { subtitle: dto.subtitle } : {}),
@@ -295,7 +322,11 @@ export class SiteContentService {
           ? { imageFileId: dto.imageFileId }
           : {}),
         updatedById: actor.id,
+        updatedAt: new Date(),
       },
+    );
+    const updated = await findOneOrThrow(this.siteContentBlockRepo, {
+      where: { key },
     });
     await this.audit.record({
       actorId: actor.id,
@@ -310,9 +341,9 @@ export class SiteContentService {
   }
 
   async listDestinations() {
-    const rows = await this.prisma.siteDestinationHighlight.findMany({
-      where: { deletedAt: null },
-      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+    const rows = await this.siteDestinationHighlightRepo.find({
+      where: { deletedAt: IsNull() },
+      order: { sortOrder: 'ASC', createdAt: 'ASC' },
     });
     return rows.map((r) => ({
       id: r.id,
@@ -328,14 +359,15 @@ export class SiteContentService {
     if (dto.imageFileId) {
       await this.assertImageFile(actor.id, dto.imageFileId);
     }
-    const row = await this.prisma.siteDestinationHighlight.create({
-      data: {
+    const row = await this.siteDestinationHighlightRepo.save(
+      this.siteDestinationHighlightRepo.create({
         airportCode: dto.airportCode.toUpperCase(),
         priceIrr: BigInt(dto.priceIrr),
-        imageFileId: dto.imageFileId,
+        imageFileId: dto.imageFileId ?? null,
         sortOrder: dto.sortOrder ?? 0,
-      },
-    });
+        updatedAt: new Date(),
+      }),
+    );
     return {
       id: row.id,
       airportCode: row.airportCode,
@@ -350,8 +382,9 @@ export class SiteContentService {
     id: string,
     dto: UpdateDestinationDto,
   ) {
-    const existing = await this.prisma.siteDestinationHighlight.findFirst({
-      where: { id, deletedAt: null },
+    const existing = await this.siteDestinationHighlightRepo.findOneBy({
+      id,
+      deletedAt: IsNull(),
     });
     if (!existing) {
       throw new NotFoundException({
@@ -362,9 +395,9 @@ export class SiteContentService {
     if (dto.imageFileId) {
       await this.assertImageFile(actor.id, dto.imageFileId);
     }
-    const updated = await this.prisma.siteDestinationHighlight.update({
-      where: { id },
-      data: {
+    await this.siteDestinationHighlightRepo.update(
+      { id },
+      {
         ...(dto.airportCode !== undefined
           ? { airportCode: dto.airportCode.toUpperCase() }
           : {}),
@@ -375,7 +408,11 @@ export class SiteContentService {
           ? { imageFileId: dto.imageFileId }
           : {}),
         ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
+        updatedAt: new Date(),
       },
+    );
+    const updated = await findOneOrThrow(this.siteDestinationHighlightRepo, {
+      where: { id },
     });
     return {
       id: updated.id,
@@ -387,8 +424,9 @@ export class SiteContentService {
   }
 
   async deleteDestination(actor: AuthenticatedUser, id: string) {
-    const existing = await this.prisma.siteDestinationHighlight.findFirst({
-      where: { id, deletedAt: null },
+    const existing = await this.siteDestinationHighlightRepo.findOneBy({
+      id,
+      deletedAt: IsNull(),
     });
     if (!existing) {
       throw new NotFoundException({
@@ -396,17 +434,17 @@ export class SiteContentService {
         message: 'مقصد یافت نشد.',
       });
     }
-    await this.prisma.siteDestinationHighlight.update({
-      where: { id },
-      data: { deletedAt: new Date() },
-    });
+    await this.siteDestinationHighlightRepo.update(
+      { id },
+      { deletedAt: new Date(), updatedAt: new Date() },
+    );
     return { id };
   }
 
   async listRoutes() {
-    const rows = await this.prisma.siteRouteHighlight.findMany({
-      where: { deletedAt: null },
-      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+    const rows = await this.siteRouteHighlightRepo.find({
+      where: { deletedAt: IsNull() },
+      order: { sortOrder: 'ASC', createdAt: 'ASC' },
     });
     return rows.map((r) => ({
       id: r.id,
@@ -418,14 +456,15 @@ export class SiteContentService {
   }
 
   async createRoute(actor: AuthenticatedUser, dto: CreateRouteDto) {
-    const row = await this.prisma.siteRouteHighlight.create({
-      data: {
+    const row = await this.siteRouteHighlightRepo.save(
+      this.siteRouteHighlightRepo.create({
         fromAirportCode: dto.fromAirportCode.toUpperCase(),
         toAirportCode: dto.toAirportCode.toUpperCase(),
         priceIrr: BigInt(dto.priceIrr),
         sortOrder: dto.sortOrder ?? 0,
-      },
-    });
+        updatedAt: new Date(),
+      }),
+    );
     return {
       id: row.id,
       fromAirportCode: row.fromAirportCode,
@@ -436,8 +475,9 @@ export class SiteContentService {
   }
 
   async updateRoute(actor: AuthenticatedUser, id: string, dto: UpdateRouteDto) {
-    const existing = await this.prisma.siteRouteHighlight.findFirst({
-      where: { id, deletedAt: null },
+    const existing = await this.siteRouteHighlightRepo.findOneBy({
+      id,
+      deletedAt: IsNull(),
     });
     if (!existing) {
       throw new NotFoundException({
@@ -445,9 +485,9 @@ export class SiteContentService {
         message: 'مسیر یافت نشد.',
       });
     }
-    const updated = await this.prisma.siteRouteHighlight.update({
-      where: { id },
-      data: {
+    await this.siteRouteHighlightRepo.update(
+      { id },
+      {
         ...(dto.fromAirportCode !== undefined
           ? { fromAirportCode: dto.fromAirportCode.toUpperCase() }
           : {}),
@@ -458,7 +498,11 @@ export class SiteContentService {
           ? { priceIrr: BigInt(dto.priceIrr) }
           : {}),
         ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
+        updatedAt: new Date(),
       },
+    );
+    const updated = await findOneOrThrow(this.siteRouteHighlightRepo, {
+      where: { id },
     });
     return {
       id: updated.id,
@@ -470,8 +514,9 @@ export class SiteContentService {
   }
 
   async deleteRoute(actor: AuthenticatedUser, id: string) {
-    const existing = await this.prisma.siteRouteHighlight.findFirst({
-      where: { id, deletedAt: null },
+    const existing = await this.siteRouteHighlightRepo.findOneBy({
+      id,
+      deletedAt: IsNull(),
     });
     if (!existing) {
       throw new NotFoundException({
@@ -479,10 +524,10 @@ export class SiteContentService {
         message: 'مسیر یافت نشد.',
       });
     }
-    await this.prisma.siteRouteHighlight.update({
-      where: { id },
-      data: { deletedAt: new Date() },
-    });
+    await this.siteRouteHighlightRepo.update(
+      { id },
+      { deletedAt: new Date(), updatedAt: new Date() },
+    );
     return { id };
   }
 
@@ -491,7 +536,7 @@ export class SiteContentService {
       this.listBlocks(),
       this.listDestinations(),
       this.listRoutes(),
-      this.prisma.airport.findMany(),
+      this.airportRepo.find(),
     ]);
     const airportMap = new Map(airports.map((a) => [a.code, a.cityFa]));
 
@@ -526,9 +571,7 @@ export class SiteContentService {
   }
 
   async readPublicMedia(fileId: string) {
-    const file = await this.prisma.storedFile.findUnique({
-      where: { id: fileId },
-    });
+    const file = await this.storedFileRepo.findOneBy({ id: fileId });
     if (!file || !fs.existsSync(file.path)) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -536,15 +579,19 @@ export class SiteContentService {
       });
     }
     const [inLibrary, inBlock, inDest, inBlog] = await Promise.all([
-      this.prisma.siteMediaAsset.count({
-        where: { storedFileId: fileId, deletedAt: null },
+      this.siteMediaAssetRepo.count({
+        where: { storedFileId: fileId, deletedAt: IsNull() },
       }),
-      this.prisma.siteContentBlock.count({ where: { imageFileId: fileId } }),
-      this.prisma.siteDestinationHighlight.count({
-        where: { imageFileId: fileId, deletedAt: null },
+      this.siteContentBlockRepo.count({ where: { imageFileId: fileId } }),
+      this.siteDestinationHighlightRepo.count({
+        where: { imageFileId: fileId, deletedAt: IsNull() },
       }),
-      this.prisma.blogPost.count({
-        where: { coverFileId: fileId, deletedAt: null, status: 'PUBLISHED' },
+      this.blogPostRepo.count({
+        where: {
+          coverFileId: fileId,
+          deletedAt: IsNull(),
+          status: BlogPostStatus.PUBLISHED,
+        },
       }),
     ]);
     if (inLibrary + inBlock + inDest + inBlog === 0) {

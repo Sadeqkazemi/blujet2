@@ -1,7 +1,16 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
-import type { AuditCategory, Role } from '../../../generated/prisma/enums';
-import type { Prisma } from '../../../generated/prisma/client';
+import { InjectRepository } from '@nestjs/typeorm';
+import {
+  FindOptionsWhere,
+  ILike,
+  In,
+  MoreThanOrEqual,
+  Not,
+  Repository,
+} from 'typeorm';
+import { AuditLog } from '../../database/entities/audit-log.entity';
+import type { AuditCategory, Role } from '../../database/enums';
+import type { JsonValue } from '../../database/json-types';
 
 export interface RecordAuditEntryInput {
   actorId: string;
@@ -17,15 +26,21 @@ export interface RecordAuditEntryInput {
 
 @Injectable()
 export class AuditService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @InjectRepository(AuditLog)
+    private readonly auditRepo: Repository<AuditLog>,
+  ) {}
 
   async record(input: RecordAuditEntryInput) {
-    return this.prisma.auditLog.create({
-      data: {
+    return this.auditRepo.save(
+      this.auditRepo.create({
         ...input,
-        metadata: input.metadata as Prisma.InputJsonValue | undefined,
-      },
-    });
+        entityType: input.entityType ?? null,
+        entityId: input.entityId ?? null,
+        metadata: (input.metadata as JsonValue | undefined) ?? null,
+        requestId: input.requestId ?? null,
+      }),
+    );
   }
 
   /**
@@ -39,35 +54,35 @@ export class AuditService {
   ) {
     const excludedForCeo: Role[] = ['CEO', 'SENIOR_MANAGER', 'BOARD_CHAIR'];
 
-    return this.prisma.auditLog.findMany({
-      where: {
-        ...(viewerRole === 'CEO'
-          ? { actorRole: { notIn: excludedForCeo } }
-          : {}),
-        ...(filters.category ? { category: filters.category } : {}),
-        ...(filters.actorRole ? { actorRole: filters.actorRole } : {}),
-        ...(filters.q
-          ? {
-              OR: [
-                { action: { contains: filters.q, mode: 'insensitive' } },
-                { detail: { contains: filters.q, mode: 'insensitive' } },
-              ],
-            }
-          : {}),
-      },
-      orderBy: { createdAt: 'desc' },
+    const base: FindOptionsWhere<AuditLog> = {};
+    if (viewerRole === 'CEO') base.actorRole = Not(In(excludedForCeo));
+    if (filters.category) base.category = filters.category;
+    if (filters.actorRole) base.actorRole = filters.actorRole;
+
+    const where: FindOptionsWhere<AuditLog> | FindOptionsWhere<AuditLog>[] =
+      filters.q
+        ? [
+            { ...base, action: ILike(`%${filters.q}%`) },
+            { ...base, detail: ILike(`%${filters.q}%`) },
+          ]
+        : base;
+
+    return this.auditRepo.find({
+      where,
+      order: { createdAt: 'DESC' },
       take: 100,
     });
   }
 
   /** IT Manager's "لاگ و رویدادها" — system-category + account-management entries. */
   async systemLogs() {
-    const rows = await this.prisma.auditLog.findMany({
-      where: { OR: [{ category: 'SYSTEM' }, { category: 'ACCOUNT' }] },
-      orderBy: { createdAt: 'desc' },
+    const rows = await this.auditRepo.find({
+      where: [{ category: 'SYSTEM' }, { category: 'ACCOUNT' }],
+      order: { createdAt: 'DESC' },
       take: 100,
-      include: {
-        actor: { select: { fullName: true, dept: true, role: true } },
+      relations: { actor: true },
+      select: {
+        actor: { fullName: true, dept: true, role: true },
       },
     });
 
@@ -100,11 +115,12 @@ export class AuditService {
 
   /** Lightweight count for the IT sidebar badge on «لاگ و رویدادها». */
   async systemLogsBadgeCount() {
-    return this.prisma.auditLog.count({
-      where: {
-        OR: [{ category: 'SYSTEM' }, { category: 'ACCOUNT' }],
-        createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
-      },
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    return this.auditRepo.count({
+      where: [
+        { category: 'SYSTEM', createdAt: MoreThanOrEqual(since) },
+        { category: 'ACCOUNT', createdAt: MoreThanOrEqual(since) },
+      ],
     });
   }
 
@@ -112,10 +128,11 @@ export class AuditService {
    * (unlike managerReports' exclusions). The level chip is a presentational
    * mapping only: SECURITY→WARN, financial categories→OK, else INFO. */
   async ceoSystemEvents() {
-    const rows = await this.prisma.auditLog.findMany({
-      orderBy: { createdAt: 'desc' },
+    const rows = await this.auditRepo.find({
+      order: { createdAt: 'DESC' },
       take: 100,
-      include: { actor: { select: { fullName: true } } },
+      relations: { actor: true },
+      select: { actor: { fullName: true } },
     });
 
     const OK_CATEGORIES = new Set(['FINANCE', 'REFUND', 'PRICING', 'AGENCY']);

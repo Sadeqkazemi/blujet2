@@ -3,7 +3,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { In, Repository } from 'typeorm';
+import { User } from '../../database/entities/user.entity';
+import { EmployeePermission } from '../../database/entities/employee-permission.entity';
+import { PanelAccessFlag } from '../../database/entities/panel-access-flag.entity';
+import { findOneOrThrow } from '../../database/utils/find-one-or-throw';
 import { AuditService } from '../audit/audit.service';
 import {
   ALL_PANEL_KEYS,
@@ -19,16 +24,21 @@ import { ErrorCode } from '../../common/errors';
 @Injectable()
 export class PanelsService {
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectRepository(User) private readonly userRepo: Repository<User>,
+    @InjectRepository(EmployeePermission)
+    private readonly employeePermissionRepo: Repository<EmployeePermission>,
+    @InjectRepository(PanelAccessFlag)
+    private readonly panelAccessFlagRepo: Repository<PanelAccessFlag>,
     private readonly audit: AuditService,
   ) {}
 
   async getNav(user: AuthenticatedUser): Promise<PanelNavItem[]> {
     if (user.role !== 'EMPLOYEE') return PANEL_NAV[user.role] ?? [];
 
-    const grants = await this.prisma.employeePermission.findMany({
+    const grants = await this.employeePermissionRepo.find({
       where: { employeeId: user.id },
-      select: { permission: { select: { key: true } } },
+      relations: { permission: true },
+      select: { permission: { key: true } },
     });
     const grantedKeys = new Set(grants.map((g) => g.permission.key));
 
@@ -65,7 +75,7 @@ export class PanelsService {
       });
     }
 
-    const employee = await this.prisma.user.findUniqueOrThrow({
+    const employee = await findOneOrThrow(this.userRepo, {
       where: { id: user.id },
       select: { dept: true, rank: true },
     });
@@ -78,9 +88,12 @@ export class PanelsService {
       site: 'پشتیبانی سایت',
     };
 
-    const grants = await this.prisma.employeePermission.findMany({
+    const grants = await this.employeePermissionRepo.find({
       where: { employeeId: user.id },
-      select: { permission: { select: { key: true, labelFa: true, sectionKey: true } } },
+      relations: { permission: true },
+      select: {
+        permission: { key: true, labelFa: true, sectionKey: true },
+      },
     });
 
     const sectionLabels: Record<string, string> = {
@@ -94,7 +107,11 @@ export class PanelsService {
 
     const grantedSectionKeys = new Set<string>();
     for (const [sectionKey, section] of Object.entries(EMPLOYEE_SECTION_NAV)) {
-      if (section.wiredKeys.some((key) => grants.some((g) => g.permission.key === key))) {
+      if (
+        section.wiredKeys.some((key) =>
+          grants.some((g) => g.permission.key === key),
+        )
+      ) {
         grantedSectionKeys.add(sectionKey);
       }
     }
@@ -122,8 +139,8 @@ export class PanelsService {
       role === 'IT_MANAGER'
         ? (PANEL_ACCESS_TOGGLE_RIGHTS.SENIOR_MANAGER ?? [])
         : (PANEL_ACCESS_TOGGLE_RIGHTS[role] ?? []);
-    const rows = await this.prisma.panelAccessFlag.findMany({
-      where: { panelKey: { in: togglable } },
+    const rows = await this.panelAccessFlagRepo.find({
+      where: { panelKey: In(togglable) },
     });
     const byKey = new Map(rows.map((r) => [r.panelKey, r]));
 
@@ -147,11 +164,12 @@ export class PanelsService {
       });
     }
 
-    const flag = await this.prisma.panelAccessFlag.upsert({
-      where: { panelKey },
-      update: { enabled, updatedById: actor.id },
-      create: { panelKey, enabled, updatedById: actor.id },
-    });
+    const updatedAt = new Date();
+    await this.panelAccessFlagRepo.upsert(
+      { panelKey, enabled, updatedById: actor.id, updatedAt },
+      ['panelKey'],
+    );
+    const flag = await this.panelAccessFlagRepo.findOneByOrFail({ panelKey });
 
     await this.audit.record({
       actorId: actor.id,
@@ -176,9 +194,7 @@ export class PanelsService {
     const key = selfKeyByRole[role];
     if (!key) return;
 
-    const flag = await this.prisma.panelAccessFlag.findUnique({
-      where: { panelKey: key },
-    });
+    const flag = await this.panelAccessFlagRepo.findOneBy({ panelKey: key });
     if (flag && !flag.enabled) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
