@@ -324,6 +324,42 @@ const STR: Record<
   },
 };
 
+const PAGE_PAD_X = 26;
+
+const CAREERS_APPLY_CSS = `
+  .careers-apply-root { width: 100%; box-sizing: border-box; overflow-x: clip; }
+  .careers-apply-pad { padding-inline: ${PAGE_PAD_X}px; box-sizing: border-box; }
+  .careers-g2, .careers-g3, .careers-g4, .careers-reqs {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 11px;
+    min-width: 0;
+  }
+  .careers-radios {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 22px;
+    min-width: 0;
+  }
+  .careers-job-head {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+  @media (min-width: 640px) {
+    .careers-g2, .careers-g3, .careers-g4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .careers-reqs { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 26px; }
+    .careers-radios { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (min-width: 980px) {
+    .careers-g3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .careers-g4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .careers-radios { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+`;
+
 const inputStyle: React.CSSProperties = {
   height: 46,
   border: '1.5px solid #e2e7ee',
@@ -334,8 +370,10 @@ const inputStyle: React.CSSProperties = {
   fontSize: 12.5,
   outline: 'none',
   width: '100%',
+  maxWidth: '100%',
   color: '#16202e',
   boxSizing: 'border-box',
+  minWidth: 0,
 };
 
 function SectionBanner({ children }: { children: string }) {
@@ -427,10 +465,6 @@ export default function CareersApplyPage() {
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  const cols4 = isMobile ? '1fr' : 'repeat(4,1fr)';
-  const cols3 = isMobile ? '1fr' : 'repeat(3,1fr)';
-  const cols2 = isMobile ? '1fr' : '1fr 1fr';
-
   useEffect(() => {
     if (!jobId) return;
     fetchJobDetail(jobId)
@@ -514,7 +548,11 @@ export default function CareersApplyPage() {
   if (notFound) {
     return (
       <PublicPageShell>
-        <div style={{ maxWidth: 640, margin: '60px auto', textAlign: 'center', padding: '0 22px' }}>
+        <style>{CAREERS_APPLY_CSS}</style>
+        <div
+          className="careers-apply-root careers-apply-pad"
+          style={{ maxWidth: 640, margin: '60px auto', textAlign: 'center' }}
+        >
           <p style={{ fontSize: 14, color: '#5a6678' }}>{t.notFound}</p>
         </div>
       </PublicPageShell>
@@ -528,8 +566,10 @@ export default function CareersApplyPage() {
 
   return (
     <PublicPageShell>
+      <style>{CAREERS_APPLY_CSS}</style>
+      <div className="careers-apply-root">
       <div style={{ background: '#eef3fa', borderBottom: '1px solid #e6eaf0' }}>
-        <div style={{ maxWidth: 1400, margin: '0 auto', padding: '10px 26px' }}>
+        <div className="careers-apply-pad" style={{ maxWidth: 1400, margin: '0 auto', paddingBlock: 10 }}>
           <Link
             to="/careers"
             style={{
@@ -548,10 +588,18 @@ export default function CareersApplyPage() {
       </div>
 
       {sent ? (
-        <section style={{ maxWidth: 640, margin: '70px auto', padding: '0 26px', textAlign: 'center' }}>
+        <section
+          className="careers-apply-pad"
+          style={{ maxWidth: 640, margin: isMobile ? '40px auto' : '70px auto', textAlign: 'center' }}
+        >
           <div
             data-testid="apply-sent"
-            style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 18, padding: '44px 30px' }}
+            style={{
+              background: '#fff',
+              border: '1px solid #eef1f5',
+              borderRadius: 18,
+              padding: isMobile ? '32px 18px' : '44px 30px',
+            }}
           >
             <div
               style={{
@@ -606,21 +654,15 @@ export default function CareersApplyPage() {
         </section>
       ) : (
         <>
-          <section style={{ background: '#fff', borderBottom: '1px solid #eef1f5', padding: '26px 22px' }}>
-            <div
-              style={{
-                maxWidth: 900,
-                margin: '0 auto',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 18,
-                flexWrap: 'wrap',
-              }}
-            >
+          <section
+            className="careers-apply-pad"
+            style={{ background: '#fff', borderBottom: '1px solid #eef1f5', paddingBlock: isMobile ? 20 : 26 }}
+          >
+            <div className="careers-job-head" style={{ maxWidth: 900, margin: '0 auto' }}>
               <div
                 style={{
-                  width: 78,
-                  height: 78,
+                  width: isMobile ? 64 : 78,
+                  height: isMobile ? 64 : 78,
                   borderRadius: 14,
                   background: '#eef3fa',
                   flex: 'none',
@@ -636,9 +678,18 @@ export default function CareersApplyPage() {
                   <span style={{ fontSize: 28, color: '#1668c4' }}>✈</span>
                 )}
               </div>
-              <div>
+              <div style={{ minWidth: 0, flex: '1 1 200px' }}>
                 <div style={{ fontSize: 12.5, fontWeight: 700, color: '#9aa4b2' }}>{t.hireEyebrow}</div>
-                <h1 style={{ fontSize: isMobile ? 18 : 22, fontWeight: 900, margin: '4px 0 0', color: '#16202e' }}>
+                <h1
+                  style={{
+                    fontSize: isMobile ? 18 : 22,
+                    fontWeight: 900,
+                    margin: '4px 0 0',
+                    color: '#16202e',
+                    lineHeight: 1.3,
+                    wordBreak: 'break-word',
+                  }}
+                >
                   {job?.title ?? '…'}
                 </h1>
                 <div style={{ fontSize: 12.5, color: '#7a8794', marginTop: 4 }}>{jobMeta}</div>
@@ -648,13 +699,10 @@ export default function CareersApplyPage() {
 
           {job && (job.generalReqs.length > 0 || job.specialReqs.length > 0) && (
             <section
+              className="careers-apply-pad careers-reqs"
               style={{
                 maxWidth: 900,
                 margin: '30px auto 0',
-                padding: '0 26px',
-                display: 'grid',
-                gridTemplateColumns: cols2,
-                gap: 26,
               }}
             >
               {job.generalReqs.length > 0 && (
@@ -702,11 +750,16 @@ export default function CareersApplyPage() {
             </section>
           )}
 
-          <section style={{ maxWidth: 900, margin: '34px auto 70px', padding: '0 26px' }}>
+          <section
+            className="careers-apply-pad"
+            style={{ maxWidth: 900, margin: isMobile ? '24px auto 56px' : '34px auto 70px' }}
+          >
             <SectionBanner>{t.personalBanner}</SectionBanner>
-            <h3 style={{ fontSize: 15.5, fontWeight: 800, margin: '0 0 16px' }}>{t.personalHeading}</h3>
+            <h3 style={{ fontSize: isMobile ? 14.5 : 15.5, fontWeight: 800, margin: '0 0 16px' }}>
+              {t.personalHeading}
+            </h3>
 
-            <div style={{ display: 'grid', gridTemplateColumns: cols4, gap: 11, marginBottom: 14 }}>
+            <div className="careers-g4" style={{ marginBottom: 14 }}>
               <input
                 data-testid="apply-firstName"
                 style={inputStyle}
@@ -737,7 +790,7 @@ export default function CareersApplyPage() {
               />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: cols3, gap: 11, marginBottom: 18 }}>
+            <div className="careers-g3" style={{ marginBottom: 18 }}>
               <input
                 dir="ltr"
                 style={inputStyle}
@@ -765,7 +818,7 @@ export default function CareersApplyPage() {
               />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: cols3, gap: 22, marginBottom: 20 }}>
+            <div className="careers-radios" style={{ marginBottom: 20 }}>
               <RadioRow
                 name="gender"
                 label={t.gender}
@@ -809,7 +862,7 @@ export default function CareersApplyPage() {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: cols3, gap: 11, marginBottom: 11 }}>
+            <div className="careers-g3" style={{ marginBottom: 11 }}>
               <input
                 data-testid="apply-phone"
                 dir="ltr"
@@ -853,7 +906,7 @@ export default function CareersApplyPage() {
                 key={idx}
                 style={{ marginBottom: 14, paddingBottom: 14, borderBottom: '1px dashed #e2e7ee' }}
               >
-                <div style={{ display: 'grid', gridTemplateColumns: cols2, gap: 11, marginBottom: 11 }}>
+                <div className="careers-g2" style={{ marginBottom: 11 }}>
                   <input
                     style={inputStyle}
                     placeholder={t.eduMajor}
@@ -923,7 +976,7 @@ export default function CareersApplyPage() {
                 key={idx}
                 style={{ marginBottom: 14, paddingBottom: 14, borderBottom: '1px dashed #e2e7ee' }}
               >
-                <div style={{ display: 'grid', gridTemplateColumns: cols4, gap: 11, marginBottom: 11 }}>
+                <div className="careers-g4" style={{ marginBottom: 11 }}>
                   <input
                     style={inputStyle}
                     placeholder={t.workCompany}
@@ -1007,9 +1060,11 @@ export default function CareersApplyPage() {
               onChange={(e) => setSkills(e.target.value)}
             />
 
-            <h3 style={{ fontSize: 15.5, fontWeight: 800, margin: '0 0 16px' }}>{t.languages}</h3>
+            <h3 style={{ fontSize: isMobile ? 14.5 : 15.5, fontWeight: 800, margin: '0 0 16px' }}>
+              {t.languages}
+            </h3>
             {langEntries.map((l, idx) => (
-              <div key={idx} style={{ display: 'grid', gridTemplateColumns: cols2, gap: 11, marginBottom: 11 }}>
+              <div key={idx} className="careers-g2" style={{ marginBottom: 11 }}>
                 <select
                   style={inputStyle}
                   value={l.lang ?? ''}
@@ -1080,7 +1135,7 @@ export default function CareersApplyPage() {
               style={{
                 border: '1.5px dashed #c7d0dc',
                 borderRadius: 13,
-                padding: '30px 20px',
+                padding: isMobile ? '24px 14px' : '30px 20px',
                 textAlign: 'center',
                 cursor: 'pointer',
                 marginBottom: 26,
@@ -1093,6 +1148,7 @@ export default function CareersApplyPage() {
                   fontSize: 13.5,
                   fontWeight: 700,
                   color: resume ? '#1668c4' : '#16202e',
+                  wordBreak: 'break-word',
                 }}
               >
                 {resume?.name ?? t.filePickLabel}
@@ -1152,12 +1208,13 @@ export default function CareersApplyPage() {
           </section>
         </>
       )}
+      </div>
 
       {toast ? (
         <div
           style={{
             position: 'fixed',
-            bottom: 26,
+            bottom: isMobile ? 18 : 26,
             left: '50%',
             transform: 'translateX(-50%)',
             background: '#16202e',
@@ -1168,6 +1225,10 @@ export default function CareersApplyPage() {
             fontWeight: 700,
             zIndex: 500,
             boxShadow: '0 14px 40px -12px rgba(0,0,0,.4)',
+            maxWidth: 'min(92vw, 420px)',
+            width: 'max-content',
+            boxSizing: 'border-box',
+            textAlign: 'center',
           }}
         >
           {toast}

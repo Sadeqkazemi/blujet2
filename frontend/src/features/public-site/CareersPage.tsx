@@ -72,6 +72,9 @@ function formatCount(n: number, locale: StoredLocale): string {
   return locale === 'en' ? String(n) : faDigits(n);
 }
 
+/** Same horizontal rhythm as the homepage public shell. */
+const PAGE_PAD_X = 26;
+
 export default function CareersPage() {
   const { locale } = useLocale();
   const isMobile = useIsMobile();
@@ -87,11 +90,49 @@ export default function CareersPage() {
 
   return (
     <PublicPageShell>
+      <style>{`
+        .careers-jobs-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 16px;
+        }
+        @media (min-width: 640px) {
+          .careers-jobs-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 18px;
+          }
+        }
+        @media (min-width: 980px) {
+          .careers-jobs-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 20px;
+          }
+        }
+        .careers-job-card {
+          display: block;
+          min-width: 0;
+          text-decoration: none;
+          color: inherit;
+          border: 1px solid #eef1f5;
+          border-radius: 18px;
+          overflow: hidden;
+          background: #fff;
+          box-shadow: 0 14px 34px -22px rgba(13, 38, 64, 0.35);
+          transition: transform 0.18s ease, box-shadow 0.18s ease;
+        }
+        @media (hover: hover) {
+          .careers-job-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px -18px rgba(13, 38, 64, 0.4);
+          }
+        }
+      `}</style>
+
       <section
         style={{
           background: 'linear-gradient(135deg,#0d2640,#16406e)',
           color: '#fff',
-          padding: isMobile ? '40px 18px' : '54px 22px',
+          padding: isMobile ? `36px ${PAGE_PAD_X}px` : '54px 26px',
           position: 'relative',
           overflow: 'hidden',
         }}
@@ -122,12 +163,32 @@ export default function CareersPage() {
           >
             {t.badge}
           </span>
-          <h1 style={{ fontSize: isMobile ? 24 : 32, fontWeight: 900, margin: '0 0 12px' }}>{t.heroTitle}</h1>
-          <p style={{ fontSize: 14.5, color: '#aac4e2', margin: 0, lineHeight: 1.8 }}>{t.heroDesc}</p>
+          <h1
+            style={{
+              fontSize: isMobile ? 24 : 32,
+              fontWeight: 900,
+              margin: '0 0 12px',
+              lineHeight: 1.25,
+              wordBreak: 'break-word',
+            }}
+          >
+            {t.heroTitle}
+          </h1>
+          <p style={{ fontSize: isMobile ? 13.5 : 14.5, color: '#aac4e2', margin: 0, lineHeight: 1.8 }}>
+            {t.heroDesc}
+          </p>
         </div>
       </section>
 
-      <section style={{ maxWidth: 1100, margin: '0 auto', padding: isMobile ? '28px 16px 64px' : '44px 26px 80px' }}>
+      <section
+        style={{
+          maxWidth: 1100,
+          margin: '0 auto',
+          padding: isMobile ? `28px ${PAGE_PAD_X}px 56px` : '44px 26px 80px',
+          width: '100%',
+          boxSizing: 'border-box',
+        }}
+      >
         {error ? (
           <p style={{ textAlign: 'center', color: '#d64545', fontSize: 13 }}>{t.error}</p>
         ) : jobs === null ? (
@@ -137,7 +198,7 @@ export default function CareersPage() {
             data-testid="careers-empty"
             style={{
               textAlign: 'center',
-              padding: '90px 20px',
+              padding: isMobile ? '56px 18px' : '90px 20px',
               color: '#9aa4b2',
               background: '#fff',
               border: '1px solid #eef1f5',
@@ -155,45 +216,27 @@ export default function CareersPage() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                marginBottom: 22,
+                marginBottom: isMobile ? 16 : 22,
                 gap: 12,
                 flexWrap: 'wrap',
               }}
             >
-              <h2 style={{ fontSize: 17, fontWeight: 800, margin: 0, color: '#16202e' }}>{t.listHeading}</h2>
+              <h2 style={{ fontSize: isMobile ? 15.5 : 17, fontWeight: 800, margin: 0, color: '#16202e' }}>
+                {t.listHeading}
+              </h2>
               <span style={{ fontSize: 12.5, fontWeight: 700, color: '#7a8794' }}>
                 {formatCount(jobs.length, locale)} {t.jobCountSuffix}
               </span>
             </div>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill,minmax(310px,1fr))',
-                gap: 20,
-              }}
-            >
+            <div className="careers-jobs-grid">
               {jobs.map((j) => {
                 const meta = JOB_TYPE_META[j.type];
                 const img = jobPostingImageUrl(j.imageUrl, j.imageFileId);
                 return (
-                  <Link
-                    key={j.id}
-                    to={`/careers/${j.id}/apply`}
-                    data-testid="job-card"
-                    style={{
-                      display: 'block',
-                      textDecoration: 'none',
-                      color: 'inherit',
-                      border: '1px solid #eef1f5',
-                      borderRadius: 18,
-                      overflow: 'hidden',
-                      background: '#fff',
-                      boxShadow: '0 14px 34px -22px rgba(13,38,64,.35)',
-                    }}
-                  >
+                  <Link key={j.id} to={`/careers/${j.id}/apply`} data-testid="job-card" className="careers-job-card">
                     <div
                       style={{
-                        height: 160,
+                        height: isMobile ? 140 : 160,
                         borderBottom: '1px solid #eef1f5',
                         background: '#eef3fa',
                         position: 'relative',
@@ -210,7 +253,7 @@ export default function CareersPage() {
                         style={{
                           position: 'absolute',
                           top: 11,
-                          right: 11,
+                          insetInlineEnd: 11,
                           fontSize: 11,
                           fontWeight: 700,
                           color: meta.color,
@@ -223,8 +266,17 @@ export default function CareersPage() {
                         {meta.label}
                       </span>
                     </div>
-                    <div style={{ padding: 18 }}>
-                      <div style={{ fontSize: 16, fontWeight: 800, color: '#16202e' }}>{j.title}</div>
+                    <div style={{ padding: isMobile ? '16px 16px 14px' : 18 }}>
+                      <div
+                        style={{
+                          fontSize: isMobile ? 15 : 16,
+                          fontWeight: 800,
+                          color: '#16202e',
+                          wordBreak: 'break-word',
+                        }}
+                      >
+                        {j.title}
+                      </div>
                       <div
                         style={{
                           display: 'flex',
@@ -233,6 +285,7 @@ export default function CareersPage() {
                           fontSize: 12.5,
                           color: '#7a8794',
                           marginTop: 8,
+                          flexWrap: 'wrap',
                         }}
                       >
                         {j.dept} · {j.city}
@@ -261,6 +314,7 @@ export default function CareersPage() {
                           marginTop: 16,
                           paddingTop: 14,
                           borderTop: '1px solid #f2f4f7',
+                          gap: 10,
                         }}
                       >
                         <span style={{ fontSize: 12.5, fontWeight: 800, color: '#1668c4' }}>{t.applyLabel}</span>
@@ -276,6 +330,7 @@ export default function CareersPage() {
                             justifyContent: 'center',
                             fontSize: 14,
                             fontWeight: 700,
+                            flex: 'none',
                           }}
                         >
                           ←
