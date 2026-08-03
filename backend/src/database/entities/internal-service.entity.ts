@@ -1,4 +1,5 @@
-import { Column, Entity, Index, PrimaryColumn } from 'typeorm';
+import { randomUUID } from 'node:crypto';
+import { BeforeInsert, Column, Entity, Index, PrimaryColumn } from 'typeorm';
 
 @Index('internal_services_key_key', ['key'], { unique: true })
 @Entity('internal_services')
@@ -8,6 +9,11 @@ export class InternalService {
     primaryKeyConstraintName: 'internal_services_pkey',
   })
   id!: string;
+
+  @BeforeInsert()
+  generateId() {
+    this.id ??= randomUUID();
+  }
 
   @Column({ type: 'text' })
   key!: string;

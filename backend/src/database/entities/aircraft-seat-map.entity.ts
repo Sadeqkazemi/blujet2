@@ -1,4 +1,5 @@
-import { Column, Entity, Index, PrimaryColumn } from 'typeorm';
+import { randomUUID } from 'node:crypto';
+import { BeforeInsert, Column, Entity, Index, PrimaryColumn } from 'typeorm';
 
 @Index('aircraft_seat_maps_aircraftType_key', ['aircraftType'], {
   unique: true,
@@ -10,6 +11,11 @@ export class AircraftSeatMap {
     primaryKeyConstraintName: 'aircraft_seat_maps_pkey',
   })
   id!: string;
+
+  @BeforeInsert()
+  generateId() {
+    this.id ??= randomUUID();
+  }
 
   @Column({ type: 'text' })
   aircraftType!: string;
