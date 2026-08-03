@@ -1,12 +1,14 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { In, Repository } from 'typeorm';
+import { Passenger } from '../../database/entities/passenger.entity';
+import { AircraftSeatMap } from '../../database/entities/aircraft-seat-map.entity';
 import {
   decryptPii,
   hashPii,
   normalizeNationalId,
 } from '../../common/pii-crypto';
 import { resolveAircraftType } from '../flights/aircraft-type.util';
-import type { AircraftSeatMap } from '../../../generated/prisma/client';
 
 /** «123******7»-style mask — this surface never returns a full national ID. */
 function maskNationalId(nid: string): string {
@@ -26,7 +28,12 @@ function cabinFor(map: AircraftSeatMap | null, seatCode: string | null) {
 
 @Injectable()
 export class PassengerReportsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @InjectRepository(Passenger)
+    private readonly passengerRepo: Repository<Passenger>,
+    @InjectRepository(AircraftSeatMap)
+    private readonly seatMapRepo: Repository<AircraftSeatMap>,
+  ) {}
 
   async search(q: string) {
     // A 10-digit input (Persian or Latin digits) is treated as an exact
@@ -35,30 +42,42 @@ export class PassengerReportsService {
     const normalized = normalizeNationalId(q);
     const isNationalId = /^\d{10}$/.test(normalized);
 
-    const passengers = await this.prisma.passenger.findMany({
-      where: isNationalId
-        ? { nationalIdHash: hashPii(normalized) }
-        : { fullName: { contains: q.trim() } },
-      take: 20,
-      include: {
-        booking: {
-          include: {
-            flightInstance: {
-              include: { flight: { include: { route: true } } },
-            },
-          },
-        },
-      },
-    });
+    const qb = this.passengerRepo
+      .createQueryBuilder('p')
+      .leftJoin('p.booking', 'booking')
+      .leftJoin('booking.flightInstance', 'fi')
+      .leftJoin('fi.flight', 'flight')
+      .leftJoin('flight.route', 'route')
+      .select(['p.id', 'p.fullName', 'p.nationalIdEnc', 'p.seatCode'])
+      .addSelect([
+        'booking.id',
+        'booking.pnr',
+        'booking.status',
+        'booking.priceIrr',
+      ])
+      .addSelect(['fi.id', 'fi.departureAt', 'fi.aircraftTypeOverride'])
+      .addSelect(['flight.id', 'flight.aircraftType', 'flight.flightNo'])
+      .addSelect(['route.id', 'route.originCode', 'route.destCode'])
+      .take(20);
+
+    if (isNationalId) {
+      qb.where('p.nationalIdHash = :hash', { hash: hashPii(normalized) });
+    } else {
+      qb.where('p.fullName LIKE :name', { name: `%${q.trim()}%` });
+    }
+
+    const passengers = await qb.getMany();
 
     const aircraftTypes = [
       ...new Set(
         passengers.map((p) => resolveAircraftType(p.booking.flightInstance)),
       ),
     ];
-    const seatMaps = await this.prisma.aircraftSeatMap.findMany({
-      where: { aircraftType: { in: aircraftTypes } },
-    });
+    const seatMaps = aircraftTypes.length
+      ? await this.seatMapRepo.find({
+          where: { aircraftType: In(aircraftTypes) },
+        })
+      : [];
     const mapByType = new Map(seatMaps.map((m) => [m.aircraftType, m]));
 
     return passengers.map((p) => {
