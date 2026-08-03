@@ -1,5 +1,5 @@
 import type { StoredLocale } from '../../../hooks/useLocale';
-import { faDigits, formatToman, localeMoney } from '../../../lib/fa-format';
+import { faDigits, localeMoney } from '../../../lib/fa-format';
 import { formatJalaliDate } from '../../../lib/jalali';
 import type { CabinClass, SearchFlightResult } from '../../../types/public-site';
 import type { ResultsCopy } from './results-copy';

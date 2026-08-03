@@ -190,7 +190,10 @@ export default function CheckoutPage() {
         }
         setSeats(m.seats.length ? m.seats : useMd80 ? buildMd80Seats() : []);
       })
-      .catch(() => setSeats(useMd80 ? buildMd80Seats() : []));
+      .catch(() => {
+        const useMd80 = shouldUseMd80SeatMap(aircraft, []);
+        setSeats(useMd80 ? buildMd80Seats() : []);
+      });
   }, [draft]);
 
   useEffect(() => {

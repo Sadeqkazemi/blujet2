@@ -12,7 +12,7 @@ export class VerifyOtpDto {
   challengeId: string;
 
   @ApiProperty({ example: '482913', description: '6-digit one-time code' })
-  @Transform(({ value }) =>
+  @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? toLatinDigits(value).replace(/\D/g, '') : value,
   )
   @IsString()
