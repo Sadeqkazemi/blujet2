@@ -140,7 +140,7 @@ describe('Agency Portal (e2e)', () => {
     const refreshBeforeSuspend = await agent.post('/auth/refresh');
     expect(refreshBeforeSuspend.status).toBe(200);
 
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const suspendRes = await request(app.getHttpServer())
       .patch(`/agencies/${agency.id}/suspend`)
       .set('Authorization', auth(senior.accessToken))
@@ -186,7 +186,7 @@ describe('Agency Portal (e2e)', () => {
   // ── Ownership isolation ──────────────────────────────────────────────
 
   it('a staff JWT gets 403 on /agency-portal/* (AGENCY-only)', async () => {
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const res = await request(app.getHttpServer())
       .get('/agency-portal/dashboard')
       .set('Authorization', auth(senior.accessToken));
@@ -453,11 +453,11 @@ describe('Agency Portal (e2e)', () => {
       .send({ scope: 'SEARCH_BOOK', months: 1 });
     const requestId = createRes.body.data.id;
 
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const stepUp = await stepUpFor(
       app,
       senior.accessToken!,
-      'senior.rahimi',
+      'senior',
       'API_KEY_ROTATE',
     );
     const approveRes = await request(app.getHttpServer())
@@ -530,11 +530,11 @@ describe('Agency Portal (e2e)', () => {
       .send({ scope: 'SEARCH_BOOK', months: 1 });
     const requestId = createRes.body.data.id;
 
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const stepUp = await stepUpFor(
       app,
       senior.accessToken!,
-      'senior.rahimi',
+      'senior',
       'API_KEY_ROTATE',
     );
     const badRes = await request(app.getHttpServer())
@@ -582,7 +582,7 @@ describe('Agency Portal (e2e)', () => {
   it('GET /agencies/:id/documents lists uploaded documents PENDING by default', async () => {
     const agency = await createFreshAgency();
     const doc = await seedDocument(agency.id);
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const res = await request(app.getHttpServer())
       .get(`/agencies/${agency.id}/documents`)
       .set('Authorization', auth(senior.accessToken));
@@ -597,7 +597,7 @@ describe('Agency Portal (e2e)', () => {
     const agency = await createFreshAgency();
     const otherAgency = await createFreshAgency();
     const doc = await seedDocument(agency.id);
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
 
     const wrongAgencyRes = await request(app.getHttpServer())
       .patch(`/agencies/${otherAgency.id}/documents/${doc.id}/decide`)

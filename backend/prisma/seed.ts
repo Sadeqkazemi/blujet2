@@ -26,7 +26,7 @@ async function main() {
     { username: 'itadmin', fullName: 'مهندس علی صدر', role: 'IT_MANAGER' },
     { username: 'comm', fullName: 'رضا مرادی', role: 'COMMERCIAL_MANAGER' },
     { username: 'finance', fullName: 'سحر کاظمی', role: 'FINANCE_MANAGER' },
-    { username: 'senior.rahimi', fullName: 'محمد رحیمی', role: 'SENIOR_MANAGER' },
+    { username: 'senior', fullName: 'محمد رحیمی', role: 'SENIOR_MANAGER' },
     { username: 'ceo', fullName: 'محمد رحیمی', role: 'CEO' },
     { username: 'chair', fullName: 'رئیس هیئت مدیره', role: 'BOARD_CHAIR' },
     { username: 'site.admin', fullName: 'ادمین سایت', role: 'SITE_ADMIN' },
@@ -40,6 +40,10 @@ async function main() {
   await prisma.user.updateMany({
     where: { username: 'comm.abbasi' },
     data: { username: 'comm' },
+  });
+  await prisma.user.updateMany({
+    where: { username: 'senior.rahimi' },
+    data: { username: 'senior' },
   });
 
   const staffByUsername = new Map<string, { id: string }>();
@@ -58,7 +62,7 @@ async function main() {
     });
     staffByUsername.set(s.username, user);
   }
-  const seniorManager = staffByUsername.get('senior.rahimi')!;
+  const seniorManager = staffByUsername.get('senior')!;
   const commercialManager = staffByUsername.get('comm')!;
   const financeManager = staffByUsername.get('finance')!;
 

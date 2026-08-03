@@ -168,7 +168,7 @@ describe('Club (e2e)', () => {
   });
 
   it('POST /club/members: SENIOR 403; bad checksum 400; duplicate 409; stored encrypted', async () => {
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const dto = {
       fullName: 'عضو جدید',
       email: `${crypto.randomUUID().slice(0, 8)}@new.example`,
@@ -210,7 +210,7 @@ describe('Club (e2e)', () => {
       .send({ level: 'PLATINUM' });
     expect(forbidden.status).toBe(403);
 
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const ok = await request(app.getHttpServer())
       .patch(`/club/members/${member.id}/level`)
       .set('Authorization', `Bearer ${senior.accessToken}`)
@@ -268,7 +268,7 @@ describe('Club (e2e)', () => {
     expect(row.status).toBe('SUBMITTED');
     expect(row.member.nationalId).toBe(nid);
 
-    for (const username of ['ceo', 'senior.rahimi', 'chair']) {
+    for (const username of ['ceo', 'senior', 'chair']) {
       const { accessToken } = await loginAs(app, username);
       const forbidden = await request(app.getHttpServer())
         .get('/club/submitted-card-requests')
@@ -361,7 +361,7 @@ describe('Club (e2e)', () => {
 
   it('Senior can approve only senior-assigned requests: CHAIR-assigned → 403, SENIOR-assigned → 200', async () => {
     const chairAssigned = await createReferredRequest('CHAIR');
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
 
     const forbidden = await request(app.getHttpServer())
       .patch(`/club/card-requests/${chairAssigned.req.id}/approve`)
@@ -397,28 +397,22 @@ describe('Club (e2e)', () => {
   });
 
   describe('tier rules (Phase 65)', () => {
-    it('GET returns the seeded defaults + computed preview for CEO and COMMERCIAL_MANAGER; other roles get 403', async () => {
-      const ceo = await loginAs(app, 'ceo');
-      const ceoRes = await request(app.getHttpServer())
-        .get('/club/tier-rules')
-        .set('Authorization', `Bearer ${ceo.accessToken}`);
-      expect(ceoRes.status).toBe(200);
-      expect(ceoRes.body.data.goldMinPoints).toBe(5000);
-      expect(ceoRes.body.data.platinumMinPoints).toBe(15000);
-      expect(ceoRes.body.data.cardRequestMinPoints).toBe(5000);
-      expect(ceoRes.body.data.preview).toEqual([
-        { tier: 'SILVER', minPoints: 0, maxPoints: 4999 },
-        { tier: 'GOLD', minPoints: 5000, maxPoints: 14999 },
-        { tier: 'PLATINUM', minPoints: 15000, maxPoints: null },
-      ]);
-
+    it('GET returns the seeded defaults + computed preview for COMMERCIAL_MANAGER; other roles get 403', async () => {
       const commercial = await loginAs(app, 'comm');
       const commercialRes = await request(app.getHttpServer())
         .get('/club/tier-rules')
         .set('Authorization', `Bearer ${commercial.accessToken}`);
       expect(commercialRes.status).toBe(200);
+      expect(commercialRes.body.data.goldMinPoints).toBe(5000);
+      expect(commercialRes.body.data.platinumMinPoints).toBe(15000);
+      expect(commercialRes.body.data.cardRequestMinPoints).toBe(5000);
+      expect(commercialRes.body.data.preview).toEqual([
+        { tier: 'SILVER', minPoints: 0, maxPoints: 4999 },
+        { tier: 'GOLD', minPoints: 5000, maxPoints: 14999 },
+        { tier: 'PLATINUM', minPoints: 15000, maxPoints: null },
+      ]);
 
-      for (const username of ['finance', 'senior.rahimi', 'chair']) {
+      for (const username of ['ceo', 'finance', 'senior', 'chair']) {
         const { accessToken } = await loginAs(app, username);
         const res = await request(app.getHttpServer())
           .get('/club/tier-rules')
@@ -428,7 +422,7 @@ describe('Club (e2e)', () => {
     });
 
     it('PATCH rejects goldMinPoints >= platinumMinPoints with VALIDATION_FAILED', async () => {
-      const { accessToken } = await loginAs(app, 'ceo');
+      const { accessToken } = await loginAs(app, 'comm');
       const res = await request(app.getHttpServer())
         .patch('/club/tier-rules')
         .set('Authorization', `Bearer ${accessToken}`)

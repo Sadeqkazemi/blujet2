@@ -56,7 +56,7 @@ async function addFlight(
 test('Senior adds a flight via the modal, sees it in پروازهای فعال and opens its detail modal', async ({
   page,
 }) => {
-  await loginAs(page, 'senior.rahimi');
+  await loginAs(page, 'senior');
   await page.getByRole('link', { name: /^مدیریت پروازها/ }).click();
   await expect(page.getByRole('heading', { name: 'مدیریت پروازها' })).toBeVisible();
   await expect(page.getByText('میانگین ضریب اشغال')).toBeVisible();

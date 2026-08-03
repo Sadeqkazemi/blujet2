@@ -1,18 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { fetchNav } from '../api/panels';
 import { fetchCartable, fetchMyReferrals, fetchReferrals } from '../api/cartable';
 import { fetchRefunds } from '../api/refunds';
 import { fetchLowSalesAlerts, fetchStaffReports } from '../api/reporting';
 import { fetchLogsBadgeCount } from '../api/audit';
+import { fetchCeoPricing } from '../api/pricing';
 import { faDigits } from '../lib/fa-format';
 import { formatJalaliDate } from '../lib/jalali';
 import type { PanelNavItem } from '../types/panels';
 import type { LowSalesAlert } from '../types/reporting';
 import { isLowSalesRole } from '../types/panel-shell';
 import PanelNotificationBell, { type PanelNotificationItem } from './PanelNotificationBell';
+import PanelNotifBell from './PanelNotifBell';
 import PanelSearchBox from './PanelSearchBox';
+import { PANEL_BRAND_PLANE_ICON, panelNavIcon } from './panel-nav-icons';
 
 const ROLE_LABELS: Record<string, string> = {
   CEO: 'مدیر عامل',
@@ -23,6 +26,12 @@ const ROLE_LABELS: Record<string, string> = {
   IT_MANAGER: 'مدیر فناوری اطلاعات',
   SITE_ADMIN: 'ادمین سایت',
   EMPLOYEE: 'کارمند',
+};
+
+/** Brand subtitle under «blujet» — sampled from each panel's design sidebar. */
+const ROLE_BRAND_SUB: Record<string, string> = {
+  IT_MANAGER: 'پنل فناوری اطلاعات',
+  EMPLOYEE: 'پنل کارمند',
 };
 
 type NavBadge = { count: number; className: string };
@@ -41,6 +50,7 @@ function lowSalesNotifItems(alerts: LowSalesAlert[]): PanelNotificationItem[] {
 export default function PanelShell() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [nav, setNav] = useState<PanelNavItem[] | null>(null);
   const [badges, setBadges] = useState<Record<string, NavBadge>>({});
   const [notifications, setNotifications] = useState<PanelNotificationItem[]>([]);
@@ -202,6 +212,21 @@ export default function PanelShell() {
       }
     }
 
+    if (navKeys.has('pricing') && user?.role === 'CEO') {
+      tasks.push(
+        fetchCeoPricing()
+          .then((r) => {
+            if (r.pending.length > 0) {
+              next.pricing = {
+                count: r.pending.length,
+                className: 'bg-[#a78bfa] text-white',
+              };
+            }
+          })
+          .catch(() => undefined),
+      );
+    }
+
     void Promise.all(tasks).then(() => {
       setBadges(next);
       setNotifications([...lowSalesNotifItems(lowSalesAlerts), ...nextNotifications]);
@@ -214,34 +239,53 @@ export default function PanelShell() {
   }
 
   const roleLabel = user ? (ROLE_LABELS[user.role] ?? user.role) : '';
-  /** Design v2 finance shell: avatar footer + brand subtitle. */
-  const isFinanceShell = user?.role === 'FINANCE_MANAGER';
+  const brandSub =
+    (user?.role ? ROLE_BRAND_SUB[user.role] : undefined) ?? 'پنل مدیریت';
+
+  /** CEO / Board / Senior use the executive shell chrome from #78. */
+  const executiveShell =
+    user?.role === 'CEO' || user?.role === 'BOARD_CHAIR' || user?.role === 'SENIOR_MANAGER';
+  /** Finance (and executives) get the avatar footer chrome. */
+  const avatarShell = executiveShell || user?.role === 'FINANCE_MANAGER';
+  const roleInitial =
+    user?.role === 'CEO'
+      ? 'مع'
+      : user?.role === 'BOARD_CHAIR'
+        ? 'ره'
+        : user?.role === 'SENIOR_MANAGER'
+          ? 'ما'
+          : user?.role === 'FINANCE_MANAGER'
+            ? 'مم'
+            : roleLabel.slice(0, 1);
+  const onDashboard = /^\/panel\/?$/.test(location.pathname);
+  const showExecNotifChrome = executiveShell && isLowSalesRole(user?.role) && !onDashboard;
+  const notifAlerts = lowSalesAlerts.slice(1);
 
   return (
     <div dir="rtl" className="flex min-h-screen bg-panel-canvas font-sans text-panel-ink">
-      <aside className="flex w-[248px] flex-none flex-col bg-panel-surface text-panel-ink">
-        <div className="flex items-center gap-2.5 border-b border-white/10 px-5 py-6">
-          <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-accent text-lg text-white">
-            ✈
+      <aside className="sticky top-0 flex h-screen w-[248px] flex-none flex-col gap-1.5 border-l border-panel-border bg-panel-surface px-[11px] py-[15px] text-panel-ink">
+        <div className="flex items-center gap-[9px] px-2 pb-3.5 pt-[7px]">
+          <div className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-[10px] bg-[#3b82f6] text-white">
+            {PANEL_BRAND_PLANE_ICON}
           </div>
           <div className="leading-[1.3]">
-            <div className="text-lg font-black tracking-tight text-white">blujet</div>
-            {isFinanceShell && <div className="text-[10px] text-[#6b7b94]">پنل مدیریت</div>}
+            <div className="text-[15.5px] font-black text-white">blujet</div>
+            <div className="text-[10px] text-[#6b7b94]">{brandSub}</div>
           </div>
         </div>
 
-        <div className="mx-4 mt-4 rounded-lg border border-[#2a3a55] bg-[#18223a] px-3 py-2.5">
-          <div className="text-[10px] text-[#6b7b94]">نقش این پنل</div>
-          <div className="mt-0.5 flex items-center gap-2 text-sm font-bold">
-            {isFinanceShell && <span className="h-2 w-2 flex-none rounded-full bg-[#3b82f6]" />}
-            {roleLabel}
+        <div className="px-[5px] pb-[11px]">
+          <label className="mb-1.5 block pr-[3px] text-[10px] text-[#6b7b94]">نقش این پنل</label>
+          <div className="flex items-center gap-[7px] rounded-[10px] border border-[#2a3a55] bg-[#18223a] px-[11px] py-[9px]">
+            <span className="h-2 w-2 flex-none rounded-full bg-[#3b82f6]" />
+            <span className="text-xs font-extrabold text-panel-ink">{roleLabel}</span>
           </div>
         </div>
 
-        <nav className="mt-4 flex flex-1 flex-col gap-0.5 px-3">
-          {nav === null && <div className="px-2 py-3 text-xs text-[#8fa1bb]">در حال بارگذاری…</div>}
+        <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
+          {nav === null && <div className="px-2 py-3 text-xs text-panel-muted-2">در حال بارگذاری…</div>}
           {nav?.length === 0 && (
-            <div className="px-2 py-3 text-xs text-[#8fa1bb]">تبی برای این نقش تعریف نشده است.</div>
+            <div className="px-2 py-3 text-xs text-panel-muted-2">تبی برای این نقش تعریف نشده است.</div>
           )}
           {nav?.map((item) => {
             const badge = badges[item.key];
@@ -251,16 +295,21 @@ export default function PanelShell() {
                 to={item.key === 'dashboard' ? '/panel' : `/panel/${item.key}`}
                 end={item.key === 'dashboard'}
                 className={({ isActive }) =>
-                  `flex items-center justify-between rounded-lg px-3 py-2.5 text-sm transition ${
-                    isActive ? 'bg-accent/20 font-bold text-white' : 'text-[#9fb0c7] hover:bg-white/5'
+                  `flex items-center gap-2.5 rounded-[11px] px-[11px] py-2.5 text-[12.5px] transition ${
+                    isActive
+                      ? 'bg-[rgba(59,130,246,.16)] font-bold text-white'
+                      : 'font-medium text-panel-muted hover:bg-white/5'
                   }`
                 }
               >
+                <span className="flex h-5 w-5 flex-none items-center justify-center">
+                  {panelNavIcon(item.key)}
+                </span>
                 <span className="flex-1">{item.labelFa}</span>
                 {badge && (
                   <span
                     data-testid={`nav-badge-${item.key}`}
-                    className={`font-num ms-2 min-w-[20px] rounded-full px-1.5 py-0.5 text-center text-[10px] font-extrabold ${badge.className}`}
+                    className={`font-num flex h-5 min-w-5 items-center justify-center rounded-[10px] px-[5px] text-center text-[10px] font-extrabold ${badge.className}`}
                   >
                     {faDigits(badge.count)}
                   </span>
@@ -271,11 +320,11 @@ export default function PanelShell() {
           })}
         </nav>
 
-        {isFinanceShell ? (
-          <div className="mt-auto border-t border-white/10 p-4">
+        {avatarShell ? (
+          <div className="mt-auto border-t border-panel-border p-4">
             <div className="flex items-center gap-2.5">
               <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#3b82f6] to-[#9333ea] text-[11px] font-extrabold text-white">
-                مم
+                {roleInitial}
               </span>
               <div className="min-w-0">
                 <div className="truncate text-xs font-bold text-white">{roleLabel}</div>
@@ -290,10 +339,10 @@ export default function PanelShell() {
             </div>
           </div>
         ) : (
-          <div className="border-t border-white/10 p-4">
+          <div className="mt-auto border-t border-panel-border pt-3">
             <button
               onClick={() => void onSignOut()}
-              className="w-full rounded-lg border border-white/10 py-2 text-xs text-[#9fb0c7] transition hover:bg-white/5"
+              className="w-full rounded-[11px] border border-panel-border py-2 text-xs text-panel-muted transition hover:bg-white/5"
             >
               خروج از حساب
             </button>
@@ -301,11 +350,26 @@ export default function PanelShell() {
         )}
       </aside>
 
-      <main className="flex-1 overflow-y-auto">
-        <div className="flex items-center justify-end gap-3 border-b border-white/10 px-8 py-3">
-          <PanelNotificationBell items={notifications} />
-          <PanelSearchBox nav={nav ?? []} />
-        </div>
+      <main className="min-w-0 flex-1 overflow-y-auto">
+        {executiveShell ? (
+          showExecNotifChrome ? (
+            <div className="flex items-center justify-end gap-2.5 px-[21px] pt-[18px]">
+              <div className="flex h-[42px] w-[230px] items-center gap-2 rounded-[10px] border border-[#28344c] bg-[#18223a] px-3 text-[12px] text-[#6b7b94]">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="M21 21l-4.3-4.3" />
+                </svg>
+                <span>جستجو…</span>
+              </div>
+              <PanelNotifBell alerts={notifAlerts} variant="dark" />
+            </div>
+          ) : null
+        ) : (
+          <div className="flex items-center justify-end gap-3 border-b border-panel-border px-8 py-3">
+            <PanelNotificationBell items={notifications} />
+            <PanelSearchBox nav={nav ?? []} />
+          </div>
+        )}
         <Outlet context={{ nav, lowSalesAlerts }} />
       </main>
     </div>

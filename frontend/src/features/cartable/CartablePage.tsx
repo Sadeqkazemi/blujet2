@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import {
   approveCartableTask,
@@ -22,22 +22,111 @@ import type {
   StaffDirectoryEntry,
 } from '../../types/cartable';
 
-const CATEGORY_CARDS: { key: CartableCategory; label: string }[] = [
-  { key: 'ADMIN', label: 'درخواست اداری' },
-  { key: 'AGENCY', label: 'همکاری آژانس' },
-  { key: 'MANAGER', label: 'درخواست مدیران' },
+const CATEGORY_CARDS: {
+  key: CartableCategory;
+  label: string;
+  iconBg: string;
+  iconColor: string;
+  icon: ReactNode;
+}[] = [
+  {
+    key: 'ADMIN',
+    label: 'درخواست اداری',
+    iconBg: 'rgba(59,130,246,.16)',
+    iconColor: '#60a5fa',
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+        <path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z" />
+        <path d="M9 13h6M9 17h4" />
+      </svg>
+    ),
+  },
+  {
+    key: 'AGENCY',
+    label: 'همکاری آژانس',
+    iconBg: 'rgba(245,158,11,.16)',
+    iconColor: '#f59e0b',
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M3 21h18" />
+        <path d="M6 21V5a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v16" />
+        <path d="M19 21V10a1 1 0 0 0-1-1h-3" />
+        <path d="M9 8h3M9 12h3M9 16h3" />
+      </svg>
+    ),
+  },
+  {
+    key: 'MANAGER',
+    label: 'درخواست مدیران',
+    iconBg: 'rgba(147,51,234,.16)',
+    iconColor: '#a855f7',
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M12 3l7 3v5.5c0 4.2-2.9 7.4-7 8.5-4.1-1.1-7-4.3-7-8.5V6l7-3z" />
+        <path d="M9 12l2 2 4-4" />
+      </svg>
+    ),
+  },
 ];
 
-const CATEGORY_BADGES: Record<CartableCategory, string> = {
-  ADMIN: 'اداری',
-  AGENCY: 'همکاری آژانس',
-  MANAGER: 'درخواست مدیر',
+const CATEGORY_META: Record<
+  CartableCategory,
+  { badge: string; tagColor: string; tagBg: string; iconBg: string; iconColor: string; icon: ReactNode }
+> = {
+  ADMIN: {
+    badge: 'اداری',
+    tagColor: '#60a5fa',
+    tagBg: 'rgba(59,130,246,.16)',
+    iconBg: 'rgba(59,130,246,.16)',
+    iconColor: '#60a5fa',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
+        <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+        <path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z" />
+        <path d="M9 13h6M9 17h4" />
+      </svg>
+    ),
+  },
+  AGENCY: {
+    badge: 'همکاری آژانس',
+    tagColor: '#f59e0b',
+    tagBg: 'rgba(245,158,11,.14)',
+    iconBg: 'rgba(245,158,11,.16)',
+    iconColor: '#f59e0b',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
+        <path d="M3 21h18" />
+        <path d="M6 21V5a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v16" />
+        <path d="M19 21V10a1 1 0 0 0-1-1h-3" />
+        <path d="M9 8h3M9 12h3M9 16h3" />
+      </svg>
+    ),
+  },
+  MANAGER: {
+    badge: 'درخواست مدیر',
+    tagColor: '#a855f7',
+    tagBg: 'rgba(147,51,234,.16)',
+    iconBg: 'rgba(147,51,234,.16)',
+    iconColor: '#a855f7',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
+        <path d="M12 3l7 3v5.5c0 4.2-2.9 7.4-7 8.5-4.1-1.1-7-4.3-7-8.5V6l7-3z" />
+        <path d="M9 12l2 2 4-4" />
+      </svg>
+    ),
+  },
 };
 
 export default function CartablePage() {
   const { user } = useAuth();
-  const isDarkPanel = user?.role === 'FINANCE_MANAGER' || user?.role === 'COMMERCIAL_MANAGER';
-  const hasChairGate = isDarkPanel;
+  const hasChairGate = user?.role === 'FINANCE_MANAGER' || user?.role === 'COMMERCIAL_MANAGER';
+  const dark =
+    user?.role === 'CEO' ||
+    user?.role === 'BOARD_CHAIR' ||
+    user?.role === 'SENIOR_MANAGER' ||
+    user?.role === 'FINANCE_MANAGER' ||
+    user?.role === 'COMMERCIAL_MANAGER';
 
   const [result, setResult] = useState<CartableListResult | null>(null);
   const [category, setCategory] = useState<CartableCategory | null>(null);
@@ -122,69 +211,50 @@ export default function CartablePage() {
   }
 
   const tasks = result?.tasks ?? [];
+  const filterLabel = category
+    ? CATEGORY_CARDS.find((c) => c.key === category)?.label ?? ''
+    : '';
 
-  const titleClass = isDarkPanel ? 'text-[20.5px] font-black text-white' : 'text-xl font-black text-ink';
-  const subClass = isDarkPanel ? 'mt-1 text-sm text-[#6b7b94]' : 'mt-1 text-sm text-muted';
-  const countPillClass = isDarkPanel
-    ? 'rounded-full bg-[#18223a] px-3 py-1.5 text-xs font-bold text-[#9fb0c7]'
-    : 'rounded-full bg-surface px-3 py-1.5 text-xs font-bold text-text-2';
-  const categoryCardClass = (active: boolean) =>
-    isDarkPanel
-      ? `rounded-xl border p-4 text-right transition ${
-          active ? 'border-[#3b82f6] bg-[#3b82f61a]' : 'border-[#1f2a3d] bg-[#141d2e] hover:border-[#3b82f666]'
-        }`
-      : `rounded-xl border p-4 text-right transition ${
-          active ? 'border-accent bg-accent/5' : 'border-border bg-white hover:border-accent/40'
-        }`;
-  const categoryLabelClass = isDarkPanel ? 'text-[11px] text-[#6b7b94]' : 'text-[11px] text-muted';
-  const categoryValueClass = isDarkPanel ? 'font-num mt-1 text-lg font-black text-white' : 'font-num mt-1 text-lg font-black text-ink';
-  const taskRowClass = isDarkPanel
-    ? 'flex flex-wrap items-center gap-4 rounded-xl border border-[#22304a] bg-[#0f1726] p-4'
-    : 'flex flex-wrap items-center gap-4 rounded-xl border border-border bg-white p-4';
-  const taskTitleClass = isDarkPanel ? 'text-sm font-bold text-white' : 'text-sm font-bold text-ink';
-  const taskMetaClass = isDarkPanel ? 'mt-1 text-[11px] text-[#6b7b94]' : 'mt-1 text-[11px] text-muted';
-  const taskDateClass = isDarkPanel ? 'font-num text-[10px] text-[#6b7b94]' : 'font-num text-[10px] text-muted-2';
-  const categoryBadgeClass = isDarkPanel
-    ? 'rounded-full bg-[#3b82f624] px-2.5 py-0.5 text-[10px] font-bold text-[#60a5fa]'
-    : 'rounded-full bg-surface-2 px-2.5 py-0.5 text-[10px] font-bold text-accent';
-  const filterBtnClass = isDarkPanel
-    ? 'rounded-lg border border-[#28344c] px-3 py-2 text-xs font-bold text-[#6b7b94] transition hover:text-white'
-    : 'rounded-lg border border-border px-3 py-2 text-xs font-bold text-muted transition hover:text-ink';
-  const emptyTextClass = isDarkPanel ? 'py-10 text-center text-sm text-[#6b7b94]' : 'py-10 text-center text-sm text-muted';
+  const shellClass = dark ? 'px-[21px] pb-[34px] pt-[18px]' : 'p-8';
+  const emptyText = category || filterDate ? 'موردی با این فیلتر یافت نشد.' : 'کارتابل خالی است ✓';
 
   return (
-    <div className={isDarkPanel ? 'px-[21px] pb-[34px] pt-[18px]' : 'p-8'}>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className={titleClass}>کارتابل من</h1>
-          <p className={subClass}>درخواست‌های در انتظار بررسی شما</p>
+    <div className={shellClass}>
+      {dark ? (
+        <div className="mb-6">
+          <h1 className="text-[20.5px] font-black text-white">کارتابل</h1>
+          <p className="mt-1 text-[11.5px] text-[#6b7b94]">کارهای در انتظار اقدام شما</p>
         </div>
-        <div className="flex items-center gap-2">
-          <span className={countPillClass}>{faDigits(result?.totalOpen ?? 0)} مورد</span>
-          <button
-            onClick={() => setComposeOpen(true)}
-            className="rounded-lg bg-[#3b82f6] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#2563eb]"
-          >
-            ایجاد پیام
-          </button>
+      ) : (
+        <div className="mb-6">
+          <h1 className="text-xl font-black text-ink">کارتابل من</h1>
+          <p className="mt-1 text-sm text-muted">درخواست‌های در انتظار بررسی شما</p>
         </div>
-      </div>
+      )}
 
       {error && (
-        <p className={`mb-4 rounded-lg p-3 text-sm ${isDarkPanel ? 'bg-[#f8717124] text-[#f87171]' : 'bg-danger/10 text-danger'}`}>
+        <p
+          className={`mb-4 rounded-lg p-3 text-sm ${
+            dark ? 'bg-[rgba(248,113,113,.12)] text-[#f87171]' : 'bg-danger/10 text-danger'
+          }`}
+        >
           {error}
         </p>
       )}
       {notice && (
-        <p className={`mb-4 rounded-lg p-3 text-sm ${isDarkPanel ? 'bg-[#34d39924] text-[#34d399]' : 'bg-[#10b98115] text-[#059669]'}`}>
+        <p
+          className={`mb-4 rounded-lg p-3 text-sm ${
+            dark ? 'bg-[rgba(52,211,153,.12)] text-[#34d399]' : 'bg-[#10b98115] text-[#059669]'
+          }`}
+        >
           {notice}
         </p>
       )}
 
       {hasChairGate && (
-        <section className="mb-6 rounded-xl border border-[#f59e0b59] bg-[#f59e0b14] p-5">
-          <h2 className="text-sm font-bold text-[#fbbf24]">ارجاع و ارسال گزارش به رئیس هیئت مدیره</h2>
-          <p className="mt-1 text-[11px] leading-relaxed text-[#cdd7e5]">
+        <section className="mb-6 rounded-xl border border-[#f59e0b40] bg-[#f59e0b0d] p-5">
+          <h2 className="text-sm font-bold text-[#92400e]">ارجاع و ارسال گزارش به رئیس هیئت مدیره</h2>
+          <p className="mt-1 text-[11px] leading-relaxed text-[#92400e]/80">
             دسترسی کامل کارتابل و ارجاعات مخصوص مدیر ارشد و مدیر عامل است؛ ارسال گزارش به رئیس هیئت مدیره
             نیازمند مجوز ایشان است.
           </p>
@@ -194,13 +264,13 @@ export default function CartablePage() {
                 مجوز تأیید شد ✓
               </span>
             ) : chairPerm?.status === 'PENDING' ? (
-              <span className="rounded-full bg-[#f59e0b24] px-3 py-1.5 text-xs font-bold text-[#fbbf24]">
+              <span className="rounded-full bg-[#f59e0b24] px-3 py-1.5 text-xs font-bold text-[#b45309]">
                 درخواست ارسال شد — در انتظار تأیید
               </span>
             ) : (
               <button
                 onClick={() => void onRequestChairPerm()}
-                className="rounded-lg bg-[#f59e0b] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#d97706]"
+                className="rounded-lg bg-[#b45309] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#92400e]"
               >
                 درخواست مجوز از رئیس هیئت مدیره
               </button>
@@ -209,87 +279,259 @@ export default function CartablePage() {
         </section>
       )}
 
-      <div className="mb-4 flex flex-wrap items-end gap-3">
-        <div>
-          <JalaliDatePicker label="فیلتر روز (شمسی)" value={filterDate} onChange={setFilterDate} />
-        </div>
-        {filterDate && (
-          <button onClick={() => setFilterDate(null)} className={filterBtnClass}>
-            حذف فیلتر روز
-          </button>
-        )}
-      </div>
-
-      <div className="mb-6 grid grid-cols-3 gap-4">
-        {CATEGORY_CARDS.map((c) => (
-          <button
-            key={c.key}
-            onClick={() => setCategory(category === c.key ? null : c.key)}
-            className={categoryCardClass(category === c.key)}
-          >
-            <div className={categoryLabelClass}>{c.label}</div>
-            <div className={categoryValueClass}>{faDigits(result?.counts[c.key] ?? 0)}</div>
-          </button>
-        ))}
-      </div>
-
-      {loading ? (
-        <p className={emptyTextClass}>در حال بارگذاری…</p>
-      ) : tasks.length === 0 ? (
-        <p className={emptyTextClass}>
-          {category ? 'موردی با این فیلتر یافت نشد ✓' : 'کارتابل خالی است ✓'}
-        </p>
-      ) : (
-        <ul className="space-y-3">
-          {tasks.map((t) => (
-            <li key={t.id} className={taskRowClass}>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className={taskTitleClass}>{t.title}</span>
-                  <span className={categoryBadgeClass}>{CATEGORY_BADGES[t.category]}</span>
-                </div>
-                <div className={taskMetaClass}>
-                  ارسال از: {t.senderLabelFa ?? t.sender?.fullName ?? '—'}
-                </div>
-              </div>
-              <span className={taskDateClass}>{formatJalaliDateTime(t.createdAt)}</span>
-              <button
-                onClick={() => openReview(t)}
-                className="rounded-lg bg-[#3b82f6] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#2563eb]"
+      <div className={`mb-[15px] grid grid-cols-1 gap-[13px] sm:grid-cols-3`}>
+        {CATEGORY_CARDS.map((c) => {
+          const on = category === c.key;
+          return (
+            <button
+              key={c.key}
+              type="button"
+              onClick={() => setCategory(on ? null : c.key)}
+              className={`flex items-center gap-[11px] rounded-[14px] border p-3.5 text-start transition ${
+                dark
+                  ? on
+                    ? 'border-[#3b82f6] bg-[rgba(59,130,246,.12)]'
+                    : 'border-[#1f2a3d] bg-[#141d2e] hover:border-[#28344c]'
+                  : on
+                    ? 'border-accent bg-accent/5'
+                    : 'border-border bg-white hover:border-accent/40'
+              }`}
+            >
+              <span
+                className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-xl"
+                style={{ background: c.iconBg, color: c.iconColor }}
               >
-                بررسی
+                {c.icon}
+              </span>
+              <div className="leading-snug">
+                <div
+                  className={`font-num text-[23.5px] font-black ${dark ? 'text-white' : 'text-ink'}`}
+                >
+                  {faDigits(result?.counts[c.key] ?? 0)}
+                </div>
+                <div className={`text-[11.5px] ${dark ? 'text-[#6b7b94]' : 'text-muted'}`}>{c.label}</div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      <div
+        className={
+          dark
+            ? 'overflow-hidden rounded-[14px] border border-[#1f2a3d] bg-[#141d2e]'
+            : 'overflow-hidden rounded-xl border border-border bg-white'
+        }
+      >
+        <div
+          className={`flex flex-wrap items-center gap-2.5 px-4 py-[11px] ${
+            dark ? 'border-b border-[#1f2a3d]' : 'border-b border-border'
+          }`}
+        >
+          <h2 className={`m-0 text-[14.5px] font-extrabold ${dark ? 'text-white' : 'text-ink'}`}>
+            کارتابل من
+          </h2>
+          {category && (
+            <span
+              className={`flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10.5px] font-bold ${
+                dark ? 'bg-[rgba(59,130,246,.14)] text-[#60a5fa]' : 'bg-accent/10 text-accent'
+              }`}
+            >
+              {filterLabel}
+              <button
+                type="button"
+                aria-label="پاک کردن فیلتر دسته"
+                onClick={() => setCategory(null)}
+                className="font-black"
+              >
+                ✕
               </button>
-            </li>
-          ))}
-        </ul>
-      )}
+            </span>
+          )}
+          <div className="mr-auto flex flex-wrap items-center gap-[7px]">
+            <span
+              className={`flex items-center gap-1.5 text-[11.5px] ${dark ? 'text-[#6b7b94]' : 'text-muted'}`}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
+                <rect x="3" y="4" width="18" height="17" rx="2" />
+                <path d="M3 9h18M8 2v4M16 2v4" />
+              </svg>
+              روز
+            </span>
+            <div
+              className={
+                dark
+                  ? 'rounded-[9px] border border-[#28344c] bg-[#18223a]'
+                  : 'min-w-[140px] rounded-lg border border-border bg-body'
+              }
+            >
+              <JalaliDatePicker
+                label={dark ? '' : 'فیلتر روز'}
+                value={filterDate}
+                onChange={setFilterDate}
+                placeholder="انتخاب تاریخ"
+                testId="cartable-date-filter"
+                theme={dark ? 'dark' : 'light'}
+                compact={dark}
+              />
+            </div>
+            {filterDate && (
+              <button
+                type="button"
+                onClick={() => setFilterDate(null)}
+                className={`text-[11px] font-bold ${dark ? 'text-[#60a5fa]' : 'text-accent'}`}
+              >
+                پاک‌کردن
+              </button>
+            )}
+            <span
+              className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                dark
+                  ? 'bg-[rgba(248,113,113,.14)] text-[#f87171]'
+                  : 'bg-danger/10 text-danger'
+              }`}
+            >
+              {faDigits(result?.totalOpen ?? 0)} مورد
+            </span>
+            <button
+              type="button"
+              onClick={() => setComposeOpen(true)}
+              className="flex items-center gap-1.5 rounded-[9px] bg-[#3b82f6] px-3 py-[7px] text-[11.5px] font-bold text-white transition hover:bg-[#2563eb]"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              ایجاد پیام
+            </button>
+          </div>
+        </div>
+
+        <div className={dark ? 'px-2 py-1.5' : 'p-3'}>
+          {loading ? (
+            <p className={`py-10 text-center text-sm ${dark ? 'text-[#6b7b94]' : 'text-muted'}`}>
+              در حال بارگذاری…
+            </p>
+          ) : tasks.length === 0 ? (
+            <p className={`px-3 py-7 text-center text-xs ${dark ? 'text-[#6b7b94]' : 'text-muted'}`}>
+              {emptyText}
+            </p>
+          ) : (
+            <ul>
+              {tasks.map((t) => {
+                const meta = CATEGORY_META[t.category];
+                return (
+                  <li
+                    key={t.id}
+                    className={`flex flex-wrap items-center justify-between gap-[11px] px-[11px] py-3 ${
+                      dark ? 'border-b border-[#1a2436]' : 'mb-2 rounded-xl border border-border bg-body/40 px-4'
+                    }`}
+                  >
+                    <div className="flex min-w-0 items-center gap-[11px]">
+                      <span
+                        className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[11px]"
+                        style={{ background: meta.iconBg, color: meta.iconColor }}
+                      >
+                        {meta.icon}
+                      </span>
+                      <div className="min-w-0 leading-relaxed">
+                        <div className="flex flex-wrap items-center gap-[7px]">
+                          <span
+                            className={`text-[12.5px] font-bold ${dark ? 'text-[#e7ecf3]' : 'text-ink'}`}
+                          >
+                            {t.title}
+                          </span>
+                          <span
+                            className="rounded-full px-2 py-0.5 text-[10px] font-bold"
+                            style={{ color: meta.tagColor, background: meta.tagBg }}
+                          >
+                            {meta.badge}
+                          </span>
+                        </div>
+                        <div
+                          className={`mt-0.5 flex items-center gap-1.5 text-[11px] ${
+                            dark ? 'text-[#6b7b94]' : 'text-muted'
+                          }`}
+                        >
+                          <svg
+                            width="13"
+                            height="13"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.9"
+                            aria-hidden
+                          >
+                            <circle cx="12" cy="8" r="3.5" />
+                            <path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" />
+                          </svg>
+                          ارسال از: {t.senderLabelFa ?? t.sender?.fullName ?? '—'}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className={`font-num text-[11px] ${dark ? 'text-[#6b7b94]' : 'text-muted'}`}>
+                        {formatJalaliDateTime(t.createdAt)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => openReview(t)}
+                        className="flex items-center gap-1.5 rounded-[9px] bg-[#3b82f6] px-3 py-[7px] text-[11.5px] font-bold text-white transition hover:bg-[#2563eb]"
+                      >
+                        <svg
+                          width="15"
+                          height="15"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          aria-hidden
+                        >
+                          <circle cx="11" cy="11" r="7" />
+                          <path d="M21 21l-4-4" />
+                        </svg>
+                        بررسی
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </div>
 
       {composeOpen && (
         <ComposeMessageModal
+          theme={dark ? 'dark' : 'light'}
           onClose={() => setComposeOpen(false)}
           onSent={(label) => setNotice(`پیام به «${label}» ارسال شد`)}
         />
       )}
 
       {reviewTask && (
-        <Modal variant={isDarkPanel ? 'dark' : 'light'} title="بررسی درخواست" onClose={() => setReviewTask(null)}>
+        <Modal
+          title="بررسی درخواست"
+          onClose={() => setReviewTask(null)}
+          variant={dark ? 'dark' : 'light'}
+          maxWidthClass="max-w-lg"
+        >
           <div className="mb-3">
-            <div className={`text-sm font-bold ${isDarkPanel ? 'text-white' : 'text-ink'}`}>{reviewTask.title}</div>
-            <p className={`mt-1 text-xs leading-relaxed ${isDarkPanel ? 'text-[#9fb0c7]' : 'text-text-2'}`}>
+            <div className={`text-sm font-bold ${dark ? 'text-white' : 'text-ink'}`}>{reviewTask.title}</div>
+            <p className={`mt-1 text-xs leading-relaxed ${dark ? 'text-[#9fb0c7]' : 'text-text-2'}`}>
               {reviewTask.description}
             </p>
           </div>
           <div
-            className={`mb-4 rounded-lg p-3 ${isDarkPanel ? 'border border-[#22304a] bg-[#0f1726]' : 'bg-surface'}`}
+            className={`mb-4 rounded-lg p-3 ${dark ? 'bg-[#18223a]' : 'bg-surface'}`}
           >
-            <div className={`text-[10px] ${isDarkPanel ? 'text-[#6b7b94]' : 'text-muted'}`}>ارسال‌کننده‌ی درخواست</div>
-            <div className={`mt-0.5 text-xs font-bold ${isDarkPanel ? 'text-[#e7ecf3]' : 'text-ink'}`}>
+            <div className={`text-[10px] ${dark ? 'text-[#6b7b94]' : 'text-muted'}`}>ارسال‌کننده‌ی درخواست</div>
+            <div className={`mt-0.5 text-xs font-bold ${dark ? 'text-[#e7ecf3]' : 'text-ink'}`}>
               {reviewTask.senderLabelFa ?? reviewTask.sender?.fullName ?? '—'}
             </div>
           </div>
 
           <label
-            className={`mb-1 block text-xs font-bold ${isDarkPanel ? 'text-white' : 'text-ink'}`}
+            className={`mb-1 block text-xs font-bold ${dark ? 'text-[#e7ecf3]' : 'text-ink'}`}
             htmlFor="review-note"
           >
             نظر مدیر *
@@ -300,15 +542,15 @@ export default function CartablePage() {
             onChange={(e) => setNote(e.target.value)}
             placeholder="توضیح یا دلیل تصمیم خود را بنویسید…"
             rows={3}
-            className={`w-full rounded-lg border p-3 text-xs outline-none transition ${
-              isDarkPanel
-                ? 'border-[#28344c] bg-[#18223a] text-[#e7ecf3] focus:border-[#3b82f6]'
-                : 'border-border focus:border-accent'
-            }`}
+            className={
+              dark
+                ? 'w-full rounded-[11px] border border-[#28344c] bg-[#0f1623] p-3 text-xs text-[#e7ecf3] outline-none placeholder:text-[#6b7b94] focus:border-[#3b82f6]'
+                : 'w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent'
+            }
           />
 
           <label
-            className={`mb-1 mt-3 block text-xs font-bold ${isDarkPanel ? 'text-white' : 'text-ink'}`}
+            className={`mb-1 mt-3 block text-xs font-bold ${dark ? 'text-[#e7ecf3]' : 'text-ink'}`}
             htmlFor="review-transfer"
           >
             انتقال به مدیر دیگر (اختیاری)
@@ -317,11 +559,11 @@ export default function CartablePage() {
             id="review-transfer"
             value={transferTo}
             onChange={(e) => setTransferTo(e.target.value)}
-            className={`w-full rounded-lg border p-3 text-xs outline-none transition ${
-              isDarkPanel
-                ? 'border-[#28344c] bg-[#18223a] text-[#e7ecf3] focus:border-[#3b82f6]'
-                : 'border-border bg-white focus:border-accent'
-            }`}
+            className={
+              dark
+                ? 'w-full rounded-[11px] border border-[#28344c] bg-[#0f1623] p-3 text-xs text-[#e7ecf3] outline-none focus:border-[#3b82f6]'
+                : 'w-full rounded-lg border border-border bg-white p-3 text-xs outline-none transition focus:border-accent'
+            }
           >
             <option value="">— انتخاب مدیر —</option>
             {staff.map((s) => (
@@ -332,7 +574,7 @@ export default function CartablePage() {
           </select>
 
           {reviewError && (
-            <p role="alert" className={`mt-2 text-xs ${isDarkPanel ? 'text-[#f87171]' : 'text-danger'}`}>
+            <p role="alert" className={`mt-2 text-xs ${dark ? 'text-[#f87171]' : 'text-danger'}`}>
               {reviewError}
             </p>
           )}
@@ -342,8 +584,8 @@ export default function CartablePage() {
               onClick={() => void onDecide('transfer')}
               disabled={!transferTo}
               className={`rounded-lg border px-4 py-2 text-xs font-bold transition disabled:opacity-50 ${
-                isDarkPanel
-                  ? 'border-[#3b82f64d] text-[#60a5fa] hover:bg-[#3b82f61a]'
+                dark
+                  ? 'border-[#3b82f6]/50 text-[#60a5fa] hover:bg-[rgba(59,130,246,.12)]'
                   : 'border-accent/40 text-accent hover:bg-accent/5'
               }`}
             >
@@ -351,13 +593,13 @@ export default function CartablePage() {
             </button>
             <button
               onClick={() => void onDecide('reject')}
-              className="rounded-lg bg-[#f87171] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#ef4444]"
+              className="rounded-lg bg-danger px-4 py-2 text-xs font-bold text-white transition hover:bg-danger/90"
             >
               انصراف
             </button>
             <button
               onClick={() => void onDecide('approve')}
-              className="rounded-lg bg-[#16a34a] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#15803d]"
+              className="rounded-lg bg-[#34d399] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#2bb583]"
             >
               تأیید
             </button>

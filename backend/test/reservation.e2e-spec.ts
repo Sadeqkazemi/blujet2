@@ -137,10 +137,37 @@ describe('Reservation (e2e)', () => {
     });
   });
 
+  it('GET /reservation/seatmap/:id includes sold-seat passenger details for staff', async () => {
+    const instance = await createScheduledInstance();
+    const chair = await loginAs(app, 'chair');
+    const issued = await request(app.getHttpServer())
+      .post('/reservation/pnr')
+      .set(auth(chair.accessToken))
+      .send({
+        flightInstanceId: instance.id,
+        seatCode: '3A',
+        passengerName: 'لیلا صادقی',
+        passengerNationalId: '0499370899',
+      });
+    expect(issued.status).toBe(201);
+
+    const res = await request(app.getHttpServer())
+      .get(`/reservation/seatmap/${instance.id}`)
+      .set(auth((await loginAs(app, 'itadmin')).accessToken));
+    expect(res.status).toBe(200);
+    expect(res.body.data.flightNo).toBeTruthy();
+    const sold = res.body.data.rows
+      .flatMap((r: { seats: { seatCode: string; passenger?: { fullName: string } }[] }) => r.seats)
+      .find((s: { seatCode: string }) => s.seatCode === '3A');
+    expect(sold.passenger.fullName).toBe('لیلا صادقی');
+    expect(sold.passenger.nationalId).toBe('0499370899');
+  });
+
   it('POST lock: canLock roles only, 409 on already-locked, encrypted PII never returned, audited', async () => {
     const instance = await createScheduledInstance();
     const chair = await loginAs(app, 'chair');
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
+    const it = await loginAs(app, 'itadmin');
 
     const forbidden = await request(app.getHttpServer())
       .post(`/reservation/seatmap/${instance.id}/lock`)
@@ -153,6 +180,16 @@ describe('Reservation (e2e)', () => {
         passengerNationalId: '0499370899',
       });
     expect(forbidden.status).toBe(403);
+
+    const itForbidden = await request(app.getHttpServer())
+      .post(`/reservation/seatmap/${instance.id}/lock`)
+      .set(auth(it.accessToken))
+      .send({
+        seatCode: '3B',
+        reason: 'تست IT',
+        classification: 'PAYABLE',
+      });
+    expect(itForbidden.status).toBe(403);
 
     const ok = await request(app.getHttpServer())
       .post(`/reservation/seatmap/${instance.id}/lock`)
@@ -213,7 +250,7 @@ describe('Reservation (e2e)', () => {
   it('PATCH release: canLock only, 409 on already-released, seat becomes lockable again', async () => {
     const instance = await createScheduledInstance();
     const it = await loginAs(app, 'itadmin');
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
 
     const locked = await request(app.getHttpServer())
       .post(`/reservation/seatmap/${instance.id}/lock`)
@@ -265,7 +302,7 @@ describe('Reservation (e2e)', () => {
   it('POST /reservation/pnr issues a TICKETED booking directly (no payment step), 409 on unavailable seat, audited', async () => {
     const instance = await createScheduledInstance();
     const chair = await loginAs(app, 'chair');
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
 
     const forbidden = await issuePnr(senior.accessToken, instance.id, '7A');
     expect(forbidden.status).toBe(403);
@@ -371,7 +408,7 @@ describe('Reservation (e2e)', () => {
   it('PATCH /reservation/pnr/:pnr/seat changes seat; 409 on a taken seat and on a CANCELLED booking', async () => {
     const instance = await createScheduledInstance();
     const chair = await loginAs(app, 'chair');
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const a = await issuePnr(chair.accessToken, instance.id, '10A', 'مسافر آ');
     const b = await issuePnr(chair.accessToken, instance.id, '10B', 'مسافر ب');
 
@@ -492,6 +529,34 @@ describe('Reservation (e2e)', () => {
     // — a JS number can't safely hold IRR amounts above 2^53.
     expect(typeof res.body.data.revenueIrr).toBe('string');
     expect(/^-?\d+$/.test(String(res.body.data.revenueIrr))).toBe(true);
+    expect(Array.isArray(res.body.data.channels)).toBe(true);
+    expect(Array.isArray(res.body.data.services)).toBe(true);
+    expect(typeof res.body.data.servicesStable).toBe('boolean');
+  });
+
+  it('GET /reservation/agency-api-access lists agencies that hold API keys', async () => {
+    const { accessToken } = await loginAs(app, 'itadmin');
+    const res = await request(app.getHttpServer())
+      .get('/reservation/agency-api-access')
+      .set(auth(accessToken));
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  it('GET /reservation/flights returns SCHEDULED instances with occupancy', async () => {
+    const { accessToken } = await loginAs(app, 'itadmin');
+    const res = await request(app.getHttpServer())
+      .get('/reservation/flights')
+      .set(auth(accessToken));
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+    if (res.body.data.length > 0) {
+      const row = res.body.data[0];
+      expect(row).toHaveProperty('flightNo');
+      expect(row).toHaveProperty('sold');
+      expect(row).toHaveProperty('capacity');
+      expect(['SELLING', 'NEAR_FULL', 'FULL']).toContain(row.statusKey);
+    }
   });
 
   // ── Role isolation ──────────────────────────────────────────────────
@@ -513,7 +578,7 @@ describe('Reservation (e2e)', () => {
     const instance = await createScheduledInstance();
     const it = await loginAs(app, 'itadmin');
     const issued = await issuePnr(it.accessToken, instance.id, '14D');
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
 
     const readSeatmap = await request(app.getHttpServer())
       .get(`/reservation/seatmap/${instance.id}`)

@@ -70,7 +70,7 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
     expect(trends).toHaveProperty('agencyDebtPct');
   });
 
-  it('GET /reporting/finance-dashboard-stats: finance manager gets real dashboard cards; other roles 403', async () => {
+  it('GET /reporting/finance-dashboard-stats: executive + finance roles get real dashboard cards; others 403', async () => {
     const finance = await loginAs(app, 'finance');
     const res = await request(app.getHttpServer())
       .get('/reporting/finance-dashboard-stats')
@@ -90,9 +90,16 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
     expect(typeof data.activeAgenciesTrendPct).toBe('number');
 
     const ceo = await loginAs(app, 'ceo');
-    const forbidden = await request(app.getHttpServer())
+    const ceoRes = await request(app.getHttpServer())
       .get('/reporting/finance-dashboard-stats')
       .set('Authorization', auth(ceo.accessToken));
+    expect(ceoRes.status).toBe(200);
+    expect(ceoRes.body.data.activeAgencies).toBeGreaterThan(0);
+
+    const commercial = await loginAs(app, 'comm');
+    const forbidden = await request(app.getHttpServer())
+      .get('/reporting/finance-dashboard-stats')
+      .set('Authorization', auth(commercial.accessToken));
     expect(forbidden.status).toBe(403);
   });
 
@@ -201,7 +208,7 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
       },
     });
 
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const res = await request(app.getHttpServer())
       .get(
         `/passenger-reports/search?q=${encodeURIComponent(`مسافر گزارش ${suffix}`)}`,
@@ -317,7 +324,7 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
   });
 
   it('staff reports: roles without the tab (SENIOR_MANAGER) get 403', async () => {
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const res = await request(app.getHttpServer())
       .get('/staff-reports')
       .set('Authorization', auth(senior.accessToken));
