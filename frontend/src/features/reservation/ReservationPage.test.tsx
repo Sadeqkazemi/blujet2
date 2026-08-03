@@ -149,6 +149,22 @@ describe('ReservationPage', () => {
     vi.spyOn(reservationApi, 'fetchReservationDashboardStats').mockResolvedValue(STATS);
     vi.spyOn(reservationApi, 'fetchPnrList').mockResolvedValue(GROUPS);
     vi.spyOn(reservationApi, 'fetchPnrDetail').mockResolvedValue(DETAIL);
+    vi.spyOn(reservationApi, 'fetchReservationFlights').mockResolvedValue([
+      {
+        flightInstanceId: 'fi1',
+        flightNo: 'EP-821',
+        aircraftType: 'MD-80',
+        originCode: 'THR',
+        destCode: 'DXB',
+        originCityFa: 'تهران',
+        destCityFa: 'دبی',
+        departureAt: '2026-08-01T05:00:00.000Z',
+        capacity: 140,
+        soldCount: 1,
+        lockedCount: 0,
+        freeCount: 139,
+      },
+    ]);
     const seatMap: SeatMap = {
       flightInstanceId: 'fi1',
       flightNo: 'EP-821',
@@ -184,7 +200,8 @@ describe('ReservationPage', () => {
 
     render(<ReservationPage />);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'نقشهٔ صندلی EP-821' }));
+    await user.click(screen.getByRole('button', { name: 'پروازها' }));
+    await user.click(await screen.findByRole('button', { name: /EP-821/ }));
     expect(await screen.findByTestId('reservation-md80-seat-map')).toBeInTheDocument();
     expect(screen.getByTestId('reservation-section-first')).toBeInTheDocument();
     await user.click(await screen.findByRole('button', { name: '3A' }));
@@ -220,11 +237,33 @@ describe('ReservationPage', () => {
     render(<ReservationPage />);
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /مدیریت رزروها/ }));
+    expect(await screen.findByText('آخرین رزروهای ثبت‌شده')).toBeInTheDocument();
     await user.click(await screen.findByRole('button', { name: 'BJDEMO1' }));
 
     await waitFor(() => expect(screen.getByText('رزرو BJDEMO1')).toBeInTheDocument());
     expect(screen.queryByRole('button', { name: 'ثبت تغییر' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'لغو رزرو' })).not.toBeInTheDocument();
+  });
+
+  it('CEO/SENIOR مدیریت رزروها shows flat PNR|مسیر|مسافر|وضعیت columns', async () => {
+    mockRole('CEO');
+    vi.spyOn(reservationApi, 'fetchReservationDashboardStats').mockResolvedValue(STATS);
+    vi.spyOn(reservationApi, 'fetchPnrList').mockResolvedValue(GROUPS);
+
+    render(<ReservationPage />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /مدیریت رزروها/ }));
+
+    expect(await screen.findByText('آخرین رزروهای ثبت‌شده')).toBeInTheDocument();
+    expect(screen.getByText('جستجوی رزرو')).toBeInTheDocument();
+    expect(screen.getByText('PNR')).toBeInTheDocument();
+    expect(screen.getByText('مسیر')).toBeInTheDocument();
+    expect(screen.getByText('مسافر')).toBeInTheDocument();
+    expect(screen.getByText('وضعیت')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'BJDEMO1' })).toBeInTheDocument();
+    expect(screen.getByText('THR → DXB')).toBeInTheDocument();
+    expect(screen.getByText('نگار رضایی')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /نقشهٔ صندلی/ })).not.toBeInTheDocument();
   });
 
   it('searches by PNR on the bookings tab', async () => {
