@@ -4,7 +4,7 @@ Acceptance checklist for پنل ادمین سایت parity with
 `design-reference-v2/پنل ادمین سایت.dc.html` and product screenshots.
 
 ## Nav
-- [x] Sidebar order: داشبورد → آژانس‌ها → پرواز → گزارش مسافران → باشگاه مشتریان → استرداد بلیط → کارتابل → تیکت‌ها → مدیریت بلاگ → مدیریت سایت → درخواست‌های استخدام (+ kyc/settings product tabs) — `backend/test/panels.e2e-spec.ts` «confirmed tab set for SITE_ADMIN»
+- [x] Sidebar order: داشبورد → آژانس‌ها → پرواز → گزارش مسافران → باشگاه مشتریان → استرداد بلیط → کارتابل → تیکت‌ها → مدیریت سایت → درخواست‌های استخدام — `backend/test/panels.e2e-spec.ts` «confirmed tab set for SITE_ADMIN» (blog / kyc / settings removed from sidebar)
 - [x] Labels match design sidebar (آژانس‌ها / پرواز / تیکت‌ها / درخواست‌های استخدام) — `panel-nav.config.ts`
 
 ## Shell
@@ -45,6 +45,15 @@ Acceptance checklist for پنل ادمین سایت parity with
 - [x] Row action «مشاهده و ارجاع ←» (no pay on admin surface) — same test
 - [x] Dedicated search box above the list — same test
 - [x] 10 records per page — same test
+
+## Cartable («کارتابل»)
+- [x] Dark SITE_ADMIN layout: 3 category KPIs, «کارتابل من», date filter, ایجاد پیام, بررسی — `CartablePage.tsx` (`dark` includes SITE_ADMIN)
+- [x] 10/page — `usePagination`
+
+## Tickets («تیکت‌ها»)
+- [x] Dark 5 KPIs + status tabs + dept chips + search + table — `SupportTicketsPage.test.tsx`
+- [x] Create-ticket modal + `POST /support-tickets/admin` — same test
+- [x] 10/page — same test
 
 ## Global panel pagination rule
 - [x] Default `PANEL_PAGE_SIZE = 10` via `usePagination` — `Pagination.test.tsx`

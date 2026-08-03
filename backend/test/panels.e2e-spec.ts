@@ -168,11 +168,8 @@ describe('Panels (e2e)', () => {
       'refund',
       'cartable',
       'tickets',
-      'blog',
       'media',
       'jobapps',
-      'kyc',
-      'settings',
     ]);
   });
 
