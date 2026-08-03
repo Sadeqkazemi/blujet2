@@ -11,7 +11,8 @@ import type { RefundDetail, RefundListRow, RefundsResult, RefundStatus } from '.
 import type { StaffDirectoryEntry } from '../../types/cartable';
 
 /** Design: five refund cards per page. */
-const REFUND_PAGE_SIZE = 5;
+/** Global panel list rule: 10 records per page. */
+const REFUND_PAGE_SIZE = 10;
 
 const STATUS_META: Record<RefundStatus, { label: string; className: string }> = {
   SUBMITTED: { label: 'ثبت مشتری', className: 'bg-[#f59e0b24] text-[#fbbf24]' },

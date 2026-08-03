@@ -52,8 +52,10 @@ describe('FlightOpsPage', () => {
     expect(screen.getByText('W5-112')).toBeInTheDocument();
     expect(screen.getAllByText('بسته‌شده')).toHaveLength(1);
     expect(screen.getAllByText('باز')).toHaveLength(1);
-    expect(screen.getByText('بارگذاری در نیرا ✓')).toBeInTheDocument();
+    expect(screen.getByText('بارگذاری در نیرا')).toBeInTheDocument();
     expect(screen.getByText('در انتظار بسته‌شدن')).toBeInTheDocument();
+    expect(screen.getByText('تهران ← دبی')).toBeInTheDocument();
+    expect(screen.getByText('مشهد ← تهران')).toBeInTheDocument();
   });
 
   it("opens a flight's detail view with stat boxes, نیرا status, and the passenger manifest", async () => {
@@ -89,5 +91,34 @@ describe('FlightOpsPage', () => {
 
     expect(await screen.findByTestId('fo-nira-pending')).toBeInTheDocument();
     expect(screen.getByText('مسافری برای این پرواز ثبت نشده است.')).toBeInTheDocument();
+  });
+
+  it('paginates the flight list at 10 rows per page', async () => {
+    const many: FlightopsList = {
+      kpis: { total: 12, open: 12, closed: 0, soldTotal: 0 },
+      rows: Array.from({ length: 12 }, (_, i) => ({
+        id: `fi-${i + 1}`,
+        flightNo: `EP-${800 + i}`,
+        originCode: 'THR',
+        destCode: 'DXB',
+        departureAt: '2026-08-10T05:00:00.000Z',
+        capacity: 180,
+        sold: i,
+        free: 180 - i,
+        closed: false,
+        niraSubmittedAt: null,
+      })),
+    };
+    vi.spyOn(flightopsApi, 'fetchFlightops').mockResolvedValue(many);
+    render(<FlightOpsPage />);
+
+    expect(await screen.findByText('EP-800')).toBeInTheDocument();
+    expect(screen.getByText('EP-809')).toBeInTheDocument();
+    expect(screen.queryByText('EP-810')).not.toBeInTheDocument();
+    expect(screen.getByTestId('pagination')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'بعدی' }));
+    expect(await screen.findByText('EP-810')).toBeInTheDocument();
+    expect(screen.queryByText('EP-800')).not.toBeInTheDocument();
   });
 });

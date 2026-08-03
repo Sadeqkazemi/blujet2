@@ -1272,6 +1272,38 @@ export class AgenciesService {
 
   // ── Agency Portal: webservice purchase requests (staff-side review) ────
 
+  /** Cross-agency queue for SITE_ADMIN «درخواست وب‌سرویس» tab. */
+  async listAllWebserviceRequests(status?: 'PENDING' | 'APPROVED' | 'REJECTED') {
+    const rows = await this.typeorm.agencyWebserviceRequest.findMany({
+      where: status ? { status } : undefined,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        agency: {
+          select: {
+            userId: true,
+            city: true,
+            licenseNo: true,
+            user: { select: { fullName: true } },
+          },
+        },
+      },
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      agencyId: r.agencyId,
+      agencyName: r.agency.user.fullName,
+      city: r.agency.city,
+      licenseNo: r.agency.licenseNo,
+      scope: r.scope,
+      months: r.months,
+      priceIrr: r.priceIrr.toString(),
+      note: r.note,
+      status: r.status,
+      decidedAt: r.decidedAt?.toISOString() ?? null,
+      createdAt: r.createdAt.toISOString(),
+    }));
+  }
+
   async listWebserviceRequests(id: string) {
     await this.getProfileOrThrow(id);
     return this.typeorm.agencyWebserviceRequest.findMany({

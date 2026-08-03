@@ -1,7 +1,7 @@
 # SITE_ADMIN panel dark-align (design-reference-v2)
 
 Acceptance checklist for پنل ادمین سایت parity with
-`design-reference-v2/پنل ادمین سایت.dc.html`.
+`design-reference-v2/پنل ادمین سایت.dc.html` and product screenshots.
 
 ## Nav
 - [x] Sidebar order: داشبورد → آژانس‌ها → پرواز → گزارش مسافران → باشگاه مشتریان → استرداد بلیط → کارتابل → تیکت‌ها → مدیریت بلاگ → مدیریت سایت → درخواست‌های استخدام (+ kyc/settings product tabs) — `backend/test/panels.e2e-spec.ts` «confirmed tab set for SITE_ADMIN»
@@ -18,6 +18,24 @@ Acceptance checklist for پنل ادمین سایت parity with
 - [x] Real MoM trend % on passenger/ticket KPIs when previous month has data
 - [x] Widgets: درخواست‌های آژانس‌ها، استرداد (با بج وضعیت)، کارتابل، اعلان‌های جدید — same test
 - [x] Backend `GET /reporting/site-admin-overview` (SITE_ADMIN) — docs/API.md + controller
+
+## Agencies («مدیریت آژانس‌ها»)
+- [x] Dark membership-request queue with «بررسی درخواست» — `SiteAdminAgenciesPage.test.tsx`
+- [x] KPIs: آژانس‌های فعال + درخواست‌های در انتظار عضویت — same test
+- [x] Tabs: آژانس‌های همکار / درخواست وب‌سرویس (+ pending badge) — same test
+- [x] Partner list search + active/suspended badges — same test
+- [x] 10 records per page on membership / partner / webservice lists — same test
+- [x] `GET /agencies/webservice-requests` cross-agency queue — `AgenciesService.listAllWebserviceRequests`
+
+## Flights («پروازها» / flightops)
+- [x] Dark layout: Nira info banner, 4 KPIs, table columns (مسیر city labels / شماره / تاریخ / فروش·ظرفیت / وضعیت / نیرا) — `FlightOpsPage.test.tsx`
+- [x] Status + Nira color coding (open green / closed grey / pending amber) — same test
+- [x] 10 records per page on flight list (+ passenger manifest) — same test
+
+## Global panel pagination rule
+- [x] Default `PANEL_PAGE_SIZE = 10` via `usePagination` — `Pagination.test.tsx`
+- [x] Overrides removed: refunds + commercial pricing now 10/page — `RefundsPage.test.tsx`, `PricingPage.test.tsx`
+- [x] Employee agencies table paginated — `EmployeeAgenciesPage.tsx`
 
 ## Login
 - Username `site.admin` / password `Blujet@1404`

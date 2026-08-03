@@ -1438,6 +1438,13 @@ request/decide pattern exactly, for a new `AgencyWebserviceRequest`.
 
 ### Agencies (staff-side review)
 
+- `GET /agencies/webservice-requests` — cross-agency queue for the
+  SITE_ADMIN «درخواست وب‌سرویس» tab (`SITE_ADMIN`, `COMMERCIAL_MANAGER`,
+  `SENIOR_MANAGER`). Optional `?status=PENDING|APPROVED|REJECTED`. Each
+  row includes `agencyId`, `agencyName`, `city`, `licenseNo` plus the
+  same request fields as the per-agency list. Must be registered
+  **before** `GET /agencies/:id/...` so `:id` does not capture
+  `webservice-requests`.
 - `GET /agencies/:id/webservice-requests` — list, same
   `AGENCY_TAB_ROLES` guard as credit requests (no per-method narrowing).
 - `PATCH /agencies/:id/webservice-requests/:reqId/decide` — body

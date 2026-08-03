@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchAgencies, fetchAgencyRequests } from '../../api/agencies';
 import EmployeeUnitPill from '../../components/EmployeeUnitPill';
+import Pagination from '../../components/Pagination';
+import { usePagination } from '../../hooks/usePagination';
 import { faDigits } from '../../lib/fa-format';
 import type { AgencyListRow, AgencyMembershipRequest } from '../../types/agencies';
 
@@ -72,6 +74,8 @@ export default function EmployeeAgenciesPage() {
     return [...pendingRows, ...agencyRows];
   }, [agencies, requests]);
 
+  const rowsPager = usePagination(rows);
+
   return (
     <div className="px-[21px] pb-[34px] pt-[18px]">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
@@ -104,7 +108,7 @@ export default function EmployeeAgenciesPage() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r) => {
+                {rowsPager.pageItems.map((r) => {
                   const st = STATUS_META[r.status];
                   const inner = (
                     <>
@@ -138,6 +142,14 @@ export default function EmployeeAgenciesPage() {
             </table>
           </div>
         )}
+        <div className="px-4 pb-4">
+          <Pagination
+            page={rowsPager.page}
+            totalPages={rowsPager.totalPages}
+            onChange={rowsPager.setPage}
+            variant="dark"
+          />
+        </div>
       </section>
     </div>
   );
