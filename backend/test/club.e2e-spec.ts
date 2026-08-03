@@ -2,6 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import * as crypto from 'node:crypto';
+import { DataSource } from 'typeorm';
 import { TypeORMService } from '../src/typeorm/typeorm.service';
 import { loginAs, loginAsCustomer } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
@@ -501,9 +502,10 @@ describe('Club (e2e)', () => {
       });
 
       const clubPoints = app.get(ClubPointsService);
+      const dataSource = app.get(DataSource);
       // 2,000,000,000 IRR at 100,000 IRR/point = 20,000 points — comfortably
       // past the seeded PLATINUM threshold (15,000).
-      await typeorm.$transaction((tx) =>
+      await dataSource.manager.transaction((tx) =>
         clubPoints.earnForPurchase(tx, member.id, 2_000_000_000n, booking.id),
       );
 
