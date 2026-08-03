@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
   BadRequestException,
   ConflictException,
@@ -5,8 +6,23 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { In, IsNull, MoreThan, Not, Repository } from 'typeorm';
 import { TypeORMService } from '../../typeorm/typeorm.service';
 import { RRule } from 'rrule';
+import { FlightInstance } from '../../database/entities/flight-instance.entity';
+import { Flight } from '../../database/entities/flight.entity';
+import { Route } from '../../database/entities/route.entity';
+import { Airport } from '../../database/entities/airport.entity';
+import { AircraftSeatMap } from '../../database/entities/aircraft-seat-map.entity';
+import { Schedule } from '../../database/entities/schedule.entity';
+import { FareRule } from '../../database/entities/fare-rule.entity';
+import { AgencyAllotment } from '../../database/entities/agency-allotment.entity';
+import { AgencyProfile } from '../../database/entities/agency-profile.entity';
+import { Booking } from '../../database/entities/booking.entity';
+import { Passenger } from '../../database/entities/passenger.entity';
+import { SeatLock } from '../../database/entities/seat-lock.entity';
+import { FarePricingProposal } from '../../database/entities/fare-pricing-proposal.entity';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
 import { enumerateSeats } from '../reservation/seat-layout';
@@ -19,7 +35,6 @@ import {
 import { StepUpService } from '../auth/step-up.service';
 import type { PersistedAiSuggestion } from '../pricing/pricing.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import type { TypeORM } from '../../../generated/typeorm/client';
 import {
   ZERO_IRR,
   addIrr,
@@ -36,14 +51,36 @@ const FUTURE_WINDOW_DAYS = 7;
 /** Statuses that count as a sold seat (design: «صندلی فروخته‌شده»). */
 const SOLD_STATUSES = ['PAID', 'TICKETED'] as const;
 
-type InstanceWithFlight = TypeORM.FlightInstanceGetPayload<{
-  include: { flight: { include: { route: true } } };
-}>;
-
 @Injectable()
 export class FlightsService {
   constructor(
     private readonly typeorm: TypeORMService,
+    @InjectRepository(FlightInstance)
+    private readonly instanceRepo: Repository<FlightInstance>,
+    @InjectRepository(Flight)
+    private readonly flightRepo: Repository<Flight>,
+    @InjectRepository(Route)
+    private readonly routeRepo: Repository<Route>,
+    @InjectRepository(Airport)
+    private readonly airportRepo: Repository<Airport>,
+    @InjectRepository(AircraftSeatMap)
+    private readonly seatMapRepo: Repository<AircraftSeatMap>,
+    @InjectRepository(Schedule)
+    private readonly scheduleRepo: Repository<Schedule>,
+    @InjectRepository(FareRule)
+    private readonly fareRuleRepo: Repository<FareRule>,
+    @InjectRepository(AgencyAllotment)
+    private readonly allotmentRepo: Repository<AgencyAllotment>,
+    @InjectRepository(AgencyProfile)
+    private readonly agencyProfileRepo: Repository<AgencyProfile>,
+    @InjectRepository(Booking)
+    private readonly bookingRepo: Repository<Booking>,
+    @InjectRepository(Passenger)
+    private readonly passengerRepo: Repository<Passenger>,
+    @InjectRepository(SeatLock)
+    private readonly seatLockRepo: Repository<SeatLock>,
+    @InjectRepository(FarePricingProposal)
+    private readonly proposalRepo: Repository<FarePricingProposal>,
     private readonly audit: AuditService,
     @Inject(PRICE_SUGGESTION_PROVIDER)
     private readonly priceSuggestions: PriceSuggestionProvider,
@@ -54,15 +91,15 @@ export class FlightsService {
     instanceIds: string[],
   ): Promise<Map<string, number>> {
     if (instanceIds.length === 0) return new Map();
-    const rows = await this.typeorm.booking.groupBy({
-      by: ['flightInstanceId'],
-      where: {
-        flightInstanceId: { in: instanceIds },
-        status: { in: [...SOLD_STATUSES] },
-      },
-      _count: { _all: true },
-    });
-    return new Map(rows.map((r) => [r.flightInstanceId, r._count._all]));
+    const rows = await this.bookingRepo
+      .createQueryBuilder('b')
+      .select('b.flightInstanceId', 'flightInstanceId')
+      .addSelect('COUNT(*)', 'count')
+      .where('b.flightInstanceId IN (:...ids)', { ids: instanceIds })
+      .andWhere('b.status IN (:...statuses)', { statuses: [...SOLD_STATUSES] })
+      .groupBy('b.flightInstanceId')
+      .getRawMany<{ flightInstanceId: string; count: string }>();
+    return new Map(rows.map((r) => [r.flightInstanceId, Number(r.count)]));
   }
 
   /** ⚑ Derived status per docs — the mocks' hardcoded strings mapped to
@@ -79,7 +116,7 @@ export class FlightsService {
     return 'ACTIVE';
   }
 
-  private baseRow(i: InstanceWithFlight, sold: number) {
+  private baseRow(i: FlightInstance, sold: number) {
     return {
       id: i.id,
       flightNo: i.flight.flightNo,
@@ -97,10 +134,12 @@ export class FlightsService {
     const futureCutoff = new Date(
       Date.now() + FUTURE_WINDOW_DAYS * 24 * 3_600_000,
     );
-    const instances = await this.typeorm.flightInstance.findMany({
-      include: { flight: { include: { route: true } } },
-      orderBy: { departureAt: 'asc' },
-    });
+    const instances = await this.instanceRepo
+      .createQueryBuilder('fi')
+      .leftJoinAndSelect('fi.flight', 'flight')
+      .leftJoinAndSelect('flight.route', 'route')
+      .orderBy('fi.departureAt', 'ASC')
+      .getMany();
     const sold = await this.soldByInstance(instances.map((i) => i.id));
 
     const scheduled = instances.filter(
@@ -127,7 +166,7 @@ export class FlightsService {
     const future = futureRows.map((i) => ({
       ...this.baseRow(i, sold.get(i.id) ?? 0),
       agencySeatsAllocated: i.agencySeatsAllocated,
-      aiSuggestion: i.aiSuggestion as PersistedAiSuggestion | null,
+      aiSuggestion: i.aiSuggestion as unknown as PersistedAiSuggestion | null,
     }));
 
     const completed = await this.completedReport();
@@ -149,21 +188,37 @@ export class FlightsService {
    * سود/ضرر compare the achieved average rate to the base rate. */
   private async completedReport() {
     await materializeDepartedInstances(this.typeorm);
-    const departed = await this.typeorm.flightInstance.findMany({
-      where: { status: 'DEPARTED' },
-      include: { flight: { include: { route: true } } },
-      orderBy: { departureAt: 'desc' },
-      take: 30,
-    });
-    const byChannel = await this.typeorm.booking.groupBy({
-      by: ['flightInstanceId', 'channel'],
-      where: {
-        flightInstanceId: { in: departed.map((d) => d.id) },
-        status: { in: [...SOLD_STATUSES] },
-      },
-      _count: { _all: true },
-      _sum: { priceIrr: true },
-    });
+    const departed = await this.instanceRepo
+      .createQueryBuilder('fi')
+      .leftJoinAndSelect('fi.flight', 'flight')
+      .leftJoinAndSelect('flight.route', 'route')
+      .where('fi.status = :status', { status: 'DEPARTED' })
+      .orderBy('fi.departureAt', 'DESC')
+      .take(30)
+      .getMany();
+
+    const byChannel = departed.length
+      ? await this.bookingRepo
+          .createQueryBuilder('b')
+          .select('b.flightInstanceId', 'flightInstanceId')
+          .addSelect('b.channel', 'channel')
+          .addSelect('COUNT(*)', 'count')
+          .addSelect('SUM(b.priceIrr)', 'sumPriceIrr')
+          .where('b.flightInstanceId IN (:...ids)', {
+            ids: departed.map((d) => d.id),
+          })
+          .andWhere('b.status IN (:...statuses)', {
+            statuses: [...SOLD_STATUSES],
+          })
+          .groupBy('b.flightInstanceId')
+          .addGroupBy('b.channel')
+          .getRawMany<{
+            flightInstanceId: string;
+            channel: 'SYSTEM' | 'CHARTER' | 'AGENCY';
+            count: string;
+            sumPriceIrr: string | null;
+          }>()
+      : [];
 
     const rows = departed.map((i) => {
       const channels = {
@@ -174,9 +229,9 @@ export class FlightsService {
       let tickets = 0;
       let revenueIrr: Irr = ZERO_IRR;
       for (const c of byChannel.filter((b) => b.flightInstanceId === i.id)) {
-        const sum = c._sum.priceIrr ?? ZERO_IRR;
+        const sum = BigInt(c.sumPriceIrr ?? '0');
         channels[c.channel] = sum;
-        tickets += c._count._all;
+        tickets += Number(c.count);
         revenueIrr = addIrr(revenueIrr, sum);
       }
       const base = i.basePriceIrr ?? ZERO_IRR;
@@ -211,7 +266,7 @@ export class FlightsService {
   }
 
   async airports() {
-    return this.typeorm.airport.findMany({ orderBy: { cityFa: 'asc' } });
+    return this.airportRepo.find({ order: { cityFa: 'ASC' } });
   }
 
   async createAirport(
@@ -226,29 +281,27 @@ export class FlightsService {
         message: 'نام شهر الزامی است.',
       });
     }
-    const existing = await this.typeorm.airport.findUnique({ where: { code } });
+    const existing = await this.airportRepo.findOneBy({ code });
     if (existing) {
       throw new ConflictException({
         code: ErrorCode.CONFLICT,
         message: 'فرودگاهی با این کد قبلاً ثبت شده است.',
       });
     }
-    const duplicateCity = await this.typeorm.airport.findFirst({
-      where: { cityFa },
-    });
+    const duplicateCity = await this.airportRepo.findOneBy({ cityFa });
     if (duplicateCity) {
       throw new ConflictException({
         code: ErrorCode.CONFLICT,
         message: 'این شهر قبلاً ثبت شده است.',
       });
     }
-    const created = await this.typeorm.airport.create({
-      data: {
+    const created = await this.airportRepo.save(
+      this.airportRepo.create({
         code,
         cityFa,
         tz: dto.tz?.trim() || 'Asia/Tehran',
-      },
-    });
+      }),
+    );
     await this.audit.record({
       actorId: actor.id,
       actorRole: actor.role,
@@ -267,13 +320,40 @@ export class FlightsService {
    * or a `changeAircraftType` override), so this is the first place that
    * needs the full catalog. */
   async aircraftTypes() {
-    const maps = await this.typeorm.aircraftSeatMap.findMany({
-      orderBy: { aircraftType: 'asc' },
+    const maps = await this.seatMapRepo.find({
+      order: { aircraftType: 'ASC' },
     });
     return maps.map((m) => ({
       aircraftType: m.aircraftType,
       capacity: enumerateSeats(m).length,
     }));
+  }
+
+  private async findOrCreateRoute(originCode: string, destCode: string) {
+    const existing = await this.routeRepo.findOneBy({ originCode, destCode });
+    if (existing) return existing;
+    return this.routeRepo.save(this.routeRepo.create({ originCode, destCode }));
+  }
+
+  private async findOrCreateFlight(
+    flightNo: string,
+    routeId: string,
+  ): Promise<Flight> {
+    const existingFlight = await this.flightRepo.findOneBy({ flightNo });
+    if (existingFlight && existingFlight.routeId !== routeId) {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'این شماره پرواز قبلاً برای مسیر دیگری ثبت شده است.',
+      });
+    }
+    if (existingFlight) return existingFlight;
+    return this.flightRepo.save(
+      this.flightRepo.create({
+        flightNo,
+        routeId,
+        aircraftType: 'Airbus A320',
+      }),
+    );
   }
 
   async create(
@@ -285,8 +365,6 @@ export class FlightsService {
       departureAt: string;
       capacity: number;
       basePriceIrr: Irr;
-      aircraftType?: string;
-      charterSeats?: number;
     },
   ) {
     if (dto.originCode === dto.destCode) {
@@ -295,8 +373,8 @@ export class FlightsService {
         message: 'مبدأ و مقصد نمی‌توانند یکسان باشند.',
       });
     }
-    const airports = await this.typeorm.airport.findMany({
-      where: { code: { in: [dto.originCode, dto.destCode] } },
+    const airports = await this.airportRepo.find({
+      where: { code: In([dto.originCode, dto.destCode]) },
     });
     if (airports.length !== 2) {
       throw new BadRequestException({
@@ -312,72 +390,26 @@ export class FlightsService {
       });
     }
 
-    const charterSeats = dto.charterSeats ?? 0;
-    if (charterSeats >= dto.capacity) {
-      throw new BadRequestException({
-        code: ErrorCode.VALIDATION_FAILED,
-        message: 'تعهد چارتری باید کمتر از تعداد صندلی موجود باشد.',
-      });
-    }
+    const route = await this.findOrCreateRoute(dto.originCode, dto.destCode);
+    const flight = await this.findOrCreateFlight(dto.flightNo, route.id);
 
-    const aircraftType = (dto.aircraftType ?? 'Airbus A320').trim() || 'Airbus A320';
-    if (dto.aircraftType) {
-      const map = await this.typeorm.aircraftSeatMap.findUnique({
-        where: { aircraftType },
-      });
-      if (!map) {
-        throw new BadRequestException({
-          code: ErrorCode.VALIDATION_FAILED,
-          message: 'نوع هواپیمای انتخاب‌شده در کاتالوگ نیست.',
-        });
-      }
-    }
-
-    const route = await this.typeorm.route.upsert({
-      where: {
-        originCode_destCode: {
-          originCode: dto.originCode,
-          destCode: dto.destCode,
-        },
-      },
-      update: {},
-      create: { originCode: dto.originCode, destCode: dto.destCode },
-    });
-
-    const existingFlight = await this.typeorm.flight.findUnique({
-      where: { flightNo: dto.flightNo },
-    });
-    if (existingFlight && existingFlight.routeId !== route.id) {
-      throw new ConflictException({
-        code: ErrorCode.CONFLICT,
-        message: 'این شماره پرواز قبلاً برای مسیر دیگری ثبت شده است.',
-      });
-    }
-    const flight =
-      existingFlight ??
-      (await this.typeorm.flight.create({
-        data: {
-          flightNo: dto.flightNo,
-          routeId: route.id,
-          aircraftType,
-        },
-      }));
-
-    const instance = await this.typeorm.flightInstance.create({
-      data: {
+    const created = await this.instanceRepo.save(
+      this.instanceRepo.create({
         flightId: flight.id,
         departureAt,
         arrivalAt: new Date(departureAt.getTime() + route.durationMin * 60_000),
         capacity: dto.capacity,
-        charterSeats,
+        charterSeats: 0,
         status: 'SCHEDULED',
         basePriceIrr: dto.basePriceIrr,
-        ...(existingFlight && dto.aircraftType
-          ? { aircraftTypeOverride: aircraftType }
-          : {}),
-      },
-      include: { flight: { include: { route: true } } },
-    });
+      }),
+    );
+    const instance = await this.instanceRepo
+      .createQueryBuilder('fi')
+      .leftJoinAndSelect('fi.flight', 'flight')
+      .leftJoinAndSelect('flight.route', 'route')
+      .where('fi.id = :id', { id: created.id })
+      .getOneOrFail();
 
     await this.audit.record({
       actorId: actor.id,
@@ -394,28 +426,39 @@ export class FlightsService {
 
   /** Flight detail modal: real channel breakdown from bookings. */
   async detail(id: string) {
-    const instance = await this.typeorm.flightInstance.findUnique({
-      where: { id },
-      include: { flight: { include: { route: true } } },
-    });
+    const instance = await this.instanceRepo
+      .createQueryBuilder('fi')
+      .leftJoinAndSelect('fi.flight', 'flight')
+      .leftJoinAndSelect('flight.route', 'route')
+      .where('fi.id = :id', { id })
+      .getOne();
     if (!instance) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
         message: 'پرواز یافت نشد.',
       });
     }
-    const byChannel = await this.typeorm.booking.groupBy({
-      by: ['channel'],
-      where: { flightInstanceId: id, status: { in: [...SOLD_STATUSES] } },
-      _count: { _all: true },
-      _sum: { priceIrr: true },
-    });
+    const byChannel = await this.bookingRepo
+      .createQueryBuilder('b')
+      .select('b.channel', 'channel')
+      .addSelect('COUNT(*)', 'count')
+      .addSelect('SUM(b.priceIrr)', 'sumPriceIrr')
+      .where('b.flightInstanceId = :id', { id })
+      .andWhere('b.status IN (:...statuses)', {
+        statuses: [...SOLD_STATUSES],
+      })
+      .groupBy('b.channel')
+      .getRawMany<{
+        channel: 'SYSTEM' | 'CHARTER' | 'AGENCY';
+        count: string;
+        sumPriceIrr: string | null;
+      }>();
     const channels = (['SYSTEM', 'CHARTER', 'AGENCY'] as const).map((ch) => {
       const row = byChannel.find((b) => b.channel === ch);
       return {
         channel: ch,
-        seats: row?._count._all ?? 0,
-        revenueIrr: row?._sum.priceIrr ?? ZERO_IRR,
+        seats: row ? Number(row.count) : 0,
+        revenueIrr: row ? BigInt(row.sumPriceIrr ?? '0') : ZERO_IRR,
       };
     });
     const sold = channels.reduce((a, c) => a + c.seats, 0);
@@ -453,17 +496,21 @@ export class FlightsService {
       saleEndsAt?: string;
     },
   ) {
-    const instance = await this.typeorm.flightInstance.findUnique({
-      where: { id },
-      include: { pricing: true },
-    });
+    const instance = await this.instanceRepo
+      .createQueryBuilder('fi')
+      .where('fi.id = :id', { id })
+      .getOne();
     if (!instance || instance.status !== 'SCHEDULED') {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
         message: 'پرواز برنامه‌ریزی‌شده یافت نشد.',
       });
     }
-    if (instance.pricing?.status === 'REGISTERED') {
+    const pricing = await this.proposalRepo
+      .createQueryBuilder('p')
+      .where('p.flightInstanceId = :id', { id })
+      .getOne();
+    if (pricing?.status === 'REGISTERED') {
       throw new ConflictException({
         code: ErrorCode.CONFLICT,
         message:
@@ -478,36 +525,35 @@ export class FlightsService {
       });
     }
 
-    const updated = await this.typeorm.flightInstance.update({
-      where: { id },
-      data: {
-        basePriceIrr: dto.priceIrr,
-        agencySeatsAllocated: dto.agencySeats,
-        ...(dto.saleStartsAt !== undefined
-          ? {
-              saleStartsAt: dto.saleStartsAt
-                ? new Date(dto.saleStartsAt)
-                : null,
-            }
-          : {}),
-        ...(dto.saleEndsAt !== undefined
-          ? { saleEndsAt: dto.saleEndsAt ? new Date(dto.saleEndsAt) : null }
-          : {}),
-      },
-    });
+    instance.basePriceIrr = dto.priceIrr;
+    instance.agencySeatsAllocated = dto.agencySeats;
+    if (dto.saleStartsAt !== undefined) {
+      instance.saleStartsAt = dto.saleStartsAt
+        ? new Date(dto.saleStartsAt)
+        : null;
+    }
+    if (dto.saleEndsAt !== undefined) {
+      instance.saleEndsAt = dto.saleEndsAt ? new Date(dto.saleEndsAt) : null;
+    }
+    const updated = await this.instanceRepo.save(instance);
 
     if (actor.role === 'COMMERCIAL_MANAGER') {
-      await this.typeorm.farePricingProposal.upsert({
-        where: { flightInstanceId: id },
-        update: { proposedPriceIrr: dto.priceIrr },
-        create: {
-          flightInstanceId: id,
-          basePriceIrr: dto.priceIrr,
-          competitorPriceIrr: dto.priceIrr,
-          proposedPriceIrr: dto.priceIrr,
-          proposedById: actor.id,
-        },
-      });
+      if (pricing) {
+        pricing.proposedPriceIrr = dto.priceIrr;
+        pricing.updatedAt = new Date();
+        await this.proposalRepo.save(pricing);
+      } else {
+        await this.proposalRepo.save(
+          this.proposalRepo.create({
+            flightInstanceId: id,
+            basePriceIrr: dto.priceIrr,
+            competitorPriceIrr: dto.priceIrr,
+            proposedPriceIrr: dto.priceIrr,
+            proposedById: actor.id,
+            updatedAt: new Date(),
+          }),
+        );
+      }
     }
 
     await this.audit.record({
@@ -553,18 +599,19 @@ export class FlightsService {
       stepUpCode,
       'PRICE_CAPACITY_CHANGE',
     );
-    const instance = await this.typeorm.flightInstance.findUnique({
-      where: { id },
-      include: { flight: true },
-    });
+    const instance = await this.instanceRepo
+      .createQueryBuilder('fi')
+      .leftJoinAndSelect('fi.flight', 'flight')
+      .where('fi.id = :id', { id })
+      .getOne();
     if (!instance) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
         message: 'پرواز یافت نشد.',
       });
     }
-    const newMap = await this.typeorm.aircraftSeatMap.findUnique({
-      where: { aircraftType: newAircraftType },
+    const newMap = await this.seatMapRepo.findOneBy({
+      aircraftType: newAircraftType,
     });
     if (!newMap) {
       throw new NotFoundException({
@@ -575,20 +622,20 @@ export class FlightsService {
     const newCapacity = enumerateSeats(newMap).length;
 
     const [confirmedCount, lockCount] = await Promise.all([
-      this.typeorm.passenger.count({
-        where: {
-          seatCode: { not: null },
-          booking: {
-            flightInstanceId: id,
-            status: { in: ['PAID', 'TICKETED'] },
-          },
-        },
-      }),
-      this.typeorm.seatLock.count({
+      this.passengerRepo
+        .createQueryBuilder('p')
+        .leftJoin('p.booking', 'booking')
+        .where('p.seatCode IS NOT NULL')
+        .andWhere('booking.flightInstanceId = :id', { id })
+        .andWhere('booking.status IN (:...statuses)', {
+          statuses: ['PAID', 'TICKETED'],
+        })
+        .getCount(),
+      this.seatLockRepo.count({
         where: {
           flightInstanceId: id,
-          releasedAt: null,
-          expiresAt: { gt: new Date() },
+          releasedAt: IsNull(),
+          expiresAt: MoreThan(new Date()),
         },
       }),
     ]);
@@ -601,21 +648,21 @@ export class FlightsService {
       });
     }
 
-    const updated = await this.typeorm.flightInstance.update({
-      where: { id },
-      data: { aircraftTypeOverride: newAircraftType, capacity: newCapacity },
-    });
+    const previousAircraftType = resolveAircraftType(instance);
+    instance.aircraftTypeOverride = newAircraftType;
+    instance.capacity = newCapacity;
+    const updated = await this.instanceRepo.save(instance);
 
     await this.audit.record({
       actorId: actor.id,
       actorRole: actor.role,
       category: 'SYSTEM',
       action: 'تغییر نوع هواپیمای پرواز',
-      detail: `نوع هواپیمای پرواز ${instance.flight.flightNo} از «${resolveAircraftType(instance)}» به «${newAircraftType}» توسط ${actor.fullName} تغییر کرد.`,
+      detail: `نوع هواپیمای پرواز ${instance.flight.flightNo} از «${previousAircraftType}» به «${newAircraftType}» توسط ${actor.fullName} تغییر کرد.`,
       entityType: 'FlightInstance',
       entityId: id,
       metadata: {
-        previousAircraftType: resolveAircraftType(instance),
+        previousAircraftType,
         newAircraftType,
         newCapacity,
       },
@@ -634,10 +681,13 @@ export class FlightsService {
     const futureCutoff = new Date(
       Date.now() + FUTURE_WINDOW_DAYS * 24 * 3_600_000,
     );
-    const future = await this.typeorm.flightInstance.findMany({
-      where: { status: 'SCHEDULED', departureAt: { gt: futureCutoff } },
-      include: { flight: { include: { route: true } } },
-    });
+    const future = await this.instanceRepo
+      .createQueryBuilder('fi')
+      .leftJoinAndSelect('fi.flight', 'flight')
+      .leftJoinAndSelect('flight.route', 'route')
+      .where('fi.status = :status', { status: 'SCHEDULED' })
+      .andWhere('fi.departureAt > :cutoff', { cutoff: futureCutoff })
+      .getMany();
     if (future.length === 0) return { analyzed: 0, available: true };
 
     const result = await this.priceSuggestions.suggest(
@@ -666,6 +716,7 @@ export class FlightsService {
     if (!result) return { analyzed: 0, available: false };
 
     const generatedAt = new Date().toISOString();
+    const futureById = new Map(future.map((i) => [i.id, i]));
     for (const s of result.suggestions) {
       const suggestion: PersistedAiSuggestion = {
         priceIrr: s.price_irr,
@@ -677,10 +728,10 @@ export class FlightsService {
         modelVersion: result.model_version,
         generatedAt,
       };
-      await this.typeorm.flightInstance.update({
-        where: { id: s.proposal_id },
-        data: { aiSuggestion: suggestion as unknown as TypeORM.InputJsonValue },
-      });
+      const target = futureById.get(s.proposal_id);
+      if (!target) continue;
+      target.aiSuggestion = suggestion as unknown as typeof target.aiSuggestion;
+      await this.instanceRepo.save(target);
     }
 
     await this.audit.record({
@@ -718,8 +769,8 @@ export class FlightsService {
         message: 'مبدأ و مقصد نمی‌توانند یکسان باشند.',
       });
     }
-    const airports = await this.typeorm.airport.findMany({
-      where: { code: { in: [dto.originCode, dto.destCode] } },
+    const airports = await this.airportRepo.find({
+      where: { code: In([dto.originCode, dto.destCode]) },
     });
     if (airports.length !== 2) {
       throw new BadRequestException({
@@ -737,45 +788,19 @@ export class FlightsService {
     }
     const [depHour, depMinute] = dto.depTime.split(':').map(Number);
 
-    const route = await this.typeorm.route.upsert({
-      where: {
-        originCode_destCode: {
-          originCode: dto.originCode,
-          destCode: dto.destCode,
-        },
-      },
-      update: {},
-      create: { originCode: dto.originCode, destCode: dto.destCode },
-    });
-    const existingFlight = await this.typeorm.flight.findUnique({
-      where: { flightNo: dto.flightNo },
-    });
-    if (existingFlight && existingFlight.routeId !== route.id) {
-      throw new ConflictException({
-        code: ErrorCode.CONFLICT,
-        message: 'این شماره پرواز قبلاً برای مسیر دیگری ثبت شده است.',
-      });
-    }
-    const flight =
-      existingFlight ??
-      (await this.typeorm.flight.create({
-        data: {
-          flightNo: dto.flightNo,
-          routeId: route.id,
-          aircraftType: 'Airbus A320',
-        },
-      }));
+    const route = await this.findOrCreateRoute(dto.originCode, dto.destCode);
+    const flight = await this.findOrCreateFlight(dto.flightNo, route.id);
 
-    const schedule = await this.typeorm.schedule.create({
-      data: {
+    const schedule = await this.scheduleRepo.save(
+      this.scheduleRepo.create({
         flightId: flight.id,
         rrule: dto.rrule,
         depHour,
         depMinute,
         durationMin: route.durationMin,
         capacity: dto.capacity,
-      },
-    });
+      }),
+    );
     const materialized = await this.materializeSchedule(
       schedule.id,
       dto.daysAhead ?? 30,
@@ -798,14 +823,17 @@ export class FlightsService {
   /**
    * Materializes FlightInstances for the next `daysAhead` days from the
    * schedule's RRULE. Idempotent: @@unique([scheduleId, departureAt]) +
-   * skipDuplicates means re-running never doubles instances. depHour/
-   * depMinute are UTC (storage is UTC per CLAUDE.md; rendering converts to
-   * the airport's IANA tz at the edge).
+   * ON CONFLICT DO NOTHING means re-running never doubles instances.
+   * depHour/depMinute are UTC (storage is UTC per CLAUDE.md; rendering
+   * converts to the airport's IANA tz at the edge). Bulk `.insert()`
+   * bypasses entity `@BeforeInsert()` listeners, so `id` is generated
+   * here explicitly per row.
    */
   async materializeSchedule(scheduleId: string, daysAhead: number) {
-    const schedule = await this.typeorm.schedule.findUniqueOrThrow({
-      where: { id: scheduleId },
-    });
+    const schedule = await this.scheduleRepo
+      .createQueryBuilder('s')
+      .where('s.id = :id', { id: scheduleId })
+      .getOneOrFail();
     if (!schedule.active) return 0;
 
     const parsed = RRule.parseString(schedule.rrule);
@@ -813,6 +841,7 @@ export class FlightsService {
     const until = new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000);
     const rule = new RRule({ ...parsed, dtstart: start });
     const dates = rule.between(start, until, true);
+    if (dates.length === 0) return 0;
 
     const rows = dates.map((d) => {
       const departureAt = new Date(
@@ -825,6 +854,7 @@ export class FlightsService {
         ),
       );
       return {
+        id: randomUUID(),
         flightId: schedule.flightId,
         scheduleId: schedule.id,
         departureAt,
@@ -836,21 +866,40 @@ export class FlightsService {
         status: 'SCHEDULED' as const,
       };
     });
-    const created = await this.typeorm.flightInstance.createMany({
-      data: rows,
-      skipDuplicates: true,
-    });
-    return created.count;
+
+    const result = await this.instanceRepo
+      .createQueryBuilder()
+      .insert()
+      .into(FlightInstance)
+      .values(rows)
+      .orIgnore()
+      .execute();
+    return (result.raw as unknown[]).length;
   }
 
   async listSchedules() {
-    const schedules = await this.typeorm.schedule.findMany({
-      orderBy: { createdAt: 'desc' },
-      include: {
-        flight: { include: { route: true } },
-        _count: { select: { instances: true } },
-      },
-    });
+    const schedules = await this.scheduleRepo
+      .createQueryBuilder('s')
+      .leftJoinAndSelect('s.flight', 'flight')
+      .leftJoinAndSelect('flight.route', 'route')
+      .orderBy('s.createdAt', 'DESC')
+      .getMany();
+
+    const counts = schedules.length
+      ? await this.instanceRepo
+          .createQueryBuilder('fi')
+          .select('fi.scheduleId', 'scheduleId')
+          .addSelect('COUNT(*)', 'count')
+          .where('fi.scheduleId IN (:...ids)', {
+            ids: schedules.map((s) => s.id),
+          })
+          .groupBy('fi.scheduleId')
+          .getRawMany<{ scheduleId: string; count: string }>()
+      : [];
+    const countById = new Map(
+      counts.map((c) => [c.scheduleId, Number(c.count)]),
+    );
+
     return schedules.map((s) => ({
       id: s.id,
       flightNo: s.flight.flightNo,
@@ -860,18 +909,17 @@ export class FlightsService {
       depTime: `${String(s.depHour).padStart(2, '0')}:${String(s.depMinute).padStart(2, '0')}`,
       capacity: s.capacity,
       active: s.active,
-      instanceCount: s._count.instances,
+      instanceCount: countById.get(s.id) ?? 0,
     }));
   }
 
   // ── Phase 13 Part B: manageable fare classes ──────────────────────────
 
   async listFareRules(instanceId: string) {
-    const rules = await this.typeorm.fareRule.findMany({
+    return this.fareRuleRepo.find({
       where: { flightInstanceId: instanceId },
-      orderBy: [{ cabin: 'asc' }, { priceIrr: 'asc' }],
+      order: { cabin: 'ASC', priceIrr: 'ASC' },
     });
-    return rules;
   }
 
   /** Physical seat count for one cabin of this instance's (possibly
@@ -886,8 +934,8 @@ export class FlightsService {
     },
     cabin: 'ECONOMY' | 'BUSINESS',
   ): Promise<number> {
-    const map = await this.typeorm.aircraftSeatMap.findUnique({
-      where: { aircraftType: resolveAircraftType(instance) },
+    const map = await this.seatMapRepo.findOneBy({
+      aircraftType: resolveAircraftType(instance),
     });
     if (!map) return 0;
     return enumerateSeats(map).filter((s) => s.cabin === cabin).length;
@@ -926,10 +974,11 @@ export class FlightsService {
       allowedChannels?: ('SYSTEM' | 'CHARTER' | 'AGENCY')[];
     },
   ) {
-    const instance = await this.typeorm.flightInstance.findUnique({
-      where: { id: instanceId },
-      include: { flight: true },
-    });
+    const instance = await this.instanceRepo
+      .createQueryBuilder('fi')
+      .leftJoinAndSelect('fi.flight', 'flight')
+      .where('fi.id = :id', { id: instanceId })
+      .getOne();
     if (!instance) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -939,7 +988,7 @@ export class FlightsService {
     this.validateFareRuleWindow(dto);
 
     const cabinSeats = await this.cabinSeatCount(instance, dto.cabin);
-    const existing = await this.typeorm.fareRule.findMany({
+    const existing = await this.fareRuleRepo.find({
       where: { flightInstanceId: instanceId, cabin: dto.cabin },
     });
     const existingTotal = existing.reduce((a, r) => a + r.seatsAllocated, 0);
@@ -950,8 +999,8 @@ export class FlightsService {
       });
     }
 
-    const created = await this.typeorm.fareRule.create({
-      data: {
+    const created = await this.fareRuleRepo.save(
+      this.fareRuleRepo.create({
         flightInstanceId: instanceId,
         cabin: dto.cabin,
         classCode: dto.classCode,
@@ -964,8 +1013,8 @@ export class FlightsService {
         validFrom: dto.validFrom ? new Date(dto.validFrom) : undefined,
         validUntil: dto.validUntil ? new Date(dto.validUntil) : undefined,
         allowedChannels: dto.allowedChannels ?? [],
-      },
-    });
+      }),
+    );
 
     await this.audit.record({
       actorId: actor.id,
@@ -996,10 +1045,12 @@ export class FlightsService {
       allowedChannels?: ('SYSTEM' | 'CHARTER' | 'AGENCY')[];
     },
   ) {
-    const rule = await this.typeorm.fareRule.findUnique({
-      where: { id: ruleId },
-      include: { flightInstance: { include: { flight: true } } },
-    });
+    const rule = await this.fareRuleRepo
+      .createQueryBuilder('r')
+      .leftJoinAndSelect('r.flightInstance', 'flightInstance')
+      .leftJoinAndSelect('flightInstance.flight', 'flight')
+      .where('r.id = :id', { id: ruleId })
+      .getOne();
     if (!rule || rule.flightInstanceId !== instanceId) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -1016,11 +1067,11 @@ export class FlightsService {
         rule.flightInstance,
         rule.cabin,
       );
-      const others = await this.typeorm.fareRule.findMany({
+      const others = await this.fareRuleRepo.find({
         where: {
           flightInstanceId: instanceId,
           cabin: rule.cabin,
-          id: { not: ruleId },
+          id: Not(ruleId),
         },
       });
       const othersTotal = others.reduce((a, r) => a + r.seatsAllocated, 0);
@@ -1032,20 +1083,21 @@ export class FlightsService {
       }
     }
 
-    const updated = await this.typeorm.fareRule.update({
-      where: { id: ruleId },
-      data: {
-        priceIrr: dto.priceIrr,
-        seatsAllocated: dto.seatsAllocated,
-        taxIrr: dto.taxIrr,
-        refundable: dto.refundable,
-        changeable: dto.changeable,
-        baggageAllowanceKg: dto.baggageAllowanceKg,
-        validFrom: dto.validFrom ? new Date(dto.validFrom) : undefined,
-        validUntil: dto.validUntil ? new Date(dto.validUntil) : undefined,
-        allowedChannels: dto.allowedChannels,
-      },
-    });
+    if (dto.priceIrr !== undefined) rule.priceIrr = dto.priceIrr;
+    if (dto.seatsAllocated !== undefined)
+      rule.seatsAllocated = dto.seatsAllocated;
+    if (dto.taxIrr !== undefined) rule.taxIrr = dto.taxIrr;
+    if (dto.refundable !== undefined) rule.refundable = dto.refundable;
+    if (dto.changeable !== undefined) rule.changeable = dto.changeable;
+    if (dto.baggageAllowanceKg !== undefined)
+      rule.baggageAllowanceKg = dto.baggageAllowanceKg;
+    if (dto.validFrom !== undefined)
+      rule.validFrom = dto.validFrom ? new Date(dto.validFrom) : null;
+    if (dto.validUntil !== undefined)
+      rule.validUntil = dto.validUntil ? new Date(dto.validUntil) : null;
+    if (dto.allowedChannels !== undefined)
+      rule.allowedChannels = dto.allowedChannels;
+    const updated = await this.fareRuleRepo.save(rule);
 
     await this.audit.record({
       actorId: actor.id,
@@ -1065,23 +1117,23 @@ export class FlightsService {
     instanceId: string,
     ruleId: string,
   ) {
-    const rule = await this.typeorm.fareRule.findUnique({
-      where: { id: ruleId },
-      include: { flightInstance: { include: { flight: true } } },
-    });
+    const rule = await this.fareRuleRepo
+      .createQueryBuilder('r')
+      .leftJoinAndSelect('r.flightInstance', 'flightInstance')
+      .leftJoinAndSelect('flightInstance.flight', 'flight')
+      .where('r.id = :id', { id: ruleId })
+      .getOne();
     if (!rule || rule.flightInstanceId !== instanceId) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
         message: 'کلاس نرخی یافت نشد.',
       });
     }
-    const activeBooking = await this.typeorm.booking.findFirst({
-      where: {
-        flightInstanceId: instanceId,
-        cabin: rule.cabin,
-        fareClassCode: rule.classCode,
-        status: { in: ['DRAFT', 'HELD', 'PAID', 'TICKETED'] },
-      },
+    const activeBooking = await this.bookingRepo.findOneBy({
+      flightInstanceId: instanceId,
+      cabin: rule.cabin,
+      fareClassCode: rule.classCode,
+      status: In(['DRAFT', 'HELD', 'PAID', 'TICKETED']),
     });
     if (activeBooking) {
       throw new ConflictException({
@@ -1090,7 +1142,7 @@ export class FlightsService {
       });
     }
 
-    await this.typeorm.fareRule.delete({ where: { id: ruleId } });
+    await this.fareRuleRepo.delete({ id: ruleId });
 
     await this.audit.record({
       actorId: actor.id,
@@ -1108,11 +1160,14 @@ export class FlightsService {
   // ── Phase 13 Part C: per-agency allotments ────────────────────────────
 
   async listAllotments(instanceId: string) {
-    const rows = await this.typeorm.agencyAllotment.findMany({
-      where: { flightInstanceId: instanceId },
-      include: { agency: { include: { user: true } } },
-      orderBy: { createdAt: 'desc' },
-    });
+    const rows = await this.allotmentRepo
+      .createQueryBuilder('a')
+      .leftJoin('a.agency', 'agency')
+      .leftJoin('agency.user', 'user')
+      .addSelect(['agency.userId', 'user.id', 'user.fullName'])
+      .where('a.flightInstanceId = :instanceId', { instanceId })
+      .orderBy('a.createdAt', 'DESC')
+      .getMany();
     const now = new Date();
     return rows.map((r) => ({
       id: r.id,
@@ -1135,13 +1190,15 @@ export class FlightsService {
     excludeId?: string,
   ): Promise<number> {
     const now = new Date();
-    const rows = await this.typeorm.agencyAllotment.findMany({
-      where: {
-        flightInstanceId: instanceId,
-        id: excludeId ? { not: excludeId } : undefined,
-        OR: [{ type: 'HARD' }, { releaseAt: null }, { releaseAt: { gt: now } }],
-      },
-    });
+    const qb = this.allotmentRepo
+      .createQueryBuilder('a')
+      .where('a.flightInstanceId = :instanceId', { instanceId })
+      .andWhere(
+        '(a.type = :hard OR a.releaseAt IS NULL OR a.releaseAt > :now)',
+        { hard: 'HARD', now },
+      );
+    if (excludeId) qb.andWhere('a.id != :excludeId', { excludeId });
+    const rows = await qb.getMany();
     return rows.reduce((a, r) => a + r.seatsAllocated, 0);
   }
 
@@ -1156,17 +1213,18 @@ export class FlightsService {
       contractPriceIrr?: Irr;
     },
   ) {
-    const instance = await this.typeorm.flightInstance.findUnique({
-      where: { id: instanceId },
-    });
+    const instance = await this.instanceRepo
+      .createQueryBuilder('fi')
+      .where('fi.id = :id', { id: instanceId })
+      .getOne();
     if (!instance) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
         message: 'پرواز یافت نشد.',
       });
     }
-    const agency = await this.typeorm.agencyProfile.findUnique({
-      where: { userId: dto.agencyId },
+    const agency = await this.agencyProfileRepo.findOneBy({
+      userId: dto.agencyId,
     });
     if (!agency) {
       throw new NotFoundException({
@@ -1190,8 +1248,8 @@ export class FlightsService {
       });
     }
 
-    const created = await this.typeorm.agencyAllotment.create({
-      data: {
+    const created = await this.allotmentRepo.save(
+      this.allotmentRepo.create({
         agencyId: dto.agencyId,
         flightInstanceId: instanceId,
         seatsAllocated: dto.seatsAllocated,
@@ -1202,8 +1260,8 @@ export class FlightsService {
             : undefined,
         contractPriceIrr: dto.contractPriceIrr,
         createdById: actor.id,
-      },
-    });
+      }),
+    );
 
     await this.audit.record({
       actorId: actor.id,
@@ -1223,21 +1281,17 @@ export class FlightsService {
     instanceId: string,
     allotmentId: string,
   ) {
-    const allotment = await this.typeorm.agencyAllotment.findUnique({
-      where: { id: allotmentId },
-    });
+    const allotment = await this.allotmentRepo.findOneBy({ id: allotmentId });
     if (!allotment || allotment.flightInstanceId !== instanceId) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
         message: 'سهمیه یافت نشد.',
       });
     }
-    const activeBooking = await this.typeorm.booking.findFirst({
-      where: {
-        flightInstanceId: instanceId,
-        agencyId: allotment.agencyId,
-        status: { in: ['DRAFT', 'HELD', 'PAID', 'TICKETED'] },
-      },
+    const activeBooking = await this.bookingRepo.findOneBy({
+      flightInstanceId: instanceId,
+      agencyId: allotment.agencyId,
+      status: In(['DRAFT', 'HELD', 'PAID', 'TICKETED']),
     });
     if (activeBooking) {
       throw new ConflictException({
@@ -1247,7 +1301,7 @@ export class FlightsService {
       });
     }
 
-    await this.typeorm.agencyAllotment.delete({ where: { id: allotmentId } });
+    await this.allotmentRepo.delete({ id: allotmentId });
 
     await this.audit.record({
       actorId: actor.id,

@@ -1,4 +1,5 @@
-import { Column, Entity, Index, PrimaryColumn } from 'typeorm';
+import { randomUUID } from 'node:crypto';
+import { BeforeInsert, Column, Entity, Index, PrimaryColumn } from 'typeorm';
 
 @Index('routes_originCode_destCode_key', ['originCode', 'destCode'], {
   unique: true,
@@ -7,6 +8,11 @@ import { Column, Entity, Index, PrimaryColumn } from 'typeorm';
 export class Route {
   @PrimaryColumn({ type: 'text', primaryKeyConstraintName: 'routes_pkey' })
   id!: string;
+
+  @BeforeInsert()
+  generateId() {
+    this.id ??= randomUUID();
+  }
 
   @Column({ type: 'text' })
   originCode!: string;
