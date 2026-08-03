@@ -42,6 +42,13 @@ import type {
  *  - BOARD_CHAIR: design four-tab ReservationSystem (BoardChairPlaneMode)
  *  - CEO / SENIOR_MANAGER: executive «هواپیما» dark shell
  */
+
+/** Design: PNR | مسیر | مسافر | وضعیت — gap + isolate so LTR PNR doesn't stick to route */
+const RECENT_PNR_GRID =
+  'grid grid-cols-[minmax(7rem,1fr)_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,0.9fr)] gap-x-2.5 items-center';
+const PNR_CODE_CELL =
+  'font-num font-bold text-[#60a5fa] [direction:ltr] [unicode-bidi:isolate] text-right';
+
 export default function ReservationPage() {
   const { user } = useAuth();
   if (user?.role === 'BOARD_CHAIR') return <BoardChairPlaneMode />;
@@ -548,7 +555,9 @@ function ItReservationView() {
             <div className="border-b border-[#1f2a3d] px-[15px] py-3 text-[13px] font-extrabold text-white">
               آخرین رزروهای ثبت‌شده
             </div>
-            <div className="grid grid-cols-[1fr_1.4fr_1fr_0.9fr] border-b border-[#1f2a3d] px-[15px] py-[11px] text-[10.5px] font-bold text-[#6b7b94]">
+            <div
+              className={`${RECENT_PNR_GRID} border-b border-[#1f2a3d] px-[15px] py-[11px] text-[10.5px] font-bold text-[#6b7b94]`}
+            >
               <span>PNR</span>
               <span>مسیر</span>
               <span>مسافر</span>
@@ -565,17 +574,17 @@ function ItReservationView() {
                 return (
                   <div
                     key={r.pnr}
-                    className="grid grid-cols-[1fr_1.4fr_1fr_0.9fr] items-center border-b border-[#16202e] px-[15px] py-3 text-xs last:border-0"
+                    className={`${RECENT_PNR_GRID} border-b border-[#16202e] px-[15px] py-3 text-xs last:border-0`}
                   >
                     <button
                       type="button"
                       onClick={() => setDetailPnr(r.pnr)}
-                      className="font-num ltr text-right font-bold text-[#60a5fa] underline decoration-dashed underline-offset-4"
+                      className={`${PNR_CODE_CELL} underline decoration-dashed underline-offset-4`}
                     >
                       {r.pnr}
                     </button>
-                    <span className="text-[#cdd6e3]">{r.route}</span>
-                    <span className="text-[#9fb0c7]">{r.passenger}</span>
+                    <span className="min-w-0 truncate text-[#cdd6e3]">{r.route}</span>
+                    <span className="min-w-0 truncate text-[#9fb0c7]">{r.passenger}</span>
                     <span className={`w-max rounded-[14px] px-2.5 py-0.5 text-[10px] font-bold ${st.className}`}>
                       {st.label}
                     </span>
@@ -639,7 +648,7 @@ function ItReservationView() {
               className="h-[42px] w-full rounded-[10px] border border-[#28344c] bg-[#0f1623] px-3 text-xs text-[#e7ecf3] outline-none placeholder:text-[#6b7b94] focus:border-[#3b82f6]"
             />
           </div>
-          <div className="grid grid-cols-[1.4fr_0.9fr_1.1fr_0.9fr_0.9fr_0.9fr] border-b border-[#1f2a3d] px-[15px] py-[11px] text-[10.5px] font-bold text-[#6b7b94]">
+          <div className="grid grid-cols-[1.4fr_0.9fr_1.1fr_0.9fr_0.9fr_0.9fr] gap-x-3.5 border-b border-[#1f2a3d] px-[15px] py-[11px] text-[10.5px] font-bold text-[#6b7b94]">
             <span>مسیر</span>
             <span>شماره پرواز</span>
             <span>تاریخ / ساعت</span>
@@ -659,10 +668,12 @@ function ItReservationView() {
                   key={f.flightInstanceId}
                   type="button"
                   onClick={() => setSeatMapFlightId(f.flightInstanceId)}
-                  className="grid w-full grid-cols-[1.4fr_0.9fr_1.1fr_0.9fr_0.9fr_0.9fr] items-center border-b border-[#16202e] px-[15px] py-3 text-right text-xs transition last:border-0 hover:bg-[#18223a]"
+                  className="grid w-full grid-cols-[1.4fr_0.9fr_1.1fr_0.9fr_0.9fr_0.9fr] items-center gap-x-3.5 border-b border-[#16202e] px-[15px] py-3 text-right text-xs transition last:border-0 hover:bg-[#18223a]"
                 >
-                  <span className="font-bold text-[#e7ecf3]">{f.route}</span>
-                  <span className="font-num ltr text-[#9fb0c7]">{f.flightNo}</span>
+                  <span className="min-w-0 truncate font-bold text-[#e7ecf3]">{f.route}</span>
+                  <span className="font-num [direction:ltr] [unicode-bidi:isolate] text-right text-[#9fb0c7]">
+                    {f.flightNo}
+                  </span>
                   <span className="text-[#9fb0c7]">{formatJalaliDateTime(f.departureAt)}</span>
                   <span className="font-num ltr text-[#9fb0c7]">{f.aircraftType}</span>
                   <div className="flex flex-col gap-1">
@@ -892,6 +903,7 @@ function ExecReservationView() {
 
   const [pnrGroups, setPnrGroups] = useState<PnrGroup[]>([]);
   const [pnrQuery, setPnrQuery] = useState('');
+  const [pnrLname, setPnrLname] = useState('');
   const [detailPnr, setDetailPnr] = useState<string | null>(null);
   const [detail, setDetail] = useState<PnrDetail | null>(null);
   const [changeSeatInput, setChangeSeatInput] = useState('');
@@ -916,11 +928,25 @@ function ExecReservationView() {
 
   const loadPnrList = useCallback(async () => {
     try {
-      setPnrGroups(await fetchPnrList(pnrQuery || undefined));
+      setPnrGroups(await fetchPnrList(pnrQuery.trim() || undefined));
     } catch {
       setError('خطا در دریافت فهرست رزروها.');
     }
   }, [pnrQuery]);
+
+  const recentRows = useMemo(() => {
+    const lname = pnrLname.trim();
+    return pnrGroups.flatMap((g) =>
+      g.rows
+        .filter((r) => !lname || r.passenger.includes(lname))
+        .map((r) => ({
+          pnr: r.pnr,
+          route: g.route,
+          passenger: r.passenger,
+          status: r.status,
+        })),
+    );
+  }, [pnrGroups, pnrLname]);
 
   const loadFlights = useCallback(async () => {
     try {
@@ -1175,77 +1201,108 @@ function ExecReservationView() {
 
       {subTab === 'dash' && <DashboardTab dark={dark} stats={stats} />}
 
-      {subTab === 'pnr' && (
-        <section
-          className={
-            dark
-              ? 'rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[15px]'
-              : 'rounded-xl border border-border bg-white p-5'
-          }
-        >
-          <div className={dark ? 'mb-3.5 grid gap-2 sm:grid-cols-[1fr_1fr_auto]' : ''}>
-            {dark && (
-              <>
+      {subTab === 'pnr' && dark && (
+        <div className="flex flex-col gap-[13px]">
+          <section className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[15px]">
+            <h3 className="mb-4 text-[13.5px] font-extrabold text-white">جستجوی رزرو</h3>
+            <div className="grid grid-cols-1 items-end gap-[9px] md:grid-cols-[1fr_1fr_auto]">
+              <label className="block">
+                <span className="mb-1.5 block text-[10.5px] text-[#6b7b94]">کد رزرو (PNR)</span>
                 <input
                   value={pnrQuery}
                   onChange={(e) => setPnrQuery(e.target.value)}
-                  placeholder="کد رزرو (PNR)"
-                  className="h-[42px] rounded-[10px] border border-[#28344c] bg-[#0f1623] px-3 text-xs text-[#e7ecf3] outline-none placeholder:text-[#6b7b94] focus:border-[#3b82f6]"
+                  placeholder="مثلاً AS-88421"
+                  dir="ltr"
+                  className="font-num h-11 w-full rounded-[10px] border border-[#28344c] bg-[#0f1623] px-[11px] text-right text-xs text-[#e7ecf3] outline-none focus:border-[#3b82f6]"
                 />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-[10.5px] text-[#6b7b94]">نام خانوادگی مسافر</span>
                 <input
-                  value=""
-                  readOnly
-                  placeholder="نام خانوادگی مسافر"
-                  className="h-[42px] rounded-[10px] border border-[#28344c] bg-[#0f1623] px-3 text-xs text-[#e7ecf3] outline-none placeholder:text-[#6b7b94]"
-                  aria-hidden
+                  value={pnrLname}
+                  onChange={(e) => setPnrLname(e.target.value)}
+                  placeholder="نام خانوادگی"
+                  className="h-11 w-full rounded-[10px] border border-[#28344c] bg-[#0f1623] px-[11px] text-xs text-[#e7ecf3] outline-none focus:border-[#3b82f6]"
                 />
-                <button
-                  type="button"
-                  onClick={() => void loadPnrList()}
-                  className="h-[42px] rounded-[10px] bg-[#3b82f6] px-5 text-xs font-extrabold text-white"
-                >
-                  جستجو
-                </button>
-              </>
+              </label>
+              <button
+                type="button"
+                onClick={() => void loadPnrList()}
+                className="flex h-11 items-center justify-center gap-1.5 rounded-[10px] bg-[#3b82f6] px-5 text-[12.5px] font-extrabold text-white"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="M21 21l-4-4" />
+                </svg>
+                جستجو
+              </button>
+            </div>
+          </section>
+
+          <section className="overflow-hidden rounded-[14px] border border-[#1f2a3d] bg-[#141d2e]">
+            <div className="border-b border-[#1f2a3d] px-[15px] py-3 text-[13px] font-extrabold text-white">
+              آخرین رزروهای ثبت‌شده
+            </div>
+            <div
+              className={`${RECENT_PNR_GRID} border-b border-[#1f2a3d] px-[15px] py-[11px] text-[10.5px] font-bold text-[#6b7b94]`}
+            >
+              <span>PNR</span>
+              <span>مسیر</span>
+              <span>مسافر</span>
+              <span>وضعیت</span>
+            </div>
+            {recentRows.length === 0 ? (
+              <div className="px-[15px] py-[26px] text-center text-xs text-[#6b7b94]">رزروی ثبت نشده است.</div>
+            ) : (
+              recentRows.slice(0, 20).map((r) => {
+                const st = STATUS_LABEL[r.status] ?? {
+                  label: r.status,
+                  darkClass: 'bg-[#18223a] text-[#9fb0c7]',
+                };
+                return (
+                  <div
+                    key={r.pnr}
+                    className={`${RECENT_PNR_GRID} border-b border-[#16202e] px-[15px] py-3 text-xs last:border-0 hover:bg-[#18223a]`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => void openPnrDetail(r.pnr)}
+                      className={`${PNR_CODE_CELL} underline decoration-dashed underline-offset-4`}
+                    >
+                      {r.pnr}
+                    </button>
+                    <span className="min-w-0 truncate text-[#cdd6e3]">{r.route}</span>
+                    <span className="min-w-0 truncate text-[#9fb0c7]">{r.passenger}</span>
+                    <span
+                      className={`w-max rounded-[14px] px-2.5 py-0.5 text-[10px] font-bold ${st.darkClass}`}
+                    >
+                      {st.label}
+                    </span>
+                  </div>
+                );
+              })
             )}
-            {!dark && (
-              <input
-                value={pnrQuery}
-                onChange={(e) => setPnrQuery(e.target.value)}
-                placeholder="جستجو با کد PNR یا نام مسافر…"
-                className="mb-4 h-[42px] w-full rounded-xl border border-border bg-white px-4 text-xs outline-none transition focus:border-accent"
-              />
-            )}
-          </div>
-          {dark && (
-            <h3 className="mb-3 text-[13.5px] font-extrabold text-white">آخرین رزروهای ثبت‌شده</h3>
-          )}
+          </section>
+        </div>
+      )}
+
+      {subTab === 'pnr' && !dark && (
+        <section className="rounded-xl border border-border bg-white p-5">
+          <input
+            value={pnrQuery}
+            onChange={(e) => setPnrQuery(e.target.value)}
+            placeholder="جستجو با کد PNR یا نام مسافر…"
+            className="mb-4 h-[42px] w-full rounded-xl border border-border bg-white px-4 text-xs outline-none transition focus:border-accent"
+          />
           {pnrGroups.length === 0 ? (
-            <p className={`py-6 text-center text-xs ${dark ? 'text-[#6b7b94]' : 'text-muted'}`}>
-              رزروی یافت نشد.
-            </p>
+            <p className="py-6 text-center text-xs text-muted">رزروی یافت نشد.</p>
           ) : (
             <div className="flex flex-col gap-4">
               {pnrGroups.map((g) => (
-                <div
-                  key={g.flightInstanceId}
-                  className={
-                    dark
-                      ? 'overflow-hidden rounded-[12px] border border-[#1f2a3d]'
-                      : 'overflow-hidden rounded-xl border border-border'
-                  }
-                >
-                  <div
-                    className={
-                      dark
-                        ? 'flex items-center gap-3 bg-[#0f1623] px-4 py-2.5 text-xs'
-                        : 'flex items-center gap-3 bg-surface px-4 py-2.5 text-xs'
-                    }
-                  >
+                <div key={g.flightInstanceId} className="overflow-hidden rounded-xl border border-border">
+                  <div className="flex items-center gap-3 bg-surface px-4 py-2.5 text-xs">
                     <span className="ltr font-num font-bold text-[#60a5fa]">{g.flightNo}</span>
-                    <span className={`flex-1 font-bold ${dark ? 'text-white' : 'text-ink'}`}>
-                      {g.route}
-                    </span>
+                    <span className="flex-1 font-bold text-ink">{g.route}</span>
                     <button
                       type="button"
                       onClick={() => void loadSeatMap(g.flightInstanceId)}
@@ -1253,52 +1310,25 @@ function ExecReservationView() {
                     >
                       نقشهٔ صندلی {g.flightNo}
                     </button>
-                    <span className={dark ? 'text-[#6b7b94]' : 'text-muted'}>
-                      {formatJalaliDate(g.departureAt)}
-                    </span>
+                    <span className="text-muted">{formatJalaliDate(g.departureAt)}</span>
                   </div>
-                  {dark ? (
-                    <div className="grid grid-cols-[1fr_1.2fr_1.2fr_auto] gap-2 border-b border-[#1f2a3d] px-4 py-2 text-[10px] text-[#6b7b94]">
-                      <span>PNR</span>
-                      <span>مسیر</span>
-                      <span>مسافر</span>
-                      <span>وضعیت</span>
-                    </div>
-                  ) : null}
-                  <ul className={dark ? 'divide-y divide-[#1f2a3d]' : 'divide-y divide-border'}>
+                  <ul className="divide-y divide-border">
                     {g.rows.map((r) => {
                       const st = STATUS_LABEL[r.status] ?? {
                         label: r.status,
                         className: 'bg-surface text-text-2',
-                        darkClass: 'bg-[#18223a] text-[#9fb0c7]',
                       };
                       return (
-                        <li
-                          key={r.pnr}
-                          className={
-                            dark
-                              ? 'grid grid-cols-[1fr_1.2fr_1.2fr_auto] items-center gap-2 px-4 py-2.5 text-xs'
-                              : 'flex items-center gap-3 px-4 py-2.5 text-xs'
-                          }
-                        >
+                        <li key={r.pnr} className="flex items-center gap-3 px-4 py-2.5 text-xs">
                           <button
                             type="button"
                             onClick={() => void openPnrDetail(r.pnr)}
-                            className={`ltr font-num font-bold underline decoration-dashed underline-offset-4 ${
-                              dark ? 'text-[#60a5fa]' : 'text-text-2'
-                            }`}
+                            className="ltr font-num font-bold text-text-2 underline decoration-dashed underline-offset-4"
                           >
                             {r.pnr}
                           </button>
-                          {dark && <span className="text-[#9fb0c7]">{g.route}</span>}
-                          <span className={dark ? 'text-[#e7ecf3]' : 'flex-1 text-ink'}>
-                            {r.passenger}
-                          </span>
-                          <span
-                            className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                              dark ? st.darkClass : st.className
-                            }`}
-                          >
+                          <span className="flex-1 text-ink">{r.passenger}</span>
+                          <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${st.className}`}>
                             {st.label}
                           </span>
                         </li>
@@ -1311,6 +1341,7 @@ function ExecReservationView() {
           )}
         </section>
       )}
+
 
       {subTab === 'flights' && (
         <FlightsTab
@@ -1608,19 +1639,21 @@ function FlightsTab({
                 onClick={() => onOpenSeatMap(f.flightInstanceId)}
                 className={
                   dark
-                    ? 'grid grid-cols-1 gap-3 rounded-[13px] border border-[#1f2a3d] bg-[#0f1623] px-3.5 py-3 text-start transition hover:border-[#3b82f6]/50 sm:grid-cols-[1.3fr_.7fr_.9fr_1.2fr_.9fr_auto]'
+                    ? 'grid grid-cols-1 gap-3 rounded-[13px] border border-[#1f2a3d] bg-[#0f1623] px-3.5 py-3 text-start transition hover:border-[#3b82f6]/50 sm:grid-cols-[1.3fr_.7fr_.9fr_1.2fr_.9fr_auto] sm:gap-x-3.5 sm:gap-y-0'
                     : 'flex flex-wrap items-center gap-3 rounded-xl border border-border px-4 py-3 text-start text-xs hover:border-accent'
                 }
               >
-                <div>
-                  <div className={`text-[13px] font-extrabold ${dark ? 'text-white' : 'text-ink'}`}>
+                <div className="min-w-0">
+                  <div className={`truncate text-[13px] font-extrabold ${dark ? 'text-white' : 'text-ink'}`}>
                     {f.originCityFa} ↔ {f.destCityFa}
                   </div>
                   <div className={`ltr mt-0.5 text-[10px] ${dark ? 'text-[#6b7b94]' : 'text-muted'}`}>
                     {f.originCode} → {f.destCode}
                   </div>
                 </div>
-                <div className="ltr font-num font-bold text-[#60a5fa]">{f.flightNo}</div>
+                <div className="font-num font-bold text-[#60a5fa] [direction:ltr] [unicode-bidi:isolate] text-right sm:text-start">
+                  {f.flightNo}
+                </div>
                 <div className={`font-num text-[11px] ${dark ? 'text-[#cdd9ec]' : 'text-ink'}`}>
                   {formatJalaliDateTime(f.departureAt)}
                 </div>
