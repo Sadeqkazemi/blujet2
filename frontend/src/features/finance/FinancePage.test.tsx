@@ -186,6 +186,28 @@ describe('FinancePage', () => {
     expect(screen.queryByText('BJ-101')).not.toBeInTheDocument();
   });
 
+  it('shows at most 5 recent financial transactions (design hint-placeholder-count)', async () => {
+    mockRole('FINANCE_MANAGER');
+    mockFinanceOpsApis();
+    vi.spyOn(reportingApi, 'fetchRecentTransactions').mockResolvedValue({
+      totalCount: 12,
+      rows: Array.from({ length: 12 }, (_, i) => ({
+        id: `t-${i}`,
+        type: 'SALE' as const,
+        titleFa: 'درآمد فروش بلیط',
+        party: `THR → DXB #${i}`,
+        occurredAt: '2026-07-10T10:00:00.000Z',
+        signedAmountIrr: '380000000',
+        statusFa: 'موفق',
+        statusTone: 'success' as const,
+      })),
+    });
+
+    renderFinance();
+    expect(await screen.findByText('۱۲ تراکنش')).toBeInTheDocument();
+    expect(screen.getAllByText('درآمد فروش بلیط')).toHaveLength(5);
+  });
+
   it('shows the payment-reconciliation queue and resolves an item with a required note', async () => {
     mockRole('FINANCE_MANAGER');
     mockFinanceOpsApis();
