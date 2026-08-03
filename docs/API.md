@@ -234,28 +234,31 @@ Roles: `BOARD_CHAIR`, `SENIOR_MANAGER`, `IT_MANAGER` have the reachable
 سامانه رزرواسیون/هواپیما nav entry (per `panel-nav.config.ts`); `CEO` is
 authorized at the API level too (⚑ product decision, see `docs/DB_SCHEMA.md`
 → Phase 9) but has no reachable nav entry, matching Phase 1's confirmed
-extraction. `canLock` = `CEO`/`BOARD_CHAIR`/`IT_MANAGER`; `SENIOR_MANAGER`
-is view-only on every endpoint below (403 on the write ones).
+extraction. `canLock` (PNR cancel / change-seat / manual issue / no-show) =
+`CEO`/`BOARD_CHAIR`/`IT_MANAGER`. Seat-map managerial lock/release/approve/
+reject is narrower: `canSeatLock` = `CEO`/`BOARD_CHAIR` only — **IT Manager
+cannot manually lock seats** (view sold-seat passenger details only).
+`SENIOR_MANAGER` is view-only on every write endpoint below (403).
 
 ### `backend/src/modules/reservation/`
 
 | Method | Path | Roles | Notes |
 |---|---|---|---|
-| GET | `/reservation/seatmap/:flightInstanceId` | BOARD_CHAIR, SENIOR_MANAGER, IT_MANAGER, CEO | Computed from `AircraftSeatMap` (by the instance's `Flight.aircraftType`) + sold seats (`Passenger.seatCode` on non-CANCELLED bookings) + active `SeatLock`s. Returns `{ rows[], cabinLayout, soldCount, lockedCount, capacity, occupancyPct }` (`cabinLayout` added Phase 30); PII never included. |
-| POST | `/reservation/seatmap/:flightInstanceId/lock` | canLock only | `{ seatCode, passengerName?, passengerNationalId?, passengerMobile? }` — 409 if the seat is already sold or actively locked (DB partial-unique-index-backed). PII encrypted+hashed like `ClubMember`. `AuditLog(category=RESERVATION)`. |
-| PATCH | `/reservation/seatmap/locks/:id/release` | canLock only | Any canLock role may release any active lock (the design's «×» chip shows no per-locker ownership filter). Sets `releasedAt`; 409 if already released. Audited. |
+| GET | `/reservation/seatmap/:flightInstanceId` | BOARD_CHAIR, SENIOR_MANAGER, IT_MANAGER, CEO | Computed from `AircraftSeatMap` + sold seats + active locks. Returns flight meta, `rows[]` (each seat: status, optional `passenger` `{ fullName, pnr, bookingStatus, nationalId, priceIrr }` for SOLD), `cabinLayout`, counts. Staff-only — sold-seat passenger fields power the IT/Board seat-map popup (IT cannot lock). |
+| POST | `/reservation/seatmap/:flightInstanceId/lock` | canSeatLock only (`CEO`/`BOARD_CHAIR`) | `{ seatCode, passengerName?, passengerNationalId?, passengerMobile? }` — 409 if the seat is already sold or actively locked (DB partial-unique-index-backed). PII encrypted+hashed like `ClubMember`. `AuditLog(category=RESERVATION)`. IT_MANAGER → 403. |
+| PATCH | `/reservation/seatmap/locks/:id/release` | canSeatLock only | Any canSeatLock role may release any active lock. Sets `releasedAt`; 409 if already released. Audited. IT_MANAGER → 403. |
 | GET | `/reservation/pnr` | all 4 reservation roles | `q?` (PNR or passenger name). Grouped by flight instance, newest first — the design's «مدیریت رزروها» list. |
 | GET | `/reservation/pnr/:pnr` | all 4 | Full detail incl. passenger + boarding-pass fields. 404 if not found. |
 | PATCH | `/reservation/pnr/:pnr/seat` | canLock only | `{ seatCode }` — «تغییر رزرو»; 409 if the target seat is sold/locked by someone else; 409 if the booking is CANCELLED. Audited. |
 | PATCH | `/reservation/pnr/:pnr/cancel` | canLock only | «لغو رزرو» → `BookingStatus.CANCELLED`; releases the seat for resale; 409 if already CANCELLED. Audited. |
 | GET | `/reservation/search` | all 4 | `origin`, `dest`, `date` (Jalali, converted) → matching `SCHEDULED` `FlightInstance`s with a computed price (`FarePricingProposal.registeredPriceIrr` if REGISTERED, else a documented flat fallback — no invented dynamic pricing) and free-seat count. |
 | POST | `/reservation/pnr` | canLock only | «صدور PNR و بلیط» — staff-side **manual/offline** issuance (phone/counter booking): `{ flightInstanceId, seatCode, passengerName, passengerNationalId?, passengerMobile? }` → creates a `TICKETED` `Booking`+`Passenger` directly (no HELD/PAID steps — no payment gateway involved, distinct from the public paid-checkout track) + a `LedgerEntry(type=SALE)`. 409 if the seat is sold/locked. Audited. |
-| GET | `/reservation/dashboard-stats` | all 4 | Real counts only (today's bookings, active PNRs, seats sold, revenue) — the design's "microservices health" cards are **not** ported (they'd describe infrastructure that doesn't exist in this monolith; CLAUDE.md forbids fabricated status data). |
+| GET | `/reservation/dashboard-stats` | all 4 | Real counts (today's bookings, active PNRs, seats sold, revenue) plus `channels[]` (share of non-cancelled bookings by `Booking.channel`) and `services[]` (dependent toggles from `InternalService` + measured DB latencies — no invented uptime). |
+| GET | `/reservation/agency-api-access` | all 4 | Agencies that already have an `AgencyApiKey` — masked key hint (`bjk_••••…`), lifetime `callCount`, ACTIVE/SUSPENDED. Empty list → design empty state. |
+| GET | `/reservation/flights` | all 4 | `q?` — SCHEDULED instances with sold/capacity/occupancy and statusKey `SELLING`/`NEAR_FULL`/`FULL` for the design «پروازها» table. |
 | POST | `/reservation/_test/flight-instance` | all 4 | E2E only — creates a fresh SCHEDULED instance with a randomized far-future date (avoids collisions across repeated test runs); always 404s in production. Same pattern as `club`'s and `pricing`'s own `_test/*` seeding hooks. |
 
-Deliberately not built this phase (see `docs/DB_SCHEMA.md`'s Phase 9 note):
-agency API access (duplicates Phase 3's `AgencyApiKey`), flight/schedule/
-capacity creation (Phase 10's own scope).
+Flight/schedule **creation** stays on Phase 10's `/flights/*` (not this shell).
 
 ---
 

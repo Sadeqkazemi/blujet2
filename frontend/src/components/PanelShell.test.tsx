@@ -108,6 +108,27 @@ describe('PanelShell', () => {
     });
   });
 
+  it('IT_MANAGER sidebar shows design brand subtitle and role chip', async () => {
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      status: 'authenticated',
+      user: { id: 'u4', fullName: 'مهندس علی صدر', role: 'IT_MANAGER', preferredLocale: 'FA' },
+      requestLogin: vi.fn(),
+      confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
+      signOut: vi.fn(),
+    });
+    vi.spyOn(panelsApi, 'fetchNav').mockResolvedValue([
+      { key: 'dashboard', labelFa: 'داشبورد فنی', implemented: true },
+      { key: 'users', labelFa: 'کاربران و دسترسی‌ها', implemented: true },
+    ]);
+
+    renderShell();
+
+    expect(await screen.findByText('پنل فناوری اطلاعات')).toBeInTheDocument();
+    expect(screen.getAllByText('مدیر فناوری اطلاعات').length).toBeGreaterThan(0);
+    expect(screen.getByRole('link', { name: 'داشبورد فنی' })).toBeInTheDocument();
+  });
+
   it('shows a purple referrals badge for EMPLOYEE when my report is pending', async () => {
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
       status: 'authenticated',
