@@ -4,8 +4,26 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
 import * as crypto from 'node:crypto';
+import {
+  EntityManager,
+  In,
+  IsNull,
+  LessThanOrEqual,
+  MoreThanOrEqual,
+  Repository,
+} from 'typeorm';
 import { TypeORMService } from '../../typeorm/typeorm.service';
+import { Booking } from '../../database/entities/booking.entity';
+import { Passenger } from '../../database/entities/passenger.entity';
+import { FlightInstance } from '../../database/entities/flight-instance.entity';
+import { Flight } from '../../database/entities/flight.entity';
+import { Airport } from '../../database/entities/airport.entity';
+import { SeatLock } from '../../database/entities/seat-lock.entity';
+import { AircraftSeatMap } from '../../database/entities/aircraft-seat-map.entity';
+import { FarePricingProposal } from '../../database/entities/fare-pricing-proposal.entity';
+import { LedgerEntry } from '../../database/entities/ledger-entry.entity';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
 import {
@@ -25,7 +43,6 @@ import type {
   FinalizeLockDto,
   IssuePnrDto,
   ListPnrQueryDto,
-  ListReservationFlightsQueryDto,
   SearchFlightsQueryDto,
 } from './dto/reservation.dtos';
 
@@ -38,55 +55,122 @@ function generatePnr(): string {
   return `BJ${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
 }
 
+type BookingDetail = Omit<Booking, 'generateId' | 'defaultTaxIrr'> & {
+  passengers: Passenger[];
+};
+
 @Injectable()
 export class PnrService {
   constructor(
+    @InjectRepository(Booking)
+    private readonly bookingRepo: Repository<Booking>,
+    @InjectRepository(Passenger)
+    private readonly passengerRepo: Repository<Passenger>,
+    @InjectRepository(FlightInstance)
+    private readonly flightInstanceRepo: Repository<FlightInstance>,
+    @InjectRepository(Flight)
+    private readonly flightRepo: Repository<Flight>,
+    @InjectRepository(Airport)
+    private readonly airportRepo: Repository<Airport>,
+    @InjectRepository(SeatLock)
+    private readonly seatLockRepo: Repository<SeatLock>,
+    @InjectRepository(AircraftSeatMap)
+    private readonly seatMapRepo: Repository<AircraftSeatMap>,
+    @InjectRepository(FarePricingProposal)
+    private readonly pricingRepo: Repository<FarePricingProposal>,
+    @InjectRepository(LedgerEntry)
+    private readonly ledgerRepo: Repository<LedgerEntry>,
     private readonly typeorm: TypeORMService,
     private readonly audit: AuditService,
     private readonly searchService: SearchService,
   ) {}
 
-  private async getBookingOrThrow(pnr: string) {
-    const booking = await this.typeorm.booking.findUnique({
-      where: { pnr },
-      include: {
-        passengers: true,
-        flightInstance: { include: { flight: { include: { route: true } } } },
-      },
-    });
+  private async findSoldConflict(
+    flightInstanceId: string,
+    seatCode: string,
+    excludeBookingId?: string,
+    manager: EntityManager = this.passengerRepo.manager,
+  ) {
+    const qb = manager
+      .createQueryBuilder(Passenger, 'p')
+      .innerJoin('p.booking', 'b')
+      .where('p.seatCode = :seatCode', { seatCode })
+      .andWhere('b.flightInstanceId = :flightInstanceId', { flightInstanceId })
+      .andWhere('b.status != :cancelled', { cancelled: 'CANCELLED' });
+    if (excludeBookingId) {
+      qb.andWhere('p.bookingId != :excludeBookingId', { excludeBookingId });
+    }
+    return qb.getOne();
+  }
+
+  /** `onlyActive: false` mirrors `issue()`'s original in-transaction check,
+   * which (unlike every other seat-conflict check in this file) omits the
+   * `expiresAt` filter — an expired-but-not-yet-released lock still blocks
+   * booking creation inside that specific atomic section. */
+  private async findLockConflict(
+    flightInstanceId: string,
+    seatCode: string,
+    options: { onlyActive: boolean },
+    manager: EntityManager = this.seatLockRepo.manager,
+  ) {
+    const qb = manager
+      .createQueryBuilder(SeatLock, 'sl')
+      .where('sl.flightInstanceId = :flightInstanceId', { flightInstanceId })
+      .andWhere('sl.seatCode = :seatCode', { seatCode })
+      .andWhere('sl.releasedAt IS NULL');
+    if (options.onlyActive) {
+      qb.andWhere('sl.expiresAt > :now', { now: new Date() });
+    }
+    return qb.getOne();
+  }
+
+  private async getBookingOrThrow(pnr: string): Promise<BookingDetail> {
+    const booking = await this.bookingRepo
+      .createQueryBuilder('b')
+      .leftJoinAndSelect('b.flightInstance', 'flightInstance')
+      .leftJoinAndSelect('flightInstance.flight', 'flight')
+      .leftJoinAndSelect('flight.route', 'route')
+      .where('b.pnr = :pnr', { pnr })
+      .getOne();
     if (!booking) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
         message: 'رزرو با این کد PNR یافت نشد.',
       });
     }
-    return booking;
+    const passengers = await this.passengerRepo.find({
+      where: { bookingId: booking.id },
+    });
+    return { ...booking, passengers };
   }
 
   async list(query: ListPnrQueryDto) {
     await materializeFlownBookings(this.typeorm);
-    const bookings = await this.typeorm.booking.findMany({
-      where: query.q
-        ? {
-            OR: [
-              { pnr: { contains: query.q, mode: 'insensitive' } },
-              {
-                passengers: {
-                  some: {
-                    fullName: { contains: query.q, mode: 'insensitive' },
-                  },
-                },
-              },
-            ],
-          }
-        : undefined,
-      include: {
-        passengers: true,
-        flightInstance: { include: { flight: { include: { route: true } } } },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 200,
-    });
+    const qb = this.bookingRepo
+      .createQueryBuilder('b')
+      .leftJoinAndSelect('b.flightInstance', 'flightInstance')
+      .leftJoinAndSelect('flightInstance.flight', 'flight')
+      .leftJoinAndSelect('flight.route', 'route')
+      .orderBy('b.createdAt', 'DESC')
+      .take(200);
+    if (query.q) {
+      qb.andWhere(
+        `(b.pnr ILIKE :q OR EXISTS (SELECT 1 FROM passengers p WHERE p."bookingId" = b.id AND p."fullName" ILIKE :q))`,
+        { q: `%${query.q}%` },
+      );
+    }
+    const bookings = await qb.getMany();
+
+    const bookingIds = bookings.map((b) => b.id);
+    const passengers = bookingIds.length
+      ? await this.passengerRepo.find({ where: { bookingId: In(bookingIds) } })
+      : [];
+    const firstPassengerByBooking = new Map<string, Passenger>();
+    for (const p of passengers) {
+      if (!firstPassengerByBooking.has(p.bookingId)) {
+        firstPassengerByBooking.set(p.bookingId, p);
+      }
+    }
 
     const groups = new Map<
       string,
@@ -111,7 +195,7 @@ export class PnrService {
       }
       groups.get(key)!.rows.push({
         pnr: b.pnr,
-        passenger: b.passengers[0]?.fullName ?? '—',
+        passenger: firstPassengerByBooking.get(b.id)?.fullName ?? '—',
         channel: b.channel,
         status: b.status,
       });
@@ -151,8 +235,8 @@ export class PnrService {
         message: 'این رزرو لغو شده است و قابل تغییر نیست.',
       });
     }
-    const map = await this.typeorm.aircraftSeatMap.findUnique({
-      where: { aircraftType: resolveAircraftType(booking.flightInstance) },
+    const map = await this.seatMapRepo.findOneBy({
+      aircraftType: resolveAircraftType(booking.flightInstance),
     });
     if (!map || !isKnownSeat(map, seatCode)) {
       throw new BadRequestException({
@@ -161,31 +245,29 @@ export class PnrService {
       });
     }
 
-    await this.typeorm.$transaction(async (tx) => {
+    await this.bookingRepo.manager.transaction(async (tx) => {
       // Lock this flight instance's row so two concurrent changeSeat calls
       // targeting it can't both pass the conflict check before either
       // commits — mirrors the same pattern used in issue().
-      await tx.$queryRaw`SELECT "id" FROM "flight_instances" WHERE "id" = ${booking.flightInstanceId} FOR UPDATE`;
+      await tx
+        .createQueryBuilder(FlightInstance, 'fi')
+        .setLock('pessimistic_write')
+        .where('fi.id = :id', { id: booking.flightInstanceId })
+        .getOne();
 
       const [soldConflict, lockConflict] = await Promise.all([
-        tx.passenger.findFirst({
-          where: {
-            seatCode,
-            bookingId: { not: booking.id },
-            booking: {
-              flightInstanceId: booking.flightInstanceId,
-              status: { not: 'CANCELLED' },
-            },
-          },
-        }),
-        tx.seatLock.findFirst({
-          where: {
-            flightInstanceId: booking.flightInstanceId,
-            seatCode,
-            releasedAt: null,
-            expiresAt: { gt: new Date() },
-          },
-        }),
+        this.findSoldConflict(
+          booking.flightInstanceId,
+          seatCode,
+          booking.id,
+          tx,
+        ),
+        this.findLockConflict(
+          booking.flightInstanceId,
+          seatCode,
+          { onlyActive: true },
+          tx,
+        ),
       ]);
       if (soldConflict || lockConflict) {
         throw new ConflictException({
@@ -194,10 +276,7 @@ export class PnrService {
         });
       }
 
-      await tx.passenger.updateMany({
-        where: { bookingId: booking.id },
-        data: { seatCode },
-      });
+      await tx.update(Passenger, { bookingId: booking.id }, { seatCode });
     });
 
     await this.audit.record({
@@ -222,10 +301,7 @@ export class PnrService {
       });
     }
 
-    await this.typeorm.booking.update({
-      where: { id: booking.id },
-      data: { status: 'CANCELLED' },
-    });
+    await this.bookingRepo.update({ id: booking.id }, { status: 'CANCELLED' });
 
     await this.audit.record({
       actorId: actor.id,
@@ -262,10 +338,7 @@ export class PnrService {
       });
     }
 
-    await this.typeorm.booking.update({
-      where: { id: booking.id },
-      data: { status: 'NO_SHOW' },
-    });
+    await this.bookingRepo.update({ id: booking.id }, { status: 'NO_SHOW' });
 
     await this.audit.record({
       actorId: actor.id,
@@ -286,22 +359,18 @@ export class PnrService {
     const dayEnd = new Date(dayStart);
     dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
 
-    const instances = await this.typeorm.flightInstance.findMany({
-      where: {
-        status: 'SCHEDULED',
-        departureAt: { gte: dayStart, lt: dayEnd },
-        flight: {
-          route: {
-            originCode: { contains: query.origin, mode: 'insensitive' },
-            destCode: { contains: query.dest, mode: 'insensitive' },
-          },
-        },
-      },
-      include: {
-        flight: { include: { route: true, instances: false } },
-        pricing: true,
-      },
-    });
+    const instances = await this.flightInstanceRepo
+      .createQueryBuilder('fi')
+      .leftJoinAndSelect('fi.flight', 'flight')
+      .leftJoinAndSelect('flight.route', 'route')
+      .where('fi.status = :status', { status: 'SCHEDULED' })
+      .andWhere('fi.departureAt >= :dayStart', { dayStart })
+      .andWhere('fi.departureAt < :dayEnd', { dayEnd })
+      .andWhere('route.originCode ILIKE :origin', {
+        origin: `%${query.origin}%`,
+      })
+      .andWhere('route.destCode ILIKE :dest', { dest: `%${query.dest}%` })
+      .getMany();
 
     const results: {
       flightInstanceId: string;
@@ -315,19 +384,21 @@ export class PnrService {
       seatsLeft: number;
     }[] = [];
     for (const instance of instances) {
-      const [soldCount, map] = await Promise.all([
-        this.typeorm.passenger.count({
-          where: {
-            seatCode: { not: null },
-            booking: {
-              flightInstanceId: instance.id,
-              status: { not: 'CANCELLED' },
-            },
-          },
+      const [soldCount, map, pricing] = await Promise.all([
+        this.passengerRepo
+          .createQueryBuilder('p')
+          .innerJoin('p.booking', 'b')
+          .where('p.seatCode IS NOT NULL')
+          .andWhere('b.flightInstanceId = :id', { id: instance.id })
+          .andWhere('b.status != :cancelled', { cancelled: 'CANCELLED' })
+          .getCount(),
+        this.seatMapRepo.findOneBy({
+          aircraftType: resolveAircraftType(instance),
         }),
-        this.typeorm.aircraftSeatMap.findUnique({
-          where: { aircraftType: resolveAircraftType(instance) },
-        }),
+        this.pricingRepo
+          .createQueryBuilder('pr')
+          .where('pr.flightInstanceId = :id', { id: instance.id })
+          .getOne(),
       ]);
       const capacity = map ? enumerateSeats(map).length : instance.capacity;
       results.push({
@@ -339,8 +410,8 @@ export class PnrService {
         departureAt: instance.departureAt,
         arrivalAt: instance.arrivalAt,
         priceIrr:
-          instance.pricing?.status === 'REGISTERED'
-            ? instance.pricing.registeredPriceIrr!
+          pricing?.status === 'REGISTERED'
+            ? (pricing.registeredPriceIrr as Irr)
             : FALLBACK_PRICE_IRR,
         seatsLeft: Math.max(0, capacity - soldCount),
       });
@@ -349,10 +420,11 @@ export class PnrService {
   }
 
   async issue(actor: AuthenticatedUser, dto: IssuePnrDto) {
-    const instance = await this.typeorm.flightInstance.findUnique({
-      where: { id: dto.flightInstanceId },
-      include: { flight: true },
-    });
+    const instance = await this.flightInstanceRepo
+      .createQueryBuilder('fi')
+      .leftJoinAndSelect('fi.flight', 'flight')
+      .where('fi.id = :id', { id: dto.flightInstanceId })
+      .getOne();
     if (!instance) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -369,8 +441,8 @@ export class PnrService {
         message: 'مهلت فروش این پرواز به پایان رسیده یا هنوز آغاز نشده است.',
       });
     }
-    const map = await this.typeorm.aircraftSeatMap.findUnique({
-      where: { aircraftType: resolveAircraftType(instance) },
+    const map = await this.seatMapRepo.findOneBy({
+      aircraftType: resolveAircraftType(instance),
     });
     if (!map || !isKnownSeat(map, dto.seatCode)) {
       throw new BadRequestException({
@@ -380,26 +452,14 @@ export class PnrService {
     }
 
     const [sold, lock, pricing] = await Promise.all([
-      this.typeorm.passenger.findFirst({
-        where: {
-          seatCode: dto.seatCode,
-          booking: {
-            flightInstanceId: dto.flightInstanceId,
-            status: { not: 'CANCELLED' },
-          },
-        },
+      this.findSoldConflict(dto.flightInstanceId, dto.seatCode),
+      this.findLockConflict(dto.flightInstanceId, dto.seatCode, {
+        onlyActive: true,
       }),
-      this.typeorm.seatLock.findFirst({
-        where: {
-          flightInstanceId: dto.flightInstanceId,
-          seatCode: dto.seatCode,
-          releasedAt: null,
-          expiresAt: { gt: new Date() },
-        },
-      }),
-      this.typeorm.farePricingProposal.findUnique({
-        where: { flightInstanceId: dto.flightInstanceId },
-      }),
+      this.pricingRepo
+        .createQueryBuilder('pr')
+        .where('pr.flightInstanceId = :id', { id: dto.flightInstanceId })
+        .getOne(),
     ]);
     if (sold || lock) {
       throw new ConflictException({
@@ -425,9 +485,9 @@ export class PnrService {
       });
     }
 
-    const priceIrr =
+    const priceIrr: Irr =
       pricing?.status === 'REGISTERED'
-        ? pricing.registeredPriceIrr!
+        ? (pricing.registeredPriceIrr as Irr)
         : FALLBACK_PRICE_IRR;
     const nationalId = dto.passengerNationalId
       ? normalizeNationalId(dto.passengerNationalId)
@@ -439,64 +499,65 @@ export class PnrService {
       });
     }
 
-    const booking = await this.typeorm.$transaction(async (tx) => {
+    const booking = await this.bookingRepo.manager.transaction(async (tx) => {
       // Lock this flight instance's row so two concurrent seat-issuance
       // requests for it can't both pass the sold/lock check below before
       // either has committed — the check + insert must be atomic per seat.
-      await tx.$queryRaw`SELECT "id" FROM "flight_instances" WHERE "id" = ${dto.flightInstanceId} FOR UPDATE`;
+      await tx
+        .createQueryBuilder(FlightInstance, 'fi')
+        .setLock('pessimistic_write')
+        .where('fi.id = :id', { id: dto.flightInstanceId })
+        .getOne();
 
-      const [sold, lock] = await Promise.all([
-        tx.passenger.findFirst({
-          where: {
-            seatCode: dto.seatCode,
-            booking: {
-              flightInstanceId: dto.flightInstanceId,
-              status: { not: 'CANCELLED' },
-            },
-          },
-        }),
-        tx.seatLock.findFirst({
-          where: {
-            flightInstanceId: dto.flightInstanceId,
-            seatCode: dto.seatCode,
-            releasedAt: null,
-          },
-        }),
+      const [sold2, lock2] = await Promise.all([
+        this.findSoldConflict(
+          dto.flightInstanceId,
+          dto.seatCode,
+          undefined,
+          tx,
+        ),
+        this.findLockConflict(
+          dto.flightInstanceId,
+          dto.seatCode,
+          { onlyActive: false },
+          tx,
+        ),
       ]);
-      if (sold || lock) {
+      if (sold2 || lock2) {
         throw new ConflictException({
           code: ErrorCode.CONFLICT,
           message: 'این صندلی در دسترس نیست.',
         });
       }
 
-      const created = await tx.booking.create({
-        data: {
+      const created = await tx.save(
+        tx.create(Booking, {
           pnr: generatePnr(),
           flightInstanceId: dto.flightInstanceId,
           channel: 'SYSTEM',
           status: 'TICKETED',
           priceIrr,
-          passengers: {
-            create: {
-              fullName: dto.passengerName,
-              seatCode: dto.seatCode,
-              nationalIdEnc: nationalId ? encryptPii(nationalId) : undefined,
-              nationalIdHash: nationalId ? hashPii(nationalId) : undefined,
-              mobileEnc: dto.passengerMobile
-                ? encryptPii(dto.passengerMobile)
-                : undefined,
-            },
-          },
-        },
-      });
-      await tx.ledgerEntry.create({
-        data: {
+        }),
+      );
+      await tx.save(
+        tx.create(Passenger, {
+          bookingId: created.id,
+          fullName: dto.passengerName,
+          seatCode: dto.seatCode,
+          nationalIdEnc: nationalId ? encryptPii(nationalId) : null,
+          nationalIdHash: nationalId ? hashPii(nationalId) : null,
+          mobileEnc: dto.passengerMobile
+            ? encryptPii(dto.passengerMobile)
+            : null,
+        }),
+      );
+      await tx.save(
+        tx.create(LedgerEntry, {
           bookingId: created.id,
           type: 'SALE',
           signedAmountIrr: priceIrr,
-        },
-      });
+        }),
+      );
       return created;
     });
 
@@ -523,9 +584,7 @@ export class PnrService {
     lockId: string,
     dto: FinalizeLockDto,
   ) {
-    const lock = await this.typeorm.seatLock.findUnique({
-      where: { id: lockId },
-    });
+    const lock = await this.seatLockRepo.findOneBy({ id: lockId });
     if (!lock) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -535,10 +594,14 @@ export class PnrService {
     if (lock.releasedAt || lock.expiresAt <= new Date()) {
       // Self-heal an expired-but-not-yet-released lock, same as the
       // seatmap request path — see docs/DB_SCHEMA.md Phase 13 Part D.
-      await this.typeorm.seatLock.updateMany({
-        where: { id: lockId, releasedAt: null, expiresAt: { lte: new Date() } },
-        data: { releasedAt: new Date() },
-      });
+      await this.seatLockRepo.update(
+        {
+          id: lockId,
+          releasedAt: IsNull(),
+          expiresAt: LessThanOrEqual(new Date()),
+        },
+        { releasedAt: new Date() },
+      );
       throw new ConflictException({
         code: ErrorCode.CONFLICT,
         message: 'این لاک آزاد شده یا منقضی شده و قابل صدور بلیط نیست.',
@@ -551,15 +614,10 @@ export class PnrService {
       });
     }
 
-    const sold = await this.typeorm.passenger.findFirst({
-      where: {
-        seatCode: lock.seatCode,
-        booking: {
-          flightInstanceId: lock.flightInstanceId,
-          status: { not: 'CANCELLED' },
-        },
-      },
-    });
+    const sold = await this.findSoldConflict(
+      lock.flightInstanceId,
+      lock.seatCode,
+    );
     if (sold) {
       throw new ConflictException({
         code: ErrorCode.CONFLICT,
@@ -567,12 +625,13 @@ export class PnrService {
       });
     }
 
-    const pricing = await this.typeorm.farePricingProposal.findUnique({
-      where: { flightInstanceId: lock.flightInstanceId },
-    });
-    const basePriceIrr =
+    const pricing = await this.pricingRepo
+      .createQueryBuilder('pr')
+      .where('pr.flightInstanceId = :id', { id: lock.flightInstanceId })
+      .getOne();
+    const basePriceIrr: Irr =
       pricing?.status === 'REGISTERED'
-        ? pricing.registeredPriceIrr!
+        ? (pricing.registeredPriceIrr as Irr)
         : FALLBACK_PRICE_IRR;
     const priceIrr: Irr =
       lock.classification === 'FREE'
@@ -591,38 +650,40 @@ export class PnrService {
       });
     }
 
-    const booking = await this.typeorm.$transaction(async (tx) => {
-      const created = await tx.booking.create({
-        data: {
+    const booking = await this.bookingRepo.manager.transaction(async (tx) => {
+      const created = await tx.save(
+        tx.create(Booking, {
           pnr: generatePnr(),
           flightInstanceId: lock.flightInstanceId,
           channel: 'SYSTEM',
           status: 'TICKETED',
           priceIrr,
-          passengers: {
-            create: {
-              fullName: dto.passengerName,
-              seatCode: lock.seatCode,
-              nationalIdEnc: nationalId ? encryptPii(nationalId) : undefined,
-              nationalIdHash: nationalId ? hashPii(nationalId) : undefined,
-              mobileEnc: dto.passengerMobile
-                ? encryptPii(dto.passengerMobile)
-                : undefined,
-            },
-          },
-        },
-      });
-      await tx.ledgerEntry.create({
-        data: {
+        }),
+      );
+      await tx.save(
+        tx.create(Passenger, {
+          bookingId: created.id,
+          fullName: dto.passengerName,
+          seatCode: lock.seatCode,
+          nationalIdEnc: nationalId ? encryptPii(nationalId) : null,
+          nationalIdHash: nationalId ? hashPii(nationalId) : null,
+          mobileEnc: dto.passengerMobile
+            ? encryptPii(dto.passengerMobile)
+            : null,
+        }),
+      );
+      await tx.save(
+        tx.create(LedgerEntry, {
           bookingId: created.id,
           type: 'SALE',
           signedAmountIrr: priceIrr,
-        },
-      });
-      await tx.seatLock.update({
-        where: { id: lockId },
-        data: { releasedAt: new Date(), bookingId: created.id },
-      });
+        }),
+      );
+      await tx.update(
+        SeatLock,
+        { id: lockId },
+        { releasedAt: new Date(), bookingId: created.id },
+      );
       return created;
     });
 
@@ -639,244 +700,38 @@ export class PnrService {
     return this.detail(booking.pnr);
   }
 
-  /**
-   * «پروازها» sub-tab of سامانه رزرواسیون/هواپیما — SCHEDULED instances
-   * with sold/locked/free counts so staff can open a seat map.
-   * Returns one shape covering CEO/Senior/IT/Board Chair tables:
-   * Persian `route`, city fields, and IT occupancy/status keys.
-   */
-  async listFlights(query: ListReservationFlightsQueryDto | string = {}) {
-    const q = (typeof query === 'string' ? query : query.q)?.trim();
-    await materializeFlownBookings(this.typeorm);
-    const airports = await this.typeorm.airport.findMany({
-      select: { code: true, cityFa: true },
-    });
-    const cityByCode = new Map(airports.map((a) => [a.code, a.cityFa]));
-
-    // Include past-dated SCHEDULED rows too — the seed (and some E2E
-    // fixtures) keep deliberately-past "SCHEDULED" instances for demos;
-    // staff still need to open their seat maps. Prefer soonest first.
-    const instances = await this.typeorm.flightInstance.findMany({
-      where: { status: 'SCHEDULED' },
-      include: {
-        flight: { include: { route: true } },
-      },
-      orderBy: { departureAt: 'asc' },
-      take: 120,
-    });
-
-    const qLower = q?.toLowerCase();
-    const filtered = qLower
-      ? instances.filter((instance) => {
-          const originCode = instance.flight.route.originCode;
-          const destCode = instance.flight.route.destCode;
-          const origin = cityByCode.get(originCode) ?? originCode;
-          const dest = cityByCode.get(destCode) ?? destCode;
-          const hay =
-            `${instance.flight.flightNo} ${originCode} ${destCode} ${origin} ${dest} ${instance.aircraftTypeOverride ?? instance.flight.aircraftType}`.toLowerCase();
-          return hay.includes(qLower);
-        })
-      : instances;
-    const limited = filtered.slice(0, 60);
-
-    const now = new Date();
-    const rows = await Promise.all(
-      limited.map(async (instance) => {
-        const aircraftType = resolveAircraftType(instance);
-        const map = await this.typeorm.aircraftSeatMap.findUnique({
-          where: { aircraftType },
-        });
-        const capacity = map ? enumerateSeats(map).length : instance.capacity;
-        const [soldCount, lockedCount] = await Promise.all([
-          this.typeorm.passenger.count({
-            where: {
-              seatCode: { not: null },
-              booking: {
-                flightInstanceId: instance.id,
-                status: { not: 'CANCELLED' },
-              },
-            },
-          }),
-          this.typeorm.seatLock.count({
-            where: {
-              flightInstanceId: instance.id,
-              releasedAt: null,
-              expiresAt: { gt: now },
-            },
-          }),
-        ]);
-        const originCode = instance.flight.route.originCode;
-        const destCode = instance.flight.route.destCode;
-        const originCityFa = cityByCode.get(originCode) ?? originCode;
-        const destCityFa = cityByCode.get(destCode) ?? destCode;
-        const occupancyPct =
-          capacity > 0 ? Math.round((soldCount / capacity) * 100) : 0;
-        const statusKey =
-          occupancyPct >= 100
-            ? 'FULL'
-            : occupancyPct >= 90
-              ? 'NEAR_FULL'
-              : 'SELLING';
-        return {
-          flightInstanceId: instance.id,
-          flightNo: instance.flight.flightNo,
-          aircraftType,
-          originCode,
-          destCode,
-          originCityFa,
-          destCityFa,
-          route: `${originCityFa} ← ${destCityFa}`,
-          departureAt: instance.departureAt,
-          capacity,
-          sold: soldCount,
-          soldCount,
-          lockedCount,
-          freeCount: Math.max(0, capacity - soldCount - lockedCount),
-          occupancyPct,
-          statusKey,
-        };
-      }),
-    );
-    return rows;
-  }
-
   async dashboardStats() {
     const dayStart = new Date();
     dayStart.setHours(0, 0, 0, 0);
 
-    const pnrStoreStarted = Date.now();
-    const [todayCount, activePnrCount, soldSeats, revenue, channelGroups, toggles] =
+    const [todayCount, activePnrCount, soldSeats, revenueRow] =
       await Promise.all([
-        this.typeorm.booking.count({ where: { createdAt: { gte: dayStart } } }),
-        this.typeorm.booking.count({
-          where: { status: { in: ['HELD', 'PAID', 'TICKETED'] } },
+        this.bookingRepo.count({
+          where: { createdAt: MoreThanOrEqual(dayStart) },
         }),
-        this.typeorm.passenger.count({
-          where: {
-            seatCode: { not: null },
-            booking: { status: { not: 'CANCELLED' } },
-          },
+        this.bookingRepo.count({
+          where: { status: In(['HELD', 'PAID', 'TICKETED']) },
         }),
-        this.typeorm.ledgerEntry.aggregate({
-          // Real ticket revenue only — AgenciesService.resetTestDebt
-          // reuses type:'SALE' for agency debt-line calibration
-          // (bookingId null, amount can be negative); excluded here the
-          // same way ReportingService's revenue aggregates exclude it.
-          where: { type: 'SALE', bookingId: { not: null } },
-          _sum: { signedAmountIrr: true },
-        }),
-        this.typeorm.booking.groupBy({
-          by: ['channel'],
-          _count: { _all: true },
-          where: { status: { notIn: ['CANCELLED', 'EXPIRED'] } },
-        }),
-        this.typeorm.internalService.findMany({
-          where: { key: { in: ['payment', 'api', 'sms', 'search'] } },
-          select: { key: true, enabled: true },
-        }),
+        this.passengerRepo
+          .createQueryBuilder('p')
+          .innerJoin('p.booking', 'b')
+          .where('p.seatCode IS NOT NULL')
+          .andWhere('b.status != :cancelled', { cancelled: 'CANCELLED' })
+          .getCount(),
+        this.ledgerRepo
+          .createQueryBuilder('l')
+          .select('SUM(l."signedAmountIrr")', 'sum')
+          .where('l.type = :type', { type: 'SALE' })
+          .andWhere('l."bookingId" IS NOT NULL')
+          .getRawOne<{ sum: string | null }>(),
       ]);
-    const pnrStoreLatencyMs = Date.now() - pnrStoreStarted;
-
-    const seatInvStarted = Date.now();
-    await this.typeorm.passenger.count({
-      where: { seatCode: { not: null } },
-    });
-    const seatInventoryLatencyMs = Date.now() - seatInvStarted;
-
-    const toggleByKey = new Map(toggles.map((t) => [t.key, t.enabled]));
-    const channelLabel: Record<string, string> = {
-      SYSTEM: 'فروش مستقیم سایت',
-      AGENCY: 'API آژانس‌های همکار',
-      CHARTER: 'فروش چارتر',
-    };
-    const channelColor: Record<string, string> = {
-      SYSTEM: '#3b82f6',
-      AGENCY: '#34d399',
-      CHARTER: '#a855f7',
-    };
-    const channelTotal = channelGroups.reduce((a, g) => a + g._count._all, 0);
-    const channels =
-      channelTotal === 0
-        ? []
-        : channelGroups
-            .map((g) => ({
-              key: g.channel,
-              label: channelLabel[g.channel] ?? g.channel,
-              color: channelColor[g.channel] ?? '#6b7b94',
-              count: g._count._all,
-              pct:
-                Math.round((g._count._all / channelTotal) * 1000) / 10,
-            }))
-            .sort((a, b) => b.count - a.count);
-
-    const svc = (
-      name: string,
-      fa: string,
-      ok: boolean,
-      latencyMs: number | null,
-    ) => ({
-      name,
-      fa,
-      ok,
-      latencyMs,
-      statusLabel: ok ? 'سالم' : 'قطع',
-    });
-
-    const services = [
-      svc('reservation-api', 'سرویس رزرواسیون مرکزی', true, pnrStoreLatencyMs),
-      svc('pnr-store', 'پایگاه ذخیره PNR', true, pnrStoreLatencyMs),
-      svc(
-        'payment-gateway',
-        'درگاه پرداخت',
-        toggleByKey.get('payment') !== false,
-        null,
-      ),
-      svc(
-        'agency-api',
-        'پلتفرم API آژانس‌ها',
-        toggleByKey.get('api') !== false,
-        null,
-      ),
-      svc('seat-inventory', 'موجودی صندلی', true, seatInventoryLatencyMs),
-      svc(
-        'notification-svc',
-        'سرویس اعلان و پیامک',
-        toggleByKey.get('sms') !== false,
-        null,
-      ),
-    ];
 
     return {
       todayBookings: todayCount,
       activePnrs: activePnrCount,
       seatsSold: soldSeats,
-      revenueIrr: revenue._sum.signedAmountIrr ?? ZERO_IRR,
-      channels,
-      services,
-      servicesStable: services.every((s) => s.ok),
+      revenueIrr: revenueRow?.sum ? BigInt(revenueRow.sum) : ZERO_IRR,
     };
-  }
-
-  /** Agencies that already hold an API key — design «دسترسی آژانس‌ها». */
-  async agencyApiAccess() {
-    const keys = await this.typeorm.agencyApiKey.findMany({
-      include: { agency: { include: { user: { select: { fullName: true } } } } },
-      orderBy: { activatedAt: 'desc' },
-    });
-    return keys.map((k) => {
-      const name = k.agency.user.fullName;
-      const initials = name.replace(/\s+/g, '').slice(0, 2) || '؟';
-      return {
-        id: k.id,
-        agencyId: k.agencyId,
-        name,
-        initials,
-        // Raw key is never stored — only an opaque hint from the key id.
-        keyHint: `bjk_••••${k.id.replace(/-/g, '').slice(0, 4)}`,
-        callCount: k.callCount,
-        status: k.status,
-      };
-    });
   }
 
   /**
@@ -896,37 +751,41 @@ export class PnrService {
     // from lower-level tests. Pick a route whose codes exist in the public
     // airport selector or the browser journey cannot select the fresh
     // instance even though it was created successfully.
-    const airportCodes = (
-      await this.typeorm.airport.findMany({ select: { code: true } })
-    ).map((airport) => airport.code);
-    const aircraftTypes = (
-      await this.typeorm.aircraftSeatMap.findMany({
-        select: { aircraftType: true },
-      })
-    ).map((seatMap) => seatMap.aircraftType);
-    const flight = await this.typeorm.flight.findFirstOrThrow({
-      where: {
-        aircraftType: { in: aircraftTypes },
-        route: {
-          originCode: { in: airportCodes },
-          destCode: { in: airportCodes },
-        },
-      },
+    const airports = await this.airportRepo.find({ select: { code: true } });
+    const airportCodes = airports.map((a) => a.code);
+    const seatMaps = await this.seatMapRepo.find({
+      select: { aircraftType: true },
     });
+    const aircraftTypes = seatMaps.map((s) => s.aircraftType);
+
+    const flight = await this.flightRepo
+      .createQueryBuilder('f')
+      .innerJoinAndSelect('f.route', 'route')
+      .where('f.aircraftType IN (:...aircraftTypes)', { aircraftTypes })
+      .andWhere('route.originCode IN (:...airportCodes)', { airportCodes })
+      .andWhere('route.destCode IN (:...airportCodes)', { airportCodes })
+      .getOne();
+    if (!flight) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'یافت نشد.',
+      });
+    }
     // Wide random jitter (25-125 days out) so repeated E2E runs practically
     // never collide on the same calendar day and confuse the date search.
     const daysAhead = 25 + Math.floor(Math.random() * 100);
     const departureAt = new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000);
-    return this.typeorm.flightInstance.create({
-      data: {
+    const instance = await this.flightInstanceRepo.save(
+      this.flightInstanceRepo.create({
         flightId: flight.id,
         departureAt,
         arrivalAt: new Date(departureAt.getTime() + 3 * 60 * 60 * 1000),
         capacity: 180,
         charterSeats: 60,
         status: 'SCHEDULED',
-      },
-      include: { flight: { include: { route: true } } },
-    });
+      }),
+    );
+    instance.flight = flight;
+    return instance;
   }
 }
