@@ -4,13 +4,19 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
-import { PrismaService } from '../../prisma/prisma.service';
+import { In, Repository } from 'typeorm';
+import { CareersSettings } from '../../database/entities/careers-settings.entity';
+import { JobPosting } from '../../database/entities/job-posting.entity';
+import { JobApplication } from '../../database/entities/job-application.entity';
+import { User } from '../../database/entities/user.entity';
+import type { JsonValue } from '../../database/json-types';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
-import type { Prisma } from '../../../generated/prisma/client';
+import { JobApplicationStatus } from '../../database/enums';
 import { ROLE_LABELS_FA } from '../../common/exec-roles';
 import {
   decryptPii,
@@ -40,12 +46,12 @@ const SINGLETON_REFERRAL_ROLES = ['CEO', 'SENIOR_MANAGER'] as const;
 const CAN_ACT_STATUSES = ['SUBMITTED', 'REFERRED'] as const;
 const MAX_JSON_ENTRIES = 20;
 
-function parseEntries(raw: string | undefined): unknown[] {
+function parseEntries(raw: string | undefined): JsonValue {
   if (!raw) return [];
   try {
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.slice(0, MAX_JSON_ENTRIES);
+    return parsed.slice(0, MAX_JSON_ENTRIES) as JsonValue;
   } catch {
     return [];
   }
@@ -54,17 +60,27 @@ function parseEntries(raw: string | undefined): unknown[] {
 @Injectable()
 export class CareersService {
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectRepository(CareersSettings)
+    private readonly settingsRepo: Repository<CareersSettings>,
+    @InjectRepository(JobPosting)
+    private readonly jobPostingRepo: Repository<JobPosting>,
+    @InjectRepository(JobApplication)
+    private readonly jobApplicationRepo: Repository<JobApplication>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
     private readonly audit: AuditService,
   ) {}
 
   // ── CareersSettings (footer-visibility toggle) ──────────────────────
   private async getOrCreateSettings() {
-    const existing = await this.prisma.careersSettings.findFirst({
-      orderBy: { createdAt: 'asc' },
+    const existing = await this.settingsRepo.findOne({
+      where: {},
+      order: { createdAt: 'ASC' },
     });
     if (existing) return existing;
-    return this.prisma.careersSettings.create({ data: {} });
+    return this.settingsRepo.save(
+      this.settingsRepo.create({ updatedAt: new Date() }),
+    );
   }
 
   async getSettings() {
@@ -77,10 +93,9 @@ export class CareersService {
     dto: UpdateCareersSettingsDto,
   ) {
     const current = await this.getOrCreateSettings();
-    const updated = await this.prisma.careersSettings.update({
-      where: { id: current.id },
-      data: { enabled: dto.enabled },
-    });
+    current.enabled = dto.enabled;
+    current.updatedAt = new Date();
+    const updated = await this.settingsRepo.save(current);
     await this.audit.record({
       actorId: actor.id,
       actorRole: actor.role,
@@ -97,9 +112,9 @@ export class CareersService {
 
   // ── Public job listing ──────────────────────────────────────────────
   async listActiveJobs() {
-    const jobs = await this.prisma.jobPosting.findMany({
+    const jobs = await this.jobPostingRepo.find({
       where: { active: true },
-      orderBy: { createdAt: 'desc' },
+      order: { createdAt: 'DESC' },
     });
     return jobs.map((j) => ({
       id: j.id,
@@ -111,7 +126,7 @@ export class CareersService {
   }
 
   async getPublicJob(id: string) {
-    const job = await this.prisma.jobPosting.findUnique({ where: { id } });
+    const job = await this.jobPostingRepo.findOneBy({ id });
     if (!job || !job.active) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -131,11 +146,13 @@ export class CareersService {
 
   // ── SITE_ADMIN: job-posting CRUD ─────────────────────────────────────
   async listAllPostings() {
-    return this.prisma.jobPosting.findMany({ orderBy: { createdAt: 'desc' } });
+    return this.jobPostingRepo.find({ order: { createdAt: 'DESC' } });
   }
 
   async createPosting(actor: AuthenticatedUser, dto: CreateJobPostingDto) {
-    const posting = await this.prisma.jobPosting.create({ data: dto });
+    const posting = await this.jobPostingRepo.save(
+      this.jobPostingRepo.create({ ...dto, updatedAt: new Date() }),
+    );
     await this.audit.record({
       actorId: actor.id,
       actorRole: actor.role,
@@ -153,19 +170,15 @@ export class CareersService {
     id: string,
     dto: UpdateJobPostingDto,
   ) {
-    const existing = await this.prisma.jobPosting.findUnique({
-      where: { id },
-    });
+    const existing = await this.jobPostingRepo.findOneBy({ id });
     if (!existing) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
         message: 'فرصت شغلی یافت نشد.',
       });
     }
-    const updated = await this.prisma.jobPosting.update({
-      where: { id },
-      data: dto,
-    });
+    Object.assign(existing, dto, { updatedAt: new Date() });
+    const updated = await this.jobPostingRepo.save(existing);
     await this.audit.record({
       actorId: actor.id,
       actorRole: actor.role,
@@ -203,9 +216,7 @@ export class CareersService {
     dto: ApplyJobDto,
     file: Express.Multer.File | undefined,
   ) {
-    const job = await this.prisma.jobPosting.findUnique({
-      where: { id: jobId },
-    });
+    const job = await this.jobPostingRepo.findOneBy({ id: jobId });
     if (!job || !job.active) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -238,8 +249,8 @@ export class CareersService {
 
     const resume = file ? this.writeResume(file) : null;
 
-    const application = await this.prisma.jobApplication.create({
-      data: {
+    const application = await this.jobApplicationRepo.save(
+      this.jobApplicationRepo.create({
         jobPostingId: job.id,
         jobTitleSnapshot: job.title,
         firstName: dto.firstName,
@@ -258,9 +269,9 @@ export class CareersService {
         email: dto.email,
         residenceProvince: dto.residenceProvince,
         residenceAddress: dto.residenceAddress,
-        eduEntries: parseEntries(dto.eduEntries) as Prisma.InputJsonValue,
-        workEntries: parseEntries(dto.workEntries) as Prisma.InputJsonValue,
-        langEntries: parseEntries(dto.langEntries) as Prisma.InputJsonValue,
+        eduEntries: parseEntries(dto.eduEntries),
+        workEntries: parseEntries(dto.workEntries),
+        langEntries: parseEntries(dto.langEntries),
         skills: dto.skills,
         otherLangs: dto.otherLangs,
         resumeFileName: resume?.fileName,
@@ -273,20 +284,20 @@ export class CareersService {
             label: 'ثبت درخواست توسط متقاضی',
             at: new Date().toISOString(),
           },
-        ] as Prisma.InputJsonValue,
-      },
-    });
+        ],
+      }),
+    );
     return { id: application.id };
   }
 
   // ── SITE_ADMIN: application review ──────────────────────────────────
   private async referralTargets() {
-    const staff = await this.prisma.user.findMany({
-      where: { role: { in: [...REFERRAL_ROLES] }, isActive: true },
+    const staff = await this.userRepo.find({
+      where: { role: In([...REFERRAL_ROLES]), isActive: true },
       select: { id: true, fullName: true, role: true },
     });
-    const singletons = await this.prisma.user.findMany({
-      where: { role: { in: [...SINGLETON_REFERRAL_ROLES] }, isActive: true },
+    const singletons = await this.userRepo.find({
+      where: { role: In([...SINGLETON_REFERRAL_ROLES]), isActive: true },
       select: { id: true, fullName: true, role: true },
     });
     return [...staff, ...singletons].map((u) => ({
@@ -295,14 +306,20 @@ export class CareersService {
     }));
   }
 
+  private applicationQuery() {
+    return this.jobApplicationRepo
+      .createQueryBuilder('a')
+      .leftJoinAndSelect('a.assignee', 'assignee');
+  }
+
   async listApplications(query: ListApplicationsQueryDto) {
-    const rows = await this.prisma.jobApplication.findMany({
-      where: {
-        ...(query.jobTitle ? { jobTitleSnapshot: query.jobTitle } : {}),
-      },
-      include: { assignee: { select: { fullName: true } } },
-      orderBy: { createdAt: 'desc' },
-    });
+    const qb = this.applicationQuery().orderBy('a.createdAt', 'DESC');
+    if (query.jobTitle) {
+      qb.andWhere('a.jobTitleSnapshot = :jobTitle', {
+        jobTitle: query.jobTitle,
+      });
+    }
+    const rows = await qb.getMany();
 
     const q = query.q?.trim().toLowerCase();
     const filtered = q
@@ -331,7 +348,9 @@ export class CareersService {
   }
 
   async getApplicationDetail(id: string) {
-    const a = await this.prisma.jobApplication.findUnique({ where: { id } });
+    const a = await this.applicationQuery()
+      .where('a.id = :id', { id })
+      .getOne();
     if (!a) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -365,7 +384,10 @@ export class CareersService {
   }
 
   async getResume(id: string) {
-    const a = await this.prisma.jobApplication.findUnique({ where: { id } });
+    const a = await this.jobApplicationRepo
+      .createQueryBuilder('a')
+      .where('a.id = :id', { id })
+      .getOne();
     if (!a || !a.resumePath || !fs.existsSync(a.resumePath)) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -380,7 +402,10 @@ export class CareersService {
   }
 
   private async requireActionable(id: string) {
-    const a = await this.prisma.jobApplication.findUnique({ where: { id } });
+    const a = await this.jobApplicationRepo
+      .createQueryBuilder('a')
+      .where('a.id = :id', { id })
+      .getOne();
     if (!a) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -403,12 +428,12 @@ export class CareersService {
     existing: unknown,
     step: string,
     label: string,
-  ): Prisma.InputJsonValue {
+  ): JsonValue {
     const list: unknown[] = Array.isArray(existing) ? existing : [];
     return [
       ...list,
       { step, label, at: new Date().toISOString() },
-    ] as Prisma.InputJsonValue;
+    ] as JsonValue;
   }
 
   async referApplication(
@@ -417,27 +442,21 @@ export class CareersService {
     dto: ReferApplicationDto,
   ) {
     const existing = await this.requireActionable(id);
-    const assignee = await this.prisma.user.findUnique({
-      where: { id: dto.assigneeId },
-    });
+    const assignee = await this.userRepo.findOneBy({ id: dto.assigneeId });
     if (!assignee) {
       throw new BadRequestException({
         code: ErrorCode.VALIDATION_FAILED,
         message: 'گیرندهٔ ارجاع نامعتبر است.',
       });
     }
-    const updated = await this.prisma.jobApplication.update({
-      where: { id },
-      data: {
-        status: 'REFERRED',
-        assigneeId: assignee.id,
-        history: this.appendHistory(
-          existing.history,
-          'referred',
-          `ارجاع به ${assignee.fullName} توسط ادمین سایت`,
-        ),
-      },
-    });
+    existing.status = JobApplicationStatus.REFERRED;
+    existing.assigneeId = assignee.id;
+    existing.history = this.appendHistory(
+      existing.history,
+      'referred',
+      `ارجاع به ${assignee.fullName} توسط ادمین سایت`,
+    );
+    const updated = await this.jobApplicationRepo.save(existing);
     await this.audit.record({
       actorId: actor.id,
       actorRole: actor.role,
@@ -452,17 +471,13 @@ export class CareersService {
 
   async hireApplication(actor: AuthenticatedUser, id: string) {
     const existing = await this.requireActionable(id);
-    const updated = await this.prisma.jobApplication.update({
-      where: { id },
-      data: {
-        status: 'HIRED',
-        history: this.appendHistory(
-          existing.history,
-          'hired',
-          'نتیجهٔ استخدام: پذیرفته شد',
-        ),
-      },
-    });
+    existing.status = JobApplicationStatus.HIRED;
+    existing.history = this.appendHistory(
+      existing.history,
+      'hired',
+      'نتیجهٔ استخدام: پذیرفته شد',
+    );
+    const updated = await this.jobApplicationRepo.save(existing);
     await this.audit.record({
       actorId: actor.id,
       actorRole: actor.role,
@@ -477,17 +492,13 @@ export class CareersService {
 
   async rejectApplication(actor: AuthenticatedUser, id: string) {
     const existing = await this.requireActionable(id);
-    const updated = await this.prisma.jobApplication.update({
-      where: { id },
-      data: {
-        status: 'REJECTED',
-        history: this.appendHistory(
-          existing.history,
-          'rejected',
-          'نتیجهٔ استخدام: رد شد',
-        ),
-      },
-    });
+    existing.status = JobApplicationStatus.REJECTED;
+    existing.history = this.appendHistory(
+      existing.history,
+      'rejected',
+      'نتیجهٔ استخدام: رد شد',
+    );
+    const updated = await this.jobApplicationRepo.save(existing);
     await this.audit.record({
       actorId: actor.id,
       actorRole: actor.role,

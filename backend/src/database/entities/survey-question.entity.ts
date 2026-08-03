@@ -1,4 +1,11 @@
-import { Column, CreateDateColumn, Entity, PrimaryColumn } from 'typeorm';
+import { randomUUID } from 'node:crypto';
+import {
+  BeforeInsert,
+  Column,
+  CreateDateColumn,
+  Entity,
+  PrimaryColumn,
+} from 'typeorm';
 
 @Entity('survey_questions')
 export class SurveyQuestion {
@@ -7,6 +14,11 @@ export class SurveyQuestion {
     primaryKeyConstraintName: 'survey_questions_pkey',
   })
   id!: string;
+
+  @BeforeInsert()
+  generateId() {
+    this.id ??= randomUUID();
+  }
 
   @Column({ type: 'text' })
   label!: string;

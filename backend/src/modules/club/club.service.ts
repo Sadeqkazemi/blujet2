@@ -5,8 +5,15 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
 import * as crypto from 'node:crypto';
-import { PrismaService } from '../../prisma/prisma.service';
+import { Repository } from 'typeorm';
+import type { JsonValue } from '../../database/json-types';
+import { ClubTierRule } from '../../database/entities/club-tier-rule.entity';
+import { ClubMember } from '../../database/entities/club-member.entity';
+import { ClubCardRequest } from '../../database/entities/club-card-request.entity';
+import { ClubPointsEntry } from '../../database/entities/club-points-entry.entity';
+import { User } from '../../database/entities/user.entity';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
 import {
@@ -18,12 +25,11 @@ import {
 } from '../../common/pii-crypto';
 import { ROLE_LABELS_FA } from '../../common/exec-roles';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import type { ClubTier } from '../../../generated/prisma/enums';
-import type {
-  ClubMember,
-  ClubTierRule,
-  Prisma,
-} from '../../../generated/prisma/client';
+import {
+  ClubCardStatus,
+  ClubCardRequestStatus,
+  ClubTier,
+} from '../../database/enums';
 
 const CARD_PREFIX: Record<ClubTier, string> = {
   SILVER: 'SILV',
@@ -69,9 +75,9 @@ export function resolveTierForPoints(
   points: number,
   rule: Pick<ClubTierRule, 'goldMinPoints' | 'platinumMinPoints'>,
 ): ClubTier {
-  if (points >= rule.platinumMinPoints) return 'PLATINUM';
-  if (points >= rule.goldMinPoints) return 'GOLD';
-  return 'SILVER';
+  if (points >= rule.platinumMinPoints) return ClubTier.PLATINUM;
+  if (points >= rule.goldMinPoints) return ClubTier.GOLD;
+  return ClubTier.SILVER;
 }
 
 function generateCardNo(tier: ClubTier): string {
@@ -89,26 +95,36 @@ function toMemberView(m: ClubMember) {
 @Injectable()
 export class ClubService {
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectRepository(ClubTierRule)
+    private readonly tierRuleRepo: Repository<ClubTierRule>,
+    @InjectRepository(ClubMember)
+    private readonly clubMemberRepo: Repository<ClubMember>,
+    @InjectRepository(ClubCardRequest)
+    private readonly cardRequestRepo: Repository<ClubCardRequest>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
     private readonly audit: AuditService,
   ) {}
 
   // ── Phase 65: club tier rules (singleton config) ────────────────────────
 
   private async getOrCreateTierRule(): Promise<ClubTierRule> {
-    const existing = await this.prisma.clubTierRule.findFirst({
-      orderBy: { createdAt: 'asc' },
+    const existing = await this.tierRuleRepo.findOne({
+      where: {},
+      order: { createdAt: 'ASC' },
     });
     if (existing) return existing;
     // Defense in depth only — prisma/seed.ts creates this row normally.
-    return this.prisma.clubTierRule.create({ data: {} });
+    return this.tierRuleRepo.save(
+      this.tierRuleRepo.create({ updatedAt: new Date() }),
+    );
   }
 
   async getTierRules() {
     const rule = await this.getOrCreateTierRule();
     let updatedByLabelFa: string | null = null;
     if (rule.updatedById) {
-      const updater = await this.prisma.user.findUnique({
+      const updater = await this.userRepo.findOne({
         where: { id: rule.updatedById },
         select: { role: true },
       });
@@ -133,15 +149,13 @@ export class ClubService {
     }
 
     const before = await this.getOrCreateTierRule();
-    const updated = await this.prisma.clubTierRule.update({
-      where: { id: before.id },
-      data: {
-        goldMinPoints: dto.goldMinPoints,
-        platinumMinPoints: dto.platinumMinPoints,
-        cardRequestMinPoints: dto.cardRequestMinPoints,
-        updatedById: actor.id,
-      },
-    });
+    const beforeSnapshot = { ...before };
+    before.goldMinPoints = dto.goldMinPoints;
+    before.platinumMinPoints = dto.platinumMinPoints;
+    before.cardRequestMinPoints = dto.cardRequestMinPoints;
+    before.updatedById = actor.id;
+    before.updatedAt = new Date();
+    const updated = await this.tierRuleRepo.save(before);
 
     await this.audit.record({
       actorId: actor.id,
@@ -150,9 +164,9 @@ export class ClubService {
       action: 'تغییر قوانین باشگاه مشتریان',
       detail:
         `قوانین باشگاه مشتریان توسط ${actor.fullName} تغییر کرد: ` +
-        `حد نصاب طلایی از ${before.goldMinPoints} به ${updated.goldMinPoints}، ` +
-        `حد نصاب پلاتین از ${before.platinumMinPoints} به ${updated.platinumMinPoints}، ` +
-        `حد نصاب کارت از ${before.cardRequestMinPoints} به ${updated.cardRequestMinPoints}.`,
+        `حد نصاب طلایی از ${beforeSnapshot.goldMinPoints} به ${updated.goldMinPoints}، ` +
+        `حد نصاب پلاتین از ${beforeSnapshot.platinumMinPoints} به ${updated.platinumMinPoints}، ` +
+        `حد نصاب کارت از ${beforeSnapshot.cardRequestMinPoints} به ${updated.cardRequestMinPoints}.`,
       entityType: 'ClubTierRule',
       entityId: updated.id,
     });
@@ -161,7 +175,7 @@ export class ClubService {
   }
 
   private async getMemberOrThrow(id: string): Promise<ClubMember> {
-    const member = await this.prisma.clubMember.findUnique({ where: { id } });
+    const member = await this.clubMemberRepo.findOneBy({ id });
     if (!member) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -172,33 +186,30 @@ export class ClubService {
   }
 
   async listMembers(query: { level?: ClubTier; q?: string }) {
-    const filters: Prisma.ClubMemberWhereInput[] = [];
-    if (query.level) filters.push({ level: query.level });
+    const qb = this.clubMemberRepo.createQueryBuilder('m');
+    if (query.level) qb.andWhere('m.level = :level', { level: query.level });
     if (query.q) {
       const q = query.q.trim();
-      const or: Prisma.ClubMemberWhereInput[] = [
-        { fullName: { contains: q, mode: 'insensitive' } },
-        { email: { contains: q, mode: 'insensitive' } },
-        { cardNo: { contains: q, mode: 'insensitive' } },
-      ];
-      // Exact national-ID match via the keyed hash — never a LIKE over PII.
       const normalized = normalizeNationalId(q);
-      if (/^\d{10}$/.test(normalized))
-        or.push({ nationalIdHash: hashPii(normalized) });
-      filters.push({ OR: or });
+      const nidClause = /^\d{10}$/.test(normalized)
+        ? ` OR m."nationalIdHash" = :nidHash`
+        : '';
+      qb.andWhere(
+        `(m."fullName" ILIKE :q OR m.email ILIKE :q OR m."cardNo" ILIKE :q${nidClause})`,
+        { q: `%${q}%`, nidHash: hashPii(normalized) },
+      );
     }
 
     const [members, all, pendingRequests, submittedRequests] =
       await Promise.all([
-        this.prisma.clubMember.findMany({
-          where: { AND: filters },
-          orderBy: { joinDate: 'desc' },
+        qb.clone().orderBy('m.joinDate', 'DESC').getMany(),
+        this.clubMemberRepo.find({ select: { level: true, cardStatus: true } }),
+        this.cardRequestRepo.count({
+          where: { status: ClubCardRequestStatus.REFERRED },
         }),
-        this.prisma.clubMember.findMany({
-          select: { level: true, cardStatus: true },
+        this.cardRequestRepo.count({
+          where: { status: ClubCardRequestStatus.SUBMITTED },
         }),
-        this.prisma.clubCardRequest.count({ where: { status: 'REFERRED' } }),
-        this.prisma.clubCardRequest.count({ where: { status: 'SUBMITTED' } }),
       ]);
 
     // KPI cards always summarize the whole club, unfiltered (per design).
@@ -206,7 +217,7 @@ export class ClubService {
     let issuedCards = 0;
     for (const m of all) {
       tierCounts[m.level] += 1;
-      if (m.cardStatus === 'ISSUED') issuedCards += 1;
+      if (m.cardStatus === ClubCardStatus.ISSUED) issuedCards += 1;
     }
 
     return {
@@ -239,7 +250,7 @@ export class ClubService {
         message: 'کد ملی واردشده معتبر نیست.',
       });
     }
-    const duplicate = await this.prisma.clubMember.findFirst({
+    const duplicate = await this.clubMemberRepo.findOne({
       where: { nationalIdHash: hashPii(nationalId) },
     });
     if (duplicate) {
@@ -249,8 +260,8 @@ export class ClubService {
       });
     }
 
-    const member = await this.prisma.clubMember.create({
-      data: {
+    const member = await this.clubMemberRepo.save(
+      this.clubMemberRepo.create({
         fullName: dto.fullName,
         email: dto.email,
         birthDate: dto.birthDate ? new Date(dto.birthDate) : undefined,
@@ -258,8 +269,8 @@ export class ClubService {
         nationalIdHash: hashPii(nationalId),
         level: dto.level,
         points: dto.points ?? 0,
-      },
-    });
+      }),
+    );
 
     await this.audit.record({
       actorId: actor.id,
@@ -276,17 +287,16 @@ export class ClubService {
 
   async updateLevel(actor: AuthenticatedUser, id: string, level: ClubTier) {
     const member = await this.getMemberOrThrow(id);
-    const updated = await this.prisma.clubMember.update({
-      where: { id },
-      data: { level },
-    });
+    const previousLevel = member.level;
+    member.level = level;
+    const updated = await this.clubMemberRepo.save(member);
 
     await this.audit.record({
       actorId: actor.id,
       actorRole: actor.role,
       category: 'CLUB',
       action: 'تغییر سطح عضویت',
-      detail: `سطح عضویت «${member.fullName}» توسط ${actor.fullName} از ${member.level} به ${level} تغییر کرد.`,
+      detail: `سطح عضویت «${member.fullName}» توسط ${actor.fullName} از ${previousLevel} به ${level} تغییر کرد.`,
       entityType: 'ClubMember',
       entityId: id,
     });
@@ -296,7 +306,7 @@ export class ClubService {
 
   async issueCardDirect(actor: AuthenticatedUser, id: string) {
     const member = await this.getMemberOrThrow(id);
-    if (member.cardStatus === 'ISSUED') {
+    if (member.cardStatus === ClubCardStatus.ISSUED) {
       throw new ConflictException({
         code: ErrorCode.CONFLICT,
         message: 'برای این عضو قبلاً کارت صادر شده است.',
@@ -304,14 +314,10 @@ export class ClubService {
     }
 
     const roleLabel = ROLE_LABELS_FA[actor.role];
-    const updated = await this.prisma.clubMember.update({
-      where: { id },
-      data: {
-        cardStatus: 'ISSUED',
-        cardNo: generateCardNo(member.level),
-        issuedByLabelFa: `${roleLabel} (صدور مستقیم)`,
-      },
-    });
+    member.cardStatus = ClubCardStatus.ISSUED;
+    member.cardNo = generateCardNo(member.level);
+    member.issuedByLabelFa = `${roleLabel} (صدور مستقیم)`;
+    const updated = await this.clubMemberRepo.save(member);
 
     // The mocks issue silently with no trail — the real system audits (⚑).
     await this.audit.record({
@@ -353,23 +359,23 @@ export class ClubService {
       nid = base + String(r < 2 ? r : 11 - r);
       break;
     }
-    const member = await this.prisma.clubMember.create({
-      data: {
+    const member = await this.clubMemberRepo.save(
+      this.clubMemberRepo.create({
         fullName: `عضو آزمایشی ${crypto.randomUUID().slice(0, 6)}`,
         email: `${crypto.randomUUID().slice(0, 8)}@e2e.example`,
         nationalIdEnc: encryptPii(nid),
         nationalIdHash: hashPii(nid),
         points: 6000,
-        level: 'GOLD',
-        cardStatus: 'REVIEW',
-      },
-    });
-    return this.prisma.clubCardRequest.create({
-      data: {
+        level: ClubTier.GOLD,
+        cardStatus: ClubCardStatus.REVIEW,
+      }),
+    );
+    return this.cardRequestRepo.save(
+      this.cardRequestRepo.create({
         memberId: member.id,
-        level: 'GOLD',
+        level: ClubTier.GOLD,
         points: 6000,
-        status: 'REFERRED',
+        status: ClubCardRequestStatus.REFERRED,
         assignedTo,
         history: [
           {
@@ -383,8 +389,8 @@ export class ClubService {
             at: 'اکنون',
           },
         ],
-      },
-    });
+      }),
+    );
   }
 
   // ── Card requests ─────────────────────────────────────────────────────
@@ -392,44 +398,48 @@ export class ClubService {
   async listRequests() {
     // SUBMITTED lives in the site-admin track — the exec panels only ever
     // see REFERRED/APPROVED/REJECTED (confirmed against all three designs).
-    const requests = await this.prisma.clubCardRequest.findMany({
-      where: { status: { in: ['REFERRED', 'APPROVED', 'REJECTED'] } },
-      include: {
-        member: {
-          select: {
-            id: true,
-            fullName: true,
-            email: true,
-            points: true,
-            level: true,
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const requests = await this.cardRequestRepo
+      .createQueryBuilder('r')
+      .leftJoin('r.member', 'member')
+      .addSelect([
+        'member.id',
+        'member.fullName',
+        'member.email',
+        'member.points',
+        'member.level',
+      ])
+      .where('r.status IN (:...statuses)', {
+        statuses: [
+          ClubCardRequestStatus.REFERRED,
+          ClubCardRequestStatus.APPROVED,
+          ClubCardRequestStatus.REJECTED,
+        ],
+      })
+      .orderBy('r.createdAt', 'DESC')
+      .getMany();
     return requests;
   }
 
   /** SITE_ADMIN track: queue of member-initiated SUBMITTED card requests. */
   async listSubmittedRequests() {
-    const requests = await this.prisma.clubCardRequest.findMany({
-      where: { status: 'SUBMITTED' },
-      include: {
-        member: {
-          select: {
-            id: true,
-            fullName: true,
-            email: true,
-            points: true,
-            level: true,
-            birthDate: true,
-            joinDate: true,
-            nationalIdEnc: true,
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const requests = await this.cardRequestRepo
+      .createQueryBuilder('r')
+      .leftJoin('r.member', 'member')
+      .addSelect([
+        'member.id',
+        'member.fullName',
+        'member.email',
+        'member.points',
+        'member.level',
+        'member.birthDate',
+        'member.joinDate',
+        'member.nationalIdEnc',
+      ])
+      .where('r.status = :status', {
+        status: ClubCardRequestStatus.SUBMITTED,
+      })
+      .orderBy('r.createdAt', 'DESC')
+      .getMany();
     return requests.map((r) => ({
       id: r.id,
       memberId: r.memberId,
@@ -459,17 +469,18 @@ export class ClubService {
     id: string,
     assignedTo: 'SENIOR' | 'CHAIR',
   ) {
-    const request = await this.prisma.clubCardRequest.findUnique({
-      where: { id },
-      include: { member: true },
-    });
+    const request = await this.cardRequestRepo
+      .createQueryBuilder('r')
+      .leftJoinAndSelect('r.member', 'member')
+      .where('r.id = :id', { id })
+      .getOne();
     if (!request) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
         message: 'درخواست یافت نشد.',
       });
     }
-    if (request.status !== 'SUBMITTED') {
+    if (request.status !== ClubCardRequestStatus.SUBMITTED) {
       throw new ConflictException({
         code: ErrorCode.CONFLICT,
         message: 'این درخواست قبلاً ارجاع شده است.',
@@ -487,25 +498,10 @@ export class ClubService {
       at: this.nowJalaliLabel(),
     });
 
-    const updated = await this.prisma.clubCardRequest.update({
-      where: { id },
-      data: {
-        status: 'REFERRED',
-        assignedTo,
-        history: history as Prisma.InputJsonValue,
-      },
-      include: {
-        member: {
-          select: {
-            id: true,
-            fullName: true,
-            email: true,
-            points: true,
-            level: true,
-          },
-        },
-      },
-    });
+    request.status = ClubCardRequestStatus.REFERRED;
+    request.assignedTo = assignedTo;
+    request.history = history as JsonValue;
+    const updated = await this.cardRequestRepo.save(request);
 
     await this.audit.record({
       actorId: actor.id,
@@ -541,11 +537,12 @@ export class ClubService {
   }
 
   private async getMemberPointsBalance(memberId: string): Promise<number> {
-    const sum = await this.prisma.clubPointsEntry.aggregate({
-      where: { clubMemberId: memberId },
-      _sum: { signedPoints: true },
-    });
-    return sum._sum.signedPoints ?? 0;
+    const row = await this.clubMemberRepo.manager
+      .createQueryBuilder(ClubPointsEntry, 'e')
+      .select('SUM(e."signedPoints")', 'sum')
+      .where('e."clubMemberId" = :memberId', { memberId })
+      .getRawOne<{ sum: string | null }>();
+    return row?.sum ? Number(row.sum) : 0;
   }
 
   /** Customer self-service: full club membership view for the user panel. */
@@ -557,9 +554,7 @@ export class ClubService {
       cardRequestMinPoints: rule.cardRequestMinPoints,
     };
 
-    const member = await this.prisma.clubMember.findUnique({
-      where: { userId },
-    });
+    const member = await this.clubMemberRepo.findOne({ where: { userId } });
     if (!member) {
       return {
         isMember: false,
@@ -575,23 +570,22 @@ export class ClubService {
     }
 
     const balance = await this.getMemberPointsBalance(member.id);
-    const cardRequest = await this.prisma.clubCardRequest.findFirst({
-      where: {
-        memberId: member.id,
-        status: { in: ['SUBMITTED', 'REFERRED', 'APPROVED'] },
-      },
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        status: true,
-        history: true,
-        cardNo: true,
-        createdAt: true,
-      },
-    });
+    const cardRequest = await this.cardRequestRepo
+      .createQueryBuilder('r')
+      .select(['r.id', 'r.status', 'r.history', 'r.cardNo', 'r.createdAt'])
+      .where('r.memberId = :memberId', { memberId: member.id })
+      .andWhere('r.status IN (:...statuses)', {
+        statuses: [
+          ClubCardRequestStatus.SUBMITTED,
+          ClubCardRequestStatus.REFERRED,
+          ClubCardRequestStatus.APPROVED,
+        ],
+      })
+      .orderBy('r.createdAt', 'DESC')
+      .getOne();
 
     const canRequestCard =
-      member.cardStatus === 'NONE' &&
+      member.cardStatus === ClubCardStatus.NONE &&
       balance >= rule.cardRequestMinPoints &&
       !cardRequest;
 
@@ -610,9 +604,7 @@ export class ClubService {
 
   /** Customer self-service: submit a membership-card issuance request. */
   async submitCardRequest(userId: string) {
-    const member = await this.prisma.clubMember.findUnique({
-      where: { userId },
-    });
+    const member = await this.clubMemberRepo.findOne({ where: { userId } });
     if (!member) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -630,19 +622,23 @@ export class ClubService {
       });
     }
 
-    if (member.cardStatus === 'ISSUED') {
+    if (member.cardStatus === ClubCardStatus.ISSUED) {
       throw new ConflictException({
         code: ErrorCode.CONFLICT,
         message: 'کارت عضویت شما قبلاً صادر شده است.',
       });
     }
 
-    const pending = await this.prisma.clubCardRequest.findFirst({
-      where: {
-        memberId: member.id,
-        status: { in: ['SUBMITTED', 'REFERRED'] },
-      },
-    });
+    const pending = await this.cardRequestRepo
+      .createQueryBuilder('r')
+      .where('r.memberId = :memberId', { memberId: member.id })
+      .andWhere('r.status IN (:...statuses)', {
+        statuses: [
+          ClubCardRequestStatus.SUBMITTED,
+          ClubCardRequestStatus.REFERRED,
+        ],
+      })
+      .getOne();
     if (pending) {
       throw new ConflictException({
         code: ErrorCode.CONFLICT,
@@ -658,28 +654,26 @@ export class ClubService {
       },
     ];
 
-    return this.prisma.$transaction(async (tx) => {
-      const req = await tx.clubCardRequest.create({
-        data: {
+    return this.clubMemberRepo.manager.transaction(async (tx) => {
+      const req = await tx.save(
+        tx.create(ClubCardRequest, {
           memberId: member.id,
           level: member.level,
           points: balance,
-          status: 'SUBMITTED',
-          history: history,
-        },
-        select: {
-          id: true,
-          status: true,
-          history: true,
-          cardNo: true,
-          createdAt: true,
-        },
+          status: ClubCardRequestStatus.SUBMITTED,
+          history,
+        }),
+      );
+      await tx.update(ClubMember, member.id, {
+        cardStatus: ClubCardStatus.REVIEW,
       });
-      await tx.clubMember.update({
-        where: { id: member.id },
-        data: { cardStatus: 'REVIEW' },
-      });
-      return req;
+      return {
+        id: req.id,
+        status: req.status,
+        history: req.history,
+        cardNo: req.cardNo,
+        createdAt: req.createdAt,
+      };
     });
   }
 
@@ -688,17 +682,18 @@ export class ClubService {
     id: string,
     decision: 'approve' | 'reject',
   ) {
-    const request = await this.prisma.clubCardRequest.findUnique({
-      where: { id },
-      include: { member: true },
-    });
+    const request = await this.cardRequestRepo
+      .createQueryBuilder('r')
+      .leftJoinAndSelect('r.member', 'member')
+      .where('r.id = :id', { id })
+      .getOne();
     if (!request) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
         message: 'درخواست یافت نشد.',
       });
     }
-    if (request.status !== 'REFERRED') {
+    if (request.status !== ClubCardRequestStatus.REFERRED) {
       throw new ConflictException({
         code: ErrorCode.CONFLICT,
         message: 'این درخواست قبلاً بررسی شده است.',
@@ -707,59 +702,51 @@ export class ClubService {
     this.assertCanDecide(actor, request.assignedTo);
 
     const roleLabel = ROLE_LABELS_FA[actor.role];
-    const history = Array.isArray(request.history)
-      ? [...(request.history as unknown[])]
-      : [];
+    const history = (
+      Array.isArray(request.history) ? [...(request.history as unknown[])] : []
+    ) as JsonValue;
 
-    const updated = await this.prisma.$transaction(async (tx) => {
+    await this.clubMemberRepo.manager.transaction(async (tx) => {
       if (decision === 'approve') {
         const cardNo = generateCardNo(request.level);
-        history.push({
+        (history as unknown[]).push({
           step: 'approved',
           labelFa: `تأیید و صدور کارت توسط ${roleLabel}`,
           at: this.nowJalaliLabel(),
         });
-        const req = await tx.clubCardRequest.update({
-          where: { id },
-          data: {
-            status: 'APPROVED',
-            cardNo,
-            decidedById: actor.id,
-            decidedAt: new Date(),
-            history: history as Prisma.InputJsonValue,
-          },
+        request.status = ClubCardRequestStatus.APPROVED;
+        request.cardNo = cardNo;
+        request.decidedById = actor.id;
+        request.decidedAt = new Date();
+        request.history = history;
+        await tx.save(request);
+        await tx.update(ClubMember, request.memberId, {
+          cardStatus: ClubCardStatus.ISSUED,
+          cardNo,
+          issuedByLabelFa: `${roleLabel} (تأیید درخواست)`,
         });
-        await tx.clubMember.update({
-          where: { id: request.memberId },
-          data: {
-            cardStatus: 'ISSUED',
-            cardNo,
-            issuedByLabelFa: `${roleLabel} (تأیید درخواست)`,
-          },
-        });
-        return req;
+        return;
       }
 
-      history.push({
+      (history as unknown[]).push({
         step: 'rejected',
         labelFa: `رد درخواست توسط ${roleLabel}`,
         at: this.nowJalaliLabel(),
       });
-      const req = await tx.clubCardRequest.update({
-        where: { id },
-        data: {
-          status: 'REJECTED',
-          decidedById: actor.id,
-          decidedAt: new Date(),
-          history: history as Prisma.InputJsonValue,
-        },
+      request.status = ClubCardRequestStatus.REJECTED;
+      request.decidedById = actor.id;
+      request.decidedAt = new Date();
+      request.history = history;
+      await tx.save(request);
+      await tx.update(ClubMember, request.memberId, {
+        cardStatus: ClubCardStatus.NONE,
       });
-      await tx.clubMember.update({
-        where: { id: request.memberId },
-        data: { cardStatus: 'NONE' },
-      });
-      return req;
     });
+
+    const updated = await this.cardRequestRepo
+      .createQueryBuilder('r')
+      .where('r.id = :id', { id })
+      .getOneOrFail();
 
     await this.audit.record({
       actorId: actor.id,

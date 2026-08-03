@@ -1,10 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { SmsLog } from '../../database/entities/sms-log.entity';
 import {
   SMS_PROVIDER,
   type SmsMessageType,
   type SmsProvider,
 } from '../../common/sms/sms-provider.interface';
+import { SmsStatus } from '../../database/enums';
 
 /** Wraps SmsProvider with the real send log (Phase 14) — see
  * docs/DB_SCHEMA.md. The only genuine (non-fabricated) failure this
@@ -13,7 +16,8 @@ import {
 @Injectable()
 export class SmsService {
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectRepository(SmsLog)
+    private readonly smsLogRepo: Repository<SmsLog>,
     @Inject(SMS_PROVIDER) private readonly provider: SmsProvider,
   ) {}
 
@@ -23,26 +27,26 @@ export class SmsService {
     messageType: SmsMessageType,
   ) {
     if (!phone) {
-      await this.prisma.smsLog.create({
-        data: {
+      await this.smsLogRepo.save(
+        this.smsLogRepo.create({
           phone: null,
           messageType,
-          status: 'FAILED',
+          status: SmsStatus.FAILED,
           failureReason: 'این حساب شماره موبایل ثبت‌شده ندارد.',
-        },
-      });
+        }),
+      );
       return { success: false as const };
     }
 
     const result = await this.provider.send(phone, message, messageType);
-    await this.prisma.smsLog.create({
-      data: {
+    await this.smsLogRepo.save(
+      this.smsLogRepo.create({
         phone,
         messageType,
-        status: result.success ? 'SUCCESS' : 'FAILED',
-        failureReason: result.failureReason,
-      },
-    });
+        status: result.success ? SmsStatus.SUCCESS : SmsStatus.FAILED,
+        failureReason: result.failureReason ?? null,
+      }),
+    );
     return result;
   }
 }

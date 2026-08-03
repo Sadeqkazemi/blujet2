@@ -3,17 +3,18 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
 import * as crypto from 'node:crypto';
-import { PrismaService } from '../../prisma/prisma.service';
+import { Repository } from 'typeorm';
+import { SupportTicket } from '../../database/entities/support-ticket.entity';
+import { User } from '../../database/entities/user.entity';
+import type { JsonValue } from '../../database/json-types';
 import { AuditService } from '../audit/audit.service';
 import { StaffDirectoryService } from '../staff-directory/staff-directory.module';
 import { ErrorCode } from '../../common/errors';
 import { normalizeIranPhone } from '../../common/normalize-iran-phone';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import type {
-  Prisma,
-  SupportTicketStatus,
-} from '../../../generated/prisma/client';
+import { SupportTicketStatus } from '../../database/enums';
 import type { SubmitSupportTicketDto } from './dto/support-ticket.dtos';
 
 function generateTrackingCode(): string {
@@ -34,19 +35,23 @@ const CUSTOMER_TICKET_SELECT = {
 @Injectable()
 export class SupportTicketsService {
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectRepository(SupportTicket)
+    private readonly ticketRepo: Repository<SupportTicket>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
     private readonly audit: AuditService,
     private readonly staffDirectory: StaffDirectoryService,
   ) {}
 
   async submit(dto: SubmitSupportTicketDto) {
-    const ticket = await this.prisma.supportTicket.create({
-      data: {
+    const ticket = await this.ticketRepo.save(
+      this.ticketRepo.create({
         trackingCode: generateTrackingCode(),
         requesterName: dto.requesterName,
         requesterPhone: normalizeIranPhone(dto.requesterPhone),
         subject: dto.subject,
         body: dto.body,
+        updatedAt: new Date(),
         history: [
           {
             step: 'submitted',
@@ -54,20 +59,21 @@ export class SupportTicketsService {
             at: new Date().toISOString(),
           },
         ],
-      },
-    });
+      }),
+    );
     return { id: ticket.id, trackingCode: ticket.trackingCode };
   }
 
   async submitForUser(actor: AuthenticatedUser, dto: SubmitSupportTicketDto) {
-    const ticket = await this.prisma.supportTicket.create({
-      data: {
+    const ticket = await this.ticketRepo.save(
+      this.ticketRepo.create({
         userId: actor.id,
         trackingCode: generateTrackingCode(),
         requesterName: dto.requesterName,
         requesterPhone: normalizeIranPhone(dto.requesterPhone),
         subject: dto.subject,
         body: dto.body,
+        updatedAt: new Date(),
         history: [
           {
             step: 'submitted',
@@ -75,46 +81,46 @@ export class SupportTicketsService {
             at: new Date().toISOString(),
           },
         ],
-      },
-      select: CUSTOMER_TICKET_SELECT,
-    });
+      }),
+    );
     return { id: ticket.id, trackingCode: ticket.trackingCode };
   }
 
   private async callerPhone(userId: string): Promise<string | null> {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.userRepo.findOne({
       where: { id: userId },
       select: { phone: true },
     });
     return user?.phone ?? null;
   }
 
-  private customerTicketWhere(
-    userId: string,
-    phone: string | null,
-  ): Prisma.SupportTicketWhereInput {
-    const or: Prisma.SupportTicketWhereInput[] = [{ userId }];
+  private customerTicketQuery(userId: string, phone: string | null) {
+    const qb = this.ticketRepo
+      .createQueryBuilder('t')
+      .select(Object.keys(CUSTOMER_TICKET_SELECT).map((k) => `t.${k}`));
     if (phone) {
-      or.push({ userId: null, requesterPhone: phone });
+      qb.where(
+        '(t."userId" = :userId OR (t."userId" IS NULL AND t."requesterPhone" = :phone))',
+        { userId, phone },
+      );
+    } else {
+      qb.where('t."userId" = :userId', { userId });
     }
-    return { OR: or };
+    return qb;
   }
 
   async listMine(actor: AuthenticatedUser) {
     const phone = await this.callerPhone(actor.id);
-    return this.prisma.supportTicket.findMany({
-      where: this.customerTicketWhere(actor.id, phone),
-      select: CUSTOMER_TICKET_SELECT,
-      orderBy: { createdAt: 'desc' },
-    });
+    return this.customerTicketQuery(actor.id, phone)
+      .orderBy('t.createdAt', 'DESC')
+      .getMany();
   }
 
   async getMine(actor: AuthenticatedUser, id: string) {
     const phone = await this.callerPhone(actor.id);
-    const ticket = await this.prisma.supportTicket.findFirst({
-      where: { id, ...this.customerTicketWhere(actor.id, phone) },
-      select: CUSTOMER_TICKET_SELECT,
-    });
+    const ticket = await this.customerTicketQuery(actor.id, phone)
+      .andWhere('t.id = :id', { id })
+      .getOne();
     if (!ticket) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -128,25 +134,22 @@ export class SupportTicketsService {
     status?: SupportTicketStatus;
     dept?: 'SITE' | 'AGENCY';
   }) {
-    return this.prisma.supportTicket.findMany({
+    return this.ticketRepo.find({
       where: {
         ...(filters.status ? { status: filters.status } : {}),
         ...(filters.dept ? { dept: filters.dept } : {}),
       },
-      include: {
-        forwardedTo: { select: { id: true, fullName: true, role: true } },
-      },
-      orderBy: { createdAt: 'desc' },
+      relations: { forwardedTo: true },
+      order: { createdAt: 'DESC' },
     });
   }
 
   private async getOrThrow(id: string) {
-    const ticket = await this.prisma.supportTicket.findUnique({
-      where: { id },
-      include: {
-        forwardedTo: { select: { id: true, fullName: true, role: true } },
-      },
-    });
+    const ticket = await this.ticketRepo
+      .createQueryBuilder('t')
+      .leftJoinAndSelect('t.forwardedTo', 'forwardedTo')
+      .where('t.id = :id', { id })
+      .getOne();
     if (!ticket) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -187,17 +190,15 @@ export class SupportTicketsService {
       at: new Date().toISOString(),
     });
 
-    const updated = await this.prisma.supportTicket.update({
-      where: { id },
-      data: {
-        forwardedToId: targetUserId,
-        status: ticket.status === 'OPEN' ? 'IN_PROGRESS' : ticket.status,
-        history: history as Prisma.InputJsonValue,
-      },
-      include: {
-        forwardedTo: { select: { id: true, fullName: true, role: true } },
-      },
-    });
+    ticket.forwardedToId = targetUserId;
+    ticket.status =
+      ticket.status === SupportTicketStatus.OPEN
+        ? SupportTicketStatus.IN_PROGRESS
+        : ticket.status;
+    ticket.history = history as JsonValue;
+    ticket.updatedAt = new Date();
+    await this.ticketRepo.save(ticket);
+    const updated = await this.getOrThrow(id);
 
     await this.audit.record({
       actorId: actor.id,
@@ -228,13 +229,11 @@ export class SupportTicketsService {
       at: new Date().toISOString(),
     });
 
-    const updated = await this.prisma.supportTicket.update({
-      where: { id },
-      data: { status, history: history as Prisma.InputJsonValue },
-      include: {
-        forwardedTo: { select: { id: true, fullName: true, role: true } },
-      },
-    });
+    ticket.status = status;
+    ticket.history = history as JsonValue;
+    ticket.updatedAt = new Date();
+    await this.ticketRepo.save(ticket);
+    const updated = await this.getOrThrow(id);
 
     await this.audit.record({
       actorId: actor.id,

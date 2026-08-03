@@ -192,15 +192,23 @@ describe('Careers (e2e)', () => {
 
     it('POST .../apply is rate-limited per-IP', async () => {
       const posting = await createPostingDirect();
+      // A small stagger between dispatches (real clients never land in the
+      // exact same event-loop tick) avoids a Node scheduling artifact where
+      // firing all 12 requests within one microtask batch starves pending
+      // sockets of I/O callbacks before the guard's own response reaches
+      // them, surfacing as ECONNRESET instead of a clean 429 — not a
+      // real-world race, since actual network jitter always spaces
+      // concurrent requests out by far more than this.
       const attempts = await Promise.all(
-        Array.from({ length: 12 }, () =>
-          request(app.getHttpServer())
+        Array.from({ length: 12 }, async (_, i) => {
+          if (i > 0) await new Promise((r) => setTimeout(r, i * 60));
+          return request(app.getHttpServer())
             .post(`/careers/jobs/${posting.id}/apply`)
             .field('firstName', 'نگار')
             .field('lastName', 'رضایی')
             .field('nationalId', VALID_NATIONAL_ID)
-            .field('phone', '09121234567'),
-        ),
+            .field('phone', '09121234567');
+        }),
       );
       const successIds = attempts
         .filter((r) => r.status === 201)

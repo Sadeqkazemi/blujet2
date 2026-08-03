@@ -1,4 +1,11 @@
-import { Column, CreateDateColumn, Entity, PrimaryColumn } from 'typeorm';
+import { randomUUID } from 'node:crypto';
+import {
+  BeforeInsert,
+  Column,
+  CreateDateColumn,
+  Entity,
+  PrimaryColumn,
+} from 'typeorm';
 import { JobType } from '../enums';
 
 @Entity('job_postings')
@@ -8,6 +15,11 @@ export class JobPosting {
     primaryKeyConstraintName: 'job_postings_pkey',
   })
   id!: string;
+
+  @BeforeInsert()
+  generateId() {
+    this.id ??= randomUUID();
+  }
 
   @Column({ type: 'text' })
   title!: string;

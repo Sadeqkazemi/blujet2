@@ -1,5 +1,10 @@
+import type { Repository } from 'typeorm';
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { SmsService } from '../sms/sms.service';
+import { SurveyInvite } from '../../database/entities/survey-invite.entity';
+import { SurveySettings } from '../../database/entities/survey-settings.entity';
+import { Booking } from '../../database/entities/booking.entity';
+import { BookingStatus } from '../../database/enums';
 import { materializeFlownBookings } from '../flights/flight-lifecycle.util';
 
 function surveyInviteLink(token: string): string {
@@ -7,7 +12,7 @@ function surveyInviteLink(token: string): string {
 }
 
 async function sendInviteSms(
-  prisma: PrismaService,
+  inviteRepo: Repository<SurveyInvite>,
   sms: SmsService,
   inviteId: string,
   contactPhone: string | null,
@@ -19,10 +24,7 @@ async function sendInviteSms(
     'SURVEY_INVITE',
   );
   if (result.success) {
-    await prisma.surveyInvite.update({
-      where: { id: inviteId },
-      data: { smsSentAt: new Date() },
-    });
+    await inviteRepo.update(inviteId, { smsSentAt: new Date() });
   }
 }
 
@@ -40,33 +42,43 @@ async function sendInviteSms(
  */
 export async function materializeSurveyInvites(
   prisma: PrismaService,
+  bookingRepo: Repository<Booking>,
+  inviteRepo: Repository<SurveyInvite>,
+  settingsRepo: Repository<SurveySettings>,
   sms: SmsService,
 ): Promise<void> {
   await materializeFlownBookings(prisma);
 
-  const settings = await prisma.surveySettings.findFirst({
-    orderBy: { createdAt: 'asc' },
+  const settings = await settingsRepo.findOne({
+    where: {},
+    order: { createdAt: 'ASC' },
   });
   if (!settings || !settings.enabled) return;
 
-  const pending = await prisma.booking.findMany({
-    where: { status: 'FLOWN', surveyInvite: null },
-    select: { id: true, flightInstanceId: true, contactPhone: true },
-  });
+  // Booking has no inverse relation to SurveyInvite (recurring shape across
+  // this codebase) — a LEFT JOIN + IS NULL filter replaces Prisma's
+  // relation-null `surveyInvite: null` where clause.
+  const pending = await bookingRepo
+    .createQueryBuilder('b')
+    .leftJoin(SurveyInvite, 'si', 'si."bookingId" = b.id')
+    .select(['b.id', 'b.flightInstanceId', 'b.contactPhone'])
+    .where('b.status = :status', { status: BookingStatus.FLOWN })
+    .andWhere('si.id IS NULL')
+    .getMany();
 
   for (const booking of pending) {
     // One booking at a time, each in its own try/catch — a single SMS or
     // DB hiccup must never block the rest (same best-effort posture as
     // every other lazy-materialization step in this codebase).
     try {
-      const invite = await prisma.surveyInvite.create({
-        data: {
+      const invite = await inviteRepo.save(
+        inviteRepo.create({
           bookingId: booking.id,
           flightInstanceId: booking.flightInstanceId,
-        },
-      });
+        }),
+      );
       await sendInviteSms(
-        prisma,
+        inviteRepo,
         sms,
         invite.id,
         booking.contactPhone,
@@ -86,18 +98,16 @@ export async function materializeSurveyInvites(
   // is permanently undeliverable (see `sendInviteSms`/`SmsService.send`),
   // so retrying it every materialize() call would just pile up FAILED
   // SmsLog rows for a case that can never succeed.
-  const unsent = await prisma.surveyInvite.findMany({
-    where: { smsSentAt: null, booking: { contactPhone: { not: null } } },
-    select: {
-      id: true,
-      token: true,
-      booking: { select: { contactPhone: true } },
-    },
-  });
+  const unsent = await inviteRepo
+    .createQueryBuilder('si')
+    .leftJoinAndSelect('si.booking', 'booking')
+    .where('si."smsSentAt" IS NULL')
+    .andWhere('booking."contactPhone" IS NOT NULL')
+    .getMany();
   for (const invite of unsent) {
     try {
       await sendInviteSms(
-        prisma,
+        inviteRepo,
         sms,
         invite.id,
         invite.booking.contactPhone,
