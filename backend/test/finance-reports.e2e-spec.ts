@@ -142,7 +142,7 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
     expect(overdue!.overdueDays).toBeGreaterThan(0);
     expect(Number(outstandingIrr)).toBeGreaterThan(0);
 
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
     const forbidden = await request(app.getHttpServer())
       .get('/reporting/agency-settlements')
       .set('Authorization', auth(commercial.accessToken));

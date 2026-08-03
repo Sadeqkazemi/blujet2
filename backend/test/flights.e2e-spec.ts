@@ -157,7 +157,7 @@ describe('Flights (e2e)', () => {
     await addBooking(departed.id, 'SYSTEM', 40_000_000);
     await addBooking(departed.id, 'AGENCY', 20_000_000);
 
-    const { accessToken } = await loginAs(app, 'comm.abbasi');
+    const { accessToken } = await loginAs(app, 'comm');
     const res = await request(app.getHttpServer())
       .get('/flights/overview')
       .set('Authorization', `Bearer ${accessToken}`);
@@ -216,7 +216,7 @@ describe('Flights (e2e)', () => {
   });
 
   it('POST /flights/airports creates a new airport and rejects duplicates', async () => {
-    const { accessToken } = await loginAs(app, 'comm.abbasi');
+    const { accessToken } = await loginAs(app, 'comm');
     // A timestamp-derived 2-letter suffix has too little entropy (only ~1300
     // combinations) not to occasionally collide with a real seeded IATA code
     // (e.g. it once landed on "ZAH" — Zahedan) — pick against the DB instead.
@@ -333,7 +333,7 @@ describe('Flights (e2e)', () => {
       capacity: 180,
       charterSeats: 60,
     });
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
 
     const overCap = await request(app.getHttpServer())
       .patch(`/flights/${instance.id}/plan`)

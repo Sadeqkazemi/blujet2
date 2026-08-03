@@ -24,7 +24,7 @@ async function main() {
   const staff: { username: string; fullName: string; role: 'EMPLOYEE' | 'IT_MANAGER' | 'COMMERCIAL_MANAGER' | 'FINANCE_MANAGER' | 'SENIOR_MANAGER' | 'CEO' | 'BOARD_CHAIR' | 'SITE_ADMIN' }[] = [
     { username: 'com.ahmadi', fullName: 'رضا احمدی', role: 'EMPLOYEE' },
     { username: 'itadmin', fullName: 'مهندس علی صدر', role: 'IT_MANAGER' },
-    { username: 'comm.abbasi', fullName: 'رضا مرادی', role: 'COMMERCIAL_MANAGER' },
+    { username: 'comm', fullName: 'رضا مرادی', role: 'COMMERCIAL_MANAGER' },
     { username: 'finance', fullName: 'سحر کاظمی', role: 'FINANCE_MANAGER' },
     { username: 'senior.rahimi', fullName: 'محمد رحیمی', role: 'SENIOR_MANAGER' },
     { username: 'ceo', fullName: 'محمد رحیمی', role: 'CEO' },
@@ -55,7 +55,7 @@ async function main() {
     staffByUsername.set(s.username, user);
   }
   const seniorManager = staffByUsername.get('senior.rahimi')!;
-  const commercialManager = staffByUsername.get('comm.abbasi')!;
+  const commercialManager = staffByUsername.get('comm')!;
   const financeManager = staffByUsername.get('finance')!;
 
   await prisma.user.upsert({

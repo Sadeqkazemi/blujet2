@@ -67,6 +67,6 @@ test('finance journey: KPI cards → detail (شبا + penalty breakdown) → ref
 });
 
 test('Commercial Manager gets no refunds surface (role isolation)', async ({ page }) => {
-  await loginAs(page, 'comm.abbasi');
+  await loginAs(page, 'comm');
   await expect(page.getByRole('link', { name: /^استرداد بلیط/ })).toHaveCount(0);
 });

@@ -61,7 +61,7 @@ describe('Webservice pricing (e2e)', () => {
   }
 
   it('COMMERCIAL_MANAGER patches plan prices; agency portal reads them on new requests', async () => {
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
 
     const patchRes = await request(app.getHttpServer())
       .patch('/webservice/pricing')

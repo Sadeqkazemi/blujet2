@@ -201,7 +201,7 @@ describe('Cartable + referrals + messages (e2e)', () => {
 
   it('chair-permission full loop: request → chair cartable task → approve → requester sees APPROVED', async () => {
     // Fresh slate for the commercial manager's requests.
-    const commId = await userId('comm.abbasi');
+    const commId = await userId('comm');
     await prisma.cartableTask.deleteMany({
       where: { sourceType: 'CHAIR_PERMISSION' },
     });
@@ -209,7 +209,7 @@ describe('Cartable + referrals + messages (e2e)', () => {
       where: { requesterId: commId },
     });
 
-    const comm = await loginAs(app, 'comm.abbasi');
+    const comm = await loginAs(app, 'comm');
     const created = await request(app.getHttpServer())
       .post('/cartable/chair-permission')
       .set('Authorization', `Bearer ${comm.accessToken}`);
@@ -589,7 +589,7 @@ describe('Cartable + referrals + messages (e2e)', () => {
 
   it('approving a referral-sourced cartable task submits the note as the report', async () => {
     const senior = await loginAs(app, 'senior.rahimi');
-    const commId = await userId('comm.abbasi');
+    const commId = await userId('comm');
     const created = await request(app.getHttpServer())
       .post('/referrals')
       .set('Authorization', `Bearer ${senior.accessToken}`)
@@ -604,7 +604,7 @@ describe('Cartable + referrals + messages (e2e)', () => {
       },
     });
 
-    const comm = await loginAs(app, 'comm.abbasi');
+    const comm = await loginAs(app, 'comm');
     const approve = await request(app.getHttpServer())
       .patch(`/cartable/${recipientTask.id}/approve`)
       .set('Authorization', `Bearer ${comm.accessToken}`)
