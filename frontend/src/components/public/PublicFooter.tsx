@@ -152,12 +152,14 @@ export default function PublicFooter() {
     { to: '/manage-booking', label: t('footerManageBooking') },
     { to: '/flight-status', label: t('footerFlightStatus') },
     { to: '/club', label: t('navLoyalty') },
+    // Only the link label — never the job ads themselves — appears when
+    // SITE_ADMIN enables «نمایش آگهی در فوتر» / CareersSettings.enabled.
+    ...(careersEnabled ? [{ to: '/careers', label: t('footerCareers') }] : []),
   ];
   const companyLinks = [
     { to: '/about', label: t('footerAbout') },
     { to: '/contact', label: t('footerContact') },
     { to: '/travel-info', label: t('footerTerms') },
-    ...(careersEnabled ? [{ to: '/careers', label: t('footerCareers') }] : []),
   ];
   const supportLinks = [
     { to: '/support', label: t('footerHelpCenter') },

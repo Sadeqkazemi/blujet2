@@ -48,7 +48,11 @@ export type UpdateJobPostingInput = Partial<CreateJobPostingInput> & { active?: 
 
 export interface EducationEntry {
   [key: string]: string | undefined;
+  major?: string;
   degree?: string;
+  courses?: string;
+  otherCourses?: string;
+  /** legacy keys still accepted when reading older applications */
   field?: string;
   institute?: string;
 }
@@ -56,6 +60,11 @@ export interface EducationEntry {
 export interface WorkEntry {
   [key: string]: string | undefined;
   company?: string;
+  position?: string;
+  fromYear?: string;
+  toYear?: string;
+  reason?: string;
+  /** legacy keys still accepted when reading older applications */
   role?: string;
   years?: string;
 }
