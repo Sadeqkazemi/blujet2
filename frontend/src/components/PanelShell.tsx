@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { fetchNav } from '../api/panels';
 import { fetchCartable, fetchMyReferrals, fetchReferrals } from '../api/cartable';
@@ -10,6 +10,7 @@ import { fetchCeoPricing } from '../api/pricing';
 import { faDigits } from '../lib/fa-format';
 import type { PanelNavItem } from '../types/panels';
 import PanelNotificationBell, { type PanelNotificationItem } from './PanelNotificationBell';
+import PanelNotifBell from './PanelNotifBell';
 import PanelSearchBox from './PanelSearchBox';
 import { PANEL_BRAND_PLANE_ICON, panelNavIcon } from './panel-nav-icons';
 import type { LowSalesAlert } from '../types/reporting';
@@ -37,6 +38,7 @@ type NavBadge = { count: number; className: string };
 export default function PanelShell() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [nav, setNav] = useState<PanelNavItem[] | null>(null);
   const [badges, setBadges] = useState<Record<string, NavBadge>>({});
   const [notifications, setNotifications] = useState<PanelNotificationItem[]>([]);
@@ -228,9 +230,23 @@ export default function PanelShell() {
   const brandSub =
     (user?.role ? ROLE_BRAND_SUB[user.role] : undefined) ?? 'پنل مدیریت';
 
+  /** CEO / Board / Senior use the executive shell chrome from #78. */
+  const executiveShell =
+    user?.role === 'CEO' || user?.role === 'BOARD_CHAIR' || user?.role === 'SENIOR_MANAGER';
+  const roleInitial =
+    user?.role === 'CEO'
+      ? 'مع'
+      : user?.role === 'BOARD_CHAIR'
+        ? 'ره'
+        : user?.role === 'SENIOR_MANAGER'
+          ? 'ما'
+          : roleLabel.slice(0, 1);
+  const onDashboard = /^\/panel\/?$/.test(location.pathname);
+  const showExecNotifChrome = executiveShell && isLowSalesRole(user?.role) && !onDashboard;
+  const notifAlerts = lowSalesAlerts.slice(1);
+
   return (
     <div dir="rtl" className="flex min-h-screen bg-panel-canvas font-sans text-panel-ink">
-      {/* Sidebar layout matches design-reference-v2 پنل مدیر ارشد (248px, icons, role chip). */}
       <aside className="sticky top-0 flex h-screen w-[248px] flex-none flex-col gap-1.5 border-l border-panel-border bg-panel-surface px-[11px] py-[15px] text-panel-ink">
         <div className="flex items-center gap-[9px] px-2 pb-3.5 pt-[7px]">
           <div className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-[10px] bg-[#3b82f6] text-white">
@@ -288,21 +304,56 @@ export default function PanelShell() {
           })}
         </nav>
 
-        <div className="mt-auto border-t border-panel-border pt-3">
-          <button
-            onClick={() => void onSignOut()}
-            className="w-full rounded-[11px] border border-panel-border py-2 text-xs text-panel-muted transition hover:bg-white/5"
-          >
-            خروج از حساب
-          </button>
-        </div>
+        {executiveShell ? (
+          <div className="mt-auto border-t border-panel-border p-4">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#3b82f6] to-[#9333ea] text-[11px] font-extrabold text-white">
+                {roleInitial}
+              </span>
+              <div className="min-w-0">
+                <div className="truncate text-xs font-bold text-white">{roleLabel}</div>
+                <button
+                  type="button"
+                  onClick={() => void onSignOut()}
+                  className="text-[10.5px] text-[#9fb0c7] transition hover:text-white"
+                >
+                  خروج از حساب
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-auto border-t border-panel-border pt-3">
+            <button
+              onClick={() => void onSignOut()}
+              className="w-full rounded-[11px] border border-panel-border py-2 text-xs text-panel-muted transition hover:bg-white/5"
+            >
+              خروج از حساب
+            </button>
+          </div>
+        )}
       </aside>
 
       <main className="min-w-0 flex-1 overflow-y-auto">
-        <div className="flex items-center justify-end gap-3 border-b border-panel-border px-8 py-3">
-          <PanelNotificationBell items={notifications} />
-          <PanelSearchBox nav={nav ?? []} />
-        </div>
+        {executiveShell ? (
+          showExecNotifChrome ? (
+            <div className="flex items-center justify-end gap-2.5 px-[21px] pt-[18px]">
+              <div className="flex h-[42px] w-[230px] items-center gap-2 rounded-[10px] border border-[#28344c] bg-[#18223a] px-3 text-[12px] text-[#6b7b94]">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="M21 21l-4.3-4.3" />
+                </svg>
+                <span>جستجو…</span>
+              </div>
+              <PanelNotifBell alerts={notifAlerts} variant="dark" />
+            </div>
+          ) : null
+        ) : (
+          <div className="flex items-center justify-end gap-3 border-b border-panel-border px-8 py-3">
+            <PanelNotificationBell items={notifications} />
+            <PanelSearchBox nav={nav ?? []} />
+          </div>
+        )}
         <Outlet context={{ nav, lowSalesAlerts }} />
       </main>
     </div>

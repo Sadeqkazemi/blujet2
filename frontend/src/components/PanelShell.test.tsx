@@ -80,7 +80,7 @@ describe('PanelShell', () => {
 
     expect(screen.getByText('پنل مدیریت')).toBeInTheDocument();
     expect(screen.getByText('نقش این پنل')).toBeInTheDocument();
-    expect(screen.getByText('مدیر ارشد')).toBeInTheDocument();
+    expect(screen.getAllByText('مدیر ارشد').length).toBeGreaterThanOrEqual(1);
 
     await waitFor(() => {
       const badge = screen.getByTestId('nav-badge-referrals');
