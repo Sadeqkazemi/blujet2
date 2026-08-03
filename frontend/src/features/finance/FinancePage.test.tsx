@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter, Outlet, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import FinancePage from './FinancePage';
 import * as reportingApi from '../../api/reporting';
@@ -12,6 +13,7 @@ import type {
   AgencySettlementsResult,
   CompletedFlightsSummary,
   KpiResult,
+  LowSalesAlert,
   RecentTransactionsResult,
   RevenueMixResult,
 } from '../../types/reporting';
@@ -92,6 +94,36 @@ const RECONCILIATION_ITEM: ReconciliationItem = {
   createdAt: '2026-07-12T09:00:00.000Z',
 };
 
+const ALERTS: LowSalesAlert[] = [
+  {
+    flightNo: 'EP-821',
+    originCode: 'THR',
+    destCode: 'DXB',
+    departureAt: '2026-08-03T08:00:00.000Z',
+    capacity: 180,
+    soldSeats: 40,
+    occupancyPct: 22,
+  },
+  {
+    flightNo: 'BJ-100',
+    originCode: 'THR',
+    destCode: 'MHD',
+    departureAt: '2026-08-03T10:00:00.000Z',
+    capacity: 150,
+    soldSeats: 30,
+    occupancyPct: 20,
+  },
+  {
+    flightNo: 'BJ-101',
+    originCode: 'MHD',
+    destCode: 'THR',
+    departureAt: '2026-08-03T12:00:00.000Z',
+    capacity: 150,
+    soldSeats: 25,
+    occupancyPct: 17,
+  },
+];
+
 function mockRole(role: Role) {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status: 'authenticated',
@@ -103,19 +135,34 @@ function mockRole(role: Role) {
   });
 }
 
+function renderFinance(lowSalesAlerts: LowSalesAlert[] = []) {
+  return render(
+    <MemoryRouter initialEntries={['/panel/finance']}>
+      <Routes>
+        <Route path="/panel" element={<Outlet context={{ nav: null, lowSalesAlerts }} />}>
+          <Route path="finance" element={<FinancePage />} />
+        </Route>
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
+function mockFinanceOpsApis() {
+  vi.spyOn(reportingApi, 'fetchKpis').mockResolvedValue(KPIS);
+  vi.spyOn(reportingApi, 'fetchCompletedFlightsSummary').mockResolvedValue(FLIGHTS);
+  vi.spyOn(reportingApi, 'fetchRecentTransactions').mockResolvedValue(TX);
+  vi.spyOn(reportingApi, 'fetchRevenueMix').mockResolvedValue(MIX);
+  vi.spyOn(reportingApi, 'fetchAgencySettlements').mockResolvedValue(SETTLEMENTS);
+  vi.spyOn(reconciliationApi, 'fetchReconciliationQueue').mockResolvedValue([]);
+}
+
 describe('FinancePage', () => {
   it('FINANCE_MANAGER gets the finance-ops view: transactions, settlements, remind action', async () => {
     mockRole('FINANCE_MANAGER');
-    vi.spyOn(reportingApi, 'fetchKpis').mockResolvedValue(KPIS);
-    vi.spyOn(reportingApi, 'fetchLowSalesAlerts').mockResolvedValue([]);
-    vi.spyOn(reportingApi, 'fetchCompletedFlightsSummary').mockResolvedValue(FLIGHTS);
-    vi.spyOn(reportingApi, 'fetchRecentTransactions').mockResolvedValue(TX);
-    vi.spyOn(reportingApi, 'fetchRevenueMix').mockResolvedValue(MIX);
-    vi.spyOn(reportingApi, 'fetchAgencySettlements').mockResolvedValue(SETTLEMENTS);
-    vi.spyOn(reconciliationApi, 'fetchReconciliationQueue').mockResolvedValue([]);
+    mockFinanceOpsApis();
     const remindSpy = vi.spyOn(agenciesApi, 'remindAgencyInvoice').mockResolvedValue({ queued: true });
 
-    render(<FinancePage />);
+    renderFinance();
     expect(await screen.findByText('تراکنش‌های مالی اخیر')).toBeInTheDocument();
     expect(screen.getByText('تسویه حساب')).toBeInTheDocument();
     expect(screen.getByText('تسویه‌حساب آژانس‌های همکار')).toBeInTheDocument();
@@ -127,20 +174,27 @@ describe('FinancePage', () => {
     await waitFor(() => expect(remindSpy).toHaveBeenCalledWith('ag1', 'inv3'));
   });
 
+  it('shows only the latest low-sales alert as a single banner on the finance page', async () => {
+    mockRole('FINANCE_MANAGER');
+    mockFinanceOpsApis();
+
+    renderFinance(ALERTS);
+    expect(await screen.findByTestId('low-sales-banner')).toBeInTheDocument();
+    expect(screen.getByTestId('low-sales-banner')).toHaveTextContent('EP-821');
+    expect(screen.getAllByTestId('low-sales-banner')).toHaveLength(1);
+    expect(screen.queryByText('BJ-100')).not.toBeInTheDocument();
+    expect(screen.queryByText('BJ-101')).not.toBeInTheDocument();
+  });
+
   it('shows the payment-reconciliation queue and resolves an item with a required note', async () => {
     mockRole('FINANCE_MANAGER');
-    vi.spyOn(reportingApi, 'fetchKpis').mockResolvedValue(KPIS);
-    vi.spyOn(reportingApi, 'fetchLowSalesAlerts').mockResolvedValue([]);
-    vi.spyOn(reportingApi, 'fetchCompletedFlightsSummary').mockResolvedValue(FLIGHTS);
-    vi.spyOn(reportingApi, 'fetchRecentTransactions').mockResolvedValue(TX);
-    vi.spyOn(reportingApi, 'fetchRevenueMix').mockResolvedValue(MIX);
-    vi.spyOn(reportingApi, 'fetchAgencySettlements').mockResolvedValue(SETTLEMENTS);
+    mockFinanceOpsApis();
     vi.spyOn(reconciliationApi, 'fetchReconciliationQueue').mockResolvedValue([RECONCILIATION_ITEM]);
     const resolveSpy = vi
       .spyOn(reconciliationApi, 'resolveReconciliation')
       .mockResolvedValue({ ...RECONCILIATION_ITEM, bookingStatus: 'TICKETED' });
 
-    render(<FinancePage />);
+    renderFinance();
     expect(await screen.findByTestId('reconciliation-item')).toHaveTextContent('BJ9K2L');
     expect(screen.getByTestId('reconciliation-item')).toHaveTextContent('GW-88213');
 
@@ -161,15 +215,10 @@ describe('FinancePage', () => {
 
   it('FINANCE_MANAGER finance-ops view loads day granularity with Jalali date picker', async () => {
     mockRole('FINANCE_MANAGER');
+    mockFinanceOpsApis();
     const kpiSpy = vi.spyOn(reportingApi, 'fetchKpis').mockResolvedValue(KPIS);
-    vi.spyOn(reportingApi, 'fetchLowSalesAlerts').mockResolvedValue([]);
-    vi.spyOn(reportingApi, 'fetchCompletedFlightsSummary').mockResolvedValue(FLIGHTS);
-    vi.spyOn(reportingApi, 'fetchRecentTransactions').mockResolvedValue(TX);
-    vi.spyOn(reportingApi, 'fetchRevenueMix').mockResolvedValue(MIX);
-    vi.spyOn(reportingApi, 'fetchAgencySettlements').mockResolvedValue(SETTLEMENTS);
-    vi.spyOn(reconciliationApi, 'fetchReconciliationQueue').mockResolvedValue([]);
 
-    render(<FinancePage />);
+    renderFinance();
     await screen.findByText('تراکنش‌های مالی اخیر');
 
     const user = userEvent.setup();
@@ -196,7 +245,7 @@ describe('FinancePage', () => {
     vi.spyOn(reportingApi, 'fetchCompletedFlightsSummary').mockResolvedValue(FLIGHTS);
     vi.spyOn(reportingApi, 'fetchRevenueMix').mockResolvedValue(MIX);
 
-    render(<FinancePage />);
+    renderFinance();
     expect(await screen.findByText('نمودار فروش')).toBeInTheDocument();
     expect(screen.getByText('ترکیب درآمد')).toBeInTheDocument();
     expect(screen.queryByText('تراکنش‌های مالی اخیر')).not.toBeInTheDocument();

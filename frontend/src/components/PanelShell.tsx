@@ -4,10 +4,13 @@ import { useAuth } from '../hooks/useAuth';
 import { fetchNav } from '../api/panels';
 import { fetchCartable, fetchMyReferrals, fetchReferrals } from '../api/cartable';
 import { fetchRefunds } from '../api/refunds';
-import { fetchStaffReports } from '../api/reporting';
+import { fetchLowSalesAlerts, fetchStaffReports } from '../api/reporting';
 import { fetchLogsBadgeCount } from '../api/audit';
 import { faDigits } from '../lib/fa-format';
+import { formatJalaliDate } from '../lib/jalali';
 import type { PanelNavItem } from '../types/panels';
+import type { LowSalesAlert } from '../types/reporting';
+import { isLowSalesRole } from '../types/panel-shell';
 import PanelNotificationBell, { type PanelNotificationItem } from './PanelNotificationBell';
 import PanelSearchBox from './PanelSearchBox';
 
@@ -24,18 +27,40 @@ const ROLE_LABELS: Record<string, string> = {
 
 type NavBadge = { count: number; className: string };
 
+function lowSalesNotifItems(alerts: LowSalesAlert[]): PanelNotificationItem[] {
+  // First alert is shown as the in-page banner; leftovers go to the bell.
+  return alerts.slice(1).map((a) => ({
+    key: `low-sales-${a.flightNo}-${a.departureAt}`,
+    title: 'هشدار فروش ضعیف',
+    sublabel: `${a.flightNo} ${a.originCode} ← ${a.destCode} · ${formatJalaliDate(a.departureAt)}`,
+    to: '/panel/finance',
+    tone: 'warning' as const,
+  }));
+}
+
 export default function PanelShell() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [nav, setNav] = useState<PanelNavItem[] | null>(null);
   const [badges, setBadges] = useState<Record<string, NavBadge>>({});
   const [notifications, setNotifications] = useState<PanelNotificationItem[]>([]);
+  const [lowSalesAlerts, setLowSalesAlerts] = useState<LowSalesAlert[]>([]);
 
   useEffect(() => {
     fetchNav()
       .then(setNav)
       .catch(() => setNav([]));
   }, []);
+
+  useEffect(() => {
+    if (!isLowSalesRole(user?.role)) {
+      setLowSalesAlerts([]);
+      return;
+    }
+    fetchLowSalesAlerts()
+      .then(setLowSalesAlerts)
+      .catch(() => setLowSalesAlerts([]));
+  }, [user?.role]);
 
   const navKeys = useMemo(() => new Set(nav?.map((item) => item.key) ?? []), [nav]);
 
@@ -179,9 +204,9 @@ export default function PanelShell() {
 
     void Promise.all(tasks).then(() => {
       setBadges(next);
-      setNotifications(nextNotifications);
+      setNotifications([...lowSalesNotifItems(lowSalesAlerts), ...nextNotifications]);
     });
-  }, [nav, navKeys, user?.role]);
+  }, [nav, navKeys, user?.role, lowSalesAlerts]);
 
   async function onSignOut() {
     await signOut();
@@ -281,7 +306,7 @@ export default function PanelShell() {
           <PanelNotificationBell items={notifications} />
           <PanelSearchBox nav={nav ?? []} />
         </div>
-        <Outlet context={{ nav }} />
+        <Outlet context={{ nav, lowSalesAlerts }} />
       </main>
     </div>
   );

@@ -46,6 +46,7 @@ describe('PanelShell', () => {
       reports: [],
       newEmployeeEvents: [{ id: 'e1', detail: 'کارمند جدید', at: '2026-07-01T00:00:00.000Z' }],
     });
+    vi.spyOn(reportingApi, 'fetchLowSalesAlerts').mockResolvedValue([]);
 
     renderShell();
 
@@ -73,6 +74,7 @@ describe('PanelShell', () => {
       referrals: [],
       kpis: { total: 4, awaitingReport: 2, reported: 1, closed: 1 },
     });
+    vi.spyOn(reportingApi, 'fetchLowSalesAlerts').mockResolvedValue([]);
 
     renderShell();
 
@@ -106,5 +108,60 @@ describe('PanelShell', () => {
     await waitFor(() => {
       expect(screen.getByTestId('nav-badge-referrals')).toHaveTextContent('۱');
     });
+  });
+
+  it('puts leftover low-sales alerts in the notification bell (banner keeps the first)', async () => {
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      status: 'authenticated',
+      user: { id: 'u1', fullName: 'مدیر مالی', role: 'FINANCE_MANAGER', preferredLocale: 'FA' },
+      requestLogin: vi.fn(),
+      confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
+      signOut: vi.fn(),
+    });
+    vi.spyOn(panelsApi, 'fetchNav').mockResolvedValue([
+      { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
+      { key: 'finance', labelFa: 'مالی', implemented: true },
+    ]);
+    vi.spyOn(reportingApi, 'fetchLowSalesAlerts').mockResolvedValue([
+      {
+        flightNo: 'EP-821',
+        originCode: 'THR',
+        destCode: 'DXB',
+        departureAt: '2026-08-03T08:00:00.000Z',
+        capacity: 180,
+        soldSeats: 40,
+        occupancyPct: 22,
+      },
+      {
+        flightNo: 'BJ-100',
+        originCode: 'THR',
+        destCode: 'MHD',
+        departureAt: '2026-08-03T10:00:00.000Z',
+        capacity: 150,
+        soldSeats: 30,
+        occupancyPct: 20,
+      },
+      {
+        flightNo: 'BJ-101',
+        originCode: 'MHD',
+        destCode: 'THR',
+        departureAt: '2026-08-03T12:00:00.000Z',
+        capacity: 150,
+        soldSeats: 25,
+        occupancyPct: 17,
+      },
+    ]);
+
+    const { default: userEvent } = await import('@testing-library/user-event');
+    renderShell();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('notification-bell-count')).toHaveTextContent('۲');
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'اعلان‌ها' }));
+    expect(screen.getByText('BJ-100 THR ← MHD', { exact: false })).toBeInTheDocument();
+    expect(screen.getByText('BJ-101 MHD ← THR', { exact: false })).toBeInTheDocument();
+    expect(screen.queryByText(/EP-821/)).not.toBeInTheDocument();
   });
 });
