@@ -33,7 +33,8 @@ const ROLE_LABELS: Record<string, string> = {
 const ROLE_BRAND_SUB: Record<string, string> = {
   IT_MANAGER: 'پنل فناوری اطلاعات',
   EMPLOYEE: 'پنل کارمند',
-  SITE_ADMIN: 'مدیریت عملیاتی',
+  // Logo line in design HTML / screenshots is «پنل مدیریت» (not roleDefs.sub).
+  SITE_ADMIN: 'پنل مدیریت',
 };
 
 type NavBadge = { count: number; className: string };

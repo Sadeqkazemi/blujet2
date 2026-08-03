@@ -30,6 +30,9 @@ export interface SiteAdminOverview {
   passengersThisMonth: number;
   ticketsSoldThisMonth: number;
   pendingActionCount: number;
+  agenciesTrendPct: number | null;
+  passengersTrendPct: number | null;
+  ticketsTrendPct: number | null;
 }
 
 export interface KpiResult {

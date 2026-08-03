@@ -8,14 +8,15 @@ Acceptance checklist for پنل ادمین سایت parity with
 - [x] Labels match design sidebar (آژانس‌ها / پرواز / تیکت‌ها / درخواست‌های استخدام) — `panel-nav.config.ts`
 
 ## Shell
-- [x] Brand subtitle «مدیریت عملیاتی» — `PanelShell.tsx` ROLE_BRAND_SUB
+- [x] Brand subtitle «پنل مدیریت» (logo line in design HTML / screenshots) — `PanelShell.tsx`
 - [x] Avatar initial «اس» in footer chrome — `PanelShell.tsx`
 - [x] Nav badges: refund awaiting review + open tickets for SITE_ADMIN — `PanelShell.tsx`
 - [x] Cartable uses dark theme for SITE_ADMIN — `CartablePage.tsx`
 
 ## Dashboard
 - [x] Four KPI cards: آژانس فعال / مسافر این ماه / بلیط فروخته‌شده / درخواست در انتظار اقدام — `SiteAdminDashboardPage.test.tsx`
-- [x] Widgets: درخواست‌های آژانس‌ها، استرداد، کارتابل — same test
+- [x] Real MoM trend % on passenger/ticket KPIs when previous month has data
+- [x] Widgets: درخواست‌های آژانس‌ها، استرداد (با بج وضعیت)، کارتابل، اعلان‌های جدید — same test
 - [x] Backend `GET /reporting/site-admin-overview` (SITE_ADMIN) — docs/API.md + controller
 
 ## Login
