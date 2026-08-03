@@ -62,7 +62,8 @@ echo ""
 if [[ "$FE" == "200" && "$BE" == "200" ]]; then
   green "Site is up. Open: http://localhost:5173/login"
   echo "Staff login: chair / Blujet@1404"
+  echo "Cursor Cloud: forward port 5173 (frontend), not 3000 (API)."
 else
   yellow "Site is NOT fully up. Try: ./scripts/start-local.sh"
-  echo "If you use Cursor Cloud Agent, forward port 5173 in the Ports tab."
+  echo "If you use Cursor Cloud Agent, forward port 5173 (NOT 3000) in the Ports tab."
 fi
