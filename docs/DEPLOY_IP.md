@@ -67,7 +67,7 @@ apt-get install -y docker-compose-plugin   # اگر با اسکریپت بالا
 ## حساب‌های نمونه (فقط اگر `SEED_ON_START=true` بوده)
 
 رمز مشترک همه نقش‌ها: `Blujet@1404` (نام کاربری‌ها در
-`backend/typeorm/seed.ts` — مثل `ceo`, `chair`, `senior.rahimi`,
+`backend/typeorm/seed.ts` — مثل `ceo`, `chair`, `senior`,
 `finance`, `comm`, `itadmin`, `site.admin`).
 
 **قبل از استفاده واقعی و در دسترس عموم قرار دادن سرور، این حساب‌های نمونه

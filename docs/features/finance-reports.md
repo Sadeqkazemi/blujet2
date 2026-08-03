@@ -24,7 +24,10 @@ journeys).
 - [x] New-employee banner rows come from real `AuditLog(category=ACCOUNT)` events — verified by inspection of `StaffReportsService.reports` (query filters `category: 'ACCOUNT', entityType: 'User'`) + the frontend banner test below
 
 ### Frontend — مالی tab
-- [x] Analytic view (CEO/Chair/Senior/Commercial): sales chart with mode switcher, channel sum tiles, completed-flights box, «ترکیب درآمد» donut — `FinancePage.test.tsx`: `'CEO gets the analytic view: sales chart + revenue mix, no transactions/settlements'` (mode switcher ships the three granularities the shared `SalesBarChart` already supports — روز/ماه/پرواز stay deferred exactly as Phase 1's dashboard deferred them, one shared limitation, not a new one)
+- [x] Analytic view (CEO/Chair/Senior/Commercial): dark design (subtitle «فروش هر پرواز…», chips روزانه→شماره پرواز, channel tiles + inline flights, KPI trend cards, flights strip, «ترکیب درآمد» donut) — `FinancePage.test.tsx`: `'CEO gets the analytic view: sales chart + revenue mix, no transactions/settlements'`
+- [x] «شماره پرواز» mode: `GET /reporting/flight-sales` picker (search + cards), selected-flight channel tiles, year-scoped KPIs/donut — `FinancePage.test.tsx`: `'CEO شماره پرواز mode shows searchable flight cards and selected-flight summary'` + `reporting.e2e-spec.ts`: `'flight-sales lists departed instances…'`
+- [x] Picker collapses many departed instances of the same `flightNo` into **one** card (aggregated sales/seats); search still shows that single box — same FinancePage test (multi-instance EP-805 fixture)
+- [x] Flight cards appear **only after search** (no default catalog dump); empty query shows prompt — same FinancePage test
 - [x] Finance-ops view (FINANCE_MANAGER): KPI row, low-sales alert, completed-flights box, transactions list, donut, settlements rows with paid-ratio bars and «ارسال یادآوری» wired to the real Phase 3 remind endpoint — `'FINANCE_MANAGER gets the finance-ops view: transactions, settlements, remind action'`
 - [x] nav flags flipped to `implemented: true` for `finance` in all 5 roles — E2E journeys click the real nav link
 
@@ -71,7 +74,7 @@ Design reference: `design-reference-v2/پنل مدیر مالی.dc.html`. Nav fo
 `FINANCE_MANAGER` matches design exactly (7 tabs — `flightops` removed).
 
 ### Backend
-- [x] `GET /reporting/finance-dashboard-stats` (FINANCE_MANAGER only): active agencies, passengers/tickets/revenue this month with month-over-month trend pct — `'GET /reporting/finance-dashboard-stats: finance manager gets real dashboard cards; other roles 403'`
+- [x] `GET /reporting/finance-dashboard-stats` (CEO, BOARD_CHAIR, SENIOR_MANAGER, FINANCE_MANAGER): active agencies, passengers/tickets/revenue this month with month-over-month trend pct — `'GET /reporting/finance-dashboard-stats: executive + finance roles get real dashboard cards; others 403'`
 - [x] `GET /reporting/kpis` now includes `trends` (revenue/profit/cost/debt pct vs previous period) — `'GET /reporting/kpis: returns trend percentages alongside KPI values'`
 - [x] `GET /reporting/recent-transactions` rows include `statusFa` + `statusTone` — extended assertion in existing recent-transactions test
 

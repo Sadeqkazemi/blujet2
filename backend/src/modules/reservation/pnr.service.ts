@@ -25,6 +25,7 @@ import type {
   FinalizeLockDto,
   IssuePnrDto,
   ListPnrQueryDto,
+  ListReservationFlightsQueryDto,
   SearchFlightsQueryDto,
 } from './dto/reservation.dtos';
 
@@ -638,37 +639,244 @@ export class PnrService {
     return this.detail(booking.pnr);
   }
 
+  /**
+   * «پروازها» sub-tab of سامانه رزرواسیون/هواپیما — SCHEDULED instances
+   * with sold/locked/free counts so staff can open a seat map.
+   * Returns one shape covering CEO/Senior/IT/Board Chair tables:
+   * Persian `route`, city fields, and IT occupancy/status keys.
+   */
+  async listFlights(query: ListReservationFlightsQueryDto | string = {}) {
+    const q = (typeof query === 'string' ? query : query.q)?.trim();
+    await materializeFlownBookings(this.typeorm);
+    const airports = await this.typeorm.airport.findMany({
+      select: { code: true, cityFa: true },
+    });
+    const cityByCode = new Map(airports.map((a) => [a.code, a.cityFa]));
+
+    // Include past-dated SCHEDULED rows too — the seed (and some E2E
+    // fixtures) keep deliberately-past "SCHEDULED" instances for demos;
+    // staff still need to open their seat maps. Prefer soonest first.
+    const instances = await this.typeorm.flightInstance.findMany({
+      where: { status: 'SCHEDULED' },
+      include: {
+        flight: { include: { route: true } },
+      },
+      orderBy: { departureAt: 'asc' },
+      take: 120,
+    });
+
+    const qLower = q?.toLowerCase();
+    const filtered = qLower
+      ? instances.filter((instance) => {
+          const originCode = instance.flight.route.originCode;
+          const destCode = instance.flight.route.destCode;
+          const origin = cityByCode.get(originCode) ?? originCode;
+          const dest = cityByCode.get(destCode) ?? destCode;
+          const hay =
+            `${instance.flight.flightNo} ${originCode} ${destCode} ${origin} ${dest} ${instance.aircraftTypeOverride ?? instance.flight.aircraftType}`.toLowerCase();
+          return hay.includes(qLower);
+        })
+      : instances;
+    const limited = filtered.slice(0, 60);
+
+    const now = new Date();
+    const rows = await Promise.all(
+      limited.map(async (instance) => {
+        const aircraftType = resolveAircraftType(instance);
+        const map = await this.typeorm.aircraftSeatMap.findUnique({
+          where: { aircraftType },
+        });
+        const capacity = map ? enumerateSeats(map).length : instance.capacity;
+        const [soldCount, lockedCount] = await Promise.all([
+          this.typeorm.passenger.count({
+            where: {
+              seatCode: { not: null },
+              booking: {
+                flightInstanceId: instance.id,
+                status: { not: 'CANCELLED' },
+              },
+            },
+          }),
+          this.typeorm.seatLock.count({
+            where: {
+              flightInstanceId: instance.id,
+              releasedAt: null,
+              expiresAt: { gt: now },
+            },
+          }),
+        ]);
+        const originCode = instance.flight.route.originCode;
+        const destCode = instance.flight.route.destCode;
+        const originCityFa = cityByCode.get(originCode) ?? originCode;
+        const destCityFa = cityByCode.get(destCode) ?? destCode;
+        const occupancyPct =
+          capacity > 0 ? Math.round((soldCount / capacity) * 100) : 0;
+        const statusKey =
+          occupancyPct >= 100
+            ? 'FULL'
+            : occupancyPct >= 90
+              ? 'NEAR_FULL'
+              : 'SELLING';
+        return {
+          flightInstanceId: instance.id,
+          flightNo: instance.flight.flightNo,
+          aircraftType,
+          originCode,
+          destCode,
+          originCityFa,
+          destCityFa,
+          route: `${originCityFa} ← ${destCityFa}`,
+          departureAt: instance.departureAt,
+          capacity,
+          sold: soldCount,
+          soldCount,
+          lockedCount,
+          freeCount: Math.max(0, capacity - soldCount - lockedCount),
+          occupancyPct,
+          statusKey,
+        };
+      }),
+    );
+    return rows;
+  }
+
   async dashboardStats() {
     const dayStart = new Date();
     dayStart.setHours(0, 0, 0, 0);
 
-    const [todayCount, activePnrCount, soldSeats, revenue] = await Promise.all([
-      this.typeorm.booking.count({ where: { createdAt: { gte: dayStart } } }),
-      this.typeorm.booking.count({
-        where: { status: { in: ['HELD', 'PAID', 'TICKETED'] } },
-      }),
-      this.typeorm.passenger.count({
-        where: {
-          seatCode: { not: null },
-          booking: { status: { not: 'CANCELLED' } },
-        },
-      }),
-      this.typeorm.ledgerEntry.aggregate({
-        // Real ticket revenue only — AgenciesService.resetTestDebt
-        // reuses type:'SALE' for agency debt-line calibration
-        // (bookingId null, amount can be negative); excluded here the
-        // same way ReportingService's revenue aggregates exclude it.
-        where: { type: 'SALE', bookingId: { not: null } },
-        _sum: { signedAmountIrr: true },
-      }),
-    ]);
+    const pnrStoreStarted = Date.now();
+    const [todayCount, activePnrCount, soldSeats, revenue, channelGroups, toggles] =
+      await Promise.all([
+        this.typeorm.booking.count({ where: { createdAt: { gte: dayStart } } }),
+        this.typeorm.booking.count({
+          where: { status: { in: ['HELD', 'PAID', 'TICKETED'] } },
+        }),
+        this.typeorm.passenger.count({
+          where: {
+            seatCode: { not: null },
+            booking: { status: { not: 'CANCELLED' } },
+          },
+        }),
+        this.typeorm.ledgerEntry.aggregate({
+          // Real ticket revenue only — AgenciesService.resetTestDebt
+          // reuses type:'SALE' for agency debt-line calibration
+          // (bookingId null, amount can be negative); excluded here the
+          // same way ReportingService's revenue aggregates exclude it.
+          where: { type: 'SALE', bookingId: { not: null } },
+          _sum: { signedAmountIrr: true },
+        }),
+        this.typeorm.booking.groupBy({
+          by: ['channel'],
+          _count: { _all: true },
+          where: { status: { notIn: ['CANCELLED', 'EXPIRED'] } },
+        }),
+        this.typeorm.internalService.findMany({
+          where: { key: { in: ['payment', 'api', 'sms', 'search'] } },
+          select: { key: true, enabled: true },
+        }),
+      ]);
+    const pnrStoreLatencyMs = Date.now() - pnrStoreStarted;
+
+    const seatInvStarted = Date.now();
+    await this.typeorm.passenger.count({
+      where: { seatCode: { not: null } },
+    });
+    const seatInventoryLatencyMs = Date.now() - seatInvStarted;
+
+    const toggleByKey = new Map(toggles.map((t) => [t.key, t.enabled]));
+    const channelLabel: Record<string, string> = {
+      SYSTEM: 'فروش مستقیم سایت',
+      AGENCY: 'API آژانس‌های همکار',
+      CHARTER: 'فروش چارتر',
+    };
+    const channelColor: Record<string, string> = {
+      SYSTEM: '#3b82f6',
+      AGENCY: '#34d399',
+      CHARTER: '#a855f7',
+    };
+    const channelTotal = channelGroups.reduce((a, g) => a + g._count._all, 0);
+    const channels =
+      channelTotal === 0
+        ? []
+        : channelGroups
+            .map((g) => ({
+              key: g.channel,
+              label: channelLabel[g.channel] ?? g.channel,
+              color: channelColor[g.channel] ?? '#6b7b94',
+              count: g._count._all,
+              pct:
+                Math.round((g._count._all / channelTotal) * 1000) / 10,
+            }))
+            .sort((a, b) => b.count - a.count);
+
+    const svc = (
+      name: string,
+      fa: string,
+      ok: boolean,
+      latencyMs: number | null,
+    ) => ({
+      name,
+      fa,
+      ok,
+      latencyMs,
+      statusLabel: ok ? 'سالم' : 'قطع',
+    });
+
+    const services = [
+      svc('reservation-api', 'سرویس رزرواسیون مرکزی', true, pnrStoreLatencyMs),
+      svc('pnr-store', 'پایگاه ذخیره PNR', true, pnrStoreLatencyMs),
+      svc(
+        'payment-gateway',
+        'درگاه پرداخت',
+        toggleByKey.get('payment') !== false,
+        null,
+      ),
+      svc(
+        'agency-api',
+        'پلتفرم API آژانس‌ها',
+        toggleByKey.get('api') !== false,
+        null,
+      ),
+      svc('seat-inventory', 'موجودی صندلی', true, seatInventoryLatencyMs),
+      svc(
+        'notification-svc',
+        'سرویس اعلان و پیامک',
+        toggleByKey.get('sms') !== false,
+        null,
+      ),
+    ];
 
     return {
       todayBookings: todayCount,
       activePnrs: activePnrCount,
       seatsSold: soldSeats,
       revenueIrr: revenue._sum.signedAmountIrr ?? ZERO_IRR,
+      channels,
+      services,
+      servicesStable: services.every((s) => s.ok),
     };
+  }
+
+  /** Agencies that already hold an API key — design «دسترسی آژانس‌ها». */
+  async agencyApiAccess() {
+    const keys = await this.typeorm.agencyApiKey.findMany({
+      include: { agency: { include: { user: { select: { fullName: true } } } } },
+      orderBy: { activatedAt: 'desc' },
+    });
+    return keys.map((k) => {
+      const name = k.agency.user.fullName;
+      const initials = name.replace(/\s+/g, '').slice(0, 2) || '؟';
+      return {
+        id: k.id,
+        agencyId: k.agencyId,
+        name,
+        initials,
+        // Raw key is never stored — only an opaque hint from the key id.
+        keyHint: `bjk_••••${k.id.replace(/-/g, '').slice(0, 4)}`,
+        callCount: k.callCount,
+        status: k.status,
+      };
+    });
   }
 
   /**

@@ -3,7 +3,7 @@ import { formatJalaliDate } from '../lib/jalali';
 import type { LowSalesAlert } from '../types/reporting';
 
 /**
- * Finance/dashboard surface shows exactly ONE low-sales box.
+ * Dashboard/finance surface shows exactly ONE low-sales box.
  * Remaining alerts live in the panel notification bell (PanelShell).
  */
 export default function LowSalesBanner({

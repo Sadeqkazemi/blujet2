@@ -110,7 +110,7 @@ describe('IT Manager (e2e)', () => {
     expect(detail.status).toBe(200);
     expect(detail.body.data.available.length).toBeGreaterThan(0);
 
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const forbidden = await request(app.getHttpServer())
       .get(`/it/employees/${id}`)
       .set(auth(senior.accessToken));

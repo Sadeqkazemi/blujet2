@@ -1618,7 +1618,7 @@ See `CLAUDE.md` → Commands. `docker compose up -d` starts Postgres+Redis;
 
 - `cd backend && npm run seed` — (re)seeds one dev account per role, all
   sharing the password `Blujet@1404` (see `backend/typeorm/seed.ts` — dev
-  usernames: `ceo`, `chair`, `senior.rahimi`, `finance`,
+  usernames: `ceo`, `chair`, `senior`, `finance`,
   `comm`, `itadmin`, `site.admin`, `com.ahmadi`), plus 6 months of
   sample flights/bookings so the dashboard has real numbers to show.
 - Backend tests need a local Postgres reachable at the `DATABASE_URL` in

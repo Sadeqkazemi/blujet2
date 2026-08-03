@@ -98,7 +98,7 @@ describe('Agencies (e2e)', () => {
   // ── Listing & detail ────────────────────────────────────────────────
 
   it('GET /agencies returns the same 4 KPI cards for all 3 agency-tab roles', async () => {
-    for (const username of ['senior.rahimi', 'finance', 'comm']) {
+    for (const username of ['senior', 'finance', 'comm']) {
       const { accessToken } = await loginAs(app, username);
       const res = await request(app.getHttpServer())
         .get('/agencies')
@@ -139,7 +139,7 @@ describe('Agencies (e2e)', () => {
       data: { managerName: `جستجوپذیر-${suffix}` },
     });
 
-    const { accessToken } = await loginAs(app, 'senior.rahimi');
+    const { accessToken } = await loginAs(app, 'senior');
     const res = await request(app.getHttpServer())
       .get(`/agencies?q=${encodeURIComponent(`جستجوپذیر-${suffix}`)}`)
       .set('Authorization', `Bearer ${accessToken}`);
@@ -168,7 +168,7 @@ describe('Agencies (e2e)', () => {
     await addAgencySale(agencyId, 300_000_000);
     await addAgencySale(agencyId, 200_000_000);
 
-    const { accessToken } = await loginAs(app, 'senior.rahimi');
+    const { accessToken } = await loginAs(app, 'senior');
     const res = await request(app.getHttpServer())
       .get(`/agencies/${agencyId}`)
       .set('Authorization', `Bearer ${accessToken}`);
@@ -184,7 +184,7 @@ describe('Agencies (e2e)', () => {
   it('activityScore is included for Finance/Commercial but omitted for Senior Manager', async () => {
     const agencyId = await createFreshAgency();
 
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const seniorRes = await request(app.getHttpServer())
       .get(`/agencies/${agencyId}`)
       .set('Authorization', `Bearer ${senior.accessToken}`);
@@ -362,7 +362,7 @@ describe('Agencies (e2e)', () => {
 
   it('PATCH suspend without a reason -> 400', async () => {
     const agencyId = await createFreshAgency();
-    const { accessToken } = await loginAs(app, 'senior.rahimi');
+    const { accessToken } = await loginAs(app, 'senior');
     const res = await request(app.getHttpServer())
       .patch(`/agencies/${agencyId}/suspend`)
       .set('Authorization', `Bearer ${accessToken}`)
@@ -372,7 +372,7 @@ describe('Agencies (e2e)', () => {
 
   it('PATCH reactivate clears suspendedAt/suspendReason', async () => {
     const agencyId = await createFreshAgency();
-    const { accessToken } = await loginAs(app, 'senior.rahimi');
+    const { accessToken } = await loginAs(app, 'senior');
 
     await request(app.getHttpServer())
       .patch(`/agencies/${agencyId}/suspend`)
@@ -410,7 +410,7 @@ describe('Agencies (e2e)', () => {
 
   it('rejecting a request sets status without creating any User/AgencyProfile', async () => {
     const reqRow = await createFreshMembershipRequest('PENDING');
-    const { accessToken } = await loginAs(app, 'senior.rahimi');
+    const { accessToken } = await loginAs(app, 'senior');
 
     const res = await request(app.getHttpServer())
       .patch(`/agencies/requests/${reqRow.id}/reject`)
@@ -428,7 +428,7 @@ describe('Agencies (e2e)', () => {
   it('PATCH .../refer is 403 for FINANCE_MANAGER', async () => {
     const reqRow = await createFreshMembershipRequest('PENDING');
     const senior = await typeorm.user.findFirstOrThrow({
-      where: { username: 'senior.rahimi' },
+      where: { username: 'senior' },
     });
     const { accessToken } = await loginAs(app, 'finance');
 
@@ -468,11 +468,11 @@ describe('Agencies (e2e)', () => {
 
   it('the raw API key is returned once at creation and the DB only stores a hash', async () => {
     const agencyId = await createFreshAgency();
-    const { accessToken } = await loginAs(app, 'senior.rahimi');
+    const { accessToken } = await loginAs(app, 'senior');
     const stepUp = await stepUpFor(
       app,
       accessToken!,
-      'senior.rahimi',
+      'senior',
       'API_KEY_ROTATE',
     );
     const res = await request(app.getHttpServer())
@@ -492,11 +492,11 @@ describe('Agencies (e2e)', () => {
 
   it('regenerating a key changes its stored hash (old key hash no longer matches)', async () => {
     const agencyId = await createFreshAgency();
-    const { accessToken } = await loginAs(app, 'senior.rahimi');
+    const { accessToken } = await loginAs(app, 'senior');
     const stepUp1 = await stepUpFor(
       app,
       accessToken!,
-      'senior.rahimi',
+      'senior',
       'API_KEY_ROTATE',
     );
     const created = await request(app.getHttpServer())
@@ -512,7 +512,7 @@ describe('Agencies (e2e)', () => {
     const stepUp2 = await stepUpFor(
       app,
       accessToken!,
-      'senior.rahimi',
+      'senior',
       'API_KEY_ROTATE',
     );
     const regenerated = await request(app.getHttpServer())
@@ -538,7 +538,7 @@ describe('Agencies (e2e)', () => {
       dueAt: new Date(Date.now() + 86_400_000).toISOString(),
     };
 
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const seniorRes = await request(app.getHttpServer())
       .post(`/agencies/${agencyId}/invoices`)
       .set('Authorization', `Bearer ${senior.accessToken}`)
@@ -562,7 +562,7 @@ describe('Agencies (e2e)', () => {
 
   it('GET .../invoices is 200 (read) for all 3 roles', async () => {
     const agencyId = await createFreshAgency();
-    for (const username of ['senior.rahimi', 'finance', 'comm']) {
+    for (const username of ['senior', 'finance', 'comm']) {
       const { accessToken } = await loginAs(app, username);
       const res = await request(app.getHttpServer())
         .get(`/agencies/${agencyId}/invoices`)
@@ -603,7 +603,7 @@ describe('Agencies (e2e)', () => {
   it('GET/POST .../messages is 403 for SENIOR_MANAGER and FINANCE_MANAGER', async () => {
     const agencyId = await createFreshAgency();
 
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const seniorGet = await request(app.getHttpServer())
       .get(`/agencies/${agencyId}/messages`)
       .set('Authorization', `Bearer ${senior.accessToken}`);
@@ -628,7 +628,7 @@ describe('Agencies (e2e)', () => {
 
   it('two simultaneous PATCH .../credit calls do not crash, last write wins, and both are audited', async () => {
     const agencyId = await createFreshAgency();
-    const seniorA = await loginAs(app, 'senior.rahimi');
+    const seniorA = await loginAs(app, 'senior');
     const financeB = await loginAs(app, 'finance');
 
     const [resA, resB] = await Promise.all([

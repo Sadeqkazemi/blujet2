@@ -120,7 +120,7 @@ describe('Flights (e2e)', () => {
       departureAt: new Date(Date.now() + 20 * 24 * 3_600_000),
     });
 
-    const { accessToken } = await loginAs(app, 'senior.rahimi');
+    const { accessToken } = await loginAs(app, 'senior');
     const res = await request(app.getHttpServer())
       .get('/flights/overview')
       .set('Authorization', `Bearer ${accessToken}`);
@@ -199,7 +199,7 @@ describe('Flights (e2e)', () => {
   });
 
   it('airports catalog is seeded (Iranian cities + DXB/IST/NJF); roles without the tab get 403', async () => {
-    const { accessToken } = await loginAs(app, 'senior.rahimi');
+    const { accessToken } = await loginAs(app, 'senior');
     const res = await request(app.getHttpServer())
       .get('/flights/airports')
       .set('Authorization', `Bearer ${accessToken}`);
@@ -247,7 +247,7 @@ describe('Flights (e2e)', () => {
   });
 
   it('POST /flights: validations (same origin/dest, past date, duplicate flightNo on another route) then a clean create', async () => {
-    const { accessToken } = await loginAs(app, 'senior.rahimi');
+    const { accessToken } = await loginAs(app, 'senior');
     const base = {
       originCode: 'THR',
       destCode: 'MHD',
@@ -311,7 +311,7 @@ describe('Flights (e2e)', () => {
     await addBooking(instance.id, 'SYSTEM', 30_000_000);
     await addBooking(instance.id, 'CHARTER', 28_000_000);
 
-    const { accessToken } = await loginAs(app, 'senior.rahimi');
+    const { accessToken } = await loginAs(app, 'senior');
     const res = await request(app.getHttpServer())
       .get(`/flights/${instance.id}`)
       .set('Authorization', `Bearer ${accessToken}`);
@@ -375,7 +375,7 @@ describe('Flights (e2e)', () => {
     const instance = await createInstance({
       departureAt: new Date(Date.now() + 20 * 24 * 3_600_000),
     });
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const res = await request(app.getHttpServer())
       .patch(`/flights/${instance.id}/plan`)
       .set('Authorization', `Bearer ${senior.accessToken}`)
@@ -393,7 +393,7 @@ describe('Flights (e2e)', () => {
     const future = await createInstance({
       departureAt: new Date(Date.now() + 20 * 24 * 3_600_000),
     });
-    const { accessToken } = await loginAs(app, 'senior.rahimi');
+    const { accessToken } = await loginAs(app, 'senior');
 
     fakeMl.nextResult = null; // ml-service down
     const down = await request(app.getHttpServer())

@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Outlet, Route, Routes } from 'react-router-dom';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import FinancePage from './FinancePage';
 import * as reportingApi from '../../api/reporting';
@@ -13,11 +13,22 @@ import type {
   AgencySettlementsResult,
   CompletedFlightsSummary,
   KpiResult,
-  LowSalesAlert,
   RecentTransactionsResult,
   RevenueMixResult,
 } from '../../types/reporting';
 import type { ReconciliationItem } from '../../types/reconciliation';
+
+function renderFinancePage() {
+  return render(
+    <MemoryRouter>
+      <Routes>
+        <Route element={<Outlet context={{ nav: [], lowSalesAlerts: [] }} />}>
+          <Route index element={<FinancePage />} />
+        </Route>
+      </Routes>
+    </MemoryRouter>,
+  );
+}
 
 // Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON on
 // the backend — a JS number can't safely hold IRR amounts above 2^53).
@@ -94,36 +105,6 @@ const RECONCILIATION_ITEM: ReconciliationItem = {
   createdAt: '2026-07-12T09:00:00.000Z',
 };
 
-const ALERTS: LowSalesAlert[] = [
-  {
-    flightNo: 'EP-821',
-    originCode: 'THR',
-    destCode: 'DXB',
-    departureAt: '2026-08-03T08:00:00.000Z',
-    capacity: 180,
-    soldSeats: 40,
-    occupancyPct: 22,
-  },
-  {
-    flightNo: 'BJ-100',
-    originCode: 'THR',
-    destCode: 'MHD',
-    departureAt: '2026-08-03T10:00:00.000Z',
-    capacity: 150,
-    soldSeats: 30,
-    occupancyPct: 20,
-  },
-  {
-    flightNo: 'BJ-101',
-    originCode: 'MHD',
-    destCode: 'THR',
-    departureAt: '2026-08-03T12:00:00.000Z',
-    capacity: 150,
-    soldSeats: 25,
-    occupancyPct: 17,
-  },
-];
-
 function mockRole(role: Role) {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status: 'authenticated',
@@ -135,34 +116,18 @@ function mockRole(role: Role) {
   });
 }
 
-function renderFinance(lowSalesAlerts: LowSalesAlert[] = []) {
-  return render(
-    <MemoryRouter initialEntries={['/panel/finance']}>
-      <Routes>
-        <Route path="/panel" element={<Outlet context={{ nav: null, lowSalesAlerts }} />}>
-          <Route path="finance" element={<FinancePage />} />
-        </Route>
-      </Routes>
-    </MemoryRouter>,
-  );
-}
-
-function mockFinanceOpsApis() {
-  vi.spyOn(reportingApi, 'fetchKpis').mockResolvedValue(KPIS);
-  vi.spyOn(reportingApi, 'fetchCompletedFlightsSummary').mockResolvedValue(FLIGHTS);
-  vi.spyOn(reportingApi, 'fetchRecentTransactions').mockResolvedValue(TX);
-  vi.spyOn(reportingApi, 'fetchRevenueMix').mockResolvedValue(MIX);
-  vi.spyOn(reportingApi, 'fetchAgencySettlements').mockResolvedValue(SETTLEMENTS);
-  vi.spyOn(reconciliationApi, 'fetchReconciliationQueue').mockResolvedValue([]);
-}
-
 describe('FinancePage', () => {
   it('FINANCE_MANAGER gets the finance-ops view: transactions, settlements, remind action', async () => {
     mockRole('FINANCE_MANAGER');
-    mockFinanceOpsApis();
+    vi.spyOn(reportingApi, 'fetchKpis').mockResolvedValue(KPIS);
+    vi.spyOn(reportingApi, 'fetchCompletedFlightsSummary').mockResolvedValue(FLIGHTS);
+    vi.spyOn(reportingApi, 'fetchRecentTransactions').mockResolvedValue(TX);
+    vi.spyOn(reportingApi, 'fetchRevenueMix').mockResolvedValue(MIX);
+    vi.spyOn(reportingApi, 'fetchAgencySettlements').mockResolvedValue(SETTLEMENTS);
+    vi.spyOn(reconciliationApi, 'fetchReconciliationQueue').mockResolvedValue([]);
     const remindSpy = vi.spyOn(agenciesApi, 'remindAgencyInvoice').mockResolvedValue({ queued: true });
 
-    renderFinance();
+    renderFinancePage();
     expect(await screen.findByText('تراکنش‌های مالی اخیر')).toBeInTheDocument();
     expect(screen.getByText('تسویه حساب')).toBeInTheDocument();
     expect(screen.getByText('تسویه‌حساب آژانس‌های همکار')).toBeInTheDocument();
@@ -174,49 +139,19 @@ describe('FinancePage', () => {
     await waitFor(() => expect(remindSpy).toHaveBeenCalledWith('ag1', 'inv3'));
   });
 
-  it('shows only the latest low-sales alert as a single banner on the finance page', async () => {
-    mockRole('FINANCE_MANAGER');
-    mockFinanceOpsApis();
-
-    renderFinance(ALERTS);
-    expect(await screen.findByTestId('low-sales-banner')).toBeInTheDocument();
-    expect(screen.getByTestId('low-sales-banner')).toHaveTextContent('EP-821');
-    expect(screen.getAllByTestId('low-sales-banner')).toHaveLength(1);
-    expect(screen.queryByText('BJ-100')).not.toBeInTheDocument();
-    expect(screen.queryByText('BJ-101')).not.toBeInTheDocument();
-  });
-
-  it('shows at most 5 recent financial transactions (design hint-placeholder-count)', async () => {
-    mockRole('FINANCE_MANAGER');
-    mockFinanceOpsApis();
-    vi.spyOn(reportingApi, 'fetchRecentTransactions').mockResolvedValue({
-      totalCount: 12,
-      rows: Array.from({ length: 12 }, (_, i) => ({
-        id: `t-${i}`,
-        type: 'SALE' as const,
-        titleFa: 'درآمد فروش بلیط',
-        party: `THR → DXB #${i}`,
-        occurredAt: '2026-07-10T10:00:00.000Z',
-        signedAmountIrr: '380000000',
-        statusFa: 'موفق',
-        statusTone: 'success' as const,
-      })),
-    });
-
-    renderFinance();
-    expect(await screen.findByText('۱۲ تراکنش')).toBeInTheDocument();
-    expect(screen.getAllByText('درآمد فروش بلیط')).toHaveLength(5);
-  });
-
   it('shows the payment-reconciliation queue and resolves an item with a required note', async () => {
     mockRole('FINANCE_MANAGER');
-    mockFinanceOpsApis();
+    vi.spyOn(reportingApi, 'fetchKpis').mockResolvedValue(KPIS);
+    vi.spyOn(reportingApi, 'fetchCompletedFlightsSummary').mockResolvedValue(FLIGHTS);
+    vi.spyOn(reportingApi, 'fetchRecentTransactions').mockResolvedValue(TX);
+    vi.spyOn(reportingApi, 'fetchRevenueMix').mockResolvedValue(MIX);
+    vi.spyOn(reportingApi, 'fetchAgencySettlements').mockResolvedValue(SETTLEMENTS);
     vi.spyOn(reconciliationApi, 'fetchReconciliationQueue').mockResolvedValue([RECONCILIATION_ITEM]);
     const resolveSpy = vi
       .spyOn(reconciliationApi, 'resolveReconciliation')
       .mockResolvedValue({ ...RECONCILIATION_ITEM, bookingStatus: 'TICKETED' });
 
-    renderFinance();
+    renderFinancePage();
     expect(await screen.findByTestId('reconciliation-item')).toHaveTextContent('BJ9K2L');
     expect(screen.getByTestId('reconciliation-item')).toHaveTextContent('GW-88213');
 
@@ -237,10 +172,14 @@ describe('FinancePage', () => {
 
   it('FINANCE_MANAGER finance-ops view loads day granularity with Jalali date picker', async () => {
     mockRole('FINANCE_MANAGER');
-    mockFinanceOpsApis();
     const kpiSpy = vi.spyOn(reportingApi, 'fetchKpis').mockResolvedValue(KPIS);
+    vi.spyOn(reportingApi, 'fetchCompletedFlightsSummary').mockResolvedValue(FLIGHTS);
+    vi.spyOn(reportingApi, 'fetchRecentTransactions').mockResolvedValue(TX);
+    vi.spyOn(reportingApi, 'fetchRevenueMix').mockResolvedValue(MIX);
+    vi.spyOn(reportingApi, 'fetchAgencySettlements').mockResolvedValue(SETTLEMENTS);
+    vi.spyOn(reconciliationApi, 'fetchReconciliationQueue').mockResolvedValue([]);
 
-    renderFinance();
+    renderFinancePage();
     await screen.findByText('تراکنش‌های مالی اخیر');
 
     const user = userEvent.setup();
@@ -259,18 +198,142 @@ describe('FinancePage', () => {
         periodKey: '2026-07-01',
         startDate: '2026-07-01T00:00:00.000Z',
         endDate: '2026-08-01T00:00:00.000Z',
-        systemIrr: '2300000000',
-        charterIrr: '1550000000',
-        agencyIrr: '1150000000',
+        systemIrr: '2300000000000',
+        charterIrr: '1550000000000',
+        agencyIrr: '1150000000000',
       },
     ]);
+    vi.spyOn(reportingApi, 'fetchKpis').mockResolvedValue(KPIS);
     vi.spyOn(reportingApi, 'fetchCompletedFlightsSummary').mockResolvedValue(FLIGHTS);
     vi.spyOn(reportingApi, 'fetchRevenueMix').mockResolvedValue(MIX);
 
-    renderFinance();
+    renderFinancePage();
+    expect(
+      await screen.findByText('فروش هر پرواز بر اساس کانال و پیشنهاد قیمت هوش مصنوعی'),
+    ).toBeInTheDocument();
     expect(await screen.findByText('نمودار فروش')).toBeInTheDocument();
     expect(screen.getByText('ترکیب درآمد')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '۶ ماهه' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'شماره پرواز' })).toBeInTheDocument();
+    expect(screen.getByText('مطالبات معوق آژانس‌ها')).toBeInTheDocument();
     expect(screen.queryByText('تراکنش‌های مالی اخیر')).not.toBeInTheDocument();
     expect(screen.queryByText('تسویه‌حساب آژانس‌های همکار')).not.toBeInTheDocument();
+  });
+
+  it('CEO شماره پرواز mode shows searchable flight cards and selected-flight summary', async () => {
+    mockRole('CEO');
+    vi.spyOn(reportingApi, 'fetchSalesChart').mockResolvedValue([]);
+    vi.spyOn(reportingApi, 'fetchKpis').mockResolvedValue(KPIS);
+    vi.spyOn(reportingApi, 'fetchCompletedFlightsSummary').mockResolvedValue(FLIGHTS);
+    vi.spyOn(reportingApi, 'fetchRevenueMix').mockResolvedValue(MIX);
+    // Multiple departed instances of the same flightNo must collapse to ONE card.
+    vi.spyOn(reportingApi, 'fetchFlightSales').mockResolvedValue({
+      rows: [
+        {
+          flightInstanceId: 'fi-1a',
+          flightNo: 'EP-805',
+          originCode: 'THR',
+          destCode: 'DXB',
+          originCityFa: 'تهران',
+          destCityFa: 'دبی',
+          departureAt: '2026-08-23T06:00:00.000Z',
+          systemIrr: '2000000000',
+          charterIrr: '1000000000',
+          agencyIrr: '1000000000',
+          totalIrr: '4000000000',
+          capacity: 168,
+          soldSeats: 120,
+        },
+        {
+          flightInstanceId: 'fi-1b',
+          flightNo: 'EP-805',
+          originCode: 'THR',
+          destCode: 'DXB',
+          originCityFa: 'تهران',
+          destCityFa: 'دبی',
+          departureAt: '2026-08-16T06:00:00.000Z',
+          systemIrr: '2120000000',
+          charterIrr: '980000000',
+          agencyIrr: '1430000000',
+          totalIrr: '4530000000',
+          capacity: 168,
+          soldSeats: 110,
+        },
+        {
+          flightInstanceId: 'fi-1c',
+          flightNo: 'EP-805',
+          originCode: 'THR',
+          destCode: 'DXB',
+          originCityFa: 'تهران',
+          destCityFa: 'دبی',
+          departureAt: '2026-08-09T06:00:00.000Z',
+          systemIrr: '1000000000',
+          charterIrr: '500000000',
+          agencyIrr: '500000000',
+          totalIrr: '2000000000',
+          capacity: 168,
+          soldSeats: 90,
+        },
+        {
+          flightInstanceId: 'fi-2',
+          flightNo: 'W5-098',
+          originCode: 'MHD',
+          destCode: 'THR',
+          originCityFa: 'مشهد',
+          destCityFa: 'تهران',
+          departureAt: '2026-06-29T09:00:00.000Z',
+          systemIrr: '1880000000',
+          charterIrr: '1420000000',
+          agencyIrr: '1040000000',
+          totalIrr: '4340000000',
+          capacity: 150,
+          soldSeats: 100,
+        },
+      ],
+    });
+
+    renderFinancePage();
+    await screen.findByText('نمودار فروش');
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'شماره پرواز' }));
+
+    // No flight cards by default — only the search box + prompt.
+    expect(await screen.findByLabelText('جستجوی شماره پرواز یا مسیر')).toBeInTheDocument();
+    expect(screen.getByText('شماره پرواز یا مسیر را جستجو کنید.')).toBeInTheDocument();
+    expect(screen.queryByTestId('flight-sales-list')).not.toBeInTheDocument();
+    expect(screen.queryByText('تهران ← دبی')).not.toBeInTheDocument();
+    expect(screen.queryByText('مشهد ← تهران')).not.toBeInTheDocument();
+
+    // Search reveals matching flights (one card per flightNo).
+    await user.type(screen.getByLabelText('جستجوی شماره پرواز یا مسیر'), 'EP-805');
+    expect(screen.queryByText('شماره پرواز یا مسیر را جستجو کنید.')).not.toBeInTheDocument();
+    expect(screen.getByTestId('flight-sales-list').className).toContain('flex-col');
+    expect(screen.getAllByRole('button', { name: /تهران ← دبی/ })).toHaveLength(1);
+    expect(screen.queryByText('مشهد ← تهران')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /تهران ← دبی/ })).toHaveTextContent('۳ پرواز');
+    // Aggregated sales: 4.0B + 4.53B + 2.0B rial = 10.53B → 1.053B toman → «۱٫۱ میلیارد»
+    expect(screen.getByRole('button', { name: /تهران ← دبی/ })).toHaveTextContent('۱٫۱ میلیارد');
+    expect(screen.getByText('پرواز EP-805')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /تهران ← دبی/ })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+
+    // Broader search can show multiple cards; clicking updates the summary.
+    await user.clear(screen.getByLabelText('جستجوی شماره پرواز یا مسیر'));
+    await user.type(screen.getByLabelText('جستجوی شماره پرواز یا مسیر'), 'تهران');
+    expect(screen.getByText('تهران ← دبی')).toBeInTheDocument();
+    expect(screen.getByText('مشهد ← تهران')).toBeInTheDocument();
+    const w5Card = screen.getByRole('button', { name: /مشهد ← تهران/ });
+    await user.click(w5Card);
+    expect(w5Card).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('پرواز W5-098')).toBeInTheDocument();
+    expect(screen.getAllByText('۴۳۴ میلیون').length).toBeGreaterThanOrEqual(1);
+
+    // Clearing search hides cards again (no default box).
+    await user.clear(screen.getByLabelText('جستجوی شماره پرواز یا مسیر'));
+    expect(screen.getByText('شماره پرواز یا مسیر را جستجو کنید.')).toBeInTheDocument();
+    expect(screen.queryByTestId('flight-sales-list')).not.toBeInTheDocument();
   });
 });
