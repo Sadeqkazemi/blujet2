@@ -206,7 +206,7 @@ describe('ReservationPage', () => {
     expect(await screen.findByText('آخرین رزروهای ثبت‌شده')).toBeInTheDocument();
     expect(await screen.findByText('نگار رضایی')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'BJDEMO1' }));
+    await user.click(screen.getByRole('button', { name: /BJDEMO1/ }));
     expect(await screen.findByRole('button', { name: 'ثبت تغییر' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'لغو رزرو' })).toBeInTheDocument();
   });
@@ -331,7 +331,7 @@ describe('ReservationPage', () => {
     render(<ReservationPage />);
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /مدیریت رزروها/ }));
-    await user.click(await screen.findByRole('button', { name: 'BJDEMO1' }));
+    await user.click(await screen.findByRole('button', { name: /BJDEMO1/ }));
     await user.click(await screen.findByRole('button', { name: 'ثبت عدم حضور مسافر' }));
 
     await waitFor(() => expect(noShowSpy).toHaveBeenCalledWith('BJDEMO1'));
@@ -347,7 +347,7 @@ describe('ReservationPage', () => {
     render(<ReservationPage />);
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /مدیریت رزروها/ }));
-    await user.click(await screen.findByRole('button', { name: 'BJDEMO1' }));
+    await user.click(await screen.findByRole('button', { name: /BJDEMO1/ }));
 
     const dialog = await screen.findByRole('dialog', { name: 'رزرو BJDEMO1' });
     expect(within(dialog).queryByRole('button', { name: 'ثبت عدم حضور مسافر' })).not.toBeInTheDocument();
