@@ -55,6 +55,16 @@ Acceptance checklist for پنل ادمین سایت parity with
 - [x] Create-ticket modal + `POST /support-tickets/admin` — same test
 - [x] 10/page — same test
 
+## Site Management («مدیریت سایت»)
+- [x] Dark banners + destinations + routes + app links + social + support + jobs + library — `MediaAdminPage.test.tsx`
+- [x] Job postings CRUD moved here from jobapps — same test
+- [x] 10/page on destinations, routes, library, jobs — `usePagination`
+
+## Employment Requests («درخواست‌های استخدام»)
+- [x] Dark applications-only queue (title/subtitle/search/«همۀ آگهی‌ها»/empty copy) — `CareersAdminPage.test.tsx`
+- [x] Detail modal: refer / hire / reject — same test
+- [x] 10/page — same test
+
 ## Global panel pagination rule
 - [x] Default `PANEL_PAGE_SIZE = 10` via `usePagination` — `Pagination.test.tsx`
 - [x] Overrides removed: refunds + commercial pricing now 10/page — `RefundsPage.test.tsx`, `PricingPage.test.tsx`
