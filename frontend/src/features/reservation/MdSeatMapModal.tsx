@@ -10,9 +10,11 @@ import { airportCityName } from '../../lib/airport-cities';
 import { faDigits, faMoney } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import {
+  isMd80Aircraft,
   md80SectionForRow,
   MD80_MAIN_CABIN_EXTRA_ROW_END,
 } from '../public-site/checkout/md80-seat-layout';
+import ReservationMd80SeatMap from './ReservationMd80SeatMap';
 import type { FlightRow } from '../../types/flights';
 import type { BookingStatus, SeatCell, SeatMap, SeatStatus } from '../../types/reservation';
 
@@ -168,6 +170,15 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
     });
   }, [seatMap]);
 
+  const seatsByCode = useMemo(() => {
+    const map = new Map<string, SeatCell>();
+    for (const row of seatMap?.rows ?? []) {
+      for (const s of row.seats) map.set(s.seatCode, s);
+    }
+    return map;
+  }, [seatMap]);
+
+  const useMd80Chart = isMd80Aircraft(seatMap?.aircraftType ?? 'MD-80');
   async function onSearch() {
     const q = query.trim();
     if (!q) {
@@ -364,6 +375,14 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
 
           {loading || !seatMap ? (
             <p className="py-10 text-center text-xs text-[#6b7b94]">در حال بارگذاری نقشهٔ صندلی…</p>
+          ) : useMd80Chart ? (
+            <ReservationMd80SeatMap
+              seatsByCode={seatsByCode}
+              selectedSeatCode={lockSeatCode ?? infoSeat?.seatCode ?? null}
+              highlightSeatCode={highlightCode}
+              canLock
+              onSeatClick={onSeatClick}
+            />
           ) : (
             <div className="mx-auto w-max max-w-full">
               {rowsWithBands.map(({ row, band, showDivider }) => {
@@ -407,7 +426,6 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
                           </span>
                         );
                       })}
-                      {/* When aisle is after last seat (unusual), still show row num */}
                       {aisleAfter >= row.seats.length && (
                         <span className="font-num w-5 text-center text-[9px] font-bold text-[#6b7b94]">
                           {faDigits(row.row)}

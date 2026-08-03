@@ -14,6 +14,11 @@ import {
   type Md80CabinSection,
 } from '../public-site/checkout/md80-seat-layout';
 
+/**
+ * Interactive MD-80 seat chart for staff panels.
+ * Layout source: design-reference-v2/MD-80-seatmap.pdf (user MD _ 80.pdf).
+ */
+
 const SECTION_LABEL: Record<Md80CabinSection, string> = {
   FIRST: 'کلاس یک (First Class)',
   BUSINESS: 'کابین اصلی با فضای پا بیشتر (Main Cabin Extra)',
@@ -22,22 +27,24 @@ const SECTION_LABEL: Record<Md80CabinSection, string> = {
 
 const SECTION_COLOR: Record<Md80CabinSection, string> = {
   FIRST: 'text-[#fbbf24]',
-  BUSINESS: 'text-[#67e8f9]',
+  BUSINESS: 'text-[#2dd4bf]',
   ECONOMY: 'text-[#9fb0c7]',
 };
 
-function seatTone(status: SeatStatus, selected: boolean, exitRow: boolean): {
-  fill: string;
-  stroke: string;
-  text: string;
-} {
-  if (selected) return { fill: '#f59e0b', stroke: '#fbbf24', text: '#1a1206' };
+function seatTone(
+  status: SeatStatus,
+  selected: boolean,
+  exitRow: boolean,
+  highlight: boolean,
+): { fill: string; stroke: string; text: string } {
+  if (selected || highlight) return { fill: '#f59e0b', stroke: '#fbbf24', text: '#1a1206' };
   if (status === 'SOLD') return { fill: '#3b82f6', stroke: '#60a5fa', text: '#fff' };
   if (status === 'LOCKED') return { fill: '#f59e0b', stroke: '#fbbf24', text: '#1a1206' };
-  if (exitRow) return { fill: '#2a1a22', stroke: '#f0a8b4', text: '#f0a8b4' };
-  return { fill: '#18223a', stroke: '#3a4a63', text: '#cdd9ec' };
+  if (exitRow) return { fill: '#1f1520', stroke: '#f0a8b4', text: '#f0a8b4' };
+  return { fill: '#e8eef6', stroke: '#8aa4c0', text: '#1a3a55' };
 }
 
+/** Top-down chair icon matching the MD-80 PDF chart. */
 function SeatIcon({
   letter,
   fill,
@@ -93,11 +100,49 @@ function AmenityChip({
           : 'کمد';
   return (
     <div
-      className="flex h-9 min-w-[62px] flex-col items-center justify-center gap-0.5 rounded-md border border-[#2a3550] bg-[#111b2d] px-1 text-[8px] font-bold text-[#7d8aa0]"
+      className="flex h-9 min-w-[62px] flex-col items-center justify-center gap-0.5 rounded-md border border-[#2a4060] bg-[#132033] px-1 text-[8px] font-bold text-[#8fb4d8]"
       aria-hidden
     >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        {kind === 'exit' && <path d="M9 6H5v12h4M13 12H5M15 8l4 4-4 4" />}
+        {kind === 'galley' && (
+          <>
+            <path d="M8 3v7a4 4 0 0 0 8 0V3" />
+            <path d="M12 14v7" />
+            <path d="M8 21h8" />
+          </>
+        )}
+        {kind === 'lav' && (
+          <>
+            <circle cx="9" cy="7" r="2.2" />
+            <circle cx="15" cy="7" r="2.2" />
+            <path d="M5 20c0-2.5 1.8-4.5 4-4.5s4 2 4 4.5" />
+            <path d="M11 20c0-2.5 1.8-4.5 4-4.5s4 2 4 4.5" />
+          </>
+        )}
+        {kind === 'closet' && (
+          <>
+            <path d="M6 21V8l6-4 6 4v13" />
+            <path d="M12 4v6" />
+            <path d="M9 11h6" />
+          </>
+        )}
+      </svg>
       <span>{label}</span>
     </div>
+  );
+}
+
+function ExitArrow({ side }: { side: 'left' | 'right' }) {
+  return (
+    <span
+      className={`inline-flex items-center text-[11px] font-black text-[#60a5fa] ${
+        side === 'left' ? '' : 'scale-x-[-1]'
+      }`}
+      aria-hidden
+    >
+      ◀
+    </span>
   );
 }
 
@@ -105,19 +150,20 @@ function ColumnHeaders({ section }: { section: Md80CabinSection }) {
   const rightCols = section === 'FIRST' ? (['E', 'F'] as const) : (['D', 'E', 'F'] as const);
   return (
     <div className="mb-1 flex items-center justify-center gap-1 text-[9px] font-bold text-[#6b7b94]">
-      <span className="w-5" />
+      <span className="w-4" />
       {(['A', 'B'] as const).map((c) => (
         <span key={`hl-${c}`} className="w-[34px] text-center">
           {c}
         </span>
       ))}
-      <span className="w-4" />
+      <span className="w-7" />
+      {section === 'FIRST' && <span className="w-[34px]" aria-hidden />}
       {rightCols.map((c) => (
         <span key={`hr-${c}`} className="w-[34px] text-center">
           {c}
         </span>
       ))}
-      <span className="w-5" />
+      <span className="w-4" />
     </div>
   );
 }
@@ -127,11 +173,13 @@ export { isMd80Aircraft, MD80_TOTAL_SEATS };
 export default function ReservationMd80SeatMap({
   seatsByCode,
   selectedSeatCode,
+  highlightSeatCode,
   canLock,
   onSeatClick,
 }: {
   seatsByCode: Map<string, SeatCell>;
   selectedSeatCode: string | null;
+  highlightSeatCode?: string | null;
   canLock: boolean;
   onSeatClick: (seat: SeatCell) => void;
 }) {
@@ -148,13 +196,48 @@ export default function ReservationMd80SeatMap({
     );
   }
 
+  function renderSeat(code: string, letter: string, first: boolean, exitRow: boolean) {
+    if (MD80_EXCLUDED.has(code)) return null;
+    const cell = resolveCell(code);
+    const selected = selectedSeatCode === code;
+    const highlight = highlightSeatCode === code;
+    const tone = seatTone(cell.status, selected, exitRow, highlight);
+    return (
+      <button
+        key={code}
+        type="button"
+        onClick={() => onSeatClick(cell)}
+        aria-label={code}
+        title={canLock ? code : `${code} — فقط مشاهده`}
+        className={`inline-flex cursor-pointer items-center justify-center rounded p-0 ${
+          highlight ? 'ring-2 ring-[#fcd34d]' : ''
+        } ${selected ? 'ring-2 ring-white' : ''}`}
+      >
+        <SeatIcon
+          letter={letter}
+          fill={tone.fill}
+          stroke={tone.stroke}
+          text={tone.text}
+          large={first}
+          exitRow={exitRow}
+        />
+      </button>
+    );
+  }
+
   return (
     <div
-      className="max-h-[380px] overflow-auto rounded-[13px] border border-[#1c2740] bg-gradient-to-b from-[#0d1626] to-[#0b1220] p-3"
+      className="max-h-[min(62vh,520px)] overflow-auto rounded-[16px] border border-[#1c2740] bg-[#0a1220] p-3"
       data-testid="reservation-md80-seat-map"
       data-aircraft="MD-80"
     >
-      <div dir="ltr" className="mx-auto w-fit min-w-[280px]">
+      {/* Fuselage shell — matches PDF capsule outline */}
+      <div
+        dir="ltr"
+        className="relative mx-auto w-fit min-w-[300px] rounded-[40px] border-[1.5px] border-[#3a5478] bg-gradient-to-b from-[#101b2e] via-[#0d1626] to-[#0b1220] px-3 py-4 shadow-[inset_0_0_40px_rgba(30,60,100,.25)]"
+      >
+        <div className="pointer-events-none absolute inset-x-6 top-0 h-3 rounded-b-full bg-[#1a2a42]/60" />
+
         <div className="mb-1 flex items-end justify-between gap-3 px-1">
           <div className="flex gap-1">
             <AmenityChip kind="closet" />
@@ -183,7 +266,7 @@ export default function ReservationMd80SeatMap({
                 <>
                   <ColumnHeaders section={section} />
                   <div
-                    className={`mb-0.5 text-[9px] font-extrabold ${SECTION_COLOR[section]}`}
+                    className={`mb-0.5 text-center text-[9px] font-extrabold ${SECTION_COLOR[section]}`}
                     data-testid={`reservation-section-${section.toLowerCase()}`}
                   >
                     {SECTION_LABEL[section]}
@@ -192,97 +275,42 @@ export default function ReservationMd80SeatMap({
               )}
 
               {exitRow && (
-                <div className="mb-0.5 flex items-center justify-center gap-1 text-[8px] font-bold text-[#f87171]">
-                  <span>◀</span>
-                  <span>ردیف خروج اضطراری</span>
-                  <span>▶</span>
+                <div className="mb-0.5 flex items-center justify-center gap-2 text-[8px] font-bold text-[#60a5fa]">
+                  <ExitArrow side="left" />
+                  <span>خروج اضطراری · ردیف {faDigits(row)}</span>
+                  <ExitArrow side="right" />
                 </div>
               )}
 
               <div
                 className={`flex items-center justify-center gap-1 py-[2px] ${
-                  inWing ? 'rounded-md bg-[#121c2e]' : ''
-                } ${exitRow ? 'rounded-md border border-dashed border-[#5a3040] bg-[#1a1218]' : ''}`}
+                  inWing ? 'rounded-md bg-[#121c2e]/80' : ''
+                } ${exitRow ? 'rounded-md border border-dashed border-[#3b6ea0] bg-[#122033]/70' : ''}`}
               >
-                <span className="font-num w-5 flex-none text-center text-[10px] font-semibold text-[#6b7b94]">
-                  {faDigits(row)}
-                </span>
+                {exitRow ? <ExitArrow side="left" /> : <span className="w-3" aria-hidden />}
 
                 {amenity ? (
                   <div className="flex w-[70px] justify-center">
                     <AmenityChip kind={amenity} />
                   </div>
                 ) : (
-                  left.map((letter) => {
-                    const code = `${row}${letter}`;
-                    if (MD80_EXCLUDED.has(code)) return null;
-                    const cell = resolveCell(code);
-                    const selected = selectedSeatCode === code;
-                    const tone = seatTone(cell.status, selected, exitRow);
-                    const clickable = cell.status === 'SOLD' || (canLock && cell.status !== 'LOCKED');
-                    return (
-                      <button
-                        key={code}
-                        type="button"
-                        onClick={() => onSeatClick(cell)}
-                        disabled={!clickable && cell.status !== 'LOCKED'}
-                        aria-label={code}
-                        title={code}
-                        className={`inline-flex items-center justify-center rounded p-0 ${
-                          clickable || cell.status === 'LOCKED' ? 'cursor-pointer' : 'cursor-default'
-                        }`}
-                      >
-                        <SeatIcon
-                          letter={letter}
-                          fill={tone.fill}
-                          stroke={tone.stroke}
-                          text={tone.text}
-                          large={first}
-                          exitRow={exitRow}
-                        />
-                      </button>
-                    );
-                  })
+                  left.map((letter) => renderSeat(`${row}${letter}`, letter, first, exitRow))
                 )}
 
-                <span data-testid={`aisle-gap-${row}`} className="w-4 flex-none" aria-hidden />
-
-                {first && <span className="inline-block w-[34px]" aria-hidden />}
-
-                {right.map((letter) => {
-                  const code = `${row}${letter}`;
-                  if (MD80_EXCLUDED.has(code)) return null;
-                  const cell = resolveCell(code);
-                  const selected = selectedSeatCode === code;
-                  const tone = seatTone(cell.status, selected, exitRow);
-                  const clickable = cell.status === 'SOLD' || (canLock && cell.status !== 'LOCKED');
-                  return (
-                    <button
-                      key={code}
-                      type="button"
-                      onClick={() => onSeatClick(cell)}
-                      disabled={!clickable && cell.status !== 'LOCKED'}
-                      aria-label={code}
-                      title={code}
-                      className={`inline-flex items-center justify-center rounded p-0 ${
-                        clickable || cell.status === 'LOCKED' ? 'cursor-pointer' : 'cursor-default'
-                      }`}
-                    >
-                      <SeatIcon
-                        letter={letter}
-                        fill={tone.fill}
-                        stroke={tone.stroke}
-                        text={tone.text}
-                        large={first}
-                        exitRow={exitRow}
-                      />
-                    </button>
-                  );
-                })}
-
-                <span className="font-num w-5 flex-none text-center text-[10px] font-semibold text-[#6b7b94]">
+                {/* Center aisle — row number like the PDF */}
+                <span
+                  data-testid={`aisle-gap-${row}`}
+                  className="font-num flex w-7 flex-none items-center justify-center text-[10px] font-bold text-[#7d8aa0]"
+                >
                   {faDigits(row)}
                 </span>
+
+                {/* First class has no D column — spacer keeps E/F aligned with economy */}
+                {first && <span className="inline-block w-[34px]" aria-hidden />}
+
+                {right.map((letter) => renderSeat(`${row}${letter}`, letter, first, exitRow))}
+
+                {exitRow ? <ExitArrow side="right" /> : <span className="w-3" aria-hidden />}
               </div>
             </div>
           );

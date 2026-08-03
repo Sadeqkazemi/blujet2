@@ -63,6 +63,7 @@ describe('FlightSeatMapModal', () => {
     );
 
     expect(await screen.findByText(/نقشه صندلی‌ها/)).toBeInTheDocument();
+    expect(await screen.findByTestId('reservation-md80-seat-map')).toBeInTheDocument();
     expect(screen.getByText(/تهران/)).toBeInTheDocument();
 
     const user = userEvent.setup();

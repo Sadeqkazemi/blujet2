@@ -10,7 +10,7 @@ function cell(code: string, status: SeatCell['status'] = 'FREE'): SeatCell {
 }
 
 describe('ReservationMd80SeatMap', () => {
-  it('renders PDF sections, column letters, and MD-80 aisle gaps', () => {
+  it('renders PDF fuselage chart with sections, aisle row numbers, and MD-80 lettering', () => {
     const seats = new Map<string, SeatCell>([
       ['3A', cell('3A')],
       ['3F', cell('3F')],
@@ -37,6 +37,8 @@ describe('ReservationMd80SeatMap', () => {
     expect(screen.getByTestId('reservation-section-economy')).toHaveTextContent(/کلاس اقتصادی/);
     expect(screen.getByText('جلو هواپیما · MD-80')).toBeInTheDocument();
     expect(screen.getByText('عقب هواپیما · MD-80')).toBeInTheDocument();
+    expect(screen.getAllByText('کمد').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('سرویس').length).toBeGreaterThanOrEqual(1);
 
     // First class: A B | E F — gap after left pair; economy has D not C
     expect(screen.getByTestId('aisle-gap-3')).toBeInTheDocument();

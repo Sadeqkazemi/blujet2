@@ -2,10 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { fetchSeatMap } from '../../api/reservation';
 import { faDigits, faMoney } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
-import {
-  isMd80Aircraft,
-  md80SectionForRow,
-} from '../public-site/checkout/md80-seat-layout';
+import { isMd80Aircraft } from '../public-site/checkout/md80-seat-layout';
+import ReservationMd80SeatMap from './ReservationMd80SeatMap';
 import type { BookingStatus, SeatCell, SeatMap, SeatStatus } from '../../types/reservation';
 
 const BOOKING_STATUS_FA: Record<BookingStatus, string> = {
@@ -25,16 +23,6 @@ const SEAT_STYLE: Record<SeatStatus, string> = {
   SOLD: 'border-[#2563eb] bg-[#3b82f6] text-white hover:brightness-110',
   LOCKED: 'border-[#d97706] bg-[#f59e0b] text-[#1a1305] hover:brightness-110',
 };
-
-function sectionLabel(row: number, aircraftType: string): string | null {
-  if (!isMd80Aircraft(aircraftType)) {
-    return null;
-  }
-  if (row === 3) return 'کلاس یک';
-  if (row === 7) return 'کابین اصلی با فضای بیشتر';
-  if (row === 12) return 'کلاس اقتصادی';
-  return null;
-}
 
 function genericCabinLabel(cabin: string, prevCabin: string | null): string | null {
   if (cabin === prevCabin) return null;
@@ -100,6 +88,16 @@ export default function FlightSeatMapModal({
     }
     return hits;
   }, [appliedQuery, map]);
+
+  const seatsByCode = useMemo(() => {
+    const m = new Map<string, SeatCell>();
+    for (const row of map?.rows ?? []) {
+      for (const s of row.seats) m.set(s.seatCode, s);
+    }
+    return m;
+  }, [map]);
+
+  const useMd80Chart = isMd80Aircraft(map?.aircraftType ?? 'MD-80');
 
   function onSeatClick(seat: SeatCell) {
     setSelected(seat);
@@ -203,7 +201,19 @@ export default function FlightSeatMapModal({
             <p className="py-10 text-center text-xs text-[#6b7b94]">در حال بارگذاری نقشهٔ صندلی…</p>
           )}
 
-          {map && (
+          {map && useMd80Chart && (
+            <ReservationMd80SeatMap
+              seatsByCode={seatsByCode}
+              selectedSeatCode={selected?.seatCode ?? null}
+              highlightSeatCode={
+                matchSet && matchSet.size === 1 ? [...matchSet][0] : null
+              }
+              canLock={false}
+              onSeatClick={onSeatClick}
+            />
+          )}
+
+          {map && !useMd80Chart && (
             <div className="rounded-[14px] border border-[#1f2a3d] bg-[#0f1623] p-3 sm:p-4">
               <div className="mx-auto flex w-max max-w-full flex-col gap-1.5">
                 {(() => {
@@ -211,22 +221,14 @@ export default function FlightSeatMapModal({
                   return map.rows.map((row) => {
                     const aisleAfter =
                       map.cabinLayout[row.cabin as 'BUSINESS' | 'ECONOMY']?.aisleAfterIndex ?? 2;
-                    const md80Label = sectionLabel(row.row, map.aircraftType);
-                    const fallbackLabel = isMd80Aircraft(map.aircraftType)
-                      ? null
-                      : genericCabinLabel(row.cabin, prevCabin);
+                    const label = genericCabinLabel(row.cabin, prevCabin);
                     prevCabin = row.cabin;
-                    const label = md80Label ?? fallbackLabel;
-                    const sectionHint = isMd80Aircraft(map.aircraftType)
-                      ? md80SectionForRow(row.row)
-                      : row.cabin;
 
                     return (
                       <div key={row.row}>
                         {label && (
                           <div className="mb-1.5 mt-2 text-center text-[10.5px] font-bold text-[#6b7b94]">
                             {label}
-                            {sectionHint === 'BUSINESS' && !md80Label ? null : null}
                           </div>
                         )}
                         <div className="flex items-center gap-1.5" dir="ltr">
