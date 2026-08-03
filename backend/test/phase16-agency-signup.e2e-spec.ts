@@ -149,13 +149,13 @@ describe('Phase 16 — agency self-registration (e2e)', () => {
       (list.body.data as { id: string }[]).some((r) => r.id === requestId),
     ).toBe(true);
 
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const seniorApprove = await request(app.getHttpServer())
       .patch(`/agencies/requests/${requestId}/approve`)
       .set('Authorization', auth(senior.accessToken));
     expect(seniorApprove.status).toBe(403);
 
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
     const approve = await request(app.getHttpServer())
       .patch(`/agencies/requests/${requestId}/approve`)
       .set('Authorization', auth(commercial.accessToken));

@@ -114,7 +114,7 @@ describe('Flight engine completion', () => {
   }
 
   it('creates a recurring schedule from an RRULE and materializes future instances idempotently', async () => {
-    const { accessToken } = await loginAs(app, 'senior.rahimi');
+    const { accessToken } = await loginAs(app, 'senior');
     const res = await request(app.getHttpServer())
       .post('/flights/schedules')
       .set('Authorization', `Bearer ${accessToken}`)
@@ -147,7 +147,7 @@ describe('Flight engine completion', () => {
   });
 
   it('rejects an invalid RRULE with 400', async () => {
-    const { accessToken } = await loginAs(app, 'senior.rahimi');
+    const { accessToken } = await loginAs(app, 'senior');
     await request(app.getHttpServer())
       .post('/flights/schedules')
       .set('Authorization', `Bearer ${accessToken}`)

@@ -1,18 +1,23 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { fetchRefundDetail, fetchRefunds, payRefund, referRefund } from '../../api/refunds';
 import { fetchStaffDirectory } from '../../api/cartable';
 import { faDigits, faMoney } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import { useStepUp } from '../../hooks/useStepUp';
+import { usePagination } from '../../hooks/usePagination';
 import Modal from '../../components/Modal';
+import Pagination from '../../components/Pagination';
 import type { RefundDetail, RefundListRow, RefundsResult, RefundStatus } from '../../types/refunds';
 import type { StaffDirectoryEntry } from '../../types/cartable';
 
+/** Design: five refund cards per page. */
+const REFUND_PAGE_SIZE = 5;
+
 const STATUS_META: Record<RefundStatus, { label: string; className: string }> = {
-  SUBMITTED: { label: 'ثبت مشتری', className: 'bg-[#f59e0b24] text-[#b45309]' },
-  REVIEW: { label: 'بررسی ادمین', className: 'bg-[#60a5fa2e] text-[#1d4ed8]' },
-  FINANCE: { label: 'آمادهٔ پرداخت', className: 'bg-[#a855f72e] text-[#7c3aed]' },
-  PAID: { label: 'پرداخت شد', className: 'bg-[#10b98124] text-[#059669]' },
+  SUBMITTED: { label: 'ثبت مشتری', className: 'bg-[#f59e0b24] text-[#fbbf24]' },
+  REVIEW: { label: 'بررسی ادمین', className: 'bg-[#3b82f624] text-[#60a5fa]' },
+  FINANCE: { label: 'آمادهٔ پرداخت', className: 'bg-[#a855f724] text-[#c084fc]' },
+  PAID: { label: 'پرداخت شد', className: 'bg-[#34d39924] text-[#34d399]' },
 };
 
 function routeLabel(r: RefundListRow) {
@@ -20,11 +25,29 @@ function routeLabel(r: RefundListRow) {
   return `${originCode} ← ${destCode}`;
 }
 
+function matchesRefundQuery(r: RefundListRow, raw: string): boolean {
+  const q = raw.trim().toLowerCase();
+  if (!q) return true;
+  const hay = [
+    r.passengerName,
+    r.booking.pnr,
+    r.booking.flightInstance.flight.flightNo,
+    r.booking.flightInstance.flight.route.originCode,
+    r.booking.flightInstance.flight.route.destCode,
+    r.assignee?.fullName ?? '',
+    STATUS_META[r.status].label,
+  ]
+    .join(' ')
+    .toLowerCase();
+  return hay.includes(q);
+}
+
 export default function RefundsPage() {
   const [data, setData] = useState<RefundsResult | null>(null);
   const [detail, setDetail] = useState<RefundDetail | null>(null);
   const [staff, setStaff] = useState<StaffDirectoryEntry[]>([]);
   const [assigneePick, setAssigneePick] = useState('');
+  const [query, setQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -87,113 +110,167 @@ export default function RefundsPage() {
   const requests = data?.requests ?? [];
   const kpis = data?.kpis;
 
+  const filtered = useMemo(
+    () => requests.filter((r) => matchesRefundQuery(r, query)),
+    [requests, query],
+  );
+  const pager = usePagination(filtered, REFUND_PAGE_SIZE);
+
+  useEffect(() => {
+    pager.setPage(1);
+    // Reset to first page whenever the search query changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run on query
+  }, [query]);
+
   return (
-    <div className="p-8">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-black text-ink">استرداد بلیط</h1>
-          <p className="mt-1 text-sm text-muted">
+    <div className="flex flex-col gap-[15px] px-[21px] pb-[34px] pt-[18px]">
+      <div className="flex flex-wrap items-center gap-3.5 rounded-2xl border border-[#2a3550] bg-gradient-to-br from-[#172339] to-[#1d2a44] p-4">
+        <span className="flex h-[52px] w-[52px] flex-none items-center justify-center rounded-[14px] bg-[#a855f72e] text-[#c084fc]">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <path d="M9 14l-4-4 4-4" />
+            <path d="M5 10h9a5 5 0 0 1 0 10h-3" />
+          </svg>
+        </span>
+        <div className="leading-snug">
+          <h1 className="text-[17px] font-black text-white">استرداد بلیط</h1>
+          <p className="mt-0.5 text-[11.5px] text-[#9fb0c7]">
             درخواست‌های استرداد ارجاع‌شده از ادمین سایت — بررسی، تأیید، پرداخت و بستن پرونده
           </p>
         </div>
         {kpis && (
-          <span className="font-num rounded-full bg-[#a855f71f] px-3 py-1.5 text-[11px] font-bold text-[#7c3aed]">
+          <span className="ms-auto rounded-full bg-[#a855f729] px-3.5 py-1.5 text-[11.5px] font-extrabold text-[#c084fc]">
             {faDigits(kpis.payoutQueue)} در صف پرداخت
           </span>
         )}
       </div>
 
-      {error && <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">{error}</p>}
-      {notice && <p className="mb-4 rounded-lg bg-[#10b98115] p-3 text-sm text-[#059669]">{notice}</p>}
+      {error && <p className="rounded-lg bg-[#f8717124] p-3 text-sm text-[#f87171]">{error}</p>}
+      {notice && <p className="rounded-lg bg-[#34d39924] p-3 text-sm text-[#34d399]">{notice}</p>}
 
       {kpis && (
-        <div className="mb-6 grid grid-cols-3 gap-4">
-          <div className="rounded-xl border border-border bg-white p-4">
-            <div className="text-[11px] text-muted">در صف پرداخت</div>
-            <div className="font-num mt-1 text-lg font-black text-[#7c3aed]">{faDigits(kpis.payoutQueue)}</div>
+        <div className="grid grid-cols-3 gap-[13px]">
+          <div className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[13px]">
+            <div className="mb-1.5 text-[11px] text-[#6b7b94]">در صف پرداخت</div>
+            <div className="font-num text-xl font-black text-[#a855f7]">{faDigits(kpis.payoutQueue)}</div>
           </div>
-          <div className="rounded-xl border border-border bg-white p-4">
-            <div className="text-[11px] text-muted">پرداخت‌شده</div>
-            <div className="font-num mt-1 text-lg font-black text-[#059669]">{faDigits(kpis.paid)}</div>
+          <div className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[13px]">
+            <div className="mb-1.5 text-[11px] text-[#6b7b94]">پرداخت‌شده</div>
+            <div className="font-num text-xl font-black text-[#34d399]">{faDigits(kpis.paid)}</div>
           </div>
-          <div className="rounded-xl border border-border bg-white p-4">
-            <div className="text-[11px] text-muted">در انتظار بررسی ادمین</div>
-            <div className="font-num mt-1 text-lg font-black text-[#b45309]">{faDigits(kpis.awaitingAdmin)}</div>
+          <div className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[13px]">
+            <div className="mb-1.5 text-[11px] text-[#6b7b94]">در انتظار بررسی ادمین</div>
+            <div className="font-num text-xl font-black text-[#f59e0b]">{faDigits(kpis.awaitingAdmin)}</div>
           </div>
         </div>
       )}
 
-      <section className="rounded-xl border border-border bg-white p-5">
-        <div className="mb-1 flex items-center justify-between">
-          <h2 className="text-sm font-bold text-ink">فهرست درخواست‌های استرداد</h2>
-          <span className="font-num text-[11px] text-muted">{faDigits(requests.length)} درخواست</span>
+      <section className="rounded-2xl border border-[#1f2a3d] bg-[#141d2e] p-4">
+        <div className="mb-3.5 flex flex-wrap items-center justify-between gap-2.5">
+          <div>
+            <h2 className="text-[15px] font-extrabold text-white">فهرست درخواست‌های استرداد</h2>
+            <p className="mt-1 text-[11.5px] text-[#6b7b94]">
+              روی هر کارت بزنید تا اطلاعات مسافر، شبا و مبلغ نمایش داده شود.
+            </p>
+          </div>
+          <span className="rounded-lg border border-[#28344c] bg-[#18223a] px-3 py-1.5 text-[11px] font-bold text-[#9fb0c7]">
+            {faDigits(query.trim() ? filtered.length : requests.length)} درخواست
+          </span>
         </div>
-        <p className="mb-3 text-[11px] text-muted">
-          روی هر کارت بزنید تا اطلاعات مسافر، شبا و مبلغ نمایش داده شود.
-        </p>
+
+        <div className="mb-3.5">
+          <label htmlFor="refund-search" className="sr-only">
+            جستجوی درخواست استرداد
+          </label>
+          <input
+            id="refund-search"
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="جستجو بر اساس نام مسافر، PNR، شماره پرواز یا مسیر…"
+            className="h-[46px] w-full rounded-xl border border-[#28344c] bg-[#18223a] px-4 text-xs text-[#e7ecf3] outline-none transition placeholder:text-[#6b7b94] focus:border-[#3b82f6]"
+          />
+        </div>
 
         {loading ? (
-          <p className="py-6 text-center text-sm text-muted">در حال بارگذاری…</p>
+          <p className="py-6 text-center text-sm text-[#6b7b94]">در حال بارگذاری…</p>
         ) : requests.length === 0 ? (
-          <p className="py-6 text-center text-xs text-muted">درخواست استردادی ثبت نشده است.</p>
+          <p className="rounded-[14px] border border-[#22304a] bg-[#0f1726] py-6 text-center text-xs text-[#6b7b94]">
+            درخواست استردادی ثبت نشده است.
+          </p>
+        ) : filtered.length === 0 ? (
+          <p className="rounded-[14px] border border-[#22304a] bg-[#0f1726] py-6 text-center text-xs text-[#6b7b94]">
+            درخواستی با این عبارت یافت نشد.
+          </p>
         ) : (
-          <ul className="divide-y divide-border">
-            {requests.map((r) => {
-              const st = STATUS_META[r.status];
-              return (
-                <li key={r.id} className="flex flex-wrap items-center gap-3 py-3">
-                  <button
-                    onClick={() => void openDetail(r.id)}
-                    className="flex min-w-0 flex-1 items-center gap-3 text-right"
+          <>
+            <ul className="flex flex-col gap-[11px]">
+              {pager.pageItems.map((r) => {
+                const st = STATUS_META[r.status];
+                return (
+                  <li
+                    key={r.id}
+                    className="flex flex-wrap items-center gap-3.5 rounded-[14px] border border-[#22304a] bg-[#0f1726] p-3.5"
                   >
-                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-2 text-sm font-black text-accent">
-                      {r.passengerName.slice(0, 1)}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-bold text-ink">
-                        {r.passengerName}{' '}
-                        <span className="ltr font-num text-[11px] text-muted">{r.booking.pnr}</span>
-                      </span>
-                      <span className="mt-0.5 block text-[11px] text-muted">
-                        {routeLabel(r)}
-                        {r.assignee ? ` · ارجاع به: ${r.assignee.fullName}` : ''}
-                      </span>
-                    </span>
-                  </button>
-                  <div className="text-left">
-                    <div className="text-[10px] text-muted">شماره پرواز</div>
-                    <div className="ltr font-num text-xs font-bold text-ink">
-                      {r.booking.flightInstance.flight.flightNo}
-                    </div>
-                  </div>
-                  <div className="text-left">
-                    <div className="text-[10px] text-muted">مبلغ قابل پرداخت</div>
-                    <div className="font-num text-xs font-black text-[#059669]">{faMoney(r.refundableIrr)} تومان</div>
-                  </div>
-                  <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${st.className}`}>{st.label}</span>
-                  {r.status === 'FINANCE' ? (
                     <button
-                      onClick={() => void onPay(r.id)}
-                      className="rounded-lg bg-[#059669] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#047857]"
+                      onClick={() => void openDetail(r.id)}
+                      className="flex min-w-0 flex-1 items-center gap-3.5 text-right"
                     >
-                      تأیید و پرداخت
+                      <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#1d2a40] text-sm font-extrabold text-[#60a5fa]">
+                        {r.passengerName.slice(0, 1)}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[13.5px] font-extrabold text-[#e7ecf3]">
+                          {r.passengerName}{' '}
+                          <span className="ltr font-num text-[10px] text-[#6b7b94]">{r.booking.pnr}</span>
+                        </span>
+                        <span className="mt-0.5 block text-[11px] text-[#8a97ab]">
+                          {routeLabel(r)}
+                          {r.assignee ? ` · ارجاع به: ${r.assignee.fullName}` : ''}
+                        </span>
+                      </span>
                     </button>
-                  ) : r.status === 'PAID' ? (
-                    <span className="text-[11px] font-bold text-[#059669]">پرداخت شد</span>
-                  ) : (
-                    <span className="text-[11px] text-muted">در انتظار ادمین</span>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+                    <div className="text-left">
+                      <div className="text-[9px] text-[#6b7b94]">شماره پرواز</div>
+                      <div className="ltr font-num rounded-lg border border-[#28344c] bg-[#18223a] px-2.5 py-1 text-[11px] font-bold text-[#cdd7e5]">
+                        {r.booking.flightInstance.flight.flightNo}
+                      </div>
+                    </div>
+                    <div className="text-left">
+                      <div className="text-[9px] text-[#6b7b94]">مبلغ قابل پرداخت</div>
+                      <div className="font-num text-sm font-black text-[#e7ecf3]">{faMoney(r.refundableIrr)} تومان</div>
+                    </div>
+                    <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${st.className}`}>{st.label}</span>
+                    {r.status === 'FINANCE' ? (
+                      <button
+                        onClick={() => void onPay(r.id)}
+                        className="rounded-[10px] bg-[#16a34a] px-3.5 py-2 text-[11px] font-extrabold text-white transition hover:bg-[#15803d]"
+                      >
+                        تأیید و پرداخت
+                      </button>
+                    ) : r.status === 'PAID' ? (
+                      <span className="text-[11px] font-extrabold text-[#34d399]">پرداخت شد</span>
+                    ) : (
+                      <span className="rounded-lg border border-[#28344c] bg-[#18223a] px-3 py-2 text-[10.5px] text-[#8a97ab]">
+                        در انتظار ادمین
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+            <Pagination page={pager.page} totalPages={pager.totalPages} onChange={pager.setPage} variant="dark" />
+          </>
         )}
       </section>
 
       {detail && (
-        <Modal title={`درخواست استرداد · بلیط ${detail.booking.pnr}`} onClose={() => setDetail(null)}>
+        <Modal
+          variant="dark"
+          title={`درخواست استرداد · بلیط ${detail.booking.pnr}`}
+          onClose={() => setDetail(null)}
+        >
           <div className="mb-3 flex items-center justify-between">
-            <span className="text-[11px] text-muted">وضعیت درخواست</span>
+            <span className="text-[11px] text-[#6b7b94]">وضعیت درخواست</span>
             <span
               className={`rounded-full px-3 py-1 text-[10px] font-bold ${STATUS_META[detail.status].className}`}
             >
@@ -201,83 +278,83 @@ export default function RefundsPage() {
             </span>
           </div>
 
-          <div className="mb-3 rounded-lg bg-surface p-3">
-            <h3 className="mb-2 text-xs font-bold text-ink">اطلاعات مسافر و حساب</h3>
+          <div className="mb-3 rounded-xl border border-[#22304a] bg-[#0f1726] p-3">
+            <h3 className="mb-2 text-xs font-extrabold text-[#8fa1bb]">اطلاعات مسافر و حساب</h3>
             <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-[11px]">
               <div>
-                <dt className="text-muted">نام مسافر</dt>
-                <dd className="font-bold text-ink">{detail.passengerName}</dd>
+                <dt className="text-[#6b7b94]">نام مسافر</dt>
+                <dd className="font-bold text-[#e7ecf3]">{detail.passengerName}</dd>
               </div>
               <div>
-                <dt className="text-muted">کد ملی</dt>
-                <dd className="ltr font-num font-bold text-ink">{detail.nationalId ?? '—'}</dd>
+                <dt className="text-[#6b7b94]">کد ملی</dt>
+                <dd className="ltr font-num font-bold text-[#e7ecf3]">{detail.nationalId ?? '—'}</dd>
               </div>
               <div>
-                <dt className="text-muted">شماره تماس</dt>
-                <dd className="ltr font-num font-bold text-ink">{detail.mobile ?? '—'}</dd>
+                <dt className="text-[#6b7b94]">شماره تماس</dt>
+                <dd className="ltr font-num font-bold text-[#e7ecf3]">{detail.mobile ?? '—'}</dd>
               </div>
               <div>
-                <dt className="text-muted">زمان ثبت درخواست</dt>
-                <dd className="font-num font-bold text-ink">{formatJalaliDateTime(detail.createdAt)}</dd>
+                <dt className="text-[#6b7b94]">زمان ثبت درخواست</dt>
+                <dd className="font-num font-bold text-[#e7ecf3]">{formatJalaliDateTime(detail.createdAt)}</dd>
               </div>
               <div className="col-span-2">
-                <dt className="text-muted">شماره شبا (IBAN)</dt>
-                <dd className="ltr font-num font-bold text-ink">{detail.iban}</dd>
+                <dt className="text-[#6b7b94]">شماره شبا (IBAN)</dt>
+                <dd className="ltr font-num font-bold text-[#e7ecf3]">{detail.iban}</dd>
               </div>
             </dl>
           </div>
 
-          <div className="mb-3 rounded-lg bg-surface p-3">
-            <h3 className="mb-2 text-xs font-bold text-ink">اطلاعات پرواز</h3>
+          <div className="mb-3 rounded-xl border border-[#22304a] bg-[#0f1726] p-3">
+            <h3 className="mb-2 text-xs font-extrabold text-[#8fa1bb]">اطلاعات پرواز</h3>
             <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-[11px]">
               <div>
-                <dt className="text-muted">مسیر</dt>
-                <dd className="font-bold text-ink">{routeLabel(detail)}</dd>
+                <dt className="text-[#6b7b94]">مسیر</dt>
+                <dd className="font-bold text-[#e7ecf3]">{routeLabel(detail)}</dd>
               </div>
               <div>
-                <dt className="text-muted">ایرلاین / شماره پرواز</dt>
-                <dd className="font-bold text-ink">
+                <dt className="text-[#6b7b94]">ایرلاین / شماره پرواز</dt>
+                <dd className="font-bold text-[#e7ecf3]">
                   blujet · <span className="ltr font-num">{detail.booking.flightInstance.flight.flightNo}</span>
                 </dd>
               </div>
               <div>
-                <dt className="text-muted">تاریخ و ساعت پرواز</dt>
-                <dd className="font-num font-bold text-ink">
+                <dt className="text-[#6b7b94]">تاریخ و ساعت پرواز</dt>
+                <dd className="font-num font-bold text-[#e7ecf3]">
                   {formatJalaliDateTime(detail.booking.flightInstance.departureAt)}
                 </dd>
               </div>
             </dl>
           </div>
 
-          <div className="mb-3 rounded-lg bg-surface p-3 text-[11px]">
+          <div className="mb-3 rounded-xl border border-[#22304a] bg-[#0f1726] p-3 text-[11px]">
             <div className="flex justify-between py-1">
-              <span className="text-muted">مبلغ پرداخت‌شدهٔ بلیط</span>
-              <span className="font-num font-bold text-ink">{faMoney(detail.totalPaidIrr)} تومان</span>
+              <span className="text-[#6b7b94]">مبلغ پرداخت‌شدهٔ بلیط</span>
+              <span className="font-num font-bold text-[#e7ecf3]">{faMoney(detail.totalPaidIrr)} تومان</span>
             </div>
             <div className="flex justify-between py-1">
-              <span className="text-muted">درصد جریمهٔ کنسلی (٪{faDigits(detail.penaltyPct)})</span>
-              <span className="font-num font-bold text-danger">−{faMoney(detail.penaltyAmountIrr)} تومان</span>
+              <span className="text-[#6b7b94]">درصد جریمهٔ کنسلی (٪{faDigits(detail.penaltyPct)})</span>
+              <span className="font-num font-bold text-[#f87171]">−{faMoney(detail.penaltyAmountIrr)} تومان</span>
             </div>
-            <div className="flex justify-between border-t border-border pt-2">
-              <span className="font-bold text-ink">مبلغ نهایی قابل پرداخت</span>
-              <span className="font-num font-black text-[#059669]">{faMoney(detail.refundableIrr)} تومان</span>
+            <div className="flex justify-between border-t border-[#1f2a3d] pt-2">
+              <span className="font-bold text-white">مبلغ نهایی قابل پرداخت</span>
+              <span className="font-num font-black text-[#34d399]">{faMoney(detail.refundableIrr)} تومان</span>
             </div>
           </div>
 
           {detail.status === 'PAID' ? (
-            <p className="rounded-lg bg-[#10b98115] p-3 text-center text-xs font-bold text-[#059669]">
+            <p className="rounded-lg bg-[#34d39924] p-3 text-center text-xs font-bold text-[#34d399]">
               پرداخت شد و پرونده بسته است ✓
             </p>
           ) : (
             <>
-              <div className="mb-3 rounded-lg border border-border p-3">
-                <h3 className="mb-2 text-xs font-bold text-ink">ارجاع به کارمند مالی</h3>
+              <div className="mb-3 rounded-xl border border-[#22304a] bg-[#0f1726] p-3">
+                <h3 className="mb-2 text-xs font-extrabold text-[#8fa1bb]">ارجاع به کارمند مالی</h3>
                 <div className="flex gap-2">
                   <select
                     aria-label="گیرنده ارجاع"
                     value={assigneePick}
                     onChange={(e) => setAssigneePick(e.target.value)}
-                    className="h-9 flex-1 rounded-lg border border-border bg-white px-2 text-xs outline-none"
+                    className="h-9 flex-1 rounded-lg border border-[#28344c] bg-[#18223a] px-2 text-xs text-[#e7ecf3] outline-none"
                   >
                     <option value="">— انتخاب کارمند —</option>
                     {staff.map((s) => (
@@ -289,24 +366,26 @@ export default function RefundsPage() {
                   <button
                     onClick={() => void onRefer()}
                     disabled={!assigneePick}
-                    className="rounded-lg bg-accent px-3 py-2 text-xs font-bold text-white transition hover:bg-accent/90 disabled:opacity-50"
+                    className="rounded-lg bg-[#3b82f6] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#2563eb] disabled:opacity-50"
                   >
                     ثبت و انتقال فرآیند ارجاع
                   </button>
                 </div>
                 {detail.assignee && (
-                  <p className="mt-2 text-[11px] text-muted">ارجاع فعلی: {detail.assignee.fullName}</p>
+                  <p className="mt-2 text-[11px] text-[#6b7b94]">ارجاع فعلی: {detail.assignee.fullName}</p>
                 )}
               </div>
               {detail.status === 'FINANCE' ? (
                 <button
                   onClick={() => void onPay(detail.id)}
-                  className="w-full rounded-lg bg-[#059669] py-2.5 text-xs font-bold text-white transition hover:bg-[#047857]"
+                  className="w-full rounded-lg bg-[#16a34a] py-2.5 text-xs font-bold text-white transition hover:bg-[#15803d]"
                 >
                   تأیید، واریز به شبا و بستن پرونده
                 </button>
               ) : (
-                <p className="rounded-lg bg-surface p-3 text-center text-[11px] text-muted">در انتظار ادمین</p>
+                <p className="rounded-lg border border-[#28344c] bg-[#18223a] p-3 text-center text-[11px] text-[#8a97ab]">
+                  در انتظار ادمین
+                </p>
               )}
             </>
           )}

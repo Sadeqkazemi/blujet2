@@ -16,6 +16,7 @@ import {
   Bucket,
   CompletedFlightsSummary,
   FinanceDashboardStats,
+  FlightSalesResult,
   KpiResult,
   KpiTrends,
   SalesChartPeriod,
@@ -25,6 +26,7 @@ import {
 
 const LOW_SALES_WINDOW_HOURS = 72;
 const LOW_SALES_OCCUPANCY_THRESHOLD = 0.6;
+const FLIGHT_SALES_LIST_LIMIT = 60;
 
 @Injectable()
 export class ReportingService {
@@ -428,6 +430,99 @@ export class ReportingService {
         : revenueThisMonthIrr > ZERO_IRR
           ? 100
           : 0,
+    };
+  }
+
+  /** Departed instances + per-channel SALE totals for the «شماره پرواز» picker. */
+  async flightSales(): Promise<FlightSalesResult> {
+    await materializeDepartedInstances(this.typeorm);
+
+    const instances = await this.typeorm.flightInstance.findMany({
+      where: { status: 'DEPARTED' },
+      orderBy: { departureAt: 'desc' },
+      take: FLIGHT_SALES_LIST_LIMIT,
+      select: {
+        id: true,
+        departureAt: true,
+        capacity: true,
+        flight: {
+          select: {
+            flightNo: true,
+            route: { select: { originCode: true, destCode: true } },
+          },
+        },
+        _count: {
+          select: {
+            bookings: { where: { status: { in: ['PAID', 'TICKETED'] } } },
+          },
+        },
+      },
+    });
+
+    const instanceIds = instances.map((i) => i.id);
+    const [entries, airports] = await Promise.all([
+      instanceIds.length === 0
+        ? Promise.resolve([])
+        : this.typeorm.ledgerEntry.findMany({
+            where: {
+              type: 'SALE',
+              bookingId: { not: null },
+              booking: { flightInstanceId: { in: instanceIds } },
+            },
+            select: {
+              signedAmountIrr: true,
+              booking: {
+                select: { channel: true, flightInstanceId: true },
+              },
+            },
+          }),
+      this.typeorm.airport.findMany({ select: { code: true, cityFa: true } }),
+    ]);
+
+    const cityByCode = new Map(airports.map((a) => [a.code, a.cityFa]));
+    const totalsByInstance = new Map<
+      string,
+      { SYSTEM: Irr; CHARTER: Irr; AGENCY: Irr }
+    >();
+    for (const entry of entries) {
+      const instanceId = entry.booking?.flightInstanceId;
+      const channel = entry.booking?.channel;
+      if (!instanceId || !channel) continue;
+      const cur = totalsByInstance.get(instanceId) ?? {
+        SYSTEM: ZERO_IRR,
+        CHARTER: ZERO_IRR,
+        AGENCY: ZERO_IRR,
+      };
+      cur[channel] = addIrr(cur[channel], entry.signedAmountIrr);
+      totalsByInstance.set(instanceId, cur);
+    }
+
+    return {
+      rows: instances.map((i) => {
+        const totals = totalsByInstance.get(i.id) ?? {
+          SYSTEM: ZERO_IRR,
+          CHARTER: ZERO_IRR,
+          AGENCY: ZERO_IRR,
+        };
+        const totalIrr = addIrr(totals.SYSTEM, totals.CHARTER, totals.AGENCY);
+        const originCode = i.flight.route.originCode;
+        const destCode = i.flight.route.destCode;
+        return {
+          flightInstanceId: i.id,
+          flightNo: i.flight.flightNo,
+          originCode,
+          destCode,
+          originCityFa: cityByCode.get(originCode) ?? originCode,
+          destCityFa: cityByCode.get(destCode) ?? destCode,
+          departureAt: i.departureAt.toISOString(),
+          systemIrr: totals.SYSTEM,
+          charterIrr: totals.CHARTER,
+          agencyIrr: totals.AGENCY,
+          totalIrr,
+          capacity: i.capacity,
+          soldSeats: i._count.bookings,
+        };
+      }),
     };
   }
 

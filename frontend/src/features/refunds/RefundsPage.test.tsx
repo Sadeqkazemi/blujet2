@@ -85,6 +85,7 @@ describe('RefundsPage', () => {
     expect(screen.getByText('در انتظار بررسی ادمین')).toBeInTheDocument();
     expect(screen.getByText('پرداخت‌شده')).toBeInTheDocument();
     expect(screen.getByText('۳ درخواست')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/جستجو بر اساس نام مسافر/)).toBeInTheDocument();
 
     // 21,000,000 rial -> ۲٬۱۰۰٬۰۰۰ toman on every card.
     expect(screen.getAllByText('۲٬۱۰۰٬۰۰۰ تومان')).toHaveLength(3);
@@ -102,6 +103,60 @@ describe('RefundsPage', () => {
     render(<RefundsPage />);
 
     expect(await screen.findByText('درخواست استردادی ثبت نشده است.')).toBeInTheDocument();
+  });
+
+  it('filters the list via the search box and shows a no-match state', async () => {
+    mockList();
+    const { default: userEvent } = await import('@testing-library/user-event');
+    render(<RefundsPage />);
+
+    await screen.findByText('رضا کریمی');
+    const search = screen.getByPlaceholderText(/جستجو بر اساس نام مسافر/);
+    await userEvent.type(search, 'سارا');
+
+    expect(screen.getByText('۱ درخواست')).toBeInTheDocument();
+    expect(screen.getByText('سارا محمدی')).toBeInTheDocument();
+    expect(screen.queryByText('رضا کریمی')).not.toBeInTheDocument();
+
+    await userEvent.clear(search);
+    await userEvent.type(search, 'ناموجود');
+    expect(await screen.findByText('درخواستی با این عبارت یافت نشد.')).toBeInTheDocument();
+  });
+
+  it('paginates at 5 requests per page', async () => {
+    const many: RefundListRow[] = Array.from({ length: 6 }, (_, i) =>
+      row({
+        id: `r${i + 1}`,
+        bookingId: `b${i + 1}`,
+        passengerName: `مسافر ${i + 1}`,
+        status: i % 2 === 0 ? 'FINANCE' : 'SUBMITTED',
+        booking: {
+          id: `b${i + 1}`,
+          pnr: `PNR${i + 1}`,
+          flightInstance: {
+            departureAt: '2026-07-27T08:30:00.000Z',
+            flight: { flightNo: 'EP-821', route: { originCode: 'THR', destCode: 'MHD' } },
+          },
+        },
+      }),
+    );
+    mockList({
+      requests: many,
+      kpis: { payoutQueue: 3, paid: 0, awaitingAdmin: 3 },
+    });
+
+    const { default: userEvent } = await import('@testing-library/user-event');
+    render(<RefundsPage />);
+
+    expect(await screen.findByText('۶ درخواست')).toBeInTheDocument();
+    expect(screen.getByText('مسافر 1')).toBeInTheDocument();
+    expect(screen.getByText('مسافر 5')).toBeInTheDocument();
+    expect(screen.queryByText('مسافر 6')).not.toBeInTheDocument();
+
+    const pager = screen.getByTestId('pagination');
+    await userEvent.click(within(pager).getByRole('button', { name: 'بعدی' }));
+    expect(await screen.findByText('مسافر 6')).toBeInTheDocument();
+    expect(screen.queryByText('مسافر 1')).not.toBeInTheDocument();
   });
 
   it('opening a card shows passenger/account info (شبا), flight info and the penalty breakdown', async () => {

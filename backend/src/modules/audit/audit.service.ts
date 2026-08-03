@@ -39,7 +39,7 @@ export class AuditService {
   ) {
     const excludedForCeo: Role[] = ['CEO', 'SENIOR_MANAGER', 'BOARD_CHAIR'];
 
-    return this.typeorm.auditLog.findMany({
+    const rows = await this.typeorm.auditLog.findMany({
       where: {
         ...(viewerRole === 'CEO'
           ? { actorRole: { notIn: excludedForCeo } }
@@ -51,13 +51,25 @@ export class AuditService {
               OR: [
                 { action: { contains: filters.q, mode: 'insensitive' } },
                 { detail: { contains: filters.q, mode: 'insensitive' } },
+                {
+                  actor: {
+                    fullName: { contains: filters.q, mode: 'insensitive' },
+                  },
+                },
               ],
             }
           : {}),
       },
       orderBy: { createdAt: 'desc' },
       take: 100,
+      include: { actor: { select: { fullName: true } } },
     });
+
+    // CEO design card shows manager display name + role label.
+    return rows.map(({ actor, ...r }) => ({
+      ...r,
+      actorName: actor.fullName,
+    }));
   }
 
   /** IT Manager's "لاگ و رویدادها" — system-category + account-management entries. */

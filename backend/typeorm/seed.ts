@@ -24,13 +24,27 @@ async function main() {
   const staff: { username: string; fullName: string; role: 'EMPLOYEE' | 'IT_MANAGER' | 'COMMERCIAL_MANAGER' | 'FINANCE_MANAGER' | 'SENIOR_MANAGER' | 'CEO' | 'BOARD_CHAIR' | 'SITE_ADMIN' }[] = [
     { username: 'com.ahmadi', fullName: 'رضا احمدی', role: 'EMPLOYEE' },
     { username: 'itadmin', fullName: 'مهندس علی صدر', role: 'IT_MANAGER' },
-    { username: 'comm.abbasi', fullName: 'رضا مرادی', role: 'COMMERCIAL_MANAGER' },
-    { username: 'finance.karimi', fullName: 'سحر کاظمی', role: 'FINANCE_MANAGER' },
-    { username: 'senior.rahimi', fullName: 'محمد رحیمی', role: 'SENIOR_MANAGER' },
+    { username: 'comm', fullName: 'رضا مرادی', role: 'COMMERCIAL_MANAGER' },
+    { username: 'finance', fullName: 'سحر کاظمی', role: 'FINANCE_MANAGER' },
+    { username: 'senior', fullName: 'محمد رحیمی', role: 'SENIOR_MANAGER' },
     { username: 'ceo', fullName: 'محمد رحیمی', role: 'CEO' },
     { username: 'chair', fullName: 'رئیس هیئت مدیره', role: 'BOARD_CHAIR' },
     { username: 'site.admin', fullName: 'ادمین سایت', role: 'SITE_ADMIN' },
   ];
+
+  // Rename legacy seed usernames so re-seed on existing DBs picks up short logins.
+  await typeorm.user.updateMany({
+    where: { username: 'finance.karimi' },
+    data: { username: 'finance' },
+  });
+  await typeorm.user.updateMany({
+    where: { username: 'comm.abbasi' },
+    data: { username: 'comm' },
+  });
+  await typeorm.user.updateMany({
+    where: { username: 'senior.rahimi' },
+    data: { username: 'senior' },
+  });
 
   const staffByUsername = new Map<string, { id: string }>();
   for (const s of staff) {
@@ -48,9 +62,9 @@ async function main() {
     });
     staffByUsername.set(s.username, user);
   }
-  const seniorManager = staffByUsername.get('senior.rahimi')!;
-  const commercialManager = staffByUsername.get('comm.abbasi')!;
-  const financeManager = staffByUsername.get('finance.karimi')!;
+  const seniorManager = staffByUsername.get('senior')!;
+  const commercialManager = staffByUsername.get('comm')!;
+  const financeManager = staffByUsername.get('finance')!;
 
   await typeorm.user.upsert({
     where: { phone: '+989120000001' },
@@ -1133,6 +1147,29 @@ async function main() {
             { step: 'paid', labelFa: 'تأیید، واریز وجه و بستن پرونده توسط مدیر مالی', at: '۵ روز پیش' },
           ],
         },
+        // Extra rows so the finance refunds list can exercise 5-per-page pagination.
+        {
+          passengerName: 'علی نوری',
+          status: 'FINANCE' as const,
+          totalPaidIrr: 28_000_000,
+          penaltyPct: 30,
+          assigneeLabel: financeStaffName,
+          history: [
+            { step: 'submitted', labelFa: 'ثبت درخواست کنسلی توسط مشتری — جریمه ٪۳۰', at: '۳ روز پیش · ۱۰:۰۰' },
+            { step: 'review', labelFa: 'بررسی توسط ادمین سایت', at: '۳ روز پیش · ۱۲:۲۰' },
+            { step: 'finance', labelFa: `ارجاع به ${financeStaffName} (کارشناس مالی) توسط ادمین سایت`, at: '۲ روز پیش · ۰۹:۱۰' },
+          ],
+        },
+        {
+          passengerName: 'فاطمه حسینی',
+          status: 'REVIEW' as const,
+          totalPaidIrr: 35_000_000,
+          penaltyPct: 50,
+          history: [
+            { step: 'submitted', labelFa: 'ثبت درخواست کنسلی توسط مشتری — جریمه ٪۵۰', at: '۴ روز پیش · ۱۵:۴۵' },
+            { step: 'review', labelFa: 'بررسی توسط ادمین سایت', at: 'دیروز · ۱۱:۰۰' },
+          ],
+        },
       ];
       for (const [index, r] of refundSeeds.entries()) {
         const penaltyAmountIrr = Math.round((r.totalPaidIrr * r.penaltyPct) / 100);
@@ -1179,6 +1216,70 @@ async function main() {
             },
           });
         }
+      }
+    }
+  }
+
+  // Backfill extra refund seeds on DBs that already had the original 4 rows,
+  // so the finance panel can demo 5-per-page pagination.
+  {
+    const someBooking = await typeorm.booking.findFirst({ where: { status: 'TICKETED' } });
+    if (someBooking) {
+      const extras = [
+        {
+          pnr: 'RFSEED05',
+          trackingCode: 'RF-00000005',
+          passengerName: 'علی نوری',
+          status: 'FINANCE' as const,
+          totalPaidIrr: 28_000_000,
+          penaltyPct: 30,
+        },
+        {
+          pnr: 'RFSEED06',
+          trackingCode: 'RF-00000006',
+          passengerName: 'فاطمه حسینی',
+          status: 'REVIEW' as const,
+          totalPaidIrr: 35_000_000,
+          penaltyPct: 50,
+        },
+      ];
+      for (const r of extras) {
+        const exists = await typeorm.booking.findUnique({ where: { pnr: r.pnr } });
+        if (exists) continue;
+        const penaltyAmountIrr = Math.round((r.totalPaidIrr * r.penaltyPct) / 100);
+        const refundBooking = await typeorm.booking.create({
+          data: {
+            pnr: r.pnr,
+            flightInstanceId: someBooking.flightInstanceId,
+            channel: someBooking.channel,
+            status: 'TICKETED',
+            priceIrr: r.totalPaidIrr,
+            taxIrr: someBooking.taxIrr,
+            userId: someBooking.userId,
+            contactPhone: someBooking.contactPhone,
+            cabin: someBooking.cabin,
+            fareClassCode: someBooking.fareClassCode,
+          },
+        });
+        await typeorm.refundRequest.create({
+          data: {
+            trackingCode: r.trackingCode,
+            bookingId: refundBooking.id,
+            passengerName: r.passengerName,
+            nidEnc: encryptPii('0012345679'),
+            mobileEnc: encryptPii('09121112233'),
+            ibanEnc: encryptPii('IR820170000000332211009900'),
+            totalPaidIrr: r.totalPaidIrr,
+            penaltyPct: r.penaltyPct,
+            penaltyAmountIrr,
+            refundableIrr: r.totalPaidIrr - penaltyAmountIrr,
+            status: r.status,
+            history: [
+              { step: 'submitted', labelFa: `ثبت درخواست کنسلی توسط مشتری — جریمه ٪${r.penaltyPct}`, at: 'اخیراً' },
+              { step: 'review', labelFa: 'بررسی توسط ادمین سایت', at: 'اخیراً' },
+            ],
+          },
+        });
       }
     }
   }

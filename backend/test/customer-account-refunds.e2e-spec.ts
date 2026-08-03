@@ -247,7 +247,7 @@ describe('Customer account refunds (e2e)', () => {
       });
     const admin = await loginAs(app, 'site.admin');
     const finance = await typeorm.user.findUniqueOrThrow({
-      where: { username: 'finance.karimi' },
+      where: { username: 'finance' },
     });
 
     const refer = await request(app.getHttpServer())

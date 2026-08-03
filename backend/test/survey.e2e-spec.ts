@@ -375,7 +375,7 @@ describe('Survey (e2e)', () => {
         .post(`/survey/${invite.token}`)
         .send({ rating: 5, comment: 'عالی بود' });
 
-      for (const username of ['ceo', 'senior.rahimi', 'chair']) {
+      for (const username of ['ceo', 'senior', 'chair']) {
         const { accessToken } = await loginAs(app, username);
         const res = await request(app.getHttpServer())
           .get('/survey/results')
@@ -392,7 +392,7 @@ describe('Survey (e2e)', () => {
     });
 
     it('GET /survey/results — 403 for IT_MANAGER/FINANCE_MANAGER/COMMERCIAL_MANAGER', async () => {
-      for (const username of ['itadmin', 'finance.karimi', 'comm.abbasi']) {
+      for (const username of ['itadmin', 'finance', 'comm']) {
         const { accessToken } = await loginAs(app, username);
         const res = await request(app.getHttpServer())
           .get('/survey/results')

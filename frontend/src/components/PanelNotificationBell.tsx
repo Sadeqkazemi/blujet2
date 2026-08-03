@@ -7,12 +7,13 @@ export interface PanelNotificationItem {
   title: string;
   sublabel?: string;
   to: string;
-  tone: 'danger' | 'purple';
+  tone: 'danger' | 'purple' | 'warning';
 }
 
 const TONE_DOT: Record<PanelNotificationItem['tone'], string> = {
   danger: 'bg-danger',
   purple: 'bg-[#a855f7]',
+  warning: 'bg-[#f59e0b]',
 };
 
 /** Every item here comes from data the shell already fetches for the nav
