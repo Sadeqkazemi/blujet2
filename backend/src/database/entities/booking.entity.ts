@@ -31,6 +31,15 @@ export class Booking {
     this.id ??= randomUUID();
   }
 
+  /** The `bigintTransformer` maps `undefined` to `null` (never omits the
+   * column), so an unset `taxIrr` would insert a literal NULL instead of
+   * falling through to the DB's `default: 0` — every TypeORM `.create()`
+   * needs this defaulted explicitly. */
+  @BeforeInsert()
+  defaultTaxIrr() {
+    this.taxIrr ??= 0n;
+  }
+
   @Column({ type: 'text' })
   pnr!: string;
 

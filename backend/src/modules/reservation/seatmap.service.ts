@@ -4,11 +4,15 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { IsNull, LessThanOrEqual, MoreThan, Repository } from 'typeorm';
+import { SeatLock } from '../../database/entities/seat-lock.entity';
+import { FlightInstance } from '../../database/entities/flight-instance.entity';
+import { AircraftSeatMap } from '../../database/entities/aircraft-seat-map.entity';
+import { Passenger } from '../../database/entities/passenger.entity';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
 import {
-  decryptPii,
   encryptPii,
   hashPii,
   isValidIranianNationalId,
@@ -16,7 +20,7 @@ import {
 } from '../../common/pii-crypto';
 import { enumerateSeats, isKnownSeat } from './seat-layout';
 import { resolveAircraftType } from '../flights/aircraft-type.util';
-import { Prisma } from '../../../generated/prisma/client';
+import { isUniqueViolation } from '../../database/utils/pg-errors';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { LockSeatDto, RejectLockDto } from './dto/reservation.dtos';
 
@@ -37,7 +41,14 @@ function hoursFromNow(hours: number): Date {
 @Injectable()
 export class SeatmapService {
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectRepository(SeatLock)
+    private readonly seatLockRepo: Repository<SeatLock>,
+    @InjectRepository(FlightInstance)
+    private readonly flightInstanceRepo: Repository<FlightInstance>,
+    @InjectRepository(AircraftSeatMap)
+    private readonly seatMapRepo: Repository<AircraftSeatMap>,
+    @InjectRepository(Passenger)
+    private readonly passengerRepo: Repository<Passenger>,
     private readonly audit: AuditService,
   ) {}
 
@@ -45,7 +56,17 @@ export class SeatmapService {
    * HELD/holdExpiresAt lazy-exclusion pattern: still un-released AND not
    * past its request-decision/hold-to-ticket deadline. */
   private activeLockWhere() {
-    return { releasedAt: null, expiresAt: { gt: new Date() } };
+    return { releasedAt: IsNull(), expiresAt: MoreThan(new Date()) };
+  }
+
+  private async findSoldConflict(flightInstanceId: string, seatCode: string) {
+    return this.passengerRepo
+      .createQueryBuilder('p')
+      .innerJoin('p.booking', 'b')
+      .where('p.seatCode = :seatCode', { seatCode })
+      .andWhere('b.flightInstanceId = :flightInstanceId', { flightInstanceId })
+      .andWhere('b.status != :cancelled', { cancelled: 'CANCELLED' })
+      .getOne();
   }
 
   /** The DB's partial unique index only knows `releasedAt IS NULL`, not
@@ -55,22 +76,23 @@ export class SeatmapService {
    * released lock themselves before proceeding. A conditional update
    * guards a concurrent double-release. */
   private async releaseIfExpired(flightInstanceId: string, seatCode: string) {
-    await this.prisma.seatLock.updateMany({
-      where: {
+    await this.seatLockRepo.update(
+      {
         flightInstanceId,
         seatCode,
-        releasedAt: null,
-        expiresAt: { lte: new Date() },
+        releasedAt: IsNull(),
+        expiresAt: LessThanOrEqual(new Date()),
       },
-      data: { releasedAt: new Date() },
-    });
+      { releasedAt: new Date() },
+    );
   }
 
   private async getFlightInstanceOrThrow(id: string) {
-    const instance = await this.prisma.flightInstance.findUnique({
-      where: { id },
-      include: { flight: { include: { route: true } } },
-    });
+    const instance = await this.flightInstanceRepo
+      .createQueryBuilder('fi')
+      .leftJoinAndSelect('fi.flight', 'flight')
+      .where('fi.id = :id', { id })
+      .getOne();
     if (!instance) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -81,9 +103,7 @@ export class SeatmapService {
   }
 
   private async getSeatMapConfigOrThrow(aircraftType: string) {
-    const map = await this.prisma.aircraftSeatMap.findUnique({
-      where: { aircraftType },
-    });
+    const map = await this.seatMapRepo.findOneBy({ aircraftType });
     if (!map) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -100,38 +120,22 @@ export class SeatmapService {
     );
     const seats = enumerateSeats(map);
 
-    const [soldPassengers, activeLocks, airports] = await Promise.all([
-      this.prisma.passenger.findMany({
-        where: {
-          seatCode: { not: null },
-          booking: { flightInstanceId, status: { not: 'CANCELLED' } },
-        },
-        select: {
-          seatCode: true,
-          fullName: true,
-          nationalIdEnc: true,
-          booking: { select: { pnr: true, status: true, priceIrr: true } },
-        },
-      }),
-      this.prisma.seatLock.findMany({
+    const [soldPassengers, activeLocks] = await Promise.all([
+      this.passengerRepo
+        .createQueryBuilder('p')
+        .innerJoin('p.booking', 'b')
+        .where('p.seatCode IS NOT NULL')
+        .andWhere('b.flightInstanceId = :flightInstanceId', {
+          flightInstanceId,
+        })
+        .andWhere('b.status != :cancelled', { cancelled: 'CANCELLED' })
+        .select(['p.seatCode'])
+        .getMany(),
+      this.seatLockRepo.find({
         where: { flightInstanceId, ...this.activeLockWhere() },
       }),
-      this.prisma.airport.findMany({
-        where: {
-          code: {
-            in: [
-              instance.flight.route.originCode,
-              instance.flight.route.destCode,
-            ],
-          },
-        },
-        select: { code: true, cityFa: true },
-      }),
     ]);
-    const cityByCode = new Map(airports.map((a) => [a.code, a.cityFa]));
-    const soldByCode = new Map(
-      soldPassengers.map((p) => [p.seatCode!, p] as const),
-    );
+    const soldCodes = new Set(soldPassengers.map((p) => p.seatCode!));
     const lockedByCode = new Map(activeLocks.map((l) => [l.seatCode, l]));
 
     const rowsMap = new Map<
@@ -142,69 +146,39 @@ export class SeatmapService {
       if (!rowsMap.has(seat.row)) {
         rowsMap.set(seat.row, { row: seat.row, cabin: seat.cabin, seats: [] });
       }
-      const sold = soldByCode.get(seat.seatCode);
       const lock = lockedByCode.get(seat.seatCode);
-      const status = sold ? 'SOLD' : lock ? 'LOCKED' : 'FREE';
+      const status = soldCodes.has(seat.seatCode)
+        ? 'SOLD'
+        : lock
+          ? 'LOCKED'
+          : 'FREE';
       rowsMap.get(seat.row)!.seats.push({
         seatCode: seat.seatCode,
         status,
         lockId: lock?.id ?? null,
-        // Staff reservation panel only — name of the passenger who holds a
-        // sold seat (IT/CEO/Board/Senior). Lock PII stays encrypted-only.
-        passenger: sold
-          ? {
-              fullName: sold.fullName,
-              pnr: sold.booking.pnr,
-              bookingStatus: sold.booking.status,
-              nationalId: sold.nationalIdEnc
-                ? decryptPii(sold.nationalIdEnc)
-                : null,
-              priceIrr: sold.booking.priceIrr,
-            }
-          : null,
-        // CEO/Board «هواپیما» tab reads the lighter occupant shape.
-        occupant: sold
-          ? {
-              pnr: sold.booking.pnr,
-              passengerName: sold.fullName,
-              bookingStatus: sold.booking.status,
-            }
-          : null,
-        lockExpiresAt: lock?.expiresAt ?? null,
-        lockPassengerName: lock?.passengerName ?? null,
       });
     }
-
-    const originCode = instance.flight.route.originCode;
-    const destCode = instance.flight.route.destCode;
 
     return {
       flightInstanceId,
       aircraftType: resolveAircraftType(instance),
-      flightNo: instance.flight.flightNo,
-      originCode,
-      destCode,
-      originCityFa: cityByCode.get(originCode) ?? originCode,
-      destCityFa: cityByCode.get(destCode) ?? destCode,
-      departureAt: instance.departureAt,
       rows: Array.from(rowsMap.values()).sort((a, b) => a.row - b.row),
       // CLAUDE.md: "seat map config lives per aircraft type in the DB, not
       // hardcoded" — the aisle gap position varies by cabin layout (e.g.
       // business 2-2 vs economy 2-3), so the frontend renders it from
       // this instead of assuming a fixed seat index.
       cabinLayout: {
-        BUSINESS: { aisleAfterIndex: map.businessColsLeft.length },
-        ECONOMY: { aisleAfterIndex: map.economyColsLeft.length },
+        BUSINESS: { aisleAfterIndex: map.businessColsLeft?.length ?? 0 },
+        ECONOMY: { aisleAfterIndex: map.economyColsLeft?.length ?? 0 },
       },
       capacity: seats.length,
-      soldCount: soldByCode.size,
+      soldCount: soldCodes.size,
       lockedCount: activeLocks.length,
-      freeCount: Math.max(0, seats.length - soldByCode.size - activeLocks.length),
       occupancyPct:
         seats.length === 0
           ? 0
           : Math.round(
-              ((soldByCode.size + activeLocks.length) / seats.length) * 1000,
+              ((soldCodes.size + activeLocks.length) / seats.length) * 1000,
             ) / 10,
     };
   }
@@ -225,12 +199,7 @@ export class SeatmapService {
       });
     }
 
-    const sold = await this.prisma.passenger.findFirst({
-      where: {
-        seatCode: dto.seatCode,
-        booking: { flightInstanceId, status: { not: 'CANCELLED' } },
-      },
-    });
+    const sold = await this.findSoldConflict(flightInstanceId, dto.seatCode);
     if (sold) {
       throw new ConflictException({
         code: ErrorCode.CONFLICT,
@@ -245,7 +214,7 @@ export class SeatmapService {
       });
     }
 
-    const activeRequesterLocks = await this.prisma.seatLock.count({
+    const activeRequesterLocks = await this.seatLockRepo.count({
       where: { lockedById: actor.id, ...this.activeLockWhere() },
     });
     if (activeRequesterLocks >= MAX_ACTIVE_MANAGERIAL_LOCKS_PER_REQUESTER) {
@@ -268,27 +237,25 @@ export class SeatmapService {
     await this.releaseIfExpired(flightInstanceId, dto.seatCode);
 
     try {
-      const lock = await this.prisma.seatLock.create({
-        data: {
+      const lock = await this.seatLockRepo.save(
+        this.seatLockRepo.create({
           flightInstanceId,
           seatCode: dto.seatCode,
           lockedById: actor.id,
           reason: dto.reason,
           classification: dto.classification,
-          discountPct: dto.discountPct,
+          discountPct: dto.discountPct ?? null,
           requesterRank: actor.role,
           approvalStatus: 'PENDING_APPROVAL',
           expiresAt: hoursFromNow(LOCK_REQUEST_TTL_HOURS),
-          passengerName: dto.passengerName,
-          passengerNationalIdEnc: nationalId
-            ? encryptPii(nationalId)
-            : undefined,
-          passengerNationalIdHash: nationalId ? hashPii(nationalId) : undefined,
+          passengerName: dto.passengerName ?? null,
+          passengerNationalIdEnc: nationalId ? encryptPii(nationalId) : null,
+          passengerNationalIdHash: nationalId ? hashPii(nationalId) : null,
           passengerMobileEnc: dto.passengerMobile
             ? encryptPii(dto.passengerMobile)
-            : undefined,
-        },
-      });
+            : null,
+        }),
+      );
 
       await this.audit.record({
         actorId: actor.id,
@@ -302,10 +269,7 @@ export class SeatmapService {
 
       return this.toLockView(lock);
     } catch (err) {
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2002'
-      ) {
+      if (isUniqueViolation(err)) {
         throw new ConflictException({
           code: ErrorCode.CONFLICT,
           message: 'این صندلی هم‌اکنون توسط شخص دیگری لاک شده است.',
@@ -316,9 +280,7 @@ export class SeatmapService {
   }
 
   private async getPendingLockOrThrow(lockId: string) {
-    const lock = await this.prisma.seatLock.findUnique({
-      where: { id: lockId },
-    });
+    const lock = await this.seatLockRepo.findOneBy({ id: lockId });
     if (!lock) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -339,7 +301,7 @@ export class SeatmapService {
   }
 
   /** Two-step approval: requesting and approving both stay within
-   * CAN_SEAT_LOCK_ROLES, but a requester can never approve their own request —
+   * CAN_LOCK_ROLES, but a requester can never approve their own request —
    * a real control between the governance roles, not a rubber stamp. */
   async approveLock(actor: AuthenticatedUser, lockId: string) {
     const lock = await this.getPendingLockOrThrow(lockId);
@@ -350,15 +312,11 @@ export class SeatmapService {
       });
     }
 
-    const updated = await this.prisma.seatLock.update({
-      where: { id: lockId },
-      data: {
-        approvalStatus: 'APPROVED',
-        approvedById: actor.id,
-        approvedAt: new Date(),
-        expiresAt: hoursFromNow(LOCK_HOLD_TTL_HOURS),
-      },
-    });
+    lock.approvalStatus = 'APPROVED';
+    lock.approvedById = actor.id;
+    lock.approvedAt = new Date();
+    lock.expiresAt = hoursFromNow(LOCK_HOLD_TTL_HOURS);
+    const updated = await this.seatLockRepo.save(lock);
 
     await this.audit.record({
       actorId: actor.id,
@@ -380,16 +338,12 @@ export class SeatmapService {
   ) {
     const lock = await this.getPendingLockOrThrow(lockId);
 
-    const updated = await this.prisma.seatLock.update({
-      where: { id: lockId },
-      data: {
-        approvalStatus: 'REJECTED',
-        rejectedById: actor.id,
-        rejectedAt: new Date(),
-        rejectionReason: dto.rejectionReason,
-        releasedAt: new Date(),
-      },
-    });
+    lock.approvalStatus = 'REJECTED';
+    lock.rejectedById = actor.id;
+    lock.rejectedAt = new Date();
+    lock.rejectionReason = dto.rejectionReason;
+    lock.releasedAt = new Date();
+    const updated = await this.seatLockRepo.save(lock);
 
     await this.audit.record({
       actorId: actor.id,
@@ -405,9 +359,7 @@ export class SeatmapService {
   }
 
   async releaseLock(actor: AuthenticatedUser, lockId: string) {
-    const lock = await this.prisma.seatLock.findUnique({
-      where: { id: lockId },
-    });
+    const lock = await this.seatLockRepo.findOneBy({ id: lockId });
     if (!lock) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -421,10 +373,9 @@ export class SeatmapService {
       });
     }
 
-    const updated = await this.prisma.seatLock.update({
-      where: { id: lockId },
-      data: { releasedAt: new Date(), releasedById: actor.id },
-    });
+    lock.releasedAt = new Date();
+    lock.releasedById = actor.id;
+    const updated = await this.seatLockRepo.save(lock);
 
     await this.audit.record({
       actorId: actor.id,
@@ -439,7 +390,7 @@ export class SeatmapService {
     return this.toLockView(updated);
   }
 
-  private toLockView(lock: Prisma.SeatLockGetPayload<Record<string, never>>) {
+  private toLockView(lock: SeatLock) {
     const {
       passengerNationalIdEnc,
       passengerNationalIdHash,

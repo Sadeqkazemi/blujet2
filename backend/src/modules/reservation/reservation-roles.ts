@@ -1,4 +1,4 @@
-import type { Role } from '../../../generated/prisma/enums';
+import type { Role } from '../../database/enums';
 
 /** Reachable nav: CEO + BOARD_CHAIR (label هواپیما), SENIOR_MANAGER +
  * IT_MANAGER (سامانه رزرواسیون). See docs/DB_SCHEMA.md Phase 9. */
