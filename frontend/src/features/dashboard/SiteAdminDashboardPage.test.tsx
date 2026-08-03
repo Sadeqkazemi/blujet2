@@ -110,7 +110,19 @@ describe('SiteAdminDashboardPage', () => {
     expect(agenciesApi.fetchAgencyRequests).toHaveBeenCalledWith('PENDING');
   });
 
-  it('shows an error message when the endpoints fail', async () => {
+  it('still renders widgets when overview endpoint fails', async () => {
+    vi.spyOn(reportingApi, 'fetchSiteAdminOverview').mockRejectedValue(new Error('404'));
+    vi.spyOn(agenciesApi, 'fetchAgencyRequests').mockResolvedValue([REQUEST]);
+    vi.spyOn(refundsApi, 'fetchRefunds').mockResolvedValue(REFUNDS);
+    vi.spyOn(cartableApi, 'fetchCartable').mockResolvedValue(CARTABLE);
+
+    renderPage();
+
+    expect(await screen.findByText('آژانس تست')).toBeInTheDocument();
+    expect(screen.getByText('آژانس فعال')).toBeInTheDocument();
+  });
+
+  it('shows an error message when all endpoints fail', async () => {
     vi.spyOn(reportingApi, 'fetchSiteAdminOverview').mockRejectedValue(new Error('x'));
     vi.spyOn(agenciesApi, 'fetchAgencyRequests').mockRejectedValue(new Error('x'));
     vi.spyOn(refundsApi, 'fetchRefunds').mockRejectedValue(new Error('x'));
