@@ -95,19 +95,14 @@ describe('Panels (e2e)', () => {
     const keys = res.body.data.map((t: { key: string }) => t.key);
     expect(keys).toEqual([
       'dashboard',
-      'agencies',
-      'flights',
       'admins',
-      'reports',
       'finance',
       'cartable',
-      'referrals',
       'mgrreports',
       'vip',
       'survey',
       'panels',
       'security',
-      'reservation',
     ]);
   });
 

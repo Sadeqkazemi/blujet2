@@ -64,23 +64,18 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'mgrreports', labelFa: 'گزارش مدیران', implemented: true },
     { key: 'survey', labelFa: 'نظرسنجی مسافران', implemented: true },
   ],
-  // Order matches design-reference-v2/پنل مدیر ارشد.dc.html sidebar
-  // (vip → survey → panels → security → reservation at the end).
+  // Senior Manager sidebar — trimmed per product request (2026-08-03):
+  // removed agencies, flights, reports, referrals, reservation.
   SENIOR_MANAGER: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
-    { key: 'agencies', labelFa: 'آژانس‌ها', implemented: true },
-    { key: 'flights', labelFa: 'مدیریت پروازها', implemented: true },
     { key: 'admins', labelFa: 'مدیران و ادمین‌ها', implemented: true },
-    { key: 'reports', labelFa: 'گزارش مسافران', implemented: true },
     { key: 'finance', labelFa: 'مالی', implemented: true },
     { key: 'cartable', labelFa: 'کارتابل', implemented: true },
-    { key: 'referrals', labelFa: 'ارجاعات', implemented: true },
     { key: 'mgrreports', labelFa: 'گزارش مدیران', implemented: true },
     { key: 'vip', labelFa: 'مشتریان VIP', implemented: true },
     { key: 'survey', labelFa: 'نظرسنجی مسافران', implemented: true },
     { key: 'panels', labelFa: 'دسترسی به پنل‌ها', implemented: true },
     { key: 'security', labelFa: 'امنیت و رمز عبور', implemented: true },
-    { key: 'reservation', labelFa: 'سامانه رزرواسیون', implemented: true },
   ],
   FINANCE_MANAGER: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
