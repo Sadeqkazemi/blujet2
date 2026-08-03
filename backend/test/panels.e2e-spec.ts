@@ -171,6 +171,10 @@ describe('Panels (e2e)', () => {
       'media',
       'jobapps',
     ]);
+    // Product request (2026-08): never surface these in the SITE_ADMIN sidebar.
+    expect(keys).not.toContain('blog');
+    expect(keys).not.toContain('kyc');
+    expect(keys).not.toContain('settings');
   });
 
   it('non-CEO/Senior roles get 403 on /panels/access', async () => {
