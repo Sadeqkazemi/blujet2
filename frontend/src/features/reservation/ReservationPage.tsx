@@ -16,6 +16,7 @@ import {
   searchFlights,
 } from '../../api/reservation';
 import { faDigits, faMoney } from '../../lib/fa-format';
+import { airportCityName } from '../../lib/airport-cities';
 import { formatJalaliDate, formatJalaliDateTime, parseJalaliDateToIso } from '../../lib/jalali';
 import Modal from '../../components/Modal';
 import BoardChairPlaneMode from './BoardChairPlaneMode';
@@ -670,8 +671,8 @@ function ItReservationView() {
                   onClick={() => setSeatMapFlightId(f.flightInstanceId)}
                   className="grid w-full grid-cols-[1.4fr_0.9fr_1.1fr_0.9fr_0.9fr_0.9fr] items-center gap-x-3.5 border-b border-[#16202e] px-[15px] py-3 text-right text-xs transition last:border-0 hover:bg-[#18223a]"
                 >
-                  <span className="min-w-0 truncate font-bold text-[#e7ecf3]">{f.route}</span>
-                  <span className="font-num [direction:ltr] [unicode-bidi:isolate] text-right text-[#9fb0c7]">
+                  <span className="min-w-0 truncate font-bold text-[#e7ecf3]">{flightRouteLabel(f)}</span>
+                  <span className="font-num text-[#9fb0c7] [direction:ltr] [unicode-bidi:isolate] text-right">
                     {f.flightNo}
                   </span>
                   <span className="text-[#9fb0c7]">{formatJalaliDateTime(f.departureAt)}</span>
@@ -1592,6 +1593,26 @@ function DashboardTab({
   );
 }
 
+function flightRouteLabel(f: ReservationFlightRow): string {
+  if (f.originCityFa?.trim() && f.destCityFa?.trim()) {
+    return `${f.originCityFa} ← ${f.destCityFa}`;
+  }
+  if (f.route?.trim()) {
+    // Prefer already-Persian route; expand bare airport codes via local map.
+    const codePair = f.route.match(/^([A-Z]{3})\s*[→←↔\-]+\s*([A-Z]{3})$/i);
+    if (codePair) {
+      const o = airportCityName(codePair[1], 'fa');
+      const d = airportCityName(codePair[2], 'fa');
+      return `${o} ← ${d}`;
+    }
+    return f.route;
+  }
+  if (f.originCode && f.destCode) {
+    return `${airportCityName(f.originCode, 'fa')} ← ${airportCityName(f.destCode, 'fa')}`;
+  }
+  return '—';
+}
+
 function FlightsTab({
   dark,
   rows,
@@ -1605,71 +1626,100 @@ function FlightsTab({
   onQ: (v: string) => void;
   onOpenSeatMap: (id: string) => void;
 }) {
-  return (
-    <section
-      className={
-        dark
-          ? 'rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[15px]'
-          : 'rounded-xl border border-border bg-white p-5'
-      }
-    >
-      <input
-        value={q}
-        onChange={(e) => onQ(e.target.value)}
-        placeholder="جستجوی پرواز — مسیر یا شماره پرواز"
-        className={
-          dark
-            ? 'mb-4 h-[42px] w-full rounded-[10px] border border-[#28344c] bg-[#0f1623] px-3 text-xs text-[#e7ecf3] outline-none placeholder:text-[#6b7b94] focus:border-[#3b82f6]'
-            : 'mb-4 h-[42px] w-full rounded-xl border border-border px-4 text-xs outline-none focus:border-accent'
-        }
-      />
-      {rows.length === 0 ? (
-        <p className={`py-6 text-center text-xs ${dark ? 'text-[#6b7b94]' : 'text-muted'}`}>
-          پروازی یافت نشد.
-        </p>
-      ) : (
-        <div className="flex flex-col gap-2.5">
-          {rows.map((f) => {
-            const soldCount = f.soldCount ?? 0;
-            const occ = f.capacity === 0 ? 0 : Math.round((soldCount / f.capacity) * 100);
+  if (dark) {
+    return (
+      <section className="overflow-hidden rounded-[14px] border border-[#1f2a3d] bg-[#141d2e]">
+        <div className="border-b border-[#1f2a3d] p-3">
+          <input
+            value={q}
+            onChange={(e) => onQ(e.target.value)}
+            placeholder="جستجوی پرواز — مسیر یا شماره پرواز"
+            className="h-[42px] w-full rounded-[10px] border border-[#28344c] bg-[#0f1623] px-3 text-xs text-[#e7ecf3] outline-none placeholder:text-[#6b7b94] focus:border-[#3b82f6]"
+          />
+        </div>
+        <div className="grid grid-cols-[1.6fr_1fr_1.2fr_1fr_0.9fr] gap-x-3.5 border-b border-[#1f2a3d] px-[15px] py-[11px] text-[10.5px] font-bold text-[#6b7b94]">
+          <span>مسیر</span>
+          <span>شماره پرواز</span>
+          <span>تاریخ / ساعت</span>
+          <span>ظرفیت</span>
+          <span>وضعیت</span>
+        </div>
+        {rows.length === 0 ? (
+          <div className="px-[15px] py-[34px] text-center text-xs text-[#6b7b94]">پروازی ثبت نشده است.</div>
+        ) : (
+          rows.map((f) => {
+            const sold = f.soldCount ?? f.sold ?? 0;
+            const occ =
+              f.occupancyPct ??
+              (f.capacity === 0 ? 0 : Math.round((sold / f.capacity) * 100));
+            const stKey = f.statusKey ?? (occ >= 100 ? 'FULL' : occ >= 90 ? 'NEAR_FULL' : 'SELLING');
+            const st = FLIGHT_STATUS[stKey] ?? FLIGHT_STATUS.SELLING;
             return (
               <button
                 key={f.flightInstanceId}
                 type="button"
                 onClick={() => onOpenSeatMap(f.flightInstanceId)}
-                className={
-                  dark
-                    ? 'grid grid-cols-1 gap-3 rounded-[13px] border border-[#1f2a3d] bg-[#0f1623] px-3.5 py-3 text-start transition hover:border-[#3b82f6]/50 sm:grid-cols-[1.3fr_.7fr_.9fr_1.2fr_.9fr_auto] sm:gap-x-3.5 sm:gap-y-0'
-                    : 'flex flex-wrap items-center gap-3 rounded-xl border border-border px-4 py-3 text-start text-xs hover:border-accent'
-                }
+                className="grid w-full grid-cols-[1.6fr_1fr_1.2fr_1fr_0.9fr] items-center gap-x-3.5 border-b border-[#16202e] px-[15px] py-3 text-start text-xs transition last:border-0 hover:bg-[#18223a]"
               >
-                <div className="min-w-0">
-                  <div className={`truncate text-[13px] font-extrabold ${dark ? 'text-white' : 'text-ink'}`}>
-                    {f.originCityFa} ↔ {f.destCityFa}
+                <span className="min-w-0 truncate font-bold text-[#e7ecf3]">{flightRouteLabel(f)}</span>
+                <span className="font-num text-[#9fb0c7] [direction:ltr] [unicode-bidi:isolate] text-right">
+                  {f.flightNo}
+                </span>
+                <span className="text-[#9fb0c7]">{formatJalaliDateTime(f.departureAt)}</span>
+                <div className="flex min-w-0 flex-col gap-1">
+                  <div className="font-num text-[10.5px] text-[#9fb0c7]">
+                    {faDigits(sold)} / {faDigits(f.capacity)}
                   </div>
-                  <div className={`ltr mt-0.5 text-[10px] ${dark ? 'text-[#6b7b94]' : 'text-muted'}`}>
+                  <div className="h-1.5 overflow-hidden rounded bg-[#0f1623]">
+                    <div
+                      className="h-full"
+                      style={{ width: `${Math.min(100, occ)}%`, background: st.bar }}
+                    />
+                  </div>
+                </div>
+                <span className={`w-max rounded-[14px] px-2.5 py-1 text-[10.5px] font-bold ${st.className}`}>
+                  {st.label}
+                </span>
+              </button>
+            );
+          })
+        )}
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded-xl border border-border bg-white p-5">
+      <input
+        value={q}
+        onChange={(e) => onQ(e.target.value)}
+        placeholder="جستجوی پرواز — مسیر یا شماره پرواز"
+        className="mb-4 h-[42px] w-full rounded-xl border border-border px-4 text-xs outline-none focus:border-accent"
+      />
+      {rows.length === 0 ? (
+        <p className="py-6 text-center text-xs text-muted">پروازی یافت نشد.</p>
+      ) : (
+        <div className="flex flex-col gap-2.5">
+          {rows.map((f) => {
+            const soldCount = f.soldCount ?? f.sold ?? 0;
+            return (
+              <button
+                key={f.flightInstanceId}
+                type="button"
+                onClick={() => onOpenSeatMap(f.flightInstanceId)}
+                className="flex flex-wrap items-center gap-3 rounded-xl border border-border px-4 py-3 text-start text-xs hover:border-accent"
+              >
+                <div>
+                  <div className="text-[13px] font-extrabold text-ink">{flightRouteLabel(f)}</div>
+                  <div className="ltr mt-0.5 text-[10px] text-muted">
                     {f.originCode} → {f.destCode}
                   </div>
                 </div>
-                <div className="font-num font-bold text-[#60a5fa] [direction:ltr] [unicode-bidi:isolate] text-right sm:text-start">
-                  {f.flightNo}
-                </div>
-                <div className={`font-num text-[11px] ${dark ? 'text-[#cdd9ec]' : 'text-ink'}`}>
-                  {formatJalaliDateTime(f.departureAt)}
-                </div>
-                <div className={`text-[11px] ${dark ? 'text-[#9fb0c7]' : 'text-text-2'}`}>
-                  {aircraftLabel(f.aircraftType)}
-                </div>
-                <div>
-                  <div className={`font-num text-[11px] font-bold ${dark ? 'text-white' : 'text-ink'}`}>
-                    {faDigits(soldCount)} / {faDigits(f.capacity)}
-                  </div>
-                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[#1a2436]">
-                    <div
-                      className="h-full rounded-full bg-[#34d399]"
-                      style={{ width: `${Math.min(100, occ)}%` }}
-                    />
-                  </div>
+                <div className="ltr font-num font-bold text-[#60a5fa]">{f.flightNo}</div>
+                <div className="font-num text-[11px] text-ink">{formatJalaliDateTime(f.departureAt)}</div>
+                <div className="text-[11px] text-text-2">{aircraftLabel(f.aircraftType)}</div>
+                <div className="font-num text-[11px] font-bold text-ink">
+                  {faDigits(soldCount)} / {faDigits(f.capacity)}
                 </div>
                 <span className="rounded-full bg-[rgba(59,130,246,.16)] px-2.5 py-1 text-[10px] font-bold text-[#60a5fa]">
                   در حال فروش

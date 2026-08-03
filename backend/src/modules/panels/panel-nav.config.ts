@@ -67,8 +67,8 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'mgrreports', labelFa: 'گزارش مدیران', implemented: true },
     { key: 'survey', labelFa: 'نظرسنجی مسافران', implemented: true },
   ],
-  // Senior Manager sidebar — trimmed per product request (2026-08-03):
-  // removed agencies, flights, reports, referrals, reservation.
+  // Senior Manager sidebar — mirrors CEO executive tabs for shared surfaces;
+  // `reservation` labeled هواپیما like CEO (content: ExecReservationView).
   SENIOR_MANAGER: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
     { key: 'admins', labelFa: 'مدیران و ادمین‌ها', implemented: true },
@@ -77,6 +77,7 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'mgrreports', labelFa: 'گزارش مدیران', implemented: true },
     { key: 'vip', labelFa: 'مشتریان VIP', implemented: true },
     { key: 'survey', labelFa: 'نظرسنجی مسافران', implemented: true },
+    { key: 'reservation', labelFa: 'هواپیما', implemented: true },
     { key: 'panels', labelFa: 'دسترسی به پنل‌ها', implemented: true },
     { key: 'security', labelFa: 'امنیت و رمز عبور', implemented: true },
   ],
