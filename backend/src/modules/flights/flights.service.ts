@@ -285,6 +285,8 @@ export class FlightsService {
       departureAt: string;
       capacity: number;
       basePriceIrr: Irr;
+      aircraftType?: string;
+      charterSeats?: number;
     },
   ) {
     if (dto.originCode === dto.destCode) {
@@ -308,6 +310,27 @@ export class FlightsService {
         code: ErrorCode.VALIDATION_FAILED,
         message: 'تاریخ و ساعت پرواز باید در آینده باشد.',
       });
+    }
+
+    const charterSeats = dto.charterSeats ?? 0;
+    if (charterSeats >= dto.capacity) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'تعهد چارتری باید کمتر از تعداد صندلی موجود باشد.',
+      });
+    }
+
+    const aircraftType = (dto.aircraftType ?? 'Airbus A320').trim() || 'Airbus A320';
+    if (dto.aircraftType) {
+      const map = await this.prisma.aircraftSeatMap.findUnique({
+        where: { aircraftType },
+      });
+      if (!map) {
+        throw new BadRequestException({
+          code: ErrorCode.VALIDATION_FAILED,
+          message: 'نوع هواپیمای انتخاب‌شده در کاتالوگ نیست.',
+        });
+      }
     }
 
     const route = await this.prisma.route.upsert({
@@ -336,7 +359,7 @@ export class FlightsService {
         data: {
           flightNo: dto.flightNo,
           routeId: route.id,
-          aircraftType: 'Airbus A320',
+          aircraftType,
         },
       }));
 
@@ -346,9 +369,12 @@ export class FlightsService {
         departureAt,
         arrivalAt: new Date(departureAt.getTime() + route.durationMin * 60_000),
         capacity: dto.capacity,
-        charterSeats: 0,
+        charterSeats,
         status: 'SCHEDULED',
         basePriceIrr: dto.basePriceIrr,
+        ...(existingFlight && dto.aircraftType
+          ? { aircraftTypeOverride: aircraftType }
+          : {}),
       },
       include: { flight: { include: { route: true } } },
     });
