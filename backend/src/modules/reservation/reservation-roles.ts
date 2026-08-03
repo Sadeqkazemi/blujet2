@@ -1,4 +1,4 @@
-import type { Role } from '../../../generated/prisma/enums';
+import type { Role } from '../../database/enums';
 
 /** Reachable per Phase 1's confirmed nav extraction: BOARD_CHAIR,
  * SENIOR_MANAGER, IT_MANAGER. CEO is API-authorized (⚑ product decision,
