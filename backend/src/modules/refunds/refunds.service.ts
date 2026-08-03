@@ -4,8 +4,15 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
 import * as crypto from 'node:crypto';
-import { PrismaService } from '../../prisma/prisma.service';
+import { EntityManager, QueryFailedError, Repository } from 'typeorm';
+import { RefundRequest } from '../../database/entities/refund-request.entity';
+import { RefundPenaltyRule } from '../../database/entities/refund-penalty-rule.entity';
+import { Booking } from '../../database/entities/booking.entity';
+import { Passenger } from '../../database/entities/passenger.entity';
+import { FlightInstance } from '../../database/entities/flight-instance.entity';
+import { User } from '../../database/entities/user.entity';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
 import { decryptPii, encryptPii } from '../../common/pii-crypto';
@@ -13,37 +20,13 @@ import { matchesLastName } from '../../common/passenger-name.util';
 import { computePenalty } from './penalty';
 import { StepUpService } from '../auth/step-up.service';
 import { negateIrr } from '../../common/money';
+import type { Irr } from '../../common/money';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import { Prisma, type RefundRequest } from '../../../generated/prisma/client';
-
-const CUSTOMER_BOOKING_INCLUDE = {
-  flightInstance: {
-    include: { flight: { include: { route: true } } },
-  },
-  passengers: true,
-  refundRequests: true,
-} satisfies Prisma.BookingInclude;
-
-type CustomerRefundBooking = Prisma.BookingGetPayload<{
-  include: typeof CUSTOMER_BOOKING_INCLUDE;
-}>;
-
-type CustomerRefundRow = Prisma.RefundRequestGetPayload<{
-  include: {
-    booking: {
-      include: {
-        flightInstance: {
-          include: { flight: { include: { route: true } } };
-        };
-      };
-    };
-  };
-}>;
+import { LedgerEntry } from '../../database/entities/ledger-entry.entity';
+import type { JsonValue } from '../../database/json-types';
 
 /** List-row shape: no PII at all (the design's cards show none). */
-function toListRow(
-  r: RefundRequest & { assignee?: { fullName: string } | null },
-) {
+function toListRow(r: RefundRequest) {
   const { nidEnc, mobileEnc, ibanEnc, ...rest } = r;
   void nidEnc;
   void mobileEnc;
@@ -51,7 +34,8 @@ function toListRow(
   return rest;
 }
 
-function toCustomerRow(r: CustomerRefundRow) {
+/** Customer-facing row: strips PII, flattens the joined booking/flight/route. */
+function toCustomerRow(r: RefundRequest) {
   const { nidEnc, mobileEnc, ibanEnc, booking, ...rest } = r;
   void nidEnc;
   void mobileEnc;
@@ -73,29 +57,62 @@ function newTrackingCode(): string {
   return `RF-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
 }
 
+function isUniqueViolation(err: unknown, constraintName: string): boolean {
+  if (!(err instanceof QueryFailedError)) return false;
+  const driverErr = err.driverError as { code?: string; constraint?: string };
+  return driverErr.code === '23505' && driverErr.constraint === constraintName;
+}
+
 @Injectable()
 export class RefundsService {
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectRepository(RefundRequest)
+    private readonly refundRepo: Repository<RefundRequest>,
+    @InjectRepository(RefundPenaltyRule)
+    private readonly ruleRepo: Repository<RefundPenaltyRule>,
+    @InjectRepository(Booking)
+    private readonly bookingRepo: Repository<Booking>,
+    @InjectRepository(Passenger)
+    private readonly passengerRepo: Repository<Passenger>,
+    @InjectRepository(FlightInstance)
+    private readonly flightInstanceRepo: Repository<FlightInstance>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
     private readonly audit: AuditService,
     private readonly stepUp: StepUpService,
   ) {}
 
+  /** RefundRequest has a recursive JsonValue `history` column, which makes
+   * TypeScript choke (TS2589) on any `find`/`findOneBy`/`update` call —
+   * query-builder `.getCount()` sidesteps the deep-generic inference. */
+  private async hasRefundRequest(
+    bookingId: string,
+    manager: EntityManager = this.refundRepo.manager,
+  ): Promise<boolean> {
+    const count = await manager
+      .createQueryBuilder(RefundRequest, 'r')
+      .where('r.bookingId = :bookingId', { bookingId })
+      .getCount();
+    return count > 0;
+  }
+
+  private staffDetailQuery() {
+    return this.refundRepo
+      .createQueryBuilder('r')
+      .leftJoin('r.assignee', 'assignee')
+      .addSelect(['assignee.id', 'assignee.fullName', 'assignee.role'])
+      .leftJoin('r.processedBy', 'processedBy')
+      .addSelect(['processedBy.id', 'processedBy.fullName', 'processedBy.role'])
+      .leftJoinAndSelect('r.booking', 'booking')
+      .leftJoinAndSelect('booking.flightInstance', 'flightInstance')
+      .leftJoinAndSelect('flightInstance.flight', 'flight')
+      .leftJoinAndSelect('flight.route', 'route');
+  }
+
   private async getOrThrow(id: string) {
-    const request = await this.prisma.refundRequest.findUnique({
-      where: { id },
-      include: {
-        assignee: { select: { id: true, fullName: true, role: true } },
-        processedBy: { select: { id: true, fullName: true, role: true } },
-        booking: {
-          include: {
-            flightInstance: {
-              include: { flight: { include: { route: true } } },
-            },
-          },
-        },
-      },
-    });
+    const request = await this.staffDetailQuery()
+      .where('r.id = :id', { id })
+      .getOne();
     if (!request) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -106,19 +123,9 @@ export class RefundsService {
   }
 
   async list() {
-    const requests = await this.prisma.refundRequest.findMany({
-      include: {
-        assignee: { select: { id: true, fullName: true, role: true } },
-        booking: {
-          include: {
-            flightInstance: {
-              include: { flight: { include: { route: true } } },
-            },
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const requests = await this.staffDetailQuery()
+      .orderBy('r.createdAt', 'DESC')
+      .getMany();
 
     const kpis = {
       payoutQueue: requests.filter((r) => r.status === 'FINANCE').length,
@@ -152,9 +159,7 @@ export class RefundsService {
       });
     }
 
-    const assignee = await this.prisma.user.findUnique({
-      where: { id: assigneeId },
-    });
+    const assignee = await this.userRepo.findOneBy({ id: assigneeId });
     if (
       !assignee ||
       !assignee.isActive ||
@@ -196,17 +201,18 @@ export class RefundsService {
         at: now,
       });
     }
-    const updated = await this.prisma.refundRequest.update({
-      where: { id },
-      data: {
-        assigneeId,
-        status: advancesToFinance ? 'FINANCE' : request.status,
-        history: history as Prisma.InputJsonValue,
-      },
-      include: {
-        assignee: { select: { id: true, fullName: true, role: true } },
-      },
-    });
+
+    request.assigneeId = assigneeId;
+    request.status = advancesToFinance ? 'FINANCE' : request.status;
+    request.history = history as JsonValue;
+    await this.refundRepo.save(request);
+
+    const updated = await this.refundRepo
+      .createQueryBuilder('r')
+      .leftJoin('r.assignee', 'assignee')
+      .addSelect(['assignee.id', 'assignee.fullName', 'assignee.role'])
+      .where('r.id = :id', { id })
+      .getOneOrFail();
 
     await this.audit.record({
       actorId: actor.id,
@@ -255,41 +261,55 @@ export class RefundsService {
 
     // ⚑ Real financial effect, one transaction: ledger reversal + booking
     // REFUNDED + request PAID. The conditional update is the double-pay guard.
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const flipped = await tx.refundRequest.updateMany({
-        where: { id, status: 'FINANCE' },
-        data: {
+    await this.refundRepo.manager.transaction(async (tx) => {
+      const result = await tx
+        .createQueryBuilder()
+        .update(RefundRequest)
+        .set({
           status: 'PAID',
           processedById: actor.id,
           paidAt: new Date(),
-          history: history as Prisma.InputJsonValue,
-        },
-      });
-      if (flipped.count === 0) {
+        })
+        .where('id = :id', { id })
+        .andWhere('status = :status', { status: 'FINANCE' })
+        .execute();
+      if ((result.affected ?? 0) === 0) {
         throw new ConflictException({
           code: ErrorCode.CONFLICT,
           message: 'این درخواست قبلاً پرداخت شده است.',
         });
       }
-      await tx.ledgerEntry.create({
-        data: {
+      // `history` is a recursive JsonValue column — including it directly in
+      // a query-builder `.set()` triggers TS2589, so it's persisted via a
+      // fresh-fetch + entity mutation + `save()` instead (safe now that the
+      // guarded status flip above already won the double-pay race).
+      const freshEntity = await tx
+        .createQueryBuilder(RefundRequest, 'r')
+        .where('r.id = :id', { id })
+        .getOneOrFail();
+      freshEntity.history = history as JsonValue;
+      await tx.save(freshEntity);
+      await tx.save(
+        tx.create(LedgerEntry, {
           bookingId: request.bookingId,
           type: 'REFUND',
           signedAmountIrr: negateIrr(request.refundableIrr),
           createdById: actor.id,
-        },
-      });
-      await tx.booking.update({
-        where: { id: request.bookingId },
-        data: { status: 'REFUNDED' },
-      });
-      return tx.refundRequest.findUniqueOrThrow({
-        where: { id },
-        include: {
-          processedBy: { select: { id: true, fullName: true, role: true } },
-        },
-      });
+        }),
+      );
+      await tx.update(
+        Booking,
+        { id: request.bookingId },
+        { status: 'REFUNDED' },
+      );
     });
+
+    const updated = await this.refundRepo
+      .createQueryBuilder('r')
+      .leftJoin('r.processedBy', 'processedBy')
+      .addSelect(['processedBy.id', 'processedBy.fullName', 'processedBy.role'])
+      .where('r.id = :id', { id })
+      .getOneOrFail();
 
     await this.audit.record({
       actorId: actor.id,
@@ -311,15 +331,13 @@ export class RefundsService {
   /** Public purchase engine: the customer's own submission — CLAUDE.md's
    * "fare-rule–driven penalty calculation, user-visible breakdown before
    * confirmation." Booking must be TICKETED and owned by the caller; only
-   * one request per booking (RefundStatus has no REJECTED to resubmit
-   * against, so a second submission is always a conflict, not a retry). */
+   * one request per booking (enforced by the unique index on `bookingId`,
+   * backstopping the application-level check below against races). */
   private previewForBooking(
-    booking: CustomerRefundBooking,
-    rules: {
-      minHoursBeforeDeparture: number;
-      penaltyPct: number;
-      labelFa: string;
-    }[],
+    booking: Pick<Booking, 'id' | 'priceIrr'> & {
+      flightInstance: Pick<FlightInstance, 'departureAt'>;
+    },
+    rules: RefundPenaltyRule[],
   ) {
     const hoursLeft =
       (booking.flightInstance.departureAt.getTime() - Date.now()) / 3_600_000;
@@ -336,12 +354,11 @@ export class RefundsService {
   }
 
   private assertRefundable(
-    booking: CustomerRefundBooking,
-    rules: {
-      minHoursBeforeDeparture: number;
-      penaltyPct: number;
-      labelFa: string;
-    }[],
+    booking: Pick<Booking, 'id' | 'priceIrr' | 'status'> & {
+      flightInstance: Pick<FlightInstance, 'departureAt'>;
+    },
+    rules: RefundPenaltyRule[],
+    hasExistingRequest: boolean,
   ) {
     if (booking.status !== 'TICKETED' && booking.status !== 'PAID') {
       throw new ConflictException({
@@ -349,7 +366,7 @@ export class RefundsService {
         message: 'این رزرو واجد شرایط استرداد نیست.',
       });
     }
-    if (booking.refundRequests.length > 0) {
+    if (hasExistingRequest) {
       throw new ConflictException({
         code: ErrorCode.CONFLICT,
         message: 'برای این رزرو قبلاً درخواست استرداد ثبت شده است.',
@@ -365,18 +382,27 @@ export class RefundsService {
     return preview;
   }
 
+  private bookingWithFlightQuery() {
+    return this.bookingRepo
+      .createQueryBuilder('b')
+      .leftJoinAndSelect('b.flightInstance', 'flightInstance')
+      .leftJoinAndSelect('flightInstance.flight', 'flight')
+      .leftJoinAndSelect('flight.route', 'route');
+  }
+
   async listEligibleBookings(userId: string) {
     const [bookings, rules] = await Promise.all([
-      this.prisma.booking.findMany({
-        where: {
-          userId,
-          status: { in: ['TICKETED', 'PAID'] },
-          refundRequests: { none: {} },
-        },
-        include: CUSTOMER_BOOKING_INCLUDE,
-        orderBy: { flightInstance: { departureAt: 'asc' } },
-      }),
-      this.prisma.refundPenaltyRule.findMany(),
+      this.bookingWithFlightQuery()
+        .where('b.userId = :userId', { userId })
+        .andWhere('b.status IN (:...statuses)', {
+          statuses: ['TICKETED', 'PAID'],
+        })
+        .andWhere(
+          'NOT EXISTS (SELECT 1 FROM refund_requests rr WHERE rr."bookingId" = b.id)',
+        )
+        .orderBy('flightInstance.departureAt', 'ASC')
+        .getMany(),
+      this.ruleRepo.find(),
     ]);
 
     return bookings.flatMap((booking) => {
@@ -397,8 +423,8 @@ export class RefundsService {
   }
 
   async listCustomerRules() {
-    const rules = await this.prisma.refundPenaltyRule.findMany({
-      orderBy: { minHoursBeforeDeparture: 'desc' },
+    const rules = await this.ruleRepo.find({
+      order: { minHoursBeforeDeparture: 'DESC' },
     });
     return rules.map((rule) => ({
       minHoursBeforeDeparture: rule.minHoursBeforeDeparture,
@@ -410,11 +436,10 @@ export class RefundsService {
 
   async previewMine(userId: string, bookingId: string) {
     const [booking, rules] = await Promise.all([
-      this.prisma.booking.findUnique({
-        where: { id: bookingId },
-        include: CUSTOMER_BOOKING_INCLUDE,
-      }),
-      this.prisma.refundPenaltyRule.findMany(),
+      this.bookingWithFlightQuery()
+        .where('b.id = :bookingId', { bookingId })
+        .getOne(),
+      this.ruleRepo.find(),
     ]);
     if (!booking || booking.userId !== userId) {
       throw new NotFoundException({
@@ -422,39 +447,44 @@ export class RefundsService {
         message: 'رزرو یافت نشد.',
       });
     }
-    return this.assertRefundable(booking, rules);
+    const existing = await this.hasRefundRequest(booking.id);
+    return this.assertRefundable(booking, rules, existing);
   }
 
   async submitFromCustomer(
     actor: AuthenticatedUser,
     dto: { bookingId: string; iban: string },
   ) {
-    let request: CustomerRefundRow | null = null;
+    let request: RefundRequest | null = null;
     for (let attempt = 0; attempt < 3 && !request; attempt += 1) {
       try {
-        request = await this.prisma.$transaction(async (tx) => {
-          const [booking, rules] = await Promise.all([
-            tx.booking.findUnique({
-              where: { id: dto.bookingId },
-              include: CUSTOMER_BOOKING_INCLUDE,
-            }),
-            tx.refundPenaltyRule.findMany(),
-          ]);
+        request = await this.refundRepo.manager.transaction(async (tx) => {
+          const booking = await tx
+            .createQueryBuilder(Booking, 'b')
+            .leftJoinAndSelect('b.flightInstance', 'flightInstance')
+            .leftJoinAndSelect('flightInstance.flight', 'flight')
+            .leftJoinAndSelect('flight.route', 'route')
+            .where('b.id = :id', { id: dto.bookingId })
+            .getOne();
           if (!booking || booking.userId !== actor.id) {
             throw new NotFoundException({
               code: ErrorCode.NOT_FOUND,
               message: 'رزرو یافت نشد.',
             });
           }
-          const preview = this.assertRefundable(booking, rules);
-          const passenger = booking.passengers[0];
-          return tx.refundRequest.create({
-            data: {
+          const rules = await tx.find(RefundPenaltyRule);
+          const existing = await this.hasRefundRequest(booking.id, tx);
+          const preview = this.assertRefundable(booking, rules, existing);
+          const passenger = await tx.findOneBy(Passenger, {
+            bookingId: booking.id,
+          });
+          const saved = await tx.save(
+            tx.create(RefundRequest, {
               trackingCode: newTrackingCode(),
               bookingId: booking.id,
               passengerName: passenger?.fullName ?? actor.fullName,
-              nidEnc: passenger?.nationalIdEnc,
-              mobileEnc: passenger?.mobileEnc,
+              nidEnc: passenger?.nationalIdEnc ?? null,
+              mobileEnc: passenger?.mobileEnc ?? null,
               ibanEnc: encryptPii(dto.iban),
               totalPaidIrr: preview.totalPaidIrr,
               penaltyPct: preview.penaltyPct,
@@ -467,25 +497,20 @@ export class RefundsService {
                   at: new Date().toISOString(),
                 },
               ],
-            },
-            include: {
-              booking: {
-                include: {
-                  flightInstance: {
-                    include: { flight: { include: { route: true } } },
-                  },
-                },
-              },
-            },
-          });
+            }),
+          );
+          saved.booking = booking;
+          return saved;
         });
       } catch (err) {
-        if (
-          err instanceof Prisma.PrismaClientKnownRequestError &&
-          err.code === 'P2002'
-        ) {
-          const target = JSON.stringify(err.meta?.target ?? '');
-          if (target.includes('trackingCode') && attempt < 2) continue;
+        if (isUniqueViolation(err, 'refund_requests_trackingCode_key')) {
+          if (attempt < 2) continue;
+          throw new ConflictException({
+            code: ErrorCode.CONFLICT,
+            message: 'برای این رزرو قبلاً درخواست استرداد ثبت شده است.',
+          });
+        }
+        if (isUniqueViolation(err, 'refund_requests_bookingId_key')) {
           throw new ConflictException({
             code: ErrorCode.CONFLICT,
             message: 'برای این رزرو قبلاً درخواست استرداد ثبت شده است.',
@@ -519,30 +544,35 @@ export class RefundsService {
    * anonymous caller has no real `actorId` — same precedent as Phase 16's
    * anonymous agency pre-registration). */
   async submitAnonymous(pnr: string, lastName: string, iban: string) {
-    const booking = await this.prisma.booking.findUnique({
-      where: { pnr: pnr.trim().toUpperCase() },
-      include: CUSTOMER_BOOKING_INCLUDE,
+    const booking = await this.bookingWithFlightQuery()
+      .where('b.pnr = :pnr', { pnr: pnr.trim().toUpperCase() })
+      .getOne();
+    if (!booking) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'رزرو یافت نشد.',
+      });
+    }
+    const passengers = await this.passengerRepo.find({
+      where: { bookingId: booking.id },
     });
-    if (
-      !booking ||
-      !booking.passengers.some((p) => matchesLastName(p.fullName, lastName))
-    ) {
+    const matchedPassenger = passengers.find((p) =>
+      matchesLastName(p.fullName, lastName),
+    );
+    if (!matchedPassenger) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
         message: 'رزرو یافت نشد.',
       });
     }
 
-    const matchedPassenger = booking.passengers.find((p) =>
-      matchesLastName(p.fullName, lastName),
-    )!;
-
-    const rules = await this.prisma.refundPenaltyRule.findMany();
-    const preview = this.assertRefundable(booking, rules);
+    const existing = await this.hasRefundRequest(booking.id);
+    const rules = await this.ruleRepo.find();
+    const preview = this.assertRefundable(booking, rules, existing);
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
-        const request = await this.prisma.refundRequest.create({
-          data: {
+        const saved = await this.refundRepo.save(
+          this.refundRepo.create({
             trackingCode: newTrackingCode(),
             bookingId: booking.id,
             passengerName: matchedPassenger.fullName,
@@ -560,25 +590,19 @@ export class RefundsService {
                 at: new Date().toISOString(),
               },
             ],
-          },
-          include: {
-            booking: {
-              include: {
-                flightInstance: {
-                  include: { flight: { include: { route: true } } },
-                },
-              },
-            },
-          },
-        });
-        return toCustomerRow(request);
+          }),
+        );
+        saved.booking = booking;
+        return toCustomerRow(saved);
       } catch (err) {
-        if (
-          err instanceof Prisma.PrismaClientKnownRequestError &&
-          err.code === 'P2002'
-        ) {
-          const target = JSON.stringify(err.meta?.target ?? '');
-          if (target.includes('trackingCode') && attempt < 2) continue;
+        if (isUniqueViolation(err, 'refund_requests_trackingCode_key')) {
+          if (attempt < 2) continue;
+          throw new ConflictException({
+            code: ErrorCode.CONFLICT,
+            message: 'برای این رزرو قبلاً درخواست استرداد ثبت شده است.',
+          });
+        }
+        if (isUniqueViolation(err, 'refund_requests_bookingId_key')) {
           throw new ConflictException({
             code: ErrorCode.CONFLICT,
             message: 'برای این رزرو قبلاً درخواست استرداد ثبت شده است.',
@@ -594,35 +618,27 @@ export class RefundsService {
   }
 
   async listMine(userId: string) {
-    const requests = await this.prisma.refundRequest.findMany({
-      where: { booking: { userId } },
-      include: {
-        booking: {
-          include: {
-            flightInstance: {
-              include: { flight: { include: { route: true } } },
-            },
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const requests = await this.refundRepo
+      .createQueryBuilder('r')
+      .leftJoinAndSelect('r.booking', 'booking')
+      .leftJoinAndSelect('booking.flightInstance', 'flightInstance')
+      .leftJoinAndSelect('flightInstance.flight', 'flight')
+      .leftJoinAndSelect('flight.route', 'route')
+      .where('booking.userId = :userId', { userId })
+      .orderBy('r.createdAt', 'DESC')
+      .getMany();
     return requests.map(toCustomerRow);
   }
 
   async getMine(userId: string, id: string) {
-    const request = await this.prisma.refundRequest.findUnique({
-      where: { id },
-      include: {
-        booking: {
-          include: {
-            flightInstance: {
-              include: { flight: { include: { route: true } } },
-            },
-          },
-        },
-      },
-    });
+    const request = await this.refundRepo
+      .createQueryBuilder('r')
+      .leftJoinAndSelect('r.booking', 'booking')
+      .leftJoinAndSelect('booking.flightInstance', 'flightInstance')
+      .leftJoinAndSelect('flightInstance.flight', 'flight')
+      .leftJoinAndSelect('flight.route', 'route')
+      .where('r.id = :id', { id })
+      .getOne();
     if (!request || request.booking.userId !== userId) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -644,25 +660,31 @@ export class RefundsService {
         message: 'یافت نشد.',
       });
     }
-    const instance = await this.prisma.flightInstance.findFirstOrThrow({
-      orderBy: { departureAt: 'desc' },
+    const instance = await this.flightInstanceRepo.findOne({
+      order: { departureAt: 'DESC' },
     });
-    const totalPaidIrr = 30_000_000n;
-    const booking = await this.prisma.booking.create({
-      data: {
+    if (!instance) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'یافت نشد.',
+      });
+    }
+    const totalPaidIrr: Irr = 30_000_000n;
+    const booking = await this.bookingRepo.save(
+      this.bookingRepo.create({
         pnr: `RF${crypto.randomUUID().slice(0, 6).toUpperCase()}`,
         flightInstanceId: instance.id,
         channel: 'SYSTEM',
         status: 'TICKETED',
         priceIrr: totalPaidIrr,
-      },
-    });
-    const rules = await this.prisma.refundPenaltyRule.findMany();
+      }),
+    );
+    const rules = await this.ruleRepo.find();
     const hoursLeft = (instance.departureAt.getTime() - Date.now()) / 3_600_000;
     const penalty = computePenalty(rules, hoursLeft, totalPaidIrr);
 
-    return this.prisma.refundRequest.create({
-      data: {
+    return this.refundRepo.save(
+      this.refundRepo.create({
         trackingCode: newTrackingCode(),
         bookingId: booking.id,
         passengerName: `مسافر آزمایشی ${crypto.randomUUID().slice(0, 4)}`,
@@ -686,7 +708,7 @@ export class RefundsService {
             at: 'اکنون',
           },
         ],
-      },
-    });
+      }),
+    );
   }
 }
