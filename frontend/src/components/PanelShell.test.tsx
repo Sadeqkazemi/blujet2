@@ -212,4 +212,39 @@ describe('PanelShell', () => {
     expect(screen.getByText('BJ-101 MHD ← THR', { exact: false })).toBeInTheDocument();
     expect(screen.queryByText(/EP-821/)).not.toBeInTheDocument();
   });
+
+  it('SITE_ADMIN sidebar hides blog, kyc and settings even if the API still returns them', async () => {
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      status: 'authenticated',
+      user: { id: 'sa1', fullName: 'ادمین سایت', role: 'SITE_ADMIN', preferredLocale: 'FA' },
+      requestLogin: vi.fn(),
+      confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
+      signOut: vi.fn(),
+    });
+    vi.spyOn(panelsApi, 'fetchNav').mockResolvedValue([
+      { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
+      { key: 'tickets', labelFa: 'تیکت‌ها', implemented: true },
+      { key: 'blog', labelFa: 'مدیریت بلاگ', implemented: true },
+      { key: 'media', labelFa: 'مدیریت سایت', implemented: true },
+      { key: 'jobapps', labelFa: 'درخواست‌های استخدام', implemented: true },
+      { key: 'kyc', labelFa: 'احراز هویت مشتریان', implemented: true },
+      { key: 'settings', labelFa: 'تنظیمات سامانه', implemented: true },
+    ]);
+    vi.spyOn(reportingApi, 'fetchLowSalesAlerts').mockResolvedValue([]);
+    vi.spyOn(cartableApi, 'fetchCartable').mockResolvedValue({
+      totalOpen: 0,
+      tasks: [],
+      counts: { ADMIN: 0, AGENCY: 0, MANAGER: 0 },
+    });
+
+    renderShell();
+
+    expect(await screen.findByText('تیکت‌ها')).toBeInTheDocument();
+    expect(screen.getByText('مدیریت سایت')).toBeInTheDocument();
+    expect(screen.getByText('درخواست‌های استخدام')).toBeInTheDocument();
+    expect(screen.queryByText('مدیریت بلاگ')).not.toBeInTheDocument();
+    expect(screen.queryByText('احراز هویت مشتریان')).not.toBeInTheDocument();
+    expect(screen.queryByText('تنظیمات سامانه')).not.toBeInTheDocument();
+  });
 });

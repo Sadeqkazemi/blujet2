@@ -128,7 +128,8 @@ export default function CartablePage() {
     user?.role === 'BOARD_CHAIR' ||
     user?.role === 'SENIOR_MANAGER' ||
     user?.role === 'FINANCE_MANAGER' ||
-    user?.role === 'COMMERCIAL_MANAGER';
+    user?.role === 'COMMERCIAL_MANAGER' ||
+    user?.role === 'SITE_ADMIN';
 
   const [result, setResult] = useState<CartableListResult | null>(null);
   const [category, setCategory] = useState<CartableCategory | null>(null);
@@ -307,12 +308,18 @@ export default function CartablePage() {
                 {c.icon}
               </span>
               <div className="leading-snug">
-                <div
-                  className={`font-num text-[23.5px] font-black ${dark ? 'text-white' : 'text-ink'}`}
-                >
-                  {faDigits(result?.counts[c.key] ?? 0)}
-                </div>
-                <div className={`text-[11.5px] ${dark ? 'text-[#6b7b94]' : 'text-muted'}`}>{c.label}</div>
+                {dark ? (
+                  <div className="font-num text-[15px] font-extrabold text-white">
+                    {faDigits(result?.counts[c.key] ?? 0)} {c.label}
+                  </div>
+                ) : (
+                  <>
+                    <div className="font-num text-[23.5px] font-black text-ink">
+                      {faDigits(result?.counts[c.key] ?? 0)}
+                    </div>
+                    <div className="text-[11.5px] text-muted">{c.label}</div>
+                  </>
+                )}
               </div>
             </button>
           );

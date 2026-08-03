@@ -850,4 +850,100 @@ export class ReportingService {
 
     return { activeAgencies, passengersThisMonth, pendingAgencyRequests };
   }
+
+  /** SITE_ADMIN dashboard KPI row — design-reference-v2/پنل ادمین سایت.dc.html */
+  async siteAdminOverview(): Promise<{
+    activeAgencies: number;
+    passengersThisMonth: number;
+    ticketsSoldThisMonth: number;
+    pendingActionCount: number;
+    agenciesTrendPct: number | null;
+    passengersTrendPct: number | null;
+    ticketsTrendPct: number | null;
+  }> {
+    const now = new Date();
+    const monthStart = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
+    );
+    const monthEnd = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
+    );
+    const prevMonthStart = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1),
+    );
+    const bookingStatuses = ['PAID', 'TICKETED'] as const;
+
+    const momPct = (current: number, previous: number): number | null => {
+      if (previous <= 0) return null;
+      return Math.round(((current - previous) / previous) * 100);
+    };
+
+    const [
+      activeAgencies,
+      passengersThisMonth,
+      ticketsSoldThisMonth,
+      passengersPrevMonth,
+      ticketsPrevMonth,
+      pendingAgencyRequests,
+      awaitingRefunds,
+      openSupportTickets,
+    ] = await Promise.all([
+      this.prisma.agencyProfile.count({
+        where: { suspendedAt: null, user: { isActive: true } },
+      }),
+      this.prisma.passenger.count({
+        where: {
+          deletedAt: null,
+          booking: {
+            status: { in: [...bookingStatuses] },
+            createdAt: { gte: monthStart, lt: monthEnd },
+          },
+        },
+      }),
+      this.prisma.booking.count({
+        where: {
+          status: { in: [...bookingStatuses] },
+          createdAt: { gte: monthStart, lt: monthEnd },
+          deletedAt: null,
+        },
+      }),
+      this.prisma.passenger.count({
+        where: {
+          deletedAt: null,
+          booking: {
+            status: { in: [...bookingStatuses] },
+            createdAt: { gte: prevMonthStart, lt: monthStart },
+          },
+        },
+      }),
+      this.prisma.booking.count({
+        where: {
+          status: { in: [...bookingStatuses] },
+          createdAt: { gte: prevMonthStart, lt: monthStart },
+          deletedAt: null,
+        },
+      }),
+      this.prisma.agencyMembershipRequest.count({
+        where: { status: { in: ['PENDING', 'REFERRED'] } },
+      }),
+      this.prisma.refundRequest.count({
+        where: { status: { in: ['SUBMITTED', 'REVIEW'] } },
+      }),
+      this.prisma.supportTicket.count({
+        where: { status: { in: ['OPEN', 'IN_PROGRESS'] } },
+      }),
+    ]);
+
+    return {
+      activeAgencies,
+      passengersThisMonth,
+      ticketsSoldThisMonth,
+      pendingActionCount:
+        pendingAgencyRequests + awaitingRefunds + openSupportTickets,
+      // Agency count is a stock metric — MoM % only for flow metrics.
+      agenciesTrendPct: null,
+      passengersTrendPct: momPct(passengersThisMonth, passengersPrevMonth),
+      ticketsTrendPct: momPct(ticketsSoldThisMonth, ticketsPrevMonth),
+    };
+  }
 }

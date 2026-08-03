@@ -1588,6 +1588,15 @@ before the next phase starts, per `CLAUDE.md` workflow rules. A phase is
 "done" only when every checklist item in its `docs/features/<name>.md` has
 a passing test — see `docs/features/panel-shell-dashboard.md` for Phase 1.
 
+- [x] **SITE_ADMIN panel dark-align (2026-08-03)** — nav order/labels to
+  `پنل ادمین سایت.dc.html`; brand subtitle «پنل مدیریت» + avatar «اس»;
+  refund/tickets nav badges; dark cartable; dashboard 4-KPI + agency/refund/
+  cartable widgets; `GET /reporting/site-admin-overview`; dark Agencies +
+  Flights (flightops) + Club + Refunds + Tickets + **مدیریت سایت** +
+  **درخواست‌های استخدام**; cartable already dark for SITE_ADMIN; sidebar
+  drops blog/kyc/settings; global **10 records/page**; refunds + tickets
+  search. See `docs/features/site-admin-panel-align.md`.
+
 ## Notable findings from design extraction (informs later phases)
 
 - Several panels contain orphaned tabs/handlers (coded, unreachable from

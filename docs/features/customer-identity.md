@@ -13,15 +13,17 @@ Design: `design-reference-v2/پنل کاربر.dc.html` → `isIdentity` tab.
 - [x] No selfie upload anywhere — UI has exactly 2 steps — `AccountIdentityTab.tsx`
 - [x] Frontend: identity tab with banner, steps, upload, submit — `AccountPage.test.tsx`
 
-## Admin review queue (SITE_ADMIN, `kyc` panel tab)
+## Admin review queue (SITE_ADMIN — API remains; no sidebar tab)
 
 No design tab exists for staff KYC review — the `APPROVED`/`REJECTED`
-transitions must be reachable, so it follows the `jobapps` queue pattern.
+transitions are reachable via API (`/identity-verifications*`). The `kyc`
+sidebar item was **removed from `PANEL_NAV.SITE_ADMIN`** (2026-08 product
+request); direct `/panel/.../kyc` shows ComingSoon via TabGate.
 
 - [x] `GET /identity-verifications` — SITE_ADMIN only; lists submitted/decided rows with customer info + id-card file name — `identity-admin.e2e-spec.ts`
 - [x] `GET /identity-verifications/:id/id-card` — streams the id-card file to staff — `identity-admin.e2e-spec.ts`
 - [x] `PATCH /identity-verifications/:id/approve` — SUBMITTED → APPROVED, customer sees APPROVED, second approve 409 — `identity-admin.e2e-spec.ts`
 - [x] `PATCH /identity-verifications/:id/reject` — requires `rejectReason` (400 without), customer sees reason + can re-submit — `identity-admin.e2e-spec.ts`
 - [x] 403 for non-SITE_ADMIN staff and customers; 404 unknown id — `identity-admin.e2e-spec.ts`
-- [x] New `kyc` tab in SITE_ADMIN nav — `panels.e2e-spec.ts`
-- [x] Frontend: queue list, pending counter, approve, reject modal with required reason, reject-reason display — `IdentityAdminPage.test.tsx`
+- [x] `kyc` **not** in SITE_ADMIN sidebar — `panels.e2e-spec.ts` (explicit `not.toContain('kyc')`)
+- [x] Frontend queue UI exists (`IdentityAdminPage`) for when tab is re-enabled — `IdentityAdminPage.test.tsx`

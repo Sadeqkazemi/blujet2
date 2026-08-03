@@ -4,7 +4,9 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 /** NestJS route prefixes — dev proxy sends these to the backend so a single
- * forwarded port (5173) is enough when previewing in Cursor/browser. */
+ * forwarded port (5173) is enough when previewing in Cursor/browser.
+ * Prefixes that also exist as React Router pages must bypass the proxy for
+ * browser navigations (Accept: text/html) so the SPA can render them. */
 const API_PROXY_PREFIXES = [
   'auth',
   'search',
@@ -45,6 +47,27 @@ const API_PROXY_PREFIXES = [
   'docs',
 ] as const
 
+/** SPA paths that share a prefix with NestJS APIs (e.g. `/careers` page vs
+ * `/careers/jobs` API). HTML navigations for these must not be proxied. */
+const SPA_OVERLAPPING_PREFIXES = new Set([
+  'careers',
+  'club',
+  'blog',
+  'contact',
+  'flight-status',
+  'support',
+])
+
+function shouldBypassProxyForSpa(
+  prefix: string,
+  req: { headers: { accept?: string }; url?: string },
+): string | undefined {
+  if (!SPA_OVERLAPPING_PREFIXES.has(prefix)) return undefined
+  const accept = req.headers.accept ?? ''
+  if (accept.includes('text/html')) return req.url
+  return undefined
+}
+
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
@@ -54,7 +77,12 @@ export default defineConfig(({ mode }) => {
   const devProxy = Object.fromEntries(
     API_PROXY_PREFIXES.map((prefix) => [
       `/${prefix}`,
-      { target: apiProxyTarget, changeOrigin: true },
+      {
+        target: apiProxyTarget,
+        changeOrigin: true,
+        bypass: (req: { headers: { accept?: string }; url?: string }) =>
+          shouldBypassProxyForSpa(prefix, req),
+      },
     ]),
   )
 

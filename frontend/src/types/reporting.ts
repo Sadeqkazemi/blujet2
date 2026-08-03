@@ -24,6 +24,17 @@ export interface CommercialOverview {
   pendingAgencyRequests: number;
 }
 
+/** SITE_ADMIN dashboard KPI row — design پنل ادمین سایت */
+export interface SiteAdminOverview {
+  activeAgencies: number;
+  passengersThisMonth: number;
+  ticketsSoldThisMonth: number;
+  pendingActionCount: number;
+  agenciesTrendPct: number | null;
+  passengersTrendPct: number | null;
+  ticketsTrendPct: number | null;
+}
+
 export interface KpiResult {
   revenueIrr: string;
   profitIrr: string;
