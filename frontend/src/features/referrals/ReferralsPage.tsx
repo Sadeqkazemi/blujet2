@@ -12,6 +12,8 @@ import { faDigits } from '../../lib/fa-format';
 import { formatJalaliDate } from '../../lib/jalali';
 import { parseJalaliDateToIso } from '../../lib/jalali';
 import Modal from '../../components/Modal';
+import Pagination from '../../components/Pagination';
+import { usePagination } from '../../hooks/usePagination';
 import AttachmentPicker from '../../components/AttachmentPicker';
 import AttachmentList from '../../components/AttachmentList';
 import type {
@@ -138,6 +140,7 @@ export default function ReferralsPage() {
   }
 
   const kpis = result?.kpis;
+  const referralsPager = usePagination(result?.referrals ?? []);
 
   if (detail) {
     const st = STATUS_META[detail.status];
@@ -286,7 +289,7 @@ export default function ReferralsPage() {
               </tr>
             </thead>
             <tbody>
-              {result!.referrals.map((r) => {
+              {referralsPager.pageItems.map((r) => {
                 const st = STATUS_META[r.status];
                 return (
                   <tr
@@ -314,6 +317,15 @@ export default function ReferralsPage() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {!loading && (result?.referrals.length ?? 0) > 0 && (
+        <Pagination
+          page={referralsPager.page}
+          totalPages={referralsPager.totalPages}
+          onChange={referralsPager.setPage}
+          variant="dark"
+        />
       )}
 
       {createOpen && (

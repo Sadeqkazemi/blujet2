@@ -4010,7 +4010,7 @@
             "name": "q",
             "required": false,
             "in": "query",
-            "description": "مسیر یا شماره پرواز",
+            "description": "جستجو در شماره پرواز، کد فرودگاه یا نام شهر",
             "schema": {
               "type": "string"
             }
@@ -4021,7 +4021,7 @@
             "description": ""
           }
         },
-        "summary": "فهرست پروازهای SCHEDULED با ظرفیت/فروش — تب پروازها",
+        "summary": "فهرست پروازهای آینده برای تب پروازها / باز کردن نقشهٔ صندلی",
         "tags": [
           "reservation"
         ]
@@ -5117,7 +5117,7 @@
             "description": ""
           }
         },
-        "summary": "افزودن پرواز جدید (مودال طراحی)",
+        "summary": "افزودن پرواز جدید — مشخصات + هواپیما/چارتر؛ سپس کلاس نرخی و پیشنهاد قیمت جداگانه",
         "tags": [
           "flights"
         ]
@@ -9246,6 +9246,16 @@
             "type": "string",
             "description": "قیمت پایه (ریال)",
             "example": "38000000"
+          },
+          "aircraftType": {
+            "type": "string",
+            "description": "نوع هواپیما (از کاتالوگ aircraft-types)",
+            "example": "Airbus A320"
+          },
+          "charterSeats": {
+            "type": "number",
+            "description": "تعهد چارتری (صندلی) — باید کمتر از ظرفیت باشد",
+            "example": 60
           }
         },
         "required": [

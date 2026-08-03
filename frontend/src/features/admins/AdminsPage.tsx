@@ -8,6 +8,8 @@ import {
 } from '../../api/admins';
 import { ApiRequestError } from '../../api/envelope';
 import Modal from '../../components/Modal';
+import Pagination from '../../components/Pagination';
+import { usePagination } from '../../hooks/usePagination';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import { useStepUp } from '../../hooks/useStepUp';
 import type { AdminCreatableRole, AdminRow } from '../../types/admins';
@@ -68,6 +70,7 @@ export default function AdminsPage() {
   const [tempPassword, setTempPassword] = useState<string | null>(null);
   const [newPass, setNewPass] = useState('');
   const stepUp = useStepUp('ADMIN_ROLE_CHANGE');
+  const rowsPager = usePagination(rows ?? []);
 
   function reload() {
     fetchAdmins()
@@ -292,7 +295,7 @@ export default function AdminsPage() {
               هنوز اطلاعاتی وارد نشده است.
             </div>
           ) : (
-            rows.map((r) => {
+            rowsPager.pageItems.map((r) => {
               const pill = rolePill(r.role);
               const status = statusTone(r);
               return (
@@ -336,6 +339,12 @@ export default function AdminsPage() {
             })
           )}
         </div>
+        <Pagination
+          page={rowsPager.page}
+          totalPages={rowsPager.totalPages}
+          onChange={rowsPager.setPage}
+          variant="dark"
+        />
       </div>
 
       {addOpen && (

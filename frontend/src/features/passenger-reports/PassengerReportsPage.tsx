@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { searchPassengers } from '../../api/reporting';
+import Pagination from '../../components/Pagination';
+import { usePagination } from '../../hooks/usePagination';
 import { faDigits, faMoney } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
 import type { PassengerReportHit } from '../../types/reporting';
@@ -21,6 +23,7 @@ export default function PassengerReportsPage() {
   const [hits, setHits] = useState<PassengerReportHit[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hitsPager = usePagination(hits ?? []);
 
   async function onSearch(e: FormEvent) {
     e.preventDefault();
@@ -92,7 +95,7 @@ export default function PassengerReportsPage() {
 
         {hits !== null && hits.length > 0 && (
           <div className="mt-6 flex flex-col gap-4">
-            {hits.map((h) => (
+            {hitsPager.pageItems.map((h) => (
               <div
                 key={`${h.pnr}-${h.fullName}`}
                 className="overflow-hidden rounded-[14px] border border-[#22304a] bg-[#0f1726]"
@@ -153,6 +156,12 @@ export default function PassengerReportsPage() {
                 </dl>
               </div>
             ))}
+            <Pagination
+              page={hitsPager.page}
+              totalPages={hitsPager.totalPages}
+              onChange={hitsPager.setPage}
+              variant="dark"
+            />
           </div>
         )}
       </div>

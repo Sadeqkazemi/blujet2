@@ -3,7 +3,6 @@ import { useAuth } from '../../hooks/useAuth';
 import {
   changeFlightAircraft,
   createAllotment,
-  createFlight,
   deleteAllotment,
   fetchAircraftTypes,
   fetchAirports,
@@ -16,12 +15,15 @@ import {
 import { fetchAgencies } from '../../api/agencies';
 import { useStepUp } from '../../hooks/useStepUp';
 import { faDigits, faMoney, latinDigits, parseTomanToRial } from '../../lib/fa-format';
-import { dayjs, formatJalaliDateTime, parseJalaliDateToIso } from '../../lib/jalali';
+import { dayjs, formatJalaliDateTime } from '../../lib/jalali';
 import Modal from '../../components/Modal';
+import Pagination from '../../components/Pagination';
+import { usePagination } from '../../hooks/usePagination';
 import FareRulesSection from '../../components/FareRulesSection';
 import JalaliDatePicker from '../../components/JalaliDatePicker';
 import PricingPage from '../pricing/PricingPage';
 import FlightCitiesTab from './FlightCitiesTab';
+import AddFlightPage from './AddFlightPage';
 import type {
   AircraftTypeOption,
   AirportEntry,
@@ -65,16 +67,6 @@ export default function FlightsPage() {
   const [loading, setLoading] = useState(true);
 
   const [addOpen, setAddOpen] = useState(false);
-  const [addForm, setAddForm] = useState({
-    originCode: '',
-    destCode: '',
-    flightNo: '',
-    date: '',
-    time: '',
-    capacity: '',
-    priceToman: '',
-  });
-  const [addError, setAddError] = useState<string | null>(null);
 
   const [detail, setDetail] = useState<FlightDetail | null>(null);
   const [expandedDone, setExpandedDone] = useState<string | null>(null);
@@ -130,44 +122,6 @@ export default function FlightsPage() {
       .then(setAirports)
       .catch(() => setAirports([]));
   }, [load]);
-
-  async function onSubmitAdd() {
-    setAddError(null);
-    const { originCode, destCode, flightNo, date, time, capacity, priceToman } = addForm;
-    if (!originCode || !destCode || !flightNo || !date || !time || !capacity || !priceToman) {
-      setAddError('لطفاً همه فیلدها را تکمیل کنید.');
-      return;
-    }
-    const dateIso = parseJalaliDateToIso(date);
-    const timeMatch = /^(\d{1,2}):(\d{2})$/.exec(latinDigits(time.trim()));
-    if (!dateIso || !timeMatch) {
-      setAddError('تاریخ (۱۴۰۵/۰۴/۲۵) و ساعت (08:30) را درست وارد کنید.');
-      return;
-    }
-    const basePriceIrr = parseTomanToRial(priceToman);
-    if (basePriceIrr == null) {
-      setAddError('قیمت بلیط را به تومان و با رقم وارد کنید.');
-      return;
-    }
-    const departure = new Date(dateIso);
-    departure.setHours(Number(timeMatch[1]), Number(timeMatch[2]), 0, 0);
-    try {
-      await createFlight({
-        originCode,
-        destCode,
-        flightNo: latinDigits(flightNo.trim()).toUpperCase(),
-        departureAt: departure.toISOString(),
-        capacity: Number(latinDigits(capacity)),
-        basePriceIrr,
-      });
-      setAddOpen(false);
-      setNotice(`پرواز جدید «${routeLabel(originCode, destCode)}» اضافه شد ✓`);
-      setSubTab('active');
-      await load();
-    } catch (e) {
-      setAddError(e instanceof Error ? e.message : 'خطا در ثبت پرواز.');
-    }
-  }
 
   async function openDetail(id: string) {
     setError(null);
@@ -348,6 +302,10 @@ export default function FlightsPage() {
       )
     : future;
 
+  const activePager = usePagination(data?.active ?? []);
+  const completedPager = usePagination(data?.completed?.rows ?? []);
+  const futurePager = usePagination(visibleFuture);
+
   const kpis = data?.kpis;
   const isCommercial = user?.role === 'COMMERCIAL_MANAGER';
   const showFuturePanel = subTab === 'future' || (isCommercial && subTab === 'active');
@@ -420,19 +378,7 @@ export default function FlightsPage() {
               <div className="flex items-center justify-between border-b border-panel-border px-5 py-3">
                 <h2 className="text-sm font-bold text-panel-ink">مدیریت پروازها و موجودی</h2>
                 <button
-                  onClick={() => {
-                    setAddError(null);
-                    setAddForm({
-                      originCode: '',
-                      destCode: '',
-                      flightNo: '',
-                      date: '',
-                      time: '',
-                      capacity: '',
-                      priceToman: '',
-                    });
-                    setAddOpen(true);
-                  }}
+                  onClick={() => setAddOpen(true)}
                   className="rounded-lg bg-accent px-3 py-2 text-xs font-bold text-white transition hover:bg-accent/90"
                 >
                   + افزودن پرواز
@@ -449,7 +395,7 @@ export default function FlightsPage() {
                     <span>وضعیت</span>
                   </div>
                   <ul>
-                    {data.active.map((f) => {
+                    {activePager.pageItems.map((f) => {
                       const pct = f.capacity > 0 ? Math.round((f.sold / f.capacity) * 100) : 0;
                       const st = STATUS_META[f.derivedStatus];
                       return (
@@ -492,11 +438,17 @@ export default function FlightsPage() {
                   {data.active.length === 0 && (
                     <p className="py-6 text-center text-xs text-panel-muted">پروازی ثبت نشده است.</p>
                   )}
+                  <Pagination
+                    page={activePager.page}
+                    totalPages={activePager.totalPages}
+                    onChange={activePager.setPage}
+                    variant="dark"
+                  />
                 </div>
               </div>
 
               {isCommercial && (
-                <div className="mt-4 rounded-xl border border-panel-border bg-panel-surface p-5">
+                <div className="mt-4">
                   <PricingPage embedded />
                 </div>
               )}
@@ -557,7 +509,7 @@ export default function FlightsPage() {
                           <span>فروش آژانس</span>
                           <span>سود حاصله</span>
                         </div>
-                        {data.completed.rows.map((d: CompletedFlightRow) => (
+                        {completedPager.pageItems.map((d: CompletedFlightRow) => (
                           <div
                             key={d.id}
                             className="grid grid-cols-[1.5fr_0.9fr_0.8fr_1fr_1fr_1fr_1fr_1.1fr] items-center gap-2 border-b border-panel-border px-5 py-3 text-[11px]"
@@ -595,7 +547,7 @@ export default function FlightsPage() {
                           <span>سود حاصله</span>
                           <span>ضرر</span>
                         </div>
-                        {data.completed.rows.map((d: CompletedFlightRow) => (
+                        {completedPager.pageItems.map((d: CompletedFlightRow) => (
                           <div key={d.id}>
                             <button
                               onClick={() => setExpandedDone(expandedDone === d.id ? null : d.id)}
@@ -663,6 +615,12 @@ export default function FlightsPage() {
                     {data.completed.rows.length === 0 && (
                       <p className="py-6 text-center text-xs text-panel-muted">پرواز انجام‌شده‌ای ثبت نشده است.</p>
                     )}
+                    <Pagination
+                      page={completedPager.page}
+                      totalPages={completedPager.totalPages}
+                      onChange={completedPager.setPage}
+                      variant="dark"
+                    />
                   </div>
                 </div>
               </section>
@@ -768,7 +726,7 @@ export default function FlightsPage() {
                       برای روز انتخاب‌شده پروازی برنامه‌ریزی نشده است.
                     </p>
                   )}
-                  {visibleFuture.map((u) => {
+                  {futurePager.pageItems.map((u) => {
                     const expanded = expandedFuture === u.id;
                     const priced = u.agencySeatsAllocated != null;
                     const direct = priced
@@ -868,6 +826,12 @@ export default function FlightsPage() {
                       </div>
                     );
                   })}
+                  <Pagination
+                    page={futurePager.page}
+                    totalPages={futurePager.totalPages}
+                    onChange={futurePager.setPage}
+                    variant="dark"
+                  />
                 </div>
               </section>
             </div>
@@ -876,135 +840,15 @@ export default function FlightsPage() {
       )}
 
       {addOpen && (
-        <Modal title="افزودن پرواز جدید" onClose={() => setAddOpen(false)}>
-          <div className="flex flex-col gap-3 text-xs">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="nf-origin" className="mb-1 block font-bold text-panel-ink">
-                  مبدأ
-                </label>
-                <select
-                  id="nf-origin"
-                  value={addForm.originCode}
-                  onChange={(e) => setAddForm((f) => ({ ...f, originCode: e.target.value }))}
-                  className="h-10 w-full rounded-lg border border-panel-border-2 bg-panel-canvas px-2 outline-none text-panel-ink"
-                >
-                  <option value="">— انتخاب شهر —</option>
-                  {airports.map((a) => (
-                    <option key={a.code} value={a.code}>
-                      {a.cityFa}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="nf-dest" className="mb-1 block font-bold text-panel-ink">
-                  مقصد
-                </label>
-                <select
-                  id="nf-dest"
-                  value={addForm.destCode}
-                  onChange={(e) => setAddForm((f) => ({ ...f, destCode: e.target.value }))}
-                  className="h-10 w-full rounded-lg border border-panel-border-2 bg-panel-canvas px-2 outline-none text-panel-ink"
-                >
-                  <option value="">— انتخاب شهر —</option>
-                  {airports.map((a) => (
-                    <option key={a.code} value={a.code}>
-                      {a.cityFa}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label htmlFor="nf-no" className="mb-1 block font-bold text-panel-ink">
-                  شماره پرواز
-                </label>
-                <input
-                  id="nf-no"
-                  dir="ltr"
-                  placeholder="EP-901"
-                  value={addForm.flightNo}
-                  onChange={(e) => setAddForm((f) => ({ ...f, flightNo: e.target.value }))}
-                  className="font-num h-10 w-full rounded-lg border border-panel-border-2 bg-panel-canvas px-2 outline-none text-panel-ink"
-                />
-              </div>
-              <div>
-                <label htmlFor="nf-date" className="mb-1 block font-bold text-panel-ink">
-                  تاریخ (جلالی)
-                </label>
-                <input
-                  id="nf-date"
-                  placeholder="۱۴۰۵/۰۴/۲۵"
-                  value={addForm.date}
-                  onChange={(e) => setAddForm((f) => ({ ...f, date: e.target.value }))}
-                  className="font-num h-10 w-full rounded-lg border border-panel-border-2 bg-panel-canvas px-2 outline-none text-panel-ink"
-                />
-              </div>
-              <div>
-                <label htmlFor="nf-time" className="mb-1 block font-bold text-panel-ink">
-                  ساعت
-                </label>
-                <input
-                  id="nf-time"
-                  dir="ltr"
-                  placeholder="08:30"
-                  value={addForm.time}
-                  onChange={(e) => setAddForm((f) => ({ ...f, time: e.target.value }))}
-                  className="font-num h-10 w-full rounded-lg border border-panel-border-2 bg-panel-canvas px-2 outline-none text-panel-ink"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="nf-cap" className="mb-1 block font-bold text-panel-ink">
-                  ظرفیت (صندلی)
-                </label>
-                <input
-                  id="nf-cap"
-                  dir="ltr"
-                  placeholder="180"
-                  value={addForm.capacity}
-                  onChange={(e) => setAddForm((f) => ({ ...f, capacity: e.target.value }))}
-                  className="font-num h-10 w-full rounded-lg border border-panel-border-2 bg-panel-canvas px-2 outline-none text-panel-ink"
-                />
-              </div>
-              <div>
-                <label htmlFor="nf-price" className="mb-1 block font-bold text-panel-ink">
-                  قیمت بلیط (تومان)
-                </label>
-                <input
-                  id="nf-price"
-                  dir="ltr"
-                  placeholder="3800000"
-                  value={addForm.priceToman}
-                  onChange={(e) => setAddForm((f) => ({ ...f, priceToman: e.target.value }))}
-                  className="font-num h-10 w-full rounded-lg border border-panel-border-2 bg-panel-canvas px-2 outline-none text-panel-ink"
-                />
-              </div>
-            </div>
-            {addError && (
-              <p role="alert" className="text-[11px] text-danger">
-                {addError}
-              </p>
-            )}
-            <div className="mt-1 flex gap-2">
-              <button
-                onClick={() => void onSubmitAdd()}
-                className="flex-1 rounded-lg bg-accent py-2.5 text-xs font-bold text-white transition hover:bg-accent/90"
-              >
-                افزودن پرواز
-              </button>
-              <button
-                onClick={() => setAddOpen(false)}
-                className="rounded-lg border border-panel-border px-4 text-xs text-panel-muted"
-              >
-                انصراف
-              </button>
-            </div>
-          </div>
-        </Modal>
+        <AddFlightPage
+          onClose={() => setAddOpen(false)}
+          onSuccess={(message) => {
+            setAddOpen(false);
+            setNotice(message);
+            setSubTab('active');
+            void load();
+          }}
+        />
       )}
 
       {detail && (
