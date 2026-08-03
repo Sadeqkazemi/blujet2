@@ -8,6 +8,7 @@ import { TypeORMService } from '../../typeorm/typeorm.service';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
 import {
+  decryptPii,
   encryptPii,
   hashPii,
   isValidIranianNationalId,
@@ -68,7 +69,7 @@ export class SeatmapService {
   private async getFlightInstanceOrThrow(id: string) {
     const instance = await this.typeorm.flightInstance.findUnique({
       where: { id },
-      include: { flight: true },
+      include: { flight: { include: { route: true } } },
     });
     if (!instance) {
       throw new NotFoundException({
@@ -99,19 +100,38 @@ export class SeatmapService {
     );
     const seats = enumerateSeats(map);
 
-    const [soldPassengers, activeLocks] = await Promise.all([
+    const [soldPassengers, activeLocks, airports] = await Promise.all([
       this.typeorm.passenger.findMany({
         where: {
           seatCode: { not: null },
           booking: { flightInstanceId, status: { not: 'CANCELLED' } },
         },
-        select: { seatCode: true },
+        select: {
+          seatCode: true,
+          fullName: true,
+          nationalIdEnc: true,
+          booking: { select: { pnr: true, status: true, priceIrr: true } },
+        },
       }),
       this.typeorm.seatLock.findMany({
         where: { flightInstanceId, ...this.activeLockWhere() },
       }),
+      this.typeorm.airport.findMany({
+        where: {
+          code: {
+            in: [
+              instance.flight.route.originCode,
+              instance.flight.route.destCode,
+            ],
+          },
+        },
+        select: { code: true, cityFa: true },
+      }),
     ]);
-    const soldCodes = new Set(soldPassengers.map((p) => p.seatCode!));
+    const cityByCode = new Map(airports.map((a) => [a.code, a.cityFa]));
+    const soldByCode = new Map(
+      soldPassengers.map((p) => [p.seatCode!, p] as const),
+    );
     const lockedByCode = new Map(activeLocks.map((l) => [l.seatCode, l]));
 
     const rowsMap = new Map<
@@ -122,22 +142,42 @@ export class SeatmapService {
       if (!rowsMap.has(seat.row)) {
         rowsMap.set(seat.row, { row: seat.row, cabin: seat.cabin, seats: [] });
       }
+      const sold = soldByCode.get(seat.seatCode);
       const lock = lockedByCode.get(seat.seatCode);
-      const status = soldCodes.has(seat.seatCode)
-        ? 'SOLD'
-        : lock
-          ? 'LOCKED'
-          : 'FREE';
+      const status = sold ? 'SOLD' : lock ? 'LOCKED' : 'FREE';
       rowsMap.get(seat.row)!.seats.push({
         seatCode: seat.seatCode,
         status,
         lockId: lock?.id ?? null,
+        // Staff reservation panel only — name of the passenger who holds a
+        // sold seat (IT/CEO/Board/Senior). Lock PII stays encrypted-only.
+        passenger: sold
+          ? {
+              fullName: sold.fullName,
+              pnr: sold.booking.pnr,
+              bookingStatus: sold.booking.status,
+              nationalId: sold.nationalIdEnc
+                ? decryptPii(sold.nationalIdEnc)
+                : null,
+              priceIrr: sold.booking.priceIrr,
+            }
+          : null,
+        lockExpiresAt: lock?.expiresAt ?? null,
       });
     }
+
+    const originCode = instance.flight.route.originCode;
+    const destCode = instance.flight.route.destCode;
 
     return {
       flightInstanceId,
       aircraftType: resolveAircraftType(instance),
+      flightNo: instance.flight.flightNo,
+      originCode,
+      destCode,
+      originCityFa: cityByCode.get(originCode) ?? originCode,
+      destCityFa: cityByCode.get(destCode) ?? destCode,
+      departureAt: instance.departureAt,
       rows: Array.from(rowsMap.values()).sort((a, b) => a.row - b.row),
       // CLAUDE.md: "seat map config lives per aircraft type in the DB, not
       // hardcoded" — the aisle gap position varies by cabin layout (e.g.
@@ -148,13 +188,14 @@ export class SeatmapService {
         ECONOMY: { aisleAfterIndex: map.economyColsLeft.length },
       },
       capacity: seats.length,
-      soldCount: soldCodes.size,
+      soldCount: soldByCode.size,
       lockedCount: activeLocks.length,
+      freeCount: Math.max(0, seats.length - soldByCode.size - activeLocks.length),
       occupancyPct:
         seats.length === 0
           ? 0
           : Math.round(
-              ((soldCodes.size + activeLocks.length) / seats.length) * 1000,
+              ((soldByCode.size + activeLocks.length) / seats.length) * 1000,
             ) / 10,
     };
   }
@@ -289,7 +330,7 @@ export class SeatmapService {
   }
 
   /** Two-step approval: requesting and approving both stay within
-   * CAN_LOCK_ROLES, but a requester can never approve their own request —
+   * CAN_SEAT_LOCK_ROLES, but a requester can never approve their own request —
    * a real control between the governance roles, not a rubber stamp. */
   async approveLock(actor: AuthenticatedUser, lockId: string) {
     const lock = await this.getPendingLockOrThrow(lockId);

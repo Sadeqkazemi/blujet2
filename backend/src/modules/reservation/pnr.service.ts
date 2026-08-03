@@ -642,33 +642,190 @@ export class PnrService {
     const dayStart = new Date();
     dayStart.setHours(0, 0, 0, 0);
 
-    const [todayCount, activePnrCount, soldSeats, revenue] = await Promise.all([
-      this.typeorm.booking.count({ where: { createdAt: { gte: dayStart } } }),
-      this.typeorm.booking.count({
-        where: { status: { in: ['HELD', 'PAID', 'TICKETED'] } },
-      }),
-      this.typeorm.passenger.count({
-        where: {
-          seatCode: { not: null },
-          booking: { status: { not: 'CANCELLED' } },
-        },
-      }),
-      this.typeorm.ledgerEntry.aggregate({
-        // Real ticket revenue only — AgenciesService.resetTestDebt
-        // reuses type:'SALE' for agency debt-line calibration
-        // (bookingId null, amount can be negative); excluded here the
-        // same way ReportingService's revenue aggregates exclude it.
-        where: { type: 'SALE', bookingId: { not: null } },
-        _sum: { signedAmountIrr: true },
-      }),
-    ]);
+    const pnrStoreStarted = Date.now();
+    const [todayCount, activePnrCount, soldSeats, revenue, channelGroups, toggles] =
+      await Promise.all([
+        this.typeorm.booking.count({ where: { createdAt: { gte: dayStart } } }),
+        this.typeorm.booking.count({
+          where: { status: { in: ['HELD', 'PAID', 'TICKETED'] } },
+        }),
+        this.typeorm.passenger.count({
+          where: {
+            seatCode: { not: null },
+            booking: { status: { not: 'CANCELLED' } },
+          },
+        }),
+        this.typeorm.ledgerEntry.aggregate({
+          // Real ticket revenue only — AgenciesService.resetTestDebt
+          // reuses type:'SALE' for agency debt-line calibration
+          // (bookingId null, amount can be negative); excluded here the
+          // same way ReportingService's revenue aggregates exclude it.
+          where: { type: 'SALE', bookingId: { not: null } },
+          _sum: { signedAmountIrr: true },
+        }),
+        this.typeorm.booking.groupBy({
+          by: ['channel'],
+          _count: { _all: true },
+          where: { status: { notIn: ['CANCELLED', 'EXPIRED'] } },
+        }),
+        this.typeorm.internalService.findMany({
+          where: { key: { in: ['payment', 'api', 'sms', 'search'] } },
+          select: { key: true, enabled: true },
+        }),
+      ]);
+    const pnrStoreLatencyMs = Date.now() - pnrStoreStarted;
+
+    const seatInvStarted = Date.now();
+    await this.typeorm.passenger.count({
+      where: { seatCode: { not: null } },
+    });
+    const seatInventoryLatencyMs = Date.now() - seatInvStarted;
+
+    const toggleByKey = new Map(toggles.map((t) => [t.key, t.enabled]));
+    const channelLabel: Record<string, string> = {
+      SYSTEM: 'فروش مستقیم سایت',
+      AGENCY: 'API آژانس‌های همکار',
+      CHARTER: 'فروش چارتر',
+    };
+    const channelColor: Record<string, string> = {
+      SYSTEM: '#3b82f6',
+      AGENCY: '#34d399',
+      CHARTER: '#a855f7',
+    };
+    const channelTotal = channelGroups.reduce((a, g) => a + g._count._all, 0);
+    const channels =
+      channelTotal === 0
+        ? []
+        : channelGroups
+            .map((g) => ({
+              key: g.channel,
+              label: channelLabel[g.channel] ?? g.channel,
+              color: channelColor[g.channel] ?? '#6b7b94',
+              count: g._count._all,
+              pct:
+                Math.round((g._count._all / channelTotal) * 1000) / 10,
+            }))
+            .sort((a, b) => b.count - a.count);
+
+    const svc = (
+      name: string,
+      fa: string,
+      ok: boolean,
+      latencyMs: number | null,
+    ) => ({
+      name,
+      fa,
+      ok,
+      latencyMs,
+      statusLabel: ok ? 'سالم' : 'قطع',
+    });
+
+    const services = [
+      svc('reservation-api', 'سرویس رزرواسیون مرکزی', true, pnrStoreLatencyMs),
+      svc('pnr-store', 'پایگاه ذخیره PNR', true, pnrStoreLatencyMs),
+      svc(
+        'payment-gateway',
+        'درگاه پرداخت',
+        toggleByKey.get('payment') !== false,
+        null,
+      ),
+      svc(
+        'agency-api',
+        'پلتفرم API آژانس‌ها',
+        toggleByKey.get('api') !== false,
+        null,
+      ),
+      svc('seat-inventory', 'موجودی صندلی', true, seatInventoryLatencyMs),
+      svc(
+        'notification-svc',
+        'سرویس اعلان و پیامک',
+        toggleByKey.get('sms') !== false,
+        null,
+      ),
+    ];
 
     return {
       todayBookings: todayCount,
       activePnrs: activePnrCount,
       seatsSold: soldSeats,
       revenueIrr: revenue._sum.signedAmountIrr ?? ZERO_IRR,
+      channels,
+      services,
+      servicesStable: services.every((s) => s.ok),
     };
+  }
+
+  /** Agencies that already hold an API key — design «دسترسی آژانس‌ها». */
+  async agencyApiAccess() {
+    const keys = await this.typeorm.agencyApiKey.findMany({
+      include: { agency: { include: { user: { select: { fullName: true } } } } },
+      orderBy: { activatedAt: 'desc' },
+    });
+    return keys.map((k) => {
+      const name = k.agency.user.fullName;
+      const initials = name.replace(/\s+/g, '').slice(0, 2) || '؟';
+      return {
+        id: k.id,
+        agencyId: k.agencyId,
+        name,
+        initials,
+        // Raw key is never stored — only an opaque hint from the key id.
+        keyHint: `bjk_••••${k.id.replace(/-/g, '').slice(0, 4)}`,
+        callCount: k.callCount,
+        status: k.status,
+      };
+    });
+  }
+
+  /** Upcoming/active flight instances for the design «پروازها» table. */
+  async listFlights(q?: string) {
+    await materializeFlownBookings(this.typeorm);
+    const instances = await this.typeorm.flightInstance.findMany({
+      where: { status: 'SCHEDULED' },
+      include: {
+        flight: { include: { route: true } },
+        bookings: {
+          where: { status: { notIn: ['CANCELLED', 'EXPIRED'] } },
+          include: { passengers: { select: { seatCode: true } } },
+        },
+      },
+      orderBy: { departureAt: 'asc' },
+      take: 150,
+    });
+
+    const needle = q?.trim().toLowerCase();
+    return instances
+      .map((i) => {
+        const sold = i.bookings.reduce(
+          (n, b) => n + b.passengers.filter((p) => p.seatCode).length,
+          0,
+        );
+        const aircraftType =
+          i.aircraftTypeOverride ?? i.flight.aircraftType;
+        const occupancyPct =
+          i.capacity > 0 ? Math.round((sold / i.capacity) * 100) : 0;
+        const statusKey =
+          occupancyPct >= 100 ? 'FULL' : occupancyPct >= 90 ? 'NEAR_FULL' : 'SELLING';
+        return {
+          flightInstanceId: i.id,
+          route: `${i.flight.route.originCode} → ${i.flight.route.destCode}`,
+          flightNo: i.flight.flightNo,
+          departureAt: i.departureAt,
+          aircraftType,
+          sold,
+          capacity: i.capacity,
+          occupancyPct,
+          statusKey,
+        };
+      })
+      .filter((f) => {
+        if (!needle) return true;
+        return (
+          f.route.toLowerCase().includes(needle) ||
+          f.flightNo.toLowerCase().includes(needle) ||
+          f.aircraftType.toLowerCase().includes(needle)
+        );
+      });
   }
 
   /**

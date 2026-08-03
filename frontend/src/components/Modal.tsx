@@ -33,6 +33,7 @@ export default function Modal({ title, onClose, children, variant = 'dark' }: Mo
         >
           <h3 className={`text-sm font-black ${dark ? 'text-white' : 'text-ink'}`}>{title}</h3>
           <button
+            type="button"
             onClick={onClose}
             aria-label="بستن"
             className={
