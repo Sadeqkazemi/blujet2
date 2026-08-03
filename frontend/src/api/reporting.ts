@@ -14,6 +14,7 @@ import type {
   SalesChartPeriod,
   StaffReportsResult,
   CommercialOverview,
+  SiteAdminOverview,
 } from '../types/reporting';
 
 function toQueryString(query: PeriodQuery): string {
@@ -52,6 +53,10 @@ export function fetchFinanceDashboardStats() {
 
 export function fetchCommercialOverview() {
   return apiGet<CommercialOverview>('/reporting/commercial-overview');
+}
+
+export function fetchSiteAdminOverview() {
+  return apiGet<SiteAdminOverview>('/reporting/site-admin-overview');
 }
 
 export function fetchRecentTransactions() {

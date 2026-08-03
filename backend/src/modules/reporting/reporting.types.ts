@@ -81,3 +81,11 @@ export interface CommercialOverview {
   passengersThisMonth: number;
   pendingAgencyRequests: number;
 }
+
+/** SITE_ADMIN dashboard KPI row — design-reference-v2/پنل ادمین سایت.dc.html */
+export interface SiteAdminOverview {
+  activeAgencies: number;
+  passengersThisMonth: number;
+  ticketsSoldThisMonth: number;
+  pendingActionCount: number;
+}

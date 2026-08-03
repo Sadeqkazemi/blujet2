@@ -128,7 +128,8 @@ export default function CartablePage() {
     user?.role === 'BOARD_CHAIR' ||
     user?.role === 'SENIOR_MANAGER' ||
     user?.role === 'FINANCE_MANAGER' ||
-    user?.role === 'COMMERCIAL_MANAGER';
+    user?.role === 'COMMERCIAL_MANAGER' ||
+    user?.role === 'SITE_ADMIN';
 
   const [result, setResult] = useState<CartableListResult | null>(null);
   const [category, setCategory] = useState<CartableCategory | null>(null);

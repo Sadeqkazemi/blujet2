@@ -850,4 +850,67 @@ export class ReportingService {
 
     return { activeAgencies, passengersThisMonth, pendingAgencyRequests };
   }
+
+  /** SITE_ADMIN dashboard KPI row — design-reference-v2/پنل ادمین سایت.dc.html */
+  async siteAdminOverview(): Promise<{
+    activeAgencies: number;
+    passengersThisMonth: number;
+    ticketsSoldThisMonth: number;
+    pendingActionCount: number;
+  }> {
+    const now = new Date();
+    const monthStart = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
+    );
+    const monthEnd = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
+    );
+    const bookingStatuses = ['PAID', 'TICKETED'] as const;
+
+    const [
+      activeAgencies,
+      passengersThisMonth,
+      ticketsSoldThisMonth,
+      pendingAgencyRequests,
+      awaitingRefunds,
+      openSupportTickets,
+    ] = await Promise.all([
+      this.typeorm.agencyProfile.count({
+        where: { suspendedAt: null, user: { isActive: true } },
+      }),
+      this.typeorm.passenger.count({
+        where: {
+          deletedAt: null,
+          booking: {
+            status: { in: [...bookingStatuses] },
+            createdAt: { gte: monthStart, lt: monthEnd },
+          },
+        },
+      }),
+      this.typeorm.booking.count({
+        where: {
+          status: { in: [...bookingStatuses] },
+          createdAt: { gte: monthStart, lt: monthEnd },
+          deletedAt: null,
+        },
+      }),
+      this.typeorm.agencyMembershipRequest.count({
+        where: { status: { in: ['PENDING', 'REFERRED'] } },
+      }),
+      this.typeorm.refundRequest.count({
+        where: { status: { in: ['SUBMITTED', 'REVIEW'] } },
+      }),
+      this.typeorm.supportTicket.count({
+        where: { status: { in: ['OPEN', 'IN_PROGRESS'] } },
+      }),
+    ]);
+
+    return {
+      activeAgencies,
+      passengersThisMonth,
+      ticketsSoldThisMonth,
+      pendingActionCount:
+        pendingAgencyRequests + awaitingRefunds + openSupportTickets,
+    };
+  }
 }

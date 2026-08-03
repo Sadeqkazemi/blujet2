@@ -95,6 +95,17 @@ export class ReportingController {
     return { success: true, data };
   }
 
+  @Get('site-admin-overview')
+  @Roles('SITE_ADMIN')
+  @ApiOperation({
+    summary:
+      'SITE_ADMIN dashboard KPI row — active agencies, passengers/tickets this month, pending actions',
+  })
+  async siteAdminOverview() {
+    const data = await this.reporting.siteAdminOverview();
+    return { success: true, data };
+  }
+
   @Get('recent-transactions')
   @Roles('FINANCE_MANAGER')
   @ApiOperation({

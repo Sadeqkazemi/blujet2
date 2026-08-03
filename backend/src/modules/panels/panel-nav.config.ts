@@ -20,18 +20,22 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
   // out rather than shipped as a dead tab; see Phase 18 notes in
   // `blog` added in Phase D (real CMS backend).
   // `media` added in Phase E (site content CMS backend).
+  // Order/labels match design-reference-v2/پنل ادمین سایت.dc.html
+  // roleDefs.siteAdmin.access (visible sidebar). `blog` is in design
+  // access but has no sidebar row — kept as a product tab before media.
+  // `kyc` + `settings` are product additions (not in design access).
   SITE_ADMIN: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
-    { key: 'agencies', labelFa: 'مدیریت آژانس‌ها', implemented: true },
-    { key: 'flightops', labelFa: 'پروازها', implemented: true },
+    { key: 'agencies', labelFa: 'آژانس‌ها', implemented: true },
+    { key: 'flightops', labelFa: 'پرواز', implemented: true },
     { key: 'reports', labelFa: 'گزارش مسافران', implemented: true },
-    { key: 'cartable', labelFa: 'کارتابل', implemented: true },
     { key: 'club', labelFa: 'باشگاه مشتریان', implemented: true },
     { key: 'refund', labelFa: 'استرداد بلیط', implemented: true },
-    { key: 'tickets', labelFa: 'تیکت‌های پشتیبانی', implemented: true },
+    { key: 'cartable', labelFa: 'کارتابل', implemented: true },
+    { key: 'tickets', labelFa: 'تیکت‌ها', implemented: true },
     { key: 'blog', labelFa: 'مدیریت بلاگ', implemented: true },
     { key: 'media', labelFa: 'مدیریت سایت', implemented: true },
-    { key: 'jobapps', labelFa: 'فرصت‌های شغلی', implemented: true },
+    { key: 'jobapps', labelFa: 'درخواست‌های استخدام', implemented: true },
     // Staff side of the customer KYC flow (/my/identity, Phase 17) — the
     // APPROVED/REJECTED transitions have to be reachable somewhere; no
     // design tab exists for it, so it follows the jobapps queue pattern.
