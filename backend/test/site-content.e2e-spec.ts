@@ -5,14 +5,15 @@ import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { PrismaClient } from '../generated/prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
+import { DataSource, In } from 'typeorm';
+import { dataSourceOptions } from '../src/database/data-source.options';
+import { SiteDestinationHighlight } from '../src/database/entities/site-destination-highlight.entity';
+import { SiteMediaAsset } from '../src/database/entities/site-media-asset.entity';
+import { SiteRouteHighlight } from '../src/database/entities/site-route-highlight.entity';
+import { StoredFile } from '../src/database/entities/stored-file.entity';
+import { User } from '../src/database/entities/user.entity';
 import { createTestApp } from './helpers/app.helper';
 import { loginAs } from './helpers/login.helper';
-
-const prisma = new PrismaClient({
-  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
-});
 
 function auth(token: string | null | undefined) {
   return { Authorization: `Bearer ${token}` };
@@ -21,6 +22,7 @@ function auth(token: string | null | undefined) {
 /** Phase E — SITE_ADMIN media CMS + public home content. See docs/API.md. */
 describe('Site content (e2e)', () => {
   let app: INestApplication<App>;
+  let dataSource: DataSource;
   const createdAssetIds: string[] = [];
   const createdDestIds: string[] = [];
   const createdRouteIds: string[] = [];
@@ -28,6 +30,7 @@ describe('Site content (e2e)', () => {
 
   beforeEach(async () => {
     app = await createTestApp();
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
@@ -35,21 +38,26 @@ describe('Site content (e2e)', () => {
   });
 
   afterAll(async () => {
+    // The app (and its DataSource) from the last test is already closed by
+    // now, so cleanup runs against a fresh standalone connection.
+    const cleanup = new DataSource(dataSourceOptions);
+    await cleanup.initialize();
     if (createdAssetIds.length) {
-      await prisma.siteMediaAsset.deleteMany({
-        where: { id: { in: createdAssetIds } },
-      });
+      await cleanup
+        .getRepository(SiteMediaAsset)
+        .delete({ id: In(createdAssetIds) });
     }
     if (createdDestIds.length) {
-      await prisma.siteDestinationHighlight.deleteMany({
-        where: { id: { in: createdDestIds } },
-      });
+      await cleanup
+        .getRepository(SiteDestinationHighlight)
+        .delete({ id: In(createdDestIds) });
     }
     if (createdRouteIds.length) {
-      await prisma.siteRouteHighlight.deleteMany({
-        where: { id: { in: createdRouteIds } },
-      });
+      await cleanup
+        .getRepository(SiteRouteHighlight)
+        .delete({ id: In(createdRouteIds) });
     }
+    await cleanup.destroy();
     for (const f of tempFiles) {
       try {
         fs.unlinkSync(f);
@@ -57,7 +65,6 @@ describe('Site content (e2e)', () => {
         /* ignore */
       }
     }
-    await prisma.$disconnect();
   });
 
   async function seedImageFile(ownerId: string) {
@@ -67,15 +74,16 @@ describe('Site content (e2e)', () => {
     );
     fs.writeFileSync(filePath, Buffer.from('fake-png-bytes'));
     tempFiles.push(filePath);
-    return prisma.storedFile.create({
-      data: {
+    const storedFileRepo = dataSource.getRepository(StoredFile);
+    return storedFileRepo.save(
+      storedFileRepo.create({
         ownerId,
         fileName: 'test-banner.png',
         mimeType: 'image/png',
         sizeBytes: 16,
         path: filePath,
-      },
-    });
+      }),
+    );
   }
 
   describe('public', () => {
@@ -92,9 +100,9 @@ describe('Site content (e2e)', () => {
     it('GET /site-content/media/:fileId serves library images', async () => {
       const { accessToken } = await loginAs(app, 'site.admin');
       expect(accessToken).toBeTruthy();
-      const siteAdmin = await prisma.user.findUniqueOrThrow({
-        where: { username: 'site.admin' },
-      });
+      const siteAdmin = await dataSource
+        .getRepository(User)
+        .findOneByOrFail({ username: 'site.admin' });
       const file = await seedImageFile(siteAdmin.id);
       const addRes = await request(app.getHttpServer())
         .post('/site-content/admin/library')
@@ -129,9 +137,9 @@ describe('Site content (e2e)', () => {
     it('POST /site-content/admin/library adds and DELETE soft-removes an asset', async () => {
       const { accessToken } = await loginAs(app, 'site.admin');
       expect(accessToken).toBeTruthy();
-      const siteAdmin = await prisma.user.findUniqueOrThrow({
-        where: { username: 'site.admin' },
-      });
+      const siteAdmin = await dataSource
+        .getRepository(User)
+        .findOneByOrFail({ username: 'site.admin' });
       const file = await seedImageFile(siteAdmin.id);
 
       const addRes = await request(app.getHttpServer())

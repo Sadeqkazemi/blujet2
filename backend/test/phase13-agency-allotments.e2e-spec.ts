@@ -1,14 +1,17 @@
 import type { INestApplication } from '@nestjs/common';
 import type { App } from 'supertest/types';
 import request from 'supertest';
-import { PrismaClient } from '../generated/prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
+import { DataSource, In } from 'typeorm';
+import { AgencyAllotment } from '../src/database/entities/agency-allotment.entity';
+import { AgencyProfile } from '../src/database/entities/agency-profile.entity';
+import { AircraftSeatMap } from '../src/database/entities/aircraft-seat-map.entity';
+import { Flight } from '../src/database/entities/flight.entity';
+import { FlightInstance } from '../src/database/entities/flight-instance.entity';
+import { Route } from '../src/database/entities/route.entity';
+import { User } from '../src/database/entities/user.entity';
+import { FlightInstanceStatus, Role } from '../src/database/enums';
 import { createTestApp } from './helpers/app.helper';
 import { loginAs } from './helpers/login.helper';
-
-const prisma = new PrismaClient({
-  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
-});
 
 /** Phase 13 Part C — per-agency allotments: capacity-sum validation
  * against the instance's coarse agencySeatsAllocated cap, SOFT release
@@ -17,6 +20,7 @@ const prisma = new PrismaClient({
  * — see docs/DB_SCHEMA.md). */
 describe('Phase 13 Part C — agency allotments', () => {
   let app: INestApplication<App>;
+  let dataSource: DataSource;
   const AIRCRAFT_TYPE = 'P13C-Jet';
   let routeId: string;
   let flightId: string;
@@ -25,97 +29,135 @@ describe('Phase 13 Part C — agency allotments', () => {
 
   beforeAll(async () => {
     app = await createTestApp();
-    staffToken = (await loginAs(app, 'senior')).accessToken!;
+    dataSource = app.get(DataSource);
+    staffToken = (await loginAs(app, 'senior.rahimi')).accessToken!;
 
-    await prisma.aircraftSeatMap.upsert({
-      where: { aircraftType: AIRCRAFT_TYPE },
-      update: {},
-      create: {
-        aircraftType: AIRCRAFT_TYPE,
-        businessRowStart: 1,
-        businessRowEnd: 0,
-        businessColsLeft: [],
-        businessColsRight: [],
-        economyRowStart: 1,
-        economyRowEnd: 5,
-        economyColsLeft: ['A'],
-        economyColsRight: ['C'],
-      },
+    const seatMapRepo = dataSource.getRepository(AircraftSeatMap);
+    const existingSeatMap = await seatMapRepo.findOneBy({
+      aircraftType: AIRCRAFT_TYPE,
     });
+    if (!existingSeatMap) {
+      await seatMapRepo.save(
+        seatMapRepo.create({
+          aircraftType: AIRCRAFT_TYPE,
+          businessRowStart: 1,
+          businessRowEnd: 0,
+          businessColsLeft: [],
+          businessColsRight: [],
+          economyRowStart: 1,
+          economyRowEnd: 5,
+          economyColsLeft: ['A'],
+          economyColsRight: ['C'],
+          updatedAt: new Date(),
+        }),
+      );
+    }
 
-    const route = await prisma.route.upsert({
-      where: { originCode_destCode: { originCode: 'THR', destCode: 'AWZ' } },
-      update: {},
-      create: { originCode: 'THR', destCode: 'AWZ', durationMin: 75 },
+    const routeRepo = dataSource.getRepository(Route);
+    let route = await routeRepo.findOneBy({
+      originCode: 'THR',
+      destCode: 'AWZ',
     });
+    if (!route) {
+      route = await routeRepo.save(
+        routeRepo.create({
+          originCode: 'THR',
+          destCode: 'AWZ',
+          durationMin: 75,
+        }),
+      );
+    }
     routeId = route.id;
 
-    const flight = await prisma.flight.upsert({
-      where: { flightNo: 'P13C-1' },
-      update: {},
-      create: { flightNo: 'P13C-1', routeId, aircraftType: AIRCRAFT_TYPE },
-    });
+    const flightRepo = dataSource.getRepository(Flight);
+    let flight = await flightRepo.findOneBy({ flightNo: 'P13C-1' });
+    if (!flight) {
+      flight = await flightRepo.save(
+        flightRepo.create({
+          flightNo: 'P13C-1',
+          routeId,
+          aircraftType: AIRCRAFT_TYPE,
+        }),
+      );
+    }
     flightId = flight.id;
 
-    const agencyUser = await prisma.user.upsert({
-      where: { phone: '+989121190001' },
-      update: {},
-      create: {
-        role: 'AGENCY',
-        phone: '+989121190001',
-        fullName: 'آژانس تست فاز سیزده',
-        isActive: true,
-      },
-    });
+    const userRepo = dataSource.getRepository(User);
+    let agencyUser = await userRepo.findOneBy({ phone: '+989121190001' });
+    if (!agencyUser) {
+      agencyUser = await userRepo.save(
+        userRepo.create({
+          role: Role.AGENCY,
+          phone: '+989121190001',
+          fullName: 'آژانس تست فاز سیزده',
+          isActive: true,
+          updatedAt: new Date(),
+        }),
+      );
+    }
     agencyUserId = agencyUser.id;
-    await prisma.agencyProfile.upsert({
-      where: { userId: agencyUser.id },
-      update: {},
-      create: {
-        userId: agencyUser.id,
-        licenseNo: 'P13C-LIC-1',
-        managerName: 'مدیر تست',
-        phone: '+989121190001',
-        email: 'p13c-agency@example.com',
-        city: 'تهران',
-        address: 'تست',
-      },
+
+    const agencyProfileRepo = dataSource.getRepository(AgencyProfile);
+    const existingProfile = await agencyProfileRepo.findOneBy({
+      userId: agencyUser.id,
     });
+    if (!existingProfile) {
+      await agencyProfileRepo.save(
+        agencyProfileRepo.create({
+          userId: agencyUser.id,
+          licenseNo: 'P13C-LIC-1',
+          managerName: 'مدیر تست',
+          phone: '+989121190001',
+          email: 'p13c-agency@example.com',
+          city: 'تهران',
+          address: 'تست',
+        }),
+      );
+    }
   });
 
   afterAll(async () => {
-    const instances = await prisma.flightInstance.findMany({
-      where: { flightId },
-    });
+    const instances = await dataSource
+      .getRepository(FlightInstance)
+      .createQueryBuilder('fi')
+      .where('fi.flightId = :flightId', { flightId })
+      .getMany();
     const iids = instances.map((i) => i.id);
-    await prisma.agencyAllotment.deleteMany({
-      where: { flightInstanceId: { in: iids } },
-    });
-    await prisma.flightInstance.deleteMany({ where: { id: { in: iids } } });
-    await prisma.flight.deleteMany({ where: { id: flightId } });
-    await prisma.route.deleteMany({ where: { id: routeId } });
-    await prisma.agencyProfile.deleteMany({ where: { userId: agencyUserId } });
-    await prisma.user.deleteMany({ where: { id: agencyUserId } });
-    await prisma.aircraftSeatMap.deleteMany({
-      where: { aircraftType: AIRCRAFT_TYPE },
-    });
+    if (iids.length > 0) {
+      await dataSource
+        .getRepository(AgencyAllotment)
+        .delete({ flightInstanceId: In(iids) });
+      await dataSource.getRepository(FlightInstance).delete({ id: In(iids) });
+    }
+    await dataSource.getRepository(Flight).delete({ id: flightId });
+    await dataSource.getRepository(Route).delete({ id: routeId });
+    await dataSource
+      .getRepository(AgencyProfile)
+      .delete({ userId: agencyUserId });
+    await dataSource.getRepository(User).delete({ id: agencyUserId });
+    await dataSource
+      .getRepository(AircraftSeatMap)
+      .delete({ aircraftType: AIRCRAFT_TYPE });
 
     await app.close();
-    await prisma.$disconnect();
   });
 
-  function freshInstance(agencySeatsAllocated: number | null, daysAhead = 90) {
+  async function freshInstance(
+    agencySeatsAllocated: number | null,
+    daysAhead = 90,
+  ) {
     const departureAt = new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000);
-    return prisma.flightInstance.create({
-      data: {
+    const flightInstanceRepo = dataSource.getRepository(FlightInstance);
+    return flightInstanceRepo.save(
+      flightInstanceRepo.create({
         flightId,
         departureAt,
         arrivalAt: new Date(departureAt.getTime() + 75 * 60 * 1000),
         capacity: 10,
         agencySeatsAllocated: agencySeatsAllocated ?? undefined,
-        status: 'SCHEDULED',
-      },
-    });
+        status: FlightInstanceStatus.SCHEDULED,
+      }),
+    );
   }
 
   it('rejects creating an allotment when the instance has no agencySeatsAllocated quota set', async () => {

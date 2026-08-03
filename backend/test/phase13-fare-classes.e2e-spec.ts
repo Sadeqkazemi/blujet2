@@ -1,20 +1,28 @@
 import type { INestApplication } from '@nestjs/common';
 import type { App } from 'supertest/types';
 import request from 'supertest';
-import { PrismaClient } from '../generated/prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
+import { DataSource, In } from 'typeorm';
+import { AircraftSeatMap } from '../src/database/entities/aircraft-seat-map.entity';
+import { Booking } from '../src/database/entities/booking.entity';
+import { ClubPointsEntry } from '../src/database/entities/club-points-entry.entity';
+import { FareRule } from '../src/database/entities/fare-rule.entity';
+import { Flight } from '../src/database/entities/flight.entity';
+import { FlightInstance } from '../src/database/entities/flight-instance.entity';
+import { LedgerEntry } from '../src/database/entities/ledger-entry.entity';
+import { Passenger } from '../src/database/entities/passenger.entity';
+import { PaymentReconciliation } from '../src/database/entities/payment-reconciliation.entity';
+import { Route } from '../src/database/entities/route.entity';
+import { WalletEntry } from '../src/database/entities/wallet-entry.entity';
+import { FlightInstanceStatus } from '../src/database/enums';
 import { createTestApp } from './helpers/app.helper';
 import { loginAs, loginAsCustomer } from './helpers/login.helper';
-
-const prisma = new PrismaClient({
-  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
-});
 
 /** Phase 13 Part B — manageable fare classes: capacity-sum validation,
  * validity window, channel eligibility, tax breakout, and delete-blocked
  * when an active booking already uses the class. */
 describe('Phase 13 Part B — fare-class management', () => {
   let app: INestApplication<App>;
+  let dataSource: DataSource;
   const AIRCRAFT_TYPE = 'P13B-Jet'; // 4 economy seats, no business
   let routeId: string;
   let flightId: string;
@@ -23,84 +31,118 @@ describe('Phase 13 Part B — fare-class management', () => {
 
   beforeAll(async () => {
     app = await createTestApp();
-    staffToken = (await loginAs(app, 'senior')).accessToken!;
+    dataSource = app.get(DataSource);
+    staffToken = (await loginAs(app, 'senior.rahimi')).accessToken!;
     customerToken = (await loginAsCustomer(app, '09901119920')).accessToken!;
 
-    await prisma.aircraftSeatMap.upsert({
-      where: { aircraftType: AIRCRAFT_TYPE },
-      update: {},
-      create: {
-        aircraftType: AIRCRAFT_TYPE,
-        businessRowStart: 1,
-        businessRowEnd: 0,
-        businessColsLeft: [],
-        businessColsRight: [],
-        economyRowStart: 1,
-        economyRowEnd: 2,
-        economyColsLeft: ['A'],
-        economyColsRight: ['C'],
-      },
+    const seatMapRepo = dataSource.getRepository(AircraftSeatMap);
+    const existingSeatMap = await seatMapRepo.findOneBy({
+      aircraftType: AIRCRAFT_TYPE,
     });
+    if (!existingSeatMap) {
+      await seatMapRepo.save(
+        seatMapRepo.create({
+          aircraftType: AIRCRAFT_TYPE,
+          businessRowStart: 1,
+          businessRowEnd: 0,
+          businessColsLeft: [],
+          businessColsRight: [],
+          economyRowStart: 1,
+          economyRowEnd: 2,
+          economyColsLeft: ['A'],
+          economyColsRight: ['C'],
+          updatedAt: new Date(),
+        }),
+      );
+    }
 
-    const route = await prisma.route.upsert({
-      where: { originCode_destCode: { originCode: 'THR', destCode: 'BND' } },
-      update: {},
-      create: { originCode: 'THR', destCode: 'BND', durationMin: 80 },
+    const routeRepo = dataSource.getRepository(Route);
+    let route = await routeRepo.findOneBy({
+      originCode: 'THR',
+      destCode: 'BND',
     });
+    if (!route) {
+      route = await routeRepo.save(
+        routeRepo.create({
+          originCode: 'THR',
+          destCode: 'BND',
+          durationMin: 80,
+        }),
+      );
+    }
     routeId = route.id;
 
-    const flight = await prisma.flight.upsert({
-      where: { flightNo: 'P13B-1' },
-      update: {},
-      create: { flightNo: 'P13B-1', routeId, aircraftType: AIRCRAFT_TYPE },
-    });
+    const flightRepo = dataSource.getRepository(Flight);
+    let flight = await flightRepo.findOneBy({ flightNo: 'P13B-1' });
+    if (!flight) {
+      flight = await flightRepo.save(
+        flightRepo.create({
+          flightNo: 'P13B-1',
+          routeId,
+          aircraftType: AIRCRAFT_TYPE,
+        }),
+      );
+    }
     flightId = flight.id;
   });
 
   afterAll(async () => {
-    const instances = await prisma.flightInstance.findMany({
-      where: { flightId },
-    });
+    const instances = await dataSource
+      .getRepository(FlightInstance)
+      .createQueryBuilder('fi')
+      .where('fi.flightId = :flightId', { flightId })
+      .getMany();
     const iids = instances.map((i) => i.id);
-    const bookings = await prisma.booking.findMany({
-      where: { flightInstanceId: { in: iids } },
-    });
+    const bookings =
+      iids.length > 0
+        ? await dataSource
+            .getRepository(Booking)
+            .findBy({ flightInstanceId: In(iids) })
+        : [];
     const bids = bookings.map((b) => b.id);
-    await prisma.paymentReconciliation.deleteMany({
-      where: { bookingId: { in: bids } },
-    });
-    await prisma.ledgerEntry.deleteMany({ where: { bookingId: { in: bids } } });
-    await prisma.clubPointsEntry.deleteMany({
-      where: { bookingId: { in: bids } },
-    });
-    await prisma.walletEntry.deleteMany({ where: { bookingId: { in: bids } } });
-    await prisma.passenger.deleteMany({ where: { bookingId: { in: bids } } });
-    await prisma.booking.deleteMany({ where: { id: { in: bids } } });
-    await prisma.fareRule.deleteMany({
-      where: { flightInstanceId: { in: iids } },
-    });
-    await prisma.flightInstance.deleteMany({ where: { id: { in: iids } } });
-    await prisma.flight.deleteMany({ where: { id: flightId } });
-    await prisma.route.deleteMany({ where: { id: routeId } });
-    await prisma.aircraftSeatMap.deleteMany({
-      where: { aircraftType: AIRCRAFT_TYPE },
-    });
+    if (bids.length > 0) {
+      await dataSource
+        .getRepository(PaymentReconciliation)
+        .delete({ bookingId: In(bids) });
+      await dataSource
+        .getRepository(LedgerEntry)
+        .delete({ bookingId: In(bids) });
+      await dataSource
+        .getRepository(ClubPointsEntry)
+        .delete({ bookingId: In(bids) });
+      await dataSource
+        .getRepository(WalletEntry)
+        .delete({ bookingId: In(bids) });
+      await dataSource.getRepository(Passenger).delete({ bookingId: In(bids) });
+      await dataSource.getRepository(Booking).delete({ id: In(bids) });
+    }
+    if (iids.length > 0) {
+      await dataSource
+        .getRepository(FareRule)
+        .delete({ flightInstanceId: In(iids) });
+      await dataSource.getRepository(FlightInstance).delete({ id: In(iids) });
+    }
+    await dataSource.getRepository(Flight).delete({ id: flightId });
+    await dataSource.getRepository(Route).delete({ id: routeId });
+    await dataSource
+      .getRepository(AircraftSeatMap)
+      .delete({ aircraftType: AIRCRAFT_TYPE });
 
     await app.close();
-    await prisma.$disconnect();
   });
 
   function freshInstance(daysAhead = 90) {
     const departureAt = new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000);
-    return prisma.flightInstance.create({
-      data: {
+    const flightInstanceRepo = dataSource.getRepository(FlightInstance);
+    return flightInstanceRepo.save(
+      flightInstanceRepo.create({
         flightId,
         departureAt,
         arrivalAt: new Date(departureAt.getTime() + 80 * 60 * 1000),
         capacity: 4,
-        status: 'SCHEDULED',
-      },
-    });
+        status: FlightInstanceStatus.SCHEDULED,
+      }),
+    );
   }
 
   it('rejects a fare rule whose seatsAllocated would push the cabin total past its physical seat count', async () => {

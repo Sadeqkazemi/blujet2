@@ -1,14 +1,18 @@
 import type { INestApplication } from '@nestjs/common';
 import type { App } from 'supertest/types';
 import request from 'supertest';
-import { PrismaClient } from '../generated/prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
+import { DataSource, In } from 'typeorm';
+import { AircraftSeatMap } from '../src/database/entities/aircraft-seat-map.entity';
+import { Booking } from '../src/database/entities/booking.entity';
+import { Flight } from '../src/database/entities/flight.entity';
+import { FlightInstance } from '../src/database/entities/flight-instance.entity';
+import { LedgerEntry } from '../src/database/entities/ledger-entry.entity';
+import { Passenger } from '../src/database/entities/passenger.entity';
+import { PaymentReconciliation } from '../src/database/entities/payment-reconciliation.entity';
+import { Route } from '../src/database/entities/route.entity';
+import { FlightInstanceStatus } from '../src/database/enums';
 import { createTestApp } from './helpers/app.helper';
 import { loginAs, loginAsCustomer } from './helpers/login.helper';
-
-const prisma = new PrismaClient({
-  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
-});
 
 /** Phase 13 Part E — real DEPARTED materialization, FLOWN/NO_SHOW booking
  * lifecycle, and the payment-reconciliation queue for a GATEWAY payment
@@ -16,6 +20,7 @@ const prisma = new PrismaClient({
  * docs/DB_SCHEMA.md Phase 13 Part E. */
 describe('Phase 13 Part E — PNR lifecycle + payment reconciliation', () => {
   let app: INestApplication<App>;
+  let dataSource: DataSource;
   const AIRCRAFT_TYPE = 'P13E-Jet';
   let flightId: string;
   const createdInstanceIds: string[] = [];
@@ -27,75 +32,96 @@ describe('Phase 13 Part E — PNR lifecycle + payment reconciliation', () => {
 
   beforeAll(async () => {
     app = await createTestApp();
+    dataSource = app.get(DataSource);
 
-    await prisma.aircraftSeatMap.upsert({
-      where: { aircraftType: AIRCRAFT_TYPE },
-      update: {},
-      create: {
-        aircraftType: AIRCRAFT_TYPE,
-        businessRowStart: 1,
-        businessRowEnd: 0,
-        businessColsLeft: [],
-        businessColsRight: [],
-        economyRowStart: 1,
-        economyRowEnd: 5,
-        economyColsLeft: ['A'],
-        economyColsRight: ['C'],
-      },
+    const seatMapRepo = dataSource.getRepository(AircraftSeatMap);
+    const existingSeatMap = await seatMapRepo.findOneBy({
+      aircraftType: AIRCRAFT_TYPE,
     });
-    const route = await prisma.route.upsert({
-      where: { originCode_destCode: { originCode: 'THR', destCode: 'BND' } },
-      update: {},
-      create: { originCode: 'THR', destCode: 'BND', durationMin: 80 },
+    if (!existingSeatMap) {
+      await seatMapRepo.save(
+        seatMapRepo.create({
+          aircraftType: AIRCRAFT_TYPE,
+          businessRowStart: 1,
+          businessRowEnd: 0,
+          businessColsLeft: [],
+          businessColsRight: [],
+          economyRowStart: 1,
+          economyRowEnd: 5,
+          economyColsLeft: ['A'],
+          economyColsRight: ['C'],
+          updatedAt: new Date(),
+        }),
+      );
+    }
+    const routeRepo = dataSource.getRepository(Route);
+    let route = await routeRepo.findOneBy({
+      originCode: 'THR',
+      destCode: 'BND',
     });
-    const flight = await prisma.flight.upsert({
-      where: { flightNo: 'P13E-1' },
-      update: {},
-      create: {
-        flightNo: 'P13E-1',
-        routeId: route.id,
-        aircraftType: AIRCRAFT_TYPE,
-      },
-    });
+    if (!route) {
+      route = await routeRepo.save(
+        routeRepo.create({
+          originCode: 'THR',
+          destCode: 'BND',
+          durationMin: 80,
+        }),
+      );
+    }
+    const flightRepo = dataSource.getRepository(Flight);
+    let flight = await flightRepo.findOneBy({ flightNo: 'P13E-1' });
+    if (!flight) {
+      flight = await flightRepo.save(
+        flightRepo.create({
+          flightNo: 'P13E-1',
+          routeId: route.id,
+          aircraftType: AIRCRAFT_TYPE,
+        }),
+      );
+    }
     flightId = flight.id;
   });
 
   afterAll(async () => {
-    await prisma.paymentReconciliation.deleteMany({
-      where: { bookingId: { in: createdBookingIds } },
-    });
-    await prisma.passenger.deleteMany({
-      where: { bookingId: { in: createdBookingIds } },
-    });
-    await prisma.ledgerEntry.deleteMany({
-      where: { bookingId: { in: createdBookingIds } },
-    });
-    await prisma.booking.deleteMany({
-      where: { id: { in: createdBookingIds } },
-    });
-    await prisma.flightInstance.deleteMany({
-      where: { id: { in: createdInstanceIds } },
-    });
-    await prisma.flight.deleteMany({ where: { id: flightId } });
-    await prisma.aircraftSeatMap.deleteMany({
-      where: { aircraftType: AIRCRAFT_TYPE },
-    });
+    if (createdBookingIds.length > 0) {
+      await dataSource
+        .getRepository(PaymentReconciliation)
+        .delete({ bookingId: In(createdBookingIds) });
+      await dataSource
+        .getRepository(Passenger)
+        .delete({ bookingId: In(createdBookingIds) });
+      await dataSource
+        .getRepository(LedgerEntry)
+        .delete({ bookingId: In(createdBookingIds) });
+      await dataSource
+        .getRepository(Booking)
+        .delete({ id: In(createdBookingIds) });
+    }
+    if (createdInstanceIds.length > 0) {
+      await dataSource
+        .getRepository(FlightInstance)
+        .delete({ id: In(createdInstanceIds) });
+    }
+    await dataSource.getRepository(Flight).delete({ id: flightId });
+    await dataSource
+      .getRepository(AircraftSeatMap)
+      .delete({ aircraftType: AIRCRAFT_TYPE });
 
     await app.close();
-    await prisma.$disconnect();
   });
 
   async function makeInstance(daysOffset: number) {
     const departureAt = new Date(Date.now() + daysOffset * 24 * 60 * 60 * 1000);
-    const instance = await prisma.flightInstance.create({
-      data: {
+    const flightInstanceRepo = dataSource.getRepository(FlightInstance);
+    const instance = await flightInstanceRepo.save(
+      flightInstanceRepo.create({
         flightId,
         departureAt,
         arrivalAt: new Date(departureAt.getTime() + 80 * 60 * 1000),
         capacity: 10,
-        status: 'SCHEDULED',
-      },
-    });
+        status: FlightInstanceStatus.SCHEDULED,
+      }),
+    );
     createdInstanceIds.push(instance.id);
     return instance;
   }
@@ -109,9 +135,11 @@ describe('Phase 13 Part E — PNR lifecycle + payment reconciliation', () => {
       .set(auth(accessToken!));
     expect(res.status).toBe(200);
 
-    const refreshed = await prisma.flightInstance.findUniqueOrThrow({
-      where: { id: instance.id },
-    });
+    const refreshed = await dataSource
+      .getRepository(FlightInstance)
+      .createQueryBuilder('fi')
+      .where('fi.id = :id', { id: instance.id })
+      .getOneOrFail();
     expect(refreshed.status).toBe('DEPARTED');
   });
 
@@ -130,9 +158,9 @@ describe('Phase 13 Part E — PNR lifecycle + payment reconciliation', () => {
     expect(issued.status).toBe(201);
     createdBookingIds.push(
       (
-        await prisma.booking.findUniqueOrThrow({
-          where: { pnr: issued.body.data.pnr },
-        })
+        await dataSource
+          .getRepository(Booking)
+          .findOneByOrFail({ pnr: issued.body.data.pnr })
       ).id,
     );
     const pnr = issued.body.data.pnr as string;
@@ -170,9 +198,9 @@ describe('Phase 13 Part E — PNR lifecycle + payment reconciliation', () => {
     expect(issued.status).toBe(201);
     createdBookingIds.push(
       (
-        await prisma.booking.findUniqueOrThrow({
-          where: { pnr: issued.body.data.pnr },
-        })
+        await dataSource
+          .getRepository(Booking)
+          .findOneByOrFail({ pnr: issued.body.data.pnr })
       ).id,
     );
 
@@ -207,9 +235,9 @@ describe('Phase 13 Part E — PNR lifecycle + payment reconciliation', () => {
     expect(paid.status).toBe(201);
     expect(paid.body.data.booking.status).toBe('TICKETED');
 
-    const reconciliation = await prisma.paymentReconciliation.findFirst({
-      where: { bookingId },
-    });
+    const reconciliation = await dataSource
+      .getRepository(PaymentReconciliation)
+      .findOneBy({ bookingId });
     expect(reconciliation).not.toBeNull();
     expect(reconciliation!.status).toBe('RESOLVED');
     // reconciliation is a direct Prisma read (native bigint); the JSON
@@ -245,14 +273,14 @@ describe('Phase 13 Part E — PNR lifecycle + payment reconciliation', () => {
       .send({ promoCode: 'THIS-CODE-DOES-NOT-EXIST' });
     expect(paid.status).toBe(400);
 
-    const stillHeld = await prisma.booking.findUniqueOrThrow({
-      where: { id: bookingId },
-    });
+    const stillHeld = await dataSource
+      .getRepository(Booking)
+      .findOneByOrFail({ id: bookingId });
     expect(stillHeld.status).toBe('HELD');
 
-    const reconciliation = await prisma.paymentReconciliation.findFirst({
-      where: { bookingId },
-    });
+    const reconciliation = await dataSource
+      .getRepository(PaymentReconciliation)
+      .findOneBy({ bookingId });
     expect(reconciliation).not.toBeNull();
     expect(reconciliation!.status).toBe('PENDING');
 

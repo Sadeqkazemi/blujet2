@@ -1,15 +1,13 @@
 import type { INestApplication } from '@nestjs/common';
 import type { App } from 'supertest/types';
 import request from 'supertest';
-import { PrismaClient } from '../generated/prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
+import { DataSource, IsNull, Like } from 'typeorm';
+import { SmsLog } from '../src/database/entities/sms-log.entity';
+import { User } from '../src/database/entities/user.entity';
+import { SmsMessageType, SmsStatus } from '../src/database/enums';
 import { createTestApp } from './helpers/app.helper';
 import { loginAs, loginAsCustomer, stepUpFor } from './helpers/login.helper';
 import { normalizeIranPhone } from '../src/common/normalize-iran-phone';
-
-const prisma = new PrismaClient({
-  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
-});
 
 /** Phase 14 — real SmsProvider + management log: OTP/temp-password sends
  * now write a genuine SmsLog row instead of only claiming delivery in an
@@ -17,17 +15,16 @@ const prisma = new PrismaClient({
  * phone number. See docs/DB_SCHEMA.md Phase 14. */
 describe('Phase 14 — SMS provider + management log', () => {
   let app: INestApplication<App>;
+  let dataSource: DataSource;
 
   beforeAll(async () => {
     app = await createTestApp();
+    dataSource = app.get(DataSource);
   });
 
   afterAll(async () => {
-    await prisma.user.deleteMany({
-      where: { username: { startsWith: 'p14.' } },
-    });
+    await dataSource.getRepository(User).delete({ username: Like('p14.%') });
     await app.close();
-    await prisma.$disconnect();
   });
 
   function auth(token: string) {
@@ -39,9 +36,12 @@ describe('Phase 14 — SMS provider + management log', () => {
     const { accessToken } = await loginAsCustomer(app, phone);
     expect(accessToken).toBeDefined();
 
-    const log = await prisma.smsLog.findFirst({
-      where: { phone: normalizeIranPhone(phone), messageType: 'OTP' },
-      orderBy: { createdAt: 'desc' },
+    const log = await dataSource.getRepository(SmsLog).findOne({
+      where: {
+        phone: normalizeIranPhone(phone),
+        messageType: SmsMessageType.OTP,
+      },
+      order: { createdAt: 'DESC' },
     });
     expect(log).not.toBeNull();
     expect(log!.status).toBe('SUCCESS');
@@ -70,9 +70,9 @@ describe('Phase 14 — SMS provider + management log', () => {
       });
     expect(created.status).toBe(201);
 
-    const log = await prisma.smsLog.findFirst({
-      where: { messageType: 'TEMP_PASSWORD', phone: null },
-      orderBy: { createdAt: 'desc' },
+    const log = await dataSource.getRepository(SmsLog).findOne({
+      where: { messageType: SmsMessageType.TEMP_PASSWORD, phone: IsNull() },
+      order: { createdAt: 'DESC' },
     });
     expect(log).not.toBeNull();
     expect(log!.status).toBe('FAILED');
@@ -106,8 +106,11 @@ describe('Phase 14 — SMS provider + management log', () => {
       });
     expect(target.status).toBe(201);
 
-    const before = await prisma.smsLog.count({
-      where: { messageType: 'TEMP_PASSWORD', status: 'FAILED' },
+    const before = await dataSource.getRepository(SmsLog).count({
+      where: {
+        messageType: SmsMessageType.TEMP_PASSWORD,
+        status: SmsStatus.FAILED,
+      },
     });
 
     const reset = await request(app.getHttpServer())
@@ -117,8 +120,11 @@ describe('Phase 14 — SMS provider + management log', () => {
     expect(reset.status).toBe(201);
     expect(reset.body.data.tempPassword).toBeDefined();
 
-    const after = await prisma.smsLog.count({
-      where: { messageType: 'TEMP_PASSWORD', status: 'FAILED' },
+    const after = await dataSource.getRepository(SmsLog).count({
+      where: {
+        messageType: SmsMessageType.TEMP_PASSWORD,
+        status: SmsStatus.FAILED,
+      },
     });
     expect(after).toBe(before + 1);
   });
