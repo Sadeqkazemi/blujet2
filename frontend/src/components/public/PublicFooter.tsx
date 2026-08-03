@@ -167,7 +167,7 @@ export default function PublicFooter() {
   ];
 
   return (
-    <footer style={{ background: '#0d2640', color: '#aebfd4', marginTop: 72 }}>
+    <footer style={{ background: '#0d2640', color: '#aebfd4', marginTop: isMobile ? 48 : 72 }}>
       <style>{`
         footer details[open] .footer-chev { transform: rotate(180deg); }
         footer summary::-webkit-details-marker { display: none; }
