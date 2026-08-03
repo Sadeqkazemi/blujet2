@@ -7,6 +7,7 @@ import { fetchRefunds } from '../api/refunds';
 import { fetchLowSalesAlerts, fetchStaffReports } from '../api/reporting';
 import { fetchLogsBadgeCount } from '../api/audit';
 import { fetchCeoPricing } from '../api/pricing';
+import { fetchSupportTickets } from '../api/support-tickets';
 import { faDigits } from '../lib/fa-format';
 import { formatJalaliDate } from '../lib/jalali';
 import type { EmployeeContext, PanelNavItem } from '../types/panels';
@@ -28,10 +29,15 @@ const ROLE_LABELS: Record<string, string> = {
   EMPLOYEE: 'کارمند',
 };
 
+/** Must stay in sync with backend `SITE_ADMIN_SIDEBAR_DENYLIST`. */
+const SITE_ADMIN_SIDEBAR_DENYLIST = new Set(['blog', 'kyc', 'settings']);
+
 /** Brand subtitle under «blujet» — sampled from each panel's design sidebar. */
 const ROLE_BRAND_SUB: Record<string, string> = {
   IT_MANAGER: 'پنل فناوری اطلاعات',
   EMPLOYEE: 'پنل کارمند',
+  // Logo line in design HTML / screenshots is «پنل مدیریت» (not roleDefs.sub).
+  SITE_ADMIN: 'پنل مدیریت',
 };
 
 type NavBadge = { count: number; className: string };
@@ -90,10 +96,19 @@ export default function PanelShell() {
       .catch(() => setLowSalesAlerts([]));
   }, [user?.role]);
 
-  const navKeys = useMemo(() => new Set(nav?.map((item) => item.key) ?? []), [nav]);
+  const visibleNav = useMemo(() => {
+    if (nav === null) return null;
+    if (user?.role !== 'SITE_ADMIN') return nav;
+    return nav.filter((item) => !SITE_ADMIN_SIDEBAR_DENYLIST.has(item.key));
+  }, [nav, user?.role]);
+
+  const navKeys = useMemo(
+    () => new Set(visibleNav?.map((item) => item.key) ?? []),
+    [visibleNav],
+  );
 
   useEffect(() => {
-    if (!nav || nav.length === 0) return;
+    if (!visibleNav || visibleNav.length === 0) return;
 
     const next: Record<string, NavBadge> = {};
     const nextNotifications: PanelNotificationItem[] = [];
@@ -123,22 +138,44 @@ export default function PanelShell() {
       );
     }
 
-    if (navKeys.has('refund') && user?.role === 'FINANCE_MANAGER') {
+    if (
+      navKeys.has('refund') &&
+      (user?.role === 'FINANCE_MANAGER' || user?.role === 'SITE_ADMIN')
+    ) {
       tasks.push(
         fetchRefunds()
           .then((r) => {
-            if (r.kpis.payoutQueue > 0) {
-              next.refund = {
-                count: r.kpis.payoutQueue,
-                className: 'bg-[#a855f7] text-white',
-              };
-              nextNotifications.push({
-                key: 'refund-queue',
-                title: 'استرداد در صف پرداخت',
-                sublabel: `${faDigits(r.kpis.payoutQueue)} مورد`,
-                to: '/panel/refund',
-                tone: 'purple',
-              });
+            if (user?.role === 'FINANCE_MANAGER') {
+              if (r.kpis.payoutQueue > 0) {
+                next.refund = {
+                  count: r.kpis.payoutQueue,
+                  className: 'bg-[#a855f7] text-white',
+                };
+                nextNotifications.push({
+                  key: 'refund-queue',
+                  title: 'استرداد در صف پرداخت',
+                  sublabel: `${faDigits(r.kpis.payoutQueue)} مورد`,
+                  to: '/panel/refund',
+                  tone: 'purple',
+                });
+              }
+            } else {
+              const awaiting = r.requests.filter(
+                (row) => row.status === 'SUBMITTED' || row.status === 'REVIEW',
+              ).length;
+              if (awaiting > 0) {
+                next.refund = {
+                  count: awaiting,
+                  className: 'bg-[#f59e0b] text-[#0f1623]',
+                };
+                nextNotifications.push({
+                  key: 'refund-review',
+                  title: 'استرداد در انتظار بررسی',
+                  sublabel: `${faDigits(awaiting)} مورد`,
+                  to: '/panel/refund',
+                  tone: 'warning',
+                });
+              }
             }
           })
           .catch(() => undefined),
@@ -245,11 +282,34 @@ export default function PanelShell() {
       );
     }
 
+    if (navKeys.has('tickets') && user?.role === 'SITE_ADMIN') {
+      tasks.push(
+        fetchSupportTickets()
+          .then((rows) => {
+            const open = rows.filter((t) => t.status === 'OPEN' || t.status === 'IN_PROGRESS').length;
+            if (open > 0) {
+              next.tickets = {
+                count: open,
+                className: 'bg-[#f59e0b] text-[#0f1623]',
+              };
+              nextNotifications.push({
+                key: 'tickets-open',
+                title: 'تیکت باز',
+                sublabel: `${faDigits(open)} مورد`,
+                to: '/panel/tickets',
+                tone: 'warning',
+              });
+            }
+          })
+          .catch(() => undefined),
+      );
+    }
+
     void Promise.all(tasks).then(() => {
       setBadges(next);
       setNotifications([...lowSalesNotifItems(lowSalesAlerts), ...nextNotifications]);
     });
-  }, [nav, navKeys, user?.role, lowSalesAlerts]);
+  }, [visibleNav, navKeys, user?.role, lowSalesAlerts]);
 
   async function onSignOut() {
     await signOut();
@@ -266,8 +326,12 @@ export default function PanelShell() {
     user?.role === 'BOARD_CHAIR' ||
     user?.role === 'SENIOR_MANAGER' ||
     user?.role === 'COMMERCIAL_MANAGER';
-  /** Finance + Employee get avatar footer chrome (design employee sidebar). */
-  const avatarShell = executiveShell || user?.role === 'FINANCE_MANAGER' || user?.role === 'EMPLOYEE';
+  /** Finance + Employee + Site Admin get avatar footer chrome. */
+  const avatarShell =
+    executiveShell ||
+    user?.role === 'FINANCE_MANAGER' ||
+    user?.role === 'EMPLOYEE' ||
+    user?.role === 'SITE_ADMIN';
   const roleInitial =
     user?.role === 'CEO'
       ? 'مع'
@@ -279,9 +343,11 @@ export default function PanelShell() {
             ? 'مم'
             : user?.role === 'COMMERCIAL_MANAGER'
               ? 'مب'
-              : user?.role === 'EMPLOYEE' && user.fullName
-                ? nameInitials(user.fullName)
-                : roleLabel.slice(0, 1);
+              : user?.role === 'SITE_ADMIN'
+                ? 'اس'
+                : user?.role === 'EMPLOYEE' && user.fullName
+                  ? nameInitials(user.fullName)
+                  : roleLabel.slice(0, 1);
   const employeeFooterSub =
     user?.role === 'EMPLOYEE'
       ? [employeeCtx?.deptLabelFa, employeeCtx?.rank].filter(Boolean).join(' · ') || roleLabel
@@ -314,11 +380,11 @@ export default function PanelShell() {
         )}
 
         <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
-          {nav === null && <div className="px-2 py-3 text-xs text-panel-muted-2">در حال بارگذاری…</div>}
-          {nav?.length === 0 && (
+          {visibleNav === null && <div className="px-2 py-3 text-xs text-panel-muted-2">در حال بارگذاری…</div>}
+          {visibleNav?.length === 0 && (
             <div className="px-2 py-3 text-xs text-panel-muted-2">تبی برای این نقش تعریف نشده است.</div>
           )}
-          {nav?.map((item) => {
+          {visibleNav?.map((item) => {
             const badge = badges[item.key];
             return (
               <NavLink
@@ -418,10 +484,10 @@ export default function PanelShell() {
         ) : (
           <div className="flex items-center justify-end gap-3 border-b border-panel-border px-8 py-3">
             <PanelNotificationBell items={notifications} />
-            <PanelSearchBox nav={nav ?? []} />
+            <PanelSearchBox nav={visibleNav ?? []} />
           </div>
         )}
-        <Outlet context={{ nav, lowSalesAlerts }} />
+        <Outlet context={{ nav: visibleNav, lowSalesAlerts }} />
       </main>
     </div>
   );

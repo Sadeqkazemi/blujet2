@@ -1062,6 +1062,7 @@ model StoredFile {
   siteMediaAsset   SiteMediaAsset?
   contentBlockImage SiteContentBlock?
   destHighlightFor SiteDestinationHighlight?
+  jobPostingImage  JobPosting?               @relation("JobPostingImage")
 
   @@index([ownerId])
   @@map("stored_files")
@@ -1916,9 +1917,12 @@ model JobPosting {
   dept         String
   city         String
   type         JobType          @default(FULL_TIME)
+  description  String           @default("")
   generalReqs  String[]
   specialReqs  String[]
   active       Boolean          @default(true)
+  imageFileId  String?          @unique
+  imageFile    StoredFile?      @relation("JobPostingImage", fields: [imageFileId], references: [id])
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
   applications JobApplication[]

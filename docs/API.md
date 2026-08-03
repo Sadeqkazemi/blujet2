@@ -56,6 +56,7 @@ set and chart shape across every panel report.
 | GET | `/reporting/completed-flights-summary` | same | Same `granularity`/`periodKey` filter → `{ flightCount, totalSeats, soldSeats, unsoldSeats }`, synced to the same period as the chart. |
 | GET | `/reporting/low-sales-alerts` | CEO, BOARD_CHAIR, SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | Flights &lt;72h out with occupancy below threshold — the design's recurring amber banner, currently hardcoded in every panel; this endpoint replaces the hardcoded copy with a real query. |
 | GET | `/reporting/commercial-overview` | COMMERCIAL_MANAGER | Commercial dashboard KPI row: `{ activeAgencies, passengersThisMonth, pendingAgencyRequests }`. |
+| GET | `/reporting/site-admin-overview` | SITE_ADMIN | Site-admin dashboard KPI row (design «آژانس فعال / مسافر این ماه / بلیط فروخته‌شده / درخواست در انتظار اقدام»): `{ activeAgencies, passengersThisMonth, ticketsSoldThisMonth, pendingActionCount, agenciesTrendPct, passengersTrendPct, ticketsTrendPct }` — `pendingActionCount` = pending/referred agency requests + SUBMITTED/REVIEW refunds + OPEN/IN_PROGRESS support tickets; trend fields are MoM % (null when previous month is 0 / N/A). |
 | GET | `/reporting/finance-dashboard-stats` | CEO, BOARD_CHAIR, SENIOR_MANAGER, FINANCE_MANAGER | Dashboard KPI row matching the design cards: `{ activeAgencies, activeAgenciesTrendPct, passengersThisMonth, passengersTrendPct, ticketsSoldThisMonth, ticketsTrendPct, revenueThisMonthIrr, revenueTrendPct }`. Widened beyond FINANCE_MANAGER so CEO/Chair/Senior dashboards can render آژانس فعال / مسافر این ماه / بلیط فروخته‌شده / درآمد without a duplicate endpoint. |
 
 ### Manager activity / audit feed (`backend/src/modules/audit/`)
@@ -1022,6 +1023,10 @@ side anyway.
 - `PATCH /support-tickets/:id/status` (new, `SITE_ADMIN` only) —
   `{ status }` ∈ `OPEN | IN_PROGRESS | ANSWERED | CLOSED`. Appends a
   `history` entry.
+- `POST /support-tickets/admin` (`SITE_ADMIN` only) — create from the
+  panel «ایجاد تیکت» modal: `{ subject, requesterName, requesterPhone?,
+  dept: SITE|AGENCY, priority: HIGH|MEDIUM|LOW, body }`. Phone optional
+  (sentinel stored when omitted). Audited.
 - Both forward and status-change actions are audit-logged
   (`category: 'SYSTEM'` — no new `AuditCategory` enum value was added for
   a scoped-down v1 feature). No audit row on the anonymous submission
@@ -1102,17 +1107,19 @@ Completes the member-initiated card-request flow started above: after a
 USER submits via `POST /my/club/card-request`, the request sits in
 `SUBMITTED` until SITE_ADMIN refers it from the پنل ادمین سایت `club` tab.
 
-- `GET /club/submitted-card-requests` (new, `SITE_ADMIN` only) — list
-  `SUBMITTED` requests with member detail (incl. decrypted national ID for
-  this admin review surface only) + history timeline. Exec panels'
-  `GET /club/card-requests` still excludes SUBMITTED.
-- `PATCH /club/card-requests/:id/refer` (new, `SITE_ADMIN` only) — body
+- `GET /club/submitted-card-requests` (`SITE_ADMIN` only) — list of **all**
+  card-request statuses for the admin queue (SUBMITTED / REFERRED /
+  APPROVED / REJECTED) with member detail (incl. decrypted national ID)
+  + history timeline. Refer action still only succeeds on SUBMITTED.
+  Exec panels' `GET /club/card-requests` still excludes SUBMITTED.
+- `PATCH /club/card-requests/:id/refer` (`SITE_ADMIN` only) — body
   `{ assignedTo: 'SENIOR' | 'CHAIR' }`; `SUBMITTED → REFERRED`, appends a
   history step, audited. `409` if not SUBMITTED.
-- `GET /club/members` KPI payload gains `submittedRequests` count (SUBMITTED
-  rows) alongside existing `pendingRequests` (REFERRED rows).
-- Frontend: `ClubPage.tsx` gains a `SITE_ADMIN` role branch — submitted
-  queue + refer modal (مدیر ارشد / رئیس هیئت مدیره picker); no approve/reject.
+- `GET /club/members` KPI payload includes `submittedRequests` (SUBMITTED)
+  alongside `pendingRequests` (REFERRED). For `SITE_ADMIN` only, each
+  member row also includes decrypted `nationalId` (profiles + VIP Excel).
+- Frontend: `SiteAdminClubPage` (via `ClubRouter`) — dark 3-KPI layout,
+  card-request queue, member profiles, VIP-ready list + Excel download.
 
 ### پنل کاربر — نشان‌شده‌ها (`/account` → تب `saved`)
 Closes the «نشان‌شده‌ها» tab in `design-reference-v2/پنل کاربر.dc.html`:
@@ -1437,6 +1444,13 @@ request/decide pattern exactly, for a new `AgencyWebserviceRequest`.
 
 ### Agencies (staff-side review)
 
+- `GET /agencies/webservice-requests` — cross-agency queue for the
+  SITE_ADMIN «درخواست وب‌سرویس» tab (`SITE_ADMIN`, `COMMERCIAL_MANAGER`,
+  `SENIOR_MANAGER`). Optional `?status=PENDING|APPROVED|REJECTED`. Each
+  row includes `agencyId`, `agencyName`, `city`, `licenseNo` plus the
+  same request fields as the per-agency list. Must be registered
+  **before** `GET /agencies/:id/...` so `:id` does not capture
+  `webservice-requests`.
 - `GET /agencies/:id/webservice-requests` — list, same
   `AGENCY_TAB_ROLES` guard as credit requests (no per-method narrowing).
 - `PATCH /agencies/:id/webservice-requests/:reqId/decide` — body
@@ -2865,11 +2879,14 @@ this stays SITE_ADMIN-only.
 ### New (SITE_ADMIN only): `GET/POST/PATCH /careers/postings`
 - `GET /careers/postings` → all postings (active + inactive).
 - `POST /careers/postings` body `{ title, dept, city, type,
-  generalReqs, specialReqs }` → creates, `active: true` by default.
+  generalReqs, specialReqs, description?, imageFileId? }` → creates,
+  `active: true` by default. `imageFileId` from `POST /files`.
 - `PATCH /careers/postings/:id` body: any subset of the create fields
   plus `active?` (the design's per-card "غیرفعال کردن آگهی"/"فعال کردن
   آگهی" toggle folds into this same endpoint rather than a separate
-  route, since it's just one more editable field).
+  route, since it's just one more editable field) and optional
+  `description` / `imageFileId` (null clears image).
+- `GET /careers/media/:fileId` (public) streams a posting cover image.
 - Both write an audit-log entry (`AuditCategory.CONTENT`).
 
 ### New (SITE_ADMIN only): `GET /careers/applications`, `GET /careers/applications/:id`, `GET /careers/applications/:id/resume`, `PATCH /careers/applications/:id/refer`, `PATCH /careers/applications/:id/hire`, `PATCH /careers/applications/:id/reject`

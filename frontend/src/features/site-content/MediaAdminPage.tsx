@@ -27,6 +27,9 @@ import Modal from '../../components/Modal';
 import Pagination from '../../components/Pagination';
 import { usePagination } from '../../hooks/usePagination';
 import { siteMediaUrl } from '../public-site/site-content-shared';
+import { SocialIcon, socialBrandColor } from '../../components/public/SocialIcon';
+import { APP_LINK_IDS, type AppDownloadLinkEntry } from '../../types/app-links';
+import { SOCIAL_LINK_IDS, type SocialLinkEntry } from '../../types/social-links';
 import type {
   ContentBlockRow,
   DestinationRow,
@@ -91,6 +94,12 @@ export default function MediaAdminPage() {
   const [editPage, setEditPage] = useState<SitePageRow | null>(null);
   const [pageDraft, setPageDraft] = useState<Partial<Record<SiteContentFieldKey, string>>>({});
   const [savingPage, setSavingPage] = useState(false);
+  const [socialLinks, setSocialLinks] = useState<SocialLinkEntry[]>([]);
+  const [appLinks, setAppLinks] = useState<AppDownloadLinkEntry[]>([]);
+  const [supportPhone, setSupportPhone] = useState('');
+  const [supportEmail, setSupportEmail] = useState('');
+  const [supportEditing, setSupportEditing] = useState(false);
+  const [supportDraft, setSupportDraft] = useState({ phone: '', email: '' });
 
   const blockMap = useMemo(
     () => new Map((blocks ?? []).map((b) => [b.key, b])),
@@ -119,6 +128,12 @@ export default function MediaAdminPage() {
         contactOfficeHours: String(s.contactOfficeHours ?? ''),
         termsText: String(s.termsText ?? ''),
       });
+      setSocialLinks(Array.isArray(s.socialLinks) ? (s.socialLinks as SocialLinkEntry[]) : []);
+      setAppLinks(
+        Array.isArray(s.appDownloadLinks) ? (s.appDownloadLinks as AppDownloadLinkEntry[]) : [],
+      );
+      setSupportPhone(String(s.supportPhone ?? ''));
+      setSupportEmail(String(s.supportEmail ?? ''));
     } catch {
       setError('خطا در دریافت محتوای سایت.');
     }
@@ -315,7 +330,43 @@ export default function MediaAdminPage() {
     }
   }
 
+  async function patchSiteLinks(patch: Record<string, unknown>) {
+    try {
+      await updateSettings(patch);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'خطا در ذخیرهٔ لینک‌های سایت.');
+    }
+  }
+
+  async function toggleSocial(id: string) {
+    const next = socialLinks.map((l) => (l.id === id ? { ...l, enabled: !l.enabled } : l));
+    setSocialLinks(next);
+    await patchSiteLinks({ socialLinks: next });
+  }
+
+  async function saveSocialUrl(id: string, url: string) {
+    const next = socialLinks.map((l) => (l.id === id ? { ...l, url } : l));
+    setSocialLinks(next);
+    await patchSiteLinks({ socialLinks: next });
+  }
+
+  async function saveAppUrl(id: string, url: string) {
+    const next = appLinks.map((l) => (l.id === id ? { ...l, url } : l));
+    setAppLinks(next);
+    await patchSiteLinks({ appDownloadLinks: next });
+  }
+
+  async function saveSupportContact() {
+    await patchSiteLinks({
+      supportPhone: supportDraft.phone,
+      supportEmail: supportDraft.email,
+    });
+    setSupportEditing(false);
+  }
+
   const destinationsPager = usePagination(destinations ?? []);
+  const routesPager = usePagination(routes ?? []);
   const libraryPager = usePagination(library ?? []);
 
   if (error && !library) {
@@ -330,7 +381,12 @@ export default function MediaAdminPage() {
   const promo = blockMap.get('PROMO_BANNER');
 
   return (
-    <div className="flex flex-col gap-[15px] p-4 text-[#e7ecf3]" dir="rtl">
+    <div className="flex flex-col gap-[15px] px-[21px] pb-[34px] pt-[18px] text-[#e7ecf3]" dir="rtl">
+      <div>
+        <h1 className="m-0 text-[20.5px] font-black text-white">مدیریت سایت</h1>
+        <p className="mt-1 text-[11.5px] text-[#6b7b94]">مدیریت صفحات سایت و کتابخانه تصاویر</p>
+      </div>
+
       {error && (
         <p className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>
       )}
@@ -377,9 +433,11 @@ export default function MediaAdminPage() {
             <button
               type="button"
               onClick={() => void toggleAnnouncement()}
-              className={`cursor-pointer rounded-[9px] px-2.5 py-1.5 text-[11.5px] font-bold text-white ${ann?.enabled ? 'bg-[#059669]' : 'bg-[#6b7280]'}`}
+              className={`cursor-pointer rounded-[9px] px-2.5 py-1.5 text-[11.5px] font-bold text-white ${
+                ann?.enabled ? 'bg-[#dc2626]' : 'bg-[#059669]'
+              }`}
             >
-              {ann?.enabled ? 'فعال' : 'غیرفعال'}
+              {ann?.enabled ? 'غیرفعال کردن' : 'فعال کردن'}
             </button>
             <button
               type="button"
@@ -504,7 +562,7 @@ export default function MediaAdminPage() {
           </button>
         </div>
         <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-          {routes.map((r) => (
+          {routesPager.pageItems.map((r) => (
             <div key={r.id} className="flex items-center gap-2.5 rounded-[11px] border border-[#28344c] px-3 py-2.5">
               <span className="flex h-[34px] w-[34px] flex-none items-center justify-center rounded-[9px] bg-[#18223a] text-accent">
                 ✈
@@ -526,6 +584,182 @@ export default function MediaAdminPage() {
             </div>
           ))}
         </div>
+        <Pagination
+          page={routesPager.page}
+          totalPages={routesPager.totalPages}
+          onChange={routesPager.setPage}
+          variant="dark"
+        />
+      </div>
+
+      {/* App download + social */}
+      <div className="grid grid-cols-1 gap-[15px] lg:grid-cols-2">
+        <div className={cardClass()}>
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h3 className="m-0 text-[14.5px] font-extrabold text-white">لینک دانلود اپلیکیشن</h3>
+              <p className="mt-0.5 text-[11px] text-[#6b7b94]">فروشگاه‌های اپ در فوتر سایت</p>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2.5">
+            {APP_LINK_IDS.map((id) => {
+              const entry = appLinks.find((l) => l.id === id) ?? {
+                id,
+                name: id,
+                url: '',
+              };
+              return (
+                <div
+                  key={id}
+                  className="flex items-center gap-2 rounded-[11px] border border-[#28344c] bg-[#18223a] px-3 py-2.5"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[12px] font-bold text-[#e7ecf3]">{entry.name}</div>
+                    <input
+                      dir="ltr"
+                      aria-label={`آدرس ${entry.name}`}
+                      defaultValue={entry.url}
+                      onBlur={(e) => {
+                        if (e.target.value !== entry.url) void saveAppUrl(id, e.target.value);
+                      }}
+                      placeholder="https://…"
+                      className="font-num mt-1 w-full rounded-md border border-[#28344c] bg-[#0f1623] px-2 py-1 text-[11px] text-[#9fb0c7] outline-none focus:border-[#3b82f6]"
+                    />
+                  </div>
+                  <span className="text-[11px] font-bold text-[#60a5fa]">ویرایش</span>
+                </div>
+              );
+            })}
+            {appLinks.length === 0 && (
+              <p className="text-[11px] text-[#6b7b94]">لینکی تعریف نشده — از seed یا تنظیمات قبلی بارگذاری شود.</p>
+            )}
+          </div>
+        </div>
+
+        <div className={cardClass()}>
+          <div className="mb-4">
+            <h3 className="m-0 text-[14.5px] font-extrabold text-white">شبکه‌های اجتماعی</h3>
+            <p className="mt-0.5 text-[11px] text-[#6b7b94]">لینک‌های فوتر با امکان فعال/غیرفعال</p>
+          </div>
+          <div className="flex flex-col gap-2.5">
+            {SOCIAL_LINK_IDS.map((id) => {
+              const entry = socialLinks.find((l) => l.id === id);
+              if (!entry) return null;
+              return (
+                <div
+                  key={id}
+                  className="flex items-center gap-2.5 rounded-[11px] border border-[#28344c] bg-[#18223a] px-3 py-2.5"
+                >
+                  <span
+                    className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-[#0f1623]"
+                    style={{ color: socialBrandColor(id) }}
+                  >
+                    <SocialIcon id={id} size={18} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[12px] font-bold text-[#e7ecf3]">{entry.name}</div>
+                    <input
+                      dir="ltr"
+                      aria-label={`آدرس ${entry.name}`}
+                      defaultValue={entry.url}
+                      onBlur={(e) => {
+                        if (e.target.value !== entry.url) void saveSocialUrl(id, e.target.value);
+                      }}
+                      className="font-num mt-1 w-full rounded-md border border-[#28344c] bg-[#0f1623] px-2 py-1 text-[11px] text-[#9fb0c7] outline-none focus:border-[#3b82f6]"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={entry.enabled}
+                    aria-label={entry.name}
+                    onClick={() => void toggleSocial(id)}
+                    className={`relative h-6 w-11 flex-none rounded-full transition ${
+                      entry.enabled ? 'bg-[#3b82f6]' : 'bg-[#28344c]'
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${
+                        entry.enabled ? 'right-0.5' : 'right-[22px]'
+                      }`}
+                    />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Support contact */}
+      <div className={cardClass()}>
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <h3 className="m-0 text-[14.5px] font-extrabold text-white">تماس پشتیبانی</h3>
+            <p className="mt-0.5 text-[11px] text-[#6b7b94]">شماره و ایمیل نمایش‌داده‌شده در سایت</p>
+          </div>
+          {!supportEditing ? (
+            <button
+              type="button"
+              onClick={() => {
+                setSupportDraft({ phone: supportPhone, email: supportEmail });
+                setSupportEditing(true);
+              }}
+              className="text-[11.5px] font-bold text-[#60a5fa]"
+            >
+              ویرایش
+            </button>
+          ) : (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setSupportEditing(false)}
+                className="text-[11.5px] font-bold text-[#6b7b94]"
+              >
+                انصراف
+              </button>
+              <button
+                type="button"
+                onClick={() => void saveSupportContact()}
+                className="text-[11.5px] font-bold text-[#60a5fa]"
+              >
+                ذخیره
+              </button>
+            </div>
+          )}
+        </div>
+        {supportEditing ? (
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <input
+              value={supportDraft.phone}
+              onChange={(e) => setSupportDraft((d) => ({ ...d, phone: e.target.value }))}
+              placeholder="تلفن"
+              className="h-10 rounded-[11px] border border-[#28344c] bg-[#0f1623] px-3 text-xs text-[#e7ecf3] outline-none focus:border-[#3b82f6]"
+            />
+            <input
+              dir="ltr"
+              value={supportDraft.email}
+              onChange={(e) => setSupportDraft((d) => ({ ...d, email: e.target.value }))}
+              placeholder="ایمیل"
+              className="h-10 rounded-[11px] border border-[#28344c] bg-[#0f1623] px-3 text-xs text-[#e7ecf3] outline-none focus:border-[#3b82f6]"
+            />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="rounded-[11px] border border-[#28344c] bg-[#18223a] px-3 py-2.5">
+              <div className="text-[10px] text-[#6b7b94]">تلفن</div>
+              <div className="font-num mt-0.5 text-[13px] font-bold text-[#e7ecf3]">
+                {supportPhone || '—'}
+              </div>
+            </div>
+            <div className="rounded-[11px] border border-[#28344c] bg-[#18223a] px-3 py-2.5">
+              <div className="text-[10px] text-[#6b7b94]">ایمیل</div>
+              <div className="ltr mt-0.5 text-[13px] font-bold text-[#e7ecf3]">
+                {supportEmail || '—'}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Static site pages */}
@@ -578,7 +812,7 @@ export default function MediaAdminPage() {
             + افزودن تصویر
           </button>
         </div>
-        <p className="mb-4 text-[11.5px] text-[#6b7b94]">مدیریت تصاویر مورد استفاده در سایت</p>
+        <p className="mb-4 text-[11.5px] text-[#6b7b94]">مدیریت و ساخت تصاویر مورد استفاده در سایت و بلاگ</p>
         {uploadOpen && (
           <label className="mb-4 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-[11px] border border-dashed border-[#2a3a55] bg-[#18223a] p-4 text-center">
             <span className="text-[11.5px] font-semibold text-[#cdd6e3]">

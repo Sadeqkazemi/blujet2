@@ -1,11 +1,14 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 import RefundsPage from './RefundsPage';
 import * as refundsApi from '../../api/refunds';
 import * as staffApi from '../../api/cartable';
 import * as authApi from '../../api/auth';
+import * as useAuthModule from '../../hooks/useAuth';
+import { mockAuthUserWithRole } from '../../test/mockAuthUser';
 import type { RefundDetail, RefundListRow, RefundsResult } from '../../types/refunds';
 import type { StaffDirectoryEntry } from '../../types/cartable';
+import type { Role } from '../../types/auth';
 
 function row(overrides: Partial<RefundListRow>): RefundListRow {
   return {
@@ -67,7 +70,19 @@ const DETAIL: RefundDetail = {
 const STAFF: StaffDirectoryEntry[] = [
   { id: 's1', fullName: 'حمید توکلی', role: 'EMPLOYEE', roleLabelFa: 'کارمند' },
   { id: 's2', fullName: 'علی احمدی', role: 'COMMERCIAL_MANAGER', roleLabelFa: 'مدیر بازرگانی' },
+  { id: 's3', fullName: 'مریم مالی', role: 'FINANCE_MANAGER', roleLabelFa: 'مدیر مالی' },
 ];
+
+function mockRole(role: Role = 'FINANCE_MANAGER') {
+  vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+    status: 'authenticated',
+    user: mockAuthUserWithRole(role),
+    requestLogin: vi.fn(),
+    confirmTwoFactor: vi.fn(),
+    agencyLogin: vi.fn(),
+    signOut: vi.fn(),
+  });
+}
 
 function mockList(data: RefundsResult = LIST) {
   vi.spyOn(refundsApi, 'fetchRefunds').mockResolvedValue(data);
@@ -75,6 +90,10 @@ function mockList(data: RefundsResult = LIST) {
 }
 
 describe('RefundsPage', () => {
+  beforeEach(() => {
+    mockRole('FINANCE_MANAGER');
+  });
+
   it('renders KPI cards, Persian-digit amounts and a status pill + action per row state', async () => {
     mockList();
     render(<RefundsPage />);
@@ -123,8 +142,8 @@ describe('RefundsPage', () => {
     expect(await screen.findByText('درخواستی با این عبارت یافت نشد.')).toBeInTheDocument();
   });
 
-  it('paginates at 5 requests per page', async () => {
-    const many: RefundListRow[] = Array.from({ length: 6 }, (_, i) =>
+  it('paginates at 10 requests per page', async () => {
+    const many: RefundListRow[] = Array.from({ length: 12 }, (_, i) =>
       row({
         id: `r${i + 1}`,
         bookingId: `b${i + 1}`,
@@ -142,20 +161,20 @@ describe('RefundsPage', () => {
     );
     mockList({
       requests: many,
-      kpis: { payoutQueue: 3, paid: 0, awaitingAdmin: 3 },
+      kpis: { payoutQueue: 6, paid: 0, awaitingAdmin: 6 },
     });
 
     const { default: userEvent } = await import('@testing-library/user-event');
     render(<RefundsPage />);
 
-    expect(await screen.findByText('۶ درخواست')).toBeInTheDocument();
+    expect(await screen.findByText('۱۲ درخواست')).toBeInTheDocument();
     expect(screen.getByText('مسافر 1')).toBeInTheDocument();
-    expect(screen.getByText('مسافر 5')).toBeInTheDocument();
-    expect(screen.queryByText('مسافر 6')).not.toBeInTheDocument();
+    expect(screen.getByText('مسافر 10')).toBeInTheDocument();
+    expect(screen.queryByText('مسافر 11')).not.toBeInTheDocument();
 
     const pager = screen.getByTestId('pagination');
     await userEvent.click(within(pager).getByRole('button', { name: 'بعدی' }));
-    expect(await screen.findByText('مسافر 6')).toBeInTheDocument();
+    expect(await screen.findByText('مسافر 11')).toBeInTheDocument();
     expect(screen.queryByText('مسافر 1')).not.toBeInTheDocument();
   });
 
@@ -249,5 +268,35 @@ describe('RefundsPage', () => {
     expect(
       within(dialog).queryByRole('button', { name: 'تأیید، واریز به شبا و بستن پرونده' }),
     ).not.toBeInTheDocument();
+  });
+
+  it('SITE_ADMIN sees admin KPIs, search, view-and-refer rows (no pay button)', async () => {
+    mockRole('SITE_ADMIN');
+    mockList();
+    render(<RefundsPage />);
+
+    expect(await screen.findByText('۱ در انتظار بررسی')).toBeInTheDocument();
+    expect(screen.getByText('ارجاع‌شده به مالی')).toBeInTheDocument();
+    expect(screen.getByText('درخواست‌های استرداد بلیط')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/جستجو بر اساس نام مسافر/)).toBeInTheDocument();
+    expect(screen.getAllByText('مشاهده و ارجاع ←').length).toBe(3);
+    expect(screen.queryByRole('button', { name: 'تأیید و پرداخت' })).not.toBeInTheDocument();
+    expect(screen.getAllByText('تهران ← مشهد').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('در انتظار بررسی').length).toBeGreaterThan(0);
+    expect(screen.getByText('ارجاع به مالی')).toBeInTheDocument();
+  });
+
+  it('SITE_ADMIN search filters the refund list', async () => {
+    mockRole('SITE_ADMIN');
+    mockList();
+    const { default: userEvent } = await import('@testing-library/user-event');
+    render(<RefundsPage />);
+
+    await screen.findByText('رضا کریمی');
+    const search = screen.getByPlaceholderText(/جستجو بر اساس نام مسافر/);
+    await userEvent.type(search, 'سارا');
+    expect(screen.getByText('۱ درخواست')).toBeInTheDocument();
+    expect(screen.getByText('سارا محمدی')).toBeInTheDocument();
+    expect(screen.queryByText('رضا کریمی')).not.toBeInTheDocument();
   });
 });

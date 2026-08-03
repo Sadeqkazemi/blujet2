@@ -186,6 +186,7 @@ describe('ClubPage', () => {
     const { default: userEvent } = await import('@testing-library/user-event');
     renderPage();
 
+    // Direct ClubPage still supports SITE_ADMIN refer flow (ClubRouter uses SiteAdminClubPage).
     expect(await screen.findByText('درخواست‌های در انتظار ارجاع')).toBeInTheDocument();
     expect(screen.getByText('ارجاع‌شده به مدیران')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'تعریف مشتری VIP جدید' })).not.toBeInTheDocument();
