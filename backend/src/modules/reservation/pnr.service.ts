@@ -4,9 +4,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import * as crypto from 'node:crypto';
 import {
+  DataSource,
   EntityManager,
   In,
   IsNull,
@@ -14,7 +15,6 @@ import {
   MoreThanOrEqual,
   Repository,
 } from 'typeorm';
-import { TypeORMService } from '../../typeorm/typeorm.service';
 import { Booking } from '../../database/entities/booking.entity';
 import { Passenger } from '../../database/entities/passenger.entity';
 import { FlightInstance } from '../../database/entities/flight-instance.entity';
@@ -80,7 +80,8 @@ export class PnrService {
     private readonly pricingRepo: Repository<FarePricingProposal>,
     @InjectRepository(LedgerEntry)
     private readonly ledgerRepo: Repository<LedgerEntry>,
-    private readonly typeorm: TypeORMService,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
     private readonly audit: AuditService,
     private readonly searchService: SearchService,
   ) {}
@@ -145,7 +146,7 @@ export class PnrService {
   }
 
   async list(query: ListPnrQueryDto) {
-    await materializeFlownBookings(this.typeorm);
+    await materializeFlownBookings(this.dataSource);
     const qb = this.bookingRepo
       .createQueryBuilder('b')
       .leftJoinAndSelect('b.flightInstance', 'flightInstance')
@@ -207,7 +208,7 @@ export class PnrService {
   }
 
   async detail(pnr: string) {
-    await materializeFlownBookings(this.typeorm);
+    await materializeFlownBookings(this.dataSource);
     const b = await this.getBookingOrThrow(pnr);
     const passenger = b.passengers[0];
     return {
@@ -322,7 +323,7 @@ export class PnrService {
    * still handled correctly since we flip it first. */
   async markNoShow(actor: AuthenticatedUser, pnr: string) {
     const booking = await this.getBookingOrThrow(pnr);
-    await materializeFlownBookings(this.typeorm);
+    await materializeFlownBookings(this.dataSource);
     const refreshed = await this.getBookingOrThrow(pnr);
 
     if (refreshed.flightInstance.status !== 'DEPARTED') {

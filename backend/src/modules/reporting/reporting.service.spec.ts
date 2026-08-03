@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
+import type { DataSource } from 'typeorm';
 import { ReportingService } from './reporting.service';
-import { TypeORMService } from '../../typeorm/typeorm.service';
 import { AgenciesService } from '../agencies/agencies.service';
 
 describe('ReportingService (unit)', () => {
@@ -8,7 +8,7 @@ describe('ReportingService (unit)', () => {
 
   beforeEach(() => {
     service = new ReportingService(
-      {} as TypeORMService,
+      {} as DataSource,
       {} as AgenciesService,
       {} as never,
       {} as never,

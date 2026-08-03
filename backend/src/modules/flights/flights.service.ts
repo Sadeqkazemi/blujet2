@@ -6,9 +6,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { In, IsNull, MoreThan, Not, Repository } from 'typeorm';
-import { TypeORMService } from '../../typeorm/typeorm.service';
+import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
+import { DataSource, In, IsNull, MoreThan, Not, Repository } from 'typeorm';
 import { RRule } from 'rrule';
 import { FlightInstance } from '../../database/entities/flight-instance.entity';
 import { Flight } from '../../database/entities/flight.entity';
@@ -54,7 +53,8 @@ const SOLD_STATUSES = ['PAID', 'TICKETED'] as const;
 @Injectable()
 export class FlightsService {
   constructor(
-    private readonly typeorm: TypeORMService,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
     @InjectRepository(FlightInstance)
     private readonly instanceRepo: Repository<FlightInstance>,
     @InjectRepository(Flight)
@@ -187,7 +187,7 @@ export class FlightsService {
   /** ⚑ Real per-channel figures from bookings — no fabricated margins.
    * سود/ضرر compare the achieved average rate to the base rate. */
   private async completedReport() {
-    await materializeDepartedInstances(this.typeorm);
+    await materializeDepartedInstances(this.dataSource);
     const departed = await this.instanceRepo
       .createQueryBuilder('fi')
       .leftJoinAndSelect('fi.flight', 'flight')

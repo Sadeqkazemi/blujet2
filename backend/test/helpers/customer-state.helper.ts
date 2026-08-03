@@ -1,13 +1,18 @@
 import type { TypeORMService } from '../../src/typeorm/typeorm.service';
+import { normalizeIranPhone } from '../../src/common/normalize-iran-phone';
 
 /** Removes user-scoped rows left over from prior e2e runs so suites that
- * reuse fixed OTP phones stay deterministic on a non-truncated test DB. */
+ * reuse fixed OTP phones stay deterministic on a non-truncated test DB.
+ * The real OTP login flow (auth.service.ts) normalizes phones to E.164
+ * before storing them, so the lookup must normalize too — matching on
+ * the raw local-form strings never found the rows, silently no-opping. */
 export async function resetCustomerPhones(
   typeorm: TypeORMService,
   phones: string[],
 ) {
+  const normalized = phones.map(normalizeIranPhone);
   const users = await typeorm.user.findMany({
-    where: { phone: { in: phones } },
+    where: { phone: { in: normalized } },
     select: { id: true },
   });
   const userIds = users.map((u) => u.id);
