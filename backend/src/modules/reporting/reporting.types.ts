@@ -55,6 +55,27 @@ export interface CompletedFlightsSummary {
   unsoldSeats: number;
 }
 
+/** One departed instance for the analytic مالی «شماره پرواز» picker. */
+export interface FlightSalesRow {
+  flightInstanceId: string;
+  flightNo: string;
+  originCode: string;
+  destCode: string;
+  originCityFa: string;
+  destCityFa: string;
+  departureAt: string;
+  systemIrr: Irr;
+  charterIrr: Irr;
+  agencyIrr: Irr;
+  totalIrr: Irr;
+  capacity: number;
+  soldSeats: number;
+}
+
+export interface FlightSalesResult {
+  rows: FlightSalesRow[];
+}
+
 export interface CommercialOverview {
   activeAgencies: number;
   passengersThisMonth: number;

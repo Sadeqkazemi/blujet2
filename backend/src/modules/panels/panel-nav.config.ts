@@ -38,47 +38,48 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'kyc', labelFa: 'احراز هویت مشتریان', implemented: true },
     { key: 'settings', labelFa: 'تنظیمات سامانه', implemented: true },
   ],
+  // Order matches design-reference-v2/پنل مدیر عامل.dc.html sidebar
+  // (settings is display:none there). clubrules stays on COMMERCIAL_MANAGER;
+  // flightops stays on SITE_ADMIN. `reservation` (label هواپیما) is in
+  // roleDefs.ceo.access and the approved CEO screenshots — same key/label
+  // as BOARD_CHAIR.
   CEO: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
-    { key: 'flightops', labelFa: 'پروازها', implemented: true },
     { key: 'admins', labelFa: 'مدیران', implemented: true },
     { key: 'finance', labelFa: 'مالی', implemented: true },
     { key: 'cartable', labelFa: 'کارتابل', implemented: true },
     { key: 'club', labelFa: 'مشتریان VIP', implemented: true },
+    { key: 'survey', labelFa: 'نظرسنجی مسافران', implemented: true },
     { key: 'mgrreports', labelFa: 'گزارش مدیران', implemented: true },
+    { key: 'reservation', labelFa: 'هواپیما', implemented: true },
     { key: 'pricing', labelFa: 'تعیین قیمت بلیط', implemented: true },
-    { key: 'clubrules', labelFa: 'قوانین باشگاه مشتریان', implemented: true },
     { key: 'panels', labelFa: 'دسترسی به پنل‌ها', implemented: true },
     { key: 'security', labelFa: 'امنیت و رمز عبور', implemented: true },
     { key: 'logs', labelFa: 'لاگ و رویدادها', implemented: true },
-    { key: 'survey', labelFa: 'نظرسنجی مسافران', implemented: true },
   ],
   BOARD_CHAIR: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
     { key: 'admins', labelFa: 'مدیران', implemented: true },
     { key: 'finance', labelFa: 'مالی', implemented: true },
     { key: 'cartable', labelFa: 'کارتابل', implemented: true },
-    { key: 'settings', labelFa: 'تنظیمات سامانه', implemented: true },
     { key: 'club', labelFa: 'مشتریان VIP', implemented: true },
     { key: 'reservation', labelFa: 'هواپیما', implemented: true },
     { key: 'mgrreports', labelFa: 'گزارش مدیران', implemented: true },
     { key: 'survey', labelFa: 'نظرسنجی مسافران', implemented: true },
   ],
+  // Senior Manager sidebar — mirrors CEO executive tabs for shared surfaces;
+  // `reservation` labeled هواپیما like CEO (content: ExecReservationView).
   SENIOR_MANAGER: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
-    { key: 'agencies', labelFa: 'آژانس‌ها', implemented: true },
-    { key: 'flights', labelFa: 'مدیریت پروازها', implemented: true },
     { key: 'admins', labelFa: 'مدیران و ادمین‌ها', implemented: true },
-    { key: 'reports', labelFa: 'گزارش مسافران', implemented: true },
     { key: 'finance', labelFa: 'مالی', implemented: true },
     { key: 'cartable', labelFa: 'کارتابل', implemented: true },
-    { key: 'referrals', labelFa: 'ارجاعات', implemented: true },
     { key: 'mgrreports', labelFa: 'گزارش مدیران', implemented: true },
     { key: 'vip', labelFa: 'مشتریان VIP', implemented: true },
+    { key: 'survey', labelFa: 'نظرسنجی مسافران', implemented: true },
+    { key: 'reservation', labelFa: 'هواپیما', implemented: true },
     { key: 'panels', labelFa: 'دسترسی به پنل‌ها', implemented: true },
     { key: 'security', labelFa: 'امنیت و رمز عبور', implemented: true },
-    { key: 'reservation', labelFa: 'سامانه رزرواسیون', implemented: true },
-    { key: 'survey', labelFa: 'نظرسنجی مسافران', implemented: true },
   ],
   FINANCE_MANAGER: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },

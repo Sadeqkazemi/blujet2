@@ -325,8 +325,10 @@ hardcodes `resRole:"super"` for the IT panel's mount, and CEO/Chair's own
 access to the same seat map, matching the design's confirmed behavior.
 Reachable nav entries (per `panel-nav.config.ts`, already confirmed in
 Phase 1's extraction): only `BOARD_CHAIR`, `SENIOR_MANAGER`, `IT_MANAGER`
-get a سامانه رزرواسیون/هواپیما sidebar tab — CEO's mount point is coded but
-unreachable from its sidebar, so CEO's `canLock` grant is API-level only
+get a سامانه رزرواسیون/هواپیما sidebar tab — CEO also has `reservation`
+(label **هواپیما**) in `PANEL_NAV`, matching `roleDefs.ceo.access` and the
+approved CEO design screenshots; CEO's `canLock` grant is therefore
+reachable from the sidebar (same as BOARD_CHAIR), not API-level only
 (consistent with the design's own copy naming CEO as an authorized locker)
 and has no UI entry point yet.
 

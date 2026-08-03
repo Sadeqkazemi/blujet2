@@ -102,7 +102,7 @@ describe('Phase 13 Part E — PNR lifecycle + payment reconciliation', () => {
 
   it('GET /flights/overview materializes a past-departure SCHEDULED instance to DEPARTED', async () => {
     const instance = await makeInstance(-2);
-    const { accessToken } = await loginAs(app, 'senior.rahimi');
+    const { accessToken } = await loginAs(app, 'senior');
 
     const res = await request(app.getHttpServer())
       .get('/flights/overview')
@@ -256,7 +256,7 @@ describe('Phase 13 Part E — PNR lifecycle + payment reconciliation', () => {
     expect(reconciliation).not.toBeNull();
     expect(reconciliation!.status).toBe('PENDING');
 
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const queue = await request(app.getHttpServer())
       .get('/reconciliation')
       .set(auth(finance.accessToken!));
@@ -267,7 +267,7 @@ describe('Phase 13 Part E — PNR lifecycle + payment reconciliation', () => {
     expect(entry).toBeDefined();
     expect(entry.bookingStatus).toBe('HELD');
 
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const forbidden = await request(app.getHttpServer())
       .get('/reconciliation')
       .set(auth(senior.accessToken!));

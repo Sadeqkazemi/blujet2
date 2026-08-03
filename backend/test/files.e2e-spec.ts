@@ -25,7 +25,7 @@ describe('Files (e2e)', () => {
   });
 
   it('accepts a PNG upload and returns an id; rejects disallowed types and oversize files', async () => {
-    const { accessToken } = await loginAs(app, 'senior.rahimi');
+    const { accessToken } = await loginAs(app, 'senior');
 
     const ok = await request(app.getHttpServer())
       .post('/files')
@@ -48,7 +48,7 @@ describe('Files (e2e)', () => {
   });
 
   it('preserves a Persian filename correctly instead of mojibake (multer/busboy decode multipart headers as latin1 by default)', async () => {
-    const { accessToken } = await loginAs(app, 'senior.rahimi');
+    const { accessToken } = await loginAs(app, 'senior');
     const res = await request(app.getHttpServer())
       .post('/files')
       .set('Authorization', `Bearer ${accessToken}`)
@@ -61,7 +61,7 @@ describe('Files (e2e)', () => {
   });
 
   it('owner can read; an unrelated exec gets 403; a referral recipient can read an attached file', async () => {
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const uploaded = await request(app.getHttpServer())
       .post('/files')
       .set('Authorization', `Bearer ${senior.accessToken}`)
@@ -85,7 +85,7 @@ describe('Files (e2e)', () => {
 
     // Attach it to a referral addressed to Finance — Finance can now read it.
     const finance = await prisma.user.findUniqueOrThrow({
-      where: { username: 'finance.karimi' },
+      where: { username: 'finance' },
     });
     await request(app.getHttpServer())
       .post('/referrals')
@@ -97,7 +97,7 @@ describe('Files (e2e)', () => {
         attachmentIds: [fileId],
       });
 
-    const financeLogin = await loginAs(app, 'finance.karimi');
+    const financeLogin = await loginAs(app, 'finance');
     const asRecipient = await request(app.getHttpServer())
       .get(`/files/${fileId}`)
       .set('Authorization', `Bearer ${financeLogin.accessToken}`);
@@ -105,7 +105,7 @@ describe('Files (e2e)', () => {
   });
 
   it('attaching a file you do not own to a referral → 400', async () => {
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const uploaded = await request(app.getHttpServer())
       .post('/files')
       .set('Authorization', `Bearer ${senior.accessToken}`)

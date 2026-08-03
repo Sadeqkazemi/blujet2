@@ -27,7 +27,7 @@ describe('Auth (e2e)', () => {
   it('rejects a wrong password with 401 INVALID credentials, no challenge issued', async () => {
     const res = await request(app.getHttpServer())
       .post('/auth/staff/login')
-      .send({ username: 'finance.karimi', password: 'wrong-password' });
+      .send({ username: 'finance', password: 'wrong-password' });
 
     expect(res.status).toBe(401);
     expect(res.body.success).toBe(false);
@@ -59,7 +59,7 @@ describe('Auth (e2e)', () => {
   it('issues a 2FA challenge on correct password, no token yet', async () => {
     const res = await request(app.getHttpServer())
       .post('/auth/staff/login')
-      .send({ username: 'finance.karimi', password: 'Blujet@1404' });
+      .send({ username: 'finance', password: 'Blujet@1404' });
 
     expect(res.status).toBe(200);
     expect(res.body.data.challengeId).toBeDefined();
@@ -69,7 +69,7 @@ describe('Auth (e2e)', () => {
   it('rejects a wrong 2FA code and increments attempts, without consuming the challenge', async () => {
     const loginRes = await request(app.getHttpServer())
       .post('/auth/staff/login')
-      .send({ username: 'finance.karimi', password: 'Blujet@1404' });
+      .send({ username: 'finance', password: 'Blujet@1404' });
     const challengeId = loginRes.body.data.challengeId;
 
     const wrongRes = await request(app.getHttpServer())
@@ -89,7 +89,7 @@ describe('Auth (e2e)', () => {
   it('rejects an expired 2FA challenge', async () => {
     const loginRes = await request(app.getHttpServer())
       .post('/auth/staff/login')
-      .send({ username: 'finance.karimi', password: 'Blujet@1404' });
+      .send({ username: 'finance', password: 'Blujet@1404' });
     const challengeId = loginRes.body.data.challengeId;
 
     await prisma.twoFactorChallenge.update({
@@ -98,7 +98,7 @@ describe('Auth (e2e)', () => {
     });
 
     const user = await prisma.user.findUniqueOrThrow({
-      where: { username: 'finance.karimi' },
+      where: { username: 'finance' },
     });
     const twoFactor = app.get<MockTwoFactorProvider>(TWO_FACTOR_PROVIDER);
     const code = twoFactor.getLastCode(user.id)!;
@@ -111,7 +111,7 @@ describe('Auth (e2e)', () => {
   });
 
   it('logs in with the correct 2FA code and issues an access token + refresh cookie', async () => {
-    const { verifyRes } = await loginAs(app, 'finance.karimi');
+    const { verifyRes } = await loginAs(app, 'finance');
 
     expect(verifyRes!.status).toBe(200);
     expect(verifyRes!.body.data.accessToken).toBeDefined();
@@ -125,10 +125,10 @@ describe('Auth (e2e)', () => {
   it('a 2FA code cannot be replayed once consumed', async () => {
     const loginRes = await request(app.getHttpServer())
       .post('/auth/staff/login')
-      .send({ username: 'finance.karimi', password: 'Blujet@1404' });
+      .send({ username: 'finance', password: 'Blujet@1404' });
     const challengeId = loginRes.body.data.challengeId as string;
     const user = await prisma.user.findUniqueOrThrow({
-      where: { username: 'finance.karimi' },
+      where: { username: 'finance' },
     });
     const code = app
       .get<MockTwoFactorProvider>(TWO_FACTOR_PROVIDER)
@@ -171,7 +171,7 @@ describe('Auth (e2e)', () => {
 
   it('mustChangePassword blocks panel APIs until POST /auth/change-password clears the flag', async () => {
     const user = await prisma.user.findUniqueOrThrow({
-      where: { username: 'finance.karimi' },
+      where: { username: 'finance' },
     });
     const originalHash = user.passwordHash;
     await prisma.user.update({
@@ -179,7 +179,7 @@ describe('Auth (e2e)', () => {
       data: { mustChangePassword: true },
     });
 
-    const { accessToken, verifyRes } = await loginAs(app, 'finance.karimi');
+    const { accessToken, verifyRes } = await loginAs(app, 'finance');
     expect(verifyRes!.body.data.user.mustChangePassword).toBe(true);
 
     const blocked = await request(app.getHttpServer())
@@ -271,7 +271,7 @@ describe('Auth (e2e)', () => {
       Array.from({ length: 8 }, () =>
         request(app.getHttpServer())
           .post('/auth/staff/login')
-          .send({ username: 'finance.karimi', password: 'wrong-password' }),
+          .send({ username: 'finance', password: 'wrong-password' }),
       ),
     );
     expect(attempts.some((r) => r.status === 429)).toBe(true);
@@ -450,10 +450,10 @@ describe('Auth (e2e)', () => {
   it('a staff 2FA challenge cannot be replayed through the customer OTP verify endpoint', async () => {
     const staffLoginRes = await request(app.getHttpServer())
       .post('/auth/staff/login')
-      .send({ username: 'finance.karimi', password: 'Blujet@1404' });
+      .send({ username: 'finance', password: 'Blujet@1404' });
     const challengeId = staffLoginRes.body.data.challengeId as string;
     const user = await prisma.user.findUniqueOrThrow({
-      where: { username: 'finance.karimi' },
+      where: { username: 'finance' },
     });
     const code = app
       .get<MockTwoFactorProvider>(TWO_FACTOR_PROVIDER)

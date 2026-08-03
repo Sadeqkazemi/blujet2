@@ -312,7 +312,7 @@ describe('Phase 27 — EMPLOYEE fl_manage/ag_settle/fn_invoices (e2e)', () => {
   });
 
   it("doesn't affect non-EMPLOYEE roles: SENIOR_MANAGER still has full flights + agencies access despite holding zero EmployeePermission rows", async () => {
-    const { accessToken } = await loginAs(app, 'senior.rahimi');
+    const { accessToken } = await loginAs(app, 'senior');
     const agency = await prisma.agencyProfile.findFirstOrThrow();
 
     const overview = await request(app.getHttpServer())

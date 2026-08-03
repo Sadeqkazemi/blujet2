@@ -26,8 +26,8 @@ import type {
 const STATUS_META: Record<Referral['status'], { label: string; className: string }> = {
   SENT: { label: 'ارسال‌شده', className: 'bg-[#f59e0b24] text-[#b45309]' },
   REVIEWING: { label: 'در حال بررسی', className: 'bg-accent/10 text-accent' },
-  REPORTED: { label: 'گزارش دریافت‌شد', className: 'bg-[#10b98124] text-[#059669]' },
-  CLOSED: { label: 'بسته‌شده', className: 'bg-surface text-muted' },
+  REPORTED: { label: 'گزارش دریافت‌شد', className: 'bg-[#34d39924] text-[#34d399]' },
+  CLOSED: { label: 'بسته‌شده', className: 'bg-panel-canvas text-panel-muted' },
 };
 
 const PRIORITY_META: Record<ReferralPriority, string> = { HIGH: 'بالا', MEDIUM: 'متوسط', LOW: 'پایین' };
@@ -147,7 +147,7 @@ export default function ReferralsPage() {
           بازگشت به فهرست ارجاعات
         </button>
         {error && <p className="rounded-lg bg-danger/10 p-3 text-sm text-danger">{error}</p>}
-        {notice && <p className="rounded-lg bg-[#10b98115] p-3 text-sm text-[#059669]">{notice}</p>}
+        {notice && <p className="rounded-lg bg-[#34d39915] p-3 text-sm text-[#34d399]">{notice}</p>}
 
         <header className="rounded-2xl bg-gradient-to-l from-navy to-navy-2 p-6 text-white">
           <div className="flex flex-wrap items-center gap-3">
@@ -166,27 +166,27 @@ export default function ReferralsPage() {
           </div>
         </header>
 
-        <section className="rounded-xl border border-border bg-white p-5">
-          <h2 className="mb-2 text-sm font-bold text-ink">شرح درخواست</h2>
-          <p className="text-xs leading-relaxed text-text-2">{detail.body}</p>
+        <section className="rounded-xl border border-panel-border bg-panel-surface p-5">
+          <h2 className="mb-2 text-sm font-bold text-panel-ink">شرح درخواست</h2>
+          <p className="text-xs leading-relaxed text-panel-muted">{detail.body}</p>
           <AttachmentList attachments={detail.attachments} variant="neutral" />
         </section>
 
-        <section className="rounded-xl border border-border bg-white p-5">
-          <h2 className="mb-3 text-sm font-bold text-ink">
+        <section className="rounded-xl border border-panel-border bg-panel-surface p-5">
+          <h2 className="mb-3 text-sm font-bold text-panel-ink">
             گزارش‌های دریافتی ({faDigits(detail.reports.length)})
           </h2>
           {detail.reports.length === 0 ? (
-            <p className="py-4 text-center text-xs text-muted">هنوز گزارشی از مدیر(ان) مقصد دریافت نشده است.</p>
+            <p className="py-4 text-center text-xs text-panel-muted">هنوز گزارشی از مدیر(ان) مقصد دریافت نشده است.</p>
           ) : (
             <ul className="space-y-3">
               {detail.reports.map((r) => (
-                <li key={r.id} className="rounded-lg bg-surface p-3">
+                <li key={r.id} className="rounded-lg bg-panel-canvas p-3">
                   <div className="flex items-center justify-between text-[11px]">
-                    <span className="font-bold text-ink">{r.from.fullName}</span>
-                    <span className="font-num text-muted-2">{formatJalaliDate(r.createdAt)}</span>
+                    <span className="font-bold text-panel-ink">{r.from.fullName}</span>
+                    <span className="font-num text-panel-muted-2">{formatJalaliDate(r.createdAt)}</span>
                   </div>
-                  <p className="mt-1.5 text-xs leading-relaxed text-text-2">{r.body}</p>
+                  <p className="mt-1.5 text-xs leading-relaxed text-panel-muted">{r.body}</p>
                   <AttachmentList attachments={r.attachments} variant="success" />
                 </li>
               ))}
@@ -194,13 +194,13 @@ export default function ReferralsPage() {
           )}
         </section>
 
-        <section className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-white p-5">
-          <span className="text-xs text-muted">اقدام نسبت به این ارجاع:</span>
+        <section className="flex flex-wrap items-center gap-3 rounded-xl border border-panel-border bg-panel-surface p-5">
+          <span className="text-xs text-panel-muted">اقدام نسبت به این ارجاع:</span>
           {detail.status === 'REPORTED' ? (
             <>
               <button
                 onClick={() => void onSenderAction('close')}
-                className="rounded-lg bg-[#059669] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#047857]"
+                className="rounded-lg bg-[#34d399] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#2bb583]"
               >
                 تأیید دریافت گزارش و بستن
               </button>
@@ -212,7 +212,7 @@ export default function ReferralsPage() {
               </button>
             </>
           ) : detail.status === 'CLOSED' ? (
-            <span className="text-xs text-muted">این ارجاع پس از تأیید گزارش بسته شده است.</span>
+            <span className="text-xs text-panel-muted">این ارجاع پس از تأیید گزارش بسته شده است.</span>
           ) : (
             <button
               onClick={() => void onSenderAction('remind')}
@@ -230,8 +230,8 @@ export default function ReferralsPage() {
     <div className="p-8">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-black text-ink">ارجاعات من به مدیران</h1>
-          <p className="mt-1 text-sm text-muted">
+          <h1 className="text-xl font-black text-panel-ink">ارجاعات من به مدیران</h1>
+          <p className="mt-1 text-sm text-panel-muted">
             با ایجاد ارجاع، یک درخواست مشخص به یک یا چند مدیر ارسال می‌شود؛ سپس می‌توانید گزارش دریافتی هر
             مدیر را بررسی کنید.
           </p>
@@ -249,7 +249,7 @@ export default function ReferralsPage() {
       </div>
 
       {error && <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">{error}</p>}
-      {notice && <p className="mb-4 rounded-lg bg-[#10b98115] p-3 text-sm text-[#059669]">{notice}</p>}
+      {notice && <p className="mb-4 rounded-lg bg-[#34d39915] p-3 text-sm text-[#34d399]">{notice}</p>}
 
       {kpis && (
         <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
@@ -261,23 +261,23 @@ export default function ReferralsPage() {
               ['بسته‌شده', kpis.closed],
             ] as [string, number][]
           ).map(([label, value]) => (
-            <div key={label} className="rounded-xl border border-border bg-white p-4">
-              <div className="text-[11px] text-muted">{label}</div>
-              <div className="font-num mt-1 text-lg font-black text-ink">{faDigits(value)}</div>
+            <div key={label} className="rounded-xl border border-panel-border bg-panel-surface p-4">
+              <div className="text-[11px] text-panel-muted">{label}</div>
+              <div className="font-num mt-1 text-lg font-black text-panel-ink">{faDigits(value)}</div>
             </div>
           ))}
         </div>
       )}
 
       {loading ? (
-        <p className="py-10 text-center text-sm text-muted">در حال بارگذاری…</p>
+        <p className="py-10 text-center text-sm text-panel-muted">در حال بارگذاری…</p>
       ) : (result?.referrals.length ?? 0) === 0 ? (
-        <p className="py-10 text-center text-sm text-muted">هنوز ارجاعی ثبت نشده است.</p>
+        <p className="py-10 text-center text-sm text-panel-muted">هنوز ارجاعی ثبت نشده است.</p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-border bg-white">
+        <div className="overflow-x-auto rounded-xl border border-panel-border bg-panel-surface">
           <table className="w-full text-right text-xs">
             <thead>
-              <tr className="border-b border-border text-[10px] text-muted">
+              <tr className="border-b border-panel-border text-[10px] text-panel-muted">
                 <th className="p-3 font-bold">موضوع ارجاع</th>
                 <th className="p-3 font-bold">مدیر(ان) مقصد</th>
                 <th className="p-3 font-bold">اولویت</th>
@@ -292,11 +292,11 @@ export default function ReferralsPage() {
                   <tr
                     key={r.id}
                     onClick={() => void openDetail(r.id)}
-                    className="cursor-pointer border-b border-border/60 transition hover:bg-surface-2/50"
+                    className="cursor-pointer border-b border-panel-border/60 transition hover:bg-panel-surface-2/50"
                   >
                     <td className="p-3">
-                      <div className="font-bold text-ink">{r.title}</div>
-                      <div className="font-num mt-0.5 text-[10px] text-muted">
+                      <div className="font-bold text-panel-ink">{r.title}</div>
+                      <div className="font-num mt-0.5 text-[10px] text-panel-muted">
                         ایجاد: {formatJalaliDate(r.createdAt)}
                       </div>
                     </td>
@@ -318,7 +318,7 @@ export default function ReferralsPage() {
 
       {createOpen && (
         <Modal title="ایجاد ارجاع جدید" onClose={() => setCreateOpen(false)}>
-          <label className="mb-1 block text-xs font-bold text-ink" htmlFor="ref-title">
+          <label className="mb-1 block text-xs font-bold text-panel-ink" htmlFor="ref-title">
             موضوع ارجاع *
           </label>
           <input
@@ -326,17 +326,17 @@ export default function ReferralsPage() {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="مثلاً: درخواست گزارش فروش سه‌ماهه"
-            className="w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent"
+            className="w-full rounded-lg border border-panel-border-2 bg-panel-canvas p-3 text-xs text-panel-ink outline-none transition focus:border-accent"
           />
 
-          <div className="mb-1 mt-3 text-xs font-bold text-ink">مدیر(ان) مقصد *</div>
+          <div className="mb-1 mt-3 text-xs font-bold text-panel-ink">مدیر(ان) مقصد *</div>
           <div className="flex flex-wrap gap-1.5">
             {staff.map((s) => (
               <button
                 key={s.id}
                 onClick={() => toggleRecipient(s.id)}
                 className={`rounded-lg px-3 py-1.5 text-[11px] font-bold transition ${
-                  recipients.includes(s.id) ? 'bg-accent text-white' : 'bg-surface text-text-2 hover:bg-surface-2'
+                  recipients.includes(s.id) ? 'bg-accent text-white' : 'bg-panel-canvas text-panel-muted hover:bg-panel-surface-2'
                 }`}
               >
                 {s.fullName} — {s.roleLabelFa}
@@ -344,7 +344,7 @@ export default function ReferralsPage() {
             ))}
           </div>
 
-          <label className="mb-1 mt-3 block text-xs font-bold text-ink" htmlFor="ref-body">
+          <label className="mb-1 mt-3 block text-xs font-bold text-panel-ink" htmlFor="ref-body">
             شرح درخواست *
           </label>
           <textarea
@@ -353,19 +353,19 @@ export default function ReferralsPage() {
             onChange={(e) => setBody(e.target.value)}
             placeholder="مشخص کنید چه گزارش یا اقدامی از مدیر(ان) انتظار دارید…"
             rows={3}
-            className="w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent"
+            className="w-full rounded-lg border border-panel-border-2 bg-panel-canvas p-3 text-xs text-panel-ink outline-none transition focus:border-accent"
           />
 
           <div className="mt-3 grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-bold text-ink" htmlFor="ref-priority">
+              <label className="mb-1 block text-xs font-bold text-panel-ink" htmlFor="ref-priority">
                 اولویت
               </label>
               <select
                 id="ref-priority"
                 value={priority}
                 onChange={(e) => setPriority(e.target.value as ReferralPriority)}
-                className="w-full rounded-lg border border-border bg-white p-3 text-xs outline-none transition focus:border-accent"
+                className="w-full rounded-lg border border-panel-border-2 bg-panel-canvas p-3 text-xs text-panel-ink outline-none transition focus:border-accent"
               >
                 <option value="HIGH">بالا</option>
                 <option value="MEDIUM">متوسط</option>
@@ -373,7 +373,7 @@ export default function ReferralsPage() {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-bold text-ink" htmlFor="ref-due">
+              <label className="mb-1 block text-xs font-bold text-panel-ink" htmlFor="ref-due">
                 مهلت دریافت گزارش
               </label>
               <input
@@ -381,12 +381,12 @@ export default function ReferralsPage() {
                 value={due}
                 onChange={(e) => setDue(e.target.value)}
                 placeholder="مثلاً ۱۴۰۵/۰۴/۲۵"
-                className="font-num w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent"
+                className="font-num w-full rounded-lg border border-panel-border-2 bg-panel-canvas p-3 text-xs text-panel-ink outline-none transition focus:border-accent"
               />
             </div>
           </div>
 
-          <label className="mb-1 mt-3 block text-xs font-bold text-ink">بارگذاری مستندات (PDF یا تصویر)</label>
+          <label className="mb-1 mt-3 block text-xs font-bold text-panel-ink">بارگذاری مستندات (PDF یا تصویر)</label>
           <AttachmentPicker value={createAttachments} onChange={setCreateAttachments} />
 
           {createError && (
@@ -396,7 +396,7 @@ export default function ReferralsPage() {
           )}
 
           <div className="mt-4 flex justify-end gap-2">
-            <button onClick={() => setCreateOpen(false)} className="rounded-lg bg-surface px-4 py-2 text-xs font-bold text-text-2">
+            <button onClick={() => setCreateOpen(false)} className="rounded-lg bg-panel-canvas px-4 py-2 text-xs font-bold text-panel-muted">
               انصراف
             </button>
             <button

@@ -22,21 +22,21 @@ describe('Audit (e2e)', () => {
     const setupPrisma = setupApp.get(PrismaService);
 
     const users = await setupPrisma.user.findMany({
-      where: { username: { in: ['finance.karimi', 'senior.rahimi', 'ceo'] } },
+      where: { username: { in: ['finance', 'senior', 'ceo'] } },
     });
     const byUsername = Object.fromEntries(users.map((u) => [u.username, u]));
 
     await setupPrisma.auditLog.createMany({
       data: [
         {
-          actorId: byUsername['finance.karimi'].id,
+          actorId: byUsername['finance'].id,
           actorRole: 'FINANCE_MANAGER',
           category: 'REFUND',
           action: 'تأیید استرداد',
           detail: 'test entry from finance manager',
         },
         {
-          actorId: byUsername['senior.rahimi'].id,
+          actorId: byUsername['senior'].id,
           actorRole: 'SENIOR_MANAGER',
           category: 'ACCESS',
           action: 'تغییر دسترسی',
@@ -67,10 +67,12 @@ describe('Audit (e2e)', () => {
     expect(roles).not.toContain('SENIOR_MANAGER');
     expect(roles).not.toContain('BOARD_CHAIR');
     expect(roles).toContain('FINANCE_MANAGER');
+    expect(res.body.data[0]).toHaveProperty('actorName');
+    expect(typeof res.body.data[0].actorName).toBe('string');
   });
 
   it("Senior Manager's manager-reports includes every role, unfiltered", async () => {
-    const { accessToken } = await loginAs(app, 'senior.rahimi');
+    const { accessToken } = await loginAs(app, 'senior');
     const res = await request(app.getHttpServer())
       .get('/audit/manager-reports')
       .set('Authorization', `Bearer ${accessToken}`);
@@ -83,7 +85,7 @@ describe('Audit (e2e)', () => {
   });
 
   it('a non-CEO/Chair/Senior role gets 403 on manager-reports', async () => {
-    const { accessToken } = await loginAs(app, 'finance.karimi');
+    const { accessToken } = await loginAs(app, 'finance');
     const res = await request(app.getHttpServer())
       .get('/audit/manager-reports')
       .set('Authorization', `Bearer ${accessToken}`);

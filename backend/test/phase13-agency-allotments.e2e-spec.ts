@@ -25,7 +25,7 @@ describe('Phase 13 Part C — agency allotments', () => {
 
   beforeAll(async () => {
     app = await createTestApp();
-    staffToken = (await loginAs(app, 'senior.rahimi')).accessToken!;
+    staffToken = (await loginAs(app, 'senior')).accessToken!;
 
     await prisma.aircraftSeatMap.upsert({
       where: { aircraftType: AIRCRAFT_TYPE },

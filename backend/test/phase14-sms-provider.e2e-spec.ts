@@ -144,7 +144,7 @@ describe('Phase 14 — SMS provider + management log', () => {
   });
 
   it('SENIOR_MANAGER cannot read the IT panel sms-log (role-gated)', async () => {
-    const { accessToken } = await loginAs(app, 'senior.rahimi');
+    const { accessToken } = await loginAs(app, 'senior');
     const res = await request(app.getHttpServer())
       .get('/it/services/sms-log')
       .set(auth(accessToken!));

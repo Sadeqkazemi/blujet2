@@ -32,7 +32,7 @@ describe('Phase 21 — forgot/set password + customer password login (e2e)', () 
     });
 
     it('403s a staff token — set-password is customer-only', async () => {
-      const { accessToken } = await loginAs(app, 'finance.karimi');
+      const { accessToken } = await loginAs(app, 'finance');
       const res = await request(app.getHttpServer())
         .post('/auth/set-password')
         .set('Authorization', `Bearer ${accessToken}`)

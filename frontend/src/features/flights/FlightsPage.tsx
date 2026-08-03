@@ -35,7 +35,7 @@ import type {
 import type { AgencyListRow } from '../../types/agencies';
 
 const STATUS_META: Record<DerivedFlightStatus, { label: string; className: string }> = {
-  ACTIVE: { label: 'فعال', className: 'bg-[#10b98124] text-[#059669]' },
+  ACTIVE: { label: 'فعال', className: 'bg-[#34d39924] text-[#34d399]' },
   SELLING: { label: 'در حال فروش', className: 'bg-[#60a5fa2e] text-[#1d4ed8]' },
   FULL: { label: 'تکمیل', className: 'bg-[#f59e0b24] text-[#b45309]' },
   CANCELLED: { label: 'لغو شده', className: 'bg-[#f8717124] text-[#dc2626]' },
@@ -44,12 +44,12 @@ const STATUS_META: Record<DerivedFlightStatus, { label: string; className: strin
 const CHANNEL_META = {
   SYSTEM: { label: 'فروش سیستمی', barClass: 'bg-accent' },
   CHARTER: { label: 'فروش چارتری', barClass: 'bg-[#a855f7]' },
-  AGENCY: { label: 'فروش آژانس همکار', barClass: 'bg-[#059669]' },
+  AGENCY: { label: 'فروش آژانس همکار', barClass: 'bg-[#34d399]' },
 } as const;
 
 function occupancyBarClass(pct: number) {
   if (pct >= 100) return 'bg-[#f59e0b]';
-  if (pct >= 60) return 'bg-[#10b981]';
+  if (pct >= 60) return 'bg-[#34d399]';
   return 'bg-[#60a5fa]';
 }
 
@@ -369,41 +369,41 @@ export default function FlightsPage() {
   return (
     <div className="p-8">
       <div className="mb-6">
-        <h1 className="text-xl font-black text-ink">مدیریت پروازها</h1>
-        <p className="mt-1 text-sm text-muted">
+        <h1 className="text-xl font-black text-panel-ink">مدیریت پروازها</h1>
+        <p className="mt-1 text-sm text-panel-muted">
           ایجاد پرواز، پایش موجودی و فروش، گزارش پروازهای انجام‌شده و برنامه‌ریزی پروازهای آینده
         </p>
       </div>
 
       {error && <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">{error}</p>}
-      {notice && <p className="mb-4 rounded-lg bg-[#10b98115] p-3 text-sm text-[#059669]">{notice}</p>}
+      {notice && <p className="mb-4 rounded-lg bg-[#34d39915] p-3 text-sm text-[#34d399]">{notice}</p>}
 
       {kpis && (
         <div className="mb-6 grid grid-cols-3 gap-4">
-          <div className="rounded-xl border border-border bg-white p-4">
-            <div className="font-num text-lg font-black text-ink">{faDigits(kpis.activeCount)}</div>
-            <div className="text-[11px] text-muted">پرواز فعال</div>
+          <div className="rounded-xl border border-panel-border bg-panel-surface p-4">
+            <div className="font-num text-lg font-black text-panel-ink">{faDigits(kpis.activeCount)}</div>
+            <div className="text-[11px] text-panel-muted">پرواز فعال</div>
           </div>
-          <div className="rounded-xl border border-border bg-white p-4">
-            <div className="font-num text-lg font-black text-ink">{faDigits(kpis.soldSeats)}</div>
-            <div className="text-[11px] text-muted">صندلی فروخته‌شده</div>
+          <div className="rounded-xl border border-panel-border bg-panel-surface p-4">
+            <div className="font-num text-lg font-black text-panel-ink">{faDigits(kpis.soldSeats)}</div>
+            <div className="text-[11px] text-panel-muted">صندلی فروخته‌شده</div>
           </div>
-          <div className="rounded-xl border border-border bg-white p-4">
+          <div className="rounded-xl border border-panel-border bg-panel-surface p-4">
             <div className="font-num text-lg font-black text-[#b45309]">
               {faDigits(kpis.meanOccupancyPct)}٪
             </div>
-            <div className="text-[11px] text-muted">میانگین ضریب اشغال</div>
+            <div className="text-[11px] text-panel-muted">میانگین ضریب اشغال</div>
           </div>
         </div>
       )}
 
-      <div className="mb-4 flex w-max gap-1 rounded-xl border border-border bg-white p-1">
+      <div className="mb-4 flex w-max gap-1 rounded-xl border border-panel-border bg-panel-surface p-1">
         {subTabs.map(([key, label]) => (
           <button
             key={key}
             onClick={() => setSubTab(key)}
             className={`rounded-lg px-3 py-2 text-xs font-bold transition ${
-              subTab === key ? 'bg-accent text-white' : 'text-muted hover:text-ink'
+              subTab === key ? 'bg-accent text-white' : 'text-panel-muted hover:text-panel-ink'
             }`}
           >
             {label}
@@ -412,13 +412,13 @@ export default function FlightsPage() {
       </div>
 
       {loading ? (
-        <p className="py-6 text-center text-sm text-muted">در حال بارگذاری…</p>
+        <p className="py-6 text-center text-sm text-panel-muted">در حال بارگذاری…</p>
       ) : (
         <>
           {subTab === 'active' && data && (
-            <section className="rounded-xl border border-border bg-white">
-              <div className="flex items-center justify-between border-b border-border px-5 py-3">
-                <h2 className="text-sm font-bold text-ink">مدیریت پروازها و موجودی</h2>
+            <section className="rounded-xl border border-panel-border bg-panel-surface">
+              <div className="flex items-center justify-between border-b border-panel-border px-5 py-3">
+                <h2 className="text-sm font-bold text-panel-ink">مدیریت پروازها و موجودی</h2>
                 <button
                   onClick={() => {
                     setAddError(null);
@@ -440,7 +440,7 @@ export default function FlightsPage() {
               </div>
               <div className="overflow-x-auto">
                 <div className="min-w-[760px]">
-                  <div className="grid grid-cols-[1.7fr_1.1fr_1.4fr_1.5fr_1.2fr_0.9fr] gap-3 border-b border-border px-5 py-2 text-[11px] font-bold text-muted">
+                  <div className="grid grid-cols-[1.7fr_1.1fr_1.4fr_1.5fr_1.2fr_0.9fr] gap-3 border-b border-panel-border px-5 py-2 text-[11px] font-bold text-panel-muted">
                     <span>مسیر</span>
                     <span>شماره پرواز</span>
                     <span>تاریخ / ساعت</span>
@@ -456,27 +456,27 @@ export default function FlightsPage() {
                         <li key={f.id}>
                           <button
                             onClick={() => void openDetail(f.id)}
-                            className="grid w-full grid-cols-[1.7fr_1.1fr_1.4fr_1.5fr_1.2fr_0.9fr] items-center gap-3 border-b border-border px-5 py-3 text-right text-xs transition hover:bg-surface"
+                            className="grid w-full grid-cols-[1.7fr_1.1fr_1.4fr_1.5fr_1.2fr_0.9fr] items-center gap-3 border-b border-panel-border px-5 py-3 text-right text-xs transition hover:bg-panel-surface-2/50"
                           >
-                            <span className="font-bold text-ink">
+                            <span className="font-bold text-panel-ink">
                               {routeLabel(f.originCode, f.destCode)}
                             </span>
-                            <span className="ltr font-num text-muted">{f.flightNo}</span>
-                            <span className="font-num text-muted">
+                            <span className="ltr font-num text-panel-muted">{f.flightNo}</span>
+                            <span className="font-num text-panel-muted">
                               {formatJalaliDateTime(f.departureAt)}
                             </span>
                             <span>
-                              <span className="font-num block text-[10px] text-muted">
+                              <span className="font-num block text-[10px] text-panel-muted">
                                 {faDigits(f.sold)} / {faDigits(f.capacity)}
                               </span>
-                              <span className="mt-1 block h-1.5 overflow-hidden rounded bg-surface-2">
+                              <span className="mt-1 block h-1.5 overflow-hidden rounded bg-panel-surface-2">
                                 <span
                                   className={`block h-full ${occupancyBarClass(pct)}`}
                                   style={{ width: `${Math.min(pct, 100)}%` }}
                                 />
                               </span>
                             </span>
-                            <span className="font-num font-bold text-ink">
+                            <span className="font-num font-bold text-panel-ink">
                               {f.basePriceIrr != null ? `${faMoney(f.basePriceIrr)} تومان` : '—'}
                             </span>
                             <span>
@@ -490,13 +490,13 @@ export default function FlightsPage() {
                     })}
                   </ul>
                   {data.active.length === 0 && (
-                    <p className="py-6 text-center text-xs text-muted">پروازی ثبت نشده است.</p>
+                    <p className="py-6 text-center text-xs text-panel-muted">پروازی ثبت نشده است.</p>
                   )}
                 </div>
               </div>
 
               {isCommercial && (
-                <div className="mt-4 rounded-xl border border-border bg-white p-5">
+                <div className="mt-4 rounded-xl border border-panel-border bg-panel-surface p-5">
                   <PricingPage embedded />
                 </div>
               )}
@@ -506,39 +506,39 @@ export default function FlightsPage() {
           {subTab === 'done' && data && (
             <div className="flex flex-col gap-4">
               <div className="grid grid-cols-4 gap-3">
-                <div className="rounded-xl border border-border bg-white p-4">
-                  <div className="text-[11px] text-muted">مجموع فروش بلیط</div>
-                  <div className="font-num mt-1 text-sm font-black text-ink">
+                <div className="rounded-xl border border-panel-border bg-panel-surface p-4">
+                  <div className="text-[11px] text-panel-muted">مجموع فروش بلیط</div>
+                  <div className="font-num mt-1 text-sm font-black text-panel-ink">
                     {faMoney(data.completed.kpis.totalSalesIrr)} تومان
                   </div>
                 </div>
-                <div className="rounded-xl border border-border bg-white p-4">
-                  <div className="text-[11px] text-muted">سود حاصله</div>
-                  <div className="font-num mt-1 text-sm font-black text-[#059669]">
+                <div className="rounded-xl border border-panel-border bg-panel-surface p-4">
+                  <div className="text-[11px] text-panel-muted">سود حاصله</div>
+                  <div className="font-num mt-1 text-sm font-black text-[#34d399]">
                     {faMoney(data.completed.kpis.totalProfitIrr)} تومان
                   </div>
                 </div>
-                <div className="rounded-xl border border-border bg-white p-4">
-                  <div className="text-[11px] text-muted">بلیط فروخته‌شده</div>
-                  <div className="font-num mt-1 text-sm font-black text-ink">
+                <div className="rounded-xl border border-panel-border bg-panel-surface p-4">
+                  <div className="text-[11px] text-panel-muted">بلیط فروخته‌شده</div>
+                  <div className="font-num mt-1 text-sm font-black text-panel-ink">
                     {faDigits(data.completed.kpis.totalTickets)}
                   </div>
                 </div>
-                <div className="rounded-xl border border-border bg-white p-4">
-                  <div className="text-[11px] text-muted">پرواز انجام‌شده</div>
-                  <div className="font-num mt-1 text-sm font-black text-ink">
+                <div className="rounded-xl border border-panel-border bg-panel-surface p-4">
+                  <div className="text-[11px] text-panel-muted">پرواز انجام‌شده</div>
+                  <div className="font-num mt-1 text-sm font-black text-panel-ink">
                     {faDigits(data.completed.kpis.flightCount)}
                   </div>
                 </div>
               </div>
 
-              <section className="rounded-xl border border-border bg-white">
-                <div className="flex items-center justify-between border-b border-border px-5 py-3">
-                  <h2 className="text-sm font-bold text-ink">گزارش پروازهای انجام‌شده</h2>
+              <section className="rounded-xl border border-panel-border bg-panel-surface">
+                <div className="flex items-center justify-between border-b border-panel-border px-5 py-3">
+                  <h2 className="text-sm font-bold text-panel-ink">گزارش پروازهای انجام‌شده</h2>
                   <button
                     type="button"
                     onClick={() => setNotice('خروجی Excel پروازهای انجام‌شده در حال آماده‌سازی…')}
-                    className="rounded-lg border border-[#059669]/40 bg-[#10b98115] px-3 py-1.5 text-[11px] font-bold text-[#059669]"
+                    className="rounded-lg border border-[#34d399]/40 bg-[#34d39915] px-3 py-1.5 text-[11px] font-bold text-[#34d399]"
                   >
                     ↓ خروجی Excel
                   </button>
@@ -547,7 +547,7 @@ export default function FlightsPage() {
                   <div className={isCommercial ? 'min-w-[920px]' : 'min-w-[900px]'}>
                     {isCommercial ? (
                       <>
-                        <div className="grid grid-cols-[1.5fr_0.9fr_0.8fr_1fr_1fr_1fr_1fr_1.1fr] gap-2 border-b border-border px-5 py-2 text-[10px] font-bold text-muted">
+                        <div className="grid grid-cols-[1.5fr_0.9fr_0.8fr_1fr_1fr_1fr_1fr_1.1fr] gap-2 border-b border-panel-border px-5 py-2 text-[10px] font-bold text-panel-muted">
                           <span>مسیر</span>
                           <span>پرواز</span>
                           <span>بلیط</span>
@@ -560,23 +560,23 @@ export default function FlightsPage() {
                         {data.completed.rows.map((d: CompletedFlightRow) => (
                           <div
                             key={d.id}
-                            className="grid grid-cols-[1.5fr_0.9fr_0.8fr_1fr_1fr_1fr_1fr_1.1fr] items-center gap-2 border-b border-border px-5 py-3 text-[11px]"
+                            className="grid grid-cols-[1.5fr_0.9fr_0.8fr_1fr_1fr_1fr_1fr_1.1fr] items-center gap-2 border-b border-panel-border px-5 py-3 text-[11px]"
                           >
                             <span>
-                              <span className="block font-bold text-ink">
+                              <span className="block font-bold text-panel-ink">
                                 {routeLabel(d.originCode, d.destCode)}
                               </span>
-                              <span className="font-num block text-[10px] text-muted">
+                              <span className="font-num block text-[10px] text-panel-muted">
                                 {formatJalaliDateTime(d.departureAt)}
                               </span>
                             </span>
-                            <span className="ltr font-num text-muted">{d.flightNo}</span>
-                            <span className="font-num font-bold text-ink">{faDigits(d.tickets)}</span>
-                            <span className="font-num text-muted">{faMoney(d.basePriceIrr)}</span>
+                            <span className="ltr font-num text-panel-muted">{d.flightNo}</span>
+                            <span className="font-num font-bold text-panel-ink">{faDigits(d.tickets)}</span>
+                            <span className="font-num text-panel-muted">{faMoney(d.basePriceIrr)}</span>
                             <span className="font-num text-accent">{faMoney(d.channelRevenueIrr.SYSTEM)}</span>
                             <span className="font-num text-[#7c3aed]">{faMoney(d.channelRevenueIrr.CHARTER)}</span>
-                            <span className="font-num text-[#059669]">{faMoney(d.channelRevenueIrr.AGENCY)}</span>
-                            <span className="font-num font-black text-[#059669]">
+                            <span className="font-num text-[#34d399]">{faMoney(d.channelRevenueIrr.AGENCY)}</span>
+                            <span className="font-num font-black text-[#34d399]">
                               {Number(d.profitIrr) > 0 ? faMoney(d.profitIrr) : '—'}
                             </span>
                           </div>
@@ -584,7 +584,7 @@ export default function FlightsPage() {
                       </>
                     ) : (
                       <>
-                        <div className="grid grid-cols-[1.5fr_0.8fr_0.6fr_1fr_1fr_1fr_1fr_1fr_1fr] gap-2 border-b border-border px-5 py-2 text-[10px] font-bold text-muted">
+                        <div className="grid grid-cols-[1.5fr_0.8fr_0.6fr_1fr_1fr_1fr_1fr_1fr_1fr] gap-2 border-b border-panel-border px-5 py-2 text-[10px] font-bold text-panel-muted">
                           <span>مسیر</span>
                           <span>پرواز</span>
                           <span>بلیط</span>
@@ -599,58 +599,58 @@ export default function FlightsPage() {
                           <div key={d.id}>
                             <button
                               onClick={() => setExpandedDone(expandedDone === d.id ? null : d.id)}
-                              className="grid w-full grid-cols-[1.5fr_0.8fr_0.6fr_1fr_1fr_1fr_1fr_1fr_1fr] items-center gap-2 border-b border-border px-5 py-3 text-right text-[11px] transition hover:bg-surface"
+                              className="grid w-full grid-cols-[1.5fr_0.8fr_0.6fr_1fr_1fr_1fr_1fr_1fr_1fr] items-center gap-2 border-b border-panel-border px-5 py-3 text-right text-[11px] transition hover:bg-panel-surface-2/50"
                             >
                               <span>
-                                <span className="block font-bold text-ink">
+                                <span className="block font-bold text-panel-ink">
                                   {routeLabel(d.originCode, d.destCode)}
                                 </span>
-                                <span className="font-num block text-[10px] text-muted">
+                                <span className="font-num block text-[10px] text-panel-muted">
                                   {formatJalaliDateTime(d.departureAt)}
                                 </span>
                               </span>
-                              <span className="ltr font-num text-muted">{d.flightNo}</span>
-                              <span className="font-num font-bold text-ink">{faDigits(d.tickets)}</span>
-                              <span className="font-num text-muted">{faMoney(d.basePriceIrr)}</span>
-                              <span className="font-num font-bold text-ink">{faMoney(d.avgPriceIrr)}</span>
+                              <span className="ltr font-num text-panel-muted">{d.flightNo}</span>
+                              <span className="font-num font-bold text-panel-ink">{faDigits(d.tickets)}</span>
+                              <span className="font-num text-panel-muted">{faMoney(d.basePriceIrr)}</span>
+                              <span className="font-num font-bold text-panel-ink">{faMoney(d.avgPriceIrr)}</span>
                               <span className="font-num text-accent">{faMoney(d.channelRevenueIrr.SYSTEM)}</span>
                               <span className="font-num text-[#7c3aed]">
                                 {faMoney(d.channelRevenueIrr.CHARTER)} / {faMoney(d.channelRevenueIrr.AGENCY)}
                               </span>
-                              <span className="font-num font-black text-[#059669]">
+                              <span className="font-num font-black text-[#34d399]">
                                 {Number(d.profitIrr) > 0 ? `${faMoney(d.profitIrr)}` : '—'}
                               </span>
-                              <span className={`font-num font-black ${Number(d.lossIrr) > 0 ? 'text-danger' : 'text-muted'}`}>
+                              <span className={`font-num font-black ${Number(d.lossIrr) > 0 ? 'text-danger' : 'text-panel-muted'}`}>
                                 {Number(d.lossIrr) > 0 ? faMoney(d.lossIrr) : '—'}
                               </span>
                             </button>
                             {expandedDone === d.id && (
-                              <div className="grid grid-cols-2 gap-3 border-b border-border bg-surface px-5 py-3 text-[11px] md:grid-cols-3">
+                              <div className="grid grid-cols-2 gap-3 border-b border-panel-border bg-panel-canvas px-5 py-3 text-[11px] md:grid-cols-3">
                                 <div>
-                                  <div className="text-[10px] text-muted">تعداد صندلی فروخته‌شده</div>
-                                  <div className="font-num font-bold text-ink">{faDigits(d.tickets)} بلیط</div>
+                                  <div className="text-[10px] text-panel-muted">تعداد صندلی فروخته‌شده</div>
+                                  <div className="font-num font-bold text-panel-ink">{faDigits(d.tickets)} بلیط</div>
                                 </div>
                                 <div>
-                                  <div className="text-[10px] text-muted">نرخ اصلی بلیط</div>
-                                  <div className="font-num font-bold text-ink">{faMoney(d.basePriceIrr)} تومان</div>
+                                  <div className="text-[10px] text-panel-muted">نرخ اصلی بلیط</div>
+                                  <div className="font-num font-bold text-panel-ink">{faMoney(d.basePriceIrr)} تومان</div>
                                 </div>
                                 <div>
-                                  <div className="text-[10px] text-muted">جمع فروش</div>
-                                  <div className="font-num font-bold text-ink">{faMoney(d.revenueIrr)} تومان</div>
+                                  <div className="text-[10px] text-panel-muted">جمع فروش</div>
+                                  <div className="font-num font-bold text-panel-ink">{faMoney(d.revenueIrr)} تومان</div>
                                 </div>
                                 <div>
-                                  <div className="text-[10px] text-muted">متوسط نرخ بلیط فروخته‌شده</div>
-                                  <div className="font-num font-bold text-ink">{faMoney(d.avgPriceIrr)} تومان</div>
+                                  <div className="text-[10px] text-panel-muted">متوسط نرخ بلیط فروخته‌شده</div>
+                                  <div className="font-num font-bold text-panel-ink">{faMoney(d.avgPriceIrr)} تومان</div>
                                 </div>
                                 <div>
-                                  <div className="text-[10px] text-muted">سود حاصله</div>
-                                  <div className="font-num font-bold text-[#059669]">
+                                  <div className="text-[10px] text-panel-muted">سود حاصله</div>
+                                  <div className="font-num font-bold text-[#34d399]">
                                     {Number(d.profitIrr) > 0 ? `${faMoney(d.profitIrr)} تومان` : '—'}
                                   </div>
                                 </div>
                                 <div>
-                                  <div className="text-[10px] text-muted">ضرر</div>
-                                  <div className={`font-num font-bold ${Number(d.lossIrr) > 0 ? 'text-danger' : 'text-muted'}`}>
+                                  <div className="text-[10px] text-panel-muted">ضرر</div>
+                                  <div className={`font-num font-bold ${Number(d.lossIrr) > 0 ? 'text-danger' : 'text-panel-muted'}`}>
                                     {Number(d.lossIrr) > 0 ? `${faMoney(d.lossIrr)} تومان` : '—'}
                                   </div>
                                 </div>
@@ -661,7 +661,7 @@ export default function FlightsPage() {
                       </>
                     )}
                     {data.completed.rows.length === 0 && (
-                      <p className="py-6 text-center text-xs text-muted">پرواز انجام‌شده‌ای ثبت نشده است.</p>
+                      <p className="py-6 text-center text-xs text-panel-muted">پرواز انجام‌شده‌ای ثبت نشده است.</p>
                     )}
                   </div>
                 </div>
@@ -678,31 +678,31 @@ export default function FlightsPage() {
 
           {showFuturePanel && data && (
             <div className="flex flex-col gap-4">
-              <p className="rounded-xl border border-accent/25 bg-accent/5 p-3 text-[11px] leading-6 text-muted">
+              <p className="rounded-xl border border-accent/25 bg-accent/5 p-3 text-[11px] leading-6 text-panel-muted">
                 برنامه‌ریزی پروازهای آینده: ظرفیت، تعهد چارتری و قیمت‌گذاری پیشنهادی هوش مصنوعی بر اساس تحلیل
                 تقاضا و رقبا.
               </p>
 
               <div className="flex flex-wrap items-center gap-3">
-                <span className="text-[11px] text-muted">فیلتر بر اساس روز:</span>
+                <span className="text-[11px] text-panel-muted">فیلتر بر اساس روز:</span>
                 <div className="relative">
                   <button
                     onClick={() => setCalOpen((v) => !v)}
-                    className="rounded-lg border border-border bg-white px-3 py-2 text-xs font-bold text-ink"
+                    className="rounded-lg border border-panel-border bg-panel-surface px-3 py-2 text-xs font-bold text-panel-ink"
                   >
                     {futureDay ? faDigits(futureDay) : 'همه‌ی روزها'} ▾
                   </button>
                   {calOpen && (
-                    <div className="absolute right-0 top-11 z-40 w-72 rounded-xl border border-border bg-white p-3 shadow-xl">
+                    <div className="absolute right-0 top-11 z-40 w-72 rounded-xl border border-panel-border bg-panel-surface p-3 shadow-xl">
                       <div className="mb-2 flex items-center justify-between">
-                        <span className="text-xs font-black text-ink">{calendar.monthLabel}</span>
-                        <span className="text-[10px] text-muted">فقط روزهای دارای پرواز</span>
+                        <span className="text-xs font-black text-panel-ink">{calendar.monthLabel}</span>
+                        <span className="text-[10px] text-panel-muted">فقط روزهای دارای پرواز</span>
                       </div>
                       <div className="mb-1 grid grid-cols-7 gap-1">
                         {WEEKDAYS_FA.map((w, i) => (
                           <span
                             key={w}
-                            className={`py-0.5 text-center text-[9px] font-bold ${i === 6 ? 'text-danger' : 'text-muted'}`}
+                            className={`py-0.5 text-center text-[9px] font-bold ${i === 6 ? 'text-danger' : 'text-panel-muted'}`}
                           >
                             {w}
                           </span>
@@ -731,7 +731,7 @@ export default function FlightsPage() {
                                   ? 'bg-accent text-white'
                                   : key != null
                                     ? 'bg-accent/10 text-accent'
-                                    : 'cursor-default text-muted/50'
+                                    : 'cursor-default text-panel-muted/50'
                               }`}
                             >
                               {faDigits(day)}
@@ -752,9 +752,9 @@ export default function FlightsPage() {
                 )}
               </div>
 
-              <section className="rounded-xl border border-border bg-white">
-                <div className="flex items-center justify-between border-b border-border px-5 py-3">
-                  <h2 className="text-sm font-bold text-ink">پروازهای آینده (برنامه‌ریزی‌شده)</h2>
+              <section className="rounded-xl border border-panel-border bg-panel-surface">
+                <div className="flex items-center justify-between border-b border-panel-border px-5 py-3">
+                  <h2 className="text-sm font-bold text-panel-ink">پروازهای آینده (برنامه‌ریزی‌شده)</h2>
                   <button
                     onClick={() => void onAiAnalysis()}
                     className="rounded-lg bg-gradient-to-l from-accent to-[#9333ea] px-3 py-2 text-xs font-bold text-white"
@@ -764,7 +764,7 @@ export default function FlightsPage() {
                 </div>
                 <div className="flex flex-col gap-3 p-4">
                   {visibleFuture.length === 0 && (
-                    <p className="py-5 text-center text-[11px] text-muted">
+                    <p className="py-5 text-center text-[11px] text-panel-muted">
                       برای روز انتخاب‌شده پروازی برنامه‌ریزی نشده است.
                     </p>
                   )}
@@ -775,18 +775,18 @@ export default function FlightsPage() {
                       ? Math.max(u.capacity - u.charterSeats - (u.agencySeatsAllocated ?? 0), 0)
                       : 0;
                     return (
-                      <div key={u.id} className="rounded-xl border border-border bg-surface p-3">
+                      <div key={u.id} className="rounded-xl border border-panel-border bg-panel-canvas p-3">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <button
                             onClick={() => setExpandedFuture(expanded ? null : u.id)}
                             className="flex items-center gap-3 text-right"
                           >
-                            <span className="text-muted">{expanded ? '▾' : '◂'}</span>
+                            <span className="text-panel-muted">{expanded ? '▾' : '◂'}</span>
                             <span>
-                              <span className="block text-sm font-black text-ink">
+                              <span className="block text-sm font-black text-panel-ink">
                                 {routeLabel(u.originCode, u.destCode)}
                               </span>
-                              <span className="block text-[11px] text-muted">
+                              <span className="block text-[11px] text-panel-muted">
                                 شماره پرواز <span className="ltr font-num">{u.flightNo}</span> · تاریخ پرواز{' '}
                                 <span className="font-num">{formatJalaliDateTime(u.departureAt)}</span>
                               </span>
@@ -796,7 +796,7 @@ export default function FlightsPage() {
                             onClick={() => openPlan(u)}
                             className={`rounded-lg px-3 py-2 text-xs font-bold transition ${
                               priced
-                                ? 'border border-border bg-white text-muted'
+                                ? 'border border-panel-border bg-panel-surface text-panel-muted'
                                 : 'bg-accent text-white hover:bg-accent/90'
                             }`}
                           >
@@ -807,44 +807,44 @@ export default function FlightsPage() {
                         {expanded && (
                           <>
                             <div className="mt-3 grid grid-cols-4 gap-2 text-[11px]">
-                              <div className="rounded-lg border border-border bg-white p-2.5">
-                                <div className="text-[10px] text-muted">ظرفیت صندلی</div>
-                                <div className="font-num font-bold text-ink">
+                              <div className="rounded-lg border border-panel-border bg-panel-surface p-2.5">
+                                <div className="text-[10px] text-panel-muted">ظرفیت صندلی</div>
+                                <div className="font-num font-bold text-panel-ink">
                                   {faDigits(u.capacity)} صندلی
                                 </div>
                               </div>
-                              <div className="rounded-lg border border-border bg-white p-2.5">
-                                <div className="text-[10px] text-muted">تعهد چارتری</div>
+                              <div className="rounded-lg border border-panel-border bg-panel-surface p-2.5">
+                                <div className="text-[10px] text-panel-muted">تعهد چارتری</div>
                                 <div className="font-num font-bold text-[#7c3aed]">
                                   {faDigits(u.charterSeats)} صندلی
                                 </div>
                               </div>
-                              <div className="rounded-lg border border-border bg-white p-2.5">
-                                <div className="text-[10px] text-muted">قیمت پیشنهادی AI</div>
+                              <div className="rounded-lg border border-panel-border bg-panel-surface p-2.5">
+                                <div className="text-[10px] text-panel-muted">قیمت پیشنهادی AI</div>
                                 {u.aiSuggestion ? (
-                                  <div className="font-num font-bold text-[#059669]">
+                                  <div className="font-num font-bold text-[#34d399]">
                                     {faMoney(u.aiSuggestion.priceIrr)} تومان{' '}
                                     <span className="rounded bg-[#9333ea1f] px-1 text-[9px] font-bold text-[#7c3aed]">
                                       AI
                                     </span>
                                   </div>
                                 ) : (
-                                  <div className="text-muted">در انتظار تحلیل</div>
+                                  <div className="text-panel-muted">در انتظار تحلیل</div>
                                 )}
                               </div>
-                              <div className="rounded-lg border border-border bg-white p-2.5">
-                                <div className="text-[10px] text-muted">نرخ نهایی / تخصیص</div>
+                              <div className="rounded-lg border border-panel-border bg-panel-surface p-2.5">
+                                <div className="text-[10px] text-panel-muted">نرخ نهایی / تخصیص</div>
                                 {priced ? (
                                   <>
-                                    <div className="font-num font-bold text-[#059669]">
+                                    <div className="font-num font-bold text-[#34d399]">
                                       {faMoney(u.basePriceIrr ?? 0)} تومان
                                     </div>
-                                    <div className="font-num text-[9px] text-muted">
+                                    <div className="font-num text-[9px] text-panel-muted">
                                       آژانس {faDigits(u.agencySeatsAllocated ?? 0)} · مستقیم {faDigits(direct)}
                                     </div>
                                   </>
                                 ) : (
-                                  <div className="text-muted">تعیین نشده</div>
+                                  <div className="text-panel-muted">تعیین نشده</div>
                                 )}
                               </div>
                             </div>
@@ -853,10 +853,10 @@ export default function FlightsPage() {
                                 <div className="mb-1 text-[11px] font-black text-[#7c3aed]">
                                   تحلیل هوش مصنوعی — چرا این قیمت؟
                                 </div>
-                                <p className="mb-2 text-[11px] leading-6 text-ink">{u.aiSuggestion.reason}</p>
+                                <p className="mb-2 text-[11px] leading-6 text-panel-ink">{u.aiSuggestion.reason}</p>
                                 <ul className="flex flex-col gap-1">
                                   {u.aiSuggestion.factors.map((fc) => (
-                                    <li key={fc} className="text-[10px] text-muted">
+                                    <li key={fc} className="text-[10px] text-panel-muted">
                                       • {fc}
                                     </li>
                                   ))}
@@ -880,14 +880,14 @@ export default function FlightsPage() {
           <div className="flex flex-col gap-3 text-xs">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label htmlFor="nf-origin" className="mb-1 block font-bold text-ink">
+                <label htmlFor="nf-origin" className="mb-1 block font-bold text-panel-ink">
                   مبدأ
                 </label>
                 <select
                   id="nf-origin"
                   value={addForm.originCode}
                   onChange={(e) => setAddForm((f) => ({ ...f, originCode: e.target.value }))}
-                  className="h-10 w-full rounded-lg border border-border bg-white px-2 outline-none"
+                  className="h-10 w-full rounded-lg border border-panel-border-2 bg-panel-canvas px-2 outline-none text-panel-ink"
                 >
                   <option value="">— انتخاب شهر —</option>
                   {airports.map((a) => (
@@ -898,14 +898,14 @@ export default function FlightsPage() {
                 </select>
               </div>
               <div>
-                <label htmlFor="nf-dest" className="mb-1 block font-bold text-ink">
+                <label htmlFor="nf-dest" className="mb-1 block font-bold text-panel-ink">
                   مقصد
                 </label>
                 <select
                   id="nf-dest"
                   value={addForm.destCode}
                   onChange={(e) => setAddForm((f) => ({ ...f, destCode: e.target.value }))}
-                  className="h-10 w-full rounded-lg border border-border bg-white px-2 outline-none"
+                  className="h-10 w-full rounded-lg border border-panel-border-2 bg-panel-canvas px-2 outline-none text-panel-ink"
                 >
                   <option value="">— انتخاب شهر —</option>
                   {airports.map((a) => (
@@ -918,7 +918,7 @@ export default function FlightsPage() {
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <label htmlFor="nf-no" className="mb-1 block font-bold text-ink">
+                <label htmlFor="nf-no" className="mb-1 block font-bold text-panel-ink">
                   شماره پرواز
                 </label>
                 <input
@@ -927,11 +927,11 @@ export default function FlightsPage() {
                   placeholder="EP-901"
                   value={addForm.flightNo}
                   onChange={(e) => setAddForm((f) => ({ ...f, flightNo: e.target.value }))}
-                  className="font-num h-10 w-full rounded-lg border border-border px-2 outline-none"
+                  className="font-num h-10 w-full rounded-lg border border-panel-border-2 bg-panel-canvas px-2 outline-none text-panel-ink"
                 />
               </div>
               <div>
-                <label htmlFor="nf-date" className="mb-1 block font-bold text-ink">
+                <label htmlFor="nf-date" className="mb-1 block font-bold text-panel-ink">
                   تاریخ (جلالی)
                 </label>
                 <input
@@ -939,11 +939,11 @@ export default function FlightsPage() {
                   placeholder="۱۴۰۵/۰۴/۲۵"
                   value={addForm.date}
                   onChange={(e) => setAddForm((f) => ({ ...f, date: e.target.value }))}
-                  className="font-num h-10 w-full rounded-lg border border-border px-2 outline-none"
+                  className="font-num h-10 w-full rounded-lg border border-panel-border-2 bg-panel-canvas px-2 outline-none text-panel-ink"
                 />
               </div>
               <div>
-                <label htmlFor="nf-time" className="mb-1 block font-bold text-ink">
+                <label htmlFor="nf-time" className="mb-1 block font-bold text-panel-ink">
                   ساعت
                 </label>
                 <input
@@ -952,13 +952,13 @@ export default function FlightsPage() {
                   placeholder="08:30"
                   value={addForm.time}
                   onChange={(e) => setAddForm((f) => ({ ...f, time: e.target.value }))}
-                  className="font-num h-10 w-full rounded-lg border border-border px-2 outline-none"
+                  className="font-num h-10 w-full rounded-lg border border-panel-border-2 bg-panel-canvas px-2 outline-none text-panel-ink"
                 />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label htmlFor="nf-cap" className="mb-1 block font-bold text-ink">
+                <label htmlFor="nf-cap" className="mb-1 block font-bold text-panel-ink">
                   ظرفیت (صندلی)
                 </label>
                 <input
@@ -967,11 +967,11 @@ export default function FlightsPage() {
                   placeholder="180"
                   value={addForm.capacity}
                   onChange={(e) => setAddForm((f) => ({ ...f, capacity: e.target.value }))}
-                  className="font-num h-10 w-full rounded-lg border border-border px-2 outline-none"
+                  className="font-num h-10 w-full rounded-lg border border-panel-border-2 bg-panel-canvas px-2 outline-none text-panel-ink"
                 />
               </div>
               <div>
-                <label htmlFor="nf-price" className="mb-1 block font-bold text-ink">
+                <label htmlFor="nf-price" className="mb-1 block font-bold text-panel-ink">
                   قیمت بلیط (تومان)
                 </label>
                 <input
@@ -980,7 +980,7 @@ export default function FlightsPage() {
                   placeholder="3800000"
                   value={addForm.priceToman}
                   onChange={(e) => setAddForm((f) => ({ ...f, priceToman: e.target.value }))}
-                  className="font-num h-10 w-full rounded-lg border border-border px-2 outline-none"
+                  className="font-num h-10 w-full rounded-lg border border-panel-border-2 bg-panel-canvas px-2 outline-none text-panel-ink"
                 />
               </div>
             </div>
@@ -998,7 +998,7 @@ export default function FlightsPage() {
               </button>
               <button
                 onClick={() => setAddOpen(false)}
-                className="rounded-lg border border-border px-4 text-xs text-muted"
+                className="rounded-lg border border-panel-border px-4 text-xs text-panel-muted"
               >
                 انصراف
               </button>
@@ -1013,25 +1013,25 @@ export default function FlightsPage() {
           onClose={() => setDetail(null)}
         >
           <div className="mb-3 grid grid-cols-3 gap-2 text-[11px]">
-            <div className="rounded-lg bg-surface p-2.5">
-              <div className="text-[10px] text-muted">صندلی فروخته‌شده</div>
-              <div className="font-num font-black text-ink">
+            <div className="rounded-lg bg-panel-canvas p-2.5">
+              <div className="text-[10px] text-panel-muted">صندلی فروخته‌شده</div>
+              <div className="font-num font-black text-panel-ink">
                 {faDigits(detail.sold)} / {faDigits(detail.capacity)}
               </div>
             </div>
-            <div className="rounded-lg bg-surface p-2.5">
-              <div className="text-[10px] text-muted">ضریب اشغال</div>
-              <div className="font-num font-black text-[#059669]">{faDigits(detail.occupancyPct)}٪</div>
+            <div className="rounded-lg bg-panel-canvas p-2.5">
+              <div className="text-[10px] text-panel-muted">ضریب اشغال</div>
+              <div className="font-num font-black text-[#34d399]">{faDigits(detail.occupancyPct)}٪</div>
             </div>
-            <div className="rounded-lg bg-surface p-2.5">
-              <div className="text-[10px] text-muted">قیمت پایه</div>
+            <div className="rounded-lg bg-panel-canvas p-2.5">
+              <div className="text-[10px] text-panel-muted">قیمت پایه</div>
               <div className="font-num font-black text-accent">
                 {detail.basePriceIrr != null ? `${faMoney(detail.basePriceIrr)} تومان` : '—'}
               </div>
             </div>
           </div>
 
-          <h3 className="mb-2 text-xs font-bold text-ink">تفکیک کانال فروش صندلی</h3>
+          <h3 className="mb-2 text-xs font-bold text-panel-ink">تفکیک کانال فروش صندلی</h3>
           <div className="flex flex-col gap-2.5">
             {detail.channels.map((c) => {
               const meta = CHANNEL_META[c.channel];
@@ -1039,12 +1039,12 @@ export default function FlightsPage() {
               return (
                 <div key={c.channel}>
                   <div className="mb-1 flex items-center justify-between text-[11px]">
-                    <span className="text-muted">{meta.label}</span>
-                    <span className="font-num font-bold text-ink">
+                    <span className="text-panel-muted">{meta.label}</span>
+                    <span className="font-num font-bold text-panel-ink">
                       {faDigits(c.seats)} صندلی · {faMoney(c.revenueIrr)} تومان
                     </span>
                   </div>
-                  <div className="h-1.5 overflow-hidden rounded bg-surface-2">
+                  <div className="h-1.5 overflow-hidden rounded bg-panel-surface-2">
                     <div className={`h-full ${meta.barClass}`} style={{ width: `${pct}%` }} />
                   </div>
                 </div>
@@ -1052,16 +1052,16 @@ export default function FlightsPage() {
             })}
           </div>
 
-          <div className="mt-3 flex items-center justify-between rounded-lg bg-surface p-3">
-            <span className="text-xs font-bold text-ink">مجموع درآمد پرواز</span>
+          <div className="mt-3 flex items-center justify-between rounded-lg bg-panel-canvas p-3">
+            <span className="text-xs font-bold text-panel-ink">مجموع درآمد پرواز</span>
             <span className="font-num text-sm font-black text-accent">
               {faMoney(detail.totalRevenueIrr)} تومان
             </span>
           </div>
 
-          <div className="mt-3 rounded-lg border border-border p-3">
+          <div className="mt-3 rounded-lg border border-panel-border p-3">
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-xs font-bold text-ink">نوع هواپیما</span>
+              <span className="text-xs font-bold text-panel-ink">نوع هواپیما</span>
               {!aircraftChangeOpen && (
                 <button
                   onClick={() => {
@@ -1076,13 +1076,13 @@ export default function FlightsPage() {
               )}
             </div>
             {!aircraftChangeOpen ? (
-              <div className="text-xs font-bold text-ink">{detail.aircraftType}</div>
+              <div className="text-xs font-bold text-panel-ink">{detail.aircraftType}</div>
             ) : (
               <div className="flex flex-col gap-2">
                 <select
                   value={selectedAircraftType}
                   onChange={(e) => setSelectedAircraftType(e.target.value)}
-                  className="rounded-lg border border-border p-2 text-xs"
+                  className="rounded-lg border border-panel-border-2 bg-panel-canvas p-2 text-xs text-panel-ink outline-none"
                 >
                   {aircraftTypes.map((t) => (
                     <option key={t.aircraftType} value={t.aircraftType}>
@@ -1105,7 +1105,7 @@ export default function FlightsPage() {
                   </button>
                   <button
                     onClick={() => setAircraftChangeOpen(false)}
-                    className="rounded-lg bg-surface px-3 py-1.5 text-[11px] font-bold text-text-2"
+                    className="rounded-lg bg-panel-canvas px-3 py-1.5 text-[11px] font-bold text-panel-muted"
                   >
                     انصراف
                   </button>
@@ -1125,17 +1125,17 @@ export default function FlightsPage() {
           onClose={() => setPlan(null)}
         >
           <div className="mb-3 grid grid-cols-2 gap-2 text-[11px]">
-            <div className="rounded-lg bg-surface p-2.5">
-              <div className="text-[10px] text-muted">ظرفیت</div>
-              <div className="font-num font-bold text-ink">{faDigits(plan.capacity)} صندلی</div>
+            <div className="rounded-lg bg-panel-canvas p-2.5">
+              <div className="text-[10px] text-panel-muted">ظرفیت</div>
+              <div className="font-num font-bold text-panel-ink">{faDigits(plan.capacity)} صندلی</div>
             </div>
-            <div className="rounded-lg bg-surface p-2.5">
-              <div className="text-[10px] text-muted">تعهد چارتری</div>
+            <div className="rounded-lg bg-panel-canvas p-2.5">
+              <div className="text-[10px] text-panel-muted">تعهد چارتری</div>
               <div className="font-num font-bold text-[#7c3aed]">{faDigits(plan.charterSeats)} صندلی</div>
             </div>
           </div>
 
-          <label htmlFor="plan-price" className="mb-1 block text-xs font-bold text-ink">
+          <label htmlFor="plan-price" className="mb-1 block text-xs font-bold text-panel-ink">
             نرخ نهایی (تومان)
           </label>
           <div className="mb-3 flex gap-2">
@@ -1144,7 +1144,7 @@ export default function FlightsPage() {
               dir="ltr"
               value={planPrice}
               onChange={(e) => setPlanPrice(e.target.value)}
-              className="font-num h-10 flex-1 rounded-lg border border-border px-2 text-xs outline-none"
+              className="font-num h-10 flex-1 rounded-lg border border-panel-border-2 bg-panel-canvas px-2 text-xs outline-none text-panel-ink"
             />
             {plan.aiSuggestion && (
               <button
@@ -1156,7 +1156,7 @@ export default function FlightsPage() {
             )}
           </div>
 
-          <label htmlFor="plan-agency" className="mb-1 block text-xs font-bold text-ink">
+          <label htmlFor="plan-agency" className="mb-1 block text-xs font-bold text-panel-ink">
             تخصیص صندلی آژانس (حداکثر {faDigits(maxAgencySeats)})
           </label>
           <input
@@ -1169,26 +1169,26 @@ export default function FlightsPage() {
             className="mb-2 w-full accent-accent"
           />
           <div className="mb-3 grid grid-cols-3 gap-2 text-[11px]">
-            <div className="rounded-lg bg-surface p-2.5 text-center">
-              <div className="text-[10px] text-muted">چارتری</div>
+            <div className="rounded-lg bg-panel-canvas p-2.5 text-center">
+              <div className="text-[10px] text-panel-muted">چارتری</div>
               <div className="font-num font-bold text-[#7c3aed]">{faDigits(plan.charterSeats)}</div>
             </div>
-            <div className="rounded-lg bg-surface p-2.5 text-center">
-              <div className="text-[10px] text-muted">آژانس</div>
-              <div className="font-num font-bold text-[#059669]">{faDigits(agencySeatsNum)}</div>
+            <div className="rounded-lg bg-panel-canvas p-2.5 text-center">
+              <div className="text-[10px] text-panel-muted">آژانس</div>
+              <div className="font-num font-bold text-[#34d399]">{faDigits(agencySeatsNum)}</div>
             </div>
-            <div className="rounded-lg bg-surface p-2.5 text-center">
-              <div className="text-[10px] text-muted">مستقیم</div>
-              <div className="font-num font-bold text-ink">{faDigits(directSeats)}</div>
+            <div className="rounded-lg bg-panel-canvas p-2.5 text-center">
+              <div className="text-[10px] text-panel-muted">مستقیم</div>
+              <div className="font-num font-bold text-panel-ink">{faDigits(directSeats)}</div>
             </div>
           </div>
-          <div className="mb-3 flex h-2 overflow-hidden rounded bg-surface-2">
+          <div className="mb-3 flex h-2 overflow-hidden rounded bg-panel-surface-2">
             <div
               className="bg-[#7c3aed]"
               style={{ width: `${plan.capacity > 0 ? (plan.charterSeats / plan.capacity) * 100 : 0}%` }}
             />
             <div
-              className="bg-[#059669]"
+              className="bg-[#34d399]"
               style={{ width: `${plan.capacity > 0 ? (agencySeatsNum / plan.capacity) * 100 : 0}%` }}
             />
             <div
@@ -1198,7 +1198,7 @@ export default function FlightsPage() {
           </div>
 
           <div className="mb-3 grid grid-cols-2 gap-2">
-            <div className="rounded-lg border border-border">
+            <div className="rounded-lg border border-panel-border">
               <JalaliDatePicker
                 label="شروع فروش"
                 value={planSaleStart}
@@ -1206,7 +1206,7 @@ export default function FlightsPage() {
                 testId="plan-sale-start"
               />
             </div>
-            <div className="rounded-lg border border-border">
+            <div className="rounded-lg border border-panel-border">
               <JalaliDatePicker
                 label="پایان فروش"
                 value={planSaleEnd}
@@ -1224,20 +1224,20 @@ export default function FlightsPage() {
             ثبت نرخ و تخصیص صندلی
           </button>
 
-          <div className="mt-5 border-t border-border pt-4">
-            <h3 className="mb-2 text-xs font-bold text-ink">سهمیه‌های صندلی آژانس‌ها</h3>
+          <div className="mt-5 border-t border-panel-border pt-4">
+            <h3 className="mb-2 text-xs font-bold text-panel-ink">سهمیه‌های صندلی آژانس‌ها</h3>
             {allotments.length === 0 && (
-              <p className="mb-2 text-[11px] text-muted">هنوز سهمیه‌ای برای این پرواز ثبت نشده است.</p>
+              <p className="mb-2 text-[11px] text-panel-muted">هنوز سهمیه‌ای برای این پرواز ثبت نشده است.</p>
             )}
             <div className="mb-3 flex flex-col gap-1.5">
               {allotments.map((a) => (
                 <div
                   key={a.id}
-                  className="flex items-center justify-between rounded-lg bg-surface px-2.5 py-2 text-[11px]"
+                  className="flex items-center justify-between rounded-lg bg-panel-canvas px-2.5 py-2 text-[11px]"
                 >
-                  <span className="font-bold text-ink">{a.agencyName}</span>
-                  <span className="font-num text-muted">{faDigits(a.seatsAllocated)} صندلی</span>
-                  <span className="text-[10px] text-muted">{a.type === 'SOFT' ? 'نرم' : 'سخت'}</span>
+                  <span className="font-bold text-panel-ink">{a.agencyName}</span>
+                  <span className="font-num text-panel-muted">{faDigits(a.seatsAllocated)} صندلی</span>
+                  <span className="text-[10px] text-panel-muted">{a.type === 'SOFT' ? 'نرم' : 'سخت'}</span>
                   <button
                     onClick={() => void onDeleteAllotment(a.id)}
                     className="text-danger"
@@ -1253,7 +1253,7 @@ export default function FlightsPage() {
                 aria-label="آژانس"
                 value={newAllotmentAgencyId}
                 onChange={(e) => setNewAllotmentAgencyId(e.target.value)}
-                className="h-10 min-w-[120px] flex-1 rounded-lg border border-border px-2 text-xs outline-none"
+                className="h-10 min-w-[120px] flex-1 rounded-lg border border-panel-border-2 bg-panel-canvas px-2 text-xs outline-none text-panel-ink"
               >
                 <option value="">انتخاب آژانس</option>
                 {agencyOptions.map((a) => (
@@ -1268,13 +1268,13 @@ export default function FlightsPage() {
                 value={newAllotmentSeats}
                 onChange={(e) => setNewAllotmentSeats(e.target.value)}
                 placeholder="تعداد"
-                className="font-num h-10 w-20 rounded-lg border border-border px-2 text-xs outline-none"
+                className="font-num h-10 w-20 rounded-lg border border-panel-border-2 bg-panel-canvas px-2 text-xs outline-none text-panel-ink"
               />
               <select
                 aria-label="نوع سهمیه"
                 value={newAllotmentType}
                 onChange={(e) => setNewAllotmentType(e.target.value as 'HARD' | 'SOFT')}
-                className="h-10 rounded-lg border border-border px-2 text-xs outline-none"
+                className="h-10 rounded-lg border border-panel-border-2 bg-panel-canvas px-2 text-xs outline-none text-panel-ink"
               >
                 <option value="HARD">سخت</option>
                 <option value="SOFT">نرم</option>
@@ -1285,7 +1285,7 @@ export default function FlightsPage() {
                 value={newAllotmentContractToman}
                 onChange={(e) => setNewAllotmentContractToman(e.target.value)}
                 placeholder="نرخ قرارداد"
-                className="font-num h-10 w-24 rounded-lg border border-border px-2 text-xs outline-none"
+                className="font-num h-10 w-24 rounded-lg border border-panel-border-2 bg-panel-canvas px-2 text-xs outline-none text-panel-ink"
               />
               <button
                 onClick={() => void onAddAllotment()}
@@ -1295,7 +1295,7 @@ export default function FlightsPage() {
               </button>
             </div>
             {newAllotmentType === 'SOFT' && (
-              <div className="mt-2 max-w-xs rounded-lg border border-border">
+              <div className="mt-2 max-w-xs rounded-lg border border-panel-border">
                 <JalaliDatePicker
                   label="موعد آزادسازی"
                   value={newAllotmentReleaseAt}

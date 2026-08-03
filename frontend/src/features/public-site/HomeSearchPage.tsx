@@ -73,6 +73,10 @@ const STR: Record<StoredLocale, {
   lblDestination: string;
   lblDepartDate: string;
   selectPlaceholder: string;
+  originPlaceholder: string;
+  destPlaceholder: string;
+  destNeedOriginPlaceholder: string;
+  cityEmptyLabel: string;
   btnSearchFlight: string;
   popularRoutesTitle: string;
   popularRoutesSub: string;

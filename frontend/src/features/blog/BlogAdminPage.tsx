@@ -9,7 +9,6 @@ import {
 import { uploadFile } from '../../api/files';
 import { faDigits } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
-import Modal from '../../components/Modal';
 import type {
   BlogCategory,
   BlogPostRow,
