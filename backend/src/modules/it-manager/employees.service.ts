@@ -6,7 +6,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as argon2 from 'argon2';
-import { PrismaService } from '../../prisma/prisma.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { ILike, In, Repository } from 'typeorm';
+import { User } from '../../database/entities/user.entity';
+import { Permission } from '../../database/entities/permission.entity';
+import { EmployeePermission } from '../../database/entities/employee-permission.entity';
+import { PasswordResetEvent } from '../../database/entities/password-reset-event.entity';
+import { findOneOrThrow } from '../../database/utils/find-one-or-throw';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
 import { generateTempPassword } from '../../common/temp-password';
@@ -24,14 +30,18 @@ import type {
 @Injectable()
 export class EmployeesService {
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectRepository(User) private readonly userRepo: Repository<User>,
+    @InjectRepository(Permission)
+    private readonly permissionRepo: Repository<Permission>,
+    @InjectRepository(EmployeePermission)
+    private readonly employeePermissionRepo: Repository<EmployeePermission>,
     private readonly audit: AuditService,
   ) {}
 
   /** Grouped by dept -> sections -> perms, matching site-data.js's shape. */
   async catalog() {
-    const rows = await this.prisma.permission.findMany({
-      orderBy: [{ dept: 'asc' }, { sectionKey: 'asc' }, { key: 'asc' }],
+    const rows = await this.permissionRepo.find({
+      order: { dept: 'ASC', sectionKey: 'ASC', key: 'ASC' },
     });
     const byDept: Record<
       string,
@@ -65,9 +75,7 @@ export class EmployeesService {
   }
 
   private async getEmployeeOrThrow(id: string) {
-    const employee = await this.prisma.user.findFirst({
-      where: { id, role: 'EMPLOYEE' },
-    });
+    const employee = await this.userRepo.findOneBy({ id, role: 'EMPLOYEE' });
     if (!employee) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -87,7 +95,7 @@ export class EmployeesService {
     actor: AuthenticatedUser,
   ): Promise<string | null> {
     if (actor.role !== 'EMPLOYEE') return null;
-    const self = await this.prisma.user.findUniqueOrThrow({
+    const self = await findOneOrThrow(this.userRepo, {
       where: { id: actor.id },
       select: { dept: true },
     });
@@ -97,20 +105,17 @@ export class EmployeesService {
   async list(actor: AuthenticatedUser, query: ListEmployeesQueryDto) {
     const employeeDept = await this.deptScopeForEmployee(actor);
     const deptFilter = employeeDept ?? query.dept;
-    const employees = await this.prisma.user.findMany({
-      where: {
-        role: 'EMPLOYEE',
-        ...(deptFilter ? { dept: deptFilter } : {}),
-        ...(query.q
-          ? {
-              OR: [
-                { fullName: { contains: query.q, mode: 'insensitive' } },
-                { username: { contains: query.q, mode: 'insensitive' } },
-              ],
-            }
-          : {}),
-      },
-      orderBy: { createdAt: 'desc' },
+    const base: { role: 'EMPLOYEE'; dept?: string } = { role: 'EMPLOYEE' };
+    if (deptFilter) base.dept = deptFilter;
+
+    const employees = await this.userRepo.find({
+      where: query.q
+        ? [
+            { ...base, fullName: ILike(`%${query.q}%`) },
+            { ...base, username: ILike(`%${query.q}%`) },
+          ]
+        : base,
+      order: { createdAt: 'DESC' },
     });
     return employees.map((e) => ({
       id: e.id,
@@ -125,8 +130,8 @@ export class EmployeesService {
   }
 
   async create(actor: AuthenticatedUser, dto: CreateEmployeeDto) {
-    const existing = await this.prisma.user.findUnique({
-      where: { username: dto.username },
+    const existing = await this.userRepo.findOneBy({
+      username: dto.username,
     });
     if (existing) {
       throw new ConflictException({
@@ -140,29 +145,38 @@ export class EmployeesService {
       catalogDept,
     );
     const grantable = isKnownCatalogDept
-      ? await this.prisma.permission.findMany({
-          where: { dept: catalogDept, key: { in: dto.permissionKeys ?? [] } },
+      ? await this.permissionRepo.find({
+          where: { dept: catalogDept, key: In(dto.permissionKeys ?? []) },
         })
       : [];
 
     const passwordHash = await argon2.hash(dto.password);
-    const employee = await this.prisma.user.create({
-      data: {
-        role: 'EMPLOYEE',
-        fullName: dto.fullName,
-        username: dto.username,
-        passwordHash,
-        dept: dto.dept,
-        rank: dto.rank,
-        referralScope: dto.referralScope ?? 'MANAGERS_ONLY',
-        createdById: actor.id,
-        employeePermissions: {
-          create: grantable.map((p) => ({
-            permissionId: p.id,
-            grantedById: actor.id,
-          })),
-        },
-      },
+    const employeeId = await this.userRepo.manager.transaction(async (tx) => {
+      const employee = await tx.save(
+        tx.create(User, {
+          role: 'EMPLOYEE',
+          fullName: dto.fullName,
+          username: dto.username,
+          passwordHash,
+          dept: dto.dept,
+          rank: dto.rank,
+          referralScope: dto.referralScope ?? 'MANAGERS_ONLY',
+          createdById: actor.id,
+          updatedAt: new Date(),
+        }),
+      );
+      if (grantable.length > 0) {
+        await tx.save(
+          grantable.map((p) =>
+            tx.create(EmployeePermission, {
+              employeeId: employee.id,
+              permissionId: p.id,
+              grantedById: actor.id,
+            }),
+          ),
+        );
+      }
+      return employee.id;
     });
 
     const deptLabel: Record<string, string> = {
@@ -180,10 +194,10 @@ export class EmployeesService {
         deptLabel[dto.dept] ?? 'واحد سازمانی'
       } ارسال شد.`,
       entityType: 'User',
-      entityId: employee.id,
+      entityId: employeeId,
     });
 
-    return this.get(actor, employee.id);
+    return this.get(actor, employeeId);
   }
 
   async get(actor: AuthenticatedUser, id: string) {
@@ -195,9 +209,9 @@ export class EmployeesService {
         message: 'دسترسی به کارمندان واحد دیگر برای شما مجاز نیست.',
       });
     }
-    const granted = await this.prisma.employeePermission.findMany({
+    const granted = await this.employeePermissionRepo.find({
       where: { employeeId: id },
-      include: { permission: true },
+      relations: { permission: true },
     });
     const grantedKeys = new Set(granted.map((g) => g.permission.key));
     const catalogDept = catalogDeptFor(employee.dept ?? '');
@@ -227,10 +241,8 @@ export class EmployeesService {
 
   async setStatus(actor: AuthenticatedUser, id: string, isActive: boolean) {
     const employee = await this.getEmployeeOrThrow(id);
-    const updated = await this.prisma.user.update({
-      where: { id },
-      data: { isActive },
-    });
+    await this.userRepo.update({ id }, { isActive, updatedAt: new Date() });
+    const updated = await findOneOrThrow(this.userRepo, { where: { id } });
 
     await this.audit.record({
       actorId: actor.id,
@@ -255,8 +267,9 @@ export class EmployeesService {
   ) {
     const employee = await this.getEmployeeOrThrow(id);
     const catalogDept = catalogDeptFor(employee.dept ?? '');
-    const permission = await this.prisma.permission.findUnique({
-      where: { dept_key: { dept: catalogDept, key: permissionKey } },
+    const permission = await this.permissionRepo.findOneBy({
+      dept: catalogDept,
+      key: permissionKey,
     });
     if (!permission) {
       throw new BadRequestException({
@@ -266,23 +279,23 @@ export class EmployeesService {
     }
 
     if (grant) {
-      await this.prisma.employeePermission.upsert({
-        where: {
-          employeeId_permissionId: {
+      const existing = await this.employeePermissionRepo.findOneBy({
+        employeeId: id,
+        permissionId: permission.id,
+      });
+      if (!existing) {
+        await this.employeePermissionRepo.save(
+          this.employeePermissionRepo.create({
             employeeId: id,
             permissionId: permission.id,
-          },
-        },
-        update: {},
-        create: {
-          employeeId: id,
-          permissionId: permission.id,
-          grantedById: actor.id,
-        },
-      });
+            grantedById: actor.id,
+          }),
+        );
+      }
     } else {
-      await this.prisma.employeePermission.deleteMany({
-        where: { employeeId: id, permissionId: permission.id },
+      await this.employeePermissionRepo.delete({
+        employeeId: id,
+        permissionId: permission.id,
       });
     }
 
@@ -319,15 +332,16 @@ export class EmployeesService {
     const tempPassword = generateTempPassword();
     const passwordHash = await argon2.hash(tempPassword);
 
-    await this.prisma.$transaction([
-      this.prisma.user.update({
-        where: { id },
-        data: { passwordHash, mustChangePassword: true },
-      }),
-      this.prisma.passwordResetEvent.create({
-        data: { employeeId: id, resetById: actor.id },
-      }),
-    ]);
+    await this.userRepo.manager.transaction(async (tx) => {
+      await tx.update(
+        User,
+        { id },
+        { passwordHash, mustChangePassword: true, updatedAt: new Date() },
+      );
+      await tx.save(
+        tx.create(PasswordResetEvent, { employeeId: id, resetById: actor.id }),
+      );
+    });
 
     await this.audit.record({
       actorId: actor.id,

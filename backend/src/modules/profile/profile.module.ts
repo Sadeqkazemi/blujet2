@@ -1,4 +1,11 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { User } from '../../database/entities/user.entity';
+import { TwoFactorChallenge } from '../../database/entities/two-factor-challenge.entity';
+import { StoredFile } from '../../database/entities/stored-file.entity';
+import { CustomerIdentityVerification } from '../../database/entities/customer-identity-verification.entity';
+import { SavedPassenger } from '../../database/entities/saved-passenger.entity';
+import { SavedBankAccount } from '../../database/entities/saved-bank-account.entity';
 import { ProfileController } from './profile.controller';
 import { ProfileService } from './profile.service';
 import { SavedPassengersService } from './saved-passengers.service';
@@ -14,7 +21,20 @@ import { AuditModule } from '../audit/audit.module';
 import { PanelsModule } from '../panels/panels.module';
 
 @Module({
-  imports: [AuthModule, FilesModule, AuditModule, PanelsModule],
+  imports: [
+    TypeOrmModule.forFeature([
+      User,
+      TwoFactorChallenge,
+      StoredFile,
+      CustomerIdentityVerification,
+      SavedPassenger,
+      SavedBankAccount,
+    ]),
+    AuthModule,
+    FilesModule,
+    AuditModule,
+    PanelsModule,
+  ],
   controllers: [
     ProfileController,
     MySavedPassengersController,

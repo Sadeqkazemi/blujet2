@@ -3,7 +3,9 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { PrismaService } from '../../prisma/prisma.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { BackupRecord } from '../../database/entities/backup-record.entity';
 import { AuditService } from '../audit/audit.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 
@@ -28,13 +30,14 @@ async function runPgDump(databaseUrl: string, filePath: string): Promise<void> {
 @Injectable()
 export class BackupsService {
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectRepository(BackupRecord)
+    private readonly backupRecordRepo: Repository<BackupRecord>,
     private readonly audit: AuditService,
   ) {}
 
   async list() {
-    return this.prisma.backupRecord.findMany({
-      orderBy: { startedAt: 'desc' },
+    return this.backupRecordRepo.find({
+      order: { startedAt: 'DESC' },
     });
   }
 
@@ -46,17 +49,24 @@ export class BackupsService {
     const fileName = `blujet-${new Date().toISOString().replace(/[:.]/g, '-')}.sql`;
     const filePath = path.join(BACKUP_DIR, fileName);
 
-    const record = await this.prisma.backupRecord.create({
-      data: { fileName, status: 'RUNNING', triggeredById: actor.id },
-    });
+    const record = await this.backupRecordRepo.save(
+      this.backupRecordRepo.create({
+        fileName,
+        status: 'RUNNING',
+        triggeredById: actor.id,
+      }),
+    );
 
     const databaseUrl = process.env.DATABASE_URL ?? '';
     try {
       await runPgDump(databaseUrl, filePath);
       const sizeBytes = fs.statSync(filePath).size;
-      const updated = await this.prisma.backupRecord.update({
-        where: { id: record.id },
-        data: { status: 'SUCCESS', completedAt: new Date(), sizeBytes },
+      await this.backupRecordRepo.update(
+        { id: record.id },
+        { status: 'SUCCESS', completedAt: new Date(), sizeBytes },
+      );
+      const updated = await this.backupRecordRepo.findOneByOrFail({
+        id: record.id,
       });
       await this.audit.record({
         actorId: actor.id,
@@ -69,13 +79,16 @@ export class BackupsService {
       });
       return updated;
     } catch (err) {
-      const updated = await this.prisma.backupRecord.update({
-        where: { id: record.id },
-        data: {
+      await this.backupRecordRepo.update(
+        { id: record.id },
+        {
           status: 'FAILED',
           completedAt: new Date(),
           errorMessage: err instanceof Error ? err.message : 'خطای نامشخص',
         },
+      );
+      const updated = await this.backupRecordRepo.findOneByOrFail({
+        id: record.id,
       });
       await this.audit.record({
         actorId: actor.id,

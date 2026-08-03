@@ -5,7 +5,9 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Not, Repository } from 'typeorm';
+import { SavedPassenger } from '../../database/entities/saved-passenger.entity';
 import { ErrorCode } from '../../common/errors';
 import {
   decryptPii,
@@ -15,7 +17,6 @@ import {
   normalizeNationalId,
 } from '../../common/pii-crypto';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import type { SavedPassenger } from '../../../generated/prisma/client';
 import type {
   CreateSavedPassengerDto,
   UpdateSavedPassengerDto,
@@ -27,7 +28,10 @@ type SavedPassengerRow = SavedPassenger;
 
 @Injectable()
 export class SavedPassengersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @InjectRepository(SavedPassenger)
+    private readonly passengerRepo: Repository<SavedPassenger>,
+  ) {}
 
   private shape(row: SavedPassengerRow) {
     return {
@@ -76,11 +80,11 @@ export class SavedPassengersService {
     excludeId?: string,
   ) {
     if (!nationalId) return;
-    const existing = await this.prisma.savedPassenger.findFirst({
+    const existing = await this.passengerRepo.findOne({
       where: {
         userId,
         nationalIdHash: hashPii(nationalId),
-        ...(excludeId ? { NOT: { id: excludeId } } : {}),
+        ...(excludeId ? { id: Not(excludeId) } : {}),
       },
     });
     if (existing) {
@@ -92,9 +96,9 @@ export class SavedPassengersService {
   }
 
   async listMine(user: AuthenticatedUser) {
-    const rows = await this.prisma.savedPassenger.findMany({
+    const rows = await this.passengerRepo.find({
       where: { userId: user.id },
-      orderBy: { createdAt: 'desc' },
+      order: { createdAt: 'DESC' },
     });
     return rows.map((row) => this.shape(row));
   }
@@ -104,7 +108,7 @@ export class SavedPassengersService {
     const passportNo = dto.passportNo?.trim() || null;
     this.assertHasIdDoc(nationalId, passportNo);
 
-    const count = await this.prisma.savedPassenger.count({
+    const count = await this.passengerRepo.count({
       where: { userId: user.id },
     });
     if (count >= MAX_SAVED) {
@@ -116,8 +120,8 @@ export class SavedPassengersService {
 
     await this.assertNotDuplicateNationalId(user.id, nationalId);
 
-    const row = await this.prisma.savedPassenger.create({
-      data: {
+    const row = await this.passengerRepo.save(
+      this.passengerRepo.create({
         userId: user.id,
         fullName: dto.fullName.trim(),
         latinName: dto.latinName.trim().toUpperCase(),
@@ -126,8 +130,9 @@ export class SavedPassengersService {
         passportNoEnc: passportNo ? encryptPii(passportNo) : null,
         mobileEnc: dto.mobile?.trim() ? encryptPii(dto.mobile.trim()) : null,
         isChild: dto.isChild ?? false,
-      },
-    });
+        updatedAt: new Date(),
+      }),
+    );
     return this.shape(row);
   }
 
@@ -136,7 +141,7 @@ export class SavedPassengersService {
     id: string,
     dto: UpdateSavedPassengerDto,
   ) {
-    const row = await this.prisma.savedPassenger.findUnique({ where: { id } });
+    const row = await this.passengerRepo.findOneBy({ id });
     if (!row || row.userId !== user.id) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -159,9 +164,9 @@ export class SavedPassengersService {
     this.assertHasIdDoc(nationalId, passportNo);
     await this.assertNotDuplicateNationalId(user.id, nationalId, id);
 
-    const updated = await this.prisma.savedPassenger.update({
-      where: { id },
-      data: {
+    await this.passengerRepo.update(
+      { id },
+      {
         ...(dto.fullName !== undefined
           ? { fullName: dto.fullName.trim() }
           : {}),
@@ -185,20 +190,22 @@ export class SavedPassengersService {
             }
           : {}),
         ...(dto.isChild !== undefined ? { isChild: dto.isChild } : {}),
+        updatedAt: new Date(),
       },
-    });
+    );
+    const updated = await this.passengerRepo.findOneByOrFail({ id });
     return this.shape(updated);
   }
 
   async remove(user: AuthenticatedUser, id: string) {
-    const row = await this.prisma.savedPassenger.findUnique({ where: { id } });
+    const row = await this.passengerRepo.findOneBy({ id });
     if (!row || row.userId !== user.id) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
         message: 'مسافر ذخیره‌شده یافت نشد.',
       });
     }
-    await this.prisma.savedPassenger.delete({ where: { id } });
+    await this.passengerRepo.delete({ id });
     return { removed: true };
   }
 }

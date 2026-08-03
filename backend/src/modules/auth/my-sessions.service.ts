@@ -3,26 +3,31 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { IsNull, MoreThan, Repository } from 'typeorm';
+import { RefreshToken } from '../../database/entities/refresh-token.entity';
 import { ErrorCode } from '../../common/errors';
 import { formatSessionDevice, hashRefreshToken } from './auth-token.util';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 
 @Injectable()
 export class MySessionsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @InjectRepository(RefreshToken)
+    private readonly refreshTokenRepo: Repository<RefreshToken>,
+  ) {}
 
   async listMine(user: AuthenticatedUser, currentRefreshToken?: string) {
     const currentHash = currentRefreshToken
       ? hashRefreshToken(currentRefreshToken)
       : null;
-    const rows = await this.prisma.refreshToken.findMany({
+    const rows = await this.refreshTokenRepo.find({
       where: {
         userId: user.id,
-        revokedAt: null,
-        expiresAt: { gt: new Date() },
+        revokedAt: IsNull(),
+        expiresAt: MoreThan(new Date()),
       },
-      orderBy: { createdAt: 'desc' },
+      order: { createdAt: 'DESC' },
     });
     return rows.map((row) => ({
       id: row.id,
@@ -40,9 +45,7 @@ export class MySessionsService {
     sessionId: string,
     currentRefreshToken?: string,
   ) {
-    const row = await this.prisma.refreshToken.findUnique({
-      where: { id: sessionId },
-    });
+    const row = await this.refreshTokenRepo.findOneBy({ id: sessionId });
     if (!row || row.userId !== user.id || row.revokedAt) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -58,10 +61,10 @@ export class MySessionsService {
         message: 'برای خروج از این دستگاه از دکمه خروج حساب استفاده کنید.',
       });
     }
-    await this.prisma.refreshToken.update({
-      where: { id: sessionId },
-      data: { revokedAt: new Date() },
-    });
+    await this.refreshTokenRepo.update(
+      { id: sessionId },
+      { revokedAt: new Date() },
+    );
     return { revoked: true };
   }
 }
