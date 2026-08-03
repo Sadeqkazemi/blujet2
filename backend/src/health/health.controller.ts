@@ -3,16 +3,14 @@ import { ApiExcludeEndpoint } from '@nestjs/swagger';
 import {
   HealthCheck,
   HealthCheckService,
-  PrismaHealthIndicator,
+  TypeOrmHealthIndicator,
 } from '@nestjs/terminus';
-import { PrismaService } from '../prisma/prisma.service';
 
 @Controller('health')
 export class HealthController {
   constructor(
     private readonly health: HealthCheckService,
-    private readonly prismaIndicator: PrismaHealthIndicator,
-    private readonly prisma: PrismaService,
+    private readonly typeOrmIndicator: TypeOrmHealthIndicator,
   ) {}
 
   // Public, unauthenticated, rate-limit-exempt — used by Docker healthcheck + uptime monitoring.
@@ -21,7 +19,7 @@ export class HealthController {
   @HealthCheck()
   check() {
     return this.health.check([
-      () => this.prismaIndicator.pingCheck('database', this.prisma),
+      () => this.typeOrmIndicator.pingCheck('database'),
       () => ({
         build: {
           status: 'up',

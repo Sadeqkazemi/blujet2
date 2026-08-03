@@ -4,9 +4,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { PrismaService } from '../../prisma/prisma.service';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { SurveySettings } from '../../database/entities/survey-settings.entity';
 import { SurveyQuestion } from '../../database/entities/survey-question.entity';
 import { SurveyInvite } from '../../database/entities/survey-invite.entity';
@@ -35,9 +34,8 @@ const FALLBACK_SUMMARY = 'خلاصه‌ای از نظرات این پرواز د
 @Injectable()
 export class SurveyService {
   constructor(
-    // Kept solely to call the shared, still-Prisma-based
-    // materializeFlownBookings() (same precedent as PnrService).
-    private readonly prisma: PrismaService,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
     @InjectRepository(SurveySettings)
     private readonly settingsRepo: Repository<SurveySettings>,
     @InjectRepository(SurveyQuestion)
@@ -60,7 +58,7 @@ export class SurveyService {
 
   private async materialize(): Promise<void> {
     await materializeSurveyInvites(
-      this.prisma,
+      this.dataSource,
       this.bookingRepo,
       this.inviteRepo,
       this.settingsRepo,

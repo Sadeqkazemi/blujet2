@@ -1,7 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { In, IsNull, Not, Raw, Repository } from 'typeorm';
-import { PrismaService } from '../../prisma/prisma.service';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, In, IsNull, Not, Raw, Repository } from 'typeorm';
 import { AgenciesService } from '../agencies/agencies.service';
 import { ErrorCode } from '../../common/errors';
 import { materializeDepartedInstances } from '../flights/flight-lifecycle.util';
@@ -38,7 +37,8 @@ const LOW_SALES_OCCUPANCY_THRESHOLD = 0.6;
 @Injectable()
 export class ReportingService {
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
     private readonly agencies: AgenciesService,
     @InjectRepository(LedgerEntry)
     private readonly ledgerEntryRepo: Repository<LedgerEntry>,
@@ -527,7 +527,7 @@ export class ReportingService {
       params,
     );
 
-    await materializeDepartedInstances(this.prisma);
+    await materializeDepartedInstances(this.dataSource);
 
     const qb = this.flightInstanceRepo
       .createQueryBuilder('fi')

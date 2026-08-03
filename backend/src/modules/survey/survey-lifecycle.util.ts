@@ -1,5 +1,4 @@
-import type { Repository } from 'typeorm';
-import type { PrismaService } from '../../prisma/prisma.service';
+import type { DataSource, Repository } from 'typeorm';
 import type { SmsService } from '../sms/sms.service';
 import { SurveyInvite } from '../../database/entities/survey-invite.entity';
 import { SurveySettings } from '../../database/entities/survey-settings.entity';
@@ -41,13 +40,13 @@ async function sendInviteSms(
  * docs/DB_SCHEMA.md's Phase 66 section.
  */
 export async function materializeSurveyInvites(
-  prisma: PrismaService,
+  dataSource: DataSource,
   bookingRepo: Repository<Booking>,
   inviteRepo: Repository<SurveyInvite>,
   settingsRepo: Repository<SurveySettings>,
   sms: SmsService,
 ): Promise<void> {
-  await materializeFlownBookings(prisma);
+  await materializeFlownBookings(dataSource);
 
   const settings = await settingsRepo.findOne({
     where: {},
