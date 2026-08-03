@@ -2156,7 +2156,7 @@ class Component extends DCLogic {
     // other managers whose accounts the CEO can manage (suspend/activate/reset) — NOT مدیر ارشد
     const _pwManaged = (this.state.role === "senior") ? [] : [
       { name:"مدیر مالی", user:"finance.karimi", initial:"مم", color:"#34d399" },
-      { name:"مدیر بازرگانی", user:"comm.abbasi", initial:"مب", color:"#a855f7" },
+      { name:"مدیر بازرگانی", user:"comm", initial:"مب", color:"#a855f7" },
       { name:"ادمین سایت", user:"site.admin", initial:"اس", color:"#60a5fa" },
       { name:"مدیر IT", user:"itadmin", initial:"مف", color:"#f59e0b" }
     ];

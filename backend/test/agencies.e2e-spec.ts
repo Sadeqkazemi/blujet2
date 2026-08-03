@@ -98,7 +98,7 @@ describe('Agencies (e2e)', () => {
   // ── Listing & detail ────────────────────────────────────────────────
 
   it('GET /agencies returns the same 4 KPI cards for all 3 agency-tab roles', async () => {
-    for (const username of ['senior', 'finance.karimi', 'comm.abbasi']) {
+    for (const username of ['senior', 'finance.karimi', 'comm']) {
       const { accessToken } = await loginAs(app, username);
       const res = await request(app.getHttpServer())
         .get('/agencies')
@@ -153,7 +153,7 @@ describe('Agencies (e2e)', () => {
     await addAgencySale(debtor, 500_000_000);
     const healthy = await createFreshAgency();
 
-    const { accessToken } = await loginAs(app, 'comm.abbasi');
+    const { accessToken } = await loginAs(app, 'comm');
     const res = await request(app.getHttpServer())
       .get('/agencies?debtorsOnly=true')
       .set('Authorization', `Bearer ${accessToken}`);
@@ -206,7 +206,7 @@ describe('Agencies (e2e)', () => {
     const agencyId = await createFreshAgency();
     const instance = await typeorm.flightInstance.findFirstOrThrow();
     const commercial = await typeorm.user.findFirstOrThrow({
-      where: { username: 'comm.abbasi' },
+      where: { username: 'comm' },
     });
 
     // 2 ticketed bookings, 1 paid invoice, 1 unpaid invoice, agency active
@@ -351,7 +351,7 @@ describe('Agencies (e2e)', () => {
 
   it('POST /settle is 403 for COMMERCIAL_MANAGER', async () => {
     const agencyId = await createFreshAgency();
-    const { accessToken } = await loginAs(app, 'comm.abbasi');
+    const { accessToken } = await loginAs(app, 'comm');
     const res = await request(app.getHttpServer())
       .post(`/agencies/${agencyId}/settle`)
       .set('Authorization', `Bearer ${accessToken}`);
@@ -392,7 +392,7 @@ describe('Agencies (e2e)', () => {
 
   it('approving a request creates both User(role=AGENCY) and AgencyProfile transactionally', async () => {
     const reqRow = await createFreshMembershipRequest('PENDING');
-    const { accessToken } = await loginAs(app, 'comm.abbasi');
+    const { accessToken } = await loginAs(app, 'comm');
 
     const res = await request(app.getHttpServer())
       .patch(`/agencies/requests/${reqRow.id}/approve`)
@@ -441,7 +441,7 @@ describe('Agencies (e2e)', () => {
 
   it('approving an already-decided request -> 409, not a silent overwrite', async () => {
     const reqRow = await createFreshMembershipRequest('PENDING');
-    const { accessToken } = await loginAs(app, 'comm.abbasi');
+    const { accessToken } = await loginAs(app, 'comm');
 
     const first = await request(app.getHttpServer())
       .patch(`/agencies/requests/${reqRow.id}/approve`)
@@ -552,7 +552,7 @@ describe('Agencies (e2e)', () => {
       .send(body);
     expect(financeRes.status).toBe(403);
 
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
     const commercialRes = await request(app.getHttpServer())
       .post(`/agencies/${agencyId}/invoices`)
       .set('Authorization', `Bearer ${commercial.accessToken}`)
@@ -562,7 +562,7 @@ describe('Agencies (e2e)', () => {
 
   it('GET .../invoices is 200 (read) for all 3 roles', async () => {
     const agencyId = await createFreshAgency();
-    for (const username of ['senior', 'finance.karimi', 'comm.abbasi']) {
+    for (const username of ['senior', 'finance.karimi', 'comm']) {
       const { accessToken } = await loginAs(app, username);
       const res = await request(app.getHttpServer())
         .get(`/agencies/${agencyId}/invoices`)
@@ -573,7 +573,7 @@ describe('Agencies (e2e)', () => {
 
   it('paying an invoice writes exactly one SETTLEMENT ledger entry and is idempotent (double pay -> 409)', async () => {
     const agencyId = await createFreshAgency();
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
     const issued = await request(app.getHttpServer())
       .post(`/agencies/${agencyId}/invoices`)
       .set('Authorization', `Bearer ${commercial.accessToken}`)
@@ -616,7 +616,7 @@ describe('Agencies (e2e)', () => {
       .send({ body: 'سلام' });
     expect(financePost.status).toBe(403);
 
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
     const commercialRes = await request(app.getHttpServer())
       .post(`/agencies/${agencyId}/messages`)
       .set('Authorization', `Bearer ${commercial.accessToken}`)

@@ -33,7 +33,7 @@ async function seedInstance(page: Page): Promise<void> {
 }
 
 async function proposeOnFreshFlight(page: Page, tomanPrice: string): Promise<void> {
-  await loginAs(page, 'comm.abbasi');
+  await loginAs(page, 'comm');
   await seedInstance(page);
   await page.getByRole('link', { name: /^مدیریت پروازها/ }).click();
   await expect(page.getByText('تعیین قیمت پرواز و ارسال به مدیر عامل')).toBeVisible();
@@ -107,7 +107,7 @@ test.describe.serial('pricing', () => {
       await expect(page.getByText('قیمت پرواز تأیید و ثبت شد ✓')).toBeVisible();
 
       // Back as Commercial: the row is locked and the modal shows the locked state.
-      await loginAs(page, 'comm.abbasi');
+      await loginAs(page, 'comm');
       await page.getByRole('link', { name: /^مدیریت پروازها/ }).click();
       await expect(page.getByText('تأییدشده و قفل‌شده').first()).toBeVisible();
       await expect(page.getByRole('button', { name: 'قفل‌شده' }).first()).toBeDisabled();

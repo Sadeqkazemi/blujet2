@@ -24,13 +24,19 @@ async function main() {
   const staff: { username: string; fullName: string; role: 'EMPLOYEE' | 'IT_MANAGER' | 'COMMERCIAL_MANAGER' | 'FINANCE_MANAGER' | 'SENIOR_MANAGER' | 'CEO' | 'BOARD_CHAIR' | 'SITE_ADMIN' }[] = [
     { username: 'com.ahmadi', fullName: 'رضا احمدی', role: 'EMPLOYEE' },
     { username: 'itadmin', fullName: 'مهندس علی صدر', role: 'IT_MANAGER' },
-    { username: 'comm.abbasi', fullName: 'رضا مرادی', role: 'COMMERCIAL_MANAGER' },
+    { username: 'comm', fullName: 'رضا مرادی', role: 'COMMERCIAL_MANAGER' },
     { username: 'finance.karimi', fullName: 'سحر کاظمی', role: 'FINANCE_MANAGER' },
     { username: 'senior', fullName: 'محمد رحیمی', role: 'SENIOR_MANAGER' },
     { username: 'ceo', fullName: 'محمد رحیمی', role: 'CEO' },
     { username: 'chair', fullName: 'رئیس هیئت مدیره', role: 'BOARD_CHAIR' },
     { username: 'site.admin', fullName: 'ادمین سایت', role: 'SITE_ADMIN' },
   ];
+
+  // Rename legacy seed username so re-seed on existing DBs picks up `comm`.
+  await typeorm.user.updateMany({
+    where: { username: 'comm.abbasi' },
+    data: { username: 'comm' },
+  });
 
   const staffByUsername = new Map<string, { id: string }>();
   for (const s of staff) {
@@ -49,7 +55,7 @@ async function main() {
     staffByUsername.set(s.username, user);
   }
   const seniorManager = staffByUsername.get('senior')!;
-  const commercialManager = staffByUsername.get('comm.abbasi')!;
+  const commercialManager = staffByUsername.get('comm')!;
   const financeManager = staffByUsername.get('finance.karimi')!;
 
   await typeorm.user.upsert({

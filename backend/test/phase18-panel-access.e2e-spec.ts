@@ -258,7 +258,7 @@ describe('Phase 18 — SITE_ADMIN + EMPLOYEE panel access (e2e)', () => {
       const { accessToken } = await loginAs(app, 'site.admin');
       const reqRow = await createAgencyRequest();
       const comm = await typeorm.user.findUniqueOrThrow({
-        where: { username: 'comm.abbasi' },
+        where: { username: 'comm' },
       });
 
       const res = await request(app.getHttpServer())
