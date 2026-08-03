@@ -940,52 +940,54 @@ function FlightSalesPicker({
           پروازی با این مشخصات یافت نشد.
         </div>
       ) : (
-        <div
-          className="flex max-w-[430px] flex-col gap-[9px]"
-          data-testid="flight-sales-list"
-        >
-          {filteredPager.pageItems.map((r) => {
-            const on = r.flightNo === selectedFlightNo;
-            const meta =
-              r.flightCount > 1
-                ? `${faDigits(r.flightCount)} پرواز`
-                : formatJalaliDate(r.departureAt);
-            return (
-              <button
-                key={r.flightNo}
-                type="button"
-                onClick={() => onSelect(r)}
-                aria-pressed={on}
-                className={`flex w-full items-center justify-between gap-2.5 rounded-xl border px-[13px] py-[11px] text-start transition ${
-                  on
-                    ? 'border-[#3b82f6] bg-[rgba(59,130,246,.16)] shadow-[0_0_0_1px_rgba(59,130,246,.35)]'
-                    : 'border-[#1f2a3d] bg-[#141d2e] hover:border-[#28344c]'
-                }`}
-              >
-                <div className="min-w-0 leading-normal">
-                  <div className={`text-[12.5px] font-extrabold ${on ? 'text-white' : 'text-[#e7ecf3]'}`}>
-                    {r.originCityFa} ← {r.destCityFa}
+        <>
+          <div
+            className="flex max-w-[430px] flex-col gap-[9px]"
+            data-testid="flight-sales-list"
+          >
+            {filteredPager.pageItems.map((r) => {
+              const on = r.flightNo === selectedFlightNo;
+              const meta =
+                r.flightCount > 1
+                  ? `${faDigits(r.flightCount)} پرواز`
+                  : formatJalaliDate(r.departureAt);
+              return (
+                <button
+                  key={r.flightNo}
+                  type="button"
+                  onClick={() => onSelect(r)}
+                  aria-pressed={on}
+                  className={`flex w-full items-center justify-between gap-2.5 rounded-xl border px-[13px] py-[11px] text-start transition ${
+                    on
+                      ? 'border-[#3b82f6] bg-[rgba(59,130,246,.16)] shadow-[0_0_0_1px_rgba(59,130,246,.35)]'
+                      : 'border-[#1f2a3d] bg-[#141d2e] hover:border-[#28344c]'
+                  }`}
+                >
+                  <div className="min-w-0 leading-normal">
+                    <div className={`text-[12.5px] font-extrabold ${on ? 'text-white' : 'text-[#e7ecf3]'}`}>
+                      {r.originCityFa} ← {r.destCityFa}
+                    </div>
+                    <div className="text-[10px] text-[#6b7b94]">
+                      پرواز <span dir="ltr">{r.flightNo}</span> · {meta}
+                    </div>
                   </div>
-                  <div className="text-[10px] text-[#6b7b94]">
-                    پرواز <span dir="ltr">{r.flightNo}</span> · {meta}
+                  <div className="shrink-0 text-left whitespace-nowrap">
+                    <div className="font-num text-xs font-extrabold text-[#60a5fa]">
+                      {faMoneyCompact(r.totalIrr)}
+                    </div>
+                    <div className="text-[9px] text-[#6b7b94]">فروش</div>
                   </div>
-                </div>
-                <div className="shrink-0 text-left whitespace-nowrap">
-                  <div className="font-num text-xs font-extrabold text-[#60a5fa]">
-                    {faMoneyCompact(r.totalIrr)}
-                  </div>
-                  <div className="text-[9px] text-[#6b7b94]">فروش</div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-        <Pagination
-          page={filteredPager.page}
-          totalPages={filteredPager.totalPages}
-          onChange={filteredPager.setPage}
-          variant="dark"
-        />
+                </button>
+              );
+            })}
+          </div>
+          <Pagination
+            page={filteredPager.page}
+            totalPages={filteredPager.totalPages}
+            onChange={filteredPager.setPage}
+            variant="dark"
+          />
+        </>
       )}
     </div>
   );
