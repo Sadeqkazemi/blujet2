@@ -3,21 +3,19 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
 import * as crypto from 'node:crypto';
-import { TypeORMService } from '../../typeorm/typeorm.service';
+import { Repository } from 'typeorm';
+import { SupportTicket } from '../../database/entities/support-ticket.entity';
+import { User } from '../../database/entities/user.entity';
+import type { JsonValue } from '../../database/json-types';
 import { AuditService } from '../audit/audit.service';
 import { StaffDirectoryService } from '../staff-directory/staff-directory.module';
 import { ErrorCode } from '../../common/errors';
 import { normalizeIranPhone } from '../../common/normalize-iran-phone';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import type {
-  TypeORM,
-  SupportTicketStatus,
-} from '../../../generated/typeorm/client';
-import type { SubmitSupportTicketDto, AdminCreateSupportTicketDto } from './dto/support-ticket.dtos';
-
-/** Staff-created tickets without a phone use this sentinel (schema requires a string). */
-const STAFF_TICKET_PHONE_SENTINEL = '09000000000';
+import { SupportTicketStatus } from '../../database/enums';
+import type { SubmitSupportTicketDto } from './dto/support-ticket.dtos';
 
 function generateTrackingCode(): string {
   return `TK${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
@@ -37,19 +35,23 @@ const CUSTOMER_TICKET_SELECT = {
 @Injectable()
 export class SupportTicketsService {
   constructor(
-    private readonly typeorm: TypeORMService,
+    @InjectRepository(SupportTicket)
+    private readonly ticketRepo: Repository<SupportTicket>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
     private readonly audit: AuditService,
     private readonly staffDirectory: StaffDirectoryService,
   ) {}
 
   async submit(dto: SubmitSupportTicketDto) {
-    const ticket = await this.typeorm.supportTicket.create({
-      data: {
+    const ticket = await this.ticketRepo.save(
+      this.ticketRepo.create({
         trackingCode: generateTrackingCode(),
         requesterName: dto.requesterName,
         requesterPhone: normalizeIranPhone(dto.requesterPhone),
         subject: dto.subject,
         body: dto.body,
+        updatedAt: new Date(),
         history: [
           {
             step: 'submitted',
@@ -57,61 +59,21 @@ export class SupportTicketsService {
             at: new Date().toISOString(),
           },
         ],
-      },
-    });
+      }),
+    );
     return { id: ticket.id, trackingCode: ticket.trackingCode };
   }
 
-  /** SITE_ADMIN create-ticket modal — sets dept/priority at insert time. */
-  async createAsAdmin(actor: AuthenticatedUser, dto: AdminCreateSupportTicketDto) {
-    const phoneRaw = dto.requesterPhone?.trim();
-    const phone = phoneRaw
-      ? normalizeIranPhone(phoneRaw)
-      : STAFF_TICKET_PHONE_SENTINEL;
-    const ticket = await this.typeorm.supportTicket.create({
-      data: {
-        trackingCode: generateTrackingCode(),
-        requesterName: dto.requesterName,
-        requesterPhone: phone,
-        subject: dto.subject,
-        body: dto.body,
-        dept: dto.dept,
-        priority: dto.priority,
-        history: [
-          {
-            step: 'submitted',
-            labelFa: `ثبت تیکت توسط ${actor.fullName} (ادمین سایت)`,
-            at: new Date().toISOString(),
-          },
-        ],
-      },
-      include: {
-        forwardedTo: { select: { id: true, fullName: true, role: true } },
-      },
-    });
-
-    await this.audit.record({
-      actorId: actor.id,
-      actorRole: actor.role,
-      category: 'SYSTEM',
-      action: 'ثبت تیکت پشتیبانی توسط ادمین',
-      detail: `تیکت ${ticket.trackingCode} («${ticket.subject}») توسط ${actor.fullName} ثبت شد.`,
-      entityType: 'SupportTicket',
-      entityId: ticket.id,
-    });
-
-    return ticket;
-  }
-
   async submitForUser(actor: AuthenticatedUser, dto: SubmitSupportTicketDto) {
-    const ticket = await this.typeorm.supportTicket.create({
-      data: {
+    const ticket = await this.ticketRepo.save(
+      this.ticketRepo.create({
         userId: actor.id,
         trackingCode: generateTrackingCode(),
         requesterName: dto.requesterName,
         requesterPhone: normalizeIranPhone(dto.requesterPhone),
         subject: dto.subject,
         body: dto.body,
+        updatedAt: new Date(),
         history: [
           {
             step: 'submitted',
@@ -119,46 +81,46 @@ export class SupportTicketsService {
             at: new Date().toISOString(),
           },
         ],
-      },
-      select: CUSTOMER_TICKET_SELECT,
-    });
+      }),
+    );
     return { id: ticket.id, trackingCode: ticket.trackingCode };
   }
 
   private async callerPhone(userId: string): Promise<string | null> {
-    const user = await this.typeorm.user.findUnique({
+    const user = await this.userRepo.findOne({
       where: { id: userId },
       select: { phone: true },
     });
     return user?.phone ?? null;
   }
 
-  private customerTicketWhere(
-    userId: string,
-    phone: string | null,
-  ): TypeORM.SupportTicketWhereInput {
-    const or: TypeORM.SupportTicketWhereInput[] = [{ userId }];
+  private customerTicketQuery(userId: string, phone: string | null) {
+    const qb = this.ticketRepo
+      .createQueryBuilder('t')
+      .select(Object.keys(CUSTOMER_TICKET_SELECT).map((k) => `t.${k}`));
     if (phone) {
-      or.push({ userId: null, requesterPhone: phone });
+      qb.where(
+        '(t."userId" = :userId OR (t."userId" IS NULL AND t."requesterPhone" = :phone))',
+        { userId, phone },
+      );
+    } else {
+      qb.where('t."userId" = :userId', { userId });
     }
-    return { OR: or };
+    return qb;
   }
 
   async listMine(actor: AuthenticatedUser) {
     const phone = await this.callerPhone(actor.id);
-    return this.typeorm.supportTicket.findMany({
-      where: this.customerTicketWhere(actor.id, phone),
-      select: CUSTOMER_TICKET_SELECT,
-      orderBy: { createdAt: 'desc' },
-    });
+    return this.customerTicketQuery(actor.id, phone)
+      .orderBy('t.createdAt', 'DESC')
+      .getMany();
   }
 
   async getMine(actor: AuthenticatedUser, id: string) {
     const phone = await this.callerPhone(actor.id);
-    const ticket = await this.typeorm.supportTicket.findFirst({
-      where: { id, ...this.customerTicketWhere(actor.id, phone) },
-      select: CUSTOMER_TICKET_SELECT,
-    });
+    const ticket = await this.customerTicketQuery(actor.id, phone)
+      .andWhere('t.id = :id', { id })
+      .getOne();
     if (!ticket) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -172,25 +134,22 @@ export class SupportTicketsService {
     status?: SupportTicketStatus;
     dept?: 'SITE' | 'AGENCY';
   }) {
-    return this.typeorm.supportTicket.findMany({
+    return this.ticketRepo.find({
       where: {
         ...(filters.status ? { status: filters.status } : {}),
         ...(filters.dept ? { dept: filters.dept } : {}),
       },
-      include: {
-        forwardedTo: { select: { id: true, fullName: true, role: true } },
-      },
-      orderBy: { createdAt: 'desc' },
+      relations: { forwardedTo: true },
+      order: { createdAt: 'DESC' },
     });
   }
 
   private async getOrThrow(id: string) {
-    const ticket = await this.typeorm.supportTicket.findUnique({
-      where: { id },
-      include: {
-        forwardedTo: { select: { id: true, fullName: true, role: true } },
-      },
-    });
+    const ticket = await this.ticketRepo
+      .createQueryBuilder('t')
+      .leftJoinAndSelect('t.forwardedTo', 'forwardedTo')
+      .where('t.id = :id', { id })
+      .getOne();
     if (!ticket) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -231,17 +190,15 @@ export class SupportTicketsService {
       at: new Date().toISOString(),
     });
 
-    const updated = await this.typeorm.supportTicket.update({
-      where: { id },
-      data: {
-        forwardedToId: targetUserId,
-        status: ticket.status === 'OPEN' ? 'IN_PROGRESS' : ticket.status,
-        history: history as TypeORM.InputJsonValue,
-      },
-      include: {
-        forwardedTo: { select: { id: true, fullName: true, role: true } },
-      },
-    });
+    ticket.forwardedToId = targetUserId;
+    ticket.status =
+      ticket.status === SupportTicketStatus.OPEN
+        ? SupportTicketStatus.IN_PROGRESS
+        : ticket.status;
+    ticket.history = history as JsonValue;
+    ticket.updatedAt = new Date();
+    await this.ticketRepo.save(ticket);
+    const updated = await this.getOrThrow(id);
 
     await this.audit.record({
       actorId: actor.id,
@@ -272,13 +229,11 @@ export class SupportTicketsService {
       at: new Date().toISOString(),
     });
 
-    const updated = await this.typeorm.supportTicket.update({
-      where: { id },
-      data: { status, history: history as TypeORM.InputJsonValue },
-      include: {
-        forwardedTo: { select: { id: true, fullName: true, role: true } },
-      },
-    });
+    ticket.status = status;
+    ticket.history = history as JsonValue;
+    ticket.updatedAt = new Date();
+    await this.ticketRepo.save(ticket);
+    const updated = await this.getOrThrow(id);
 
     await this.audit.record({
       actorId: actor.id,

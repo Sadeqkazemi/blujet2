@@ -1,6 +1,7 @@
+import { Repository } from 'typeorm';
 import { KavenegarSmsProvider } from './kavenegar-sms.provider';
 import { MockSmsProvider } from './mock-sms.provider';
-import { TypeORMService } from '../../typeorm/typeorm.service';
+import { ExternalServiceConfig } from '../../database/entities/external-service-config.entity';
 import { encryptPii } from '../pii-crypto';
 
 describe('KavenegarSmsProvider (unit)', () => {
@@ -16,12 +17,10 @@ describe('KavenegarSmsProvider (unit)', () => {
     process.env.KAVENEGAR_SENDER_LINE = originalSender;
   });
 
-  function makeTypeORM(config: unknown) {
+  function makeConfigRepo(config: unknown) {
     return {
-      externalServiceConfig: {
-        findUnique: jest.fn().mockResolvedValue(config),
-      },
-    } as unknown as TypeORMService;
+      findOneBy: jest.fn().mockResolvedValue(config),
+    } as unknown as Repository<ExternalServiceConfig>;
   }
 
   it('falls back to the mock provider when no ExternalServiceConfig row exists (never a real network call)', async () => {
@@ -30,7 +29,7 @@ describe('KavenegarSmsProvider (unit)', () => {
     const mock = new MockSmsProvider();
     const mockSend = jest.spyOn(mock, 'send');
 
-    const provider = new KavenegarSmsProvider(makeTypeORM(null), mock);
+    const provider = new KavenegarSmsProvider(makeConfigRepo(null), mock);
     const result = await provider.send('09121234567', 'کد شما: 1234', 'OTP');
 
     expect(result).toEqual({ success: true });
@@ -44,7 +43,10 @@ describe('KavenegarSmsProvider (unit)', () => {
     const mock = new MockSmsProvider();
 
     const provider = new KavenegarSmsProvider(
-      makeTypeORM({ enabled: false, apiKeyEncrypted: encryptPii('real-key') }),
+      makeConfigRepo({
+        enabled: false,
+        apiKeyEncrypted: encryptPii('real-key'),
+      }),
       mock,
     );
     const result = await provider.send('09121234567', 'پیام', 'OTP');
@@ -59,7 +61,7 @@ describe('KavenegarSmsProvider (unit)', () => {
     const mock = new MockSmsProvider();
 
     const provider = new KavenegarSmsProvider(
-      makeTypeORM({ enabled: true, apiKeyEncrypted: null }),
+      makeConfigRepo({ enabled: true, apiKeyEncrypted: null }),
       mock,
     );
     const result = await provider.send('09121234567', 'پیام', 'OTP');
@@ -79,7 +81,7 @@ describe('KavenegarSmsProvider (unit)', () => {
     global.fetch = fetchMock;
 
     const provider = new KavenegarSmsProvider(
-      makeTypeORM({
+      makeConfigRepo({
         enabled: true,
         apiKeyEncrypted: encryptPii('real-kavenegar-key'),
       }),
@@ -107,7 +109,10 @@ describe('KavenegarSmsProvider (unit)', () => {
     });
 
     const provider = new KavenegarSmsProvider(
-      makeTypeORM({ enabled: true, apiKeyEncrypted: encryptPii('real-key') }),
+      makeConfigRepo({
+        enabled: true,
+        apiKeyEncrypted: encryptPii('real-key'),
+      }),
       new MockSmsProvider(),
     );
     const result = await provider.send('09121234567', 'پیام', 'OTP');
@@ -122,7 +127,10 @@ describe('KavenegarSmsProvider (unit)', () => {
       .mockRejectedValue(new Error('network unreachable'));
 
     const provider = new KavenegarSmsProvider(
-      makeTypeORM({ enabled: true, apiKeyEncrypted: encryptPii('real-key') }),
+      makeConfigRepo({
+        enabled: true,
+        apiKeyEncrypted: encryptPii('real-key'),
+      }),
       new MockSmsProvider(),
     );
     const result = await provider.send('09121234567', 'پیام', 'OTP');

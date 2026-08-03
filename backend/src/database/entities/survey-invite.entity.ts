@@ -1,4 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import {
+  BeforeInsert,
   Column,
   CreateDateColumn,
   Entity,
@@ -20,6 +22,11 @@ export class SurveyInvite {
     primaryKeyConstraintName: 'survey_invites_pkey',
   })
   id!: string;
+
+  @BeforeInsert()
+  generateId() {
+    this.id ??= randomUUID();
+  }
 
   @Column({ type: 'text' })
   bookingId!: string;
@@ -46,6 +53,11 @@ export class SurveyInvite {
 
   @Column({ type: 'text' })
   token!: string;
+
+  @BeforeInsert()
+  generateToken() {
+    this.token ??= randomUUID();
+  }
 
   @Column({ type: 'timestamp', precision: 3, nullable: true })
   smsSentAt!: Date | null;
