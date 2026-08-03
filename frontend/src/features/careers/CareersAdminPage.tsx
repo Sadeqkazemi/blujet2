@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  createPosting,
   fetchAllPostings,
   fetchApplicationDetail,
   fetchApplicationResume,
@@ -8,7 +7,6 @@ import {
   hireApplication,
   referApplication,
   rejectApplication,
-  updatePosting,
 } from '../../api/careers';
 import { faDigits } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
@@ -16,115 +14,52 @@ import Modal from '../../components/Modal';
 import Pagination from '../../components/Pagination';
 import { usePagination } from '../../hooks/usePagination';
 import type {
-  CreateJobPostingInput,
   JobApplicationDetail,
   JobApplicationRow,
   JobApplicationStatus,
   JobPosting,
-  JobType,
 } from '../../types/careers';
 
-const JOB_TYPE_LABELS: Record<JobType, string> = {
-  FULL_TIME: 'تمام‌وقت',
-  REMOTE: 'دورکاری',
-  PART_TIME: 'پاره‌وقت',
-};
-
 const STATUS_META: Record<JobApplicationStatus, { label: string; className: string }> = {
-  SUBMITTED: { label: 'در انتظار بررسی', className: 'bg-[#f59e0b24] text-[#b45309]' },
-  REFERRED: { label: 'ارجاع‌شده', className: 'bg-[#a855f72e] text-[#7c3aed]' },
-  HIRED: { label: 'استخدام شد', className: 'bg-[#10b98124] text-[#059669]' },
-  REJECTED: { label: 'رد شد', className: 'bg-[#ef444424] text-[#b91c1c]' },
+  SUBMITTED: { label: 'در انتظار بررسی', className: 'bg-[rgba(245,158,11,.14)] text-[#f59e0b]' },
+  REFERRED: { label: 'ارجاع‌شده', className: 'bg-[rgba(168,85,247,.16)] text-[#c084fc]' },
+  HIRED: { label: 'استخدام شد', className: 'bg-[rgba(52,211,153,.14)] text-[#34d399]' },
+  REJECTED: { label: 'رد شد', className: 'bg-[rgba(248,113,113,.14)] text-[#f87171]' },
 };
 
-const emptyForm: CreateJobPostingInput = {
-  title: '',
-  dept: '',
-  city: '',
-  type: 'FULL_TIME',
-  generalReqs: [],
-  specialReqs: [],
-};
-
+/**
+ * SITE_ADMIN «درخواست‌های استخدام» — applications queue only.
+ * Job posting CRUD lives on مدیریت سایت (MediaAdminPage).
+ */
 export default function CareersAdminPage() {
-  const [tab, setTab] = useState<'postings' | 'applications'>('postings');
-
   const [postings, setPostings] = useState<JobPosting[] | null>(null);
-  const [editing, setEditing] = useState<JobPosting | null>(null);
-  const [formOpen, setFormOpen] = useState(false);
-  const [form, setForm] = useState<CreateJobPostingInput>(emptyForm);
-  const [generalReqsText, setGeneralReqsText] = useState('');
-  const [specialReqsText, setSpecialReqsText] = useState('');
-
   const [applications, setApplications] = useState<JobApplicationRow[] | null>(null);
   const [q, setQ] = useState('');
+  const [jobFilter, setJobFilter] = useState('');
   const [detail, setDetail] = useState<JobApplicationDetail | null>(null);
   const [assigneePick, setAssigneePick] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const loadPostings = useCallback(async () => {
+  const loadApplications = useCallback(async (query?: string, jobTitle?: string) => {
     try {
-      setPostings(await fetchAllPostings());
-    } catch {
-      setError('خطا در دریافت فرصت‌های شغلی.');
-    }
-  }, []);
-
-  const loadApplications = useCallback(async (query?: string) => {
-    try {
-      setApplications(await fetchApplications(query ? { q: query } : undefined));
+      setApplications(
+        await fetchApplications({
+          ...(query ? { q: query } : {}),
+          ...(jobTitle ? { jobTitle } : {}),
+        }),
+      );
     } catch {
       setError('خطا در دریافت درخواست‌های استخدام.');
     }
   }, []);
 
   useEffect(() => {
-    void loadPostings();
     void loadApplications();
-  }, [loadPostings, loadApplications]);
-
-  function openCreate() {
-    setEditing(null);
-    setForm(emptyForm);
-    setGeneralReqsText('');
-    setSpecialReqsText('');
-    setFormOpen(true);
-  }
-
-  function openEdit(p: JobPosting) {
-    setEditing(p);
-    setForm({ title: p.title, dept: p.dept, city: p.city, type: p.type, generalReqs: p.generalReqs, specialReqs: p.specialReqs });
-    setGeneralReqsText(p.generalReqs.join('\n'));
-    setSpecialReqsText(p.specialReqs.join('\n'));
-    setFormOpen(true);
-  }
-
-  async function onSaveForm() {
-    const generalReqs = generalReqsText.split('\n').map((s) => s.trim()).filter(Boolean);
-    const specialReqs = specialReqsText.split('\n').map((s) => s.trim()).filter(Boolean);
-    const payload = { ...form, generalReqs, specialReqs };
-    try {
-      if (editing) {
-        await updatePosting(editing.id, payload);
-      } else {
-        await createPosting(payload);
-      }
-      setFormOpen(false);
-      await loadPostings();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'خطا در ذخیره فرصت شغلی.');
-    }
-  }
-
-  async function onToggleActive(p: JobPosting) {
-    try {
-      await updatePosting(p.id, { active: !p.active });
-      await loadPostings();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'خطا در تغییر وضعیت.');
-    }
-  }
+    fetchAllPostings()
+      .then(setPostings)
+      .catch(() => setPostings([]));
+  }, [loadApplications]);
 
   async function openDetail(id: string) {
     setError(null);
@@ -143,7 +78,7 @@ export default function CareersAdminPage() {
       const target = detail.referralTargets.find((r) => r.id === assigneePick);
       setNotice(`درخواست به ${target?.labelFa ?? ''} ارجاع شد ✓`);
       setDetail(await fetchApplicationDetail(detail.id));
-      await loadApplications(q || undefined);
+      await loadApplications(q || undefined, jobFilter || undefined);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'خطا در ثبت ارجاع.');
     }
@@ -154,7 +89,7 @@ export default function CareersAdminPage() {
     try {
       await hireApplication(detail.id);
       setDetail(await fetchApplicationDetail(detail.id));
-      await loadApplications(q || undefined);
+      await loadApplications(q || undefined, jobFilter || undefined);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'خطا در ثبت استخدام.');
     }
@@ -165,7 +100,7 @@ export default function CareersAdminPage() {
     try {
       await rejectApplication(detail.id);
       setDetail(await fetchApplicationDetail(detail.id));
-      await loadApplications(q || undefined);
+      await loadApplications(q || undefined, jobFilter || undefined);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'خطا در ثبت رد درخواست.');
     }
@@ -185,260 +120,198 @@ export default function CareersAdminPage() {
     }
   }
 
-  const postingRows = postings ?? [];
-  const applicationRows = applications ?? [];
-  const postingRowsPager = usePagination(postingRows);
-  const applicationRowsPager = usePagination(applicationRows);
+  function runSearch() {
+    void loadApplications(q.trim() || undefined, jobFilter || undefined);
+  }
+
+  const rows = applications ?? [];
+  const pager = usePagination(rows);
+
+  useEffect(() => {
+    pager.setPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset on filter only
+  }, [q, jobFilter, applications]);
+
+  const jobOptions = useMemo(() => {
+    const titles = new Set<string>();
+    for (const p of postings ?? []) titles.add(p.title);
+    for (const a of rows) titles.add(a.jobTitle);
+    return Array.from(titles).sort((a, b) => a.localeCompare(b, 'fa'));
+  }, [postings, rows]);
 
   return (
-    <div className="p-8">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-black text-ink">فرصت‌های شغلی</h1>
-          <p className="mt-1 text-sm text-muted">آگهی‌های استخدام صفحه «همکاری با ما» و بررسی درخواست‌های ارسالی</p>
-        </div>
-        <div className="flex gap-2 rounded-xl border border-border bg-white p-1 text-xs font-bold">
-          <button
-            onClick={() => setTab('postings')}
-            className={`rounded-lg px-3 py-2 transition ${tab === 'postings' ? 'bg-accent text-white' : 'text-muted'}`}
-          >
-            آگهی‌ها
-          </button>
-          <button
-            onClick={() => setTab('applications')}
-            className={`rounded-lg px-3 py-2 transition ${tab === 'applications' ? 'bg-accent text-white' : 'text-muted'}`}
-          >
-            درخواست‌های استخدام
-          </button>
-        </div>
+    <div className="flex flex-col gap-[15px] px-[21px] pb-[34px] pt-[18px]">
+      <div>
+        <h1 className="m-0 text-[20.5px] font-black text-white">درخواست‌های استخدام</h1>
+        <p className="mt-1 text-[11.5px] text-[#6b7b94]">
+          فرم‌های استخدام و فایل‌های ارسالی متقاضیان – ارجاع به واحدهای مرتبط
+        </p>
       </div>
 
-      {error && <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">{error}</p>}
-      {notice && <p className="mb-4 rounded-lg bg-[#10b98115] p-3 text-sm text-[#059669]">{notice}</p>}
-
-      {tab === 'postings' && (
-        <section className="rounded-xl border border-border bg-white p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-sm font-bold text-ink">آگهی‌های استخدام</h2>
-            <button onClick={openCreate} className="rounded-lg bg-accent px-3 py-2 text-xs font-bold text-white">
-              + ایجاد فرصت شغلی
-            </button>
-          </div>
-
-          {postings === null ? (
-            <p className="py-6 text-center text-sm text-muted">در حال بارگذاری…</p>
-          ) : postingRows.length === 0 ? (
-            <p className="py-6 text-center text-xs text-muted">فرصت شغلی‌ای ثبت نشده است.</p>
-          ) : (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {postingRowsPager.pageItems.map((p) => (
-                <div key={p.id} className="rounded-xl border border-border bg-surface p-4">
-                  <div className="text-sm font-bold text-ink">{p.title}</div>
-                  <div className="mt-1 text-[11px] text-muted">
-                    {p.dept} · {p.city}
-                  </div>
-                  <div className="mt-3 flex items-center justify-between">
-                    <span className="rounded-full bg-surface-2 px-2.5 py-1 text-[10px] font-bold text-accent">
-                      {JOB_TYPE_LABELS[p.type]}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => void onToggleActive(p)} className="text-[11px] font-bold text-muted">
-                        {p.active ? 'غیرفعال‌سازی' : 'فعال‌سازی'}
-                      </button>
-                      <button onClick={() => openEdit(p)} className="text-[11px] font-bold text-accent">
-                        ویرایش
-                      </button>
-                    </div>
-                  </div>
-                  {!p.active && <div className="mt-2 text-[10px] font-bold text-danger">غیرفعال</div>}
-                </div>
-              ))}
-            </div>
-          )}
-          <Pagination
-            page={postingRowsPager.page}
-            totalPages={postingRowsPager.totalPages}
-            onChange={postingRowsPager.setPage}
-            variant="light"
-          />
-        </section>
+      {error && (
+        <p className="rounded-lg bg-[rgba(248,113,113,.12)] p-3 text-sm text-[#f87171]">{error}</p>
+      )}
+      {notice && (
+        <p className="rounded-lg bg-[rgba(52,211,153,.12)] p-3 text-sm text-[#34d399]">{notice}</p>
       )}
 
-      {tab === 'applications' && (
-        <section className="rounded-xl border border-border bg-white p-5">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <h2 className="text-sm font-bold text-ink">درخواست‌های استخدام</h2>
-            <div className="flex items-center gap-2">
-              <input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && void loadApplications(q || undefined)}
-                placeholder="جستجو نام، کد ملی، تلفن…"
-                className="h-9 rounded-lg border border-border px-2 text-xs outline-none"
-              />
-              <button
-                onClick={() => void loadApplications(q || undefined)}
-                className="rounded-lg border border-border px-3 py-2 text-xs font-bold text-ink"
-              >
-                جستجو
-              </button>
-            </div>
+      <section className="overflow-hidden rounded-[14px] border border-[#1f2a3d] bg-[#141d2e]">
+        <div className="border-b border-[#1f2a3d] px-[15px] py-[14px]">
+          <h2 className="m-0 text-[14.5px] font-extrabold text-white">فرم‌های ثبت‌شده در صفحات استخدام</h2>
+          <p className="mt-1 text-[11px] text-[#6b7b94]">
+            رزومه و مشخصات متقاضیان را ببینید و در صورت نیاز به واحد مرتبط ارجاع دهید
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && runSearch()}
+              placeholder="جستجو در نام، کد ملی، تلفن یا ایمیل…"
+              className="h-10 min-w-[220px] flex-1 rounded-[10px] border border-[#28344c] bg-[#18223a] px-3 text-[11.5px] text-[#e7ecf3] outline-none placeholder:text-[#6b7b94] focus:border-[#3b82f6]"
+            />
+            <select
+              aria-label="فیلتر آگهی"
+              value={jobFilter}
+              onChange={(e) => {
+                setJobFilter(e.target.value);
+                void loadApplications(q.trim() || undefined, e.target.value || undefined);
+              }}
+              className="h-10 rounded-[10px] border border-[#28344c] bg-[#18223a] px-3 text-[11.5px] text-[#e7ecf3] outline-none focus:border-[#3b82f6]"
+            >
+              <option value="">همۀ آگهی‌ها</option>
+              {jobOptions.map((title) => (
+                <option key={title} value={title}>
+                  {title}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={runSearch}
+              className="rounded-[10px] bg-[#3b82f6] px-3 py-2 text-[11.5px] font-bold text-white transition hover:bg-[#2563eb]"
+            >
+              جستجو
+            </button>
           </div>
+        </div>
 
-          {applications === null ? (
-            <p className="py-6 text-center text-sm text-muted">در حال بارگذاری…</p>
-          ) : applicationRows.length === 0 ? (
-            <p className="py-6 text-center text-xs text-muted">درخواستی ثبت نشده است.</p>
-          ) : (
-            <ul className="divide-y divide-border">
-              {applicationRowsPager.pageItems.map((a) => {
+        {applications === null ? (
+          <p className="py-10 text-center text-sm text-[#6b7b94]">در حال بارگذاری…</p>
+        ) : rows.length === 0 ? (
+          <p className="py-[40px] text-center text-xs text-[#6b7b94]">
+            هنوز فرمی از صفحات استخدام ثبت نشده است.
+          </p>
+        ) : (
+          <>
+            <ul className="divide-y divide-[#1a2436]">
+              {pager.pageItems.map((a) => {
                 const st = STATUS_META[a.status];
                 return (
-                  <li key={a.id} className="flex flex-wrap items-center gap-3 py-3">
-                    <button onClick={() => void openDetail(a.id)} className="flex min-w-0 flex-1 items-center gap-3 text-right">
-                      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-2 text-sm font-black text-accent">
+                  <li key={a.id}>
+                    <button
+                      type="button"
+                      onClick={() => void openDetail(a.id)}
+                      className="flex w-full flex-wrap items-center gap-3 px-[15px] py-3.5 text-start transition hover:bg-[rgba(59,130,246,.06)]"
+                    >
+                      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[rgba(59,130,246,.16)] text-sm font-black text-[#60a5fa]">
                         {a.name.slice(0, 1)}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-bold text-ink">{a.name}</span>
-                        <span className="mt-0.5 block text-[11px] text-muted">
+                        <span className="block text-[12.5px] font-bold text-[#e7ecf3]">{a.name}</span>
+                        <span className="mt-0.5 block text-[11px] text-[#6b7b94]">
                           {a.jobTitle}
                           {a.assigneeLabelFa ? ` · ارجاع به: ${a.assigneeLabelFa}` : ''}
                         </span>
                       </span>
+                      <div className="text-left">
+                        <div className="text-[10px] text-[#6b7b94]">تاریخ ثبت</div>
+                        <div className="font-num text-xs font-bold text-[#e7ecf3]">
+                          {formatJalaliDateTime(a.at)}
+                        </div>
+                      </div>
+                      <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${st.className}`}>
+                        {st.label}
+                      </span>
                     </button>
-                    <div className="text-left">
-                      <div className="text-[10px] text-muted">تاریخ ثبت</div>
-                      <div className="font-num text-xs font-bold text-ink">{formatJalaliDateTime(a.at)}</div>
-                    </div>
-                    <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${st.className}`}>{st.label}</span>
                   </li>
                 );
               })}
             </ul>
-          )}
-          <Pagination
-            page={applicationRowsPager.page}
-            totalPages={applicationRowsPager.totalPages}
-            onChange={applicationRowsPager.setPage}
-            variant="light"
-          />
-        </section>
-      )}
-
-      {formOpen && (
-        <Modal title={editing ? 'ویرایش فرصت شغلی' : 'ایجاد فرصت شغلی'} onClose={() => setFormOpen(false)}>
-          <div className="flex flex-col gap-3">
-            <input
-              value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-              placeholder="عنوان شغل"
-              className="h-10 rounded-lg border border-border px-3 text-xs outline-none"
-            />
-            <div className="grid grid-cols-2 gap-3">
-              <input
-                value={form.dept}
-                onChange={(e) => setForm({ ...form, dept: e.target.value })}
-                placeholder="واحد"
-                className="h-10 rounded-lg border border-border px-3 text-xs outline-none"
-              />
-              <input
-                value={form.city}
-                onChange={(e) => setForm({ ...form, city: e.target.value })}
-                placeholder="شهر"
-                className="h-10 rounded-lg border border-border px-3 text-xs outline-none"
+            <div className="px-[15px] pb-4 pt-2">
+              <Pagination
+                page={pager.page}
+                totalPages={pager.totalPages}
+                onChange={pager.setPage}
+                variant="dark"
               />
             </div>
-            <select
-              value={form.type}
-              onChange={(e) => setForm({ ...form, type: e.target.value as JobType })}
-              className="h-10 rounded-lg border border-border px-3 text-xs outline-none"
-            >
-              <option value="FULL_TIME">تمام‌وقت</option>
-              <option value="REMOTE">دورکاری</option>
-              <option value="PART_TIME">پاره‌وقت</option>
-            </select>
-            <textarea
-              value={generalReqsText}
-              onChange={(e) => setGeneralReqsText(e.target.value)}
-              placeholder="شرایط عمومی (هر مورد در یک خط)"
-              rows={3}
-              className="rounded-lg border border-border p-3 text-xs outline-none"
-            />
-            <textarea
-              value={specialReqsText}
-              onChange={(e) => setSpecialReqsText(e.target.value)}
-              placeholder="شرایط تخصصی (هر مورد در یک خط)"
-              rows={3}
-              className="rounded-lg border border-border p-3 text-xs outline-none"
-            />
-            <button
-              onClick={() => void onSaveForm()}
-              disabled={!form.title.trim() || !form.dept.trim() || !form.city.trim()}
-              className="rounded-lg bg-accent px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
-            >
-              ذخیره
-            </button>
-          </div>
-        </Modal>
-      )}
+          </>
+        )}
+      </section>
 
       {detail && (
-        <Modal title={`درخواست استخدام · ${detail.name}`} onClose={() => setDetail(null)}>
+        <Modal
+          variant="dark"
+          title={`درخواست استخدام · ${detail.name}`}
+          onClose={() => setDetail(null)}
+        >
           <div className="mb-3 flex items-center justify-between">
-            <span className="text-[11px] text-muted">وضعیت</span>
-            <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${STATUS_META[detail.status].className}`}>
+            <span className="text-[11px] text-[#6b7b94]">وضعیت</span>
+            <span
+              className={`rounded-full px-3 py-1 text-[10px] font-bold ${STATUS_META[detail.status].className}`}
+            >
               {STATUS_META[detail.status].label}
             </span>
           </div>
 
-          <div className="mb-3 rounded-lg bg-surface p-3">
-            <h3 className="mb-2 text-xs font-bold text-ink">اطلاعات متقاضی</h3>
+          <div className="mb-3 rounded-xl border border-[#22304a] bg-[#0f1726] p-3">
+            <h3 className="mb-2 text-xs font-extrabold text-[#8fa1bb]">اطلاعات متقاضی</h3>
             <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-[11px]">
               <div>
-                <dt className="text-muted">شغل مورد نظر</dt>
-                <dd className="font-bold text-ink">{detail.jobTitle}</dd>
+                <dt className="text-[#6b7b94]">شغل مورد نظر</dt>
+                <dd className="font-bold text-[#e7ecf3]">{detail.jobTitle}</dd>
               </div>
               <div>
-                <dt className="text-muted">کد ملی</dt>
-                <dd className="ltr font-num font-bold text-ink">{faDigits(detail.nationalId)}</dd>
+                <dt className="text-[#6b7b94]">کد ملی</dt>
+                <dd className="ltr font-num font-bold text-[#e7ecf3]">{faDigits(detail.nationalId)}</dd>
               </div>
               <div>
-                <dt className="text-muted">تلفن</dt>
-                <dd className="ltr font-num font-bold text-ink">{faDigits(detail.phone)}</dd>
+                <dt className="text-[#6b7b94]">تلفن</dt>
+                <dd className="ltr font-num font-bold text-[#e7ecf3]">{faDigits(detail.phone)}</dd>
               </div>
               <div>
-                <dt className="text-muted">ایمیل</dt>
-                <dd className="ltr font-bold text-ink">{detail.email ?? '—'}</dd>
+                <dt className="text-[#6b7b94]">ایمیل</dt>
+                <dd className="ltr font-bold text-[#e7ecf3]">{detail.email ?? '—'}</dd>
               </div>
               {detail.skills && (
                 <div className="col-span-2">
-                  <dt className="text-muted">مهارت‌ها</dt>
-                  <dd className="text-ink">{detail.skills}</dd>
+                  <dt className="text-[#6b7b94]">مهارت‌ها</dt>
+                  <dd className="text-[#e7ecf3]">{detail.skills}</dd>
                 </div>
               )}
             </dl>
             {detail.hasResume ? (
               <button
+                type="button"
                 onClick={() => void onDownloadResume(detail.id, detail.resumeFileName)}
-                className="mt-3 text-[11px] font-bold text-accent"
+                className="mt-3 text-[11px] font-bold text-[#60a5fa]"
               >
                 دانلود رزومه ({detail.resumeFileName})
               </button>
             ) : (
-              <div className="mt-3 text-[11px] text-muted">رزومه‌ای ثبت نشده است.</div>
+              <div className="mt-3 text-[11px] text-[#6b7b94]">رزومه‌ای ثبت نشده است.</div>
             )}
           </div>
 
           {detail.canAct && (
-            <div className="mb-3 rounded-lg border border-border p-3">
-              <h3 className="mb-2 text-xs font-bold text-ink">ارجاع به مدیران</h3>
+            <div className="mb-3 rounded-xl border border-[#22304a] bg-[#0f1726] p-3">
+              <h3 className="mb-2 text-xs font-extrabold text-[#8fa1bb]">ارجاع به مدیران</h3>
               <div className="flex gap-2">
                 <select
                   aria-label="گیرنده ارجاع"
                   value={assigneePick}
                   onChange={(e) => setAssigneePick(e.target.value)}
-                  className="h-9 flex-1 rounded-lg border border-border bg-white px-2 text-xs outline-none"
+                  className="h-9 flex-1 rounded-lg border border-[#28344c] bg-[#18223a] px-2 text-xs text-[#e7ecf3] outline-none"
                 >
                   <option value="">— انتخاب مدیر —</option>
                   {detail.referralTargets.map((r) => (
@@ -448,28 +321,36 @@ export default function CareersAdminPage() {
                   ))}
                 </select>
                 <button
+                  type="button"
                   onClick={() => void onRefer()}
                   disabled={!assigneePick}
-                  className="rounded-lg bg-accent px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
+                  className="rounded-lg bg-[#3b82f6] px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
                 >
                   ثبت ارجاع
                 </button>
               </div>
-
               <div className="mt-3 flex gap-2">
-                <button onClick={() => void onHire()} className="flex-1 rounded-lg bg-[#10b98124] px-3 py-2 text-xs font-bold text-[#059669]">
+                <button
+                  type="button"
+                  onClick={() => void onHire()}
+                  className="flex-1 rounded-lg bg-[rgba(52,211,153,.14)] px-3 py-2 text-xs font-bold text-[#34d399]"
+                >
                   استخدام
                 </button>
-                <button onClick={() => void onReject()} className="flex-1 rounded-lg bg-[#ef444424] px-3 py-2 text-xs font-bold text-[#b91c1c]">
+                <button
+                  type="button"
+                  onClick={() => void onReject()}
+                  className="flex-1 rounded-lg bg-[rgba(248,113,113,.14)] px-3 py-2 text-xs font-bold text-[#f87171]"
+                >
                   رد درخواست
                 </button>
               </div>
             </div>
           )}
 
-          <div className="rounded-lg border border-border p-3">
-            <h3 className="mb-2 text-xs font-bold text-ink">روند بررسی</h3>
-            <ul className="flex flex-col gap-2 text-[11px] text-muted">
+          <div className="rounded-xl border border-[#22304a] bg-[#0f1726] p-3">
+            <h3 className="mb-2 text-xs font-extrabold text-[#8fa1bb]">روند بررسی</h3>
+            <ul className="flex flex-col gap-2 text-[11px] text-[#6b7b94]">
               {detail.history.map((h, i) => (
                 <li key={i}>
                   {h.label} — <span className="font-num">{formatJalaliDateTime(h.at)}</span>

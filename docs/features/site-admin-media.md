@@ -1,20 +1,24 @@
 # SITE_ADMIN media CMS — acceptance checklist
 
-Design source: `design-reference-v2/پنل ادمین سایت.dc.html` (media tab ~L1521+).
+Design source: `design-reference-v2/پنل ادمین سایت.dc.html` (media tab ~L1521+)
++ product screenshots (2026-08 dark-align).
 
-**Scope this phase:** image library, hero/announcement/promo banners,
-popular destinations, popular routes. Deferred: social links (settings tab),
-app download links, support contact fields, job postings block (jobapps tab),
-static site pages list.
+**Scope:** image library, hero/announcement/promo banners, popular destinations,
+popular routes, social links, app download links, support contact, job postings
+block, static site pages. Application forms queue lives on `jobapps` tab.
 
 ## Admin panel (`MediaAdminPage`, tab `media`)
 
 - [x] Image library: list, upload, soft-delete — `site-content.e2e-spec.ts` library
 - [x] Hero banner edit (title, subtitle, button, cover) — e2e + `MediaAdminPage.test.tsx`
-- [x] Announcement bar toggle + text + optional image — e2e
+- [x] Announcement bar toggle («غیرفعال کردن») + text — e2e + MediaAdminPage.test
 - [x] Promo banner edit (badge, title, button, cover) — e2e
 - [x] Popular destinations CRUD — e2e
-- [x] Popular routes CRUD — e2e
+- [x] Popular routes CRUD (+ 10/page) — e2e / MediaAdminPage
+- [x] Social networks toggles + URLs — `MediaAdminPage.test.tsx`
+- [x] App download links — same test
+- [x] Support contact edit — same test
+- [x] Job opportunities cards (create / deactivate / footer publish) — MediaAdminPage.test
 - [x] `media` tab in SITE_ADMIN nav — `panels.e2e-spec.ts`
 
 ## Public API
@@ -28,6 +32,5 @@ static site pages list.
 
 ## Explicit deferrals
 
-- Social links, app store links, support phone/email (existing settings paths)
-- Job postings section in media tab (use jobapps tab)
-- Per-locale / structured static page CMS beyond text keys (Phase I ships list + text edit)
+- Per-locale structured static page CMS beyond text keys
+- Job application cover images on posting cards

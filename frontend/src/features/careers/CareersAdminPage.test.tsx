@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import CareersAdminPage from './CareersAdminPage';
 import * as careersApi from '../../api/careers';
@@ -66,61 +66,33 @@ function appDetail(overrides: Partial<JobApplicationDetail> = {}): JobApplicatio
   };
 }
 
-function mockLists(postings: JobPosting[] = [posting()], apps: JobApplicationRow[] = [appRow()]) {
-  vi.spyOn(careersApi, 'fetchAllPostings').mockResolvedValue(postings);
+function mockLists(apps: JobApplicationRow[] = [appRow()]) {
+  vi.spyOn(careersApi, 'fetchAllPostings').mockResolvedValue([posting()]);
   vi.spyOn(careersApi, 'fetchApplications').mockResolvedValue(apps);
 }
 
 describe('CareersAdminPage', () => {
-  it('renders the postings tab with existing job cards', async () => {
-    mockLists();
-    render(<CareersAdminPage />);
-    expect(await screen.findByText('کارشناس پشتیبانی مسافران')).toBeInTheDocument();
-    expect(screen.getByText('پشتیبانی · تهران')).toBeInTheDocument();
-  });
-
-  it('creates a new posting from the form', async () => {
+  it('renders dark applications queue title, search, job filter and empty state', async () => {
     mockLists([]);
-    const create = vi.spyOn(careersApi, 'createPosting').mockResolvedValue(posting({ id: 'p2' }));
-
-    const { default: userEvent } = await import('@testing-library/user-event');
     render(<CareersAdminPage />);
 
-    await screen.findByText('فرصت شغلی‌ای ثبت نشده است.');
-    await userEvent.click(screen.getByRole('button', { name: '+ ایجاد فرصت شغلی' }));
-
-    const dialog = await screen.findByRole('dialog', { name: 'ایجاد فرصت شغلی' });
-    await userEvent.type(within(dialog).getByPlaceholderText('عنوان شغل'), 'توسعه‌دهنده فرانت‌اند');
-    await userEvent.type(within(dialog).getByPlaceholderText('واحد'), 'IT');
-    await userEvent.type(within(dialog).getByPlaceholderText('شهر'), 'تهران');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'ذخیره' }));
-
-    expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({ title: 'توسعه‌دهنده فرانت‌اند', dept: 'IT', city: 'تهران' }),
-    );
+    expect(await screen.findByText('درخواست‌های استخدام')).toBeInTheDocument();
+    expect(
+      screen.getByText(/فرم‌های استخدام و فایل‌های ارسالی متقاضیان/),
+    ).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/جستجو در نام، کد ملی، تلفن یا ایمیل/)).toBeInTheDocument();
+    expect(screen.getByLabelText('فیلتر آگهی')).toHaveDisplayValue('همۀ آگهی‌ها');
+    expect(screen.getByText('هنوز فرمی از صفحات استخدام ثبت نشده است.')).toBeInTheDocument();
   });
 
-  it('toggles a posting active/inactive', async () => {
-    mockLists();
-    const update = vi.spyOn(careersApi, 'updatePosting').mockResolvedValue(posting({ active: false }));
-
-    const { default: userEvent } = await import('@testing-library/user-event');
-    render(<CareersAdminPage />);
-
-    await userEvent.click(await screen.findByRole('button', { name: 'غیرفعال‌سازی' }));
-    expect(update).toHaveBeenCalledWith('p1', { active: false });
-  });
-
-  it('switches to the applications tab and opens a detail with referral targets', async () => {
+  it('lists applications and opens detail with referral targets', async () => {
     mockLists();
     vi.spyOn(careersApi, 'fetchApplicationDetail').mockResolvedValue(appDetail());
 
     const { default: userEvent } = await import('@testing-library/user-event');
     render(<CareersAdminPage />);
 
-    await userEvent.click(screen.getByRole('button', { name: 'درخواست‌های استخدام' }));
     await userEvent.click(await screen.findByRole('button', { name: /نگار رضایی/ }));
-
     const dialog = await screen.findByRole('dialog', { name: /نگار رضایی/ });
     expect(within(dialog).getByText('رضا مرادی (مدیر بازرگانی)')).toBeInTheDocument();
   });
@@ -128,15 +100,15 @@ describe('CareersAdminPage', () => {
   it('refers an application to a selected manager', async () => {
     mockLists();
     vi.spyOn(careersApi, 'fetchApplicationDetail').mockResolvedValue(appDetail());
-    const refer = vi.spyOn(careersApi, 'referApplication').mockResolvedValue({ id: 'a1', status: 'REFERRED' });
+    const refer = vi
+      .spyOn(careersApi, 'referApplication')
+      .mockResolvedValue({ id: 'a1', status: 'REFERRED' });
 
     const { default: userEvent } = await import('@testing-library/user-event');
     render(<CareersAdminPage />);
 
-    await userEvent.click(screen.getByRole('button', { name: 'درخواست‌های استخدام' }));
     await userEvent.click(await screen.findByRole('button', { name: /نگار رضایی/ }));
     const dialog = await screen.findByRole('dialog', { name: /نگار رضایی/ });
-
     await userEvent.selectOptions(within(dialog).getByLabelText('گیرنده ارجاع'), 'm1');
     await userEvent.click(within(dialog).getByRole('button', { name: 'ثبت ارجاع' }));
 
@@ -146,16 +118,50 @@ describe('CareersAdminPage', () => {
   it('hires an applicant from the detail modal', async () => {
     mockLists();
     vi.spyOn(careersApi, 'fetchApplicationDetail').mockResolvedValue(appDetail());
-    const hire = vi.spyOn(careersApi, 'hireApplication').mockResolvedValue({ id: 'a1', status: 'HIRED' });
+    const hire = vi
+      .spyOn(careersApi, 'hireApplication')
+      .mockResolvedValue({ id: 'a1', status: 'HIRED' });
 
     const { default: userEvent } = await import('@testing-library/user-event');
     render(<CareersAdminPage />);
 
-    await userEvent.click(screen.getByRole('button', { name: 'درخواست‌های استخدام' }));
     await userEvent.click(await screen.findByRole('button', { name: /نگار رضایی/ }));
     const dialog = await screen.findByRole('dialog', { name: /نگار رضایی/ });
-
     await userEvent.click(within(dialog).getByRole('button', { name: 'استخدام' }));
     expect(hire).toHaveBeenCalledWith('a1');
+  });
+
+  it('filters applications by job title', async () => {
+    mockLists();
+    const fetchApps = vi.spyOn(careersApi, 'fetchApplications').mockResolvedValue([appRow()]);
+
+    const { default: userEvent } = await import('@testing-library/user-event');
+    render(<CareersAdminPage />);
+
+    await screen.findByText('نگار رضایی');
+    await userEvent.selectOptions(
+      screen.getByLabelText('فیلتر آگهی'),
+      'کارشناس پشتیبانی مسافران',
+    );
+
+    await waitFor(() =>
+      expect(fetchApps).toHaveBeenCalledWith({ jobTitle: 'کارشناس پشتیبانی مسافران' }),
+    );
+  });
+
+  it('paginates at 10 applications per page', async () => {
+    mockLists(
+      Array.from({ length: 12 }, (_, i) =>
+        appRow({ id: `a${i + 1}`, name: `متقاضی ${i + 1}` }),
+      ),
+    );
+    const { default: userEvent } = await import('@testing-library/user-event');
+    render(<CareersAdminPage />);
+
+    expect(await screen.findByText('متقاضی 1')).toBeInTheDocument();
+    expect(screen.getByText('متقاضی 10')).toBeInTheDocument();
+    expect(screen.queryByText('متقاضی 11')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'بعدی' }));
+    expect(await screen.findByText('متقاضی 11')).toBeInTheDocument();
   });
 });
