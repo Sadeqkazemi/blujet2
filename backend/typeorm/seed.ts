@@ -22,7 +22,7 @@ async function main() {
   const passwordHash = await argon2.hash(STAFF_PASSWORD);
 
   const staff: { username: string; fullName: string; role: 'EMPLOYEE' | 'IT_MANAGER' | 'COMMERCIAL_MANAGER' | 'FINANCE_MANAGER' | 'SENIOR_MANAGER' | 'CEO' | 'BOARD_CHAIR' | 'SITE_ADMIN' }[] = [
-    { username: 'com.ahmadi', fullName: 'رضا احمدی', role: 'EMPLOYEE' },
+    { username: 'com.ahmadi', fullName: 'سمیرا احمدی', role: 'EMPLOYEE' },
     { username: 'itadmin', fullName: 'مهندس علی صدر', role: 'IT_MANAGER' },
     { username: 'comm', fullName: 'رضا مرادی', role: 'COMMERCIAL_MANAGER' },
     { username: 'finance', fullName: 'سحر کاظمی', role: 'FINANCE_MANAGER' },
@@ -1459,7 +1459,11 @@ async function main() {
 
   const commercialEmployee = await typeorm.user.upsert({
     where: { username: 'sales.moradi' },
-    update: {},
+    update: {
+      dept: 'commercial',
+      rank: 'کارشناس',
+      isActive: true,
+    },
     create: {
       role: 'EMPLOYEE',
       username: 'sales.moradi',
@@ -1469,6 +1473,54 @@ async function main() {
       rank: 'کارشناس',
       referralScope: 'MANAGERS_ONLY',
       createdById: itManager.id,
+      twoFactorEnabled: true,
+      isActive: true,
+    },
+  });
+  // Design-reference demo employee (screenshots: سمیرا احمدی / واحد بازرگانی).
+  const designDemoEmployee = await typeorm.user.upsert({
+    where: { username: 'com.ahmadi' },
+    update: {
+      role: 'EMPLOYEE',
+      fullName: 'سمیرا احمدی',
+      dept: 'commercial',
+      rank: 'کارشناس',
+      twoFactorEnabled: true,
+      isActive: true,
+    },
+    create: {
+      role: 'EMPLOYEE',
+      username: 'com.ahmadi',
+      passwordHash,
+      fullName: 'سمیرا احمدی',
+      dept: 'commercial',
+      rank: 'کارشناس',
+      referralScope: 'MANAGERS_ONLY',
+      createdById: itManager.id,
+      twoFactorEnabled: true,
+      isActive: true,
+    },
+  });
+  // Zero-permission employee — used by panels.e2e «no granted permissions» case.
+  const emptyEmployee = await typeorm.user.upsert({
+    where: { username: 'emp.none' },
+    update: {
+      role: 'EMPLOYEE',
+      dept: 'commercial',
+      rank: 'کارشناس',
+      twoFactorEnabled: true,
+      isActive: true,
+    },
+    create: {
+      role: 'EMPLOYEE',
+      username: 'emp.none',
+      passwordHash,
+      fullName: 'بدون دسترسی',
+      dept: 'commercial',
+      rank: 'کارشناس',
+      referralScope: 'MANAGERS_ONLY',
+      createdById: itManager.id,
+      twoFactorEnabled: true,
       isActive: true,
     },
   });
@@ -1488,7 +1540,10 @@ async function main() {
     },
   });
   for (const [employee, keys] of [
-    [commercialEmployee, ['ag_list', 'fl_view', 'ct_list', 'ct_process']],
+    // No fl_view — employee sidebar has no مدیریت پروازها (product).
+    [commercialEmployee, ['ag_list', 'ct_list', 'ct_process']],
+    // Design demo: agencies + reports + cartable (screenshot sidebar).
+    [designDemoEmployee, ['ag_list', 'rp_sales', 'ct_list', 'ct_process']],
     [financeEmployee, ['rf_list']],
   ] as const) {
     const perms = await typeorm.permission.findMany({ where: { key: { in: keys as unknown as string[] } } });
@@ -1499,6 +1554,112 @@ async function main() {
         create: { employeeId: employee.id, permissionId: perm.id, grantedById: itManager.id },
       });
     }
+  }
+  // Drop legacy fl_* grants from commercial demo (tab removed from employee nav).
+  const flightPerms = await typeorm.permission.findMany({
+    where: { key: { in: ['fl_view', 'fl_manage'] } },
+    select: { id: true },
+  });
+  if (flightPerms.length > 0) {
+    await typeorm.employeePermission.deleteMany({
+      where: {
+        employeeId: { in: [commercialEmployee.id, designDemoEmployee.id] },
+        permissionId: { in: flightPerms.map((p) => p.id) },
+      },
+    });
+  }
+  // Ensure emp.none stays permission-free even on re-seed.
+  await typeorm.employeePermission.deleteMany({ where: { employeeId: emptyEmployee.id } });
+
+  // Design-demo cartable + referral + activity feed for سمیرا احمدی screenshots.
+  const designCartableCount = await typeorm.cartableTask.count({
+    where: { assigneeId: designDemoEmployee.id },
+  });
+  if (designCartableCount === 0) {
+    await typeorm.cartableTask.createMany({
+      data: [
+        {
+          assigneeId: designDemoEmployee.id,
+          category: 'AGENCY',
+          title: 'پیگیری درخواست عضویت آژانس نگین‌پرواز',
+          description: 'کنترل مدارک و اطلاعات آژانس متقاضی.',
+          senderId: commercialManager.id,
+          senderLabelFa: 'رضا مرادی · مدیر بازرگانی',
+          createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
+        },
+        {
+          assigneeId: designDemoEmployee.id,
+          category: 'ADMIN',
+          title: 'هماهنگی تسویه دوره‌ای آژانس‌ها',
+          description: 'پیگیری افزایش اعتبار و تسویه ماه جاری.',
+          senderLabelFa: 'مدیر بازرگانی',
+          createdAt: new Date(Date.now() - 28 * 60 * 60 * 1000),
+        },
+        {
+          assigneeId: designDemoEmployee.id,
+          category: 'MANAGER',
+          title: 'صدور بلیط گروهی تهران–کیش',
+          description: 'رزرو گروهی ۸ نفره برای مسیر تهران–کیش.',
+          senderId: commercialManager.id,
+          senderLabelFa: 'رضا مرادی · مدیر بازرگانی',
+          createdAt: new Date(Date.now() - 40 * 60 * 60 * 1000),
+        },
+      ],
+    });
+  }
+
+  const designReferralCount = await typeorm.managerReferralRecipient.count({
+    where: { recipientId: designDemoEmployee.id },
+  });
+  if (designReferralCount === 0) {
+    const designReferral = await typeorm.managerReferral.create({
+      data: {
+        fromId: commercialManager.id,
+        title: 'بررسی درخواست همکاری آژانس نگین پرواز',
+        body: 'اولویت با بررسی مجوز بند «ب» است.',
+        priority: 'HIGH',
+        status: 'SENT',
+        recipients: { create: [{ recipientId: designDemoEmployee.id }] },
+      },
+    });
+    await typeorm.cartableTask.create({
+      data: {
+        assigneeId: designDemoEmployee.id,
+        category: 'MANAGER',
+        title: designReferral.title,
+        description: 'کنترل مدارک و اطلاعات آژانس متقاضی و ثبت گزارش',
+        senderId: commercialManager.id,
+        senderLabelFa: 'رضا مرادی · مدیر بازرگانی',
+        sourceType: 'MANAGER_REFERRAL',
+        sourceId: designReferral.id,
+      },
+    });
+  }
+
+  const designActivityCount = await typeorm.auditLog.count({
+    where: { actorId: designDemoEmployee.id },
+  });
+  if (designActivityCount === 0) {
+    await typeorm.auditLog.createMany({
+      data: [
+        {
+          actorId: designDemoEmployee.id,
+          actorRole: 'EMPLOYEE',
+          category: 'AGENCY',
+          action: 'تماس با آژانس پارسیان‌گشت',
+          detail: 'پیگیری تسویه دوره‌ای و درخواست افزایش اعتبار.',
+          createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+        },
+        {
+          actorId: designDemoEmployee.id,
+          actorRole: 'EMPLOYEE',
+          category: 'RESERVATION',
+          action: 'صدور ۸ بلیط گروهی',
+          detail: 'رزرو گروهی مسیر تهران–کیش برای ۸ مسافر.',
+          createdAt: new Date(Date.now() - 26 * 60 * 60 * 1000),
+        },
+      ],
+    });
   }
 
   const employeeCartableCount = await typeorm.cartableTask.count({

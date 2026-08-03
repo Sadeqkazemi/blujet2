@@ -148,8 +148,12 @@ export const EMPLOYEE_SECTION_NAV: Record<
   string,
   { labelFa: string; wiredKeys: string[] }
 > = {
+  // Order + labels match design-reference-v2/پنل کارمند.dc.html + user
+  // screenshots (سمیرا احمدی). «مدیریت پروازها» removed from employee
+  // sidebar per product — fl_* stays permission-catalog only, no tab.
+  // finance / IT sections stay unwired — no dead tabs.
   agencies: {
-    labelFa: 'آژانس‌ها',
+    labelFa: 'مدیریت آژانس‌ها',
     wiredKeys: [
       'ag_list',
       'ag_requests',
@@ -158,13 +162,12 @@ export const EMPLOYEE_SECTION_NAV: Record<
       'fn_invoices',
     ],
   },
-  flights: { labelFa: 'مدیریت پروازها', wiredKeys: ['fl_view', 'fl_manage'] },
-  pricing: { labelFa: 'تعیین قیمت بلیط', wiredKeys: ['pr_propose'] },
-  reports: { labelFa: 'گزارش مسافران', wiredKeys: ['rp_sales', 'rp_finance'] },
+  pricing: { labelFa: 'نرخ‌گذاری', wiredKeys: ['pr_propose'] },
   refund: {
     labelFa: 'استرداد بلیط',
     wiredKeys: ['rf_list', 'rf_details', 'rf_process'],
   },
+  reports: { labelFa: 'گزارش‌ها', wiredKeys: ['rp_sales', 'rp_finance'] },
   cartable: {
     labelFa: 'کارتابل',
     wiredKeys: ['ct_list', 'ct_process'],

@@ -2,6 +2,7 @@ import { apiGet } from './http';
 import type {
   AgencySettlementsResult,
   CompletedFlightsSummary,
+  EmployeeActivityResult,
   FinanceDashboardStats,
   FlightSalesResult,
   KpiResult,
@@ -72,4 +73,9 @@ export function searchPassengers(q: string) {
 export function fetchStaffReports(staffId?: string) {
   const qs = staffId ? `?staffId=${encodeURIComponent(staffId)}` : '';
   return apiGet<StaffReportsResult>(`/staff-reports${qs}`);
+}
+
+/** EMPLOYEE activity feed for «گزارش‌های من» */
+export function fetchMyActivity() {
+  return apiGet<EmployeeActivityResult>('/staff-reports/mine');
 }

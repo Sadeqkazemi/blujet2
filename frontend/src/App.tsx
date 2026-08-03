@@ -21,9 +21,10 @@ import AgencyCreditPage from './features/agency-portal/AgencyCreditPage';
 import AgencySalesPage from './features/agency-portal/AgencySalesPage';
 import AgencyInboxPage from './features/agency-portal/AgencyInboxPage';
 import AgencyProfilePage from './features/agency-portal/AgencyProfilePage';
-import AgenciesListPage from './features/agencies/AgenciesListPage';
+import AgenciesRouter from './features/agencies/AgenciesRouter';
 import AgencyDetailPage from './features/agencies/AgencyDetailPage';
 import RequestDetailPage from './features/agencies/RequestDetailPage';
+import ReportsRouter from './components/ReportsRouter';
 import CartableRouter from './components/CartableRouter';
 import ClubPage from './features/club/ClubPage';
 import ClubTierRulesPage from './features/club/ClubTierRulesPage';
@@ -37,7 +38,6 @@ import FlightsPage from './features/flights/FlightsPage';
 import FlightOpsPage from './features/flightops/FlightOpsPage';
 import ReservationPage from './features/reservation/ReservationPage';
 import FinancePage from './features/finance/FinancePage';
-import PassengerReportsPage from './features/passenger-reports/PassengerReportsPage';
 import StaffReportsPage from './features/staff-reports/StaffReportsPage';
 import ManagerReportsPage from './features/manager-reports/ManagerReportsPage';
 import AdminsPage from './features/admins/AdminsPage';
@@ -128,7 +128,7 @@ export default function App() {
             <Route path="/panel" element={<PanelShell />}>
               <Route index element={<DashboardRouter />} />
               <Route path="agencies" element={<TabGate tabKey="agencies" />}>
-                <Route index element={<AgenciesListPage />} />
+                <Route index element={<AgenciesRouter />} />
                 <Route path="requests/:requestId" element={<RequestDetailPage />} />
                 <Route path=":agencyId" element={<AgencyDetailPage />} />
               </Route>
@@ -202,7 +202,7 @@ export default function App() {
                 <Route index element={<FinancePage />} />
               </Route>
               <Route path="reports" element={<TabGate tabKey="reports" />}>
-                <Route index element={<PassengerReportsPage />} />
+                <Route index element={<ReportsRouter />} />
               </Route>
               <Route path="staff" element={<TabGate tabKey="staff" />}>
                 <Route index element={<StaffReportsPage />} />

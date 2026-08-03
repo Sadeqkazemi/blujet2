@@ -1,9 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import MyReferralsPage from './MyReferralsPage';
 import * as cartableApi from '../../api/cartable';
 import * as filesApi from '../../api/files';
+import * as panelsApi from '../../api/panels';
 import type { MyReferral, MyReferralListResult } from '../../types/cartable';
 
 afterEach(() => {
@@ -36,19 +37,31 @@ function mockList(referrals: MyReferral[]) {
 }
 
 describe('MyReferralsPage', () => {
+  beforeEach(() => {
+    vi.spyOn(panelsApi, 'fetchEmployeeContext').mockResolvedValue({
+      dept: 'commercial',
+      deptLabelFa: 'بازرگانی',
+      rank: 'کارشناس',
+      permissionLabelsFa: [],
+    });
+  });
+
   it('renders the empty state when nothing is assigned', async () => {
     mockList([]);
     render(<MyReferralsPage />);
     expect(await screen.findByTestId('my-referrals-empty')).toBeInTheDocument();
   });
 
-  it('lists referrals assigned to me with KPI counts', async () => {
+  it('lists referrals with screenshot actions', async () => {
     mockList([REFERRAL]);
     render(<MyReferralsPage />);
 
     expect(await screen.findByText('گزارش فروش سه‌ماهه')).toBeInTheDocument();
     expect(screen.getByText('در انتظار اقدام')).toBeInTheDocument();
-    expect(screen.getByText(/محمد رحیمی/)).toBeInTheDocument();
+    expect(screen.getByText(/مدیر ارشد/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'شروع بررسی' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'تکمیل و بستن' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'ارجاع این کار' })).toBeInTheDocument();
   });
 
   it('opens a referral detail and submits a real report', async () => {
@@ -68,7 +81,8 @@ describe('MyReferralsPage', () => {
     render(<MyReferralsPage />);
     await userEvent.click(await screen.findByTestId('my-referral-r1'));
 
-    expect(await screen.findByText('لطفاً گزارش فروش سه‌ماهه را آماده کنید.')).toBeInTheDocument();
+    expect(await screen.findByText(/توضیح مدیر/)).toBeInTheDocument();
+    expect(await screen.findByTestId('referral-report-body')).toBeInTheDocument();
     await userEvent.type(screen.getByTestId('referral-report-body'), 'گزارش من آماده است.');
     await userEvent.click(screen.getByRole('button', { name: 'ثبت گزارش' }));
 

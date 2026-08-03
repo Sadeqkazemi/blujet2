@@ -109,7 +109,7 @@ describe('Panels (e2e)', () => {
   });
 
   it('an EMPLOYEE with no granted permissions still gets dashboard + referrals, not an error', async () => {
-    const { accessToken } = await loginAs(app, 'com.ahmadi');
+    const { accessToken } = await loginAs(app, 'emp.none');
     const res = await request(app.getHttpServer())
       .get('/panels/nav')
       .set('Authorization', `Bearer ${accessToken}`);
@@ -120,8 +120,23 @@ describe('Panels (e2e)', () => {
     ]);
   });
 
-  it('EMPLOYEE nav is computed dynamically from real EmployeePermission grants (sales.moradi: ag_list + fl_view)', async () => {
+  it('EMPLOYEE nav is computed dynamically from real EmployeePermission grants (sales.moradi: ag_list, no flights)', async () => {
     const { accessToken } = await loginAs(app, 'sales.moradi');
+    const res = await request(app.getHttpServer())
+      .get('/panels/nav')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([
+      { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
+      { key: 'agencies', labelFa: 'مدیریت آژانس‌ها', implemented: true },
+      { key: 'cartable', labelFa: 'کارتابل', implemented: true },
+      { key: 'referrals', labelFa: 'ارجاعات', implemented: true },
+    ]);
+    expect(res.body.data.map((t: { key: string }) => t.key)).not.toContain('flights');
+  });
+
+  it('com.ahmadi (design demo employee) gets agencies + reports + cartable + referrals, never flights', async () => {
+    const { accessToken } = await loginAs(app, 'com.ahmadi');
     const res = await request(app.getHttpServer())
       .get('/panels/nav')
       .set('Authorization', `Bearer ${accessToken}`);
@@ -130,10 +145,11 @@ describe('Panels (e2e)', () => {
     expect(keys).toEqual([
       'dashboard',
       'agencies',
-      'flights',
+      'reports',
       'cartable',
       'referrals',
     ]);
+    expect(keys).not.toContain('flights');
   });
 
   it('returns the confirmed tab set for SITE_ADMIN', async () => {
