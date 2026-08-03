@@ -4010,7 +4010,7 @@
             "name": "q",
             "required": false,
             "in": "query",
-            "description": "مسیر یا شماره پرواز",
+            "description": "جستجو در شماره پرواز، کد فرودگاه یا نام شهر",
             "schema": {
               "type": "string"
             }
@@ -4021,7 +4021,7 @@
             "description": ""
           }
         },
-        "summary": "فهرست پروازهای SCHEDULED با ظرفیت/فروش — تب پروازها",
+        "summary": "فهرست پروازهای آینده برای تب پروازها / باز کردن نقشهٔ صندلی",
         "tags": [
           "reservation"
         ]
