@@ -434,7 +434,8 @@ function FinanceOpsView() {
           </div>
           <div className="mb-3 text-[11px] text-[#6b7b94]">فروش، تسویه، کمیسیون و استرداد</div>
           <div className="flex flex-col divide-y divide-[#22304a]">
-            {tx.rows.map((t) => (
+            {/* Design hint-placeholder-count="5" — show five most-recent rows. */}
+            {tx.rows.slice(0, 5).map((t) => (
               <div key={t.id} className="flex items-center gap-3 py-2.5 text-xs">
                 <span
                   className={`flex h-9 w-9 flex-none items-center justify-center rounded-lg text-sm ${TX_ICON_CLASS[t.type] ?? 'bg-[#18223a] text-[#6b7b94]'}`}
