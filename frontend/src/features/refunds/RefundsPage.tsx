@@ -1,12 +1,17 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { fetchRefundDetail, fetchRefunds, payRefund, referRefund } from '../../api/refunds';
 import { fetchStaffDirectory } from '../../api/cartable';
 import { faDigits, faMoney } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import { useStepUp } from '../../hooks/useStepUp';
+import { usePagination } from '../../hooks/usePagination';
 import Modal from '../../components/Modal';
+import Pagination from '../../components/Pagination';
 import type { RefundDetail, RefundListRow, RefundsResult, RefundStatus } from '../../types/refunds';
 import type { StaffDirectoryEntry } from '../../types/cartable';
+
+/** Design: five refund cards per page. */
+const REFUND_PAGE_SIZE = 5;
 
 const STATUS_META: Record<RefundStatus, { label: string; className: string }> = {
   SUBMITTED: { label: 'ثبت مشتری', className: 'bg-[#f59e0b24] text-[#fbbf24]' },
@@ -20,11 +25,29 @@ function routeLabel(r: RefundListRow) {
   return `${originCode} ← ${destCode}`;
 }
 
+function matchesRefundQuery(r: RefundListRow, raw: string): boolean {
+  const q = raw.trim().toLowerCase();
+  if (!q) return true;
+  const hay = [
+    r.passengerName,
+    r.booking.pnr,
+    r.booking.flightInstance.flight.flightNo,
+    r.booking.flightInstance.flight.route.originCode,
+    r.booking.flightInstance.flight.route.destCode,
+    r.assignee?.fullName ?? '',
+    STATUS_META[r.status].label,
+  ]
+    .join(' ')
+    .toLowerCase();
+  return hay.includes(q);
+}
+
 export default function RefundsPage() {
   const [data, setData] = useState<RefundsResult | null>(null);
   const [detail, setDetail] = useState<RefundDetail | null>(null);
   const [staff, setStaff] = useState<StaffDirectoryEntry[]>([]);
   const [assigneePick, setAssigneePick] = useState('');
+  const [query, setQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -87,6 +110,18 @@ export default function RefundsPage() {
   const requests = data?.requests ?? [];
   const kpis = data?.kpis;
 
+  const filtered = useMemo(
+    () => requests.filter((r) => matchesRefundQuery(r, query)),
+    [requests, query],
+  );
+  const pager = usePagination(filtered, REFUND_PAGE_SIZE);
+
+  useEffect(() => {
+    pager.setPage(1);
+    // Reset to first page whenever the search query changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run on query
+  }, [query]);
+
   return (
     <div className="flex flex-col gap-[15px] px-[21px] pb-[34px] pt-[18px]">
       <div className="flex flex-wrap items-center gap-3.5 rounded-2xl border border-[#2a3550] bg-gradient-to-br from-[#172339] to-[#1d2a44] p-4">
@@ -138,8 +173,22 @@ export default function RefundsPage() {
             </p>
           </div>
           <span className="rounded-lg border border-[#28344c] bg-[#18223a] px-3 py-1.5 text-[11px] font-bold text-[#9fb0c7]">
-            {faDigits(requests.length)} درخواست
+            {faDigits(query.trim() ? filtered.length : requests.length)} درخواست
           </span>
+        </div>
+
+        <div className="mb-3.5">
+          <label htmlFor="refund-search" className="sr-only">
+            جستجوی درخواست استرداد
+          </label>
+          <input
+            id="refund-search"
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="جستجو بر اساس نام مسافر، PNR، شماره پرواز یا مسیر…"
+            className="h-[46px] w-full rounded-xl border border-[#28344c] bg-[#18223a] px-4 text-xs text-[#e7ecf3] outline-none transition placeholder:text-[#6b7b94] focus:border-[#3b82f6]"
+          />
         </div>
 
         {loading ? (
@@ -148,62 +197,69 @@ export default function RefundsPage() {
           <p className="rounded-[14px] border border-[#22304a] bg-[#0f1726] py-6 text-center text-xs text-[#6b7b94]">
             درخواست استردادی ثبت نشده است.
           </p>
+        ) : filtered.length === 0 ? (
+          <p className="rounded-[14px] border border-[#22304a] bg-[#0f1726] py-6 text-center text-xs text-[#6b7b94]">
+            درخواستی با این عبارت یافت نشد.
+          </p>
         ) : (
-          <ul className="flex flex-col gap-[11px]">
-            {requests.map((r) => {
-              const st = STATUS_META[r.status];
-              return (
-                <li
-                  key={r.id}
-                  className="flex flex-wrap items-center gap-3.5 rounded-[14px] border border-[#22304a] bg-[#0f1726] p-3.5"
-                >
-                  <button
-                    onClick={() => void openDetail(r.id)}
-                    className="flex min-w-0 flex-1 items-center gap-3.5 text-right"
+          <>
+            <ul className="flex flex-col gap-[11px]">
+              {pager.pageItems.map((r) => {
+                const st = STATUS_META[r.status];
+                return (
+                  <li
+                    key={r.id}
+                    className="flex flex-wrap items-center gap-3.5 rounded-[14px] border border-[#22304a] bg-[#0f1726] p-3.5"
                   >
-                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#1d2a40] text-sm font-extrabold text-[#60a5fa]">
-                      {r.passengerName.slice(0, 1)}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[13.5px] font-extrabold text-[#e7ecf3]">
-                        {r.passengerName}{' '}
-                        <span className="ltr font-num text-[10px] text-[#6b7b94]">{r.booking.pnr}</span>
-                      </span>
-                      <span className="mt-0.5 block text-[11px] text-[#8a97ab]">
-                        {routeLabel(r)}
-                        {r.assignee ? ` · ارجاع به: ${r.assignee.fullName}` : ''}
-                      </span>
-                    </span>
-                  </button>
-                  <div className="text-left">
-                    <div className="text-[9px] text-[#6b7b94]">شماره پرواز</div>
-                    <div className="ltr font-num rounded-lg border border-[#28344c] bg-[#18223a] px-2.5 py-1 text-[11px] font-bold text-[#cdd7e5]">
-                      {r.booking.flightInstance.flight.flightNo}
-                    </div>
-                  </div>
-                  <div className="text-left">
-                    <div className="text-[9px] text-[#6b7b94]">مبلغ قابل پرداخت</div>
-                    <div className="font-num text-sm font-black text-[#e7ecf3]">{faMoney(r.refundableIrr)} تومان</div>
-                  </div>
-                  <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${st.className}`}>{st.label}</span>
-                  {r.status === 'FINANCE' ? (
                     <button
-                      onClick={() => void onPay(r.id)}
-                      className="rounded-[10px] bg-[#16a34a] px-3.5 py-2 text-[11px] font-extrabold text-white transition hover:bg-[#15803d]"
+                      onClick={() => void openDetail(r.id)}
+                      className="flex min-w-0 flex-1 items-center gap-3.5 text-right"
                     >
-                      تأیید و پرداخت
+                      <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#1d2a40] text-sm font-extrabold text-[#60a5fa]">
+                        {r.passengerName.slice(0, 1)}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[13.5px] font-extrabold text-[#e7ecf3]">
+                          {r.passengerName}{' '}
+                          <span className="ltr font-num text-[10px] text-[#6b7b94]">{r.booking.pnr}</span>
+                        </span>
+                        <span className="mt-0.5 block text-[11px] text-[#8a97ab]">
+                          {routeLabel(r)}
+                          {r.assignee ? ` · ارجاع به: ${r.assignee.fullName}` : ''}
+                        </span>
+                      </span>
                     </button>
-                  ) : r.status === 'PAID' ? (
-                    <span className="text-[11px] font-extrabold text-[#34d399]">پرداخت شد</span>
-                  ) : (
-                    <span className="rounded-lg border border-[#28344c] bg-[#18223a] px-3 py-2 text-[10.5px] text-[#8a97ab]">
-                      در انتظار ادمین
-                    </span>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+                    <div className="text-left">
+                      <div className="text-[9px] text-[#6b7b94]">شماره پرواز</div>
+                      <div className="ltr font-num rounded-lg border border-[#28344c] bg-[#18223a] px-2.5 py-1 text-[11px] font-bold text-[#cdd7e5]">
+                        {r.booking.flightInstance.flight.flightNo}
+                      </div>
+                    </div>
+                    <div className="text-left">
+                      <div className="text-[9px] text-[#6b7b94]">مبلغ قابل پرداخت</div>
+                      <div className="font-num text-sm font-black text-[#e7ecf3]">{faMoney(r.refundableIrr)} تومان</div>
+                    </div>
+                    <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${st.className}`}>{st.label}</span>
+                    {r.status === 'FINANCE' ? (
+                      <button
+                        onClick={() => void onPay(r.id)}
+                        className="rounded-[10px] bg-[#16a34a] px-3.5 py-2 text-[11px] font-extrabold text-white transition hover:bg-[#15803d]"
+                      >
+                        تأیید و پرداخت
+                      </button>
+                    ) : r.status === 'PAID' ? (
+                      <span className="text-[11px] font-extrabold text-[#34d399]">پرداخت شد</span>
+                    ) : (
+                      <span className="rounded-lg border border-[#28344c] bg-[#18223a] px-3 py-2 text-[10.5px] text-[#8a97ab]">
+                        در انتظار ادمین
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+            <Pagination page={pager.page} totalPages={pager.totalPages} onChange={pager.setPage} variant="dark" />
+          </>
         )}
       </section>
 
