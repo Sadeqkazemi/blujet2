@@ -32,5 +32,6 @@ block, static site pages. Application forms queue lives on `jobapps` tab.
 
 ## Explicit deferrals
 
+- Social links, app store links, support phone/email on media tab
+- Job postings live on `jobapps` tab (create / ads / applications)
 - Per-locale structured static page CMS beyond text keys
-- Job application cover images on posting cards

@@ -96,6 +96,53 @@ export class CareersService {
   }
 
   // ── Public job listing ──────────────────────────────────────────────
+  private mediaUrl(fileId: string | null): string | null {
+    return fileId ? `/careers/media/${fileId}` : null;
+  }
+
+  private serializePosting<T extends {
+    id: string;
+    title: string;
+    dept: string;
+    city: string;
+    type: string;
+    description: string;
+    generalReqs: string[];
+    specialReqs: string[];
+    active: boolean;
+    imageFileId: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }>(j: T) {
+    return {
+      id: j.id,
+      title: j.title,
+      dept: j.dept,
+      city: j.city,
+      type: j.type,
+      description: j.description,
+      generalReqs: j.generalReqs,
+      specialReqs: j.specialReqs,
+      active: j.active,
+      imageFileId: j.imageFileId,
+      imageUrl: this.mediaUrl(j.imageFileId),
+      createdAt: j.createdAt,
+      updatedAt: j.updatedAt,
+    };
+  }
+
+  private async assertImageFile(ownerId: string, fileId: string) {
+    const file = await this.typeorm.storedFile.findFirst({
+      where: { id: fileId, ownerId },
+    });
+    if (!file || !file.mimeType.startsWith('image/')) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'تصویر آگهی معتبر نیست یا متعلق به شما نیست.',
+      });
+    }
+  }
+
   async listActiveJobs() {
     const jobs = await this.typeorm.jobPosting.findMany({
       where: { active: true },
@@ -107,6 +154,9 @@ export class CareersService {
       dept: j.dept,
       city: j.city,
       type: j.type,
+      description: j.description,
+      imageFileId: j.imageFileId,
+      imageUrl: this.mediaUrl(j.imageFileId),
     }));
   }
 
@@ -124,18 +174,62 @@ export class CareersService {
       dept: job.dept,
       city: job.city,
       type: job.type,
+      description: job.description,
       generalReqs: job.generalReqs,
       specialReqs: job.specialReqs,
+      imageFileId: job.imageFileId,
+      imageUrl: this.mediaUrl(job.imageFileId),
+    };
+  }
+
+  async readPublicMedia(fileId: string) {
+    const file = await this.typeorm.storedFile.findUnique({ where: { id: fileId } });
+    if (!file || !fs.existsSync(file.path)) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'تصویر یافت نشد.',
+      });
+    }
+    const linked = await this.typeorm.jobPosting.count({
+      where: { imageFileId: fileId },
+    });
+    if (linked === 0) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'تصویر یافت نشد.',
+      });
+    }
+    return {
+      mimeType: file.mimeType,
+      fileName: file.fileName,
+      stream: fs.createReadStream(file.path),
     };
   }
 
   // ── SITE_ADMIN: job-posting CRUD ─────────────────────────────────────
   async listAllPostings() {
-    return this.typeorm.jobPosting.findMany({ orderBy: { createdAt: 'desc' } });
+    const rows = await this.typeorm.jobPosting.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+    return rows.map((j) => this.serializePosting(j));
   }
 
   async createPosting(actor: AuthenticatedUser, dto: CreateJobPostingDto) {
-    const posting = await this.typeorm.jobPosting.create({ data: dto });
+    if (dto.imageFileId) {
+      await this.assertImageFile(actor.id, dto.imageFileId);
+    }
+    const posting = await this.typeorm.jobPosting.create({
+      data: {
+        title: dto.title,
+        dept: dto.dept,
+        city: dto.city,
+        type: dto.type,
+        generalReqs: dto.generalReqs,
+        specialReqs: dto.specialReqs,
+        description: dto.description ?? '',
+        imageFileId: dto.imageFileId ?? null,
+      },
+    });
     await this.audit.record({
       actorId: actor.id,
       actorRole: actor.role,
@@ -145,7 +239,7 @@ export class CareersService {
       entityType: 'JobPosting',
       entityId: posting.id,
     });
-    return posting;
+    return this.serializePosting(posting);
   }
 
   async updatePosting(
@@ -162,9 +256,22 @@ export class CareersService {
         message: 'فرصت شغلی یافت نشد.',
       });
     }
+    if (dto.imageFileId) {
+      await this.assertImageFile(actor.id, dto.imageFileId);
+    }
     const updated = await this.typeorm.jobPosting.update({
       where: { id },
-      data: dto,
+      data: {
+        ...(dto.title !== undefined ? { title: dto.title } : {}),
+        ...(dto.dept !== undefined ? { dept: dto.dept } : {}),
+        ...(dto.city !== undefined ? { city: dto.city } : {}),
+        ...(dto.type !== undefined ? { type: dto.type } : {}),
+        ...(dto.generalReqs !== undefined ? { generalReqs: dto.generalReqs } : {}),
+        ...(dto.specialReqs !== undefined ? { specialReqs: dto.specialReqs } : {}),
+        ...(dto.active !== undefined ? { active: dto.active } : {}),
+        ...(dto.description !== undefined ? { description: dto.description } : {}),
+        ...(dto.imageFileId !== undefined ? { imageFileId: dto.imageFileId } : {}),
+      },
     });
     await this.audit.record({
       actorId: actor.id,
@@ -175,7 +282,7 @@ export class CareersService {
       entityType: 'JobPosting',
       entityId: updated.id,
     });
-    return updated;
+    return this.serializePosting(updated);
   }
 
   // ── Public application submission ───────────────────────────────────

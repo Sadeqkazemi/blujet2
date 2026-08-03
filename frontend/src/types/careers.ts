@@ -14,6 +14,9 @@ export interface JobSummary {
   dept: string;
   city: string;
   type: JobType;
+  description?: string;
+  imageFileId?: string | null;
+  imageUrl?: string | null;
 }
 
 export interface JobDetail extends JobSummary {
@@ -23,6 +26,9 @@ export interface JobDetail extends JobSummary {
 
 export interface JobPosting extends JobDetail {
   active: boolean;
+  description: string;
+  imageFileId: string | null;
+  imageUrl: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -34,6 +40,8 @@ export interface CreateJobPostingInput {
   type: JobType;
   generalReqs: string[];
   specialReqs: string[];
+  description?: string;
+  imageFileId?: string | null;
 }
 
 export type UpdateJobPostingInput = Partial<CreateJobPostingInput> & { active?: boolean };

@@ -5,6 +5,7 @@ import { fetchActiveJobs } from '../../api/careers';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import type { JobSummary, JobType } from '../../types/careers';
+import { jobPostingImageUrl } from './site-content-shared';
 
 const JOB_TYPE_META: Record<JobType, { label: string; color: string; bg: string }> = {
   FULL_TIME: { label: 'تمام‌وقت', color: '#1668c4', bg: '#eef4fb' },
@@ -90,16 +91,35 @@ export default function CareersPage() {
           >
             {jobs.map((j) => {
               const meta = JOB_TYPE_META[j.type];
+              const img = jobPostingImageUrl(j.imageUrl, j.imageFileId);
               return (
                 <div
                   key={j.id}
                   data-testid="job-card"
-                  style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 16, padding: '18px 18px 16px' }}
+                  style={{
+                    background: '#fff',
+                    border: '1px solid #eef1f5',
+                    borderRadius: 16,
+                    overflow: 'hidden',
+                  }}
                 >
+                  {img ? (
+                    <img
+                      src={img}
+                      alt=""
+                      style={{ width: '100%', height: 120, objectFit: 'cover', display: 'block' }}
+                    />
+                  ) : null}
+                  <div style={{ padding: '18px 18px 16px' }}>
                   <div style={{ fontSize: 15, fontWeight: 800, color: '#0d2640' }}>{j.title}</div>
                   <div style={{ fontSize: 12, color: '#5a6678', marginTop: 6 }}>
                     {j.dept} · {j.city}
                   </div>
+                  {j.description ? (
+                    <div style={{ fontSize: 12, color: '#5a6678', marginTop: 8, lineHeight: 1.6 }}>
+                      {j.description}
+                    </div>
+                  ) : null}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 }}>
                     <span
                       style={{
@@ -119,6 +139,7 @@ export default function CareersPage() {
                     >
                       {t.applyLabel} ←
                     </Link>
+                  </div>
                   </div>
                 </div>
               );
