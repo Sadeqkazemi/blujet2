@@ -9,6 +9,13 @@ export interface PanelNavItem {
 }
 
 /**
+ * SITE_ADMIN sidebar must never surface these keys (product request 2026-08).
+ * Kept as an explicit denylist so a future accidental re-add to PANEL_NAV
+ * cannot ship them again without also deleting this set.
+ */
+export const SITE_ADMIN_SIDEBAR_DENYLIST = new Set(['blog', 'kyc', 'settings']);
+
+/**
  * Server-computed per-role sidebar, confirmed from a full read of each
  * panel's design file. Deliberately excludes tabs the extraction found to
  * be coded-but-unreachable (dead `sc-if` blocks with no nav trigger) —

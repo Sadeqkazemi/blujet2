@@ -29,6 +29,9 @@ const ROLE_LABELS: Record<string, string> = {
   EMPLOYEE: 'کارمند',
 };
 
+/** Must stay in sync with backend `SITE_ADMIN_SIDEBAR_DENYLIST`. */
+const SITE_ADMIN_SIDEBAR_DENYLIST = new Set(['blog', 'kyc', 'settings']);
+
 /** Brand subtitle under «blujet» — sampled from each panel's design sidebar. */
 const ROLE_BRAND_SUB: Record<string, string> = {
   IT_MANAGER: 'پنل فناوری اطلاعات',
@@ -93,10 +96,19 @@ export default function PanelShell() {
       .catch(() => setLowSalesAlerts([]));
   }, [user?.role]);
 
-  const navKeys = useMemo(() => new Set(nav?.map((item) => item.key) ?? []), [nav]);
+  const visibleNav = useMemo(() => {
+    if (nav === null) return null;
+    if (user?.role !== 'SITE_ADMIN') return nav;
+    return nav.filter((item) => !SITE_ADMIN_SIDEBAR_DENYLIST.has(item.key));
+  }, [nav, user?.role]);
+
+  const navKeys = useMemo(
+    () => new Set(visibleNav?.map((item) => item.key) ?? []),
+    [visibleNav],
+  );
 
   useEffect(() => {
-    if (!nav || nav.length === 0) return;
+    if (!visibleNav || visibleNav.length === 0) return;
 
     const next: Record<string, NavBadge> = {};
     const nextNotifications: PanelNotificationItem[] = [];
@@ -297,7 +309,7 @@ export default function PanelShell() {
       setBadges(next);
       setNotifications([...lowSalesNotifItems(lowSalesAlerts), ...nextNotifications]);
     });
-  }, [nav, navKeys, user?.role, lowSalesAlerts]);
+  }, [visibleNav, navKeys, user?.role, lowSalesAlerts]);
 
   async function onSignOut() {
     await signOut();
@@ -368,11 +380,11 @@ export default function PanelShell() {
         )}
 
         <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
-          {nav === null && <div className="px-2 py-3 text-xs text-panel-muted-2">در حال بارگذاری…</div>}
-          {nav?.length === 0 && (
+          {visibleNav === null && <div className="px-2 py-3 text-xs text-panel-muted-2">در حال بارگذاری…</div>}
+          {visibleNav?.length === 0 && (
             <div className="px-2 py-3 text-xs text-panel-muted-2">تبی برای این نقش تعریف نشده است.</div>
           )}
-          {nav?.map((item) => {
+          {visibleNav?.map((item) => {
             const badge = badges[item.key];
             return (
               <NavLink
@@ -472,10 +484,10 @@ export default function PanelShell() {
         ) : (
           <div className="flex items-center justify-end gap-3 border-b border-panel-border px-8 py-3">
             <PanelNotificationBell items={notifications} />
-            <PanelSearchBox nav={nav ?? []} />
+            <PanelSearchBox nav={visibleNav ?? []} />
           </div>
         )}
-        <Outlet context={{ nav, lowSalesAlerts }} />
+        <Outlet context={{ nav: visibleNav, lowSalesAlerts }} />
       </main>
     </div>
   );
