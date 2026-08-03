@@ -28,7 +28,7 @@ describe('EmployeeDashboardPage', () => {
       dept: 'commercial',
       deptLabelFa: 'بازرگانی',
       rank: 'کارشناس',
-      permissionLabelsFa: ['داشبورد', 'آژانس‌ها', 'مدیریت پروازها', 'کارتابل', 'ارجاعات'],
+      permissionLabelsFa: ['داشبورد', 'مدیریت آژانس‌ها', 'مدیریت پروازها', 'کارتابل', 'ارجاعات'],
     });
     vi.spyOn(cartableApi, 'fetchMyReferrals').mockResolvedValue({
       referrals: [],
@@ -44,11 +44,11 @@ describe('EmployeeDashboardPage', () => {
     });
     renderWithNav([
       { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
-      { key: 'agencies', labelFa: 'آژانس‌ها', implemented: true },
+      { key: 'agencies', labelFa: 'مدیریت آژانس‌ها', implemented: true },
       { key: 'flights', labelFa: 'مدیریت پروازها', implemented: true },
     ]);
 
-    expect(await screen.findByRole('link', { name: /آژانس‌ها/ })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: /مدیریت آژانس‌ها/ })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /مدیریت پروازها/ })).toHaveAttribute('href', '/panel/flights');
   });
 

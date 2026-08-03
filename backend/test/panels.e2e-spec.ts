@@ -109,7 +109,7 @@ describe('Panels (e2e)', () => {
   });
 
   it('an EMPLOYEE with no granted permissions still gets dashboard + referrals, not an error', async () => {
-    const { accessToken } = await loginAs(app, 'com.ahmadi');
+    const { accessToken } = await loginAs(app, 'emp.none');
     const res = await request(app.getHttpServer())
       .get('/panels/nav')
       .set('Authorization', `Bearer ${accessToken}`);
@@ -126,11 +126,26 @@ describe('Panels (e2e)', () => {
       .get('/panels/nav')
       .set('Authorization', `Bearer ${accessToken}`);
     expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([
+      { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
+      { key: 'agencies', labelFa: 'مدیریت آژانس‌ها', implemented: true },
+      { key: 'flights', labelFa: 'مدیریت پروازها', implemented: true },
+      { key: 'cartable', labelFa: 'کارتابل', implemented: true },
+      { key: 'referrals', labelFa: 'ارجاعات', implemented: true },
+    ]);
+  });
+
+  it('com.ahmadi (design demo employee) gets agencies + reports + cartable + referrals', async () => {
+    const { accessToken } = await loginAs(app, 'com.ahmadi');
+    const res = await request(app.getHttpServer())
+      .get('/panels/nav')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(res.status).toBe(200);
     const keys = res.body.data.map((t: { key: string }) => t.key);
     expect(keys).toEqual([
       'dashboard',
       'agencies',
-      'flights',
+      'reports',
       'cartable',
       'referrals',
     ]);

@@ -1459,7 +1459,11 @@ async function main() {
 
   const commercialEmployee = await prisma.user.upsert({
     where: { username: 'sales.moradi' },
-    update: {},
+    update: {
+      dept: 'commercial',
+      rank: 'کارشناس',
+      isActive: true,
+    },
     create: {
       role: 'EMPLOYEE',
       username: 'sales.moradi',
@@ -1469,6 +1473,54 @@ async function main() {
       rank: 'کارشناس',
       referralScope: 'MANAGERS_ONLY',
       createdById: itManager.id,
+      twoFactorEnabled: true,
+      isActive: true,
+    },
+  });
+  // Design-reference demo employee (پنل کارمند.dc.html uses com.ahmadi).
+  const designDemoEmployee = await prisma.user.upsert({
+    where: { username: 'com.ahmadi' },
+    update: {
+      role: 'EMPLOYEE',
+      fullName: 'رضا احمدی',
+      dept: 'commercial',
+      rank: 'کارشناس',
+      twoFactorEnabled: true,
+      isActive: true,
+    },
+    create: {
+      role: 'EMPLOYEE',
+      username: 'com.ahmadi',
+      passwordHash,
+      fullName: 'رضا احمدی',
+      dept: 'commercial',
+      rank: 'کارشناس',
+      referralScope: 'MANAGERS_ONLY',
+      createdById: itManager.id,
+      twoFactorEnabled: true,
+      isActive: true,
+    },
+  });
+  // Zero-permission employee — used by panels.e2e «no granted permissions» case.
+  const emptyEmployee = await prisma.user.upsert({
+    where: { username: 'emp.none' },
+    update: {
+      role: 'EMPLOYEE',
+      dept: 'commercial',
+      rank: 'کارشناس',
+      twoFactorEnabled: true,
+      isActive: true,
+    },
+    create: {
+      role: 'EMPLOYEE',
+      username: 'emp.none',
+      passwordHash,
+      fullName: 'بدون دسترسی',
+      dept: 'commercial',
+      rank: 'کارشناس',
+      referralScope: 'MANAGERS_ONLY',
+      createdById: itManager.id,
+      twoFactorEnabled: true,
       isActive: true,
     },
   });
@@ -1489,6 +1541,8 @@ async function main() {
   });
   for (const [employee, keys] of [
     [commercialEmployee, ['ag_list', 'fl_view', 'ct_list', 'ct_process']],
+    // Design demo: agencies + reports + cartable (permOrder subset).
+    [designDemoEmployee, ['ag_list', 'rp_sales', 'ct_list', 'ct_process']],
     [financeEmployee, ['rf_list']],
   ] as const) {
     const perms = await prisma.permission.findMany({ where: { key: { in: keys as unknown as string[] } } });
@@ -1500,6 +1554,8 @@ async function main() {
       });
     }
   }
+  // Ensure emp.none stays permission-free even on re-seed.
+  await prisma.employeePermission.deleteMany({ where: { employeeId: emptyEmployee.id } });
 
   const employeeCartableCount = await prisma.cartableTask.count({
     where: { assigneeId: commercialEmployee.id },
