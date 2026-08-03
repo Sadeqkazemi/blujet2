@@ -1,13 +1,17 @@
+import { randomUUID } from 'node:crypto';
 import {
+  BeforeInsert,
   Column,
   CreateDateColumn,
   Entity,
   Index,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryColumn,
 } from 'typeorm';
 import { EmployeeReferralScope, Locale, Role } from '../enums';
+import { RefreshToken } from './refresh-token.entity';
 
 @Index('users_email_key', ['email'], { unique: true })
 @Index('users_nationalIdHash_idx', ['nationalIdHash'])
@@ -18,6 +22,11 @@ import { EmployeeReferralScope, Locale, Role } from '../enums';
 export class User {
   @PrimaryColumn({ type: 'text', primaryKeyConstraintName: 'users_pkey' })
   id!: string;
+
+  @BeforeInsert()
+  generateId() {
+    this.id ??= randomUUID();
+  }
 
   @Column({ type: 'enum', enum: Role, enumName: 'Role' })
   role!: Role;
@@ -110,4 +119,7 @@ export class User {
 
   @Column({ type: 'text', nullable: true })
   referralCode!: string | null;
+
+  @OneToMany(() => RefreshToken, (rt) => rt.user)
+  refreshTokens!: RefreshToken[];
 }
