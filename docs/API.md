@@ -2879,11 +2879,14 @@ this stays SITE_ADMIN-only.
 ### New (SITE_ADMIN only): `GET/POST/PATCH /careers/postings`
 - `GET /careers/postings` → all postings (active + inactive).
 - `POST /careers/postings` body `{ title, dept, city, type,
-  generalReqs, specialReqs }` → creates, `active: true` by default.
+  generalReqs, specialReqs, description?, imageFileId? }` → creates,
+  `active: true` by default. `imageFileId` from `POST /files`.
 - `PATCH /careers/postings/:id` body: any subset of the create fields
   plus `active?` (the design's per-card "غیرفعال کردن آگهی"/"فعال کردن
   آگهی" toggle folds into this same endpoint rather than a separate
-  route, since it's just one more editable field).
+  route, since it's just one more editable field) and optional
+  `description` / `imageFileId` (null clears image).
+- `GET /careers/media/:fileId` (public) streams a posting cover image.
 - Both write an audit-log entry (`AuditCategory.CONTENT`).
 
 ### New (SITE_ADMIN only): `GET /careers/applications`, `GET /careers/applications/:id`, `GET /careers/applications/:id/resume`, `PATCH /careers/applications/:id/refer`, `PATCH /careers/applications/:id/hire`, `PATCH /careers/applications/:id/reject`
