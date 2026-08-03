@@ -1103,17 +1103,19 @@ Completes the member-initiated card-request flow started above: after a
 USER submits via `POST /my/club/card-request`, the request sits in
 `SUBMITTED` until SITE_ADMIN refers it from the پنل ادمین سایت `club` tab.
 
-- `GET /club/submitted-card-requests` (new, `SITE_ADMIN` only) — list
-  `SUBMITTED` requests with member detail (incl. decrypted national ID for
-  this admin review surface only) + history timeline. Exec panels'
-  `GET /club/card-requests` still excludes SUBMITTED.
-- `PATCH /club/card-requests/:id/refer` (new, `SITE_ADMIN` only) — body
+- `GET /club/submitted-card-requests` (`SITE_ADMIN` only) — list of **all**
+  card-request statuses for the admin queue (SUBMITTED / REFERRED /
+  APPROVED / REJECTED) with member detail (incl. decrypted national ID)
+  + history timeline. Refer action still only succeeds on SUBMITTED.
+  Exec panels' `GET /club/card-requests` still excludes SUBMITTED.
+- `PATCH /club/card-requests/:id/refer` (`SITE_ADMIN` only) — body
   `{ assignedTo: 'SENIOR' | 'CHAIR' }`; `SUBMITTED → REFERRED`, appends a
   history step, audited. `409` if not SUBMITTED.
-- `GET /club/members` KPI payload gains `submittedRequests` count (SUBMITTED
-  rows) alongside existing `pendingRequests` (REFERRED rows).
-- Frontend: `ClubPage.tsx` gains a `SITE_ADMIN` role branch — submitted
-  queue + refer modal (مدیر ارشد / رئیس هیئت مدیره picker); no approve/reject.
+- `GET /club/members` KPI payload includes `submittedRequests` (SUBMITTED)
+  alongside `pendingRequests` (REFERRED). For `SITE_ADMIN` only, each
+  member row also includes decrypted `nationalId` (profiles + VIP Excel).
+- Frontend: `SiteAdminClubPage` (via `ClubRouter`) — dark 3-KPI layout,
+  card-request queue, member profiles, VIP-ready list + Excel download.
 
 ### پنل کاربر — نشان‌شده‌ها (`/account` → تب `saved`)
 Closes the «نشان‌شده‌ها» tab in `design-reference-v2/پنل کاربر.dc.html`:
