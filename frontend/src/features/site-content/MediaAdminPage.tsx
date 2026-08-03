@@ -23,6 +23,8 @@ import {
 } from '../../types/site-pages';
 import { faDigits, latinDigits, localeMoney } from '../../lib/fa-format';
 import Modal from '../../components/Modal';
+import Pagination from '../../components/Pagination';
+import { usePagination } from '../../hooks/usePagination';
 import { siteMediaUrl } from '../public-site/site-content-shared';
 import type {
   ContentBlockRow,
@@ -311,6 +313,9 @@ export default function MediaAdminPage() {
     }
   }
 
+  const destinationsPager = usePagination(destinations ?? []);
+  const libraryPager = usePagination(library ?? []);
+
   if (error && !library) {
     return <p className="p-8 text-sm text-danger">{error}</p>;
   }
@@ -447,7 +452,7 @@ export default function MediaAdminPage() {
           </button>
         </div>
         <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
-          {destinations.map((d) => (
+          {destinationsPager.pageItems.map((d) => (
             <div key={d.id} className="overflow-hidden rounded-xl border border-[#28344c] bg-[#18223a]">
               <div className="flex h-[104px] items-center justify-center border-b border-dashed border-[#aebfd6] bg-[#eef3fa]">
                 {d.imageFileId ? (
@@ -473,6 +478,12 @@ export default function MediaAdminPage() {
             </div>
           ))}
         </div>
+        <Pagination
+          page={destinationsPager.page}
+          totalPages={destinationsPager.totalPages}
+          onChange={destinationsPager.setPage}
+          variant="dark"
+        />
       </div>
 
       {/* Routes */}
@@ -581,7 +592,7 @@ export default function MediaAdminPage() {
           </label>
         )}
         <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
-          {library.map((m) => (
+          {libraryPager.pageItems.map((m) => (
             <div key={m.id} className="overflow-hidden rounded-[11px] border border-[#1f2a3d] bg-[#18223a]">
               <div className="h-[88px] bg-[#eef3fa]">
                 <img src={siteMediaUrl(m.fileId) ?? ''} alt={m.label} className="h-full w-full object-cover" />
@@ -600,6 +611,12 @@ export default function MediaAdminPage() {
             </div>
           ))}
         </div>
+        <Pagination
+          page={libraryPager.page}
+          totalPages={libraryPager.totalPages}
+          onChange={libraryPager.setPage}
+          variant="dark"
+        />
       </div>
 
       {/* Block edit modal */}

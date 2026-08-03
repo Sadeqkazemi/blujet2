@@ -17,6 +17,8 @@ import { useStepUp } from '../../hooks/useStepUp';
 import { faDigits, faMoney, latinDigits, parseTomanToRial } from '../../lib/fa-format';
 import { dayjs, formatJalaliDateTime } from '../../lib/jalali';
 import Modal from '../../components/Modal';
+import Pagination from '../../components/Pagination';
+import { usePagination } from '../../hooks/usePagination';
 import FareRulesSection from '../../components/FareRulesSection';
 import JalaliDatePicker from '../../components/JalaliDatePicker';
 import PricingPage from '../pricing/PricingPage';
@@ -300,6 +302,10 @@ export default function FlightsPage() {
       )
     : future;
 
+  const activePager = usePagination(data?.active ?? []);
+  const completedPager = usePagination(data?.completed?.rows ?? []);
+  const futurePager = usePagination(visibleFuture);
+
   const kpis = data?.kpis;
   const isCommercial = user?.role === 'COMMERCIAL_MANAGER';
   const showFuturePanel = subTab === 'future' || (isCommercial && subTab === 'active');
@@ -389,7 +395,7 @@ export default function FlightsPage() {
                     <span>وضعیت</span>
                   </div>
                   <ul>
-                    {data.active.map((f) => {
+                    {activePager.pageItems.map((f) => {
                       const pct = f.capacity > 0 ? Math.round((f.sold / f.capacity) * 100) : 0;
                       const st = STATUS_META[f.derivedStatus];
                       return (
@@ -432,6 +438,12 @@ export default function FlightsPage() {
                   {data.active.length === 0 && (
                     <p className="py-6 text-center text-xs text-panel-muted">پروازی ثبت نشده است.</p>
                   )}
+                  <Pagination
+                    page={activePager.page}
+                    totalPages={activePager.totalPages}
+                    onChange={activePager.setPage}
+                    variant="dark"
+                  />
                 </div>
               </div>
 
@@ -497,7 +509,7 @@ export default function FlightsPage() {
                           <span>فروش آژانس</span>
                           <span>سود حاصله</span>
                         </div>
-                        {data.completed.rows.map((d: CompletedFlightRow) => (
+                        {completedPager.pageItems.map((d: CompletedFlightRow) => (
                           <div
                             key={d.id}
                             className="grid grid-cols-[1.5fr_0.9fr_0.8fr_1fr_1fr_1fr_1fr_1.1fr] items-center gap-2 border-b border-panel-border px-5 py-3 text-[11px]"
@@ -535,7 +547,7 @@ export default function FlightsPage() {
                           <span>سود حاصله</span>
                           <span>ضرر</span>
                         </div>
-                        {data.completed.rows.map((d: CompletedFlightRow) => (
+                        {completedPager.pageItems.map((d: CompletedFlightRow) => (
                           <div key={d.id}>
                             <button
                               onClick={() => setExpandedDone(expandedDone === d.id ? null : d.id)}
@@ -603,6 +615,12 @@ export default function FlightsPage() {
                     {data.completed.rows.length === 0 && (
                       <p className="py-6 text-center text-xs text-panel-muted">پرواز انجام‌شده‌ای ثبت نشده است.</p>
                     )}
+                    <Pagination
+                      page={completedPager.page}
+                      totalPages={completedPager.totalPages}
+                      onChange={completedPager.setPage}
+                      variant="dark"
+                    />
                   </div>
                 </div>
               </section>
@@ -708,7 +726,7 @@ export default function FlightsPage() {
                       برای روز انتخاب‌شده پروازی برنامه‌ریزی نشده است.
                     </p>
                   )}
-                  {visibleFuture.map((u) => {
+                  {futurePager.pageItems.map((u) => {
                     const expanded = expandedFuture === u.id;
                     const priced = u.agencySeatsAllocated != null;
                     const direct = priced
@@ -808,6 +826,12 @@ export default function FlightsPage() {
                       </div>
                     );
                   })}
+                  <Pagination
+                    page={futurePager.page}
+                    totalPages={futurePager.totalPages}
+                    onChange={futurePager.setPage}
+                    variant="dark"
+                  />
                 </div>
               </section>
             </div>

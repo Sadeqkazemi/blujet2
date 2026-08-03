@@ -10,6 +10,8 @@ import { uploadFile } from '../../api/files';
 import { faDigits } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import Modal from '../../components/Modal';
+import Pagination from '../../components/Pagination';
+import { usePagination } from '../../hooks/usePagination';
 import type {
   BlogCategory,
   BlogPostRow,
@@ -152,6 +154,7 @@ export default function BlogAdminPage() {
   }
 
   const rows = posts ?? [];
+  const rowsPager = usePagination(rows);
 
   return (
     <div className="p-8">
@@ -322,7 +325,7 @@ export default function BlogAdminPage() {
           <p className="py-6 text-center text-xs text-muted">مقاله‌ای یافت نشد.</p>
         ) : (
           <ul className="flex flex-col gap-2">
-            {rows.map((p) => {
+            {rowsPager.pageItems.map((p) => {
               const st = STATUS_META[p.status];
               const date = p.publishedAt ?? p.scheduledAt ?? p.createdAt;
               return (
@@ -368,6 +371,12 @@ export default function BlogAdminPage() {
             })}
           </ul>
         )}
+        <Pagination
+          page={rowsPager.page}
+          totalPages={rowsPager.totalPages}
+          onChange={rowsPager.setPage}
+          variant="light"
+        />
       </section>
     </div>
   );

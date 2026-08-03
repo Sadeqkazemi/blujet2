@@ -11,6 +11,8 @@ import {
 import { faDigits } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import Modal from '../../components/Modal';
+import Pagination from '../../components/Pagination';
+import { usePagination } from '../../hooks/usePagination';
 import type { EmployeeDetail, EmployeeListRow, PermissionCatalog } from '../../types/it-manager';
 
 const DEPT_OPTIONS = [
@@ -87,6 +89,8 @@ export default function EmployeesPage() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detail, setDetail] = useState<EmployeeDetail | null>(null);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
+
+  const employeesPager = usePagination(employees);
 
   const load = useCallback(async () => {
     try {
@@ -263,7 +267,7 @@ export default function EmployeesPage() {
           <p className="py-6 text-center text-xs text-[#6b7b94]">کارمندی ثبت نشده است.</p>
         ) : (
           <ul className="divide-y divide-[#1f2a3d]">
-            {employees.map((e) => (
+            {employeesPager.pageItems.map((e) => (
               <li
                 key={e.id}
                 className="grid grid-cols-[1.6fr_1.3fr_1.4fr_1fr_0.9fr_1.4fr] items-center gap-2 px-4 py-3 text-xs"
@@ -312,6 +316,12 @@ export default function EmployeesPage() {
             ))}
           </ul>
         )}
+        <Pagination
+          page={employeesPager.page}
+          totalPages={employeesPager.totalPages}
+          onChange={employeesPager.setPage}
+          variant="dark"
+        />
       </section>
 
       <div className="mb-3 flex items-center gap-2">

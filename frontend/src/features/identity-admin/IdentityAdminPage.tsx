@@ -8,6 +8,8 @@ import {
 import { faDigits } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
 import Modal from '../../components/Modal';
+import Pagination from '../../components/Pagination';
+import { usePagination } from '../../hooks/usePagination';
 import type {
   IdentityReviewStatus,
   IdentityVerificationRow,
@@ -91,6 +93,7 @@ export default function IdentityAdminPage() {
   }
 
   const list = rows ?? [];
+  const listPager = usePagination(list);
 
   return (
     <div className="p-8">
@@ -120,7 +123,7 @@ export default function IdentityAdminPage() {
           <p className="py-6 text-center text-xs text-muted">درخواستی برای بررسی وجود ندارد.</p>
         ) : (
           <ul className="divide-y divide-border">
-            {list.map((r) => {
+            {listPager.pageItems.map((r) => {
               const st = STATUS_META[r.status];
               return (
                 <li key={r.id} data-testid="kyc-row" className="flex flex-wrap items-center gap-3 py-3">
@@ -193,6 +196,12 @@ export default function IdentityAdminPage() {
             })}
           </ul>
         )}
+        <Pagination
+          page={listPager.page}
+          totalPages={listPager.totalPages}
+          onChange={listPager.setPage}
+          variant="light"
+        />
       </section>
 
       {rejecting && (

@@ -10,6 +10,8 @@ import { ApiRequestError } from '../../api/envelope';
 import { faDigits } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import { useStepUp } from '../../hooks/useStepUp';
+import Pagination from '../../components/Pagination';
+import { usePagination } from '../../hooks/usePagination';
 import type { AdminCreatableRole, AdminRow } from '../../types/admins';
 import { panelInitials } from '../panel/panel-nav-icons';
 import PanelAlert from '../panel/PanelAlert';
@@ -250,6 +252,7 @@ export default function PanelAdminsPage() {
   const [cpSuggested, setCpSuggested] = useState('');
   const [resetDelivery, setResetDelivery] = useState<'sms' | 'email'>('sms');
   const stepUp = useStepUp('ADMIN_ROLE_CHANGE');
+  const rowsPager = usePagination(rows ?? []);
 
   function reload() {
     fetchAdmins()
@@ -534,7 +537,7 @@ export default function PanelAdminsPage() {
           {rows.length === 0 ? (
             <p className={`py-[22px] text-center text-[11.5px] ${panelMuted}`}>هنوز اطلاعاتی وارد نشده است.</p>
           ) : (
-            rows.map((r) => (
+            rowsPager.pageItems.map((r) => (
               <button
                 key={r.id}
                 type="button"
@@ -566,6 +569,12 @@ export default function PanelAdminsPage() {
             ))
           )}
         </div>
+        <Pagination
+          page={rowsPager.page}
+          totalPages={rowsPager.totalPages}
+          onChange={rowsPager.setPage}
+          variant="dark"
+        />
       </div>
 
       {addOpen && (
