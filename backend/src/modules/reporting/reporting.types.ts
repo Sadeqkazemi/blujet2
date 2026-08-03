@@ -88,4 +88,8 @@ export interface SiteAdminOverview {
   passengersThisMonth: number;
   ticketsSoldThisMonth: number;
   pendingActionCount: number;
+  /** MoM % change vs previous calendar month; null when previous month is 0. */
+  agenciesTrendPct: number | null;
+  passengersTrendPct: number | null;
+  ticketsTrendPct: number | null;
 }

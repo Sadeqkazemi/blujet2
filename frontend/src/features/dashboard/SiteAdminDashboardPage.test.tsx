@@ -16,6 +16,9 @@ const OVERVIEW: SiteAdminOverview = {
   passengersThisMonth: 340,
   ticketsSoldThisMonth: 280,
   pendingActionCount: 5,
+  agenciesTrendPct: null,
+  passengersTrendPct: 12,
+  ticketsTrendPct: 5,
 };
 
 const REQUEST: AgencyMembershipRequest = {
@@ -107,6 +110,7 @@ describe('SiteAdminDashboardPage', () => {
     expect(await screen.findByText('آژانس تست')).toBeInTheDocument();
     expect(await screen.findByText('نگار رضایی')).toBeInTheDocument();
     expect(await screen.findByText('بررسی مجوز آژانس')).toBeInTheDocument();
+    expect(screen.getByText('اعلان‌های جدید')).toBeInTheDocument();
     expect(agenciesApi.fetchAgencyRequests).toHaveBeenCalledWith('PENDING');
   });
 
