@@ -189,6 +189,8 @@ export default function PanelShell() {
   }
 
   const roleLabel = user ? (ROLE_LABELS[user.role] ?? user.role) : '';
+  /** Design v2 finance shell: avatar footer + brand subtitle. */
+  const isFinanceShell = user?.role === 'FINANCE_MANAGER';
 
   return (
     <div dir="rtl" className="flex min-h-screen bg-panel-canvas font-sans text-panel-ink">
@@ -197,12 +199,18 @@ export default function PanelShell() {
           <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-accent text-lg text-white">
             ✈
           </div>
-          <span className="text-lg font-black tracking-tight">blujet</span>
+          <div className="leading-[1.3]">
+            <div className="text-lg font-black tracking-tight text-white">blujet</div>
+            {isFinanceShell && <div className="text-[10px] text-[#6b7b94]">پنل مدیریت</div>}
+          </div>
         </div>
 
-        <div className="mx-4 mt-4 rounded-lg bg-white/5 px-3 py-2.5">
-          <div className="text-[11px] text-[#8fa1bb]">نقش این پنل</div>
-          <div className="text-sm font-bold">{roleLabel}</div>
+        <div className="mx-4 mt-4 rounded-lg border border-[#2a3a55] bg-[#18223a] px-3 py-2.5">
+          <div className="text-[10px] text-[#6b7b94]">نقش این پنل</div>
+          <div className="mt-0.5 flex items-center gap-2 text-sm font-bold">
+            {isFinanceShell && <span className="h-2 w-2 flex-none rounded-full bg-[#3b82f6]" />}
+            {roleLabel}
+          </div>
         </div>
 
         <nav className="mt-4 flex flex-1 flex-col gap-0.5 px-3">
@@ -238,14 +246,34 @@ export default function PanelShell() {
           })}
         </nav>
 
-        <div className="border-t border-white/10 p-4">
-          <button
-            onClick={() => void onSignOut()}
-            className="w-full rounded-lg border border-white/10 py-2 text-xs text-[#9fb0c7] transition hover:bg-white/5"
-          >
-            خروج از حساب
-          </button>
-        </div>
+        {isFinanceShell ? (
+          <div className="mt-auto border-t border-white/10 p-4">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#3b82f6] to-[#9333ea] text-[11px] font-extrabold text-white">
+                مم
+              </span>
+              <div className="min-w-0">
+                <div className="truncate text-xs font-bold text-white">{roleLabel}</div>
+                <button
+                  type="button"
+                  onClick={() => void onSignOut()}
+                  className="text-[10.5px] text-[#9fb0c7] transition hover:text-white"
+                >
+                  خروج از حساب
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="border-t border-white/10 p-4">
+            <button
+              onClick={() => void onSignOut()}
+              className="w-full rounded-lg border border-white/10 py-2 text-xs text-[#9fb0c7] transition hover:bg-white/5"
+            >
+              خروج از حساب
+            </button>
+          </div>
+        )}
       </aside>
 
       <main className="flex-1 overflow-y-auto">
