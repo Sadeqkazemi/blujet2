@@ -2,14 +2,13 @@ import type { INestApplication } from '@nestjs/common';
 import type { App } from 'supertest/types';
 import request from 'supertest';
 import * as crypto from 'node:crypto';
-import { TypeORMClient } from '../generated/typeorm/client';
-import { TypeORMPg } from '@typeorm/adapter-pg';
+import { DataSource, In } from 'typeorm';
+import { dataSourceOptions } from '../src/database/data-source.options';
+import { BlogPost } from '../src/database/entities/blog-post.entity';
+import { User } from '../src/database/entities/user.entity';
+import { BlogCategory, BlogPostStatus } from '../src/database/enums';
 import { createTestApp } from './helpers/app.helper';
 import { loginAs } from './helpers/login.helper';
-
-const typeorm = new TypeORMClient({
-  adapter: new TypeORMPg({ connectionString: process.env.DATABASE_URL }),
-});
 
 function auth(token: string | null | undefined) {
   return { Authorization: `Bearer ${token}` };
@@ -18,10 +17,12 @@ function auth(token: string | null | undefined) {
 /** Phase D — SITE_ADMIN blog CMS + public listing. See docs/API.md. */
 describe('Blog (e2e)', () => {
   let app: INestApplication<App>;
+  let dataSource: DataSource;
   const createdPostIds: string[] = [];
 
   beforeEach(async () => {
     app = await createTestApp();
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
@@ -29,10 +30,14 @@ describe('Blog (e2e)', () => {
   });
 
   afterAll(async () => {
-    await typeorm.blogPost.deleteMany({
-      where: { id: { in: createdPostIds } },
-    });
-    await typeorm.$disconnect();
+    // The app (and its DataSource) from the last test is already closed by
+    // now, so cleanup runs against a fresh standalone connection.
+    const cleanup = new DataSource(dataSourceOptions);
+    await cleanup.initialize();
+    if (createdPostIds.length > 0) {
+      await cleanup.getRepository(BlogPost).delete({ id: In(createdPostIds) });
+    }
+    await cleanup.destroy();
   });
 
   async function createPostDirect(
@@ -44,23 +49,24 @@ describe('Blog (e2e)', () => {
       scheduledAt: Date;
     }>,
   ) {
-    const siteAdmin = await typeorm.user.findUniqueOrThrow({
-      where: { username: 'site.admin' },
-    });
+    const siteAdmin = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ username: 'site.admin' });
     const suffix = crypto.randomUUID().slice(0, 6);
-    const post = await typeorm.blogPost.create({
-      data: {
+    const blogPostRepo = dataSource.getRepository(BlogPost);
+    const post = await blogPostRepo.save(
+      blogPostRepo.create({
         title: overrides?.title ?? `مقالهٔ تست ${suffix}`,
         slug: overrides?.slug ?? `test-post-${suffix}`,
         body: 'متن نمونه برای تست.',
-        category: overrides?.category ?? 'NEWS',
-        status: overrides?.status ?? 'DRAFT',
+        category: overrides?.category ?? BlogCategory.NEWS,
+        status: overrides?.status ?? BlogPostStatus.DRAFT,
         authorId: siteAdmin.id,
-        publishedAt:
-          overrides?.status === 'PUBLISHED' ? new Date() : undefined,
+        publishedAt: overrides?.status === 'PUBLISHED' ? new Date() : undefined,
         scheduledAt: overrides?.scheduledAt,
-      },
-    });
+        updatedAt: new Date(),
+      }),
+    );
     createdPostIds.push(post.id);
     return post;
   }
@@ -189,7 +195,11 @@ describe('Blog (e2e)', () => {
       expect(res.status).toBe(200);
       const ids = res.body.data.map((p: { id: string }) => p.id);
       expect(ids).toContain(guide.id);
-      expect(res.body.data.every((p: { category: string }) => p.category === 'GUIDE')).toBe(true);
+      expect(
+        res.body.data.every(
+          (p: { category: string }) => p.category === 'GUIDE',
+        ),
+      ).toBe(true);
     });
   });
 });
