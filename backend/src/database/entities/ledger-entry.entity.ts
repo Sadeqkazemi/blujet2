@@ -1,4 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import {
+  BeforeInsert,
   Column,
   CreateDateColumn,
   Entity,
@@ -22,6 +24,11 @@ export class LedgerEntry {
     primaryKeyConstraintName: 'ledger_entries_pkey',
   })
   id!: string;
+
+  @BeforeInsert()
+  generateId() {
+    this.id ??= randomUUID();
+  }
 
   @Column({ type: 'text', nullable: true })
   bookingId!: string | null;
