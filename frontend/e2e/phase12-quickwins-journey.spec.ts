@@ -15,7 +15,7 @@ test('CEO opens گزارش مدیران and sees the real audit feed with role f
 });
 
 test('Senior toggles a sibling panel off and back on in دسترسی به پنل‌ها', async ({ page }) => {
-  await loginAs(page, 'senior.rahimi');
+  await loginAs(page, 'senior');
   await page.getByRole('link', { name: 'دسترسی به پنل‌ها' }).click();
   await page.waitForURL('**/panel/panels');
 

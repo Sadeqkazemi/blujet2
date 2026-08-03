@@ -45,7 +45,7 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
   // ── admins ────────────────────────────────────────────────────────────
 
   it('GET /admins: hierarchy scoping — Senior never gets a manageable SENIOR_MANAGER row; roles without the tab get 403', async () => {
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const res = await request(app.getHttpServer())
       .get('/admins')
       .set('Authorization', auth(senior.accessToken));
@@ -203,9 +203,9 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
     expect(loginRes.status).toBe(200);
 
     const seniorTarget = await prisma.user.findFirstOrThrow({
-      where: { username: 'senior.rahimi' },
+      where: { username: 'senior' },
     });
-    const senior2 = await loginAs(app, 'senior.rahimi');
+    const senior2 = await loginAs(app, 'senior');
     const forbidden = await request(app.getHttpServer())
       .post(`/admins/${seniorTarget.id}/reset-password`)
       .set('Authorization', auth(senior2.accessToken))
@@ -256,7 +256,7 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
       true,
     );
 
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const forbidden = await request(app.getHttpServer())
       .get('/audit/system-events')
       .set('Authorization', auth(senior.accessToken));

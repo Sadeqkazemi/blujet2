@@ -239,7 +239,7 @@ describe('Cartable + referrals + messages (e2e)', () => {
   });
 
   it('chair-permission request as SENIOR_MANAGER → 403 (gate exists only in Finance/Commercial)', async () => {
-    const { accessToken } = await loginAs(app, 'senior.rahimi');
+    const { accessToken } = await loginAs(app, 'senior');
     const res = await request(app.getHttpServer())
       .post('/cartable/chair-permission')
       .set('Authorization', `Bearer ${accessToken}`);
@@ -249,7 +249,7 @@ describe('Cartable + referrals + messages (e2e)', () => {
   // ── Referrals ────────────────────────────────────────────────────────
 
   it('creating a referral requires title/body/≥1 recipient and creates recipient cartable tasks', async () => {
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const financeId = await userId('finance.karimi');
 
     const invalid = await request(app.getHttpServer())
@@ -288,7 +288,7 @@ describe('Cartable + referrals + messages (e2e)', () => {
       .send({ title: 'ت', body: 'ت', recipientIds: [await userId('ceo')] });
     expect(forbidden.status).toBe(403);
 
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const list = await request(app.getHttpServer())
       .get('/referrals')
       .set('Authorization', `Bearer ${senior.accessToken}`);
@@ -310,7 +310,7 @@ describe('Cartable + referrals + messages (e2e)', () => {
   });
 
   it('a non-recipient, non-sender exec gets 403 on referral detail; a non-recipient cannot report', async () => {
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const financeId = await userId('finance.karimi');
     const created = await request(app.getHttpServer())
       .post('/referrals')
@@ -331,7 +331,7 @@ describe('Cartable + referrals + messages (e2e)', () => {
   });
 
   it('full referral loop: report flips to REPORTED, close only from REPORTED, revision back to REVIEWING', async () => {
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const financeId = await userId('finance.karimi');
     const created = await request(app.getHttpServer())
       .post('/referrals')
@@ -390,7 +390,7 @@ describe('Cartable + referrals + messages (e2e)', () => {
   );
 
   it('a referral created with attachmentIds resolves real fileName/mimeType/sizeBytes in list() and detail(); myReferrals() resolves it for the recipient too', async () => {
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const financeId = await userId('finance.karimi');
 
     const uploaded = await request(app.getHttpServer())
@@ -455,7 +455,7 @@ describe('Cartable + referrals + messages (e2e)', () => {
   });
 
   it('a report submitted with attachmentIds resolves real metadata inside detail().reports', async () => {
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const financeId = await userId('finance.karimi');
     const created = await request(app.getHttpServer())
       .post('/referrals')
@@ -491,7 +491,7 @@ describe('Cartable + referrals + messages (e2e)', () => {
   });
 
   it('a referral with no attachments resolves to an empty array, not null/undefined', async () => {
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const financeId = await userId('finance.karimi');
     const created = await request(app.getHttpServer())
       .post('/referrals')
@@ -508,7 +508,7 @@ describe('Cartable + referrals + messages (e2e)', () => {
   // ── GET /referrals/mine (Phase 26 — recipient-side listing) ────────────
 
   it('GET /referrals/mine returns only referrals where the caller is a recipient, not ones they sent', async () => {
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const employeeId = await userId('com.ahmadi');
     const created = await request(app.getHttpServer())
       .post('/referrals')
@@ -539,7 +539,7 @@ describe('Cartable + referrals + messages (e2e)', () => {
   });
 
   it('GET /referrals/mine: hasMyReport flips true only after this recipient reports, and counts reconcile', async () => {
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const employeeId = await userId('com.ahmadi');
     const created = await request(app.getHttpServer())
       .post('/referrals')
@@ -588,7 +588,7 @@ describe('Cartable + referrals + messages (e2e)', () => {
   });
 
   it('approving a referral-sourced cartable task submits the note as the report', async () => {
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const commId = await userId('comm.abbasi');
     const created = await request(app.getHttpServer())
       .post('/referrals')
@@ -712,7 +712,7 @@ describe('Cartable + referrals + messages (e2e)', () => {
       },
     });
 
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const refer = await request(app.getHttpServer())
       .patch(`/agencies/requests/${reqRow.id}/refer`)
       .set('Authorization', `Bearer ${senior.accessToken}`)

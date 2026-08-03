@@ -21,7 +21,7 @@ test('CEO admins journey: list with real status → open detail → block → un
 });
 
 test('Senior changes their own password and reverts it (امنیت و رمز عبور)', async ({ page }) => {
-  await loginAs(page, 'senior.rahimi');
+  await loginAs(page, 'senior');
   await page.getByRole('link', { name: 'امنیت و رمز عبور' }).click();
   await page.waitForURL('**/panel/security');
 

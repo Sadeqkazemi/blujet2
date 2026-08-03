@@ -87,7 +87,7 @@ describe('Panels (e2e)', () => {
   });
 
   it('returns the confirmed tab set for Senior Manager in design sidebar order', async () => {
-    const { accessToken } = await loginAs(app, 'senior.rahimi');
+    const { accessToken } = await loginAs(app, 'senior');
     const res = await request(app.getHttpServer())
       .get('/panels/nav')
       .set('Authorization', `Bearer ${accessToken}`);

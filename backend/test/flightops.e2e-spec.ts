@@ -124,7 +124,7 @@ describe('Flightops (e2e)', () => {
   // ── Role gate ───────────────────────────────────────────────────────
 
   it('403s for a role outside the flightops set (SENIOR_MANAGER, EMPLOYEE)', async () => {
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const seniorRes = await request(app.getHttpServer())
       .get('/flightops')
       .set('Authorization', auth(senior.accessToken));
