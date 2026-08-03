@@ -15,6 +15,7 @@ import {
   updateRoute,
 } from '../../api/site-content';
 import { fetchSettings, updateSettings } from '../../api/admins';
+import { uploadFile } from '../../api/files';
 import {
   SITE_CONTENT_FIELD_LABELS,
   SITE_PAGE_ROWS,
@@ -113,6 +114,7 @@ export default function MediaAdminPage() {
         homeHeroSubtitle: String(s.homeHeroSubtitle ?? ''),
         aboutUsText: String(s.aboutUsText ?? ''),
         contactAddress: String(s.contactAddress ?? ''),
+        contactOfficeHours: String(s.contactOfficeHours ?? ''),
         termsText: String(s.termsText ?? ''),
       });
     } catch {
@@ -605,7 +607,6 @@ export default function MediaAdminPage() {
       {/* Block edit modal */}
       {editBlock && (
         <Modal
-          open
           onClose={() => setEditBlock(null)}
           title={`ویرایش ${BLOCK_META[editBlock.key].title}`}
         >
@@ -639,7 +640,6 @@ export default function MediaAdminPage() {
       {/* Destination modal */}
       {destModal && (
         <Modal
-          open
           onClose={() => setDestModal(null)}
           title={destModal === 'create' ? 'افزودن مقصد' : 'ویرایش مقصد'}
         >
@@ -679,7 +679,6 @@ export default function MediaAdminPage() {
       {/* Route modal */}
       {routeModal && (
         <Modal
-          open
           onClose={() => setRouteModal(null)}
           title={routeModal === 'create' ? 'افزودن مسیر' : 'ویرایش مسیر'}
         >
@@ -729,7 +728,7 @@ export default function MediaAdminPage() {
       )}
 
       {editPage && (
-        <Modal open onClose={() => setEditPage(null)} title={`ویرایش ${editPage.nameFa}`}>
+        <Modal onClose={() => setEditPage(null)} title={`ویرایش ${editPage.nameFa}`}>
           <div className="flex flex-col gap-3">
             {editPage.editHint && (
               <p className="m-0 text-[11px] text-muted">{editPage.editHint}</p>
