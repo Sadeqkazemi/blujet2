@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { fetchManagerReports } from '../../api/audit';
 import JalaliDatePicker from '../../components/JalaliDatePicker';
+import Pagination from '../../components/Pagination';
+import { usePagination } from '../../hooks/usePagination';
 import { useAuth } from '../../hooks/useAuth';
 import { faDigits } from '../../lib/fa-format';
 import { dayjs, formatJalaliDateTime } from '../../lib/jalali';
@@ -105,6 +107,8 @@ export default function ManagerReportsPage() {
     if (!dayIso) return rows;
     return rows.filter((r) => isSameJalaliDay(r.createdAt, dayIso));
   }, [rows, dayIso]);
+
+  const filteredPager = usePagination(filtered);
 
   const kpis = useMemo(() => {
     const all = rows ?? [];
@@ -332,7 +336,7 @@ export default function ManagerReportsPage() {
                     گزارش
                   </div>
                 )}
-                {filtered.map((r) =>
+                {filteredPager.pageItems.map((r) =>
                   dark ? (
                     <DarkReportCard key={r.id} row={r} />
                   ) : (
@@ -341,6 +345,12 @@ export default function ManagerReportsPage() {
                 )}
               </div>
             )}
+            <Pagination
+              page={filteredPager.page}
+              totalPages={filteredPager.totalPages}
+              onChange={filteredPager.setPage}
+              variant={dark ? 'dark' : 'light'}
+            />
           </>
         )}
       </section>

@@ -12,6 +12,8 @@ import {
 import { faDigits } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import Modal from '../../components/Modal';
+import Pagination from '../../components/Pagination';
+import { usePagination } from '../../hooks/usePagination';
 import JalaliDatePicker from '../../components/JalaliDatePicker';
 import ComposeMessageModal from './ComposeMessageModal';
 import type {
@@ -210,6 +212,7 @@ export default function CartablePage() {
   }
 
   const tasks = result?.tasks ?? [];
+  const tasksPager = usePagination(tasks);
   const filterLabel = category
     ? CATEGORY_CARDS.find((c) => c.key === category)?.label ?? ''
     : '';
@@ -416,7 +419,7 @@ export default function CartablePage() {
             </p>
           ) : (
             <ul>
-              {tasks.map((t) => {
+              {tasksPager.pageItems.map((t) => {
                 const meta = CATEGORY_META[t.category];
                 return (
                   <li
@@ -496,6 +499,12 @@ export default function CartablePage() {
               })}
             </ul>
           )}
+          <Pagination
+            page={tasksPager.page}
+            totalPages={tasksPager.totalPages}
+            onChange={tasksPager.setPage}
+            variant={dark ? 'dark' : 'light'}
+          />
         </div>
       </div>
 

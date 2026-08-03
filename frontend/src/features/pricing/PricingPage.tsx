@@ -12,6 +12,8 @@ import { faDigits, faMoney, parseTomanToRial } from '../../lib/fa-format';
 import { formatJalaliDate } from '../../lib/jalali';
 import { useStepUp } from '../../hooks/useStepUp';
 import Modal from '../../components/Modal';
+import Pagination from '../../components/Pagination';
+import { usePagination } from '../../hooks/usePagination';
 import type {
   CeoPricingResult,
   CommercialFlightRow,
@@ -104,6 +106,8 @@ function CeoPricing() {
 
   const pending = data?.pending ?? [];
   const registered = data?.registered ?? [];
+  const pendingPager = usePagination(pending);
+  const registeredPager = usePagination(registered);
 
   function vsColor(proposed: string | number, competitor: string | number): string {
     const delta = ((Number(proposed) - Number(competitor)) / Number(competitor)) * 100;
@@ -182,7 +186,7 @@ function CeoPricing() {
         </div>
       ) : (
         <div className="mb-4 flex flex-col gap-2.5">
-          {pending.map((p) => (
+          {pendingPager.pageItems.map((p) => (
             <div
               key={p.id}
               className="rounded-[13px] border border-[#1f2a3d] bg-[#141d2e] px-[17px] py-[15px]"
@@ -332,6 +336,13 @@ function CeoPricing() {
         </div>
       )}
 
+      <Pagination
+        page={pendingPager.page}
+        totalPages={pendingPager.totalPages}
+        onChange={pendingPager.setPage}
+        variant="dark"
+      />
+
       {registered.length > 0 && (
         <section className="mt-1">
           <div className="mb-3 flex items-center gap-2.5">
@@ -342,7 +353,7 @@ function CeoPricing() {
             </span>
           </div>
           <div className="flex flex-col gap-2">
-            {registered.map((p) => (
+            {registeredPager.pageItems.map((p) => (
               <div
                 key={p.id}
                 className="flex flex-wrap items-center gap-3 rounded-[13px] border border-[#1f2a3d] bg-[#141d2e] px-[15px] py-[13px]"
@@ -378,6 +389,12 @@ function CeoPricing() {
               </div>
             ))}
           </div>
+          <Pagination
+            page={registeredPager.page}
+            totalPages={registeredPager.totalPages}
+            onChange={registeredPager.setPage}
+            variant="dark"
+          />
         </section>
       )}
       {stepUp.modal}
@@ -451,6 +468,7 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
   }
 
   const flights = data?.flights ?? [];
+  const flightsPager = usePagination(flights);
   const locked = selected?.pricing?.status === 'REGISTERED';
 
   return (
@@ -481,7 +499,7 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
         </p>
       ) : (
         <ul className="space-y-3">
-          {flights.map((row) => {
+          {flightsPager.pageItems.map((row) => {
             const st = statusOf(row);
             return (
               <li key={row.id} className="flex flex-wrap items-center gap-4 rounded-xl border border-border bg-white p-4">
@@ -528,6 +546,13 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
           })}
         </ul>
       )}
+
+      <Pagination
+        page={flightsPager.page}
+        totalPages={flightsPager.totalPages}
+        onChange={flightsPager.setPage}
+        variant="light"
+      />
 
       {selected && (
         <Modal title={`تعیین قیمت پرواز — ${routeLabel(selected)}`} onClose={() => setSelected(null)}>

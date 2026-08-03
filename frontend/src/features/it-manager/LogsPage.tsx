@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { fetchSystemLogs } from '../../api/it-manager';
+import Pagination from '../../components/Pagination';
+import { usePagination } from '../../hooks/usePagination';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import type { AuditLogRow } from '../../types/it-manager';
 
@@ -12,6 +14,8 @@ const LEVEL_LABEL: Record<AuditLogRow['level'], { label: string; className: stri
 export default function LogsPage() {
   const [logs, setLogs] = useState<AuditLogRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const logsPager = usePagination(logs ?? []);
 
   useEffect(() => {
     fetchSystemLogs()
@@ -52,7 +56,7 @@ export default function LogsPage() {
             </p>
           ) : (
             <ul>
-              {logs.map((l) => {
+              {logsPager.pageItems.map((l) => {
                 const lvl = LEVEL_LABEL[l.level] ?? LEVEL_LABEL.info;
                 return (
                   <li
@@ -74,6 +78,12 @@ export default function LogsPage() {
             </ul>
           )}
         </div>
+        <Pagination
+          page={logsPager.page}
+          totalPages={logsPager.totalPages}
+          onChange={logsPager.setPage}
+          variant="dark"
+        />
       </section>
     </div>
   );

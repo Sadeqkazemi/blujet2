@@ -7,6 +7,8 @@ import {
   sendEmployeeManagerMessage,
 } from '../../api/cartable';
 import { faDigits } from '../../lib/fa-format';
+import Pagination from '../../components/Pagination';
+import { usePagination } from '../../hooks/usePagination';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import type {
   CartableListResult,
@@ -94,6 +96,7 @@ export default function EmployeeCartablePage() {
   }
 
   const tasks = result?.tasks ?? [];
+  const tasksPager = usePagination(tasks);
   const canSend = msgTo && msgText.trim().length > 0;
 
   return (
@@ -182,7 +185,7 @@ export default function EmployeeCartablePage() {
         </p>
       ) : (
         <ul className="space-y-3">
-          {tasks.map((t) => {
+          {tasksPager.pageItems.map((t) => {
             const fromName = t.senderLabelFa ?? t.sender?.fullName ?? '—';
             const done = t.status !== 'OPEN';
             return (
@@ -218,6 +221,13 @@ export default function EmployeeCartablePage() {
           })}
         </ul>
       )}
+
+      <Pagination
+        page={tasksPager.page}
+        totalPages={tasksPager.totalPages}
+        onChange={tasksPager.setPage}
+        variant="light"
+      />
 
       {result && result.totalOpen > 0 && (
         <p className="mt-4 text-center text-[11px] text-muted">

@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { fetchStaffReports } from '../../api/reporting';
+import Pagination from '../../components/Pagination';
+import { usePagination } from '../../hooks/usePagination';
 import { faDigits } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import type { StaffReportsResult } from '../../types/reporting';
@@ -36,6 +38,8 @@ export default function StaffReportsPage() {
       cancelled = true;
     };
   }, [staffId]);
+
+  const reportsPager = usePagination(data?.reports ?? []);
 
   if (error) return <p className="px-[21px] py-8 text-sm text-[#f87171]">{error}</p>;
   if (!data) return <p className="px-[21px] py-8 text-sm text-[#6b7b94]">در حال بارگذاری…</p>;
@@ -139,7 +143,7 @@ export default function StaffReportsPage() {
           <p className="px-3 py-[26px] text-center text-xs text-[#6b7b94]">گزارشی برای این کارمند ثبت نشده است.</p>
         ) : (
           <div className="flex flex-col gap-2.5">
-            {data.reports.map((r) => (
+            {reportsPager.pageItems.map((r) => (
               <div
                 key={r.id}
                 className="flex items-start gap-3 rounded-xl border border-[#1f2a3d] bg-[#101a2c] px-3.5 py-[13px]"
@@ -165,6 +169,12 @@ export default function StaffReportsPage() {
             ))}
           </div>
         )}
+        <Pagination
+          page={reportsPager.page}
+          totalPages={reportsPager.totalPages}
+          onChange={reportsPager.setPage}
+          variant="dark"
+        />
       </div>
     </div>
   );

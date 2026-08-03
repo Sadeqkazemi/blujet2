@@ -5,6 +5,8 @@ import { faDigits, faMoney } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import { useStepUp } from '../../hooks/useStepUp';
 import Modal from '../../components/Modal';
+import Pagination from '../../components/Pagination';
+import { usePagination } from '../../hooks/usePagination';
 import type { RefundDetail, RefundListRow, RefundsResult, RefundStatus } from '../../types/refunds';
 import type { StaffDirectoryEntry } from '../../types/cartable';
 
@@ -85,6 +87,7 @@ export default function RefundsPage() {
   }
 
   const requests = data?.requests ?? [];
+  const requestsPager = usePagination(requests);
   const kpis = data?.kpis;
 
   return (
@@ -138,7 +141,7 @@ export default function RefundsPage() {
           <p className="py-6 text-center text-xs text-muted">درخواست استردادی ثبت نشده است.</p>
         ) : (
           <ul className="divide-y divide-border">
-            {requests.map((r) => {
+            {requestsPager.pageItems.map((r) => {
               const st = STATUS_META[r.status];
               return (
                 <li key={r.id} className="flex flex-wrap items-center gap-3 py-3">
@@ -188,6 +191,12 @@ export default function RefundsPage() {
             })}
           </ul>
         )}
+        <Pagination
+          page={requestsPager.page}
+          totalPages={requestsPager.totalPages}
+          onChange={requestsPager.setPage}
+          variant="light"
+        />
       </section>
 
       {detail && (

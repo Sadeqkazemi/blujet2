@@ -11,6 +11,8 @@ import {
   fetchSalesChart,
 } from '../../api/reporting';
 import LowSalesBanner from '../../components/LowSalesBanner';
+import Pagination from '../../components/Pagination';
+import { usePagination } from '../../hooks/usePagination';
 import type { PanelShellContext } from '../../types/panel-shell';
 import { remindAgencyInvoice } from '../../api/agencies';
 import { fetchReconciliationQueue, resolveReconciliation } from '../../api/reconciliation';
@@ -236,6 +238,7 @@ function ReconciliationQueueCard({
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const itemsPager = usePagination(items);
 
   async function submit(id: string) {
     if (note.trim().length < 3) {
@@ -270,7 +273,7 @@ function ReconciliationQueueCard({
         <p className="text-xs text-muted">موردی برای بررسی وجود ندارد.</p>
       )}
       <div className="flex flex-col gap-3">
-        {items.map((item) => (
+        {itemsPager.pageItems.map((item) => (
           <div
             key={item.id}
             data-testid="reconciliation-item"
@@ -327,6 +330,12 @@ function ReconciliationQueueCard({
           </div>
         ))}
       </div>
+      <Pagination
+        page={itemsPager.page}
+        totalPages={itemsPager.totalPages}
+        onChange={itemsPager.setPage}
+        variant="light"
+      />
     </div>
   );
 }
@@ -345,6 +354,9 @@ function FinanceOpsView() {
   const [reconciliation, setReconciliation] = useState<ReconciliationItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  const txPager = usePagination(tx?.rows ?? []);
+  const settlementsPager = usePagination(settlements?.rows ?? []);
 
   useEffect(() => {
     if (!chart.isQueryReady) return;
@@ -474,7 +486,7 @@ function FinanceOpsView() {
           </div>
           <div className="mb-3 text-[11px] text-muted">فروش، تسویه، کمیسیون و استرداد</div>
           <div className="flex flex-col divide-y divide-border/60">
-            {tx.rows.map((t) => (
+            {txPager.pageItems.map((t) => (
               <div key={t.id} className="flex items-center gap-3 py-2.5 text-xs">
                 <span
                   className={`flex h-9 w-9 flex-none items-center justify-center rounded-lg text-sm ${TX_ICON_CLASS[t.type] ?? 'bg-body text-muted'}`}
@@ -502,6 +514,12 @@ function FinanceOpsView() {
               </div>
             ))}
           </div>
+          <Pagination
+            page={txPager.page}
+            totalPages={txPager.totalPages}
+            onChange={txPager.setPage}
+            variant="light"
+          />
         </div>
         <RevenueMixCard mix={mix} />
       </div>
@@ -515,7 +533,7 @@ function FinanceOpsView() {
         </div>
         <div className="mb-4 text-[11px] text-muted">وضعیت پرداخت دوره‌ای و مطالبات معوق</div>
         <div className="flex flex-col gap-3">
-          {settlements.rows.map((s) => {
+          {settlementsPager.pageItems.map((s) => {
             const st = SETTLEMENT_STATUS[s.status];
             return (
               <div
@@ -566,6 +584,12 @@ function FinanceOpsView() {
             );
           })}
         </div>
+        <Pagination
+          page={settlementsPager.page}
+          totalPages={settlementsPager.totalPages}
+          onChange={settlementsPager.setPage}
+          variant="light"
+        />
       </div>
     </>
   );
@@ -873,6 +897,7 @@ function FlightSalesPicker({
 }) {
   const hasQuery = search.trim().length > 0;
   const filtered = filterFlightSalesRows(rows, search);
+  const filteredPager = usePagination(filtered);
 
   if (rows.length === 0) {
     return (
@@ -916,10 +941,10 @@ function FlightSalesPicker({
         </div>
       ) : (
         <div
-          className="flex max-h-[320px] max-w-[430px] flex-col gap-[9px] overflow-y-auto pe-1"
+          className="flex max-w-[430px] flex-col gap-[9px]"
           data-testid="flight-sales-list"
         >
-          {filtered.map((r) => {
+          {filteredPager.pageItems.map((r) => {
             const on = r.flightNo === selectedFlightNo;
             const meta =
               r.flightCount > 1
@@ -955,6 +980,12 @@ function FlightSalesPicker({
             );
           })}
         </div>
+        <Pagination
+          page={filteredPager.page}
+          totalPages={filteredPager.totalPages}
+          onChange={filteredPager.setPage}
+          variant="dark"
+        />
       )}
     </div>
   );

@@ -14,6 +14,8 @@ import {
 import { faDigits } from '../../lib/fa-format';
 import { formatJalaliDate, parseJalaliDateToIso } from '../../lib/jalali';
 import Modal from '../../components/Modal';
+import Pagination from '../../components/Pagination';
+import { usePagination } from '../../hooks/usePagination';
 import type { ClubCardRequest, ClubMembersResult, ClubSubmittedCardRequest, ClubTier } from '../../types/club';
 
 const TIER_LABELS: Record<ClubTier, string> = {
@@ -266,6 +268,9 @@ export default function ClubPage() {
       ? requests.filter((r) => r.status === 'REFERRED')
       : requests;
 
+  const membersPager = usePagination(members);
+  const visibleRequestsPager = usePagination(visibleRequests);
+
   const shellClass = dark ? 'px-[21px] pb-[34px] pt-[18px]' : 'p-8';
   const title =
     isSiteAdmin ? 'باشگاه مشتریان' : 'مشتریان VIP';
@@ -462,7 +467,7 @@ export default function ClubPage() {
             </p>
           ) : dark && isExecutiveRich ? (
             <div className="flex flex-col gap-[9px]">
-              {visibleRequests.map((r) => {
+              {visibleRequestsPager.pageItems.map((r) => {
                 const st = REQUEST_STATUS[r.status];
                 const tier = TIER_META[r.level];
                 return (
@@ -512,7 +517,7 @@ export default function ClubPage() {
             </div>
           ) : (
             <ul className={dark ? 'flex flex-col gap-2' : 'divide-y divide-border'}>
-              {visibleRequests.map((r) => {
+              {visibleRequestsPager.pageItems.map((r) => {
                 const st = REQUEST_STATUS[r.status];
                 const seniorCanAct = !isSenior || r.assignedTo === 'SENIOR';
                 const tier = TIER_META[r.level];
@@ -606,6 +611,12 @@ export default function ClubPage() {
               })}
             </ul>
           )}
+          <Pagination
+            page={visibleRequestsPager.page}
+            totalPages={visibleRequestsPager.totalPages}
+            onChange={visibleRequestsPager.setPage}
+            variant={dark ? 'dark' : 'light'}
+          />
         </section>
       )}
 
@@ -702,7 +713,7 @@ export default function ClubPage() {
           </p>
         ) : dark && isExecutiveRich ? (
           <div className="flex flex-col gap-[9px]">
-            {members.map((m) => {
+            {membersPager.pageItems.map((m) => {
               const tier = TIER_META[m.level];
               const issued = m.cardStatus === 'ISSUED';
               return (
@@ -772,7 +783,7 @@ export default function ClubPage() {
           </div>
         ) : (
           <ul className={dark ? 'flex flex-col gap-2' : 'divide-y divide-border'}>
-            {members.map((m) => (
+            {membersPager.pageItems.map((m) => (
               <li
                 key={m.id}
                 className={dark ? 'rounded-xl border border-[#1f2a3d] bg-[#101a2c] px-3 py-3' : 'py-3'}
@@ -931,6 +942,12 @@ export default function ClubPage() {
             ))}
           </ul>
         )}
+        <Pagination
+          page={membersPager.page}
+          totalPages={membersPager.totalPages}
+          onChange={membersPager.setPage}
+          variant={dark ? 'dark' : 'light'}
+        />
       </section>
 
       {/* ── Add VIP accordion (executive dark) ── */}

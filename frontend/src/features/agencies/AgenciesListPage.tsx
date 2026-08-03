@@ -8,6 +8,8 @@ import {
   settleAgency,
 } from '../../api/agencies';
 import { faDigits, faMoney } from '../../lib/fa-format';
+import Pagination from '../../components/Pagination';
+import { usePagination } from '../../hooks/usePagination';
 import { TIER_LABELS, statusBadge } from './agency-labels';
 import type { AgencyListResult, AgencyListRow, AgencyMembershipRequest } from '../../types/agencies';
 
@@ -76,6 +78,10 @@ export default function AgenciesListPage() {
     () => (result?.agencies ?? []).filter((a) => Number(a.usedIrr) > 0 || a.pendingInvoiceCount > 0),
     [result],
   );
+
+  const pendingPager = usePagination(pendingRequests);
+  const debtorsPager = usePagination(debtors);
+  const agenciesPager = usePagination(result?.agencies ?? []);
 
   async function onSettle(agency: AgencyListRow) {
     setSettlingId(agency.id);
@@ -159,7 +165,7 @@ export default function AgenciesListPage() {
           </p>
         ) : (
           <ul className={isCommercial ? '' : 'divide-y divide-panel-border'}>
-            {pendingRequests.map((r) => (
+            {pendingPager.pageItems.map((r) => (
               <li
                 key={r.id}
                 className={`flex flex-wrap items-center gap-3 ${
@@ -200,6 +206,12 @@ export default function AgenciesListPage() {
             ))}
           </ul>
         )}
+        <Pagination
+          page={pendingPager.page}
+          totalPages={pendingPager.totalPages}
+          onChange={pendingPager.setPage}
+          variant="dark"
+        />
         </div>
       </section>
 
@@ -237,7 +249,7 @@ export default function AgenciesListPage() {
             </button>
           </div>
           <ul className="px-2 py-1.5">
-            {debtors.map((d) => {
+            {debtorsPager.pageItems.map((d) => {
               const unpaid = d.pendingInvoiceCount > 0;
               const label = unpaid ? 'فاکتور پرداخت‌نشده' : 'بدهی جاری';
               return (
@@ -272,6 +284,12 @@ export default function AgenciesListPage() {
               );
             })}
           </ul>
+          <Pagination
+            page={debtorsPager.page}
+            totalPages={debtorsPager.totalPages}
+            onChange={debtorsPager.setPage}
+            variant="dark"
+          />
         </section>
       )}
 
@@ -313,7 +331,7 @@ export default function AgenciesListPage() {
         <p className="py-10 text-center text-sm text-panel-muted">آژانسی با این عبارت یافت نشد.</p>
       ) : subTab === 'credit' && !isCommercial ? (
         <ul className="space-y-3">
-          {result!.agencies.map((a) => {
+          {agenciesPager.pageItems.map((a) => {
             const settled = Number(a.usedIrr) <= 0;
             return (
               <li key={a.id} className="flex flex-wrap items-center gap-4 rounded-xl border border-panel-border bg-panel-surface p-4">
@@ -356,7 +374,7 @@ export default function AgenciesListPage() {
         </ul>
       ) : (
         <ul className="space-y-3">
-          {result!.agencies.map((a) => {
+          {agenciesPager.pageItems.map((a) => {
             const badge = statusBadge(a.isActive);
             return (
               <li key={a.id}>
@@ -395,6 +413,14 @@ export default function AgenciesListPage() {
             );
           })}
         </ul>
+      )}
+      {!loading && (result?.agencies.length ?? 0) > 0 && (
+        <Pagination
+          page={agenciesPager.page}
+          totalPages={agenciesPager.totalPages}
+          onChange={agenciesPager.setPage}
+          variant="dark"
+        />
       )}
     </div>
   );
