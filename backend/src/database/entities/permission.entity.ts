@@ -1,4 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import {
+  BeforeInsert,
   Column,
   CreateDateColumn,
   Entity,
@@ -11,6 +13,11 @@ import {
 export class Permission {
   @PrimaryColumn({ type: 'text', primaryKeyConstraintName: 'permissions_pkey' })
   id!: string;
+
+  @BeforeInsert()
+  generateId() {
+    this.id ??= randomUUID();
+  }
 
   @Column({ type: 'text' })
   dept!: string;

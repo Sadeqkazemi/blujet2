@@ -1,4 +1,5 @@
-import { Column, Entity, PrimaryColumn } from 'typeorm';
+import { randomUUID } from 'node:crypto';
+import { BeforeInsert, Column, Entity, PrimaryColumn } from 'typeorm';
 
 @Entity('refund_penalty_rules')
 export class RefundPenaltyRule {
@@ -7,6 +8,11 @@ export class RefundPenaltyRule {
     primaryKeyConstraintName: 'refund_penalty_rules_pkey',
   })
   id!: string;
+
+  @BeforeInsert()
+  generateId() {
+    this.id ??= randomUUID();
+  }
 
   @Column({ type: 'int' })
   minHoursBeforeDeparture!: number;
