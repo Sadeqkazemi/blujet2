@@ -1,10 +1,9 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import MediaAdminPage from './MediaAdminPage';
 import * as siteContentApi from '../../api/site-content';
 import * as adminsApi from '../../api/admins';
-import * as careersApi from '../../api/careers';
 
 vi.mock('../../api/site-content');
 vi.mock('../../api/files', () => ({
@@ -115,48 +114,9 @@ describe('MediaAdminPage', () => {
       },
       refundRules: [],
     });
-    vi.spyOn(careersApi, 'fetchAllPostings').mockResolvedValue([
-      {
-        id: 'p1',
-        title: 'کارشناس پشتیبانی مسافران',
-        dept: 'پشتیبانی',
-        city: 'تهران',
-        type: 'FULL_TIME',
-        generalReqs: [],
-        specialReqs: [],
-        active: true,
-        createdAt: '2026-07-01T00:00:00.000Z',
-        updatedAt: '2026-07-01T00:00:00.000Z',
-      },
-    ]);
-    vi.spyOn(careersApi, 'fetchCareersSettings').mockResolvedValue({ enabled: true });
-    vi.spyOn(careersApi, 'createPosting').mockResolvedValue({
-      id: 'p2',
-      title: 'توسعه‌دهنده فرانت‌اند',
-      dept: 'IT',
-      city: 'تهران',
-      type: 'REMOTE',
-      generalReqs: [],
-      specialReqs: [],
-      active: true,
-      createdAt: '2026-07-01T00:00:00.000Z',
-      updatedAt: '2026-07-01T00:00:00.000Z',
-    });
-    vi.spyOn(careersApi, 'updatePosting').mockResolvedValue({
-      id: 'p1',
-      title: 'کارشناس پشتیبانی مسافران',
-      dept: 'پشتیبانی',
-      city: 'تهران',
-      type: 'FULL_TIME',
-      generalReqs: [],
-      specialReqs: [],
-      active: false,
-      createdAt: '2026-07-01T00:00:00.000Z',
-      updatedAt: '2026-07-01T00:00:00.000Z',
-    });
   });
 
-  it('renders page title and design CMS sections including links and jobs', async () => {
+  it('renders page title and design CMS sections including links', async () => {
     render(<MediaAdminPage />);
     expect(await screen.findByText('مدیریت سایت')).toBeInTheDocument();
     expect(screen.getByText('بنر اصلی سایت')).toBeInTheDocument();
@@ -167,16 +127,15 @@ describe('MediaAdminPage', () => {
     expect(screen.getByText('لینک دانلود اپلیکیشن')).toBeInTheDocument();
     expect(screen.getByText('شبکه‌های اجتماعی')).toBeInTheDocument();
     expect(screen.getByText('تماس پشتیبانی')).toBeInTheDocument();
-    expect(screen.getByText('فرصت‌های شغلی')).toBeInTheDocument();
     expect(screen.getByText('کتابخانهٔ تصاویر')).toBeInTheDocument();
+    expect(screen.queryByText('فرصت‌های شغلی')).not.toBeInTheDocument();
   });
 
-  it('shows seeded destination, route, support and job cards', async () => {
+  it('shows seeded destination, route and support contact', async () => {
     render(<MediaAdminPage />);
     expect(await screen.findByText('IST')).toBeInTheDocument();
     expect(screen.getByText(/THR ← MHD/)).toBeInTheDocument();
     expect(screen.getByText('021-91000000')).toBeInTheDocument();
-    expect(await screen.findByText('کارشناس پشتیبانی مسافران')).toBeInTheDocument();
   });
 
   it('opens hero banner editor', async () => {
@@ -196,23 +155,6 @@ describe('MediaAdminPage', () => {
       expect(siteContentApi.updateContentBlock).toHaveBeenCalledWith('ANNOUNCEMENT_BAR', {
         enabled: false,
       });
-    });
-  });
-
-  it('creates a job posting from the media jobs section', async () => {
-    const user = userEvent.setup();
-    render(<MediaAdminPage />);
-    await screen.findByText('فرصت‌های شغلی');
-    await user.click(screen.getByRole('button', { name: '+ ایجاد فرصت شغلی' }));
-    const dialog = await screen.findByRole('dialog', { name: 'ایجاد فرصت شغلی' });
-    await user.type(within(dialog).getByPlaceholderText('عنوان شغل'), 'توسعه‌دهنده فرانت‌اند');
-    await user.type(within(dialog).getByPlaceholderText('واحد'), 'IT');
-    await user.type(within(dialog).getByPlaceholderText('شهر'), 'تهران');
-    await user.click(within(dialog).getByRole('button', { name: 'ذخیره' }));
-    await waitFor(() => {
-      expect(careersApi.createPosting).toHaveBeenCalledWith(
-        expect.objectContaining({ title: 'توسعه‌دهنده فرانت‌اند', dept: 'IT', city: 'تهران' }),
-      );
     });
   });
 

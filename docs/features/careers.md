@@ -8,9 +8,11 @@ file** — only a small "فرصت‌های شغلی" posting-management card gri
 `پنل ادمین سایت.dc.html` does (title/dept/city + type badge + "ویرایش",
 no delete). The public pages and the review UI were built by extension
 of this codebase's existing visual language, approved by the user before
-implementation. Job-posting CRUD lives on the SITE_ADMIN `media`
-(مدیریت سایت) tab matching the design; the `jobapps` tab is the dark
-applications-review queue only. Resume upload is made real (the
+implementation. Job-posting CRUD (with image + description text) and the
+applications queue live on the SITE_ADMIN `jobapps` tab as three sections:
+ایجاد فرصت شغلی / آگهی‌ها / درخواست‌های استخدام. Footer visibility is
+controlled by «نمایش آگهی در فوتر» (`CareersSettings.enabled`). Resume
+upload is made real (the
 design's own mock never actually persists the picked file); a small
 self-contained resume-storage slice on `JobApplication` instead of
 reusing `StoredFile` (which requires an authenticated `User` owner a job

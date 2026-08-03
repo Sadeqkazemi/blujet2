@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import { useCareersEnabled } from '../../hooks/useCareersEnabled';
 import { useT } from '../../lib/i18n';
 
 function AppStoreIcon({ size = 15 }: { size?: number }) {
@@ -144,6 +145,7 @@ function MobileAccordionSection({ title, links }: { title: string; links: { to: 
 export default function PublicFooter() {
   const t = useT();
   const isMobile = useIsMobile();
+  const careersEnabled = useCareersEnabled();
 
   const serviceLinks = [
     { to: '/results', label: t('footerBookFlight') },
@@ -155,6 +157,7 @@ export default function PublicFooter() {
     { to: '/about', label: t('footerAbout') },
     { to: '/contact', label: t('footerContact') },
     { to: '/travel-info', label: t('footerTerms') },
+    ...(careersEnabled ? [{ to: '/careers', label: t('footerCareers') }] : []),
   ];
   const supportLinks = [
     { to: '/support', label: t('footerHelpCenter') },
