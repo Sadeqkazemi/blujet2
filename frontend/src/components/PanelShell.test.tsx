@@ -76,10 +76,35 @@ describe('PanelShell', () => {
 
     renderShell();
 
+    expect(screen.getByText('پنل مدیریت')).toBeInTheDocument();
+    expect(screen.getByText('نقش این پنل')).toBeInTheDocument();
+    expect(screen.getByText('مدیر ارشد')).toBeInTheDocument();
+
     await waitFor(() => {
       const badge = screen.getByTestId('nav-badge-referrals');
       expect(badge).toHaveTextContent('۲');
       expect(badge.className).toContain('a855f7');
+    });
+  });
+
+  it('shows the IT brand subtitle for IT_MANAGER', async () => {
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      status: 'authenticated',
+      user: { id: 'u4', fullName: 'مدیر IT', role: 'IT_MANAGER', preferredLocale: 'FA' },
+      requestLogin: vi.fn(),
+      confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
+      signOut: vi.fn(),
+    });
+    vi.spyOn(panelsApi, 'fetchNav').mockResolvedValue([
+      { key: 'dashboard', labelFa: 'داشبورد فنی', implemented: true },
+    ]);
+
+    renderShell();
+
+    expect(screen.getByText('پنل فناوری اطلاعات')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('داشبورد فنی')).toBeInTheDocument();
     });
   });
 
