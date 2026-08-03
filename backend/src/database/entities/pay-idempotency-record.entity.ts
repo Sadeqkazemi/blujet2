@@ -1,4 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import {
+  BeforeInsert,
   Column,
   CreateDateColumn,
   Entity,
@@ -21,6 +23,11 @@ export class PayIdempotencyRecord {
     primaryKeyConstraintName: 'pay_idempotency_records_pkey',
   })
   id!: string;
+
+  @BeforeInsert()
+  generateId() {
+    this.id ??= randomUUID();
+  }
 
   @Column({ type: 'text' })
   idempotencyKey!: string;

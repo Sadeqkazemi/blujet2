@@ -4,31 +4,39 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { In, Repository } from 'typeorm';
+import { SavedFlight } from '../../database/entities/saved-flight.entity';
+import { FlightInstance } from '../../database/entities/flight-instance.entity';
+import { Airport } from '../../database/entities/airport.entity';
 import { ErrorCode } from '../../common/errors';
 import { getCabinPrice } from './pricing';
 import { ZERO_IRR, isPositiveIrr } from '../../common/money';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import type { CabinClass } from '../../../generated/prisma/enums';
+import type { CabinClass } from '../../database/enums';
 
 const MAX_SAVED = 20;
 
 @Injectable()
 export class SavedFlightsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @InjectRepository(SavedFlight)
+    private readonly savedFlightRepo: Repository<SavedFlight>,
+    @InjectRepository(FlightInstance)
+    private readonly flightInstanceRepo: Repository<FlightInstance>,
+    @InjectRepository(Airport)
+    private readonly airportRepo: Repository<Airport>,
+  ) {}
 
   async listMine(user: AuthenticatedUser) {
-    const rows = await this.prisma.savedFlight.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        flightInstance: {
-          include: {
-            flight: { include: { route: true } },
-          },
-        },
-      },
-    });
+    const rows = await this.savedFlightRepo
+      .createQueryBuilder('s')
+      .leftJoinAndSelect('s.flightInstance', 'flightInstance')
+      .leftJoinAndSelect('flightInstance.flight', 'flight')
+      .leftJoinAndSelect('flight.route', 'route')
+      .where('s.userId = :userId', { userId: user.id })
+      .orderBy('s.createdAt', 'DESC')
+      .getMany();
 
     const airportCodes = new Set<string>();
     for (const row of rows) {
@@ -36,8 +44,8 @@ export class SavedFlightsService {
       airportCodes.add(row.flightInstance.flight.route.destCode);
     }
     const airports = airportCodes.size
-      ? await this.prisma.airport.findMany({
-          where: { code: { in: [...airportCodes] } },
+      ? await this.airportRepo.find({
+          where: { code: In([...airportCodes]) },
         })
       : [];
     const cityByCode = new Map(airports.map((a) => [a.code, a.cityFa]));
@@ -53,7 +61,7 @@ export class SavedFlightsService {
         if (inst.status === 'SCHEDULED' && inst.departureAt > now) {
           try {
             priceIrr = await getCabinPrice(
-              this.prisma,
+              this.savedFlightRepo.manager,
               row.flightInstanceId,
               row.cabin,
             );
@@ -86,8 +94,8 @@ export class SavedFlightsService {
     user: AuthenticatedUser,
     dto: { flightInstanceId: string; cabin: CabinClass },
   ) {
-    const instance = await this.prisma.flightInstance.findUnique({
-      where: { id: dto.flightInstanceId },
+    const instance = await this.flightInstanceRepo.findOneBy({
+      id: dto.flightInstanceId,
     });
     if (!instance || instance.status !== 'SCHEDULED') {
       throw new NotFoundException({
@@ -102,9 +110,13 @@ export class SavedFlightsService {
       });
     }
 
-    await getCabinPrice(this.prisma, dto.flightInstanceId, dto.cabin);
+    await getCabinPrice(
+      this.savedFlightRepo.manager,
+      dto.flightInstanceId,
+      dto.cabin,
+    );
 
-    const count = await this.prisma.savedFlight.count({
+    const count = await this.savedFlightRepo.count({
       where: { userId: user.id },
     });
     if (count >= MAX_SAVED) {
@@ -114,14 +126,10 @@ export class SavedFlightsService {
       });
     }
 
-    const existing = await this.prisma.savedFlight.findUnique({
-      where: {
-        userId_flightInstanceId_cabin: {
-          userId: user.id,
-          flightInstanceId: dto.flightInstanceId,
-          cabin: dto.cabin,
-        },
-      },
+    const existing = await this.savedFlightRepo.findOneBy({
+      userId: user.id,
+      flightInstanceId: dto.flightInstanceId,
+      cabin: dto.cabin,
     });
     if (existing) {
       throw new ConflictException({
@@ -130,24 +138,24 @@ export class SavedFlightsService {
       });
     }
 
-    return this.prisma.savedFlight.create({
-      data: {
+    return this.savedFlightRepo.save(
+      this.savedFlightRepo.create({
         userId: user.id,
         flightInstanceId: dto.flightInstanceId,
         cabin: dto.cabin,
-      },
-    });
+      }),
+    );
   }
 
   async remove(user: AuthenticatedUser, id: string) {
-    const row = await this.prisma.savedFlight.findUnique({ where: { id } });
+    const row = await this.savedFlightRepo.findOneBy({ id });
     if (!row || row.userId !== user.id) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
         message: 'پرواز ذخیره‌شده یافت نشد.',
       });
     }
-    await this.prisma.savedFlight.delete({ where: { id } });
+    await this.savedFlightRepo.delete({ id });
     return { removed: true };
   }
 }

@@ -1,4 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import {
+  BeforeInsert,
   Column,
   CreateDateColumn,
   Entity,
@@ -24,6 +26,11 @@ import { User } from './user.entity';
 export class PriceLock {
   @PrimaryColumn({ type: 'text', primaryKeyConstraintName: 'price_locks_pkey' })
   id!: string;
+
+  @BeforeInsert()
+  generateId() {
+    this.id ??= randomUUID();
+  }
 
   @Column({ type: 'text' })
   userId!: string;
