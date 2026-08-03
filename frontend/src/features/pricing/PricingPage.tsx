@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import {
   fetchCeoPricing,
@@ -8,6 +8,7 @@ import {
   setLegalRate,
   upsertProposal,
 } from '../../api/pricing';
+import { fetchAirports } from '../../api/flights';
 import { faDigits, faMoney, parseTomanToRial } from '../../lib/fa-format';
 import { formatJalaliDate } from '../../lib/jalali';
 import { useStepUp } from '../../hooks/useStepUp';
@@ -20,9 +21,22 @@ import type {
   CommercialPricingResult,
   PricingProposal,
 } from '../../types/pricing';
+import type { AirportEntry } from '../../types/flights';
 
-function routeLabel(p: { flight: { flightNo: string; route: { originCode: string; destCode: string } } }) {
+/** Design hint-placeholder-count for commercial pricing rows = 5. */
+const COMMERCIAL_PRICING_PAGE_SIZE = 5;
+
+function routeCodes(p: {
+  flight: { flightNo?: string; route: { originCode: string; destCode: string } };
+}) {
   return `${p.flight.route.originCode} ← ${p.flight.route.destCode}`;
+}
+
+/** @deprecated alias — CEO list still uses airport codes. */
+function routeLabel(p: {
+  flight: { flightNo?: string; route: { originCode: string; destCode: string } };
+}) {
+  return routeCodes(p);
 }
 
 function vsCompetitorLabel(proposed: string | number, competitor: string | number): string {
@@ -32,6 +46,21 @@ function vsCompetitorLabel(proposed: string | number, competitor: string | numbe
   if (Math.abs(delta) < 1) return 'هم‌تراز رقبا';
   const pct = faDigits(Math.abs(Math.round(delta)));
   return delta < 0 ? `${pct}٪ پایین‌تر از رقبا` : `${pct}٪ بالاتر از رقبا`;
+}
+
+function moneyOrDash(irr: string | number | null | undefined): string {
+  if (irr == null || irr === '') return '—';
+  const n = Number(irr);
+  if (!Number.isFinite(n) || n <= 0) return '—';
+  return `${faMoney(irr)} تومان`;
+}
+
+/** Match backend upsert: competitor ≈ base + 3% when no proposal yet. */
+function derivedCompetitorIrr(baseIrr: string | null | undefined): string | null {
+  if (baseIrr == null || baseIrr === '') return null;
+  const base = Number(baseIrr);
+  if (!Number.isFinite(base) || base <= 0) return null;
+  return String(Math.round((base * 1.03) / 100_000) * 100_000);
 }
 
 /** CEO view — «تعیین قیمت بلیط». */
@@ -402,9 +431,10 @@ function CeoPricing() {
   );
 }
 
-/** Commercial Manager view — pricing list + set-price modal. */
+/** Commercial Manager view — pricing list + set-price modal (design v2 dark). */
 function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
   const [data, setData] = useState<CommercialPricingResult | null>(null);
+  const [airports, setAirports] = useState<AirportEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [selected, setSelected] = useState<CommercialFlightRow | null>(null);
@@ -412,6 +442,20 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
   const [legalInput, setLegalInput] = useState('');
   const [noteInput, setNoteInput] = useState('');
   const [modalError, setModalError] = useState<string | null>(null);
+
+  const cityByCode = useMemo(
+    () => new Map(airports.map((a) => [a.code, a.cityFa])),
+    [airports],
+  );
+
+  const persianRoute = useCallback(
+    (row: CommercialFlightRow) => {
+      const o = cityByCode.get(row.flight.route.originCode) ?? row.flight.route.originCode;
+      const d = cityByCode.get(row.flight.route.destCode) ?? row.flight.route.destCode;
+      return `${o} ← ${d}`;
+    },
+    [cityByCode],
+  );
 
   const load = useCallback(async () => {
     try {
@@ -423,22 +467,73 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
 
   useEffect(() => {
     void load();
+    fetchAirports()
+      .then(setAirports)
+      .catch(() => setAirports([]));
   }, [load]);
 
-  function statusOf(row: CommercialFlightRow): { label: string; className: string; btn: string } {
-    if (row.pricing?.status === 'REGISTERED')
-      return { label: 'تأییدشده و قفل‌شده', className: 'bg-[#10b98124] text-[#059669]', btn: 'قفل‌شده' };
-    if (row.pricing)
-      return { label: 'در انتظار تأیید مدیر عامل', className: 'bg-[#a78bfa2e] text-[#6d28d9]', btn: 'ویرایش پیشنهاد' };
-    return { label: 'قیمت‌گذاری نشده', className: 'bg-surface text-muted', btn: 'تعیین قیمت' };
+  function statusOf(row: CommercialFlightRow): {
+    label: string;
+    color: string;
+    bg: string;
+    btn: string;
+    btnBg: string;
+    btnColor: string;
+  } {
+    if (row.pricing?.status === 'REGISTERED') {
+      return {
+        label: 'تأییدشده و قفل‌شده',
+        color: '#34d399',
+        bg: 'rgba(16,185,129,.14)',
+        btn: 'قفل‌شده',
+        btnBg: '#18223a',
+        btnColor: '#6b7b94',
+      };
+    }
+    if (row.pricing) {
+      return {
+        label: 'در انتظار تأیید مدیر عامل',
+        color: '#a78bfa',
+        bg: 'rgba(167,139,250,.16)',
+        btn: 'ویرایش پیشنهاد',
+        btnBg: '#3b82f6',
+        btnColor: '#fff',
+      };
+    }
+    return {
+      label: 'قیمت‌گذاری نشده',
+      color: '#8494ac',
+      bg: 'rgba(130,145,168,.12)',
+      btn: 'تعیین قیمت',
+      btnBg: '#3b82f6',
+      btnColor: '#fff',
+    };
+  }
+
+  function baseIrr(row: CommercialFlightRow): string | null {
+    return row.pricing?.basePriceIrr ?? row.basePriceIrr;
+  }
+
+  function competitorIrr(row: CommercialFlightRow): string | null {
+    return row.pricing?.competitorPriceIrr ?? derivedCompetitorIrr(baseIrr(row));
   }
 
   function openModal(row: CommercialFlightRow) {
     setSelected(row);
     setModalError(null);
-    setProposedInput('');
-    setLegalInput('');
-    setNoteInput(row.pricing?.note ?? '');
+    if (row.pricing && row.pricing.status !== 'REGISTERED') {
+      setProposedInput(String(Math.round(Number(row.pricing.proposedPriceIrr) / 10)));
+      setLegalInput(
+        row.pricing.legalRateIrr ? String(Math.round(Number(row.pricing.legalRateIrr) / 10)) : '',
+      );
+      setNoteInput(row.pricing.note ?? '');
+    } else {
+      setProposedInput(
+        row.basePriceIrr ? String(Math.round(Number(row.basePriceIrr) / 10)) : '',
+      );
+      setLegalInput('');
+      setNoteInput('');
+    }
   }
 
   async function onSubmit() {
@@ -468,130 +563,168 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
   }
 
   const flights = data?.flights ?? [];
-  const flightsPager = usePagination(flights);
+  const flightsPager = usePagination(flights, COMMERCIAL_PRICING_PAGE_SIZE);
   const locked = selected?.pricing?.status === 'REGISTERED';
 
   return (
-    <div className={embedded ? '' : 'p-8'}>
-      {embedded ? (
-        <div className="mb-4">
-          <h2 className="text-sm font-bold text-ink">تعیین قیمت پرواز و ارسال به مدیر عامل</h2>
-          <p className="mt-0.5 text-[11px] text-muted">
-            نرخ پیشنهادی و نرخ قانونی هر پرواز را تعیین کنید؛ پس از تأیید مدیر عامل، قیمت ثبت و قفل می‌شود.
-          </p>
-        </div>
-      ) : (
+    <div className={embedded ? '' : 'px-[21px] pb-[34px] pt-[18px]'}>
+      {!embedded && (
         <div className="mb-6">
-          <h1 className="text-xl font-black text-ink">تعیین قیمت پرواز و ارسال به مدیر عامل</h1>
-          <p className="mt-1 text-sm text-muted">
+          <h1 className="m-0 text-[20.5px] font-black text-white">تعیین قیمت پرواز و ارسال به مدیر عامل</h1>
+          <p className="mt-1 text-[11.5px] text-[#6b7b94]">
             نرخ پیشنهادی و نرخ قانونی هر پرواز را تعیین کنید؛ پس از تأیید مدیر عامل، قیمت ثبت و قفل می‌شود و قابل
             تغییر نخواهد بود.
           </p>
         </div>
       )}
 
-      {error && <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">{error}</p>}
-      {notice && <p className="mb-4 rounded-lg bg-[#10b98115] p-3 text-sm text-[#059669]">{notice}</p>}
+      {error && (
+        <p className="mb-4 rounded-lg bg-[rgba(248,113,113,.12)] p-3 text-sm text-[#f87171]">{error}</p>
+      )}
+      {notice && (
+        <p className="mb-4 rounded-lg bg-[rgba(52,211,153,.12)] p-3 text-sm text-[#34d399]">{notice}</p>
+      )}
 
-      {flights.length === 0 ? (
-        <p className="rounded-xl border border-border bg-white py-8 text-center text-sm text-muted">
-          پرواز برنامه‌ریزی‌شده‌ای وجود ندارد.
-        </p>
-      ) : (
-        <ul className="space-y-3">
-          {flightsPager.pageItems.map((row) => {
-            const st = statusOf(row);
-            return (
-              <li key={row.id} className="flex flex-wrap items-center gap-4 rounded-xl border border-border bg-white p-4">
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-bold text-ink">
-                    {routeLabel(row)} <span className="ltr font-num text-xs text-muted">{row.flight.flightNo}</span>
-                  </div>
-                  <div className="font-num mt-0.5 text-[11px] text-muted">تاریخ {formatJalaliDate(row.departureAt)}</div>
-                </div>
-                <div className="text-left">
-                  <div className="text-[10px] text-muted">نرخ پیشنهادی</div>
-                  <div className="font-num text-xs font-black text-ink">
-                    {row.pricing ? `${faMoney(row.pricing.proposedPriceIrr)} تومان` : '—'}
-                  </div>
-                </div>
-                <div className="text-left">
-                  <div className="text-[10px] text-muted">نرخ قانونی</div>
-                  <div className="font-num text-xs font-black text-ink">
-                    {row.pricing?.legalRateIrr ? `${faMoney(row.pricing.legalRateIrr)} تومان` : '—'}
-                  </div>
-                </div>
-                {row.pricing?.status === 'REGISTERED' && (
-                  <div className="text-left">
-                    <div className="text-[10px] text-muted">قیمت قفل‌شده</div>
-                    <div className="font-num text-xs font-black text-[#059669]">
-                      {faMoney(row.pricing.registeredPriceIrr ?? 0)} تومان
+      <div className="overflow-hidden rounded-[14px] border border-[#1f2a3d] bg-[#141d2e]">
+        {embedded && (
+          <div className="border-b border-[#1f2a3d] px-[15px] py-[13px]">
+            <h2 className="m-0 text-[14.5px] font-extrabold text-white">
+              تعیین قیمت پرواز و ارسال به مدیر عامل
+            </h2>
+            <p className="mt-1 text-[11.5px] text-[#6b7b94]">
+              نرخ پیشنهادی و نرخ قانونی هر پرواز را تعیین کنید؛ پس از تأیید مدیر عامل، قیمت ثبت و قفل می‌شود و
+              قابل تغییر نخواهد بود.
+            </p>
+          </div>
+        )}
+
+        {flights.length === 0 ? (
+          <p className="px-[15px] py-[22px] text-center text-[11.5px] text-[#6b7b94]">
+            پروازی برای قیمت‌گذاری ثبت نشده است.
+          </p>
+        ) : (
+          <div className="flex flex-col">
+            {flightsPager.pageItems.map((row) => {
+              const st = statusOf(row);
+              const base = baseIrr(row);
+              const comp = competitorIrr(row);
+              return (
+                <div
+                  key={row.id}
+                  className="flex flex-wrap items-center gap-[15px] border-b border-[#1a2436] px-[15px] py-[13px] last:border-b-0"
+                >
+                  <div className="min-w-[170px] flex-1">
+                    <div className="mb-[3px] flex flex-wrap items-center gap-2">
+                      <span className="text-[13.5px] font-extrabold text-[#e7ecf3]">{persianRoute(row)}</span>
+                      <span
+                        dir="ltr"
+                        className="rounded-[7px] bg-[#0f1623] px-2 py-0.5 font-num text-[10px] font-bold text-[#9fb0c7]"
+                      >
+                        {row.flight.flightNo}
+                      </span>
+                    </div>
+                    <div className="text-[10.5px] text-[#6b7b94]">
+                      تاریخ {formatJalaliDate(row.departureAt)} · پایه {moneyOrDash(base)} · رقبا{' '}
+                      {moneyOrDash(comp)}
                     </div>
                   </div>
-                )}
-                <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${st.className}`}>{st.label}</span>
-                <button
-                  onClick={() => openModal(row)}
-                  disabled={st.btn === 'قفل‌شده'}
-                  className={`rounded-lg px-3 py-2 text-xs font-bold transition ${
-                    st.btn === 'قفل‌شده'
-                      ? 'cursor-default bg-surface text-muted'
-                      : 'bg-accent text-white hover:bg-accent/90'
-                  }`}
-                >
-                  {st.btn}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+
+                  <div className="flex-none text-center">
+                    <div className="mb-0.5 text-[9.5px] text-[#8494ac]">نرخ پیشنهادی</div>
+                    <div className="whitespace-nowrap text-[12.5px] font-extrabold text-[#e7ecf3]">
+                      {row.pricing ? moneyOrDash(row.pricing.proposedPriceIrr) : '—'}
+                    </div>
+                  </div>
+
+                  <div className="flex-none text-center">
+                    <div className="mb-0.5 text-[9.5px] text-[#60a5fa]">نرخ قانونی</div>
+                    <div className="whitespace-nowrap text-[12.5px] font-extrabold text-[#93c5fd]">
+                      {row.pricing?.legalRateIrr ? moneyOrDash(row.pricing.legalRateIrr) : '—'}
+                    </div>
+                  </div>
+
+                  {row.pricing?.status === 'REGISTERED' && (
+                    <div className="flex-none text-center">
+                      <div className="mb-0.5 text-[9.5px] text-[#34d399]">قیمت قفل‌شده</div>
+                      <div className="whitespace-nowrap text-[12.5px] font-black text-[#34d399]">
+                        {moneyOrDash(row.pricing.registeredPriceIrr)}
+                      </div>
+                    </div>
+                  )}
+
+                  <span
+                    className="flex-none rounded-[14px] px-[11px] py-[5px] text-[10.5px] font-bold"
+                    style={{ color: st.color, background: st.bg }}
+                  >
+                    {st.label}
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() => openModal(row)}
+                    disabled={st.btn === 'قفل‌شده'}
+                    className="flex-none whitespace-nowrap rounded-[9px] px-[15px] py-[9px] text-[11.5px] font-extrabold disabled:cursor-default"
+                    style={{ background: st.btnBg, color: st.btnColor }}
+                  >
+                    {st.btn}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       <Pagination
         page={flightsPager.page}
         totalPages={flightsPager.totalPages}
         onChange={flightsPager.setPage}
-        variant="light"
+        variant="dark"
       />
 
       {selected && (
-        <Modal title={`تعیین قیمت پرواز — ${routeLabel(selected)}`} onClose={() => setSelected(null)}>
-          <div className="mb-3 grid grid-cols-2 gap-3">
-            <div className="rounded-lg bg-surface p-3">
-              <div className="text-[10px] text-muted">قیمت پایهٔ شرکت</div>
-              <div className="font-num mt-1 text-xs font-black text-ink">
-                {selected.pricing ? `${faMoney(selected.pricing.basePriceIrr)} تومان` : '—'}
+        <Modal title={`تعیین قیمت پرواز — ${persianRoute(selected)}`} onClose={() => setSelected(null)}>
+          <div className="mb-1 font-num text-[11px] text-[#6b7b94]" dir="ltr">
+            {selected.flight.flightNo}
+          </div>
+          <div className="mb-3.5 grid grid-cols-2 gap-2.5">
+            <div className="rounded-[11px] border border-[#22304a] bg-[#0f1623] px-[13px] py-[11px]">
+              <div className="mb-1.5 text-[10.5px] text-[#6b7b94]">قیمت پایهٔ شرکت</div>
+              <div className="font-num text-[13.5px] font-extrabold text-[#cdd9ec]">
+                {moneyOrDash(baseIrr(selected))}
               </div>
             </div>
-            <div className="rounded-lg bg-surface p-3">
-              <div className="text-[10px] text-muted">قیمت رقبا</div>
-              <div className="font-num mt-1 text-xs font-black text-ink">
-                {selected.pricing ? `${faMoney(selected.pricing.competitorPriceIrr)} تومان` : '—'}
+            <div className="rounded-[11px] border border-[#22304a] bg-[#0f1623] px-[13px] py-[11px]">
+              <div className="mb-1.5 text-[10.5px] text-[#6b7b94]">قیمت رقبا</div>
+              <div className="font-num text-[13.5px] font-extrabold text-[#f59e0b]">
+                {moneyOrDash(competitorIrr(selected))}
               </div>
             </div>
           </div>
 
           {locked ? (
-            <div className="rounded-lg bg-[#10b98115] p-4 text-center">
-              <p className="text-xs font-bold text-[#059669]">قیمت این پرواز توسط مدیر عامل تأیید و قفل شده است</p>
-              <p className="font-num mt-2 text-lg font-black text-ink">
-                {faMoney(selected.pricing?.registeredPriceIrr ?? 0)} تومان
+            <div className="rounded-xl border border-[rgba(16,185,129,.4)] bg-[rgba(16,185,129,.09)] p-[15px] text-center">
+              <p className="text-xs font-extrabold text-[#34d399]">
+                قیمت این پرواز توسط مدیر عامل تأیید و قفل شده است
+              </p>
+              <p className="font-num mt-2 text-[22px] font-black text-white">
+                {moneyOrDash(selected.pricing?.registeredPriceIrr)}
               </p>
               {selected.pricing?.legalRateIrr && (
-                <p className="font-num mt-1 text-[11px] text-muted">
-                  نرخ قانونی ثبت‌شده: {faMoney(selected.pricing.legalRateIrr)} تومان
+                <p className="font-num mt-1.5 text-[11px] text-[#8494ac]">
+                  نرخ قانونی ثبت‌شده: {moneyOrDash(selected.pricing.legalRateIrr)}
                 </p>
               )}
-              <p className="mt-2 text-[11px] text-muted">این قیمت دیگر قابل تغییر نیست.</p>
+              <p className="mt-1 text-[11px] text-[#8494ac]">این قیمت دیگر قابل تغییر نیست.</p>
             </div>
           ) : (
             <>
               {selected.pricing && (
-                <p className="mb-3 rounded-lg bg-[#a78bfa1a] p-3 text-[11px] text-[#6d28d9]">
+                <p className="mb-[13px] flex items-center gap-[7px] rounded-[10px] border border-[rgba(167,139,250,.3)] bg-[rgba(167,139,250,.1)] px-3 py-[9px] text-[11px] text-[#c4b5fd]">
                   این پیشنهاد در انتظار تأیید مدیر عامل است؛ می‌توانید تا زمان تأیید آن را ویرایش کنید.
                 </p>
               )}
-              <label className="mb-1 block text-xs font-bold text-ink" htmlFor="proposed-input">
+              <label className="mb-1.5 block text-[11.5px] text-[#9fb0c7]" htmlFor="proposed-input">
                 نرخ پیشنهادی (تومان)
               </label>
               <input
@@ -600,9 +733,9 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
                 value={proposedInput}
                 onChange={(e) => setProposedInput(e.target.value)}
                 placeholder="مثلاً ۳۸۵۰۰۰۰"
-                className="font-num w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent"
+                className="font-num h-11 w-full rounded-[10px] border border-[#28344c] bg-[#0f1726] px-3 text-right text-[13px] text-[#e7ecf3] outline-none"
               />
-              <label className="mb-1 mt-3 block text-xs font-bold text-ink" htmlFor="legal-input">
+              <label className="mb-1.5 mt-3 block text-[11.5px] text-[#9fb0c7]" htmlFor="legal-input">
                 نرخ قانونی / مصوب سازمان هواپیمایی (تومان)
               </label>
               <input
@@ -611,9 +744,9 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
                 value={legalInput}
                 onChange={(e) => setLegalInput(e.target.value)}
                 placeholder="سقف نرخ مصوب"
-                className="font-num w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent"
+                className="font-num h-11 w-full rounded-[10px] border border-[#28344c] bg-[#0f1726] px-3 text-right text-[13px] text-[#e7ecf3] outline-none"
               />
-              <label className="mb-1 mt-3 block text-xs font-bold text-ink" htmlFor="note-input">
+              <label className="mb-1.5 mt-3 block text-[11.5px] text-[#9fb0c7]" htmlFor="note-input">
                 یادداشت برای مدیر عامل (اختیاری)
               </label>
               <textarea
@@ -622,17 +755,20 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
                 onChange={(e) => setNoteInput(e.target.value)}
                 placeholder="توضیح دلیل قیمت پیشنهادی…"
                 rows={2}
-                className="w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent"
+                className="w-full rounded-[10px] border border-[#28344c] bg-[#0f1726] px-3 py-2.5 text-[12.5px] leading-[1.8] text-[#e7ecf3] outline-none"
               />
               {modalError && (
-                <p role="alert" className="mt-2 text-xs text-danger">
+                <p role="alert" className="mt-2 text-xs text-[#f87171]">
                   {modalError}
                 </p>
               )}
               <button
                 onClick={() => void onSubmit()}
-                className="mt-4 w-full rounded-lg bg-accent py-2.5 text-xs font-bold text-white transition hover:bg-accent/90"
+                className="mt-4 flex h-[46px] w-full items-center justify-center gap-2 rounded-[11px] bg-[#3b82f6] text-[13px] font-extrabold text-white"
               >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M22 2L11 13M22 2l-7 20-4-9-9-4z" />
+                </svg>
                 ارسال نرخ پیشنهادی برای تأیید مدیر عامل
               </button>
             </>

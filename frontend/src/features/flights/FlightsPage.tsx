@@ -448,7 +448,7 @@ export default function FlightsPage() {
               </div>
 
               {isCommercial && (
-                <div className="mt-4 rounded-xl border border-panel-border bg-panel-surface p-5">
+                <div className="mt-4">
                   <PricingPage embedded />
                 </div>
               )}
