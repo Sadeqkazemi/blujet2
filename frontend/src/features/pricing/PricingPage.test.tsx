@@ -68,6 +68,7 @@ const COMMERCIAL_DATA: CommercialPricingResult = {
       departureAt: '2026-07-27T08:30:00.000Z',
       capacity: 180,
       charterSeats: 60,
+      basePriceIrr: '38000000',
       flight: { flightNo: 'EP-821', route: { originCode: 'THR', destCode: 'DXB' } },
       pricing: PROPOSAL,
     },
@@ -76,6 +77,8 @@ const COMMERCIAL_DATA: CommercialPricingResult = {
       departureAt: '2026-08-06T08:30:00.000Z',
       capacity: 180,
       charterSeats: 60,
+      // No base — modal opens empty so validation can be exercised.
+      basePriceIrr: null,
       flight: { flightNo: 'EP-822', route: { originCode: 'THR', destCode: 'IST' } },
       pricing: null,
     },
@@ -84,6 +87,7 @@ const COMMERCIAL_DATA: CommercialPricingResult = {
       departureAt: '2026-08-16T08:30:00.000Z',
       capacity: 180,
       charterSeats: 60,
+      basePriceIrr: '38000000',
       flight: { flightNo: 'EP-823', route: { originCode: 'MHD', destCode: 'KIH' } },
       pricing: REGISTERED,
     },
@@ -190,6 +194,11 @@ describe('PricingPage', () => {
     expect(screen.getByRole('button', { name: 'ویرایش پیشنهاد' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'تعیین قیمت' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'قفل‌شده' })).toBeDisabled();
+    // Subtitle shows base + competitor for rows that already have a proposal.
+    expect(screen.getAllByText(/پایه/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/رقبا/).length).toBeGreaterThan(0);
+    // Proposed rate column shows the pending proposal amount (rial→toman).
+    expect(screen.getAllByText('۳٬۸۵۰٬۰۰۰ تومان').length).toBeGreaterThan(0);
   });
 
   it('Commercial set-price modal validates the proposed price and submits toman→rial', async () => {
@@ -216,5 +225,36 @@ describe('PricingPage', () => {
       }),
     );
     expect(await screen.findByText('نرخ پیشنهادی برای تأیید به مدیر عامل ارسال شد ✓')).toBeInTheDocument();
+  });
+
+  it('Commercial pricing list paginates at 5 rows per page (design hint-placeholder-count)', async () => {
+    mockRole('COMMERCIAL_MANAGER');
+    const many: CommercialPricingResult = {
+      flights: Array.from({ length: 7 }, (_, i) => ({
+        id: `fi-page-${i + 1}`,
+        departureAt: '2026-08-06T08:30:00.000Z',
+        capacity: 180,
+        charterSeats: 60,
+        basePriceIrr: '38000000',
+        flight: {
+          flightNo: `EP-${800 + i}`,
+          route: { originCode: 'THR', destCode: 'DXB' },
+        },
+        pricing: null,
+      })),
+    };
+    vi.spyOn(pricingApi, 'fetchCommercialPricing').mockResolvedValue(many);
+
+    const { default: userEvent } = await import('@testing-library/user-event');
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('button', { name: 'تعیین قیمت' })).toHaveLength(5);
+    });
+    expect(screen.getByTestId('pagination')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'بعدی' }));
+    await waitFor(() => {
+      expect(screen.getAllByRole('button', { name: 'تعیین قیمت' })).toHaveLength(2);
+    });
   });
 });
