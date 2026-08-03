@@ -103,6 +103,30 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
     expect(forbidden.status).toBe(403);
   });
 
+  it('GET /reporting/site-admin-overview: SITE_ADMIN gets KPI row; others 403', async () => {
+    const siteAdmin = await loginAs(app, 'site.admin');
+    const res = await request(app.getHttpServer())
+      .get('/reporting/site-admin-overview')
+      .set('Authorization', auth(siteAdmin.accessToken));
+    expect(res.status).toBe(200);
+    const data = res.body.data as {
+      activeAgencies: number;
+      passengersThisMonth: number;
+      ticketsSoldThisMonth: number;
+      pendingActionCount: number;
+    };
+    expect(data.activeAgencies).toBeGreaterThan(0);
+    expect(data.passengersThisMonth).toBeGreaterThanOrEqual(0);
+    expect(data.ticketsSoldThisMonth).toBeGreaterThanOrEqual(0);
+    expect(data.pendingActionCount).toBeGreaterThanOrEqual(0);
+
+    const finance = await loginAs(app, 'finance');
+    const forbidden = await request(app.getHttpServer())
+      .get('/reporting/site-admin-overview')
+      .set('Authorization', auth(finance.accessToken));
+    expect(forbidden.status).toBe(403);
+  });
+
   // ── revenue mix ────────────────────────────────────────────────────────
 
   it('GET /reporting/revenue-mix: per-channel sums add up to the total, pcts computed', async () => {

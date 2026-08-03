@@ -7,6 +7,7 @@ import { fetchRefunds } from '../api/refunds';
 import { fetchLowSalesAlerts, fetchStaffReports } from '../api/reporting';
 import { fetchLogsBadgeCount } from '../api/audit';
 import { fetchCeoPricing } from '../api/pricing';
+import { fetchSupportTickets } from '../api/support-tickets';
 import { faDigits } from '../lib/fa-format';
 import { formatJalaliDate } from '../lib/jalali';
 import type { EmployeeContext, PanelNavItem } from '../types/panels';
@@ -32,6 +33,7 @@ const ROLE_LABELS: Record<string, string> = {
 const ROLE_BRAND_SUB: Record<string, string> = {
   IT_MANAGER: 'پنل فناوری اطلاعات',
   EMPLOYEE: 'پنل کارمند',
+  SITE_ADMIN: 'مدیریت عملیاتی',
 };
 
 type NavBadge = { count: number; className: string };
@@ -123,22 +125,44 @@ export default function PanelShell() {
       );
     }
 
-    if (navKeys.has('refund') && user?.role === 'FINANCE_MANAGER') {
+    if (
+      navKeys.has('refund') &&
+      (user?.role === 'FINANCE_MANAGER' || user?.role === 'SITE_ADMIN')
+    ) {
       tasks.push(
         fetchRefunds()
           .then((r) => {
-            if (r.kpis.payoutQueue > 0) {
-              next.refund = {
-                count: r.kpis.payoutQueue,
-                className: 'bg-[#a855f7] text-white',
-              };
-              nextNotifications.push({
-                key: 'refund-queue',
-                title: 'استرداد در صف پرداخت',
-                sublabel: `${faDigits(r.kpis.payoutQueue)} مورد`,
-                to: '/panel/refund',
-                tone: 'purple',
-              });
+            if (user?.role === 'FINANCE_MANAGER') {
+              if (r.kpis.payoutQueue > 0) {
+                next.refund = {
+                  count: r.kpis.payoutQueue,
+                  className: 'bg-[#a855f7] text-white',
+                };
+                nextNotifications.push({
+                  key: 'refund-queue',
+                  title: 'استرداد در صف پرداخت',
+                  sublabel: `${faDigits(r.kpis.payoutQueue)} مورد`,
+                  to: '/panel/refund',
+                  tone: 'purple',
+                });
+              }
+            } else {
+              const awaiting = r.requests.filter(
+                (row) => row.status === 'SUBMITTED' || row.status === 'REVIEW',
+              ).length;
+              if (awaiting > 0) {
+                next.refund = {
+                  count: awaiting,
+                  className: 'bg-[#f59e0b] text-[#0f1623]',
+                };
+                nextNotifications.push({
+                  key: 'refund-review',
+                  title: 'استرداد در انتظار بررسی',
+                  sublabel: `${faDigits(awaiting)} مورد`,
+                  to: '/panel/refund',
+                  tone: 'warning',
+                });
+              }
             }
           })
           .catch(() => undefined),
@@ -245,6 +269,29 @@ export default function PanelShell() {
       );
     }
 
+    if (navKeys.has('tickets') && user?.role === 'SITE_ADMIN') {
+      tasks.push(
+        fetchSupportTickets()
+          .then((rows) => {
+            const open = rows.filter((t) => t.status === 'OPEN' || t.status === 'IN_PROGRESS').length;
+            if (open > 0) {
+              next.tickets = {
+                count: open,
+                className: 'bg-[#f59e0b] text-[#0f1623]',
+              };
+              nextNotifications.push({
+                key: 'tickets-open',
+                title: 'تیکت باز',
+                sublabel: `${faDigits(open)} مورد`,
+                to: '/panel/tickets',
+                tone: 'warning',
+              });
+            }
+          })
+          .catch(() => undefined),
+      );
+    }
+
     void Promise.all(tasks).then(() => {
       setBadges(next);
       setNotifications([...lowSalesNotifItems(lowSalesAlerts), ...nextNotifications]);
@@ -266,8 +313,12 @@ export default function PanelShell() {
     user?.role === 'BOARD_CHAIR' ||
     user?.role === 'SENIOR_MANAGER' ||
     user?.role === 'COMMERCIAL_MANAGER';
-  /** Finance + Employee get avatar footer chrome (design employee sidebar). */
-  const avatarShell = executiveShell || user?.role === 'FINANCE_MANAGER' || user?.role === 'EMPLOYEE';
+  /** Finance + Employee + Site Admin get avatar footer chrome. */
+  const avatarShell =
+    executiveShell ||
+    user?.role === 'FINANCE_MANAGER' ||
+    user?.role === 'EMPLOYEE' ||
+    user?.role === 'SITE_ADMIN';
   const roleInitial =
     user?.role === 'CEO'
       ? 'مع'
@@ -279,9 +330,11 @@ export default function PanelShell() {
             ? 'مم'
             : user?.role === 'COMMERCIAL_MANAGER'
               ? 'مب'
-              : user?.role === 'EMPLOYEE' && user.fullName
-                ? nameInitials(user.fullName)
-                : roleLabel.slice(0, 1);
+              : user?.role === 'SITE_ADMIN'
+                ? 'اس'
+                : user?.role === 'EMPLOYEE' && user.fullName
+                  ? nameInitials(user.fullName)
+                  : roleLabel.slice(0, 1);
   const employeeFooterSub =
     user?.role === 'EMPLOYEE'
       ? [employeeCtx?.deptLabelFa, employeeCtx?.rank].filter(Boolean).join(' · ') || roleLabel
