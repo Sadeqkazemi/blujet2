@@ -104,8 +104,13 @@ echo "▶ Applying database migrations…"
  npx prisma db seed 2>/dev/null || true
 )
 
+echo "▶ Building backend…"
+(cd backend && npx nest build)
+
 echo "▶ Starting backend on :3000…"
-(cd backend && nohup npm run start:dev > "$LOG_DIR/backend.log" 2>&1 & echo $! > "$LOG_DIR/backend.pid")
+# Prefer the compiled app over `nest start --watch` here: watch mode can
+# sit idle after compile without binding the port (seen in cloud VMs).
+(cd backend && nohup node --enable-source-maps dist/src/main > "$LOG_DIR/backend.log" 2>&1 & echo $! > "$LOG_DIR/backend.pid")
 
 echo "▶ Starting frontend on :5173…"
 (cd frontend && nohup npm run dev -- --host 0.0.0.0 --port 5173 > "$LOG_DIR/frontend.log" 2>&1 & echo $! > "$LOG_DIR/frontend.pid")
@@ -126,7 +131,8 @@ for i in $(seq 1 45); do
     echo "   Status: ./scripts/status-local.sh"
     echo "   Stop: ./scripts/stop-local.sh"
     echo ""
-    yellow "   Cursor Cloud? Forward port 5173 in the Ports tab, then open the forwarded URL."
+    yellow "   Cursor Cloud? Forward port 5173 (frontend) in the Ports tab — NOT 3000."
+    yellow "   Open the forwarded 5173 URL (…/login). Port 3000 is API-only and shows JSON 404 on /."
     exit 0
   fi
   printf '.'
