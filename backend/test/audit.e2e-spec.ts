@@ -22,7 +22,7 @@ describe('Audit (e2e)', () => {
     const setupTypeORM = setupApp.get(TypeORMService);
 
     const users = await setupTypeORM.user.findMany({
-      where: { username: { in: ['finance.karimi', 'senior.rahimi', 'ceo'] } },
+      where: { username: { in: ['finance.karimi', 'senior', 'ceo'] } },
     });
     const byUsername = Object.fromEntries(users.map((u) => [u.username, u]));
 
@@ -36,7 +36,7 @@ describe('Audit (e2e)', () => {
           detail: 'test entry from finance manager',
         },
         {
-          actorId: byUsername['senior.rahimi'].id,
+          actorId: byUsername['senior'].id,
           actorRole: 'SENIOR_MANAGER',
           category: 'ACCESS',
           action: 'تغییر دسترسی',
@@ -70,7 +70,7 @@ describe('Audit (e2e)', () => {
   });
 
   it("Senior Manager's manager-reports includes every role, unfiltered", async () => {
-    const { accessToken } = await loginAs(app, 'senior.rahimi');
+    const { accessToken } = await loginAs(app, 'senior');
     const res = await request(app.getHttpServer())
       .get('/audit/manager-reports')
       .set('Authorization', `Bearer ${accessToken}`);

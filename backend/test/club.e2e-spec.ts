@@ -168,7 +168,7 @@ describe('Club (e2e)', () => {
   });
 
   it('POST /club/members: SENIOR 403; bad checksum 400; duplicate 409; stored encrypted', async () => {
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const dto = {
       fullName: 'عضو جدید',
       email: `${crypto.randomUUID().slice(0, 8)}@new.example`,
@@ -210,7 +210,7 @@ describe('Club (e2e)', () => {
       .send({ level: 'PLATINUM' });
     expect(forbidden.status).toBe(403);
 
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const ok = await request(app.getHttpServer())
       .patch(`/club/members/${member.id}/level`)
       .set('Authorization', `Bearer ${senior.accessToken}`)
@@ -268,7 +268,7 @@ describe('Club (e2e)', () => {
     expect(row.status).toBe('SUBMITTED');
     expect(row.member.nationalId).toBe(nid);
 
-    for (const username of ['ceo', 'senior.rahimi', 'chair']) {
+    for (const username of ['ceo', 'senior', 'chair']) {
       const { accessToken } = await loginAs(app, username);
       const forbidden = await request(app.getHttpServer())
         .get('/club/submitted-card-requests')
@@ -361,7 +361,7 @@ describe('Club (e2e)', () => {
 
   it('Senior can approve only senior-assigned requests: CHAIR-assigned → 403, SENIOR-assigned → 200', async () => {
     const chairAssigned = await createReferredRequest('CHAIR');
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
 
     const forbidden = await request(app.getHttpServer())
       .patch(`/club/card-requests/${chairAssigned.req.id}/approve`)
@@ -418,7 +418,7 @@ describe('Club (e2e)', () => {
         .set('Authorization', `Bearer ${commercial.accessToken}`);
       expect(commercialRes.status).toBe(200);
 
-      for (const username of ['finance.karimi', 'senior.rahimi', 'chair']) {
+      for (const username of ['finance.karimi', 'senior', 'chair']) {
         const { accessToken } = await loginAs(app, username);
         const res = await request(app.getHttpServer())
           .get('/club/tier-rules')

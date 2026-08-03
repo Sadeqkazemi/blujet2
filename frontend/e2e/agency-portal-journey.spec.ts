@@ -89,7 +89,7 @@ test('agency sends an inbox message and sees it in the thread', async ({ page })
 test('role isolation: a staff login never reaches /agency, an agency login never reaches /panel', async ({
   page,
 }) => {
-  await loginAs(page, 'senior.rahimi');
+  await loginAs(page, 'senior');
   await page.goto('/agency');
   await page.waitForURL('**/panel');
 

@@ -28,7 +28,7 @@ describe('Phase 13 — reservation engine completion', () => {
   beforeAll(async () => {
     app = await createTestApp();
     customerToken = (await loginAsCustomer(app, '09901119901')).accessToken!;
-    staffToken = (await loginAs(app, 'senior.rahimi')).accessToken!;
+    staffToken = (await loginAs(app, 'senior')).accessToken!;
 
     await typeorm.aircraftSeatMap.upsert({
       where: { aircraftType: AIRCRAFT_SMALL },
@@ -236,7 +236,7 @@ describe('Phase 13 — reservation engine completion', () => {
     const stepUp1 = await stepUpFor(
       app,
       staffToken,
-      'senior.rahimi',
+      'senior',
       'PRICE_CAPACITY_CHANGE',
     );
     const okChange = await request(app.getHttpServer())
@@ -290,7 +290,7 @@ describe('Phase 13 — reservation engine completion', () => {
     const stepUp2 = await stepUpFor(
       app,
       staffToken,
-      'senior.rahimi',
+      'senior',
       'PRICE_CAPACITY_CHANGE',
     );
     const rejectedChange = await request(app.getHttpServer())

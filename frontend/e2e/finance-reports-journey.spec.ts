@@ -33,7 +33,7 @@ test('CEO opens مالی and gets the analytic view (no finance-ops sections)', 
 test('Senior searches گزارش مسافران and sees the ticket card with a masked national ID', async ({
   page,
 }) => {
-  await loginAs(page, 'senior.rahimi');
+  await loginAs(page, 'senior');
   await page.getByRole('link', { name: 'گزارش مسافران' }).click();
   await page.waitForURL('**/panel/reports');
 

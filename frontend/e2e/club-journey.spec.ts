@@ -24,7 +24,7 @@ async function seedRequest(page: Page, assignedTo: 'SENIOR' | 'CHAIR') {
 }
 
 test('Senior approves a senior-assigned card request; a chair-assigned one stays read-only', async ({ page }) => {
-  await loginAs(page, 'senior.rahimi');
+  await loginAs(page, 'senior');
   await seedRequest(page, 'SENIOR');
   await seedRequest(page, 'CHAIR');
 

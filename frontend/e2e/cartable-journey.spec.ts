@@ -44,7 +44,7 @@ test('referral loop: Senior creates a referral to Commercial → Commercial repo
 
   const seniorCtx = await browser.newContext();
   const seniorPage = await seniorCtx.newPage();
-  await loginAs(seniorPage, 'senior.rahimi');
+  await loginAs(seniorPage, 'senior');
   await seniorPage.getByRole('link', { name: /^ارجاعات/ }).click();
   await seniorPage.getByRole('button', { name: 'ایجاد ارجاع جدید' }).click();
   await seniorPage.fill('#ref-title', title);

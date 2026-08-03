@@ -201,7 +201,7 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
       },
     });
 
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const res = await request(app.getHttpServer())
       .get(
         `/passenger-reports/search?q=${encodeURIComponent(`مسافر گزارش ${suffix}`)}`,
@@ -317,7 +317,7 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
   });
 
   it('staff reports: roles without the tab (SENIOR_MANAGER) get 403', async () => {
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const res = await request(app.getHttpServer())
       .get('/staff-reports')
       .set('Authorization', auth(senior.accessToken));

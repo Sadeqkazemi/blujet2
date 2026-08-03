@@ -88,7 +88,7 @@ test('IT Manager issues a manual PNR, finds it in PNR management, then cancels i
 });
 
 test('SENIOR_MANAGER sees the seat map read-only — no lock or issue controls', async ({ page }) => {
-  await loginAs(page, 'senior.rahimi');
+  await loginAs(page, 'senior');
   await page.getByRole('link', { name: 'سامانه رزرواسیون' }).click();
   await page.getByRole('button', { name: 'مدیریت رزروها' }).click();
   await expect(page.getByText('THR', { exact: false }).first()).toBeVisible({ timeout: 15000 });

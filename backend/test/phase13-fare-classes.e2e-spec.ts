@@ -23,7 +23,7 @@ describe('Phase 13 Part B — fare-class management', () => {
 
   beforeAll(async () => {
     app = await createTestApp();
-    staffToken = (await loginAs(app, 'senior.rahimi')).accessToken!;
+    staffToken = (await loginAs(app, 'senior')).accessToken!;
     customerToken = (await loginAsCustomer(app, '09901119920')).accessToken!;
 
     await typeorm.aircraftSeatMap.upsert({

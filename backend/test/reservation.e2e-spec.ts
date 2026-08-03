@@ -140,7 +140,7 @@ describe('Reservation (e2e)', () => {
   it('POST lock: canLock roles only, 409 on already-locked, encrypted PII never returned, audited', async () => {
     const instance = await createScheduledInstance();
     const chair = await loginAs(app, 'chair');
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
 
     const forbidden = await request(app.getHttpServer())
       .post(`/reservation/seatmap/${instance.id}/lock`)
@@ -213,7 +213,7 @@ describe('Reservation (e2e)', () => {
   it('PATCH release: canLock only, 409 on already-released, seat becomes lockable again', async () => {
     const instance = await createScheduledInstance();
     const it = await loginAs(app, 'itadmin');
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
 
     const locked = await request(app.getHttpServer())
       .post(`/reservation/seatmap/${instance.id}/lock`)
@@ -265,7 +265,7 @@ describe('Reservation (e2e)', () => {
   it('POST /reservation/pnr issues a TICKETED booking directly (no payment step), 409 on unavailable seat, audited', async () => {
     const instance = await createScheduledInstance();
     const chair = await loginAs(app, 'chair');
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
 
     const forbidden = await issuePnr(senior.accessToken, instance.id, '7A');
     expect(forbidden.status).toBe(403);
@@ -371,7 +371,7 @@ describe('Reservation (e2e)', () => {
   it('PATCH /reservation/pnr/:pnr/seat changes seat; 409 on a taken seat and on a CANCELLED booking', async () => {
     const instance = await createScheduledInstance();
     const chair = await loginAs(app, 'chair');
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const a = await issuePnr(chair.accessToken, instance.id, '10A', 'مسافر آ');
     const b = await issuePnr(chair.accessToken, instance.id, '10B', 'مسافر ب');
 
@@ -513,7 +513,7 @@ describe('Reservation (e2e)', () => {
     const instance = await createScheduledInstance();
     const it = await loginAs(app, 'itadmin');
     const issued = await issuePnr(it.accessToken, instance.id, '14D');
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
 
     const readSeatmap = await request(app.getHttpServer())
       .get(`/reservation/seatmap/${instance.id}`)
