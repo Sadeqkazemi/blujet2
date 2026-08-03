@@ -1,4 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import {
+  BeforeInsert,
   Column,
   CreateDateColumn,
   Entity,
@@ -28,6 +30,11 @@ export class CustomerReferral {
     primaryKeyConstraintName: 'customer_referrals_pkey',
   })
   id!: string;
+
+  @BeforeInsert()
+  generateId() {
+    this.id ??= randomUUID();
+  }
 
   @Column({ type: 'text' })
   referrerUserId!: string;

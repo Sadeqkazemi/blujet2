@@ -5,12 +5,16 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { IsNull, MoreThan, Repository } from 'typeorm';
+import { PriceLock } from '../../database/entities/price-lock.entity';
+import { FlightInstance } from '../../database/entities/flight-instance.entity';
+import { ClubMember } from '../../database/entities/club-member.entity';
 import { ErrorCode } from '../../common/errors';
 import { getCabinPrice } from './pricing';
 import { pctOfIrr, roundIrrTo } from '../../common/money';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import type { CabinClass } from '../../../generated/prisma/enums';
+import type { CabinClass } from '../../database/enums';
 
 const LOCK_TTL_MS = 72 * 60 * 60 * 1000;
 /** Flat, NestJS-computed fee — CLAUDE.md: "fee/risk suggested by the ML
@@ -21,15 +25,20 @@ const GOLD_TIER_LEVELS = ['GOLD', 'PLATINUM'] as const;
 
 @Injectable()
 export class PriceLockService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @InjectRepository(PriceLock)
+    private readonly priceLockRepo: Repository<PriceLock>,
+    @InjectRepository(FlightInstance)
+    private readonly flightInstanceRepo: Repository<FlightInstance>,
+    @InjectRepository(ClubMember)
+    private readonly clubMemberRepo: Repository<ClubMember>,
+  ) {}
 
   async create(
     user: AuthenticatedUser,
     dto: { flightInstanceId: string; cabin: CabinClass },
   ) {
-    const member = await this.prisma.clubMember.findUnique({
-      where: { userId: user.id },
-    });
+    const member = await this.clubMemberRepo.findOneBy({ userId: user.id });
     if (
       !member ||
       !GOLD_TIER_LEVELS.includes(
@@ -43,8 +52,8 @@ export class PriceLockService {
       });
     }
 
-    const instance = await this.prisma.flightInstance.findUnique({
-      where: { id: dto.flightInstanceId },
+    const instance = await this.flightInstanceRepo.findOneBy({
+      id: dto.flightInstanceId,
     });
     if (!instance || instance.status !== 'SCHEDULED') {
       throw new NotFoundException({
@@ -53,14 +62,12 @@ export class PriceLockService {
       });
     }
 
-    const existing = await this.prisma.priceLock.findFirst({
-      where: {
-        userId: user.id,
-        flightInstanceId: dto.flightInstanceId,
-        cabin: dto.cabin,
-        status: 'ACTIVE',
-        expiresAt: { gt: new Date() },
-      },
+    const existing = await this.priceLockRepo.findOneBy({
+      userId: user.id,
+      flightInstanceId: dto.flightInstanceId,
+      cabin: dto.cabin,
+      status: 'ACTIVE',
+      expiresAt: MoreThan(new Date()),
     });
     if (existing) {
       throw new ConflictException({
@@ -70,32 +77,33 @@ export class PriceLockService {
     }
 
     const priceIrr = await getCabinPrice(
-      this.prisma,
+      this.priceLockRepo.manager,
       dto.flightInstanceId,
       dto.cabin,
     );
     const feeIrr = roundIrrTo(pctOfIrr(priceIrr, LOCK_FEE_PCT), 10_000n);
 
-    return this.prisma.priceLock.create({
-      data: {
+    return this.priceLockRepo.save(
+      this.priceLockRepo.create({
         userId: user.id,
         flightInstanceId: dto.flightInstanceId,
         cabin: dto.cabin,
         lockedPriceIrr: priceIrr,
         feeIrr,
         expiresAt: new Date(Date.now() + LOCK_TTL_MS),
-      },
-    });
+      }),
+    );
   }
 
   async listMine(user: AuthenticatedUser) {
-    const locks = await this.prisma.priceLock.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        flightInstance: { include: { flight: { include: { route: true } } } },
-      },
-    });
+    const locks = await this.priceLockRepo
+      .createQueryBuilder('l')
+      .leftJoinAndSelect('l.flightInstance', 'flightInstance')
+      .leftJoinAndSelect('flightInstance.flight', 'flight')
+      .leftJoinAndSelect('flight.route', 'route')
+      .where('l.userId = :userId', { userId: user.id })
+      .orderBy('l.createdAt', 'DESC')
+      .getMany();
     return locks.map((l) => ({
       id: l.id,
       flightInstanceId: l.flightInstanceId,
@@ -116,7 +124,7 @@ export class PriceLockService {
   }
 
   async cancel(user: AuthenticatedUser, id: string) {
-    const lock = await this.prisma.priceLock.findUnique({ where: { id } });
+    const lock = await this.priceLockRepo.findOneBy({ id });
     if (!lock || lock.userId !== user.id) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -129,10 +137,8 @@ export class PriceLockService {
         message: 'این قفل قیمت دیگر فعال نیست.',
       });
     }
-    return this.prisma.priceLock.update({
-      where: { id },
-      data: { status: 'CANCELLED' },
-    });
+    lock.status = 'CANCELLED';
+    return this.priceLockRepo.save(lock);
   }
 
   /** Finds an active, non-expired, not-yet-consumed lock for this exact
@@ -143,15 +149,13 @@ export class PriceLockService {
     flightInstanceId: string,
     cabin: CabinClass,
   ) {
-    return this.prisma.priceLock.findFirst({
-      where: {
-        userId,
-        flightInstanceId,
-        cabin,
-        status: 'ACTIVE',
-        expiresAt: { gt: new Date() },
-        bookingId: null,
-      },
+    return this.priceLockRepo.findOneBy({
+      userId,
+      flightInstanceId,
+      cabin,
+      status: 'ACTIVE',
+      expiresAt: MoreThan(new Date()),
+      bookingId: IsNull(),
     });
   }
 }
