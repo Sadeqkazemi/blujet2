@@ -21,9 +21,9 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
   // `blog` added in Phase D (real CMS backend).
   // `media` added in Phase E (site content CMS backend).
   // Order/labels match design-reference-v2/پنل ادمین سایت.dc.html
-  // roleDefs.siteAdmin.access (visible sidebar). `blog` is in design
-  // access but has no sidebar row — kept as a product tab before media.
-  // `kyc` + `settings` are product additions (not in design access).
+  // roleDefs.siteAdmin.access (visible sidebar). Blog/KYC/settings are
+  // reachable via routes for other workflows but deliberately omitted from
+  // the SITE_ADMIN sidebar per product request (2026-08).
   SITE_ADMIN: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
     { key: 'agencies', labelFa: 'آژانس‌ها', implemented: true },
@@ -33,14 +33,8 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'refund', labelFa: 'استرداد بلیط', implemented: true },
     { key: 'cartable', labelFa: 'کارتابل', implemented: true },
     { key: 'tickets', labelFa: 'تیکت‌ها', implemented: true },
-    { key: 'blog', labelFa: 'مدیریت بلاگ', implemented: true },
     { key: 'media', labelFa: 'مدیریت سایت', implemented: true },
     { key: 'jobapps', labelFa: 'درخواست‌های استخدام', implemented: true },
-    // Staff side of the customer KYC flow (/my/identity, Phase 17) — the
-    // APPROVED/REJECTED transitions have to be reachable somewhere; no
-    // design tab exists for it, so it follows the jobapps queue pattern.
-    { key: 'kyc', labelFa: 'احراز هویت مشتریان', implemented: true },
-    { key: 'settings', labelFa: 'تنظیمات سامانه', implemented: true },
   ],
   // Order matches design-reference-v2/پنل مدیر عامل.dc.html sidebar
   // (settings is display:none there). clubrules stays on COMMERCIAL_MANAGER;

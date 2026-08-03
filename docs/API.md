@@ -1023,6 +1023,10 @@ side anyway.
 - `PATCH /support-tickets/:id/status` (new, `SITE_ADMIN` only) —
   `{ status }` ∈ `OPEN | IN_PROGRESS | ANSWERED | CLOSED`. Appends a
   `history` entry.
+- `POST /support-tickets/admin` (`SITE_ADMIN` only) — create from the
+  panel «ایجاد تیکت» modal: `{ subject, requesterName, requesterPhone?,
+  dept: SITE|AGENCY, priority: HIGH|MEDIUM|LOW, body }`. Phone optional
+  (sentinel stored when omitted). Audited.
 - Both forward and status-change actions are audit-logged
   (`category: 'SYSTEM'` — no new `AuditCategory` enum value was added for
   a scoped-down v1 feature). No audit row on the anonymous submission
