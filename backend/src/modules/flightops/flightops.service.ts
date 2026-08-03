@@ -1,23 +1,27 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { IsNull, Repository } from 'typeorm';
+import { FlightInstance } from '../../database/entities/flight-instance.entity';
+import { Passenger } from '../../database/entities/passenger.entity';
+import { Booking } from '../../database/entities/booking.entity';
 import { NiraService } from '../nira/nira.service';
 import { decryptPii } from '../../common/pii-crypto';
 import { ErrorCode } from '../../common/errors';
 import { isSaleAutoClosed } from './sale-close.util';
-import type { Prisma } from '../../../generated/prisma/client';
 
 /** Statuses that count as a real, ticketed passenger — same convention
  * as FlightsService/AgencyPortalService. */
 const SOLD_STATUSES = ['PAID', 'TICKETED'] as const;
 
-type InstanceWithFlight = Prisma.FlightInstanceGetPayload<{
-  include: { flight: { include: { route: true } } };
-}>;
-
 @Injectable()
 export class FlightopsService {
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectRepository(FlightInstance)
+    private readonly instanceRepo: Repository<FlightInstance>,
+    @InjectRepository(Passenger)
+    private readonly passengerRepo: Repository<Passenger>,
+    @InjectRepository(Booking)
+    private readonly bookingRepo: Repository<Booking>,
     private readonly nira: NiraService,
   ) {}
 
@@ -25,15 +29,15 @@ export class FlightopsService {
     instanceIds: string[],
   ): Promise<Map<string, number>> {
     if (instanceIds.length === 0) return new Map();
-    const rows = await this.prisma.booking.groupBy({
-      by: ['flightInstanceId'],
-      where: {
-        flightInstanceId: { in: instanceIds },
-        status: { in: [...SOLD_STATUSES] },
-      },
-      _count: { _all: true },
-    });
-    return new Map(rows.map((r) => [r.flightInstanceId, r._count._all]));
+    const rows = await this.bookingRepo
+      .createQueryBuilder('b')
+      .select('b.flightInstanceId', 'flightInstanceId')
+      .addSelect('COUNT(*)', 'count')
+      .where('b.flightInstanceId IN (:...ids)', { ids: instanceIds })
+      .andWhere('b.status IN (:...statuses)', { statuses: [...SOLD_STATUSES] })
+      .groupBy('b.flightInstanceId')
+      .getRawMany<{ flightInstanceId: string; count: string }>();
+    return new Map(rows.map((r) => [r.flightInstanceId, Number(r.count)]));
   }
 
   /** Lazily submits the manifest to نیرا once an instance has crossed the
@@ -42,8 +46,8 @@ export class FlightopsService {
    * guards a concurrent double-submit; a second call after the first
    * succeeds is a pure no-op (niraSubmittedAt already non-null). */
   private async materializeNiraSubmission(
-    instance: InstanceWithFlight,
-  ): Promise<InstanceWithFlight> {
+    instance: FlightInstance,
+  ): Promise<FlightInstance> {
     if (
       instance.niraSubmittedAt !== null ||
       !isSaleAutoClosed(instance.departureAt)
@@ -51,16 +55,16 @@ export class FlightopsService {
       return instance;
     }
 
-    const passengers = await this.prisma.passenger.findMany({
-      where: {
-        booking: {
-          flightInstanceId: instance.id,
-          status: { in: [...SOLD_STATUSES] },
-        },
-        deletedAt: null,
-      },
-      select: { fullName: true, nationalIdEnc: true, seatCode: true },
-    });
+    const passengers = await this.passengerRepo
+      .createQueryBuilder('p')
+      .leftJoin('p.booking', 'booking')
+      .select(['p.id', 'p.fullName', 'p.nationalIdEnc', 'p.seatCode'])
+      .where('booking.flightInstanceId = :id', { id: instance.id })
+      .andWhere('booking.status IN (:...statuses)', {
+        statuses: [...SOLD_STATUSES],
+      })
+      .andWhere('p.deletedAt IS NULL')
+      .getMany();
 
     await this.nira.submitManifest(
       instance.flight.flightNo,
@@ -73,16 +77,15 @@ export class FlightopsService {
     );
 
     const submittedAt = new Date();
-    const updated = await this.prisma.flightInstance.updateMany({
-      where: { id: instance.id, niraSubmittedAt: null },
-      data: { niraSubmittedAt: submittedAt },
-    });
-    return updated.count > 0
-      ? { ...instance, niraSubmittedAt: submittedAt }
-      : instance;
+    const updated = await this.instanceRepo.update(
+      { id: instance.id, niraSubmittedAt: IsNull() },
+      { niraSubmittedAt: submittedAt },
+    );
+    if ((updated.affected ?? 0) > 0) instance.niraSubmittedAt = submittedAt;
+    return instance;
   }
 
-  private baseRow(i: InstanceWithFlight, sold: number) {
+  private baseRow(i: FlightInstance, sold: number) {
     const closed = isSaleAutoClosed(i.departureAt);
     return {
       id: i.id,
@@ -99,11 +102,16 @@ export class FlightopsService {
   }
 
   async list() {
-    const instances = await this.prisma.flightInstance.findMany({
-      where: { status: 'SCHEDULED' },
-      include: { flight: { include: { route: true } } },
-      orderBy: { departureAt: 'asc' },
-    });
+    const instances = await this.instanceRepo
+      .createQueryBuilder('fi')
+      .leftJoin('fi.flight', 'flight')
+      .leftJoin('flight.route', 'route')
+      .select(['fi.id', 'fi.departureAt', 'fi.capacity', 'fi.niraSubmittedAt'])
+      .addSelect(['flight.id', 'flight.flightNo'])
+      .addSelect(['route.id', 'route.originCode', 'route.destCode'])
+      .where('fi.status = :status', { status: 'SCHEDULED' })
+      .orderBy('fi.departureAt', 'ASC')
+      .getMany();
 
     const materialized = await Promise.all(
       instances.map((i) => this.materializeNiraSubmission(i)),
@@ -122,10 +130,14 @@ export class FlightopsService {
   }
 
   async detail(id: string) {
-    const instance = await this.prisma.flightInstance.findUnique({
-      where: { id },
-      include: { flight: { include: { route: true } } },
-    });
+    const instance = await this.instanceRepo
+      .createQueryBuilder('fi')
+      .leftJoin('fi.flight', 'flight')
+      .leftJoin('flight.route', 'route')
+      .addSelect(['flight.id', 'flight.flightNo'])
+      .addSelect(['route.id', 'route.originCode', 'route.destCode'])
+      .where('fi.id = :id', { id })
+      .getOne();
     if (!instance || instance.status === 'CANCELLED') {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -137,16 +149,17 @@ export class FlightopsService {
     const sold = await this.soldByInstance([materialized.id]);
     const soldCount = sold.get(materialized.id) ?? 0;
 
-    const passengers = await this.prisma.passenger.findMany({
-      where: {
-        booking: {
-          flightInstanceId: materialized.id,
-          status: { in: [...SOLD_STATUSES] },
-        },
-        deletedAt: null,
-      },
-      include: { booking: { select: { pnr: true } } },
-    });
+    const passengers = await this.passengerRepo
+      .createQueryBuilder('p')
+      .leftJoin('p.booking', 'booking')
+      .select(['p.id', 'p.fullName', 'p.nationalIdEnc', 'p.seatCode'])
+      .addSelect(['booking.id', 'booking.pnr'])
+      .where('booking.flightInstanceId = :id', { id: materialized.id })
+      .andWhere('booking.status IN (:...statuses)', {
+        statuses: [...SOLD_STATUSES],
+      })
+      .andWhere('p.deletedAt IS NULL')
+      .getMany();
 
     return {
       ...this.baseRow(materialized, soldCount),
