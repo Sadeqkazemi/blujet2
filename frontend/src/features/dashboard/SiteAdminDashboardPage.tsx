@@ -55,21 +55,52 @@ export default function SiteAdminDashboardPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([
-      fetchSiteAdminOverview(),
-      fetchAgencyRequests('PENDING'),
-      fetchRefunds(),
-      fetchCartable(),
-    ])
-      .then(([ov, reqs, refundResult, cartableData]) => {
-        setOverview(ov);
-        setRequests(reqs);
-        setRefunds(
-          refundResult.requests.filter((r) => r.status === 'SUBMITTED' || r.status === 'REVIEW'),
-        );
-        setCartable(cartableData);
-      })
-      .catch(() => setError('خطا در دریافت اطلاعات داشبورد.'));
+    let cancelled = false;
+
+    async function load() {
+      const results = await Promise.allSettled([
+        fetchSiteAdminOverview(),
+        fetchAgencyRequests('PENDING'),
+        fetchRefunds(),
+        fetchCartable(),
+      ]);
+
+      if (cancelled) return;
+
+      const [ovRes, reqRes, refundRes, cartRes] = results;
+      const ov = ovRes.status === 'fulfilled' ? ovRes.value : null;
+      const reqs = reqRes.status === 'fulfilled' ? reqRes.value : [];
+      const refundResult = refundRes.status === 'fulfilled' ? refundRes.value : null;
+      const cartableData = cartRes.status === 'fulfilled' ? cartRes.value : null;
+
+      if (!ov && !refundResult && !cartableData && reqRes.status === 'rejected') {
+        setError('خطا در دریافت اطلاعات داشبورد.');
+        return;
+      }
+
+      setOverview(
+        ov ?? {
+          activeAgencies: 0,
+          passengersThisMonth: 0,
+          ticketsSoldThisMonth: 0,
+          pendingActionCount: 0,
+        },
+      );
+      setRequests(reqs);
+      setRefunds(
+        (refundResult?.requests ?? []).filter(
+          (r) => r.status === 'SUBMITTED' || r.status === 'REVIEW',
+        ),
+      );
+      setCartable(
+        cartableData ?? { tasks: [], counts: { ADMIN: 0, AGENCY: 0, MANAGER: 0 }, totalOpen: 0 },
+      );
+    }
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   if (error) {
