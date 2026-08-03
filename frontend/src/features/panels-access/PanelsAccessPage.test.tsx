@@ -54,4 +54,21 @@ describe('PanelsAccessPage', () => {
     expect(screen.getByText('پنل مدیر عامل')).toBeInTheDocument();
     expect(screen.queryByRole('switch', { name: 'پنل مدیر مالی' })).not.toBeInTheDocument();
   });
+
+  it('CEO dark card grid shows status pills and flips access', async () => {
+    mockRole('CEO');
+    vi.spyOn(panelsApi, 'fetchAccessFlags').mockResolvedValue(FLAGS);
+    const setSpy = vi
+      .spyOn(panelsApi, 'setAccessFlag')
+      .mockResolvedValue({ panelKey: 'FINANCE', enabled: false, updatedAt: '2026-07-17T00:00:00.000Z' });
+
+    render(<PanelsAccessPage />);
+    expect(await screen.findByText(/واحدها توسط مدیر IT مدیریت می‌شود/)).toBeInTheDocument();
+    expect(screen.getByText('دسترسی فعال')).toBeInTheDocument();
+    expect(screen.getByText('دسترسی مسدود')).toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('switch', { name: 'پنل مدیر مالی' }));
+    await waitFor(() => expect(setSpy).toHaveBeenCalledWith('FINANCE', false));
+  });
 });

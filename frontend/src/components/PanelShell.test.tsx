@@ -26,6 +26,7 @@ describe('PanelShell', () => {
       agencyLogin: vi.fn(),
       signOut: vi.fn(),
     });
+    vi.spyOn(reportingApi, 'fetchLowSalesAlerts').mockResolvedValue([]);
     vi.spyOn(panelsApi, 'fetchNav').mockResolvedValue([
       { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
       { key: 'cartable', labelFa: 'کارتابل', implemented: true },
@@ -65,6 +66,7 @@ describe('PanelShell', () => {
       agencyLogin: vi.fn(),
       signOut: vi.fn(),
     });
+    vi.spyOn(reportingApi, 'fetchLowSalesAlerts').mockResolvedValue([]);
     vi.spyOn(panelsApi, 'fetchNav').mockResolvedValue([
       { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
       { key: 'referrals', labelFa: 'ارجاعات', implemented: true },

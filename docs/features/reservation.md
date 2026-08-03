@@ -3,10 +3,11 @@
 Covers `docs/API.md` → "Phase 9" and `docs/DB_SCHEMA.md` → "Phase 9".
 Scope: the shared `ReservationSystem` component's PNR management, seat
 map + managerial seat lock, staff-side manual PNR issuance, and search —
-embedded in BOARD_CHAIR, SENIOR_MANAGER, IT_MANAGER panels (CEO is
-API-authorized per the ⚑ product decision but has no reachable nav entry).
-Agency API access (Phase 3 already covers it) and flight/schedule creation
-(Phase 10) are explicitly out of scope.
+embedded in CEO (nav label هواپیما), BOARD_CHAIR (هواپیما), SENIOR_MANAGER,
+and IT_MANAGER panels. Agency API access (Phase 3 already covers it) and
+flight/schedule creation (Phase 10) stay out of the reservation module's
+write path; the «پروازها» sub-tab is a read-only upcoming-instance list
+that opens the seat map.
 
 ## Acceptance checklist
 

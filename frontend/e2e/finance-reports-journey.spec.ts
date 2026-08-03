@@ -8,7 +8,7 @@ test('Finance Manager opens مالی and sees real transactions, revenue mix, an
   page,
 }) => {
   await loginAs(page, 'finance.karimi');
-  await page.getByRole('link', { name: 'مالی' }).click();
+  await page.getByRole('link', { name: 'مالی', exact: true }).click();
   await page.waitForURL('**/panel/finance');
 
   await expect(page.getByText('تراکنش‌های مالی اخیر', { exact: true })).toBeVisible();
@@ -21,11 +21,17 @@ test('Finance Manager opens مالی and sees real transactions, revenue mix, an
 
 test('CEO opens مالی and gets the analytic view (no finance-ops sections)', async ({ page }) => {
   await loginAs(page, 'ceo');
-  await page.getByRole('link', { name: 'مالی' }).click();
+  await page.getByRole('link', { name: 'مالی', exact: true }).click();
   await page.waitForURL('**/panel/finance');
 
+  await expect(
+    page.getByText('فروش هر پرواز بر اساس کانال و پیشنهاد قیمت هوش مصنوعی', { exact: true }),
+  ).toBeVisible();
   await expect(page.getByText('نمودار فروش', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '۶ ماهه' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'شماره پرواز' })).toBeVisible();
   await expect(page.getByText('ترکیب درآمد', { exact: true })).toBeVisible();
+  await expect(page.getByText('مطالبات معوق آژانس‌ها', { exact: true })).toBeVisible();
   await expect(page.getByText('تراکنش‌های مالی اخیر', { exact: true })).toHaveCount(0);
   await expect(page.getByText('تسویه‌حساب آژانس‌های همکار', { exact: true })).toHaveCount(0);
 });

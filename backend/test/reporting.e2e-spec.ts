@@ -253,6 +253,34 @@ describe('Reporting (e2e)', () => {
     expect(total).toBeGreaterThan(0n);
   });
 
+  it('flight-sales lists departed instances with channel totals for the picker', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/reporting/flight-sales')
+      .set('Authorization', `Bearer ${ceoToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data.rows)).toBe(true);
+    expect(res.body.data.rows.length).toBeGreaterThan(0);
+    const row = res.body.data.rows.find(
+      (r: { flightNo: string }) => r.flightNo === ownFlightNo,
+    );
+    expect(row).toBeDefined();
+    expect(row).toEqual(
+      expect.objectContaining({
+        flightInstanceId: expect.any(String),
+        flightNo: ownFlightNo,
+        originCityFa: expect.any(String),
+        destCityFa: expect.any(String),
+        departureAt: expect.any(String),
+        systemIrr: expect.anything(),
+        charterIrr: expect.anything(),
+        agencyIrr: expect.anything(),
+        totalIrr: expect.anything(),
+        capacity: expect.any(Number),
+        soldSeats: expect.any(Number),
+      }),
+    );
+  });
+
   it('completed-flights-summary reconciles: sold + unsold === total seats', async () => {
     const res = await request(app.getHttpServer())
       .get('/reporting/completed-flights-summary?granularity=q6')

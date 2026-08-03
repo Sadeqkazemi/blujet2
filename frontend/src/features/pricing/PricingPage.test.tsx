@@ -131,6 +131,17 @@ describe('PricingPage', () => {
     expect(screen.getByText('قفل‌شده')).toBeInTheDocument();
   });
 
+  it('CEO empty pending list shows the design empty state', async () => {
+    mockRole('CEO');
+    vi.spyOn(pricingApi, 'fetchCeoPricing').mockResolvedValue({ pending: [], registered: [] });
+
+    renderPage();
+
+    expect(await screen.findByText('در انتظار تأیید مدیر عامل')).toBeInTheDocument();
+    expect(screen.getByText('اطلاعاتی یافت نشد')).toBeInTheDocument();
+    expect(screen.queryByText('قیمت‌های ثبت‌شده')).not.toBeInTheDocument();
+  });
+
   it('CEO registering with AI calls the API with source=AI', async () => {
     mockRole('CEO');
     vi.spyOn(pricingApi, 'fetchCeoPricing').mockResolvedValue(CEO_DATA);

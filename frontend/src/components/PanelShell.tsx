@@ -4,13 +4,16 @@ import { useAuth } from '../hooks/useAuth';
 import { fetchNav } from '../api/panels';
 import { fetchCartable, fetchMyReferrals, fetchReferrals } from '../api/cartable';
 import { fetchRefunds } from '../api/refunds';
-import { fetchStaffReports } from '../api/reporting';
+import { fetchLowSalesAlerts, fetchStaffReports } from '../api/reporting';
 import { fetchLogsBadgeCount } from '../api/audit';
+import { fetchCeoPricing } from '../api/pricing';
 import { faDigits } from '../lib/fa-format';
 import type { PanelNavItem } from '../types/panels';
 import PanelNotificationBell, { type PanelNotificationItem } from './PanelNotificationBell';
 import PanelSearchBox from './PanelSearchBox';
 import { PANEL_BRAND_PLANE_ICON, panelNavIcon } from './panel-nav-icons';
+import type { LowSalesAlert } from '../types/reporting';
+import { isLowSalesRole } from '../types/panel-shell';
 
 const ROLE_LABELS: Record<string, string> = {
   CEO: 'مدیر عامل',
@@ -37,12 +40,23 @@ export default function PanelShell() {
   const [nav, setNav] = useState<PanelNavItem[] | null>(null);
   const [badges, setBadges] = useState<Record<string, NavBadge>>({});
   const [notifications, setNotifications] = useState<PanelNotificationItem[]>([]);
+  const [lowSalesAlerts, setLowSalesAlerts] = useState<LowSalesAlert[]>([]);
 
   useEffect(() => {
     fetchNav()
       .then(setNav)
       .catch(() => setNav([]));
   }, []);
+
+  useEffect(() => {
+    if (!isLowSalesRole(user?.role)) {
+      setLowSalesAlerts([]);
+      return;
+    }
+    fetchLowSalesAlerts()
+      .then(setLowSalesAlerts)
+      .catch(() => setLowSalesAlerts([]));
+  }, [user?.role]);
 
   const navKeys = useMemo(() => new Set(nav?.map((item) => item.key) ?? []), [nav]);
 
@@ -184,6 +198,21 @@ export default function PanelShell() {
       }
     }
 
+    if (navKeys.has('pricing') && user?.role === 'CEO') {
+      tasks.push(
+        fetchCeoPricing()
+          .then((r) => {
+            if (r.pending.length > 0) {
+              next.pricing = {
+                count: r.pending.length,
+                className: 'bg-[#a78bfa] text-white',
+              };
+            }
+          })
+          .catch(() => undefined),
+      );
+    }
+
     void Promise.all(tasks).then(() => {
       setBadges(next);
       setNotifications(nextNotifications);
@@ -274,7 +303,7 @@ export default function PanelShell() {
           <PanelNotificationBell items={notifications} />
           <PanelSearchBox nav={nav ?? []} />
         </div>
-        <Outlet context={{ nav }} />
+        <Outlet context={{ nav, lowSalesAlerts }} />
       </main>
     </div>
   );

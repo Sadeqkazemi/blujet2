@@ -162,7 +162,16 @@ export class SeatmapService {
               priceIrr: sold.booking.priceIrr,
             }
           : null,
+        // CEO/Board «هواپیما» tab reads the lighter occupant shape.
+        occupant: sold
+          ? {
+              pnr: sold.booking.pnr,
+              passengerName: sold.fullName,
+              bookingStatus: sold.booking.status,
+            }
+          : null,
         lockExpiresAt: lock?.expiresAt ?? null,
+        lockPassengerName: lock?.passengerName ?? null,
       });
     }
 
