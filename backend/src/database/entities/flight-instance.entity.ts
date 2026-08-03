@@ -1,4 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import {
+  BeforeInsert,
   Column,
   Entity,
   Index,
@@ -25,6 +27,11 @@ export class FlightInstance {
     primaryKeyConstraintName: 'flight_instances_pkey',
   })
   id!: string;
+
+  @BeforeInsert()
+  generateId() {
+    this.id ??= randomUUID();
+  }
 
   @Column({ type: 'text' })
   flightId!: string;
