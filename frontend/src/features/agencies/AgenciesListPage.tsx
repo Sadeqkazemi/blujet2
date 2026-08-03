@@ -8,6 +8,8 @@ import {
   settleAgency,
 } from '../../api/agencies';
 import { faDigits, faMoney } from '../../lib/fa-format';
+import Pagination from '../../components/Pagination';
+import { usePagination } from '../../hooks/usePagination';
 import { TIER_LABELS, statusBadge } from './agency-labels';
 import type { AgencyListResult, AgencyListRow, AgencyMembershipRequest } from '../../types/agencies';
 
@@ -15,8 +17,8 @@ type SubTab = 'list' | 'credit';
 
 function KpiCard({ label, value, valueClass }: { label: string; value: string; valueClass: string }) {
   return (
-    <div className="rounded-xl border border-[#1f2a3d] bg-[#141d2e] p-4">
-      <div className="text-[11px] text-[#6b7b94]">{label}</div>
+    <div className="rounded-xl border border-panel-border bg-panel-surface p-4">
+      <div className="text-[11px] text-panel-muted">{label}</div>
       <div className={`font-num mt-1 text-lg font-black ${valueClass}`}>{value}</div>
     </div>
   );
@@ -24,9 +26,9 @@ function KpiCard({ label, value, valueClass }: { label: string; value: string; v
 
 function CreditBar({ usedIrr, limitIrr }: { usedIrr: number; limitIrr: number }) {
   const pct = limitIrr > 0 ? Math.min((usedIrr / limitIrr) * 100, 100) : usedIrr > 0 ? 100 : 0;
-  const tone = pct >= 90 ? 'bg-[#f87171]' : pct >= 60 ? 'bg-[#f59e0b]' : 'bg-[#34d399]';
+  const tone = pct >= 90 ? 'bg-danger' : pct >= 60 ? 'bg-[#f59e0b]' : 'bg-[#34d399]';
   return (
-    <div className="h-1.5 w-full overflow-hidden rounded bg-[#18223a]">
+    <div className="h-1.5 w-full overflow-hidden rounded bg-panel-canvas">
       <div className={`h-full ${tone}`} style={{ width: `${pct}%` }} />
     </div>
   );
@@ -77,6 +79,10 @@ export default function AgenciesListPage() {
     [result],
   );
 
+  const pendingPager = usePagination(pendingRequests);
+  const debtorsPager = usePagination(debtors);
+  const agenciesPager = usePagination(result?.agencies ?? []);
+
   async function onSettle(agency: AgencyListRow) {
     setSettlingId(agency.id);
     setNotice(null);
@@ -104,91 +110,186 @@ export default function AgenciesListPage() {
   const kpis = result?.kpis;
 
   return (
-    <div className="px-[21px] pb-[34px] pt-[18px]">
+    <div className="p-8">
       <div className="mb-6">
-        <h1 className="text-[20.5px] font-black text-white">آژانس‌ها</h1>
-        <p className="mt-1 text-sm text-[#6b7b94]">
-          {isCommercial ? 'آژانس‌های همکار، فاکتورها و مکاتبه‌ها' : 'مدیریت آژانس‌های همکار، اعتبار و تسویه'}
+        <h1 className="text-xl font-black text-panel-ink">آژانس‌ها</h1>
+        <p className="mt-1 text-sm text-panel-muted">
+          {isCommercial
+            ? 'آژانس‌های همکار، درخواست‌ها و پروفایل هر آژانس'
+            : 'مدیریت آژانس‌های همکار، اعتبار و تسویه'}
         </p>
       </div>
 
-      {error && <p className="mb-4 rounded-lg bg-[#f8717124] p-3 text-sm text-[#f87171]">{error}</p>}
-      {notice && <p className="mb-4 rounded-lg bg-[#34d39924] p-3 text-sm text-[#34d399]">{notice}</p>}
+      {error && <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">{error}</p>}
+      {notice && <p className="mb-4 rounded-lg bg-[#34d39915] p-3 text-sm text-[#34d399]">{notice}</p>}
 
-      <section className="mb-6 rounded-xl border border-[#1f2a3d] bg-[#141d2e] p-5">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-bold text-white">
+      <section
+        className={`mb-6 overflow-hidden rounded-[14px] border ${
+          isCommercial ? 'border-[#2a3550] bg-[#141d2e]' : 'border-panel-border bg-panel-surface'
+        } ${isCommercial ? '' : 'p-5'}`}
+      >
+        <div
+          className={
+            isCommercial
+              ? 'flex flex-wrap items-center gap-[9px] border-b border-[#1f2a3d] px-[15px] py-3'
+              : 'mb-3 flex items-center justify-between'
+          }
+        >
+          {isCommercial && (
+            <span className="flex h-8 w-8 flex-none items-center justify-center rounded-[9px] bg-[rgba(245,158,11,.16)] text-[#f59e0b]">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
+                <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+                <path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z" />
+                <path d="M9 13h6M9 17h4" />
+              </svg>
+            </span>
+          )}
+          <h2 className={`text-sm font-bold ${isCommercial ? 'font-extrabold text-white' : 'text-panel-ink'}`}>
             {isCommercial ? 'درخواست‌های همکاری آژانس‌ها' : 'درخواست‌های جدید عضویت'}
           </h2>
-          <span className="rounded-full bg-[#f59e0b24] px-3 py-1 text-[11px] font-bold text-[#fbbf24]">
+          <span
+            className={`rounded-full px-3 py-1 text-[11px] font-bold ${
+              isCommercial ? 'bg-[rgba(245,158,11,.14)] text-[#f59e0b]' : 'bg-[#f59e0b1f] text-[#b45309]'
+            }`}
+          >
             {faDigits(pendingRequests.length)} {isCommercial ? 'درخواست' : 'در انتظار'}
           </span>
+          {isCommercial && (
+            <span className="mr-auto text-[10.5px] text-[#6b7b94]">ارسال‌شده از سوی ادمین سایت</span>
+          )}
         </div>
+        <div className={isCommercial ? 'px-2 py-1.5' : undefined}>
         {pendingRequests.length === 0 ? (
-          <p className="py-3 text-center text-xs text-[#6b7b94]">
+          <p className={`py-3 text-center text-xs text-panel-muted ${isCommercial ? 'py-[18px]' : ''}`}>
             {isCommercial ? 'درخواست همکاری جدیدی وجود ندارد.' : 'درخواست جدیدی در انتظار تأیید نیست.'}
           </p>
         ) : (
-          <ul className="divide-y divide-[#22304a]">
-            {pendingRequests.map((r) => (
-              <li key={r.id} className="flex flex-wrap items-center gap-3 py-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#1d2a40] text-sm font-black text-[#60a5fa]">
-                  {r.applicantName.slice(0, 1)}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-bold text-white">{r.applicantName}</div>
-                  <div className="mt-0.5 text-[11px] text-[#6b7b94]">
-                    مدیر: {r.managerName} · مجوز <span className="ltr font-num">{r.licenseNo}</span> · {r.city}
+          <ul className={isCommercial ? '' : 'divide-y divide-panel-border'}>
+            {pendingPager.pageItems.map((r) => (
+              <li
+                key={r.id}
+                className={`flex flex-wrap items-center gap-3 ${
+                  isCommercial
+                    ? 'justify-between border-b border-[#1a2436] px-2.5 py-[11px] last:border-b-0'
+                    : 'py-3'
+                }`}
+              >
+                <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                  <span
+                    className={`flex h-10 w-10 items-center justify-center rounded-[10px] text-sm font-black ${
+                      isCommercial ? 'bg-[#241d12] text-[#f59e0b]' : 'bg-panel-surface-2 text-accent'
+                    }`}
+                  >
+                    {r.applicantName.slice(0, 1)}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className={`text-sm font-bold ${isCommercial ? 'text-[12.5px] font-extrabold text-[#e7ecf3]' : 'text-panel-ink'}`}>
+                      {r.applicantName}
+                    </div>
+                    <div className="mt-0.5 text-[11px] text-panel-muted">
+                      مدیر: {r.managerName} · مجوز <span className="ltr font-num">{r.licenseNo}</span> · {r.city}
+                    </div>
                   </div>
                 </div>
-                {r.status === 'REFERRED' && (
-                  <span className="rounded-full bg-[#3b82f624] px-2.5 py-1 text-[10px] font-bold text-[#60a5fa]">ارجاع‌شده</span>
-                )}
-                <Link
-                  to={`/panel/agencies/requests/${r.id}`}
-                  className="rounded-lg bg-[#3b82f6] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#2563eb]"
-                >
-                  {isCommercial ? 'بررسی و اقدام' : 'بررسی درخواست'}
-                </Link>
+                <div className="flex flex-none items-center gap-[9px]">
+                  {r.status === 'REFERRED' && (
+                    <span className="rounded-full bg-accent/10 px-2.5 py-1 text-[10px] font-bold text-accent">ارجاع‌شده</span>
+                  )}
+                  <Link
+                    to={`/panel/agencies/requests/${r.id}`}
+                    className="rounded-[9px] bg-accent px-[13px] py-2 text-[11.5px] font-bold text-white transition hover:bg-accent/90"
+                  >
+                    {isCommercial ? 'بررسی و اقدام' : 'بررسی درخواست'}
+                  </Link>
+                </div>
               </li>
             ))}
           </ul>
         )}
+        <Pagination
+          page={pendingPager.page}
+          totalPages={pendingPager.totalPages}
+          onChange={pendingPager.setPage}
+          variant="dark"
+        />
+        </div>
       </section>
 
       {!isCommercial && kpis && (
         <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-          <KpiCard label="آژانس‌های فعال" value={faDigits(kpis.activeCount)} valueClass="text-white" />
-          <KpiCard label="مجموع اعتبار اعطاشده" value={`${faMoney(kpis.totalCreditGrantedIrr)} تومان`} valueClass="text-[#60a5fa]" />
-          <KpiCard label="اعتبار مصرف‌شده (بدهی)" value={`${faMoney(kpis.totalUsedIrr)} تومان`} valueClass="text-[#f87171]" />
-          <KpiCard label="در انتظار تسویه" value={faDigits(kpis.pendingSettlementCount)} valueClass="text-[#fbbf24]" />
+          <KpiCard label="آژانس‌های فعال" value={faDigits(kpis.activeCount)} valueClass="text-panel-ink" />
+          <KpiCard label="مجموع اعتبار اعطاشده" value={`${faMoney(kpis.totalCreditGrantedIrr)} تومان`} valueClass="text-accent" />
+          <KpiCard label="اعتبار مصرف‌شده (بدهی)" value={`${faMoney(kpis.totalUsedIrr)} تومان`} valueClass="text-danger" />
+          <KpiCard label="در انتظار تسویه" value={faDigits(kpis.pendingSettlementCount)} valueClass="text-[#b45309]" />
         </div>
       )}
 
       {isCommercial && debtors.length > 0 && (
-        <section className="mb-6 rounded-xl border border-[#f59e0b59] bg-[#f59e0b14] p-5">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-sm font-bold text-[#fbbf24]">
-              آژانس‌های دارای بدهی یا فاکتور پرداخت‌نشده
-              <span className="mr-2 rounded-full bg-[#f59e0b26] px-2.5 py-0.5 text-[11px] font-bold">
-                {faDigits(debtors.length)} آژانس
-              </span>
-            </h2>
+        <section className="mb-6 overflow-hidden rounded-[14px] border border-[rgba(248,113,113,.35)] bg-[#141d2e]">
+          <div className="flex flex-wrap items-center gap-[9px] border-b border-[#1f2a3d] px-3.5 py-[11px]">
+            <span className="flex h-8 w-8 flex-none items-center justify-center rounded-[9px] bg-[rgba(248,113,113,.16)] text-[#f87171]">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M10.3 3.9l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3l-8-14a2 2 0 0 0-3.4 0z" />
+                <path d="M12 9v4M12 17h.01" />
+              </svg>
+            </span>
+            <h2 className="m-0 text-sm font-extrabold text-white">آژانس‌های دارای بدهی یا فاکتور پرداخت‌نشده</h2>
+            <span className="rounded-[18px] bg-[rgba(248,113,113,.14)] px-[9px] py-0.5 text-[11px] font-bold text-[#f87171]">
+              {faDigits(debtors.length)} آژانس
+            </span>
             <button
               onClick={() => void onNotifyAll()}
-              className="rounded-lg bg-[#f59e0b] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#d97706]"
+              className="mr-auto flex items-center gap-1.5 rounded-[9px] bg-[#3b82f6] px-[11px] py-[7px] text-[11.5px] font-bold text-white transition hover:brightness-110"
             >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.7 21a2 2 0 0 1-3.4 0" />
+              </svg>
               ارسال اعلان به همه
             </button>
           </div>
-          <ul className="divide-y divide-[#f59e0b33]">
-            {debtors.map((d) => (
-              <li key={d.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
-                <span className="font-bold text-white">{d.fullName}</span>
-                <span className="font-num text-xs text-[#fbbf24]">مبلغ {faMoney(d.usedIrr)} تومان</span>
-              </li>
-            ))}
+          <ul className="px-2 py-1.5">
+            {debtorsPager.pageItems.map((d) => {
+              const unpaid = d.pendingInvoiceCount > 0;
+              const label = unpaid ? 'فاکتور پرداخت‌نشده' : 'بدهی جاری';
+              return (
+                <li
+                  key={d.id}
+                  className="flex items-center justify-between gap-2.5 border-b border-[#1a2436] px-2.5 py-[11px] last:border-b-0"
+                >
+                  <div className="flex min-w-0 items-center gap-[9px]">
+                    <span className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-[10px] bg-[#1d2a40] text-[11.5px] font-extrabold text-[#9fb0c7]">
+                      {d.fullName.slice(0, 1)}
+                    </span>
+                    <div className="min-w-0 leading-[1.6]">
+                      <div className="text-[12.5px] font-bold text-[#e7ecf3]">{d.fullName}</div>
+                      <span
+                        className={`rounded-xl px-[7px] py-0.5 text-[10px] font-bold ${
+                          unpaid
+                            ? 'bg-[rgba(245,158,11,.14)] text-[#f59e0b]'
+                            : 'bg-[rgba(248,113,113,.14)] text-[#f87171]'
+                        }`}
+                      >
+                        {label}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex-none text-left">
+                    <div className="text-[9.5px] text-[#6b7b94]">مبلغ</div>
+                    <div className="font-num text-[12.5px] font-extrabold text-[#f87171]">
+                      {faMoney(d.usedIrr)} تومان
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
+          <Pagination
+            page={debtorsPager.page}
+            totalPages={debtorsPager.totalPages}
+            onChange={debtorsPager.setPage}
+            variant="dark"
+          />
         </section>
       )}
 
@@ -204,7 +305,7 @@ export default function AgenciesListPage() {
               key={t.key}
               onClick={() => setSubTab(t.key)}
               className={`rounded-full px-4 py-2 text-xs font-bold transition ${
-                subTab === t.key ? 'bg-[#3b82f6] text-white' : 'bg-[#18223a] text-[#6b7b94] hover:text-white'
+                subTab === t.key ? 'bg-accent text-white' : 'bg-panel-canvas text-panel-muted hover:bg-panel-surface-2'
               }`}
             >
               {t.label}
@@ -213,45 +314,45 @@ export default function AgenciesListPage() {
         </div>
       )}
 
-      {isCommercial && <h2 className="mb-3 text-sm font-bold text-white">آژانس‌های همکار</h2>}
+      {isCommercial && <h2 className="mb-3 text-sm font-bold text-panel-ink">آژانس‌های همکار</h2>}
 
       <div className="mb-4">
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="جستجوی آژانس بر اساس نام، مجوز، مدیر یا شهر…"
-          className="h-[46px] w-full rounded-xl border border-[#28344c] bg-[#18223a] px-4 text-xs text-[#e7ecf3] outline-none transition focus:border-[#3b82f6]"
+          className="h-[46px] w-full rounded-xl border border-panel-border-2 bg-panel-canvas px-4 text-xs text-panel-ink outline-none transition focus:border-accent"
         />
       </div>
 
       {loading ? (
-        <p className="py-10 text-center text-sm text-[#6b7b94]">در حال بارگذاری…</p>
+        <p className="py-10 text-center text-sm text-panel-muted">در حال بارگذاری…</p>
       ) : (result?.agencies.length ?? 0) === 0 ? (
-        <p className="py-10 text-center text-sm text-[#6b7b94]">آژانسی با این عبارت یافت نشد.</p>
+        <p className="py-10 text-center text-sm text-panel-muted">آژانسی با این عبارت یافت نشد.</p>
       ) : subTab === 'credit' && !isCommercial ? (
         <ul className="space-y-3">
-          {result!.agencies.map((a) => {
+          {agenciesPager.pageItems.map((a) => {
             const settled = Number(a.usedIrr) <= 0;
             return (
-              <li key={a.id} className="flex flex-wrap items-center gap-4 rounded-xl border border-[#22304a] bg-[#0f1726] p-4">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#1d2a40] text-sm font-black text-[#60a5fa]">
+              <li key={a.id} className="flex flex-wrap items-center gap-4 rounded-xl border border-panel-border bg-panel-surface p-4">
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-panel-surface-2 text-sm font-black text-accent">
                   {a.fullName.slice(0, 1)}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-bold text-white">{a.fullName}</div>
-                  <div className="mt-0.5 text-[11px] text-[#6b7b94]">
+                  <div className="text-sm font-bold text-panel-ink">{a.fullName}</div>
+                  <div className="mt-0.5 text-[11px] text-panel-muted">
                     مجوز <span className="ltr font-num">{a.licenseNo}</span> · {a.city}
                   </div>
                 </div>
                 <div className="text-left">
-                  <div className="text-[10px] text-[#6b7b94]">بدهی جاری</div>
-                  <div className={`font-num text-sm font-black ${settled ? 'text-[#34d399]' : 'text-[#f87171]'}`}>
+                  <div className="text-[10px] text-panel-muted">بدهی جاری</div>
+                  <div className={`font-num text-sm font-black ${settled ? 'text-[#34d399]' : 'text-danger'}`}>
                     {faMoney(Math.max(Number(a.usedIrr), 0))} تومان
                   </div>
                 </div>
                 <span
                   className={`rounded-full px-3 py-1 text-[10px] font-bold ${
-                    settled ? 'bg-[#34d39924] text-[#34d399]' : 'bg-[#f59e0b24] text-[#fbbf24]'
+                    settled ? 'bg-[#34d39924] text-[#34d399]' : 'bg-[#f59e0b24] text-[#b45309]'
                   }`}
                 >
                   {settled ? 'تسویه شد' : 'در انتظار پرداخت'}
@@ -261,8 +362,8 @@ export default function AgenciesListPage() {
                   onClick={() => void onSettle(a)}
                   className={`rounded-lg px-3 py-2 text-xs font-bold transition ${
                     settled
-                      ? 'cursor-default bg-[#18223a] text-[#6b7b94]'
-                      : 'bg-[#16a34a] text-white hover:bg-[#15803d]'
+                      ? 'cursor-default bg-panel-canvas text-panel-muted'
+                      : 'bg-[#34d399] text-white hover:bg-[#2bb583]'
                   }`}
                 >
                   {settled ? 'تسویه شده' : settlingId === a.id ? 'در حال ثبت…' : 'ثبت تسویه'}
@@ -273,26 +374,26 @@ export default function AgenciesListPage() {
         </ul>
       ) : (
         <ul className="space-y-3">
-          {result!.agencies.map((a) => {
+          {agenciesPager.pageItems.map((a) => {
             const badge = statusBadge(a.isActive);
             return (
               <li key={a.id}>
                 <button
                   onClick={() => navigate(`/panel/agencies/${a.id}`)}
-                  className="flex w-full flex-wrap items-center gap-4 rounded-xl border border-[#22304a] bg-[#0f1726] p-4 text-right transition hover:border-[#3b82f666]"
+                  className="flex w-full flex-wrap items-center gap-4 rounded-xl border border-panel-border bg-panel-surface p-4 text-right transition hover:border-accent/40"
                 >
-                  <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#1d2a40] text-base font-black text-[#60a5fa]">
+                  <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-panel-surface-2 text-base font-black text-accent">
                     {a.fullName.slice(0, 1)}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-bold text-white">{a.fullName}</div>
-                    <div className="mt-0.5 text-[11px] text-[#6b7b94]">
+                    <div className="text-sm font-bold text-panel-ink">{a.fullName}</div>
+                    <div className="mt-0.5 text-[11px] text-panel-muted">
                       مجوز <span className="ltr font-num">{a.licenseNo}</span> · {a.city} · سطح همکاری{' '}
-                      <span className="font-bold text-[#fbbf24]">{TIER_LABELS[a.tier]}</span>
+                      <span className="font-bold text-[#b45309]">{TIER_LABELS[a.tier]}</span>
                     </div>
                   </div>
                   <div className="w-44">
-                    <div className="mb-1 flex items-center justify-between text-[10px] text-[#6b7b94]">
+                    <div className="mb-1 flex items-center justify-between text-[10px] text-panel-muted">
                       <span>اعتبار (مانده / سقف)</span>
                       <span className="font-num">
                         {faMoney(Math.max(Number(a.remainingIrr), 0))} / {faMoney(a.limitIrr)}
@@ -301,8 +402,8 @@ export default function AgenciesListPage() {
                     <CreditBar usedIrr={Math.max(Number(a.usedIrr), 0)} limitIrr={Number(a.limitIrr)} />
                   </div>
                   <div className="text-left">
-                    <div className="text-[10px] text-[#6b7b94]">بدهی جاری</div>
-                    <div className={`font-num text-sm font-black ${Number(a.usedIrr) > 0 ? 'text-[#f87171]' : 'text-[#34d399]'}`}>
+                    <div className="text-[10px] text-panel-muted">بدهی جاری</div>
+                    <div className={`font-num text-sm font-black ${Number(a.usedIrr) > 0 ? 'text-danger' : 'text-[#34d399]'}`}>
                       {faMoney(Math.max(Number(a.usedIrr), 0))} تومان
                     </div>
                   </div>
@@ -312,6 +413,14 @@ export default function AgenciesListPage() {
             );
           })}
         </ul>
+      )}
+      {!loading && (result?.agencies.length ?? 0) > 0 && (
+        <Pagination
+          page={agenciesPager.page}
+          totalPages={agenciesPager.totalPages}
+          onChange={agenciesPager.setPage}
+          variant="dark"
+        />
       )}
     </div>
   );

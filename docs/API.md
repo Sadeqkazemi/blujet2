@@ -369,11 +369,13 @@ stays untouched on the same page).
 - POST `/flights/airports` — `{ cityFa, code, tz? }` — add a city/airport
   to the catalog (Commercial «شهرهای پروازی» tab); 409 on duplicate code or
   city name; audited.
-- POST `/flights` — «افزودن پرواز» modal `{ originCode, destCode,
-  flightNo, departureDate (Jalali), departureTime, capacity,
-  basePriceToman }` — find-or-create Route/Flight, create instance;
-  validation per design («لطفاً همه فیلدها را تکمیل کنید.») plus server
-  rules (origin≠dest, future date, capacity/price bounds); audited.
+- POST `/flights` — full-page «افزودن پرواز جدید» (Commercial design):
+  `{ originCode, destCode, flightNo, departureAt (UTC ISO), capacity,
+  basePriceIrr, aircraftType?, charterSeats? }` — find-or-create
+  Route/Flight, create instance; optional aircraft/charter applied at
+  create. Client then posts fare-rules + `PUT .../proposal` for CEO
+  approval. Server rules: origin≠dest, future date, charterSeats &lt;
+  capacity, aircraft in seat-map catalog; audited.
 - GET `/flights/:instanceId` — flight detail modal: sold/cap, ضریب اشغال,
   قیمت پایه, real channel breakdown (seats + revenue per سیستمی/چارتری/
   آژانس) and مجموع درآمد from bookings.

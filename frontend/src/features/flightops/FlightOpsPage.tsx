@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { fetchFlightops, fetchFlightopsDetail } from '../../api/flightops';
 import { faDigits } from '../../lib/fa-format';
+import Pagination from '../../components/Pagination';
+import { usePagination } from '../../hooks/usePagination';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import type { FlightopsDetail, FlightopsList } from '../../types/flightops';
 
@@ -38,6 +40,8 @@ export default function FlightOpsPage() {
       .then(setDetail)
       .catch(() => setDetailError('خطا در دریافت جزئیات پرواز.'));
   }, [selectedId]);
+
+  const rowsPager = usePagination(list?.rows ?? []);
 
   if (error) return <p className="p-8 text-sm text-danger">{error}</p>;
   if (!list) return <p className="p-8 text-sm text-muted">در حال بارگذاری…</p>;
@@ -193,7 +197,7 @@ export default function FlightOpsPage() {
                 </tr>
               </thead>
               <tbody>
-                {list.rows.map((row) => (
+                {rowsPager.pageItems.map((row) => (
                   <tr
                     key={row.id}
                     data-testid={`fo-row-${row.id}`}
@@ -228,6 +232,12 @@ export default function FlightOpsPage() {
             </table>
           </div>
         )}
+        <Pagination
+          page={rowsPager.page}
+          totalPages={rowsPager.totalPages}
+          onChange={rowsPager.setPage}
+          variant="light"
+        />
       </div>
     </div>
   );

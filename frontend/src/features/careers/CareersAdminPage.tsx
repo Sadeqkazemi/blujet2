@@ -13,6 +13,8 @@ import {
 import { faDigits } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import Modal from '../../components/Modal';
+import Pagination from '../../components/Pagination';
+import { usePagination } from '../../hooks/usePagination';
 import type {
   CreateJobPostingInput,
   JobApplicationDetail,
@@ -185,6 +187,8 @@ export default function CareersAdminPage() {
 
   const postingRows = postings ?? [];
   const applicationRows = applications ?? [];
+  const postingRowsPager = usePagination(postingRows);
+  const applicationRowsPager = usePagination(applicationRows);
 
   return (
     <div className="p-8">
@@ -227,7 +231,7 @@ export default function CareersAdminPage() {
             <p className="py-6 text-center text-xs text-muted">فرصت شغلی‌ای ثبت نشده است.</p>
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {postingRows.map((p) => (
+              {postingRowsPager.pageItems.map((p) => (
                 <div key={p.id} className="rounded-xl border border-border bg-surface p-4">
                   <div className="text-sm font-bold text-ink">{p.title}</div>
                   <div className="mt-1 text-[11px] text-muted">
@@ -251,6 +255,12 @@ export default function CareersAdminPage() {
               ))}
             </div>
           )}
+          <Pagination
+            page={postingRowsPager.page}
+            totalPages={postingRowsPager.totalPages}
+            onChange={postingRowsPager.setPage}
+            variant="light"
+          />
         </section>
       )}
 
@@ -281,7 +291,7 @@ export default function CareersAdminPage() {
             <p className="py-6 text-center text-xs text-muted">درخواستی ثبت نشده است.</p>
           ) : (
             <ul className="divide-y divide-border">
-              {applicationRows.map((a) => {
+              {applicationRowsPager.pageItems.map((a) => {
                 const st = STATUS_META[a.status];
                 return (
                   <li key={a.id} className="flex flex-wrap items-center gap-3 py-3">
@@ -307,6 +317,12 @@ export default function CareersAdminPage() {
               })}
             </ul>
           )}
+          <Pagination
+            page={applicationRowsPager.page}
+            totalPages={applicationRowsPager.totalPages}
+            onChange={applicationRowsPager.setPage}
+            variant="light"
+          />
         </section>
       )}
 

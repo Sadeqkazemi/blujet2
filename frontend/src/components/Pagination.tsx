@@ -33,6 +33,7 @@ export default function Pagination({
     ? 'h-[42px] w-[42px] rounded-[11px] border border-[#28344c] bg-[#18223a] text-[13px] font-semibold text-[#9fb0c7] transition hover:text-white'
     : 'h-[42px] w-[42px] rounded-[11px] border border-[#e6eaf0] bg-white text-[13px] font-semibold text-[#5a6678] transition hover:border-[#cfd6e0]';
 
+  // Show a compact window of page numbers when there are many pages.
   const windowSize = 7;
   let start = Math.max(1, page - Math.floor(windowSize / 2));
   const end = Math.min(totalPages, start + windowSize - 1);

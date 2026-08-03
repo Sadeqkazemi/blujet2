@@ -19,6 +19,8 @@ import { faDigits, faMoney } from '../../lib/fa-format';
 import { airportCityName } from '../../lib/airport-cities';
 import { formatJalaliDate, formatJalaliDateTime, parseJalaliDateToIso } from '../../lib/jalali';
 import Modal from '../../components/Modal';
+import Pagination from '../../components/Pagination';
+import { usePagination } from '../../hooks/usePagination';
 import BoardChairPlaneMode from './BoardChairPlaneMode';
 import FlightSeatMapModal from './FlightSeatMapModal';
 import ReservationMd80SeatMap, {
@@ -243,6 +245,10 @@ function ItReservationView() {
       ),
     [pnrGroups],
   );
+
+  const recentPager = usePagination(recentRows);
+  const agenciesPager = usePagination(agencies ?? []);
+  const flightsPager = usePagination(flights ?? []);
 
   async function onPnrSearch() {
     setError(null);
@@ -567,7 +573,7 @@ function ItReservationView() {
             {recentRows.length === 0 ? (
               <div className="px-[15px] py-[26px] text-center text-xs text-[#6b7b94]">رزروی ثبت نشده است.</div>
             ) : (
-              recentRows.slice(0, 20).map((r) => {
+              recentPager.pageItems.map((r) => {
                 const st = IT_STATUS_LABEL[r.status] ?? {
                   label: r.status,
                   className: 'bg-[#18223a] text-[#9fb0c7]',
@@ -593,6 +599,12 @@ function ItReservationView() {
                 );
               })
             )}
+            <Pagination
+              page={recentPager.page}
+              totalPages={recentPager.totalPages}
+              onChange={recentPager.setPage}
+              variant="dark"
+            />
           </section>
         </div>
       )}
@@ -606,7 +618,7 @@ function ItReservationView() {
               آژانسی با دسترسی API ثبت نشده است.
             </div>
           ) : (
-            agencies.map((a) => (
+            agenciesPager.pageItems.map((a) => (
               <div
                 key={a.id}
                 className="flex flex-wrap items-center gap-3.5 rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-3.5"
@@ -636,6 +648,12 @@ function ItReservationView() {
               </div>
             ))
           )}
+          <Pagination
+            page={agenciesPager.page}
+            totalPages={agenciesPager.totalPages}
+            onChange={agenciesPager.setPage}
+            variant="dark"
+          />
         </div>
       )}
 
@@ -662,7 +680,7 @@ function ItReservationView() {
           ) : flights.length === 0 ? (
             <div className="px-[15px] py-[34px] text-center text-xs text-[#6b7b94]">پروازی ثبت نشده است.</div>
           ) : (
-            flights.map((f) => {
+            flightsPager.pageItems.map((f) => {
               const st = FLIGHT_STATUS[f.statusKey ?? 'SELLING'];
               return (
                 <button
@@ -695,6 +713,12 @@ function ItReservationView() {
               );
             })
           )}
+          <Pagination
+            page={flightsPager.page}
+            totalPages={flightsPager.totalPages}
+            onChange={flightsPager.setPage}
+            variant="dark"
+          />
         </section>
       )}
 
@@ -948,6 +972,10 @@ function ExecReservationView() {
         })),
     );
   }, [pnrGroups, pnrLname]);
+
+  const recentPager = usePagination(recentRows);
+  const pnrGroupsPager = usePagination(pnrGroups);
+  const searchResultsPager = usePagination(searchResults);
 
   const loadFlights = useCallback(async () => {
     try {
@@ -1255,7 +1283,7 @@ function ExecReservationView() {
             {recentRows.length === 0 ? (
               <div className="px-[15px] py-[26px] text-center text-xs text-[#6b7b94]">رزروی ثبت نشده است.</div>
             ) : (
-              recentRows.slice(0, 20).map((r) => {
+              recentPager.pageItems.map((r) => {
                 const st = STATUS_LABEL[r.status] ?? {
                   label: r.status,
                   darkClass: 'bg-[#18223a] text-[#9fb0c7]',
@@ -1283,6 +1311,12 @@ function ExecReservationView() {
                 );
               })
             )}
+            <Pagination
+              page={recentPager.page}
+              totalPages={recentPager.totalPages}
+              onChange={recentPager.setPage}
+              variant="dark"
+            />
           </section>
         </div>
       )}
@@ -1299,7 +1333,7 @@ function ExecReservationView() {
             <p className="py-6 text-center text-xs text-muted">رزروی یافت نشد.</p>
           ) : (
             <div className="flex flex-col gap-4">
-              {pnrGroups.map((g) => (
+              {pnrGroupsPager.pageItems.map((g) => (
                 <div key={g.flightInstanceId} className="overflow-hidden rounded-xl border border-border">
                   <div className="flex items-center gap-3 bg-surface px-4 py-2.5 text-xs">
                     <span className="ltr font-num font-bold text-[#60a5fa]">{g.flightNo}</span>
@@ -1340,6 +1374,12 @@ function ExecReservationView() {
               ))}
             </div>
           )}
+          <Pagination
+            page={pnrGroupsPager.page}
+            totalPages={pnrGroupsPager.totalPages}
+            onChange={pnrGroupsPager.setPage}
+            variant="light"
+          />
         </section>
       )}
 
@@ -1398,7 +1438,7 @@ function ExecReservationView() {
 
           {searchResults.length > 0 && (
             <section className="flex flex-col gap-2">
-              {searchResults.map((f) => (
+              {searchResultsPager.pageItems.map((f) => (
                 <div
                   key={f.flightInstanceId}
                   className={
@@ -1426,6 +1466,12 @@ function ExecReservationView() {
               ))}
             </section>
           )}
+          <Pagination
+            page={searchResultsPager.page}
+            totalPages={searchResultsPager.totalPages}
+            onChange={searchResultsPager.setPage}
+            variant={dark ? 'dark' : 'light'}
+          />
         </div>
       )}
 
@@ -1626,6 +1672,8 @@ function FlightsTab({
   onQ: (v: string) => void;
   onOpenSeatMap: (id: string) => void;
 }) {
+  const rowsPager = usePagination(rows);
+
   if (dark) {
     return (
       <section className="overflow-hidden rounded-[14px] border border-[#1f2a3d] bg-[#141d2e]">
@@ -1647,7 +1695,7 @@ function FlightsTab({
         {rows.length === 0 ? (
           <div className="px-[15px] py-[34px] text-center text-xs text-[#6b7b94]">پروازی ثبت نشده است.</div>
         ) : (
-          rows.map((f) => {
+          rowsPager.pageItems.map((f) => {
             const sold = f.soldCount ?? f.sold ?? 0;
             const occ =
               f.occupancyPct ??
@@ -1684,6 +1732,12 @@ function FlightsTab({
             );
           })
         )}
+        <Pagination
+          page={rowsPager.page}
+          totalPages={rowsPager.totalPages}
+          onChange={rowsPager.setPage}
+          variant="dark"
+        />
       </section>
     );
   }
@@ -1700,7 +1754,7 @@ function FlightsTab({
         <p className="py-6 text-center text-xs text-muted">پروازی یافت نشد.</p>
       ) : (
         <div className="flex flex-col gap-2.5">
-          {rows.map((f) => {
+          {rowsPager.pageItems.map((f) => {
             const soldCount = f.soldCount ?? f.sold ?? 0;
             return (
               <button
@@ -1729,6 +1783,12 @@ function FlightsTab({
           })}
         </div>
       )}
+      <Pagination
+        page={rowsPager.page}
+        totalPages={rowsPager.totalPages}
+        onChange={rowsPager.setPage}
+        variant="light"
+      />
     </section>
   );
 }
