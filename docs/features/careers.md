@@ -4,11 +4,14 @@
 `design-reference-v2/فرصت‌های شغلی.dc.html` (listing) and
 `design-reference-v2/فرصت‌های شغلی-فرم درخواست.dc.html` / استخدام (apply
 form). Routes: `/careers` → listing, `/careers/:jobId/apply` → form.
-SITE_ADMIN `jobapps` tab has three sections: ایجاد فرصت شغلی / آگهی‌ها /
-درخواست‌های استخدام. Footer shows **only** the «فرصت‌های شغلی» link under
-**خدمات** when «نمایش لینک در فوتر» (`CareersSettings.enabled`) is on —
-never the ads themselves. Resume upload is real (PDF ≤3MB); national ID
-encrypted at rest; referral targets from real staff accounts.
+Both pages use the shared homepage shell (`PublicPageShell` →
+`PublicHeader` + `PublicFooter`) and are responsive (1→2→3/4 column
+breakpoints at 640px / 980px). SITE_ADMIN `jobapps` tab has three
+sections: ایجاد فرصت شغلی / آگهی‌ها / درخواست‌های استخدام. Footer shows
+**only** the «فرصت‌های شغلی» link under **خدمات** when «نمایش لینک در
+فوتر» (`CareersSettings.enabled`) is on — never the ads themselves.
+Resume upload is real (PDF ≤3MB); national ID encrypted at rest;
+referral targets from real staff accounts.
 
 ## Acceptance checklist
 
