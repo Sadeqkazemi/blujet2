@@ -42,19 +42,19 @@ function StatCard({
 }) {
   const trendUp = trendPct >= 0;
   return (
-    <div className="rounded-xl border border-white/10 bg-panel-surface p-4">
+    <div className="rounded-xl border border-[#1f2a3d] bg-[#141d2e] p-4">
       <div className="mb-3 flex items-center justify-between">
         <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${iconClass}`}>{icon}</span>
         <span
           className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-            trendUp ? 'bg-[#10b98118] text-[#059669]' : 'bg-danger/10 text-danger'
+            trendUp ? 'bg-[#34d39924] text-[#34d399]' : 'bg-[#f8717124] text-[#f87171]'
           }`}
         >
           {trendLabel(trendPct)}
         </span>
       </div>
-      <div className="font-num text-xl font-black text-panel-ink">{value}</div>
-      <div className="mt-1 text-[11px] text-panel-muted">{label}</div>
+      <div className="font-num text-xl font-black text-white">{value}</div>
+      <div className="mt-1 text-[11px] text-[#6b7b94]">{label}</div>
     </div>
   );
 }
@@ -112,10 +112,10 @@ export default function FinanceDashboardPage() {
   };
 
   return (
-    <div className="p-8">
+    <div className="px-[21px] pb-[34px] pt-[18px]">
       <div className="mb-6">
-        <h1 className="text-xl font-black text-panel-ink">داشبورد</h1>
-        <p className="mt-1 text-sm text-panel-muted">نمای کلی فروش و کارهای در انتظار اقدام</p>
+        <h1 className="text-[20.5px] font-black text-white">داشبورد</h1>
+        <p className="mt-1 text-sm text-[#6b7b94]">نمای کلی فروش و کارهای در انتظار اقدام</p>
       </div>
 
       {error && <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">{error}</p>}
@@ -173,19 +173,19 @@ export default function FinanceDashboardPage() {
       )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.7fr_1fr]">
-        <div className="rounded-xl border border-white/10 bg-panel-surface p-5">
+        <div className="rounded-xl border border-[#1f2a3d] bg-[#141d2e] p-5">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-sm font-bold text-panel-ink">نمودار فروش</h2>
-              <p className="mt-0.5 text-[11px] text-panel-muted">به تفکیک کانال · تومان</p>
+              <h2 className="text-sm font-bold text-white">نمودار فروش</h2>
+              <p className="mt-0.5 text-[11px] text-[#6b7b94]">به تفکیک کانال · تومان</p>
             </div>
-            <div className="flex gap-1 rounded-lg border border-white/10 bg-panel-canvas p-1">
+            <div className="flex gap-1 rounded-lg border border-[#28344c] bg-[#18223a] p-1">
               {CHART_MODES.map((m) => (
                 <button
                   key={m.key}
                   onClick={() => setGranularity(m.key)}
                   className={`rounded-md px-3 py-1.5 text-[11px] transition ${
-                    granularity === m.key ? 'bg-accent font-bold text-white' : 'text-panel-muted hover:text-panel-ink'
+                    granularity === m.key ? 'bg-[#3b82f6] font-bold text-white' : 'text-[#6b7b94] hover:text-white'
                   }`}
                 >
                   {m.label}
@@ -195,81 +195,81 @@ export default function FinanceDashboardPage() {
           </div>
 
           <div className="mb-4 grid grid-cols-3 gap-3">
-            <div className="rounded-lg bg-white/5 p-3 text-xs">
-              <div className="mb-1 flex items-center gap-1.5 text-[10px] text-panel-muted">
-                <span className="h-2 w-2 rounded-sm bg-[#1668c4]" />
+            <div className="rounded-lg border border-[#28344c] bg-[#18223a] p-3 text-xs">
+              <div className="mb-1 flex items-center gap-1.5 text-[10px] text-[#6b7b94]">
+                <span className="h-2 w-2 rounded-sm bg-[#3b82f6]" />
                 سیستمی
               </div>
-              <div className="font-num font-black text-[#1668c4]">{faMoney(channelSums.system)}</div>
+              <div className="font-num font-black text-[#60a5fa]">{faMoney(channelSums.system)}</div>
             </div>
-            <div className="rounded-lg bg-white/5 p-3 text-xs">
-              <div className="mb-1 flex items-center gap-1.5 text-[10px] text-panel-muted">
+            <div className="rounded-lg border border-[#28344c] bg-[#18223a] p-3 text-xs">
+              <div className="mb-1 flex items-center gap-1.5 text-[10px] text-[#6b7b94]">
                 <span className="h-2 w-2 rounded-sm bg-[#a855f7]" />
                 چارتر
               </div>
-              <div className="font-num font-black text-[#a855f7]">{faMoney(channelSums.charter)}</div>
+              <div className="font-num font-black text-[#c084fc]">{faMoney(channelSums.charter)}</div>
             </div>
-            <div className="rounded-lg bg-white/5 p-3 text-xs">
-              <div className="mb-1 flex items-center gap-1.5 text-[10px] text-panel-muted">
-                <span className="h-2 w-2 rounded-sm bg-[#059669]" />
+            <div className="rounded-lg border border-[#28344c] bg-[#18223a] p-3 text-xs">
+              <div className="mb-1 flex items-center gap-1.5 text-[10px] text-[#6b7b94]">
+                <span className="h-2 w-2 rounded-sm bg-[#34d399]" />
                 آژانس
               </div>
-              <div className="font-num font-black text-[#059669]">{faMoney(channelSums.agency)}</div>
+              <div className="font-num font-black text-[#34d399]">{faMoney(channelSums.agency)}</div>
             </div>
           </div>
 
           {loading ? (
-            <p className="py-10 text-center text-sm text-panel-muted">در حال بارگذاری…</p>
+            <p className="py-10 text-center text-sm text-[#6b7b94]">در حال بارگذاری…</p>
           ) : (
             <SalesBarChart periods={periods} selectedPeriodKey={periodKey} onSelectPeriod={setPeriodKey} />
           )}
 
           {flights && (
-            <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl border border-white/10 bg-white/5 p-4 md:grid-cols-4">
+            <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl border border-[#28344c] bg-gradient-to-br from-[#1a2740] to-[#141d2e] p-4 md:grid-cols-4">
               <div>
-                <div className="font-num text-lg font-black text-panel-ink">{faDigits(flights.flightCount)}</div>
-                <div className="text-xs text-panel-muted">پروازهای انجام‌شده</div>
+                <div className="font-num text-lg font-black text-white">{faDigits(flights.flightCount)}</div>
+                <div className="text-xs text-[#6b7b94]">پروازهای انجام‌شده</div>
               </div>
               <div>
-                <div className="font-num text-lg font-black text-panel-ink">{faDigits(flights.totalSeats)}</div>
-                <div className="text-xs text-panel-muted">مجموع صندلی</div>
+                <div className="font-num text-lg font-black text-white">{faDigits(flights.totalSeats)}</div>
+                <div className="text-xs text-[#6b7b94]">مجموع صندلی</div>
               </div>
               <div>
-                <div className="font-num text-lg font-black text-[#059669]">{faDigits(flights.soldSeats)}</div>
-                <div className="text-xs text-panel-muted">فروخته‌شده</div>
+                <div className="font-num text-lg font-black text-[#34d399]">{faDigits(flights.soldSeats)}</div>
+                <div className="text-xs text-[#6b7b94]">فروخته‌شده</div>
               </div>
               <div>
-                <div className="font-num text-lg font-black text-danger">{faDigits(flights.unsoldSeats)}</div>
-                <div className="text-xs text-panel-muted">فروش‌نرفته</div>
+                <div className="font-num text-lg font-black text-[#f87171]">{faDigits(flights.unsoldSeats)}</div>
+                <div className="text-xs text-[#6b7b94]">فروش‌نرفته</div>
               </div>
             </div>
           )}
         </div>
 
         {cartable && (
-          <section className="rounded-xl border border-white/10 bg-panel-surface p-5">
+          <section className="rounded-xl border border-[#1f2a3d] bg-[#141d2e] p-5">
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-bold text-panel-ink">
+              <h2 className="text-sm font-bold text-white">
                 کارتابل
                 {cartable.totalOpen > 0 && (
-                  <span className="mr-2 rounded-full bg-danger/10 px-2.5 py-0.5 text-[11px] font-bold text-danger">
+                  <span className="mr-2 rounded-full bg-[#f8717124] px-2.5 py-0.5 text-[11px] font-bold text-[#f87171]">
                     {faDigits(cartable.totalOpen)}
                   </span>
                 )}
               </h2>
             </div>
             {cartable.tasks.length === 0 ? (
-              <p className="py-6 text-center text-xs text-panel-muted">کارتابل خالی است ✓</p>
+              <p className="py-6 text-center text-xs text-[#6b7b94]">کارتابل خالی است ✓</p>
             ) : (
-              <ul className="divide-y divide-white/10">
+              <ul className="divide-y divide-[#22304a]">
                 {cartable.tasks.slice(0, 4).map((t) => (
                   <li key={t.id} className="flex items-start gap-3 py-3 text-xs">
-                    <span className="mt-0.5 flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-accent/10 text-accent">
+                    <span className="mt-0.5 flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-[#3b82f624] text-[#60a5fa]">
                       ✉
                     </span>
                     <div className="min-w-0">
-                      <div className="font-bold text-panel-ink">{t.title}</div>
-                      <div className="mt-0.5 text-[10px] text-panel-muted">
+                      <div className="font-bold text-white">{t.title}</div>
+                      <div className="mt-0.5 text-[10px] text-[#6b7b94]">
                         {t.senderLabelFa ?? t.sender?.fullName ?? ''}
                       </div>
                     </div>
@@ -277,7 +277,7 @@ export default function FinanceDashboardPage() {
                 ))}
               </ul>
             )}
-            <Link to="/panel/cartable" className="mt-4 block text-center text-xs font-bold text-accent">
+            <Link to="/panel/cartable" className="mt-4 block text-center text-xs font-bold text-[#60a5fa]">
               مشاهده‌ی همه‌ی کارها ←
             </Link>
           </section>
