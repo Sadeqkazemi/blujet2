@@ -8,7 +8,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { EmployeePermissionGuard } from '../../common/guards/employee-permission.guard';
 import { RequiresPermission } from '../../common/decorators/requires-permission.decorator';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import type { AuditCategory, Role } from '../../../generated/prisma/enums';
+import type { AuditCategory, Role } from '../../database/enums';
 
 @ApiTags('audit')
 @Controller('audit')

@@ -1,4 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import {
+  BeforeInsert,
   Column,
   CreateDateColumn,
   Entity,
@@ -20,6 +22,11 @@ import { User } from './user.entity';
 export class AuditLog {
   @PrimaryColumn({ type: 'text', primaryKeyConstraintName: 'audit_logs_pkey' })
   id!: string;
+
+  @BeforeInsert()
+  generateId() {
+    this.id ??= randomUUID();
+  }
 
   @Column({ type: 'text' })
   actorId!: string;
