@@ -114,11 +114,16 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
       passengersThisMonth: number;
       ticketsSoldThisMonth: number;
       pendingActionCount: number;
+      agenciesTrendPct: number | null;
+      passengersTrendPct: number | null;
+      ticketsTrendPct: number | null;
     };
     expect(data.activeAgencies).toBeGreaterThan(0);
     expect(data.passengersThisMonth).toBeGreaterThanOrEqual(0);
     expect(data.ticketsSoldThisMonth).toBeGreaterThanOrEqual(0);
     expect(data.pendingActionCount).toBeGreaterThanOrEqual(0);
+    expect(data).toHaveProperty('passengersTrendPct');
+    expect(data).toHaveProperty('ticketsTrendPct');
 
     const finance = await loginAs(app, 'finance');
     const forbidden = await request(app.getHttpServer())
