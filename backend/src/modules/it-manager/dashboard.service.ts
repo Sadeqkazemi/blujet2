@@ -2,11 +2,28 @@ import { Injectable } from '@nestjs/common';
 import * as os from 'node:os';
 import { readFile } from 'node:fs/promises';
 import { statfs } from 'node:fs/promises';
-import { PrismaService } from '../../prisma/prisma.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { In, IsNull, MoreThan, MoreThanOrEqual, Repository } from 'typeorm';
+import { RefreshToken } from '../../database/entities/refresh-token.entity';
+import { InternalService } from '../../database/entities/internal-service.entity';
+import { BackupRecord } from '../../database/entities/backup-record.entity';
+import { AuditLog } from '../../database/entities/audit-log.entity';
+import { ExternalServiceConfig } from '../../database/entities/external-service-config.entity';
 
 @Injectable()
 export class ItDashboardService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @InjectRepository(RefreshToken)
+    private readonly refreshTokenRepo: Repository<RefreshToken>,
+    @InjectRepository(InternalService)
+    private readonly internalServiceRepo: Repository<InternalService>,
+    @InjectRepository(BackupRecord)
+    private readonly backupRecordRepo: Repository<BackupRecord>,
+    @InjectRepository(AuditLog)
+    private readonly auditLogRepo: Repository<AuditLog>,
+    @InjectRepository(ExternalServiceConfig)
+    private readonly externalServiceConfigRepo: Repository<ExternalServiceConfig>,
+  ) {}
 
   private async diskUsedPct(): Promise<number | null> {
     try {
@@ -58,26 +75,31 @@ export class ItDashboardService {
       recentEvents,
       securityAlerts,
     ] = await Promise.all([
-      this.prisma.refreshToken.count({
-        where: { revokedAt: null, expiresAt: { gt: new Date() } },
+      this.refreshTokenRepo.count({
+        where: { revokedAt: IsNull(), expiresAt: MoreThan(new Date()) },
       }),
-      this.prisma.internalService.findMany(),
-      this.prisma.backupRecord.findFirst({ orderBy: { startedAt: 'desc' } }),
-      this.prisma.auditLog.findMany({
+      this.internalServiceRepo.find(),
+      this.backupRecordRepo.findOne({
+        where: {},
+        order: { startedAt: 'DESC' },
+      }),
+      this.auditLogRepo.find({
         where: {
-          category: { in: ['SYSTEM', 'ACCOUNT', 'ACCESS', 'SECURITY'] },
+          category: In(['SYSTEM', 'ACCOUNT', 'ACCESS', 'SECURITY']),
         },
-        orderBy: { createdAt: 'desc' },
+        order: { createdAt: 'DESC' },
         take: 8,
       }),
-      this.prisma.auditLog.count({
+      this.auditLogRepo.count({
         where: {
           category: 'SECURITY',
-          createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+          createdAt: MoreThanOrEqual(
+            new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+          ),
         },
       }),
     ]);
-    const external = await this.prisma.externalServiceConfig.findMany();
+    const external = await this.externalServiceConfigRepo.find();
     const [diskUsedPct, bandwidthUsedPct] = await Promise.all([
       this.diskUsedPct(),
       this.bandwidthUsedPct(),
