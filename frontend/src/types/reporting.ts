@@ -170,3 +170,16 @@ export interface StaffReportsResult {
   }[];
   newEmployeeEvents: { id: string; detail: string; at: string }[];
 }
+
+/** EMPLOYEE «گزارش‌های من» — GET /staff-reports/mine */
+export interface EmployeeActivityItem {
+  id: string;
+  title: string;
+  detail: string;
+  category: string;
+  at: string;
+}
+
+export interface EmployeeActivityResult {
+  items: EmployeeActivityItem[];
+}

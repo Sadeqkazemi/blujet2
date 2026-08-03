@@ -88,8 +88,13 @@ export class PanelsService {
       cartable: 'کارتابل',
       referrals: 'ارجاعات',
     };
+    for (const [sectionKey, section] of Object.entries(EMPLOYEE_SECTION_NAV)) {
+      sectionLabels[sectionKey] = section.labelFa;
+    }
     for (const entry of PERMISSION_CATALOG) {
-      sectionLabels[entry.sectionKey] = entry.sectionLabelFa;
+      if (!sectionLabels[entry.sectionKey]) {
+        sectionLabels[entry.sectionKey] = entry.sectionLabelFa;
+      }
     }
 
     const grantedSectionKeys = new Set<string>();

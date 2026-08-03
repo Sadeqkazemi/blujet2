@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { fetchNav } from '../api/panels';
+import { fetchNav, fetchEmployeeContext } from '../api/panels';
 import { fetchCartable, fetchMyReferrals, fetchReferrals } from '../api/cartable';
 import { fetchRefunds } from '../api/refunds';
 import { fetchLowSalesAlerts, fetchStaffReports } from '../api/reporting';
@@ -9,7 +9,7 @@ import { fetchLogsBadgeCount } from '../api/audit';
 import { fetchCeoPricing } from '../api/pricing';
 import { faDigits } from '../lib/fa-format';
 import { formatJalaliDate } from '../lib/jalali';
-import type { PanelNavItem } from '../types/panels';
+import type { EmployeeContext, PanelNavItem } from '../types/panels';
 import type { LowSalesAlert } from '../types/reporting';
 import { isLowSalesRole } from '../types/panel-shell';
 import PanelNotificationBell, { type PanelNotificationItem } from './PanelNotificationBell';
@@ -36,6 +36,13 @@ const ROLE_BRAND_SUB: Record<string, string> = {
 
 type NavBadge = { count: number; className: string };
 
+function nameInitials(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '؟';
+  if (parts.length === 1) return parts[0]!.slice(0, 2);
+  return `${parts[0]!.slice(0, 1)}${parts[parts.length - 1]!.slice(0, 1)}`;
+}
+
 function lowSalesNotifItems(alerts: LowSalesAlert[]): PanelNotificationItem[] {
   // First alert is shown as the in-page banner; leftovers go to the bell.
   return alerts.slice(1).map((a) => ({
@@ -55,12 +62,23 @@ export default function PanelShell() {
   const [badges, setBadges] = useState<Record<string, NavBadge>>({});
   const [notifications, setNotifications] = useState<PanelNotificationItem[]>([]);
   const [lowSalesAlerts, setLowSalesAlerts] = useState<LowSalesAlert[]>([]);
+  const [employeeCtx, setEmployeeCtx] = useState<EmployeeContext | null>(null);
 
   useEffect(() => {
     fetchNav()
       .then(setNav)
       .catch(() => setNav([]));
   }, []);
+
+  useEffect(() => {
+    if (user?.role !== 'EMPLOYEE') {
+      setEmployeeCtx(null);
+      return;
+    }
+    fetchEmployeeContext()
+      .then(setEmployeeCtx)
+      .catch(() => setEmployeeCtx(null));
+  }, [user?.role]);
 
   useEffect(() => {
     if (!isLowSalesRole(user?.role)) {
@@ -248,8 +266,8 @@ export default function PanelShell() {
     user?.role === 'BOARD_CHAIR' ||
     user?.role === 'SENIOR_MANAGER' ||
     user?.role === 'COMMERCIAL_MANAGER';
-  /** Finance (and executives) get the avatar footer chrome. */
-  const avatarShell = executiveShell || user?.role === 'FINANCE_MANAGER';
+  /** Finance + Employee get avatar footer chrome (design employee sidebar). */
+  const avatarShell = executiveShell || user?.role === 'FINANCE_MANAGER' || user?.role === 'EMPLOYEE';
   const roleInitial =
     user?.role === 'CEO'
       ? 'مع'
@@ -261,7 +279,13 @@ export default function PanelShell() {
             ? 'مم'
             : user?.role === 'COMMERCIAL_MANAGER'
               ? 'مب'
-              : roleLabel.slice(0, 1);
+              : user?.role === 'EMPLOYEE' && user.fullName
+                ? nameInitials(user.fullName)
+                : roleLabel.slice(0, 1);
+  const employeeFooterSub =
+    user?.role === 'EMPLOYEE'
+      ? [employeeCtx?.deptLabelFa, employeeCtx?.rank].filter(Boolean).join(' · ') || roleLabel
+      : null;
   const onDashboard = /^\/panel\/?$/.test(location.pathname);
   const showExecNotifChrome = executiveShell && isLowSalesRole(user?.role) && !onDashboard;
   const notifAlerts = lowSalesAlerts.slice(1);
@@ -279,13 +303,15 @@ export default function PanelShell() {
           </div>
         </div>
 
-        <div className="px-[5px] pb-[11px]">
-          <label className="mb-1.5 block pr-[3px] text-[10px] text-[#6b7b94]">نقش این پنل</label>
-          <div className="flex items-center gap-[7px] rounded-[10px] border border-[#2a3a55] bg-[#18223a] px-[11px] py-[9px]">
-            <span className="h-2 w-2 flex-none rounded-full bg-[#3b82f6]" />
-            <span className="text-xs font-extrabold text-panel-ink">{roleLabel}</span>
+        {user?.role !== 'EMPLOYEE' && (
+          <div className="px-[5px] pb-[11px]">
+            <label className="mb-1.5 block pr-[3px] text-[10px] text-[#6b7b94]">نقش این پنل</label>
+            <div className="flex items-center gap-[7px] rounded-[10px] border border-[#2a3a55] bg-[#18223a] px-[11px] py-[9px]">
+              <span className="h-2 w-2 flex-none rounded-full bg-[#3b82f6]" />
+              <span className="text-xs font-extrabold text-panel-ink">{roleLabel}</span>
+            </div>
           </div>
-        </div>
+        )}
 
         <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
           {nav === null && <div className="px-2 py-3 text-xs text-panel-muted-2">در حال بارگذاری…</div>}
@@ -328,19 +354,39 @@ export default function PanelShell() {
         {avatarShell ? (
           <div className="mt-auto border-t border-panel-border p-4">
             <div className="flex items-center gap-2.5">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#3b82f6] to-[#9333ea] text-[11px] font-extrabold text-white">
+              <span className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-gradient-to-br from-[#3b82f6] to-[#9333ea] text-[11px] font-extrabold text-white">
                 {roleInitial}
               </span>
-              <div className="min-w-0">
-                <div className="truncate text-xs font-bold text-white">{roleLabel}</div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-xs font-bold text-white">
+                  {user?.role === 'EMPLOYEE' ? (user.fullName ?? roleLabel) : roleLabel}
+                </div>
+                {user?.role === 'EMPLOYEE' ? (
+                  <div className="truncate text-[10px] text-[#6b7b94]">{employeeFooterSub}</div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void onSignOut()}
+                    className="text-[10.5px] text-[#9fb0c7] transition hover:text-white"
+                  >
+                    خروج از حساب
+                  </button>
+                )}
+              </div>
+              {user?.role === 'EMPLOYEE' && (
                 <button
                   type="button"
                   onClick={() => void onSignOut()}
-                  className="text-[10.5px] text-[#9fb0c7] transition hover:text-white"
+                  title="خروج"
+                  aria-label="خروج از حساب"
+                  className="flex-none text-[#6b7b94] transition hover:text-white"
                 >
-                  خروج از حساب
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <path d="M16 17l5-5-5-5M21 12H9" />
+                  </svg>
                 </button>
-              </div>
+              )}
             </div>
           </div>
         ) : (
