@@ -91,6 +91,8 @@ export default defineConfig(({ mode }) => {
     host: '0.0.0.0',
     port: 5173,
     strictPort: true,
+    // Allow Cloudflare quick tunnels / Cursor port-forward hostnames.
+    allowedHosts: true,
     proxy: devProxy,
   },
   plugins: [
