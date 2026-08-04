@@ -1,0 +1,82 @@
+import { randomUUID } from 'node:crypto';
+import {
+  BeforeInsert,
+  Column,
+  CreateDateColumn,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  PrimaryColumn,
+} from 'typeorm';
+import { AllotmentType } from '../enums';
+import { bigintTransformer } from '../transformers/bigint.transformer';
+import { AgencyProfile } from './agency-profile.entity';
+import { FlightInstance } from './flight-instance.entity';
+import { User } from './user.entity';
+
+@Entity('agency_allotments')
+export class AgencyAllotment {
+  @PrimaryColumn({
+    type: 'text',
+    primaryKeyConstraintName: 'agency_allotments_pkey',
+  })
+  id!: string;
+
+  @BeforeInsert()
+  generateId() {
+    this.id ??= randomUUID();
+  }
+
+  @Column({ type: 'text' })
+  agencyId!: string;
+
+  @ManyToOne(() => AgencyProfile, { onDelete: 'RESTRICT', onUpdate: 'CASCADE' })
+  @JoinColumn({
+    name: 'agencyId',
+    foreignKeyConstraintName: 'agency_allotments_agencyId_fkey',
+  })
+  agency!: AgencyProfile;
+
+  @Column({ type: 'text' })
+  flightInstanceId!: string;
+
+  @ManyToOne(() => FlightInstance, {
+    onDelete: 'RESTRICT',
+    onUpdate: 'CASCADE',
+  })
+  @JoinColumn({
+    name: 'flightInstanceId',
+    foreignKeyConstraintName: 'agency_allotments_flightInstanceId_fkey',
+  })
+  flightInstance!: FlightInstance;
+
+  @Column({ type: 'int' })
+  seatsAllocated!: number;
+
+  @Column({
+    type: 'enum',
+    enum: AllotmentType,
+    enumName: 'AllotmentType',
+    default: AllotmentType.HARD,
+  })
+  type!: AllotmentType;
+
+  @Column({ type: 'timestamp', precision: 3, nullable: true })
+  releaseAt!: Date | null;
+
+  @Column({ type: 'bigint', nullable: true, transformer: bigintTransformer })
+  contractPriceIrr!: bigint | null;
+
+  @Column({ type: 'text' })
+  createdById!: string;
+
+  @ManyToOne(() => User, { onDelete: 'RESTRICT', onUpdate: 'CASCADE' })
+  @JoinColumn({
+    name: 'createdById',
+    foreignKeyConstraintName: 'agency_allotments_createdById_fkey',
+  })
+  createdBy!: User;
+
+  @CreateDateColumn({ precision: 3, default: () => 'CURRENT_TIMESTAMP' })
+  createdAt!: Date;
+}

@@ -27,7 +27,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PanelAccessGuard } from '../panels/panel-access.guard';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import type { SiteContentBlockKey } from '../../../generated/typeorm/client';
+import type { SiteContentBlockKey } from '../../database/enums';
 
 @ApiTags('site-content')
 @Controller('site-content/admin')

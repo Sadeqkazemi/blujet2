@@ -30,7 +30,6 @@ import { siteMediaUrl } from '../public-site/site-content-shared';
 import { SocialIcon, socialBrandColor } from '../../components/public/SocialIcon';
 import { APP_LINK_IDS, type AppDownloadLinkEntry } from '../../types/app-links';
 import { SOCIAL_LINK_IDS, type SocialLinkEntry } from '../../types/social-links';
-import MediaJobPostingsSection from './MediaJobPostingsSection';
 import type {
   ContentBlockRow,
   DestinationRow,
@@ -762,8 +761,6 @@ export default function MediaAdminPage() {
           </div>
         )}
       </div>
-
-      <MediaJobPostingsSection onError={setError} />
 
       {/* Static site pages */}
       <div className={cardClass()}>

@@ -1,25 +1,17 @@
 # Feature: فرصت‌های شغلی (Careers)
 
-**Status: COMPLETE.** See `docs/API.md`'s Phase 67 section for the full
-endpoint shapes and scope decisions, including a post-implementation
-correction: the public listing/application pages and the SITE_ADMIN
-application-review UI (list/detail/refer/hire/reject) have **no design
-file** — only a small "فرصت‌های شغلی" posting-management card grid inside
-`پنل ادمین سایت.dc.html` does (title/dept/city + type badge + "ویرایش",
-no delete). The public pages and the review UI were built by extension
-of this codebase's existing visual language, approved by the user before
-implementation. Job-posting CRUD lives on the SITE_ADMIN `media`
-(مدیریت سایت) tab matching the design; the `jobapps` tab is the dark
-applications-review queue only. Resume upload is made real (the
-design's own mock never actually persists the picked file); a small
-self-contained resume-storage slice on `JobApplication` instead of
-reusing `StoredFile` (which requires an authenticated `User` owner a job
-applicant doesn't have); the mock's own `getJob(id) || getActiveJobs()[0]`
-silent-fallback bug is not replicated (real 404 on an unknown/inactive
-job id instead); the referral-target list is computed from real
-`COMMERCIAL_MANAGER`/`FINANCE_MANAGER` staff plus the singleton
-`CEO`/`SENIOR_MANAGER` accounts; no delete action (deactivate only,
-matching the design).
+**Status: COMPLETE.** Public pages match the approved design bundle files
+`design-reference-v2/فرصت‌های شغلی.dc.html` (listing) and
+`design-reference-v2/فرصت‌های شغلی-فرم درخواست.dc.html` / استخدام (apply
+form). Routes: `/careers` → listing, `/careers/:jobId/apply` → form.
+Both pages use the shared homepage shell (`PublicPageShell` →
+`PublicHeader` + `PublicFooter`) and are responsive (1→2→3/4 column
+breakpoints at 640px / 980px). SITE_ADMIN `jobapps` tab has three
+sections: ایجاد فرصت شغلی / آگهی‌ها / درخواست‌های استخدام. Footer shows
+**only** the «فرصت‌های شغلی» link under **خدمات** when «نمایش لینک در
+فوتر» (`CareersSettings.enabled`) is on — never the ads themselves.
+Resume upload is real (PDF ≤3MB); national ID encrypted at rest;
+referral targets from real staff accounts.
 
 ## Acceptance checklist
 
