@@ -40,6 +40,7 @@ describe('LoginPage', () => {
     expect(screen.getByRole('button', { name: 'ورود به سامانه' })).toBeInTheDocument();
     expect(screen.getByTestId('staff-passenger-link')).toHaveAttribute('href', '/signin');
     expect(screen.getByTestId('staff-agency-link')).toHaveAttribute('href', '/agency/login');
+    expect(screen.getByTestId('staff-login-home-logo')).toHaveAttribute('href', '/');
   });
 
   it('shows an inline Persian validation error when submitted empty', async () => {
@@ -70,5 +71,23 @@ describe('LoginPage', () => {
     expect(await screen.findByTestId('staff-forgot-toast')).toHaveTextContent(
       'برای بازیابی رمز عبور، با واحد فناوری اطلاعات (مدیر IT) تماس بگیرید',
     );
+  });
+
+  it('toggles password visibility with an eye icon control', async () => {
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue(baseAuth);
+    renderLoginPage();
+
+    const input = screen.getByLabelText('رمز عبور');
+    expect(input).toHaveAttribute('type', 'password');
+
+    await userEvent.click(screen.getByTestId('staff-toggle-password'));
+    expect(input).toHaveAttribute('type', 'text');
+    expect(screen.getByTestId('staff-toggle-password')).toHaveAttribute(
+      'aria-label',
+      'پنهان کردن رمز عبور',
+    );
+
+    await userEvent.click(screen.getByTestId('staff-toggle-password'));
+    expect(input).toHaveAttribute('type', 'password');
   });
 });
