@@ -35,6 +35,7 @@ describe('LoginPage', () => {
     renderLoginPage();
 
     expect(screen.getByText('به سامانهٔ مدیریت داخلی blujet خوش آمدید')).toBeInTheDocument();
+    expect(screen.getByTestId('staff-login-mobile-brand')).toBeInTheDocument();
     expect(screen.getByLabelText('نام کاربری')).toBeInTheDocument();
     expect(screen.getByLabelText('رمز عبور')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'ورود به سامانه' })).toBeInTheDocument();

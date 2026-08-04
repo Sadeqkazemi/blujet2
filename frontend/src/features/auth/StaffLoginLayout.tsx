@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 
 const FEATURES = [
   {
@@ -28,32 +29,54 @@ const FEATURES = [
   },
 ];
 
+function BrandMark({ compact = false }: { compact?: boolean }) {
+  return (
+    <Link
+      to="/"
+      data-testid={compact ? 'staff-login-mobile-logo' : 'staff-login-home-logo'}
+      className="relative flex items-center gap-2.5 no-underline transition hover:opacity-90"
+      aria-label="بازگشت به صفحه اصلی blujet"
+    >
+      <div
+        className={`flex flex-none items-center justify-center rounded-xl bg-gradient-to-br from-accent to-navy-2 text-white shadow-lg ${
+          compact ? 'h-10 w-10 text-base' : 'h-[42px] w-[42px] text-[19px]'
+        }`}
+      >
+        ✈
+      </div>
+      <div>
+        <div className={`leading-none font-black text-white ${compact ? 'text-[17px]' : 'text-[19px]'}`}>blujet</div>
+        <div className={`mt-0.5 text-[#93a5c2] ${compact ? 'text-[10px]' : 'text-[10.5px]'}`}>سامانهٔ مدیریت داخلی</div>
+      </div>
+    </Link>
+  );
+}
+
 /** Shared light two-column shell for the staff login + 2FA steps — matches
  * design-reference/ورود مدیران و کارمندان.dc.html (light theme, visual
- * panel on the aside, white form panel). */
+ * panel on the aside, white form panel). Responsive: compact brand header on
+ * small screens; full visual column from `lg` up. */
 export function StaffLoginLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="grid min-h-screen grid-cols-1 bg-[#eef2f8] font-sans text-[#0f172a] md:grid-cols-[1fr_460px]">
-      <div className="relative hidden overflow-hidden bg-[#0b1526] md:flex md:flex-col md:justify-between md:p-11">
+    <div
+      data-testid="staff-login-shell"
+      className="grid min-h-screen min-h-[100dvh] grid-cols-1 overflow-x-hidden bg-[#eef2f8] font-sans text-[#0f172a] lg:grid-cols-[minmax(0,1fr)_minmax(360px,460px)]"
+    >
+      <aside
+        data-testid="staff-login-visual"
+        className="relative hidden overflow-hidden bg-[#0b1526] lg:flex lg:flex-col lg:justify-between lg:p-10 xl:p-11"
+      >
         <div
           className="pointer-events-none absolute inset-0"
           style={{ background: 'linear-gradient(175deg,#123a63 0%,#0d2640 55%,#0b1526 100%)' }}
         />
-        <div className="relative flex items-center gap-2.5">
-          <div className="flex h-[42px] w-[42px] items-center justify-center rounded-xl bg-gradient-to-br from-accent to-navy-2 text-[19px] text-white shadow-lg">
-            ✈
-          </div>
-          <div>
-            <div className="text-[19px] leading-none font-black text-white">blujet</div>
-            <div className="mt-0.5 text-[10.5px] text-[#93a5c2]">سامانهٔ مدیریت داخلی</div>
-          </div>
-        </div>
+        <BrandMark />
 
         <div className="relative max-w-[460px]">
-          <h1 className="mb-4 text-[32px] leading-relaxed font-black text-white">
+          <h1 className="mb-4 text-[28px] leading-relaxed font-black text-white xl:text-[32px]">
             به سامانهٔ مدیریت داخلی blujet خوش آمدید
           </h1>
-          <p className="text-[13.5px] leading-loose text-[#c3cfe3]">
+          <p className="text-[13px] leading-loose text-[#c3cfe3] xl:text-[13.5px]">
             این درگاه مخصوص مدیران و کارمندان سازمان است — همهٔ فعالیت‌ها، مدیریت پروازها، آژانس‌ها و امور مالی از
             همین‌جا در دسترس شماست.
           </p>
@@ -69,10 +92,19 @@ export function StaffLoginLayout({ children }: { children: ReactNode }) {
             </div>
           ))}
         </div>
-      </div>
+      </aside>
 
-      <div className="flex items-center justify-center bg-white p-9">
-        <div className="w-full max-w-[360px]">{children}</div>
+      <div className="flex min-h-screen min-h-[100dvh] flex-col bg-white">
+        <div
+          data-testid="staff-login-mobile-brand"
+          className="border-b border-[#e8eef6] bg-gradient-to-l from-[#123a63] to-[#0b1526] px-5 py-4 sm:px-7 lg:hidden"
+        >
+          <BrandMark compact />
+        </div>
+
+        <div className="flex flex-1 flex-col justify-center px-5 py-7 sm:px-8 sm:py-9 md:px-10 md:py-10">
+          <div className="mx-auto w-full max-w-[360px]">{children}</div>
+        </div>
       </div>
     </div>
   );
