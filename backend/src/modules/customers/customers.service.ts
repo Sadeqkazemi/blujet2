@@ -68,7 +68,9 @@ export class CustomersService {
       const digits = toLatinDigits(rawQ).replace(/\D/g, '');
       if (digits.length >= 2) {
         // Match stored E.164 (+989…) and local 09… forms by digit suffix.
-        const e164 = normalizeIranPhone(digits.startsWith('0') ? digits : `0${digits}`);
+        const e164 = normalizeIranPhone(
+          digits.startsWith('0') ? digits : `0${digits}`,
+        );
         const local = toLocalIranMobile(e164);
         qb.andWhere(
           `(regexp_replace(COALESCE(u.phone, ''), '[^0-9]', '', 'g') LIKE :digits
@@ -209,9 +211,7 @@ export class CustomersService {
     const purchases = bookings.map((b) => {
       const route = b.flightInstance?.flight?.route;
       const origin =
-        (route && cityByCode.get(route.originCode)) ??
-        route?.originCode ??
-        '—';
+        (route && cityByCode.get(route.originCode)) ?? route?.originCode ?? '—';
       const dest =
         (route && cityByCode.get(route.destCode)) ?? route?.destCode ?? '—';
       const dep = b.flightInstance?.departureAt ?? b.createdAt;
@@ -232,9 +232,7 @@ export class CustomersService {
         phoneNorm
           ? '(t.userId = :userId OR (t.userId IS NULL AND t.requesterPhone = :phone))'
           : 't.userId = :userId',
-        phoneNorm
-          ? { userId: user.id, phone: phoneNorm }
-          : { userId: user.id },
+        phoneNorm ? { userId: user.id, phone: phoneNorm } : { userId: user.id },
       );
     const tickets = await ticketsQb
       .orderBy('t.createdAt', 'DESC')
@@ -280,9 +278,7 @@ export class CustomersService {
     const refunds = refundRows.map((r) => {
       const route = r.booking?.flightInstance?.flight?.route;
       const origin =
-        (route && refundCity.get(route.originCode)) ??
-        route?.originCode ??
-        '—';
+        (route && refundCity.get(route.originCode)) ?? route?.originCode ?? '—';
       const dest =
         (route && refundCity.get(route.destCode)) ?? route?.destCode ?? '—';
       return {
