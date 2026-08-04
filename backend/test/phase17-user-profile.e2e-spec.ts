@@ -1,7 +1,8 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { PrismaService } from '../src/prisma/prisma.service';
+import { DataSource } from 'typeorm';
+import { User } from '../src/database/entities/user.entity';
 import { TWO_FACTOR_PROVIDER } from '../src/modules/auth/providers/two-factor-provider.interface';
 import { MockTwoFactorProvider } from '../src/modules/auth/providers/mock-two-factor.provider';
 import { loginAsCustomer } from './helpers/login.helper';
@@ -11,12 +12,12 @@ import { createTestApp } from './helpers/app.helper';
  * verification. See docs/DB_SCHEMA.md Phase 17. */
 describe('Phase 17 — user profile (e2e)', () => {
   let app: INestApplication<App>;
-  let prisma: PrismaService;
+  let dataSource: DataSource;
   let twoFactor: MockTwoFactorProvider;
 
   beforeEach(async () => {
     app = await createTestApp();
-    prisma = app.get(PrismaService);
+    dataSource = app.get(DataSource);
     twoFactor = app.get<MockTwoFactorProvider>(TWO_FACTOR_PROVIDER);
   });
 
@@ -55,17 +56,18 @@ describe('Phase 17 — user profile (e2e)', () => {
     expect(valid.body.data.nationalId).toBe('0012345679');
     expect(valid.body.data.passportNo).toBe('A12345678');
 
-    const row = await prisma.user.findUniqueOrThrow({ where: { id: userId! } });
+    const row = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ id: userId! });
     expect(row.nationalIdEnc).not.toContain('0012345679');
     expect(row.nationalIdHash).toBeTruthy();
   });
 
   it('email verification: request → wrong code rejected → correct code stamps emailVerifiedAt', async () => {
     const { accessToken, userId } = await loginAsCustomer(app, '09901119933');
-    await prisma.user.update({
-      where: { id: userId! },
-      data: { email: 'customer@test.example' },
-    });
+    await dataSource
+      .getRepository(User)
+      .update({ id: userId! }, { email: 'customer@test.example' });
 
     const requestRes = await request(app.getHttpServer())
       .post('/my/profile/email/verify-request')
@@ -88,7 +90,9 @@ describe('Phase 17 — user profile (e2e)', () => {
     expect(ok.status).toBe(200);
     expect(ok.body.data.verified).toBe(true);
 
-    const row = await prisma.user.findUniqueOrThrow({ where: { id: userId! } });
+    const row = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ id: userId! });
     expect(row.emailVerifiedAt).not.toBeNull();
   });
 

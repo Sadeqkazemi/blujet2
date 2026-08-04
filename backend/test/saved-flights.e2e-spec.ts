@@ -1,32 +1,38 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { PrismaService } from '../src/prisma/prisma.service';
+import { DataSource } from 'typeorm';
+import { dataSourceOptions } from '../src/database/data-source.options';
+import { FlightInstance } from '../src/database/entities/flight-instance.entity';
+import { SavedFlight } from '../src/database/entities/saved-flight.entity';
 import { loginAs, loginAsCustomer } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 import { resetCustomerPhones } from './helpers/customer-state.helper';
 
 describe('Saved flights (e2e)', () => {
   let app: INestApplication<App>;
-  let prisma: PrismaService;
+  let dataSource: DataSource;
   let flightInstanceId: string;
 
   beforeAll(async () => {
-    const setupApp = await createTestApp();
-    prisma = setupApp.get(PrismaService);
-    const instance = await prisma.flightInstance.findFirst({
-      where: { status: 'SCHEDULED', departureAt: { gt: new Date() } },
-      orderBy: { departureAt: 'asc' },
-    });
+    const setupDataSource = new DataSource(dataSourceOptions);
+    await setupDataSource.initialize();
+    const instance = await setupDataSource
+      .getRepository(FlightInstance)
+      .createQueryBuilder('fi')
+      .where('fi.status = :status', { status: 'SCHEDULED' })
+      .andWhere('fi.departureAt > :now', { now: new Date() })
+      .orderBy('fi.departureAt', 'ASC')
+      .getOne();
     if (!instance) throw new Error('No future SCHEDULED flight in seed');
     flightInstanceId = instance.id;
-    await setupApp.close();
+    await setupDataSource.destroy();
   });
 
   beforeEach(async () => {
     app = await createTestApp();
-    prisma = app.get(PrismaService);
-    await resetCustomerPhones(prisma, [
+    dataSource = app.get(DataSource);
+    await resetCustomerPhones(dataSource, [
       '09180000001',
       '09180000002',
       '09180000004',
@@ -70,9 +76,9 @@ describe('Saved flights (e2e)', () => {
       .set('Authorization', `Bearer ${accessToken}`);
     expect(del.status).toBe(200);
 
-    const after = await prisma.savedFlight.findMany({
-      where: { userId: userId! },
-    });
+    const after = await dataSource
+      .getRepository(SavedFlight)
+      .findBy({ userId: userId! });
     expect(after.every((r) => r.id !== save.body.data.id)).toBe(true);
   });
 

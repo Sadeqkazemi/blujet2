@@ -1,4 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import {
+  BeforeInsert,
   Column,
   CreateDateColumn,
   Entity,
@@ -13,6 +15,11 @@ import { bigintTransformer } from '../transformers/bigint.transformer';
 export class PromoCode {
   @PrimaryColumn({ type: 'text', primaryKeyConstraintName: 'promo_codes_pkey' })
   id!: string;
+
+  @BeforeInsert()
+  generateId() {
+    this.id ??= randomUUID();
+  }
 
   @Column({ type: 'text' })
   code!: string;

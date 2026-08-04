@@ -2,7 +2,10 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import * as argon2 from 'argon2';
 import { App } from 'supertest/types';
-import { PrismaService } from '../src/prisma/prisma.service';
+import { DataSource } from 'typeorm';
+import { User } from '../src/database/entities/user.entity';
+import { TwoFactorChallenge } from '../src/database/entities/two-factor-challenge.entity';
+import { AuditLog } from '../src/database/entities/audit-log.entity';
 import { TWO_FACTOR_PROVIDER } from '../src/modules/auth/providers/two-factor-provider.interface';
 import { MockTwoFactorProvider } from '../src/modules/auth/providers/mock-two-factor.provider';
 import { loginAs } from './helpers/login.helper';
@@ -11,13 +14,13 @@ import { normalizeIranPhone } from '../src/common/normalize-iran-phone';
 
 describe('Auth (e2e)', () => {
   let app: INestApplication<App>;
-  let prisma: PrismaService;
+  let dataSource: DataSource;
 
   // Fresh app per test — each app instance gets its own in-memory throttler
   // storage, so the strict login/2FA rate limit can't leak between tests.
   beforeEach(async () => {
     app = await createTestApp();
-    prisma = app.get(PrismaService);
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
@@ -35,13 +38,9 @@ describe('Auth (e2e)', () => {
   });
 
   it('rejects login for a suspended account with 403 ACCOUNT_SUSPENDED', async () => {
-    const user = await prisma.user.findUniqueOrThrow({
-      where: { username: 'site.admin' },
-    });
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { isActive: false },
-    });
+    const userRepo = dataSource.getRepository(User);
+    const user = await userRepo.findOneByOrFail({ username: 'site.admin' });
+    await userRepo.update({ id: user.id }, { isActive: false });
 
     const res = await request(app.getHttpServer())
       .post('/auth/staff/login')
@@ -50,10 +49,7 @@ describe('Auth (e2e)', () => {
     expect(res.status).toBe(403);
     expect(res.body.error.code).toBe('ACCOUNT_SUSPENDED');
 
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { isActive: true },
-    });
+    await userRepo.update({ id: user.id }, { isActive: true });
   });
 
   it('issues a 2FA challenge on correct password, no token yet', async () => {
@@ -79,9 +75,9 @@ describe('Auth (e2e)', () => {
     expect(wrongRes.status).toBe(401);
     expect(wrongRes.body.error.code).toBe('TWO_FACTOR_INVALID');
 
-    const challenge = await prisma.twoFactorChallenge.findUniqueOrThrow({
-      where: { id: challengeId },
-    });
+    const challenge = await dataSource
+      .getRepository(TwoFactorChallenge)
+      .findOneByOrFail({ id: challengeId });
     expect(challenge.attempts).toBe(1);
     expect(challenge.consumedAt).toBeNull();
   });
@@ -92,14 +88,13 @@ describe('Auth (e2e)', () => {
       .send({ username: 'finance.karimi', password: 'Blujet@1404' });
     const challengeId = loginRes.body.data.challengeId;
 
-    await prisma.twoFactorChallenge.update({
-      where: { id: challengeId },
-      data: { expiresAt: new Date(Date.now() - 1000) },
-    });
+    await dataSource
+      .getRepository(TwoFactorChallenge)
+      .update({ id: challengeId }, { expiresAt: new Date(Date.now() - 1000) });
 
-    const user = await prisma.user.findUniqueOrThrow({
-      where: { username: 'finance.karimi' },
-    });
+    const user = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ username: 'finance.karimi' });
     const twoFactor = app.get<MockTwoFactorProvider>(TWO_FACTOR_PROVIDER);
     const code = twoFactor.getLastCode(user.id)!;
 
@@ -127,9 +122,9 @@ describe('Auth (e2e)', () => {
       .post('/auth/staff/login')
       .send({ username: 'finance.karimi', password: 'Blujet@1404' });
     const challengeId = loginRes.body.data.challengeId as string;
-    const user = await prisma.user.findUniqueOrThrow({
-      where: { username: 'finance.karimi' },
-    });
+    const user = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ username: 'finance.karimi' });
     const code = app
       .get<MockTwoFactorProvider>(TWO_FACTOR_PROVIDER)
       .getLastCode(user.id)!;
@@ -147,9 +142,9 @@ describe('Auth (e2e)', () => {
   });
 
   it('rejects passwords stored as plaintext — DB row is an argon2 hash, never the raw password', async () => {
-    const user = await prisma.user.findUniqueOrThrow({
-      where: { username: 'ceo' },
-    });
+    const user = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ username: 'ceo' });
     expect(user.passwordHash).not.toBe('Blujet@1404');
     expect(user.passwordHash).toMatch(/^\$argon2/);
   });
@@ -170,14 +165,10 @@ describe('Auth (e2e)', () => {
   });
 
   it('mustChangePassword blocks panel APIs until POST /auth/change-password clears the flag', async () => {
-    const user = await prisma.user.findUniqueOrThrow({
-      where: { username: 'finance.karimi' },
-    });
+    const userRepo = dataSource.getRepository(User);
+    const user = await userRepo.findOneByOrFail({ username: 'finance.karimi' });
     const originalHash = user.passwordHash;
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { mustChangePassword: true },
-    });
+    await userRepo.update({ id: user.id }, { mustChangePassword: true });
 
     const { accessToken, verifyRes } = await loginAs(app, 'finance.karimi');
     expect(verifyRes!.body.data.user.mustChangePassword).toBe(true);
@@ -205,26 +196,22 @@ describe('Auth (e2e)', () => {
       .set('Authorization', `Bearer ${accessToken}`);
     expect(nav.status).toBe(200);
 
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
+    await userRepo.update(
+      { id: user.id },
+      {
         passwordHash: originalHash ?? (await argon2.hash('Blujet@1404')),
         mustChangePassword: false,
       },
-    });
+    );
   });
 
   it('/auth/me defaults preferredLocale to FA; PATCH /auth/me/locale updates it and persists', async () => {
     // ceo is a shared seed account reused across many tests/runs — reset it
     // to the schema default explicitly rather than assuming no earlier test
     // (or a previous run against this same persistent DB) left it mutated.
-    const { id } = await prisma.user.findUniqueOrThrow({
-      where: { username: 'ceo' },
-    });
-    await prisma.user.update({
-      where: { id },
-      data: { preferredLocale: 'FA' },
-    });
+    const userRepo = dataSource.getRepository(User);
+    const { id } = await userRepo.findOneByOrFail({ username: 'ceo' });
+    await userRepo.update({ id }, { preferredLocale: 'FA' });
 
     const { accessToken } = await loginAs(app, 'ceo');
     const before = await request(app.getHttpServer())
@@ -246,10 +233,7 @@ describe('Auth (e2e)', () => {
 
     // Leave the shared seed account as we found it so other tests/runs that
     // touch 'ceo' never observe this test's mutation.
-    await prisma.user.update({
-      where: { id },
-      data: { preferredLocale: 'FA' },
-    });
+    await userRepo.update({ id }, { preferredLocale: 'FA' });
   });
 
   it('PATCH /auth/me/locale: 401 without a token, 400 on an invalid locale', async () => {
@@ -282,9 +266,9 @@ describe('Auth (e2e)', () => {
     const loginRes = await agent
       .post('/auth/staff/login')
       .send({ username: 'ceo', password: 'Blujet@1404' });
-    const user = await prisma.user.findUniqueOrThrow({
-      where: { username: 'ceo' },
-    });
+    const user = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ username: 'ceo' });
     const code = app
       .get<MockTwoFactorProvider>(TWO_FACTOR_PROVIDER)
       .getLastCode(user.id)!;
@@ -313,9 +297,9 @@ describe('Auth (e2e)', () => {
     const loginRes = await agent
       .post('/auth/staff/login')
       .send({ username: 'ceo', password: 'Blujet@1404' });
-    const user = await prisma.user.findUniqueOrThrow({
-      where: { username: 'ceo' },
-    });
+    const user = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ username: 'ceo' });
     const code = app
       .get<MockTwoFactorProvider>(TWO_FACTOR_PROVIDER)
       .getLastCode(user.id)!;
@@ -342,10 +326,13 @@ describe('Auth (e2e)', () => {
     expect(legitFollowUp.status).toBe(401);
     expect(legitFollowUp.body.success).toBe(false);
 
-    const securityLog = await prisma.auditLog.findFirst({
-      where: { actorId: user.id, category: 'SECURITY' },
-      orderBy: { createdAt: 'desc' },
-    });
+    const securityLog = await dataSource
+      .getRepository(AuditLog)
+      .createQueryBuilder('a')
+      .where('a.actorId = :actorId', { actorId: user.id })
+      .andWhere('a.category = :category', { category: 'SECURITY' })
+      .orderBy('a.createdAt', 'DESC')
+      .getOne();
     expect(securityLog).not.toBeNull();
   });
 
@@ -354,9 +341,9 @@ describe('Auth (e2e)', () => {
     const loginRes = await agent
       .post('/auth/staff/login')
       .send({ username: 'ceo', password: 'Blujet@1404' });
-    const user = await prisma.user.findUniqueOrThrow({
-      where: { username: 'ceo' },
-    });
+    const user = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ username: 'ceo' });
     const code = app
       .get<MockTwoFactorProvider>(TWO_FACTOR_PROVIDER)
       .getLastCode(user.id)!;
@@ -385,8 +372,9 @@ describe('Auth (e2e)', () => {
     expect(first.status).toBe(200);
     expect(first.body.data.challengeId).toBeDefined();
 
-    const user1 = await prisma.user.findUniqueOrThrow({
-      where: { phone: normalizeIranPhone(phone) },
+    const userRepo = dataSource.getRepository(User);
+    const user1 = await userRepo.findOneByOrFail({
+      phone: normalizeIranPhone(phone),
     });
     expect(user1.role).toBe('USER');
 
@@ -394,8 +382,8 @@ describe('Auth (e2e)', () => {
       .post('/auth/otp/request')
       .send({ phone });
     expect(second.status).toBe(200);
-    const user2 = await prisma.user.findUniqueOrThrow({
-      where: { phone: normalizeIranPhone(phone) },
+    const user2 = await userRepo.findOneByOrFail({
+      phone: normalizeIranPhone(phone),
     });
     expect(user2.id).toBe(user1.id);
   });
@@ -452,9 +440,9 @@ describe('Auth (e2e)', () => {
       .post('/auth/staff/login')
       .send({ username: 'finance.karimi', password: 'Blujet@1404' });
     const challengeId = staffLoginRes.body.data.challengeId as string;
-    const user = await prisma.user.findUniqueOrThrow({
-      where: { username: 'finance.karimi' },
-    });
+    const user = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ username: 'finance.karimi' });
     const code = app
       .get<MockTwoFactorProvider>(TWO_FACTOR_PROVIDER)
       .getLastCode(user.id)!;

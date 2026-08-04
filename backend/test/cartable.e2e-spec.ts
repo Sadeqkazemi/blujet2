@@ -2,17 +2,24 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import * as crypto from 'node:crypto';
-import { PrismaService } from '../src/prisma/prisma.service';
+import { DataSource } from 'typeorm';
+import { CartableTask } from '../src/database/entities/cartable-task.entity';
+import { User } from '../src/database/entities/user.entity';
+import { AuditLog } from '../src/database/entities/audit-log.entity';
+import { ChairReportPermission } from '../src/database/entities/chair-report-permission.entity';
+import { ManagerReferral } from '../src/database/entities/manager-referral.entity';
+import { ManagerReferralReport } from '../src/database/entities/manager-referral-report.entity';
+import { AgencyMembershipRequest } from '../src/database/entities/agency-membership-request.entity';
 import { loginAs } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
 describe('Cartable + referrals + messages (e2e)', () => {
   let app: INestApplication<App>;
-  let prisma: PrismaService;
+  let dataSource: DataSource;
 
   beforeEach(async () => {
     app = await createTestApp();
-    prisma = app.get(PrismaService);
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
@@ -20,21 +27,24 @@ describe('Cartable + referrals + messages (e2e)', () => {
   });
 
   async function userId(username: string): Promise<string> {
-    const user = await prisma.user.findUniqueOrThrow({ where: { username } });
+    const user = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ username });
     return user.id;
   }
 
   /** A throwaway OPEN task for the given assignee, independent of seed data. */
   async function createFreshTask(assigneeId: string) {
-    return prisma.cartableTask.create({
-      data: {
+    const repo = dataSource.getRepository(CartableTask);
+    return repo.save(
+      repo.create({
         assigneeId,
         category: 'ADMIN',
         title: `تست ${crypto.randomUUID().slice(0, 8)}`,
         description: 'مورد تستی',
         senderLabelFa: 'تست',
-      },
-    });
+      }),
+    );
   }
 
   // ── Listing & filters ─────────────────────────────────────────────────
@@ -64,15 +74,16 @@ describe('Cartable + referrals + messages (e2e)', () => {
   it('category= filters rows; counts stay unfiltered (KPI cards show all OPEN)', async () => {
     const ceoId = await userId('ceo');
     await createFreshTask(ceoId); // ADMIN
-    await prisma.cartableTask.create({
-      data: {
+    const cartableTaskRepo = dataSource.getRepository(CartableTask);
+    await cartableTaskRepo.save(
+      cartableTaskRepo.create({
         assigneeId: ceoId,
         category: 'AGENCY',
         title: 'تست دسته',
         description: 'د',
         senderLabelFa: 'ت',
-      },
-    });
+      }),
+    );
 
     const { accessToken } = await loginAs(app, 'ceo');
     const res = await request(app.getHttpServer())
@@ -145,9 +156,12 @@ describe('Cartable + referrals + messages (e2e)', () => {
       .set('Authorization', `Bearer ${accessToken}`)
       .send({ note: 'دلیل مشخص' });
 
-    const auditRow = await prisma.auditLog.findFirst({
-      where: { entityType: 'CartableTask', entityId: task.id },
-    });
+    const auditRow = await dataSource
+      .getRepository(AuditLog)
+      .createQueryBuilder('a')
+      .where('a.entityType = :entityType', { entityType: 'CartableTask' })
+      .andWhere('a.entityId = :entityId', { entityId: task.id })
+      .getOne();
     expect(auditRow).not.toBeNull();
     expect(auditRow!.detail).toContain('دلیل مشخص');
   });
@@ -166,9 +180,9 @@ describe('Cartable + referrals + messages (e2e)', () => {
     expect(res.body.data.assigneeId).toBe(financeId);
     expect(res.body.data.status).toBe('OPEN');
 
-    const original = await prisma.cartableTask.findUniqueOrThrow({
-      where: { id: task.id },
-    });
+    const original = await dataSource
+      .getRepository(CartableTask)
+      .findOneByOrFail({ id: task.id });
     expect(original.status).toBe('TRANSFERRED');
     expect(original.transferredToId).toBe(financeId);
 
@@ -185,9 +199,9 @@ describe('Cartable + referrals + messages (e2e)', () => {
   it('transfer to a non-staff user → 400', async () => {
     const ceoId = await userId('ceo');
     const task = await createFreshTask(ceoId);
-    const customer = await prisma.user.findFirstOrThrow({
-      where: { role: 'USER' },
-    });
+    const customer = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ role: 'USER' });
     const { accessToken } = await loginAs(app, 'ceo');
 
     const res = await request(app.getHttpServer())
@@ -202,12 +216,12 @@ describe('Cartable + referrals + messages (e2e)', () => {
   it('chair-permission full loop: request → chair cartable task → approve → requester sees APPROVED', async () => {
     // Fresh slate for the commercial manager's requests.
     const commId = await userId('comm.abbasi');
-    await prisma.cartableTask.deleteMany({
-      where: { sourceType: 'CHAIR_PERMISSION' },
-    });
-    await prisma.chairReportPermission.deleteMany({
-      where: { requesterId: commId },
-    });
+    await dataSource
+      .getRepository(CartableTask)
+      .delete({ sourceType: 'CHAIR_PERMISSION' });
+    await dataSource
+      .getRepository(ChairReportPermission)
+      .delete({ requesterId: commId });
 
     const comm = await loginAs(app, 'comm.abbasi');
     const created = await request(app.getHttpServer())
@@ -222,9 +236,12 @@ describe('Cartable + referrals + messages (e2e)', () => {
     expect(dup.status).toBe(409);
 
     // The chair received a cartable task and approves it.
-    const chairTask = await prisma.cartableTask.findFirstOrThrow({
-      where: { sourceType: 'CHAIR_PERMISSION', sourceId: created.body.data.id },
-    });
+    const chairTask = await dataSource
+      .getRepository(CartableTask)
+      .findOneByOrFail({
+        sourceType: 'CHAIR_PERMISSION',
+        sourceId: created.body.data.id,
+      });
     const chair = await loginAs(app, 'chair');
     const approve = await request(app.getHttpServer())
       .patch(`/cartable/${chairTask.id}/approve`)
@@ -269,13 +286,13 @@ describe('Cartable + referrals + messages (e2e)', () => {
       });
     expect(created.status).toBe(201);
 
-    const recipientTask = await prisma.cartableTask.findFirst({
-      where: {
+    const recipientTask = await dataSource
+      .getRepository(CartableTask)
+      .findOneBy({
         sourceType: 'MANAGER_REFERRAL',
         sourceId: created.body.data.id,
         assigneeId: financeId,
-      },
-    });
+      });
     expect(recipientTask).not.toBeNull();
     expect(recipientTask!.category).toBe('MANAGER');
   });
@@ -596,13 +613,13 @@ describe('Cartable + referrals + messages (e2e)', () => {
       .send({ title: 'از طریق کارتابل', body: 'شرح', recipientIds: [commId] });
     const referralId = created.body.data.id as string;
 
-    const recipientTask = await prisma.cartableTask.findFirstOrThrow({
-      where: {
+    const recipientTask = await dataSource
+      .getRepository(CartableTask)
+      .findOneByOrFail({
         sourceType: 'MANAGER_REFERRAL',
         sourceId: referralId,
         assigneeId: commId,
-      },
-    });
+      });
 
     const comm = await loginAs(app, 'comm.abbasi');
     const approve = await request(app.getHttpServer())
@@ -611,14 +628,21 @@ describe('Cartable + referrals + messages (e2e)', () => {
       .send({ note: 'گزارش من از طریق کارتابل' });
     expect(approve.status).toBe(200);
 
-    const referral = await prisma.managerReferral.findUniqueOrThrow({
-      where: { id: referralId },
-      include: { reports: true },
-    });
+    const referral = await dataSource
+      .getRepository(ManagerReferral)
+      .createQueryBuilder('r')
+      .where('r.id = :id', { id: referralId })
+      .getOneOrFail();
     expect(referral.status).toBe('REPORTED');
-    expect(
-      referral.reports.some((r) => r.body === 'گزارش من از طریق کارتابل'),
-    ).toBe(true);
+
+    const reports = await dataSource
+      .getRepository(ManagerReferralReport)
+      .createQueryBuilder('rep')
+      .where('rep.referralId = :referralId', { referralId })
+      .getMany();
+    expect(reports.some((r) => r.body === 'گزارش من از طریق کارتابل')).toBe(
+      true,
+    );
   });
 
   // ── Manager messages ─────────────────────────────────────────────────
@@ -633,12 +657,10 @@ describe('Cartable + referrals + messages (e2e)', () => {
     expect(res.body.data.deliveredCount).toBe(1);
 
     const financeId = await userId('finance.karimi');
-    const delivered = await prisma.cartableTask.findFirst({
-      where: {
-        sourceType: 'MANAGER_MESSAGE',
-        sourceId: res.body.data.message.id,
-        assigneeId: financeId,
-      },
+    const delivered = await dataSource.getRepository(CartableTask).findOneBy({
+      sourceType: 'MANAGER_MESSAGE',
+      sourceId: res.body.data.message.id,
+      assigneeId: financeId,
     });
     expect(delivered).not.toBeNull();
     expect(delivered!.title).toBe('موضوع تستی');
@@ -700,8 +722,11 @@ describe('Cartable + referrals + messages (e2e)', () => {
 
   it('referring an agency membership request creates a cartable task for the referred-to manager', async () => {
     const financeId = await userId('finance.karimi');
-    const reqRow = await prisma.agencyMembershipRequest.create({
-      data: {
+    const agencyMembershipRequestRepo = dataSource.getRepository(
+      AgencyMembershipRequest,
+    );
+    const reqRow = await agencyMembershipRequestRepo.save(
+      agencyMembershipRequestRepo.create({
         applicantName: `متقاضی کارتابل ${crypto.randomUUID().slice(0, 6)}`,
         managerName: 'م',
         licenseNo: `AG-CT-${crypto.randomUUID().slice(0, 8)}`,
@@ -709,8 +734,8 @@ describe('Cartable + referrals + messages (e2e)', () => {
         phone: `+9893${crypto.randomUUID().replace(/\D/g, '').slice(0, 8)}`,
         email: `${crypto.randomUUID().slice(0, 8)}@x.example`,
         status: 'PENDING',
-      },
-    });
+      }),
+    );
 
     const senior = await loginAs(app, 'senior.rahimi');
     const refer = await request(app.getHttpServer())
@@ -719,12 +744,10 @@ describe('Cartable + referrals + messages (e2e)', () => {
       .send({ referredToId: financeId, note: 'بررسی اعتباری شود' });
     expect(refer.status).toBe(200);
 
-    const task = await prisma.cartableTask.findFirst({
-      where: {
-        sourceType: 'AGENCY_REQUEST',
-        sourceId: reqRow.id,
-        assigneeId: financeId,
-      },
+    const task = await dataSource.getRepository(CartableTask).findOneBy({
+      sourceType: 'AGENCY_REQUEST',
+      sourceId: reqRow.id,
+      assigneeId: financeId,
     });
     expect(task).not.toBeNull();
     expect(task!.category).toBe('AGENCY');

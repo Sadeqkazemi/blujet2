@@ -1,7 +1,8 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { PrismaService } from '../src/prisma/prisma.service';
+import { DataSource } from 'typeorm';
+import { User } from '../src/database/entities/user.entity';
 import { loginAs } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
@@ -13,11 +14,11 @@ const PNG_BYTES = Buffer.from(
 
 describe('Files (e2e)', () => {
   let app: INestApplication<App>;
-  let prisma: PrismaService;
+  let dataSource: DataSource;
 
   beforeEach(async () => {
     app = await createTestApp();
-    prisma = app.get(PrismaService);
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
@@ -84,9 +85,9 @@ describe('Files (e2e)', () => {
     expect(forbidden.status).toBe(403);
 
     // Attach it to a referral addressed to Finance — Finance can now read it.
-    const finance = await prisma.user.findUniqueOrThrow({
-      where: { username: 'finance.karimi' },
-    });
+    const finance = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ username: 'finance.karimi' });
     await request(app.getHttpServer())
       .post('/referrals')
       .set('Authorization', `Bearer ${senior.accessToken}`)

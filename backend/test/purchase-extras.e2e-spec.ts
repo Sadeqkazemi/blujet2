@@ -2,7 +2,17 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import * as crypto from 'node:crypto';
-import { PrismaService } from '../src/prisma/prisma.service';
+import { DataSource } from 'typeorm';
+import { AircraftSeatMap } from '../src/database/entities/aircraft-seat-map.entity';
+import { Booking } from '../src/database/entities/booking.entity';
+import { CabinFare } from '../src/database/entities/cabin-fare.entity';
+import { ClubMember } from '../src/database/entities/club-member.entity';
+import { Flight } from '../src/database/entities/flight.entity';
+import { FlightInstance } from '../src/database/entities/flight-instance.entity';
+import { LedgerEntry } from '../src/database/entities/ledger-entry.entity';
+import { PriceLock } from '../src/database/entities/price-lock.entity';
+import { PromoCode } from '../src/database/entities/promo-code.entity';
+import { Route } from '../src/database/entities/route.entity';
 import { encryptPii, hashPii } from '../src/common/pii-crypto';
 import { loginAsCustomer } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
@@ -33,43 +43,61 @@ function phoneFor(n: number): string {
 
 describe('Purchase extras: promo codes, wallet, club points, price lock (e2e)', () => {
   let app: INestApplication<App>;
-  let prisma: PrismaService;
+  let dataSource: DataSource;
   let flightId: string;
   const AIRCRAFT_TYPE = 'PE2E-TestJet';
 
   beforeAll(async () => {
     const setupApp = await createTestApp();
-    prisma = setupApp.get(PrismaService);
+    dataSource = setupApp.get(DataSource);
 
-    await prisma.aircraftSeatMap.upsert({
-      where: { aircraftType: AIRCRAFT_TYPE },
-      update: {},
-      create: {
-        aircraftType: AIRCRAFT_TYPE,
-        businessRowStart: 1,
-        businessRowEnd: 0,
-        businessColsLeft: [],
-        businessColsRight: [],
-        economyRowStart: 1,
-        economyRowEnd: 10,
-        economyColsLeft: ['A', 'B'],
-        economyColsRight: ['C'],
-      },
+    const seatMapRepo = dataSource.getRepository(AircraftSeatMap);
+    const existingSeatMap = await seatMapRepo.findOneBy({
+      aircraftType: AIRCRAFT_TYPE,
     });
-    const route = await prisma.route.upsert({
-      where: { originCode_destCode: { originCode: 'THR', destCode: 'IFN' } },
-      update: {},
-      create: { originCode: 'THR', destCode: 'IFN', durationMin: 60 },
+    if (!existingSeatMap) {
+      await seatMapRepo.save(
+        seatMapRepo.create({
+          aircraftType: AIRCRAFT_TYPE,
+          businessRowStart: 1,
+          businessRowEnd: 0,
+          businessColsLeft: [],
+          businessColsRight: [],
+          economyRowStart: 1,
+          economyRowEnd: 10,
+          economyColsLeft: ['A', 'B'],
+          economyColsRight: ['C'],
+          updatedAt: new Date(),
+        }),
+      );
+    }
+
+    const routeRepo = dataSource.getRepository(Route);
+    let route = await routeRepo.findOneBy({
+      originCode: 'THR',
+      destCode: 'IFN',
     });
-    const flight = await prisma.flight.upsert({
-      where: { flightNo: 'PE-300' },
-      update: {},
-      create: {
-        flightNo: 'PE-300',
-        routeId: route.id,
-        aircraftType: AIRCRAFT_TYPE,
-      },
-    });
+    if (!route) {
+      route = await routeRepo.save(
+        routeRepo.create({
+          originCode: 'THR',
+          destCode: 'IFN',
+          durationMin: 60,
+        }),
+      );
+    }
+
+    const flightRepo = dataSource.getRepository(Flight);
+    let flight = await flightRepo.findOneBy({ flightNo: 'PE-300' });
+    if (!flight) {
+      flight = await flightRepo.save(
+        flightRepo.create({
+          flightNo: 'PE-300',
+          routeId: route.id,
+          aircraftType: AIRCRAFT_TYPE,
+        }),
+      );
+    }
     flightId = flight.id;
 
     await setupApp.close();
@@ -77,7 +105,7 @@ describe('Purchase extras: promo codes, wallet, club points, price lock (e2e)', 
 
   beforeEach(async () => {
     app = await createTestApp();
-    prisma = app.get(PrismaService);
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
@@ -86,15 +114,16 @@ describe('Purchase extras: promo codes, wallet, club points, price lock (e2e)', 
 
   async function freshInstance(daysAhead = 40) {
     const departureAt = new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000);
-    return prisma.flightInstance.create({
-      data: {
+    const instanceRepo = dataSource.getRepository(FlightInstance);
+    return instanceRepo.save(
+      instanceRepo.create({
         flightId,
         departureAt,
         arrivalAt: new Date(departureAt.getTime() + 60 * 60 * 1000),
         capacity: 30,
         status: 'SCHEDULED',
-      },
-    });
+      }),
+    );
   }
 
   async function loginAndBook(phone: string, seatCode: string, daysAhead = 40) {
@@ -122,16 +151,17 @@ describe('Purchase extras: promo codes, wallet, club points, price lock (e2e)', 
 
   async function linkGoldMember(userId: string) {
     const nid = validNationalId();
-    return prisma.clubMember.create({
-      data: {
+    const clubMemberRepo = dataSource.getRepository(ClubMember);
+    return clubMemberRepo.save(
+      clubMemberRepo.create({
         userId,
         fullName: 'عضو طلایی تست',
         email: `${crypto.randomUUID().slice(0, 8)}@club.example`,
         nationalIdEnc: encryptPii(nid),
         nationalIdHash: hashPii(nid),
         level: 'GOLD',
-      },
-    });
+      }),
+    );
   }
 
   // ── Promo codes ─────────────────────────────────────────────────────
@@ -142,9 +172,10 @@ describe('Purchase extras: promo codes, wallet, club points, price lock (e2e)', 
       '1A',
     );
     const code = `TEST20-${RUN}`;
-    await prisma.promoCode.create({
-      data: { code, type: 'PERCENT', value: 20, active: true },
-    });
+    const promoCodeRepo = dataSource.getRepository(PromoCode);
+    await promoCodeRepo.save(
+      promoCodeRepo.create({ code, type: 'PERCENT', value: 20n, active: true }),
+    );
 
     const payRes = await request(app.getHttpServer())
       .post(`/bookings/${bookingId}/pay`)
@@ -155,9 +186,9 @@ describe('Purchase extras: promo codes, wallet, club points, price lock (e2e)', 
     const expected = priceIrr - Math.round(priceIrr * 0.2);
     expect(payRes.body.data.booking.priceIrr).toBe(String(expected));
 
-    const ledger = await prisma.ledgerEntry.findFirst({
-      where: { bookingId, type: 'SALE' },
-    });
+    const ledger = await dataSource
+      .getRepository(LedgerEntry)
+      .findOneBy({ bookingId, type: 'SALE' });
     expect(ledger!.signedAmountIrr).toBe(BigInt(expected));
   });
 
@@ -172,15 +203,16 @@ describe('Purchase extras: promo codes, wallet, club points, price lock (e2e)', 
 
   it('enforces maxPerUser on a promo code', async () => {
     const code = `ONCE-${RUN}`;
-    await prisma.promoCode.create({
-      data: {
+    const promoCodeRepo = dataSource.getRepository(PromoCode);
+    await promoCodeRepo.save(
+      promoCodeRepo.create({
         code,
         type: 'FIXED',
-        value: 1_000_000,
+        value: 1_000_000n,
         active: true,
         maxPerUser: 1,
-      },
-    });
+      }),
+    );
     const first = await loginAndBook(phoneFor(3), '1C');
     const firstPay = await request(app.getHttpServer())
       .post(`/bookings/${first.bookingId}/pay`)
@@ -248,9 +280,9 @@ describe('Purchase extras: promo codes, wallet, club points, price lock (e2e)', 
       .send({ paymentMethod: 'WALLET' });
     expect(res.status).toBe(409);
 
-    const booking = await prisma.booking.findUniqueOrThrow({
-      where: { id: bookingId },
-    });
+    const booking = await dataSource
+      .getRepository(Booking)
+      .findOneByOrFail({ id: bookingId });
     expect(booking.status).toBe('HELD');
   });
 
@@ -333,20 +365,29 @@ describe('Purchase extras: promo codes, wallet, club points, price lock (e2e)', 
     const lockedPriceIrr = Number(lockRes.body.data.lockedPriceIrr);
 
     // Market price moves (a registered fare change) — the lock must still win.
-    await prisma.cabinFare.upsert({
-      where: {
-        flightInstanceId_cabin: {
+    const cabinFareRepo = dataSource.getRepository(CabinFare);
+    const existingFare = await cabinFareRepo.findOneBy({
+      flightInstanceId: instance.id,
+      cabin: 'ECONOMY',
+    });
+    if (existingFare) {
+      await cabinFareRepo.update(
+        { id: existingFare.id },
+        {
+          priceIrr: BigInt(lockedPriceIrr + 50_000_000),
+          updatedAt: new Date(),
+        },
+      );
+    } else {
+      await cabinFareRepo.save(
+        cabinFareRepo.create({
           flightInstanceId: instance.id,
           cabin: 'ECONOMY',
-        },
-      },
-      update: { priceIrr: lockedPriceIrr + 50_000_000 },
-      create: {
-        flightInstanceId: instance.id,
-        cabin: 'ECONOMY',
-        priceIrr: lockedPriceIrr + 50_000_000,
-      },
-    });
+          priceIrr: BigInt(lockedPriceIrr + 50_000_000),
+          updatedAt: new Date(),
+        }),
+      );
+    }
 
     const bookRes = await request(app.getHttpServer())
       .post('/bookings')
@@ -366,9 +407,9 @@ describe('Purchase extras: promo codes, wallet, club points, price lock (e2e)', 
     expect(payRes.body.data.priceChanged).toBe(false);
     expect(payRes.body.data.booking.priceIrr).toBe(String(lockedPriceIrr));
 
-    const lockAfter = await prisma.priceLock.findUnique({
-      where: { id: lockRes.body.data.id },
-    });
+    const lockAfter = await dataSource
+      .getRepository(PriceLock)
+      .findOneBy({ id: lockRes.body.data.id });
     expect(lockAfter!.status).toBe('USED');
   });
 

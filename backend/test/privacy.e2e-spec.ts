@@ -1,7 +1,16 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { PrismaService } from '../src/prisma/prisma.service';
+import { DataSource, IsNull } from 'typeorm';
+import { dataSourceOptions } from '../src/database/data-source.options';
+import { User } from '../src/database/entities/user.entity';
+import { AircraftSeatMap } from '../src/database/entities/aircraft-seat-map.entity';
+import { Route } from '../src/database/entities/route.entity';
+import { Flight } from '../src/database/entities/flight.entity';
+import { FlightInstance } from '../src/database/entities/flight-instance.entity';
+import { Passenger } from '../src/database/entities/passenger.entity';
+import { Booking } from '../src/database/entities/booking.entity';
+import { RefreshToken } from '../src/database/entities/refresh-token.entity';
 import { loginAsCustomer } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 import { normalizeIranPhone } from '../src/common/normalize-iran-phone';
@@ -13,51 +22,67 @@ function phoneFor(n: number): string {
 
 describe('Privacy / GDPR export & delete (e2e)', () => {
   let app: INestApplication<App>;
-  let prisma: PrismaService;
+  let dataSource: DataSource;
   let flightId: string;
   const AIRCRAFT_TYPE = 'PR2E-TestJet';
 
   beforeAll(async () => {
-    const setupApp = await createTestApp();
-    prisma = setupApp.get(PrismaService);
+    const setupDataSource = new DataSource(dataSourceOptions);
+    await setupDataSource.initialize();
 
-    await prisma.aircraftSeatMap.upsert({
-      where: { aircraftType: AIRCRAFT_TYPE },
-      update: {},
-      create: {
-        aircraftType: AIRCRAFT_TYPE,
-        businessRowStart: 1,
-        businessRowEnd: 0,
-        businessColsLeft: [],
-        businessColsRight: [],
-        economyRowStart: 1,
-        economyRowEnd: 5,
-        economyColsLeft: ['A', 'B'],
-        economyColsRight: ['C'],
-      },
+    const seatMapRepo = setupDataSource.getRepository(AircraftSeatMap);
+    const existingSeatMap = await seatMapRepo.findOneBy({
+      aircraftType: AIRCRAFT_TYPE,
     });
-    const route = await prisma.route.upsert({
-      where: { originCode_destCode: { originCode: 'THR', destCode: 'TBZ' } },
-      update: {},
-      create: { originCode: 'THR', destCode: 'TBZ', durationMin: 65 },
+    if (!existingSeatMap) {
+      await seatMapRepo.save(
+        seatMapRepo.create({
+          aircraftType: AIRCRAFT_TYPE,
+          businessRowStart: 1,
+          businessRowEnd: 0,
+          businessColsLeft: [],
+          businessColsRight: [],
+          economyRowStart: 1,
+          economyRowEnd: 5,
+          economyColsLeft: ['A', 'B'],
+          economyColsRight: ['C'],
+          updatedAt: new Date(),
+        }),
+      );
+    }
+    const routeRepo = setupDataSource.getRepository(Route);
+    let route = await routeRepo.findOneBy({
+      originCode: 'THR',
+      destCode: 'TBZ',
     });
-    const flight = await prisma.flight.upsert({
-      where: { flightNo: 'PR-400' },
-      update: {},
-      create: {
-        flightNo: 'PR-400',
-        routeId: route.id,
-        aircraftType: AIRCRAFT_TYPE,
-      },
-    });
+    if (!route) {
+      route = await routeRepo.save(
+        routeRepo.create({
+          originCode: 'THR',
+          destCode: 'TBZ',
+          durationMin: 65,
+        }),
+      );
+    }
+    const flightRepo = setupDataSource.getRepository(Flight);
+    let flight = await flightRepo.findOneBy({ flightNo: 'PR-400' });
+    if (!flight) {
+      flight = await flightRepo.save(
+        flightRepo.create({
+          flightNo: 'PR-400',
+          routeId: route.id,
+          aircraftType: AIRCRAFT_TYPE,
+        }),
+      );
+    }
     flightId = flight.id;
 
-    await setupApp.close();
+    await setupDataSource.destroy();
   });
 
   beforeEach(async () => {
     app = await createTestApp();
-    prisma = app.get(PrismaService);
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
@@ -66,15 +91,16 @@ describe('Privacy / GDPR export & delete (e2e)', () => {
 
   async function freshInstance(daysAhead = 40) {
     const departureAt = new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000);
-    return prisma.flightInstance.create({
-      data: {
+    const repo = dataSource.getRepository(FlightInstance);
+    return repo.save(
+      repo.create({
         flightId,
         departureAt,
         arrivalAt: new Date(departureAt.getTime() + 65 * 60 * 1000),
         capacity: 20,
         status: 'SCHEDULED',
-      },
-    });
+      }),
+    );
   }
 
   it('exports the customer’s own bookings, passengers, and account info', async () => {
@@ -147,31 +173,31 @@ describe('Privacy / GDPR export & delete (e2e)', () => {
     expect(deleteRes.status).toBe(200);
     expect(deleteRes.body.data.deleted).toBe(true);
 
-    const user = await prisma.user.findUniqueOrThrow({
-      where: { id: userId! },
-    });
+    const user = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ id: userId! });
     expect(user.isActive).toBe(false);
     expect(user.deletedAt).not.toBeNull();
     expect(user.phone).toBeNull();
     expect(user.fullName).toBe('کاربر حذف‌شده');
 
-    const passenger = await prisma.passenger.findFirstOrThrow({
-      where: { bookingId },
-    });
+    const passenger = await dataSource
+      .getRepository(Passenger)
+      .findOneByOrFail({ bookingId });
     expect(passenger.fullName).toBe('کاربر حذف‌شده');
     expect(passenger.nationalIdEnc).toBeNull();
     expect(passenger.mobileEnc).toBeNull();
 
-    const booking = await prisma.booking.findUniqueOrThrow({
-      where: { id: bookingId },
-    });
+    const booking = await dataSource
+      .getRepository(Booking)
+      .findOneByOrFail({ id: bookingId });
     expect(booking.contactPhone).toBeNull();
     // The booking row itself (financial record) survives — never hard-deleted.
     expect(booking.priceIrr).toBeGreaterThan(0);
 
-    const refreshTokens = await prisma.refreshToken.findMany({
-      where: { userId: userId!, revokedAt: null },
-    });
+    const refreshTokens = await dataSource
+      .getRepository(RefreshToken)
+      .findBy({ userId: userId!, revokedAt: IsNull() });
     expect(refreshTokens).toHaveLength(0);
 
     // The deleted account can no longer log in (find-or-create on phone
@@ -181,9 +207,9 @@ describe('Privacy / GDPR export & delete (e2e)', () => {
       .post('/auth/otp/request')
       .send({ phone });
     expect(reLoginRes.status).toBe(200);
-    const newUser = await prisma.user.findUniqueOrThrow({
-      where: { phone: normalizeIranPhone(phone) },
-    });
+    const newUser = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ phone: normalizeIranPhone(phone) });
     expect(newUser.id).not.toBe(userId);
   });
 });

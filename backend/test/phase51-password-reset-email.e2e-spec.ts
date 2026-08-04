@@ -2,8 +2,9 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import * as crypto from 'node:crypto';
+import { DataSource } from 'typeorm';
+import { User } from '../src/database/entities/user.entity';
 import { createTestApp } from './helpers/app.helper';
-import { PrismaService } from '../src/prisma/prisma.service';
 
 function uniqueEmail(tag: string): string {
   return `${tag}-${crypto.randomUUID().slice(0, 8)}@example.com`;
@@ -16,11 +17,11 @@ function uniqueEmail(tag: string): string {
  * current-password check). See docs/API.md's Phase 51 section. */
 describe('Phase 51 — password reset via verified email (e2e)', () => {
   let app: INestApplication<App>;
-  let prisma: PrismaService;
+  let dataSource: DataSource;
 
   beforeEach(async () => {
     app = await createTestApp();
-    prisma = app.get(PrismaService);
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
@@ -28,14 +29,16 @@ describe('Phase 51 — password reset via verified email (e2e)', () => {
   });
 
   async function makeVerifiedCustomer(email: string) {
-    return prisma.user.create({
-      data: {
+    const repo = dataSource.getRepository(User);
+    return repo.save(
+      repo.create({
         role: 'USER',
         email,
         fullName: 'مشتری تست ایمیل',
         emailVerifiedAt: new Date(),
-      },
-    });
+        updatedAt: new Date(),
+      }),
+    );
   }
 
   describe('POST /auth/password-reset/email/request', () => {
@@ -59,9 +62,15 @@ describe('Phase 51 — password reset via verified email (e2e)', () => {
 
     it('401s when the email exists but was never verified', async () => {
       const email = uniqueEmail('unverified');
-      await prisma.user.create({
-        data: { role: 'USER', email, fullName: 'ایمیل تأییدنشده' },
-      });
+      const repo = dataSource.getRepository(User);
+      await repo.save(
+        repo.create({
+          role: 'USER',
+          email,
+          fullName: 'ایمیل تأییدنشده',
+          updatedAt: new Date(),
+        }),
+      );
 
       const res = await request(app.getHttpServer())
         .post('/auth/password-reset/email/request')
@@ -72,10 +81,9 @@ describe('Phase 51 — password reset via verified email (e2e)', () => {
     it('403s a suspended account even with a verified email', async () => {
       const email = uniqueEmail('suspended-reset');
       const user = await makeVerifiedCustomer(email);
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { isActive: false },
-      });
+      await dataSource
+        .getRepository(User)
+        .update({ id: user.id }, { isActive: false });
 
       const res = await request(app.getHttpServer())
         .post('/auth/password-reset/email/request')

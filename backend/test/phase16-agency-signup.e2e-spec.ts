@@ -1,7 +1,13 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { PrismaService } from '../src/prisma/prisma.service';
+import { DataSource, In, Like } from 'typeorm';
+import { User } from '../src/database/entities/user.entity';
+import { AgencyCreditLine } from '../src/database/entities/agency-credit-line.entity';
+import { AgencyProfile } from '../src/database/entities/agency-profile.entity';
+import { AgencyMembershipRequest } from '../src/database/entities/agency-membership-request.entity';
+import { AgencyRequestOtp } from '../src/database/entities/agency-request-otp.entity';
+import { SmsLog } from '../src/database/entities/sms-log.entity';
 import { TWO_FACTOR_PROVIDER } from '../src/modules/auth/providers/two-factor-provider.interface';
 import { MockTwoFactorProvider } from '../src/modules/auth/providers/mock-two-factor.provider';
 import { loginAs } from './helpers/login.helper';
@@ -12,12 +18,12 @@ import { createTestApp } from './helpers/app.helper';
  * docs/DB_SCHEMA.md Phase 16. */
 describe('Phase 16 — agency self-registration (e2e)', () => {
   let app: INestApplication<App>;
-  let prisma: PrismaService;
+  let dataSource: DataSource;
   let twoFactor: MockTwoFactorProvider;
 
   beforeEach(async () => {
     app = await createTestApp();
-    prisma = app.get(PrismaService);
+    dataSource = app.get(DataSource);
     twoFactor = app.get<MockTwoFactorProvider>(TWO_FACTOR_PROVIDER);
   });
 
@@ -27,26 +33,26 @@ describe('Phase 16 — agency self-registration (e2e)', () => {
     // re-run (or a combined suite run) doesn't hit the phone unique
     // constraint on a second approveRequest for the same number.
     const phonePrefix = '0912111000';
-    const users = await prisma.user.findMany({
-      where: { phone: { startsWith: phonePrefix } },
+    const users = await dataSource.getRepository(User).find({
+      where: { phone: Like(`${phonePrefix}%`) },
       select: { id: true },
     });
     const userIds = users.map((u) => u.id);
     if (userIds.length > 0) {
-      await prisma.agencyCreditLine.deleteMany({
-        where: { agencyId: { in: userIds } },
-      });
-      await prisma.agencyProfile.deleteMany({
-        where: { userId: { in: userIds } },
-      });
-      await prisma.user.deleteMany({ where: { id: { in: userIds } } });
+      await dataSource
+        .getRepository(AgencyCreditLine)
+        .delete({ agencyId: In(userIds) });
+      await dataSource
+        .getRepository(AgencyProfile)
+        .delete({ userId: In(userIds) });
+      await dataSource.getRepository(User).delete({ id: In(userIds) });
     }
-    await prisma.agencyMembershipRequest.deleteMany({
-      where: { phone: { startsWith: phonePrefix } },
-    });
-    await prisma.agencyRequestOtp.deleteMany({
-      where: { phone: { startsWith: phonePrefix } },
-    });
+    await dataSource
+      .getRepository(AgencyMembershipRequest)
+      .delete({ phone: Like(`${phonePrefix}%`) });
+    await dataSource
+      .getRepository(AgencyRequestOtp)
+      .delete({ phone: Like(`${phonePrefix}%`) });
     await app.close();
   });
 
@@ -81,9 +87,11 @@ describe('Phase 16 — agency self-registration (e2e)', () => {
     const res = await submitFreshRequest(phone);
     expect(res.status).toBe(201);
 
-    const row = await prisma.agencyMembershipRequest.findUniqueOrThrow({
-      where: { id: res.body.data.id },
-    });
+    const row = await dataSource
+      .getRepository(AgencyMembershipRequest)
+      .createQueryBuilder('r')
+      .where('r.id = :id', { id: res.body.data.id })
+      .getOneOrFail();
     expect(row.status).toBe('PENDING');
     expect(row.phone).toBe(phone);
     expect(row.email).toBeNull();
@@ -162,15 +170,15 @@ describe('Phase 16 — agency self-registration (e2e)', () => {
     expect(approve.status).toBe(200);
     expect(approve.body.data.tempPassword).toBeTruthy();
 
-    const agencyUser = await prisma.user.findUniqueOrThrow({
-      where: { id: approve.body.data.agencyId },
-    });
+    const agencyUser = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ id: approve.body.data.agencyId });
     expect(agencyUser.role).toBe('AGENCY');
     expect(agencyUser.phone).toBe(phone);
 
-    const smsLog = await prisma.smsLog.findFirst({
+    const smsLog = await dataSource.getRepository(SmsLog).findOne({
       where: { phone, messageType: 'TEMP_PASSWORD' },
-      orderBy: { createdAt: 'desc' },
+      order: { createdAt: 'desc' },
     });
     expect(smsLog).not.toBeNull();
     expect(smsLog!.status).toBe('SUCCESS');

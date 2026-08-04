@@ -2,19 +2,26 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import * as crypto from 'node:crypto';
-import { PrismaService } from '../src/prisma/prisma.service';
+import { DataSource } from 'typeorm';
+import { Flight } from '../src/database/entities/flight.entity';
+import { FlightInstance } from '../src/database/entities/flight-instance.entity';
+import { Booking } from '../src/database/entities/booking.entity';
+import { RefundRequest } from '../src/database/entities/refund-request.entity';
+import { LedgerEntry } from '../src/database/entities/ledger-entry.entity';
+import { User } from '../src/database/entities/user.entity';
+import { AuditLog } from '../src/database/entities/audit-log.entity';
 import { encryptPii } from '../src/common/pii-crypto';
 import { loginAs, stepUpFor } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
-import type { RefundStatus } from '../generated/prisma/enums';
+import type { RefundStatus } from '../src/database/enums';
 
 describe('Refunds (e2e)', () => {
   let app: INestApplication<App>;
-  let prisma: PrismaService;
+  let dataSource: DataSource;
 
   beforeEach(async () => {
     app = await createTestApp();
-    prisma = app.get(PrismaService);
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
@@ -25,42 +32,48 @@ describe('Refunds (e2e)', () => {
     status: RefundStatus,
     totalPaidIrr = 30_000_000,
   ) {
-    const flight = await prisma.flight.findFirstOrThrow();
-    const instance = await prisma.flightInstance.create({
-      data: {
+    const flight = await dataSource
+      .getRepository(Flight)
+      .createQueryBuilder('f')
+      .getOneOrFail();
+    const instanceRepo = dataSource.getRepository(FlightInstance);
+    const instance = await instanceRepo.save(
+      instanceRepo.create({
         flightId: flight.id,
         departureAt: new Date(Date.now() + 7 * 24 * 3_600_000),
         arrivalAt: new Date(Date.now() + 7 * 24 * 3_600_000 + 3 * 3_600_000),
         capacity: 180,
         charterSeats: 0,
         status: 'SCHEDULED',
-      },
-    });
-    const booking = await prisma.booking.create({
-      data: {
+      }),
+    );
+    const bookingRepo = dataSource.getRepository(Booking);
+    const booking = await bookingRepo.save(
+      bookingRepo.create({
         pnr: `RT${crypto.randomUUID().slice(0, 6).toUpperCase()}`,
         flightInstanceId: instance.id,
         channel: 'SYSTEM',
         status: 'TICKETED',
-        priceIrr: totalPaidIrr,
-      },
-    });
+        priceIrr: BigInt(totalPaidIrr),
+      }),
+    );
     const penaltyAmountIrr = Math.round(totalPaidIrr * 0.3);
-    const req = await prisma.refundRequest.create({
-      data: {
+    const refundRepo = dataSource.getRepository(RefundRequest);
+    const req = await refundRepo.save(
+      refundRepo.create({
         trackingCode: `RF-${crypto.randomBytes(4).toString('hex').toUpperCase()}`,
         bookingId: booking.id,
         passengerName: `مسافر ${crypto.randomUUID().slice(0, 4)}`,
         ibanEnc: encryptPii('IR820170000000332211009900'),
         nidEnc: encryptPii('0012345679'),
-        totalPaidIrr,
+        totalPaidIrr: BigInt(totalPaidIrr),
         penaltyPct: 30,
-        penaltyAmountIrr,
-        refundableIrr: totalPaidIrr - penaltyAmountIrr,
+        penaltyAmountIrr: BigInt(penaltyAmountIrr),
+        refundableIrr: BigInt(totalPaidIrr - penaltyAmountIrr),
         status,
         history: [{ step: 'submitted', labelFa: 'ثبت درخواست', at: 'اکنون' }],
-      },
-    });
+      }),
+    );
     return { booking, req };
   }
 
@@ -100,9 +113,11 @@ describe('Refunds (e2e)', () => {
     expect(res.body.data.iban).toBe('IR820170000000332211009900');
     expect(res.body.data.nationalId).toBe('0012345679');
 
-    const row = await prisma.refundRequest.findUniqueOrThrow({
-      where: { id: req.id },
-    });
+    const row = await dataSource
+      .getRepository(RefundRequest)
+      .createQueryBuilder('r')
+      .where('r.id = :id', { id: req.id })
+      .getOneOrFail();
     expect(row.ibanEnc).not.toContain('IR8201');
   });
 
@@ -124,9 +139,9 @@ describe('Refunds (e2e)', () => {
   it('finance reassignment changes assignee + history without changing FINANCE; non-finance assignee → 400', async () => {
     const { req } = await createRequest('FINANCE');
     const { accessToken } = await loginAs(app, 'finance.karimi');
-    const staffer = await prisma.user.findFirstOrThrow({
-      where: { username: 'finance.karimi' },
-    });
+    const staffer = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ username: 'finance.karimi' });
 
     const res = await request(app.getHttpServer())
       .patch(`/refunds/${req.id}/refer`)
@@ -138,9 +153,9 @@ describe('Refunds (e2e)', () => {
     const history = res.body.data.history as { labelFa: string }[];
     expect(history.some((h) => h.labelFa.includes('تغییر مسئول'))).toBe(true);
 
-    const customer = await prisma.user.findFirstOrThrow({
-      where: { role: 'USER' },
-    });
+    const customer = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ role: 'USER' });
     const invalid = await request(app.getHttpServer())
       .patch(`/refunds/${req.id}/refer`)
       .set('Authorization', `Bearer ${accessToken}`)
@@ -167,24 +182,24 @@ describe('Refunds (e2e)', () => {
     expect(res.body.data.processedBy.role).toBe('FINANCE_MANAGER');
     expect(res.body.data.paidAt).toBeTruthy();
 
-    const ledger = await prisma.ledgerEntry.findMany({
-      where: { bookingId: booking.id, type: 'REFUND' },
-    });
+    const ledger = await dataSource
+      .getRepository(LedgerEntry)
+      .findBy({ bookingId: booking.id, type: 'REFUND' });
     expect(ledger).toHaveLength(1);
     expect(ledger[0].signedAmountIrr).toBe(-req.refundableIrr);
 
-    const updatedBooking = await prisma.booking.findUniqueOrThrow({
-      where: { id: booking.id },
-    });
+    const updatedBooking = await dataSource
+      .getRepository(Booking)
+      .findOneByOrFail({ id: booking.id });
     expect(updatedBooking.status).toBe('REFUNDED');
 
-    const audit = await prisma.auditLog.findFirst({
-      where: {
-        category: 'REFUND',
-        entityType: 'RefundRequest',
-        entityId: req.id,
-      },
-    });
+    const audit = await dataSource
+      .getRepository(AuditLog)
+      .createQueryBuilder('a')
+      .where('a.category = :category', { category: 'REFUND' })
+      .andWhere('a.entityType = :entityType', { entityType: 'RefundRequest' })
+      .andWhere('a.entityId = :entityId', { entityId: req.id })
+      .getOne();
     expect(audit).not.toBeNull();
   });
 
@@ -230,9 +245,9 @@ describe('Refunds (e2e)', () => {
       .send(stepUp3);
     expect(replay.status).toBe(409);
 
-    const ledger = await prisma.ledgerEntry.count({
-      where: { bookingId: payable.booking.id, type: 'REFUND' },
-    });
+    const ledger = await dataSource
+      .getRepository(LedgerEntry)
+      .countBy({ bookingId: payable.booking.id, type: 'REFUND' });
     expect(ledger).toBe(1);
   });
 
@@ -255,14 +270,16 @@ describe('Refunds (e2e)', () => {
       expect(res.status).toBe(200);
     }
 
-    const ledgerSum = await prisma.ledgerEntry.aggregate({
-      where: {
-        bookingId: { in: [a.booking.id, b.booking.id] },
-        type: 'REFUND',
-      },
-      _sum: { signedAmountIrr: true },
-    });
-    expect(ledgerSum._sum.signedAmountIrr).toBe(
+    const ledgerSum = await dataSource
+      .getRepository(LedgerEntry)
+      .createQueryBuilder('l')
+      .select('SUM(l.signedAmountIrr)', 'sum')
+      .where('l.bookingId IN (:...bookingIds)', {
+        bookingIds: [a.booking.id, b.booking.id],
+      })
+      .andWhere('l.type = :type', { type: 'REFUND' })
+      .getRawOne<{ sum: string }>();
+    expect(BigInt(ledgerSum!.sum)).toBe(
       -(a.req.refundableIrr + b.req.refundableIrr),
     );
   });

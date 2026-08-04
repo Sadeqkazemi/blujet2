@@ -1,7 +1,8 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { PrismaService } from '../src/prisma/prisma.service';
+import { DataSource, IsNull, MoreThan } from 'typeorm';
+import { RefreshToken } from '../src/database/entities/refresh-token.entity';
 import { loginAs, loginAsCustomer } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
@@ -15,11 +16,11 @@ function extractRefreshCookie(
 
 describe('My sessions (e2e)', () => {
   let app: INestApplication<App>;
-  let prisma: PrismaService;
+  let dataSource: DataSource;
 
   beforeEach(async () => {
     app = await createTestApp();
-    prisma = app.get(PrismaService);
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
@@ -76,13 +77,15 @@ describe('My sessions (e2e)', () => {
       .set('Cookie', currentCookie);
     expect(revoke.status).toBe(200);
 
-    const revoked = await prisma.refreshToken.findUnique({
-      where: { id: other.id },
-    });
-    expect(revoked!.revokedAt).not.toBeNull();
+    const revoked = await dataSource
+      .getRepository(RefreshToken)
+      .findOneByOrFail({ id: other.id });
+    expect(revoked.revokedAt).not.toBeNull();
 
-    const after = await prisma.refreshToken.findMany({
-      where: { userId, revokedAt: null, expiresAt: { gt: new Date() } },
+    const after = await dataSource.getRepository(RefreshToken).findBy({
+      userId,
+      revokedAt: IsNull(),
+      expiresAt: MoreThan(new Date()),
     });
     expect(after.some((r) => r.id === other.id)).toBe(false);
     expect(after.some((r) => r.id === current.id)).toBe(true);
@@ -90,9 +93,9 @@ describe('My sessions (e2e)', () => {
 
   it('403 for staff; 404 when revoking another user session', async () => {
     const customer = await loginAsCustomer(app, '09180000002');
-    const rows = await prisma.refreshToken.findMany({
-      where: { userId: customer.userId!, revokedAt: null },
-    });
+    const rows = await dataSource
+      .getRepository(RefreshToken)
+      .findBy({ userId: customer.userId!, revokedAt: IsNull() });
     expect(rows.length).toBeGreaterThan(0);
 
     const ceo = await loginAs(app, 'ceo');

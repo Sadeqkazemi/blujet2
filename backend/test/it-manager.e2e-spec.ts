@@ -2,17 +2,23 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import * as crypto from 'node:crypto';
-import { PrismaService } from '../src/prisma/prisma.service';
+import { DataSource, IsNull, MoreThan } from 'typeorm';
+import { User } from '../src/database/entities/user.entity';
+import { AuditLog } from '../src/database/entities/audit-log.entity';
+import { PasswordResetEvent } from '../src/database/entities/password-reset-event.entity';
+import { SecurityPolicy } from '../src/database/entities/security-policy.entity';
+import { RefreshToken } from '../src/database/entities/refresh-token.entity';
+import { ExternalServiceConfig } from '../src/database/entities/external-service-config.entity';
 import { loginAs, stepUpFor } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
 describe('IT Manager (e2e)', () => {
   let app: INestApplication<App>;
-  let prisma: PrismaService;
+  let dataSource: DataSource;
 
   beforeEach(async () => {
     app = await createTestApp();
-    prisma = app.get(PrismaService);
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
@@ -21,6 +27,30 @@ describe('IT Manager (e2e)', () => {
 
   function auth(token: string | null | undefined) {
     return { Authorization: `Bearer ${token}` };
+  }
+
+  async function findAuditLog(where: {
+    category?: string;
+    action?: string;
+    entityType?: string;
+    entityId?: string;
+  }) {
+    const qb = dataSource.getRepository(AuditLog).createQueryBuilder('a');
+    if (where.category) {
+      qb.andWhere('a.category = :category', { category: where.category });
+    }
+    if (where.action) {
+      qb.andWhere('a.action = :action', { action: where.action });
+    }
+    if (where.entityType) {
+      qb.andWhere('a.entityType = :entityType', {
+        entityType: where.entityType,
+      });
+    }
+    if (where.entityId) {
+      qb.andWhere('a.entityId = :entityId', { entityId: where.entityId });
+    }
+    return qb.getOne();
   }
 
   async function createEmployee(overrides?: Partial<{ dept: string }>) {
@@ -75,9 +105,9 @@ describe('IT Manager (e2e)', () => {
       .set(auth(accessToken))
       .send({
         fullName: 'تکراری',
-        username: (await prisma.user.findFirst({
-          where: { fullName: 'کارمند تست' },
-        }))!.username,
+        username: (await dataSource
+          .getRepository(User)
+          .findOneBy({ fullName: 'کارمند تست' }))!.username,
         password: 'testpass1',
         dept: 'commercial',
       });
@@ -94,8 +124,9 @@ describe('IT Manager (e2e)', () => {
       });
     expect(shortPassword.status).toBe(400);
 
-    const audit = await prisma.auditLog.findFirst({
-      where: { category: 'ACCOUNT', action: 'ایجاد حساب کارمند' },
+    const audit = await findAuditLog({
+      category: 'ACCOUNT',
+      action: 'ایجاد حساب کارمند',
     });
     expect(audit).not.toBeNull();
   });
@@ -134,8 +165,10 @@ describe('IT Manager (e2e)', () => {
       .send({ isActive: true });
     expect(reactivated.body.data.isActive).toBe(true);
 
-    const audit = await prisma.auditLog.findFirst({
-      where: { category: 'ACCOUNT', entityType: 'User', entityId: id },
+    const audit = await findAuditLog({
+      category: 'ACCOUNT',
+      entityType: 'User',
+      entityId: id,
     });
     expect(audit).not.toBeNull();
   });
@@ -172,8 +205,10 @@ describe('IT Manager (e2e)', () => {
       .send({ permissionKey: 'rf_list', grant: true });
     expect(wrongDept.status).toBe(400);
 
-    const audit = await prisma.auditLog.findFirst({
-      where: { category: 'ACCESS', entityType: 'User', entityId: id },
+    const audit = await findAuditLog({
+      category: 'ACCESS',
+      entityType: 'User',
+      entityId: id,
     });
     expect(audit).not.toBeNull();
   });
@@ -181,7 +216,8 @@ describe('IT Manager (e2e)', () => {
   it('POST /it/employees/:id/reset-password returns a temp password once, replaces the hash, sets mustChangePassword, audited', async () => {
     const { res, accessToken } = await createEmployee();
     const id = res.body.data.id;
-    const before = await prisma.user.findUniqueOrThrow({ where: { id } });
+    const userRepo = dataSource.getRepository(User);
+    const before = await userRepo.findOneByOrFail({ id });
 
     const reset = await request(app.getHttpServer())
       .post(`/it/employees/${id}/reset-password`)
@@ -190,17 +226,18 @@ describe('IT Manager (e2e)', () => {
     expect(typeof reset.body.data.tempPassword).toBe('string');
     expect(reset.body.data.tempPassword.length).toBeGreaterThan(5);
 
-    const after = await prisma.user.findUniqueOrThrow({ where: { id } });
+    const after = await userRepo.findOneByOrFail({ id });
     expect(after.passwordHash).not.toBe(before.passwordHash);
     expect(after.mustChangePassword).toBe(true);
 
-    const resetEvent = await prisma.passwordResetEvent.findFirst({
-      where: { employeeId: id },
-    });
+    const resetEvent = await dataSource
+      .getRepository(PasswordResetEvent)
+      .findOneBy({ employeeId: id });
     expect(resetEvent).not.toBeNull();
 
-    const audit = await prisma.auditLog.findFirst({
-      where: { category: 'ACCOUNT', action: 'بازنشانی رمز عبور کارمند' },
+    const audit = await findAuditLog({
+      category: 'ACCOUNT',
+      action: 'بازنشانی رمز عبور کارمند',
     });
     expect(audit).not.toBeNull();
   });
@@ -211,7 +248,7 @@ describe('IT Manager (e2e)', () => {
     const { accessToken } = await loginAs(app, 'itadmin');
     // Isolate from other tests/runs that may have already created+mutated
     // the id=1 singleton — force a fresh auto-create here.
-    await prisma.securityPolicy.deleteMany({ where: { id: 1 } });
+    await dataSource.getRepository(SecurityPolicy).delete({ id: 1 });
     const get = await request(app.getHttpServer())
       .get('/it/security/policy')
       .set(auth(accessToken));
@@ -228,8 +265,9 @@ describe('IT Manager (e2e)', () => {
     // Untouched fields survive the partial update.
     expect(patch.body.data.maxAttempts).toBe(5);
 
-    const audit = await prisma.auditLog.findFirst({
-      where: { category: 'SECURITY', action: 'به‌روزرسانی سیاست رمز عبور' },
+    const audit = await findAuditLog({
+      category: 'SECURITY',
+      action: 'به‌روزرسانی سیاست رمز عبور',
     });
     expect(audit).not.toBeNull();
   });
@@ -257,8 +295,9 @@ describe('IT Manager (e2e)', () => {
     expect(logoutAll.status).toBe(201);
     expect(logoutAll.body.data.revokedCount).toBeGreaterThanOrEqual(2);
 
-    const remaining = await prisma.refreshToken.count({
-      where: { revokedAt: null, expiresAt: { gt: new Date() } },
+    const remaining = await dataSource.getRepository(RefreshToken).countBy({
+      revokedAt: IsNull(),
+      expiresAt: MoreThan(new Date()),
     });
     expect(remaining).toBe(0);
     void other;
@@ -294,12 +333,10 @@ describe('IT Manager (e2e)', () => {
       .send({ enabled: true });
     expect(notFound.status).toBe(404);
 
-    const audit = await prisma.auditLog.findFirst({
-      where: {
-        category: 'SYSTEM',
-        entityType: 'InternalService',
-        entityId: 'search',
-      },
+    const audit = await findAuditLog({
+      category: 'SYSTEM',
+      entityType: 'InternalService',
+      entityId: 'search',
     });
     expect(audit).not.toBeNull();
   });
@@ -319,9 +356,9 @@ describe('IT Manager (e2e)', () => {
     expect(created.body.data.hasApiKey).toBe(true);
     expect(created.body.data.apiKeyEncrypted).toBeUndefined();
 
-    const row = await prisma.externalServiceConfig.findUniqueOrThrow({
-      where: { id: created.body.data.id },
-    });
+    const row = await dataSource
+      .getRepository(ExternalServiceConfig)
+      .findOneByOrFail({ id: created.body.data.id });
     expect(row.apiKeyEncrypted).not.toBe('super-secret-key');
     expect(row.apiKeyEncrypted).not.toContain('super-secret-key');
 
@@ -335,9 +372,9 @@ describe('IT Manager (e2e)', () => {
       .delete(`/it/services/external/${created.body.data.id}`)
       .set(auth(accessToken));
     expect(removed.status).toBe(200);
-    const gone = await prisma.externalServiceConfig.findUnique({
-      where: { id: created.body.data.id },
-    });
+    const gone = await dataSource
+      .getRepository(ExternalServiceConfig)
+      .findOneBy({ id: created.body.data.id });
     expect(gone).toBeNull();
   });
 
@@ -360,9 +397,9 @@ describe('IT Manager (e2e)', () => {
     expect(tested.body.data.ok).toBe(false);
     expect(typeof tested.body.data.message).toBe('string');
 
-    const row = await prisma.externalServiceConfig.findUniqueOrThrow({
-      where: { id: created.body.data.id },
-    });
+    const row = await dataSource
+      .getRepository(ExternalServiceConfig)
+      .findOneByOrFail({ id: created.body.data.id });
     expect(row.lastTestOk).toBe(false);
     expect(row.lastTestAt).not.toBeNull();
   });

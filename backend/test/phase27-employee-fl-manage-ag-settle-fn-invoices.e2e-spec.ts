@@ -2,7 +2,13 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import * as crypto from 'node:crypto';
-import { PrismaService } from '../src/prisma/prisma.service';
+import { DataSource } from 'typeorm';
+import { User } from '../src/database/entities/user.entity';
+import { Flight } from '../src/database/entities/flight.entity';
+import { FlightInstance } from '../src/database/entities/flight-instance.entity';
+import { AgencyProfile } from '../src/database/entities/agency-profile.entity';
+import { AgencyInvoice } from '../src/database/entities/agency-invoice.entity';
+import { LedgerEntry } from '../src/database/entities/ledger-entry.entity';
 import { loginAs } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
@@ -19,11 +25,11 @@ import { createTestApp } from './helpers/app.helper';
  */
 describe('Phase 27 — EMPLOYEE fl_manage/ag_settle/fn_invoices (e2e)', () => {
   let app: INestApplication<App>;
-  let prisma: PrismaService;
+  let dataSource: DataSource;
 
   beforeEach(async () => {
     app = await createTestApp();
-    prisma = app.get(PrismaService);
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
@@ -35,19 +41,23 @@ describe('Phase 27 — EMPLOYEE fl_manage/ag_settle/fn_invoices (e2e)', () => {
   }
 
   async function createInstance() {
-    const flight = await prisma.flight.findFirstOrThrow();
+    const flight = await dataSource
+      .getRepository(Flight)
+      .createQueryBuilder('f')
+      .getOneOrFail();
     const departureAt = new Date(Date.now() + 14 * 24 * 3_600_000);
-    return prisma.flightInstance.create({
-      data: {
+    const instanceRepo = dataSource.getRepository(FlightInstance);
+    return instanceRepo.save(
+      instanceRepo.create({
         flightId: flight.id,
         departureAt,
         arrivalAt: new Date(departureAt.getTime() + 3 * 3_600_000),
         capacity: 180,
         charterSeats: 60,
         status: 'SCHEDULED',
-        basePriceIrr: 30_000_000,
-      },
-    });
+        basePriceIrr: 30_000_000n,
+      }),
+    );
   }
 
   async function createEmployeeWithPermissions(
@@ -74,41 +84,45 @@ describe('Phase 27 — EMPLOYEE fl_manage/ag_settle/fn_invoices (e2e)', () => {
   // ledger balance to an absolute target so this is safe to call even if
   // prior tests already left SALE/SETTLEMENT rows on the same agency.
   async function setAgencyDebt(agencyId: string, targetIrr = 20_000_000n) {
-    const creator = await prisma.user.findFirstOrThrow({
-      where: { role: 'COMMERCIAL_MANAGER' },
-    });
-    const sum = await prisma.ledgerEntry.aggregate({
-      where: { agencyId, type: { in: ['SALE', 'SETTLEMENT'] } },
-      _sum: { signedAmountIrr: true },
-    });
-    const deltaIrr = targetIrr - (sum._sum.signedAmountIrr ?? 0n);
+    const creator = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ role: 'COMMERCIAL_MANAGER' });
+    const sumRow = await dataSource
+      .getRepository(LedgerEntry)
+      .createQueryBuilder('l')
+      .select('SUM(l.signedAmountIrr)', 'sum')
+      .where('l.agencyId = :agencyId', { agencyId })
+      .andWhere('l.type IN (:...types)', { types: ['SALE', 'SETTLEMENT'] })
+      .getRawOne<{ sum: string | null }>();
+    const deltaIrr = targetIrr - BigInt(sumRow?.sum ?? '0');
     if (deltaIrr !== 0n) {
-      await prisma.ledgerEntry.create({
-        data: {
+      const ledgerRepo = dataSource.getRepository(LedgerEntry);
+      await ledgerRepo.save(
+        ledgerRepo.create({
           agencyId,
           type: 'SALE',
           signedAmountIrr: deltaIrr,
           createdById: creator.id,
-        },
-      });
+        }),
+      );
     }
   }
 
   async function createAgencyInvoice(agencyId: string) {
-    return prisma.agencyInvoice.create({
-      data: {
+    const commercial = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ role: 'COMMERCIAL_MANAGER' });
+    const invoiceRepo = dataSource.getRepository(AgencyInvoice);
+    return invoiceRepo.save(
+      invoiceRepo.create({
         agencyId,
         invoiceNo: `INV-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
-        issuedById: (
-          await prisma.user.findFirstOrThrow({
-            where: { role: 'COMMERCIAL_MANAGER' },
-          })
-        ).id,
+        issuedById: commercial.id,
         dueAt: new Date(Date.now() + 10 * 24 * 3_600_000),
-        amountIrr: 5_000_000,
+        amountIrr: 5_000_000n,
         status: 'UNPAID',
-      },
-    });
+      }),
+    );
   }
 
   // ── fl_manage ───────────────────────────────────────────────────────
@@ -179,7 +193,10 @@ describe('Phase 27 — EMPLOYEE fl_manage/ag_settle/fn_invoices (e2e)', () => {
         'ag_settle',
       ]);
       const { accessToken } = await loginAs(app, username);
-      const agency = await prisma.agencyProfile.findFirstOrThrow();
+      const agency = await dataSource
+        .getRepository(AgencyProfile)
+        .createQueryBuilder('a')
+        .getOneOrFail();
 
       const list = await request(app.getHttpServer())
         .get('/agencies')
@@ -204,7 +221,10 @@ describe('Phase 27 — EMPLOYEE fl_manage/ag_settle/fn_invoices (e2e)', () => {
         'ag_list',
       ]);
       const { accessToken } = await loginAs(app, username);
-      const agency = await prisma.agencyProfile.findFirstOrThrow();
+      const agency = await dataSource
+        .getRepository(AgencyProfile)
+        .createQueryBuilder('a')
+        .getOneOrFail();
 
       const settle = await request(app.getHttpServer())
         .post(`/agencies/${agency.userId}/settle`)
@@ -233,7 +253,10 @@ describe('Phase 27 — EMPLOYEE fl_manage/ag_settle/fn_invoices (e2e)', () => {
         'fn_invoices',
       ]);
       const { accessToken } = await loginAs(app, username);
-      const agency = await prisma.agencyProfile.findFirstOrThrow();
+      const agency = await dataSource
+        .getRepository(AgencyProfile)
+        .createQueryBuilder('a')
+        .getOneOrFail();
       const invoice = await createAgencyInvoice(agency.userId);
 
       const list = await request(app.getHttpServer())
@@ -283,7 +306,10 @@ describe('Phase 27 — EMPLOYEE fl_manage/ag_settle/fn_invoices (e2e)', () => {
         'ag_settle',
       ]);
       const { accessToken } = await loginAs(app, username);
-      const agency = await prisma.agencyProfile.findFirstOrThrow();
+      const agency = await dataSource
+        .getRepository(AgencyProfile)
+        .createQueryBuilder('a')
+        .getOneOrFail();
       const invoice = await createAgencyInvoice(agency.userId);
 
       const invoices = await request(app.getHttpServer())
@@ -313,7 +339,10 @@ describe('Phase 27 — EMPLOYEE fl_manage/ag_settle/fn_invoices (e2e)', () => {
 
   it("doesn't affect non-EMPLOYEE roles: SENIOR_MANAGER still has full flights + agencies access despite holding zero EmployeePermission rows", async () => {
     const { accessToken } = await loginAs(app, 'senior.rahimi');
-    const agency = await prisma.agencyProfile.findFirstOrThrow();
+    const agency = await dataSource
+      .getRepository(AgencyProfile)
+      .createQueryBuilder('a')
+      .getOneOrFail();
 
     const overview = await request(app.getHttpServer())
       .get('/flights/overview')

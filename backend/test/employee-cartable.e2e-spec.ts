@@ -2,17 +2,19 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import * as crypto from 'node:crypto';
-import { PrismaService } from '../src/prisma/prisma.service';
+import { DataSource } from 'typeorm';
+import { User } from '../src/database/entities/user.entity';
+import { CartableTask } from '../src/database/entities/cartable-task.entity';
 import { loginAs } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
 describe('EMPLOYEE cartable (e2e)', () => {
   let app: INestApplication<App>;
-  let prisma: PrismaService;
+  let dataSource: DataSource;
 
   beforeEach(async () => {
     app = await createTestApp();
-    prisma = app.get(PrismaService);
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
@@ -37,19 +39,20 @@ describe('EMPLOYEE cartable (e2e)', () => {
   }
 
   async function seedTaskFor(assigneeId: string) {
-    const commercial = await prisma.user.findUniqueOrThrow({
-      where: { username: 'comm.abbasi' },
-    });
-    return prisma.cartableTask.create({
-      data: {
+    const commercial = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ username: 'comm.abbasi' });
+    const repo = dataSource.getRepository(CartableTask);
+    return repo.save(
+      repo.create({
         assigneeId,
         category: 'ADMIN',
         title: 'کار تست کارمند',
         description: 'توضیح کار تست',
         senderId: commercial.id,
         senderLabelFa: 'مدیر بازرگانی',
-      },
-    });
+      }),
+    );
   }
 
   it('sales.moradi nav includes cartable when ct_list+ct_process are granted', async () => {
@@ -63,7 +66,10 @@ describe('EMPLOYEE cartable (e2e)', () => {
   });
 
   it("GET /cartable returns only the employee's own tasks with ct_list", async () => {
-    const { username, id } = await createEmployeeWithPermissions(['ct_list', 'ct_process']);
+    const { username, id } = await createEmployeeWithPermissions([
+      'ct_list',
+      'ct_process',
+    ]);
     const other = await createEmployeeWithPermissions(['ct_list']);
     await seedTaskFor(id);
     await seedTaskFor(other.id);
@@ -88,7 +94,10 @@ describe('EMPLOYEE cartable (e2e)', () => {
   });
 
   it('PATCH approve marks task done; reject stays forbidden for EMPLOYEE', async () => {
-    const { username, id } = await createEmployeeWithPermissions(['ct_list', 'ct_process']);
+    const { username, id } = await createEmployeeWithPermissions([
+      'ct_list',
+      'ct_process',
+    ]);
     const task = await seedTaskFor(id);
     const { accessToken } = await loginAs(app, username);
 
@@ -106,10 +115,13 @@ describe('EMPLOYEE cartable (e2e)', () => {
   });
 
   it('POST /cartable/manager-message delivers a cartable task to the manager', async () => {
-    const { username } = await createEmployeeWithPermissions(['ct_list', 'ct_process']);
-    const manager = await prisma.user.findUniqueOrThrow({
-      where: { username: 'comm.abbasi' },
-    });
+    const { username } = await createEmployeeWithPermissions([
+      'ct_list',
+      'ct_process',
+    ]);
+    const manager = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ username: 'comm.abbasi' });
     const { accessToken } = await loginAs(app, username);
 
     const send = await request(app.getHttpServer())
@@ -121,10 +133,15 @@ describe('EMPLOYEE cartable (e2e)', () => {
 
     const mgrCartable = await request(app.getHttpServer())
       .get('/cartable')
-      .set('Authorization', `Bearer ${(await loginAs(app, 'comm.abbasi')).accessToken}`);
-    expect(mgrCartable.body.data.tasks.some((t: { title: string }) => t.title.includes('پیام'))).toBe(
-      true,
-    );
+      .set(
+        'Authorization',
+        `Bearer ${(await loginAs(app, 'comm.abbasi')).accessToken}`,
+      );
+    expect(
+      mgrCartable.body.data.tasks.some((t: { title: string }) =>
+        t.title.includes('پیام'),
+      ),
+    ).toBe(true);
 
     const sent = await request(app.getHttpServer())
       .get('/cartable/manager-message/sent')

@@ -3,20 +3,22 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import * as crypto from 'node:crypto';
 import * as argon2 from 'argon2';
-import { PrismaService } from '../src/prisma/prisma.service';
+import { DataSource } from 'typeorm';
+import { User } from '../src/database/entities/user.entity';
+import { RefundPenaltyRule } from '../src/database/entities/refund-penalty-rule.entity';
 import { loginAs, stepUpFor } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
-import type { Role } from '../generated/prisma/enums';
+import type { Role } from '../src/database/enums';
 import { TWO_FACTOR_PROVIDER } from '../src/modules/auth/providers/two-factor-provider.interface';
 import { MockTwoFactorProvider } from '../src/modules/auth/providers/mock-two-factor.provider';
 
 describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', () => {
   let app: INestApplication<App>;
-  let prisma: PrismaService;
+  let dataSource: DataSource;
 
   beforeEach(async () => {
     app = await createTestApp();
-    prisma = app.get(PrismaService);
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
@@ -29,8 +31,9 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
 
   async function createManagedAdmin(role: Role = 'IT_MANAGER') {
     const suffix = crypto.randomUUID().slice(0, 8);
-    return prisma.user.create({
-      data: {
+    const userRepo = dataSource.getRepository(User);
+    return userRepo.save(
+      userRepo.create({
         role,
         username: `p12.${suffix}`,
         email: `p12.${suffix}@test.example`,
@@ -38,8 +41,9 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
         passwordHash: await argon2.hash('Blujet@1404'),
         twoFactorEnabled: true,
         isActive: true,
-      },
-    });
+        updatedAt: new Date(),
+      }),
+    );
   }
 
   // ── admins ────────────────────────────────────────────────────────────
@@ -146,9 +150,9 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
     expect(loginOk.status).toBe(200);
 
     // Never CEO/BOARD_CHAIR, never self.
-    const ceoUser = await prisma.user.findFirstOrThrow({
-      where: { username: 'ceo' },
-    });
+    const ceoUser = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ username: 'ceo' });
     const blockCeo = await request(app.getHttpServer())
       .patch(`/admins/${ceoUser.id}/block`)
       .set('Authorization', auth(ceo.accessToken));
@@ -202,9 +206,9 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
       .send({ username: target.username, password: tempPassword });
     expect(loginRes.status).toBe(200);
 
-    const seniorTarget = await prisma.user.findFirstOrThrow({
-      where: { username: 'senior.rahimi' },
-    });
+    const seniorTarget = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ username: 'senior.rahimi' });
     const senior2 = await loginAs(app, 'senior.rahimi');
     const forbidden = await request(app.getHttpServer())
       .post(`/admins/${seniorTarget.id}/reset-password`)
@@ -355,9 +359,9 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
     expect(patchRes.status).toBe(200);
 
     // The Phase 7 refunds engine reads this exact table — verify the row.
-    const dbRow = await prisma.refundPenaltyRule.findUniqueOrThrow({
-      where: { id: rule.id },
-    });
+    const dbRow = await dataSource
+      .getRepository(RefundPenaltyRule)
+      .findOneByOrFail({ id: rule.id });
     expect(dbRow.penaltyPct).toBe(newPct);
 
     // Restore the original percentage.
@@ -503,7 +507,9 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
         },
       });
     expect(patchContent.status).toBe(200);
-    expect(patchContent.body.data.settings.aboutUsText).toBe('متن درباره ما از CMS');
+    expect(patchContent.body.data.settings.aboutUsText).toBe(
+      'متن درباره ما از CMS',
+    );
 
     const publicContent = await request(app.getHttpServer()).get(
       '/settings/site-content',

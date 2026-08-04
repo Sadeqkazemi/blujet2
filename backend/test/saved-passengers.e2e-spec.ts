@@ -1,19 +1,20 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { PrismaService } from '../src/prisma/prisma.service';
+import { DataSource } from 'typeorm';
+import { SavedPassenger } from '../src/database/entities/saved-passenger.entity';
 import { loginAs, loginAsCustomer } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 import { resetCustomerPhones } from './helpers/customer-state.helper';
 
 describe('Saved passengers (e2e)', () => {
   let app: INestApplication<App>;
-  let prisma: PrismaService;
+  let dataSource: DataSource;
 
   beforeEach(async () => {
     app = await createTestApp();
-    prisma = app.get(PrismaService);
-    await resetCustomerPhones(prisma, [
+    dataSource = app.get(DataSource);
+    await resetCustomerPhones(dataSource, [
       '09180000001',
       '09180000002',
       '09180000004',
@@ -77,9 +78,9 @@ describe('Saved passengers (e2e)', () => {
       .set('Authorization', `Bearer ${accessToken}`);
     expect(del.status).toBe(200);
 
-    const stored = await prisma.savedPassenger.findMany({
-      where: { userId: userId! },
-    });
+    const stored = await dataSource
+      .getRepository(SavedPassenger)
+      .findBy({ userId: userId! });
     expect(stored.every((r) => r.id !== create.body.data.id)).toBe(true);
     expect(stored.some((r) => r.passportNoEnc?.includes('A22113344'))).toBe(
       false,
