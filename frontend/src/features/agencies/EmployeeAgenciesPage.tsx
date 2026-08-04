@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchAgencies, fetchAgencyRequests } from '../../api/agencies';
+import { fetchEmployeeContext } from '../../api/panels';
 import EmployeeUnitPill from '../../components/EmployeeUnitPill';
 import Pagination from '../../components/Pagination';
 import { usePagination } from '../../hooks/usePagination';
@@ -37,9 +38,16 @@ export default function EmployeeAgenciesPage() {
   const load = useCallback(async () => {
     setError(null);
     try {
+      // Membership requests are gated by the `ag_requests` permission
+      // server-side; only fetch them when this employee actually has it,
+      // so an unprivileged employee never fires a request that 403s.
+      const ctx = await fetchEmployeeContext().catch(() => null);
+      const canSeeRequests = ctx?.permissionKeys.includes('ag_requests') ?? false;
       const [list, reqs] = await Promise.all([
         fetchAgencies({}),
-        fetchAgencyRequests().catch(() => [] as AgencyMembershipRequest[]),
+        canSeeRequests
+          ? fetchAgencyRequests().catch(() => [] as AgencyMembershipRequest[])
+          : Promise.resolve([] as AgencyMembershipRequest[]),
       ]);
       setAgencies(list.agencies);
       setRequests(reqs.filter((r) => r.status === 'PENDING' || r.status === 'REFERRED'));

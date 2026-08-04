@@ -29,6 +29,7 @@ describe('EmployeeDashboardPage', () => {
       deptLabelFa: 'بازرگانی',
       rank: 'کارشناس',
       permissionLabelsFa: ['داشبورد', 'مدیریت آژانس‌ها', 'گزارش‌ها', 'کارتابل', 'ارجاعات'],
+      permissionKeys: ['ag_list', 'rp_sales', 'ct_list', 'ct_process'],
     });
     vi.spyOn(cartableApi, 'fetchMyReferrals').mockResolvedValue({
       referrals: [],
@@ -82,6 +83,7 @@ describe('EmployeeDashboardPage', () => {
       deptLabelFa: 'بازرگانی',
       rank: 'کارشناس',
       permissionLabelsFa: ['داشبورد', 'ارجاعات'],
+      permissionKeys: [],
     });
     renderWithNav([{ key: 'dashboard', labelFa: 'داشبورد', implemented: true }]);
 
@@ -94,6 +96,7 @@ describe('EmployeeDashboardPage', () => {
       deptLabelFa: 'بازرگانی',
       rank: 'کارشناس',
       permissionLabelsFa: ['داشبورد', 'ارجاعات'],
+      permissionKeys: [],
     });
     renderWithNav([
       { key: 'dashboard', labelFa: 'داشبورد', implemented: true },

@@ -143,6 +143,10 @@ export class PanelsService {
       deptLabelFa: deptLabels[employee.dept ?? ''] ?? employee.dept ?? '—',
       rank: employee.rank,
       permissionLabelsFa: permissionLabels,
+      // Raw granted permission keys (e.g. 'ag_list', 'ag_requests') so the UI
+      // can avoid firing endpoint calls it isn't authorized for — the server
+      // still enforces every permission via @RequiresPermission.
+      permissionKeys: grants.map((g) => g.permission.key),
     };
   }
 
