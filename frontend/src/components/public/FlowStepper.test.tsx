@@ -13,7 +13,7 @@ describe('FlowStepper', () => {
     );
     expect(screen.getByTestId('flow-step-search')).toHaveTextContent('✓');
     expect(screen.getByTestId('flow-step-results')).toHaveTextContent('✓');
-    expect(screen.getByTestId('flow-step-checkout')).toHaveTextContent('تکمیل خرید');
+    expect(screen.getByTestId('flow-step-checkout')).toHaveTextContent('تأیید اطلاعات');
     expect(screen.getByTestId('flow-step-payment')).toHaveTextContent('۵');
   });
 

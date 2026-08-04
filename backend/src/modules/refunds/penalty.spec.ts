@@ -34,26 +34,26 @@ describe('computePenalty (unit)', () => {
     [2.9, 100],
     [0, 100],
   ])('hoursLeft=%p → %p٪', (hoursLeft, expectedPct) => {
-    expect(computePenalty(RULES, hoursLeft, 10_000_000).penaltyPct).toBe(
+    expect(computePenalty(RULES, hoursLeft, 10_000_000n).penaltyPct).toBe(
       expectedPct,
     );
   });
 
   it('refundable = totalPaid − penalty, integer IRR', () => {
-    const r = computePenalty(RULES, 100, 25_000_000);
-    expect(r.penaltyAmountIrr).toBe(7_500_000);
-    expect(r.refundableIrr).toBe(17_500_000);
-    expect(Number.isInteger(r.penaltyAmountIrr)).toBe(true);
+    const r = computePenalty(RULES, 100, 25_000_000n);
+    expect(r.penaltyAmountIrr).toBe(7_500_000n);
+    expect(r.refundableIrr).toBe(17_500_000n);
+    expect(typeof r.penaltyAmountIrr).toBe('bigint');
   });
 
   it('100٪ bracket leaves nothing refundable (غیرقابل استرداد)', () => {
-    const r = computePenalty(RULES, 1, 25_000_000);
-    expect(r.refundableIrr).toBe(0);
+    const r = computePenalty(RULES, 1, 25_000_000n);
+    expect(r.refundableIrr).toBe(0n);
   });
 
   it('rounds odd percentages to whole rial', () => {
-    const r = computePenalty(RULES, 100, 33_333_333);
-    expect(r.penaltyAmountIrr).toBe(10_000_000);
-    expect(r.penaltyAmountIrr + r.refundableIrr).toBe(33_333_333);
+    const r = computePenalty(RULES, 100, 33_333_333n);
+    expect(r.penaltyAmountIrr).toBe(10_000_000n);
+    expect(r.penaltyAmountIrr + r.refundableIrr).toBe(33_333_333n);
   });
 });

@@ -16,6 +16,10 @@ export default function ProtectedRoute() {
     return <Navigate to="/login" replace />;
   }
 
+  if (user?.mustChangePassword) {
+    return <Navigate to="/required-password-change" replace />;
+  }
+
   // The management panels are staff-only — an AGENCY session belongs in its
   // own self-service portal, not this shell (role isolation, both directions).
   if (user?.role === 'AGENCY') {

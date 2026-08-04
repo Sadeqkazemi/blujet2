@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import CartablePage from './CartablePage';
 import * as cartableApi from '../../api/cartable';
 import * as useAuthModule from '../../hooks/useAuth';
+import { mockAuthUserWithRole } from '../../test/mockAuthUser';
 import type { CartableListResult } from '../../types/cartable';
 import type { Role } from '../../types/auth';
 
@@ -30,7 +31,7 @@ const LIST: CartableListResult = {
 function mockRole(role: Role) {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status: 'authenticated',
-    user: { id: 'u1', fullName: 'کاربر تست', role },
+    user: mockAuthUserWithRole(role),
     requestLogin: vi.fn(),
     confirmTwoFactor: vi.fn(),
     agencyLogin: vi.fn(),
@@ -54,10 +55,12 @@ describe('CartablePage', () => {
 
     renderPage();
 
-    expect(await screen.findByText('درخواست اداری')).toBeInTheDocument();
-    expect(screen.getByText('همکاری آژانس')).toBeInTheDocument();
-    expect(screen.getByText('درخواست مدیران')).toBeInTheDocument();
+    expect(await screen.findByText('کارهای در انتظار اقدام شما')).toBeInTheDocument();
+    expect(screen.getByText(/درخواست اداری/)).toBeInTheDocument();
+    expect(screen.getByText(/همکاری آژانس/)).toBeInTheDocument();
+    expect(screen.getByText(/درخواست مدیران/)).toBeInTheDocument();
     expect(screen.getByText('۴ مورد')).toBeInTheDocument();
+    expect(screen.getByText('کارتابل من')).toBeInTheDocument();
     expect(screen.getByText('درخواست گزارش فروش سه‌ماهه')).toBeInTheDocument();
     expect(screen.getByText('ارسال از: محمد رحیمی · مدیر ارشد')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'ایجاد پیام' })).toBeInTheDocument();
@@ -145,5 +148,35 @@ describe('CartablePage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'ارسال پیام' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('گیرنده، موضوع و متن پیام الزامی است.');
     expect(send).not.toHaveBeenCalled();
+  });
+
+  it('SITE_ADMIN dark layout shows category KPIs, create message and 10/page', async () => {
+    mockRole('SITE_ADMIN');
+    const manyTasks = Array.from({ length: 12 }, (_, i) => ({
+      ...LIST.tasks[0],
+      id: `t${i + 1}`,
+      title: `وظیفه ${i + 1}`,
+    }));
+    vi.spyOn(cartableApi, 'fetchCartable').mockResolvedValue({
+      tasks: manyTasks,
+      counts: { ADMIN: 2, AGENCY: 2, MANAGER: 2 },
+      totalOpen: 12,
+    });
+    vi.spyOn(cartableApi, 'fetchStaffDirectory').mockResolvedValue([]);
+
+    const { default: userEvent } = await import('@testing-library/user-event');
+    renderPage();
+
+    expect(await screen.findByText('کارتابل')).toBeInTheDocument();
+    expect(screen.getByText('کارهای در انتظار اقدام شما')).toBeInTheDocument();
+    expect(screen.getByText('۲ درخواست اداری')).toBeInTheDocument();
+    expect(screen.getByText('۲ همکاری آژانس')).toBeInTheDocument();
+    expect(screen.getByText('۲ درخواست مدیران')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /ایجاد پیام/ })).toBeInTheDocument();
+    expect(screen.getByText('وظیفه 1')).toBeInTheDocument();
+    expect(screen.getByText('وظیفه 10')).toBeInTheDocument();
+    expect(screen.queryByText('وظیفه 11')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'بعدی' }));
+    expect(await screen.findByText('وظیفه 11')).toBeInTheDocument();
   });
 });

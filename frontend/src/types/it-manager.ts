@@ -111,16 +111,21 @@ export interface BackupSchedule {
 
 export interface ItDashboardData {
   kpis: {
-    activeEmployees: number;
-    activeSessions: number;
     servicesUp: number;
     servicesTotal: number;
+    uptime30dPct: number;
+    activeSessions: number;
+    securityAlerts: number;
+    allServicesHealthy: boolean;
     lastBackupStatus: string | null;
     lastBackupAt: string | null;
   };
   serviceHealth: { name: string; uptimePct: number | null; enabled: boolean }[];
   resources: {
+    cpuUsedPct: number;
     memoryUsedPct: number;
+    diskUsedPct: number | null;
+    bandwidthUsedPct: number | null;
     loadAvg1m: number;
     cpuCount: number;
     uptimeSeconds: number;
@@ -135,4 +140,7 @@ export interface AuditLogRow {
   action: string;
   detail: string;
   createdAt: string;
+  actorName: string;
+  unit: string;
+  level: 'info' | 'warn' | 'error';
 }

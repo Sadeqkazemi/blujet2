@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fetchSales } from '../../api/agency-portal';
+import { downloadSalesExport, fetchSales } from '../../api/agency-portal';
 import { faDigits, faMoney, faPercent } from '../../lib/fa-format';
 import { formatJalaliDate } from '../../lib/jalali';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
@@ -47,6 +47,9 @@ const STR: Record<StoredLocale, {
   colAmount: string;
   colStatus: string;
   toman: string;
+  exportExcel: string;
+  exportBusy: string;
+  exportError: string;
 }> = {
   fa: {
     heading: 'فروش و گزارش',
@@ -70,6 +73,9 @@ const STR: Record<StoredLocale, {
     colAmount: 'مبلغ',
     colStatus: 'وضعیت',
     toman: 'تومان',
+    exportExcel: 'خروجی Excel',
+    exportBusy: 'در حال آماده‌سازی…',
+    exportError: 'خطا در دریافت خروجی.',
   },
   en: {
     heading: 'Sales & Reports',
@@ -93,6 +99,9 @@ const STR: Record<StoredLocale, {
     colAmount: 'Amount',
     colStatus: 'Status',
     toman: 'Toman',
+    exportExcel: 'Export Excel',
+    exportBusy: 'Preparing…',
+    exportError: 'Error downloading the export.',
   },
   ar: {
     heading: 'المبيعات والتقارير',
@@ -116,6 +125,9 @@ const STR: Record<StoredLocale, {
     colAmount: 'المبلغ',
     colStatus: 'الحالة',
     toman: 'تومان',
+    exportExcel: 'تصدير Excel',
+    exportBusy: 'جارٍ التحضير…',
+    exportError: 'خطأ في تنزيل التصدير.',
   },
 };
 
@@ -124,6 +136,8 @@ export default function AgencySalesPage() {
   const t = STR[locale];
   const [data, setData] = useState<AgencySalesReport | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchSales()
@@ -142,16 +156,44 @@ export default function AgencySalesPage() {
     { label: t.kpiRefundRate, value: faPercent(data.summary.refundRatePct) },
   ];
 
+  async function onExport() {
+    setExportError(null);
+    setExportBusy(true);
+    try {
+      const blob = await downloadSalesExport();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'agency-sales.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setExportError(t.exportError);
+    } finally {
+      setExportBusy(false);
+    }
+  }
+
   return (
-    <div className="p-8">
-      <h1 className="mb-1 text-xl font-black text-ink">{t.heading}</h1>
-      <p className="mb-6 text-sm text-muted">{t.subtitle}</p>
+    <div>
+      <div className="mb-6 flex flex-wrap items-start justify-end gap-3">
+        <button
+          type="button"
+          data-testid="sales-export"
+          disabled={exportBusy}
+          onClick={() => void onExport()}
+          className="rounded-lg border border-border bg-white px-4 py-2 text-xs font-bold text-accent disabled:opacity-60"
+        >
+          {exportBusy ? t.exportBusy : t.exportExcel}
+        </button>
+      </div>
+      {exportError && <p className="mb-4 text-xs text-danger">{exportError}</p>}
 
       <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
         {kpis.map((k) => (
           <div key={k.label} className="rounded-xl border border-border bg-white p-4">
             <div className="text-[11px] text-muted">{k.label}</div>
-            <div className="font-num mt-1 text-lg font-black text-ink">{k.value}</div>
+            <div className="mt-1 text-lg font-black text-ink">{k.value}</div>
           </div>
         ))}
       </div>
@@ -174,10 +216,10 @@ export default function AgencySalesPage() {
               <tbody>
                 {data.perFlight.map((f) => (
                   <tr key={f.flightNo} className="border-b border-border/60">
-                    <td className="ltr font-num py-2.5">{f.flightNo}</td>
-                    <td className="ltr font-num py-2.5">{f.route}</td>
-                    <td className="font-num py-2.5">{faDigits(f.ticketsCount)}</td>
-                    <td className="font-num py-2.5 font-bold">{faMoney(f.salesIrr)} {t.toman}</td>
+                    <td className="ltr py-2.5">{f.flightNo}</td>
+                    <td className="ltr py-2.5">{f.route}</td>
+                    <td className="py-2.5">{faDigits(f.ticketsCount)}</td>
+                    <td className="py-2.5 font-bold">{faMoney(f.salesIrr)} {t.toman}</td>
                   </tr>
                 ))}
               </tbody>
@@ -205,12 +247,12 @@ export default function AgencySalesPage() {
               <tbody>
                 {data.tickets.map((t2) => (
                   <tr key={t2.pnr} className="border-b border-border/60">
-                    <td className="ltr font-num py-2.5">{t2.pnr}</td>
-                    <td className="ltr font-num py-2.5">
+                    <td className="ltr py-2.5">{t2.pnr}</td>
+                    <td className="ltr py-2.5">
                       {t2.flightNo} — {t2.route}
                     </td>
-                    <td className="font-num py-2.5">{formatJalaliDate(t2.departureAt)}</td>
-                    <td className="font-num py-2.5 font-bold">{faMoney(t2.priceIrr)} {t.toman}</td>
+                    <td className="py-2.5">{formatJalaliDate(t2.departureAt)}</td>
+                    <td className="py-2.5 font-bold">{faMoney(t2.priceIrr)} {t.toman}</td>
                     <td className="py-2.5">{BOOKING_STATUS_LABEL[t2.status]?.[locale] ?? t2.status}</td>
                   </tr>
                 ))}

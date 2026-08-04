@@ -9,3 +9,10 @@ export interface PanelAccessFlag {
   enabled: boolean;
   updatedAt: string | null;
 }
+
+export interface EmployeeContext {
+  dept: string | null;
+  deptLabelFa: string;
+  rank: string | null;
+  permissionLabelsFa: string[];
+}

@@ -62,6 +62,20 @@ export const PERMISSION_CATALOG: PermissionCatalogEntry[] = [
     key: 'rp_sales',
     labelFa: 'گزارش فروش',
   },
+  {
+    dept: 'commercial',
+    sectionKey: 'cartable',
+    sectionLabelFa: 'کارتابل',
+    key: 'ct_list',
+    labelFa: 'مشاهده کارتابل',
+  },
+  {
+    dept: 'commercial',
+    sectionKey: 'cartable',
+    sectionLabelFa: 'کارتابل',
+    key: 'ct_process',
+    labelFa: 'انجام کارها و ارسال پیام به مدیر',
+  },
   // finance
   {
     dept: 'finance',
@@ -111,6 +125,20 @@ export const PERMISSION_CATALOG: PermissionCatalogEntry[] = [
     sectionLabelFa: 'گزارش‌ها',
     key: 'rp_finance',
     labelFa: 'گزارش مالی',
+  },
+  {
+    dept: 'finance',
+    sectionKey: 'cartable',
+    sectionLabelFa: 'کارتابل',
+    key: 'ct_list',
+    labelFa: 'مشاهده کارتابل',
+  },
+  {
+    dept: 'finance',
+    sectionKey: 'cartable',
+    sectionLabelFa: 'کارتابل',
+    key: 'ct_process',
+    labelFa: 'انجام کارها و ارسال پیام به مدیر',
   },
   // it
   {

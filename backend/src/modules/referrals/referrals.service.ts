@@ -5,33 +5,44 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { TypeORMService } from '../../typeorm/typeorm.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { In, Repository } from 'typeorm';
+import { ManagerReferral } from '../../database/entities/manager-referral.entity';
+import { ManagerReferralRecipient } from '../../database/entities/manager-referral-recipient.entity';
+import { ManagerReferralReport } from '../../database/entities/manager-referral-report.entity';
+import { User } from '../../database/entities/user.entity';
+import { StoredFile } from '../../database/entities/stored-file.entity';
 import { AuditService } from '../audit/audit.service';
 import { CartableService } from '../cartable/cartable.service';
 import { ErrorCode } from '../../common/errors';
 import { STAFF_ROLES } from '../../common/exec-roles';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import type { ReferralPriority } from '../../../generated/typeorm/enums';
+import type { ReferralPriority } from '../../database/enums';
 
 @Injectable()
 export class ReferralsService {
   constructor(
-    private readonly typeorm: TypeORMService,
+    @InjectRepository(ManagerReferral)
+    private readonly referralRepo: Repository<ManagerReferral>,
+    @InjectRepository(ManagerReferralRecipient)
+    private readonly recipientRepo: Repository<ManagerReferralRecipient>,
+    @InjectRepository(ManagerReferralReport)
+    private readonly reportRepo: Repository<ManagerReferralReport>,
+    @InjectRepository(User) private readonly userRepo: Repository<User>,
+    @InjectRepository(StoredFile)
+    private readonly storedFileRepo: Repository<StoredFile>,
     private readonly audit: AuditService,
     private readonly cartable: CartableService,
   ) {}
 
   private async getOwnOrThrow(actor: AuthenticatedUser, id: string) {
-    const referral = await this.typeorm.managerReferral.findUnique({
-      where: { id },
-      include: {
-        recipients: {
-          include: {
-            recipient: { select: { id: true, fullName: true, role: true } },
-          },
-        },
-      },
-    });
+    const referral = await this.referralRepo
+      .createQueryBuilder('referral')
+      .leftJoinAndSelect('referral.recipients', 'recipients')
+      .leftJoin('recipients.recipient', 'recipient')
+      .addSelect(['recipient.id', 'recipient.fullName', 'recipient.role'])
+      .where('referral.id = :id', { id })
+      .getOne();
     if (!referral) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -52,8 +63,8 @@ export class ReferralsService {
     attachmentIds?: string[],
   ) {
     if (!attachmentIds || attachmentIds.length === 0) return;
-    const owned = await this.typeorm.storedFile.count({
-      where: { id: { in: attachmentIds }, ownerId: actor.id },
+    const owned = await this.storedFileRepo.count({
+      where: { id: In(attachmentIds), ownerId: actor.id },
     });
     if (owned !== attachmentIds.length) {
       throw new BadRequestException({
@@ -69,8 +80,8 @@ export class ReferralsService {
   private async resolveAttachments(raw: unknown) {
     const ids = Array.isArray(raw) ? (raw as string[]) : [];
     if (ids.length === 0) return [];
-    const files = await this.typeorm.storedFile.findMany({
-      where: { id: { in: ids } },
+    const files = await this.storedFileRepo.find({
+      where: { id: In(ids) },
       select: { id: true, fileName: true, mimeType: true, sizeBytes: true },
     });
     const byId = new Map(files.map((f) => [f.id, f]));
@@ -80,18 +91,29 @@ export class ReferralsService {
   }
 
   async list(actor: AuthenticatedUser) {
-    const referrals = await this.typeorm.managerReferral.findMany({
-      where: { fromId: actor.id },
-      include: {
-        recipients: {
-          include: {
-            recipient: { select: { id: true, fullName: true, role: true } },
-          },
-        },
-        _count: { select: { reports: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const referrals = await this.referralRepo
+      .createQueryBuilder('referral')
+      .leftJoinAndSelect('referral.recipients', 'recipients')
+      .leftJoin('recipients.recipient', 'recipient')
+      .addSelect(['recipient.id', 'recipient.fullName', 'recipient.role'])
+      .where('referral.fromId = :fromId', { fromId: actor.id })
+      .orderBy('referral.createdAt', 'DESC')
+      .getMany();
+
+    const reportCounts = referrals.length
+      ? await this.reportRepo
+          .createQueryBuilder('report')
+          .select('report.referralId', 'referralId')
+          .addSelect('COUNT(*)', 'count')
+          .where('report.referralId IN (:...ids)', {
+            ids: referrals.map((r) => r.id),
+          })
+          .groupBy('report.referralId')
+          .getRawMany<{ referralId: string; count: string }>()
+      : [];
+    const reportCountById = new Map(
+      reportCounts.map((r) => [r.referralId, parseInt(r.count, 10)]),
+    );
 
     const counts = {
       total: referrals.length,
@@ -109,6 +131,7 @@ export class ReferralsService {
     const withAttachments = await Promise.all(
       referrals.map(async (r) => ({
         ...r,
+        _count: { reports: reportCountById.get(r.id) ?? 0 },
         attachments: await this.resolveAttachments(r.attachments),
       })),
     );
@@ -130,18 +153,25 @@ export class ReferralsService {
    * the gap flagged in Phase 18's PANEL_NAV notes (EMPLOYEE's referrals
    * tab was left out of the computed nav for exactly this reason). */
   async myReferrals(actor: AuthenticatedUser) {
-    const rows = await this.typeorm.managerReferralRecipient.findMany({
-      where: { recipientId: actor.id },
-      include: {
-        referral: {
-          include: {
-            from: { select: { id: true, fullName: true, role: true } },
-            reports: { where: { fromId: actor.id }, select: { id: true } },
-          },
-        },
-      },
-      orderBy: { referral: { createdAt: 'desc' } },
-    });
+    const rows = await this.recipientRepo
+      .createQueryBuilder('rec')
+      .innerJoinAndSelect('rec.referral', 'referral')
+      .leftJoin('referral.from', 'from')
+      .addSelect(['from.id', 'from.fullName', 'from.role'])
+      .where('rec.recipientId = :recipientId', { recipientId: actor.id })
+      .orderBy('referral.createdAt', 'DESC')
+      .getMany();
+
+    const referralIds = rows.map((r) => r.referralId);
+    const myReports = referralIds.length
+      ? await this.reportRepo
+          .createQueryBuilder('report')
+          .select(['report.id', 'report.referralId'])
+          .where('report.referralId IN (:...ids)', { ids: referralIds })
+          .andWhere('report.fromId = :fromId', { fromId: actor.id })
+          .getMany()
+      : [];
+    const hasReportByReferralId = new Set(myReports.map((r) => r.referralId));
 
     const referrals = await Promise.all(
       rows.map(async (r) => ({
@@ -154,7 +184,7 @@ export class ReferralsService {
         createdAt: r.referral.createdAt,
         from: r.referral.from,
         attachments: await this.resolveAttachments(r.referral.attachments),
-        hasMyReport: r.referral.reports.length > 0,
+        hasMyReport: hasReportByReferralId.has(r.referral.id),
       })),
     );
 
@@ -180,11 +210,11 @@ export class ReferralsService {
       attachmentIds?: string[];
     },
   ) {
-    const recipients = await this.typeorm.user.findMany({
+    const recipients = await this.userRepo.find({
       where: {
-        id: { in: dto.recipientIds },
+        id: In(dto.recipientIds),
         isActive: true,
-        role: { in: [...STAFF_ROLES] },
+        role: In([...STAFF_ROLES]),
       },
     });
     if (recipients.length !== new Set(dto.recipientIds).size) {
@@ -201,26 +231,37 @@ export class ReferralsService {
     }
     await this.assertOwnedAttachments(actor, dto.attachmentIds);
 
-    const referral = await this.typeorm.managerReferral.create({
-      data: {
-        fromId: actor.id,
-        title: dto.title,
-        body: dto.body,
-        priority: dto.priority ?? 'MEDIUM',
-        dueAt: dto.dueAt ? new Date(dto.dueAt) : undefined,
-        attachments: dto.attachmentIds ?? [],
-        recipients: {
-          create: dto.recipientIds.map((recipientId) => ({ recipientId })),
-        },
+    const createdId = await this.referralRepo.manager.transaction(
+      async (tx) => {
+        const created = await tx.save(
+          tx.create(ManagerReferral, {
+            fromId: actor.id,
+            title: dto.title,
+            body: dto.body,
+            priority: dto.priority ?? 'MEDIUM',
+            dueAt: dto.dueAt ? new Date(dto.dueAt) : undefined,
+            attachments: dto.attachmentIds ?? [],
+          }),
+        );
+        await tx.save(
+          dto.recipientIds.map((recipientId) =>
+            tx.create(ManagerReferralRecipient, {
+              referralId: created.id,
+              recipientId,
+            }),
+          ),
+        );
+        return created.id;
       },
-      include: {
-        recipients: {
-          include: {
-            recipient: { select: { id: true, fullName: true, role: true } },
-          },
-        },
-      },
-    });
+    );
+
+    const referral = await this.referralRepo
+      .createQueryBuilder('referral')
+      .leftJoinAndSelect('referral.recipients', 'recipients')
+      .leftJoin('recipients.recipient', 'recipient')
+      .addSelect(['recipient.id', 'recipient.fullName', 'recipient.role'])
+      .where('referral.id = :id', { id: createdId })
+      .getOneOrFail();
 
     // Delivery wiring (⚑): recipients have no referrals tab — they receive
     // and answer through their cartable.
@@ -250,23 +291,15 @@ export class ReferralsService {
   }
 
   async detail(actor: AuthenticatedUser, id: string) {
-    const referral = await this.typeorm.managerReferral.findUnique({
-      where: { id },
-      include: {
-        from: { select: { id: true, fullName: true, role: true } },
-        recipients: {
-          include: {
-            recipient: { select: { id: true, fullName: true, role: true } },
-          },
-        },
-        reports: {
-          include: {
-            from: { select: { id: true, fullName: true, role: true } },
-          },
-          orderBy: { createdAt: 'asc' },
-        },
-      },
-    });
+    const referral = await this.referralRepo
+      .createQueryBuilder('referral')
+      .leftJoin('referral.from', 'from')
+      .addSelect(['from.id', 'from.fullName', 'from.role'])
+      .leftJoinAndSelect('referral.recipients', 'recipients')
+      .leftJoin('recipients.recipient', 'recipient')
+      .addSelect(['recipient.id', 'recipient.fullName', 'recipient.role'])
+      .where('referral.id = :id', { id })
+      .getOne();
     if (!referral) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -283,10 +316,17 @@ export class ReferralsService {
         message: 'دسترسی به این ارجاع برای شما مجاز نیست.',
       });
     }
+    const reportRows = await this.reportRepo
+      .createQueryBuilder('report')
+      .leftJoin('report.from', 'from')
+      .addSelect(['from.id', 'from.fullName', 'from.role'])
+      .where('report.referralId = :id', { id })
+      .orderBy('report.createdAt', 'ASC')
+      .getMany();
     const [attachments, reports] = await Promise.all([
       this.resolveAttachments(referral.attachments),
       Promise.all(
-        referral.reports.map(async (r) => ({
+        reportRows.map(async (r) => ({
           ...r,
           attachments: await this.resolveAttachments(r.attachments),
         })),
@@ -300,10 +340,11 @@ export class ReferralsService {
     id: string,
     dto: { body: string; attachmentIds?: string[] },
   ) {
-    const referral = await this.typeorm.managerReferral.findUnique({
-      where: { id },
-      include: { recipients: true },
-    });
+    const referral = await this.referralRepo
+      .createQueryBuilder('referral')
+      .leftJoinAndSelect('referral.recipients', 'recipients')
+      .where('referral.id = :id', { id })
+      .getOne();
     if (!referral) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -324,18 +365,15 @@ export class ReferralsService {
     }
     await this.assertOwnedAttachments(actor, dto.attachmentIds);
 
-    const report = await this.typeorm.managerReferralReport.create({
-      data: {
+    const report = await this.reportRepo.save(
+      this.reportRepo.create({
         referralId: id,
         fromId: actor.id,
         body: dto.body,
         attachments: dto.attachmentIds ?? [],
-      },
-    });
-    await this.typeorm.managerReferral.update({
-      where: { id },
-      data: { status: 'REPORTED' },
-    });
+      }),
+    );
+    await this.referralRepo.update({ id }, { status: 'REPORTED' });
 
     await this.audit.record({
       actorId: actor.id,
@@ -358,10 +396,11 @@ export class ReferralsService {
         message: 'فقط ارجاع دارای گزارش دریافت‌شده قابل بستن است.',
       });
     }
-    const updated = await this.typeorm.managerReferral.update({
-      where: { id },
-      data: { status: 'CLOSED' },
-    });
+    await this.referralRepo.update({ id }, { status: 'CLOSED' });
+    const updated = await this.referralRepo
+      .createQueryBuilder('r')
+      .where('r.id = :id', { id })
+      .getOneOrFail();
     await this.audit.record({
       actorId: actor.id,
       actorRole: actor.role,
@@ -382,10 +421,11 @@ export class ReferralsService {
         message: 'درخواست اصلاح فقط برای گزارش دریافت‌شده ممکن است.',
       });
     }
-    const updated = await this.typeorm.managerReferral.update({
-      where: { id },
-      data: { status: 'REVIEWING' },
-    });
+    await this.referralRepo.update({ id }, { status: 'REVIEWING' });
+    const updated = await this.referralRepo
+      .createQueryBuilder('r')
+      .where('r.id = :id', { id })
+      .getOneOrFail();
     // Ask recipients again through their cartable.
     for (const r of referral.recipients) {
       await this.cartable.createTask({
@@ -418,10 +458,11 @@ export class ReferralsService {
         message: 'یادآوری فقط برای ارجاع در انتظار گزارش ممکن است.',
       });
     }
-    const updated = await this.typeorm.managerReferral.update({
-      where: { id },
-      data: { status: 'REVIEWING' },
-    });
+    await this.referralRepo.update({ id }, { status: 'REVIEWING' });
+    const updated = await this.referralRepo
+      .createQueryBuilder('r')
+      .where('r.id = :id', { id })
+      .getOneOrFail();
     await this.audit.record({
       actorId: actor.id,
       actorRole: actor.role,

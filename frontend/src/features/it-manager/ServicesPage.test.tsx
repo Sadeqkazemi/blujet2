@@ -34,7 +34,7 @@ describe('ServicesPage', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders internal and external service cards and toggles an internal service', async () => {
+  it('renders internal and external service cards and toggles an internal service after confirm', async () => {
     vi.spyOn(itApi, 'fetchItServices').mockResolvedValue(RESULT);
     const toggleSpy = vi.spyOn(itApi, 'toggleInternalService').mockResolvedValue({});
 
@@ -44,6 +44,7 @@ describe('ServicesPage', () => {
 
     const user = userEvent.setup();
     await user.click(screen.getByRole('switch', { name: 'موتور جستجوی پرواز' }));
+    await user.click(await screen.findByRole('button', { name: 'غیرفعال کن' }));
     await waitFor(() => expect(toggleSpy).toHaveBeenCalledWith('search', false));
   });
 

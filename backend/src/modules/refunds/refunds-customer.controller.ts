@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { RefundsService } from './refunds.service';
-import { SubmitRefundDto } from './dto/submit-refund.dto';
+import { PreviewRefundDto, SubmitRefundDto } from './dto/submit-refund.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -34,6 +34,37 @@ export class RefundsCustomerController {
   @ApiOperation({ summary: 'فهرست درخواست‌های استرداد مشتری جاری' })
   async listMine(@CurrentUser() actor: AuthenticatedUser) {
     return { success: true, data: await this.refunds.listMine(actor.id) };
+  }
+
+  @Get('eligible-bookings')
+  @ApiOperation({
+    summary: 'فهرست رزروهای قابل استرداد با پیش‌نمایش جریمه',
+  })
+  async eligibleBookings(@CurrentUser() actor: AuthenticatedUser) {
+    return {
+      success: true,
+      data: await this.refunds.listEligibleBookings(actor.id),
+    };
+  }
+
+  @Get('rules')
+  @ApiOperation({ summary: 'قوانین جاری جریمه استرداد برای نمایش به مشتری' })
+  async rules() {
+    return { success: true, data: await this.refunds.listCustomerRules() };
+  }
+
+  @Post('preview')
+  @ApiOperation({
+    summary: 'بازمحاسبه مالکیت، امکان استرداد و جریمه پیش از تأیید',
+  })
+  async preview(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Body() dto: PreviewRefundDto,
+  ) {
+    return {
+      success: true,
+      data: await this.refunds.previewMine(actor.id, dto.bookingId),
+    };
   }
 
   @Get(':id')

@@ -1,26 +1,28 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { TypeORMService } from '../src/typeorm/typeorm.service';
+import { DataSource } from 'typeorm';
+import { AuditLog } from '../src/database/entities/audit-log.entity';
+import { PanelAccessFlag } from '../src/database/entities/panel-access-flag.entity';
 import { loginAs } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
 describe('Panels (e2e)', () => {
   let app: INestApplication<App>;
-  let typeorm: TypeORMService;
+  let dataSource: DataSource;
 
   // Fresh app per test — avoids leaking the shared login-route throttle budget across tests.
   beforeEach(async () => {
     app = await createTestApp();
-    typeorm = app.get(TypeORMService);
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
     await app.close();
   });
 
-  it('returns the confirmed tab set for Finance Manager (flights/admins/settings excluded)', async () => {
-    const { accessToken } = await loginAs(app, 'finance.karimi');
+  it('returns the confirmed tab set for Finance Manager (flights/flightops/admins/settings excluded)', async () => {
+    const { accessToken } = await loginAs(app, 'finance');
     const res = await request(app.getHttpServer())
       .get('/panels/nav')
       .set('Authorization', `Bearer ${accessToken}`);
@@ -30,7 +32,6 @@ describe('Panels (e2e)', () => {
     expect(keys).toEqual([
       'dashboard',
       'agencies',
-      'flightops',
       'reports',
       'staff',
       'finance',
@@ -38,8 +39,30 @@ describe('Panels (e2e)', () => {
       'cartable',
     ]);
     expect(keys).not.toContain('flights');
+    expect(keys).not.toContain('flightops');
     expect(keys).not.toContain('admins');
     expect(keys).not.toContain('settings');
+  });
+
+  it('returns the confirmed tab set for Commercial Manager (includes webservice + flights)', async () => {
+    const { accessToken } = await loginAs(app, 'comm');
+    const res = await request(app.getHttpServer())
+      .get('/panels/nav')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(res.status).toBe(200);
+    const keys = res.body.data.map((t: { key: string }) => t.key);
+    expect(keys).toEqual([
+      'dashboard',
+      'agencies',
+      'flights',
+      'reports',
+      'staff',
+      'clubrules',
+      'webservice',
+      'finance',
+      'cartable',
+    ]);
+    expect(keys).not.toContain('flightops');
   });
 
   it('returns the confirmed tab set for CEO', async () => {
@@ -50,23 +73,45 @@ describe('Panels (e2e)', () => {
     const keys = res.body.data.map((t: { key: string }) => t.key);
     expect(keys).toEqual([
       'dashboard',
-      'flightops',
       'admins',
       'finance',
       'cartable',
       'club',
+      'survey',
       'mgrreports',
+      'reservation',
       'pricing',
-      'clubrules',
       'panels',
       'security',
       'logs',
+    ]);
+    expect(keys).not.toContain('clubrules');
+    expect(keys).not.toContain('flightops');
+  });
+
+  it('returns the confirmed tab set for Senior Manager in design sidebar order', async () => {
+    const { accessToken } = await loginAs(app, 'senior');
+    const res = await request(app.getHttpServer())
+      .get('/panels/nav')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(res.status).toBe(200);
+    const keys = res.body.data.map((t: { key: string }) => t.key);
+    expect(keys).toEqual([
+      'dashboard',
+      'admins',
+      'finance',
+      'cartable',
+      'mgrreports',
+      'vip',
       'survey',
+      'reservation',
+      'panels',
+      'security',
     ]);
   });
 
   it('an EMPLOYEE with no granted permissions still gets dashboard + referrals, not an error', async () => {
-    const { accessToken } = await loginAs(app, 'com.ahmadi');
+    const { accessToken } = await loginAs(app, 'emp.none');
     const res = await request(app.getHttpServer())
       .get('/panels/nav')
       .set('Authorization', `Bearer ${accessToken}`);
@@ -77,14 +122,36 @@ describe('Panels (e2e)', () => {
     ]);
   });
 
-  it('EMPLOYEE nav is computed dynamically from real EmployeePermission grants (sales.moradi: ag_list + fl_view)', async () => {
+  it('EMPLOYEE nav is computed dynamically from real EmployeePermission grants (sales.moradi: ag_list, no flights)', async () => {
     const { accessToken } = await loginAs(app, 'sales.moradi');
     const res = await request(app.getHttpServer())
       .get('/panels/nav')
       .set('Authorization', `Bearer ${accessToken}`);
     expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([
+      { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
+      { key: 'agencies', labelFa: 'مدیریت آژانس‌ها', implemented: true },
+      { key: 'cartable', labelFa: 'کارتابل', implemented: true },
+      { key: 'referrals', labelFa: 'ارجاعات', implemented: true },
+    ]);
+    expect(res.body.data.map((t: { key: string }) => t.key)).not.toContain('flights');
+  });
+
+  it('com.ahmadi (design demo employee) gets agencies + reports + cartable + referrals, never flights', async () => {
+    const { accessToken } = await loginAs(app, 'com.ahmadi');
+    const res = await request(app.getHttpServer())
+      .get('/panels/nav')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(res.status).toBe(200);
     const keys = res.body.data.map((t: { key: string }) => t.key);
-    expect(keys).toEqual(['dashboard', 'agencies', 'flights', 'referrals']);
+    expect(keys).toEqual([
+      'dashboard',
+      'agencies',
+      'reports',
+      'cartable',
+      'referrals',
+    ]);
+    expect(keys).not.toContain('flights');
   });
 
   it('returns the confirmed tab set for SITE_ADMIN', async () => {
@@ -99,16 +166,21 @@ describe('Panels (e2e)', () => {
       'agencies',
       'flightops',
       'reports',
-      'cartable',
       'club',
       'refund',
+      'cartable',
       'tickets',
+      'media',
       'jobapps',
     ]);
+    // Product request (2026-08): never surface these in the SITE_ADMIN sidebar.
+    expect(keys).not.toContain('blog');
+    expect(keys).not.toContain('kyc');
+    expect(keys).not.toContain('settings');
   });
 
   it('non-CEO/Senior roles get 403 on /panels/access', async () => {
-    const { accessToken } = await loginAs(app, 'finance.karimi');
+    const { accessToken } = await loginAs(app, 'finance');
     const res = await request(app.getHttpServer())
       .get('/panels/access')
       .set('Authorization', `Bearer ${accessToken}`);
@@ -117,7 +189,7 @@ describe('Panels (e2e)', () => {
 
   it('CEO can toggle a sibling panel off, it audits the action, and the affected role is blocked server-side', async () => {
     const ceo = await loginAs(app, 'ceo');
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
 
     const before = await request(app.getHttpServer())
       .get('/reporting/kpis?granularity=q6')
@@ -131,10 +203,13 @@ describe('Panels (e2e)', () => {
     expect(toggle.status).toBe(200);
     expect(toggle.body.data.enabled).toBe(false);
 
-    const auditRow = await typeorm.auditLog.findFirst({
-      where: { category: 'ACCESS', entityId: 'FINANCE' },
-      orderBy: { createdAt: 'desc' },
-    });
+    const auditRow = await dataSource
+      .getRepository(AuditLog)
+      .createQueryBuilder('a')
+      .where('a.category = :category', { category: 'ACCESS' })
+      .andWhere('a.entityId = :entityId', { entityId: 'FINANCE' })
+      .orderBy('a.createdAt', 'DESC')
+      .getOne();
     expect(auditRow).not.toBeNull();
     expect(auditRow!.actorRole).toBe('CEO');
 
@@ -176,16 +251,19 @@ describe('Panels (e2e)', () => {
 
     expect([resA.status, resB.status]).toEqual([200, 200]);
 
-    const finalFlag = await typeorm.panelAccessFlag.findUniqueOrThrow({
-      where: { panelKey: 'COMMERCIAL' },
-    });
+    const finalFlag = await dataSource
+      .getRepository(PanelAccessFlag)
+      .findOneByOrFail({ panelKey: 'COMMERCIAL' });
     expect([true, false]).toContain(finalFlag.enabled);
 
-    const auditRows = await typeorm.auditLog.findMany({
-      where: { category: 'ACCESS', entityId: 'COMMERCIAL' },
-      orderBy: { createdAt: 'desc' },
-      take: 2,
-    });
+    const auditRows = await dataSource
+      .getRepository(AuditLog)
+      .createQueryBuilder('a')
+      .where('a.category = :category', { category: 'ACCESS' })
+      .andWhere('a.entityId = :entityId', { entityId: 'COMMERCIAL' })
+      .orderBy('a.createdAt', 'DESC')
+      .take(2)
+      .getMany();
     expect(auditRows).toHaveLength(2);
 
     // Cleanup.

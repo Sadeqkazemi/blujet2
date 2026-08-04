@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
-import { fetchApiKeys, fetchMyWebserviceRequests, requestWebservice } from '../../api/agency-portal';
+import { Link } from 'react-router-dom';
+import { fetchApiKeys, fetchAgencyPortalWebservicePlans, fetchMyWebserviceRequests, requestWebservice } from '../../api/agency-portal';
 import { ApiRequestError } from '../../api/envelope';
 import { formatJalaliDate } from '../../lib/jalali';
+import { faMoney } from '../../lib/fa-format';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import type { AgencyApiKeySummary, AgencyApiScope, AgencyWebserviceRequest } from '../../types/agency-portal';
 
@@ -33,11 +35,11 @@ const SCOPE_LABEL: Record<string, Tr> = {
   SEARCH_ONLY: { fa: 'فقط جستجو', en: 'Search Only', ar: 'البحث فقط' },
 };
 
-const WS_PLANS: { key: 1 | 3 | 12; label: Tr; priceLabel: string }[] = [
-  { key: 1, label: { fa: '۱ ماهه', en: '1 Month', ar: 'شهر واحد' }, priceLabel: '۴٬۵۰۰٬۰۰۰' },
-  { key: 3, label: { fa: '۳ ماهه', en: '3 Months', ar: '٣ أشهر' }, priceLabel: '۱۲٬۰۰۰٬۰۰۰' },
-  { key: 12, label: { fa: '۱۲ ماهه', en: '12 Months', ar: '١٢ شهرًا' }, priceLabel: '۴۲٬۰۰۰٬۰۰۰' },
-];
+const WS_PLAN_LABELS: Record<1 | 3 | 12, Tr> = {
+  1: { fa: '۱ ماهه', en: '1 Month', ar: 'شهر واحد' },
+  3: { fa: '۳ ماهه', en: '3 Months', ar: '٣ أشهر' },
+  12: { fa: '۱۲ ماهه', en: '12 Months', ar: '١٢ شهرًا' },
+};
 
 const STR: Record<StoredLocale, {
   toman: string;
@@ -62,6 +64,7 @@ const STR: Record<StoredLocale, {
   domainLabel: string;
   keyNotice: string;
   activatedAtLabel: string;
+  viewDocsLabel: string;
 }> = {
   fa: {
     toman: 'تومان',
@@ -88,6 +91,7 @@ const STR: Record<StoredLocale, {
     keyNotice:
       'کلید دسترسی API به دلیل امنیت فقط یک‌بار — هنگام تأیید درخواست — از طریق مکاتبه (کارتابل) برای شما ارسال شده است. در صورت گم‌شدن کلید، درخواست صدور مجدد را با پشتیبانی مطرح کنید.',
     activatedAtLabel: 'فعال‌سازی:',
+    viewDocsLabel: 'مشاهده مستندات وب‌سرویس',
   },
   en: {
     toman: 'Toman',
@@ -114,6 +118,7 @@ const STR: Record<StoredLocale, {
     keyNotice:
       'For security, the API access key was sent to you only once — via correspondence (cartable) — when the request was approved. If you lose the key, request re-issuance through support.',
     activatedAtLabel: 'Activated:',
+    viewDocsLabel: 'View web service documentation',
   },
   ar: {
     toman: 'تومان',
@@ -140,6 +145,7 @@ const STR: Record<StoredLocale, {
     keyNotice:
       'لأسباب أمنية، أُرسل مفتاح الوصول إلى API لمرة واحدة فقط — عند الموافقة على الطلب — عبر المراسلات (الكارتابل). في حال فقدان المفتاح، يُرجى طلب إعادة الإصدار من الدعم.',
     activatedAtLabel: 'التفعيل:',
+    viewDocsLabel: 'عرض توثيق خدمة الويب',
   },
 };
 
@@ -150,18 +156,34 @@ export default function AgencyWebservicePage() {
   const [plan, setPlan] = useState<1 | 3 | 12>(1);
   const [requests, setRequests] = useState<AgencyWebserviceRequest[]>([]);
   const [apiKeys, setApiKeys] = useState<AgencyApiKeySummary[]>([]);
+  const [planPrices, setPlanPrices] = useState<Record<1 | 3 | 12, number>>({
+    1: 45_000_000,
+    3: 120_000_000,
+    12: 420_000_000,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const selPlan = WS_PLANS.find((p) => p.key === plan)!;
+  const wsPlans = ([1, 3, 12] as const).map((key) => ({
+    key,
+    label: WS_PLAN_LABELS[key],
+    priceLabel: faMoney(planPrices[key]),
+  }));
+
+  const selPlan = wsPlans.find((p) => p.key === plan)!;
 
   function reload() {
     setLoading(true);
-    Promise.all([fetchMyWebserviceRequests(), fetchApiKeys()])
-      .then(([r, k]) => {
+    Promise.all([fetchMyWebserviceRequests(), fetchApiKeys(), fetchAgencyPortalWebservicePlans()])
+      .then(([r, k, plans]) => {
         setRequests(r);
         setApiKeys(k);
+        const byMonth = Object.fromEntries(plans.plans.map((p) => [p.months, p.priceIrr])) as Record<
+          1 | 3 | 12,
+          number
+        >;
+        setPlanPrices(byMonth);
         setError(null);
       })
       .catch(() => setError(t.errorFallback))
@@ -236,7 +258,7 @@ export default function AgencyWebservicePage() {
 
           <div className="mb-2 text-xs font-bold text-[#5a6678]">{t.durationLabel}</div>
           <div className="mb-5 grid grid-cols-3 gap-2">
-            {WS_PLANS.map((p) => (
+            {wsPlans.map((p) => (
               <div
                 key={p.key}
                 data-testid={`ws-plan-${p.key}`}
@@ -244,7 +266,7 @@ export default function AgencyWebservicePage() {
                 className={`cursor-pointer rounded-xl border p-3 text-center ${plan === p.key ? 'border-[#1668c4] bg-[#f2f7fd]' : 'border-[#e8eef6]'}`}
               >
                 <div className="text-xs font-extrabold text-[#0d2640]">{p.label[locale]}</div>
-                <div className="font-num mt-1 text-[11px] font-bold text-[#1668c4]">
+                <div className="mt-1 text-[11px] font-bold text-[#1668c4]">
                   {p.priceLabel} {t.toman}
                 </div>
               </div>
@@ -254,7 +276,7 @@ export default function AgencyWebservicePage() {
           <div className="flex items-center justify-between rounded-xl bg-[#fafbfd] p-4">
             <div>
               <div className="text-[10.5px] text-[#8a96a6]">{t.payableLabel}</div>
-              <div className="font-num text-base font-black text-[#0d2640]">
+              <div className="text-base font-black text-[#0d2640]">
                 {selPlan.priceLabel} <span className="text-[10px] font-normal text-[#8a96a6]">{t.toman}</span>
               </div>
             </div>
@@ -299,8 +321,15 @@ export default function AgencyWebservicePage() {
             {t.keyNotice}
           </div>
           <div data-testid="ws-key-activated-at" className="text-[10.5px] text-[#8a96a6]">
-            {t.activatedAtLabel} <span className="font-num">{formatJalaliDate(activeKey.activatedAt)}</span>
+            {t.activatedAtLabel} <span>{formatJalaliDate(activeKey.activatedAt)}</span>
           </div>
+          <Link
+            to="/agency/apidocs"
+            data-testid="ws-view-docs"
+            className="mt-4 flex h-11 items-center justify-center gap-2 rounded-[10px] border border-[#d9e7f6] text-xs font-bold text-[#1668c4] transition hover:bg-[#f2f7fd]"
+          >
+            📄 {t.viewDocsLabel}
+          </Link>
         </div>
       )}
     </div>

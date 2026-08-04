@@ -1,18 +1,36 @@
 import type { ReactNode } from 'react';
 
 const FEATURES = [
-  { icon: '🛡️', text: 'احراز هویت امن و کنترل دسترسی نقش‌محور' },
-  { icon: '✓', text: 'هر نقش فقط به بخش‌های مجاز خود دسترسی دارد' },
-  { icon: '🕒', text: 'ثبت گزارش خودکار فعالیت‌ها برای مدیران' },
+  {
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 3l7 3v5.5c0 4.2-2.9 7.4-7 8.5-4.1-1.1-7-4.3-7-8.5V6l7-3z" />
+      </svg>
+    ),
+    text: 'احراز هویت امن و کنترل دسترسی نقش‌محور',
+  },
+  {
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M20 6L9 17l-5-5" />
+      </svg>
+    ),
+    text: 'هر نقش فقط به بخش‌های مجاز خود دسترسی دارد',
+  },
+  {
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3 2" />
+      </svg>
+    ),
+    text: 'ثبت گزارش خودکار فعالیت‌ها برای مدیران',
+  },
 ];
 
 /** Shared light two-column shell for the staff login + 2FA steps — matches
- * the refreshed design-reference/ورود مدیران و کارمندان.dc.html (light
- * theme, visual panel on the aside, white form panel). The design's photo
- * background is a solid brand gradient here instead of a hotlinked
- * external image (no external asset dependency at runtime), and the
- * accent stays #1668c4 per CLAUDE.md's locked palette rather than the
- * design file's local blue variant. */
+ * design-reference/ورود مدیران و کارمندان.dc.html (light theme, visual
+ * panel on the aside, white form panel). */
 export function StaffLoginLayout({ children }: { children: ReactNode }) {
   return (
     <div className="grid min-h-screen grid-cols-1 bg-[#eef2f8] font-sans text-[#0f172a] md:grid-cols-[1fr_460px]">
@@ -44,7 +62,7 @@ export function StaffLoginLayout({ children }: { children: ReactNode }) {
         <div className="relative flex flex-col gap-3">
           {FEATURES.map((f) => (
             <div key={f.text} className="flex items-center gap-2.5 text-[12.5px] text-[#dde5f2]">
-              <span className="flex h-7 w-7 flex-none items-center justify-center rounded-lg bg-accent/20">
+              <span className="flex h-7 w-7 flex-none items-center justify-center rounded-lg bg-accent/20 text-[#60a5fa]">
                 {f.icon}
               </span>
               {f.text}

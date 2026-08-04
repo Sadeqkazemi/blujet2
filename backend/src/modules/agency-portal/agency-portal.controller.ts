@@ -4,12 +4,14 @@ import {
   Get,
   Param,
   Post,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiConsumes, ApiOperation, ApiProduces, ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { AgencyPortalService } from './agency-portal.service';
 import {
   PostInboxMessageDto,
@@ -95,6 +97,22 @@ export class AgencyPortalController {
     return { success: true, data: await this.portal.sales(actor) };
   }
 
+  @Get('sales/export')
+  @ApiOperation({ summary: 'خروجی CSV فروش آژانس برای Excel' })
+  @ApiProduces('text/csv')
+  async salesExport(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Res() res: Response,
+  ) {
+    const csv = await this.portal.salesCsv(actor);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="agency-sales.csv"',
+    );
+    res.send(csv);
+  }
+
   @Get('inbox')
   @ApiOperation({ summary: 'کارتابل و پیام‌ها — خواندن' })
   async inbox(@CurrentUser() actor: AuthenticatedUser) {
@@ -146,6 +164,13 @@ export class AgencyPortalController {
       success: true,
       data: await this.portal.uploadDocument(actor, file, dto),
     };
+  }
+
+  @Get('webservice-plans')
+  @ApiOperation({ summary: 'قیمت‌های فعلی پلن‌های وب‌سرویس (ریال)' })
+  async webservicePlans(@CurrentUser() actor: AuthenticatedUser) {
+    await this.portal.assertAgency(actor);
+    return { success: true, data: await this.portal.webservicePlans() };
   }
 
   @Post('webservice-requests')

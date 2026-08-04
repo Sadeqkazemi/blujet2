@@ -1,7 +1,8 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { TypeORMService } from '../../src/typeorm/typeorm.service';
+import { DataSource } from 'typeorm';
+import { User } from '../../src/database/entities/user.entity';
 import { TWO_FACTOR_PROVIDER } from '../../src/modules/auth/providers/two-factor-provider.interface';
 import { MockTwoFactorProvider } from '../../src/modules/auth/providers/mock-two-factor.provider';
 
@@ -11,7 +12,7 @@ export async function loginAs(
   username: string,
   password = 'Blujet@1404',
 ) {
-  const typeorm = app.get(TypeORMService);
+  const dataSource = app.get(DataSource);
   const twoFactor = app.get<MockTwoFactorProvider>(TWO_FACTOR_PROVIDER);
 
   const loginRes = await request(app.getHttpServer())
@@ -22,7 +23,9 @@ export async function loginAs(
     return { loginRes, verifyRes: null, accessToken: null as string | null };
   }
 
-  const user = await typeorm.user.findUniqueOrThrow({ where: { username } });
+  const user = await dataSource
+    .getRepository(User)
+    .findOneByOrFail({ username });
   const code = twoFactor.getLastCode(user.id);
   if (!code) throw new Error(`No 2FA code recorded for ${username}`);
 
@@ -51,7 +54,7 @@ export async function stepUpFor(
     | 'PRICE_CAPACITY_CHANGE'
     | 'SESSION_REVOKE',
 ) {
-  const typeorm = app.get(TypeORMService);
+  const dataSource = app.get(DataSource);
   const twoFactor = app.get<MockTwoFactorProvider>(TWO_FACTOR_PROVIDER);
 
   const requestRes = await request(app.getHttpServer())
@@ -64,7 +67,9 @@ export async function stepUpFor(
     );
   }
 
-  const user = await typeorm.user.findUniqueOrThrow({ where: { username } });
+  const user = await dataSource
+    .getRepository(User)
+    .findOneByOrFail({ username });
   const code = twoFactor.getLastCode(user.id);
   if (!code) throw new Error(`No step-up code recorded for ${username}`);
 

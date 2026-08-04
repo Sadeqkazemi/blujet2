@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import SupportTicketsPage from './SupportTicketsPage';
 import * as ticketsApi from '../../api/support-tickets';
@@ -34,14 +34,21 @@ function mockList(rows: SupportTicketRow[] = [TICKET]) {
 }
 
 describe('SupportTicketsPage', () => {
-  it('renders the ticket list with subject, tracking code and status pill', async () => {
-    mockList();
+  it('renders dark KPIs, table columns, status/priority badges and create button', async () => {
+    mockList([
+      TICKET,
+      row({ id: 't2', trackingCode: 'TK222', status: 'CLOSED', subject: 'بسته', requesterName: 'علی' }),
+    ]);
     render(<SupportTicketsPage />);
 
-    expect(await screen.findByText('مشکل در پرداخت')).toBeInTheDocument();
+    expect(await screen.findByText('تیکت‌ها')).toBeInTheDocument();
+    expect(screen.getByText('کل تیکت‌ها')).toBeInTheDocument();
+    expect(screen.getByText('مشکل در پرداخت')).toBeInTheDocument();
     expect(screen.getByText('TK1A2B3C4D')).toBeInTheDocument();
-    expect(screen.getByText('باز')).toBeInTheDocument();
-    expect(screen.getByText('۱ تیکت')).toBeInTheDocument();
+    expect(screen.getAllByText('باز').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('متوسط').length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: /ایجاد تیکت/ })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/جستجو بر اساس شماره/)).toBeInTheDocument();
   });
 
   it('shows the empty state when no tickets exist', async () => {
@@ -58,7 +65,7 @@ describe('SupportTicketsPage', () => {
     const { default: userEvent } = await import('@testing-library/user-event');
     render(<SupportTicketsPage />);
 
-    await userEvent.click(await screen.findByRole('button', { name: /حسین رضوی/ }));
+    await userEvent.click(await screen.findByText('حسین رضوی'));
     const dialog = await screen.findByRole('dialog', { name: /TK1A2B3C4D/ });
 
     expect(within(dialog).getByText('حسین رضوی')).toBeInTheDocument();
@@ -78,7 +85,7 @@ describe('SupportTicketsPage', () => {
     const { default: userEvent } = await import('@testing-library/user-event');
     render(<SupportTicketsPage />);
 
-    await userEvent.click(await screen.findByRole('button', { name: /حسین رضوی/ }));
+    await userEvent.click(await screen.findByText('حسین رضوی'));
     const dialog = await screen.findByRole('dialog', { name: /TK1A2B3C4D/ });
 
     const submit = within(dialog).getByRole('button', { name: 'ثبت ارجاع' });
@@ -101,11 +108,61 @@ describe('SupportTicketsPage', () => {
     const { default: userEvent } = await import('@testing-library/user-event');
     render(<SupportTicketsPage />);
 
-    await userEvent.click(await screen.findByRole('button', { name: /حسین رضوی/ }));
+    await userEvent.click(await screen.findByText('حسین رضوی'));
     const dialog = await screen.findByRole('dialog', { name: /TK1A2B3C4D/ });
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'بسته شده' }));
 
     expect(updateStatus).toHaveBeenCalledWith('t1', 'CLOSED');
+  });
+
+  it('creates a ticket via the admin modal', async () => {
+    mockList([]);
+    const create = vi.spyOn(ticketsApi, 'createAdminSupportTicket').mockResolvedValue(
+      row({ trackingCode: 'TKNEW1234', subject: 'عدم صدور بلیط' }),
+    );
+
+    const { default: userEvent } = await import('@testing-library/user-event');
+    render(<SupportTicketsPage />);
+
+    await userEvent.click(await screen.findByRole('button', { name: /ایجاد تیکت/ }));
+    const dialog = await screen.findByRole('dialog', { name: 'ایجاد تیکت جدید' });
+
+    await userEvent.type(within(dialog).getByPlaceholderText(/عدم صدور بلیط/), 'عدم صدور بلیط');
+    await userEvent.type(within(dialog).getByPlaceholderText(/نام آژانس/), 'آژانس تست');
+    await userEvent.type(within(dialog).getByPlaceholderText(/جزئیات مشکل/), 'توضیح کامل مشکل');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'ثبت تیکت' }));
+
+    await waitFor(() =>
+      expect(create).toHaveBeenCalledWith({
+        subject: 'عدم صدور بلیط',
+        requesterName: 'آژانس تست',
+        dept: 'SITE',
+        priority: 'MEDIUM',
+        body: 'توضیح کامل مشکل',
+      }),
+    );
+    expect(await screen.findByText(/تیکت TKNEW1234 ثبت شد/)).toBeInTheDocument();
+  });
+
+  it('paginates at 10 tickets per page', async () => {
+    mockList(
+      Array.from({ length: 12 }, (_, i) =>
+        row({
+          id: `t${i + 1}`,
+          trackingCode: `TK${1000 + i}`,
+          subject: `موضوع ${i + 1}`,
+          requesterName: `کاربر ${i + 1}`,
+        }),
+      ),
+    );
+    const { default: userEvent } = await import('@testing-library/user-event');
+    render(<SupportTicketsPage />);
+
+    expect(await screen.findByText('موضوع 1')).toBeInTheDocument();
+    expect(screen.getByText('موضوع 10')).toBeInTheDocument();
+    expect(screen.queryByText('موضوع 11')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'بعدی' }));
+    expect(await screen.findByText('موضوع 11')).toBeInTheDocument();
   });
 });

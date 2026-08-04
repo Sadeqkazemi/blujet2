@@ -30,7 +30,9 @@ describe('CeoLogsPage', () => {
     vi.spyOn(adminsApi, 'fetchSystemEvents').mockResolvedValue(ROWS);
     render(<CeoLogsPage />);
 
-    expect(await screen.findByText('تأیید نرخ پیشنهادی پرواز')).toBeInTheDocument();
+    expect(await screen.findByText('لاگ و رویدادها')).toBeInTheDocument();
+    expect(screen.getByText('لاگ‌ها و رویدادهای سامانه')).toBeInTheDocument();
+    expect(screen.getByText('تأیید نرخ پیشنهادی پرواز')).toBeInTheDocument();
     expect(screen.getByText('موفق')).toBeInTheDocument();
     expect(screen.getByText('هشدار')).toBeInTheDocument();
   });

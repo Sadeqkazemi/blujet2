@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { dayjs } from '../lib/jalali';
+import { dayjs, isoDateAtNoon, toIsoDateOnly } from '../lib/jalali';
 import { faDigits } from '../lib/fa-format';
 
 const WEEKDAYS = ['ش', 'ی', 'د', 'س', 'چ', 'پ', 'ج'];
@@ -31,8 +31,8 @@ function buildMonthCells(viewMonth: ReturnType<typeof dayjs>, minIso: string | n
   const cells: (Cell | null)[] = Array.from({ length: offset }, () => null);
   for (let d = 1; d <= daysInMonth; d++) {
     const day = start.add(d - 1, 'day');
-    const iso = day.toDate().toISOString();
-    cells.push({ date: d, iso, disabled: minIso ? iso.slice(0, 10) < minIso.slice(0, 10) : false });
+    const iso = toIsoDateOnly(day);
+    cells.push({ date: d, iso, disabled: minIso ? iso < minIso.slice(0, 10) : false });
   }
   return cells;
 }
@@ -43,10 +43,27 @@ interface JalaliDatePickerProps {
   onChange: (iso: string) => void;
   minDate?: string;
   testId?: string;
+  placeholder?: string;
+  subLabel?: string;
+  isRTL?: boolean;
+  theme?: 'light' | 'dark';
+  /** Compact single-line trigger (toolbar chips in dark panels). */
+  compact?: boolean;
 }
 
 /** Jalali (شمسی) date picker — CLAUDE.md requires Jalali everywhere users pick dates. */
-export default function JalaliDatePicker({ label, value, onChange, minDate, testId }: JalaliDatePickerProps) {
+export default function JalaliDatePicker({
+  label,
+  value,
+  onChange,
+  minDate,
+  testId,
+  placeholder = 'انتخاب کنید',
+  subLabel,
+  isRTL = true,
+  theme = 'light',
+  compact = false,
+}: JalaliDatePickerProps) {
   const [open, setOpen] = useState(false);
   const [viewMonth, setViewMonth] = useState(() => (value ? dayjs(value).calendar('jalali') : dayjs().calendar('jalali')));
   const rootRef = useRef<HTMLDivElement>(null);
@@ -66,23 +83,71 @@ export default function JalaliDatePicker({ label, value, onChange, minDate, test
 
   const displayValue = value
     ? faDigits(dayjs(value).calendar('jalali').format('YYYY/MM/DD'))
-    : 'انتخاب کنید';
+    : placeholder;
+
+  const weekdaySub =
+    subLabel ??
+    (value
+      ? faDigits(dayjs(value).calendar('jalali').format('dddd')) +
+        ' ' +
+        faDigits(String(dayjs(value).calendar('jalali').year()))
+      : label);
+
+  const dark = theme === 'dark';
+  const valueColor = dark ? (value ? '#e7ecf3' : '#9fb0c7') : value ? '#0d2640' : '#aeb6c2';
+  const mutedColor = dark ? '#6b7b94' : '#9aa4b2';
+  const popupBg = dark ? '#141d2e' : '#fff';
+  const popupBorder = dark ? '#2a3550' : '#e6eaf0';
 
   return (
-    <div ref={rootRef} style={{ position: 'relative' }}>
+    <div ref={rootRef} style={{ position: 'relative', height: '100%' }}>
       <div
         data-testid={testId}
         onClick={() => setOpen((v) => !v)}
-        style={{ cursor: 'pointer', padding: '5px 13px', display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}
+        style={{
+          cursor: 'pointer',
+          padding: compact ? '0 10px' : '5px 13px',
+          display: 'flex',
+          flexDirection: compact ? 'row' : 'column',
+          alignItems: compact ? 'center' : undefined,
+          justifyContent: 'center',
+          gap: compact ? 6 : undefined,
+          height: compact ? 38 : '100%',
+        }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#9aa4b2', fontWeight: 600, marginBottom: 3 }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="4" width="18" height="18" rx="2" />
-            <path d="M3 9h18M8 2v4M16 2v4" />
-          </svg>
-          {label}
-        </div>
-        <div style={{ fontSize: '13.5px', fontWeight: 800, color: value ? '#0d2640' : '#aeb6c2' }}>{displayValue}</div>
+        {compact ? (
+          <>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={mutedColor} strokeWidth="1.9">
+              <rect x="3" y="4" width="18" height="17" rx="2" />
+              <path d="M3 9h18M8 2v4M16 2v4" />
+            </svg>
+            <span style={{ fontSize: 11.5, fontWeight: 600, color: valueColor, whiteSpace: 'nowrap' }}>
+              {value ? displayValue : placeholder}
+            </span>
+          </>
+        ) : (
+          <>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                fontSize: 11,
+                color: mutedColor,
+                fontWeight: 600,
+                marginBottom: 3,
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" />
+                <path d="M3 9h18M8 2v4M16 2v4" />
+              </svg>
+              {label}
+            </div>
+            <div style={{ fontSize: '13.5px', fontWeight: 800, color: valueColor }}>{displayValue}</div>
+            <div style={{ fontSize: '10.5px', color: mutedColor, marginTop: 1 }}>{weekdaySub}</div>
+          </>
+        )}
       </div>
 
       {open && (
@@ -91,15 +156,18 @@ export default function JalaliDatePicker({ label, value, onChange, minDate, test
             position: 'absolute',
             top: '100%',
             marginTop: 8,
-            right: 0,
+            [isRTL ? 'right' : 'left']: 0,
             width: 300,
             maxWidth: '92vw',
-            background: '#fff',
-            border: '1px solid #e6eaf0',
+            background: popupBg,
+            border: `1px solid ${popupBorder}`,
             borderRadius: 18,
-            boxShadow: '0 24px 56px -14px rgba(13,38,102,.34)',
+            boxShadow: dark
+              ? '0 24px 60px -16px rgba(0,0,0,.6)'
+              : '0 24px 56px -14px rgba(13,38,102,.34)',
             padding: '18px 20px',
             zIndex: 50,
+            color: dark ? '#e7ecf3' : undefined,
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
@@ -108,7 +176,7 @@ export default function JalaliDatePicker({ label, value, onChange, minDate, test
               onClick={() => {
                 const today = dayjs().calendar('jalali');
                 setViewMonth(today);
-                onChange(today.toDate().toISOString());
+                onChange(isoDateAtNoon(toIsoDateOnly(today)));
                 setOpen(false);
               }}
               style={{ padding: '7px 15px', border: '1.5px solid #1668c4', borderRadius: 22, color: '#1668c4', fontSize: '11.5px', fontWeight: 700, cursor: 'pointer' }}
@@ -144,14 +212,14 @@ export default function JalaliDatePicker({ label, value, onChange, minDate, test
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 2 }}>
             {cells.map((c, i) => {
               if (!c) return <span key={`blank-${i}`} />;
-              const isSelected = selectedIsoDay === c.iso.slice(0, 10);
+              const isSelected = selectedIsoDay === c.iso;
               return (
                 <span
                   key={c.iso}
                   data-testid={testId ? `${testId}-day-${c.date}` : undefined}
                   onClick={() => {
                     if (c.disabled) return;
-                    onChange(c.iso);
+                    onChange(isoDateAtNoon(c.iso));
                     setOpen(false);
                   }}
                   style={{

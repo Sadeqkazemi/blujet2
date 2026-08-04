@@ -2,20 +2,36 @@ import type { INestApplication } from '@nestjs/common';
 import type { App } from 'supertest/types';
 import request from 'supertest';
 import * as crypto from 'node:crypto';
-import { TypeORMClient } from '../generated/typeorm/client';
-import { TypeORMPg } from '@typeorm/adapter-pg';
+import { DataSource, In } from 'typeorm';
+import { dataSourceOptions } from '../src/database/data-source.options';
+import { AiUsageLog } from '../src/database/entities/ai-usage-log.entity';
+import { AuditLog } from '../src/database/entities/audit-log.entity';
+import { Booking } from '../src/database/entities/booking.entity';
+import { Flight } from '../src/database/entities/flight.entity';
+import { FlightInstance } from '../src/database/entities/flight-instance.entity';
+import { Route } from '../src/database/entities/route.entity';
+import { SurveyInvite } from '../src/database/entities/survey-invite.entity';
+import { SurveyQuestion } from '../src/database/entities/survey-question.entity';
+import { SurveyResponse } from '../src/database/entities/survey-response.entity';
+import { SurveySettings } from '../src/database/entities/survey-settings.entity';
+import {
+  BookingChannel,
+  BookingStatus,
+  FlightInstanceStatus,
+} from '../src/database/enums';
 import { createTestApp } from './helpers/app.helper';
 import { loginAs } from './helpers/login.helper';
-
-const typeorm = new TypeORMClient({
-  adapter: new TypeORMPg({ connectionString: process.env.DATABASE_URL }),
-});
 
 /** Phase 66 — نظرسنجی مسافران: IT_MANAGER config, lazy invite creation +
  * SMS on FLOWN, public token submission, and CEO/SENIOR_MANAGER/
  * BOARD_CHAIR read-only results + AI summary. See docs/API.md. */
 describe('Survey (e2e)', () => {
   let app: INestApplication<App>;
+  let dataSource: DataSource;
+  // A standalone connection: beforeAll runs before any app exists, and
+  // afterAll runs after the last per-test app (and its own DataSource) has
+  // already been closed by afterEach.
+  let fixtureDataSource: DataSource;
   const FLIGHT_NO = 'SVY-1';
   let flightId: string;
   const createdInstanceIds: string[] = [];
@@ -27,20 +43,34 @@ describe('Survey (e2e)', () => {
   }
 
   beforeAll(async () => {
-    const route = await typeorm.route.upsert({
-      where: { originCode_destCode: { originCode: 'THR', destCode: 'KIH' } },
-      update: {},
-      create: { originCode: 'THR', destCode: 'KIH', durationMin: 70 },
+    fixtureDataSource = new DataSource(dataSourceOptions);
+    await fixtureDataSource.initialize();
+
+    const routeRepo = fixtureDataSource.getRepository(Route);
+    let route = await routeRepo.findOneBy({
+      originCode: 'THR',
+      destCode: 'KIH',
     });
-    const flight = await typeorm.flight.upsert({
-      where: { flightNo: FLIGHT_NO },
-      update: {},
-      create: {
-        flightNo: FLIGHT_NO,
-        routeId: route.id,
-        aircraftType: 'SVY-Jet',
-      },
-    });
+    if (!route) {
+      route = await routeRepo.save(
+        routeRepo.create({
+          originCode: 'THR',
+          destCode: 'KIH',
+          durationMin: 70,
+        }),
+      );
+    }
+    const flightRepo = fixtureDataSource.getRepository(Flight);
+    let flight = await flightRepo.findOneBy({ flightNo: FLIGHT_NO });
+    if (!flight) {
+      flight = await flightRepo.save(
+        flightRepo.create({
+          flightNo: FLIGHT_NO,
+          routeId: route.id,
+          aircraftType: 'SVY-Jet',
+        }),
+      );
+    }
     flightId = flight.id;
   });
 
@@ -49,6 +79,7 @@ describe('Survey (e2e)', () => {
   // do this); this file logs in as many different staff users.
   beforeEach(async () => {
     app = await createTestApp();
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
@@ -56,55 +87,75 @@ describe('Survey (e2e)', () => {
   });
 
   afterAll(async () => {
-    await typeorm.surveyResponse.deleteMany({
-      where: { invite: { bookingId: { in: createdBookingIds } } },
-    });
-    await typeorm.surveyInvite.deleteMany({
-      where: { bookingId: { in: createdBookingIds } },
-    });
-    await typeorm.surveyQuestion.deleteMany({
-      where: { id: { in: createdQuestionIds } },
-    });
-    await typeorm.booking.deleteMany({
-      where: { id: { in: createdBookingIds } },
-    });
-    await typeorm.flightInstance.deleteMany({
-      where: { id: { in: createdInstanceIds } },
-    });
-    await typeorm.flight.deleteMany({ where: { id: flightId } });
-    await typeorm.surveySettings.updateMany({ data: { enabled: true } });
+    if (createdBookingIds.length > 0) {
+      const invites = await fixtureDataSource
+        .getRepository(SurveyInvite)
+        .findBy({ bookingId: In(createdBookingIds) });
+      const inviteIds = invites.map((i) => i.id);
+      if (inviteIds.length > 0) {
+        await fixtureDataSource
+          .getRepository(SurveyResponse)
+          .delete({ inviteId: In(inviteIds) });
+      }
+      await fixtureDataSource
+        .getRepository(SurveyInvite)
+        .delete({ bookingId: In(createdBookingIds) });
+    }
+    if (createdQuestionIds.length > 0) {
+      await fixtureDataSource
+        .getRepository(SurveyQuestion)
+        .delete({ id: In(createdQuestionIds) });
+    }
+    if (createdBookingIds.length > 0) {
+      await fixtureDataSource
+        .getRepository(Booking)
+        .delete({ id: In(createdBookingIds) });
+    }
+    if (createdInstanceIds.length > 0) {
+      await fixtureDataSource
+        .getRepository(FlightInstance)
+        .delete({ id: In(createdInstanceIds) });
+    }
+    await fixtureDataSource.getRepository(Flight).delete({ id: flightId });
+    await fixtureDataSource
+      .createQueryBuilder()
+      .update(SurveySettings)
+      .set({ enabled: true, updatedAt: new Date() })
+      .execute();
 
-    await typeorm.$disconnect();
+    await fixtureDataSource.destroy();
   });
 
   async function makeFlownBooking(overrides?: {
     contactPhone?: string | null;
   }) {
     const departureAt = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
-    const instance = await typeorm.flightInstance.create({
-      data: {
+    const flightInstanceRepo = dataSource.getRepository(FlightInstance);
+    const instance = await flightInstanceRepo.save(
+      flightInstanceRepo.create({
         flightId,
         departureAt,
         arrivalAt: new Date(departureAt.getTime() + 70 * 60 * 1000),
         capacity: 10,
-        status: 'DEPARTED',
-      },
-    });
+        status: FlightInstanceStatus.DEPARTED,
+      }),
+    );
     createdInstanceIds.push(instance.id);
 
-    const booking = await typeorm.booking.create({
-      data: {
+    const bookingRepo = dataSource.getRepository(Booking);
+    const booking = await bookingRepo.save(
+      bookingRepo.create({
         pnr: `SVY${crypto.randomUUID().slice(0, 6).toUpperCase()}`,
         flightInstanceId: instance.id,
-        channel: 'SYSTEM',
-        status: 'FLOWN',
-        priceIrr: 1_000_000,
+        channel: BookingChannel.SYSTEM,
+        status: BookingStatus.FLOWN,
+        priceIrr: 1_000_000n,
         contactPhone:
           overrides?.contactPhone === undefined
             ? '09120000000'
             : overrides.contactPhone,
-      },
-    });
+      }),
+    );
     createdBookingIds.push(booking.id);
     return { instance, booking };
   }
@@ -126,10 +177,12 @@ describe('Survey (e2e)', () => {
       expect(patchRes.body.data.title).toBe('نظرسنجی رضایت مسافران بلوجت');
       expect(patchRes.body.data.updatedByLabelFa).toBeTruthy();
 
-      const auditRow = await typeorm.auditLog.findFirst({
-        where: { entityType: 'SurveySettings' },
-        orderBy: { createdAt: 'desc' },
-      });
+      const auditRow = await dataSource
+        .getRepository(AuditLog)
+        .createQueryBuilder('a')
+        .where('a.entityType = :entityType', { entityType: 'SurveySettings' })
+        .orderBy('a.createdAt', 'DESC')
+        .getOne();
       expect(auditRow?.category).toBe('SURVEY');
 
       const ceo = await loginAs(app, 'ceo');
@@ -176,18 +229,18 @@ describe('Survey (e2e)', () => {
         .set(auth(it.accessToken));
       expect(first.status).toBe(200);
 
-      const invite = await typeorm.surveyInvite.findUnique({
-        where: { bookingId: booking.id },
-      });
+      const invite = await dataSource
+        .getRepository(SurveyInvite)
+        .findOneBy({ bookingId: booking.id });
       expect(invite).not.toBeNull();
       expect(invite?.smsSentAt).not.toBeNull();
 
       await request(app.getHttpServer())
         .get('/survey/stats')
         .set(auth(it.accessToken));
-      const count = await typeorm.surveyInvite.count({
-        where: { bookingId: booking.id },
-      });
+      const count = await dataSource
+        .getRepository(SurveyInvite)
+        .count({ where: { bookingId: booking.id } });
       expect(count).toBe(1);
     });
 
@@ -203,9 +256,9 @@ describe('Survey (e2e)', () => {
         .get('/survey/stats')
         .set(auth(it.accessToken));
 
-      const invite = await typeorm.surveyInvite.findUnique({
-        where: { bookingId: booking.id },
-      });
+      const invite = await dataSource
+        .getRepository(SurveyInvite)
+        .findOneBy({ bookingId: booking.id });
       expect(invite).toBeNull();
 
       await request(app.getHttpServer())
@@ -223,9 +276,9 @@ describe('Survey (e2e)', () => {
         .set(auth(it.accessToken));
       expect(res.status).toBe(200);
 
-      const invite = await typeorm.surveyInvite.findUnique({
-        where: { bookingId: booking.id },
-      });
+      const invite = await dataSource
+        .getRepository(SurveyInvite)
+        .findOneBy({ bookingId: booking.id });
       expect(invite).not.toBeNull();
       expect(invite?.smsSentAt).toBeNull();
     });
@@ -234,21 +287,22 @@ describe('Survey (e2e)', () => {
       const { booking } = await makeFlownBooking();
       // Simulate a prior run where the invite row was created but the SMS
       // send itself failed/crashed before smsSentAt could be set.
-      await typeorm.surveyInvite.create({
-        data: {
+      const surveyInviteRepo = dataSource.getRepository(SurveyInvite);
+      await surveyInviteRepo.save(
+        surveyInviteRepo.create({
           bookingId: booking.id,
           flightInstanceId: booking.flightInstanceId,
-        },
-      });
+        }),
+      );
       const it = await loginAs(app, 'itadmin');
 
       await request(app.getHttpServer())
         .get('/survey/stats')
         .set(auth(it.accessToken));
 
-      const invite = await typeorm.surveyInvite.findUniqueOrThrow({
-        where: { bookingId: booking.id },
-      });
+      const invite = await dataSource
+        .getRepository(SurveyInvite)
+        .findOneByOrFail({ bookingId: booking.id });
       expect(invite.smsSentAt).not.toBeNull();
     });
   });
@@ -267,14 +321,13 @@ describe('Survey (e2e)', () => {
       await request(app.getHttpServer())
         .get('/survey/stats')
         .set(auth(it.accessToken));
-      const invite = await typeorm.surveyInvite.findUniqueOrThrow({
-        where: { bookingId: booking.id },
-      });
+      const invite = await dataSource
+        .getRepository(SurveyInvite)
+        .findOneByOrFail({ bookingId: booking.id });
 
-      await typeorm.booking.update({
-        where: { id: booking.id },
-        data: { status: 'NO_SHOW' },
-      });
+      await dataSource
+        .getRepository(Booking)
+        .update({ id: booking.id }, { status: BookingStatus.NO_SHOW });
 
       const getRes = await request(app.getHttpServer()).get(
         `/survey/${invite.token}`,
@@ -293,9 +346,9 @@ describe('Survey (e2e)', () => {
       await request(app.getHttpServer())
         .get('/survey/stats')
         .set(auth(it.accessToken));
-      const invite = await typeorm.surveyInvite.findUniqueOrThrow({
-        where: { bookingId: booking.id },
-      });
+      const invite = await dataSource
+        .getRepository(SurveyInvite)
+        .findOneByOrFail({ bookingId: booking.id });
 
       const getRes = await request(app.getHttpServer()).get(
         `/survey/${invite.token}`,
@@ -333,9 +386,9 @@ describe('Survey (e2e)', () => {
       await request(app.getHttpServer())
         .get('/survey/stats')
         .set(auth(it.accessToken));
-      const invite = await typeorm.surveyInvite.findUniqueOrThrow({
-        where: { bookingId: booking.id },
-      });
+      const invite = await dataSource
+        .getRepository(SurveyInvite)
+        .findOneByOrFail({ bookingId: booking.id });
 
       await request(app.getHttpServer())
         .patch('/survey/settings')
@@ -368,14 +421,14 @@ describe('Survey (e2e)', () => {
       await request(app.getHttpServer())
         .get('/survey/stats')
         .set(auth(it.accessToken));
-      const invite = await typeorm.surveyInvite.findUniqueOrThrow({
-        where: { bookingId: booking.id },
-      });
+      const invite = await dataSource
+        .getRepository(SurveyInvite)
+        .findOneByOrFail({ bookingId: booking.id });
       await request(app.getHttpServer())
         .post(`/survey/${invite.token}`)
         .send({ rating: 5, comment: 'عالی بود' });
 
-      for (const username of ['ceo', 'senior.rahimi', 'chair']) {
+      for (const username of ['ceo', 'senior', 'chair']) {
         const { accessToken } = await loginAs(app, username);
         const res = await request(app.getHttpServer())
           .get('/survey/results')
@@ -392,7 +445,7 @@ describe('Survey (e2e)', () => {
     });
 
     it('GET /survey/results — 403 for IT_MANAGER/FINANCE_MANAGER/COMMERCIAL_MANAGER', async () => {
-      for (const username of ['itadmin', 'finance.karimi', 'comm.abbasi']) {
+      for (const username of ['itadmin', 'finance', 'comm']) {
         const { accessToken } = await loginAs(app, username);
         const res = await request(app.getHttpServer())
           .get('/survey/results')
@@ -427,16 +480,16 @@ describe('Survey (e2e)', () => {
       await request(app.getHttpServer())
         .get('/survey/stats')
         .set(auth(it.accessToken));
-      const invite = await typeorm.surveyInvite.findUniqueOrThrow({
-        where: { bookingId: booking.id },
-      });
+      const invite = await dataSource
+        .getRepository(SurveyInvite)
+        .findOneByOrFail({ bookingId: booking.id });
       await request(app.getHttpServer())
         .post(`/survey/${invite.token}`)
         .send({ rating: 2, comment: 'صندلی راحت نبود' });
 
-      const logsBefore = await typeorm.aiUsageLog.count({
-        where: { provider: 'survey-summary' },
-      });
+      const logsBefore = await dataSource
+        .getRepository(AiUsageLog)
+        .count({ where: { provider: 'survey-summary' } });
 
       const ceo = await loginAs(app, 'ceo');
       const res = await request(app.getHttpServer())
@@ -447,9 +500,9 @@ describe('Survey (e2e)', () => {
         'خلاصه‌ای از نظرات این پرواز در دسترس نیست.',
       );
 
-      const logsAfter = await typeorm.aiUsageLog.count({
-        where: { provider: 'survey-summary' },
-      });
+      const logsAfter = await dataSource
+        .getRepository(AiUsageLog)
+        .count({ where: { provider: 'survey-summary' } });
       expect(logsAfter).toBe(logsBefore);
 
       const it2 = await loginAs(app, 'itadmin');

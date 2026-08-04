@@ -4,7 +4,10 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import HomeSearchPage from './HomeSearchPage';
 import * as publicSiteApi from '../../api/publicSite';
+import * as siteContentApi from '../../api/site-content';
+import * as settingsApi from '../../api/settings';
 import * as useAuthModule from '../../hooks/useAuth';
+import * as useIsMobileModule from '../../hooks/useIsMobile';
 import * as useLocaleModule from '../../hooks/useLocale';
 
 const AIRPORTS = [
@@ -14,6 +17,22 @@ const AIRPORTS = [
 
 function mockLocale(locale: 'fa' | 'en' | 'ar' = 'fa') {
   vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale, setLocale: vi.fn() });
+}
+
+function mockDesktop() {
+  vi.spyOn(useIsMobileModule, 'useIsMobile').mockReturnValue(false);
+}
+
+function mockMobile() {
+  vi.spyOn(useIsMobileModule, 'useIsMobile').mockReturnValue(true);
+}
+
+function mockHomeApis() {
+  vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
+  vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockResolvedValue(CMS_HOME);
+  vi.spyOn(settingsApi, 'fetchPublicAppLinks').mockResolvedValue({
+    links: [{ id: 'app_store', name: 'App Store', url: 'https://apps.apple.com/blujet' }],
+  });
 }
 
 function renderPage() {
@@ -32,33 +51,119 @@ function renderPage() {
   );
 }
 
+async function pickAirport(testId: 'home-origin' | 'home-dest', code: string) {
+  await userEvent.click(screen.getByTestId(testId));
+  await userEvent.click(screen.getByTestId(`airport-option-${code}`));
+}
+
 async function pickToday() {
   await userEvent.click(screen.getByTestId('home-date'));
   await userEvent.click(screen.getByTestId('home-date-today'));
 }
 
+const CMS_HOME = {
+  blocks: [
+    {
+      key: 'HERO_BANNER' as const,
+      enabled: true,
+      title: 'عنوان CMS',
+      subtitle: 'زیرعنوان CMS',
+      buttonText: 'جستجو',
+      badgeText: 'برچسب CMS',
+      imageFileId: null,
+      imageUrl: null,
+    },
+    {
+      key: 'ANNOUNCEMENT_BAR' as const,
+      enabled: true,
+      title: 'اطلاعیه CMS',
+      subtitle: '',
+      buttonText: 'جزئیات',
+      badgeText: '',
+      imageFileId: null,
+      imageUrl: null,
+    },
+    {
+      key: 'PROMO_BANNER' as const,
+      enabled: true,
+      title: 'پromo CMS',
+      subtitle: 'توضیح promo',
+      buttonText: 'رزرو',
+      badgeText: 'ویژه CMS',
+      imageFileId: null,
+      imageUrl: null,
+    },
+  ],
+  destinations: [
+    { airportCode: 'DXB', cityFa: 'دبی', priceIrr: '38000000', imageUrl: null },
+  ],
+  routes: [
+    {
+      fromAirportCode: 'THR',
+      toAirportCode: 'MHD',
+      fromCityFa: 'تهران',
+      toCityFa: 'مشهد',
+      priceIrr: '16000000',
+    },
+  ],
+};
+
 describe('HomeSearchPage', () => {
   it('renders RTL search form with airports loaded', async () => {
     vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
+    vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockResolvedValue(CMS_HOME);
+    vi.spyOn(settingsApi, 'fetchPublicAppLinks').mockResolvedValue({
+      links: [{ id: 'app_store', name: 'App Store', url: 'https://apps.apple.com/blujet' }],
+    });
     renderPage();
 
-    expect(await screen.findAllByText('تهران (THR)')).toHaveLength(2);
+    expect(await screen.findByTestId('home-origin')).toBeInTheDocument();
+    expect(screen.getByTestId('home-origin')).toHaveTextContent('شهر مبدا');
+    expect(screen.getByTestId('home-dest')).toHaveTextContent('شهر مقصد');
     expect(screen.getByTestId('home-search-submit')).toBeInTheDocument();
+    expect(document.getElementById('search-card')).toBeInTheDocument();
   });
 
   it('shows a validation error when submitted without selections', async () => {
     vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
+    vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockResolvedValue(CMS_HOME);
+    vi.spyOn(settingsApi, 'fetchPublicAppLinks').mockResolvedValue({
+      links: [{ id: 'app_store', name: 'App Store', url: 'https://apps.apple.com/blujet' }],
+    });
     renderPage();
-    await screen.findAllByText('تهران (THR)');
+    await screen.findByTestId('home-origin');
 
     await userEvent.click(screen.getByTestId('home-search-submit'));
     expect(screen.getByText('مبدأ، مقصد و تاریخ را انتخاب کنید.')).toBeInTheDocument();
   });
 
-  it('renders the mock marketing sections (offers, destinations, club, app)', async () => {
+  it('renders CMS-driven marketing sections when home content loads', async () => {
     vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
+    vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockResolvedValue(CMS_HOME);
+    vi.spyOn(settingsApi, 'fetchPublicAppLinks').mockResolvedValue({
+      links: [{ id: 'app_store', name: 'App Store', url: 'https://apps.apple.com/blujet' }],
+    });
     renderPage();
-    await screen.findAllByText('تهران (THR)');
+    await screen.findByTestId('home-origin');
+
+    expect(screen.getByText('عنوان CMS')).toBeInTheDocument();
+    expect(screen.getByText('اطلاعیه CMS')).toBeInTheDocument();
+    expect(screen.getByText('پromo CMS')).toBeInTheDocument();
+    expect(screen.getByTestId('popular-dest-DXB')).toBeInTheDocument();
+    expect(screen.getByTestId('popular-route-MHD')).toBeInTheDocument();
+    expect(screen.getByText('پیشنهادهای ویژه')).toBeInTheDocument();
+    expect(screen.getByText('با رسیدن به حد امتیاز، کارت عضویت بگیر')).toBeInTheDocument();
+    const appStore = screen.getByTestId('app-link-app_store');
+    expect(appStore.tagName).toBe('A');
+    expect(appStore).toHaveAttribute('href', 'https://apps.apple.com/blujet');
+  });
+
+  it('falls back to static marketing when CMS fetch fails', async () => {
+    vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
+    vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockRejectedValue(new Error('offline'));
+    vi.spyOn(settingsApi, 'fetchPublicAppLinks').mockResolvedValue({ links: [] });
+    renderPage();
+    await screen.findByTestId('home-origin');
 
     expect(screen.getByText('پیشنهادهای ویژه')).toBeInTheDocument();
     expect(screen.getByTestId('offer-THR-IST')).toBeInTheDocument();
@@ -70,13 +175,51 @@ describe('HomeSearchPage', () => {
     expect(screen.getByText('سفرت را همراه خودت ببر')).toBeInTheDocument();
   });
 
+  it('shows selected city names in origin and destination fields', async () => {
+    mockHomeApis();
+    renderPage();
+    await screen.findByTestId('home-origin');
+
+    await pickAirport('home-origin', 'THR');
+    await pickAirport('home-dest', 'MHD');
+
+    expect(screen.getByTestId('home-origin')).toHaveTextContent('تهران');
+    expect(screen.getByTestId('home-dest')).toHaveTextContent('مشهد');
+  });
+
+  it('lists fallback cities when airports API has not loaded yet', async () => {
+    vi.spyOn(publicSiteApi, 'fetchAirports').mockReturnValue(new Promise(() => {}));
+    vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockResolvedValue(CMS_HOME);
+    vi.spyOn(settingsApi, 'fetchPublicAppLinks').mockResolvedValue({ links: [] });
+    renderPage();
+    await screen.findByTestId('home-origin');
+
+    await userEvent.click(screen.getByTestId('home-origin'));
+    expect(await screen.findByTestId('airport-option-THR')).toBeInTheDocument();
+    expect(screen.getByTestId('airport-option-MHD')).toBeInTheDocument();
+  });
+
+  it('blocks destination picker until origin is chosen', async () => {
+    mockHomeApis();
+    renderPage();
+    await screen.findByTestId('home-origin');
+
+    await userEvent.click(screen.getByTestId('home-dest'));
+    expect(screen.queryByTestId('airport-option-MHD')).not.toBeInTheDocument();
+    expect(screen.getByText('ابتدا مبدا را انتخاب کنید')).toBeInTheDocument();
+  });
+
   it('rejects identical origin and destination', async () => {
     vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
+    vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockResolvedValue(CMS_HOME);
+    vi.spyOn(settingsApi, 'fetchPublicAppLinks').mockResolvedValue({
+      links: [{ id: 'app_store', name: 'App Store', url: 'https://apps.apple.com/blujet' }],
+    });
     renderPage();
-    await screen.findAllByText('تهران (THR)');
+    await screen.findByTestId('home-origin');
 
-    await userEvent.selectOptions(screen.getByTestId('home-origin'), 'THR');
-    await userEvent.selectOptions(screen.getByTestId('home-dest'), 'THR');
+    await pickAirport('home-origin', 'THR');
+    await pickAirport('home-dest', 'THR');
     await pickToday();
     await userEvent.click(screen.getByTestId('home-search-submit'));
 
@@ -86,8 +229,18 @@ describe('HomeSearchPage', () => {
   it('renders translated marketing sections and Latin-digit toman prices in English', async () => {
     mockLocale('en');
     vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
+    vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockResolvedValue({
+      ...CMS_HOME,
+      blocks: CMS_HOME.blocks.map((b) =>
+        b.key === 'HERO_BANNER'
+          ? { ...b, title: 'Book your next flight with blujet', badgeText: 'Up to 5% cashback' }
+          : b.key === 'PROMO_BANNER'
+            ? { ...b, title: 'Up to 40% off international flights', badgeText: 'blujet Summer Sale' }
+            : b,
+      ),
+    });
     renderPage();
-    await screen.findAllByText('Tehran (THR)');
+    await screen.findByTestId('home-origin');
 
     expect(screen.getByText('Book your next flight with blujet')).toBeInTheDocument();
     expect(screen.getByText('Special Offers')).toBeInTheDocument();
@@ -101,13 +254,70 @@ describe('HomeSearchPage', () => {
   it('renders Arabic marketing sections with Eastern Arabic-Indic digits', async () => {
     mockLocale('ar');
     vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
+    vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockResolvedValue({
+      ...CMS_HOME,
+      blocks: CMS_HOME.blocks.map((b) =>
+        b.key === 'HERO_BANNER' ? { ...b, title: 'احجز رحلتك القادمة مع blujet' } : b,
+      ),
+    });
     renderPage();
-    await screen.findAllByText('طهران (THR)');
+    await screen.findByTestId('home-origin');
 
     expect(screen.getByText('احجز رحلتك القادمة مع blujet')).toBeInTheDocument();
     expect(screen.getByText('عروض خاصة')).toBeInTheDocument();
     expect(screen.getByText('الوجهات الشائعة')).toBeInTheDocument();
     expect(screen.getByTestId('offer-THR-IST')).toHaveTextContent('١٩٪ خصم');
     expect(screen.getByTestId('popular-route-MHD')).toHaveTextContent('١٬٦٠٠٬٠٠٠');
+  });
+});
+
+/** Frozen responsive layout — do not change without explicit product approval. */
+describe('HomeSearchPage — responsive layout (frozen)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    mockHomeApis();
+  });
+
+  it('desktop: services grid, destinations + loyalty carousel visible, no hscroll', async () => {
+    mockDesktop();
+    renderPage();
+    await screen.findByTestId('home-origin');
+
+    const services = screen.getByTestId('home-services');
+    expect(services).not.toHaveClass('hscroll');
+    expect(services).toHaveStyle({ display: 'grid' });
+
+    const offers = screen.getByTestId('special-offers-scroll');
+    expect(offers).not.toHaveClass('hscroll');
+    expect(offers).toHaveStyle({ display: 'grid' });
+
+    expect(screen.getByText('مقصدهای محبوب')).toBeInTheDocument();
+    expect(screen.getByTestId('popular-dest-DXB')).toBeInTheDocument();
+    expect(screen.getByText('با رسیدن به حد امتیاز، کارت عضویت بگیر')).toBeInTheDocument();
+  });
+
+  it('mobile: horizontal hscroll for services/offers/destinations, carousel hidden', async () => {
+    mockMobile();
+    renderPage();
+    await screen.findByTestId('home-origin');
+
+    const services = screen.getByTestId('home-services');
+    expect(services).toHaveClass('hscroll');
+    expect(services).toHaveStyle({ display: 'flex', overflowX: 'auto' });
+
+    const serviceButtons = services.querySelectorAll('button');
+    expect(serviceButtons.length).toBe(4);
+    expect(serviceButtons[0]).toHaveStyle({ flex: '0 0 calc(50% - 6.5px)' });
+
+    const offers = screen.getByTestId('special-offers-scroll');
+    expect(offers).toHaveClass('hscroll');
+    expect(offers).toHaveStyle({ display: 'flex', overflowX: 'auto' });
+
+    const offerButtons = offers.querySelectorAll('button');
+    expect(offerButtons[0]).toHaveStyle({ flex: '0 0 calc(50% - 9px)' });
+
+    expect(screen.getByText('مقصدهای محبوب')).toBeInTheDocument();
+    expect(screen.getByTestId('popular-dest-DXB')).toBeInTheDocument();
+    expect(screen.queryByText('با رسیدن به حد امتیاز، کارت عضویت بگیر')).not.toBeInTheDocument();
   });
 });

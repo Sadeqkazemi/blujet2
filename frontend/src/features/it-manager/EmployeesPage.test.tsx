@@ -39,8 +39,8 @@ describe('EmployeesPage', () => {
     const createSpy = vi.spyOn(itApi, 'createEmployee');
 
     render(<EmployeesPage />);
-    expect(await screen.findByText('رضا کاظمی')).toBeInTheDocument();
-    expect(screen.getByText('فعال')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'رضا کاظمی' })).toBeInTheDocument();
+    expect(screen.getAllByText('فعال').length).toBeGreaterThan(0);
 
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'افزودن کاربر' }));
@@ -72,5 +72,31 @@ describe('EmployeesPage', () => {
 
     await user.click(screen.getByText('+ مشاهدهٔ پروازها'));
     await waitFor(() => expect(grantSpy).toHaveBeenCalledWith('e1', 'fl_view', true));
+  });
+
+  it('shows suspend confirmation before deactivating an employee', async () => {
+    vi.spyOn(itApi, 'fetchEmployees').mockResolvedValue(EMPLOYEES);
+    vi.spyOn(itApi, 'fetchPermissionCatalog').mockResolvedValue(CATALOG);
+    const statusSpy = vi.spyOn(itApi, 'setEmployeeStatus').mockResolvedValue({ id: 'e1', isActive: false });
+
+    render(<EmployeesPage />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'تعلیق' }));
+    expect(screen.getByText(/آیا حساب «رضا کاظمی» معلق شود/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'تعلیق حساب' }));
+    await waitFor(() => expect(statusSpy).toHaveBeenCalledWith('e1', false));
+  });
+
+  it('creates a custom organizational unit in the add-user form', async () => {
+    vi.spyOn(itApi, 'fetchEmployees').mockResolvedValue([]);
+    vi.spyOn(itApi, 'fetchPermissionCatalog').mockResolvedValue(CATALOG);
+
+    render(<EmployeesPage />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'افزودن کاربر' }));
+    await user.click(screen.getByRole('button', { name: '+ ایجاد واحد سازمانی جدید' }));
+    await user.type(screen.getByPlaceholderText('نام واحد جدید (مثلاً بازاریابی)'), 'بازاریابی');
+    await user.click(screen.getByRole('button', { name: 'افزودن' }));
+    expect(screen.getByRole('button', { name: 'بازاریابی' })).toBeInTheDocument();
   });
 });

@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AgencySalesPage from './AgencySalesPage';
 import * as portalApi from '../../api/agency-portal';
@@ -21,12 +22,12 @@ const REPORT: AgencySalesReport = {
       flightNo: 'EP-821',
       route: 'THR → DXB',
       departureAt: '2026-08-01T05:00:00.000Z',
-      priceIrr: 190_000_000,
+      priceIrr: '190000000',
       passengerCount: 1,
     },
   ],
-  perFlight: [{ flightNo: 'EP-821', route: 'THR → DXB', ticketsCount: 4, salesIrr: 700_000_000 }],
-  summary: { totalSalesIrr: 760_000_000, ticketsIssued: 4, avgFareIrr: 190_000_000, refundRatePct: 0 },
+  perFlight: [{ flightNo: 'EP-821', route: 'THR → DXB', ticketsCount: 4, salesIrr: '700000000' }],
+  summary: { totalSalesIrr: '760000000', ticketsIssued: 4, avgFareIrr: '190000000', refundRatePct: 0 },
 };
 
 describe('AgencySalesPage', () => {
@@ -44,8 +45,7 @@ describe('AgencySalesPage', () => {
     vi.spyOn(portalApi, 'fetchSales').mockResolvedValue(REPORT);
     render(<AgencySalesPage />);
 
-    expect(await screen.findByText('Sales & Reports')).toBeInTheDocument();
-    expect(screen.getByText('Total Sales (Toman)')).toBeInTheDocument();
+    expect(await screen.findByText('Total Sales (Toman)')).toBeInTheDocument();
     expect(screen.getByText('Sales per Flight')).toBeInTheDocument();
     expect(screen.getByText('Ticketed')).toBeInTheDocument();
   });
@@ -55,7 +55,20 @@ describe('AgencySalesPage', () => {
     vi.spyOn(portalApi, 'fetchSales').mockResolvedValue(REPORT);
     render(<AgencySalesPage />);
 
-    expect(await screen.findByText('المبيعات والتقارير')).toBeInTheDocument();
-    expect(screen.getByText('تم إصدار التذكرة')).toBeInTheDocument();
+    expect(await screen.findByText('تم إصدار التذكرة')).toBeInTheDocument();
+  });
+
+  it('downloads sales export CSV when export button is clicked', async () => {
+    vi.spyOn(portalApi, 'fetchSales').mockResolvedValue(REPORT);
+    const exportSpy = vi.spyOn(portalApi, 'downloadSalesExport').mockResolvedValue(
+      new Blob(['PNR,Flight'], { type: 'text/csv' }),
+    );
+
+    render(<AgencySalesPage />);
+    await screen.findByText('BJAG001');
+
+    await userEvent.click(screen.getByTestId('sales-export'));
+
+    expect(exportSpy).toHaveBeenCalled();
   });
 });
