@@ -38,6 +38,8 @@ describe('LoginPage', () => {
     expect(screen.getByLabelText('نام کاربری')).toBeInTheDocument();
     expect(screen.getByLabelText('رمز عبور')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'ورود به سامانه' })).toBeInTheDocument();
+    expect(screen.getByTestId('staff-passenger-link')).toHaveAttribute('href', '/signin');
+    expect(screen.getByTestId('staff-agency-link')).toHaveAttribute('href', '/agency/login');
   });
 
   it('shows an inline Persian validation error when submitted empty', async () => {
