@@ -5,10 +5,12 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
-import { Role } from '../../../generated/typeorm/enums';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Role } from '../../database/enums';
 import { SKIP_MUST_CHANGE_PASSWORD } from '../decorators/skip-must-change-password.decorator';
 import type { AuthenticatedUser } from '../types/authenticated-user';
-import { TypeORMService } from '../../typeorm/typeorm.service';
+import { User } from '../../database/entities/user.entity';
 
 const PASSWORD_CHANGE_ROLES: Role[] = [
   'EMPLOYEE',
@@ -26,7 +28,8 @@ const PASSWORD_CHANGE_ROLES: Role[] = [
 export class JwtAuthGuard extends AuthGuard('jwt') {
   constructor(
     private readonly reflector: Reflector,
-    private readonly typeorm: TypeORMService,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
   ) {
     super();
   }
@@ -41,11 +44,13 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     );
     if (skip) return true;
 
-    const request = context.switchToHttp().getRequest<{ user?: AuthenticatedUser }>();
+    const request = context
+      .switchToHttp()
+      .getRequest<{ user?: AuthenticatedUser }>();
     const user = request.user;
     if (!user || !PASSWORD_CHANGE_ROLES.includes(user.role)) return true;
 
-    const row = await this.typeorm.user.findUnique({
+    const row = await this.userRepo.findOne({
       where: { id: user.id },
       select: { mustChangePassword: true },
     });

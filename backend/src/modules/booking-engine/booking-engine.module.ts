@@ -1,4 +1,28 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { Airport } from '../../database/entities/airport.entity';
+import { Booking } from '../../database/entities/booking.entity';
+import { Passenger } from '../../database/entities/passenger.entity';
+import { FlightInstance } from '../../database/entities/flight-instance.entity';
+import { AircraftSeatMap } from '../../database/entities/aircraft-seat-map.entity';
+import { SeatLock } from '../../database/entities/seat-lock.entity';
+import { User } from '../../database/entities/user.entity';
+import { PriceLock } from '../../database/entities/price-lock.entity';
+import { PaymentReconciliation } from '../../database/entities/payment-reconciliation.entity';
+import { PayIdempotencyRecord } from '../../database/entities/pay-idempotency-record.entity';
+import { LedgerEntry } from '../../database/entities/ledger-entry.entity';
+import { PromoCode } from '../../database/entities/promo-code.entity';
+import { PromoRedemption } from '../../database/entities/promo-redemption.entity';
+import { WalletEntry } from '../../database/entities/wallet-entry.entity';
+import { ClubMember } from '../../database/entities/club-member.entity';
+import { ClubPointsEntry } from '../../database/entities/club-points-entry.entity';
+import { ClubTierRule } from '../../database/entities/club-tier-rule.entity';
+import { SavedFlight } from '../../database/entities/saved-flight.entity';
+import { FareRule } from '../../database/entities/fare-rule.entity';
+import { CabinFare } from '../../database/entities/cabin-fare.entity';
+import { FarePricingProposal } from '../../database/entities/fare-pricing-proposal.entity';
+import { RefundRequest } from '../../database/entities/refund-request.entity';
+import { RefreshToken } from '../../database/entities/refresh-token.entity';
 import { SearchController } from './search.controller';
 import { SearchService } from './search.service';
 import { SearchAdvisoryService } from './search-advisory.service';
@@ -18,7 +42,36 @@ import { AiModule } from '../ai/ai.module';
 import { PAYMENT_GATEWAY, SandboxPaymentGateway } from './payment-gateway';
 
 @Module({
-  imports: [AuditModule, CustomerReferralsModule, AiModule],
+  imports: [
+    TypeOrmModule.forFeature([
+      Airport,
+      Booking,
+      Passenger,
+      FlightInstance,
+      AircraftSeatMap,
+      SeatLock,
+      User,
+      PriceLock,
+      PaymentReconciliation,
+      PayIdempotencyRecord,
+      LedgerEntry,
+      PromoCode,
+      PromoRedemption,
+      WalletEntry,
+      ClubMember,
+      ClubPointsEntry,
+      ClubTierRule,
+      SavedFlight,
+      FareRule,
+      CabinFare,
+      FarePricingProposal,
+      RefundRequest,
+      RefreshToken,
+    ]),
+    AuditModule,
+    CustomerReferralsModule,
+    AiModule,
+  ],
   controllers: [
     SearchController,
     BookingController,
