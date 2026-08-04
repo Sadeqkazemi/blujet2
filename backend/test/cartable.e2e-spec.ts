@@ -2,17 +2,24 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import * as crypto from 'node:crypto';
-import { TypeORMService } from '../src/typeorm/typeorm.service';
+import { DataSource } from 'typeorm';
+import { CartableTask } from '../src/database/entities/cartable-task.entity';
+import { User } from '../src/database/entities/user.entity';
+import { AuditLog } from '../src/database/entities/audit-log.entity';
+import { ChairReportPermission } from '../src/database/entities/chair-report-permission.entity';
+import { ManagerReferral } from '../src/database/entities/manager-referral.entity';
+import { ManagerReferralReport } from '../src/database/entities/manager-referral-report.entity';
+import { AgencyMembershipRequest } from '../src/database/entities/agency-membership-request.entity';
 import { loginAs } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
 describe('Cartable + referrals + messages (e2e)', () => {
   let app: INestApplication<App>;
-  let typeorm: TypeORMService;
+  let dataSource: DataSource;
 
   beforeEach(async () => {
     app = await createTestApp();
-    typeorm = app.get(TypeORMService);
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
@@ -20,28 +27,31 @@ describe('Cartable + referrals + messages (e2e)', () => {
   });
 
   async function userId(username: string): Promise<string> {
-    const user = await typeorm.user.findUniqueOrThrow({ where: { username } });
+    const user = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ username });
     return user.id;
   }
 
   /** A throwaway OPEN task for the given assignee, independent of seed data. */
   async function createFreshTask(assigneeId: string) {
-    return typeorm.cartableTask.create({
-      data: {
+    const repo = dataSource.getRepository(CartableTask);
+    return repo.save(
+      repo.create({
         assigneeId,
         category: 'ADMIN',
         title: `تست ${crypto.randomUUID().slice(0, 8)}`,
         description: 'مورد تستی',
         senderLabelFa: 'تست',
-      },
-    });
+      }),
+    );
   }
 
   // ── Listing & filters ─────────────────────────────────────────────────
 
   it('GET /cartable returns only the caller’s own tasks and per-category counts', async () => {
     const ceoId = await userId('ceo');
-    const financeId = await userId('finance');
+    const financeId = await userId('finance.karimi');
     const ceoTask = await createFreshTask(ceoId);
     const financeTask = await createFreshTask(financeId);
 
@@ -64,15 +74,16 @@ describe('Cartable + referrals + messages (e2e)', () => {
   it('category= filters rows; counts stay unfiltered (KPI cards show all OPEN)', async () => {
     const ceoId = await userId('ceo');
     await createFreshTask(ceoId); // ADMIN
-    await typeorm.cartableTask.create({
-      data: {
+    const cartableTaskRepo = dataSource.getRepository(CartableTask);
+    await cartableTaskRepo.save(
+      cartableTaskRepo.create({
         assigneeId: ceoId,
         category: 'AGENCY',
         title: 'تست دسته',
         description: 'د',
         senderLabelFa: 'ت',
-      },
-    });
+      }),
+    );
 
     const { accessToken } = await loginAs(app, 'ceo');
     const res = await request(app.getHttpServer())
@@ -127,7 +138,7 @@ describe('Cartable + referrals + messages (e2e)', () => {
       .send({ note: 'رد' });
     expect(second.status).toBe(409);
 
-    const otherTask = await createFreshTask(await userId('finance'));
+    const otherTask = await createFreshTask(await userId('finance.karimi'));
     const foreign = await request(app.getHttpServer())
       .patch(`/cartable/${otherTask.id}/approve`)
       .set('Authorization', `Bearer ${ceo.accessToken}`)
@@ -145,16 +156,19 @@ describe('Cartable + referrals + messages (e2e)', () => {
       .set('Authorization', `Bearer ${accessToken}`)
       .send({ note: 'دلیل مشخص' });
 
-    const auditRow = await typeorm.auditLog.findFirst({
-      where: { entityType: 'CartableTask', entityId: task.id },
-    });
+    const auditRow = await dataSource
+      .getRepository(AuditLog)
+      .createQueryBuilder('a')
+      .where('a.entityType = :entityType', { entityType: 'CartableTask' })
+      .andWhere('a.entityId = :entityId', { entityId: task.id })
+      .getOne();
     expect(auditRow).not.toBeNull();
     expect(auditRow!.detail).toContain('دلیل مشخص');
   });
 
   it('transfer creates a new OPEN task for the target and marks the original TRANSFERRED', async () => {
     const ceoId = await userId('ceo');
-    const financeId = await userId('finance');
+    const financeId = await userId('finance.karimi');
     const task = await createFreshTask(ceoId);
     const ceo = await loginAs(app, 'ceo');
 
@@ -166,14 +180,14 @@ describe('Cartable + referrals + messages (e2e)', () => {
     expect(res.body.data.assigneeId).toBe(financeId);
     expect(res.body.data.status).toBe('OPEN');
 
-    const original = await typeorm.cartableTask.findUniqueOrThrow({
-      where: { id: task.id },
-    });
+    const original = await dataSource
+      .getRepository(CartableTask)
+      .findOneByOrFail({ id: task.id });
     expect(original.status).toBe('TRANSFERRED');
     expect(original.transferredToId).toBe(financeId);
 
     // The target actually sees it.
-    const finance = await loginAs(app, 'finance');
+    const finance = await loginAs(app, 'finance.karimi');
     const list = await request(app.getHttpServer())
       .get('/cartable')
       .set('Authorization', `Bearer ${finance.accessToken}`);
@@ -185,9 +199,9 @@ describe('Cartable + referrals + messages (e2e)', () => {
   it('transfer to a non-staff user → 400', async () => {
     const ceoId = await userId('ceo');
     const task = await createFreshTask(ceoId);
-    const customer = await typeorm.user.findFirstOrThrow({
-      where: { role: 'USER' },
-    });
+    const customer = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ role: 'USER' });
     const { accessToken } = await loginAs(app, 'ceo');
 
     const res = await request(app.getHttpServer())
@@ -201,15 +215,15 @@ describe('Cartable + referrals + messages (e2e)', () => {
 
   it('chair-permission full loop: request → chair cartable task → approve → requester sees APPROVED', async () => {
     // Fresh slate for the commercial manager's requests.
-    const commId = await userId('comm');
-    await typeorm.cartableTask.deleteMany({
-      where: { sourceType: 'CHAIR_PERMISSION' },
-    });
-    await typeorm.chairReportPermission.deleteMany({
-      where: { requesterId: commId },
-    });
+    const commId = await userId('comm.abbasi');
+    await dataSource
+      .getRepository(CartableTask)
+      .delete({ sourceType: 'CHAIR_PERMISSION' });
+    await dataSource
+      .getRepository(ChairReportPermission)
+      .delete({ requesterId: commId });
 
-    const comm = await loginAs(app, 'comm');
+    const comm = await loginAs(app, 'comm.abbasi');
     const created = await request(app.getHttpServer())
       .post('/cartable/chair-permission')
       .set('Authorization', `Bearer ${comm.accessToken}`);
@@ -222,9 +236,12 @@ describe('Cartable + referrals + messages (e2e)', () => {
     expect(dup.status).toBe(409);
 
     // The chair received a cartable task and approves it.
-    const chairTask = await typeorm.cartableTask.findFirstOrThrow({
-      where: { sourceType: 'CHAIR_PERMISSION', sourceId: created.body.data.id },
-    });
+    const chairTask = await dataSource
+      .getRepository(CartableTask)
+      .findOneByOrFail({
+        sourceType: 'CHAIR_PERMISSION',
+        sourceId: created.body.data.id,
+      });
     const chair = await loginAs(app, 'chair');
     const approve = await request(app.getHttpServer())
       .patch(`/cartable/${chairTask.id}/approve`)
@@ -239,7 +256,7 @@ describe('Cartable + referrals + messages (e2e)', () => {
   });
 
   it('chair-permission request as SENIOR_MANAGER → 403 (gate exists only in Finance/Commercial)', async () => {
-    const { accessToken } = await loginAs(app, 'senior');
+    const { accessToken } = await loginAs(app, 'senior.rahimi');
     const res = await request(app.getHttpServer())
       .post('/cartable/chair-permission')
       .set('Authorization', `Bearer ${accessToken}`);
@@ -249,8 +266,8 @@ describe('Cartable + referrals + messages (e2e)', () => {
   // ── Referrals ────────────────────────────────────────────────────────
 
   it('creating a referral requires title/body/≥1 recipient and creates recipient cartable tasks', async () => {
-    const senior = await loginAs(app, 'senior');
-    const financeId = await userId('finance');
+    const senior = await loginAs(app, 'senior.rahimi');
+    const financeId = await userId('finance.karimi');
 
     const invalid = await request(app.getHttpServer())
       .post('/referrals')
@@ -269,26 +286,26 @@ describe('Cartable + referrals + messages (e2e)', () => {
       });
     expect(created.status).toBe(201);
 
-    const recipientTask = await typeorm.cartableTask.findFirst({
-      where: {
+    const recipientTask = await dataSource
+      .getRepository(CartableTask)
+      .findOneBy({
         sourceType: 'MANAGER_REFERRAL',
         sourceId: created.body.data.id,
         assigneeId: financeId,
-      },
-    });
+      });
     expect(recipientTask).not.toBeNull();
     expect(recipientTask!.category).toBe('MANAGER');
   });
 
   it('POST /referrals as a non-senior role → 403; KPI counts reconcile with statuses', async () => {
-    const finance = await loginAs(app, 'finance');
+    const finance = await loginAs(app, 'finance.karimi');
     const forbidden = await request(app.getHttpServer())
       .post('/referrals')
       .set('Authorization', `Bearer ${finance.accessToken}`)
       .send({ title: 'ت', body: 'ت', recipientIds: [await userId('ceo')] });
     expect(forbidden.status).toBe(403);
 
-    const senior = await loginAs(app, 'senior');
+    const senior = await loginAs(app, 'senior.rahimi');
     const list = await request(app.getHttpServer())
       .get('/referrals')
       .set('Authorization', `Bearer ${senior.accessToken}`);
@@ -310,8 +327,8 @@ describe('Cartable + referrals + messages (e2e)', () => {
   });
 
   it('a non-recipient, non-sender exec gets 403 on referral detail; a non-recipient cannot report', async () => {
-    const senior = await loginAs(app, 'senior');
-    const financeId = await userId('finance');
+    const senior = await loginAs(app, 'senior.rahimi');
+    const financeId = await userId('finance.karimi');
     const created = await request(app.getHttpServer())
       .post('/referrals')
       .set('Authorization', `Bearer ${senior.accessToken}`)
@@ -331,8 +348,8 @@ describe('Cartable + referrals + messages (e2e)', () => {
   });
 
   it('full referral loop: report flips to REPORTED, close only from REPORTED, revision back to REVIEWING', async () => {
-    const senior = await loginAs(app, 'senior');
-    const financeId = await userId('finance');
+    const senior = await loginAs(app, 'senior.rahimi');
+    const financeId = await userId('finance.karimi');
     const created = await request(app.getHttpServer())
       .post('/referrals')
       .set('Authorization', `Bearer ${senior.accessToken}`)
@@ -345,7 +362,7 @@ describe('Cartable + referrals + messages (e2e)', () => {
       .set('Authorization', `Bearer ${senior.accessToken}`);
     expect(early.status).toBe(409);
 
-    const finance = await loginAs(app, 'finance');
+    const finance = await loginAs(app, 'finance.karimi');
     const report = await request(app.getHttpServer())
       .post(`/referrals/${referralId}/reports`)
       .set('Authorization', `Bearer ${finance.accessToken}`)
@@ -390,8 +407,8 @@ describe('Cartable + referrals + messages (e2e)', () => {
   );
 
   it('a referral created with attachmentIds resolves real fileName/mimeType/sizeBytes in list() and detail(); myReferrals() resolves it for the recipient too', async () => {
-    const senior = await loginAs(app, 'senior');
-    const financeId = await userId('finance');
+    const senior = await loginAs(app, 'senior.rahimi');
+    const financeId = await userId('finance.karimi');
 
     const uploaded = await request(app.getHttpServer())
       .post('/files')
@@ -439,7 +456,7 @@ describe('Cartable + referrals + messages (e2e)', () => {
       expect.objectContaining({ id: fileId, fileName: 'مدرک.png' }),
     ]);
 
-    const finance = await loginAs(app, 'finance');
+    const finance = await loginAs(app, 'finance.karimi');
     const mine = await request(app.getHttpServer())
       .get('/referrals/mine')
       .set('Authorization', `Bearer ${finance.accessToken}`);
@@ -455,8 +472,8 @@ describe('Cartable + referrals + messages (e2e)', () => {
   });
 
   it('a report submitted with attachmentIds resolves real metadata inside detail().reports', async () => {
-    const senior = await loginAs(app, 'senior');
-    const financeId = await userId('finance');
+    const senior = await loginAs(app, 'senior.rahimi');
+    const financeId = await userId('finance.karimi');
     const created = await request(app.getHttpServer())
       .post('/referrals')
       .set('Authorization', `Bearer ${senior.accessToken}`)
@@ -467,7 +484,7 @@ describe('Cartable + referrals + messages (e2e)', () => {
       });
     const referralId = created.body.data.id as string;
 
-    const finance = await loginAs(app, 'finance');
+    const finance = await loginAs(app, 'finance.karimi');
     const uploaded = await request(app.getHttpServer())
       .post('/files')
       .set('Authorization', `Bearer ${finance.accessToken}`)
@@ -491,8 +508,8 @@ describe('Cartable + referrals + messages (e2e)', () => {
   });
 
   it('a referral with no attachments resolves to an empty array, not null/undefined', async () => {
-    const senior = await loginAs(app, 'senior');
-    const financeId = await userId('finance');
+    const senior = await loginAs(app, 'senior.rahimi');
+    const financeId = await userId('finance.karimi');
     const created = await request(app.getHttpServer())
       .post('/referrals')
       .set('Authorization', `Bearer ${senior.accessToken}`)
@@ -508,7 +525,7 @@ describe('Cartable + referrals + messages (e2e)', () => {
   // ── GET /referrals/mine (Phase 26 — recipient-side listing) ────────────
 
   it('GET /referrals/mine returns only referrals where the caller is a recipient, not ones they sent', async () => {
-    const senior = await loginAs(app, 'senior');
+    const senior = await loginAs(app, 'senior.rahimi');
     const employeeId = await userId('com.ahmadi');
     const created = await request(app.getHttpServer())
       .post('/referrals')
@@ -539,7 +556,7 @@ describe('Cartable + referrals + messages (e2e)', () => {
   });
 
   it('GET /referrals/mine: hasMyReport flips true only after this recipient reports, and counts reconcile', async () => {
-    const senior = await loginAs(app, 'senior');
+    const senior = await loginAs(app, 'senior.rahimi');
     const employeeId = await userId('com.ahmadi');
     const created = await request(app.getHttpServer())
       .post('/referrals')
@@ -588,37 +605,44 @@ describe('Cartable + referrals + messages (e2e)', () => {
   });
 
   it('approving a referral-sourced cartable task submits the note as the report', async () => {
-    const senior = await loginAs(app, 'senior');
-    const commId = await userId('comm');
+    const senior = await loginAs(app, 'senior.rahimi');
+    const commId = await userId('comm.abbasi');
     const created = await request(app.getHttpServer())
       .post('/referrals')
       .set('Authorization', `Bearer ${senior.accessToken}`)
       .send({ title: 'از طریق کارتابل', body: 'شرح', recipientIds: [commId] });
     const referralId = created.body.data.id as string;
 
-    const recipientTask = await typeorm.cartableTask.findFirstOrThrow({
-      where: {
+    const recipientTask = await dataSource
+      .getRepository(CartableTask)
+      .findOneByOrFail({
         sourceType: 'MANAGER_REFERRAL',
         sourceId: referralId,
         assigneeId: commId,
-      },
-    });
+      });
 
-    const comm = await loginAs(app, 'comm');
+    const comm = await loginAs(app, 'comm.abbasi');
     const approve = await request(app.getHttpServer())
       .patch(`/cartable/${recipientTask.id}/approve`)
       .set('Authorization', `Bearer ${comm.accessToken}`)
       .send({ note: 'گزارش من از طریق کارتابل' });
     expect(approve.status).toBe(200);
 
-    const referral = await typeorm.managerReferral.findUniqueOrThrow({
-      where: { id: referralId },
-      include: { reports: true },
-    });
+    const referral = await dataSource
+      .getRepository(ManagerReferral)
+      .createQueryBuilder('r')
+      .where('r.id = :id', { id: referralId })
+      .getOneOrFail();
     expect(referral.status).toBe('REPORTED');
-    expect(
-      referral.reports.some((r) => r.body === 'گزارش من از طریق کارتابل'),
-    ).toBe(true);
+
+    const reports = await dataSource
+      .getRepository(ManagerReferralReport)
+      .createQueryBuilder('rep')
+      .where('rep.referralId = :referralId', { referralId })
+      .getMany();
+    expect(reports.some((r) => r.body === 'گزارش من از طریق کارتابل')).toBe(
+      true,
+    );
   });
 
   // ── Manager messages ─────────────────────────────────────────────────
@@ -632,13 +656,11 @@ describe('Cartable + referrals + messages (e2e)', () => {
     expect(res.status).toBe(201);
     expect(res.body.data.deliveredCount).toBe(1);
 
-    const financeId = await userId('finance');
-    const delivered = await typeorm.cartableTask.findFirst({
-      where: {
-        sourceType: 'MANAGER_MESSAGE',
-        sourceId: res.body.data.message.id,
-        assigneeId: financeId,
-      },
+    const financeId = await userId('finance.karimi');
+    const delivered = await dataSource.getRepository(CartableTask).findOneBy({
+      sourceType: 'MANAGER_MESSAGE',
+      sourceId: res.body.data.message.id,
+      assigneeId: financeId,
     });
     expect(delivered).not.toBeNull();
     expect(delivered!.title).toBe('موضوع تستی');
@@ -669,7 +691,7 @@ describe('Cartable + referrals + messages (e2e)', () => {
       .set('Authorization', `Bearer ${ceo.accessToken}`)
       .send({ toDept: 'COMMERCIAL', subject: 'مال من', body: 'متن' });
 
-    const finance = await loginAs(app, 'finance');
+    const finance = await loginAs(app, 'finance.karimi');
     const sent = await request(app.getHttpServer())
       .get('/manager-messages/sent')
       .set('Authorization', `Bearer ${finance.accessToken}`);
@@ -699,9 +721,12 @@ describe('Cartable + referrals + messages (e2e)', () => {
   });
 
   it('referring an agency membership request creates a cartable task for the referred-to manager', async () => {
-    const financeId = await userId('finance');
-    const reqRow = await typeorm.agencyMembershipRequest.create({
-      data: {
+    const financeId = await userId('finance.karimi');
+    const agencyMembershipRequestRepo = dataSource.getRepository(
+      AgencyMembershipRequest,
+    );
+    const reqRow = await agencyMembershipRequestRepo.save(
+      agencyMembershipRequestRepo.create({
         applicantName: `متقاضی کارتابل ${crypto.randomUUID().slice(0, 6)}`,
         managerName: 'م',
         licenseNo: `AG-CT-${crypto.randomUUID().slice(0, 8)}`,
@@ -709,22 +734,20 @@ describe('Cartable + referrals + messages (e2e)', () => {
         phone: `+9893${crypto.randomUUID().replace(/\D/g, '').slice(0, 8)}`,
         email: `${crypto.randomUUID().slice(0, 8)}@x.example`,
         status: 'PENDING',
-      },
-    });
+      }),
+    );
 
-    const senior = await loginAs(app, 'senior');
+    const senior = await loginAs(app, 'senior.rahimi');
     const refer = await request(app.getHttpServer())
       .patch(`/agencies/requests/${reqRow.id}/refer`)
       .set('Authorization', `Bearer ${senior.accessToken}`)
       .send({ referredToId: financeId, note: 'بررسی اعتباری شود' });
     expect(refer.status).toBe(200);
 
-    const task = await typeorm.cartableTask.findFirst({
-      where: {
-        sourceType: 'AGENCY_REQUEST',
-        sourceId: reqRow.id,
-        assigneeId: financeId,
-      },
+    const task = await dataSource.getRepository(CartableTask).findOneBy({
+      sourceType: 'AGENCY_REQUEST',
+      sourceId: reqRow.id,
+      assigneeId: financeId,
     });
     expect(task).not.toBeNull();
     expect(task!.category).toBe('AGENCY');

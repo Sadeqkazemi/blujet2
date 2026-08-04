@@ -1,11 +1,27 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { CartableTask } from '../../database/entities/cartable-task.entity';
+import { ChairReportPermission } from '../../database/entities/chair-report-permission.entity';
+import { ManagerReferral } from '../../database/entities/manager-referral.entity';
+import { ManagerReferralReport } from '../../database/entities/manager-referral-report.entity';
+import { User } from '../../database/entities/user.entity';
 import { CartableController } from './cartable.controller';
 import { CartableService } from './cartable.service';
 import { PanelsModule } from '../panels/panels.module';
 import { AuditModule } from '../audit/audit.module';
 
 @Module({
-  imports: [PanelsModule, AuditModule],
+  imports: [
+    TypeOrmModule.forFeature([
+      CartableTask,
+      ChairReportPermission,
+      ManagerReferral,
+      ManagerReferralReport,
+      User,
+    ]),
+    PanelsModule,
+    AuditModule,
+  ],
   controllers: [CartableController],
   providers: [CartableService],
   exports: [CartableService],

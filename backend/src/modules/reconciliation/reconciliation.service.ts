@@ -3,9 +3,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { TypeORMService } from '../../typeorm/typeorm.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { PaymentReconciliation } from '../../database/entities/payment-reconciliation.entity';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
+import { PaymentReconciliationStatus } from '../../database/enums';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 
 /** Phase 13 Part E — the real "payment succeeded, ticket not issued"
@@ -16,15 +19,16 @@ import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 @Injectable()
 export class ReconciliationService {
   constructor(
-    private readonly typeorm: TypeORMService,
+    @InjectRepository(PaymentReconciliation)
+    private readonly reconciliationRepo: Repository<PaymentReconciliation>,
     private readonly audit: AuditService,
   ) {}
 
   async list() {
-    const rows = await this.typeorm.paymentReconciliation.findMany({
-      where: { status: 'PENDING' },
-      include: { booking: { select: { pnr: true, status: true } } },
-      orderBy: { createdAt: 'asc' },
+    const rows = await this.reconciliationRepo.find({
+      where: { status: PaymentReconciliationStatus.PENDING },
+      relations: { booking: true },
+      order: { createdAt: 'ASC' },
     });
     return rows.map((r) => ({
       id: r.id,
@@ -37,31 +41,25 @@ export class ReconciliationService {
   }
 
   async resolve(actor: AuthenticatedUser, id: string, resolutionNote: string) {
-    const row = await this.typeorm.paymentReconciliation.findUnique({
-      where: { id },
-    });
+    const row = await this.reconciliationRepo.findOneBy({ id });
     if (!row) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
         message: 'مورد تطبیق پرداخت یافت نشد.',
       });
     }
-    if (row.status === 'RESOLVED') {
+    if (row.status === PaymentReconciliationStatus.RESOLVED) {
       throw new ConflictException({
         code: ErrorCode.CONFLICT,
         message: 'این مورد قبلاً رفع‌شده علامت خورده است.',
       });
     }
 
-    const updated = await this.typeorm.paymentReconciliation.update({
-      where: { id },
-      data: {
-        status: 'RESOLVED',
-        resolvedById: actor.id,
-        resolvedAt: new Date(),
-        resolutionNote,
-      },
-    });
+    row.status = PaymentReconciliationStatus.RESOLVED;
+    row.resolvedById = actor.id;
+    row.resolvedAt = new Date();
+    row.resolutionNote = resolutionNote;
+    const updated = await this.reconciliationRepo.save(row);
 
     await this.audit.record({
       actorId: actor.id,

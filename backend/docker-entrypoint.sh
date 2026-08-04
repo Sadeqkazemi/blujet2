@@ -1,12 +1,12 @@
 #!/bin/sh
 set -e
 
-echo "Running typeorm migrate deploy..."
-npx typeorm migrate deploy
+echo "Running database migrations..."
+npm run migration:run:prod
 
 if [ "$SEED_ON_START" = "true" ]; then
   echo "Seeding database..."
-  npx tsx typeorm/seed.ts || true
+  npm run seed:prod || true
 fi
 
 exec "$@"
