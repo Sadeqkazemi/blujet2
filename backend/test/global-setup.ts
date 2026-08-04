@@ -8,7 +8,7 @@ import * as dotenv from 'dotenv';
  * which produced systemic 401 / EntityNotFoundError("User") failures.
  * Seed once before the suite (idempotent).
  */
-export default async function globalSetup() {
+export default function globalSetup(): void {
   const backendRoot = path.join(__dirname, '..');
   dotenv.config({
     path: path.join(backendRoot, '.env.test'),

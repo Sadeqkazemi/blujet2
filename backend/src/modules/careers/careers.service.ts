@@ -20,7 +20,6 @@ import { ErrorCode } from '../../common/errors';
 import { JobApplicationStatus } from '../../database/enums';
 import { ROLE_LABELS_FA } from '../../common/exec-roles';
 import {
-  decryptPii,
   encryptPii,
   hashPii,
   isValidIranianNationalId,
