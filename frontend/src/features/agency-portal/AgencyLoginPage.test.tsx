@@ -77,19 +77,23 @@ describe('AgencyLoginPage', () => {
     );
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'ثبت‌نام' }));
+    await user.click(screen.getByRole('button', { name: 'ثبت‌نام آژانس' }));
 
     await user.type(screen.getByLabelText('نام آژانس'), 'آژانس مسافرتی پرشین');
     await user.type(screen.getByLabelText('شماره مجوز بند ب'), 'XXXX-1234');
     await user.type(screen.getByLabelText('نام مدیر آژانس'), 'نگار رضایی');
-    await user.type(screen.getByLabelText('شماره موبایل'), '09121234567');
+    await user.type(screen.getByLabelText('شماره موبایل آژانس'), '09121234567');
     await user.click(screen.getByRole('checkbox'));
     await user.click(screen.getByRole('button', { name: 'ثبت درخواست و دریافت کد' }));
 
     expect(requestOtp).toHaveBeenCalledWith('09121234567');
 
-    const codeInput = await screen.findByLabelText(/کد تأیید ۶ رقمی/);
-    await user.type(codeInput, '482913');
+    await screen.findByLabelText(/کد تأیید ۶ رقمی/);
+    const cells = document.querySelectorAll('input[type="tel"][maxlength="1"]');
+    expect(cells.length).toBe(6);
+    for (let i = 0; i < 6; i++) {
+      await user.type(cells[i] as HTMLInputElement, '482913'[i]!);
+    }
     await user.click(screen.getByRole('button', { name: 'تأیید و ثبت درخواست' }));
 
     await screen.findByText(/درخواست همکاری شما ثبت شد/);
@@ -127,9 +131,9 @@ describe('AgencyLoginPage', () => {
     );
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'إنشاء حساب' }));
+    await user.click(screen.getByRole('button', { name: 'تسجيل الوكالة' }));
     expect(screen.getByLabelText('اسم الوكالة')).toBeInTheDocument();
-    expect(screen.getByLabelText('رقم الترخيص (الفئة ب)')).toBeInTheDocument();
+    expect(screen.getByLabelText('رقم الترخيص')).toBeInTheDocument();
   });
 
   it('forgot password: requests OTP, verifies, sets password, shows done', async () => {
