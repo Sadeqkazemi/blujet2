@@ -1629,6 +1629,17 @@ a passing test — see `docs/features/panel-shell-dashboard.md` for Phase 1.
   freshly migrated+seeded DB) green before push. `main` now runs entirely
   on TypeORM with no remaining Prisma references.
 
+- [x] **Production edge hardening (2026-08-04)** — production Nginx now
+  proxies every top-level NestJS controller prefix and distinguishes HTML
+  navigations from API requests for overlapping public routes; the Vite dev
+  proxy applies the same rule to manage-booking and survey. `GET /health`
+  now fails with HTTP 503 semantics when PostgreSQL is unavailable. Public
+  locale changes now synchronize the root document `lang`/`dir` attributes.
+  Regression coverage: `edge-routing.test.ts`, `health.controller.spec.ts`,
+  and `useLocale.test.tsx`. Verification: 75 backend unit tests and 526
+  frontend unit tests passed; both production builds passed. See
+  `docs/features/production-edge-hardening.md`.
+
 ## Notable findings from design extraction (informs later phases)
 
 - Several panels contain orphaned tabs/handlers (coded, unreachable from

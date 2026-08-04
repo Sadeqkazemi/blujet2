@@ -42,7 +42,9 @@ export function decryptPii(stored: string): string {
 
 /** Soft decrypt for admin list UIs — returns null if ciphertext was sealed
  * under a different key (stale seed / key rotation) instead of 500'ing. */
-export function tryDecryptPii(stored: string | null | undefined): string | null {
+export function tryDecryptPii(
+  stored: string | null | undefined,
+): string | null {
   if (!stored) return null;
   try {
     return decryptPii(stored);
