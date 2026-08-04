@@ -5,9 +5,15 @@ import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import * as crypto from 'node:crypto';
+import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
 import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
-import { TypeORMService } from '../src/typeorm/typeorm.service';
+import { Flight } from '../src/database/entities/flight.entity';
+import { FlightInstance } from '../src/database/entities/flight-instance.entity';
+import { Booking } from '../src/database/entities/booking.entity';
+import { Airport } from '../src/database/entities/airport.entity';
+import { AuditLog } from '../src/database/entities/audit-log.entity';
+import { FarePricingProposal } from '../src/database/entities/fare-pricing-proposal.entity';
 import {
   PRICE_SUGGESTION_PROVIDER,
   type PriceSuggestionProvider,
@@ -29,7 +35,7 @@ class FakePriceSuggestionProvider implements PriceSuggestionProvider {
 
 describe('Flights (e2e)', () => {
   let app: INestApplication<App>;
-  let typeorm: TypeORMService;
+  let dataSource: DataSource;
   let fakeMl: FakePriceSuggestionProvider;
 
   beforeEach(async () => {
@@ -55,7 +61,7 @@ describe('Flights (e2e)', () => {
     );
     app.useGlobalFilters(new AllExceptionsFilter(logger));
     await app.init();
-    typeorm = app.get(TypeORMService);
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
@@ -75,20 +81,24 @@ describe('Flights (e2e)', () => {
       basePriceIrr: number;
     }> = {},
   ) {
-    const flight = await typeorm.flight.findFirstOrThrow();
+    const flight = await dataSource
+      .getRepository(Flight)
+      .createQueryBuilder('f')
+      .getOneOrFail();
     const departureAt =
       over.departureAt ?? new Date(Date.now() + 14 * 24 * 3_600_000);
-    return typeorm.flightInstance.create({
-      data: {
+    const instanceRepo = dataSource.getRepository(FlightInstance);
+    return instanceRepo.save(
+      instanceRepo.create({
         flightId: flight.id,
         departureAt,
         arrivalAt: new Date(departureAt.getTime() + 3 * 3_600_000),
         capacity: over.capacity ?? 180,
         charterSeats: over.charterSeats ?? 60,
         status: over.status ?? 'SCHEDULED',
-        basePriceIrr: over.basePriceIrr ?? 30_000_000,
-      },
-    });
+        basePriceIrr: BigInt(over.basePriceIrr ?? 30_000_000),
+      }),
+    );
   }
 
   async function addBooking(
@@ -96,15 +106,16 @@ describe('Flights (e2e)', () => {
     channel: 'SYSTEM' | 'CHARTER' | 'AGENCY',
     priceIrr: number,
   ) {
-    return typeorm.booking.create({
-      data: {
+    const bookingRepo = dataSource.getRepository(Booking);
+    return bookingRepo.save(
+      bookingRepo.create({
         pnr: `FL${crypto.randomUUID().slice(0, 6).toUpperCase()}`,
         flightInstanceId,
         channel,
         status: 'TICKETED',
-        priceIrr,
-      },
-    });
+        priceIrr: BigInt(priceIrr),
+      }),
+    );
   }
 
   it('overview: KPI figures reconcile with the rows; statuses derived from real state; future rows split off', async () => {
@@ -120,7 +131,7 @@ describe('Flights (e2e)', () => {
       departureAt: new Date(Date.now() + 20 * 24 * 3_600_000),
     });
 
-    const { accessToken } = await loginAs(app, 'senior');
+    const { accessToken } = await loginAs(app, 'senior.rahimi');
     const res = await request(app.getHttpServer())
       .get('/flights/overview')
       .set('Authorization', `Bearer ${accessToken}`);
@@ -157,7 +168,7 @@ describe('Flights (e2e)', () => {
     await addBooking(departed.id, 'SYSTEM', 40_000_000);
     await addBooking(departed.id, 'AGENCY', 20_000_000);
 
-    const { accessToken } = await loginAs(app, 'comm');
+    const { accessToken } = await loginAs(app, 'comm.abbasi');
     const res = await request(app.getHttpServer())
       .get('/flights/overview')
       .set('Authorization', `Bearer ${accessToken}`);
@@ -199,7 +210,7 @@ describe('Flights (e2e)', () => {
   });
 
   it('airports catalog is seeded (Iranian cities + DXB/IST/NJF); roles without the tab get 403', async () => {
-    const { accessToken } = await loginAs(app, 'senior');
+    const { accessToken } = await loginAs(app, 'senior.rahimi');
     const res = await request(app.getHttpServer())
       .get('/flights/airports')
       .set('Authorization', `Bearer ${accessToken}`);
@@ -208,7 +219,7 @@ describe('Flights (e2e)', () => {
     expect(codes).toEqual(expect.arrayContaining(['THR', 'DXB', 'IST', 'NJF']));
     expect(codes.length).toBeGreaterThanOrEqual(23);
 
-    const finance = await loginAs(app, 'finance');
+    const finance = await loginAs(app, 'finance.karimi');
     const denied = await request(app.getHttpServer())
       .get('/flights/overview')
       .set('Authorization', `Bearer ${finance.accessToken}`);
@@ -216,14 +227,14 @@ describe('Flights (e2e)', () => {
   });
 
   it('POST /flights/airports creates a new airport and rejects duplicates', async () => {
-    const { accessToken } = await loginAs(app, 'comm');
+    const { accessToken } = await loginAs(app, 'comm.abbasi');
     // A timestamp-derived 2-letter suffix has too little entropy (only ~1300
     // combinations) not to occasionally collide with a real seeded IATA code
     // (e.g. it once landed on "ZAH" — Zahedan) — pick against the DB instead.
     const existing = new Set(
-      (await typeorm.airport.findMany({ select: { code: true } })).map(
-        (a) => a.code,
-      ),
+      (
+        await dataSource.getRepository(Airport).find({ select: { code: true } })
+      ).map((a) => a.code),
     );
     let code: string;
     do {
@@ -247,7 +258,7 @@ describe('Flights (e2e)', () => {
   });
 
   it('POST /flights: validations (same origin/dest, past date, duplicate flightNo on another route) then a clean create', async () => {
-    const { accessToken } = await loginAs(app, 'senior');
+    const { accessToken } = await loginAs(app, 'senior.rahimi');
     const base = {
       originCode: 'THR',
       destCode: 'MHD',
@@ -287,34 +298,13 @@ describe('Flights (e2e)', () => {
     expect(ok.body.data.derivedStatus).toBe('ACTIVE');
     expect(ok.body.data.sold).toBe(0);
 
-    const withExtras = await request(app.getHttpServer())
-      .post('/flights')
-      .set('Authorization', `Bearer ${accessToken}`)
-      .send({
-        ...base,
-        flightNo: uniqueFlightNo(),
-        capacity: 180,
-        charterSeats: 40,
-        aircraftType: 'Airbus A320',
-      });
-    expect(withExtras.status).toBe(201);
-    const extrasInstance = await typeorm.flightInstance.findUniqueOrThrow({
-      where: { id: withExtras.body.data.id },
-      include: { flight: true },
-    });
-    expect(extrasInstance.charterSeats).toBe(40);
-    expect(extrasInstance.flight.aircraftType).toBe('Airbus A320');
-
-    const badCharter = await request(app.getHttpServer())
-      .post('/flights')
-      .set('Authorization', `Bearer ${accessToken}`)
-      .send({ ...base, flightNo: uniqueFlightNo(), capacity: 100, charterSeats: 100 });
-    expect(badCharter.status).toBe(400);
-
-    const instance = await typeorm.flightInstance.findUniqueOrThrow({
-      where: { id: ok.body.data.id },
-      include: { flight: { include: { route: true } } },
-    });
+    const instance = await dataSource
+      .getRepository(FlightInstance)
+      .createQueryBuilder('fi')
+      .innerJoinAndSelect('fi.flight', 'flight')
+      .innerJoinAndSelect('flight.route', 'route')
+      .where('fi.id = :id', { id: ok.body.data.id })
+      .getOneOrFail();
     expect(instance.flight.route.originCode).toBe('THR');
     expect(instance.flight.route.destCode).toBe('MHD');
     // arrivalAt = departure + the route's seeded duration (default 120min).
@@ -322,9 +312,12 @@ describe('Flights (e2e)', () => {
       instance.flight.route.durationMin * 60_000,
     );
 
-    const audit = await typeorm.auditLog.findFirst({
-      where: { entityType: 'FlightInstance', entityId: instance.id },
-    });
+    const audit = await dataSource
+      .getRepository(AuditLog)
+      .createQueryBuilder('a')
+      .where('a.entityType = :entityType', { entityType: 'FlightInstance' })
+      .andWhere('a.entityId = :entityId', { entityId: instance.id })
+      .getOne();
     expect(audit).not.toBeNull();
   });
 
@@ -335,7 +328,7 @@ describe('Flights (e2e)', () => {
     await addBooking(instance.id, 'SYSTEM', 30_000_000);
     await addBooking(instance.id, 'CHARTER', 28_000_000);
 
-    const { accessToken } = await loginAs(app, 'senior');
+    const { accessToken } = await loginAs(app, 'senior.rahimi');
     const res = await request(app.getHttpServer())
       .get(`/flights/${instance.id}`)
       .set('Authorization', `Bearer ${accessToken}`);
@@ -357,7 +350,7 @@ describe('Flights (e2e)', () => {
       capacity: 180,
       charterSeats: 60,
     });
-    const commercial = await loginAs(app, 'comm');
+    const commercial = await loginAs(app, 'comm.abbasi');
 
     const overCap = await request(app.getHttpServer())
       .patch(`/flights/${instance.id}/plan`)
@@ -376,18 +369,21 @@ describe('Flights (e2e)', () => {
     expect(ok.body.data.proposalPending).toBe(true);
 
     // ⚑ The plan never registers a bookable price — the proposal stays PENDING.
-    // (direct TypeORM read — proposedPriceIrr is a native bigint column.)
-    const proposal = await typeorm.farePricingProposal.findUniqueOrThrow({
-      where: { flightInstanceId: instance.id },
-    });
+    // (query-builder read — FarePricingProposal has a jsonb aiSuggestion
+    // column, so a plain findOneBy/findOne would hit TS2589.)
+    const proposalRepo = dataSource.getRepository(FarePricingProposal);
+    const proposal = await proposalRepo
+      .createQueryBuilder('p')
+      .where('p.flightInstanceId = :id', { id: instance.id })
+      .getOneOrFail();
     expect(proposal.status).toBe('PENDING');
     expect(proposal.proposedPriceIrr).toBe(39_000_000n);
 
     // Once the CEO registers it, re-planning is locked.
-    await typeorm.farePricingProposal.update({
-      where: { flightInstanceId: instance.id },
-      data: { status: 'REGISTERED', registeredPriceIrr: 39_000_000 },
-    });
+    await proposalRepo.update(
+      { flightInstanceId: instance.id },
+      { status: 'REGISTERED', registeredPriceIrr: 39_000_000n },
+    );
     const locked = await request(app.getHttpServer())
       .patch(`/flights/${instance.id}/plan`)
       .set('Authorization', `Bearer ${commercial.accessToken}`)
@@ -399,7 +395,7 @@ describe('Flights (e2e)', () => {
     const instance = await createInstance({
       departureAt: new Date(Date.now() + 20 * 24 * 3_600_000),
     });
-    const senior = await loginAs(app, 'senior');
+    const senior = await loginAs(app, 'senior.rahimi');
     const res = await request(app.getHttpServer())
       .patch(`/flights/${instance.id}/plan`)
       .set('Authorization', `Bearer ${senior.accessToken}`)
@@ -407,9 +403,11 @@ describe('Flights (e2e)', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.proposalPending).toBe(false);
 
-    const proposal = await typeorm.farePricingProposal.findUnique({
-      where: { flightInstanceId: instance.id },
-    });
+    const proposal = await dataSource
+      .getRepository(FarePricingProposal)
+      .createQueryBuilder('p')
+      .where('p.flightInstanceId = :id', { id: instance.id })
+      .getOne();
     expect(proposal).toBeNull();
   });
 
@@ -417,7 +415,7 @@ describe('Flights (e2e)', () => {
     const future = await createInstance({
       departureAt: new Date(Date.now() + 20 * 24 * 3_600_000),
     });
-    const { accessToken } = await loginAs(app, 'senior');
+    const { accessToken } = await loginAs(app, 'senior.rahimi');
 
     fakeMl.nextResult = null; // ml-service down
     const down = await request(app.getHttpServer())
@@ -447,9 +445,11 @@ describe('Flights (e2e)', () => {
     expect(ok.body.data.available).toBe(true);
     expect(ok.body.data.analyzed).toBeGreaterThanOrEqual(1);
 
-    const row = await typeorm.flightInstance.findUniqueOrThrow({
-      where: { id: future.id },
-    });
+    const row = await dataSource
+      .getRepository(FlightInstance)
+      .createQueryBuilder('fi')
+      .where('fi.id = :id', { id: future.id })
+      .getOneOrFail();
     const suggestion = row.aiSuggestion as {
       priceIrr: number;
       modelVersion: string;

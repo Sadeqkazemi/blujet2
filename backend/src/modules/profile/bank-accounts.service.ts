@@ -5,7 +5,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { TypeORMService } from '../../typeorm/typeorm.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { SavedBankAccount } from '../../database/entities/saved-bank-account.entity';
+import { findOneOrThrow } from '../../database/utils/find-one-or-throw';
 import { ErrorCode } from '../../common/errors';
 import { encryptPii, decryptPii, hashPii } from '../../common/pii-crypto';
 import {
@@ -17,7 +20,6 @@ import {
   normalizeSheba,
 } from '../../common/iban.util';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import type { SavedBankAccount } from '../../../generated/typeorm/client';
 import type {
   CreateBankAccountDto,
   UpdateBankAccountDto,
@@ -27,7 +29,10 @@ const MAX_ACCOUNTS = 5;
 
 @Injectable()
 export class BankAccountsService {
-  constructor(private readonly typeorm: TypeORMService) {}
+  constructor(
+    @InjectRepository(SavedBankAccount)
+    private readonly bankAccountRepo: Repository<SavedBankAccount>,
+  ) {}
 
   private shape(row: SavedBankAccount) {
     const sheba = decryptPii(row.shebaEnc);
@@ -47,9 +52,9 @@ export class BankAccountsService {
   }
 
   async listMine(user: AuthenticatedUser) {
-    const rows = await this.typeorm.savedBankAccount.findMany({
+    const rows = await this.bankAccountRepo.find({
       where: { userId: user.id },
-      orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
+      order: { isDefault: 'DESC', createdAt: 'DESC' },
     });
     return rows.map((row) => this.shape(row));
   }
@@ -70,7 +75,7 @@ export class BankAccountsService {
       });
     }
 
-    const count = await this.typeorm.savedBankAccount.count({
+    const count = await this.bankAccountRepo.count({
       where: { userId: user.id },
     });
     if (count >= MAX_ACCOUNTS) {
@@ -80,8 +85,9 @@ export class BankAccountsService {
       });
     }
 
-    const existing = await this.typeorm.savedBankAccount.findFirst({
-      where: { userId: user.id, shebaHash: hashPii(sheba) },
+    const existing = await this.bankAccountRepo.findOneBy({
+      userId: user.id,
+      shebaHash: hashPii(sheba),
     });
     if (existing) {
       throw new ConflictException({
@@ -94,15 +100,16 @@ export class BankAccountsService {
     const bankName = dto.bankName?.trim() || guessed.bankName;
     const isFirst = count === 0;
 
-    return this.typeorm.$transaction(async (tx) => {
+    return this.bankAccountRepo.manager.transaction(async (tx) => {
       if (isFirst) {
-        await tx.savedBankAccount.updateMany({
-          where: { userId: user.id, isDefault: true },
-          data: { isDefault: false },
-        });
+        await tx.update(
+          SavedBankAccount,
+          { userId: user.id, isDefault: true },
+          { isDefault: false },
+        );
       }
-      const row = await tx.savedBankAccount.create({
-        data: {
+      const row = await tx.save(
+        tx.create(SavedBankAccount, {
           userId: user.id,
           bankName,
           bankShort: guessed.bankShort,
@@ -112,16 +119,15 @@ export class BankAccountsService {
           shebaEnc: encryptPii(sheba),
           shebaHash: hashPii(sheba),
           isDefault: isFirst,
-        },
-      });
+          updatedAt: new Date(),
+        }),
+      );
       return this.shape(row);
     });
   }
 
   async update(user: AuthenticatedUser, id: string, dto: UpdateBankAccountDto) {
-    const row = await this.typeorm.savedBankAccount.findUnique({
-      where: { id },
-    });
+    const row = await this.bankAccountRepo.findOneBy({ id });
     if (!row || row.userId !== user.id) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -129,44 +135,44 @@ export class BankAccountsService {
       });
     }
     if (dto.isDefault) {
-      await this.typeorm.$transaction([
-        this.typeorm.savedBankAccount.updateMany({
-          where: { userId: user.id, isDefault: true },
-          data: { isDefault: false },
-        }),
-        this.typeorm.savedBankAccount.update({
-          where: { id },
-          data: { isDefault: true },
-        }),
-      ]);
+      await this.bankAccountRepo.manager.transaction(async (tx) => {
+        await tx.update(
+          SavedBankAccount,
+          { userId: user.id, isDefault: true },
+          { isDefault: false, updatedAt: new Date() },
+        );
+        await tx.update(
+          SavedBankAccount,
+          { id },
+          { isDefault: true, updatedAt: new Date() },
+        );
+      });
     }
-    const updated = await this.typeorm.savedBankAccount.findUniqueOrThrow({
+    const updated = await findOneOrThrow(this.bankAccountRepo, {
       where: { id },
     });
     return this.shape(updated);
   }
 
   async remove(user: AuthenticatedUser, id: string) {
-    const row = await this.typeorm.savedBankAccount.findUnique({
-      where: { id },
-    });
+    const row = await this.bankAccountRepo.findOneBy({ id });
     if (!row || row.userId !== user.id) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
         message: 'حساب بانکی یافت نشد.',
       });
     }
-    await this.typeorm.savedBankAccount.delete({ where: { id } });
+    await this.bankAccountRepo.delete({ id });
     if (row.isDefault) {
-      const next = await this.typeorm.savedBankAccount.findFirst({
+      const next = await this.bankAccountRepo.findOne({
         where: { userId: user.id },
-        orderBy: { createdAt: 'desc' },
+        order: { createdAt: 'DESC' },
       });
       if (next) {
-        await this.typeorm.savedBankAccount.update({
-          where: { id: next.id },
-          data: { isDefault: true },
-        });
+        await this.bankAccountRepo.update(
+          { id: next.id },
+          { isDefault: true, updatedAt: new Date() },
+        );
       }
     }
     return { removed: true };

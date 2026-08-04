@@ -1,5 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { TypeORMService } from '../../typeorm/typeorm.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { SystemSetting } from '../../database/entities/system-setting.entity';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
 import {
@@ -14,14 +16,16 @@ const SETTING_KEY = 'webservicePlanPrices';
 @Injectable()
 export class WebservicePricingService {
   constructor(
-    private readonly typeorm: TypeORMService,
+    @InjectRepository(SystemSetting)
+    private readonly settingRepo: Repository<SystemSetting>,
     private readonly audit: AuditService,
   ) {}
 
   async getPlanPrices(): Promise<WebservicePlanPrices> {
-    const row = await this.typeorm.systemSetting.findUnique({
-      where: { key: SETTING_KEY },
-    });
+    const row = await this.settingRepo
+      .createQueryBuilder('s')
+      .where('s.key = :key', { key: SETTING_KEY })
+      .getOne();
     if (!row) return { ...DEFAULT_WEBSERVICE_PLAN_PRICES_IRR };
     try {
       return parseWebservicePlanPrices(row.value);
@@ -44,15 +48,25 @@ export class WebservicePricingService {
       });
     }
 
-    await this.typeorm.systemSetting.upsert({
-      where: { key: SETTING_KEY },
-      update: { value: parsed, updatedById: actor.id },
-      create: {
-        key: SETTING_KEY,
-        value: parsed,
-        updatedById: actor.id,
-      },
-    });
+    const existing = await this.settingRepo
+      .createQueryBuilder('s')
+      .where('s.key = :key', { key: SETTING_KEY })
+      .getOne();
+    if (existing) {
+      existing.value = parsed;
+      existing.updatedById = actor.id;
+      existing.updatedAt = new Date();
+      await this.settingRepo.save(existing);
+    } else {
+      await this.settingRepo.save(
+        this.settingRepo.create({
+          key: SETTING_KEY,
+          value: parsed,
+          updatedById: actor.id,
+          updatedAt: new Date(),
+        }),
+      );
+    }
 
     await this.audit.record({
       actorId: actor.id,

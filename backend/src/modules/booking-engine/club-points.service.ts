@@ -1,8 +1,11 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { TypeORMService } from '../../typeorm/typeorm.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { EntityManager, Repository } from 'typeorm';
+import { ClubMember } from '../../database/entities/club-member.entity';
+import { ClubPointsEntry } from '../../database/entities/club-points-entry.entity';
+import { ClubTierRule } from '../../database/entities/club-tier-rule.entity';
 import { ErrorCode } from '../../common/errors';
 import { resolveTierForPoints } from '../club/club.service';
-import type { TypeORM } from '../../../generated/typeorm/client';
 import type { Irr } from '../../common/money';
 
 /** Server-side config (CLAUDE.md: "conversion rate is server-side config")
@@ -13,25 +16,38 @@ const IRR_PER_REDEEMED_POINT = 10_000;
 
 @Injectable()
 export class ClubPointsService {
-  constructor(private readonly typeorm: TypeORMService) {}
+  constructor(
+    @InjectRepository(ClubMember)
+    private readonly clubMemberRepo: Repository<ClubMember>,
+    @InjectRepository(ClubPointsEntry)
+    private readonly pointsRepo: Repository<ClubPointsEntry>,
+  ) {}
 
   async findMemberByUserId(userId: string) {
-    return this.typeorm.clubMember.findUnique({ where: { userId } });
+    return this.clubMemberRepo.findOneBy({ userId });
+  }
+
+  private async sumPoints(
+    manager: EntityManager,
+    clubMemberId: string,
+  ): Promise<number> {
+    const row = await manager
+      .createQueryBuilder(ClubPointsEntry, 'e')
+      .select('SUM(e."signedPoints")', 'sum')
+      .where('e."clubMemberId" = :clubMemberId', { clubMemberId })
+      .getRawOne<{ sum: string | null }>();
+    return row?.sum ? Number(row.sum) : 0;
   }
 
   async getBalance(clubMemberId: string): Promise<number> {
-    const sum = await this.typeorm.clubPointsEntry.aggregate({
-      where: { clubMemberId },
-      _sum: { signedPoints: true },
-    });
-    return sum._sum.signedPoints ?? 0;
+    return this.sumPoints(this.pointsRepo.manager, clubMemberId);
   }
 
   /** Only called for GATEWAY/WALLET payments (real money spent) — never
    * when the purchase itself was paid with points, to avoid a
    * redeem-to-earn loophole. */
   async earnForPurchase(
-    tx: TypeORM.TransactionClient,
+    manager: EntityManager,
     clubMemberId: string,
     paidIrr: Irr,
     bookingId: string,
@@ -40,17 +56,22 @@ export class ClubPointsService {
     // never routes the amount through a float.
     const points = Number(paidIrr / BigInt(IRR_PER_EARNED_POINT));
     if (points <= 0) return;
-    await tx.clubPointsEntry.create({
-      data: { clubMemberId, type: 'EARN', signedPoints: points, bookingId },
-    });
-    await this.syncCache(tx, clubMemberId);
+    await manager.save(
+      manager.create(ClubPointsEntry, {
+        clubMemberId,
+        type: 'EARN',
+        signedPoints: points,
+        bookingId,
+      }),
+    );
+    await this.syncCache(manager, clubMemberId);
   }
 
   /** "Pay with points" — the design's payment method for club members
    * (CLAUDE.md). Redeems exactly enough points to cover priceIrr; throws
    * if the member doesn't have enough. */
   async redeemForPayment(
-    tx: TypeORM.TransactionClient,
+    manager: EntityManager,
     clubMemberId: string,
     priceIrr: Irr,
     bookingId: string,
@@ -59,26 +80,22 @@ export class ClubPointsService {
     // Math.ceil, no float involved.
     const rate = BigInt(IRR_PER_REDEEMED_POINT);
     const pointsNeeded = Number((priceIrr + rate - 1n) / rate);
-    const sum = await tx.clubPointsEntry.aggregate({
-      where: { clubMemberId },
-      _sum: { signedPoints: true },
-    });
-    const balance = sum._sum.signedPoints ?? 0;
+    const balance = await this.sumPoints(manager, clubMemberId);
     if (balance < pointsNeeded) {
       throw new BadRequestException({
         code: ErrorCode.VALIDATION_FAILED,
         message: 'امتیاز باشگاه کافی نیست.',
       });
     }
-    await tx.clubPointsEntry.create({
-      data: {
+    await manager.save(
+      manager.create(ClubPointsEntry, {
         clubMemberId,
         type: 'REDEEM',
         signedPoints: -pointsNeeded,
         bookingId,
-      },
-    });
-    await this.syncCache(tx, clubMemberId);
+      }),
+    );
+    await this.syncCache(manager, clubMemberId);
     return pointsNeeded;
   }
 
@@ -88,19 +105,17 @@ export class ClubPointsService {
    * ClubTierRule thresholds every time points change, so tier promotion
    * (and demotion, on a redemption) is real rather than a manual-only
    * staff action. */
-  private async syncCache(tx: TypeORM.TransactionClient, clubMemberId: string) {
-    const sum = await tx.clubPointsEntry.aggregate({
-      where: { clubMemberId },
-      _sum: { signedPoints: true },
-    });
-    const points = sum._sum.signedPoints ?? 0;
-    const rule = await tx.clubTierRule.findFirst({
-      orderBy: { createdAt: 'asc' },
-    });
+  private async syncCache(manager: EntityManager, clubMemberId: string) {
+    const points = await this.sumPoints(manager, clubMemberId);
+    const rule = await manager
+      .createQueryBuilder(ClubTierRule, 'r')
+      .orderBy('r.createdAt', 'ASC')
+      .getOne();
     const level = rule ? resolveTierForPoints(points, rule) : undefined;
-    await tx.clubMember.update({
-      where: { id: clubMemberId },
-      data: { points, ...(level ? { level } : {}) },
-    });
+    await manager.update(
+      ClubMember,
+      { id: clubMemberId },
+      { points, ...(level ? { level } : {}) },
+    );
   }
 }

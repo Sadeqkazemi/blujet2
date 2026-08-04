@@ -56,14 +56,14 @@ Acceptance checklist for پنل ادمین سایت parity with
 - [x] 10/page — same test
 
 ## Site Management («مدیریت سایت»)
-- [x] Dark banners + destinations + routes + app links + social + support + jobs + library — `MediaAdminPage.test.tsx`
-- [x] Job postings CRUD moved here from jobapps — same test
-- [x] 10/page on destinations, routes, library, jobs — `usePagination`
+- [x] Dark banners + destinations + routes + app links + social + support + library — `MediaAdminPage.test.tsx`
+- [x] 10/page on destinations, routes, library — `usePagination`
 
-## Employment Requests («درخواست‌های استخدام»)
-- [x] Dark applications-only queue (title/subtitle/search/«همۀ آگهی‌ها»/empty copy) — `CareersAdminPage.test.tsx`
-- [x] Detail modal: refer / hire / reject — same test
-- [x] 10/page — same test
+## Employment panel («استخدام» / jobapps)
+- [x] Three tabs: ایجاد فرصت شغلی (عکس+متن) / آگهی‌ها / درخواست‌های استخدام — `CareersAdminPage.test.tsx`
+- [x] Footer visibility toggle «نمایش آگهی در فوتر» → `CareersSettings.enabled` — same test + `PublicFooter.test.tsx`
+- [x] Applications show form fields + uploaded resume docs — same test
+- [x] Job posting `description` + `imageFileId` — migration + API
 
 ## Global panel pagination rule
 - [x] Default `PANEL_PAGE_SIZE = 10` via `usePagination` — `Pagination.test.tsx`

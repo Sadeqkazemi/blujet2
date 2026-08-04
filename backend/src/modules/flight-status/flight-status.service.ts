@@ -3,7 +3,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { TypeORMService } from '../../typeorm/typeorm.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { FlightInstance } from '../../database/entities/flight-instance.entity';
+import { Airport } from '../../database/entities/airport.entity';
 import { ErrorCode } from '../../common/errors';
 import { resolveAircraftType } from '../flights/aircraft-type.util';
 
@@ -14,7 +17,12 @@ const STATUS_LABEL_FA: Record<string, string> = {
 
 @Injectable()
 export class FlightStatusService {
-  constructor(private readonly typeorm: TypeORMService) {}
+  constructor(
+    @InjectRepository(FlightInstance)
+    private readonly instanceRepo: Repository<FlightInstance>,
+    @InjectRepository(Airport)
+    private readonly airportRepo: Repository<Airport>,
+  ) {}
 
   async lookup(params: {
     flightNo?: string;
@@ -34,21 +42,30 @@ export class FlightStatusService {
     const dayEnd = new Date(dayStart);
     dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
 
-    const instance = await this.typeorm.flightInstance.findFirst({
-      where: {
-        departureAt: { gte: dayStart, lt: dayEnd },
-        flight: params.flightNo
-          ? { flightNo: { equals: params.flightNo, mode: 'insensitive' } }
-          : {
-              route: {
-                originCode: { equals: params.origin, mode: 'insensitive' },
-                destCode: { equals: params.dest, mode: 'insensitive' },
-              },
-            },
-      },
-      include: { flight: { include: { route: true } } },
-      orderBy: { departureAt: 'asc' },
-    });
+    const qb = this.instanceRepo
+      .createQueryBuilder('instance')
+      .innerJoinAndSelect('instance.flight', 'flight')
+      .innerJoinAndSelect('flight.route', 'route')
+      .where(
+        'instance.departureAt >= :dayStart AND instance.departureAt < :dayEnd',
+        {
+          dayStart,
+          dayEnd,
+        },
+      )
+      .orderBy('instance.departureAt', 'ASC');
+
+    if (params.flightNo) {
+      qb.andWhere('flight."flightNo" ILIKE :flightNo', {
+        flightNo: params.flightNo,
+      });
+    } else {
+      qb.andWhere('route."originCode" ILIKE :origin', {
+        origin: params.origin,
+      }).andWhere('route."destCode" ILIKE :dest', { dest: params.dest });
+    }
+
+    const instance = await qb.getOne();
 
     if (!instance) {
       throw new NotFoundException({
@@ -58,10 +75,10 @@ export class FlightStatusService {
     }
 
     const [originAirport, destAirport] = await Promise.all([
-      this.typeorm.airport.findUnique({
+      this.airportRepo.findOne({
         where: { code: instance.flight.route.originCode },
       }),
-      this.typeorm.airport.findUnique({
+      this.airportRepo.findOne({
         where: { code: instance.flight.route.destCode },
       }),
     ]);

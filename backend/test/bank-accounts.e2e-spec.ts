@@ -1,7 +1,8 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { TypeORMService } from '../src/typeorm/typeorm.service';
+import { DataSource } from 'typeorm';
+import { SavedBankAccount } from '../src/database/entities/saved-bank-account.entity';
 import { loginAs, loginAsCustomer } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 import { resetCustomerPhones } from './helpers/customer-state.helper';
@@ -12,12 +13,12 @@ const SECOND_SHEBA = 'IR060120000000332211452192';
 
 describe('Bank accounts (e2e)', () => {
   let app: INestApplication<App>;
-  let typeorm: TypeORMService;
+  let dataSource: DataSource;
 
   beforeEach(async () => {
     app = await createTestApp();
-    typeorm = app.get(TypeORMService);
-    await resetCustomerPhones(typeorm, [
+    dataSource = app.get(DataSource);
+    await resetCustomerPhones(dataSource, [
       '09180000001',
       '09180000002',
       '09180000004',
@@ -71,9 +72,9 @@ describe('Bank accounts (e2e)', () => {
       .set('Authorization', `Bearer ${accessToken}`);
     expect(del.status).toBe(200);
 
-    const stored = await typeorm.savedBankAccount.findMany({
-      where: { userId: userId! },
-    });
+    const stored = await dataSource
+      .getRepository(SavedBankAccount)
+      .findBy({ userId: userId! });
     expect(stored.every((r) => r.id !== create.body.data.id)).toBe(true);
     expect(stored.some((r) => r.shebaEnc.includes(VALID_SHEBA))).toBe(false);
   });

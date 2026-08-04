@@ -1,8 +1,10 @@
-import { TypeORMService } from '../../typeorm/typeorm.service';
-import type {
-  BookingChannel,
-  CabinClass,
-} from '../../../generated/typeorm/enums';
+import type { EntityManager } from 'typeorm';
+import { CabinFare } from '../../database/entities/cabin-fare.entity';
+import { FareRule } from '../../database/entities/fare-rule.entity';
+import { FlightInstance } from '../../database/entities/flight-instance.entity';
+import { FarePricingProposal } from '../../database/entities/fare-pricing-proposal.entity';
+import { Booking } from '../../database/entities/booking.entity';
+import type { BookingChannel, CabinClass } from '../../database/enums';
 import { type Irr, pctOfIrr, roundIrrTo } from '../../common/money';
 
 /** Same documented flat fallback as reservation/pnr.service.ts — no
@@ -20,32 +22,36 @@ const BUSINESS_MULTIPLIER_PCT = 180;
  * and at pre-payment re-price time so the two can never disagree.
  */
 export async function getCabinPrice(
-  typeorm: TypeORMService,
+  manager: EntityManager,
   flightInstanceId: string,
   cabin: CabinClass,
   channel: BookingChannel = 'SYSTEM',
 ): Promise<Irr> {
   const byClass = await resolveFareClass(
-    typeorm,
+    manager,
     flightInstanceId,
     cabin,
     channel,
   );
   if (byClass) return byClass.priceIrr;
 
-  const fare = await typeorm.cabinFare.findUnique({
-    where: { flightInstanceId_cabin: { flightInstanceId, cabin } },
-  });
+  const fare = await manager.findOneBy(CabinFare, { flightInstanceId, cabin });
   if (fare) return fare.priceIrr;
 
-  const instance = await typeorm.flightInstance.findUnique({
-    where: { id: flightInstanceId },
-    include: { pricing: true },
-  });
+  const [instance, pricing] = await Promise.all([
+    manager
+      .createQueryBuilder(FlightInstance, 'fi')
+      .where('fi.id = :flightInstanceId', { flightInstanceId })
+      .getOne(),
+    manager
+      .createQueryBuilder(FarePricingProposal, 'p')
+      .where('p.flightInstanceId = :flightInstanceId', { flightInstanceId })
+      .getOne(),
+  ]);
   const economyPrice: Irr =
-    instance?.pricing?.status === 'REGISTERED'
-      ? instance.pricing.registeredPriceIrr!
-      : (instance?.basePriceIrr ?? FALLBACK_ECONOMY_PRICE_IRR);
+    pricing?.status === 'REGISTERED'
+      ? (pricing.registeredPriceIrr as Irr)
+      : ((instance?.basePriceIrr as Irr | null) ?? FALLBACK_ECONOMY_PRICE_IRR);
 
   return cabin === 'BUSINESS'
     ? roundIrrTo(pctOfIrr(economyPrice, BUSINESS_MULTIPLIER_PCT), 100_000n)
@@ -67,36 +73,39 @@ export async function getCabinPrice(
  * merely unavailable to buy, invisible to pricing entirely.
  */
 export async function resolveFareClass(
-  typeorm: TypeORMService,
+  manager: EntityManager,
   flightInstanceId: string,
   cabin: CabinClass,
   channel: BookingChannel = 'SYSTEM',
 ): Promise<{ classCode: string; priceIrr: Irr; taxIrr: Irr } | null> {
   const now = new Date();
-  const allRules = await typeorm.fareRule.findMany({
+  const allRules = await manager.find(FareRule, {
     where: { flightInstanceId, cabin },
-    orderBy: { priceIrr: 'asc' },
+    order: { priceIrr: 'ASC' },
   });
   const rules = allRules.filter(
     (r) =>
       (!r.validFrom || r.validFrom <= now) &&
       (!r.validUntil || r.validUntil >= now) &&
-      (r.allowedChannels.length === 0 || r.allowedChannels.includes(channel)),
+      ((r.allowedChannels ?? []).length === 0 ||
+        (r.allowedChannels ?? []).includes(channel)),
   );
   if (rules.length === 0) return null;
 
-  const usage = await typeorm.booking.groupBy({
-    by: ['fareClassCode'],
-    where: {
-      flightInstanceId,
-      cabin,
-      fareClassCode: { not: null },
-      status: { in: ['DRAFT', 'HELD', 'PAID', 'TICKETED'] },
-    },
-    _count: { _all: true },
-  });
+  const usageRows = await manager
+    .createQueryBuilder(Booking, 'b')
+    .select('b.fareClassCode', 'fareClassCode')
+    .addSelect('COUNT(*)', 'count')
+    .where('b.flightInstanceId = :flightInstanceId', { flightInstanceId })
+    .andWhere('b.cabin = :cabin', { cabin })
+    .andWhere('b.fareClassCode IS NOT NULL')
+    .andWhere('b.status IN (:...statuses)', {
+      statuses: ['DRAFT', 'HELD', 'PAID', 'TICKETED'],
+    })
+    .groupBy('b.fareClassCode')
+    .getRawMany<{ fareClassCode: string; count: string }>();
   const used = new Map(
-    usage.map((u) => [u.fareClassCode as string, u._count._all]),
+    usageRows.map((u) => [u.fareClassCode, Number(u.count)]),
   );
 
   for (const rule of rules) {

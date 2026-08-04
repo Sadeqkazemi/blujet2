@@ -5,9 +5,13 @@ import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import * as crypto from 'node:crypto';
+import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
 import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
-import { TypeORMService } from '../src/typeorm/typeorm.service';
+import { AuditLog } from '../src/database/entities/audit-log.entity';
+import { FarePricingProposal } from '../src/database/entities/fare-pricing-proposal.entity';
+import { Flight } from '../src/database/entities/flight.entity';
+import { FlightInstance } from '../src/database/entities/flight-instance.entity';
 import {
   PRICE_SUGGESTION_PROVIDER,
   type PriceSuggestionProvider,
@@ -29,7 +33,7 @@ class FakePriceSuggestionProvider implements PriceSuggestionProvider {
 
 describe('Pricing (e2e)', () => {
   let app: INestApplication<App>;
-  let typeorm: TypeORMService;
+  let dataSource: DataSource;
   let fakeMl: FakePriceSuggestionProvider;
 
   beforeEach(async () => {
@@ -55,7 +59,7 @@ describe('Pricing (e2e)', () => {
     );
     app.useGlobalFilters(new AllExceptionsFilter(logger));
     await app.init();
-    typeorm = app.get(TypeORMService);
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
@@ -63,9 +67,13 @@ describe('Pricing (e2e)', () => {
   });
 
   async function createScheduledInstance() {
-    const flight = await typeorm.flight.findFirstOrThrow();
-    return typeorm.flightInstance.create({
-      data: {
+    const flight = await dataSource
+      .getRepository(Flight)
+      .createQueryBuilder('f')
+      .getOneOrFail();
+    const instanceRepo = dataSource.getRepository(FlightInstance);
+    return instanceRepo.save(
+      instanceRepo.create({
         flightId: flight.id,
         departureAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
         arrivalAt: new Date(
@@ -74,8 +82,8 @@ describe('Pricing (e2e)', () => {
         capacity: 180,
         charterSeats: 60,
         status: 'SCHEDULED',
-      },
-    });
+      }),
+    );
   }
 
   it('Commercial proposes a price for a scheduled flight; re-PUT while PENDING edits it', async () => {
@@ -100,9 +108,12 @@ describe('Pricing (e2e)', () => {
     expect(edited.status).toBe(200);
     expect(edited.body.data.proposedPriceIrr).toBe('39000000');
 
-    const audit = await typeorm.auditLog.findFirst({
-      where: { category: 'PRICING', entityId: created.body.data.id },
-    });
+    const audit = await dataSource
+      .getRepository(AuditLog)
+      .createQueryBuilder('a')
+      .where('a.category = :category', { category: 'PRICING' })
+      .andWhere('a.entityId = :entityId', { entityId: created.body.data.id })
+      .getOne();
     expect(audit).not.toBeNull();
   });
 
@@ -228,9 +239,11 @@ describe('Pricing (e2e)', () => {
     expect(analysis.body.data.available).toBe(true);
     expect(analysis.body.data.analyzed).toBeGreaterThanOrEqual(1);
 
-    const stored = await typeorm.farePricingProposal.findUniqueOrThrow({
-      where: { id: proposalId },
-    });
+    const stored = await dataSource
+      .getRepository(FarePricingProposal)
+      .createQueryBuilder('p')
+      .where('p.id = :id', { id: proposalId })
+      .getOneOrFail();
     const suggestion = stored.aiSuggestion as {
       priceIrr: number;
       modelVersion: string;
@@ -294,9 +307,11 @@ describe('Pricing (e2e)', () => {
       .send({ proposedPriceIrr: 30_000_000 });
     expect(edited.status).toBe(200);
 
-    const stored = await typeorm.farePricingProposal.findUniqueOrThrow({
-      where: { id: proposalId },
-    });
+    const stored = await dataSource
+      .getRepository(FarePricingProposal)
+      .createQueryBuilder('p')
+      .where('p.id = :id', { id: proposalId })
+      .getOneOrFail();
     expect(stored.aiSuggestion).toBeNull();
 
     const stepUp = await stepUpFor(
@@ -354,9 +369,11 @@ describe('Pricing (e2e)', () => {
     expect(registered.status).toBe(409);
     expect(registered.body.error.message).toContain('نرخ قانونی');
 
-    const stored = await typeorm.farePricingProposal.findUniqueOrThrow({
-      where: { id: proposalId },
-    });
+    const stored = await dataSource
+      .getRepository(FarePricingProposal)
+      .createQueryBuilder('p')
+      .where('p.id = :id', { id: proposalId })
+      .getOneOrFail();
     expect(stored.status).toBe('PENDING');
     expect(stored.registeredPriceIrr).toBeNull();
   });
