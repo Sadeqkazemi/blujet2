@@ -4,6 +4,10 @@ import {
   PRICE_SUGGESTION_PROVIDER,
 } from './price-suggestion.provider';
 import {
+  MlPriceAdvisoryProvider,
+  PRICE_ADVISORY_PROVIDER,
+} from './price-advisory.provider';
+import {
   AnthropicSurveySummaryProvider,
   SURVEY_SUMMARY_PROVIDER,
 } from './survey-summary.provider';
@@ -13,11 +17,16 @@ import {
 @Module({
   providers: [
     { provide: PRICE_SUGGESTION_PROVIDER, useClass: MlPriceSuggestionProvider },
+    { provide: PRICE_ADVISORY_PROVIDER, useClass: MlPriceAdvisoryProvider },
     {
       provide: SURVEY_SUMMARY_PROVIDER,
       useClass: AnthropicSurveySummaryProvider,
     },
   ],
-  exports: [PRICE_SUGGESTION_PROVIDER, SURVEY_SUMMARY_PROVIDER],
+  exports: [
+    PRICE_SUGGESTION_PROVIDER,
+    PRICE_ADVISORY_PROVIDER,
+    SURVEY_SUMMARY_PROVIDER,
+  ],
 })
 export class AiModule {}

@@ -36,6 +36,7 @@ import { SavedFlightsService } from './saved-flights.service';
 import { MySavedFlightsController } from './my-saved-flights.controller';
 import { PrivacyController } from './privacy.controller';
 import { PrivacyService } from './privacy.service';
+import { PriceAdvisoryService } from './price-advisory.service';
 import { AuditModule } from '../audit/audit.module';
 import { CustomerReferralsModule } from '../customer-referrals/customer-referrals.module';
 import { AiModule } from '../ai/ai.module';
@@ -88,9 +89,8 @@ import { PAYMENT_GATEWAY, SandboxPaymentGateway } from './payment-gateway';
     PriceLockService,
     SavedFlightsService,
     PrivacyService,
-    // PAYMENT_GATEWAY env var selects the driver; sandbox is the only one
-    // until a real Shetab/PSP contract exists — the interface is final.
-    { provide: PAYMENT_GATEWAY, useClass: SandboxPaymentGateway },
+    PriceAdvisoryService,
+    { provide: PAYMENT_GATEWAY, useFactory: createPaymentGateway },
   ],
   exports: [SearchService, BookingService],
 })
