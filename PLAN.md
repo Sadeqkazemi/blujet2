@@ -1597,6 +1597,32 @@ a passing test — see `docs/features/panel-shell-dashboard.md` for Phase 1.
   drops blog/kyc/settings; global **10 records/page**; refunds + tickets
   search. See `docs/features/site-admin-panel-align.md`.
 
+- [x] **Prisma → TypeORM migration reconciled onto `main` (2026-08-04)** —
+  the `claude/admin-panels-multi-role-kv5nk3` branch's full 18-phase
+  Prisma→TypeORM migration was merged with `main`'s independently-diverged
+  Prisma-based history (86 commits), resolving all conflicts (7 service
+  files + 16 e2e test files, plus 2 silently-leaked Prisma files caught by
+  a repo-wide `git grep`) — full backend e2e suite green (472/472) before
+  push. While landing this, `origin/main` was independently force-pushed
+  twice by another process: first the feature branch's remote tip, then
+  `main` itself with a **full history rewrite** (all ~459 prior commits
+  got new hashes, via a retroactive `prisma`→`typeorm` text rename) plus
+  its own separately-produced, functionally-equivalent TypeORM migration
+  (commit `cf7d3d9`, authored via a "Cursor Agent" under the same account).
+  Per explicit user decision each time: the first collision was resolved
+  by force-pushing this reconciled branch over the other one; the second
+  (on `main`) was resolved by treating the rewritten `main` as the base
+  and merging this branch's verified work onto it (`--allow-unrelated-histories`),
+  keeping two real fixes unique to the rewritten history — the corrected
+  `typeorm` package version (`^0.3.22`, not the nonexistent `^1.1.0` both
+  efforts had pinned) and a `DataSource`-query health check replacing
+  `@nestjs/terminus` — and dropping a stray Prisma-format `migration.sql`
+  the rewrite had left under `backend/typeorm/migrations/`. Landed as a
+  genuine fast-forward on `main` (`c5c0e72`), full verification (tsc,
+  eslint, 72 backend unit + 520 frontend unit + 472 backend e2e, all on a
+  freshly migrated+seeded DB) green before push. `main` now runs entirely
+  on TypeORM with no remaining Prisma references.
+
 ## Notable findings from design extraction (informs later phases)
 
 - Several panels contain orphaned tabs/handlers (coded, unreachable from
