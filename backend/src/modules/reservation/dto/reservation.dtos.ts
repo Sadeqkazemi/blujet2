@@ -130,3 +130,12 @@ export class ListPnrQueryDto {
   @IsString()
   q?: string;
 }
+
+export class ListReservationFlightsQueryDto {
+  @ApiPropertyOptional({
+    description: 'جستجو در شماره پرواز، کد فرودگاه یا نام شهر',
+  })
+  @IsOptional()
+  @IsString()
+  q?: string;
+}

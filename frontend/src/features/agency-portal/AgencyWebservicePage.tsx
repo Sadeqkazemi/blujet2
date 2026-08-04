@@ -266,7 +266,7 @@ export default function AgencyWebservicePage() {
                 className={`cursor-pointer rounded-xl border p-3 text-center ${plan === p.key ? 'border-[#1668c4] bg-[#f2f7fd]' : 'border-[#e8eef6]'}`}
               >
                 <div className="text-xs font-extrabold text-[#0d2640]">{p.label[locale]}</div>
-                <div className="font-num mt-1 text-[11px] font-bold text-[#1668c4]">
+                <div className="mt-1 text-[11px] font-bold text-[#1668c4]">
                   {p.priceLabel} {t.toman}
                 </div>
               </div>
@@ -276,7 +276,7 @@ export default function AgencyWebservicePage() {
           <div className="flex items-center justify-between rounded-xl bg-[#fafbfd] p-4">
             <div>
               <div className="text-[10.5px] text-[#8a96a6]">{t.payableLabel}</div>
-              <div className="font-num text-base font-black text-[#0d2640]">
+              <div className="text-base font-black text-[#0d2640]">
                 {selPlan.priceLabel} <span className="text-[10px] font-normal text-[#8a96a6]">{t.toman}</span>
               </div>
             </div>
@@ -321,7 +321,7 @@ export default function AgencyWebservicePage() {
             {t.keyNotice}
           </div>
           <div data-testid="ws-key-activated-at" className="text-[10.5px] text-[#8a96a6]">
-            {t.activatedAtLabel} <span className="font-num">{formatJalaliDate(activeKey.activatedAt)}</span>
+            {t.activatedAtLabel} <span>{formatJalaliDate(activeKey.activatedAt)}</span>
           </div>
           <Link
             to="/agency/apidocs"

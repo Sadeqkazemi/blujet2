@@ -172,45 +172,45 @@ export default function ServicesPage() {
   }
 
   return (
-    <div className="p-8">
+    <div className="px-[21px] pb-[34px] pt-[18px]">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-black text-ink">سرویس‌های سایت</h1>
-          <p className="mt-1 text-sm text-muted">وضعیت و کنترل تمام سرویس‌های فعال در سایت</p>
+          <h1 className="text-[20.5px] font-black text-white">سرویس‌های سایت</h1>
+          <p className="mt-1 text-[11.5px] text-[#6b7b94]">وضعیت و کنترل تمام سرویس‌های فعال در سایت</p>
         </div>
         <div className="flex items-center gap-4 text-xs">
-          <span className="rounded-xl border border-border bg-white px-3 py-2">
-            <span className="font-num font-black text-[#059669]">
+          <span className="rounded-xl border border-[#1f2a3d] bg-[#141d2e] px-3 py-2">
+            <span className="font-num font-black text-[#34d399]">
               {faDigits(internal.filter((s) => s.enabled).length + external.filter((s) => s.enabled).length)}
             </span>{' '}
-            <span className="text-muted">سرویس فعال</span>
+            <span className="text-[#6b7b94]">سرویس فعال</span>
           </span>
-          <span className="rounded-xl border border-border bg-white px-3 py-2">
-            <span className="font-num font-black text-ink">
+          <span className="rounded-xl border border-[#1f2a3d] bg-[#141d2e] px-3 py-2">
+            <span className="font-num font-black text-[#e7ecf3]">
               {faDigits(internal.length + external.length)}
             </span>{' '}
-            <span className="text-muted">کل سرویس‌ها</span>
+            <span className="text-[#6b7b94]">کل سرویس‌ها</span>
           </span>
         </div>
       </div>
 
-      {error && <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">{error}</p>}
+      {error && <p className="mb-4 rounded-lg bg-[rgba(248,113,113,.12)] p-3 text-sm text-[#f87171]">{error}</p>}
 
-      <h2 className="mb-3 text-sm font-bold text-ink">سرویس‌های داخلی سایت</h2>
+      <h2 className="mb-3 text-[14.5px] font-extrabold text-white">سرویس‌های داخلی سایت</h2>
       <div className="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {internal.map((s) => (
-          <div key={s.id} className="rounded-xl border border-border bg-white p-3">
+          <div key={s.id} className="rounded-xl border border-[#1f2a3d] bg-[#141d2e] p-3">
             <div className="mb-3 flex items-start justify-between gap-2">
               <div>
-                <div className="text-xs font-bold text-ink">{s.nameFa}</div>
-                <div className="mt-0.5 text-[10px] text-muted">آپ‌تایم {faPercent(s.uptimePct)}</div>
+                <div className="text-xs font-bold text-[#e7ecf3]">{s.nameFa}</div>
+                <div className="mt-0.5 text-[10px] text-[#6b7b94]">آپ‌تایم {faPercent(s.uptimePct)}</div>
               </div>
               <button
                 role="switch"
                 aria-checked={s.enabled}
                 aria-label={s.nameFa}
                 onClick={() => void onToggleInternal(s)}
-                className={`relative h-6 w-11 rounded-full transition ${s.enabled ? 'bg-accent' : 'bg-border'}`}
+                className={`relative h-6 w-11 rounded-full transition ${s.enabled ? 'bg-[#3b82f6]' : 'bg-[#28344c]'}`}
               >
                 <span
                   className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${
@@ -221,7 +221,7 @@ export default function ServicesPage() {
             </div>
             <span
               className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                s.enabled ? 'bg-[#10b98124] text-[#059669]' : 'bg-danger/15 text-danger'
+                s.enabled ? 'bg-[rgba(16,185,129,.14)] text-[#34d399]' : 'bg-[rgba(248,113,113,.14)] text-[#f87171]'
               }`}
             >
               {s.enabled ? 'فعال' : 'غیرفعال'}
@@ -231,12 +231,12 @@ export default function ServicesPage() {
       </div>
 
       {smsLog && (
-        <div className="mb-8 rounded-xl border border-border bg-white p-4">
+        <div className="mb-8 rounded-xl border border-[#1f2a3d] bg-[#141d2e] p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-bold text-ink">سامانه پیامک (SMS)</h2>
+            <h2 className="text-[14.5px] font-extrabold text-white">سامانه پیامک (SMS)</h2>
             <span
               className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                smsLog.enabled ? 'bg-[#10b98124] text-[#059669]' : 'bg-danger/15 text-danger'
+                smsLog.enabled ? 'bg-[rgba(16,185,129,.14)] text-[#34d399]' : 'bg-[rgba(248,113,113,.14)] text-[#f87171]'
               }`}
             >
               {smsLog.enabled ? 'فعال' : 'غیرفعال'}
@@ -244,31 +244,31 @@ export default function ServicesPage() {
           </div>
           <div className="mb-4 flex gap-6 text-xs">
             <div>
-              <span className="font-num font-black text-[#059669]">{faDigits(smsLog.todaySuccessCount)}</span>{' '}
-              <span className="text-muted">ارسال موفق امروز</span>
+              <span className="font-num font-black text-[#34d399]">{faDigits(smsLog.todaySuccessCount)}</span>{' '}
+              <span className="text-[#6b7b94]">ارسال موفق امروز</span>
             </div>
             <div>
-              <span className="font-num font-black text-danger">{faDigits(smsLog.todayFailedCount)}</span>{' '}
-              <span className="text-muted">ارسال ناموفق امروز</span>
+              <span className="font-num font-black text-[#f87171]">{faDigits(smsLog.todayFailedCount)}</span>{' '}
+              <span className="text-[#6b7b94]">ارسال ناموفق امروز</span>
             </div>
           </div>
-          <div className="flex flex-col divide-y divide-border/60">
+          <div className="flex flex-col divide-y divide-[#1f2a3d]">
             {smsLog.recent.length === 0 && (
-              <p className="py-2 text-xs text-muted">پیامکی ثبت نشده است.</p>
+              <p className="py-2 text-xs text-[#6b7b94]">پیامکی ثبت نشده است.</p>
             )}
             {smsLog.recent.map((r) => (
               <div key={r.id} data-testid="sms-log-row" className="flex items-center gap-3 py-2 text-xs">
-                <div className="ltr font-num min-w-[110px] text-muted">{r.phoneMasked}</div>
-                <div className="min-w-[110px] text-ink">{SMS_MESSAGE_TYPE_LABEL[r.messageType] ?? r.messageType}</div>
+                <div className="ltr font-num min-w-[110px] text-[#6b7b94]">{r.phoneMasked}</div>
+                <div className="min-w-[110px] text-[#e7ecf3]">{SMS_MESSAGE_TYPE_LABEL[r.messageType] ?? r.messageType}</div>
                 <span
                   className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                    r.status === 'SUCCESS' ? 'bg-[#10b98124] text-[#059669]' : 'bg-danger/15 text-danger'
+                    r.status === 'SUCCESS' ? 'bg-[rgba(16,185,129,.14)] text-[#34d399]' : 'bg-[rgba(248,113,113,.14)] text-[#f87171]'
                   }`}
                 >
                   {r.status === 'SUCCESS' ? 'موفق' : 'ناموفق'}
                 </span>
-                {r.failureReason && <span className="text-[10.5px] text-danger">{r.failureReason}</span>}
-                <span className="mr-auto text-[10.5px] text-muted">{formatJalaliDateTime(r.createdAt)}</span>
+                {r.failureReason && <span className="text-[10.5px] text-[#f87171]">{r.failureReason}</span>}
+                <span className="mr-auto text-[10.5px] text-[#6b7b94]">{formatJalaliDateTime(r.createdAt)}</span>
               </div>
             ))}
           </div>
@@ -276,31 +276,31 @@ export default function ServicesPage() {
       )}
 
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-bold text-ink">سرویس‌های خارجی (API)</h2>
+        <h2 className="text-[14.5px] font-extrabold text-white">سرویس‌های خارجی (API)</h2>
         <button
           onClick={() => {
             setAddError(null);
             setAddOpen(true);
           }}
-          className="rounded-lg bg-accent px-3 py-1.5 text-[11px] font-bold text-white transition hover:bg-accent/90"
+          className="rounded-lg bg-[#3b82f6] px-3 py-1.5 text-[11px] font-bold text-white transition hover:brightness-110"
         >
           افزودن سرویس خارجی
         </button>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {external.map((s) => (
-          <div key={s.id} className="rounded-xl border border-border bg-white p-3">
+          <div key={s.id} className="rounded-xl border border-[#1f2a3d] bg-[#141d2e] p-3">
             <div className="mb-2 flex items-start justify-between gap-2">
               <div>
-                <div className="text-xs font-bold text-ink">{s.nameFa}</div>
-                <div className="mt-0.5 text-[10px] text-muted">{s.provider}</div>
+                <div className="text-xs font-bold text-[#e7ecf3]">{s.nameFa}</div>
+                <div className="mt-0.5 text-[10px] text-[#6b7b94]">{s.provider}</div>
               </div>
               <button
                 role="switch"
                 aria-checked={s.enabled}
                 aria-label={s.nameFa}
                 onClick={() => onToggleExternal(s)}
-                className={`relative h-6 w-11 rounded-full transition ${s.enabled ? 'bg-accent' : 'bg-border'}`}
+                className={`relative h-6 w-11 rounded-full transition ${s.enabled ? 'bg-[#3b82f6]' : 'bg-[#28344c]'}`}
               >
                 <span
                   className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${
@@ -309,28 +309,28 @@ export default function ServicesPage() {
                 />
               </button>
             </div>
-            <div className="ltr mb-2 truncate rounded-md bg-surface px-2 py-1 text-[10px] text-muted">{s.endpoint}</div>
+            <div className="ltr mb-2 truncate rounded-md bg-[#18223a] px-2 py-1 text-[10px] text-[#6b7b94]">{s.endpoint}</div>
             {testResult?.id === s.id && (
-              <div className={`mb-2 rounded-md p-1.5 text-[10px] ${testResult.ok ? 'bg-[#10b98115] text-[#059669]' : 'bg-danger/10 text-danger'}`}>
+              <div className={`mb-2 rounded-md p-1.5 text-[10px] ${testResult.ok ? 'bg-[rgba(16,185,129,.12)] text-[#34d399]' : 'bg-[rgba(248,113,113,.12)] text-[#f87171]'}`}>
                 {testResult.message}
               </div>
             )}
             <div className="flex items-center justify-between">
               <span
                 className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                  s.enabled ? 'bg-[#10b98124] text-[#059669]' : 'bg-danger/15 text-danger'
+                  s.enabled ? 'bg-[rgba(16,185,129,.14)] text-[#34d399]' : 'bg-[rgba(248,113,113,.14)] text-[#f87171]'
                 }`}
               >
                 {s.enabled ? 'فعال' : 'غیرفعال'}
               </span>
               <div className="flex gap-2">
-                <button onClick={() => onOpenSettings(s)} className="text-[10.5px] font-bold text-accent">
+                <button onClick={() => onOpenSettings(s)} className="text-[10.5px] font-bold text-[#3b82f6]">
                   تنظیمات
                 </button>
-                <button onClick={() => void onTest(s)} className="text-[10.5px] font-bold text-accent">
+                <button onClick={() => void onTest(s)} className="text-[10.5px] font-bold text-[#3b82f6]">
                   تست اتصال
                 </button>
-                <button onClick={() => void onRemove(s)} className="text-[10.5px] font-bold text-danger">
+                <button onClick={() => void onRemove(s)} className="text-[10.5px] font-bold text-[#f87171]">
                   حذف
                 </button>
               </div>
@@ -340,17 +340,17 @@ export default function ServicesPage() {
       </div>
 
       {addOpen && (
-        <Modal title="تعریف سرویس خارجی جدید" onClose={() => setAddOpen(false)}>
-          <label className="mb-1 block text-xs font-bold text-ink" htmlFor="svc-name">
+        <Modal variant="dark" title="تعریف سرویس خارجی جدید" onClose={() => setAddOpen(false)}>
+          <label className="mb-1 block text-xs font-bold text-[#e7ecf3]" htmlFor="svc-name">
             نام سرویس
           </label>
           <input
             id="svc-name"
             value={form.nameFa}
             onChange={(e) => setForm({ ...form, nameFa: e.target.value })}
-            className="w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent"
+            className="w-full rounded-lg border border-[#1f2a3d] p-3 text-xs outline-none transition focus:border-[#3b82f6]"
           />
-          <label className="mb-1 mt-3 block text-xs font-bold text-ink" htmlFor="svc-endpoint">
+          <label className="mb-1 mt-3 block text-xs font-bold text-[#e7ecf3]" htmlFor="svc-endpoint">
             آدرس Endpoint
           </label>
           <input
@@ -359,9 +359,9 @@ export default function ServicesPage() {
             value={form.endpoint}
             onChange={(e) => setForm({ ...form, endpoint: e.target.value })}
             placeholder="https://api.provider.com/v1/"
-            className="ltr w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent"
+            className="ltr w-full rounded-lg border border-[#1f2a3d] p-3 text-xs outline-none transition focus:border-[#3b82f6]"
           />
-          <label className="mb-1 mt-3 block text-xs font-bold text-ink" htmlFor="svc-key">
+          <label className="mb-1 mt-3 block text-xs font-bold text-[#e7ecf3]" htmlFor="svc-key">
             کلید احراز (API Key)
           </label>
           <input
@@ -369,20 +369,20 @@ export default function ServicesPage() {
             dir="ltr"
             value={form.apiKey}
             onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
-            className="ltr w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent"
+            className="ltr w-full rounded-lg border border-[#1f2a3d] p-3 text-xs outline-none transition focus:border-[#3b82f6]"
           />
           {addError && (
-            <p role="alert" className="mt-2 text-xs text-danger">
+            <p role="alert" className="mt-2 text-xs text-[#f87171]">
               {addError}
             </p>
           )}
           <div className="mt-4 flex justify-end gap-2">
-            <button onClick={() => setAddOpen(false)} className="rounded-lg bg-surface px-4 py-2 text-xs font-bold text-text-2">
+            <button onClick={() => setAddOpen(false)} className="rounded-lg bg-[#18223a] px-4 py-2 text-xs font-bold text-[#cdd6e3]">
               انصراف
             </button>
             <button
               onClick={() => void onCreate()}
-              className="rounded-lg bg-accent px-4 py-2 text-xs font-bold text-white transition hover:bg-accent/90"
+              className="rounded-lg bg-[#3b82f6] px-4 py-2 text-xs font-bold text-white transition hover:brightness-110"
             >
               ثبت و اتصال سرویس
             </button>
@@ -391,17 +391,17 @@ export default function ServicesPage() {
       )}
 
       {editTarget && (
-        <Modal title="تنظیمات سرویس" onClose={() => setEditTarget(null)}>
-          <label className="mb-1 block text-xs font-bold text-ink" htmlFor="edit-svc-name">
+        <Modal variant="dark" title="تنظیمات سرویس" onClose={() => setEditTarget(null)}>
+          <label className="mb-1 block text-xs font-bold text-[#e7ecf3]" htmlFor="edit-svc-name">
             نام سرویس
           </label>
           <input
             id="edit-svc-name"
             value={editForm.nameFa}
             onChange={(e) => setEditForm({ ...editForm, nameFa: e.target.value })}
-            className="w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent"
+            className="w-full rounded-lg border border-[#1f2a3d] p-3 text-xs outline-none transition focus:border-[#3b82f6]"
           />
-          <label className="mb-1 mt-3 block text-xs font-bold text-ink" htmlFor="edit-svc-endpoint">
+          <label className="mb-1 mt-3 block text-xs font-bold text-[#e7ecf3]" htmlFor="edit-svc-endpoint">
             آدرس Endpoint
           </label>
           <input
@@ -409,11 +409,11 @@ export default function ServicesPage() {
             dir="ltr"
             value={editForm.endpoint}
             onChange={(e) => setEditForm({ ...editForm, endpoint: e.target.value })}
-            className="ltr w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent"
+            className="ltr w-full rounded-lg border border-[#1f2a3d] p-3 text-xs outline-none transition focus:border-[#3b82f6]"
           />
           <div className="mt-3 grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-bold text-ink" htmlFor="edit-svc-method">
+              <label className="mb-1 block text-xs font-bold text-[#e7ecf3]" htmlFor="edit-svc-method">
                 متد
               </label>
               <select
@@ -421,14 +421,14 @@ export default function ServicesPage() {
                 dir="ltr"
                 value={editForm.method}
                 onChange={(e) => setEditForm({ ...editForm, method: e.target.value as 'GET' | 'POST' })}
-                className="ltr w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent"
+                className="ltr w-full rounded-lg border border-[#1f2a3d] p-3 text-xs outline-none transition focus:border-[#3b82f6]"
               >
                 <option value="POST">POST</option>
                 <option value="GET">GET</option>
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-bold text-ink" htmlFor="edit-svc-timeout">
+              <label className="mb-1 block text-xs font-bold text-[#e7ecf3]" htmlFor="edit-svc-timeout">
                 مهلت اتصال (میلی‌ثانیه)
               </label>
               <input
@@ -437,11 +437,11 @@ export default function ServicesPage() {
                 inputMode="numeric"
                 value={editForm.timeoutMs}
                 onChange={(e) => setEditForm({ ...editForm, timeoutMs: e.target.value })}
-                className="ltr w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent"
+                className="ltr w-full rounded-lg border border-[#1f2a3d] p-3 text-xs outline-none transition focus:border-[#3b82f6]"
               />
             </div>
           </div>
-          <label className="mb-1 mt-3 block text-xs font-bold text-ink" htmlFor="edit-svc-key">
+          <label className="mb-1 mt-3 block text-xs font-bold text-[#e7ecf3]" htmlFor="edit-svc-key">
             کلید احراز (API Key)
           </label>
           <input
@@ -450,20 +450,20 @@ export default function ServicesPage() {
             value={editForm.apiKey}
             onChange={(e) => setEditForm({ ...editForm, apiKey: e.target.value })}
             placeholder={editTarget.hasApiKey ? 'برای تغییر وارد کنید — خالی یعنی بدون تغییر' : '—'}
-            className="ltr w-full rounded-lg border border-border p-3 text-xs outline-none transition focus:border-accent placeholder:text-[10px]"
+            className="ltr w-full rounded-lg border border-[#1f2a3d] p-3 text-xs outline-none transition focus:border-[#3b82f6] placeholder:text-[10px]"
           />
           {editError && (
-            <p role="alert" className="mt-2 text-xs text-danger">
+            <p role="alert" className="mt-2 text-xs text-[#f87171]">
               {editError}
             </p>
           )}
           <div className="mt-4 flex justify-end gap-2">
-            <button onClick={() => setEditTarget(null)} className="rounded-lg bg-surface px-4 py-2 text-xs font-bold text-text-2">
+            <button onClick={() => setEditTarget(null)} className="rounded-lg bg-[#18223a] px-4 py-2 text-xs font-bold text-[#cdd6e3]">
               انصراف
             </button>
             <button
               onClick={() => void onSaveSettings()}
-              className="rounded-lg bg-accent px-4 py-2 text-xs font-bold text-white transition hover:bg-accent/90"
+              className="rounded-lg bg-[#3b82f6] px-4 py-2 text-xs font-bold text-white transition hover:brightness-110"
             >
               ثبت تغییرات
             </button>
@@ -473,17 +473,18 @@ export default function ServicesPage() {
 
       {confirmTarget && (
         <Modal
+          variant="dark"
           title={confirmTarget.service.enabled ? 'غیرفعال‌سازی سرویس' : 'فعال‌سازی سرویس'}
           onClose={() => setConfirmTarget(null)}
         >
-          <p className="mb-4 text-xs text-muted">
+          <p className="mb-4 text-xs text-[#6b7b94]">
             آیا سرویس «{confirmTarget.service.nameFa}» روی سایت{' '}
             {confirmTarget.service.enabled ? 'غیرفعال' : 'فعال'} شود؟
           </p>
           <div className="flex justify-end gap-2">
             <button
               onClick={() => setConfirmTarget(null)}
-              className="rounded-lg bg-surface px-4 py-2 text-xs font-bold text-text-2"
+              className="rounded-lg bg-[#18223a] px-4 py-2 text-xs font-bold text-[#cdd6e3]"
             >
               انصراف
             </button>
@@ -494,7 +495,7 @@ export default function ServicesPage() {
                   : confirmToggleExternal())
               }
               className={`rounded-lg px-4 py-2 text-xs font-bold text-white ${
-                confirmTarget.service.enabled ? 'bg-danger' : 'bg-accent'
+                confirmTarget.service.enabled ? 'bg-danger' : 'bg-[#3b82f6]'
               }`}
             >
               {confirmTarget.service.enabled ? 'غیرفعال کن' : 'فعال کن'}

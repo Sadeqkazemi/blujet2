@@ -5,22 +5,40 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { TypeORMService } from '../../typeorm/typeorm.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { FindOptionsWhere, In, Not, Raw, Repository } from 'typeorm';
+import { CartableTask } from '../../database/entities/cartable-task.entity';
+import { ChairReportPermission } from '../../database/entities/chair-report-permission.entity';
+import { ManagerReferral } from '../../database/entities/manager-referral.entity';
+import { ManagerReferralReport } from '../../database/entities/manager-referral-report.entity';
+import { User } from '../../database/entities/user.entity';
+import { findOneOrThrow } from '../../database/utils/find-one-or-throw';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
-import { EXEC_ROLES, ROLE_LABELS_FA, STAFF_ROLES } from '../../common/exec-roles';
+import {
+  EXEC_ROLES,
+  ROLE_LABELS_FA,
+  STAFF_ROLES,
+} from '../../common/exec-roles';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type {
   CartableCategory,
   CartableStatus,
   Role,
-} from '../../../generated/typeorm/enums';
-import type { CartableTask } from '../../../generated/typeorm/client';
+} from '../../database/enums';
 
 @Injectable()
 export class CartableService {
   constructor(
-    private readonly typeorm: TypeORMService,
+    @InjectRepository(CartableTask)
+    private readonly taskRepo: Repository<CartableTask>,
+    @InjectRepository(ChairReportPermission)
+    private readonly chairPermissionRepo: Repository<ChairReportPermission>,
+    @InjectRepository(ManagerReferral)
+    private readonly managerReferralRepo: Repository<ManagerReferral>,
+    @InjectRepository(ManagerReferralReport)
+    private readonly managerReferralReportRepo: Repository<ManagerReferralReport>,
+    @InjectRepository(User) private readonly userRepo: Repository<User>,
     private readonly audit: AuditService,
   ) {}
 
@@ -28,7 +46,7 @@ export class CartableService {
     actor: AuthenticatedUser,
     id: string,
   ): Promise<CartableTask> {
-    const task = await this.typeorm.cartableTask.findUnique({ where: { id } });
+    const task = await this.taskRepo.findOneBy({ id });
     if (!task) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -60,37 +78,47 @@ export class CartableService {
     },
   ) {
     const status = query.status ?? 'OPEN';
-    const dateFilter = query.date
-      ? {
-          createdAt: {
-            gte: new Date(query.date),
-            lt: new Date(new Date(query.date).getTime() + 24 * 60 * 60 * 1000),
-          },
-        }
-      : {};
+    const where: FindOptionsWhere<CartableTask> = {
+      assigneeId: actor.id,
+      status,
+    };
+    if (query.category) where.category = query.category;
+    if (query.date) {
+      const start = new Date(query.date);
+      const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+      where.createdAt = Raw(
+        (alias) => `${alias} >= :start AND ${alias} < :end`,
+        {
+          start,
+          end,
+        },
+      );
+    }
 
     const [tasks, countRows] = await Promise.all([
-      this.typeorm.cartableTask.findMany({
-        where: {
-          assigneeId: actor.id,
-          status,
-          ...(query.category ? { category: query.category } : {}),
-          ...dateFilter,
-        },
-        include: { sender: { select: { fullName: true, role: true } } },
-        orderBy: { createdAt: 'desc' },
+      this.taskRepo.find({
+        where,
+        relations: { sender: true },
+        select: { sender: { fullName: true, role: true } },
+        order: { createdAt: 'DESC' },
       }),
       // KPI cards always show OPEN counts per category, unfiltered by the
       // table's own category/date selection (matches the design).
-      this.typeorm.cartableTask.groupBy({
-        by: ['category'],
-        where: { assigneeId: actor.id, status: 'OPEN' },
-        _count: { _all: true },
-      }),
+      this.taskRepo
+        .createQueryBuilder('t')
+        .select('t.category', 'category')
+        .addSelect('COUNT(*)', 'count')
+        .where('t.assigneeId = :assigneeId', { assigneeId: actor.id })
+        .andWhere('t.status = :status', { status: 'OPEN' })
+        .groupBy('t.category')
+        .getRawMany<{
+          category: 'ADMIN' | 'AGENCY' | 'MANAGER';
+          count: string;
+        }>(),
     ]);
 
     const counts = { ADMIN: 0, AGENCY: 0, MANAGER: 0 };
-    for (const row of countRows) counts[row.category] = row._count._all;
+    for (const row of countRows) counts[row.category] = parseInt(row.count, 10);
 
     return {
       tasks,
@@ -107,14 +135,14 @@ export class CartableService {
     note: string,
   ) {
     if (task.sourceType === 'CHAIR_PERMISSION' && task.sourceId) {
-      await this.typeorm.chairReportPermission.update({
-        where: { id: task.sourceId },
-        data: {
+      await this.chairPermissionRepo.update(
+        { id: task.sourceId },
+        {
           status: decision,
           decidedById: actor.id,
           decidedAt: new Date(),
         },
-      });
+      );
     }
 
     // The recipient's review of a referral task doubles as the report
@@ -125,17 +153,22 @@ export class CartableService {
       task.sourceId &&
       decision === 'APPROVED'
     ) {
-      const referral = await this.typeorm.managerReferral.findUnique({
-        where: { id: task.sourceId },
-      });
+      const referral = await this.managerReferralRepo
+        .createQueryBuilder('r')
+        .where('r.id = :id', { id: task.sourceId })
+        .getOne();
       if (referral && referral.status !== 'CLOSED') {
-        await this.typeorm.managerReferralReport.create({
-          data: { referralId: referral.id, fromId: actor.id, body: note },
-        });
-        await this.typeorm.managerReferral.update({
-          where: { id: referral.id },
-          data: { status: 'REPORTED' },
-        });
+        await this.managerReferralReportRepo.save(
+          this.managerReferralReportRepo.create({
+            referralId: referral.id,
+            fromId: actor.id,
+            body: note,
+          }),
+        );
+        await this.managerReferralRepo.update(
+          { id: referral.id },
+          { status: 'REPORTED' },
+        );
       }
     }
   }
@@ -149,11 +182,11 @@ export class CartableService {
     const task = await this.getOwnOpenTaskOrThrow(actor, id);
 
     // Conditional update guards against two concurrent resolutions.
-    const updated = await this.typeorm.cartableTask.updateMany({
-      where: { id, status: 'OPEN' },
-      data: { status: decision, resolutionNote: note, resolvedAt: new Date() },
-    });
-    if (updated.count === 0) {
+    const updated = await this.taskRepo.update(
+      { id, status: 'OPEN' },
+      { status: decision, resolutionNote: note, resolvedAt: new Date() },
+    );
+    if (!updated.affected) {
       throw new ConflictException({
         code: ErrorCode.CONFLICT,
         message: 'این مورد قبلاً بررسی شده است.',
@@ -173,7 +206,7 @@ export class CartableService {
       entityId: id,
     });
 
-    return this.typeorm.cartableTask.findUniqueOrThrow({ where: { id } });
+    return findOneOrThrow(this.taskRepo, { where: { id } });
   }
 
   approve(actor: AuthenticatedUser, id: string, note: string) {
@@ -192,7 +225,7 @@ export class CartableService {
   ) {
     const task = await this.getOwnOpenTaskOrThrow(actor, id);
 
-    const target = await this.typeorm.user.findUnique({ where: { id: toId } });
+    const target = await this.userRepo.findOneBy({ id: toId });
     if (
       !target ||
       !target.isActive ||
@@ -205,25 +238,26 @@ export class CartableService {
       });
     }
 
-    const newTask = await this.typeorm.$transaction(async (tx) => {
-      const updated = await tx.cartableTask.updateMany({
-        where: { id, status: 'OPEN' },
-        data: {
+    const newTask = await this.taskRepo.manager.transaction(async (tx) => {
+      const updated = await tx.update(
+        CartableTask,
+        { id, status: 'OPEN' },
+        {
           status: 'TRANSFERRED',
           resolutionNote: note,
           transferredToId: toId,
           resolvedAt: new Date(),
         },
-      });
-      if (updated.count === 0) {
+      );
+      if (!updated.affected) {
         throw new ConflictException({
           code: ErrorCode.CONFLICT,
           message: 'این مورد قبلاً بررسی شده است.',
         });
       }
       // The mocks toast and drop the item; the real system routes it (⚑).
-      return tx.cartableTask.create({
-        data: {
+      return tx.save(
+        tx.create(CartableTask, {
           assigneeId: toId,
           category: task.category,
           title: task.title,
@@ -232,8 +266,8 @@ export class CartableService {
           senderLabelFa: task.senderLabelFa,
           sourceType: task.sourceType,
           sourceId: task.sourceId,
-        },
-      });
+        }),
+      );
     });
 
     await this.audit.record({
@@ -253,8 +287,9 @@ export class CartableService {
   // ── Chairman permission gate (Finance/Commercial only) ─────────────────
 
   async requestChairPermission(actor: AuthenticatedUser) {
-    const existing = await this.typeorm.chairReportPermission.findFirst({
-      where: { requesterId: actor.id, status: { in: ['PENDING', 'APPROVED'] } },
+    const existing = await this.chairPermissionRepo.findOneBy({
+      requesterId: actor.id,
+      status: In(['PENDING', 'APPROVED']),
     });
     if (existing) {
       throw new ConflictException({
@@ -266,8 +301,9 @@ export class CartableService {
       });
     }
 
-    const chair = await this.typeorm.user.findFirst({
-      where: { role: 'BOARD_CHAIR', isActive: true },
+    const chair = await this.userRepo.findOneBy({
+      role: 'BOARD_CHAIR',
+      isActive: true,
     });
     if (!chair) {
       throw new ConflictException({
@@ -276,23 +312,25 @@ export class CartableService {
       });
     }
 
-    const request = await this.typeorm.$transaction(async (tx) => {
-      const created = await tx.chairReportPermission.create({
-        data: { requesterId: actor.id },
-      });
-      await tx.cartableTask.create({
-        data: {
-          assigneeId: chair.id,
-          category: 'MANAGER',
-          title: 'درخواست مجوز ارسال گزارش به رئیس هیئت مدیره',
-          description: `${actor.fullName} درخواست مجوز ارسال گزارش مستقیم به رئیس هیئت مدیره را دارد.`,
-          senderId: actor.id,
-          sourceType: 'CHAIR_PERMISSION',
-          sourceId: created.id,
-        },
-      });
-      return created;
-    });
+    const request = await this.chairPermissionRepo.manager.transaction(
+      async (tx) => {
+        const created = await tx.save(
+          tx.create(ChairReportPermission, { requesterId: actor.id }),
+        );
+        await tx.save(
+          tx.create(CartableTask, {
+            assigneeId: chair.id,
+            category: 'MANAGER',
+            title: 'درخواست مجوز ارسال گزارش به رئیس هیئت مدیره',
+            description: `${actor.fullName} درخواست مجوز ارسال گزارش مستقیم به رئیس هیئت مدیره را دارد.`,
+            senderId: actor.id,
+            sourceType: 'CHAIR_PERMISSION',
+            sourceId: created.id,
+          }),
+        );
+        return created;
+      },
+    );
 
     await this.audit.record({
       actorId: actor.id,
@@ -308,9 +346,9 @@ export class CartableService {
   }
 
   async getChairPermission(actor: AuthenticatedUser) {
-    const latest = await this.typeorm.chairReportPermission.findFirst({
+    const latest = await this.chairPermissionRepo.findOne({
       where: { requesterId: actor.id },
-      orderBy: { createdAt: 'desc' },
+      order: { createdAt: 'DESC' },
     });
     // Wrapped: the shared response envelope treats a bare null data as an
     // error, and "no request yet" is a perfectly valid state.
@@ -334,7 +372,7 @@ export class CartableService {
       | 'EMPLOYEE_MESSAGE';
     sourceId?: string;
   }) {
-    return this.typeorm.cartableTask.create({ data: input });
+    return this.taskRepo.save(this.taskRepo.create(input));
   }
 
   /** Fans a task out to every active user holding one of the given roles. */
@@ -343,11 +381,11 @@ export class CartableService {
     input: Omit<Parameters<CartableService['createTask']>[0], 'assigneeId'>,
     excludeUserId?: string,
   ) {
-    const recipients = await this.typeorm.user.findMany({
+    const recipients = await this.userRepo.find({
       where: {
-        role: { in: roles },
+        role: In(roles),
         isActive: true,
-        id: { not: excludeUserId },
+        ...(excludeUserId ? { id: Not(excludeUserId) } : {}),
       },
       select: { id: true },
     });
@@ -366,16 +404,19 @@ export class CartableService {
   }
 
   async listManagerRecipients(actor: AuthenticatedUser) {
-    const employee = await this.typeorm.user.findUniqueOrThrow({
+    const employee = await findOneOrThrow(this.userRepo, {
       where: { id: actor.id },
       select: { dept: true },
     });
     const ownRole = this.deptManagerRole(employee.dept);
 
-    const managers = await this.typeorm.user.findMany({
-      where: { role: { in: [...EXEC_ROLES, 'IT_MANAGER', 'SITE_ADMIN'] }, isActive: true },
+    const managers = await this.userRepo.find({
+      where: {
+        role: In([...EXEC_ROLES, 'IT_MANAGER', 'SITE_ADMIN']),
+        isActive: true,
+      },
       select: { id: true, fullName: true, role: true },
-      orderBy: { fullName: 'asc' },
+      order: { fullName: 'ASC' },
     });
 
     return managers.map((m) => ({
@@ -391,7 +432,7 @@ export class CartableService {
     actor: AuthenticatedUser,
     dto: { toId: string; body: string },
   ) {
-    const target = await this.typeorm.user.findUnique({ where: { id: dto.toId } });
+    const target = await this.userRepo.findOneBy({ id: dto.toId });
     if (
       !target ||
       !target.isActive ||
@@ -432,10 +473,11 @@ export class CartableService {
   }
 
   async listSentEmployeeManagerMessages(actor: AuthenticatedUser) {
-    const rows = await this.typeorm.cartableTask.findMany({
+    const rows = await this.taskRepo.find({
       where: { senderId: actor.id, sourceType: 'EMPLOYEE_MESSAGE' },
-      include: { assignee: { select: { fullName: true } } },
-      orderBy: { createdAt: 'desc' },
+      relations: { assignee: true },
+      select: { assignee: { fullName: true } },
+      order: { createdAt: 'DESC' },
       take: 20,
     });
     return rows.map((r) => ({

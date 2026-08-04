@@ -1,4 +1,9 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { FarePricingProposal } from '../../database/entities/fare-pricing-proposal.entity';
+import { FlightInstance } from '../../database/entities/flight-instance.entity';
+import { Flight } from '../../database/entities/flight.entity';
+import { Booking } from '../../database/entities/booking.entity';
 import { PricingController } from './pricing.controller';
 import { PricingService } from './pricing.service';
 import { AiModule } from '../ai/ai.module';
@@ -7,7 +12,18 @@ import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [AiModule, PanelsModule, AuditModule, AuthModule],
+  imports: [
+    TypeOrmModule.forFeature([
+      FarePricingProposal,
+      FlightInstance,
+      Flight,
+      Booking,
+    ]),
+    AiModule,
+    PanelsModule,
+    AuditModule,
+    AuthModule,
+  ],
   controllers: [PricingController],
   providers: [PricingService],
 })

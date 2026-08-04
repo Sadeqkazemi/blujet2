@@ -94,6 +94,26 @@ class CreateFlightDto {
   @MinIrrAmount(1n)
   @TransformToIrr()
   basePriceIrr: Irr;
+
+  @ApiProperty({
+    description: 'نوع هواپیما (از کاتالوگ aircraft-types)',
+    example: 'Airbus A320',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  aircraftType?: string;
+
+  @ApiProperty({
+    description: 'تعهد چارتری (صندلی) — باید کمتر از ظرفیت باشد',
+    example: 60,
+    required: false,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(1000)
+  charterSeats?: number;
 }
 
 class CreateScheduleDto {
@@ -414,7 +434,9 @@ export class FlightsController {
   @Post()
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
   @RequiresPermission('fl_manage')
-  @ApiOperation({ summary: 'افزودن پرواز جدید (مودال طراحی)' })
+  @ApiOperation({
+    summary: 'افزودن پرواز جدید — مشخصات + هواپیما/چارتر؛ سپس کلاس نرخی و پیشنهاد قیمت جداگانه',
+  })
   async create(
     @CurrentUser() actor: AuthenticatedUser,
     @Body() dto: CreateFlightDto,

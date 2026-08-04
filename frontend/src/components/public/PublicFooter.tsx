@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import { useCareersEnabled } from '../../hooks/useCareersEnabled';
 import { useT } from '../../lib/i18n';
 
 function AppStoreIcon({ size = 15 }: { size?: number }) {
@@ -144,12 +145,16 @@ function MobileAccordionSection({ title, links }: { title: string; links: { to: 
 export default function PublicFooter() {
   const t = useT();
   const isMobile = useIsMobile();
+  const careersEnabled = useCareersEnabled();
 
   const serviceLinks = [
     { to: '/results', label: t('footerBookFlight') },
     { to: '/manage-booking', label: t('footerManageBooking') },
     { to: '/flight-status', label: t('footerFlightStatus') },
     { to: '/club', label: t('navLoyalty') },
+    // Only the link label — never the job ads themselves — appears when
+    // SITE_ADMIN enables «نمایش آگهی در فوتر» / CareersSettings.enabled.
+    ...(careersEnabled ? [{ to: '/careers', label: t('footerCareers') }] : []),
   ];
   const companyLinks = [
     { to: '/about', label: t('footerAbout') },
@@ -162,7 +167,7 @@ export default function PublicFooter() {
   ];
 
   return (
-    <footer style={{ background: '#0d2640', color: '#aebfd4', marginTop: 72 }}>
+    <footer style={{ background: '#0d2640', color: '#aebfd4', marginTop: isMobile ? 48 : 72 }}>
       <style>{`
         footer details[open] .footer-chev { transform: rotate(180deg); }
         footer summary::-webkit-details-marker { display: none; }
@@ -196,7 +201,7 @@ export default function PublicFooter() {
             <FooterLinkColumn title={t('footerColSupport')} links={supportLinks} />
           </div>
           <div style={{ borderTop: '1px solid #ffffff12' }}>
-            <div style={{ maxWidth: 1180, margin: '0 auto', padding: '15px 26px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11.5px', color: '#7d92ad' }}>
+            <div style={{ maxWidth: 1320, margin: '0 auto', padding: '15px 26px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11.5px', color: '#7d92ad' }}>
               <span>{t('footerCopyright')}</span>
             </div>
           </div>

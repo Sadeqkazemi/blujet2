@@ -1,14 +1,20 @@
 import type { INestApplication } from '@nestjs/common';
 import type { App } from 'supertest/types';
 import request from 'supertest';
-import { TypeORMClient } from '../generated/typeorm/client';
-import { TypeORMPg } from '@typeorm/adapter-pg';
+import { DataSource, In, IsNull, MoreThan } from 'typeorm';
+import { AircraftSeatMap } from '../src/database/entities/aircraft-seat-map.entity';
+import { Booking } from '../src/database/entities/booking.entity';
+import { Flight } from '../src/database/entities/flight.entity';
+import { FlightInstance } from '../src/database/entities/flight-instance.entity';
+import { LedgerEntry } from '../src/database/entities/ledger-entry.entity';
+import { Passenger } from '../src/database/entities/passenger.entity';
+import { PaymentReconciliation } from '../src/database/entities/payment-reconciliation.entity';
+import { Route } from '../src/database/entities/route.entity';
+import { SeatLock } from '../src/database/entities/seat-lock.entity';
+import { User } from '../src/database/entities/user.entity';
+import { FlightInstanceStatus } from '../src/database/enums';
 import { createTestApp } from './helpers/app.helper';
 import { loginAs } from './helpers/login.helper';
-
-const typeorm = new TypeORMClient({
-  adapter: new TypeORMPg({ connectionString: process.env.DATABASE_URL }),
-});
 
 /** Phase 13 Part D — managerial reservation governance layered onto
  * Phase 9's SeatLock: reason/classification on request, two-step
@@ -16,6 +22,7 @@ const typeorm = new TypeORMClient({
  * TTLs with self-healing expiry, and finalize-into-a-priced-booking. */
 describe('Phase 13 Part D — managerial lock governance', () => {
   let app: INestApplication<App>;
+  let dataSource: DataSource;
   const AIRCRAFT_TYPE = 'P13D-Jet';
   let instanceId: string;
   let ceoToken: string;
@@ -28,81 +35,102 @@ describe('Phase 13 Part D — managerial lock governance', () => {
 
   beforeAll(async () => {
     app = await createTestApp();
+    dataSource = app.get(DataSource);
     ceoToken = (await loginAs(app, 'ceo')).accessToken!;
     chairToken = (await loginAs(app, 'chair')).accessToken!;
     itToken = (await loginAs(app, 'itadmin')).accessToken!;
 
-    await typeorm.aircraftSeatMap.upsert({
-      where: { aircraftType: AIRCRAFT_TYPE },
-      update: {},
-      create: {
-        aircraftType: AIRCRAFT_TYPE,
-        businessRowStart: 1,
-        businessRowEnd: 0,
-        businessColsLeft: [],
-        businessColsRight: [],
-        economyRowStart: 1,
-        economyRowEnd: 6,
-        economyColsLeft: ['A'],
-        economyColsRight: ['C'],
-      },
+    const seatMapRepo = dataSource.getRepository(AircraftSeatMap);
+    const existingSeatMap = await seatMapRepo.findOneBy({
+      aircraftType: AIRCRAFT_TYPE,
     });
-    const route = await typeorm.route.upsert({
-      where: { originCode_destCode: { originCode: 'THR', destCode: 'MHD' } },
-      update: {},
-      create: { originCode: 'THR', destCode: 'MHD', durationMin: 70 },
+    if (!existingSeatMap) {
+      await seatMapRepo.save(
+        seatMapRepo.create({
+          aircraftType: AIRCRAFT_TYPE,
+          businessRowStart: 1,
+          businessRowEnd: 0,
+          businessColsLeft: [],
+          businessColsRight: [],
+          economyRowStart: 1,
+          economyRowEnd: 6,
+          economyColsLeft: ['A'],
+          economyColsRight: ['C'],
+          updatedAt: new Date(),
+        }),
+      );
+    }
+    const routeRepo = dataSource.getRepository(Route);
+    let route = await routeRepo.findOneBy({
+      originCode: 'THR',
+      destCode: 'MHD',
     });
-    const flight = await typeorm.flight.upsert({
-      where: { flightNo: 'P13D-1' },
-      update: {},
-      create: {
-        flightNo: 'P13D-1',
-        routeId: route.id,
-        aircraftType: AIRCRAFT_TYPE,
-      },
-    });
+    if (!route) {
+      route = await routeRepo.save(
+        routeRepo.create({
+          originCode: 'THR',
+          destCode: 'MHD',
+          durationMin: 70,
+        }),
+      );
+    }
+    const flightRepo = dataSource.getRepository(Flight);
+    let flight = await flightRepo.findOneBy({ flightNo: 'P13D-1' });
+    if (!flight) {
+      flight = await flightRepo.save(
+        flightRepo.create({
+          flightNo: 'P13D-1',
+          routeId: route.id,
+          aircraftType: AIRCRAFT_TYPE,
+        }),
+      );
+    }
     const departureAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
-    const instance = await typeorm.flightInstance.create({
-      data: {
+    const flightInstanceRepo = dataSource.getRepository(FlightInstance);
+    const instance = await flightInstanceRepo.save(
+      flightInstanceRepo.create({
         flightId: flight.id,
         departureAt,
         arrivalAt: new Date(departureAt.getTime() + 70 * 60 * 1000),
         capacity: 12,
-        status: 'SCHEDULED',
-      },
-    });
+        status: FlightInstanceStatus.SCHEDULED,
+      }),
+    );
     instanceId = instance.id;
   });
 
   afterAll(async () => {
-    await typeorm.seatLock.deleteMany({
-      where: { flightInstanceId: instanceId },
-    });
-    const passengers = await typeorm.passenger.findMany({
-      where: { booking: { flightInstanceId: instanceId } },
-      select: { bookingId: true },
-    });
+    await dataSource
+      .getRepository(SeatLock)
+      .delete({ flightInstanceId: instanceId });
+    const passengers = await dataSource
+      .getRepository(Passenger)
+      .createQueryBuilder('p')
+      .innerJoin('p.booking', 'b')
+      .where('b.flightInstanceId = :instanceId', { instanceId })
+      .getMany();
     const bookingIds = passengers.map((p) => p.bookingId);
-    await typeorm.paymentReconciliation.deleteMany({
-      where: { bookingId: { in: bookingIds } },
-    });
-    await typeorm.ledgerEntry.deleteMany({
-      where: { bookingId: { in: bookingIds } },
-    });
-    await typeorm.passenger.deleteMany({
-      where: { bookingId: { in: bookingIds } },
-    });
-    await typeorm.booking.deleteMany({ where: { id: { in: bookingIds } } });
-    await typeorm.flightInstance.delete({ where: { id: instanceId } });
-    await typeorm.flight.deleteMany({ where: { flightNo: 'P13D-1' } });
+    if (bookingIds.length > 0) {
+      await dataSource
+        .getRepository(PaymentReconciliation)
+        .delete({ bookingId: In(bookingIds) });
+      await dataSource
+        .getRepository(LedgerEntry)
+        .delete({ bookingId: In(bookingIds) });
+      await dataSource
+        .getRepository(Passenger)
+        .delete({ bookingId: In(bookingIds) });
+      await dataSource.getRepository(Booking).delete({ id: In(bookingIds) });
+    }
+    await dataSource.getRepository(FlightInstance).delete({ id: instanceId });
+    await dataSource.getRepository(Flight).delete({ flightNo: 'P13D-1' });
     // Route THR-MHD is left in place — it may be shared with unrelated
     // seed/load-test flights (FK-restricted delete would 500 here).
-    await typeorm.aircraftSeatMap.deleteMany({
-      where: { aircraftType: AIRCRAFT_TYPE },
-    });
+    await dataSource
+      .getRepository(AircraftSeatMap)
+      .delete({ aircraftType: AIRCRAFT_TYPE });
 
     await app.close();
-    await typeorm.$disconnect();
   });
 
   it('rejects a request missing reason/classification, and discountPct without DISCOUNTED', async () => {
@@ -248,12 +276,12 @@ describe('Phase 13 Part D — managerial lock governance', () => {
     expect(payable.status).toBe(201);
     expect(payable.body.data.priceIrr).toBe('38000000');
 
-    const booking = await typeorm.booking.findUniqueOrThrow({
-      where: { pnr: free.body.data.pnr },
-    });
-    const lock = await typeorm.seatLock.findFirst({
-      where: { bookingId: booking.id },
-    });
+    const booking = await dataSource
+      .getRepository(Booking)
+      .findOneByOrFail({ pnr: free.body.data.pnr });
+    const lock = await dataSource
+      .getRepository(SeatLock)
+      .findOneBy({ bookingId: booking.id });
     expect(lock).not.toBeNull();
     expect(lock!.releasedAt).not.toBeNull();
   });
@@ -266,10 +294,12 @@ describe('Phase 13 Part D — managerial lock governance', () => {
     const lockId = requested.body.data.id;
 
     // Simulate the request-decision TTL having already passed.
-    await typeorm.seatLock.update({
-      where: { id: lockId },
-      data: { expiresAt: new Date(Date.now() - 60 * 60 * 1000) },
-    });
+    await dataSource
+      .getRepository(SeatLock)
+      .update(
+        { id: lockId },
+        { expiresAt: new Date(Date.now() - 60 * 60 * 1000) },
+      );
 
     const seatmap = await request(app.getHttpServer())
       .get(`/reservation/seatmap/${instanceId}`)
@@ -284,9 +314,9 @@ describe('Phase 13 Part D — managerial lock governance', () => {
 
     // The DB row is still releasedAt: null at this point — the new
     // request must self-heal it, not 409 on the partial unique index.
-    const stale = await typeorm.seatLock.findUniqueOrThrow({
-      where: { id: lockId },
-    });
+    const stale = await dataSource
+      .getRepository(SeatLock)
+      .findOneByOrFail({ id: lockId });
     expect(stale.releasedAt).toBeNull();
 
     const relock = await request(app.getHttpServer())
@@ -301,15 +331,14 @@ describe('Phase 13 Part D — managerial lock governance', () => {
   });
 
   it('enforces the per-requester active-lock cap regardless of flight instance', async () => {
-    const existing = await typeorm.seatLock.count({
+    const itAdmin = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ username: 'itadmin' });
+    const existing = await dataSource.getRepository(SeatLock).count({
       where: {
-        lockedById: (
-          await typeorm.user.findUniqueOrThrow({
-            where: { username: 'itadmin' },
-          })
-        ).id,
-        releasedAt: null,
-        expiresAt: { gt: new Date() },
+        lockedById: itAdmin.id,
+        releasedAt: IsNull(),
+        expiresAt: MoreThan(new Date()),
       },
     });
     const remainingBudget = 5 - existing;

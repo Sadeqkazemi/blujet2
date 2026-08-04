@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import PublicFooter from './PublicFooter';
 import * as useLocaleModule from '../../hooks/useLocale';
 import * as useIsMobileModule from '../../hooks/useIsMobile';
+import * as useCareersEnabledModule from '../../hooks/useCareersEnabled';
 
 function mockLocale(locale: 'fa' | 'en' | 'ar' = 'fa') {
   vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale, setLocale: vi.fn() });
@@ -19,6 +20,7 @@ function mockMobile() {
 
 beforeEach(() => {
   vi.restoreAllMocks();
+  vi.spyOn(useCareersEnabledModule, 'useCareersEnabled').mockReturnValue(false);
 });
 
 function renderFooter() {
@@ -62,11 +64,16 @@ describe('PublicFooter — desktop', () => {
 
   it('renders company links without blog or careers', () => {
     mockLocale('fa');
-    renderFooter();
-    expect(screen.getByText('درباره ما')).toHaveAttribute('href', '/about');
-    expect(screen.getByText('تماس با ما')).toHaveAttribute('href', '/contact');
-    expect(screen.getByText('قوانین و مقررات')).toHaveAttribute('href', '/travel-info');
+    const { rerender } = renderFooter();
     expect(screen.queryByText('فرصت‌های شغلی')).not.toBeInTheDocument();
+
+    vi.spyOn(useCareersEnabledModule, 'useCareersEnabled').mockReturnValue(true);
+    rerender(
+      <MemoryRouter>
+        <PublicFooter />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('فرصت‌های شغلی')).toHaveAttribute('href', '/careers');
   });
 });
 

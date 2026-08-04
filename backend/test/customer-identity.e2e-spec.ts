@@ -1,7 +1,8 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { TypeORMService } from '../src/typeorm/typeorm.service';
+import { DataSource } from 'typeorm';
+import { User } from '../src/database/entities/user.entity';
 import { encryptPii } from '../src/common/pii-crypto';
 import { loginAs, loginAsCustomer } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
@@ -14,12 +15,12 @@ const PNG_BYTES = Buffer.from(
 
 describe('Customer identity verification (e2e)', () => {
   let app: INestApplication<App>;
-  let typeorm: TypeORMService;
+  let dataSource: DataSource;
 
   beforeEach(async () => {
     app = await createTestApp();
-    typeorm = app.get(TypeORMService);
-    await resetCustomerPhones(typeorm, ['09180000101', '09180000102']);
+    dataSource = app.get(DataSource);
+    await resetCustomerPhones(dataSource, ['09180000101', '09180000102']);
   });
 
   afterEach(async () => {
@@ -36,15 +37,15 @@ describe('Customer identity verification (e2e)', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.steps[0].done).toBe(false);
 
-    await typeorm.user.update({
-      where: { id: userId! },
-      data: {
+    await dataSource.getRepository(User).update(
+      { id: userId! },
+      {
         fullName: 'کاربر تست',
         nationalIdEnc: encryptPii('0012345679'),
         nationalIdHash: 'hash',
         birthDate: new Date('1990-01-01'),
       },
-    });
+    );
 
     res = await request(app.getHttpServer())
       .get('/my/identity')
@@ -77,13 +78,13 @@ describe('Customer identity verification (e2e)', () => {
   it('403 for staff; 400 submit without id card', async () => {
     const phone = '09180000102';
     const { accessToken, userId } = await loginAsCustomer(app, phone);
-    await typeorm.user.update({
-      where: { id: userId! },
-      data: {
+    await dataSource.getRepository(User).update(
+      { id: userId! },
+      {
         nationalIdEnc: encryptPii('0012345679'),
         birthDate: new Date('1990-01-01'),
       },
-    });
+    );
 
     const bad = await request(app.getHttpServer())
       .post('/my/identity/submit')

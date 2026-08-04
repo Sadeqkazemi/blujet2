@@ -1,17 +1,25 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
+import { DataSource } from 'typeorm';
+import { AircraftSeatMap } from '../src/database/entities/aircraft-seat-map.entity';
+import { Route } from '../src/database/entities/route.entity';
+import { Flight } from '../src/database/entities/flight.entity';
+import { FlightInstance } from '../src/database/entities/flight-instance.entity';
+import { AgencyProfile } from '../src/database/entities/agency-profile.entity';
+import { LedgerEntry } from '../src/database/entities/ledger-entry.entity';
 import { loginAs, loginAsCustomer } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
-import { TypeORMService } from '../src/typeorm/typeorm.service';
 
 describe('Reporting (e2e)', () => {
   let app: INestApplication<App>;
+  let dataSource: DataSource;
   let ceoToken: string;
   let ownFlightNo: string;
 
   beforeAll(async () => {
     app = await createTestApp();
+    dataSource = app.get(DataSource);
     const { accessToken } = await loginAs(app, 'ceo');
     ceoToken = accessToken!;
 
@@ -24,46 +32,61 @@ describe('Reporting (e2e)', () => {
     // file creates and pays its own dedicated booking so both the org-wide
     // q6 totals and the by-flightNo query always have a real, deterministic
     // SALE entry to find, regardless of what else has run.
-    const typeorm = app.get(TypeORMService);
     const AIRCRAFT_TYPE = 'RP-TestJet';
-    await typeorm.aircraftSeatMap.upsert({
-      where: { aircraftType: AIRCRAFT_TYPE },
-      update: {},
-      create: {
-        aircraftType: AIRCRAFT_TYPE,
-        businessRowStart: 1,
-        businessRowEnd: 0,
-        businessColsLeft: [],
-        businessColsRight: [],
-        economyRowStart: 1,
-        economyRowEnd: 3,
-        economyColsLeft: ['A'],
-        economyColsRight: ['C'],
-      },
+    const seatMapRepo = dataSource.getRepository(AircraftSeatMap);
+    const existingSeatMap = await seatMapRepo.findOneBy({
+      aircraftType: AIRCRAFT_TYPE,
     });
-    const route = await typeorm.route.upsert({
-      where: { originCode_destCode: { originCode: 'THR', destCode: 'IFN' } },
-      update: {},
-      create: { originCode: 'THR', destCode: 'IFN', durationMin: 70 },
+    if (!existingSeatMap) {
+      await seatMapRepo.save(
+        seatMapRepo.create({
+          aircraftType: AIRCRAFT_TYPE,
+          businessRowStart: 1,
+          businessRowEnd: 0,
+          businessColsLeft: [],
+          businessColsRight: [],
+          economyRowStart: 1,
+          economyRowEnd: 3,
+          economyColsLeft: ['A'],
+          economyColsRight: ['C'],
+          updatedAt: new Date(),
+        }),
+      );
+    }
+    const routeRepo = dataSource.getRepository(Route);
+    let route = await routeRepo.findOneBy({
+      originCode: 'THR',
+      destCode: 'IFN',
     });
+    if (!route) {
+      route = await routeRepo.save(
+        routeRepo.create({
+          originCode: 'THR',
+          destCode: 'IFN',
+          durationMin: 70,
+        }),
+      );
+    }
     ownFlightNo = `RP-${Date.now().toString(36).toUpperCase().slice(-6)}`;
-    const flight = await typeorm.flight.create({
-      data: {
+    const flightRepo = dataSource.getRepository(Flight);
+    const flight = await flightRepo.save(
+      flightRepo.create({
         flightNo: ownFlightNo,
         routeId: route.id,
         aircraftType: AIRCRAFT_TYPE,
-      },
-    });
+      }),
+    );
     const departureAt = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
-    const instance = await typeorm.flightInstance.create({
-      data: {
+    const instanceRepo = dataSource.getRepository(FlightInstance);
+    const instance = await instanceRepo.save(
+      instanceRepo.create({
         flightId: flight.id,
         departureAt,
         arrivalAt: new Date(departureAt.getTime() + 70 * 60 * 1000),
         capacity: 4,
         status: 'SCHEDULED',
-      },
-    });
+      }),
+    );
 
     const { accessToken: customerToken } = await loginAsCustomer(
       app,
@@ -140,23 +163,23 @@ describe('Reporting (e2e)', () => {
     // kpis().revenueIrr (Math.abs-summed, no bookingId filter) diverged
     // from sales-chart's total (which happened to skip these rows only
     // because they have no booking.channel) whenever such a row existed.
-    const typeorm = app.get(TypeORMService);
-    const agency = await typeorm.agencyProfile.findFirst({
-      select: { userId: true },
-    });
+    const agency = await dataSource
+      .getRepository(AgencyProfile)
+      .findOne({ where: {}, select: { userId: true } });
     expect(agency).not.toBeNull();
 
     const before = await request(app.getHttpServer())
       .get('/reporting/kpis?granularity=q6')
       .set('Authorization', `Bearer ${ceoToken}`);
 
-    await typeorm.ledgerEntry.create({
-      data: {
+    const ledgerRepo = dataSource.getRepository(LedgerEntry);
+    await ledgerRepo.save(
+      ledgerRepo.create({
         agencyId: agency!.userId,
         type: 'SALE',
-        signedAmountIrr: -390_000_000,
-      },
-    });
+        signedAmountIrr: -390_000_000n,
+      }),
+    );
 
     const chart = await request(app.getHttpServer())
       .get('/reporting/sales-chart?granularity=q6')
@@ -251,6 +274,34 @@ describe('Reporting (e2e)', () => {
       BigInt(String(res.body.data[0].charterIrr)) +
       BigInt(String(res.body.data[0].agencyIrr));
     expect(total).toBeGreaterThan(0n);
+  });
+
+  it('flight-sales lists departed instances with channel totals for the picker', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/reporting/flight-sales')
+      .set('Authorization', `Bearer ${ceoToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data.rows)).toBe(true);
+    expect(res.body.data.rows.length).toBeGreaterThan(0);
+    const row = res.body.data.rows.find(
+      (r: { flightNo: string }) => r.flightNo === ownFlightNo,
+    );
+    expect(row).toBeDefined();
+    expect(row).toEqual(
+      expect.objectContaining({
+        flightInstanceId: expect.any(String),
+        flightNo: ownFlightNo,
+        originCityFa: expect.any(String),
+        destCityFa: expect.any(String),
+        departureAt: expect.any(String),
+        systemIrr: expect.anything(),
+        charterIrr: expect.anything(),
+        agencyIrr: expect.anything(),
+        totalIrr: expect.anything(),
+        capacity: expect.any(Number),
+        soldSeats: expect.any(Number),
+      }),
+    );
   });
 
   it('completed-flights-summary reconciles: sold + unsold === total seats', async () => {
