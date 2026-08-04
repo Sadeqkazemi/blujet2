@@ -91,6 +91,9 @@ export default defineConfig(({ mode }) => {
     host: '0.0.0.0',
     port: 5173,
     strictPort: true,
+    // Allow Cursor port-forward hosts and temporary public tunnels
+    // (*.trycloudflare.com, *.loca.lt) used for remote preview.
+    allowedHosts: true,
     proxy: devProxy,
   },
   plugins: [
