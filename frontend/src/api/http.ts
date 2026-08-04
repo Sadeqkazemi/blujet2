@@ -2,15 +2,39 @@ import type { ApiEnvelope } from './envelope';
 import { ApiRequestError } from './envelope';
 import { getAccessToken, setAccessToken } from './token-store';
 
-const BASE_URL = import.meta.env.VITE_API_URL;
+const BASE_URL = import.meta.env.VITE_API_URL ?? '';
+const REQUEST_TIMEOUT_MS = 15_000;
 
 let refreshInFlight: Promise<boolean> | null = null;
 
-async function refreshAccessToken(): Promise<boolean> {
+async function fetchWithTimeout(path: string, init: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(`${BASE_URL}${path}`, { ...init, signal: controller.signal });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new ApiRequestError(
+        'TIMEOUT',
+        'سرور پاسخ نداد. لطفاً چند لحظه بعد دوباره تلاش کنید.',
+        408,
+      );
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+// Exported so the auth bootstrap effect (useAuth.tsx) can share this same
+// in-flight request instead of firing its own — two concurrent /auth/refresh
+// calls both racing to consume the same not-yet-rotated refresh-token cookie
+// trip the server's reuse-detection and revoke the whole session.
+export async function refreshAccessToken(): Promise<boolean> {
   if (!refreshInFlight) {
     refreshInFlight = (async () => {
       try {
-        const res = await fetch(`${BASE_URL}/auth/refresh`, { method: 'POST', credentials: 'include' });
+        const res = await fetchWithTimeout('/auth/refresh', { method: 'POST', credentials: 'include' });
         const body = (await res.json()) as ApiEnvelope<{ accessToken: string }>;
         if (body.success && body.data) {
           setAccessToken(body.data.accessToken);
@@ -36,21 +60,35 @@ async function doFetch(path: string, init: RequestInit): Promise<Response> {
     headers.set('Content-Type', 'application/json');
   }
 
-  return fetch(`${BASE_URL}${path}`, { ...init, headers, credentials: 'include' });
+  return fetchWithTimeout(path, { ...init, headers, credentials: 'include' });
 }
 
 /** All frontend HTTP calls go through here — components never call fetch directly. */
 export async function apiRequest<T>(path: string, init: RequestInit = {}, retry = true): Promise<T> {
   const res = await doFetch(path, init);
 
-  if (res.status === 401 && retry) {
+  if (res.status === 401 && retry && getAccessToken()) {
     const refreshed = await refreshAccessToken();
     if (refreshed) return apiRequest<T>(path, init, false);
   }
 
-  const body = (await res.json()) as ApiEnvelope<T>;
-  if (!body.success || !body.data) {
-    throw new ApiRequestError(body.error?.code ?? 'UNKNOWN', body.error?.message ?? 'خطای ناشناخته', res.status);
+  const raw = await res.text();
+  let body: ApiEnvelope<T>;
+  try {
+    body = JSON.parse(raw) as ApiEnvelope<T>;
+  } catch {
+    throw new ApiRequestError(
+      'BAD_GATEWAY',
+      res.status === 502 ? 'سرور در دسترس نیست. لطفاً چند لحظه بعد دوباره تلاش کنید.' : 'خطا در ارتباط با سرور',
+      res.status,
+    );
+  }
+  if (!body.success || body.data == null) {
+    const rawMessage = body.error?.message;
+    const message = Array.isArray(rawMessage)
+      ? rawMessage.join(' ')
+      : (rawMessage ?? 'خطای ناشناخته');
+    throw new ApiRequestError(body.error?.code ?? 'UNKNOWN', message, res.status);
   }
   return body.data;
 }
@@ -64,7 +102,7 @@ export function apiGet<T>(path: string): Promise<T> {
 export async function apiGetBlob(path: string, retry = true): Promise<Blob> {
   const res = await doFetch(path, { method: 'GET' });
 
-  if (res.status === 401 && retry) {
+  if (res.status === 401 && retry && getAccessToken()) {
     const refreshed = await refreshAccessToken();
     if (refreshed) return apiGetBlob(path, false);
   }

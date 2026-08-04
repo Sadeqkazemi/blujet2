@@ -15,6 +15,7 @@ import {
   FinalizeLockDto,
   IssuePnrDto,
   ListPnrQueryDto,
+  ListReservationFlightsQueryDto,
   SearchFlightsQueryDto,
 } from './dto/reservation.dtos';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -78,6 +79,14 @@ export class PnrController {
     return { success: true, data: await this.pnr.markNoShow(actor, pnr) };
   }
 
+  @Get('flights')
+  @ApiOperation({
+    summary: 'فهرست پروازهای آینده برای تب پروازها / باز کردن نقشهٔ صندلی',
+  })
+  async listFlights(@Query() query: ListReservationFlightsQueryDto) {
+    return { success: true, data: await this.pnr.listFlights(query) };
+  }
+
   @Get('search')
   @ApiOperation({ summary: 'جستجوی پرواز برای صدور دستی رزرو' })
   async search(@Query() query: SearchFlightsQueryDto) {
@@ -111,9 +120,20 @@ export class PnrController {
   }
 
   @Get('dashboard-stats')
-  @ApiOperation({ summary: 'آمار واقعی رزروها — بدون داده جعلی سلامت سرویس' })
+  @ApiOperation({
+    summary:
+      'آمار واقعی رزروها + تفکیک کانال + وضعیت سرویس‌های وابسته (بر اساس toggle/latency واقعی)',
+  })
   async dashboardStats() {
     return { success: true, data: await this.pnr.dashboardStats() };
+  }
+
+  @Get('agency-api-access')
+  @ApiOperation({
+    summary: 'فهرست آژانس‌هایی که کلید API دارند — تب دسترسی آژانس‌ها',
+  })
+  async agencyApiAccess() {
+    return { success: true, data: await this.pnr.agencyApiAccess() };
   }
 
   @Post('_test/flight-instance')

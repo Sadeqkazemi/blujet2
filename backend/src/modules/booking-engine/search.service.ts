@@ -1,24 +1,19 @@
 import { Injectable } from '@nestjs/common';
-import { TypeORMService } from '../../typeorm/typeorm.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { In, IsNull, MoreThan, Repository, SelectQueryBuilder } from 'typeorm';
+import { Airport } from '../../database/entities/airport.entity';
+import { FlightInstance } from '../../database/entities/flight-instance.entity';
+import { AircraftSeatMap } from '../../database/entities/aircraft-seat-map.entity';
+import { Passenger } from '../../database/entities/passenger.entity';
+import { SeatLock } from '../../database/entities/seat-lock.entity';
 import { RedisService } from '../../redis/redis.service';
 import { getCabinPrice } from './pricing';
 import type { Irr } from '../../common/money';
 import { enumerateSeats } from '../reservation/seat-layout';
 import { resolveAircraftType } from '../flights/aircraft-type.util';
-import { filterPublicSearchAirports } from '../../common/public-airport-filter';
-import type { CabinClass } from '../../../generated/typeorm/enums';
-import type { TypeORM } from '../../../generated/typeorm/client';
+import type { CabinClass } from '../../database/enums';
 
 const ACTIVE_BOOKING_STATUSES = ['DRAFT', 'HELD', 'PAID', 'TICKETED'] as const;
-
-/** Phase 13: an instance with a sale window is excluded from search once
- * outside it; NULL on either end means "no restriction" (existing
- * instances keep working unchanged). Reused by createBooking's own
- * re-check so a stale search result can't be booked past the window. */
-const SALE_WINDOW_OPEN_WHERE = {
-  OR: [{ saleStartsAt: null }, { saleStartsAt: { lte: new Date() } }],
-  AND: [{ OR: [{ saleEndsAt: null }, { saleEndsAt: { gte: new Date() } }] }],
-} satisfies TypeORM.FlightInstanceWhereInput;
 
 // CLAUDE.md: search-result cache TTL 5-10 min; Redis is never the source of
 // truth for seats/bookings — availability is still re-checked (takenSeatCodes
@@ -29,7 +24,16 @@ const SEARCH_TTL_SECONDS = 300;
 @Injectable()
 export class SearchService {
   constructor(
-    private readonly typeorm: TypeORMService,
+    @InjectRepository(Airport)
+    private readonly airportRepo: Repository<Airport>,
+    @InjectRepository(FlightInstance)
+    private readonly flightInstanceRepo: Repository<FlightInstance>,
+    @InjectRepository(AircraftSeatMap)
+    private readonly seatMapRepo: Repository<AircraftSeatMap>,
+    @InjectRepository(Passenger)
+    private readonly passengerRepo: Repository<Passenger>,
+    @InjectRepository(SeatLock)
+    private readonly seatLockRepo: Repository<SeatLock>,
     private readonly redis: RedisService,
   ) {}
 
@@ -38,11 +42,9 @@ export class SearchService {
     const cached = await this.redis.get<unknown>(cacheKey);
     if (cached) return cached;
 
-    const airports = filterPublicSearchAirports(
-      await this.typeorm.airport.findMany({
-        orderBy: { cityFa: 'asc' },
-      }),
-    );
+    const airports = await this.airportRepo.find({
+      order: { cityFa: 'ASC' },
+    });
     await this.redis.set(cacheKey, airports, AIRPORTS_TTL_SECONDS);
     return airports;
   }
@@ -77,10 +79,12 @@ export class SearchService {
    * of the TTL window after someone else just booked the seat they're
    * looking at. */
   async invalidateForInstance(flightInstanceId: string): Promise<void> {
-    const instance = await this.typeorm.flightInstance.findUnique({
-      where: { id: flightInstanceId },
-      include: { flight: { include: { route: true } } },
-    });
+    const instance = await this.flightInstanceRepo
+      .createQueryBuilder('fi')
+      .leftJoinAndSelect('fi.flight', 'flight')
+      .leftJoinAndSelect('flight.route', 'route')
+      .where('fi.id = :id', { id: flightInstanceId })
+      .getOne();
     if (!instance) return;
     await this.redis.del(
       this.searchCacheKey(
@@ -91,27 +95,45 @@ export class SearchService {
     );
   }
 
+  /** Phase 13: an instance with a sale window is excluded from search once
+   * outside it; NULL on either end means "no restriction" (existing
+   * instances keep working unchanged). Reused by createBooking's own
+   * re-check so a stale search result can't be booked past the window. */
+  private applySaleWindowOpen(
+    qb: SelectQueryBuilder<FlightInstance>,
+    alias: string,
+    now: Date,
+  ): SelectQueryBuilder<FlightInstance> {
+    qb.andWhere(
+      `("${alias}"."saleStartsAt" IS NULL OR "${alias}"."saleStartsAt" <= :now)`,
+      { now },
+    );
+    qb.andWhere(
+      `("${alias}"."saleEndsAt" IS NULL OR "${alias}"."saleEndsAt" >= :now)`,
+      { now },
+    );
+    return qb;
+  }
+
   private async searchUncached(origin: string, dest: string, date: string) {
     const dayStart = new Date(date);
     dayStart.setUTCHours(0, 0, 0, 0);
     const dayEnd = new Date(dayStart);
     dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
+    const now = new Date();
 
-    const instances = await this.typeorm.flightInstance.findMany({
-      where: {
-        status: 'SCHEDULED',
-        departureAt: { gte: dayStart, lt: dayEnd },
-        flight: {
-          route: {
-            originCode: { equals: origin, mode: 'insensitive' },
-            destCode: { equals: dest, mode: 'insensitive' },
-          },
-        },
-        ...SALE_WINDOW_OPEN_WHERE,
-      },
-      include: { flight: { include: { route: true } } },
-      orderBy: { departureAt: 'asc' },
-    });
+    const qb = this.flightInstanceRepo
+      .createQueryBuilder('fi')
+      .leftJoinAndSelect('fi.flight', 'flight')
+      .leftJoinAndSelect('flight.route', 'route')
+      .where('fi.status = :status', { status: 'SCHEDULED' })
+      .andWhere('fi.departureAt >= :dayStart', { dayStart })
+      .andWhere('fi.departureAt < :dayEnd', { dayEnd })
+      .andWhere('LOWER(route.originCode) = LOWER(:origin)', { origin })
+      .andWhere('LOWER(route.destCode) = LOWER(:dest)', { dest })
+      .orderBy('fi.departureAt', 'ASC');
+    this.applySaleWindowOpen(qb, 'fi', now);
+    const instances = await qb.getMany();
 
     const results: {
       flightInstanceId: string;
@@ -124,8 +146,8 @@ export class SearchService {
       cabins: { cabin: CabinClass; priceIrr: Irr; seatsLeft: number }[];
     }[] = [];
     for (const instance of instances) {
-      const map = await this.typeorm.aircraftSeatMap.findUnique({
-        where: { aircraftType: resolveAircraftType(instance) },
+      const map = await this.seatMapRepo.findOneBy({
+        aircraftType: resolveAircraftType(instance),
       });
       const seats = map ? enumerateSeats(map) : [];
       const taken = await this.takenSeatCodes(instance.id);
@@ -143,7 +165,11 @@ export class SearchService {
         if (cabinSeats.length === 0) continue;
         cabins.push({
           cabin,
-          priceIrr: await getCabinPrice(this.typeorm, instance.id, cabin),
+          priceIrr: await getCabinPrice(
+            this.flightInstanceRepo.manager,
+            instance.id,
+            cabin,
+          ),
           seatsLeft,
         });
       }
@@ -182,37 +208,39 @@ export class SearchService {
     dayStart: Date,
     dayEnd: Date,
   ) {
+    const now = new Date();
+    const firstLegsQb = this.flightInstanceRepo
+      .createQueryBuilder('fi')
+      .leftJoinAndSelect('fi.flight', 'flight')
+      .leftJoinAndSelect('flight.route', 'route')
+      .where('fi.status = :status', { status: 'SCHEDULED' })
+      .andWhere('fi.departureAt >= :dayStart', { dayStart })
+      .andWhere('fi.departureAt < :dayEnd', { dayEnd })
+      .andWhere('LOWER(route.originCode) = LOWER(:origin)', { origin });
+    this.applySaleWindowOpen(firstLegsQb, 'fi', now);
+
+    const secondLegsQb = this.flightInstanceRepo
+      .createQueryBuilder('fi')
+      .leftJoinAndSelect('fi.flight', 'flight')
+      .leftJoinAndSelect('flight.route', 'route')
+      .where('fi.status = :status', { status: 'SCHEDULED' })
+      .andWhere('fi.departureAt >= :dayStart', { dayStart })
+      .andWhere('LOWER(route.destCode) = LOWER(:dest)', { dest });
+    this.applySaleWindowOpen(secondLegsQb, 'fi', now);
+
     const [firstLegs, secondLegs] = await Promise.all([
-      this.typeorm.flightInstance.findMany({
-        where: {
-          status: 'SCHEDULED',
-          departureAt: { gte: dayStart, lt: dayEnd },
-          flight: {
-            route: { originCode: { equals: origin, mode: 'insensitive' } },
-          },
-          ...SALE_WINDOW_OPEN_WHERE,
-        },
-        include: { flight: { include: { route: true } } },
-      }),
-      this.typeorm.flightInstance.findMany({
-        where: {
-          status: 'SCHEDULED',
-          departureAt: { gte: dayStart },
-          flight: {
-            route: { destCode: { equals: dest, mode: 'insensitive' } },
-          },
-          ...SALE_WINDOW_OPEN_WHERE,
-        },
-        include: { flight: { include: { route: true } } },
-      }),
+      firstLegsQb.getMany(),
+      secondLegsQb.getMany(),
     ]);
 
     const transferCodes = new Set(
       firstLegs.map((l) => l.flight.route.destCode),
     );
-    const airports = await this.typeorm.airport.findMany({
-      where: { code: { in: [...transferCodes] } },
-    });
+    const airports = transferCodes.size
+      ? await this.airportRepo.find({
+          where: { code: In([...transferCodes]) },
+        })
+      : [];
     const minConnect = new Map(
       airports.map((a) => [a.code, a.minConnectMin * 60_000]),
     );
@@ -269,8 +297,8 @@ export class SearchService {
         let seatsLeft = Number.MAX_SAFE_INTEGER;
         let ok = true;
         for (const leg of legs) {
-          const map = await this.typeorm.aircraftSeatMap.findUnique({
-            where: { aircraftType: resolveAircraftType(leg) },
+          const map = await this.seatMapRepo.findOneBy({
+            aircraftType: resolveAircraftType(leg),
           });
           const seats = (map ? enumerateSeats(map) : []).filter(
             (s) => s.cabin === cabin,
@@ -284,7 +312,11 @@ export class SearchService {
             seatsLeft,
             seats.filter((s) => !taken.has(s.seatCode)).length,
           );
-          priceSum += await getCabinPrice(this.typeorm, leg.id, cabin);
+          priceSum += await getCabinPrice(
+            this.flightInstanceRepo.manager,
+            leg.id,
+            cabin,
+          );
         }
         if (ok) cabins.push({ cabin, priceIrr: priceSum, seatsLeft });
       }
@@ -314,18 +346,33 @@ export class SearchService {
   }
 
   async seatMap(flightInstanceId: string) {
-    const instance = await this.typeorm.flightInstance.findUniqueOrThrow({
-      where: { id: flightInstanceId },
-      include: { flight: true },
-    });
-    const map = await this.typeorm.aircraftSeatMap.findUniqueOrThrow({
-      where: { aircraftType: resolveAircraftType(instance) },
+    const instance = await this.flightInstanceRepo
+      .createQueryBuilder('fi')
+      .leftJoinAndSelect('fi.flight', 'flight')
+      .where('fi.id = :id', { id: flightInstanceId })
+      .getOneOrFail();
+    const map = await this.seatMapRepo.findOneByOrFail({
+      aircraftType: resolveAircraftType(instance),
     });
     const seats = enumerateSeats(map);
     const taken = await this.takenSeatCodes(flightInstanceId);
 
     return {
       flightInstanceId,
+      aircraftType: resolveAircraftType(instance),
+      cabinLayout: {
+        BUSINESS: {
+          colsLeft: map.businessColsLeft,
+          colsRight: map.businessColsRight,
+          aisleAfterIndex: map.businessColsLeft?.length ?? 0,
+        },
+        ECONOMY: {
+          colsLeft: map.economyColsLeft,
+          colsRight: map.economyColsRight,
+          aisleAfterIndex: map.economyColsLeft?.length ?? 0,
+        },
+      },
+      excludedSeatCodes: map.excludedSeatCodes ?? [],
       seats: seats.map((s) => ({
         ...s,
         status: taken.has(s.seatCode) ? 'TAKEN' : 'FREE',
@@ -340,26 +387,29 @@ export class SearchService {
    * a booking already past its TTL frees the seat immediately here even
    * before the lazy-expiry sweep runs on that row). */
   async takenSeatCodes(flightInstanceId: string): Promise<Set<string>> {
+    const now = new Date();
     const [passengers, locks] = await Promise.all([
-      this.typeorm.passenger.findMany({
-        where: {
-          seatCode: { not: null },
-          booking: {
-            flightInstanceId,
-            status: { in: [...ACTIVE_BOOKING_STATUSES] },
-            OR: [
-              { status: { not: 'HELD' } },
-              { holdExpiresAt: { gt: new Date() } },
-            ],
-          },
-        },
-        select: { seatCode: true },
-      }),
-      this.typeorm.seatLock.findMany({
+      this.passengerRepo
+        .createQueryBuilder('p')
+        .innerJoin('p.booking', 'b')
+        .select(['p.seatCode'])
+        .where('p.seatCode IS NOT NULL')
+        .andWhere('b.flightInstanceId = :flightInstanceId', {
+          flightInstanceId,
+        })
+        .andWhere('b.status IN (:...statuses)', {
+          statuses: [...ACTIVE_BOOKING_STATUSES],
+        })
+        .andWhere('(b.status != :held OR b."holdExpiresAt" > :now)', {
+          held: 'HELD',
+          now,
+        })
+        .getMany(),
+      this.seatLockRepo.find({
         where: {
           flightInstanceId,
-          releasedAt: null,
-          expiresAt: { gt: new Date() },
+          releasedAt: IsNull(),
+          expiresAt: MoreThan(now),
         },
         select: { seatCode: true },
       }),
@@ -429,31 +479,39 @@ export class SearchService {
     AGENCY: number;
     MANAGERIAL: number;
   }> {
-    const [passengers, lockCount] = await Promise.all([
-      this.typeorm.passenger.findMany({
-        where: {
-          seatCode: { not: null },
-          booking: {
-            flightInstanceId,
-            status: { in: [...ACTIVE_BOOKING_STATUSES] },
-            OR: [
-              { status: { not: 'HELD' } },
-              { holdExpiresAt: { gt: new Date() } },
-            ],
-          },
-        },
-        select: { booking: { select: { channel: true } } },
-      }),
-      this.typeorm.seatLock.count({
+    const now = new Date();
+    const [channelRows, lockCount] = await Promise.all([
+      this.passengerRepo
+        .createQueryBuilder('p')
+        .innerJoin('p.booking', 'b')
+        .select('b.channel', 'channel')
+        .addSelect('COUNT(*)', 'count')
+        .where('p.seatCode IS NOT NULL')
+        .andWhere('b.flightInstanceId = :flightInstanceId', {
+          flightInstanceId,
+        })
+        .andWhere('b.status IN (:...statuses)', {
+          statuses: [...ACTIVE_BOOKING_STATUSES],
+        })
+        .andWhere('(b.status != :held OR b."holdExpiresAt" > :now)', {
+          held: 'HELD',
+          now,
+        })
+        .groupBy('b.channel')
+        .getRawMany<{
+          channel: 'SYSTEM' | 'CHARTER' | 'AGENCY';
+          count: string;
+        }>(),
+      this.seatLockRepo.count({
         where: {
           flightInstanceId,
-          releasedAt: null,
-          expiresAt: { gt: new Date() },
+          releasedAt: IsNull(),
+          expiresAt: MoreThan(now),
         },
       }),
     ]);
     const counts = { SYSTEM: 0, CHARTER: 0, AGENCY: 0, MANAGERIAL: lockCount };
-    for (const p of passengers) counts[p.booking.channel] += 1;
+    for (const row of channelRows) counts[row.channel] = Number(row.count);
     return counts;
   }
 }

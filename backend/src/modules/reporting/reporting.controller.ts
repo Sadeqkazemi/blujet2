@@ -33,6 +33,16 @@ export class ReportingController {
     return { success: true, data };
   }
 
+  @Get('flight-sales')
+  @ApiOperation({
+    summary:
+      'Departed flights with per-channel sales — «شماره پرواز» picker on analytic مالی',
+  })
+  async flightSales() {
+    const data = await this.reporting.flightSales();
+    return { success: true, data };
+  }
+
   @Get('kpis')
   @ApiOperation({
     summary:
@@ -64,10 +74,10 @@ export class ReportingController {
   }
 
   @Get('finance-dashboard-stats')
-  @Roles('FINANCE_MANAGER')
+  @Roles('CEO', 'BOARD_CHAIR', 'SENIOR_MANAGER', 'FINANCE_MANAGER')
   @ApiOperation({
     summary:
-      'کارت‌های داشبورد مدیر مالی — آژانس/مسافر/بلیط/درآمد ماه جاری با روند',
+      'کارت‌های داشبورد اجرایی/مالی — آژانس/مسافر/بلیط/درآمد ماه جاری با روند (پنل مدیر عامل و هم‌ترازها + مدیر مالی)',
   })
   async financeDashboardStats() {
     const data = await this.reporting.financeDashboardStats();
@@ -82,6 +92,17 @@ export class ReportingController {
   })
   async commercialOverview() {
     const data = await this.reporting.commercialOverview();
+    return { success: true, data };
+  }
+
+  @Get('site-admin-overview')
+  @Roles('SITE_ADMIN')
+  @ApiOperation({
+    summary:
+      'SITE_ADMIN dashboard KPI row — active agencies, passengers/tickets this month, pending actions',
+  })
+  async siteAdminOverview() {
+    const data = await this.reporting.siteAdminOverview();
     return { success: true, data };
   }
 

@@ -63,6 +63,20 @@ const mockRoutes = [
   },
 ];
 
+const mockSocial = [
+  { id: 'instagram' as const, name: 'اینستاگرام', url: 'instagram.com/blujet', enabled: true },
+  { id: 'telegram' as const, name: 'تلگرام', url: 't.me/blujet', enabled: true },
+  { id: 'whatsapp' as const, name: 'واتساپ', url: '', enabled: false },
+  { id: 'linkedin' as const, name: 'لینکدین', url: '', enabled: false },
+  { id: 'x' as const, name: 'ایکس', url: '', enabled: false },
+];
+
+const mockApps = [
+  { id: 'google_play' as const, name: 'گوگل پلی', url: 'https://play.google.com' },
+  { id: 'app_store' as const, name: 'اپ استور', url: 'https://apps.apple.com' },
+  { id: 'bazaar_myket' as const, name: 'کافه بازار', url: 'https://cafebazaar.ir' },
+];
+
 describe('MediaAdminPage', () => {
   beforeEach(() => {
     vi.mocked(siteContentApi.fetchLibraryAssets).mockResolvedValue([]);
@@ -79,6 +93,10 @@ describe('MediaAdminPage', () => {
         aboutUsText: 'درباره blujet',
         contactAddress: 'تهران',
         termsText: 'قوانین',
+        supportPhone: '021-91000000',
+        supportEmail: 'support@blujet.ir',
+        socialLinks: mockSocial,
+        appDownloadLinks: mockApps,
       },
       refundRules: [],
     });
@@ -89,25 +107,35 @@ describe('MediaAdminPage', () => {
         aboutUsText: 'متن جدید',
         contactAddress: 'تهران',
         termsText: 'قوانین',
+        supportPhone: '021-91000000',
+        supportEmail: 'support@blujet.ir',
+        socialLinks: mockSocial,
+        appDownloadLinks: mockApps,
       },
       refundRules: [],
     });
   });
 
-  it('renders banner and CMS sections', async () => {
+  it('renders page title and design CMS sections including links', async () => {
     render(<MediaAdminPage />);
-    expect(await screen.findByText('بنر اصلی سایت')).toBeInTheDocument();
+    expect(await screen.findByText('مدیریت سایت')).toBeInTheDocument();
+    expect(screen.getByText('بنر اصلی سایت')).toBeInTheDocument();
     expect(screen.getByText('بنر اطلاع‌رسانی بالای هدر')).toBeInTheDocument();
     expect(screen.getByText('بنر تبلیغاتی میانی')).toBeInTheDocument();
     expect(screen.getByText('مقاصد محبوب')).toBeInTheDocument();
     expect(screen.getByText('مسیرهای پرتردد')).toBeInTheDocument();
+    expect(screen.getByText('لینک دانلود اپلیکیشن')).toBeInTheDocument();
+    expect(screen.getByText('شبکه‌های اجتماعی')).toBeInTheDocument();
+    expect(screen.getByText('تماس پشتیبانی')).toBeInTheDocument();
     expect(screen.getByText('کتابخانهٔ تصاویر')).toBeInTheDocument();
+    expect(screen.queryByText('فرصت‌های شغلی')).not.toBeInTheDocument();
   });
 
-  it('shows seeded destination and route rows', async () => {
+  it('shows seeded destination, route and support contact', async () => {
     render(<MediaAdminPage />);
     expect(await screen.findByText('IST')).toBeInTheDocument();
     expect(screen.getByText(/THR ← MHD/)).toBeInTheDocument();
+    expect(screen.getByText('021-91000000')).toBeInTheDocument();
   });
 
   it('opens hero banner editor', async () => {
@@ -118,11 +146,11 @@ describe('MediaAdminPage', () => {
     expect(screen.getByDisplayValue('پرواز بعدی‌ات را با blujet رزرو کن')).toBeInTheDocument();
   });
 
-  it('toggles announcement bar', async () => {
+  it('toggles announcement bar with design deactivate label', async () => {
     const user = userEvent.setup();
     render(<MediaAdminPage />);
     await screen.findByText('بنر اطلاع‌رسانی بالای هدر');
-    await user.click(screen.getByRole('button', { name: 'فعال' }));
+    await user.click(screen.getByRole('button', { name: 'غیرفعال کردن' }));
     await waitFor(() => {
       expect(siteContentApi.updateContentBlock).toHaveBeenCalledWith('ANNOUNCEMENT_BAR', {
         enabled: false,

@@ -27,6 +27,16 @@ export function formatJalaliDate(date: string | number | Date) {
   return faDigits(dayjs(date).calendar('jalali').format('YYYY/MM/DD'));
 }
 
+/** Calendar day → Gregorian YYYY-MM-DD without local-timezone drift from toISOString(). */
+export function toIsoDateOnly(d: ReturnType<typeof dayjs>): string {
+  return d.calendar('gregory').format('YYYY-MM-DD');
+}
+
+/** Stable UTC noon for date-only ISO strings used in search/forms. */
+export function isoDateAtNoon(isoDay: string): string {
+  return `${isoDay.slice(0, 10)}T12:00:00.000Z`;
+}
+
 /**
  * Parses a user-typed Jalali date (`YYYY/MM/DD`, Persian or Latin digits)
  * into an ISO 8601 UTC string via the jalaliday plugin — never hand-rolled

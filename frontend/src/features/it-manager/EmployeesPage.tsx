@@ -21,6 +21,8 @@ import {
 import { STAFF_PANEL } from '../../lib/staff-panel-theme';
 import { staffCard, staffInput, staffInnerTile, staffPage, staffStatusStyle } from '../../lib/staff-panel-styles';
 import Modal from '../../components/Modal';
+import Pagination from '../../components/Pagination';
+import { usePagination } from '../../hooks/usePagination';
 import type { EmployeeDetail, EmployeeListRow, PermissionCatalog } from '../../types/it-manager';
 
 const DEPT_OPTIONS = [
@@ -165,6 +167,8 @@ export default function EmployeesPage() {
   const [detail, setDetail] = useState<EmployeeDetail | null>(null);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
 
+  const employeesPager = usePagination(employees);
+
   const load = useCallback(async () => {
     try {
       setEmployees(await fetchEmployees());
@@ -303,29 +307,30 @@ export default function EmployeesPage() {
   const catalogGroups = catalogDeptKey ? (catalog?.[catalogDeptKey] ?? []) : [];
 
   return (
-    <div style={staffPage}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-        <StaffPanelPageHeader
-          title="کاربران و دسترسی‌ها"
-          subtitle="مدیریت یوزرها، نقش‌ها و بازنشانی رمز عبور — همه حساب‌ها زیر نظر واحد IT"
-        />
-        <div style={{ paddingTop: 4 }}>
-          <StaffPrimaryButton
-            onClick={() => {
-              setAddError(null);
-              setAddOpen(true);
-            }}
-          >
-            افزودن کاربر
-          </StaffPrimaryButton>
+    <div className="px-[21px] pb-[34px] pt-[18px]">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-[20.5px] font-black text-white">کاربران و دسترسی‌ها</h1>
+          <p className="mt-1 text-[11.5px] text-[#6b7b94]">
+            حساب‌ها، نقش‌ها، رمز عبور و سطح دسترسی کارمندان واحدها — یکپارچه
+          </p>
         </div>
+        <button
+          onClick={() => {
+            setAddError(null);
+            setAddOpen(true);
+          }}
+          className="rounded-lg bg-[#3b82f6] px-4 py-2 text-xs font-bold text-white transition hover:brightness-110"
+        >
+          افزودن کاربر
+        </button>
       </div>
 
-      {error && <StaffAlert tone="error">{error}</StaffAlert>}
-      {notice && <StaffAlert tone="success">{notice}</StaffAlert>}
+      {error && <p className="mb-4 rounded-lg bg-[rgba(248,113,113,.12)] p-3 text-sm text-[#f87171]">{error}</p>}
+      {notice && <p className="mb-4 rounded-lg bg-[rgba(16,185,129,.12)] p-3 text-sm text-[#34d399]">{notice}</p>}
 
-      <section style={{ ...staffCard, marginBottom: 32 }}>
-        <div style={empTableHeader}>
+      <section className="mb-8 overflow-hidden rounded-xl border border-[#1f2a3d] bg-[#141d2e]">
+        <div className="grid grid-cols-[1.6fr_1.3fr_1.4fr_1fr_0.9fr_1.4fr] gap-2 border-b border-[#1f2a3d] bg-[#18223a] px-4 py-2.5 text-[10.5px] font-bold text-[#6b7b94]">
           <span>کاربر</span>
           <span>نقش</span>
           <span>نام کاربری</span>
@@ -334,12 +339,12 @@ export default function EmployeesPage() {
           <span>اقدامات</span>
         </div>
         {loading ? (
-          <p style={{ padding: '24px 0', textAlign: 'center', fontSize: 12, color: STAFF_PANEL.textMuted }}>در حال بارگذاری…</p>
+          <p className="py-6 text-center text-[11.5px] text-[#6b7b94]">در حال بارگذاری…</p>
         ) : employees.length === 0 ? (
-          <p style={{ padding: '24px 0', textAlign: 'center', fontSize: 11, color: STAFF_PANEL.textMuted }}>کارمندی ثبت نشده است.</p>
+          <p className="py-6 text-center text-xs text-[#6b7b94]">کارمندی ثبت نشده است.</p>
         ) : (
-          <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-            {employees.map((e, idx) => (
+          <ul className="divide-y divide-[#1f2a3d]">
+            {employeesPager.pageItems.map((e) => (
               <li
                 key={e.id}
                 style={{
@@ -350,49 +355,43 @@ export default function EmployeesPage() {
                 <button
                   type="button"
                   onClick={() => setDetailId(e.id)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    padding: 0,
-                    textAlign: 'right',
-                    fontWeight: 800,
-                    color: STAFF_PANEL.text,
-                    textDecoration: 'underline dashed',
-                    textUnderlineOffset: 4,
-                    cursor: 'pointer',
-                    fontFamily: 'inherit',
-                    fontSize: 11,
-                  }}
+                  className="text-right font-bold text-[#e7ecf3] underline decoration-dashed underline-offset-4"
                 >
                   {e.fullName}
                 </button>
-                <span style={{ color: STAFF_PANEL.navMuted }}>{deptRoleLabel(e.dept, e.rank, customDeptLabels)}</span>
-                <span className="font-num" style={{ direction: 'ltr', color: STAFF_PANEL.textMuted }}>{e.username}</span>
-                <span className="font-num" style={{ color: STAFF_PANEL.textMuted }}>
+                <span className="text-[#cdd6e3]">{deptRoleLabel(e.dept, e.rank, customDeptLabels)}</span>
+                <span className="font-num ltr text-[#6b7b94]">{e.username}</span>
+                <span className="font-num text-[#6b7b94]">
                   {e.lastLoginAt ? formatJalaliDateTime(e.lastLoginAt) : 'هنوز وارد نشده'}
                 </span>
-                <span style={staffStatusStyle(e.isActive ? 'success' : 'danger')}>
+                <span
+                  className={`w-fit rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                    e.isActive ? 'bg-[rgba(16,185,129,.14)] text-[#34d399]' : 'bg-[rgba(248,113,113,.14)] text-[#f87171]'
+                  }`}
+                >
                   {e.isActive ? 'فعال' : 'مسدود'}
                 </span>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                   <button
                     type="button"
                     onClick={() => setDetailId(e.id)}
-                    style={{ ...actionBtn, color: STAFF_PANEL.navMuted, background: STAFF_PANEL.inputBg }}
+                    className="rounded-lg border border-[#1f2a3d] bg-[#18223a] px-2 py-1 text-[10px] font-bold text-[#cdd6e3]"
                   >
                     جزئیات
                   </button>
                   <button
                     type="button"
                     onClick={() => void onQuickReset(e)}
-                    style={{ ...actionBtn, color: STAFF_PANEL.link }}
+                    className="rounded-lg border border-[#1f2a3d] px-2 py-1 text-[10px] font-bold text-[#3b82f6]"
                   >
                     ریست رمز
                   </button>
                   <button
                     type="button"
                     onClick={() => requestStatusChange(e)}
-                    style={{ ...actionBtn, color: e.isActive ? STAFF_PANEL.danger : STAFF_PANEL.success }}
+                    className={`rounded-lg border border-[#1f2a3d] px-2 py-1 text-[10px] font-bold ${
+                      e.isActive ? 'text-[#f87171]' : 'text-[#34d399]'
+                    }`}
                   >
                     {e.isActive ? 'تعلیق' : 'فعال‌سازی'}
                   </button>
@@ -401,35 +400,30 @@ export default function EmployeesPage() {
             ))}
           </ul>
         )}
+        <Pagination
+          page={employeesPager.page}
+          totalPages={employeesPager.totalPages}
+          onChange={employeesPager.setPage}
+          variant="dark"
+        />
       </section>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
         <span style={{ height: 20, width: 4, borderRadius: 2, background: STAFF_PANEL.warning }} />
         <div>
-          <h2 style={{ fontSize: 13, fontWeight: 800, color: STAFF_PANEL.text, margin: 0 }}>دسترسی و سطوح کارمندان</h2>
-          <p style={{ fontSize: 11, color: STAFF_PANEL.textMuted, margin: 0 }}>تعیین سطح دسترسی کارمندان واحدها و مدیریت رمز عبور</p>
+          <h2 className="text-[14.5px] font-extrabold text-white">دسترسی و سطوح کارمندان</h2>
+          <p className="text-[11px] text-[#6b7b94]">تعیین سطح دسترسی کارمندان واحدها و مدیریت رمز عبور</p>
         </div>
       </div>
 
-      <div
-        style={{
-          marginBottom: 16,
-          borderRadius: 14,
-          border: `1px solid ${STAFF_PANEL.cardBorder}`,
-          background: STAFF_PANEL.cardBg,
-          padding: 16,
-          fontSize: 11,
-          lineHeight: 1.7,
-          color: STAFF_PANEL.navMuted,
-        }}
-      >
-        واحد IT فقط دسترسی <strong style={{ color: STAFF_PANEL.text }}>کارمندان</strong> واحدها را تعیین می‌کند.
-        دسترسی به پنل‌های مدیریتی توسط <strong style={{ color: STAFF_PANEL.text }}>مدیر عامل</strong> و{' '}
-        <strong style={{ color: STAFF_PANEL.text }}>مدیر ارشد</strong> مدیریت می‌شود.
+      <div className="mb-4 rounded-xl border border-[#1f2a3d] bg-[#141d2e] p-4 text-xs leading-6 text-[#cdd6e3]">
+        واحد IT فقط دسترسی <strong className="text-[#e7ecf3]">کارمندان</strong> واحدها را تعیین می‌کند.
+        دسترسی به پنل‌های مدیریتی توسط <strong className="text-[#e7ecf3]">مدیر عامل</strong> و{' '}
+        <strong className="text-[#e7ecf3]">مدیر ارشد</strong> مدیریت می‌شود.
       </div>
 
-      <section style={{ ...staffCard, marginBottom: 24 }}>
-        <div style={permTableHeader}>
+      <section className="mb-6 overflow-hidden rounded-xl border border-[#1f2a3d] bg-[#141d2e]">
+        <div className="grid grid-cols-[1.4fr_repeat(5,1fr)] gap-2 border-b border-[#1f2a3d] bg-[#18223a] px-4 py-2.5 text-[10.5px] font-bold text-[#6b7b94]">
           <span>نقش</span>
           {PERM_COLS.map((c) => (
             <span key={c} style={{ textAlign: 'center' }}>
@@ -440,14 +434,11 @@ export default function EmployeesPage() {
         {PERM_MATRIX.map((p, idx) => (
           <div
             key={p.role}
-            style={{
-              ...permTableRow,
-              borderTop: idx > 0 ? `1px solid ${STAFF_PANEL.sidebarBorder}` : undefined,
-            }}
+            className="grid grid-cols-[1.4fr_repeat(5,1fr)] items-center gap-2 border-t border-[#1f2a3d] px-4 py-3 text-xs"
           >
             <div>
-              <div style={{ fontWeight: 800, color: STAFF_PANEL.text }}>{p.role}</div>
-              <div style={{ fontSize: 10, color: STAFF_PANEL.textMuted }}>{p.managedBy}</div>
+              <div className="font-bold text-[#e7ecf3]">{p.role}</div>
+              <div className="text-[10px] text-[#6b7b94]">{p.managedBy}</div>
             </div>
             {p.caps.map((ok, i) => (
               <span key={i} style={{ textAlign: 'center', fontSize: 14, color: ok ? STAFF_PANEL.success : STAFF_PANEL.textMuted }}>
@@ -458,33 +449,22 @@ export default function EmployeesPage() {
         ))}
       </section>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
-          <section
-            style={{
-              borderRadius: 14,
-              border: `1px solid ${STAFF_PANEL.cardBorder}`,
-              background: STAFF_PANEL.cardBg,
-              padding: 20,
-            }}
-          >
-            <h3 style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 800, color: STAFF_PANEL.text }}>مدیریت رمز عبور کارمندان</h3>
-            <p style={{ margin: '0 0 12px', fontSize: 10.5, color: STAFF_PANEL.textMuted }}>
-              فقط رمز عبور کارمندان واحدها قابل بازنشانی است.
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {employees.map((e) => (
-                <div
-                  key={e.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    borderRadius: 8,
-                    border: `1px solid ${STAFF_PANEL.inputBorder}`,
-                    padding: 10,
-                    fontSize: 11,
-                  }}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <section className="rounded-xl border border-[#1f2a3d] bg-[#141d2e] p-5">
+          <h3 className="mb-1 text-[14.5px] font-extrabold text-white">مدیریت رمز عبور کارمندان</h3>
+          <p className="mb-3 text-[10.5px] text-[#6b7b94]">
+            فقط رمز عبور کارمندان واحدها قابل بازنشانی است.
+          </p>
+          <div className="flex flex-col gap-2">
+            {employees.map((e) => (
+              <div key={e.id} className="flex items-center gap-2 rounded-lg border border-[#1f2a3d] p-2.5 text-xs">
+                <span className="flex-1 font-bold text-[#e7ecf3]">
+                  {e.fullName}{' '}
+                  <span className="font-normal text-[#6b7b94]">· {DEPT_LABELS[e.dept ?? ''] ?? e.dept}</span>
+                </span>
+                <button
+                  onClick={() => void onQuickReset(e)}
+                  className="rounded-lg border border-[#1f2a3d] px-2.5 py-1 text-[10px] font-bold text-[#3b82f6]"
                 >
                   <span style={{ flex: 1, fontWeight: 800, color: STAFF_PANEL.text }}>
                     {e.fullName}{' '}
@@ -502,27 +482,14 @@ export default function EmployeesPage() {
             </div>
           </section>
 
-          <section
-            style={{
-              borderRadius: 14,
-              border: `1px solid ${STAFF_PANEL.cardBorder}`,
-              background: STAFF_PANEL.cardBg,
-              padding: 20,
-            }}
-          >
-            <h3 style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 800, color: STAFF_PANEL.text }}>سطح دسترسی واحد IT</h3>
-            <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-              {IT_SCOPE.map((s, idx) => (
-                <li
-                  key={s.label}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '10px 0',
-                    fontSize: 11,
-                    borderTop: idx > 0 ? `1px solid ${STAFF_PANEL.sidebarBorder}` : undefined,
-                  }}
+        <section className="rounded-xl border border-[#1f2a3d] bg-[#141d2e] p-5">
+          <h3 className="mb-3 text-[14.5px] font-extrabold text-white">سطح دسترسی واحد IT</h3>
+          <ul className="divide-y divide-[#1f2a3d]">
+            {IT_SCOPE.map((s) => (
+              <li key={s.label} className="flex items-center justify-between py-2.5 text-xs">
+                <span className="text-[#cdd6e3]">{s.label}</span>
+                <span
+                  className={`font-bold ${s.ok ? 'text-[#34d399]' : 'text-[#f87171]'}`}
                 >
                   <span style={{ color: STAFF_PANEL.navMuted }}>{s.label}</span>
                   <span style={{ fontWeight: 800, color: s.ok ? STAFF_PANEL.success : STAFF_PANEL.danger }}>
@@ -536,17 +503,17 @@ export default function EmployeesPage() {
       </div>
 
       {addOpen && (
-        <Modal dark title="ایجاد کارمند جدید" onClose={() => setAddOpen(false)}>
-          <label style={labelStyle} htmlFor="emp-name">
+        <Modal variant="dark" title="ایجاد کارمند جدید" onClose={() => setAddOpen(false)}>
+          <label className="mb-1 block text-xs font-bold text-[#e7ecf3]" htmlFor="emp-name">
             نام و نام خانوادگی
           </label>
           <input
             id="emp-name"
             value={form.fullName}
             onChange={(e) => setForm({ ...form, fullName: e.target.value })}
-            style={fieldInput}
+            className="w-full rounded-lg border border-[#1f2a3d] p-3 text-xs outline-none transition focus:border-[#3b82f6]"
           />
-          <label style={{ ...labelStyle, marginTop: 12 }} htmlFor="emp-username">
+          <label className="mb-1 mt-3 block text-xs font-bold text-[#e7ecf3]" htmlFor="emp-username">
             نام کاربری
           </label>
           <input
@@ -554,10 +521,9 @@ export default function EmployeesPage() {
             dir="ltr"
             value={form.username}
             onChange={(e) => setForm({ ...form, username: e.target.value })}
-            className="font-num"
-            style={fieldInput}
+            className="font-num w-full rounded-lg border border-[#1f2a3d] p-3 text-xs outline-none transition focus:border-[#3b82f6]"
           />
-          <label style={{ ...labelStyle, marginTop: 12 }} htmlFor="emp-password">
+          <label className="mb-1 mt-3 block text-xs font-bold text-[#e7ecf3]" htmlFor="emp-password">
             رمز عبور اولیه
           </label>
           <input
@@ -566,49 +532,57 @@ export default function EmployeesPage() {
             type="password"
             value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })}
-            style={fieldInput}
+            className="w-full rounded-lg border border-[#1f2a3d] p-3 text-xs outline-none transition focus:border-[#3b82f6]"
           />
 
-          <div style={{ marginTop: 12, marginBottom: 4, fontSize: 11, fontWeight: 800, color: STAFF_PANEL.text }}>رتبه سازمانی</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          <div className="mb-1 mt-3 text-xs font-bold text-[#e7ecf3]">رتبه سازمانی</div>
+          <div className="flex flex-wrap gap-1.5">
             {RANK_OPTIONS.map((r) => (
               <button
                 key={r}
                 type="button"
                 onClick={() => setForm({ ...form, rank: r })}
-                style={staffSegmentedControl(form.rank === r)}
+                className={`rounded-lg px-3 py-2 text-[11px] font-bold transition ${
+                  form.rank === r ? 'bg-[#3b82f6] text-white' : 'bg-[#18223a] text-[#cdd6e3]'
+                }`}
               >
                 {r}
               </button>
             ))}
           </div>
 
-          <div style={{ marginTop: 12, marginBottom: 4, fontSize: 11, fontWeight: 800, color: STAFF_PANEL.text }}>دسترسی ارجاعات</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          <div className="mb-1 mt-3 text-xs font-bold text-[#e7ecf3]">دسترسی ارجاعات</div>
+          <div className="flex flex-wrap gap-1.5">
             <button
               type="button"
               onClick={() => setForm({ ...form, referralScope: 'MANAGERS_ONLY' })}
-              style={staffSegmentedControl(form.referralScope === 'MANAGERS_ONLY')}
+              className={`rounded-lg px-3 py-2 text-[11px] font-bold transition ${
+                form.referralScope === 'MANAGERS_ONLY' ? 'bg-[#3b82f6] text-white' : 'bg-[#18223a] text-[#cdd6e3]'
+              }`}
             >
               فقط مدیران بخش‌ها
             </button>
             <button
               type="button"
               onClick={() => setForm({ ...form, referralScope: 'ALL_STAFF' })}
-              style={staffSegmentedControl(form.referralScope === 'ALL_STAFF')}
+              className={`rounded-lg px-3 py-2 text-[11px] font-bold transition ${
+                form.referralScope === 'ALL_STAFF' ? 'bg-[#3b82f6] text-white' : 'bg-[#18223a] text-[#cdd6e3]'
+              }`}
             >
               همه کارمندان
             </button>
           </div>
 
-          <div style={{ marginTop: 12, marginBottom: 4, fontSize: 11, fontWeight: 800, color: STAFF_PANEL.text }}>واحد سازمانی</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          <div className="mb-1 mt-3 text-xs font-bold text-[#e7ecf3]">واحد سازمانی</div>
+          <div className="flex flex-wrap gap-1.5">
             {DEPT_OPTIONS.map((d) => (
               <button
                 key={d.value}
                 type="button"
                 onClick={() => setForm({ ...form, dept: d.value })}
-                style={staffSegmentedControl(form.dept === d.value)}
+                className={`rounded-lg px-3 py-2 text-[11px] font-bold transition ${
+                  form.dept === d.value ? 'bg-[#3b82f6] text-white' : 'bg-[#18223a] text-[#cdd6e3]'
+                }`}
               >
                 {d.label}
               </button>
@@ -618,10 +592,9 @@ export default function EmployeesPage() {
                 key={d.id}
                 type="button"
                 onClick={() => setForm({ ...form, dept: d.id })}
-                style={{
-                  ...staffSegmentedControl(form.dept === d.id),
-                  ...(form.dept === d.id ? { background: STAFF_PANEL.warning } : {}),
-                }}
+                className={`rounded-lg px-3 py-2 text-[11px] font-bold transition ${
+                  form.dept === d.id ? 'bg-[#f59e0b] text-white' : 'bg-[#18223a] text-[#cdd6e3]'
+                }`}
               >
                 {d.label}
               </button>
@@ -633,14 +606,22 @@ export default function EmployeesPage() {
                 value={newDeptName}
                 onChange={(e) => setNewDeptName(e.target.value)}
                 placeholder="نام واحد جدید (مثلاً بازاریابی)"
-                style={{ ...fieldInput, flex: 1, padding: 10 }}
+                className="flex-1 rounded-lg border border-[#1f2a3d] p-2.5 text-xs outline-none focus:border-[#3b82f6]"
               />
-              <StaffPrimaryButton onClick={submitNewDept}>افزودن</StaffPrimaryButton>
-              <StaffSecondaryButton
+              <button
+                type="button"
+                onClick={submitNewDept}
+                className="rounded-lg bg-[#3b82f6] px-3 py-2 text-[11px] font-bold text-white"
+              >
+                افزودن
+              </button>
+              <button
+                type="button"
                 onClick={() => {
                   setAddingDept(false);
                   setNewDeptName('');
                 }}
+                className="rounded-lg border border-[#1f2a3d] px-3 py-2 text-[11px] font-bold text-[#cdd6e3]"
               >
                 انصراف
               </StaffSecondaryButton>
@@ -649,37 +630,27 @@ export default function EmployeesPage() {
             <button
               type="button"
               onClick={() => setAddingDept(true)}
-              style={{
-                marginTop: 8,
-                background: 'none',
-                border: 'none',
-                fontSize: 11,
-                fontWeight: 800,
-                color: STAFF_PANEL.link,
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                padding: 0,
-              }}
+              className="mt-2 text-[11px] font-bold text-[#3b82f6]"
             >
               + ایجاد واحد سازمانی جدید
             </button>
           )}
 
           {form.dept.startsWith('custom_') && catalogGroups.length === 0 && (
-            <p style={{ marginTop: 8, fontSize: 10.5, color: STAFF_PANEL.textMuted }}>
+            <p className="mt-2 text-[10.5px] text-[#6b7b94]">
               برای واحد سفارشی، کاتالوگ دسترسی از پیش تعریف نشده — پس از ایجاد حساب می‌توانید دسترسی‌ها
               را در جزئیات اضافه کنید.
             </p>
           )}
 
           {catalogGroups.length > 0 && (
-            <div style={{ marginTop: 12 }}>
-              <div style={{ marginBottom: 8, fontSize: 10.5, color: STAFF_PANEL.textMuted }}>دسترسی‌های واحد</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div className="mt-3">
+              <div className="mb-2 text-[10.5px] text-[#6b7b94]">دسترسی‌های واحد</div>
+              <div className="flex flex-col gap-2">
                 {catalogGroups.map((g) => (
                   <div key={g.sectionKey}>
-                    <div style={{ marginBottom: 4, fontSize: 11, fontWeight: 800, color: STAFF_PANEL.navMuted }}>{g.sectionLabelFa}</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6 }}>
+                    <div className="mb-1 text-[11px] font-bold text-[#cdd6e3]">{g.sectionLabelFa}</div>
+                    <div className="grid grid-cols-2 gap-1.5">
                       {g.perms.map((p) => {
                         const checked = selectedPerms.has(p.key);
                         return (
@@ -694,17 +665,9 @@ export default function EmployeesPage() {
                                 return next;
                               })
                             }
-                            style={{
-                              borderRadius: 8,
-                              border: `1px solid ${checked ? STAFF_PANEL.accent : STAFF_PANEL.inputBorder}`,
-                              background: checked ? STAFF_PANEL.accentSoft : 'transparent',
-                              color: checked ? STAFF_PANEL.accent : STAFF_PANEL.navMuted,
-                              padding: '6px 10px',
-                              textAlign: 'right',
-                              fontSize: 11,
-                              cursor: 'pointer',
-                              fontFamily: 'inherit',
-                            }}
+                            className={`rounded-lg border px-2.5 py-1.5 text-right text-[11px] transition ${
+                              checked ? 'border-[#3b82f6] bg-[#3b82f6]/10 text-[#3b82f6]' : 'border-[#1f2a3d] text-[#cdd6e3]'
+                            }`}
                           >
                             {p.labelFa}
                           </button>
@@ -718,25 +681,37 @@ export default function EmployeesPage() {
           )}
 
           {addError && (
-            <p role="alert" style={{ marginTop: 8, fontSize: 11, color: STAFF_PANEL.danger }}>
+            <p role="alert" className="mt-2 text-xs text-[#f87171]">
               {addError}
             </p>
           )}
-          <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-            <StaffSecondaryButton onClick={() => setAddOpen(false)}>انصراف</StaffSecondaryButton>
-            <StaffPrimaryButton onClick={() => void onCreate()}>ایجاد حساب و اعلان به مدیر</StaffPrimaryButton>
+          <div className="mt-4 flex justify-end gap-2">
+            <button onClick={() => setAddOpen(false)} className="rounded-lg bg-[#18223a] px-4 py-2 text-xs font-bold text-[#cdd6e3]">
+              انصراف
+            </button>
+            <button
+              onClick={() => void onCreate()}
+              className="rounded-lg bg-[#3b82f6] px-4 py-2 text-xs font-bold text-white transition hover:brightness-110"
+            >
+              ایجاد حساب و اعلان به مدیر
+            </button>
           </div>
         </Modal>
       )}
 
       {statusConfirm && (
-        <Modal dark title="تعلیق حساب کارمند" onClose={() => setStatusConfirm(null)}>
-          <p style={{ marginBottom: 16, fontSize: 11, color: STAFF_PANEL.textMuted }}>
+        <Modal variant="dark" title="تعلیق حساب کارمند" onClose={() => setStatusConfirm(null)}>
+          <p className="mb-4 text-xs text-[#6b7b94]">
             آیا حساب «{statusConfirm.fullName}» معلق شود؟ کارمند تا زمان فعال‌سازی مجدد نمی‌تواند وارد
             سامانه شود.
           </p>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-            <StaffSecondaryButton onClick={() => setStatusConfirm(null)}>انصراف</StaffSecondaryButton>
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => setStatusConfirm(null)}
+              className="rounded-lg bg-[#18223a] px-4 py-2 text-xs font-bold text-[#cdd6e3]"
+            >
+              انصراف
+            </button>
             <button
               type="button"
               onClick={() => void confirmSuspend()}
@@ -759,57 +734,33 @@ export default function EmployeesPage() {
       )}
 
       {detailId && detail && (
-        <Modal dark title={detail.fullName} onClose={() => setDetailId(null)}>
-          <div style={{ marginBottom: 12, display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, fontSize: 11 }}>
-            <div style={staffInnerTile}>
-              <div style={{ fontSize: 10, color: STAFF_PANEL.textMuted }}>آخرین ورود</div>
-              <div className="font-num" style={{ fontWeight: 800, color: STAFF_PANEL.text }}>
+        <Modal variant="dark" title={detail.fullName} onClose={() => setDetailId(null)}>
+          <div className="mb-3 grid grid-cols-2 gap-2 text-xs">
+            <div className="rounded-lg bg-[#18223a] p-2.5">
+              <div className="text-[10px] text-[#6b7b94]">آخرین ورود</div>
+              <div className="font-num font-bold text-[#e7ecf3]">
                 {detail.lastLoginAt ? formatJalaliDateTime(detail.lastLoginAt) : '—'}
               </div>
             </div>
-            <div style={staffInnerTile}>
-              <div style={{ fontSize: 10, color: STAFF_PANEL.textMuted }}>نام کاربری</div>
-              <div className="font-num" style={{ direction: 'ltr', fontWeight: 800, color: STAFF_PANEL.text }}>{detail.username}</div>
+            <div className="rounded-lg bg-[#18223a] p-2.5">
+              <div className="text-[10px] text-[#6b7b94]">نام کاربری</div>
+              <div className="font-num ltr font-bold text-[#e7ecf3]">{detail.username}</div>
             </div>
           </div>
 
-          <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: STAFF_PANEL.text }}>
+          <div className="mb-2 flex items-center justify-between">
+            <div className="text-xs font-bold text-[#e7ecf3]">
               دسترسی‌های فعال{' '}
-              <span style={{ fontSize: 10.5, fontWeight: 400, color: STAFF_PANEL.textMuted }}>
+              <span className="text-[10.5px] font-normal text-[#6b7b94]">
                 ({faDigits(detail.permissions.length)})
               </span>
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {detail.permissions.map((p) => (
-              <div
-                key={p.key}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  borderRadius: 8,
-                  border: '1px solid rgba(52,211,153,0.25)',
-                  background: 'rgba(52,211,153,0.08)',
-                  padding: 8,
-                }}
-              >
-                <span style={{ flex: 1, fontSize: 11, color: STAFF_PANEL.navMuted }}>{p.labelFa}</span>
-                <button
-                  type="button"
-                  onClick={() => void onGrant(p.key, false)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    fontSize: 10,
-                    fontWeight: 800,
-                    color: STAFF_PANEL.danger,
-                    cursor: 'pointer',
-                    fontFamily: 'inherit',
-                    padding: 0,
-                  }}
-                >
+              <div key={p.key} className="flex items-center gap-2 rounded-lg border border-[#10b98140] bg-[#10b98108] p-2">
+                <span className="flex-1 text-[11px] text-[#cdd6e3]">{p.labelFa}</span>
+                <button onClick={() => void onGrant(p.key, false)} className="text-[10px] font-bold text-[#f87171]">
                   حذف
                 </button>
               </div>
@@ -817,25 +768,15 @@ export default function EmployeesPage() {
           </div>
 
           {detail.available.length > 0 && (
-            <div style={{ marginTop: 12, borderTop: `1px solid ${STAFF_PANEL.sidebarBorder}`, paddingTop: 12 }}>
-              <div style={{ marginBottom: 8, fontSize: 11, fontWeight: 800, color: STAFF_PANEL.text }}>افزودن دسترسی</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6 }}>
+            <div className="mt-3 border-t border-[#1f2a3d] pt-3">
+              <div className="mb-2 text-xs font-bold text-[#e7ecf3]">افزودن دسترسی</div>
+              <div className="grid grid-cols-2 gap-1.5">
                 {detail.available.map((p) => (
                   <button
                     key={p.key}
                     type="button"
                     onClick={() => void onGrant(p.key, true)}
-                    style={{
-                      borderRadius: 8,
-                      border: `1px dashed ${STAFF_PANEL.inputBorder}`,
-                      background: 'transparent',
-                      padding: 8,
-                      textAlign: 'right',
-                      fontSize: 11,
-                      color: STAFF_PANEL.navMuted,
-                      cursor: 'pointer',
-                      fontFamily: 'inherit',
-                    }}
+                    className="rounded-lg border border-dashed border-[#1f2a3d] p-2 text-right text-[11px] text-[#cdd6e3]"
                   >
                     + {p.labelFa}
                   </button>
@@ -845,25 +786,22 @@ export default function EmployeesPage() {
           )}
 
           {tempPassword && (
-            <div
-              style={{
-                marginTop: 16,
-                borderRadius: 8,
-                border: `1px solid rgba(59,130,246,0.4)`,
-                background: STAFF_PANEL.accentSoft,
-                padding: 12,
-              }}
-            >
-              <div style={{ fontSize: 10, color: STAFF_PANEL.textMuted }}>رمز موقت تولیدشده</div>
-              <div className="font-num" style={{ direction: 'ltr', marginTop: 4, fontSize: 13, fontWeight: 900, color: STAFF_PANEL.link }}>
-                {tempPassword}
-              </div>
+            <div className="mt-4 rounded-lg border border-[#3b82f6]/40 bg-[#3b82f6]/10 p-3">
+              <div className="text-[10px] text-[#6b7b94]">رمز موقت تولیدشده</div>
+              <div className="font-num ltr mt-1 text-sm font-black text-[#3b82f6]">{tempPassword}</div>
             </div>
           )}
 
-          <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-            <StaffPrimaryButton onClick={() => void onResetPassword()}>بازنشانی رمز عبور</StaffPrimaryButton>
-            <StaffSecondaryButton onClick={() => setDetailId(null)}>بستن</StaffSecondaryButton>
+          <div className="mt-4 flex justify-end gap-2">
+            <button
+              onClick={() => void onResetPassword()}
+              className="rounded-lg bg-[#3b82f6] px-4 py-2 text-xs font-bold text-white transition hover:brightness-110"
+            >
+              بازنشانی رمز عبور
+            </button>
+            <button onClick={() => setDetailId(null)} className="rounded-lg bg-[#18223a] px-4 py-2 text-xs font-bold text-[#cdd6e3]">
+              بستن
+            </button>
           </div>
         </Modal>
       )}

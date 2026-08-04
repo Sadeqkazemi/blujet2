@@ -1,0 +1,494 @@
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../../hooks/useAuth';
+import { useLocale, type StoredLocale } from '../../hooks/useLocale';
+import { useT } from '../../lib/i18n';
+import { AGENCY_NAV_ITEMS, agencyInitials } from './agency-nav-config';
+import type { AgencyNavKey } from './agency-nav-config';
+
+const LANG_OPTIONS: { value: StoredLocale; label: string }[] = [
+  { value: 'fa', label: 'فارسی' },
+  { value: 'en', label: 'English' },
+  { value: 'ar', label: 'العربية' },
+];
+
+const STR: Record<StoredLocale, { b2bPartner: string; agencyPanel: string; menuTitle: string }> = {
+  fa: { b2bPartner: 'همکار B2B', agencyPanel: 'پنل آژانس', menuTitle: 'منو' },
+  en: { b2bPartner: 'B2B Partner', agencyPanel: 'Agency Panel', menuTitle: 'Menu' },
+  ar: { b2bPartner: 'شريك B2B', agencyPanel: 'لوحة الوكالة', menuTitle: 'القائمة' },
+};
+
+function ChevronIcon({ isRTL }: { isRTL: boolean }) {
+  return (
+    <svg
+      width={16}
+      height={16}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="#9aa4b2"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ flex: 'none', transform: isRTL ? 'scaleX(-1)' : undefined }}
+      aria-hidden
+    >
+      <path d="M9 18l6-6-6-6" />
+    </svg>
+  );
+}
+
+interface Props {
+  isMobile: boolean;
+  activeKey: AgencyNavKey;
+  agencyName: string;
+  onSignOut: () => void;
+}
+
+export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, onSignOut }: Props) {
+  const { user } = useAuth();
+  const { locale, setLocale } = useLocale();
+  const t = useT();
+  const at = STR[locale];
+  const isRTL = locale !== 'en';
+  const [langOpen, setLangOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const displayName = agencyName || user?.fullName || '—';
+  const initials = agencyInitials(displayName);
+  const logoTextColor = isMobile ? '#fff' : '#16202e';
+  const logoSquareBg = isMobile ? '#fff' : '#1668c4';
+  const logoIconColor = isMobile ? '#1668c4' : '#fff';
+
+  const navLinks = [
+    { to: '/', label: t('navFlights') },
+    { to: '/destinations', label: t('navDestinations') },
+    { to: '/club', label: t('navLoyalty') },
+    { to: '/support', label: t('navSupport') },
+  ];
+
+  const langDropdown = (
+    <>
+      <div onClick={() => setLangOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 120 }} />
+      <div
+        style={{
+          position: 'absolute',
+          top: 44,
+          [isRTL ? 'left' : 'right']: 0,
+          width: 150,
+          background: '#fff',
+          border: '1px solid #e6eaf0',
+          borderRadius: 14,
+          boxShadow: '0 20px 50px -16px rgba(13,38,64,.35)',
+          zIndex: 130,
+          overflow: 'hidden',
+          padding: 6,
+        }}
+      >
+        {LANG_OPTIONS.map((opt) => (
+          <div
+            key={opt.value}
+            onClick={() => {
+              setLocale(opt.value);
+              setLangOpen(false);
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 8,
+              padding: '9px 11px',
+              borderRadius: 9,
+              fontSize: 12.5,
+              fontWeight: 600,
+              color: '#16202e',
+              cursor: 'pointer',
+            }}
+          >
+            {opt.label}
+            {locale === opt.value && <span style={{ color: '#1668c4', fontWeight: 900 }}>✓</span>}
+          </div>
+        ))}
+      </div>
+    </>
+  );
+
+  const userMenuPanel = (width: number, top: number, align: 'left' | 'right') => (
+    <>
+      <div onClick={() => setUserMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 120 }} />
+      <div
+        style={{
+          position: 'absolute',
+          top,
+          [align]: 0,
+          width,
+          maxWidth: '80vw',
+          background: '#fff',
+          border: '1px solid #e6eaf0',
+          borderRadius: 16,
+          boxShadow: '0 20px 50px -16px rgba(13,38,64,.35)',
+          zIndex: 130,
+          overflow: 'hidden',
+        }}
+      >
+        <div style={{ padding: 15, background: 'linear-gradient(135deg,#0d2640,#16406e)', color: '#fff' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div
+              style={{
+                width: 46,
+                height: 46,
+                borderRadius: 10,
+                background: 'rgba(255,255,255,.16)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 800,
+                fontSize: 13.5,
+              }}
+            >
+              {initials}
+            </div>
+            <div style={{ lineHeight: 1.5 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 800 }}>{displayName}</div>
+              <div style={{ fontSize: 10.5, color: '#caa53a', fontWeight: 700 }}>{at.b2bPartner}</div>
+            </div>
+          </div>
+        </div>
+        <div style={{ padding: 5 }}>
+          <Link
+            to="/agency"
+            onClick={() => setUserMenuOpen(false)}
+            style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: 11.5, color: '#16202e', textDecoration: 'none', fontWeight: 600 }}
+          >
+            <span style={{ color: '#1668c4' }}>👤</span>
+            {at.agencyPanel}
+          </Link>
+          <Link
+            to="/manage-booking"
+            onClick={() => setUserMenuOpen(false)}
+            style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: 11.5, color: '#16202e', textDecoration: 'none', fontWeight: 600 }}
+          >
+            <span style={{ color: '#1668c4' }}>🧳</span>
+            {t('tripsLabel')}
+          </Link>
+          <span
+            onClick={() => {
+              setUserMenuOpen(false);
+              onSignOut();
+            }}
+            style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: 11.5, color: '#e5484d', fontWeight: 600, cursor: 'pointer' }}
+          >
+            <span>↩</span>
+            {t('logoutLabel')}
+          </span>
+        </div>
+      </div>
+    </>
+  );
+
+  return (
+    <>
+      <header data-testid="agency-portal-header" style={{ gridColumn: '1 / -1', position: 'sticky', top: 0, zIndex: 150 }}>
+        <div
+          style={{
+            background: isMobile ? '#1668c4' : '#fff',
+            borderBottom: isMobile ? 'none' : '1px solid #e6eaf0',
+            boxShadow: '0 2px 12px -8px rgba(13,38,102,.25)',
+          }}
+        >
+          <div
+            style={{
+              padding: '0 22px',
+              height: isMobile ? 58 : 70,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            {isMobile && (
+              <span
+                data-testid="agency-mobile-menu-toggle"
+                onClick={() => setMobileMenuOpen((v) => !v)}
+                style={{
+                  display: 'flex',
+                  width: 38,
+                  height: 38,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: 10,
+                  cursor: 'pointer',
+                  fontSize: 17,
+                  color: '#fff',
+                  flex: 'none',
+                }}
+              >
+                ☰
+              </span>
+            )}
+
+            <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none', color: logoTextColor }}>
+              <div
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 10,
+                  background: logoSquareBg,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: logoIconColor,
+                  fontSize: 18,
+                }}
+              >
+                ✈
+              </div>
+              <span style={{ fontWeight: 900, fontSize: 18, letterSpacing: '-.5px', color: logoTextColor }}>blujet</span>
+            </Link>
+
+            {!isMobile && (
+              <nav style={{ display: 'flex', gap: 30, fontSize: 15.5, color: '#3b4554', fontWeight: 600, height: '100%', alignItems: 'center', whiteSpace: 'nowrap' }}>
+                {navLinks.map((link) => (
+                  <Link key={link.to} to={link.to} style={{ textDecoration: 'none', color: '#3b4554' }}>
+                    {link.label}
+                  </Link>
+                ))}
+              </nav>
+            )}
+
+            {!isMobile && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ position: 'relative' }}>
+                  <span
+                    onClick={() => setLangOpen((v) => !v)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      cursor: 'pointer',
+                      color: '#5a6678',
+                      border: '1.5px solid #e2e7ee',
+                      borderRadius: 20,
+                      padding: '6px 12px',
+                      fontSize: 12.5,
+                      fontWeight: 700,
+                    }}
+                  >
+                    <GlobeIcon />
+                    {locale.toUpperCase()}
+                  </span>
+                  {langOpen && langDropdown}
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <div
+                    data-testid="agency-notif-toggle"
+                    onClick={() => setNotifOpen((v) => !v)}
+                    style={{
+                      width: 42,
+                      height: 42,
+                      borderRadius: '50%',
+                      background: '#f3f5f8',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#5a6678',
+                      fontSize: 15.5,
+                      position: 'relative',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    🔔
+                  </div>
+                  {notifOpen && (
+                    <>
+                      <div onClick={() => setNotifOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 120 }} />
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: 52,
+                          [isRTL ? 'left' : 'right']: 0,
+                          width: 340,
+                          background: '#fff',
+                          border: '1px solid #e6eaf0',
+                          borderRadius: 14,
+                          boxShadow: '0 20px 50px -16px rgba(13,38,64,.35)',
+                          zIndex: 130,
+                          overflow: 'hidden',
+                          padding: 26,
+                          textAlign: 'center',
+                          color: '#8a96a6',
+                          fontSize: 11.5,
+                        }}
+                      >
+                        {locale === 'fa' ? 'هنوز اعلانی وجود ندارد.' : locale === 'ar' ? 'لا توجد إشعارات بعد.' : 'No notifications yet.'}
+                      </div>
+                    </>
+                  )}
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <div
+                    data-testid="agency-user-menu-toggle"
+                    onClick={() => setUserMenuOpen((v) => !v)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      background: '#fff',
+                      border: '1px solid #e6eaf0',
+                      padding: '4px 10px 4px 7px',
+                      borderRadius: 30,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: 10,
+                        background: 'linear-gradient(135deg,#1668c4,#3b8ae0)',
+                        color: '#fff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 800,
+                        fontSize: 12.5,
+                      }}
+                    >
+                      {initials}
+                    </div>
+                    <div style={{ lineHeight: 1.35, textAlign: isRTL ? 'right' : 'left' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#16202e' }}>{displayName}</div>
+                      <div style={{ fontSize: 10, color: '#caa53a', fontWeight: 700 }}>{at.b2bPartner}</div>
+                    </div>
+                    <span style={{ fontSize: 8, color: '#9aa4b2', marginRight: 2 }}>▼</span>
+                  </div>
+                  {userMenuOpen && userMenuPanel(300, 54, isRTL ? 'left' : 'right')}
+                </div>
+              </div>
+            )}
+
+            {isMobile && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ position: 'relative' }}>
+                  <span onClick={() => setLangOpen((v) => !v)} style={{ width: 36, height: 36, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', cursor: 'pointer' }}>
+                    <GlobeIcon size={19} />
+                  </span>
+                  {langOpen && langDropdown}
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <span
+                    data-testid="agency-user-menu-toggle-mobile"
+                    onClick={() => setUserMenuOpen((v) => !v)}
+                    style={{ width: 36, height: 36, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', cursor: 'pointer' }}
+                  >
+                    <UserOutlineIcon size={19} />
+                  </span>
+                  {userMenuOpen && userMenuPanel(280, 46, 'left')}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {isMobile && mobileMenuOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: '#fff', zIndex: 210, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', padding: '26px 20px 18px' }}>
+            <span style={{ fontSize: 22, fontWeight: 800, color: '#16202e' }}>{at.menuTitle}</span>
+            <span
+              onClick={() => setMobileMenuOpen(false)}
+              style={{
+                position: 'absolute',
+                [isRTL ? 'left' : 'right']: 20,
+                top: 22,
+                width: 34,
+                height: 34,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 24,
+                color: '#16202e',
+                cursor: 'pointer',
+              }}
+            >
+              ×
+            </span>
+          </div>
+          <div style={{ padding: '4px 24px 0', display: 'flex', flexDirection: 'column' }}>
+            {navLinks.map((link, i) => (
+              <Link
+                key={link.to}
+                to={link.to}
+                onClick={() => setMobileMenuOpen(false)}
+                style={{
+                  padding: '20px 0',
+                  textDecoration: 'none',
+                  color: '#16202e',
+                  fontSize: 17,
+                  fontWeight: 700,
+                  borderTop: i > 0 ? '1px solid #eef1f5' : undefined,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                {link.label}
+                <ChevronIcon isRTL={isRTL} />
+              </Link>
+            ))}
+            {AGENCY_NAV_ITEMS.map((item) => (
+              <Link
+                key={item.key}
+                to={item.path}
+                onClick={() => setMobileMenuOpen(false)}
+                style={{
+                  padding: '20px 0',
+                  textDecoration: 'none',
+                  color: '#16202e',
+                  fontSize: 17,
+                  fontWeight: activeKey === item.key ? 800 : 700,
+                  borderTop: '1px solid #eef1f5',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                {item.label[locale]}
+                {activeKey !== item.key && <ChevronIcon isRTL={isRTL} />}
+              </Link>
+            ))}
+          </div>
+          <div style={{ marginTop: 'auto', padding: '14px 24px 32px' }}>
+            <span
+              onClick={() => {
+                setMobileMenuOpen(false);
+                onSignOut();
+              }}
+              style={{ display: 'block', padding: '10px 0', color: '#e5484d', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+            >
+              {t('logoutLabel')}
+            </span>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function GlobeIcon({ size = 15 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18M12 3c2.5 2.5 4 5.7 4 9s-1.5 6.5-4 9c-2.5-2.5-4-5.7-4-9s1.5-6.5 4-9z" />
+    </svg>
+  );
+}
+
+function UserOutlineIcon({ size = 17 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21c0-4 4-6 8-6s8 2 8 6" />
+    </svg>
+  );
+}
