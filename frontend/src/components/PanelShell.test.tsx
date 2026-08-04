@@ -87,7 +87,7 @@ describe('PanelShell', () => {
     await waitFor(() => {
       const badge = screen.getByTestId('nav-badge-referrals');
       expect(badge).toHaveTextContent('۲');
-      expect(badge.className).toContain('a855f7');
+      expect(badge).toHaveStyle({ background: '#a855f7' });
     });
   });
 

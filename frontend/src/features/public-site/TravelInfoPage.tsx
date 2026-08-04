@@ -107,20 +107,21 @@ export default function TravelInfoPage() {
 
   return (
     <PublicPageShell>
-      <section style={{ background: 'linear-gradient(150deg,#0d2640,#124a86)', color: '#fff', padding: '39px 22px 35px', textAlign: 'center' }}>
-        <h1 style={{ fontSize: isMobile ? 24 : 30, fontWeight: 900, margin: '0 0 10px', letterSpacing: '-.5px' }}>{t.heroTitle}</h1>
-        <p style={{ fontSize: 13, color: '#c9dcf3', margin: 0 }}>{t.heroSub}</p>
-        {termsIntro && (
-          <p data-testid="terms-cms-intro" style={{ fontSize: 12.5, color: '#e2edf9', margin: '14px auto 0', maxWidth: 640, lineHeight: 1.9 }}>
-            {termsIntro}
-          </p>
-        )}
+      <section style={{ background: 'linear-gradient(135deg,#0d2640,#16406e)', color: '#fff', padding: '33px 22px' }}>
+        <div style={{ maxWidth: 1320, margin: '0 auto' }}>
+          <h1 style={{ fontSize: isMobile ? 24 : 27, fontWeight: 900, margin: '0 0 8px', letterSpacing: '-.5px' }}>{t.heroTitle}</h1>
+          <p style={{ fontSize: '12.5px', color: '#aac4e2', margin: 0 }}>{t.heroSub}</p>
+          {termsIntro && (
+            <p data-testid="terms-cms-intro" style={{ fontSize: '12.5px', color: '#e2edf9', margin: '14px 0 0', maxWidth: 640, lineHeight: 1.9 }}>
+              {termsIntro}
+            </p>
+          )}
+        </div>
       </section>
 
-      <div style={{ maxWidth: 1080, margin: '0 auto', padding: '31px 22px 47px', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '250px 1fr', gap: 24, alignItems: 'start' }}>
-        {/* TOC */}
-        <div style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 15, padding: 9, position: isMobile ? 'static' : 'sticky', top: 100 }}>
-          <div style={{ fontSize: 11.5, fontWeight: 800, color: '#8a96a6', padding: '8px 11px 6px' }}>{t.toc}</div>
+      <div style={{ maxWidth: 1320, margin: '32px auto 56px', padding: '0 26px', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '250px 1fr', gap: 23, alignItems: 'start' }}>
+        <aside style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 14, padding: 11, position: isMobile ? 'static' : 'sticky', top: 130 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#9aa4b2', padding: '7px 10px' }}>{t.toc}</div>
           {SECTIONS.map((s, i) => (
             <button
               key={s.title.fa}
@@ -132,42 +133,42 @@ export default function TravelInfoPage() {
                 display: 'block',
                 width: '100%',
                 textAlign: locale === 'en' ? 'left' : 'right',
-                padding: '9px 11px',
-                borderRadius: 9,
+                padding: '9px 10px',
+                borderRadius: 10,
                 border: 'none',
                 background: active === i ? '#eef4fb' : 'transparent',
                 color: active === i ? '#1668c4' : '#5a6678',
                 fontWeight: active === i ? 800 : 600,
-                fontSize: 12.5,
+                fontSize: 12,
                 fontFamily: 'inherit',
                 cursor: 'pointer',
+                marginBottom: 2,
               }}
             >
               {s.title[locale]}
             </button>
           ))}
-        </div>
+        </aside>
 
-        {/* SECTIONS */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
           {SECTIONS.map((s, i) => (
             <div
               key={s.title.fa}
               ref={(el) => {
                 sectionRefs.current[i] = el;
               }}
-              style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 16, padding: '19px 21px', scrollMarginTop: 100 }}
+              style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 14, padding: 18, scrollMarginTop: 130 }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginBottom: 13 }}>
-                <span style={{ width: 32, height: 32, borderRadius: 10, background: '#eef4fb', color: '#1668c4', fontWeight: 900, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                <span style={{ width: 34, height: 34, borderRadius: 10, background: '#eef4fb', color: '#1668c4', fontWeight: 800, fontSize: '12.5px', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
                   {formatToman(i + 1, locale)}
                 </span>
-                <h2 style={{ fontSize: 16, fontWeight: 900, color: '#0d2640', margin: 0 }}>{s.title[locale]}</h2>
+                <h2 style={{ fontSize: 16, fontWeight: 800, color: '#0d2640', margin: 0 }}>{s.title[locale]}</h2>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
                 {s.items.map((it) => (
-                  <div key={it.fa} style={{ display: 'flex', gap: 9, fontSize: 12.5, color: '#3b4554', lineHeight: 1.9 }}>
-                    <span style={{ color: '#1668c4', flex: 'none' }}>•</span>
+                  <div key={it.fa} style={{ display: 'flex', gap: 8, fontSize: 12, color: '#5a6678', lineHeight: 2 }}>
+                    <span style={{ color: '#1668c4', flex: 'none', marginTop: 1 }}>•</span>
                     {it[locale]}
                   </div>
                 ))}
@@ -175,8 +176,8 @@ export default function TravelInfoPage() {
             </div>
           ))}
 
-          <div style={{ background: '#fff7e6', border: '1px solid #f2dfb0', borderRadius: 14, padding: '15px 18px', display: 'flex', gap: 11, fontSize: 12, color: '#7d651e', lineHeight: 1.9 }}>
-            <span style={{ flex: 'none' }}>⚠️</span>
+          <div style={{ background: '#fbf6ea', border: '1px solid #f0e2bf', borderRadius: 14, padding: 15, display: 'flex', gap: 11, alignItems: 'flex-start', fontSize: '11.5px', color: '#7a6320', lineHeight: 2 }}>
+            <span style={{ flex: 'none', fontSize: 18 }}>⚠️</span>
             {t.warningNote}
           </div>
         </div>

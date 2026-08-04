@@ -44,6 +44,15 @@ export default function SalesBarChart({
   );
   const max = Math.max(1, ...totals);
 
+  const legendClass = dark
+    ? 'flex items-center gap-1.5 text-xs text-[#9fb0c7]'
+    : 'flex items-center gap-1.5 text-xs text-text-2';
+  const toggleClass = dark
+    ? 'text-[11px] text-[#6b7b94] underline decoration-dotted'
+    : 'text-[11px] text-muted underline decoration-dotted';
+  const thClass = dark ? 'border-b border-[#28344c] text-[#6b7b94]' : 'border-b border-border text-muted';
+  const trClass = dark ? 'border-b border-[#28344c]/60 font-num text-[#e7ecf3]' : 'border-b border-border/60 font-num';
+
   return (
     <div>
       {!dark && (

@@ -1,18 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { fetchDocuments, fetchProfile, uploadDocument } from '../../api/agency-portal';
-import { formatJalaliDate } from '../../lib/jalali';
+import { formatJalaliDate, toJalali } from '../../lib/jalali';
+import { faDigits } from '../../lib/fa-format';
 import { ApiRequestError } from '../../api/envelope';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import type { AgencyDocument, AgencyDocumentType, AgencyProfile } from '../../types/agency-portal';
 
-// پروفایل و مدارک — field labels and document status match
-// design-reference-v2/پنل آژانس.dc.html's own isEN `profileFields`/
-// `documents` sample data for this exact tab; AR has no counterpart
-// there and is hand-translated. This page keeps its own local
-// tier/document-type/status label maps rather than translating the
-// shared `frontend/src/features/agencies/agency-labels.ts` module — that
-// module backs the staff-side AgencyDetailPage.tsx, which stays
-// Persian-only per CLAUDE.md (staff panels aren't locale-switchable).
 interface Tr {
   fa: string;
   en: string;
@@ -31,39 +25,67 @@ const DOC_TYPE_LABEL: Record<AgencyDocumentType, Tr> = {
   OTHER: { fa: 'سایر', en: 'Other', ar: 'أخرى' },
 };
 
-const DOC_STATUS_LABEL: Record<AgencyDocument['status'], { label: Tr; className: string }> = {
-  PENDING: { label: { fa: 'در انتظار بررسی', en: 'Pending', ar: 'قيد المراجعة' }, className: 'bg-[#f59e0b24] text-[#b45309]' },
-  APPROVED: { label: { fa: 'تأیید شد', en: 'Approved', ar: 'تمت الموافقة' }, className: 'bg-[#10b98124] text-[#059669]' },
-  REJECTED: { label: { fa: 'رد شد', en: 'Rejected', ar: 'مرفوض' }, className: 'bg-danger/15 text-danger' },
+const DOC_STATUS_STYLE: Record<AgencyDocument['status'], { label: Tr; color: string; bg: string }> = {
+  PENDING: {
+    label: { fa: 'در انتظار بررسی', en: 'Pending', ar: 'قيد المراجعة' },
+    color: '#b45309',
+    bg: '#fef3c7',
+  },
+  APPROVED: {
+    label: { fa: 'تأیید شد', en: 'Approved', ar: 'تمت الموافقة' },
+    color: '#1f8a5b',
+    bg: '#eaf7f0',
+  },
+  REJECTED: {
+    label: { fa: 'رد شد', en: 'Rejected', ar: 'مرفوض' },
+    color: '#e8553a',
+    bg: '#fdecec',
+  },
 };
 
-const STR: Record<StoredLocale, {
-  heading: string;
-  subtitle: string;
-  errorFallback: string;
-  loading: string;
-  agencyInfoHeading: string;
-  fieldManager: string;
-  fieldLicenseNo: string;
-  fieldCity: string;
-  fieldPhone: string;
-  fieldEmail: string;
-  fieldPartnershipType: string;
-  partnershipValue: (tier: string) => string;
-  uploadHeading: string;
-  noFileSelected: string;
-  uploadErrorFallback: string;
-  uploadBtn: string;
-  uploadingBtn: string;
-  documentsHeading: string;
-  documentsEmpty: string;
-}> = {
+const DOC_ICON = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <path d="M14 2v6h6" />
+  </svg>
+);
+
+const UPLOAD_ICON = (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <path d="M17 8l-5-5-5 5" />
+    <path d="M12 3v12" />
+  </svg>
+);
+
+const STR: Record<
+  StoredLocale,
+  {
+    heading: string;
+    subtitle: string;
+    errorFallback: string;
+    loading: string;
+    fieldManager: string;
+    fieldLicenseNo: string;
+    fieldCity: string;
+    fieldPhone: string;
+    fieldEmail: string;
+    fieldPartnershipType: string;
+    partnershipValue: (tier: string) => string;
+    accountActive: (year: string) => string;
+    documentsTitle: string;
+    documentsEmpty: string;
+    uploadDocLabel: string;
+    noFileSelected: string;
+    uploadErrorFallback: string;
+    uploadingBtn: string;
+  }
+> = {
   fa: {
     heading: 'پروفایل و مدارک',
     subtitle: 'اطلاعات ثبت‌شده آژانس شما و مدارک ارسالی',
     errorFallback: 'خطا در دریافت پروفایل.',
     loading: 'در حال بارگذاری…',
-    agencyInfoHeading: 'اطلاعات آژانس',
     fieldManager: 'مدیر عامل',
     fieldLicenseNo: 'شماره مجوز',
     fieldCity: 'شهر',
@@ -71,20 +93,19 @@ const STR: Record<StoredLocale, {
     fieldEmail: 'ایمیل',
     fieldPartnershipType: 'نوع همکاری',
     partnershipValue: (tier) => `آژانس همکار ${tier}`,
-    uploadHeading: 'آپلود مدرک جدید',
+    accountActive: (year) => `● حساب فعال · عضو از ${year}`,
+    documentsTitle: 'مدارک آژانس',
+    documentsEmpty: 'مدرکی آپلود نشده است.',
+    uploadDocLabel: 'بارگذاری مدرک جدید',
     noFileSelected: 'فایلی انتخاب نشده است.',
     uploadErrorFallback: 'خطا در آپلود مدرک.',
-    uploadBtn: 'آپلود',
     uploadingBtn: 'در حال آپلود…',
-    documentsHeading: 'مدارک ارسالی',
-    documentsEmpty: 'مدرکی آپلود نشده است.',
   },
   en: {
     heading: 'Profile & Documents',
     subtitle: "Your agency's registered information and submitted documents",
     errorFallback: 'Error loading the profile.',
     loading: 'Loading…',
-    agencyInfoHeading: 'Agency Information',
     fieldManager: 'CEO',
     fieldLicenseNo: 'License Number',
     fieldCity: 'City',
@@ -92,20 +113,19 @@ const STR: Record<StoredLocale, {
     fieldEmail: 'Email',
     fieldPartnershipType: 'Partnership Type',
     partnershipValue: (tier) => `${tier} Partner Agency`,
-    uploadHeading: 'Upload New Document',
+    accountActive: (year) => `● Active account · Member since ${year}`,
+    documentsTitle: 'Agency documents',
+    documentsEmpty: 'No documents uploaded yet.',
+    uploadDocLabel: 'Upload new document',
     noFileSelected: 'No file selected.',
     uploadErrorFallback: 'Error uploading the document.',
-    uploadBtn: 'Upload',
     uploadingBtn: 'Uploading…',
-    documentsHeading: 'Submitted Documents',
-    documentsEmpty: 'No documents uploaded yet.',
   },
   ar: {
     heading: 'الملف الشخصي والمستندات',
     subtitle: 'معلومات وكالتك المسجّلة والمستندات المُرسلة',
     errorFallback: 'خطأ في تحميل الملف الشخصي.',
     loading: 'جارٍ التحميل…',
-    agencyInfoHeading: 'معلومات الوكالة',
     fieldManager: 'المدير العام',
     fieldLicenseNo: 'رقم الترخيص',
     fieldCity: 'المدينة',
@@ -113,18 +133,35 @@ const STR: Record<StoredLocale, {
     fieldEmail: 'البريد الإلكتروني',
     fieldPartnershipType: 'نوع الشراكة',
     partnershipValue: (tier) => `وكالة شريكة ${tier}`,
-    uploadHeading: 'رفع مستند جديد',
+    accountActive: (year) => `● حساب نشط · عضو منذ ${year}`,
+    documentsTitle: 'مستندات الوكالة',
+    documentsEmpty: 'لم يتم رفع أي مستند بعد.',
+    uploadDocLabel: 'رفع مستند جديد',
     noFileSelected: 'لم يتم اختيار ملف.',
     uploadErrorFallback: 'خطأ في رفع المستند.',
-    uploadBtn: 'رفع',
     uploadingBtn: 'جارٍ الرفع…',
-    documentsHeading: 'المستندات المُرسلة',
-    documentsEmpty: 'لم يتم رفع أي مستند بعد.',
   },
 };
 
+function agencyInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return name.slice(0, 2).toUpperCase() || 'PA';
+}
+
+function memberYear(joinedAt: string, locale: StoredLocale): string {
+  if (locale === 'en') return String(new Date(joinedAt).getFullYear());
+  const { jy } = toJalali(joinedAt);
+  return faDigits(jy);
+}
+
+function formatFileMeta(fileName: string, createdAt: string): string {
+  return `${fileName} · ${formatJalaliDate(createdAt)}`;
+}
+
 export default function AgencyProfilePage() {
   const { locale } = useLocale();
+  const isMobile = useIsMobile();
   const t = STR[locale];
   const [profile, setProfile] = useState<AgencyProfile | null>(null);
   const [documents, setDocuments] = useState<AgencyDocument[]>([]);
@@ -146,12 +183,7 @@ export default function AgencyProfilePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(reload, []);
 
-  async function onUpload() {
-    const file = fileInputRef.current?.files?.[0];
-    if (!file) {
-      setUploadError(t.noFileSelected);
-      return;
-    }
+  async function onUpload(file: File) {
     setUploadError(null);
     setUploading(true);
     try {
@@ -165,8 +197,17 @@ export default function AgencyProfilePage() {
     }
   }
 
-  if (error) return <p className="p-8 text-sm text-danger">{error}</p>;
-  if (!profile) return <p className="p-8 text-sm text-muted">{t.loading}</p>;
+  function onFileChange() {
+    const file = fileInputRef.current?.files?.[0];
+    if (!file) {
+      setUploadError(t.noFileSelected);
+      return;
+    }
+    void onUpload(file);
+  }
+
+  if (error) return <p style={{ fontSize: 13, color: '#e5484d' }}>{error}</p>;
+  if (!profile) return <p style={{ fontSize: 13, color: '#8a96a6' }}>{t.loading}</p>;
 
   const fields: [string, string][] = [
     [t.fieldManager, profile.managerName],
@@ -188,66 +229,135 @@ export default function AgencyProfilePage() {
               <dd className="ltr mt-1 text-sm font-bold text-ink">{value}</dd>
             </div>
           ))}
-        </dl>
-      </div>
-
-      <div className="mb-6 rounded-xl border border-border bg-white p-5">
-        <div className="mb-4 text-sm font-bold text-ink">{t.uploadHeading}</div>
-        <div className="flex flex-wrap items-center gap-3">
-          <select
-            value={docType}
-            onChange={(e) => setDocType(e.target.value as AgencyDocumentType)}
-            className="rounded-lg border border-border bg-white px-3 py-2 text-xs"
-          >
-            {(Object.keys(DOC_TYPE_LABEL) as AgencyDocumentType[]).map((dt) => (
-              <option key={dt} value={dt}>
-                {DOC_TYPE_LABEL[dt][locale]}
-              </option>
-            ))}
-          </select>
-          <input ref={fileInputRef} type="file" accept=".pdf,.png,.jpg,.jpeg" className="text-xs" />
-          <button
-            disabled={uploading}
-            onClick={() => void onUpload()}
-            className="rounded-lg bg-accent px-4 py-2 text-xs font-bold text-white transition hover:brightness-110 disabled:opacity-60"
-          >
-            {uploading ? t.uploadingBtn : t.uploadBtn}
-          </button>
         </div>
-        {uploadError && (
-          <p role="alert" className="mt-3 text-xs text-danger">
-            {uploadError}
-          </p>
-        )}
-      </div>
 
-      <div className="rounded-xl border border-border bg-white p-5">
-        <div className="mb-4 text-sm font-bold text-ink">{t.documentsHeading}</div>
-        {documents.length === 0 ? (
-          <p className="py-4 text-center text-xs text-muted">{t.documentsEmpty}</p>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {documents.map((d) => {
-              const st = DOC_STATUS_LABEL[d.status];
-              return (
-                <div
-                  key={d.id}
-                  className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2 text-xs"
-                >
-                  <div>
-                    <div className="font-bold">{DOC_TYPE_LABEL[d.docType][locale]}</div>
-                    <div className="text-[10px] text-muted">
-                      {d.file.fileName} — {formatJalaliDate(d.createdAt)}
+        <div style={{ background: '#fff', border: '1px solid #eef2f7', borderRadius: 14, padding: 16 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 800, color: '#0d2640', margin: '0 0 16px' }}>{t.documentsTitle}</h3>
+          {documents.length === 0 ? (
+            <p style={{ padding: '12px 0', textAlign: 'center', fontSize: 11.5, color: '#8a96a6', margin: 0 }}>
+              {t.documentsEmpty}
+            </p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+              {documents.map((d) => {
+                const st = DOC_STATUS_STYLE[d.status];
+                return (
+                  <div
+                    key={d.id}
+                    data-testid="agency-doc-row"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '11px 12px',
+                      background: '#f8fafc',
+                      border: '1px solid #eef2f7',
+                      borderRadius: 12,
+                      gap: 10,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
+                      <div
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 9,
+                          background: '#fff',
+                          border: '1px solid #e6ecf3',
+                          color: '#1668c4',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flex: 'none',
+                        }}
+                      >
+                        {DOC_ICON}
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: '#16202e' }}>
+                          {DOC_TYPE_LABEL[d.docType][locale]}
+                        </div>
+                        <div style={{ fontSize: 10.5, color: '#8a96a6', marginTop: 2 }}>
+                          {formatFileMeta(d.file.fileName, d.createdAt)}
+                        </div>
+                      </div>
                     </div>
+                    <span
+                      style={{
+                        fontSize: 10.5,
+                        fontWeight: 700,
+                        color: st.color,
+                        background: st.bg,
+                        padding: '3px 8px',
+                        borderRadius: 7,
+                        flex: 'none',
+                      }}
+                    >
+                      {st.label[locale]}
+                    </span>
                   </div>
-                  <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${st.className}`}>
-                    {st.label[locale]}
-                  </span>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
+          )}
+
+          <div style={{ marginTop: 14 }}>
+            <select
+              value={docType}
+              onChange={(e) => setDocType(e.target.value as AgencyDocumentType)}
+              style={{
+                width: '100%',
+                height: 40,
+                marginBottom: 10,
+                background: '#f6f8fb',
+                border: '1px solid #e3e9f1',
+                borderRadius: 11,
+                padding: '0 11px',
+                fontFamily: 'inherit',
+                fontSize: 12,
+                color: '#16202e',
+              }}
+            >
+              {(Object.keys(DOC_TYPE_LABEL) as AgencyDocumentType[]).map((dt) => (
+                <option key={dt} value={dt}>
+                  {DOC_TYPE_LABEL[dt][locale]}
+                </option>
+              ))}
+            </select>
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 7,
+                height: 46,
+                border: '1.5px dashed #c3d2e3',
+                borderRadius: 12,
+                color: '#1668c4',
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: uploading ? 'wait' : 'pointer',
+                opacity: uploading ? 0.7 : 1,
+              }}
+            >
+              {UPLOAD_ICON}
+              {uploading ? t.uploadingBtn : t.uploadDocLabel}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.png,.jpg,.jpeg"
+                onChange={onFileChange}
+                disabled={uploading}
+                style={{ display: 'none' }}
+              />
+            </label>
+            {uploadError && (
+              <p role="alert" style={{ fontSize: 11, color: '#e5484d', margin: '8px 0 0' }}>
+                {uploadError}
+              </p>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

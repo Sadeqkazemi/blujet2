@@ -68,7 +68,7 @@ describe('FlightStatusPage', () => {
 
     expect(await screen.findByTestId('fs-result')).toBeInTheDocument();
     expect(screen.getByTestId('fs-status-pill')).toHaveTextContent('برنامه‌ریزی‌شده');
-    expect(screen.getByText('تهران')).toBeInTheDocument();
+    expect(screen.getByText('تهران — مهرآباد')).toBeInTheDocument();
     expect(screen.getByText('مشهد')).toBeInTheDocument();
     expect(screen.getByText('Airbus A320')).toBeInTheDocument();
     expect(lookup).toHaveBeenCalledWith(
@@ -117,15 +117,13 @@ describe('FlightStatusPage', () => {
     );
   });
 
-  it('disables the delay-SMS toggle as not-yet-built', async () => {
-    vi.spyOn(flightStatusApi, 'lookupFlightStatus').mockResolvedValue(RESULT);
+  it('shows helpful link cards below the search form', async () => {
     renderPage();
 
-    await userEvent.type(screen.getByTestId('fs-flightno'), 'BJ-410');
-    await userEvent.click(screen.getByTestId('fs-search'));
-    await screen.findByTestId('fs-result');
-
-    expect(screen.getByTestId('fs-sms-toggle')).toBeDisabled();
+    const help = screen.getByTestId('fs-help-links');
+    expect(help).toBeInTheDocument();
+    expect(help).toHaveTextContent('مدیریت رزرو');
+    expect(help).toHaveTextContent('پشتیبانی ۲۴ ساعته');
   });
 
   it('renders translated heading, labels, and a translated status pill in English', async () => {

@@ -49,6 +49,8 @@ const COPY = {
     tracking: 'پیگیری درخواست‌های استرداد',
     trackingSub: 'وضعیت لحظه‌ای درخواست‌های شما در هر مرحله',
     noneRequests: 'هنوز درخواست استردادی ثبت نکرده‌اید.',
+    noneRequestsTitle: 'درخواستی ثبت نشده است!',
+    noneRequestsSub: 'هنوز درخواست استردادی ثبت نکرده‌اید.',
     trackingCode: 'کد پیگیری',
     ticket: 'بلیط',
     amount: 'مبلغ قابل بازگشت',
@@ -86,6 +88,8 @@ const COPY = {
     tracking: 'Track Refund Requests',
     trackingSub: 'Live status of your requests at every stage',
     noneRequests: 'You have not submitted a refund request yet.',
+    noneRequestsTitle: 'No requests submitted!',
+    noneRequestsSub: "You haven't submitted a refund request yet.",
     trackingCode: 'Tracking code',
     ticket: 'Ticket',
     amount: 'Refund amount',
@@ -123,6 +127,8 @@ const COPY = {
     tracking: 'تتبع طلبات الاسترداد',
     trackingSub: 'الحالة المباشرة للطلب في كل مرحلة',
     noneRequests: 'لم تقدم طلب استرداد بعد.',
+    noneRequestsTitle: 'لم يتم تقديم أي طلب!',
+    noneRequestsSub: 'لم تقدّم بعد طلب استرداد.',
     trackingCode: 'رمز التتبع',
     ticket: 'التذكرة',
     amount: 'مبلغ الاسترداد',
@@ -337,7 +343,17 @@ export default function AccountRefundsTab() {
             <h3 className="m-0 text-[15px] font-extrabold text-ink">{t.tracking}</h3>
             <p className="mb-4 mt-1 text-xs text-muted">{t.trackingSub}</p>
             {requests.length === 0 ? (
-              <p className="py-8 text-center text-xs text-muted">{t.noneRequests}</p>
+              <div style={{ textAlign: 'center', padding: '40px 20px 24px' }}>
+                <div style={{ width: 72, height: 72, margin: '0 auto 18px', borderRadius: 20, background: '#fef6e6', color: '#e0a53a', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                  <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 14 4 9l5-5" />
+                    <path d="M4 9h10a6 6 0 0 1 6 6v1" />
+                  </svg>
+                  <span style={{ position: 'absolute', top: -6, left: -6, width: 24, height: 24, borderRadius: 7, background: '#f0a83c', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 900, border: '3px solid #fff' }}>!</span>
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 800, color: '#16202e' }}>{t.noneRequestsTitle as string}</div>
+                <div style={{ fontSize: 11.5, color: '#9aa4b2', marginTop: 7 }}>{t.noneRequestsSub as string}</div>
+              </div>
             ) : (
               <div className="flex flex-col gap-3">
                 {requests.map((row) => (

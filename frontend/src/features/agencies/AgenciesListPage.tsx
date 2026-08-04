@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
@@ -15,7 +16,9 @@ import type { AgencyListResult, AgencyListRow, AgencyMembershipRequest } from '.
 
 type SubTab = 'list' | 'credit';
 
-function KpiCard({ label, value, valueClass }: { label: string; value: string; valueClass: string }) {
+function CreditBar({ usedIrr, limitIrr }: { usedIrr: number; limitIrr: number }) {
+  const pct = limitIrr > 0 ? Math.min((usedIrr / limitIrr) * 100, 100) : usedIrr > 0 ? 100 : 0;
+  const color = pct >= 90 ? STAFF_PANEL.danger : pct >= 60 ? STAFF_PANEL.warning : STAFF_PANEL.success;
   return (
     <div className="rounded-xl border border-panel-border bg-panel-surface p-4">
       <div className="text-[11px] text-panel-muted">{label}</div>
@@ -238,6 +241,7 @@ export default function AgenciesListPage() {
               {faDigits(debtors.length)} آژانس
             </span>
             <button
+              type="button"
               onClick={() => void onNotifyAll()}
               className="mr-auto flex items-center gap-1.5 rounded-[9px] bg-[#3b82f6] px-[11px] py-[7px] text-[11.5px] font-bold text-white transition hover:brightness-110"
             >
@@ -294,7 +298,7 @@ export default function AgenciesListPage() {
       )}
 
       {!isCommercial && (
-        <div className="mb-4 flex gap-1.5">
+        <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
           {(
             [
               { key: 'list', label: 'آژانس‌های همکار' },
@@ -316,7 +320,7 @@ export default function AgenciesListPage() {
 
       {isCommercial && <h2 className="mb-3 text-sm font-bold text-panel-ink">آژانس‌های همکار</h2>}
 
-      <div className="mb-4">
+      <div style={{ marginBottom: 16 }}>
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -358,6 +362,7 @@ export default function AgenciesListPage() {
                   {settled ? 'تسویه شد' : 'در انتظار پرداخت'}
                 </span>
                 <button
+                  type="button"
                   disabled={settled || settlingId === a.id}
                   onClick={() => void onSettle(a)}
                   className={`rounded-lg px-3 py-2 text-xs font-bold transition ${
@@ -376,9 +381,11 @@ export default function AgenciesListPage() {
         <ul className="space-y-3">
           {agenciesPager.pageItems.map((a) => {
             const badge = statusBadge(a.isActive);
+            const badgeColor = a.isActive ? STAFF_PANEL.success : STAFF_PANEL.textMuted;
             return (
               <li key={a.id}>
                 <button
+                  type="button"
                   onClick={() => navigate(`/panel/agencies/${a.id}`)}
                   className="flex w-full flex-wrap items-center gap-4 rounded-xl border border-panel-border bg-panel-surface p-4 text-right transition hover:border-accent/40"
                 >
@@ -395,7 +402,7 @@ export default function AgenciesListPage() {
                   <div className="w-44">
                     <div className="mb-1 flex items-center justify-between text-[10px] text-panel-muted">
                       <span>اعتبار (مانده / سقف)</span>
-                      <span className="font-num">
+                      <span>
                         {faMoney(Math.max(Number(a.remainingIrr), 0))} / {faMoney(a.limitIrr)}
                       </span>
                     </div>
@@ -407,7 +414,18 @@ export default function AgenciesListPage() {
                       {faMoney(Math.max(Number(a.usedIrr), 0))} تومان
                     </div>
                   </div>
-                  <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${badge.className}`}>{badge.label}</span>
+                  <span
+                    style={{
+                      borderRadius: 20,
+                      padding: '4px 12px',
+                      fontSize: 10,
+                      fontWeight: 800,
+                      background: a.isActive ? 'rgba(52,211,153,0.15)' : STAFF_PANEL.inputBg,
+                      color: badgeColor,
+                    }}
+                  >
+                    {badge.label}
+                  </span>
                 </button>
               </li>
             );

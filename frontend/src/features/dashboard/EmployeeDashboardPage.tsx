@@ -22,6 +22,7 @@ function KpiIcon({ children, bg, color }: { children: ReactNode; bg: string; col
  * پنل کارمند dashboard — KPI cards + permission chips (screenshot).
  */
 export default function EmployeeDashboardPage() {
+  const isMobile = useIsMobile();
   const { nav } = useOutletContext<PanelShellContext>();
   const grantedSections = (nav ?? []).filter(
     (item) => item.key !== 'dashboard' && item.key !== 'referrals',
@@ -132,7 +133,7 @@ export default function EmployeeDashboardPage() {
           <p className="mt-1 text-[11px] text-[#6b7b94]">
             این دسترسی‌ها توسط مدیر IT مطابق واحد سازمانی شما تعیین شده است.
           </p>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {context.permissionLabelsFa.map((label) => (
               <span
                 key={label}
@@ -143,7 +144,7 @@ export default function EmployeeDashboardPage() {
               </span>
             ))}
           </div>
-        </section>
+        </StaffPanelCard>
       )}
 
       {nav === null && <p className="text-xs text-[#6b7b94]">در حال بارگذاری…</p>}

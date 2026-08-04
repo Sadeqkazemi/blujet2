@@ -1,12 +1,31 @@
 import { useState } from 'react';
 import { createAirport } from '../../api/flights';
 import { faDigits, latinDigits } from '../../lib/fa-format';
+import { StaffAlert, StaffPanelCard, StaffPrimaryButton } from '../../components/staff-panel-ui';
+import { STAFF_PANEL } from '../../lib/staff-panel-theme';
+import { staffInput, staffTableHeader, staffTableRow } from '../../lib/staff-panel-styles';
 import type { AirportEntry } from '../../types/flights';
 
 interface FlightCitiesTabProps {
   airports: AirportEntry[];
   onCreated: (airport: AirportEntry) => void;
 }
+
+const labelStyle = {
+  display: 'block' as const,
+  marginBottom: 4,
+  fontSize: 11,
+  fontWeight: 800,
+  color: STAFF_PANEL.textMuted,
+};
+
+const inputStyle = {
+  ...staffInput,
+  height: 40,
+  width: '100%',
+  padding: '0 12px',
+  fontSize: 12,
+};
 
 export default function FlightCitiesTab({ airports, onCreated }: FlightCitiesTabProps) {
   const [cityFa, setCityFa] = useState('');
@@ -39,12 +58,14 @@ export default function FlightCitiesTab({ airports, onCreated }: FlightCitiesTab
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <section className="rounded-xl border border-border bg-white p-5">
-        <h2 className="mb-4 text-sm font-bold text-ink">افزودن شهر جدید</h2>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_auto]">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {error && <StaffAlert tone="error">{error}</StaffAlert>}
+      {notice && <StaffAlert tone="success">{notice}</StaffAlert>}
+
+      <StaffPanelCard title="افزودن شهر جدید">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 12, alignItems: 'end' }}>
           <div>
-            <label htmlFor="city-name" className="mb-1 block text-[11px] font-bold text-muted">
+            <label htmlFor="city-name" style={labelStyle}>
               نام شهر *
             </label>
             <input
@@ -52,11 +73,11 @@ export default function FlightCitiesTab({ airports, onCreated }: FlightCitiesTab
               value={cityFa}
               onChange={(e) => setCityFa(e.target.value)}
               placeholder="مثلاً وان"
-              className="h-10 w-full rounded-lg border border-border px-3 text-xs outline-none"
+              style={inputStyle}
             />
           </div>
           <div>
-            <label htmlFor="city-code" className="mb-1 block text-[11px] font-bold text-muted">
+            <label htmlFor="city-code" style={labelStyle}>
               کد فرودگاه *
             </label>
             <input
@@ -66,34 +87,35 @@ export default function FlightCitiesTab({ airports, onCreated }: FlightCitiesTab
               onChange={(e) => setCode(e.target.value.toUpperCase())}
               placeholder="VAS"
               maxLength={3}
-              className="font-num h-10 w-full rounded-lg border border-border px-3 text-xs outline-none"
+              className="font-num"
+              style={inputStyle}
             />
           </div>
-          <div className="flex items-end">
-            <button
-              disabled={busy}
-              onClick={() => void onSubmit()}
-              className="h-10 rounded-lg bg-accent px-5 text-xs font-bold text-white disabled:opacity-50"
-            >
-              {busy ? 'در حال ثبت…' : 'افزودن شهر'}
-            </button>
-          </div>
+          <StaffPrimaryButton disabled={busy} onClick={() => void onSubmit()} style={{ height: 40 }}>
+            {busy ? 'در حال ثبت…' : 'افزودن شهر'}
+          </StaffPrimaryButton>
         </div>
-        {error && <p className="mt-2 text-[11px] text-danger">{error}</p>}
-        {notice && <p className="mt-2 text-[11px] font-bold text-[#059669]">{notice}</p>}
-        <p className="mt-3 text-[11px] text-muted">
+        <p style={{ marginTop: 12, fontSize: 11, color: STAFF_PANEL.textMuted }}>
           این شهرها همان لیستی هستند که در باکس جستجوی بلیط در صفحهٔ اصلی سایت هم نمایش داده می‌شوند.
         </p>
-      </section>
+      </StaffPanelCard>
 
-      <section className="rounded-xl border border-border bg-white">
-        <div className="flex items-center justify-between border-b border-border px-5 py-3">
-          <h2 className="text-sm font-bold text-ink">شهرهای دارای پرواز</h2>
-          <span className="text-[11px] text-muted">{faDigits(airports.length)} شهر</span>
-        </div>
-        <div className="overflow-x-auto">
-          <div className="min-w-[480px]">
-            <div className="grid grid-cols-[1.2fr_0.7fr_1.6fr] gap-3 border-b border-border px-5 py-2 text-[10px] font-bold text-muted">
+      <StaffPanelCard
+        title="شهرهای دارای پرواز"
+        padding={0}
+        headerAction={
+          <span style={{ fontSize: 11, color: STAFF_PANEL.textMuted }}>{faDigits(airports.length)} شهر</span>
+        }
+      >
+        <div style={{ overflowX: 'auto' }}>
+          <div style={{ minWidth: 480 }}>
+            <div
+              style={{
+                ...staffTableHeader,
+                gridTemplateColumns: '1.2fr 0.7fr 1.6fr',
+                fontSize: 10,
+              }}
+            >
               <span>شهر</span>
               <span>کد</span>
               <span>فرودگاه</span>
@@ -101,19 +123,25 @@ export default function FlightCitiesTab({ airports, onCreated }: FlightCitiesTab
             {airports.map((a) => (
               <div
                 key={a.id}
-                className="grid grid-cols-[1.2fr_0.7fr_1.6fr] gap-3 border-b border-border px-5 py-3 text-xs"
+                style={{
+                  ...staffTableRow,
+                  gridTemplateColumns: '1.2fr 0.7fr 1.6fr',
+                  cursor: 'default',
+                }}
               >
-                <span className="font-bold text-ink">{a.cityFa}</span>
-                <span className="ltr font-num text-muted">{a.code}</span>
-                <span className="text-muted">فرودگاه {a.cityFa}</span>
+                <span style={{ fontWeight: 800, color: STAFF_PANEL.text }}>{a.cityFa}</span>
+                <span className="ltr font-num" style={{ color: STAFF_PANEL.textMuted }}>{a.code}</span>
+                <span style={{ color: STAFF_PANEL.textMuted }}>فرودگاه {a.cityFa}</span>
               </div>
             ))}
             {airports.length === 0 && (
-              <p className="py-6 text-center text-xs text-muted">شهری ثبت نشده است.</p>
+              <p style={{ padding: '24px 0', textAlign: 'center', fontSize: 11, color: STAFF_PANEL.textMuted }}>
+                شهری ثبت نشده است.
+              </p>
             )}
           </div>
         </div>
-      </section>
+      </StaffPanelCard>
     </div>
   );
 }

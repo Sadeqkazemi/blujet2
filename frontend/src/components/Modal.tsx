@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
+import { STAFF_PANEL } from '../lib/staff-panel-theme';
 
 interface ModalProps {
   title: string;

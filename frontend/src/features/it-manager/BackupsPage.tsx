@@ -2,6 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createBackup, fetchBackupSchedule, fetchBackups } from '../../api/it-manager';
 import { faDigits } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
+import {
+  StaffAlert,
+  StaffPanelCard,
+  StaffPanelPageHeader,
+  StaffPrimaryButton,
+} from '../../components/staff-panel-ui';
+import { STAFF_PANEL } from '../../lib/staff-panel-theme';
+import { staffStatusStyle } from '../../lib/staff-panel-styles';
 import type { BackupRecord, BackupSchedule } from '../../types/it-manager';
 
 const STATUS: Record<BackupRecord['status'], { label: string; className: string; iconColor: string }> = {
@@ -139,7 +147,7 @@ export default function BackupsPage() {
               })}
             </ul>
           )}
-        </section>
+        </StaffPanelCard>
 
         {schedule && (
           <section className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[15px]">

@@ -36,7 +36,7 @@ describe('AgencySeatsPage', () => {
 
     expect(await screen.findByTestId('alloc-card')).toBeInTheDocument();
     expect(screen.getByText('تخصیص‌یافته')).toBeInTheDocument();
-    expect(screen.getByText('فعال')).toBeInTheDocument();
+    expect(screen.getByText('مجوز پرواز')).toBeInTheDocument();
     expect(screen.getByText('۸')).toBeInTheDocument();
   });
 
@@ -53,7 +53,7 @@ describe('AgencySeatsPage', () => {
     render(<AgencySeatsPage />);
 
     expect(await screen.findByText('Allocated')).toBeInTheDocument();
-    expect(screen.getByText('Active')).toBeInTheDocument();
+    expect(screen.getByText('Flight license')).toBeInTheDocument();
     expect(screen.getByText(/available for you to sell/)).toBeInTheDocument();
   });
 
@@ -63,6 +63,6 @@ describe('AgencySeatsPage', () => {
     render(<AgencySeatsPage />);
 
     expect(await screen.findByText('مخصَّص')).toBeInTheDocument();
-    expect(screen.getByText('نشط')).toBeInTheDocument();
+    expect(screen.getByText('ترخيص الرحلة')).toBeInTheDocument();
   });
 });

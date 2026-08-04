@@ -40,16 +40,16 @@ import type {
 } from '../../types/reporting';
 import type { ReconciliationItem } from '../../types/reconciliation';
 
-const SETTLEMENT_STATUS: Record<SettlementStatus, { label: string; className: string }> = {
-  SETTLED: { label: 'تسویه شد', className: 'bg-[#10b98124] text-[#059669]' },
-  PENDING: { label: 'در انتظار پرداخت', className: 'bg-[#f59e0b24] text-[#b45309]' },
-  OVERDUE: { label: 'معوق', className: 'bg-danger/15 text-danger' },
+const SETTLEMENT_STATUS: Record<SettlementStatus, { label: string; tone: 'success' | 'warning' | 'danger' }> = {
+  SETTLED: { label: 'تسویه شد', tone: 'success' },
+  PENDING: { label: 'در انتظار پرداخت', tone: 'warning' },
+  OVERDUE: { label: 'معوق', tone: 'danger' },
 };
 
 const MIX_COLORS_LIGHT: Record<string, string> = {
   SYSTEM: '#1668c4',
   CHARTER: '#a855f7',
-  AGENCY: '#059669',
+  AGENCY: '#34d399',
 };
 
 const MIX_COLORS_DARK: Record<string, string> = {
@@ -75,8 +75,15 @@ function RevenueMixCard({ mix, theme = 'light' }: { mix: RevenueMixResult; theme
       <div className={`mb-4 text-[11px] ${dark ? 'text-[#6b7b94]' : 'text-muted'}`}>بر اساس کانال فروش</div>
       <div className="mb-4 flex items-center justify-center">
         <div
-          className="flex h-36 w-36 items-center justify-center rounded-full"
-          style={{ background: gradient }}
+          style={{
+            display: 'flex',
+            width: 144,
+            height: 144,
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '50%',
+            background: gradient,
+          }}
           role="img"
           aria-label="نمودار ترکیب درآمد"
         >
@@ -94,7 +101,7 @@ function RevenueMixCard({ mix, theme = 'light' }: { mix: RevenueMixResult; theme
           </div>
         </div>
       </div>
-      <div className="flex flex-col gap-2.5">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {mix.channels.map((c) => (
           <div
             key={c.channel}
@@ -168,65 +175,6 @@ function CompletedFlightsCard({
   );
 }
 
-const TX_STATUS_CLASS: Record<string, string> = {
-  success: 'bg-[#10b98124] text-[#059669]',
-  warning: 'bg-[#f59e0b24] text-[#b45309]',
-  danger: 'bg-danger/15 text-danger',
-};
-
-const TX_ICON_CLASS: Record<string, string> = {
-  SALE: 'bg-accent/10 text-accent',
-  SETTLEMENT: 'bg-[#10b98118] text-[#059669]',
-  COMMISSION: 'bg-[#f59e0b18] text-[#b45309]',
-  REFUND: 'bg-danger/10 text-danger',
-};
-
-function trendBadge(pct: number): string {
-  if (pct === 0) return '۰٪';
-  return `${pct > 0 ? '+' : '−'}${faDigits(Math.abs(pct))}٪`;
-}
-
-function FinanceKpiCard({
-  label,
-  value,
-  sublabel,
-  trendPct,
-  countBadge,
-  iconClass,
-}: {
-  label: string;
-  value: string;
-  sublabel?: string;
-  trendPct?: number;
-  countBadge?: string;
-  iconClass: string;
-}) {
-  return (
-    <div className="rounded-xl border border-border bg-white p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${iconClass}`}>●</span>
-        {countBadge ? (
-          <span className="rounded-full bg-danger/10 px-2 py-0.5 text-[10px] font-bold text-danger">{countBadge}</span>
-        ) : trendPct !== undefined ? (
-          <span className="rounded-full bg-[#10b98118] px-2 py-0.5 text-[10px] font-bold text-[#059669]">
-            {trendBadge(trendPct)}
-          </span>
-        ) : null}
-      </div>
-      <div className="font-num text-lg font-black text-ink">{value}</div>
-      <div className="mt-1 text-[11px] text-muted">
-        {label}
-        {sublabel ? ` · ${sublabel}` : ''}
-      </div>
-    </div>
-  );
-}
-
-/** صف مغایرت‌های پرداخت — no design mock exists for this (it's a Phase 13
- * backend-only addition: a real "payment succeeded, ticket not issued"
- * queue), so this is a new, functionally-styled card rather than a
- * redesign of an existing one — same approach as other un-mocked
- * backend-only controls added later in this project. */
 function ReconciliationQueueCard({
   items,
   onResolve,
@@ -284,47 +232,63 @@ function ReconciliationQueueCard({
                 <div className="text-[9px] text-muted">کد رزرو</div>
                 <div className="font-num font-extrabold text-ink">{item.pnr}</div>
               </div>
-              <div className="min-w-[110px] text-xs">
-                <div className="text-[9px] text-muted">شناسه درگاه</div>
-                <div className="font-num font-bold">{item.gatewayRefId}</div>
+              <div style={{ minWidth: 110, fontSize: 11 }}>
+                <div style={{ fontSize: 9, color: STAFF_PANEL.textMuted }}>شناسه درگاه</div>
+                <div style={{ fontWeight: 800 }}>{item.gatewayRefId}</div>
               </div>
-              <div className="min-w-[110px] text-xs">
-                <div className="text-[9px] text-muted">مبلغ</div>
-                <div className="font-num font-bold">{faMoney(item.amountIrr)} تومان</div>
+              <div style={{ minWidth: 110, fontSize: 11 }}>
+                <div style={{ fontSize: 9, color: STAFF_PANEL.textMuted }}>مبلغ</div>
+                <div style={{ fontWeight: 800 }}>{faMoney(item.amountIrr)} تومان</div>
               </div>
-              <div className="min-w-[110px] text-xs">
-                <div className="text-[9px] text-muted">تاریخ</div>
+              <div style={{ minWidth: 110, fontSize: 11 }}>
+                <div style={{ fontSize: 9, color: STAFF_PANEL.textMuted }}>تاریخ</div>
                 <div>{formatJalaliDateTime(item.createdAt)}</div>
               </div>
               <button
+                type="button"
                 onClick={() => {
                   setOpenId(openId === item.id ? null : item.id);
                   setError(null);
                   setNote('');
                 }}
-                className="mr-auto rounded-lg border border-accent/30 bg-accent/10 px-3 py-1.5 text-[11px] font-extrabold text-accent transition hover:bg-accent/20"
+                style={{
+                  marginRight: 'auto',
+                  borderRadius: 10,
+                  border: `1px solid ${STAFF_PANEL.accent}`,
+                  background: STAFF_PANEL.accentSoft,
+                  padding: '6px 12px',
+                  fontSize: 11,
+                  fontWeight: 800,
+                  color: STAFF_PANEL.accent,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
               >
                 رفع مغایرت
               </button>
             </div>
             {openId === item.id && (
-              <div className="mt-3 flex flex-col gap-2 border-t border-border/60 pt-3">
-                {error && <p role="alert" className="text-[11px] text-danger">{error}</p>}
+              <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${STAFF_PANEL.sidebarBorder}` }}>
+                {error && (
+                  <p role="alert" style={{ fontSize: 11, color: STAFF_PANEL.danger }}>
+                    {error}
+                  </p>
+                )}
                 <textarea
                   data-testid="reconciliation-note"
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   placeholder="توضیح رفع مغایرت (مثلاً: بلیط دستی صادر و مغایرت رفع شد.)"
-                  className="w-full rounded-lg border border-border p-2 text-xs"
+                  style={{ ...staffInput, width: '100%', padding: 8, fontSize: 11, boxSizing: 'border-box' }}
                   rows={2}
                 />
-                <button
-                  disabled={busy}
+                <StaffPrimaryButton
                   onClick={() => void submit(item.id)}
-                  className="self-start rounded-lg bg-accent px-4 py-1.5 text-[11px] font-extrabold text-white disabled:opacity-50"
+                  disabled={busy}
+                  style={{ marginTop: 8 }}
                 >
                   {busy ? 'در حال ثبت…' : 'ثبت رفع مغایرت'}
-                </button>
+                </StaffPrimaryButton>
               </div>
             )}
           </div>
@@ -340,8 +304,6 @@ function ReconciliationQueueCard({
   );
 }
 
-/** FINANCE_MANAGER's finance-ops layout — the only panel with transactions
- * and agency settlements, per the design. */
 function FinanceOpsView() {
   const { lowSalesAlerts = [] } = useOutletContext<PanelShellContext>();
   const bannerAlert = lowSalesAlerts[0] ?? null;
@@ -395,9 +357,9 @@ function FinanceOpsView() {
     }
   }
 
-  if (error) return <p className="p-8 text-sm text-danger">{error}</p>;
+  if (error) return <StaffAlert tone="error">{error}</StaffAlert>;
   if (!chart.isQueryReady || !kpis || !flights || !tx || !mix || !settlements || !reconciliation)
-    return <p className="p-8 text-sm text-muted">در حال بارگذاری…</p>;
+    return <p style={{ fontSize: 12, color: STAFF_PANEL.textMuted }}>در حال بارگذاری…</p>;
 
   const periodLabel =
     chart.granularity === 'year'
@@ -412,41 +374,12 @@ function FinanceOpsView() {
               ? 'روزانه'
               : '';
 
-  const kpiCards = [
-    {
-      label: `کل درآمد · ${periodLabel}`,
-      value: faMoney(kpis.revenueIrr),
-      trendPct: kpis.trends.revenuePct,
-      iconClass: 'bg-[#10b98118] text-[#059669]',
-    },
-    {
-      label: `سود خالص · حاشیه ${faPercent(kpis.marginPct)}`,
-      value: faMoney(kpis.profitIrr),
-      trendPct: kpis.trends.profitPct,
-      iconClass: 'bg-accent/10 text-accent',
-    },
-    {
-      label: 'هزینه عملیاتی',
-      value: faMoney(kpis.operatingCostIrr),
-      trendPct: kpis.trends.operatingCostPct,
-      iconClass: 'bg-[#f59e0b18] text-[#b45309]',
-    },
-    {
-      label: 'مطالبات معوق آژانس‌ها',
-      value: faMoney(kpis.agencyDebtIrr),
-      countBadge: faDigits(kpis.agencyDebtCount),
-      iconClass: 'bg-danger/10 text-danger',
-    },
-  ];
-
   return (
     <>
-      {notice && (
-        <p className="mb-4 rounded-lg bg-[#10b98118] p-3 text-xs font-bold text-[#059669]">{notice}</p>
-      )}
+      {notice && <StaffAlert tone="success">{notice}</StaffAlert>}
 
-      <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
-        <span className="text-[11px] text-muted">بازهٔ گزارش:</span>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end', gap: 8, marginBottom: 16 }}>
+        <span style={{ fontSize: 11, color: STAFF_PANEL.textMuted }}>بازهٔ گزارش:</span>
         <SalesChartControls
           modes={chart.modes}
           granularity={chart.granularity}
@@ -459,28 +392,36 @@ function FinanceOpsView() {
           onFlightNoChange={chart.setFlightNo}
           onApplyFlightNo={chart.applyFlightNo}
           variant="segmented"
+          dark
         />
       </div>
 
-      <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-        {kpiCards.map((k) => (
-          <FinanceKpiCard key={k.label} {...k} />
-        ))}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 24 }}>
+        <StaffKpiCard label={`کل درآمد · ${periodLabel}`} value={faMoney(kpis.revenueIrr)} trend={trendLabel(kpis.trends.revenuePct)} trendUp={kpis.trends.revenuePct >= 0} iconColor={STAFF_PANEL.success} />
+        <StaffKpiCard label={`سود خالص · حاشیه ${faPercent(kpis.marginPct)}`} value={faMoney(kpis.profitIrr)} trend={trendLabel(kpis.trends.profitPct)} trendUp={kpis.trends.profitPct >= 0} iconColor={STAFF_PANEL.accent} />
+        <StaffKpiCard label="هزینه عملیاتی" value={faMoney(kpis.operatingCostIrr)} trend={trendLabel(kpis.trends.operatingCostPct)} trendUp={kpis.trends.operatingCostPct <= 0} iconColor={STAFF_PANEL.warning} />
+        <StaffKpiCard label="مطالبات معوق آژانس‌ها" value={faMoney(kpis.agencyDebtIrr)} sublabel={`${faDigits(kpis.agencyDebtCount)} آژانس`} iconColor={STAFF_PANEL.danger} />
       </div>
 
       <LowSalesBanner alert={bannerAlert} variant="light" />
 
       <ReconciliationQueueCard items={reconciliation} onResolve={onResolveReconciliation} />
 
-      <div className="mb-6">
-        <CompletedFlightsCard flights={flights} />
-      </div>
+      <StaffPanelCard title="پروازهای انجام‌شده" style={{ marginBottom: 24 }} padding={0}>
+        <StaffFlightsSummaryGrid
+          flightCount={flights.flightCount}
+          totalSeats={flights.totalSeats}
+          soldSeats={flights.soldSeats}
+          unsoldSeats={flights.unsoldSeats}
+        />
+      </StaffPanelCard>
 
-      <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-[1.7fr_1fr]">
-        <div className="rounded-xl border border-border bg-white p-5">
-          <div className="mb-1 flex items-center justify-between">
-            <div className="text-sm font-bold text-ink">تراکنش‌های مالی اخیر</div>
-            <span className="rounded-lg bg-body px-3 py-1 text-[11px] font-bold text-muted">
+      <div style={{ display: 'grid', gridTemplateColumns: '1.7fr 1fr', gap: 12, marginBottom: 24 }}>
+        <StaffPanelCard
+          title="تراکنش‌های مالی اخیر"
+          subtitle="فروش، تسویه، کمیسیون و استرداد"
+          headerAction={
+            <span style={{ borderRadius: 10, background: STAFF_PANEL.inputBg, padding: '4px 10px', fontSize: 11, fontWeight: 800, color: STAFF_PANEL.textMuted }}>
               {faDigits(tx.totalCount)} تراکنش
             </span>
           </div>
@@ -491,28 +432,41 @@ function FinanceOpsView() {
                 <span
                   className={`flex h-9 w-9 flex-none items-center justify-center rounded-lg text-sm ${TX_ICON_CLASS[t.type] ?? 'bg-body text-muted'}`}
                 >
-                  {t.type === 'REFUND' ? '↩' : t.type === 'COMMISSION' ? '₪' : '✓'}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="font-extrabold text-ink">{t.titleFa}</div>
-                  <div className="mt-0.5 text-[10px] text-muted">
-                    {t.party} · {formatJalaliDateTime(t.occurredAt)}
+                  <span
+                    style={{
+                      display: 'flex',
+                      width: 36,
+                      height: 36,
+                      flexShrink: 0,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: 10,
+                      background: icon.bg,
+                      color: icon.color,
+                      fontSize: 14,
+                    }}
+                  >
+                    {t.type === 'REFUND' ? '↩' : t.type === 'COMMISSION' ? '₪' : '✓'}
+                  </span>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontWeight: 900, color: STAFF_PANEL.text }}>{t.titleFa}</div>
+                    <div style={{ marginTop: 2, fontSize: 10, color: STAFF_PANEL.textMuted }}>
+                      {t.party} · {formatJalaliDateTime(t.occurredAt)}
+                    </div>
                   </div>
+                  <span style={staffStatusStyle(TX_STATUS_TONE[t.statusTone] ?? 'warning')}>{t.statusFa}</span>
+                  <span
+                    style={{
+                      fontWeight: 900,
+                      whiteSpace: 'nowrap',
+                      color: Number(t.signedAmountIrr) >= 0 && t.type !== 'REFUND' ? STAFF_PANEL.success : STAFF_PANEL.danger,
+                    }}
+                  >
+                    {Number(t.signedAmountIrr) >= 0 ? '+' : '−'} {faMoney(Math.abs(Number(t.signedAmountIrr)))}
+                  </span>
                 </div>
-                <span
-                  className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${TX_STATUS_CLASS[t.statusTone]}`}
-                >
-                  {t.statusFa}
-                </span>
-                <span
-                  className={`font-num font-black whitespace-nowrap ${
-                    Number(t.signedAmountIrr) >= 0 && t.type !== 'REFUND' ? 'text-[#059669]' : 'text-danger'
-                  }`}
-                >
-                  {Number(t.signedAmountIrr) >= 0 ? '+' : '−'} {faMoney(Math.abs(Number(t.signedAmountIrr)))}
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
           <Pagination
             page={txPager.page}
@@ -524,10 +478,11 @@ function FinanceOpsView() {
         <RevenueMixCard mix={mix} />
       </div>
 
-      <div className="rounded-xl border border-border bg-white p-5">
-        <div className="mb-1 flex items-center justify-between gap-2">
-          <div className="text-sm font-bold text-ink">تسویه‌حساب آژانس‌های همکار</div>
-          <span className="rounded-full bg-danger/10 px-3 py-1 text-[11px] font-extrabold text-danger">
+      <StaffPanelCard
+        title="تسویه‌حساب آژانس‌های همکار"
+        subtitle="وضعیت پرداخت دوره‌ای و مطالبات معوق"
+        headerAction={
+          <span style={{ ...staffStatusStyle('danger'), padding: '4px 12px' }}>
             مجموع مطالبات: {faMoney(settlements.outstandingIrr)} تومان
           </span>
         </div>
@@ -535,51 +490,53 @@ function FinanceOpsView() {
         <div className="flex flex-col gap-3">
           {settlementsPager.pageItems.map((s) => {
             const st = SETTLEMENT_STATUS[s.status];
+            const barColor = s.status === 'SETTLED' ? STAFF_PANEL.success : s.status === 'OVERDUE' ? STAFF_PANEL.danger : STAFF_PANEL.warning;
             return (
-              <div
-                key={s.agencyId}
-                className="flex flex-wrap items-center gap-4 rounded-xl border border-border/70 bg-body/50 px-4 py-3"
-              >
-                <div className="min-w-[140px]">
-                  <div className="text-xs font-extrabold text-ink">{s.agencyName}</div>
-                  {s.dueAt && (
-                    <div className="mt-0.5 text-[10px] text-muted">سررسید: {formatJalaliDate(s.dueAt)}</div>
+              <div key={s.agencyId} style={{ ...staffInnerTile, padding: '12px 14px' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 14 }}>
+                  <div style={{ minWidth: 140 }}>
+                    <div style={{ fontSize: 11, fontWeight: 900, color: STAFF_PANEL.text }}>{s.agencyName}</div>
+                    {s.dueAt && (
+                      <div style={{ marginTop: 2, fontSize: 10, color: STAFF_PANEL.textMuted }}>سررسید: {formatJalaliDate(s.dueAt)}</div>
+                    )}
+                  </div>
+                  <div style={{ minWidth: 110, fontSize: 11 }}>
+                    <div style={{ fontSize: 9, color: STAFF_PANEL.textMuted }}>مبلغ دوره</div>
+                    <div style={{ fontWeight: 800 }}>{faMoney(s.totalIrr)} تومان</div>
+                  </div>
+                  <div style={{ minWidth: 140, flex: 1 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 10, color: STAFF_PANEL.textMuted }}>
+                      <span>پرداخت‌شده</span>
+                      <span style={{ fontWeight: 900 }}>{faPercent(s.paidPct)}</span>
+                    </div>
+                    <div style={{ height: 6, overflow: 'hidden', borderRadius: 4, background: STAFF_PANEL.inputBg }}>
+                      <div style={{ height: '100%', borderRadius: 4, background: barColor, width: `${s.paidPct}%` }} />
+                    </div>
+                  </div>
+                  <span style={staffStatusStyle(st.tone)}>
+                    {st.label}
+                    {s.status === 'OVERDUE' && ` — ${faDigits(s.overdueDays)} روز`}
+                  </span>
+                  {s.remindInvoiceId && (
+                    <button
+                      type="button"
+                      onClick={() => void onRemind(s.agencyId, s.remindInvoiceId!, s.agencyName)}
+                      style={{
+                        borderRadius: 10,
+                        border: `1px solid ${STAFF_PANEL.accent}`,
+                        background: STAFF_PANEL.accentSoft,
+                        padding: '6px 12px',
+                        fontSize: 11,
+                        fontWeight: 800,
+                        color: STAFF_PANEL.accent,
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                      }}
+                    >
+                      ارسال یادآوری
+                    </button>
                   )}
                 </div>
-                <div className="min-w-[110px] text-xs">
-                  <div className="text-[9px] text-muted">مبلغ دوره</div>
-                  <div className="font-num font-bold">{faMoney(s.totalIrr)} تومان</div>
-                </div>
-                <div className="min-w-[140px] flex-1">
-                  <div className="mb-1 flex items-center justify-between text-[10px]">
-                    <span className="text-muted">پرداخت‌شده</span>
-                    <span className="font-num font-extrabold">{faPercent(s.paidPct)}</span>
-                  </div>
-                  <div className="h-1.5 overflow-hidden rounded bg-border/60">
-                    <div
-                      className={`h-full rounded ${
-                        s.status === 'SETTLED'
-                          ? 'bg-[#059669]'
-                          : s.status === 'OVERDUE'
-                            ? 'bg-danger'
-                            : 'bg-[#f59e0b]'
-                      }`}
-                      style={{ width: `${s.paidPct}%` }}
-                    />
-                  </div>
-                </div>
-                <span className={`rounded-full px-3 py-1 text-[10px] font-extrabold ${st.className}`}>
-                  {st.label}
-                  {s.status === 'OVERDUE' && ` — ${faDigits(s.overdueDays)} روز`}
-                </span>
-                {s.remindInvoiceId && (
-                  <button
-                    onClick={() => void onRemind(s.agencyId, s.remindInvoiceId!, s.agencyName)}
-                    className="rounded-lg border border-accent/30 bg-accent/10 px-3 py-1.5 text-[11px] font-extrabold text-accent transition hover:bg-accent/20"
-                  >
-                    ارسال یادآوری
-                  </button>
-                )}
               </div>
             );
           })}

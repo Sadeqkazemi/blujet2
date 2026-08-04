@@ -29,7 +29,7 @@ const STATUS_ADMIN: Record<RefundStatus, { label: string; className: string }> =
   PAID: { label: 'پرداخت شد', className: 'bg-[#34d39924] text-[#34d399]' },
 };
 
-function routeLabel(r: RefundListRow) {
+function routeLabel(r: RefundListRow | RefundDetail) {
   const { originCode, destCode } = r.booking.flightInstance.flight.route;
   return `${airportCityName(originCode, 'fa')} ← ${airportCityName(destCode, 'fa')}`;
 }
@@ -66,6 +66,41 @@ function initials(name: string): string {
     .map((w) => w[0] ?? '')
     .join('');
 }
+
+function StatusBadge({ status }: { status: RefundStatus }) {
+  const st = STATUS_META[status];
+  return (
+    <span
+      style={{
+        borderRadius: 20,
+        padding: '4px 12px',
+        fontSize: 10,
+        fontWeight: 800,
+        ...st.style,
+      }}
+    >
+      {st.label}
+    </span>
+  );
+}
+
+const inputStyle: CSSProperties = {
+  borderRadius: 10,
+  border: `1px solid ${STAFF_PANEL.inputBorder}`,
+  background: STAFF_PANEL.inputBg,
+  color: STAFF_PANEL.text,
+  padding: '8px 12px',
+  fontSize: 11,
+  outline: 'none',
+  fontFamily: 'inherit',
+};
+
+const infoBlockStyle: CSSProperties = {
+  marginBottom: 12,
+  borderRadius: 10,
+  background: STAFF_PANEL.inputBg,
+  padding: 12,
+};
 
 export default function RefundsPage() {
   const { user } = useAuth();
@@ -408,7 +443,7 @@ export default function RefundsPage() {
             <Pagination page={pager.page} totalPages={pager.totalPages} onChange={pager.setPage} variant="dark" />
           </>
         )}
-      </section>
+      </StaffPanelCard>
 
       {detail && (
         <Modal
@@ -530,7 +565,7 @@ export default function RefundsPage() {
                     className="rounded-lg bg-[#3b82f6] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#2563eb] disabled:opacity-50"
                   >
                     ثبت و انتقال فرآیند ارجاع
-                  </button>
+                  </StaffPrimaryButton>
                 </div>
                 {detail.assignee && (
                   <p className="mt-2 text-[11px] text-[#6b7b94]">ارجاع فعلی: {detail.assignee.fullName}</p>

@@ -91,7 +91,6 @@ const STR: Record<
     maritalMarried: string;
     military: string;
     militaryConscript: string;
-    militaryExempt: string;
     militaryWaived: string;
     exemptionType: string;
     phone: string;
@@ -367,7 +366,7 @@ const inputStyle: React.CSSProperties = {
   background: '#fafbfd',
   padding: '0 12px',
   fontFamily: 'inherit',
-  fontSize: 12.5,
+  fontSize: '12.5px',
   outline: 'none',
   width: '100%',
   maxWidth: '100%',
@@ -465,6 +464,10 @@ export default function CareersApplyPage() {
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
+  const cols4 = isMobile ? '1fr' : 'repeat(4,1fr)';
+  const cols3 = isMobile ? '1fr' : 'repeat(3,1fr)';
+  const cols2 = isMobile ? '1fr' : '1fr 1fr';
+
   useEffect(() => {
     if (!jobId) return;
     fetchJobDetail(jobId)
@@ -514,6 +517,9 @@ export default function CareersApplyPage() {
     setSubmitting(true);
     try {
       const isoBirthDate = birthDate.trim() ? parseJalaliDateToIso(birthDate.trim()) : null;
+      const cleanEdu = eduEntries.filter((e) => Object.values(e).some((v) => v?.trim()));
+      const cleanWork = workEntries.filter((e) => Object.values(e).some((v) => v?.trim()));
+      const cleanLang = langEntries.filter((e) => e.lang?.trim() || e.level?.trim());
       await applyToJob(jobId, {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
@@ -554,6 +560,9 @@ export default function CareersApplyPage() {
           style={{ maxWidth: 640, margin: '60px auto', textAlign: 'center' }}
         >
           <p style={{ fontSize: 14, color: '#5a6678' }}>{t.notFound}</p>
+          <Link to="/careers" style={{ display: 'inline-block', marginTop: 16, color: '#1668c4', fontWeight: 700, textDecoration: 'none' }}>
+            {t.backToCareers}
+          </Link>
         </div>
       </PublicPageShell>
     );

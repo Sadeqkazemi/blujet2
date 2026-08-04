@@ -175,6 +175,31 @@ function CartableWidget({ cartable }: { cartable: CartableListResult }) {
   );
 }
 
+const KPI_ICONS = {
+  revenue: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M3 3v18h18" />
+      <path d="M7 14l3.5-3.5 3 3L20 7" />
+    </svg>
+  ),
+  profit: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+    </svg>
+  ),
+  cost: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <rect x="3" y="6" width="18" height="13" rx="2" />
+      <path d="M3 10h18" />
+    </svg>
+  ),
+  debt: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+    </svg>
+  ),
+};
+
 export default function DashboardPage() {
   const { lowSalesAlerts = [] } = useOutletContext<PanelShellContext>();
   const bannerAlert = lowSalesAlerts[0] ?? null;

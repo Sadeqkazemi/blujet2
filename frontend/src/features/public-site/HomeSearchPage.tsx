@@ -9,6 +9,7 @@ import type { PublicHomeContent } from '../../types/site-content';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import { horizontalScrollStyle, useHorizontalDragScroll } from '../../hooks/useHorizontalDragScroll';
 import { formatLocalePercent, formatToman } from '../../lib/fa-format';
 import { destinationGradient } from './site-content-shared';
 import HomeSearchCard from './home/HomeSearchCard';
@@ -66,9 +67,18 @@ const STR: Record<StoredLocale, {
   heroBadge: string;
   heroTitle: string;
   heroSub: string;
+  heroCta: string;
+  economyCabin: string;
+  airlineBadge: string;
+  airlineTitle: string;
+  airlineSub: string;
+  airlineBtn: string;
   tripOneWay: string;
   tripRoundTrip: string;
   tripMultiCity: string;
+  tabBook: string;
+  tabManage: string;
+  tabStatus: string;
   lblOrigin: string;
   lblDestination: string;
   lblDepartDate: string;
@@ -125,9 +135,18 @@ const STR: Record<StoredLocale, {
     heroBadge: 'در هر پرواز تا ۵٪ کش‌بک بگیرید',
     heroTitle: 'پرواز بعدی‌ات را با blujet رزرو کن',
     heroSub: 'بیش از ۲۰۰ مقصد داخلی و بین‌المللی، با بهترین قیمت، پشتیبانی شبانه‌روزی و امتیاز در هر سفر.',
+    heroCta: 'مشاهده پیشنهادهای ویژه',
+    economyCabin: 'اکونومی',
+    airlineBadge: 'ایرلاین‌های شریک',
+    airlineTitle: 'پرواز با ۴۵+ ایرلاین معتبر بین‌المللی',
+    airlineSub: 'تمام پروازها با ایرلاین‌های دارای مجوز رسمی و پوشش بیمه مسافرتی رزرو می‌شوند.',
+    airlineBtn: 'مشاهده ایرلاین‌ها',
     tripOneWay: 'یک‌طرفه',
     tripRoundTrip: 'رفت و برگشت',
     tripMultiCity: 'چندمسیره',
+    tabBook: 'رزرو پرواز',
+    tabManage: 'مدیریت رزرو',
+    tabStatus: 'وضعیت پرواز',
     lblOrigin: 'مبدا',
     lblDestination: 'مقصد',
     lblDepartDate: 'تاریخ رفت',
@@ -184,9 +203,18 @@ const STR: Record<StoredLocale, {
     heroBadge: 'Up to 5% cashback on every flight',
     heroTitle: 'Book your next flight with blujet',
     heroSub: 'Over 200 domestic and international destinations, the best prices, 24/7 support, and rewards on every trip.',
+    heroCta: 'See offers',
+    economyCabin: 'Economy',
+    airlineBadge: 'Partner Airlines',
+    airlineTitle: 'Fly with 45+ trusted international airlines',
+    airlineSub: 'All flights are booked with officially licensed airlines and travel insurance coverage.',
+    airlineBtn: 'View Airlines',
     tripOneWay: 'One-way',
     tripRoundTrip: 'Round-trip',
     tripMultiCity: 'Multi-city',
+    tabBook: 'Book Flight',
+    tabManage: 'Manage Booking',
+    tabStatus: 'Flight Status',
     lblOrigin: 'From',
     lblDestination: 'To',
     lblDepartDate: 'Departure date',
@@ -243,9 +271,18 @@ const STR: Record<StoredLocale, {
     heroBadge: 'احصل على استرداد نقدي حتى ٥٪ في كل رحلة',
     heroTitle: 'احجز رحلتك القادمة مع blujet',
     heroSub: 'أكثر من ٢٠٠ وجهة داخلية ودولية بأفضل الأسعار، مع دعم على مدار الساعة ونقاط في كل رحلة.',
+    heroCta: 'عرض العروض',
+    economyCabin: 'اقتصادية',
+    airlineBadge: 'شركات الطيران الشريكة',
+    airlineTitle: 'طيران مع أكثر من ٤٥ شركة طيران دولية موثوقة',
+    airlineSub: 'جميع الرحلات محجوزة مع شركات طيران مرخصة رسمياً وتغطية تأمين السفر.',
+    airlineBtn: 'عرض شركات الطيران',
     tripOneWay: 'ذهاب فقط',
     tripRoundTrip: 'ذهاب وإياب',
     tripMultiCity: 'متعدد المدن',
+    tabBook: 'حجز الرحلة',
+    tabManage: 'إدارة الحجز',
+    tabStatus: 'حالة الرحلة',
     lblOrigin: 'من',
     lblDestination: 'إلى',
     lblDepartDate: 'تاريخ المغادرة',
@@ -328,6 +365,30 @@ export default function HomeSearchPage() {
   const [annClosed, setAnnClosed] = useState(false);
   const [homeContent, setHomeContent] = useState<PublicHomeContent | null>(null);
   const [appLinks, setAppLinks] = useState<{ id: AppLinkId; url: string }[]>([]);
+  const [topTab, setTopTab] = useState<'book' | 'manage' | 'status'>('book');
+  const [searching, setSearching] = useState(false);
+  const [searchFrom, setSearchFrom] = useState('');
+  const [searchTo, setSearchTo] = useState('');
+
+  function scrollToOffers() {
+    const el = document.getElementById('offers');
+    if (el) {
+      const y = el.getBoundingClientRect().top + window.scrollY - 80;
+      window.scrollTo({ top: y, behavior: 'smooth' });
+    }
+  }
+
+  function handleSearchSubmit(url: string, meta?: { origin: string; dest: string }) {
+    if (meta) {
+      setSearchFrom(meta.origin);
+      setSearchTo(meta.dest);
+    }
+    setSearching(true);
+    window.setTimeout(() => {
+      setSearching(false);
+      navigate(url);
+    }, 1600);
+  }
 
   useEffect(() => {
     fetchAirports()
@@ -550,6 +611,8 @@ export default function HomeSearchPage() {
           })}
         </div>
       </section>
+
+      <FeatureQuickLinks locale={locale} labels={t.quickLinks} hrefs={t.quickLinkHrefs} />
 
       {/* SPECIAL OFFERS */}
       <section id="offers" style={{ maxWidth: 1180, margin: '0 auto', padding: isMobile ? '14px 26px 7px' : '18px 26px 7px', scrollMarginTop: 96 }}>

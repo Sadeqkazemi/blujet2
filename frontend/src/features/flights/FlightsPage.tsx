@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import {
@@ -43,6 +44,23 @@ const STATUS_META: Record<DerivedFlightStatus, { label: string; className: strin
   CANCELLED: { label: 'لغو شده', className: 'bg-[#f8717124] text-[#dc2626]' },
 };
 
+function StatusBadge({ status }: { status: DerivedFlightStatus }) {
+  const st = STATUS_META[status];
+  return (
+    <span
+      style={{
+        borderRadius: 20,
+        padding: '4px 10px',
+        fontSize: 10,
+        fontWeight: 800,
+        ...st.style,
+      }}
+    >
+      {st.label}
+    </span>
+  );
+}
+
 const CHANNEL_META = {
   SYSTEM: { label: 'فروش سیستمی', barClass: 'bg-accent' },
   CHARTER: { label: 'فروش چارتری', barClass: 'bg-[#a855f7]' },
@@ -54,6 +72,37 @@ function occupancyBarClass(pct: number) {
   if (pct >= 60) return 'bg-[#34d399]';
   return 'bg-[#60a5fa]';
 }
+
+const inputStyle: CSSProperties = {
+  ...staffInput,
+  height: 40,
+  width: '100%',
+  padding: '0 8px',
+  fontSize: 12,
+};
+
+const labelStyle: CSSProperties = {
+  display: 'block',
+  marginBottom: 4,
+  fontWeight: 800,
+  fontSize: 12,
+  color: STAFF_PANEL.text,
+};
+
+const infoBlockStyle: CSSProperties = {
+  ...staffInnerTile,
+};
+
+const secondaryButtonStyle: CSSProperties = {
+  borderRadius: 10,
+  border: `1px solid ${STAFF_PANEL.inputBorder}`,
+  background: 'transparent',
+  color: STAFF_PANEL.textMuted,
+  padding: '8px 16px',
+  fontSize: 12,
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+};
 
 const WEEKDAYS_FA = ['ش', 'ی', 'د', 'س', 'چ', 'پ', 'ج'];
 
@@ -359,6 +408,7 @@ export default function FlightsPage() {
         {subTabs.map(([key, label]) => (
           <button
             key={key}
+            type="button"
             onClick={() => setSubTab(key)}
             className={`rounded-lg px-3 py-2 text-xs font-bold transition ${
               subTab === key ? 'bg-accent text-white' : 'text-panel-muted hover:text-panel-ink'
@@ -397,10 +447,10 @@ export default function FlightsPage() {
                   <ul>
                     {activePager.pageItems.map((f) => {
                       const pct = f.capacity > 0 ? Math.round((f.sold / f.capacity) * 100) : 0;
-                      const st = STATUS_META[f.derivedStatus];
                       return (
                         <li key={f.id}>
                           <button
+                            type="button"
                             onClick={() => void openDetail(f.id)}
                             className="grid w-full grid-cols-[1.7fr_1.1fr_1.4fr_1.5fr_1.2fr_0.9fr] items-center gap-3 border-b border-panel-border px-5 py-3 text-right text-xs transition hover:bg-panel-surface-2/50"
                           >
@@ -417,8 +467,12 @@ export default function FlightsPage() {
                               </span>
                               <span className="mt-1 block h-1.5 overflow-hidden rounded bg-panel-surface-2">
                                 <span
-                                  className={`block h-full ${occupancyBarClass(pct)}`}
-                                  style={{ width: `${Math.min(pct, 100)}%` }}
+                                  style={{
+                                    display: 'block',
+                                    height: '100%',
+                                    background: occupancyBarColor(pct),
+                                    width: `${Math.min(pct, 100)}%`,
+                                  }}
                                 />
                               </span>
                             </span>
@@ -426,9 +480,7 @@ export default function FlightsPage() {
                               {f.basePriceIrr != null ? `${faMoney(f.basePriceIrr)} تومان` : '—'}
                             </span>
                             <span>
-                              <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${st.className}`}>
-                                {st.label}
-                              </span>
+                              <StatusBadge status={f.derivedStatus} />
                             </span>
                           </button>
                         </li>
@@ -452,7 +504,7 @@ export default function FlightsPage() {
                   <PricingPage embedded />
                 </div>
               )}
-            </section>
+            </StaffPanelCard>
           )}
 
           {subTab === 'done' && data && (
@@ -494,9 +546,10 @@ export default function FlightsPage() {
                   >
                     ↓ خروجی Excel
                   </button>
-                </div>
-                <div className="overflow-x-auto">
-                  <div className={isCommercial ? 'min-w-[920px]' : 'min-w-[900px]'}>
+                }
+              >
+                <div style={{ overflowX: 'auto' }}>
+                  <div style={{ minWidth: isCommercial ? 920 : 900 }}>
                     {isCommercial ? (
                       <>
                         <div className="grid grid-cols-[1.5fr_0.9fr_0.8fr_1fr_1fr_1fr_1fr_1.1fr] gap-2 border-b border-panel-border px-5 py-2 text-[10px] font-bold text-panel-muted">
@@ -550,6 +603,7 @@ export default function FlightsPage() {
                         {completedPager.pageItems.map((d: CompletedFlightRow) => (
                           <div key={d.id}>
                             <button
+                              type="button"
                               onClick={() => setExpandedDone(expandedDone === d.id ? null : d.id)}
                               className="grid w-full grid-cols-[1.5fr_0.8fr_0.6fr_1fr_1fr_1fr_1fr_1fr_1fr] items-center gap-2 border-b border-panel-border px-5 py-3 text-right text-[11px] transition hover:bg-panel-surface-2/50"
                             >
@@ -623,7 +677,7 @@ export default function FlightsPage() {
                     />
                   </div>
                 </div>
-              </section>
+              </StaffPanelCard>
             </div>
           )}
 
@@ -645,6 +699,7 @@ export default function FlightsPage() {
                 <span className="text-[11px] text-panel-muted">فیلتر بر اساس روز:</span>
                 <div className="relative">
                   <button
+                    type="button"
                     onClick={() => setCalOpen((v) => !v)}
                     className="rounded-lg border border-panel-border bg-panel-surface px-3 py-2 text-xs font-bold text-panel-ink"
                   >
@@ -656,7 +711,7 @@ export default function FlightsPage() {
                         <span className="text-xs font-black text-panel-ink">{calendar.monthLabel}</span>
                         <span className="text-[10px] text-panel-muted">فقط روزهای دارای پرواز</span>
                       </div>
-                      <div className="mb-1 grid grid-cols-7 gap-1">
+                      <div style={{ marginBottom: 4, display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
                         {WEEKDAYS_FA.map((w, i) => (
                           <span
                             key={w}
@@ -666,7 +721,7 @@ export default function FlightsPage() {
                           </span>
                         ))}
                       </div>
-                      <div className="grid grid-cols-7 gap-1">
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
                         {Array.from({ length: calendar.offset }).map((_, i) => (
                           <span key={`b${i}`} />
                         ))}
@@ -677,6 +732,7 @@ export default function FlightsPage() {
                           return (
                             <button
                               key={day}
+                              type="button"
                               disabled={key == null}
                               onClick={() => {
                                 if (key != null) {
@@ -684,9 +740,16 @@ export default function FlightsPage() {
                                   setCalOpen(false);
                                 }
                               }}
-                              className={`aspect-square rounded-lg text-[11px] font-bold ${
-                                selected
-                                  ? 'bg-accent text-white'
+                              style={{
+                                aspectRatio: '1',
+                                borderRadius: 8,
+                                fontSize: 11,
+                                fontWeight: 800,
+                                border: 'none',
+                                fontFamily: 'inherit',
+                                cursor: key != null ? 'pointer' : 'default',
+                                background: selected
+                                  ? STAFF_PANEL.accent
                                   : key != null
                                     ? 'bg-accent/10 text-accent'
                                     : 'cursor-default text-panel-muted/50'
@@ -702,8 +765,19 @@ export default function FlightsPage() {
                 </div>
                 {futureDay && (
                   <button
+                    type="button"
                     onClick={() => setFutureDay(null)}
-                    className="rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-[11px] font-bold text-danger"
+                    style={{
+                      borderRadius: 10,
+                      border: `1px solid rgba(248,113,113,0.3)`,
+                      background: 'rgba(248,113,113,0.08)',
+                      padding: '8px 12px',
+                      fontSize: 11,
+                      fontWeight: 800,
+                      color: STAFF_PANEL.danger,
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                    }}
                   >
                     ✕ پاک‌کردن فیلتر
                   </button>
@@ -714,13 +788,25 @@ export default function FlightsPage() {
                 <div className="flex items-center justify-between border-b border-panel-border px-5 py-3">
                   <h2 className="text-sm font-bold text-panel-ink">پروازهای آینده (برنامه‌ریزی‌شده)</h2>
                   <button
+                    type="button"
                     onClick={() => void onAiAnalysis()}
-                    className="rounded-lg bg-gradient-to-l from-accent to-[#9333ea] px-3 py-2 text-xs font-bold text-white"
+                    style={{
+                      borderRadius: 10,
+                      background: `linear-gradient(to left, ${STAFF_PANEL.accent}, ${STAFF_PANEL.purple})`,
+                      padding: '8px 12px',
+                      fontSize: 11,
+                      fontWeight: 800,
+                      color: '#fff',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                    }}
                   >
                     ✦ تحلیل قیمت‌گذاری با هوش مصنوعی
                   </button>
-                </div>
-                <div className="flex flex-col gap-3 p-4">
+                }
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   {visibleFuture.length === 0 && (
                     <p className="py-5 text-center text-[11px] text-panel-muted">
                       برای روز انتخاب‌شده پروازی برنامه‌ریزی نشده است.
@@ -736,8 +822,20 @@ export default function FlightsPage() {
                       <div key={u.id} className="rounded-xl border border-panel-border bg-panel-canvas p-3">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <button
+                            type="button"
                             onClick={() => setExpandedFuture(expanded ? null : u.id)}
-                            className="flex items-center gap-3 text-right"
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 12,
+                              textAlign: 'right',
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              fontFamily: 'inherit',
+                              padding: 0,
+                              color: STAFF_PANEL.text,
+                            }}
                           >
                             <span className="text-panel-muted">{expanded ? '▾' : '◂'}</span>
                             <span>
@@ -751,8 +849,9 @@ export default function FlightsPage() {
                             </span>
                           </button>
                           <button
+                            type="button"
                             onClick={() => openPlan(u)}
-                            className={`rounded-lg px-3 py-2 text-xs font-bold transition ${
+                            style={
                               priced
                                 ? 'border border-panel-border bg-panel-surface text-panel-muted'
                                 : 'bg-accent text-white hover:bg-accent/90'
@@ -782,9 +881,7 @@ export default function FlightsPage() {
                                 {u.aiSuggestion ? (
                                   <div className="font-num font-bold text-[#34d399]">
                                     {faMoney(u.aiSuggestion.priceIrr)} تومان{' '}
-                                    <span className="rounded bg-[#9333ea1f] px-1 text-[9px] font-bold text-[#7c3aed]">
-                                      AI
-                                    </span>
+                                    <span style={{ ...staffStatusStyle('purple'), padding: '2px 4px', fontSize: 9 }}>AI</span>
                                   </div>
                                 ) : (
                                   <div className="text-panel-muted">در انتظار تحلیل</div>
@@ -807,8 +904,16 @@ export default function FlightsPage() {
                               </div>
                             </div>
                             {u.aiSuggestion && (
-                              <div className="mt-3 rounded-lg border border-[#9333ea40] bg-gradient-to-l from-accent/5 to-[#9333ea0d] p-3">
-                                <div className="mb-1 text-[11px] font-black text-[#7c3aed]">
+                              <div
+                                style={{
+                                  marginTop: 12,
+                                  borderRadius: 10,
+                                  border: `1px solid rgba(168,85,247,0.25)`,
+                                  background: `linear-gradient(to left, ${STAFF_PANEL.accentSoft}, rgba(168,85,247,0.05))`,
+                                  padding: 12,
+                                }}
+                              >
+                                <div style={{ marginBottom: 4, fontSize: 11, fontWeight: 900, color: STAFF_PANEL.purple }}>
                                   تحلیل هوش مصنوعی — چرا این قیمت؟
                                 </div>
                                 <p className="mb-2 text-[11px] leading-6 text-panel-ink">{u.aiSuggestion.reason}</p>
@@ -833,7 +938,7 @@ export default function FlightsPage() {
                     variant="dark"
                   />
                 </div>
-              </section>
+              </StaffPanelCard>
             </div>
           )}
         </>
@@ -853,6 +958,7 @@ export default function FlightsPage() {
 
       {detail && (
         <Modal
+          dark
           title={`${routeLabel(detail.originCode, detail.destCode)} · ${detail.flightNo}`}
           onClose={() => setDetail(null)}
         >
@@ -908,12 +1014,21 @@ export default function FlightsPage() {
               <span className="text-xs font-bold text-panel-ink">نوع هواپیما</span>
               {!aircraftChangeOpen && (
                 <button
+                  type="button"
                   onClick={() => {
                     setSelectedAircraftType(detail.aircraftType);
                     setAircraftChangeError(null);
                     setAircraftChangeOpen(true);
                   }}
-                  className="text-[11px] font-bold text-accent"
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 800,
+                    color: STAFF_PANEL.accent,
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
                 >
                   تغییر
                 </button>
@@ -922,7 +1037,7 @@ export default function FlightsPage() {
             {!aircraftChangeOpen ? (
               <div className="text-xs font-bold text-panel-ink">{detail.aircraftType}</div>
             ) : (
-              <div className="flex flex-col gap-2">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <select
                   value={selectedAircraftType}
                   onChange={(e) => setSelectedAircraftType(e.target.value)}
@@ -935,16 +1050,12 @@ export default function FlightsPage() {
                   ))}
                 </select>
                 {aircraftChangeError && (
-                  <p role="alert" className="text-[11px] text-danger">
+                  <p role="alert" style={{ fontSize: 11, color: STAFF_PANEL.danger, margin: 0 }}>
                     {aircraftChangeError}
                   </p>
                 )}
-                <div className="flex gap-2">
-                  <button
-                    disabled={aircraftChangeBusy}
-                    onClick={() => void onChangeAircraft()}
-                    className="rounded-lg bg-accent px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50"
-                  >
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <StaffPrimaryButton disabled={aircraftChangeBusy} onClick={() => void onChangeAircraft()}>
                     {aircraftChangeBusy ? 'در حال ثبت…' : 'ثبت تغییر'}
                   </button>
                   <button
@@ -965,6 +1076,7 @@ export default function FlightsPage() {
 
       {plan && (
         <Modal
+          dark
           title={`نرخ‌گذاری و تخصیص · ${routeLabel(plan.originCode, plan.destCode)}`}
           onClose={() => setPlan(null)}
         >
@@ -982,7 +1094,7 @@ export default function FlightsPage() {
           <label htmlFor="plan-price" className="mb-1 block text-xs font-bold text-panel-ink">
             نرخ نهایی (تومان)
           </label>
-          <div className="mb-3 flex gap-2">
+          <div style={{ marginBottom: 12, display: 'flex', gap: 8 }}>
             <input
               id="plan-price"
               dir="ltr"
@@ -992,8 +1104,19 @@ export default function FlightsPage() {
             />
             {plan.aiSuggestion && (
               <button
+                type="button"
                 onClick={() => setPlanPrice(String(Math.round(plan.aiSuggestion!.priceIrr / 10)))}
-                className="rounded-lg border border-[#9333ea55] bg-[#9333ea14] px-3 text-[11px] font-bold text-[#7c3aed]"
+                style={{
+                  borderRadius: 10,
+                  border: `1px solid rgba(168,85,247,0.35)`,
+                  background: 'rgba(168,85,247,0.08)',
+                  padding: '0 12px',
+                  fontSize: 11,
+                  fontWeight: 800,
+                  color: STAFF_PANEL.purple,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
               >
                 استفاده از قیمت AI
               </button>
@@ -1010,7 +1133,7 @@ export default function FlightsPage() {
             max={maxAgencySeats}
             value={Math.min(agencySeatsNum, maxAgencySeats)}
             onChange={(e) => setPlanAgency(e.target.value)}
-            className="mb-2 w-full accent-accent"
+            style={{ marginBottom: 8, width: '100%', accentColor: STAFF_PANEL.accent }}
           />
           <div className="mb-3 grid grid-cols-3 gap-2 text-[11px]">
             <div className="rounded-lg bg-panel-canvas p-2.5 text-center">
@@ -1028,16 +1151,14 @@ export default function FlightsPage() {
           </div>
           <div className="mb-3 flex h-2 overflow-hidden rounded bg-panel-surface-2">
             <div
-              className="bg-[#7c3aed]"
-              style={{ width: `${plan.capacity > 0 ? (plan.charterSeats / plan.capacity) * 100 : 0}%` }}
+              style={{ background: STAFF_PANEL.purple, width: `${plan.capacity > 0 ? (plan.charterSeats / plan.capacity) * 100 : 0}%` }}
             />
             <div
               className="bg-[#34d399]"
               style={{ width: `${plan.capacity > 0 ? (agencySeatsNum / plan.capacity) * 100 : 0}%` }}
             />
             <div
-              className="bg-accent"
-              style={{ width: `${plan.capacity > 0 ? (directSeats / plan.capacity) * 100 : 0}%` }}
+              style={{ background: STAFF_PANEL.accent, width: `${plan.capacity > 0 ? (directSeats / plan.capacity) * 100 : 0}%` }}
             />
           </div>
 
@@ -1061,19 +1182,16 @@ export default function FlightsPage() {
             </div>
           </div>
 
-          <button
-            onClick={() => void onSubmitPlan()}
-            className="w-full rounded-lg bg-accent py-2.5 text-xs font-bold text-white transition hover:bg-accent/90"
-          >
+          <StaffPrimaryButton onClick={() => void onSubmitPlan()} style={{ width: '100%', padding: '10px 16px' }}>
             ثبت نرخ و تخصیص صندلی
-          </button>
+          </StaffPrimaryButton>
 
           <div className="mt-5 border-t border-panel-border pt-4">
             <h3 className="mb-2 text-xs font-bold text-panel-ink">سهمیه‌های صندلی آژانس‌ها</h3>
             {allotments.length === 0 && (
               <p className="mb-2 text-[11px] text-panel-muted">هنوز سهمیه‌ای برای این پرواز ثبت نشده است.</p>
             )}
-            <div className="mb-3 flex flex-col gap-1.5">
+            <div style={{ marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
               {allotments.map((a) => (
                 <div
                   key={a.id}
@@ -1083,8 +1201,9 @@ export default function FlightsPage() {
                   <span className="font-num text-panel-muted">{faDigits(a.seatsAllocated)} صندلی</span>
                   <span className="text-[10px] text-panel-muted">{a.type === 'SOFT' ? 'نرم' : 'سخت'}</span>
                   <button
+                    type="button"
                     onClick={() => void onDeleteAllotment(a.id)}
-                    className="text-danger"
+                    style={{ color: STAFF_PANEL.danger, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
                     aria-label={`حذف سهمیه ${a.agencyName}`}
                   >
                     ✕
@@ -1092,7 +1211,7 @@ export default function FlightsPage() {
                 </div>
               ))}
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               <select
                 aria-label="آژانس"
                 value={newAllotmentAgencyId}
@@ -1132,8 +1251,19 @@ export default function FlightsPage() {
                 className="font-num h-10 w-24 rounded-lg border border-panel-border-2 bg-panel-canvas px-2 text-xs outline-none text-panel-ink"
               />
               <button
+                type="button"
                 onClick={() => void onAddAllotment()}
-                className="rounded-lg border border-accent px-3 text-[11px] font-bold text-accent"
+                style={{
+                  borderRadius: 10,
+                  border: `1px solid ${STAFF_PANEL.accent}`,
+                  background: 'transparent',
+                  padding: '0 12px',
+                  fontSize: 11,
+                  fontWeight: 800,
+                  color: STAFF_PANEL.accent,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
               >
                 + افزودن
               </button>
@@ -1148,7 +1278,7 @@ export default function FlightsPage() {
                 />
               </div>
             )}
-            {allotmentError && <p className="mt-2 text-[11px] text-danger">{allotmentError}</p>}
+            {allotmentError && <p style={{ marginTop: 8, fontSize: 11, color: STAFF_PANEL.danger }}>{allotmentError}</p>}
           </div>
 
           <FareRulesSection instanceId={plan.id} />
