@@ -1,16 +1,30 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { CareersController } from './careers.controller';
 import { CareersPublicController } from './careers-public.controller';
 import { CareersService } from './careers.service';
 import { AuditModule } from '../audit/audit.module';
 import { PanelsModule } from '../panels/panels.module';
+import { CareersSettings } from '../../database/entities/careers-settings.entity';
+import { JobPosting } from '../../database/entities/job-posting.entity';
+import { JobApplication } from '../../database/entities/job-application.entity';
+import { User } from '../../database/entities/user.entity';
 
 @Module({
   // CareersController's static /careers/postings, /careers/settings and
   // /careers/applications routes must be registered before
   // CareersPublicController's /careers/jobs* routes — no overlap today,
   // but keeping the same order as SurveyModule for consistency/safety.
-  imports: [AuditModule, PanelsModule],
+  imports: [
+    TypeOrmModule.forFeature([
+      CareersSettings,
+      JobPosting,
+      JobApplication,
+      User,
+    ]),
+    AuditModule,
+    PanelsModule,
+  ],
   controllers: [CareersController, CareersPublicController],
   providers: [CareersService],
   exports: [CareersService],

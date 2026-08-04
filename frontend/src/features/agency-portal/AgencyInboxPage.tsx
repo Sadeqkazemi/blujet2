@@ -144,10 +144,28 @@ export default function AgencyInboxPage() {
   const selectedTag = selected ? messageTag(selected, t) : null;
 
   return (
-    <div data-testid="agency-inbox">
-      <div style={{ marginBottom: 22 }}>
-        <h1 style={{ fontSize: 20, fontWeight: 900, color: '#0d2640', margin: 0 }}>{t.heading}</h1>
-        <div style={{ fontSize: 11.5, color: '#7a8696', marginTop: 3 }}>{t.subtitle}</div>
+    <div>
+      <div className="mb-4 flex flex-col gap-3 rounded-xl border border-border bg-white p-5">
+        {messages.length === 0 ? (
+          <p className="py-4 text-center text-xs text-muted">{t.empty}</p>
+        ) : (
+          messages.map((m) => (
+            <div
+              key={m.id}
+              className={`max-w-[70%] rounded-xl px-3.5 py-2.5 text-xs ${
+                m.senderIsAgency
+                  ? 'self-end bg-accent/10 text-ink'
+                  : 'self-start bg-[#f3f5f8] text-ink'
+              }`}
+            >
+              <div className="mb-1 text-[10px] font-bold text-muted">
+                {m.senderIsAgency ? t.youLabel : 'blujet'}
+              </div>
+              <div>{m.body}</div>
+              <div className="mt-1 text-[10px] text-muted">{formatJalaliDateTime(m.createdAt)}</div>
+            </div>
+          ))
+        )}
       </div>
 
       <div

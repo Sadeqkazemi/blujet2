@@ -1,5 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Outlet, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import FinanceDashboardPage from './FinanceDashboardPage';
 import * as reportingApi from '../../api/reporting';
@@ -29,6 +29,18 @@ const SALES_CHART = [
 
 const FLIGHTS = { flightCount: 6, totalSeats: 1080, soldSeats: 900, unsoldSeats: 180 };
 
+function renderFinanceDashboard() {
+  return render(
+    <MemoryRouter>
+      <Routes>
+        <Route element={<Outlet context={{ nav: [], lowSalesAlerts: [] }} />}>
+          <Route index element={<FinanceDashboardPage />} />
+        </Route>
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
 describe('FinanceDashboardPage', () => {
   it('renders finance-specific stat cards, sales chart, and cartable widget', async () => {
     vi.spyOn(reportingApi, 'fetchFinanceDashboardStats').mockResolvedValue(STATS);
@@ -54,11 +66,7 @@ describe('FinanceDashboardPage', () => {
       ],
     });
 
-    render(
-      <MemoryRouter>
-        <FinanceDashboardPage />
-      </MemoryRouter>,
-    );
+    renderFinanceDashboard();
 
     expect(await screen.findByText('آژانس فعال')).toBeInTheDocument();
     expect(screen.getByText('مسافر این ماه')).toBeInTheDocument();

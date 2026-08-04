@@ -218,77 +218,15 @@ export default function AgencyProfilePage() {
     [t.fieldPartnershipType, t.partnershipValue(TIER_LABEL_LOCAL[profile.tier][locale])],
   ];
 
-  const initials = agencyInitials(profile.fullName);
-  const joinedYear = memberYear(profile.joinedAt, locale);
-
   return (
-    <div data-testid="agency-profile">
-      <div style={{ marginBottom: 22 }}>
-        <h1 style={{ fontSize: 20, fontWeight: 900, color: '#0d2640', margin: 0 }}>{t.heading}</h1>
-        <div style={{ fontSize: 11.5, color: '#7a8696', marginTop: 3 }}>{t.subtitle}</div>
-      </div>
-
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
-          gap: 13,
-          alignItems: 'start',
-        }}
-      >
-        <div style={{ background: '#fff', border: '1px solid #eef2f7', borderRadius: 14, padding: 16 }}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 11,
-              paddingBottom: 15,
-              borderBottom: '1px solid #eef2f7',
-              marginBottom: 18,
-            }}
-          >
-            <div
-              style={{
-                width: 58,
-                height: 58,
-                borderRadius: 14,
-                background: 'linear-gradient(135deg,#1668c4,#3b8ae0)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 800,
-                fontSize: 18,
-                color: '#fff',
-                flex: 'none',
-              }}
-            >
-              {initials}
-            </div>
-            <div>
-              <div data-testid="agency-profile-name" style={{ fontSize: 16, fontWeight: 900, color: '#0d2640' }}>
-                {profile.fullName}
-              </div>
-              <div style={{ fontSize: 11.5, color: '#1f8a5b', fontWeight: 700, marginTop: 3 }}>
-                {profile.isActive ? t.accountActive(joinedYear) : '—'}
-              </div>
-            </div>
-          </div>
+    <div>
+      <div className="mb-6 rounded-xl border border-border bg-white p-5">
+        <div className="mb-4 text-sm font-bold text-ink">{t.agencyInfoHeading}</div>
+        <dl className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {fields.map(([label, value]) => (
-            <div
-              key={label}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '9px 0',
-                borderBottom: '1px solid #f4f6fa',
-                gap: 12,
-              }}
-            >
-              <span style={{ fontSize: 11.5, color: '#8a96a6' }}>{label}</span>
-              <span dir="ltr" style={{ fontSize: 12, fontWeight: 700, color: '#16202e', textAlign: locale === 'en' ? 'left' : 'right' }}>
-                {value}
-              </span>
+            <div key={label}>
+              <dt className="text-[11px] text-muted">{label}</dt>
+              <dd className="ltr mt-1 text-sm font-bold text-ink">{value}</dd>
             </div>
           ))}
         </div>

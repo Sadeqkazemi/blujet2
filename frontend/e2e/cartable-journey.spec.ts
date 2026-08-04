@@ -24,7 +24,7 @@ test('message loop: CEO composes to واحد مالی → it appears in Finance�
 
   const finCtx = await browser.newContext();
   const finPage = await finCtx.newPage();
-  await loginAs(finPage, 'finance.karimi');
+  await loginAs(finPage, 'finance');
   await finPage.getByRole('link', { name: /^کارتابل/ }).click();
   const row = finPage.locator('li', { hasText: subject });
   await expect(row).toBeVisible();
@@ -44,7 +44,7 @@ test('referral loop: Senior creates a referral to Commercial → Commercial repo
 
   const seniorCtx = await browser.newContext();
   const seniorPage = await seniorCtx.newPage();
-  await loginAs(seniorPage, 'senior.rahimi');
+  await loginAs(seniorPage, 'senior');
   await seniorPage.getByRole('link', { name: /^ارجاعات/ }).click();
   await seniorPage.getByRole('button', { name: 'ایجاد ارجاع جدید' }).click();
   await seniorPage.fill('#ref-title', title);
@@ -55,7 +55,7 @@ test('referral loop: Senior creates a referral to Commercial → Commercial repo
 
   const commCtx = await browser.newContext();
   const commPage = await commCtx.newPage();
-  await loginAs(commPage, 'comm.abbasi');
+  await loginAs(commPage, 'comm');
   await commPage.getByRole('link', { name: /^کارتابل/ }).click();
   const row = commPage.locator('li', { hasText: title });
   await expect(row).toBeVisible();

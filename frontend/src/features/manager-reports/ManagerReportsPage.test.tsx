@@ -3,13 +3,17 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import ManagerReportsPage from './ManagerReportsPage';
 import * as auditApi from '../../api/audit';
+import * as useAuthModule from '../../hooks/useAuth';
+import { mockAuthUserWithRole } from '../../test/mockAuthUser';
 import type { ManagerReportRow } from '../../types/audit';
+import type { Role } from '../../types/auth';
 
 const ROWS: ManagerReportRow[] = [
   {
     id: 'a1',
     actorId: 'u1',
     actorRole: 'FINANCE_MANAGER',
+    actorName: 'سحر کاظمی',
     category: 'AGENCY',
     action: 'تسویه فاکتور آژانس',
     detail: 'فاکتور INV-1001 توسط سحر کاظمی تسویه شد.',
@@ -19,17 +23,49 @@ const ROWS: ManagerReportRow[] = [
   },
 ];
 
+function mockRole(role: Role) {
+  vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+    status: 'authenticated',
+    user: mockAuthUserWithRole(role),
+    requestLogin: vi.fn(),
+    confirmTwoFactor: vi.fn(),
+    agencyLogin: vi.fn(),
+    signOut: vi.fn(),
+  });
+}
+
 describe('ManagerReportsPage', () => {
-  it('renders the real audit feed and filters by actor role', async () => {
+  it('CEO dark layout: KPIs, unit chips, and filters by finance unit', async () => {
+    mockRole('CEO');
     const fetchSpy = vi.spyOn(auditApi, 'fetchManagerReports').mockResolvedValue(ROWS);
 
+    render(<ManagerReportsPage />);
+    expect(await screen.findByText('گزارش عملکرد مدیران')).toBeInTheDocument();
+    expect(screen.getByText('کل گزارش‌ها')).toBeInTheDocument();
+    expect(screen.getByText('اقدامات کلیدی مدیران')).toBeInTheDocument();
+    expect(await screen.findByText('تسویه فاکتور آژانس')).toBeInTheDocument();
+    expect(screen.getByText('سحر کاظمی')).toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'مالی' }));
+    await waitFor(() =>
+      expect(fetchSpy).toHaveBeenLastCalledWith({ actorRole: 'FINANCE_MANAGER', q: undefined }),
+    );
+  });
+
+  it('unit chip بازرگانی maps to COMMERCIAL_MANAGER filter', async () => {
+    mockRole('BOARD_CHAIR');
+    const fetchSpy = vi.spyOn(auditApi, 'fetchManagerReports').mockResolvedValue(ROWS);
     render(<ManagerReportsPage />);
     expect(await screen.findByText('تسویه فاکتور آژانس')).toBeInTheDocument();
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'مدیر مالی' }));
+    await user.click(screen.getByRole('button', { name: 'بازرگانی' }));
     await waitFor(() =>
-      expect(fetchSpy).toHaveBeenLastCalledWith({ actorRole: 'FINANCE_MANAGER', q: undefined }),
+      expect(fetchSpy).toHaveBeenLastCalledWith({
+        actorRole: 'COMMERCIAL_MANAGER',
+        q: undefined,
+      }),
     );
   });
 });

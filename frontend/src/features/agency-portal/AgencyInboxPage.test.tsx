@@ -50,9 +50,8 @@ describe('AgencyInboxPage', () => {
     vi.spyOn(portalApi, 'fetchInbox').mockResolvedValue(MESSAGES);
     render(<AgencyInboxPage />);
 
-    expect(await screen.findByRole('heading', { name: 'Inbox & Messages' })).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('Write your reply…')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Send reply' })).toBeInTheDocument();
+    expect(await screen.findByPlaceholderText('Write your message…')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Send' })).toBeInTheDocument();
   });
 
   it('renders translated heading and empty state in Arabic', async () => {
@@ -60,7 +59,6 @@ describe('AgencyInboxPage', () => {
     vi.spyOn(portalApi, 'fetchInbox').mockResolvedValue([]);
     render(<AgencyInboxPage />);
 
-    expect(await screen.findByRole('heading', { name: 'الوارد والرسائل' })).toBeInTheDocument();
-    expect(screen.getByText('لا توجد رسائل بعد.')).toBeInTheDocument();
+    expect(await screen.findByText('لا توجد رسائل بعد.')).toBeInTheDocument();
   });
 });

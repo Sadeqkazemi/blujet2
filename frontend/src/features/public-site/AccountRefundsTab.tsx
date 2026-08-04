@@ -366,7 +366,11 @@ export default function AccountRefundsTab() {
       )}
 
       {selected && (
-        <Modal title={t.modalTitle as string} onClose={() => !submitBusy && setSelected(null)}>
+        <Modal
+          variant="light"
+          title={t.modalTitle as string}
+          onClose={() => !submitBusy && setSelected(null)}
+        >
           {previewBusy ? (
             <p className="py-6 text-center text-sm text-muted">{t.previewLoading}</p>
           ) : preview ? (

@@ -1,16 +1,22 @@
 import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { useIsMobile } from '../hooks/useIsMobile';
-import { fetchNav } from '../api/panels';
+import { fetchNav, fetchEmployeeContext } from '../api/panels';
 import { fetchCartable, fetchMyReferrals, fetchReferrals } from '../api/cartable';
 import { fetchRefunds } from '../api/refunds';
-import { fetchStaffReports } from '../api/reporting';
+import { fetchLowSalesAlerts, fetchStaffReports } from '../api/reporting';
 import { fetchLogsBadgeCount } from '../api/audit';
+import { fetchCeoPricing } from '../api/pricing';
+import { fetchSupportTickets } from '../api/support-tickets';
 import { faDigits } from '../lib/fa-format';
-import { STAFF_PANEL } from '../lib/staff-panel-theme';
-import { staffNavIcon } from './staff-panel-nav-icons';
-import type { PanelNavItem } from '../types/panels';
+import { formatJalaliDate } from '../lib/jalali';
+import type { EmployeeContext, PanelNavItem } from '../types/panels';
+import type { LowSalesAlert } from '../types/reporting';
+import { isLowSalesRole } from '../types/panel-shell';
+import PanelNotificationBell, { type PanelNotificationItem } from './PanelNotificationBell';
+import PanelNotifBell from './PanelNotifBell';
+import PanelSearchBox from './PanelSearchBox';
+import { PANEL_BRAND_PLANE_ICON, panelNavIcon } from './panel-nav-icons';
 
 const ROLE_LABELS: Record<string, string> = {
   CEO: 'مدیر عامل',
@@ -23,71 +29,35 @@ const ROLE_LABELS: Record<string, string> = {
   EMPLOYEE: 'کارمند',
 };
 
-type NavBadge = { count: number; bg: string };
+/** Must stay in sync with backend `SITE_ADMIN_SIDEBAR_DENYLIST`. */
+const SITE_ADMIN_SIDEBAR_DENYLIST = new Set(['blog', 'kyc', 'settings']);
 
-function navPath(key: string) {
-  return key === 'dashboard' ? '/panel' : `/panel/${key}`;
+/** Brand subtitle under «blujet» — sampled from each panel's design sidebar. */
+const ROLE_BRAND_SUB: Record<string, string> = {
+  IT_MANAGER: 'پنل فناوری اطلاعات',
+  EMPLOYEE: 'پنل کارمند',
+  // Logo line in design HTML / screenshots is «پنل مدیریت» (not roleDefs.sub).
+  SITE_ADMIN: 'پنل مدیریت',
+};
+
+type NavBadge = { count: number; className: string };
+
+function nameInitials(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '؟';
+  if (parts.length === 1) return parts[0]!.slice(0, 2);
+  return `${parts[0]!.slice(0, 1)}${parts[parts.length - 1]!.slice(0, 1)}`;
 }
 
-function NavItem({
-  item,
-  active,
-  badge,
-  onNavigate,
-}: {
-  item: PanelNavItem;
-  active: boolean;
-  badge?: NavBadge;
-  onNavigate?: () => void;
-}) {
-  return (
-    <NavLink
-      to={navPath(item.key)}
-      end={item.key === 'dashboard'}
-      onClick={onNavigate}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-        padding: '10px 11px',
-        borderRadius: 11,
-        fontSize: 12.5,
-        fontWeight: active ? 800 : 600,
-        color: active ? '#fff' : STAFF_PANEL.navMuted,
-        background: active ? STAFF_PANEL.accentSoft : 'transparent',
-        textDecoration: 'none',
-      }}
-    >
-      <span style={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
-        {staffNavIcon(item.key)}
-      </span>
-      <span style={{ flex: 1 }}>{item.labelFa}</span>
-      {badge && (
-        <span
-          data-testid={`nav-badge-${item.key}`}
-          style={{
-            fontSize: 10,
-            fontWeight: 800,
-            color: '#fff',
-            background: badge.bg,
-            minWidth: 20,
-            height: 20,
-            padding: '0 5px',
-            borderRadius: 10,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flex: 'none',
-          }}
-        >
-          {faDigits(badge.count)}
-        </span>
-      )}
-      {!item.implemented && (
-        <span style={{ fontSize: 10, color: '#5a6678', flex: 'none' }}>به‌زودی</span>
-      )}
-    </NavLink>
-  );
+function lowSalesNotifItems(alerts: LowSalesAlert[]): PanelNotificationItem[] {
+  // First alert is shown as the in-page banner; leftovers go to the bell.
+  return alerts.slice(1).map((a) => ({
+    key: `low-sales-${a.flightNo}-${a.departureAt}`,
+    title: 'هشدار فروش ضعیف',
+    sublabel: `${a.flightNo} ${a.originCode} ← ${a.destCode} · ${formatJalaliDate(a.departureAt)}`,
+    to: '/panel/finance',
+    tone: 'warning' as const,
+  }));
 }
 
 export default function PanelShell() {
@@ -97,7 +67,9 @@ export default function PanelShell() {
   const location = useLocation();
   const [nav, setNav] = useState<PanelNavItem[] | null>(null);
   const [badges, setBadges] = useState<Record<string, NavBadge>>({});
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [notifications, setNotifications] = useState<PanelNotificationItem[]>([]);
+  const [lowSalesAlerts, setLowSalesAlerts] = useState<LowSalesAlert[]>([]);
+  const [employeeCtx, setEmployeeCtx] = useState<EmployeeContext | null>(null);
 
   useEffect(() => {
     fetchNav()
@@ -106,32 +78,106 @@ export default function PanelShell() {
   }, []);
 
   useEffect(() => {
-    setMobileMenuOpen(false);
-  }, [location.pathname]);
-
-  const navKeys = useMemo(() => new Set(nav?.map((item) => item.key) ?? []), [nav]);
+    if (user?.role !== 'EMPLOYEE') {
+      setEmployeeCtx(null);
+      return;
+    }
+    fetchEmployeeContext()
+      .then(setEmployeeCtx)
+      .catch(() => setEmployeeCtx(null));
+  }, [user?.role]);
 
   useEffect(() => {
-    if (!nav || nav.length === 0) return;
+    if (!isLowSalesRole(user?.role)) {
+      setLowSalesAlerts([]);
+      return;
+    }
+    fetchLowSalesAlerts()
+      .then(setLowSalesAlerts)
+      .catch(() => setLowSalesAlerts([]));
+  }, [user?.role]);
+
+  const visibleNav = useMemo(() => {
+    if (nav === null) return null;
+    if (user?.role !== 'SITE_ADMIN') return nav;
+    return nav.filter((item) => !SITE_ADMIN_SIDEBAR_DENYLIST.has(item.key));
+  }, [nav, user?.role]);
+
+  const navKeys = useMemo(
+    () => new Set(visibleNav?.map((item) => item.key) ?? []),
+    [visibleNav],
+  );
+
+  useEffect(() => {
+    if (!visibleNav || visibleNav.length === 0) return;
 
     const next: Record<string, NavBadge> = {};
+    const nextNotifications: PanelNotificationItem[] = [];
     const tasks: Promise<void>[] = [];
 
     if (navKeys.has('cartable')) {
       tasks.push(
         fetchCartable()
           .then((r) => {
-            if (r.totalOpen > 0) next.cartable = { count: r.totalOpen, bg: STAFF_PANEL.danger };
+            if (r.totalOpen > 0) {
+              next.cartable = {
+                count: r.totalOpen,
+                className: 'bg-danger text-white',
+              };
+              for (const t of r.tasks.slice(0, 5)) {
+                nextNotifications.push({
+                  key: `cartable-${t.id}`,
+                  title: t.title,
+                  sublabel: t.senderLabelFa ?? t.sender?.fullName ?? undefined,
+                  to: '/panel/cartable',
+                  tone: 'danger',
+                });
+              }
+            }
           })
           .catch(() => undefined),
       );
     }
 
-    if (navKeys.has('refund') && user?.role === 'FINANCE_MANAGER') {
+    if (
+      navKeys.has('refund') &&
+      (user?.role === 'FINANCE_MANAGER' || user?.role === 'SITE_ADMIN')
+    ) {
       tasks.push(
         fetchRefunds()
           .then((r) => {
-            if (r.kpis.payoutQueue > 0) next.refund = { count: r.kpis.payoutQueue, bg: STAFF_PANEL.purple };
+            if (user?.role === 'FINANCE_MANAGER') {
+              if (r.kpis.payoutQueue > 0) {
+                next.refund = {
+                  count: r.kpis.payoutQueue,
+                  className: 'bg-[#a855f7] text-white',
+                };
+                nextNotifications.push({
+                  key: 'refund-queue',
+                  title: 'استرداد در صف پرداخت',
+                  sublabel: `${faDigits(r.kpis.payoutQueue)} مورد`,
+                  to: '/panel/refund',
+                  tone: 'purple',
+                });
+              }
+            } else {
+              const awaiting = r.requests.filter(
+                (row) => row.status === 'SUBMITTED' || row.status === 'REVIEW',
+              ).length;
+              if (awaiting > 0) {
+                next.refund = {
+                  count: awaiting,
+                  className: 'bg-[#f59e0b] text-[#0f1623]',
+                };
+                nextNotifications.push({
+                  key: 'refund-review',
+                  title: 'استرداد در انتظار بررسی',
+                  sublabel: `${faDigits(awaiting)} مورد`,
+                  to: '/panel/refund',
+                  tone: 'warning',
+                });
+              }
+            }
           })
           .catch(() => undefined),
       );
@@ -142,7 +188,17 @@ export default function PanelShell() {
         fetchStaffReports()
           .then((r) => {
             if (r.newEmployeeEvents.length > 0) {
-              next.staff = { count: r.newEmployeeEvents.length, bg: STAFF_PANEL.danger };
+              next.staff = {
+                count: r.newEmployeeEvents.length,
+                className: 'bg-danger text-white',
+              };
+              nextNotifications.push({
+                key: 'staff-events',
+                title: 'رویدادهای جدید کارمندان',
+                sublabel: `${faDigits(r.newEmployeeEvents.length)} مورد`,
+                to: '/panel/staff',
+                tone: 'danger',
+              });
             }
           })
           .catch(() => undefined),
@@ -153,7 +209,16 @@ export default function PanelShell() {
       tasks.push(
         fetchLogsBadgeCount()
           .then((r) => {
-            if (r.count > 0) next.logs = { count: r.count, bg: STAFF_PANEL.danger };
+            if (r.count > 0) {
+              next.logs = { count: r.count, className: 'bg-danger text-white' };
+              nextNotifications.push({
+                key: 'logs-alerts',
+                title: 'رویدادهای امنیتی جدید',
+                sublabel: `${faDigits(r.count)} مورد`,
+                to: '/panel/logs',
+                tone: 'danger',
+              });
+            }
           })
           .catch(() => undefined),
       );
@@ -165,7 +230,17 @@ export default function PanelShell() {
           fetchMyReferrals()
             .then((r) => {
               if (r.counts.awaitingMyReport > 0) {
-                next.referrals = { count: r.counts.awaitingMyReport, bg: STAFF_PANEL.purple };
+                next.referrals = {
+                  count: r.counts.awaitingMyReport,
+                  className: 'bg-[#a855f7] text-white',
+                };
+                nextNotifications.push({
+                  key: 'referrals-awaiting',
+                  title: 'ارجاعات در انتظار گزارش',
+                  sublabel: `${faDigits(r.counts.awaitingMyReport)} مورد`,
+                  to: '/panel/referrals',
+                  tone: 'purple',
+                });
               }
             })
             .catch(() => undefined),
@@ -175,7 +250,17 @@ export default function PanelShell() {
           fetchReferrals()
             .then((r) => {
               if (r.kpis.awaitingReport > 0) {
-                next.referrals = { count: r.kpis.awaitingReport, bg: STAFF_PANEL.purple };
+                next.referrals = {
+                  count: r.kpis.awaitingReport,
+                  className: 'bg-[#a855f7] text-white',
+                };
+                nextNotifications.push({
+                  key: 'referrals-awaiting',
+                  title: 'ارجاعات در انتظار گزارش',
+                  sublabel: `${faDigits(r.kpis.awaitingReport)} مورد`,
+                  to: '/panel/referrals',
+                  tone: 'purple',
+                });
               }
             })
             .catch(() => undefined),
@@ -183,8 +268,49 @@ export default function PanelShell() {
       }
     }
 
-    void Promise.all(tasks).then(() => setBadges(next));
-  }, [nav, navKeys, user?.role]);
+    if (navKeys.has('pricing') && user?.role === 'CEO') {
+      tasks.push(
+        fetchCeoPricing()
+          .then((r) => {
+            if (r.pending.length > 0) {
+              next.pricing = {
+                count: r.pending.length,
+                className: 'bg-[#a78bfa] text-white',
+              };
+            }
+          })
+          .catch(() => undefined),
+      );
+    }
+
+    if (navKeys.has('tickets') && user?.role === 'SITE_ADMIN') {
+      tasks.push(
+        fetchSupportTickets()
+          .then((rows) => {
+            const open = rows.filter((t) => t.status === 'OPEN' || t.status === 'IN_PROGRESS').length;
+            if (open > 0) {
+              next.tickets = {
+                count: open,
+                className: 'bg-[#f59e0b] text-[#0f1623]',
+              };
+              nextNotifications.push({
+                key: 'tickets-open',
+                title: 'تیکت باز',
+                sublabel: `${faDigits(open)} مورد`,
+                to: '/panel/tickets',
+                tone: 'warning',
+              });
+            }
+          })
+          .catch(() => undefined),
+      );
+    }
+
+    void Promise.all(tasks).then(() => {
+      setBadges(next);
+      setNotifications([...lowSalesNotifItems(lowSalesAlerts), ...nextNotifications]);
+    });
+  }, [visibleNav, navKeys, user?.role, lowSalesAlerts]);
 
   async function onSignOut() {
     await signOut();
@@ -192,6 +318,44 @@ export default function PanelShell() {
   }
 
   const roleLabel = user ? (ROLE_LABELS[user.role] ?? user.role) : '';
+  const brandSub =
+    (user?.role ? ROLE_BRAND_SUB[user.role] : undefined) ?? 'پنل مدیریت';
+
+  /** Dark executive chrome: CEO / Board / Senior / Commercial (design v2 shells). */
+  const executiveShell =
+    user?.role === 'CEO' ||
+    user?.role === 'BOARD_CHAIR' ||
+    user?.role === 'SENIOR_MANAGER' ||
+    user?.role === 'COMMERCIAL_MANAGER';
+  /** Finance + Employee + Site Admin get avatar footer chrome. */
+  const avatarShell =
+    executiveShell ||
+    user?.role === 'FINANCE_MANAGER' ||
+    user?.role === 'EMPLOYEE' ||
+    user?.role === 'SITE_ADMIN';
+  const roleInitial =
+    user?.role === 'CEO'
+      ? 'مع'
+      : user?.role === 'BOARD_CHAIR'
+        ? 'ره'
+        : user?.role === 'SENIOR_MANAGER'
+          ? 'ما'
+          : user?.role === 'FINANCE_MANAGER'
+            ? 'مم'
+            : user?.role === 'COMMERCIAL_MANAGER'
+              ? 'مب'
+              : user?.role === 'SITE_ADMIN'
+                ? 'اس'
+                : user?.role === 'EMPLOYEE' && user.fullName
+                  ? nameInitials(user.fullName)
+                  : roleLabel.slice(0, 1);
+  const employeeFooterSub =
+    user?.role === 'EMPLOYEE'
+      ? [employeeCtx?.deptLabelFa, employeeCtx?.rank].filter(Boolean).join(' · ') || roleLabel
+      : null;
+  const onDashboard = /^\/panel\/?$/.test(location.pathname);
+  const showExecNotifChrome = executiveShell && isLowSalesRole(user?.role) && !onDashboard;
+  const notifAlerts = lowSalesAlerts.slice(1);
 
   function isActive(key: string) {
     const path = navPath(key);
@@ -295,128 +459,137 @@ export default function PanelShell() {
   );
 
   return (
-    <div
-      dir="rtl"
-      data-testid="panel-shell"
-      style={{
-        fontFamily: 'Vazirmatn, sans-serif',
-        background: STAFF_PANEL.pageBg,
-        color: STAFF_PANEL.text,
-        minHeight: '100vh',
-        display: 'grid',
-        gridTemplateColumns: isMobile ? '1fr' : '248px 1fr',
-        gridTemplateRows: isMobile ? 'auto 1fr' : '1fr',
-      }}
-    >
-      {isMobile && (
-        <header
-          style={{
-            gridColumn: '1 / -1',
-            position: 'sticky',
-            top: 0,
-            zIndex: 150,
-            background: STAFF_PANEL.sidebarBg,
-            borderBottom: `1px solid ${STAFF_PANEL.sidebarBorder}`,
-            padding: '0 16px',
-            height: 56,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 10,
-          }}
-        >
-          <button
-            type="button"
-            data-testid="panel-mobile-menu-open"
-            aria-label="منوی پنل"
-            onClick={() => setMobileMenuOpen(true)}
-            style={{
-              width: 38,
-              height: 38,
-              borderRadius: 10,
-              border: `1px solid ${STAFF_PANEL.inputBorder}`,
-              background: STAFF_PANEL.inputBg,
-              color: STAFF_PANEL.text,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              fontSize: 18,
-            }}
-          >
-            ☰
-          </button>
-          <span style={{ fontWeight: 900, fontSize: 16, color: '#fff' }}>blujet</span>
-          <span style={{ fontSize: 11, color: STAFF_PANEL.textMuted }}>{roleLabel}</span>
-        </header>
-      )}
-
-      {isMobile && mobileMenuOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 200,
-            background: 'rgba(13,22,35,0.55)',
-          }}
-          onClick={() => setMobileMenuOpen(false)}
-        >
-          <aside
-            data-testid="panel-mobile-drawer"
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: 'min(280px, 88vw)',
-              height: '100%',
-              background: STAFF_PANEL.sidebarBg,
-              borderLeft: `1px solid ${STAFF_PANEL.sidebarBorder}`,
-              padding: '15px 11px',
-              display: 'flex',
-              flexDirection: 'column',
-              overflowY: 'auto',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
-              <button
-                type="button"
-                data-testid="panel-mobile-menu-close"
-                aria-label="بستن"
-                onClick={() => setMobileMenuOpen(false)}
-                style={{
-                  border: 'none',
-                  background: 'transparent',
-                  color: STAFF_PANEL.navMuted,
-                  fontSize: 24,
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
-                }}
-              >
-                ×
-              </button>
-            </div>
-            {sidebarContent}
-          </aside>
+    <div dir="rtl" className="flex min-h-screen bg-panel-canvas font-sans text-panel-ink">
+      <aside className="sticky top-0 flex h-screen w-[248px] flex-none flex-col gap-1.5 border-l border-panel-border bg-panel-surface px-[11px] py-[15px] text-panel-ink">
+        <div className="flex items-center gap-[9px] px-2 pb-3.5 pt-[7px]">
+          <div className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-[10px] bg-[#3b82f6] text-white">
+            {PANEL_BRAND_PLANE_ICON}
+          </div>
+          <div className="leading-[1.3]">
+            <div className="text-[15.5px] font-black text-white">blujet</div>
+            <div className="text-[10px] text-[#6b7b94]">{brandSub}</div>
+          </div>
         </div>
-      )}
 
-      {!isMobile && (
-        <aside
-          data-testid="panel-sidebar"
-          style={{
-            background: STAFF_PANEL.sidebarBg,
-            borderLeft: `1px solid ${STAFF_PANEL.sidebarBorder}`,
-            padding: '15px 11px',
-            display: 'flex',
-            flexDirection: 'column',
-            position: 'sticky',
-            top: 0,
-            height: '100vh',
-            overflowY: 'auto',
-          }}
-        >
-          {sidebarContent}
-        </aside>
-      )}
+        {user?.role !== 'EMPLOYEE' && (
+          <div className="px-[5px] pb-[11px]">
+            <label className="mb-1.5 block pr-[3px] text-[10px] text-[#6b7b94]">نقش این پنل</label>
+            <div className="flex items-center gap-[7px] rounded-[10px] border border-[#2a3a55] bg-[#18223a] px-[11px] py-[9px]">
+              <span className="h-2 w-2 flex-none rounded-full bg-[#3b82f6]" />
+              <span className="text-xs font-extrabold text-panel-ink">{roleLabel}</span>
+            </div>
+          </div>
+        )}
 
-      <main style={{ padding: isMobile ? '16px 16px 34px' : '18px 21px 34px', minWidth: 0, overflowY: 'auto' }}>
-        <Outlet context={{ nav }} />
+        <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
+          {visibleNav === null && <div className="px-2 py-3 text-xs text-panel-muted-2">در حال بارگذاری…</div>}
+          {visibleNav?.length === 0 && (
+            <div className="px-2 py-3 text-xs text-panel-muted-2">تبی برای این نقش تعریف نشده است.</div>
+          )}
+          {visibleNav?.map((item) => {
+            const badge = badges[item.key];
+            return (
+              <NavLink
+                key={item.key}
+                to={item.key === 'dashboard' ? '/panel' : `/panel/${item.key}`}
+                end={item.key === 'dashboard'}
+                className={({ isActive }) =>
+                  `flex items-center gap-2.5 rounded-[11px] px-[11px] py-2.5 text-[12.5px] transition ${
+                    isActive
+                      ? 'bg-[rgba(59,130,246,.16)] font-bold text-white'
+                      : 'font-medium text-panel-muted hover:bg-white/5'
+                  }`
+                }
+              >
+                <span className="flex h-5 w-5 flex-none items-center justify-center">
+                  {panelNavIcon(item.key)}
+                </span>
+                <span className="flex-1">{item.labelFa}</span>
+                {badge && (
+                  <span
+                    data-testid={`nav-badge-${item.key}`}
+                    className={`font-num flex h-5 min-w-5 items-center justify-center rounded-[10px] px-[5px] text-center text-[10px] font-extrabold ${badge.className}`}
+                  >
+                    {faDigits(badge.count)}
+                  </span>
+                )}
+                {!item.implemented && <span className="text-[10px] text-[#5a6678]">به‌زودی</span>}
+              </NavLink>
+            );
+          })}
+        </nav>
+
+        {avatarShell ? (
+          <div className="mt-auto border-t border-panel-border p-4">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-gradient-to-br from-[#3b82f6] to-[#9333ea] text-[11px] font-extrabold text-white">
+                {roleInitial}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-xs font-bold text-white">
+                  {user?.role === 'EMPLOYEE' ? (user.fullName ?? roleLabel) : roleLabel}
+                </div>
+                {user?.role === 'EMPLOYEE' ? (
+                  <div className="truncate text-[10px] text-[#6b7b94]">{employeeFooterSub}</div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void onSignOut()}
+                    className="text-[10.5px] text-[#9fb0c7] transition hover:text-white"
+                  >
+                    خروج از حساب
+                  </button>
+                )}
+              </div>
+              {user?.role === 'EMPLOYEE' && (
+                <button
+                  type="button"
+                  onClick={() => void onSignOut()}
+                  title="خروج"
+                  aria-label="خروج از حساب"
+                  className="flex-none text-[#6b7b94] transition hover:text-white"
+                >
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <path d="M16 17l5-5-5-5M21 12H9" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="mt-auto border-t border-panel-border pt-3">
+            <button
+              onClick={() => void onSignOut()}
+              className="w-full rounded-[11px] border border-panel-border py-2 text-xs text-panel-muted transition hover:bg-white/5"
+            >
+              خروج از حساب
+            </button>
+          </div>
+        )}
+      </aside>
+
+      <main className="min-w-0 flex-1 overflow-y-auto">
+        {executiveShell ? (
+          showExecNotifChrome ? (
+            <div className="flex items-center justify-end gap-2.5 px-[21px] pt-[18px]">
+              <div className="flex h-[42px] w-[230px] items-center gap-2 rounded-[10px] border border-[#28344c] bg-[#18223a] px-3 text-[12px] text-[#6b7b94]">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="M21 21l-4.3-4.3" />
+                </svg>
+                <span>جستجو…</span>
+              </div>
+              <PanelNotifBell alerts={notifAlerts} variant="dark" />
+            </div>
+          ) : null
+        ) : (
+          <div className="flex items-center justify-end gap-3 border-b border-panel-border px-8 py-3">
+            <PanelNotificationBell items={notifications} />
+            <PanelSearchBox nav={visibleNav ?? []} />
+          </div>
+        )}
+        <Outlet context={{ nav: visibleNav, lowSalesAlerts }} />
       </main>
     </div>
   );

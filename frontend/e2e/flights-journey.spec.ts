@@ -56,7 +56,7 @@ async function addFlight(
 test('Senior adds a flight via the modal, sees it in پروازهای فعال and opens its detail modal', async ({
   page,
 }) => {
-  await loginAs(page, 'senior.rahimi');
+  await loginAs(page, 'senior');
   await page.getByRole('link', { name: /^مدیریت پروازها/ }).click();
   await expect(page.getByRole('heading', { name: 'مدیریت پروازها' })).toBeVisible();
   await expect(page.getByText('میانگین ضریب اشغال')).toBeVisible();
@@ -97,7 +97,7 @@ test.describe.serial('future flights with the real ml-service', () => {
   test('Commercial: new future flight → AI analysis → نرخ‌گذاری with the AI price → Phase 6 proposal pending', async ({
     page,
   }) => {
-    await loginAs(page, 'comm.abbasi');
+    await loginAs(page, 'comm');
     await page.getByRole('link', { name: /^مدیریت پروازها/ }).click();
 
     const flightNo = uniqueFlightNo();

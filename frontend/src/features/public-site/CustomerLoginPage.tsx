@@ -12,10 +12,47 @@ import { useAuth } from '../../hooks/useAuth';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { ApiRequestError } from '../../api/envelope';
-import { requestAgencySignupOtp, submitAgencyRequest } from '../../api/agencies';
-import { faDigits } from '../../lib/fa-format';
+import { faDigits, latinDigits } from '../../lib/fa-format';
 
 const RESEND_SECONDS = 120;
+
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  boxSizing: 'border-box',
+  padding: '11px 13px',
+  border: '1.5px solid #e3e9f1',
+  borderRadius: 11,
+  fontFamily: 'inherit',
+  fontSize: 13.5,
+  color: '#16202e',
+  background: '#fff',
+  outline: 'none',
+};
+
+function sanitizeMobileInput(raw: string) {
+  return latinDigits(raw).replace(/[^\d]/g, '').slice(0, 11);
+}
+
+function sanitizeOtpInput(raw: string) {
+  return latinDigits(raw).replace(/\D/g, '').slice(0, 6);
+}
+
+const labelStyle: React.CSSProperties = { display: 'block', fontSize: 11.5, fontWeight: 700, color: '#5a6678', marginBottom: 6 };
+
+function primaryBtn(enabled: boolean): React.CSSProperties {
+  return {
+    border: 'none',
+    borderRadius: 11,
+    background: enabled ? '#1668c4' : '#aab8c8',
+    color: '#fff',
+    padding: '12px 0',
+    width: '100%',
+    fontSize: 13.5,
+    fontWeight: 800,
+    cursor: enabled ? 'pointer' : 'not-allowed',
+    fontFamily: 'inherit',
+  };
+}
 
 function useCountdown() {
   const [left, setLeft] = useState(0);
@@ -569,15 +606,22 @@ export default function CustomerLoginPage() {
             <form onSubmit={(e) => void onPasswordLogin(e)} style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
               <PhoneField label={t.mobileLabel} value={phone} onChange={setPhone} testId="signin-pw-phone" />
               <div>
-                <div style={loginLabelStyle}>{t.passwordLabel}</div>
+                <label style={labelStyle}>{t.mobileLabel}</label>
                 <input
-                  type="password"
-                  data-testid="signin-pw-password"
+                  data-testid="signin-pw-phone"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
                   dir="ltr"
-                  value={userPassword}
-                  onChange={(e) => setUserPassword(e.target.value)}
-                  style={loginFieldStyle}
+                  value={phone}
+                  onChange={(e) => setPhone(sanitizeMobileInput(e.target.value))}
+                  placeholder="09xxxxxxxxx"
+                  style={inputStyle}
                 />
+              </div>
+              <div>
+                <label style={labelStyle}>{t.passwordLabel}</label>
+                <input type="password" data-testid="signin-pw-password" dir="ltr" value={userPassword} onChange={(e) => setUserPassword(e.target.value)} style={inputStyle} />
               </div>
               <button
                 type="submit"
@@ -615,7 +659,20 @@ export default function CustomerLoginPage() {
                   </div>
                 </>
               )}
-              <PhoneField label={t.mobileLabel} value={phone} onChange={setPhone} testId="signin-phone" />
+              <div>
+                <label style={labelStyle}>{t.mobileLabel}</label>
+                <input
+                  data-testid="signin-phone"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  dir="ltr"
+                  value={phone}
+                  onChange={(e) => setPhone(sanitizeMobileInput(e.target.value))}
+                  placeholder="09xxxxxxxxx"
+                  style={inputStyle}
+                />
+              </div>
               {!isLogin && (
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5, color: '#3b4554', cursor: 'pointer' }}>
                   <input type="checkbox" data-testid="signup-terms" checked={terms} onChange={(e) => setTerms(e.target.checked)} />
@@ -662,21 +719,23 @@ export default function CustomerLoginPage() {
                 </div>
                 <input
                   data-testid="signin-code"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
                   dir="ltr"
                   value={code}
-                  onChange={(e) => setCode(e.target.value)}
+                  onChange={(e) => setCode(sanitizeOtpInput(e.target.value))}
                   placeholder="- - - - - -"
-                  style={{
-                    ...loginFieldStyle,
-                    height: 60,
-                    fontSize: 22,
-                    fontWeight: 800,
-                    letterSpacing: 8,
-                    textAlign: 'center',
-                  }}
+                  maxLength={6}
+                  style={{ ...inputStyle, fontSize: 15, letterSpacing: 4, textAlign: 'center' }}
                 />
               </div>
-              <button type="submit" data-testid="signin-verify" disabled={busy || !code.trim()} style={loginPrimaryBtn(!busy && !!code.trim())}>
+              {import.meta.env.DEV && (
+                <p data-testid="signin-dev-otp-hint" style={{ margin: 0, fontSize: 11, color: '#6b7585', textAlign: 'center' }}>
+                  {locale === 'en' ? 'Dev OTP code: 123456' : 'کد توسعه (OTP): ۱۲۳۴۵۶'}
+                </p>
+              )}
+              <button type="submit" data-testid="signin-verify" disabled={busy || !code.trim()} style={primaryBtn(!busy && !!code.trim())}>
                 {isLogin ? t.confirmLogin : t.confirmSignup}
               </button>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>

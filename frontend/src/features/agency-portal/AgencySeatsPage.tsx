@@ -158,17 +158,26 @@ export default function AgencySeatsPage() {
                     </div>
                   </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
-                  {(
-                    [
-                      [t.allocatedLabel, f.seatsAllocated, '#8a5cf6'],
-                      [t.soldLabel, f.seatsUsed, '#1f8a5b'],
-                      [t.remainingLabel, left, '#1668c4'],
-                    ] as const
-                  ).map(([label, val, color]) => (
-                    <div key={label} style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: 10.5, color: '#8a96a6', marginBottom: 2 }}>{label}</div>
-                      <div style={{ fontSize: 15.5, fontWeight: 800, color }}>{faDigits(val)}</div>
+                <span
+                  className={`rounded-full px-3 py-1 text-[10.5px] font-extrabold ${
+                    f.active ? 'bg-[#e8f5ee] text-[#1f8a5b]' : 'bg-surface text-muted'
+                  }`}
+                >
+                  {f.active ? t.activeBadge : t.releasedBadge}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                {(
+                  [
+                    [t.allocatedLabel, f.seatsAllocated, '#1668c4'],
+                    [t.soldLabel, f.seatsUsed, '#1f8a5b'],
+                    [t.remainingLabel, left, left === 0 ? '#d64545' : '#0d2640'],
+                  ] as const
+                ).map(([label, val, color]) => (
+                  <div key={label} className="rounded-xl border border-[#eef1f5] bg-[#fafbfd] p-3 text-center">
+                    <div className="mb-1 text-[10.5px] text-[#8a96a6]">{label}</div>
+                    <div className="text-lg font-black" style={{ color }}>
+                      {faDigits(val)}
                     </div>
                   ))}
                   {f.active && (
