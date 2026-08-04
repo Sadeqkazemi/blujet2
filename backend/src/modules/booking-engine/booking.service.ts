@@ -26,6 +26,12 @@ import {
   isValidIranianNationalId,
   normalizeNationalId,
 } from '../../common/pii-crypto';
+import {
+  generateUniqueItineraryPnr,
+  generateUniquePnr,
+  legPnr,
+} from '../../common/pnr.util';
+import { captureAndTicket } from '../../common/booking-state.util';
 import { enumerateSeats } from '../reservation/seat-layout';
 import { matchesLastName } from '../../common/passenger-name.util';
 import { resolveAircraftType } from '../flights/aircraft-type.util';
@@ -40,6 +46,10 @@ import { CustomerReferralsService } from '../customer-referrals/customer-referra
 import { applyPromoCode } from './promo.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { CreateBookingDto } from './dto/create-booking.dto';
+
+type ConnectionFlightInstance = TypeORM.FlightInstanceGetPayload<{
+  include: { flight: { include: { route: true } } };
+}>;
 
 export type PaymentMethod = 'GATEWAY' | 'WALLET' | 'POINTS';
 
@@ -760,6 +770,442 @@ export class BookingService {
     return {
       priceChanged: false as const,
       booking: this.toDetail(paid.booking),
+    };
+  }
+
+  private toItineraryDetail(
+    itinerary: {
+      id: string;
+      pnr: string;
+      holdExpiresAt: Date | null;
+      legs: BookingWithRelations[];
+    },
+    totalPriceIrr: number,
+  ) {
+    return {
+      itineraryId: itinerary.id,
+      pnr: itinerary.pnr,
+      holdExpiresAt: itinerary.holdExpiresAt,
+      totalPriceIrr,
+      legs: itinerary.legs.map((leg) => this.toDetail(leg)),
+    };
+  }
+
+  /** Atomic hold for a 2-leg connection — shared itinerary PNR, per-leg bookings. */
+  async createConnectionBooking(
+    user: AuthenticatedUser,
+    dto: CreateConnectionBookingDto,
+    idempotencyKey?: string,
+  ) {
+    if (dto.legs.length !== 2) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'رزرو اتصال فقط برای دو پرواز پشتیبانی می‌شود.',
+      });
+    }
+
+    const paxCount = dto.legs[0].passengers.length;
+    if (dto.legs[1].passengers.length !== paxCount) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'تعداد مسافران در هر دو پرواز باید یکسان باشد.',
+      });
+    }
+
+    if (idempotencyKey) {
+      const existing = await this.typeorm.booking.findUnique({
+        where: { idempotencyKey },
+        include: {
+          ...BOOKING_INCLUDE,
+          itinerary: { include: { legs: { include: BOOKING_INCLUDE } } },
+        },
+      });
+      if (existing?.itinerary) {
+        const total = existing.itinerary.legs.reduce(
+          (sum, leg) => sum + leg.priceIrr,
+          0,
+        );
+        return this.toItineraryDetail(existing.itinerary, total);
+      }
+    }
+
+    const contactUser = await this.typeorm.user.findUniqueOrThrow({
+      where: { id: user.id },
+      select: { phone: true },
+    });
+
+    const holdExpiresAt = new Date(Date.now() + HOLD_TTL_MS);
+    let totalPriceIrr = 0;
+
+    const result = await this.typeorm.$transaction(async (tx) => {
+      const legInstances: {
+        leg: CreateConnectionBookingDto['legs'][number];
+        instance: ConnectionFlightInstance;
+      }[] = [];
+      for (const leg of dto.legs) {
+        const instance = await tx.flightInstance.findUnique({
+          where: { id: leg.flightInstanceId },
+          include: { flight: { include: { route: true } } },
+        });
+        if (!instance || instance.status !== 'SCHEDULED') {
+          throw new NotFoundException({
+            code: ErrorCode.NOT_FOUND,
+            message: 'یکی از پروازهای اتصال یافت نشد.',
+          });
+        }
+        legInstances.push({ leg, instance });
+      }
+
+      const sortedIds = legInstances
+        .map((l) => l.instance.id)
+        .sort()
+        .join(',');
+      for (const id of sortedIds.split(',')) {
+        await tx.$queryRaw`SELECT id FROM flight_instances WHERE id = ${id} FOR UPDATE`;
+      }
+
+      const itineraryPnr = await generateUniqueItineraryPnr(tx);
+      const itinerary = await tx.itinerary.create({
+        data: {
+          pnr: itineraryPnr,
+          userId: user.id,
+          channel: 'SYSTEM',
+          holdExpiresAt,
+        },
+      });
+
+      const first = legInstances[0]!.instance;
+      const second = legInstances[1]!.instance;
+      const via = first.flight.route.destCode;
+      if (second.flight.route.originCode !== via) {
+        throw new BadRequestException({
+          code: ErrorCode.VALIDATION_FAILED,
+          message: 'پرواز دوم باید از همان فرودگاه اتصال حرکت کند.',
+        });
+      }
+      const airport = await tx.airport.findUnique({ where: { code: via } });
+      const minGapMs = (airport?.minConnectMin ?? 60) * 60_000;
+      if (second.departureAt.getTime() < first.arrivalAt.getTime() + minGapMs) {
+        throw new BadRequestException({
+          code: ErrorCode.VALIDATION_FAILED,
+          message: 'زمان اتصال بین دو پرواز کافی نیست.',
+        });
+      }
+
+      const createdLegs: BookingWithRelations[] = [];
+
+      for (let legIndex = 0; legIndex < legInstances.length; legIndex++) {
+        const { leg, instance } = legInstances[legIndex]!;
+        const map = await tx.aircraftSeatMap.findUnique({
+          where: { aircraftType: resolveAircraftType(instance) },
+        });
+        if (!map) {
+          throw new NotFoundException({
+            code: ErrorCode.NOT_FOUND,
+            message: 'نقشه صندلی برای یکی از پروازها تعریف نشده است.',
+          });
+        }
+
+        const seatsByCode = new Map(
+          enumerateSeats(map).map((s) => [s.seatCode, s]),
+        );
+        const requestedCodes = leg.passengers.map((p) => p.seatCode);
+        for (const code of requestedCodes) {
+          const seat = seatsByCode.get(code);
+          if (!seat || seat.cabin !== dto.cabin) {
+            throw new BadRequestException({
+              code: ErrorCode.VALIDATION_FAILED,
+              message: `صندلی ${code} در پرواز ${instance.flight.flightNo} معتبر نیست.`,
+            });
+          }
+        }
+
+        const taken = await this.search.takenSeatCodes(instance.id);
+        const conflict = requestedCodes.find((c) => taken.has(c));
+        if (conflict) {
+          throw new ConflictException({
+            code: ErrorCode.CONFLICT,
+            message: `صندلی ${conflict} در پرواز ${instance.flight.flightNo} در دسترس نیست.`,
+          });
+        }
+
+        const counts = await this.search.takenCountsByChannel(instance.id);
+        const publicPoolLimit =
+          instance.capacity -
+          instance.charterSeats -
+          (instance.agencySeatsAllocated ?? 0);
+        if (counts.SYSTEM + counts.MANAGERIAL + paxCount > publicPoolLimit) {
+          throw new ConflictException({
+            code: ErrorCode.POOL_EXHAUSTED,
+            message: `ظرفیت فروش عمومی پرواز ${instance.flight.flightNo} تکمیل شده است.`,
+          });
+        }
+
+        const fareClass = await resolveFareClass(
+          this.typeorm,
+          instance.id,
+          dto.cabin,
+        );
+        const taxIrr = (fareClass?.taxIrr ?? 0) * paxCount;
+        const unitPriceIrr = await getCabinPrice(
+          this.typeorm,
+          instance.id,
+          dto.cabin,
+        );
+        const priceIrr = unitPriceIrr * paxCount + taxIrr;
+        totalPriceIrr += priceIrr;
+
+        const booking = await tx.booking.create({
+          data: {
+            pnr: legPnr(itineraryPnr, legIndex),
+            flightInstanceId: instance.id,
+            itineraryId: itinerary.id,
+            legIndex,
+            channel: 'SYSTEM',
+            status: 'HELD',
+            cabin: dto.cabin,
+            fareClassCode: fareClass?.classCode ?? null,
+            priceIrr,
+            taxIrr,
+            userId: user.id,
+            contactPhone: contactUser.phone ?? undefined,
+            holdExpiresAt,
+            idempotencyKey: legIndex === 0 ? idempotencyKey : undefined,
+            passengers: {
+              create: leg.passengers.map((p) => {
+                const nationalId = p.nationalId
+                  ? normalizeNationalId(p.nationalId)
+                  : undefined;
+                return {
+                  fullName: p.fullName,
+                  seatCode: p.seatCode,
+                  nationalIdEnc: nationalId ? encryptPii(nationalId) : undefined,
+                  nationalIdHash: nationalId ? hashPii(nationalId) : undefined,
+                  mobileEnc: p.mobile ? encryptPii(p.mobile) : undefined,
+                };
+              }),
+            },
+          },
+          include: BOOKING_INCLUDE,
+        });
+        createdLegs.push(booking);
+      }
+
+      return { itinerary, legs: createdLegs };
+    });
+
+    for (const leg of result.legs) {
+      await this.search.invalidateForInstance(leg.flightInstanceId);
+    }
+
+    await this.audit.record({
+      actorId: user.id,
+      actorRole: user.role,
+      category: 'RESERVATION',
+      action: 'رزرو اتصال (HELD)',
+      detail: `رزرو اتصال ${result.itinerary.pnr} با ${result.legs.length} پرواز ثبت شد.`,
+      entityType: 'Itinerary',
+      entityId: result.itinerary.id,
+    });
+
+    return this.toItineraryDetail(
+      { ...result.itinerary, legs: result.legs },
+      totalPriceIrr,
+    );
+  }
+
+  async payItinerary(
+    itineraryId: string,
+    user: AuthenticatedUser,
+    options: {
+      confirmedPriceIrr?: number;
+      promoCode?: string;
+      paymentMethod?: PaymentMethod;
+    } = {},
+  ) {
+    const itinerary = await this.typeorm.itinerary.findUnique({
+      where: { id: itineraryId },
+      include: { legs: { include: BOOKING_INCLUDE, orderBy: { legIndex: 'asc' } } },
+    });
+    if (!itinerary || itinerary.userId !== user.id) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'رزرو اتصال یافت نشد.',
+      });
+    }
+    if (itinerary.legs.length === 0) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'رزرو اتصال یافت نشد.',
+      });
+    }
+
+    for (const leg of itinerary.legs) {
+      if (leg.status === 'HELD' && leg.holdExpiresAt && leg.holdExpiresAt <= new Date()) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'مهلت نگهداری این رزرو به پایان رسیده است.',
+        });
+      }
+      if (leg.status !== 'HELD') {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'این رزرو اتصال قبلاً پرداخت شده یا قابل پرداخت نیست.',
+        });
+      }
+    }
+
+    let currentTotalIrr = 0;
+    const repricedLegs: { id: string; currentPriceIrr: number }[] = [];
+    for (const leg of itinerary.legs) {
+      const fareClass = await resolveFareClass(
+        this.typeorm,
+        leg.flightInstanceId,
+        leg.cabin,
+      );
+      const taxIrr = (fareClass?.taxIrr ?? 0) * leg.passengers.length;
+      const currentPriceIrr =
+        (await getCabinPrice(
+          this.typeorm,
+          leg.flightInstanceId,
+          leg.cabin,
+        )) *
+          leg.passengers.length +
+        taxIrr;
+      currentTotalIrr += currentPriceIrr;
+      repricedLegs.push({ id: leg.id, currentPriceIrr });
+    }
+
+    const storedTotal = itinerary.legs.reduce((s, l) => s + l.priceIrr, 0);
+    if (currentTotalIrr !== storedTotal) {
+      if (options.confirmedPriceIrr !== currentTotalIrr) {
+        return {
+          priceChanged: true as const,
+          previousPriceIrr: storedTotal,
+          currentPriceIrr: currentTotalIrr,
+        };
+      }
+    }
+
+    const paymentMethod: PaymentMethod = options.paymentMethod ?? 'GATEWAY';
+    const member = await this.clubPoints.findMemberByUserId(user.id);
+    let gatewayRefId: string | null = null;
+    let reconciliationId: string | null = null;
+
+    if (paymentMethod === 'GATEWAY') {
+      const { authority } = await this.gateway.request(
+        currentTotalIrr,
+        itineraryId,
+      );
+      const verified = await this.gateway.verify(authority, currentTotalIrr);
+      if (!verified.ok) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'پرداخت از سوی درگاه تأیید نشد.',
+        });
+      }
+      gatewayRefId = verified.refId;
+      const reconciliation = await this.typeorm.paymentReconciliation.create({
+        data: {
+          bookingId: itinerary.legs[0]!.id,
+          gatewayRefId: verified.refId,
+          amountIrr: currentTotalIrr,
+        },
+      });
+      reconciliationId = reconciliation.id;
+    }
+
+    const paid = await this.typeorm.$transaction(async (tx) => {
+      let finalTotalIrr = currentTotalIrr;
+      let discountIrr = 0;
+      if (options.promoCode) {
+        const firstLeg = itinerary.legs[0]!;
+        const result = await applyPromoCode(tx, {
+          code: options.promoCode,
+          userId: user.id,
+          bookingId: firstLeg.id,
+          originCode: firstLeg.flightInstance.flight.route.originCode,
+          destCode:
+            itinerary.legs[itinerary.legs.length - 1]!.flightInstance.flight.route
+              .destCode,
+          cabin: firstLeg.cabin,
+          priceIrr: currentTotalIrr,
+        });
+        finalTotalIrr = result.finalPriceIrr;
+        discountIrr = result.discountIrr;
+      }
+
+      if (paymentMethod === 'WALLET') {
+        await this.wallet.charge(tx, user.id, finalTotalIrr, itinerary.legs[0]!.id);
+      } else if (paymentMethod === 'POINTS') {
+        if (!member) {
+          throw new BadRequestException({
+            code: ErrorCode.VALIDATION_FAILED,
+            message: 'پرداخت با امتیاز فقط برای اعضای باشگاه مشتریان است.',
+          });
+        }
+        await this.clubPoints.redeemForPayment(
+          tx,
+          member.id,
+          finalTotalIrr,
+          itinerary.legs[0]!.id,
+        );
+      }
+
+      const ratio = finalTotalIrr / currentTotalIrr;
+      for (const repriced of repricedLegs) {
+        const legFinal = Math.round(repriced.currentPriceIrr * ratio);
+        await captureAndTicket(tx, repriced.id, { priceIrr: legFinal });
+      }
+
+      if (reconciliationId) {
+        await tx.paymentReconciliation.update({
+          where: { id: reconciliationId },
+          data: { status: 'RESOLVED', resolvedAt: new Date() },
+        });
+      }
+
+      await tx.ledgerEntry.create({
+        data: {
+          bookingId: itinerary.legs[0]!.id,
+          type: 'SALE',
+          signedAmountIrr: finalTotalIrr,
+          createdById: user.id,
+        },
+      });
+
+      if (member && paymentMethod !== 'POINTS') {
+        await this.clubPoints.earnForPurchase(
+          tx,
+          member.id,
+          finalTotalIrr,
+          itinerary.legs[0]!.id,
+        );
+      }
+
+      const refreshed = await tx.itinerary.findUniqueOrThrow({
+        where: { id: itineraryId },
+        include: { legs: { include: BOOKING_INCLUDE, orderBy: { legIndex: 'asc' } } },
+      });
+      return { itinerary: refreshed, discountIrr };
+    });
+
+    await this.audit.record({
+      actorId: user.id,
+      actorRole: user.role,
+      category: 'RESERVATION',
+      action: 'پرداخت رزرو اتصال',
+      detail: `رزرو اتصال ${paid.itinerary.pnr} پرداخت شد.`,
+      entityType: 'Itinerary',
+      entityId: paid.itinerary.id,
+      metadata: { paymentMethod, gatewayRefId },
+    });
+
+    const total = paid.itinerary.legs.reduce((s, l) => s + l.priceIrr, 0);
+    return {
+      priceChanged: false as const,
+      itinerary: this.toItineraryDetail(paid.itinerary, total),
+      discountIrr: paid.discountIrr,
     };
   }
 }

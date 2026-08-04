@@ -26,6 +26,7 @@ import { PricingModule } from './modules/pricing/pricing.module';
 import { RefundsModule } from './modules/refunds/refunds.module';
 import { ReservationModule } from './modules/reservation/reservation.module';
 import { AgencyPortalModule } from './modules/agency-portal/agency-portal.module';
+import { AgencyApiModule } from './modules/agency-api/agency-api.module';
 import { FlightsModule } from './modules/flights/flights.module';
 import { PassengerReportsModule } from './modules/passenger-reports/passenger-reports.module';
 import { StaffReportsModule } from './modules/staff-reports/staff-reports.module';
@@ -100,6 +101,7 @@ import { WebservicePricingModule } from './modules/webservice-pricing/webservice
     RefundsModule,
     ReservationModule,
     AgencyPortalModule,
+    AgencyApiModule,
     FlightsModule,
     PassengerReportsModule,
     StaffReportsModule,

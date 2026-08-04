@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   Param,
   Post,
   Res,
@@ -19,6 +20,10 @@ import {
   RequestWebserviceDto,
   UploadDocumentDto,
 } from './dto/agency-portal.dtos';
+import {
+  CreateAgencyBookingDto,
+  IssueAgencyBookingDto,
+} from '../agencies/dto/create-agency-booking.dto';
 import { MAX_FILE_BYTES } from '../files/files.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -203,5 +208,44 @@ export class AgencyPortalController {
   })
   async apiKeys(@CurrentUser() actor: AuthenticatedUser) {
     return { success: true, data: await this.portal.apiKeys(actor) };
+  }
+
+  @Post('bookings')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @ApiOperation({ summary: 'رزرو صندلی آژانس — نگهداری ۱۰ دقیقه‌ای (HELD)' })
+  async createBooking(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Body() dto: CreateAgencyBookingDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    return {
+      success: true,
+      data: await this.portal.createBooking(actor, dto, idempotencyKey),
+    };
+  }
+
+  @Get('bookings/:id')
+  @ApiOperation({ summary: 'جزئیات یک رزرو آژانس' })
+  async getBooking(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    return { success: true, data: await this.portal.getBooking(actor, id) };
+  }
+
+  @Post('bookings/:id/issue')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @ApiOperation({
+    summary: 'صدور بلیط از اعتبار — re-price بلافاصله پیش از کسر اعتبار',
+  })
+  async issueBooking(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: IssueAgencyBookingDto,
+  ) {
+    return {
+      success: true,
+      data: await this.portal.issueBooking(actor, id, dto),
+    };
   }
 }

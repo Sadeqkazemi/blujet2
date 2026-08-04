@@ -16,6 +16,7 @@ import { Passenger } from '../../database/entities/passenger.entity';
 import { AuditService } from '../audit/audit.service';
 import { CartableService } from '../cartable/cartable.service';
 import { AgenciesService } from '../agencies/agencies.service';
+import { AgencyBookingService } from '../agencies/agency-booking.service';
 import { FilesService } from '../files/files.service';
 import { WebservicePricingService } from '../webservice-pricing/webservice-pricing.service';
 import { ErrorCode } from '../../common/errors';
@@ -26,6 +27,10 @@ import type {
   RequestWebserviceDto,
   UploadDocumentDto,
 } from './dto/agency-portal.dtos';
+import type {
+  CreateAgencyBookingDto,
+  IssueAgencyBookingDto,
+} from '../agencies/dto/create-agency-booking.dto';
 
 const CREDIT_REVIEW_ROLES = [
   'SENIOR_MANAGER',
@@ -61,6 +66,7 @@ export class AgencyPortalService {
     private readonly audit: AuditService,
     private readonly cartable: CartableService,
     private readonly agencies: AgenciesService,
+    private readonly agencyBookings: AgencyBookingService,
     private readonly files: FilesService,
     private readonly webservicePricing: WebservicePricingService,
   ) {}
@@ -556,5 +562,27 @@ export class AgencyPortalService {
       lastUsedAt: k.lastUsedAt,
       callCount: k.callCount,
     }));
+  }
+
+  async createBooking(
+    actor: AuthenticatedUser,
+    dto: CreateAgencyBookingDto,
+    idempotencyKey?: string,
+  ) {
+    return this.agencyBookings.createBooking(actor, dto, idempotencyKey);
+  }
+
+  async getBooking(actor: AuthenticatedUser, bookingId: string) {
+    return this.agencyBookings.getById(actor, bookingId);
+  }
+
+  async issueBooking(
+    actor: AuthenticatedUser,
+    bookingId: string,
+    dto: IssueAgencyBookingDto,
+  ) {
+    return this.agencyBookings.issue(actor, bookingId, {
+      confirmedPriceIrr: dto.confirmedPriceIrr,
+    });
   }
 }
