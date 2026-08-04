@@ -8,34 +8,30 @@ Unlike every prior page, `design-reference-v2/ورود و ثبتنام.dc.html` 
 **structurally different field layout** from the real app: the design's
 mock is email+password-first with a Google sign-in button and a 5-digit
 OTP step, while the real `CustomerLoginPage.tsx` is phone+OTP-first (6-digit
-OTP, no Google sign-in — out of scope) with a separate real-password toggle
-and a real agency-login/agency-signup flow. Because of this mismatch, most
-strings were hand-translated to match the real app's actual fields and
-flows, rather than lifted verbatim from the design. Where a concept does
-line up 1:1 with the design (tab labels "ورود"/"ثبت‌نام", the agency-account
-activation note, the "ارسال مجدد کد" resend label), the design bundle's own
-`isEN` ternary / `arDeep` entry was used as the EN/AR source so wording
-stays consistent with the rest of the app.
+OTP, no Google sign-in — out of scope) with a separate real-password toggle.
+Agency login/signup is a **separate route** (`/agency/login`); staff login
+is `/login`. Cross-links between the three surfaces replace the old
+کاربر/آژانس segment on this page.
+
+Because of the design mismatch, most strings were hand-translated to match
+the real app's actual fields and flows. Where a concept does line up 1:1
+with the design (tab labels "ورود"/"ثبت‌نام", the "ارسال مجدد کد" resend
+label), the design bundle's own `isEN` ternary / `arDeep` entry was used.
 
 ## Acceptance checklist
 
-- [x] Login/Signup tabs, User/Agency account toggle, and the subtitle text
-      (four variants: login-user, login-agency, signup-user, signup-agency)
-      render in fa/en/ar
-      — `PublicMockPages.test.tsx` › "renders translated tabs, labels, and
-      forgot-password link in English" + "renders translated tabs and
-      labels in Arabic"
-- [x] All three pre-existing `CustomerLoginPage` tests (OTP flow with
-      resend countdown, signup name/terms validation + agency signup,
-      password-login toggle + forgot-password link) pass unmodified — fa
-      strings byte-identical to before this phase, including the two
-      byte-critical strings asserted verbatim: `'فراموشی رمز عبور؟'` and
-      `'ارسال مجدد کد'`
-      — `PublicMockPages.test.tsx` (original `describe('CustomerLoginPage')`
-      tests, unchanged)
+- [x] Login/Signup tabs and subtitle text (login / signup) render in
+      fa/en/ar — no User/Agency account toggle on this page
+      — `PublicMockPages.test.tsx` › English + Arabic tab tests
+- [x] Cross-links to `/agency/login` and `/login` are present
+      — `PublicMockPages.test.tsx` › OTP flow test asserts
+      `signin-agency-link` / `signin-staff-link`
+- [x] OTP flow with resend countdown, signup name/terms validation,
+      password-login toggle + forgot-password link
+      — `PublicMockPages.test.tsx` › `describe('CustomerLoginPage')`
 - [x] Forgot-password link translates to "Forgot password?" / "نسيت كلمة
       المرور؟" and keeps its `/forgot-password` href in every locale
-      — `PublicMockPages.test.tsx` › new English + Arabic tests above
+      — `PublicMockPages.test.tsx` › English + Arabic tests
 - [x] Resend-code countdown timer digits render via locale-aware `fmtTimer`
       (Persian digits in fa, Latin digits in en/ar) — implemented in
       `CustomerLoginPage.tsx`; not separately unit-tested this phase (same
