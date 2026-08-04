@@ -29,6 +29,7 @@ import CartableRouter from './components/CartableRouter';
 import ClubRouter from './features/club/ClubRouter';
 import ClubPage from './features/club/ClubPage';
 import ClubTierRulesPage from './features/club/ClubTierRulesPage';
+import SiteAdminCustomersPage from './features/customers/SiteAdminCustomersPage';
 import EmployeesPage from './features/it-manager/EmployeesPage';
 import ServicesPage from './features/it-manager/ServicesPage';
 import BackupsPage from './features/it-manager/BackupsPage';
@@ -204,6 +205,10 @@ export default function App() {
               </Route>
               <Route path="reports" element={<TabGate tabKey="reports" />}>
                 <Route index element={<ReportsRouter />} />
+              </Route>
+              <Route path="customers" element={<TabGate tabKey="customers" />}>
+                <Route index element={<SiteAdminCustomersPage />} />
+                <Route path=":customerId" element={<SiteAdminCustomersPage />} />
               </Route>
               <Route path="staff" element={<TabGate tabKey="staff" />}>
                 <Route index element={<StaffReportsPage />} />

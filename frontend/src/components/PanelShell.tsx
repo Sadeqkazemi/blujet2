@@ -8,6 +8,7 @@ import { fetchLowSalesAlerts, fetchStaffReports } from '../api/reporting';
 import { fetchLogsBadgeCount } from '../api/audit';
 import { fetchCeoPricing } from '../api/pricing';
 import { fetchSupportTickets } from '../api/support-tickets';
+import { fetchCustomersIncompleteCount } from '../api/customers';
 import { faDigits } from '../lib/fa-format';
 import { formatJalaliDate } from '../lib/jalali';
 import type { EmployeeContext, PanelNavItem } from '../types/panels';
@@ -299,6 +300,21 @@ export default function PanelShell() {
                 to: '/panel/tickets',
                 tone: 'warning',
               });
+            }
+          })
+          .catch(() => undefined),
+      );
+    }
+
+    if (navKeys.has('customers') && user?.role === 'SITE_ADMIN') {
+      tasks.push(
+        fetchCustomersIncompleteCount()
+          .then((r) => {
+            if (r.count > 0) {
+              next.customers = {
+                count: r.count,
+                className: 'bg-[#f59e0b] text-[#0f1623]',
+              };
             }
           })
           .catch(() => undefined),

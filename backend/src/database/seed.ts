@@ -965,6 +965,19 @@ async function main() {
         { userId: testUser.id },
       );
     }
+    // SITE_ADMIN «مشتریان» design shows نگار as کامل with national ID + email.
+    if (!testUser.nationalIdEnc || !testUser.email) {
+      await userRepo.update(
+        { id: testUser.id },
+        {
+          email: testUser.email ?? 'negar@email.example',
+          nationalIdEnc: testUser.nationalIdEnc ?? encryptPii('0012345679'),
+          nationalIdHash: testUser.nationalIdHash ?? hashPii('0012345679'),
+          birthDate: testUser.birthDate ?? new Date('1993-08-05'),
+          updatedAt: new Date(),
+        },
+      );
+    }
     const entryCount = await clubPointsEntryRepo.count({
       where: { clubMemberId: negarMember.id },
     });

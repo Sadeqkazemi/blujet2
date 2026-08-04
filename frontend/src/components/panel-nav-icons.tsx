@@ -66,6 +66,12 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M21 21l-2.3-2.3" />
     </NavIcon>
   ),
+  customers: (
+    <NavIcon>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 20c0-3.5 3.6-6 8-6s8 2.5 8 6" />
+    </NavIcon>
+  ),
   finance: (
     <NavIcon>
       <path d="M3 3v18h18" />

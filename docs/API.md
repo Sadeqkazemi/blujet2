@@ -43,6 +43,16 @@ Error codes: `INVALID_CREDENTIALS`, `TWO_FACTOR_REQUIRED`, `TWO_FACTOR_INVALID`,
 | GET | `/panels/access` | CEO, SENIOR_MANAGER, IT_MANAGER | Current `PanelAccessFlag` states for the panels that role is allowed to toggle (CEO: finance/commercial/IT; Senior Manager: +CEO panel, site admin; IT: none — IT's "دسترسی به پنل‌ها" tab in the design is read-only informational, no toggle wired). |
 | PATCH | `/panels/access/:panelKey` | CEO, SENIOR_MANAGER | `{ enabled }` → toggles a sibling panel; writes an `AuditLog(category=ACCESS)` row. |
 
+### Customers — SITE_ADMIN (`backend/src/modules/customers/`)
+
+پنل ادمین سایت → تب «مشتریان» (فهرست USERها، جستجو با موبایل، جزئیات).
+
+| Method | Path | Roles | Notes |
+|---|---|---|---|
+| GET | `/customers` | SITE_ADMIN | Query: `q?` (mobile digits). Returns `{ customers[], incompleteCount, total }`. Incomplete = missing name or national ID (design warn badge). National ID decrypted for site admin. |
+| GET | `/customers/incomplete-count` | SITE_ADMIN | `{ count }` for sidebar badge. |
+| GET | `/customers/:id` | SITE_ADMIN | Detail for tabs: profile, `docs` (KYC id-card), `purchases` (bookings), `contacts` (support tickets by userId/phone), `club`. |
+
 ### Reporting (`backend/src/modules/reporting/`)
 
 Shared by all 6 panels' dashboard/finance tabs — confirmed identical KPI

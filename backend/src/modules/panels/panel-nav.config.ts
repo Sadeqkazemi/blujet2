@@ -36,6 +36,7 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'agencies', labelFa: 'آژانس‌ها', implemented: true },
     { key: 'flightops', labelFa: 'پرواز', implemented: true },
     { key: 'reports', labelFa: 'گزارش مسافران', implemented: true },
+    { key: 'customers', labelFa: 'مشتریان', implemented: true },
     { key: 'club', labelFa: 'باشگاه مشتریان', implemented: true },
     { key: 'refund', labelFa: 'استرداد بلیط', implemented: true },
     { key: 'cartable', labelFa: 'کارتابل', implemented: true },
