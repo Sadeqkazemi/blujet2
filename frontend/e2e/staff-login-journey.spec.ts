@@ -49,6 +49,7 @@ const ROLE_CASES = [
       'نظرسنجی مسافران',
       'پشتیبان‌گیری',
       'تنظیمات سامانه',
+      'نظرسنجی مسافران',
     ],
     // Phase 8: IT's own real dashboard (service-health/os-metrics), not the
     // shared sales/KPI one the other roles get.

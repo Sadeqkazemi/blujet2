@@ -1,11 +1,11 @@
 # Feature: IT Manager panel — accounts, permissions, services, security, logs, backups (Phase 8)
 
 Covers `docs/API.md` → "Phase 8" and `docs/DB_SCHEMA.md` → "Phase 8".
-Scope is the 6 tabs `PLAN.md`'s Phase 8 bullet names: کاربران و دسترسی‌ها
-(accounts+permissions), رمزها و امنیت, سرویس‌های سایت, لاگ و رویدادها
-(reuses Phase 1's `/audit/logs`), پشتیبان‌گیری, و داشبورد فنی. سامانه
-رزرواسیون (Phase 9), دسترسی به پنل‌ها و تنظیمات سامانه (both Phase 12) are
-explicitly out of scope — left `implemented: false` in `panel-nav.config.ts`.
+Scope is the 6 core IT tabs from Phase 8 (کاربران و دسترسی‌ها، رمزها و
+امنیت، سرویس‌های سایت، لاگ و رویدادها، پشتیبان‌گیری، داشبورد فنی) plus
+the tabs added in later phases: سامانه رزرواسیون (Phase 9), دسترسی به
+پنل‌ها + تنظیمات سامانه (Phase 12), and نظرسنجی مسافران (Phase 66).
+All 10 nav items in `panel-nav.config.ts` are `implemented: true`.
 
 ## Acceptance checklist
 
@@ -48,7 +48,10 @@ journeys) + the updated `staff-login-journey.spec.ts` itadmin case.
 
 ### Logs & Panel access (reused, not rebuilt)
 - [x] IT panel's لاگ و رویدادها tab renders `GET /audit/logs` (already implemented Phase 1) — no new backend — `LogsPage.tsx` wired directly; endpoint already covered by `audit.e2e-spec.ts`
-- [x] Nav confirms سامانه رزرواسیون / دسترسی به پنل‌ها / تنظیمات سامانه stay `implemented: false` — `staff-login-journey.spec.ts` itadmin case asserts the full 9-tab list incl. their "به‌زودی" suffix
+- [x] Nav lists all 10 implemented tabs including سامانه رزرواسیون، دسترسی به پنل‌ها، تنظیمات سامانه، نظرسنجی مسافران — `staff-login-journey.spec.ts` itadmin case
+
+### Phase 66 — survey config tab
+- [x] نظرسنجی مسافران tab renders `SurveyConfigPage` for IT_MANAGER — `SurveyConfigPage.test.tsx` (5 tests) + `survey.e2e-spec.ts`
 
 ### Frontend
 - [x] داشبورد فنی: KPI cards, service-health list, resource bars, recent events — `ItDashboardPage.test.tsx`
