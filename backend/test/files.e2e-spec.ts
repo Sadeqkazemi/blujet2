@@ -1,7 +1,8 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { PrismaService } from '../src/prisma/prisma.service';
+import { DataSource } from 'typeorm';
+import { User } from '../src/database/entities/user.entity';
 import { loginAs } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
@@ -13,11 +14,11 @@ const PNG_BYTES = Buffer.from(
 
 describe('Files (e2e)', () => {
   let app: INestApplication<App>;
-  let prisma: PrismaService;
+  let dataSource: DataSource;
 
   beforeEach(async () => {
     app = await createTestApp();
-    prisma = app.get(PrismaService);
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
@@ -25,7 +26,7 @@ describe('Files (e2e)', () => {
   });
 
   it('accepts a PNG upload and returns an id; rejects disallowed types and oversize files', async () => {
-    const { accessToken } = await loginAs(app, 'senior');
+    const { accessToken } = await loginAs(app, 'senior.rahimi');
 
     const ok = await request(app.getHttpServer())
       .post('/files')
@@ -48,7 +49,7 @@ describe('Files (e2e)', () => {
   });
 
   it('preserves a Persian filename correctly instead of mojibake (multer/busboy decode multipart headers as latin1 by default)', async () => {
-    const { accessToken } = await loginAs(app, 'senior');
+    const { accessToken } = await loginAs(app, 'senior.rahimi');
     const res = await request(app.getHttpServer())
       .post('/files')
       .set('Authorization', `Bearer ${accessToken}`)
@@ -61,7 +62,7 @@ describe('Files (e2e)', () => {
   });
 
   it('owner can read; an unrelated exec gets 403; a referral recipient can read an attached file', async () => {
-    const senior = await loginAs(app, 'senior');
+    const senior = await loginAs(app, 'senior.rahimi');
     const uploaded = await request(app.getHttpServer())
       .post('/files')
       .set('Authorization', `Bearer ${senior.accessToken}`)
@@ -84,9 +85,9 @@ describe('Files (e2e)', () => {
     expect(forbidden.status).toBe(403);
 
     // Attach it to a referral addressed to Finance — Finance can now read it.
-    const finance = await prisma.user.findUniqueOrThrow({
-      where: { username: 'finance' },
-    });
+    const finance = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ username: 'finance.karimi' });
     await request(app.getHttpServer())
       .post('/referrals')
       .set('Authorization', `Bearer ${senior.accessToken}`)
@@ -97,7 +98,7 @@ describe('Files (e2e)', () => {
         attachmentIds: [fileId],
       });
 
-    const financeLogin = await loginAs(app, 'finance');
+    const financeLogin = await loginAs(app, 'finance.karimi');
     const asRecipient = await request(app.getHttpServer())
       .get(`/files/${fileId}`)
       .set('Authorization', `Bearer ${financeLogin.accessToken}`);
@@ -105,7 +106,7 @@ describe('Files (e2e)', () => {
   });
 
   it('attaching a file you do not own to a referral → 400', async () => {
-    const senior = await loginAs(app, 'senior');
+    const senior = await loginAs(app, 'senior.rahimi');
     const uploaded = await request(app.getHttpServer())
       .post('/files')
       .set('Authorization', `Bearer ${senior.accessToken}`)

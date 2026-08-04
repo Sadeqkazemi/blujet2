@@ -3,7 +3,17 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import * as crypto from 'node:crypto';
 import * as argon2 from 'argon2';
-import { PrismaService } from '../src/prisma/prisma.service';
+import { DataSource } from 'typeorm';
+import { AgencyApiKey } from '../src/database/entities/agency-api-key.entity';
+import { AgencyCreditLine } from '../src/database/entities/agency-credit-line.entity';
+import { AgencyDocument } from '../src/database/entities/agency-document.entity';
+import { AgencyMembershipRequest } from '../src/database/entities/agency-membership-request.entity';
+import { AgencyProfile } from '../src/database/entities/agency-profile.entity';
+import { Booking } from '../src/database/entities/booking.entity';
+import { FlightInstance } from '../src/database/entities/flight-instance.entity';
+import { LedgerEntry } from '../src/database/entities/ledger-entry.entity';
+import { StoredFile } from '../src/database/entities/stored-file.entity';
+import { User } from '../src/database/entities/user.entity';
 import { loginAs, stepUpFor } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
@@ -11,11 +21,11 @@ const AGENCY_PASSWORD = 'AgencyTest@123';
 
 describe('Agency Portal (e2e)', () => {
   let app: INestApplication<App>;
-  let prisma: PrismaService;
+  let dataSource: DataSource;
 
   beforeEach(async () => {
     app = await createTestApp();
-    prisma = app.get(PrismaService);
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
@@ -33,17 +43,20 @@ describe('Agency Portal (e2e)', () => {
     // Real random digits — the hex→'0' mapping collided on the unique phone column.
     const phone = `+9891${crypto.randomInt(10_000_000, 100_000_000)}`;
     const passwordHash = await argon2.hash(AGENCY_PASSWORD);
-    const user = await prisma.user.create({
-      data: {
+    const userRepo = dataSource.getRepository(User);
+    const user = await userRepo.save(
+      userRepo.create({
         role: 'AGENCY',
         phone,
         fullName: `آژانس تست ${suffix}`,
         passwordHash,
         isActive: true,
-      },
-    });
-    await prisma.agencyProfile.create({
-      data: {
+        updatedAt: new Date(),
+      }),
+    );
+    const agencyProfileRepo = dataSource.getRepository(AgencyProfile);
+    await agencyProfileRepo.save(
+      agencyProfileRepo.create({
         userId: user.id,
         licenseNo: `AG-TEST-${suffix}`,
         managerName: 'مدیر تست',
@@ -52,14 +65,16 @@ describe('Agency Portal (e2e)', () => {
         city: 'تهران',
         address: 'آدرس تست',
         tier: 'NORMAL',
-      },
-    });
-    await prisma.agencyCreditLine.create({
-      data: {
+      }),
+    );
+    const creditLineRepo = dataSource.getRepository(AgencyCreditLine);
+    await creditLineRepo.save(
+      creditLineRepo.create({
         agencyId: user.id,
-        limitIrr: overrides?.limitIrr ?? 1_000_000_000,
-      },
-    });
+        limitIrr: BigInt(overrides?.limitIrr ?? 1_000_000_000),
+        updatedAt: new Date(),
+      }),
+    );
     return { id: user.id, phone };
   }
 
@@ -74,26 +89,31 @@ describe('Agency Portal (e2e)', () => {
   }
 
   async function addAgencySale(agencyId: string, amountIrr: number) {
-    const instance = await prisma.flightInstance.findFirst();
+    const instance = await dataSource
+      .getRepository(FlightInstance)
+      .createQueryBuilder('fi')
+      .getOne();
     if (!instance) throw new Error('seed flightInstance missing');
-    const booking = await prisma.booking.create({
-      data: {
+    const bookingRepo = dataSource.getRepository(Booking);
+    const booking = await bookingRepo.save(
+      bookingRepo.create({
         pnr: `TST${crypto.randomUUID().slice(0, 6).toUpperCase()}`,
         flightInstanceId: instance.id,
         channel: 'AGENCY',
         agencyId,
         status: 'TICKETED',
-        priceIrr: amountIrr,
-      },
-    });
-    await prisma.ledgerEntry.create({
-      data: {
+        priceIrr: BigInt(amountIrr),
+      }),
+    );
+    const ledgerRepo = dataSource.getRepository(LedgerEntry);
+    await ledgerRepo.save(
+      ledgerRepo.create({
         bookingId: booking.id,
         agencyId,
         type: 'SALE',
-        signedAmountIrr: amountIrr,
-      },
-    });
+        signedAmountIrr: BigInt(amountIrr),
+      }),
+    );
     return booking;
   }
 
@@ -120,10 +140,12 @@ describe('Agency Portal (e2e)', () => {
 
   it('POST /auth/agency/login: 403 when the agency is suspended', async () => {
     const agency = await createFreshAgency();
-    await prisma.agencyProfile.update({
-      where: { userId: agency.id },
-      data: { suspendedAt: new Date(), suspendReason: 'test' },
-    });
+    await dataSource
+      .getRepository(AgencyProfile)
+      .update(
+        { userId: agency.id },
+        { suspendedAt: new Date(), suspendReason: 'test' },
+      );
     const { res } = await loginAsAgency(agency.phone);
     expect(res.status).toBe(403);
   });
@@ -157,8 +179,9 @@ describe('Agency Portal (e2e)', () => {
   it('approving a membership request issues a one-time temp password that logs in', async () => {
     const commercial = await loginAs(app, 'comm');
     const suffix = crypto.randomUUID().slice(0, 6);
-    const reqRow = await prisma.agencyMembershipRequest.create({
-      data: {
+    const membershipRepo = dataSource.getRepository(AgencyMembershipRequest);
+    const reqRow = await membershipRepo.save(
+      membershipRepo.create({
         applicantName: `آژانس جدید ${suffix}`,
         managerName: 'مدیر جدید',
         licenseNo: `AG-NEW-${suffix}`,
@@ -166,8 +189,8 @@ describe('Agency Portal (e2e)', () => {
         phone: `+9892${crypto.randomInt(10_000_000, 100_000_000)}`,
         email: `${suffix}@new.example`,
         status: 'PENDING',
-      },
-    });
+      }),
+    );
     const approveRes = await request(app.getHttpServer())
       .patch(`/agencies/requests/${reqRow.id}/approve`)
       .set('Authorization', auth(commercial.accessToken));
@@ -467,9 +490,9 @@ describe('Agency Portal (e2e)', () => {
     expect(approveRes.status).toBe(200);
     expect(approveRes.body.data.status).toBe('APPROVED');
 
-    const keyRow = await prisma.agencyApiKey.findFirst({
+    const keyRow = await dataSource.getRepository(AgencyApiKey).findOne({
       where: { agencyId: agency.id },
-      orderBy: { activatedAt: 'desc' },
+      order: { activatedAt: 'DESC' },
     });
     expect(keyRow?.scope).toBe('SEARCH_BOOK');
 
@@ -515,9 +538,9 @@ describe('Agency Portal (e2e)', () => {
     expect(rejectRes.status).toBe(200);
     expect(rejectRes.body.data.status).toBe('REJECTED');
 
-    const keyRow = await prisma.agencyApiKey.findFirst({
-      where: { agencyId: agency.id },
-    });
+    const keyRow = await dataSource
+      .getRepository(AgencyApiKey)
+      .findOneBy({ agencyId: agency.id });
     expect(keyRow).toBeNull();
   });
 
@@ -565,18 +588,24 @@ describe('Agency Portal (e2e)', () => {
   // ── Document review (staff-side) ────────────────────────────────────────
 
   async function seedDocument(agencyId: string) {
-    const stored = await prisma.storedFile.create({
-      data: {
+    const storedFileRepo = dataSource.getRepository(StoredFile);
+    const stored = await storedFileRepo.save(
+      storedFileRepo.create({
         ownerId: agencyId,
         fileName: 'مجوز-فعالیت.pdf',
         mimeType: 'application/pdf',
         sizeBytes: 12_345,
         path: `/tmp/test-${crypto.randomUUID()}.pdf`,
-      },
-    });
-    return prisma.agencyDocument.create({
-      data: { agencyId, fileId: stored.id, docType: 'LICENSE' },
-    });
+      }),
+    );
+    const agencyDocumentRepo = dataSource.getRepository(AgencyDocument);
+    return agencyDocumentRepo.save(
+      agencyDocumentRepo.create({
+        agencyId,
+        fileId: stored.id,
+        docType: 'LICENSE',
+      }),
+    );
   }
 
   it('GET /agencies/:id/documents lists uploaded documents PENDING by default', async () => {

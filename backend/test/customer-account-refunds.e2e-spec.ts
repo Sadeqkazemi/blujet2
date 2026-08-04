@@ -2,37 +2,56 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import * as crypto from 'node:crypto';
-import { PrismaService } from '../src/prisma/prisma.service';
+import { DataSource } from 'typeorm';
+import { dataSourceOptions } from '../src/database/data-source.options';
+import { Route } from '../src/database/entities/route.entity';
+import { Flight } from '../src/database/entities/flight.entity';
+import { FlightInstance } from '../src/database/entities/flight-instance.entity';
+import { Booking } from '../src/database/entities/booking.entity';
+import { Passenger } from '../src/database/entities/passenger.entity';
+import { RefundPenaltyRule } from '../src/database/entities/refund-penalty-rule.entity';
+import { RefundRequest } from '../src/database/entities/refund-request.entity';
+import { User } from '../src/database/entities/user.entity';
 import { loginAs, loginAsCustomer } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
 describe('Customer account refunds (e2e)', () => {
   let app: INestApplication<App>;
-  let prisma: PrismaService;
+  let dataSource: DataSource;
   let flightId: string;
   const phoneSeed = Number(Date.now().toString().slice(-8));
   const phone = (offset: number) =>
     `09${String((phoneSeed + offset) % 1_000_000_000).padStart(9, '0')}`;
 
   beforeAll(async () => {
-    const setup = await createTestApp();
-    prisma = setup.get(PrismaService);
-    const route = await prisma.route.upsert({
-      where: {
-        originCode_destCode: { originCode: 'THR', destCode: 'KIH' },
-      },
-      update: {},
-      create: { originCode: 'THR', destCode: 'KIH', durationMin: 100 },
+    const setupDataSource = new DataSource(dataSourceOptions);
+    await setupDataSource.initialize();
+
+    const routeRepo = setupDataSource.getRepository(Route);
+    let route = await routeRepo.findOneBy({
+      originCode: 'THR',
+      destCode: 'KIH',
     });
-    const flight = await prisma.flight.upsert({
-      where: { flightNo: 'RF-901' },
-      update: {},
-      create: {
-        flightNo: 'RF-901',
-        routeId: route.id,
-        aircraftType: 'Refund-Test',
-      },
-    });
+    if (!route) {
+      route = await routeRepo.save(
+        routeRepo.create({
+          originCode: 'THR',
+          destCode: 'KIH',
+          durationMin: 100,
+        }),
+      );
+    }
+    const flightRepo = setupDataSource.getRepository(Flight);
+    let flight = await flightRepo.findOneBy({ flightNo: 'RF-901' });
+    if (!flight) {
+      flight = await flightRepo.save(
+        flightRepo.create({
+          flightNo: 'RF-901',
+          routeId: route.id,
+          aircraftType: 'Refund-Test',
+        }),
+      );
+    }
     flightId = flight.id;
     const rules = [
       [72, 30, 'بیش از ۷۲ ساعت مانده'],
@@ -40,27 +59,23 @@ describe('Customer account refunds (e2e)', () => {
       [3, 70, 'بین ۳ تا ۲۴ ساعت مانده'],
       [0, 100, 'کمتر از ۳ ساعت / پس از پرواز'],
     ] as const;
+    const ruleRepo = setupDataSource.getRepository(RefundPenaltyRule);
     for (const [minHoursBeforeDeparture, penaltyPct, labelFa] of rules) {
-      const existing = await prisma.refundPenaltyRule.findFirst({
-        where: { minHoursBeforeDeparture },
-      });
+      const existing = await ruleRepo.findOneBy({ minHoursBeforeDeparture });
       if (existing) {
-        await prisma.refundPenaltyRule.update({
-          where: { id: existing.id },
-          data: { penaltyPct, labelFa },
-        });
+        await ruleRepo.update({ id: existing.id }, { penaltyPct, labelFa });
       } else {
-        await prisma.refundPenaltyRule.create({
-          data: { minHoursBeforeDeparture, penaltyPct, labelFa },
-        });
+        await ruleRepo.save(
+          ruleRepo.create({ minHoursBeforeDeparture, penaltyPct, labelFa }),
+        );
       }
     }
-    await setup.close();
+    await setupDataSource.destroy();
   });
 
   beforeEach(async () => {
     app = await createTestApp();
-    prisma = app.get(PrismaService);
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
@@ -74,28 +89,34 @@ describe('Customer account refunds (e2e)', () => {
   ) {
     const { accessToken, userId } = await loginAsCustomer(app, phone);
     const departureAt = new Date(Date.now() + hoursAhead * 3_600_000);
-    const instance = await prisma.flightInstance.create({
-      data: {
+    const instanceRepo = dataSource.getRepository(FlightInstance);
+    const instance = await instanceRepo.save(
+      instanceRepo.create({
         flightId,
         departureAt,
         arrivalAt: new Date(departureAt.getTime() + 100 * 60_000),
         capacity: 20,
         status: 'SCHEDULED',
-      },
-    });
-    const booking = await prisma.booking.create({
-      data: {
+      }),
+    );
+    const bookingRepo = dataSource.getRepository(Booking);
+    const booking = await bookingRepo.save(
+      bookingRepo.create({
         pnr: `CR${crypto.randomUUID().replaceAll('-', '').slice(0, 6).toUpperCase()}`,
         flightInstanceId: instance.id,
         userId,
         channel: 'SYSTEM',
         status,
-        priceIrr: 20_000_000,
-      },
-    });
-    await prisma.passenger.create({
-      data: { bookingId: booking.id, fullName: 'مسافر استرداد حساب' },
-    });
+        priceIrr: 20_000_000n,
+      }),
+    );
+    const passengerRepo = dataSource.getRepository(Passenger);
+    await passengerRepo.save(
+      passengerRepo.create({
+        bookingId: booking.id,
+        fullName: 'مسافر استرداد حساب',
+      }),
+    );
     return { accessToken: accessToken!, userId: userId!, booking, departureAt };
   }
 
@@ -230,9 +251,11 @@ describe('Customer account refunds (e2e)', () => {
     const [a, b] = await Promise.all([submit(), submit()]);
     expect([a.status, b.status].sort()).toEqual([201, 409]);
     expect(
-      await prisma.refundRequest.count({
-        where: { bookingId: owner.booking.id },
-      }),
+      await dataSource
+        .getRepository(RefundRequest)
+        .createQueryBuilder('r')
+        .where('r.bookingId = :bookingId', { bookingId: owner.booking.id })
+        .getCount(),
     ).toBe(1);
   });
 
@@ -246,9 +269,9 @@ describe('Customer account refunds (e2e)', () => {
         iban: 'IR820170000000332211009900',
       });
     const admin = await loginAs(app, 'site.admin');
-    const finance = await prisma.user.findUniqueOrThrow({
-      where: { username: 'finance' },
-    });
+    const finance = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ username: 'finance.karimi' });
 
     const refer = await request(app.getHttpServer())
       .patch(`/refunds/${submit.body.data.id}/refer`)

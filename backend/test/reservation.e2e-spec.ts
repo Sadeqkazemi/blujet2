@@ -1,13 +1,22 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { PrismaService } from '../src/prisma/prisma.service';
+import { DataSource, In } from 'typeorm';
+import { AircraftSeatMap } from '../src/database/entities/aircraft-seat-map.entity';
+import { AuditLog } from '../src/database/entities/audit-log.entity';
+import { Booking } from '../src/database/entities/booking.entity';
+import { Flight } from '../src/database/entities/flight.entity';
+import { FlightInstance } from '../src/database/entities/flight-instance.entity';
+import { LedgerEntry } from '../src/database/entities/ledger-entry.entity';
+import { Passenger } from '../src/database/entities/passenger.entity';
+import { PaymentReconciliation } from '../src/database/entities/payment-reconciliation.entity';
+import { SeatLock } from '../src/database/entities/seat-lock.entity';
 import { loginAs } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
 describe('Reservation (e2e)', () => {
   let app: INestApplication<App>;
-  let prisma: PrismaService;
+  let dataSource: DataSource;
   // Phase 13D: a global per-requester active-lock cap now means leftover
   // SeatLock rows from repeated manual runs against a persistent dev DB
   // can spuriously trip the cap in later runs — clean up what each test
@@ -16,33 +25,37 @@ describe('Reservation (e2e)', () => {
 
   beforeEach(async () => {
     app = await createTestApp();
-    prisma = app.get(PrismaService);
+    dataSource = app.get(DataSource);
     createdInstanceIds = [];
   });
 
   afterEach(async () => {
     if (createdInstanceIds.length) {
-      await prisma.seatLock.deleteMany({
-        where: { flightInstanceId: { in: createdInstanceIds } },
-      });
-      const passengers = await prisma.passenger.findMany({
-        where: { booking: { flightInstanceId: { in: createdInstanceIds } } },
-        select: { bookingId: true },
-      });
+      await dataSource
+        .getRepository(SeatLock)
+        .delete({ flightInstanceId: In(createdInstanceIds) });
+      const passengers = await dataSource
+        .getRepository(Passenger)
+        .createQueryBuilder('p')
+        .innerJoin('p.booking', 'b')
+        .where('b.flightInstanceId IN (:...ids)', { ids: createdInstanceIds })
+        .getMany();
       const bookingIds = passengers.map((p) => p.bookingId);
-      await prisma.paymentReconciliation.deleteMany({
-        where: { bookingId: { in: bookingIds } },
-      });
-      await prisma.ledgerEntry.deleteMany({
-        where: { bookingId: { in: bookingIds } },
-      });
-      await prisma.passenger.deleteMany({
-        where: { bookingId: { in: bookingIds } },
-      });
-      await prisma.booking.deleteMany({ where: { id: { in: bookingIds } } });
-      await prisma.flightInstance.deleteMany({
-        where: { id: { in: createdInstanceIds } },
-      });
+      if (bookingIds.length) {
+        await dataSource
+          .getRepository(PaymentReconciliation)
+          .delete({ bookingId: In(bookingIds) });
+        await dataSource
+          .getRepository(LedgerEntry)
+          .delete({ bookingId: In(bookingIds) });
+        await dataSource
+          .getRepository(Passenger)
+          .delete({ bookingId: In(bookingIds) });
+        await dataSource.getRepository(Booking).delete({ id: In(bookingIds) });
+      }
+      await dataSource
+        .getRepository(FlightInstance)
+        .delete({ id: In(createdInstanceIds) });
     }
     await app.close();
   });
@@ -52,18 +65,22 @@ describe('Reservation (e2e)', () => {
   }
 
   async function createScheduledInstance() {
-    const flight = await prisma.flight.findFirstOrThrow();
+    const flight = await dataSource
+      .getRepository(Flight)
+      .createQueryBuilder('f')
+      .getOneOrFail();
     const departureAt = new Date(Date.now() + 20 * 24 * 60 * 60 * 1000);
-    const instance = await prisma.flightInstance.create({
-      data: {
+    const instanceRepo = dataSource.getRepository(FlightInstance);
+    const instance = await instanceRepo.save(
+      instanceRepo.create({
         flightId: flight.id,
         departureAt,
         arrivalAt: new Date(departureAt.getTime() + 3 * 60 * 60 * 1000),
         capacity: 180,
         charterSeats: 60,
         status: 'SCHEDULED',
-      },
-    });
+      }),
+    );
     createdInstanceIds.push(instance.id);
     return instance;
   }
@@ -96,8 +113,9 @@ describe('Reservation (e2e)', () => {
     // of the seed's 2-3) proves the endpoint reads the real config per
     // aircraft rather than always returning the same fixed number.
     const customType = `WIDE-${Date.now()}`;
-    await prisma.aircraftSeatMap.create({
-      data: {
+    const seatMapRepo = dataSource.getRepository(AircraftSeatMap);
+    await seatMapRepo.save(
+      seatMapRepo.create({
         aircraftType: customType,
         businessRowStart: 1,
         businessRowEnd: 1,
@@ -107,12 +125,17 @@ describe('Reservation (e2e)', () => {
         economyRowEnd: 2,
         economyColsLeft: ['A', 'B', 'C'],
         economyColsRight: ['D', 'E'],
-      },
-    });
-    const flight = await prisma.flight.findFirstOrThrow();
+        updatedAt: new Date(),
+      }),
+    );
+    const flight = await dataSource
+      .getRepository(Flight)
+      .createQueryBuilder('f')
+      .getOneOrFail();
     const departureAt = new Date(Date.now() + 21 * 24 * 60 * 60 * 1000);
-    const customInstance = await prisma.flightInstance.create({
-      data: {
+    const instanceRepo = dataSource.getRepository(FlightInstance);
+    const customInstance = await instanceRepo.save(
+      instanceRepo.create({
         flightId: flight.id,
         departureAt,
         arrivalAt: new Date(departureAt.getTime() + 3 * 60 * 60 * 1000),
@@ -120,8 +143,8 @@ describe('Reservation (e2e)', () => {
         charterSeats: 0,
         status: 'SCHEDULED',
         aircraftTypeOverride: customType,
-      },
-    });
+      }),
+    );
     createdInstanceIds.push(customInstance.id);
 
     const customRes = await request(app.getHttpServer())
@@ -132,9 +155,7 @@ describe('Reservation (e2e)', () => {
       ECONOMY: { aisleAfterIndex: 3 },
     });
 
-    await prisma.aircraftSeatMap.delete({
-      where: { aircraftType: customType },
-    });
+    await seatMapRepo.delete({ aircraftType: customType });
   });
 
   it('GET /reservation/seatmap/:id includes sold-seat passenger details for staff', async () => {
@@ -215,13 +236,13 @@ describe('Reservation (e2e)', () => {
       });
     expect(dup.status).toBe(409);
 
-    const audit = await prisma.auditLog.findFirst({
-      where: {
-        category: 'RESERVATION',
-        entityType: 'SeatLock',
-        entityId: ok.body.data.id,
-      },
-    });
+    const audit = await dataSource
+      .getRepository(AuditLog)
+      .createQueryBuilder('a')
+      .where('a.category = :category', { category: 'RESERVATION' })
+      .andWhere('a.entityType = :entityType', { entityType: 'SeatLock' })
+      .andWhere('a.entityId = :entityId', { entityId: ok.body.data.id })
+      .getOne();
     expect(audit).not.toBeNull();
   });
 
@@ -317,25 +338,25 @@ describe('Reservation (e2e)', () => {
     expect(issued.body.data.status).toBe('TICKETED');
     expect(issued.body.data.passenger.seatCode).toBe('7A');
 
-    const booking = await prisma.booking.findUniqueOrThrow({
-      where: { pnr: issued.body.data.pnr },
-    });
+    const booking = await dataSource
+      .getRepository(Booking)
+      .findOneByOrFail({ pnr: issued.body.data.pnr });
     expect(booking.status).toBe('TICKETED');
-    const ledger = await prisma.ledgerEntry.findFirst({
-      where: { bookingId: booking.id, type: 'SALE' },
-    });
+    const ledger = await dataSource
+      .getRepository(LedgerEntry)
+      .findOneBy({ bookingId: booking.id, type: 'SALE' });
     expect(ledger).not.toBeNull();
 
     const conflict = await issuePnr(chair.accessToken, instance.id, '7A');
     expect(conflict.status).toBe(409);
 
-    const audit = await prisma.auditLog.findFirst({
-      where: {
-        category: 'RESERVATION',
-        action: 'صدور دستی PNR',
-        entityId: booking.id,
-      },
-    });
+    const audit = await dataSource
+      .getRepository(AuditLog)
+      .createQueryBuilder('a')
+      .where('a.category = :category', { category: 'RESERVATION' })
+      .andWhere('a.action = :action', { action: 'صدور دستی PNR' })
+      .andWhere('a.entityId = :entityId', { entityId: booking.id })
+      .getOne();
     expect(audit).not.toBeNull();
   });
 
@@ -353,15 +374,14 @@ describe('Reservation (e2e)', () => {
     expect(succeeded.length).toBe(1);
     expect(conflicted.length).toBe(4);
 
-    const ticketedForSeat = await prisma.passenger.count({
-      where: {
-        seatCode: '16A',
-        booking: {
-          flightInstanceId: instance.id,
-          status: { not: 'CANCELLED' },
-        },
-      },
-    });
+    const ticketedForSeat = await dataSource
+      .getRepository(Passenger)
+      .createQueryBuilder('p')
+      .innerJoin('p.booking', 'b')
+      .where('p.seatCode = :seatCode', { seatCode: '16A' })
+      .andWhere('b.flightInstanceId = :instanceId', { instanceId: instance.id })
+      .andWhere('b.status != :status', { status: 'CANCELLED' })
+      .getCount();
     expect(ticketedForSeat).toBe(1);
   });
 
@@ -460,15 +480,14 @@ describe('Reservation (e2e)', () => {
     const statuses = [resA.status, resB.status].sort();
     expect(statuses).toEqual([200, 409]);
 
-    const holdersOfSeat = await prisma.passenger.count({
-      where: {
-        seatCode: '18A',
-        booking: {
-          flightInstanceId: instance.id,
-          status: { not: 'CANCELLED' },
-        },
-      },
-    });
+    const holdersOfSeat = await dataSource
+      .getRepository(Passenger)
+      .createQueryBuilder('p')
+      .innerJoin('p.booking', 'b')
+      .where('p.seatCode = :seatCode', { seatCode: '18A' })
+      .andWhere('b.flightInstanceId = :instanceId', { instanceId: instance.id })
+      .andWhere('b.status != :status', { status: 'CANCELLED' })
+      .getCount();
     expect(holdersOfSeat).toBe(1);
   });
 
@@ -498,10 +517,12 @@ describe('Reservation (e2e)', () => {
   it('GET /reservation/search finds SCHEDULED instances on origin/dest/date with computed price + free seats', async () => {
     const instance = await createScheduledInstance();
     const { accessToken } = await loginAs(app, 'chair');
-    const flight = await prisma.flight.findUniqueOrThrow({
-      where: { id: instance.flightId },
-      include: { route: true },
-    });
+    const flight = await dataSource
+      .getRepository(Flight)
+      .createQueryBuilder('f')
+      .innerJoinAndSelect('f.route', 'route')
+      .where('f.id = :id', { id: instance.flightId })
+      .getOneOrFail();
 
     const res = await request(app.getHttpServer())
       .get(

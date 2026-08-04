@@ -3,7 +3,10 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import * as crypto from 'node:crypto';
 import * as argon2 from 'argon2';
-import { PrismaService } from '../src/prisma/prisma.service';
+import { DataSource } from 'typeorm';
+import { User } from '../src/database/entities/user.entity';
+import { AgencyProfile } from '../src/database/entities/agency-profile.entity';
+import { AgencyCreditLine } from '../src/database/entities/agency-credit-line.entity';
 import { loginAs } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
@@ -11,11 +14,11 @@ const AGENCY_PASSWORD = 'AgencyTest@123';
 
 describe('Webservice pricing (e2e)', () => {
   let app: INestApplication<App>;
-  let prisma: PrismaService;
+  let dataSource: DataSource;
 
   beforeEach(async () => {
     app = await createTestApp();
-    prisma = app.get(PrismaService);
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
@@ -26,17 +29,20 @@ describe('Webservice pricing (e2e)', () => {
     const suffix = crypto.randomUUID().slice(0, 8);
     const phone = `+9891${crypto.randomInt(10_000_000, 100_000_000)}`;
     const passwordHash = await argon2.hash(AGENCY_PASSWORD);
-    const user = await prisma.user.create({
-      data: {
+    const userRepo = dataSource.getRepository(User);
+    const user = await userRepo.save(
+      userRepo.create({
         role: 'AGENCY',
         phone,
         fullName: `آژانس تست ${suffix}`,
         passwordHash,
         isActive: true,
-      },
-    });
-    await prisma.agencyProfile.create({
-      data: {
+        updatedAt: new Date(),
+      }),
+    );
+    const profileRepo = dataSource.getRepository(AgencyProfile);
+    await profileRepo.save(
+      profileRepo.create({
         userId: user.id,
         licenseNo: `AG-TEST-${suffix}`,
         managerName: 'مدیر تست',
@@ -45,11 +51,16 @@ describe('Webservice pricing (e2e)', () => {
         city: 'تهران',
         address: 'آدرس تست',
         tier: 'NORMAL',
-      },
-    });
-    await prisma.agencyCreditLine.create({
-      data: { agencyId: user.id, limitIrr: 1_000_000_000 },
-    });
+      }),
+    );
+    const creditRepo = dataSource.getRepository(AgencyCreditLine);
+    await creditRepo.save(
+      creditRepo.create({
+        agencyId: user.id,
+        limitIrr: 1_000_000_000n,
+        updatedAt: new Date(),
+      }),
+    );
     return phone;
   }
 

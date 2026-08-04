@@ -5,9 +5,13 @@ import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import * as crypto from 'node:crypto';
+import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
 import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
-import { PrismaService } from '../src/prisma/prisma.service';
+import { Flight } from '../src/database/entities/flight.entity';
+import { FlightInstance } from '../src/database/entities/flight-instance.entity';
+import { Booking } from '../src/database/entities/booking.entity';
+import { Passenger } from '../src/database/entities/passenger.entity';
 import { encryptPii } from '../src/common/pii-crypto';
 import {
   NIRA_PROVIDER,
@@ -35,7 +39,7 @@ class SpyNiraProvider implements NiraProvider {
 
 describe('Flightops (e2e)', () => {
   let app: INestApplication<App>;
-  let prisma: PrismaService;
+  let dataSource: DataSource;
   let spyNira: SpyNiraProvider;
 
   beforeEach(async () => {
@@ -61,7 +65,7 @@ describe('Flightops (e2e)', () => {
     );
     app.useGlobalFilters(new AllExceptionsFilter(logger));
     await app.init();
-    prisma = app.get(PrismaService);
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
@@ -77,48 +81,52 @@ describe('Flightops (e2e)', () => {
   }
 
   async function createInstance(hoursToDeparture: number) {
-    const flight = await prisma.flight.findFirstOrThrow();
+    const flightRepo = dataSource.getRepository(Flight);
+    const flight = await flightRepo.createQueryBuilder('f').getOneOrFail();
     const flightNo = uniqueFlightNo();
     const departureAt = new Date(Date.now() + hoursToDeparture * 3_600_000);
-    const createdFlight = await prisma.flight.create({
-      data: {
+    const createdFlight = await flightRepo.save(
+      flightRepo.create({
         flightNo,
         routeId: flight.routeId,
         aircraftType: flight.aircraftType,
-      },
-    });
-    return prisma.flightInstance.create({
-      data: {
+      }),
+    );
+    const instanceRepo = dataSource.getRepository(FlightInstance);
+    return instanceRepo.save(
+      instanceRepo.create({
         flightId: createdFlight.id,
         departureAt,
         arrivalAt: new Date(departureAt.getTime() + 3 * 3_600_000),
         capacity: 100,
         status: 'SCHEDULED',
-      },
-    });
+      }),
+    );
   }
 
   async function addSoldPassenger(
     flightInstanceId: string,
     overrides?: { fullName?: string; nationalId?: string; seatCode?: string },
   ) {
-    const booking = await prisma.booking.create({
-      data: {
+    const bookingRepo = dataSource.getRepository(Booking);
+    const booking = await bookingRepo.save(
+      bookingRepo.create({
         pnr: `FT${crypto.randomUUID().slice(0, 6).toUpperCase()}`,
         flightInstanceId,
         channel: 'SYSTEM',
         status: 'TICKETED',
-        priceIrr: 30_000_000,
-      },
-    });
-    return prisma.passenger.create({
-      data: {
+        priceIrr: 30_000_000n,
+      }),
+    );
+    const passengerRepo = dataSource.getRepository(Passenger);
+    return passengerRepo.save(
+      passengerRepo.create({
         bookingId: booking.id,
         fullName: overrides?.fullName ?? 'علی رضایی',
         nationalIdEnc: encryptPii(overrides?.nationalId ?? '0012345678'),
         seatCode: overrides?.seatCode ?? '12A',
-      },
-    });
+      }),
+    );
   }
 
   // ── Role gate ───────────────────────────────────────────────────────
@@ -181,9 +189,11 @@ describe('Flightops (e2e)', () => {
       { fullName: 'سارا احمدی', nationalId: '0019876543', seatCode: '4C' },
     ]);
 
-    const updated = await prisma.flightInstance.findUniqueOrThrow({
-      where: { id: instance.id },
-    });
+    const updated = await dataSource
+      .getRepository(FlightInstance)
+      .createQueryBuilder('fi')
+      .where('fi.id = :id', { id: instance.id })
+      .getOneOrFail();
     expect(updated.niraSubmittedAt).not.toBeNull();
   });
 
@@ -263,24 +273,26 @@ describe('Flightops (e2e)', () => {
       seatCode: '7B',
     });
     // A HELD (non-sold) booking must NOT appear in the manifest.
-    const heldBooking = await prisma.booking.create({
-      data: {
+    const bookingRepo = dataSource.getRepository(Booking);
+    const heldBooking = await bookingRepo.save(
+      bookingRepo.create({
         pnr: `FT${crypto.randomUUID().slice(0, 6).toUpperCase()}`,
         flightInstanceId: instance.id,
         channel: 'SYSTEM',
         status: 'HELD',
-        priceIrr: 30_000_000,
+        priceIrr: 30_000_000n,
         holdExpiresAt: new Date(Date.now() + 600_000),
-      },
-    });
-    await prisma.passenger.create({
-      data: {
+      }),
+    );
+    const passengerRepo = dataSource.getRepository(Passenger);
+    await passengerRepo.save(
+      passengerRepo.create({
         bookingId: heldBooking.id,
         fullName: 'رزرو نشده',
         nationalIdEnc: encryptPii('0099988877'),
         seatCode: '9C',
-      },
-    });
+      }),
+    );
 
     const { accessToken } = await loginAs(app, 'site.admin');
     const res = await request(app.getHttpServer())
@@ -295,9 +307,9 @@ describe('Flightops (e2e)', () => {
       pnr: expect.any(String),
     });
 
-    const dbRow = await prisma.passenger.findUniqueOrThrow({
-      where: { id: sold.id },
-    });
+    const dbRow = await dataSource
+      .getRepository(Passenger)
+      .findOneByOrFail({ id: sold.id });
     expect(dbRow.nationalIdEnc).not.toBe('0011122233');
     expect(dbRow.nationalIdEnc).toContain('.');
   });
@@ -310,10 +322,9 @@ describe('Flightops (e2e)', () => {
     expect(missingRes.status).toBe(404);
 
     const cancelled = await createInstance(72);
-    await prisma.flightInstance.update({
-      where: { id: cancelled.id },
-      data: { status: 'CANCELLED' },
-    });
+    await dataSource
+      .getRepository(FlightInstance)
+      .update({ id: cancelled.id }, { status: 'CANCELLED' });
     const cancelledRes = await request(app.getHttpServer())
       .get(`/flightops/${cancelled.id}`)
       .set('Authorization', auth(accessToken));

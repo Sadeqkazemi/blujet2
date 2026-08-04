@@ -2,18 +2,23 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import * as crypto from 'node:crypto';
-import { PrismaService } from '../src/prisma/prisma.service';
+import { DataSource, In } from 'typeorm';
+import { FlightInstance } from '../src/database/entities/flight-instance.entity';
+import { Booking } from '../src/database/entities/booking.entity';
+import { Passenger } from '../src/database/entities/passenger.entity';
+import { User } from '../src/database/entities/user.entity';
+import { AuditLog } from '../src/database/entities/audit-log.entity';
 import { encryptPii, hashPii } from '../src/common/pii-crypto';
 import { loginAs } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
 describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () => {
   let app: INestApplication<App>;
-  let prisma: PrismaService;
+  let dataSource: DataSource;
 
   beforeEach(async () => {
     app = await createTestApp();
-    prisma = app.get(PrismaService);
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
@@ -214,28 +219,33 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
     // own throwaway flights/instances for unrelated aircraft types with no
     // matching AircraftSeatMap row, so an unfiltered findFirst() can pick
     // one of those and make `cabin` resolve to null non-deterministically.
-    const instance = await prisma.flightInstance.findFirstOrThrow({
-      where: { flight: { aircraftType: 'Airbus A320' } },
-    });
+    const instance = await dataSource
+      .getRepository(FlightInstance)
+      .createQueryBuilder('fi')
+      .innerJoin('fi.flight', 'f')
+      .where('f.aircraftType = :type', { type: 'Airbus A320' })
+      .getOneOrFail();
     const nationalId = '0499370899'; // valid checksum test ID
-    const booking = await prisma.booking.create({
-      data: {
+    const bookingRepo = dataSource.getRepository(Booking);
+    const booking = await bookingRepo.save(
+      bookingRepo.create({
         pnr: `PR${suffix.toUpperCase()}`,
         flightInstanceId: instance.id,
         channel: 'SYSTEM',
         status: 'TICKETED',
-        priceIrr: 42_000_000,
-      },
-    });
-    await prisma.passenger.create({
-      data: {
+        priceIrr: 42_000_000n,
+      }),
+    );
+    const passengerRepo = dataSource.getRepository(Passenger);
+    await passengerRepo.save(
+      passengerRepo.create({
         bookingId: booking.id,
         fullName: `مسافر گزارش ${suffix}`,
         nationalIdEnc: encryptPii(nationalId),
         nationalIdHash: hashPii(nationalId),
         seatCode: '4C',
-      },
-    });
+      }),
+    );
 
     const senior = await loginAs(app, 'senior');
     const res = await request(app.getHttpServer())
@@ -258,28 +268,33 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
     // own throwaway flights/instances for unrelated aircraft types with no
     // matching AircraftSeatMap row, so an unfiltered findFirst() can pick
     // one of those and make `cabin` resolve to null non-deterministically.
-    const instance = await prisma.flightInstance.findFirstOrThrow({
-      where: { flight: { aircraftType: 'Airbus A320' } },
-    });
+    const instance = await dataSource
+      .getRepository(FlightInstance)
+      .createQueryBuilder('fi')
+      .innerJoin('fi.flight', 'f')
+      .where('f.aircraftType = :type', { type: 'Airbus A320' })
+      .getOneOrFail();
     const nationalId = '1287960649';
-    const booking = await prisma.booking.create({
-      data: {
+    const bookingRepo = dataSource.getRepository(Booking);
+    const booking = await bookingRepo.save(
+      bookingRepo.create({
         pnr: `PN${suffix.toUpperCase()}`,
         flightInstanceId: instance.id,
         channel: 'SYSTEM',
         status: 'TICKETED',
-        priceIrr: 38_000_000,
-      },
-    });
-    await prisma.passenger.create({
-      data: {
+        priceIrr: 38_000_000n,
+      }),
+    );
+    const passengerRepo = dataSource.getRepository(Passenger);
+    await passengerRepo.save(
+      passengerRepo.create({
         bookingId: booking.id,
         fullName: `مسافر کدملی ${suffix}`,
         nationalIdEnc: encryptPii(nationalId),
         nationalIdHash: hashPii(nationalId),
         seatCode: '12B',
-      },
-    });
+      }),
+    );
 
     const finance = await loginAs(app, 'finance');
     const res = await request(app.getHttpServer())
@@ -303,18 +318,19 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
 
   it('GET /staff-reports: finance manager sees only finance-dept employees and their real audit feed', async () => {
     // Give the seeded finance employee a real audited action.
-    const finEmployee = await prisma.user.findFirstOrThrow({
-      where: { role: 'EMPLOYEE', dept: 'finance' },
-    });
-    await prisma.auditLog.create({
-      data: {
+    const finEmployee = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ role: 'EMPLOYEE', dept: 'finance' });
+    const auditRepo = dataSource.getRepository(AuditLog);
+    await auditRepo.save(
+      auditRepo.create({
         actorId: finEmployee.id,
         actorRole: 'EMPLOYEE',
         category: 'FINANCE',
         action: 'ثبت تسویه آزمایشی',
         detail: 'اقدام آزمایشی کارمند مالی برای تست گزارش کارمندان',
-      },
-    });
+      }),
+    );
 
     const finance = await loginAs(app, 'finance');
     const res = await request(app.getHttpServer())
@@ -329,8 +345,8 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
     expect(reports.some((r) => r.staffId === finEmployee.id)).toBe(true);
 
     // Dept isolation: no commercial/sales-dept employee ever appears.
-    const commEmployees = await prisma.user.findMany({
-      where: { role: 'EMPLOYEE', dept: { in: ['commercial', 'sales'] } },
+    const commEmployees = await dataSource.getRepository(User).find({
+      where: { role: 'EMPLOYEE', dept: In(['commercial', 'sales']) },
       select: { id: true },
     });
     for (const c of commEmployees) {
@@ -340,9 +356,9 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
   });
 
   it('GET /staff-reports?staffId= filters to one employee; a foreign-dept staffId yields an empty feed', async () => {
-    const commEmployee = await prisma.user.findFirstOrThrow({
-      where: { role: 'EMPLOYEE', dept: { in: ['commercial', 'sales'] } },
-    });
+    const commEmployee = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ role: 'EMPLOYEE', dept: In(['commercial', 'sales']) });
 
     const finance = await loginAs(app, 'finance');
     const res = await request(app.getHttpServer())
