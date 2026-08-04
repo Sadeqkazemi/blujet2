@@ -1595,7 +1595,13 @@ a passing test — see `docs/features/panel-shell-dashboard.md` for Phase 1.
   Flights (flightops) + Club + Refunds + Tickets + **مدیریت سایت** +
   **درخواست‌های استخدام**; cartable already dark for SITE_ADMIN; sidebar
   drops blog/kyc/settings; global **10 records/page**; refunds + tickets
-  search. See `docs/features/site-admin-panel-align.md`.
+  search.   See `docs/features/site-admin-panel-align.md`.
+
+- [x] **SITE_ADMIN — مشتریان (2026-08-04)** — tab `customers` after
+  reports in `PANEL_NAV`; `GET /customers` + `/:id` + incomplete-count
+  badge; list (mobile search, کامل/ناقص) + detail tabs (اطلاعات و مدارک /
+  تاریخچه خرید / تماس‌ها و تیکت‌ها / باشگاه). See
+  `docs/features/site-admin-customers.md`.
 
 - [x] **Prisma → TypeORM migration reconciled onto `main` (2026-08-04)** —
   the `claude/admin-panels-multi-role-kv5nk3` branch's full 18-phase

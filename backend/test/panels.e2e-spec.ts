@@ -168,6 +168,7 @@ describe('Panels (e2e)', () => {
       'agencies',
       'flightops',
       'reports',
+      'customers',
       'club',
       'refund',
       'cartable',
