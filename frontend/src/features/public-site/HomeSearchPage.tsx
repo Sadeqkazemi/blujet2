@@ -66,9 +66,18 @@ const STR: Record<StoredLocale, {
   heroBadge: string;
   heroTitle: string;
   heroSub: string;
+  heroCta: string;
+  economyCabin: string;
+  airlineBadge: string;
+  airlineTitle: string;
+  airlineSub: string;
+  airlineBtn: string;
   tripOneWay: string;
   tripRoundTrip: string;
   tripMultiCity: string;
+  tabBook: string;
+  tabManage: string;
+  tabStatus: string;
   lblOrigin: string;
   lblDestination: string;
   lblDepartDate: string;
@@ -125,9 +134,18 @@ const STR: Record<StoredLocale, {
     heroBadge: 'در هر پرواز تا ۵٪ کش‌بک بگیرید',
     heroTitle: 'پرواز بعدی‌ات را با blujet رزرو کن',
     heroSub: 'بیش از ۲۰۰ مقصد داخلی و بین‌المللی، با بهترین قیمت، پشتیبانی شبانه‌روزی و امتیاز در هر سفر.',
+    heroCta: 'مشاهده پیشنهادهای ویژه',
+    economyCabin: 'اکونومی',
+    airlineBadge: 'ایرلاین‌های شریک',
+    airlineTitle: 'پرواز با ۴۵+ ایرلاین معتبر بین‌المللی',
+    airlineSub: 'تمام پروازها با ایرلاین‌های دارای مجوز رسمی و پوشش بیمه مسافرتی رزرو می‌شوند.',
+    airlineBtn: 'مشاهده ایرلاین‌ها',
     tripOneWay: 'یک‌طرفه',
     tripRoundTrip: 'رفت و برگشت',
     tripMultiCity: 'چندمسیره',
+    tabBook: 'رزرو پرواز',
+    tabManage: 'مدیریت رزرو',
+    tabStatus: 'وضعیت پرواز',
     lblOrigin: 'مبدا',
     lblDestination: 'مقصد',
     lblDepartDate: 'تاریخ رفت',
@@ -184,9 +202,18 @@ const STR: Record<StoredLocale, {
     heroBadge: 'Up to 5% cashback on every flight',
     heroTitle: 'Book your next flight with blujet',
     heroSub: 'Over 200 domestic and international destinations, the best prices, 24/7 support, and rewards on every trip.',
+    heroCta: 'See offers',
+    economyCabin: 'Economy',
+    airlineBadge: 'Partner Airlines',
+    airlineTitle: 'Fly with 45+ trusted international airlines',
+    airlineSub: 'All flights are booked with officially licensed airlines and travel insurance coverage.',
+    airlineBtn: 'View Airlines',
     tripOneWay: 'One-way',
     tripRoundTrip: 'Round-trip',
     tripMultiCity: 'Multi-city',
+    tabBook: 'Book Flight',
+    tabManage: 'Manage Booking',
+    tabStatus: 'Flight Status',
     lblOrigin: 'From',
     lblDestination: 'To',
     lblDepartDate: 'Departure date',
@@ -243,9 +270,18 @@ const STR: Record<StoredLocale, {
     heroBadge: 'احصل على استرداد نقدي حتى ٥٪ في كل رحلة',
     heroTitle: 'احجز رحلتك القادمة مع blujet',
     heroSub: 'أكثر من ٢٠٠ وجهة داخلية ودولية بأفضل الأسعار، مع دعم على مدار الساعة ونقاط في كل رحلة.',
+    heroCta: 'عرض العروض',
+    economyCabin: 'اقتصادية',
+    airlineBadge: 'شركات الطيران الشريكة',
+    airlineTitle: 'طيران مع أكثر من ٤٥ شركة طيران دولية موثوقة',
+    airlineSub: 'جميع الرحلات محجوزة مع شركات طيران مرخصة رسمياً وتغطية تأمين السفر.',
+    airlineBtn: 'عرض شركات الطيران',
     tripOneWay: 'ذهاب فقط',
     tripRoundTrip: 'ذهاب وإياب',
     tripMultiCity: 'متعدد المدن',
+    tabBook: 'حجز الرحلة',
+    tabManage: 'إدارة الحجز',
+    tabStatus: 'حالة الرحلة',
     lblOrigin: 'من',
     lblDestination: 'إلى',
     lblDepartDate: 'تاريخ المغادرة',
@@ -328,6 +364,30 @@ export default function HomeSearchPage() {
   const [annClosed, setAnnClosed] = useState(false);
   const [homeContent, setHomeContent] = useState<PublicHomeContent | null>(null);
   const [appLinks, setAppLinks] = useState<{ id: AppLinkId; url: string }[]>([]);
+  const [topTab, setTopTab] = useState<'book' | 'manage' | 'status'>('book');
+  const [searching, setSearching] = useState(false);
+  const [searchFrom, setSearchFrom] = useState('');
+  const [searchTo, setSearchTo] = useState('');
+
+  function scrollToOffers() {
+    const el = document.getElementById('offers');
+    if (el) {
+      const y = el.getBoundingClientRect().top + window.scrollY - 80;
+      window.scrollTo({ top: y, behavior: 'smooth' });
+    }
+  }
+
+  function handleSearchSubmit(url: string, meta?: { origin: string; dest: string }) {
+    if (meta) {
+      setSearchFrom(meta.origin);
+      setSearchTo(meta.dest);
+    }
+    setSearching(true);
+    window.setTimeout(() => {
+      setSearching(false);
+      navigate(url);
+    }, 1600);
+  }
 
   useEffect(() => {
     fetchAirports()
@@ -448,6 +508,119 @@ export default function HomeSearchPage() {
   const heroImage = heroBlock?.imageUrl;
   const promoImage = promoBlock?.imageUrl;
 
+  const loyaltySlide = (
+    <div
+      dir={locale === 'en' ? 'ltr' : 'rtl'}
+      style={{
+        flex: 1,
+        minHeight: 220,
+        boxSizing: 'border-box',
+        background: 'linear-gradient(120deg,#1668c4,#0d3b66)',
+        padding: '26px 46px',
+        display: 'flex',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 20,
+        position: 'relative',
+        overflow: 'hidden',
+        width: '100%',
+      }}
+    >
+      <div style={{ position: 'absolute', top: -80, left: -40, width: 280, height: 280, borderRadius: '50%', background: '#ffffff14' }} />
+      <div style={{ position: 'relative', maxWidth: 440 }}>
+        <div style={{ display: 'inline-block', background: '#ffffff22', color: '#fff', padding: '5px 11px', borderRadius: 20, fontSize: '11.5px', fontWeight: 600, marginBottom: 14 }}>
+          {t.loyaltyEyebrow}
+        </div>
+        <h2 style={{ fontSize: '22.5px', fontWeight: 800, color: '#fff', margin: '0 0 10px', letterSpacing: '-.5px' }}>{t.loyaltyTitle}</h2>
+        <p style={{ fontSize: 13, color: '#dce8f6', margin: '0 0 16px', lineHeight: 1.75 }}>{t.loyaltySub}</p>
+        <button type="button" onClick={() => navigate('/club')} style={{ display: 'inline-block', padding: '10px 21px', background: '#fff', color: '#1668c4', borderRadius: 11, fontSize: 13, fontWeight: 800, cursor: 'pointer', border: 'none', fontFamily: 'inherit' }}>
+          {t.loyaltyCta}
+        </button>
+      </div>
+      <div style={{ position: 'relative', flex: 'none', display: 'flex', flexDirection: 'column', gap: 8, width: 290 }}>
+        {[
+          ['#cbd5e1', t.tierSilver, t.tierSilverRange],
+          ['#e7c66b', t.tierGold, t.tierGoldRange],
+          ['#9fd2ff', t.tierPlatinum, t.tierPlatinumRange],
+        ].map(([dot, name, range]) => (
+          <div key={String(name)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#ffffff14', border: '1px solid #ffffff26', borderRadius: 12, padding: '9px 13px' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 7, color: '#fff', fontWeight: 800, fontSize: '12.5px' }}>
+              <span style={{ width: 11, height: 11, borderRadius: '50%', background: dot }} />
+              {name}
+            </span>
+            <span style={{ color: '#cdd9ec', fontSize: '11.5px', fontWeight: 600 }}>{range}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const appSlide = (
+    <div
+      dir={locale === 'en' ? 'ltr' : 'rtl'}
+      style={{
+        flex: 1,
+        minHeight: 220,
+        boxSizing: 'border-box',
+        background: '#fff',
+        padding: '28px 46px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 30,
+        flexWrap: 'wrap',
+        width: '100%',
+      }}
+    >
+      <div style={{ flex: 1, minWidth: 300 }}>
+        <div style={{ fontSize: '11.5px', color: '#1668c4', fontWeight: 700, marginBottom: 10 }}>{t.appEyebrow}</div>
+        <h2 style={{ fontSize: '22.5px', fontWeight: 800, margin: '0 0 12px', color: '#0d2640', letterSpacing: '-.5px' }}>{t.appTitle}</h2>
+        <p style={{ fontSize: 13, color: '#3f546b', lineHeight: 1.8, margin: '0 0 20px', maxWidth: 460 }}>{t.appSub}</p>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          {APP_LINK_ORDER.map((id) => {
+            const link = appLinks.find((l) => l.id === id);
+            const label = t[APP_LINK_LABELS[id]];
+            const isBazaar = id === 'bazaar_myket';
+            const style: React.CSSProperties = {
+              display: 'flex',
+              alignItems: 'center',
+              gap: 7,
+              background: isBazaar ? '#fff' : '#0d2640',
+              color: isBazaar ? '#0d2640' : '#fff',
+              padding: '9px 16px',
+              borderRadius: 12,
+              fontSize: '12.5px',
+              fontWeight: 600,
+              border: isBazaar ? '1.5px solid #d5e1f0' : 'none',
+              textDecoration: 'none',
+              fontFamily: 'inherit',
+              cursor: link ? 'pointer' : 'default',
+              opacity: link ? 1 : 0.85,
+            };
+            if (link) {
+              return (
+                <a key={id} href={link.url} target="_blank" rel="noopener noreferrer" data-testid={`app-link-${id}`} style={style}>
+                  {!isBazaar && <span style={{ fontSize: '14.5px' }}>⬇</span>}
+                  {label}
+                </a>
+              );
+            }
+            return (
+              <span key={id} data-testid={`app-link-${id}`} style={style}>
+                {!isBazaar && <span style={{ fontSize: '14.5px' }}>⬇</span>}
+                {label}
+              </span>
+            );
+          })}
+        </div>
+      </div>
+      <div style={{ flex: 'none', width: 230, height: 172, borderRadius: 18, background: 'linear-gradient(160deg,#cfe0f5,#e8eef6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#5e7fa8', fontFamily: "'Roboto Mono',monospace", fontSize: 11 }}>
+        App mockup
+      </div>
+    </div>
+  );
+
   return (
     <PublicPageShell beforeHeader={announcementBar}>
       {loadError && (
@@ -550,6 +723,8 @@ export default function HomeSearchPage() {
           })}
         </div>
       </section>
+
+      <FeatureQuickLinks locale={locale} labels={t.quickLinks} hrefs={t.quickLinkHrefs} />
 
       {/* SPECIAL OFFERS */}
       <section id="offers" style={{ maxWidth: 1180, margin: '0 auto', padding: isMobile ? '14px 26px 7px' : '18px 26px 7px', scrollMarginTop: 96 }}>

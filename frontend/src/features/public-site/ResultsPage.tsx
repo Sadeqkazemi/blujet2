@@ -78,6 +78,7 @@ export default function ResultsPage() {
 
   const [airports, setAirports] = useState<Airport[]>([]);
   const [results, setResults] = useState<SearchFlightResult[] | null>(null);
+  const [returnResults, setReturnResults] = useState<SearchFlightResult[] | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -114,9 +115,10 @@ export default function ResultsPage() {
   }, [status]);
 
   useEffect(() => {
-    if (!origin || !dest || !date) return;
+    if (!parsed || !origin || !dest || !date) return;
     let cancelled = false;
     setResults(null);
+    setReturnResults(null);
     setSearchError(null);
     setAiState('idle');
     setAdvisory(null);
@@ -255,7 +257,7 @@ export default function ResultsPage() {
     resultsPager.setPage(1);
   }
 
-  if (!origin || !dest || !date) {
+  if (!parsed || !origin || !dest || !date) {
     return (
       <PublicPageShell>
         <div style={{ maxWidth: 720, margin: '0 auto', padding: '40px 26px', textAlign: 'center' }}>

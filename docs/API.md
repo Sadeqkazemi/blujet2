@@ -941,18 +941,27 @@ logic. No schema change.
   after submission, mirroring `TicketPage.tsx`'s already-built
   authenticated refund flow (enter شبا → submit → see the real computed
   breakdown), not a pre-submission preview.
-- No `AuditService.record` call on the anonymous path (its `actorId` is a
-  required real `User.id`, which an anonymous caller doesn't have) — same
-  precedent as Phase 16's anonymous agency pre-registration.
+- `POST /manage-booking/change-seat` (public, `@Throttle` 10/min per IP)
+  — `{ pnr, lastName, seatCode }`. Re-verifies the same PNR+lastName
+  match, requires status `PAID`/`TICKETED` and a future departure, then
+  moves the **credential-matching passenger** to a free seat in the
+  booking's own cabin. Same `SELECT … FOR UPDATE` on the flight-instance
+  row + `takenSeatCodes` re-check as `createBooking`, so two concurrent
+  movers of the same target seat can't both win (409 for the loser).
+  400 for a seat outside the cabin / identical to the current one; audit
+  (`RESERVATION`) recorded when the booking has a `userId`. Frontend:
+  seat-map modal on مدیریت رزرو fed by the existing public
+  `GET /search/flights/:id/seatmap`.
+- No `AuditService.record` call on the anonymous lookup/refund paths (its
+  `actorId` is a required real `User.id`, which an anonymous caller
+  doesn't have) — same precedent as Phase 16's anonymous agency
+  pre-registration.
 
 ### Explicit deferrals (flagged, not oversights)
-- **تغییر صندلی (seat change)** and **دانلود بلیط (ticket download)** —
-  the mock's buttons for both already had no `onClick` handler at all
-  (pure decoration); left disabled with a "به‌زودی" hint this phase
-  rather than built. Seat change on an already-TICKETED booking is a
-  distinct feature (seat-availability check, no existing customer-facing
-  endpoint) deserving its own scoped review; ticket download/PDF was
-  already flagged deferred in PLAN.md's Phase 9 notes.
+- ~~**تغییر صندلی (seat change)** and **دانلود بلیط (ticket download)**~~
+  — **both built post-audit**: seat change via the real endpoint above;
+  دانلود بلیط opens a print-ready boarding-pass window rendered from the
+  looked-up booking (browser print → save as PDF), no new endpoint.
 - **Per-passenger partial refund selection** — the mock's refund modal
   let the user check individual passengers to refund a subset of the
   fare. The real `RefundRequest` model (Phase 7) is 1:1 with `Booking`,
@@ -1888,7 +1897,7 @@ the frontend UI closure, and the found-and-fixed bugs are in
 
 | Method | Path | Notes |
 |---|---|---|
-| POST | `/my/price-locks` | `{ flightInstanceId, cabin }` — 403 if the caller isn't a `GOLD`/`PLATINUM` `ClubMember`; 404 if the flight is gone or no longer `SCHEDULED`; 409 if an active, unexpired lock already exists for that user+flight+cabin. Locks the live cabin price for 72h flat (`LOCK_TTL_MS`), fee = flat 3% of that price rounded to the nearest 10,000 IRR (`LOCK_FEE_PCT` — CLAUDE.md: "fee/risk suggested by the ML service but authorized and computed by NestJS"; the AI-suggested variable fee stays deferred). **The fee is computed and stored but never charged anywhere** — see the ⚑ note in `docs/features/wallet-price-lock.md`; this phase's frontend surfaces the fee as a plain data field without asserting it was billed. |
+| POST | `/my/price-locks` | `{ flightInstanceId, cabin }` — 403 if the caller isn't a `GOLD`/`PLATINUM` `ClubMember`; 404 if the flight is gone or no longer `SCHEDULED`; 409 if an active, unexpired lock already exists for that user+flight+cabin. Locks the live cabin price for 72h flat (`LOCK_TTL_MS`), fee = flat 3% of that price rounded to the nearest 10,000 IRR (`LOCK_FEE_PCT` — CLAUDE.md: "fee/risk suggested by the ML service but authorized and computed by NestJS"; the AI-suggested variable fee stays deferred). **The fee is billed immediately from the member's wallet** inside the same transaction that creates the lock (a `WalletEntry` `PURCHASE` debit row — never a mutable balance); 409 «موجودی کیف پول … کافی نیست» when the balance can't cover it. Non-refundable on cancel — the fee buys the 72h option itself. |
 | GET | `/my/price-locks` | Own locks, newest first. **Phase 34 addition**: each row now also includes `flight: { flightNo, originCode, destCode, departureAt }` (joined via `FlightInstance → Flight → Route`) — previously only raw fields, giving the frontend no way to show which flight a lock is for. |
 | DELETE | `/my/price-locks/:id` | Owner-only; 404 otherwise; 400 if not currently `ACTIVE` → `CANCELLED`. |
 

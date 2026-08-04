@@ -9,8 +9,9 @@ import { faDigits, latinDigits } from '../../lib/fa-format';
 // ورود و ثبتنام — rebuilt to match design-reference/ورود و ثبتنام.dc.html:
 // ورود/ثبت‌نام tabs, کاربر/آژانس segment, OTP with resend countdown.
 // Customer OTP uses the existing auth hooks (verification find-or-creates
-// the account, so the signup tab's OTP is the same flow); agency signup is
-// a mock submit per the "no backend work" scope.
+// the account, so the signup tab's OTP is the same flow); agency signup
+// submits a real Phase 16 AgencyMembershipRequest (phone-OTP-verified)
+// that lands in the staff review queue (پنل ادمین ← آژانس‌ها ← درخواست‌ها).
 //
 // The design's own login page has a materially different field layout
 // (email+password-first with Google sign-in, 5-digit OTP) from this real
@@ -284,6 +285,10 @@ export default function CustomerLoginPage() {
   const [agencyPass, setAgencyPass] = useState('');
   const [agencyName, setAgencyName] = useState('');
   const [licenseNo, setLicenseNo] = useState('');
+  const [agencyManager, setAgencyManager] = useState('');
+  const [agencyPhone, setAgencyPhone] = useState('');
+  const [agencyChallengeId, setAgencyChallengeId] = useState<string | null>(null);
+  const [agencyCode, setAgencyCode] = useState('');
   const [agencySubmitted, setAgencySubmitted] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
@@ -347,6 +352,42 @@ export default function CustomerLoginPage() {
       navigate('/agency', { replace: true });
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.errAgencyLoginFailed);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onAgencyRequestOtp(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setBusy(true);
+    try {
+      const { challengeId: id } = await requestAgencySignupOtp(agencyPhone.trim());
+      setAgencyChallengeId(id);
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t.errSendCode);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onAgencySignupConfirm(e: React.FormEvent) {
+    e.preventDefault();
+    if (!agencyChallengeId) return;
+    setError(null);
+    setBusy(true);
+    try {
+      await submitAgencyRequest({
+        applicantName: agencyName.trim(),
+        managerName: agencyManager.trim(),
+        licenseNo: licenseNo.trim(),
+        phone: agencyPhone.trim(),
+        challengeId: agencyChallengeId,
+        code: agencyCode.trim(),
+      });
+      setAgencySubmitted(true);
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t.errInvalidCode);
     } finally {
       setBusy(false);
     }
@@ -596,7 +637,7 @@ export default function CustomerLoginPage() {
             </form>
           )}
 
-          {/* ---- AGENCY SIGNUP (mock submit) ---- */}
+          {/* ---- AGENCY SIGNUP (real Phase 16 membership request) ---- */}
           {isAgency && !isLogin && (
             agencySubmitted ? (
               <div data-testid="agency-signup-done" style={{ background: '#eef9f1', border: '1px solid #bfe6cc', borderRadius: 12, padding: '20px 16px', textAlign: 'center' }}>
@@ -606,14 +647,42 @@ export default function CustomerLoginPage() {
                   {t.agencyNote}
                 </div>
               </div>
+            ) : agencyChallengeId ? (
+              <form onSubmit={onAgencySignupConfirm} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div>
+                  <label style={labelStyle}>{t.otpLabel}</label>
+                  <input
+                    data-testid="agency-otp-code"
+                    dir="ltr"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={agencyCode}
+                    onChange={(e) => setAgencyCode(e.target.value)}
+                    placeholder="——————"
+                    style={{ ...inputStyle, textAlign: 'center', letterSpacing: 6, fontWeight: 800 }}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  data-testid="agency-signup-confirm"
+                  disabled={busy || agencyCode.trim().length !== 6}
+                  style={primaryBtn(!busy && agencyCode.trim().length === 6)}
+                >
+                  {t.agencySubmitBtn}
+                </button>
+                <span
+                  onClick={() => {
+                    setAgencyChallengeId(null);
+                    setAgencyCode('');
+                    setError(null);
+                  }}
+                  style={{ fontSize: 11.5, color: '#1668c4', fontWeight: 700, cursor: 'pointer', textAlign: 'center' }}
+                >
+                  {t.editNumber}
+                </span>
+              </form>
             ) : (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  setAgencySubmitted(true);
-                }}
-                style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
-              >
+              <form onSubmit={onAgencyRequestOtp} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div>
                   <label style={labelStyle}>{t.agencyNameLabel}</label>
                   <input data-testid="agency-name" value={agencyName} onChange={(e) => setAgencyName(e.target.value)} placeholder={t.agencyNamePlaceholder} style={inputStyle} />
@@ -624,13 +693,30 @@ export default function CustomerLoginPage() {
                 </div>
                 <div>
                   <label style={labelStyle}>{t.agencyManagerLabel}</label>
-                  <input placeholder={t.agencyManagerPlaceholder} style={inputStyle} />
+                  <input data-testid="agency-manager" value={agencyManager} onChange={(e) => setAgencyManager(e.target.value)} placeholder={t.agencyManagerPlaceholder} style={inputStyle} />
                 </div>
                 <div>
                   <label style={labelStyle}>{t.agencyPhoneLabel}</label>
-                  <input dir="ltr" placeholder="09xxxxxxxxx" style={inputStyle} />
+                  <input data-testid="agency-phone" dir="ltr" value={agencyPhone} onChange={(e) => setAgencyPhone(e.target.value)} placeholder="09xxxxxxxxx" style={inputStyle} />
                 </div>
-                <button type="submit" data-testid="agency-signup-btn" disabled={!agencyName.trim() || !licenseNo.trim()} style={primaryBtn(!!agencyName.trim() && !!licenseNo.trim())}>
+                <button
+                  type="submit"
+                  data-testid="agency-signup-btn"
+                  disabled={
+                    busy ||
+                    !agencyName.trim() ||
+                    !licenseNo.trim() ||
+                    !agencyManager.trim() ||
+                    !/^09\d{9}$/.test(agencyPhone.trim())
+                  }
+                  style={primaryBtn(
+                    !busy &&
+                      !!agencyName.trim() &&
+                      !!licenseNo.trim() &&
+                      !!agencyManager.trim() &&
+                      /^09\d{9}$/.test(agencyPhone.trim()),
+                  )}
+                >
                   {t.agencySubmitBtn}
                 </button>
                 <p style={{ fontSize: 10.5, color: '#8a96a6', margin: 0, lineHeight: 1.9 }}>
