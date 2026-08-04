@@ -104,7 +104,7 @@ export default function ResultsFlightCard({
                 fontSize: 21,
               }}
             >
-              <FlightPathPlane rtl={isRTL} size={21} style={{ color: '#6b7787' }} />
+              ✈
             </div>
             <span style={{ fontSize: 13.5, color: '#16202e', fontWeight: 700, textAlign: 'center' }}>{airline}</span>
           </div>
