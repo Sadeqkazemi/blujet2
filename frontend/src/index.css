@@ -62,8 +62,10 @@ body {
   unicode-bidi: isolate;
 }
 
+/* Roboto Mono for booking codes, seat rows, Latin numeric inputs — not fa/ar prices/times. */
 .font-num {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 @keyframes spin {

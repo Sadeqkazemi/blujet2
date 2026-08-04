@@ -75,6 +75,9 @@ export default function ResultsPage() {
   const origin = params.get('origin') ?? '';
   const dest = params.get('dest') ?? '';
   const date = params.get('date') ?? '';
+  const adults = Math.max(1, Number(params.get('adults') ?? '1') || 1);
+  const cabinRaw = params.get('cabin') ?? 'ECONOMY';
+  const preferredCabin: CabinClass = cabinRaw === 'BUSINESS' ? 'BUSINESS' : 'ECONOMY';
 
   const [airports, setAirports] = useState<Airport[]>([]);
   const [results, setResults] = useState<SearchFlightResult[] | null>(null);
@@ -254,6 +257,42 @@ export default function ResultsPage() {
     setFAirline('all');
     resultsPager.setPage(1);
   }
+
+  const cabinLabels = useMemo(
+    () => ({
+      ECONOMY: CABIN_LABEL.ECONOMY[locale],
+      BUSINESS: CABIN_LABEL.BUSINESS[locale],
+    }),
+    [locale],
+  );
+
+  const cardLabels = useMemo(
+    () => ({
+      direct: t.direct,
+      oneStop: t.oneStop,
+      seatsLeft: t.seatsLeft,
+      select: t.select,
+      buyTicket: t.buyTicket,
+      toman: t.toman,
+      priceLock: t.priceLock,
+      saveFlight: t.saveFlight,
+      savedFlight: t.savedFlight,
+      analyzing: t.aiAnalyzing,
+      detailsBook: t.detailsBook,
+      flightDetails: t.flightDetails,
+      flightNo: t.flightNo,
+      aircraft: t.aircraft,
+      lowSeats: t.lowSeats,
+      priceDetails: t.priceDetails,
+      adultPax: t.adultPax,
+      total: t.total,
+      seatsRemaining: t.seatsRemaining,
+      outbound: t.outbound,
+      originAirport: t.originAirport,
+      destAirport: t.destAirport,
+    }),
+    [t],
+  );
 
   if (!origin || !dest || !date) {
     return (

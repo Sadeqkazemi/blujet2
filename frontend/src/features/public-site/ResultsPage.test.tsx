@@ -9,7 +9,7 @@ import { mockAuthUser } from '../../test/mockAuthUser';
 import * as useLocaleModule from '../../hooks/useLocale';
 import * as useIsMobileModule from '../../hooks/useIsMobile';
 import { ApiRequestError } from '../../api/envelope';
-import type { PriceLock, SearchFlightResult } from '../../types/public-site';
+import type { Airport, PriceLock, SearchFlightResult } from '../../types/public-site';
 
 function mockLocale(locale: 'fa' | 'en' | 'ar') {
   vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale, setLocale: vi.fn() });
@@ -50,6 +50,7 @@ function renderPage(
     confirmTwoFactor: vi.fn(),
     agencyLogin: vi.fn(),
     signOut: vi.fn(),
+    refreshMe: vi.fn(),
   });
   return render(
     <MemoryRouter initialEntries={[`/results?${search}`]}>
@@ -68,9 +69,10 @@ async function expandFirstCard(locale: 'fa' | 'en' | 'ar' = 'fa') {
 }
 
 describe('ResultsPage', () => {
-  it('renders flight cards with per-cabin price and seatsLeft', async () => {
+  it('renders collapsed flight cards and expands to show cabin actions', async () => {
     mockSearchApis();
     vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+    const user = userEvent.setup();
     renderPage();
 
     expect(await screen.findByTestId('result-card')).toBeInTheDocument();
@@ -82,6 +84,7 @@ describe('ResultsPage', () => {
   it('shows origin and destination city names in the search summary', async () => {
     mockSearchApis();
     vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+    const user = userEvent.setup();
     renderPage();
 
     expect(await screen.findByTestId('result-card')).toBeInTheDocument();
@@ -143,6 +146,7 @@ describe('ResultsPage', () => {
   it('opens edit-search modal with trip type, airport pickers, and inline calendar', async () => {
     vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
     vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+    const user = userEvent.setup();
     renderPage();
     await screen.findByTestId('result-card');
 
@@ -158,7 +162,7 @@ describe('ResultsPage', () => {
     expect(screen.getByTestId('edit-search-calendar')).toBeInTheDocument();
   });
 
-  it('calls advisory API and shows buy recommendation', async () => {
+  it('calls advisory API and shows buy recommendation with probability', async () => {
     mockSearchApis();
     vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
     const advisorySpy = vi.spyOn(publicSiteApi, 'fetchSearchAdvisory').mockResolvedValue({
@@ -166,6 +170,8 @@ describe('ResultsPage', () => {
       recommendation: 'buy',
       reasonFa: 'قیمت امروز در محدوده مناسب است — برای سفر قطعی همین حالا بخرید.',
       predictedPriceIrr: '380000000',
+      priceIncreaseProbPct: 72,
+      cheapestDayLabel: '۱۴ مرداد',
     });
     renderPage();
     await screen.findByTestId('result-card');
@@ -180,11 +186,12 @@ describe('ResultsPage', () => {
     it('redirects an unauthenticated visitor to /signin, remembering the search', async () => {
       mockSearchApis();
       vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+      const user = userEvent.setup();
       renderPage('unauthenticated');
       await screen.findByTestId('result-card');
       await expandFirstCard();
 
-      await userEvent.click(screen.getByTestId('real-lock-fi-1-ECONOMY'));
+      await user.click(screen.getByTestId('real-lock-fi-1-ECONOMY'));
 
       expect(await screen.findByText('صفحه ورود')).toBeInTheDocument();
     });
@@ -194,11 +201,12 @@ describe('ResultsPage', () => {
       vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
       vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({ isMember: false, level: null, balance: 0 });
       const createLock = vi.spyOn(publicSiteApi, 'createPriceLock');
+      const user = userEvent.setup();
       renderPage('authenticated');
       await screen.findByTestId('result-card');
       await expandFirstCard();
 
-      await userEvent.click(screen.getByTestId('real-lock-fi-1-ECONOMY'));
+      await user.click(screen.getByTestId('real-lock-fi-1-ECONOMY'));
 
       expect(await screen.findByTestId('real-lock-modal')).toHaveTextContent(
         'قفل قیمت تا ۷۲ ساعت مخصوص اعضای سطح طلایی و بالاتر باشگاه مشتریان است.',
@@ -223,11 +231,12 @@ describe('ResultsPage', () => {
         flight: { flightNo: 'BJ-100', originCode: 'THR', destCode: 'MHD', departureAt: '2026-08-01T05:00:00.000Z' },
       };
       const createLock = vi.spyOn(publicSiteApi, 'createPriceLock').mockResolvedValue(lock);
+      const user = userEvent.setup();
       renderPage('authenticated');
       await screen.findByTestId('result-card');
       await expandFirstCard();
 
-      await userEvent.click(screen.getByTestId('real-lock-fi-1-ECONOMY'));
+      await user.click(screen.getByTestId('real-lock-fi-1-ECONOMY'));
 
       expect(await screen.findByText('قیمت شما قفل شد')).toBeInTheDocument();
       expect(createLock).toHaveBeenCalledWith('fi-1', 'ECONOMY');
@@ -240,11 +249,12 @@ describe('ResultsPage', () => {
       vi.spyOn(publicSiteApi, 'createPriceLock').mockRejectedValue(
         new ApiRequestError('CONFLICT', 'شما قبلاً برای این پرواز و کلاس، قیمت را قفل کرده‌اید.', 409),
       );
+      const user = userEvent.setup();
       renderPage('authenticated');
       await screen.findByTestId('result-card');
       await expandFirstCard();
 
-      await userEvent.click(screen.getByTestId('real-lock-fi-1-ECONOMY'));
+      await user.click(screen.getByTestId('real-lock-fi-1-ECONOMY'));
 
       expect(await screen.findByRole('alert')).toHaveTextContent(
         'شما قبلاً برای این پرواز و کلاس، قیمت را قفل کرده‌اید.',
@@ -256,11 +266,12 @@ describe('ResultsPage', () => {
     it('redirects an unauthenticated visitor to /signin when saving', async () => {
       mockSearchApis();
       vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+      const user = userEvent.setup();
       renderPage('unauthenticated');
       await screen.findByTestId('result-card');
       await expandFirstCard();
 
-      await userEvent.click(screen.getByTestId('real-save-fi-1-ECONOMY'));
+      await user.click(screen.getByTestId('real-save-fi-1-ECONOMY'));
 
       expect(await screen.findByText('صفحه ورود')).toBeInTheDocument();
     });
@@ -285,11 +296,12 @@ describe('ResultsPage', () => {
         bookable: true,
         createdAt: '2026-07-01T00:00:00.000Z',
       });
+      const user = userEvent.setup();
       renderPage('authenticated');
       await screen.findByTestId('result-card');
       await expandFirstCard();
 
-      await userEvent.click(screen.getByTestId('real-save-fi-1-ECONOMY'));
+      await user.click(screen.getByTestId('real-save-fi-1-ECONOMY'));
 
       expect(save).toHaveBeenCalledWith('fi-1', 'ECONOMY');
       expect(await screen.findByTestId('real-save-fi-1-ECONOMY')).toHaveTextContent('ذخیره شد');
@@ -300,6 +312,7 @@ describe('ResultsPage', () => {
     mockLocale('en');
     mockSearchApis();
     vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+    const user = userEvent.setup();
     renderPage();
 
     expect(await screen.findByTestId('result-card')).toBeInTheDocument();
