@@ -97,11 +97,11 @@ fi
 echo "▶ Applying database migrations…"
 (set +e
  cd backend
- npx typeorm migrate deploy
+ npm run migration:run
  if [[ $? -ne 0 ]]; then
-   npx typeorm migrate dev --name init --skip-seed
+   npm run migration:run
  fi
- npx typeorm db seed 2>/dev/null || true
+ npm run seed 2>/dev/null || true
 )
 
 echo "▶ Building backend…"

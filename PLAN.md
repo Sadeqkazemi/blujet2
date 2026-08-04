@@ -1626,7 +1626,7 @@ See `CLAUDE.md` → Commands. `docker compose up -d` starts Postgres+Redis;
 `cd ml-service && uvicorn app.main:app --reload` for the three services.
 
 - `cd backend && npm run seed` — (re)seeds one dev account per role, all
-  sharing the password `Blujet@1404` (see `backend/typeorm/seed.ts` — dev
+  sharing the password `Blujet@1404` (see `backend/src/database/seed.ts` — dev
   usernames: `ceo`, `chair`, `senior`, `finance`,
   `comm`, `itadmin`, `site.admin`, `com.ahmadi`), plus 6 months of
   sample flights/bookings so the dashboard has real numbers to show.

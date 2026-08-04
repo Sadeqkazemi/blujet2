@@ -177,7 +177,7 @@ Management panels (one per role — shared shell, role-scoped tabs):
   records are not.
 - `design-reference/` / `design-reference-v2/` sample arrays are for
   visual reference only — do **not** copy them into production UI code.
-- `backend/typeorm/seed.ts` remains for **local/dev/E2E** only (never
+- `backend/src/database/seed.ts` remains for **local/dev/E2E** only (never
   production). Seeded rows are real DB rows for testing; they are not
   a license to hardcode the same content in the frontend.
 

@@ -204,7 +204,7 @@ Management panels (one per role — shared shell, role-scoped tabs):
 - Frontend never calls fetch/axios directly in components — only through `src/api/`.
 - Environment variables: validated at startup; `.env.example` always kept current;
   never commit real secrets.
-- Seed data: `backend/typeorm/seed.ts` must stay in sync with the schema and
+- Seed data: `backend/src/database/seed.ts` must stay in sync with the schema and
   create realistic sample data for every domain (test users with known
   passwords **for every role**, sample airports/routes/flights with
   schedules and fares, club members in each tier, an agency with credit,

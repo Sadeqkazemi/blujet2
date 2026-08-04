@@ -18,7 +18,7 @@ submission and site-admin referral live in their own tracks.
 - [x] `computePenalty(hoursLeft)` unit tests: ≥72h→30٪, 24–72h→50٪, 3–24h→70٪, <3h→100٪, boundary values (exactly 72/24/3), and refundable = totalPaid − penalty
       — `backend/src/modules/refunds/penalty.spec.ts` (all cases incl. boundaries + rounding)
 - [x] Rules are seeded from `RefundPenaltyRule` (server-side source of truth) — not hardcoded in the handler
-      — `backend/typeorm/seed.ts` Phase 7 block; `refunds.service.ts` reads `refundPenaltyRule.findMany()` (exercised by `createTestRequest` in the E2E journey)
+      — `backend/src/database/seed.ts` Phase 7 block; `refunds.service.ts` reads `refundPenaltyRule.findMany()` (exercised by `createTestRequest` in the E2E journey)
 
 ### Backend — refer & pay
 - [x] `refer {assigneeId}` sets the assignee + appends the design's history label, does NOT change status, audited; non-staff assignee → 400

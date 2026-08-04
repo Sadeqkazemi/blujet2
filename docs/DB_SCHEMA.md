@@ -1,6 +1,6 @@
 # DB_SCHEMA.md — blujet data model
 
-Source of truth: `backend/typeorm/schema.typeorm` (generated from this doc once
+Source of truth: `backend/src/database/schema.typeorm` (generated from this doc once
 approved). This file groups entities by the phase that introduces them, per
 `CLAUDE.md`'s workflow rule ("one feature = backend endpoint + tests +
 frontend page, fully working, before starting the next feature").
