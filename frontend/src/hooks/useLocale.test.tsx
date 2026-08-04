@@ -19,6 +19,8 @@ function mockAuth(overrides: Partial<ReturnType<typeof useAuthModule.useAuth>>) 
 describe('useLocale', () => {
   beforeEach(() => {
     localStorage.clear();
+    document.documentElement.lang = 'fa';
+    document.documentElement.dir = 'rtl';
     vi.restoreAllMocks();
   });
 
@@ -71,6 +73,24 @@ describe('useLocale', () => {
 
     await waitFor(() => expect(result.current.locale).toBe('en'));
     expect(localStorage.getItem('blujet_lang')).toBe('en');
+  });
+
+  it('keeps the root document language and direction in sync', async () => {
+    localStorage.setItem('blujet_lang', 'en');
+    mockAuth({});
+    const { result } = renderHook(() => useLocale(), { wrapper: LocaleProvider });
+
+    await waitFor(() => {
+      expect(document.documentElement.lang).toBe('en');
+      expect(document.documentElement.dir).toBe('ltr');
+    });
+
+    act(() => result.current.setLocale('ar'));
+
+    await waitFor(() => {
+      expect(document.documentElement.lang).toBe('ar');
+      expect(document.documentElement.dir).toBe('rtl');
+    });
   });
 
   it('falls back to fa with a no-op setter when used outside a LocaleProvider', () => {

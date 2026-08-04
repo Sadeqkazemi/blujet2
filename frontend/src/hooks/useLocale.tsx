@@ -41,6 +41,13 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<StoredLocale>(() => readStored());
   const { status, user } = useAuth();
 
+  // A locally-directed wrapper does not update browser or screen-reader
+  // semantics; keep the root document metadata aligned with the UI locale.
+  useEffect(() => {
+    document.documentElement.lang = locale;
+    document.documentElement.dir = locale === 'en' ? 'ltr' : 'rtl';
+  }, [locale]);
+
   // The moment we know who's logged in is the moment "this device now
   // represents this account" — DB naturally wins over whatever an
   // anonymous session had going before login.

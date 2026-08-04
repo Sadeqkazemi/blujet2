@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
 import { ApiExcludeEndpoint } from '@nestjs/swagger';
 import { DataSource } from 'typeorm';
 
@@ -24,10 +24,10 @@ export class HealthController {
         },
       };
     } catch {
-      return {
+      throw new ServiceUnavailableException({
         status: 'error',
         error: { database: { status: 'down' } },
-      };
+      });
     }
   }
 }

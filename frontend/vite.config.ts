@@ -56,6 +56,8 @@ const SPA_OVERLAPPING_PREFIXES = new Set([
   'blog',
   'contact',
   'flight-status',
+  'manage-booking',
+  'survey',
   'support',
 ])
 
