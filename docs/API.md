@@ -51,7 +51,7 @@ Error codes: `INVALID_CREDENTIALS`, `TWO_FACTOR_REQUIRED`, `TWO_FACTOR_INVALID`,
 |---|---|---|---|
 | GET | `/customers` | SITE_ADMIN | Query: `q?` (mobile digits). Returns `{ customers[], incompleteCount, total }`. Incomplete = missing name or national ID (design warn badge). National ID decrypted for site admin. |
 | GET | `/customers/incomplete-count` | SITE_ADMIN | `{ count }` for sidebar badge. |
-| GET | `/customers/:id` | SITE_ADMIN | Detail for tabs: profile, `docs` (KYC id-card), `purchases` (bookings), `contacts` (support tickets by userId/phone), `club`. |
+| GET | `/customers/:id` | SITE_ADMIN | Detail for tabs: profile, `docs` (KYC id-card), `purchases` (bookings), `refunds` (استرداد via booking.userId), `contacts` (support tickets by userId/phone), `club`. |
 
 ### Reporting (`backend/src/modules/reporting/`)
 

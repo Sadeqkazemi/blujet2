@@ -8,6 +8,7 @@ import { SupportTicket } from '../../database/entities/support-ticket.entity';
 import { CustomerIdentityVerification } from '../../database/entities/customer-identity-verification.entity';
 import { StoredFile } from '../../database/entities/stored-file.entity';
 import { Airport } from '../../database/entities/airport.entity';
+import { RefundRequest } from '../../database/entities/refund-request.entity';
 import { Role } from '../../database/enums';
 import { ErrorCode } from '../../common/errors';
 import { decryptPii } from '../../common/pii-crypto';
@@ -48,6 +49,8 @@ export class CustomersService {
     private readonly fileRepo: Repository<StoredFile>,
     @InjectRepository(Airport)
     private readonly airportRepo: Repository<Airport>,
+    @InjectRepository(RefundRequest)
+    private readonly refundRepo: Repository<RefundRequest>,
   ) {}
 
   private userBaseQb() {
@@ -250,6 +253,58 @@ export class CustomersService {
       status: t.status,
     }));
 
+    const refundRows = await this.refundRepo
+      .createQueryBuilder('r')
+      .innerJoinAndSelect('r.booking', 'b')
+      .leftJoinAndSelect('b.flightInstance', 'fi')
+      .leftJoinAndSelect('fi.flight', 'f')
+      .leftJoinAndSelect('f.route', 'route')
+      .where('b.userId = :userId', { userId: user.id })
+      .andWhere('b.deletedAt IS NULL')
+      .orderBy('r.createdAt', 'DESC')
+      .take(50)
+      .getMany();
+
+    const refundCodes = new Set<string>();
+    for (const r of refundRows) {
+      const origin = r.booking?.flightInstance?.flight?.route?.originCode;
+      const dest = r.booking?.flightInstance?.flight?.route?.destCode;
+      if (origin) refundCodes.add(origin);
+      if (dest) refundCodes.add(dest);
+    }
+    const refundAirports =
+      refundCodes.size > 0
+        ? await this.airportRepo
+            .createQueryBuilder('a')
+            .where('a.code IN (:...codes)', { codes: [...refundCodes] })
+            .getMany()
+        : [];
+    const refundCity = new Map(refundAirports.map((a) => [a.code, a.cityFa]));
+
+    const refunds = refundRows.map((r) => {
+      const route = r.booking?.flightInstance?.flight?.route;
+      const origin =
+        (route && refundCity.get(route.originCode)) ??
+        route?.originCode ??
+        '—';
+      const dest =
+        (route && refundCity.get(route.destCode)) ?? route?.destCode ?? '—';
+      return {
+        id: r.id,
+        trackingCode: r.trackingCode,
+        passengerName: r.passengerName,
+        route: `${origin} ← ${dest}`,
+        pnr: r.booking?.pnr ?? '—',
+        status: r.status,
+        totalPaidIrr: r.totalPaidIrr.toString(),
+        penaltyPct: r.penaltyPct,
+        penaltyAmountIrr: r.penaltyAmountIrr.toString(),
+        refundableIrr: r.refundableIrr.toString(),
+        createdAt: r.createdAt.toISOString(),
+        paidAt: r.paidAt ? r.paidAt.toISOString() : null,
+      };
+    });
+
     return {
       id: user.id,
       fullName: user.fullName?.trim() || '',
@@ -276,6 +331,7 @@ export class CustomersService {
       docs,
       purchases,
       contacts,
+      refunds,
     };
   }
 }

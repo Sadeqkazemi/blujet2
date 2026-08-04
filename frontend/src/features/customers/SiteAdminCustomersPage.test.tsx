@@ -70,6 +70,22 @@ const DETAIL: CustomerDetail = {
       status: 'CLOSED',
     },
   ],
+  refunds: [
+    {
+      id: 'rf1',
+      trackingCode: 'RF-1001',
+      passengerName: 'نگار رضایی',
+      route: 'تهران ← دبی',
+      pnr: 'AS5K2P',
+      status: 'PAID',
+      totalPaidIrr: '38000000',
+      penaltyPct: 30,
+      penaltyAmountIrr: '11400000',
+      refundableIrr: '26600000',
+      createdAt: '2026-06-01T00:00:00.000Z',
+      paidAt: '2026-06-02T00:00:00.000Z',
+    },
+  ],
 };
 
 function renderList() {
@@ -132,10 +148,17 @@ describe('SiteAdminCustomersPage', () => {
     expect(screen.getByText('اطلاعات شخصی')).toBeInTheDocument();
     expect(screen.getByText('مدارک هویتی بارگذاری‌شده')).toBeInTheDocument();
     expect(screen.getByText('تأییدشده')).toBeInTheDocument();
+    expect(screen.getByText('موبایل')).toBeInTheDocument();
+    expect(screen.getByText('کد ملی')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'تاریخچه خرید' }));
     expect(screen.getByText('تهران ← دبی')).toBeInTheDocument();
     expect(screen.getByText('صادر شده')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'تاریخچه استرداد' }));
+    expect(screen.getByText('تاریخچه استرداد مبالغ بلیط')).toBeInTheDocument();
+    expect(screen.getByText('پرداخت‌شده')).toBeInTheDocument();
+    expect(screen.getByText(/جریمه/)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'تماس‌ها و تیکت‌ها' }));
     expect(screen.getByText('استعلام مانده امتیاز باشگاه')).toBeInTheDocument();

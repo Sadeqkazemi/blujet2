@@ -7,6 +7,7 @@ import { SupportTicket } from '../../database/entities/support-ticket.entity';
 import { CustomerIdentityVerification } from '../../database/entities/customer-identity-verification.entity';
 import { StoredFile } from '../../database/entities/stored-file.entity';
 import { Airport } from '../../database/entities/airport.entity';
+import { RefundRequest } from '../../database/entities/refund-request.entity';
 import { CustomersController } from './customers.controller';
 import { CustomersService } from './customers.service';
 import { PanelsModule } from '../panels/panels.module';
@@ -21,6 +22,7 @@ import { PanelsModule } from '../panels/panels.module';
       CustomerIdentityVerification,
       StoredFile,
       Airport,
+      RefundRequest,
     ]),
     PanelsModule,
   ],

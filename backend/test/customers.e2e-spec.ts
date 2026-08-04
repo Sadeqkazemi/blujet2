@@ -106,6 +106,7 @@ describe('Customers (SITE_ADMIN) (e2e)', () => {
     expect(Array.isArray(detail.body.data.purchases)).toBe(true);
     expect(Array.isArray(detail.body.data.contacts)).toBe(true);
     expect(Array.isArray(detail.body.data.docs)).toBe(true);
+    expect(Array.isArray(detail.body.data.refunds)).toBe(true);
   });
 
   it('returns 404 for unknown customer id', async () => {

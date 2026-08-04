@@ -24,9 +24,10 @@ Acceptance checklist for the site-admin «مشتریان» tab, matching
 
 - [x] Back link to list
 - [x] Header: avatar initial, name, warn pill, phone · email, club pill
-- [x] Tabs: اطلاعات و مدارک / تاریخچه خرید / تماس‌ها و تیکت‌ها / باشگاه مشتریان
-- [x] Info: personal fields + uploaded ID docs (or empty state)
+- [x] Tabs: اطلاعات و مدارک / تاریخچه خرید / تاریخچه استرداد / تماس‌ها و تیکت‌ها / باشگاه مشتریان
+- [x] Info: personal fields in labeled boxes + uploaded ID docs (or empty state)
 - [x] Purchases: route, date, PNR, amount تومان, status badge
+- [x] Refunds: route, PNR, tracking, penalty/refundable amounts, status
 - [x] Contacts: channel, subject, date, status
 - [x] Club: level + current points
 - [x] Proven by: `frontend/src/features/customers/SiteAdminCustomersPage.test.tsx`, `backend/test/customers.e2e-spec.ts`

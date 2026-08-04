@@ -44,6 +44,21 @@ export interface CustomerContact {
   status: string;
 }
 
+export interface CustomerRefund {
+  id: string;
+  trackingCode: string;
+  passengerName: string;
+  route: string;
+  pnr: string;
+  status: string;
+  totalPaidIrr: string;
+  penaltyPct: number;
+  penaltyAmountIrr: string;
+  refundableIrr: string;
+  createdAt: string;
+  paidAt: string | null;
+}
+
 export interface CustomerDetail {
   id: string;
   fullName: string;
@@ -62,4 +77,5 @@ export interface CustomerDetail {
   docs: CustomerDoc[];
   purchases: CustomerPurchase[];
   contacts: CustomerContact[];
+  refunds: CustomerRefund[];
 }
