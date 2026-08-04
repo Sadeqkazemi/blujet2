@@ -1,9 +1,11 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
+import { DataSource } from 'typeorm';
+import { User } from '../src/database/entities/user.entity';
+import { AuditLog } from '../src/database/entities/audit-log.entity';
 import { loginAs, loginAsCustomer } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
-import { TypeORMService } from '../src/typeorm/typeorm.service';
 
 /** Phase 21: فراموشی رمز — a customer proves phone ownership via the
  * existing OTP challenge, then sets a new password with no current-password
@@ -12,11 +14,11 @@ import { TypeORMService } from '../src/typeorm/typeorm.service';
  * password is actually usable. See docs/API.md's Phase 21 section. */
 describe('Phase 21 — forgot/set password + customer password login (e2e)', () => {
   let app: INestApplication<App>;
-  let typeorm: TypeORMService;
+  let dataSource: DataSource;
 
   beforeEach(async () => {
     app = await createTestApp();
-    typeorm = app.get(TypeORMService);
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
@@ -32,7 +34,7 @@ describe('Phase 21 — forgot/set password + customer password login (e2e)', () 
     });
 
     it('403s a staff token — set-password is customer-only', async () => {
-      const { accessToken } = await loginAs(app, 'finance.karimi');
+      const { accessToken } = await loginAs(app, 'finance');
       const res = await request(app.getHttpServer())
         .post('/auth/set-password')
         .set('Authorization', `Bearer ${accessToken}`)
@@ -85,10 +87,13 @@ describe('Phase 21 — forgot/set password + customer password login (e2e)', () 
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ newPassword: 'AuditedPass1!' });
 
-      const row = await typeorm.auditLog.findFirst({
-        where: { entityId: userId, category: 'SECURITY' },
-        orderBy: { createdAt: 'desc' },
-      });
+      const row = await dataSource
+        .getRepository(AuditLog)
+        .createQueryBuilder('a')
+        .where('a.entityId = :entityId', { entityId: userId })
+        .andWhere('a.category = :category', { category: 'SECURITY' })
+        .orderBy('a.createdAt', 'DESC')
+        .getOne();
       expect(row).not.toBeNull();
     });
   });
@@ -131,10 +136,9 @@ describe('Phase 21 — forgot/set password + customer password login (e2e)', () 
         .post('/auth/set-password')
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ newPassword: 'SuspendedPw1!' });
-      await typeorm.user.update({
-        where: { id: userId },
-        data: { isActive: false },
-      });
+      await dataSource
+        .getRepository(User)
+        .update({ id: userId }, { isActive: false });
 
       const res = await request(app.getHttpServer())
         .post('/auth/customer/login-password')
@@ -145,10 +149,9 @@ describe('Phase 21 — forgot/set password + customer password login (e2e)', () 
       // e2e test DB; other spec files reuse arbitrary customer phone
       // numbers and would otherwise inherit a permanently-suspended
       // account from this test.
-      await typeorm.user.update({
-        where: { id: userId },
-        data: { isActive: true },
-      });
+      await dataSource
+        .getRepository(User)
+        .update({ id: userId }, { isActive: true });
     });
 
     it('400s a malformed phone number', async () => {

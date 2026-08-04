@@ -3,18 +3,22 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import * as crypto from 'node:crypto';
 import * as argon2 from 'argon2';
-import { TypeORMService } from '../src/typeorm/typeorm.service';
+import { DataSource } from 'typeorm';
+import { User } from '../src/database/entities/user.entity';
+import { RefundPenaltyRule } from '../src/database/entities/refund-penalty-rule.entity';
 import { loginAs, stepUpFor } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
-import type { Role } from '../generated/typeorm/enums';
+import type { Role } from '../src/database/enums';
+import { TWO_FACTOR_PROVIDER } from '../src/modules/auth/providers/two-factor-provider.interface';
+import { MockTwoFactorProvider } from '../src/modules/auth/providers/mock-two-factor.provider';
 
 describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', () => {
   let app: INestApplication<App>;
-  let typeorm: TypeORMService;
+  let dataSource: DataSource;
 
   beforeEach(async () => {
     app = await createTestApp();
-    typeorm = app.get(TypeORMService);
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
@@ -27,8 +31,9 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
 
   async function createManagedAdmin(role: Role = 'IT_MANAGER') {
     const suffix = crypto.randomUUID().slice(0, 8);
-    return typeorm.user.create({
-      data: {
+    const userRepo = dataSource.getRepository(User);
+    return userRepo.save(
+      userRepo.create({
         role,
         username: `p12.${suffix}`,
         email: `p12.${suffix}@test.example`,
@@ -36,8 +41,9 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
         passwordHash: await argon2.hash('Blujet@1404'),
         twoFactorEnabled: true,
         isActive: true,
-      },
-    });
+        updatedAt: new Date(),
+      }),
+    );
   }
 
   // ── admins ────────────────────────────────────────────────────────────
@@ -144,13 +150,43 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
     expect(loginOk.status).toBe(200);
 
     // Never CEO/BOARD_CHAIR, never self.
-    const ceoUser = await typeorm.user.findFirstOrThrow({
-      where: { username: 'ceo' },
-    });
+    const ceoUser = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ username: 'ceo' });
     const blockCeo = await request(app.getHttpServer())
       .patch(`/admins/${ceoUser.id}/block`)
       .set('Authorization', auth(ceo.accessToken));
     expect(blockCeo.status).toBe(403);
+  });
+
+  it('blocking an account revokes its live session — a pre-existing refresh cookie stops working immediately', async () => {
+    const target = await createManagedAdmin();
+    const agent = request.agent(app.getHttpServer());
+    const loginRes = await agent
+      .post('/auth/staff/login')
+      .send({ username: target.username, password: 'Blujet@1404' });
+    const code = app
+      .get<MockTwoFactorProvider>(TWO_FACTOR_PROVIDER)
+      .getLastCode(target.id)!;
+    await agent
+      .post('/auth/staff/login/verify')
+      .send({ challengeId: loginRes.body.data.challengeId, code });
+
+    // The refresh token issued above is still valid at this point.
+    const refreshBeforeBlock = await agent.post('/auth/refresh');
+    expect(refreshBeforeBlock.status).toBe(200);
+
+    const ceo = await loginAs(app, 'ceo');
+    const blockRes = await request(app.getHttpServer())
+      .patch(`/admins/${target.id}/block`)
+      .set('Authorization', auth(ceo.accessToken));
+    expect(blockRes.status).toBe(200);
+
+    // The already-issued (and just-rotated) refresh cookie must now fail —
+    // blocking must not require a global logout-all to take effect.
+    const refreshAfterBlock = await agent.post('/auth/refresh');
+    expect(refreshAfterBlock.status).toBe(401);
+    expect(refreshAfterBlock.body.success).toBe(false);
   });
 
   it('POST /admins/:id/reset-password returns a temp password once that actually logs in; Senior cannot reset a SENIOR_MANAGER', async () => {
@@ -170,9 +206,9 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
       .send({ username: target.username, password: tempPassword });
     expect(loginRes.status).toBe(200);
 
-    const seniorTarget = await typeorm.user.findFirstOrThrow({
-      where: { username: 'senior.rahimi' },
-    });
+    const seniorTarget = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ username: 'senior.rahimi' });
     const senior2 = await loginAs(app, 'senior.rahimi');
     const forbidden = await request(app.getHttpServer())
       .post(`/admins/${seniorTarget.id}/reset-password`)
@@ -269,6 +305,42 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
     expect(forbidden.status).toBe(403);
   });
 
+  it('IT_MANAGER can only write its own operational keys — payment-gateway/brand keys are Board Chair-only', async () => {
+    const it = await loginAs(app, 'itadmin');
+
+    const allowed = await request(app.getHttpServer())
+      .patch('/settings')
+      .set('Authorization', auth(it.accessToken))
+      .send({ patch: { maintenance: true, sandbox: false } });
+    expect(allowed.status).toBe(200);
+    expect(allowed.body.data.settings.maintenance).toBe(true);
+
+    const outOfScope = await request(app.getHttpServer())
+      .patch('/settings')
+      .set('Authorization', auth(it.accessToken))
+      .send({ patch: { gatewayZarin: true } });
+    expect(outOfScope.status).toBe(403);
+
+    const mixed = await request(app.getHttpServer())
+      .patch('/settings')
+      .set('Authorization', auth(it.accessToken))
+      .send({ patch: { companyName: 'شرکت جعلی', supportPhone: '021-00000' } });
+    expect(mixed.status).toBe(403);
+
+    // The rejected patch must not have partially applied.
+    const after = await request(app.getHttpServer())
+      .get('/settings')
+      .set('Authorization', auth(it.accessToken));
+    expect(after.body.data.settings.companyName).not.toBe('شرکت جعلی');
+    expect(after.body.data.settings.gatewayZarin).not.toBe(true);
+
+    // Restore for repeatable runs.
+    await request(app.getHttpServer())
+      .patch('/settings')
+      .set('Authorization', auth(it.accessToken))
+      .send({ patch: { maintenance: false, sandbox: true } });
+  });
+
   it('PATCH /settings/refund-rules writes the REAL Phase 7 engine rows (chair only, IT 403)', async () => {
     const chair = await loginAs(app, 'chair');
     const getRes = await request(app.getHttpServer())
@@ -287,9 +359,9 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
     expect(patchRes.status).toBe(200);
 
     // The Phase 7 refunds engine reads this exact table — verify the row.
-    const dbRow = await typeorm.refundPenaltyRule.findUniqueOrThrow({
-      where: { id: rule.id },
-    });
+    const dbRow = await dataSource
+      .getRepository(RefundPenaltyRule)
+      .findOneByOrFail({ id: rule.id });
     expect(dbRow.penaltyPct).toBe(newPct);
 
     // Restore the original percentage.
@@ -435,7 +507,9 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
         },
       });
     expect(patchContent.status).toBe(200);
-    expect(patchContent.body.data.settings.aboutUsText).toBe('متن درباره ما از CMS');
+    expect(patchContent.body.data.settings.aboutUsText).toBe(
+      'متن درباره ما از CMS',
+    );
 
     const publicContent = await request(app.getHttpServer()).get(
       '/settings/site-content',

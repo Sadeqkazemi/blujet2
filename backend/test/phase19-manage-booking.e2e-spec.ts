@@ -1,7 +1,12 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { TypeORMService } from '../src/typeorm/typeorm.service';
+import { DataSource } from 'typeorm';
+import { dataSourceOptions } from '../src/database/data-source.options';
+import { AircraftSeatMap } from '../src/database/entities/aircraft-seat-map.entity';
+import { Route } from '../src/database/entities/route.entity';
+import { Flight } from '../src/database/entities/flight.entity';
+import { FlightInstance } from '../src/database/entities/flight-instance.entity';
 import { loginAsCustomer } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
@@ -10,51 +15,67 @@ import { createTestApp } from './helpers/app.helper';
  * reasoning. */
 describe('Phase 19 — anonymous manage-booking self-service (e2e)', () => {
   let app: INestApplication<App>;
-  let typeorm: TypeORMService;
+  let dataSource: DataSource;
   let flightId: string;
   const AIRCRAFT_TYPE = 'MB2E-TestJet';
 
   beforeAll(async () => {
-    const setupApp = await createTestApp();
-    typeorm = setupApp.get(TypeORMService);
+    const setupDataSource = new DataSource(dataSourceOptions);
+    await setupDataSource.initialize();
 
-    await typeorm.aircraftSeatMap.upsert({
-      where: { aircraftType: AIRCRAFT_TYPE },
-      update: {},
-      create: {
-        aircraftType: AIRCRAFT_TYPE,
-        businessRowStart: 1,
-        businessRowEnd: 0,
-        businessColsLeft: [],
-        businessColsRight: [],
-        economyRowStart: 1,
-        economyRowEnd: 3,
-        economyColsLeft: ['A'],
-        economyColsRight: ['C'],
-      },
+    const seatMapRepo = setupDataSource.getRepository(AircraftSeatMap);
+    const existingSeatMap = await seatMapRepo.findOneBy({
+      aircraftType: AIRCRAFT_TYPE,
     });
-    const route = await typeorm.route.upsert({
-      where: { originCode_destCode: { originCode: 'THR', destCode: 'MHD' } },
-      update: {},
-      create: { originCode: 'THR', destCode: 'MHD', durationMin: 85 },
+    if (!existingSeatMap) {
+      await seatMapRepo.save(
+        seatMapRepo.create({
+          aircraftType: AIRCRAFT_TYPE,
+          businessRowStart: 1,
+          businessRowEnd: 0,
+          businessColsLeft: [],
+          businessColsRight: [],
+          economyRowStart: 1,
+          economyRowEnd: 3,
+          economyColsLeft: ['A'],
+          economyColsRight: ['C'],
+          updatedAt: new Date(),
+        }),
+      );
+    }
+    const routeRepo = setupDataSource.getRepository(Route);
+    let route = await routeRepo.findOneBy({
+      originCode: 'THR',
+      destCode: 'MHD',
     });
-    const flight = await typeorm.flight.upsert({
-      where: { flightNo: 'MB-300' },
-      update: {},
-      create: {
-        flightNo: 'MB-300',
-        routeId: route.id,
-        aircraftType: AIRCRAFT_TYPE,
-      },
-    });
+    if (!route) {
+      route = await routeRepo.save(
+        routeRepo.create({
+          originCode: 'THR',
+          destCode: 'MHD',
+          durationMin: 85,
+        }),
+      );
+    }
+    const flightRepo = setupDataSource.getRepository(Flight);
+    let flight = await flightRepo.findOneBy({ flightNo: 'MB-300' });
+    if (!flight) {
+      flight = await flightRepo.save(
+        flightRepo.create({
+          flightNo: 'MB-300',
+          routeId: route.id,
+          aircraftType: AIRCRAFT_TYPE,
+        }),
+      );
+    }
     flightId = flight.id;
 
-    await setupApp.close();
+    await setupDataSource.destroy();
   });
 
   beforeEach(async () => {
     app = await createTestApp();
-    typeorm = app.get(TypeORMService);
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
@@ -69,15 +90,16 @@ describe('Phase 19 — anonymous manage-booking self-service (e2e)', () => {
   ) {
     const { accessToken } = await loginAsCustomer(app, phone);
     const departureAt = new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000);
-    const instance = await typeorm.flightInstance.create({
-      data: {
+    const instanceRepo = dataSource.getRepository(FlightInstance);
+    const instance = await instanceRepo.save(
+      instanceRepo.create({
         flightId,
         departureAt,
         arrivalAt: new Date(departureAt.getTime() + 85 * 60 * 1000),
         capacity: 4,
         status: 'SCHEDULED',
-      },
-    });
+      }),
+    );
     const createRes = await request(app.getHttpServer())
       .post('/bookings')
       .set('Authorization', `Bearer ${accessToken}`)
@@ -144,15 +166,16 @@ describe('Phase 19 — anonymous manage-booking self-service (e2e)', () => {
     it('redacts co-passenger names on multi-passenger bookings', async () => {
       const { accessToken } = await loginAsCustomer(app, '09150000009');
       const departureAt = new Date(Date.now() + 12 * 24 * 60 * 60 * 1000);
-      const instance = await typeorm.flightInstance.create({
-        data: {
+      const instanceRepo2 = dataSource.getRepository(FlightInstance);
+      const instance = await instanceRepo2.save(
+        instanceRepo2.create({
           flightId,
           departureAt,
           arrivalAt: new Date(departureAt.getTime() + 85 * 60 * 1000),
           capacity: 4,
           status: 'SCHEDULED',
-        },
-      });
+        }),
+      );
       const createRes = await request(app.getHttpServer())
         .post('/bookings')
         .set('Authorization', `Bearer ${accessToken}`)

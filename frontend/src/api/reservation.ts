@@ -1,9 +1,11 @@
 import { apiGet, apiPatch, apiPost } from './http';
 import type {
+  AgencyApiAccessRow,
   FlightSearchResult,
   PnrDetail,
   PnrGroup,
   ReservationDashboardStats,
+  ReservationFlightRow,
   SeatLockView,
   SeatMap,
 } from '../types/reservation';
@@ -14,7 +16,15 @@ export function fetchSeatMap(flightInstanceId: string) {
 
 export function lockSeat(
   flightInstanceId: string,
-  dto: { seatCode: string; passengerName?: string; passengerNationalId?: string; passengerMobile?: string },
+  dto: {
+    seatCode: string;
+    reason: string;
+    classification: 'FREE' | 'DISCOUNTED' | 'PAYABLE';
+    discountPct?: number;
+    passengerName?: string;
+    passengerNationalId?: string;
+    passengerMobile?: string;
+  },
 ) {
   return apiPost<SeatLockView>(`/reservation/seatmap/${flightInstanceId}/lock`, dto);
 }
@@ -44,6 +54,11 @@ export function markNoShow(pnr: string) {
   return apiPatch<PnrDetail>(`/reservation/pnr/${pnr}/no-show`);
 }
 
+export function fetchReservationFlights(q?: string) {
+  const qs = q ? `?q=${encodeURIComponent(q)}` : '';
+  return apiGet<ReservationFlightRow[]>(`/reservation/flights${qs}`);
+}
+
 export function searchFlights(origin: string, dest: string, date: string) {
   const params = new URLSearchParams({ origin, dest, date });
   return apiGet<FlightSearchResult[]>(`/reservation/search?${params.toString()}`);
@@ -61,4 +76,8 @@ export function issuePnr(dto: {
 
 export function fetchReservationDashboardStats() {
   return apiGet<ReservationDashboardStats>('/reservation/dashboard-stats');
+}
+
+export function fetchAgencyApiAccess() {
+  return apiGet<AgencyApiAccessRow[]>('/reservation/agency-api-access');
 }

@@ -12,7 +12,7 @@ Design source: `design-reference-v2/پنل ادمین سایت.dc.html` (blog ta
 - [x] «ذخیرهٔ پیش‌نویس» saves as DRAFT — `blog.e2e-spec.ts` admin create draft
 - [x] «ویرایش» loads existing post into editor — `BlogAdminPage.test.tsx` "opens edit form"
 - [x] «حذف» soft-deletes post — `blog.e2e-spec.ts` admin delete
-- [x] `blog` tab appears in SITE_ADMIN sidebar (`PANEL_NAV`) — `panels.e2e-spec.ts` "returns the confirmed tab set for SITE_ADMIN"
+- [x] `blog` tab removed from SITE_ADMIN sidebar (2026-08 product request; CMS API/routes remain) — `panels.e2e-spec.ts` "returns the confirmed tab set for SITE_ADMIN"
 
 ## Public API (no login)
 

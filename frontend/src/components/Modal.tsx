@@ -5,72 +5,55 @@ interface ModalProps {
   title: string;
   onClose: () => void;
   children: ReactNode;
-  /** Use staff panel dark card styling (management panels). */
-  dark?: boolean;
+  /** Staff panels use the dark chrome by default. Pass "light" only for rare light surfaces. */
+  variant?: 'dark' | 'light';
+  /** Tailwind max-width class, default max-w-md */
+  maxWidthClass?: string;
 }
 
-export default function Modal({ title, onClose, children, dark }: ModalProps) {
-  const panelStyle: CSSProperties | undefined = dark
-    ? {
-        width: '100%',
-        maxWidth: 448,
-        borderRadius: 16,
-        border: `1px solid ${STAFF_PANEL.cardBorder}`,
-        background: STAFF_PANEL.cardBg,
-        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
-      }
-    : undefined;
+export default function Modal({
+  title,
+  onClose,
+  children,
+  variant = 'dark',
+  maxWidthClass = 'max-w-md',
+}: ModalProps) {
+  const dark = variant === 'dark';
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#070b14]/60 p-4 backdrop-blur-[3px]"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#070b14]/72 p-4 backdrop-blur-[3px]"
       role="presentation"
       onClick={onClose}
     >
       <div
         role="dialog"
         aria-label={title}
-        className={dark ? undefined : 'w-full max-w-md rounded-2xl border border-border bg-white shadow-2xl'}
-        style={panelStyle}
+        className={`w-full ${maxWidthClass} rounded-2xl border shadow-2xl ${
+          dark ? 'border-[#2a3550] bg-[#141d2e]' : 'border-border bg-white'
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         <div
-          className={dark ? undefined : 'flex items-center justify-between border-b border-border px-5 py-4'}
-          style={
-            dark
-              ? {
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  borderBottom: `1px solid ${STAFF_PANEL.sidebarBorder}`,
-                  padding: '16px 20px',
-                }
-              : undefined
-          }
+          className={`flex items-center justify-between border-b px-5 py-4 ${
+            dark ? 'border-[#1f2a3d]' : 'border-border'
+          }`}
         >
-          <h3
-            className={dark ? undefined : 'text-sm font-black text-ink'}
-            style={dark ? { fontSize: 13, fontWeight: 900, color: '#fff', margin: 0 } : undefined}
-          >
-            {title}
-          </h3>
+          <h3 className={`text-sm font-black ${dark ? 'text-white' : 'text-ink'}`}>{title}</h3>
           <button
             type="button"
             onClick={onClose}
             aria-label="بستن"
-            className={dark ? undefined : 'text-muted transition hover:text-ink'}
-            style={
+            className={
               dark
-                ? { background: 'none', border: 'none', color: STAFF_PANEL.textMuted, cursor: 'pointer', fontFamily: 'inherit' }
-                : undefined
+                ? 'text-[#9fb0c7] transition hover:text-white'
+                : 'text-muted transition hover:text-ink'
             }
           >
             ✕
           </button>
         </div>
-        <div className={dark ? undefined : 'p-5'} style={dark ? { padding: 20 } : undefined}>
-          {children}
-        </div>
+        <div className={`p-5 ${dark ? 'text-[#e7ecf3]' : ''}`}>{children}</div>
       </div>
     </div>
   );

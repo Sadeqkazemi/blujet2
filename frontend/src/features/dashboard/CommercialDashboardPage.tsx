@@ -1,223 +1,281 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Link, useOutletContext } from 'react-router-dom';
 import { fetchCartable } from '../../api/cartable';
-import {
-  fetchCommercialOverview,
-  fetchLowSalesAlerts,
-  fetchRevenueMix,
-} from '../../api/reporting';
+import { fetchCommercialOverview, fetchRevenueMix } from '../../api/reporting';
 import type { CartableListResult } from '../../types/cartable';
-import type { CommercialOverview, LowSalesAlert, RevenueMixResult } from '../../types/reporting';
+import type { CommercialOverview, RevenueMixResult } from '../../types/reporting';
+import type { PanelShellContext } from '../../types/panel-shell';
 import { faDigits, faMoney, faPercent } from '../../lib/fa-format';
-import { formatJalaliDateTime } from '../../lib/jalali';
-import {
-  StaffCartableWidget,
-  StaffKpiCard,
-  StaffPanelCard,
-  StaffPanelPageHeader,
-} from '../../components/staff-panel-ui';
-import { STAFF_PANEL } from '../../lib/staff-panel-theme';
-import { useIsMobile } from '../../hooks/useIsMobile';
+import LowSalesBanner from '../../components/LowSalesBanner';
+import PanelNotifBell from '../../components/PanelNotifBell';
 
 const MIX_COLORS = { SYSTEM: '#3b82f6', CHARTER: '#a855f7', AGENCY: '#34d399' };
 
-function LowSalesBanner({ alerts }: { alerts: LowSalesAlert[] }) {
-  if (alerts.length === 0) return null;
-  const a = alerts[0];
+function KpiIcon({ children, bg, color }: { children: ReactNode; bg: string; color: string }) {
   return (
-    <div
-      style={{
-        background: 'rgba(245,158,11,0.08)',
-        border: '1px solid rgba(245,158,11,0.35)',
-        borderRadius: 14,
-        padding: '13px 15px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 11,
-        flexWrap: 'wrap',
-        marginBottom: 15,
-      }}
+    <span
+      className="flex h-10 w-10 items-center justify-center rounded-[11px]"
+      style={{ background: bg, color }}
     >
-      <span
-        style={{
-          width: 36,
-          height: 36,
-          borderRadius: 10,
-          background: 'rgba(245,158,11,0.16)',
-          color: STAFF_PANEL.warning,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flex: 'none',
-        }}
-      >
-        ⚠
-      </span>
-      <div style={{ lineHeight: 1.6, minWidth: 0, flex: 1 }}>
-        <div style={{ fontSize: 12.5, fontWeight: 800, color: '#fbbf24' }}>
-          هشدار فروش ضعیف — کمتر از ۷۲ ساعت تا پرواز
+      {children}
+    </span>
+  );
+}
+
+function KpiCard({
+  label,
+  value,
+  trend,
+  icon,
+}: {
+  label: string;
+  value: string;
+  trend?: string;
+  icon: ReactNode;
+}) {
+  return (
+    <div className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[14px]">
+      <div className="mb-3 flex items-center justify-between">
+        {icon}
+        {trend ? (
+          <span className="text-[11px] font-bold text-[#34d399]">{trend}</span>
+        ) : null}
+      </div>
+      <div className="font-num text-[22.5px] font-black text-white">{value}</div>
+      <div className="mt-1 text-[11.5px] text-[#6b7b94]">{label}</div>
+    </div>
+  );
+}
+
+function FinancialSummaryCard({ mix }: { mix: RevenueMixResult }) {
+  const total = mix.totalIrr || 1;
+  const sys = mix.channels.find((c) => c.channel === 'SYSTEM');
+  const ch = mix.channels.find((c) => c.channel === 'CHARTER');
+  const ag = mix.channels.find((c) => c.channel === 'AGENCY');
+  const sysPct = sys?.pct ?? 0;
+  const chPct = ch?.pct ?? 0;
+  const agPct = ag?.pct ?? 0;
+
+  return (
+    <div className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[15px]">
+      <div className="mb-3.5 flex flex-wrap items-center justify-between gap-2.5">
+        <div>
+          <h2 className="m-0 text-[14.5px] font-extrabold text-white">گزارش مالی</h2>
+          <p className="mt-1 text-[11px] text-[#6b7b94]">
+            خلاصه فروش سال جاری — جزئیات و فیلترها در صفحه مالی
+          </p>
         </div>
-        <div style={{ fontSize: 11.5, color: '#cdd7e5', marginTop: 4 }}>
-          پرواز <span dir="ltr">{a.flightNo}</span> {a.originCode} ← {a.destCode} (
-          {formatJalaliDateTime(a.departureAt).split(' ')[0]}) تنها {faDigits(a.soldSeats)} از{' '}
-          {faDigits(a.capacity)} صندلی فروخته شده است.
+        <Link
+          to="/panel/finance"
+          className="rounded-[9px] border border-[rgba(59,130,246,.3)] bg-[rgba(59,130,246,.12)] px-3 py-1.5 text-[11.5px] font-bold text-[#60a5fa]"
+        >
+          مشاهده جزئیات ←
+        </Link>
+      </div>
+
+      <div className="mb-1.5 flex h-4 overflow-hidden rounded-lg bg-[#18223a]">
+        <div style={{ width: `${sysPct}%`, background: MIX_COLORS.SYSTEM }} />
+        <div style={{ width: `${chPct}%`, background: MIX_COLORS.CHARTER }} />
+        <div style={{ width: `${agPct}%`, background: MIX_COLORS.AGENCY }} />
+      </div>
+      <div className="mb-3.5 flex flex-wrap gap-3 text-[10px] text-[#9fb0c7]">
+        <span className="flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-sm" style={{ background: MIX_COLORS.SYSTEM }} />
+          سیستمی {faPercent(sysPct)}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-sm" style={{ background: MIX_COLORS.CHARTER }} />
+          چارتر {faPercent(chPct)}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-sm" style={{ background: MIX_COLORS.AGENCY }} />
+          آژانس {faPercent(agPct)}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2.5">
+        <div className="rounded-[12px] border border-[#28344c] bg-[#18223a] p-3">
+          <div className="mb-1 text-[10.5px] text-[#6b7b94]">جمع فروش سال</div>
+          <div className="font-num text-base font-black text-white">{faMoney(total)}</div>
+        </div>
+        <div className="rounded-[12px] border border-[#28344c] bg-[#18223a] p-3">
+          <div className="mb-1 flex items-center gap-1.5 text-[10.5px] text-[#6b7b94]">
+            <span className="h-2.5 w-2.5 rounded-sm" style={{ background: MIX_COLORS.SYSTEM }} />
+            فروش سیستمی
+          </div>
+          <div className="font-num text-[13.5px] font-extrabold text-[#60a5fa]">
+            {faMoney(sys?.amountIrr ?? 0)}
+          </div>
+        </div>
+        <div className="rounded-[12px] border border-[#28344c] bg-[#18223a] p-3">
+          <div className="mb-1 flex items-center gap-1.5 text-[10.5px] text-[#6b7b94]">
+            <span className="h-2.5 w-2.5 rounded-sm" style={{ background: MIX_COLORS.CHARTER }} />
+            فروش چارتری
+          </div>
+          <div className="font-num text-[13.5px] font-extrabold text-[#a855f7]">
+            {faMoney(ch?.amountIrr ?? 0)}
+          </div>
+        </div>
+        <div className="rounded-[12px] border border-[#28344c] bg-[#18223a] p-3">
+          <div className="mb-1 flex items-center gap-1.5 text-[10.5px] text-[#6b7b94]">
+            <span className="h-2.5 w-2.5 rounded-sm" style={{ background: MIX_COLORS.AGENCY }} />
+            فروش آژانس
+          </div>
+          <div className="font-num text-[13.5px] font-extrabold text-[#34d399]">
+            {faMoney(ag?.amountIrr ?? 0)}
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-function ChannelSummary({ mix }: { mix: RevenueMixResult }) {
-  const total = mix.totalIrr || 1;
-  const sysPct = mix.channels.find((c) => c.channel === 'SYSTEM')?.pct ?? 0;
-  const chPct = mix.channels.find((c) => c.channel === 'CHARTER')?.pct ?? 0;
-  const agPct = mix.channels.find((c) => c.channel === 'AGENCY')?.pct ?? 0;
-
+function CartableWidget({ cartable }: { cartable: CartableListResult }) {
   return (
-    <StaffPanelCard
-      title="گزارش مالی"
-      subtitle="خلاصه فروش سال جاری — جزئیات و فیلترها در صفحه مالی"
-      headerAction={
-        <Link
-          to="/panel/finance"
-          style={{
-            fontSize: 11.5,
-            fontWeight: 700,
-            color: STAFF_PANEL.link,
-            background: STAFF_PANEL.accentSoft,
-            border: '1px solid rgba(59,130,246,0.3)',
-            padding: '7px 12px',
-            borderRadius: 9,
-            textDecoration: 'none',
-          }}
-        >
-          مشاهده جزئیات ←
-        </Link>
-      }
-    >
-      <div
-        style={{
-          display: 'flex',
-          height: 16,
-          borderRadius: 8,
-          overflow: 'hidden',
-          marginBottom: 7,
-          background: STAFF_PANEL.inputBg,
-        }}
-      >
-        <div style={{ width: `${sysPct}%`, background: MIX_COLORS.SYSTEM }} />
-        <div style={{ width: `${chPct}%`, background: MIX_COLORS.CHARTER }} />
-        <div style={{ width: `${agPct}%`, background: MIX_COLORS.AGENCY }} />
-      </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 11, marginBottom: 13 }}>
-        {(
-          [
-            ['سیستمی', sysPct, MIX_COLORS.SYSTEM],
-            ['چارتر', chPct, MIX_COLORS.CHARTER],
-            ['آژانس', agPct, MIX_COLORS.AGENCY],
-          ] as const
-        ).map(([label, pct, color]) => (
-          <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, color: STAFF_PANEL.navMuted }}>
-            <span style={{ width: 9, height: 9, borderRadius: 2, background: color }} />
-            {label} {faPercent(pct)}
+    <div className="overflow-hidden rounded-[14px] border border-[#2a3550] bg-[#141d2e]">
+      <div className="flex items-center gap-2 border-b border-[#1f2a3d] px-3.5 py-3">
+        <span className="relative flex h-[30px] w-[30px] items-center justify-center rounded-lg bg-[rgba(248,113,113,.16)] text-[#f87171]">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+            <path d="M13.5 21a2 2 0 0 1-3 0" />
+          </svg>
+        </span>
+        <h3 className="m-0 flex-1 text-[13.5px] font-extrabold text-white">کارتابل</h3>
+        {cartable.totalOpen > 0 && (
+          <span className="font-num flex h-[22px] min-w-[22px] items-center justify-center rounded-[11px] bg-[#f87171] px-1.5 text-[10px] font-extrabold text-white">
+            {faDigits(cartable.totalOpen)}
           </span>
-        ))}
+        )}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
-        <div style={{ background: STAFF_PANEL.inputBg, border: `1px solid ${STAFF_PANEL.inputBorder}`, borderRadius: 12, padding: 12 }}>
-          <div style={{ fontSize: 10.5, color: STAFF_PANEL.textMuted, marginBottom: 5 }}>جمع فروش سال</div>
-          <div style={{ fontSize: 16, fontWeight: 900, color: '#fff' }}>{faMoney(total)}</div>
-        </div>
-        {mix.channels.map((c) => (
-          <div
-            key={c.channel}
-            style={{ background: STAFF_PANEL.inputBg, border: `1px solid ${STAFF_PANEL.inputBorder}`, borderRadius: 12, padding: 12 }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10.5, color: STAFF_PANEL.textMuted, marginBottom: 5 }}>
-              <span
-                style={{
-                  width: 9,
-                  height: 9,
-                  borderRadius: 2,
-                  background: MIX_COLORS[c.channel as keyof typeof MIX_COLORS],
-                }}
-              />
-              {c.labelFa.replace('فروش ', '')}
-            </div>
-            <div
-              style={{
-                fontSize: 13.5,
-                fontWeight: 800,
-                color: MIX_COLORS[c.channel as keyof typeof MIX_COLORS],
-              }}
+      <div className="px-1.5 py-1">
+        {cartable.tasks.length === 0 ? (
+          <p className="px-2.5 py-[18px] text-center text-[11.5px] text-[#6b7b94]">کارتابل خالی است ✓</p>
+        ) : (
+          cartable.tasks.slice(0, 4).map((t) => (
+            <Link
+              key={t.id}
+              to="/panel/cartable"
+              className="flex items-start gap-2.5 rounded-[10px] px-2.5 py-2.5 transition hover:bg-[#18223a]"
             >
-              {faMoney(c.amountIrr)}
-            </div>
-          </div>
-        ))}
+              <span className="flex h-[34px] w-[34px] flex-none items-center justify-center rounded-[9px] bg-[rgba(59,130,246,.16)] text-[#60a5fa]">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <path d="M9 11l3 3L22 4" />
+                  <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                </svg>
+              </span>
+              <div className="min-w-0 leading-snug">
+                <div className="text-[11.5px] font-bold text-[#e7ecf3]">{t.title}</div>
+                <div className="mt-0.5 text-[10.5px] text-[#6b7b94]">
+                  {t.senderLabelFa ?? t.sender?.fullName ?? ''}
+                </div>
+              </div>
+            </Link>
+          ))
+        )}
       </div>
-    </StaffPanelCard>
+      <Link
+        to="/panel/cartable"
+        className="block border-t border-[#1f2a3d] py-2.5 text-center text-[11.5px] font-bold text-[#60a5fa]"
+      >
+        مشاهده‌ی همه‌ی کارها ←
+      </Link>
+    </div>
   );
 }
 
 export default function CommercialDashboardPage() {
-  const isMobile = useIsMobile();
+  const { lowSalesAlerts = [] } = useOutletContext<PanelShellContext>();
+  const bannerAlert = lowSalesAlerts[0] ?? null;
+  const notifAlerts = lowSalesAlerts.slice(1);
   const [overview, setOverview] = useState<CommercialOverview | null>(null);
   const [mix, setMix] = useState<RevenueMixResult | null>(null);
-  const [alerts, setAlerts] = useState<LowSalesAlert[]>([]);
   const [cartable, setCartable] = useState<CartableListResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([
-      fetchCommercialOverview(),
-      fetchRevenueMix({ granularity: 'year' }),
-      fetchLowSalesAlerts(),
-      fetchCartable(),
-    ])
-      .then(([ov, mixData, alertData, cartableData]) => {
+    Promise.all([fetchCommercialOverview(), fetchRevenueMix({ granularity: 'year' }), fetchCartable()])
+      .then(([ov, mixData, cartableData]) => {
         setOverview(ov);
         setMix(mixData);
-        setAlerts(alertData);
         setCartable(cartableData);
       })
       .catch(() => setError('خطا در دریافت اطلاعات داشبورد.'));
   }, []);
 
-  if (error) return <p style={{ fontSize: 13, color: STAFF_PANEL.danger }}>{error}</p>;
+  if (error) {
+    return <p className="px-[21px] py-8 text-sm text-[#f87171]">{error}</p>;
+  }
   if (!overview || !mix || !cartable) {
-    return <p style={{ fontSize: 13, color: STAFF_PANEL.textMuted }}>در حال بارگذاری…</p>;
+    return <p className="px-[21px] py-8 text-sm text-[#6b7b94]">در حال بارگذاری…</p>;
   }
 
   return (
-    <div data-testid="commercial-dashboard">
-      <StaffPanelPageHeader title="داشبورد" subtitle="نمای کلی فروش و کارهای در انتظار اقدام" />
-
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
-          gap: 13,
-          marginBottom: 24,
-        }}
-      >
-        <StaffKpiCard label="آژانس فعال" value={faDigits(overview.activeAgencies)} iconBg={STAFF_PANEL.accentSoft} iconColor={STAFF_PANEL.accent} icon="●" />
-        <StaffKpiCard label="مسافر این ماه" value={faDigits(overview.passengersThisMonth)} iconBg="rgba(168,85,247,0.16)" iconColor={STAFF_PANEL.purple} icon="●" />
-        <StaffKpiCard label="درخواست همکاری آژانس‌ها" value={faDigits(overview.pendingAgencyRequests)} iconBg="rgba(16,185,129,0.16)" iconColor={STAFF_PANEL.success} icon="●" />
+    <div className="px-[21px] pb-[34px] pt-[18px]">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="m-0 text-[20.5px] font-black text-white">داشبورد</h1>
+          <p className="mt-1 text-[11.5px] text-[#6b7b94]">نمای کلی فروش و کارهای در انتظار اقدام</p>
+        </div>
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-[42px] w-[230px] items-center gap-2 rounded-[10px] border border-[#28344c] bg-[#18223a] px-3 text-[12px] text-[#6b7b94]">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="11" cy="11" r="7" />
+              <path d="M21 21l-4.3-4.3" />
+            </svg>
+            <span>جستجو…</span>
+          </div>
+          <PanelNotifBell alerts={notifAlerts} variant="dark" />
+        </div>
       </div>
 
-      <LowSalesBanner alerts={alerts} />
+      <div className="mb-6 grid grid-cols-1 gap-[13px] md:grid-cols-3">
+        <KpiCard
+          label="آژانس فعال"
+          value={faDigits(overview.activeAgencies)}
+          icon={
+            <KpiIcon bg="rgba(59,130,246,.16)" color="#3b82f6">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <path d="M3 21h18" />
+                <path d="M6 21V5a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v16" />
+                <path d="M19 21V10a1 1 0 0 0-1-1h-3" />
+              </svg>
+            </KpiIcon>
+          }
+        />
+        <KpiCard
+          label="مسافر این ماه"
+          value={faDigits(overview.passengersThisMonth)}
+          icon={
+            <KpiIcon bg="rgba(147,51,234,.16)" color="#a855f7">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <circle cx="9" cy="8" r="3.2" />
+                <path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" />
+                <path d="M16 5a3.2 3.2 0 0 1 0 6.4" />
+                <path d="M18 14.5c1.9.6 3.4 2.4 3.4 4.5" />
+              </svg>
+            </KpiIcon>
+          }
+        />
+        <KpiCard
+          label="درخواست همکاری آژانس‌ها"
+          value={faDigits(overview.pendingAgencyRequests)}
+          icon={
+            <KpiIcon bg="rgba(16,185,129,.16)" color="#34d399">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+                <path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z" />
+                <path d="M12 11v6M9 14h6" />
+              </svg>
+            </KpiIcon>
+          }
+        />
+      </div>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : '1.7fr 1fr',
-          gap: 15,
-          alignItems: 'start',
-        }}
-      >
-        <ChannelSummary mix={mix} />
-        <StaffCartableWidget cartable={cartable} />
+      <LowSalesBanner alert={bannerAlert} variant="dark" />
+
+      <div className="grid grid-cols-1 items-start gap-[15px] lg:grid-cols-[1.7fr_1fr]">
+        <FinancialSummaryCard mix={mix} />
+        <CartableWidget cartable={cartable} />
       </div>
     </div>
   );

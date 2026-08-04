@@ -36,6 +36,38 @@ function trendLabel(pct: number): string {
   return `${pct > 0 ? '+' : '−'}${faDigits(Math.abs(pct))}٪`;
 }
 
+function StatCard({
+  label,
+  value,
+  trendPct,
+  icon,
+  iconClass,
+}: {
+  label: string;
+  value: string;
+  trendPct: number;
+  icon: React.ReactNode;
+  iconClass: string;
+}) {
+  const trendUp = trendPct >= 0;
+  return (
+    <div className="rounded-xl border border-[#1f2a3d] bg-[#141d2e] p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${iconClass}`}>{icon}</span>
+        <span
+          className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+            trendUp ? 'bg-[#34d39924] text-[#34d399]' : 'bg-[#f8717124] text-[#f87171]'
+          }`}
+        >
+          {trendLabel(trendPct)}
+        </span>
+      </div>
+      <div className="font-num text-xl font-black text-white">{value}</div>
+      <div className="mt-1 text-[11px] text-[#6b7b94]">{label}</div>
+    </div>
+  );
+}
+
 export default function FinanceDashboardPage() {
   const isMobile = useIsMobile();
   const [stats, setStats] = useState<FinanceDashboardStats | null>(null);
@@ -90,8 +122,11 @@ export default function FinanceDashboardPage() {
   };
 
   return (
-    <div data-testid="finance-dashboard">
-      <StaffPanelPageHeader title="داشبورد" subtitle="نمای کلی فروش و کارهای در انتظار اقدام" />
+    <div className="px-[21px] pb-[34px] pt-[18px]">
+      <div className="mb-6">
+        <h1 className="text-[20.5px] font-black text-white">داشبورد</h1>
+        <p className="mt-1 text-sm text-[#6b7b94]">نمای کلی فروش و کارهای در انتظار اقدام</p>
+      </div>
 
       {error && (
         <p style={{ marginBottom: 16, fontSize: 13, color: STAFF_PANEL.danger }}>{error}</p>
@@ -164,93 +199,117 @@ export default function FinanceDashboardPage() {
         </div>
       )}
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : '1.7fr 1fr',
-          gap: 15,
-          alignItems: 'start',
-        }}
-      >
-        <StaffPanelCard
-          title="نمودار فروش"
-          subtitle="به تفکیک کانال · تومان"
-          headerAction={
-            <div
-              style={{
-                display: 'flex',
-                gap: 4,
-                padding: 4,
-                borderRadius: 10,
-                border: `1px solid ${STAFF_PANEL.inputBorder}`,
-                background: STAFF_PANEL.inputBg,
-              }}
-            >
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.7fr_1fr]">
+        <div className="rounded-xl border border-[#1f2a3d] bg-[#141d2e] p-5">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-bold text-white">نمودار فروش</h2>
+              <p className="mt-0.5 text-[11px] text-[#6b7b94]">به تفکیک کانال · تومان</p>
+            </div>
+            <div className="flex gap-1 rounded-lg border border-[#28344c] bg-[#18223a] p-1">
               {CHART_MODES.map((m) => (
                 <button
                   key={m.key}
                   type="button"
                   onClick={() => setGranularity(m.key)}
-                  style={staffSegmentedControl(granularity === m.key)}
+                  className={`rounded-md px-3 py-1.5 text-[11px] transition ${
+                    granularity === m.key ? 'bg-[#3b82f6] font-bold text-white' : 'text-[#6b7b94] hover:text-white'
+                  }`}
                 >
                   {m.label}
                 </button>
               ))}
             </div>
-          }
-        >
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
-              gap: 10,
-              marginBottom: 16,
-            }}
-          >
-            {(
-              [
-                ['سیستمی', channelSums.system, '#1668c4'],
-                ['چارتر', channelSums.charter, '#a855f7'],
-                ['آژانس', channelSums.agency, '#059669'],
-              ] as const
-            ).map(([label, sum, color]) => (
-              <div
-                key={label}
-                style={{
-                  background: STAFF_PANEL.inputBg,
-                  border: `1px solid ${STAFF_PANEL.inputBorder}`,
-                  borderRadius: 12,
-                  padding: 12,
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: STAFF_PANEL.textMuted, marginBottom: 5 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: 2, background: color }} />
-                  {label}
-                </div>
-                <div style={{ fontSize: 14, fontWeight: 900, color }}>{faMoney(sum)}</div>
+          </div>
+
+          <div className="mb-4 grid grid-cols-3 gap-3">
+            <div className="rounded-lg border border-[#28344c] bg-[#18223a] p-3 text-xs">
+              <div className="mb-1 flex items-center gap-1.5 text-[10px] text-[#6b7b94]">
+                <span className="h-2 w-2 rounded-sm bg-[#3b82f6]" />
+                سیستمی
               </div>
-            ))}
+              <div className="font-num font-black text-[#60a5fa]">{faMoney(channelSums.system)}</div>
+            </div>
+            <div className="rounded-lg border border-[#28344c] bg-[#18223a] p-3 text-xs">
+              <div className="mb-1 flex items-center gap-1.5 text-[10px] text-[#6b7b94]">
+                <span className="h-2 w-2 rounded-sm bg-[#a855f7]" />
+                چارتر
+              </div>
+              <div className="font-num font-black text-[#c084fc]">{faMoney(channelSums.charter)}</div>
+            </div>
+            <div className="rounded-lg border border-[#28344c] bg-[#18223a] p-3 text-xs">
+              <div className="mb-1 flex items-center gap-1.5 text-[10px] text-[#6b7b94]">
+                <span className="h-2 w-2 rounded-sm bg-[#34d399]" />
+                آژانس
+              </div>
+              <div className="font-num font-black text-[#34d399]">{faMoney(channelSums.agency)}</div>
+            </div>
           </div>
 
           {loading ? (
-            <p style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: STAFF_PANEL.textMuted }}>
-              در حال بارگذاری…
-            </p>
+            <p className="py-10 text-center text-sm text-[#6b7b94]">در حال بارگذاری…</p>
           ) : (
             <SalesBarChart dark periods={periods} selectedPeriodKey={periodKey} onSelectPeriod={setPeriodKey} />
           )}
 
           {flights && (
-            <StaffFlightsSummaryGrid
-              flightCount={flights.flightCount}
-              totalSeats={flights.totalSeats}
-              soldSeats={flights.soldSeats}
-              unsoldSeats={flights.unsoldSeats}
-            />
+            <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl border border-[#28344c] bg-gradient-to-br from-[#1a2740] to-[#141d2e] p-4 md:grid-cols-4">
+              <div>
+                <div className="font-num text-lg font-black text-white">{faDigits(flights.flightCount)}</div>
+                <div className="text-xs text-[#6b7b94]">پروازهای انجام‌شده</div>
+              </div>
+              <div>
+                <div className="font-num text-lg font-black text-white">{faDigits(flights.totalSeats)}</div>
+                <div className="text-xs text-[#6b7b94]">مجموع صندلی</div>
+              </div>
+              <div>
+                <div className="font-num text-lg font-black text-[#34d399]">{faDigits(flights.soldSeats)}</div>
+                <div className="text-xs text-[#6b7b94]">فروخته‌شده</div>
+              </div>
+              <div>
+                <div className="font-num text-lg font-black text-[#f87171]">{faDigits(flights.unsoldSeats)}</div>
+                <div className="text-xs text-[#6b7b94]">فروش‌نرفته</div>
+              </div>
+            </div>
           )}
         </StaffPanelCard>
 
-        {cartable && <StaffCartableWidget cartable={cartable} />}
+        {cartable && (
+          <section className="rounded-xl border border-[#1f2a3d] bg-[#141d2e] p-5">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-bold text-white">
+                کارتابل
+                {cartable.totalOpen > 0 && (
+                  <span className="mr-2 rounded-full bg-[#f8717124] px-2.5 py-0.5 text-[11px] font-bold text-[#f87171]">
+                    {faDigits(cartable.totalOpen)}
+                  </span>
+                )}
+              </h2>
+            </div>
+            {cartable.tasks.length === 0 ? (
+              <p className="py-6 text-center text-xs text-[#6b7b94]">کارتابل خالی است ✓</p>
+            ) : (
+              <ul className="divide-y divide-[#22304a]">
+                {cartable.tasks.slice(0, 4).map((t) => (
+                  <li key={t.id} className="flex items-start gap-3 py-3 text-xs">
+                    <span className="mt-0.5 flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-[#3b82f624] text-[#60a5fa]">
+                      ✉
+                    </span>
+                    <div className="min-w-0">
+                      <div className="font-bold text-white">{t.title}</div>
+                      <div className="mt-0.5 text-[10px] text-[#6b7b94]">
+                        {t.senderLabelFa ?? t.sender?.fullName ?? ''}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <Link to="/panel/cartable" className="mt-4 block text-center text-xs font-bold text-[#60a5fa]">
+              مشاهده‌ی همه‌ی کارها ←
+            </Link>
+          </section>
+        )}
       </div>
     </div>
   );

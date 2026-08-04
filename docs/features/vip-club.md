@@ -29,6 +29,7 @@ Backend items proven by `backend/test/club.e2e-spec.ts` (9 tests) +
 
 ### Frontend
 - [x] CEO/Chair rich layout (4 KPI cards, requests + timeline modal, directory with filters/search/issue, add-VIP form) — `ClubPage.test.tsx: 'CEO sees the 4 KPI cards...'` + `'CEO request modal shows the روند درخواست timeline...'` + `'the add-VIP form validates required fields'`
+- [x] CEO/Chair dark design parity (KPI icons, request rows, member cards, accordion «تعریف مشتری VIP جدید», design subtitle) — same ClubPage tests + subtitle assertion in CEO layout test
 - [x] Senior simple layout (no KPIs/search/add-form; inline approve; chair-assigned read-only note) — `'Senior Manager sees the simple layout...'`
 - [x] Tier labels + Persian ٬-separated points — asserted in the CEO layout test
 - [x] Role isolation — `club-journey.spec.ts: 'Finance Manager has no مشتریان VIP nav entry (role isolation)'`

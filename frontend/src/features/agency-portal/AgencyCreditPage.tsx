@@ -294,47 +294,11 @@ export default function AgencyCreditPage() {
   const unpaidCount = invoices.filter((inv) => inv.status !== 'PAID').length;
 
   return (
-    <div data-testid="agency-credit">
-      <div style={{ marginBottom: 22 }}>
-        <h1 style={{ fontSize: 20, fontWeight: 900, color: '#0d2640', margin: 0 }}>{t.heading}</h1>
-        <div style={{ fontSize: 11.5, color: '#7a8696', marginTop: 3 }}>{t.subtitle}</div>
-      </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 13.5, fontWeight: 800, color: '#0d2640' }}>{t.sectionTitle}</span>
-          <button
-            type="button"
-            onClick={() => setRequestOpen(true)}
-            style={{
-              height: 42,
-              padding: '0 17px',
-              background: '#1668c4',
-              color: '#fff',
-              borderRadius: 11,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 7,
-              fontSize: 12.5,
-              fontWeight: 800,
-              border: 'none',
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-            }}
-          >
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-            {t.addCreditBtn}
-          </button>
-        </div>
-
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
-            gap: 13,
-          }}
+    <div>
+      <div className="mb-6 flex items-center justify-end">
+        <button
+          onClick={() => setRequestOpen(true)}
+          className="rounded-lg bg-accent px-4 py-2 text-xs font-bold text-white transition hover:brightness-110"
         >
           {(
             [
@@ -352,34 +316,68 @@ export default function AgencyCreditPage() {
           ))}
         </div>
 
-        <div style={{ background: '#fff', border: '1px solid #eef2f7', borderRadius: 14, overflow: 'hidden' }}>
-          <div
-            style={{
-              padding: '11px 14px',
-              borderBottom: '1px solid #eef2f7',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 8,
-              flexWrap: 'wrap',
-            }}
-          >
-            <span style={{ fontSize: 13.5, fontWeight: 800, color: '#0d2640' }}>{t.invoicesTitle}</span>
-            {unpaidCount > 0 && (
-              <span
-                style={{
-                  fontSize: 10.5,
-                  fontWeight: 700,
-                  color: '#e8893a',
-                  background: '#fdf1e7',
-                  border: '1px solid #f7e0c4',
-                  padding: '4px 10px',
-                  borderRadius: 14,
-                }}
-              >
-                {faDigits(unpaidCount)} {t.invoicesPendingLabel}
-              </span>
-            )}
+      <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="rounded-xl border border-border bg-white p-4">
+          <div className="text-[11px] text-muted">{t.creditLimitLabel}</div>
+          <div className="mt-1 text-lg font-black text-ink">{faMoney(credit.limitIrr)} {t.toman}</div>
+        </div>
+        <div className="rounded-xl border border-border bg-white p-4">
+          <div className="text-[11px] text-muted">{t.creditUsedLabel}</div>
+          <div className="mt-1 text-lg font-black text-ink">{faMoney(credit.usedIrr)} {t.toman}</div>
+        </div>
+        <div className="rounded-xl border border-border bg-white p-4">
+          <div className="text-[11px] text-muted">{t.creditRemainingLabel}</div>
+          <div className="mt-1 text-lg font-black text-accent">{faMoney(credit.remainingIrr)} {t.toman}</div>
+        </div>
+      </div>
+
+      <div className="mb-6 rounded-xl border border-border bg-white p-5">
+        <div className="mb-4 text-sm font-bold text-ink">{t.invoicesHeading}</div>
+        {invoices.length === 0 ? (
+          <p className="py-4 text-center text-xs text-muted">{t.invoicesEmpty}</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-right text-xs">
+              <thead>
+                <tr className="border-b border-border text-[10px] text-muted">
+                  <th className="py-2 font-bold">{t.colInvoiceNo}</th>
+                  <th className="py-2 font-bold">{t.colDueDate}</th>
+                  <th className="py-2 font-bold">{t.colAmount}</th>
+                  <th className="py-2 font-bold">{t.colStatus}</th>
+                  <th className="py-2" />
+                </tr>
+              </thead>
+              <tbody>
+                {invoices.map((inv) => {
+                  const st = INVOICE_STATUS_LOCAL[inv.status];
+                  return (
+                    <tr key={inv.id} className="border-b border-border/60">
+                      <td className="py-2.5">
+                        <span className="ltr">{inv.invoiceNo}</span>
+                      </td>
+                      <td className="py-2.5">{formatJalaliDate(inv.dueAt)}</td>
+                      <td className="py-2.5 font-bold">{faMoney(inv.amountIrr)} {t.toman}</td>
+                      <td className="py-2.5">
+                        <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${st.className}`}>
+                          {st.label[locale]}
+                        </span>
+                      </td>
+                      <td className="py-2.5">
+                        {inv.status !== 'PAID' && (
+                          <button
+                            disabled={payingId === inv.id}
+                            onClick={() => void onPay(inv.id)}
+                            className="rounded-md bg-[#10b98118] px-2.5 py-1 text-[10px] font-bold text-[#059669] transition hover:bg-[#10b98130] disabled:opacity-60"
+                          >
+                            {payingId === inv.id ? t.payingBtn : t.payBtn}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
           {invoices.length === 0 ? (
             <p style={{ padding: 24, textAlign: 'center', fontSize: 12, color: '#8a96a6', margin: 0 }}>{t.invoicesEmpty}</p>
@@ -388,148 +386,33 @@ export default function AgencyCreditPage() {
               const st = INVOICE_STATUS[inv.status];
               const isPaid = inv.status === 'PAID';
               return (
-                <div
-                  key={inv.id}
-                  data-testid="agency-invoice-row"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 11,
-                    padding: '12px 14px',
-                    borderBottom: '1px solid #f4f6fa',
-                    flexWrap: 'wrap',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0 }}>
-                    <div
-                      style={{
-                        width: 38,
-                        height: 38,
-                        borderRadius: 9,
-                        background: '#eef4fb',
-                        color: '#1668c4',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flex: 'none',
-                      }}
-                    >
-                      {INVOICE_ICON}
-                    </div>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: '#16202e' }}>{t.invoiceDesc}</div>
-                      <div style={{ fontSize: 10.5, color: '#8a96a6', marginTop: 3 }}>
-                        <span dir="ltr">{inv.invoiceNo}</span>
-                        {' · '}
-                        {t.issuedOnLabel} {formatJalaliDate(inv.issuedAt)}
-                        {' · '}
-                        {t.dueOnLabel} {formatJalaliDate(inv.dueAt)}
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 13, flexWrap: 'wrap' }}>
-                    <div style={{ textAlign: locale === 'en' ? 'left' : 'right' }}>
-                      <div style={{ fontSize: 13, fontWeight: 800, color: '#0d2640' }}>
-                        {faMoney(inv.amountIrr)} {t.toman}
-                      </div>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: st.color, marginTop: 2 }}>{st.label[locale]}</div>
-                    </div>
-                    {!isPaid ? (
-                      <button
-                        type="button"
-                        disabled={payingId === inv.id}
-                        onClick={() => void onPay(inv.id)}
-                        style={{
-                          height: 40,
-                          padding: '0 16px',
-                          background: '#1668c4',
-                          color: '#fff',
-                          borderRadius: 10,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 6,
-                          fontSize: 11.5,
-                          fontWeight: 700,
-                          border: 'none',
-                          cursor: 'pointer',
-                          fontFamily: 'inherit',
-                          opacity: payingId === inv.id ? 0.7 : 1,
-                        }}
-                      >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-                          <rect x="2" y="5" width="20" height="14" rx="2" />
-                          <path d="M2 10h20" />
-                        </svg>
-                        {payingId === inv.id ? t.payingBtn : t.payBtn}
-                      </button>
-                    ) : (
-                      <span
-                        style={{
-                          height: 40,
-                          padding: '0 15px',
-                          background: '#eaf7f0',
-                          color: '#1f8a5b',
-                          border: '1px solid #cdeede',
-                          borderRadius: 10,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 6,
-                          fontSize: 11.5,
-                          fontWeight: 700,
-                        }}
-                      >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M20 6L9 17l-5-5" />
-                        </svg>
-                        {t.paidLabel}
-                      </span>
-                    )}
-                  </div>
+                <div key={r.id} className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2 text-xs">
+                  <span className="font-bold">{faMoney(r.requestedLimitIrr)} {t.toman}</span>
+                  <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${st.className}`}>{st.label[locale]}</span>
                 </div>
               );
             })
           )}
         </div>
 
-        {creditRequests.length > 0 && (
-          <div style={{ background: '#fff', border: '1px solid #eef2f7', borderRadius: 14, padding: 14 }}>
-            <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0d2640', marginBottom: 12 }}>{t.creditRequestsHeading}</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {creditRequests.map((r) => {
-                const st = CREDIT_REQUEST_STATUS[r.status];
-                return (
-                  <div
-                    key={r.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '10px 12px',
-                      border: '1px solid #f4f6fa',
-                      borderRadius: 10,
-                      fontSize: 12,
-                    }}
-                  >
-                    <span style={{ fontWeight: 800 }}>
-                      {faMoney(r.requestedLimitIrr)} {t.toman}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 10.5,
-                        fontWeight: 700,
-                        color: st.color,
-                        background: st.bg,
-                        padding: '4px 10px',
-                        borderRadius: 14,
-                      }}
-                    >
-                      {st.label[locale]}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+      <div className="rounded-xl border border-border bg-white p-5">
+        <div className="mb-4 text-sm font-bold text-ink">{t.ledgerHeading}</div>
+        {ledger.length === 0 ? (
+          <p className="py-4 text-center text-xs text-muted">{t.ledgerEmpty}</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {ledger.map((entry) => (
+              <div key={entry.id} className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2 text-xs">
+                <div>
+                  <div className="font-bold">{LEDGER_LABEL[entry.type][locale]}</div>
+                  <div className="text-[10px] text-muted">{formatJalaliDateTime(entry.occurredAt)}</div>
+                </div>
+                <span className={`font-bold ${Number(entry.signedAmountIrr) < 0 ? 'text-[#059669]' : 'text-danger'}`}>
+                  {Number(entry.signedAmountIrr) < 0 ? '+' : '−'}
+                  {faMoney(Math.abs(Number(entry.signedAmountIrr)))}
+                </span>
+              </div>
+            ))}
           </div>
         )}
 
@@ -597,8 +480,7 @@ export default function AgencyCreditPage() {
               </label>
               <input
                 id="requestedLimit"
-                dir="ltr"
-                inputMode="numeric"
+                className="ltr w-full rounded-lg border border-border bg-white px-3.5 py-2.5 text-sm font-bold outline-none focus:border-accent"
                 value={requestedLimit}
                 onChange={(e) => setRequestedLimit(e.target.value)}
                 style={{

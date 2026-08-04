@@ -15,4 +15,14 @@ describe('StatTile', () => {
     render(<StatTile label="هزینه عملیاتی" value="۰ تومان" />);
     expect(screen.queryByText(/حاشیه/)).not.toBeInTheDocument();
   });
+
+  it('renders a real icon in the colored badge for every tone', () => {
+    const { container, rerender } = render(<StatTile label="کل درآمد" value="۰" tone="good" />);
+    expect(container.querySelector('svg')).toBeInTheDocument();
+
+    for (const tone of ['accent', 'warning', 'critical'] as const) {
+      rerender(<StatTile label="کل درآمد" value="۰" tone={tone} />);
+      expect(container.querySelector('svg')).toBeInTheDocument();
+    }
+  });
 });

@@ -64,14 +64,15 @@ function mockRole(role: Role) {
 }
 
 describe('SettingsPage', () => {
-  it('BOARD_CHAIR sees company/gateways/refund-rules sections and saving persists a toggle', async () => {
-    mockRole('BOARD_CHAIR');
+  it('IT_MANAGER sees company/gateways/refund-rules and saving persists a toggle', async () => {
+    mockRole('IT_MANAGER');
     vi.spyOn(adminsApi, 'fetchSettings').mockResolvedValue(DATA);
     const updateSpy = vi.spyOn(adminsApi, 'updateSettings').mockResolvedValue(DATA);
 
     render(<SettingsPage />);
     expect(await screen.findByText('اطلاعات شرکت')).toBeInTheDocument();
     expect(screen.getByText('قوانین استرداد')).toBeInTheDocument();
+    expect(screen.getByText('تنظیمات کلی سامانه')).toBeInTheDocument();
 
     const user = userEvent.setup();
     await user.click(screen.getByRole('switch', { name: 'حالت تعمیر و نگهداری' }));
@@ -80,17 +81,6 @@ describe('SettingsPage', () => {
     await waitFor(() =>
       expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ maintenance: true })),
     );
-  });
-
-  it('IT_MANAGER only gets the global toggles (no company/refund sections)', async () => {
-    mockRole('IT_MANAGER');
-    vi.spyOn(adminsApi, 'fetchSettings').mockResolvedValue(DATA);
-
-    render(<SettingsPage />);
-    expect(await screen.findByText('تنظیمات کلی سامانه')).toBeInTheDocument();
-    expect(screen.getByText('شبکه‌های اجتماعی')).toBeInTheDocument();
-    expect(screen.queryByText('اطلاعات شرکت')).not.toBeInTheDocument();
-    expect(screen.queryByText('قوانین استرداد')).not.toBeInTheDocument();
   });
 
   it('IT_MANAGER can save an enabled social link', async () => {

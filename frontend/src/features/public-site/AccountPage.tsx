@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import { useAuth } from '../../hooks/useAuth';
 import {
@@ -50,8 +50,14 @@ import AccountPassengersTab, { type SavedPassengerForm } from './AccountPassenge
 import AccountBankAccountsTab, { type BankAccountForm } from './AccountBankAccountsTab';
 import AccountReferralTab from './AccountReferralTab';
 import AccountIdentityTab from './AccountIdentityTab';
-import AccountProfileSavedPax from './AccountProfileSavedPax';
 import AccountRefundsTab from './AccountRefundsTab';
+import AccountSidebar from './account/AccountSidebar';
+import AccountProfileTab from './account/AccountProfileTab';
+import AccountInfoTab from './account/AccountInfoTab';
+import AccountPrivacyPanel from './account/AccountPrivacyPanel';
+import type { TabKey } from './account/account-types';
+import { isAccountTabKey } from './account/account-nav-items';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 // پنل کاربر — real data from the existing bookings/wallet/club-points/refunds
 // endpoints (none of this is mock). Matches design-reference/پنل کاربر.dc.html's
@@ -79,51 +85,6 @@ const STATUS_LABEL: Record<string, StatusEntry> = {
   EXPIRED: { label: { fa: 'منقضی شده', en: 'Expired', ar: 'منتهي الصلاحية' }, bg: '#fbf0ef', color: '#d64545' },
   REFUNDED: { label: { fa: 'مسترد شده', en: 'Refunded', ar: 'تم الاسترداد' }, bg: '#f1f4f8', color: '#8a96a6' },
 };
-
-const TIER_LABEL: Record<string, Tr> = {
-  SILVER: { fa: 'نقره‌ای', en: 'Silver', ar: 'فضية' },
-  GOLD: { fa: 'طلایی', en: 'Gold', ar: 'ذهبية' },
-  PLATINUM: { fa: 'پلاتین', en: 'Platinum', ar: 'بلاتينية' },
-};
-
-type TabKey = 'trips' | 'wallet' | 'club' | 'saved' | 'price-locks' | 'passengers' | 'refunds' | 'tickets' | 'security' | 'banks' | 'referral' | 'identity' | 'profile';
-
-const TAB_LABEL: Record<TabKey, Tr> = {
-  profile: { fa: 'پروفایل من', en: 'My Profile', ar: 'ملفي الشخصي' },
-  trips: { fa: 'سفرها', en: 'Trips', ar: 'رحلاتي' },
-  wallet: { fa: 'کیف پول', en: 'Wallet', ar: 'المحفظة' },
-  club: { fa: 'باشگاه مشتریان', en: 'Loyalty Club', ar: 'نادي الولاء' },
-  saved: { fa: 'نشان‌شده‌ها', en: 'Saved', ar: 'المحفوظة' },
-  'price-locks': { fa: 'قفل قیمت', en: 'Price Lock', ar: 'قفل السعر' },
-  passengers: { fa: 'مسافران', en: 'Passengers', ar: 'المسافرون' },
-  refunds: { fa: 'استرداد‌ها', en: 'Refunds', ar: 'الاستردادات' },
-  tickets: { fa: 'پیام به پشتیبانی', en: 'Message Support', ar: 'رسالة للدعم' },
-  security: { fa: 'امنیت حساب', en: 'Account Security', ar: 'أمان الحساب' },
-  banks: { fa: 'حساب‌های بانکی', en: 'Bank Accounts', ar: 'الحسابات البنكية' },
-  referral: { fa: 'معرفی دوستان', en: 'Invite Friends', ar: 'دعوة الأصدقاء' },
-  identity: { fa: 'احراز هویت', en: 'Identity Verification', ar: 'التحقق من الهوية' },
-};
-
-const PRIMARY_TABS: { key: TabKey; icon: string }[] = [
-  { key: 'trips', icon: '🧳' },
-  { key: 'wallet', icon: '💳' },
-  { key: 'club', icon: '★' },
-  { key: 'saved', icon: '🔖' },
-  { key: 'price-locks', icon: '🔒' },
-];
-
-const ACCOUNT_TABS: { key: TabKey; icon: string }[] = [
-  { key: 'profile', icon: '🪪' },
-  { key: 'passengers', icon: '👤' },
-  { key: 'refunds', icon: '↺' },
-  { key: 'tickets', icon: '💬' },
-  { key: 'security', icon: '🛡️' },
-  { key: 'banks', icon: '🏦' },
-  { key: 'referral', icon: '🎁' },
-  { key: 'identity', icon: '🛡️' },
-];
-
-const TABS: { key: TabKey; icon: string }[] = [...PRIMARY_TABS, ...ACCOUNT_TABS];
 
 const TICKET_STATUS_LABEL: Record<SupportTicketStatus, Tr> = {
   OPEN: { fa: 'باز', en: 'Open', ar: 'مفتوح' },
@@ -635,8 +596,11 @@ export default function AccountPage() {
   const { locale } = useLocale();
   const isMobile = useIsMobile();
   const t = STR[locale];
+  const isMobile = useIsMobile();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<TabKey>('trips');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlTab = searchParams.get('tab');
+  const [tab, setTab] = useState<TabKey>(() => (isAccountTabKey(urlTab) ? urlTab : 'trips'));
   const [bookings, setBookings] = useState<BookingDetail[] | null>(null);
   const [wallet, setWallet] = useState<{ balanceIrr: string } | null>(null);
   const [club, setClub] = useState<{ isMember: boolean; level: string | null; balance: number } | null>(null);
@@ -698,6 +662,24 @@ export default function AccountPage() {
   const [pwError, setPwError] = useState<string | null>(null);
   const [pwNotice, setPwNotice] = useState<string | null>(null);
   const [pwSaving, setPwSaving] = useState(false);
+
+  const selectTab = (next: TabKey) => {
+    setTab(next);
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        params.set('tab', next);
+        return params;
+      },
+      { replace: true },
+    );
+  };
+
+  useEffect(() => {
+    if (isAccountTabKey(urlTab) && urlTab !== tab) {
+      setTab(urlTab);
+    }
+  }, [urlTab, tab]);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -1067,74 +1049,21 @@ export default function AccountPage() {
           margin: '0 auto',
           padding: '20px 22px 44px',
           display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : locale === 'en' ? '290px 1fr' : '262px 1fr',
+          gridTemplateColumns: isMobile ? '1fr' : '262px 1fr',
           gap: 20,
           alignItems: 'start',
         }}
       >
-        <aside
-          style={{
-            position: isMobile ? 'static' : 'sticky',
-            top: isMobile ? undefined : 86,
-            alignSelf: 'start',
-            background: '#fff',
-            border: '1px solid #e9eef4',
-            borderRadius: 18,
-            overflow: 'hidden',
-            boxShadow: '0 20px 44px -32px rgba(13,38,102,.55)',
-          }}
-        >
-          <div style={{ padding: '16px 15px 15px', background: 'linear-gradient(150deg,#123a62 0%,#0c243d 100%)', color: '#fff' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'linear-gradient(135deg,#ffffff2e,#ffffff0f)', border: '1.5px solid #ffffff59', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
-                <svg width="27" height="27" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm0 2c-5.33 0-9 2.69-9 6v2h18v-2c0-3.31-3.67-6-9-6z" /></svg>
-              </div>
-              <div style={{ minWidth: 0, lineHeight: 1.4 }}>
-                <div style={{ fontSize: '15.5px', fontWeight: 800 }}>{user?.fullName ?? t.defaultUserName}</div>
-                {club?.isMember && club.level && (
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 6, fontSize: 10, fontWeight: 700, color: '#f2d98a', background: '#ffffff17', border: '1px solid #ffffff29', padding: '3px 9px', borderRadius: 12, whiteSpace: 'nowrap' }}>
-                    {t.memberPrefix}
-                    {TIER_LABEL[club.level]?.[locale] ?? club.level}
-                  </div>
-                )}
-              </div>
-            </div>
-            <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#ffffff12', border: '1px solid #ffffff24', borderRadius: 12, padding: '9px 8px 9px 12px' }}>
-              <div style={{ lineHeight: 1.35, minWidth: 0 }}>
-                <div style={{ fontSize: '9.5px', color: '#aac4e2', whiteSpace: 'nowrap' }}>{t.sidebarPointsLabel}</div>
-                <div style={{ fontSize: 16, fontWeight: 900, marginTop: 2, whiteSpace: 'nowrap' }}>{club ? faDigits(club.balance) : '—'}</div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setTab('wallet')}
-                style={{ border: 'none', fontSize: 10, fontWeight: 800, color: '#0d2640', background: '#f2d98a', padding: '7px 11px', borderRadius: 9, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}
-              >
-                {t.sidebarWalletLink}
-              </button>
-            </div>
-          </div>
-          <div style={{ padding: 9 }}>
-            {PRIMARY_TABS.map((tb) => (
-              <SidebarNavItem key={tb.key} tb={tb} active={tab === tb.key} locale={locale} onSelect={() => setTab(tb.key)} />
-            ))}
-            <div style={{ height: 6 }} />
-            {ACCOUNT_TABS.map((tb) => (
-              <SidebarNavItem key={tb.key} tb={tb} active={tab === tb.key} locale={locale} onSelect={() => setTab(tb.key)} />
-            ))}
-            <div style={{ height: 1, background: '#eef1f5', margin: '11px 6px 7px' }} />
-            <button
-              type="button"
-              onClick={() => void signOut()}
-              style={{ display: 'flex', alignItems: 'center', gap: 11, width: '100%', padding: '9px 12px', borderRadius: 11, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#e5484d', fontFamily: 'inherit' }}
-            >
-              <span style={{ width: 20, textAlign: 'center' }}>↩</span>
-              {t.sidebarLogout}
-            </button>
-          </div>
-        </aside>
+        <AccountSidebar
+          tab={tab}
+          onTabChange={selectTab}
+          user={user}
+          club={club}
+          onSignOut={() => void signOut().then(() => navigate('/', { replace: true }))}
+          isMobile={isMobile}
+        />
 
         <main style={{ minWidth: 0 }}>
-
         {error && <p style={{ marginBottom: 16, borderRadius: 10, background: '#fef2f2', padding: 10, fontSize: 12, color: '#e5484d' }}>{error}</p>}
 
         {profile && profile.completionPct < 100 && !bannerDismissed && tab !== 'profile' && (
@@ -1159,7 +1088,7 @@ export default function AccountPage() {
             <div style={{ display: 'flex', gap: 10 }}>
               <button
                 type="button"
-                onClick={() => setTab('profile')}
+                onClick={() => selectTab('account-info')}
                 style={{ border: 'none', borderRadius: 9, background: '#e7c66b', color: '#3b2f0e', padding: '7px 14px', fontSize: 11.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
               >
                 {t.bannerCompleteBtn}
@@ -1176,255 +1105,34 @@ export default function AccountPage() {
         )}
 
         {tab === 'profile' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ background: 'linear-gradient(135deg,#0d2640,#16406e)', color: '#fff', borderRadius: 18, padding: '20px 22px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-                <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#ffffff22', border: '2px solid #ffffff55', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
-                  <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm0 2c-5.33 0-9 2.69-9 6v2h18v-2c0-3.31-3.67-6-9-6z" /></svg>
-                </div>
-                <div style={{ lineHeight: 1.6, minWidth: 0 }}>
-                  <div style={{ fontSize: 18, fontWeight: 900 }}>{profile?.fullName ?? user?.fullName ?? t.defaultUserName}</div>
-                  <div style={{ fontSize: 11.5, color: '#aac4e2' }} dir="ltr">
-                    {t.lblUserCode} CM-{user?.id ? user.id.slice(-4).toUpperCase() : '----'}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  data-testid="profile-go-security"
-                  onClick={() => setTab('security')}
-                  style={{ marginInlineStart: 'auto', fontSize: 11.5, fontWeight: 700, background: '#ffffff1e', border: '1px solid #ffffff33', padding: '9px 14px', borderRadius: 11, cursor: 'pointer', color: '#fff', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
-                >
-                  {t.btnSecurity}
-                </button>
-              </div>
-              <div style={{ marginTop: 16, background: '#ffffff14', border: '1px solid #ffffff22', borderRadius: 12, padding: '11px 14px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, marginBottom: 8 }}>
-                  <span style={{ color: '#aac4e2' }}>{t.completionLabel}</span>
-                  <span style={{ fontWeight: 800, color: '#f2d98a' }}>
-                    {profile ? faDigits(profile.completionPct) : '—'}٪
-                  </span>
-                </div>
-                <div style={{ height: 7, borderRadius: 6, background: '#ffffff1c', overflow: 'hidden' }}>
-                  <div
-                    style={{
-                      height: '100%',
-                      width: `${profile?.completionPct ?? 0}%`,
-                      borderRadius: 6,
-                      background: 'linear-gradient(90deg,#f2d98a,#caa53a)',
-                    }}
-                  />
-                </div>
-                <div style={{ fontSize: 10, color: '#8fa9cc', marginTop: 7, lineHeight: 1.7 }}>{t.profileCompletionHint}</div>
-              </div>
-            </div>
+          <AccountProfileTab
+            user={user}
+            profile={profile}
+            bookings={bookings}
+            clubBalance={club?.balance ?? 0}
+            walletBalanceIrr={wallet?.balanceIrr ?? null}
+            passengerCount={savedPassengers?.length ?? 0}
+            isMobile={isMobile}
+            onNavigateTab={selectTab}
+          />
+        )}
 
-            {profile && profile.completionPct < 100 && (
-              <div
-                data-testid="profile-incomplete-notice"
-                style={{ background: 'linear-gradient(135deg,#fff8ec,#fef2e0)', border: '1px solid #f6e0bb', borderRadius: 16, padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 13 }}
-              >
-                <span style={{ width: 44, height: 44, borderRadius: 12, background: '#f0a83c', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 3l7 3v5.5c0 4.2-2.9 7.4-7 8.5-4.1-1.1-7-4.3-7-8.5V6l7-3z" />
-                    <path d="M12 9v3M12 16h.01" />
-                  </svg>
-                </span>
-                <div style={{ lineHeight: 1.6 }}>
-                  <div style={{ fontSize: 14, fontWeight: 800, color: '#9a6a16' }}>{t.hdrProfileIncomplete}</div>
-                  <div style={{ fontSize: 11.5, color: '#b07f2a' }}>{t.subProfileIncomplete}</div>
-                </div>
-              </div>
-            )}
-
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 11 }}>
-              {[
-                { label: t.statCompletedTrips, value: faDigits((bookings ?? []).filter((b) => b.status === 'TICKETED').length), accent: '#1668c4', bg: '#eef4fb', icon: 'plane' as const },
-                { label: t.statLoyaltyPoints, value: club ? faDigits(club.balance) : '—', accent: '#caa53a', bg: '#fdf6e3', icon: 'star' as const },
-                { label: t.statWalletBalance, value: wallet ? faMoney(wallet.balanceIrr) : '—', accent: '#1f8a5b', bg: '#e9f6ef', icon: 'wallet' as const },
-                { label: t.statSavedPassengers, value: faDigits(savedPassengers?.length ?? 0), accent: '#7c5cd6', bg: '#f1edfb', icon: 'users' as const },
-              ].map((st) => (
-                <div key={st.label} data-testid={`profile-stat-${st.icon}`} style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 14, padding: '13px 14px', display: 'flex', alignItems: 'center', gap: 11, minWidth: 0 }}>
-                  <span style={{ width: 38, height: 38, borderRadius: 11, background: st.bg, color: st.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
-                    {st.icon === 'plane' && (
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z" /></svg>
-                    )}
-                    {st.icon === 'star' && (
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 15.9 6.8 18.6l1-5.8L3.5 8.7l5.9-.9z" /></svg>
-                    )}
-                    {st.icon === 'wallet' && (
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="6" width="18" height="13" rx="2.5" /><path d="M3 10h18" /><circle cx="16.5" cy="14.5" r="1.3" fill="currentColor" stroke="none" /></svg>
-                    )}
-                    {st.icon === 'users' && (
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="9" cy="8" r="3.2" /><path d="M3 20c0-3.5 2.7-6 6-6s6 2.5 6 6" /><path d="M16 4.5a3.2 3.2 0 0 1 0 6.4" /><path d="M21 20c0-2.8-1.7-5-4-5.7" /></svg>
-                    )}
-                  </span>
-                  <div style={{ lineHeight: 1.5, minWidth: 0 }}>
-                    <div style={{ fontSize: 15, fontWeight: 900, color: '#16202e', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{st.value}</div>
-                    <div style={{ fontSize: 10, color: '#9aa4b2', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{st.label}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {profileNotice && <p style={{ fontSize: 12, color: '#1f8a5b' }}>{profileNotice}</p>}
-            {profileError && <p role="alert" style={{ fontSize: 12, color: '#e5484d' }}>{profileError}</p>}
-
-            <form onSubmit={onSaveProfile} style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 16, padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <h3 style={{ fontSize: 15, fontWeight: 800, margin: 0, color: '#0d2640' }}>{t.accountInfoHeading}</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 11 }}>
-              <div>
-                <label htmlFor="profile-fullName" style={{ display: 'block', fontSize: 10.5, color: '#9aa4b2', marginBottom: 5 }}>
-                  {t.fullNameLabel}
-                </label>
-                <input
-                  id="profile-fullName"
-                  value={profileForm.fullName}
-                  onChange={(e) => setProfileForm((f) => ({ ...f, fullName: e.target.value }))}
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '11px 13px', border: 'none', borderRadius: 12, background: '#f6f8fb', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700, color: '#16202e', outline: 'none' }}
-                />
-              </div>
-              <div>
-                <label htmlFor="profile-nationalId" style={{ display: 'block', fontSize: 10.5, color: '#9aa4b2', marginBottom: 5 }}>
-                  {t.nationalIdLabel}
-                </label>
-                <input
-                  id="profile-nationalId"
-                  dir="ltr"
-                  value={profileForm.nationalId}
-                  onChange={(e) => setProfileForm((f) => ({ ...f, nationalId: e.target.value }))}
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '11px 13px', border: 'none', borderRadius: 12, background: '#f6f8fb', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700, color: '#16202e', outline: 'none' }}
-                />
-              </div>
-              <div>
-                <label htmlFor="profile-passportNo" style={{ display: 'block', fontSize: 10.5, color: '#9aa4b2', marginBottom: 5 }}>
-                  {t.passportLabel}
-                </label>
-                <input
-                  id="profile-passportNo"
-                  dir="ltr"
-                  value={profileForm.passportNo}
-                  onChange={(e) => setProfileForm((f) => ({ ...f, passportNo: e.target.value }))}
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '11px 13px', border: 'none', borderRadius: 12, background: '#f6f8fb', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700, color: '#16202e', outline: 'none' }}
-                />
-              </div>
-              </div>
-              <button
-                type="submit"
-                disabled={profileSaving}
-                style={{ border: 'none', borderRadius: 10, background: '#1668c4', color: '#fff', padding: '11px 22px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', alignSelf: 'flex-start' }}
-              >
-                {profileSaving ? t.savingButton : t.saveButton}
-              </button>
-            </form>
-
-            {savedPassengers && (
-              <AccountProfileSavedPax
-                passengers={savedPassengers}
-                onAdd={() => {
-                  setPassengersAddPending(true);
-                  setTab('passengers');
-                }}
-              />
-            )}
-
-            <div style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 16, padding: '18px 20px' }}>
-              <h3 style={{ fontSize: 14, fontWeight: 800, margin: '0 0 12px' }}>{t.emailHeading}</h3>
-              <p style={{ fontSize: 12, color: '#5a6678', marginBottom: 12 }}>
-                {profile?.email ?? t.emailNotSet}{' '}
-                {profile?.emailVerifiedAt && <span style={{ color: '#1f8a5b', fontWeight: 700 }}>{t.emailVerifiedTag}</span>}
-              </p>
-              {profile?.email && !profile.emailVerifiedAt && (
-                <>
-                  {!emailChallengeId ? (
-                    <button
-                      type="button"
-                      onClick={() => void onRequestEmailVerify()}
-                      style={{ border: '1px solid #1668c4', borderRadius: 10, background: 'transparent', color: '#1668c4', padding: '9px 18px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
-                    >
-                      {t.sendVerifyCodeBtn}
-                    </button>
-                  ) : (
-                    <form onSubmit={onVerifyEmail} style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                      <div>
-                        <label htmlFor="email-code" style={{ display: 'block', fontSize: 11, color: '#5a6678', marginBottom: 6 }}>
-                          {t.codeLabel}
-                        </label>
-                        <input
-                          id="email-code"
-                          dir="ltr"
-                          inputMode="numeric"
-                          maxLength={6}
-                          value={emailCode}
-                          onChange={(e) => setEmailCode(e.target.value.replace(/\D/g, ''))}
-                          style={{ width: 140, boxSizing: 'border-box', padding: '10px 13px', border: '1.5px solid #e3e9f1', borderRadius: 10, fontFamily: 'inherit', fontSize: 13, textAlign: 'center', letterSpacing: 4 }}
-                        />
-                      </div>
-                      <button
-                        type="submit"
-                        style={{ border: 'none', borderRadius: 10, background: '#1668c4', color: '#fff', padding: '11px 18px', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
-                      >
-                        {t.verifyBtn}
-                      </button>
-                    </form>
-                  )}
-                </>
-              )}
-            </div>
-
-            <div style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 16, padding: '18px 20px' }}>
-              <h3 style={{ fontSize: 14, fontWeight: 800, margin: '0 0 12px' }}>{t.privacyHeading}</h3>
-              {exportError && <p role="alert" style={{ fontSize: 12, color: '#e5484d', marginBottom: 10 }}>{exportError}</p>}
-              <p style={{ fontSize: 12, color: '#5a6678', marginBottom: 12 }}>{t.privacyDesc}</p>
-              <button
-                type="button"
-                data-testid="privacy-export-button"
-                disabled={exportBusy}
-                onClick={() => void onExportData()}
-                style={{ border: '1px solid #1668c4', borderRadius: 10, background: 'transparent', color: '#1668c4', padding: '9px 18px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 18 }}
-              >
-                {exportBusy ? t.exportBusyBtn : t.exportBtn}
-              </button>
-
-              <div style={{ borderTop: '1px solid #f1f4f8', paddingTop: 16 }}>
-                <h4 style={{ fontSize: 12.5, fontWeight: 800, color: '#e5484d', margin: '0 0 8px' }}>{t.deleteHeading}</h4>
-                {!deleteConfirmOpen ? (
-                  <button
-                    type="button"
-                    data-testid="privacy-delete-open"
-                    onClick={() => setDeleteConfirmOpen(true)}
-                    style={{ border: '1px solid #e5484d', borderRadius: 10, background: 'transparent', color: '#e5484d', padding: '9px 18px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
-                  >
-                    {t.deleteHeading}
-                  </button>
-                ) : (
-                  <div style={{ background: '#fef2f2', border: '1px solid #fbd0d0', borderRadius: 12, padding: '14px 16px' }}>
-                    <p style={{ fontSize: 12, color: '#8a2c2c', marginBottom: 12 }}>{t.deleteWarning}</p>
-                    {deleteError && <p role="alert" style={{ fontSize: 12, color: '#e5484d', marginBottom: 10 }}>{deleteError}</p>}
-                    <div style={{ display: 'flex', gap: 10 }}>
-                      <button
-                        type="button"
-                        data-testid="privacy-delete-confirm"
-                        disabled={deleteBusy}
-                        onClick={() => void onConfirmDelete()}
-                        style={{ border: 'none', borderRadius: 10, background: '#e5484d', color: '#fff', padding: '9px 18px', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
-                      >
-                        {deleteBusy ? t.deleteBusyBtn : t.deleteConfirmBtn}
-                      </button>
-                      <button
-                        type="button"
-                        data-testid="privacy-delete-cancel"
-                        disabled={deleteBusy}
-                        onClick={() => setDeleteConfirmOpen(false)}
-                        style={{ border: '1px solid #e3e9f1', borderRadius: 10, background: '#fff', color: '#5a6678', padding: '9px 18px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
-                      >
-                        {t.deleteCancelBtn}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+        {tab === 'account-info' && (
+          <AccountInfoTab
+            profile={profile}
+            profileForm={profileForm}
+            onProfileFormChange={setProfileForm}
+            onSaveProfile={onSaveProfile}
+            profileSaving={profileSaving}
+            profileError={profileError}
+            profileNotice={profileNotice}
+            isMobile={isMobile}
+            emailChallengeId={emailChallengeId}
+            emailCode={emailCode}
+            onEmailCodeChange={setEmailCode}
+            onRequestEmailVerify={onRequestEmailVerify}
+            onVerifyEmail={onVerifyEmail}
+          />
         )}
 
         {tab === 'trips' && (
@@ -1710,7 +1418,7 @@ export default function AccountPage() {
             submitError={identitySubmitError}
             onUpload={onUploadIdentityIdCard}
             onSubmit={onSubmitIdentity}
-            onGoProfile={() => setTab('profile')}
+            onGoProfile={() => selectTab('profile')}
           />
         )}
         {tab === 'identity' && identity === null && (
@@ -1797,7 +1505,7 @@ export default function AccountPage() {
         )}
 
         {tab === 'security' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 520 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: isMobile ? '100%' : 520 }}>
             <div style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 16, padding: 18 }}>
             <h3 style={{ fontSize: 15, fontWeight: 800, margin: '0 0 4px' }}>{t.securityHeading}</h3>
             <p style={{ fontSize: 11.5, color: '#8a96a6', margin: '0 0 16px', lineHeight: 1.8 }}>{t.securitySub}</p>
@@ -1856,6 +1564,17 @@ export default function AccountPage() {
                 onRevoke={onRevokeSession}
               />
             )}
+            <AccountPrivacyPanel
+              exportBusy={exportBusy}
+              exportError={exportError}
+              onExportData={onExportData}
+              deleteConfirmOpen={deleteConfirmOpen}
+              deleteBusy={deleteBusy}
+              deleteError={deleteError}
+              onDeleteOpen={() => setDeleteConfirmOpen(true)}
+              onDeleteCancel={() => setDeleteConfirmOpen(false)}
+              onDeleteConfirm={onConfirmDelete}
+            />
           </div>
         )}
         </main>

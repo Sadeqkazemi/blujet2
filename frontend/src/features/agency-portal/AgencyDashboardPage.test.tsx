@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import AgencyDashboardPage from './AgencyDashboardPage';
 import * as portalApi from '../../api/agency-portal';
 import * as useLocaleModule from '../../hooks/useLocale';
+import * as useIsMobileModule from '../../hooks/useIsMobile';
 import type { AgencyDashboard } from '../../types/agency-portal';
 
 function mockLocale(locale: 'fa' | 'en' | 'ar') {
@@ -14,8 +15,6 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-// Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON on
-// the backend — a JS number can't safely hold IRR amounts above 2^53).
 const DASHBOARD: AgencyDashboard = {
   credit: { limitIrr: '1800000000', usedIrr: '500000000', remainingIrr: '1300000000' },
   kpis: { salesThisMonthIrr: '384000000', ticketsIssuedTotal: 142, seatsSoldThisMonth: 12 },
@@ -30,41 +29,68 @@ const DASHBOARD: AgencyDashboard = {
 };
 
 describe('AgencyDashboardPage', () => {
-  function renderPage() {
-    return render(
+  beforeEach(() => {
+    vi.spyOn(useIsMobileModule, 'useIsMobile').mockReturnValue(false);
+    vi.spyOn(portalApi, 'fetchAllotments').mockResolvedValue([
+      {
+        id: 'a1',
+        flightNo: 'EP-821',
+        route: 'THR → DXB',
+        departureAt: '2026-07-25T08:30:00.000Z',
+        aircraftType: 'A320',
+        seatsAllocated: 30,
+        seatsUsed: 18,
+        type: 'SOFT',
+        releaseAt: null,
+        contractPriceIrr: '380000000',
+        active: true,
+      },
+    ]);
+  });
+
+  it('renders real KPI cards and the 6-month sales chart from the API, not fabricated data', async () => {
+    vi.spyOn(portalApi, 'fetchDashboard').mockResolvedValue(DASHBOARD);
+    render(
       <MemoryRouter>
         <AgencyDashboardPage />
       </MemoryRouter>,
     );
-  }
 
-  it('renders real KPI cards and the 6-month sales chart from the API, not fabricated data', async () => {
-    vi.spyOn(portalApi, 'fetchDashboard').mockResolvedValue(DASHBOARD);
-    renderPage();
-
-    expect(await screen.findByText('داشبورد آژانس')).toBeInTheDocument();
-    expect(screen.getByTestId('agency-kpi-sales')).toHaveTextContent('۳۸٬۴۰۰٬۰۰۰');
-    expect(screen.getByTestId('agency-credit-card')).toHaveTextContent('۱۳۰٬۰۰۰٬۰۰۰');
+    expect(await screen.findByTestId('agency-dashboard')).toBeInTheDocument();
+    expect(screen.getByText('فروش این ماه')).toBeInTheDocument();
+    expect(screen.getAllByText(/۳۸٬۴۰۰٬۰۰۰/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/۱۳۰٬۰۰۰٬۰۰۰/).length).toBeGreaterThan(0);
+    expect(screen.getByText('صندلی تخصیص‌یافته')).toBeInTheDocument();
+    expect(screen.getByText('۳۰')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'نمودار فروش ۶ ماه اخیر' })).toBeInTheDocument();
+    expect(screen.getByTestId('agency-view-statement')).toHaveAttribute('href', '/agency/credit');
   });
 
-  it('renders translated headings and KPI labels in English', async () => {
+  it('renders translated KPI labels in English', async () => {
     mockLocale('en');
     vi.spyOn(portalApi, 'fetchDashboard').mockResolvedValue(DASHBOARD);
-    renderPage();
+    render(
+      <MemoryRouter>
+        <AgencyDashboardPage />
+      </MemoryRouter>,
+    );
 
-    expect(await screen.findByText('Agency Dashboard')).toBeInTheDocument();
-    expect(screen.getByText("Sales this month")).toBeInTheDocument();
+    expect(await screen.findByText('Sales this month')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Last 6 months sales chart' })).toBeInTheDocument();
     expect(screen.getByText('Ordibehesht')).toBeInTheDocument();
+    expect(screen.getByText('View statement')).toBeInTheDocument();
   });
 
-  it('renders translated headings and KPI labels in Arabic', async () => {
+  it('renders translated KPI labels in Arabic', async () => {
     mockLocale('ar');
     vi.spyOn(portalApi, 'fetchDashboard').mockResolvedValue(DASHBOARD);
-    renderPage();
+    render(
+      <MemoryRouter>
+        <AgencyDashboardPage />
+      </MemoryRouter>,
+    );
 
-    expect(await screen.findByText('لوحة تحكم الوكالة')).toBeInTheDocument();
-    expect(screen.getByTestId('agency-credit-card')).toHaveTextContent('الرصيد المتبقي');
+    expect(await screen.findByText('مبيعات هذا الشهر')).toBeInTheDocument();
+    expect(screen.getByText('عرض كشف الحساب')).toBeInTheDocument();
   });
 });

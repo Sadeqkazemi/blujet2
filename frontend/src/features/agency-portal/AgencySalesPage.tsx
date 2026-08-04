@@ -205,21 +205,8 @@ export default function AgencySalesPage() {
   ];
 
   return (
-    <div data-testid="agency-sales">
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          gap: 10,
-          flexWrap: 'wrap',
-          marginBottom: 22,
-        }}
-      >
-        <div>
-          <h1 style={{ fontSize: 20, fontWeight: 900, color: '#0d2640', margin: 0 }}>{t.heading}</h1>
-          <div style={{ fontSize: 11.5, color: '#7a8696', marginTop: 3 }}>{t.subtitle}</div>
-        </div>
+    <div>
+      <div className="mb-6 flex flex-wrap items-start justify-end gap-3">
         <button
           type="button"
           data-testid="sales-export"
@@ -258,29 +245,39 @@ export default function AgencySalesPage() {
         }}
       >
         {kpis.map((k) => (
-          <div
-            key={k.key}
-            data-testid={`agency-sales-kpi-${k.key}`}
-            style={{ background: '#fff', border: '1px solid #eef2f7', borderRadius: 14, padding: 14 }}
-          >
-            <div style={{ fontSize: 11.5, color: '#8a96a6' }}>{k.label}</div>
-            <div style={{ fontSize: 20.5, fontWeight: 900, color: '#0d2640', marginTop: 6 }}>{k.value}</div>
+          <div key={k.label} className="rounded-xl border border-border bg-white p-4">
+            <div className="text-[11px] text-muted">{k.label}</div>
+            <div className="mt-1 text-lg font-black text-ink">{k.value}</div>
           </div>
         ))}
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
-        <div style={{ background: '#fff', border: '1px solid #eef2f7', borderRadius: 14, overflow: 'hidden' }}>
-          <div
-            style={{
-              padding: '11px 14px',
-              borderBottom: '1px solid #eef2f7',
-              fontSize: 13.5,
-              fontWeight: 800,
-              color: '#0d2640',
-            }}
-          >
-            {t.perFlightHeading}
+      <div className="mb-6 rounded-xl border border-border bg-white p-5">
+        <div className="mb-4 text-sm font-bold text-ink">{t.perFlightHeading}</div>
+        {data.perFlight.length === 0 ? (
+          <p className="py-4 text-center text-xs text-muted">{t.perFlightEmpty}</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-right text-xs">
+              <thead>
+                <tr className="border-b border-border text-[10px] text-muted">
+                  <th className="py-2 font-bold">{t.colFlight}</th>
+                  <th className="py-2 font-bold">{t.colRoute}</th>
+                  <th className="py-2 font-bold">{t.colTicketsCount}</th>
+                  <th className="py-2 font-bold">{t.colTotalSales}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.perFlight.map((f) => (
+                  <tr key={f.flightNo} className="border-b border-border/60">
+                    <td className="ltr py-2.5">{f.flightNo}</td>
+                    <td className="ltr py-2.5">{f.route}</td>
+                    <td className="py-2.5">{faDigits(f.ticketsCount)}</td>
+                    <td className="py-2.5 font-bold">{faMoney(f.salesIrr)} {t.toman}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
           {data.perFlight.length === 0 ? (
             <p style={{ padding: 24, textAlign: 'center', fontSize: 12, color: '#8a96a6', margin: 0 }}>
@@ -315,17 +312,36 @@ export default function AgencySalesPage() {
           )}
         </div>
 
-        <div style={{ background: '#fff', border: '1px solid #eef2f7', borderRadius: 14, overflow: 'hidden' }}>
-          <div
-            style={{
-              padding: '11px 14px',
-              borderBottom: '1px solid #eef2f7',
-              fontSize: 13.5,
-              fontWeight: 800,
-              color: '#0d2640',
-            }}
-          >
-            {t.ticketsHeading}
+      <div className="rounded-xl border border-border bg-white p-5">
+        <div className="mb-4 text-sm font-bold text-ink">{t.ticketsHeading}</div>
+        {data.tickets.length === 0 ? (
+          <p className="py-4 text-center text-xs text-muted">{t.ticketsEmpty}</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-right text-xs">
+              <thead>
+                <tr className="border-b border-border text-[10px] text-muted">
+                  <th className="py-2 font-bold">{t.colPnr}</th>
+                  <th className="py-2 font-bold">{t.colFlight}</th>
+                  <th className="py-2 font-bold">{t.colDepartureDate}</th>
+                  <th className="py-2 font-bold">{t.colAmount}</th>
+                  <th className="py-2 font-bold">{t.colStatus}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.tickets.map((t2) => (
+                  <tr key={t2.pnr} className="border-b border-border/60">
+                    <td className="ltr py-2.5">{t2.pnr}</td>
+                    <td className="ltr py-2.5">
+                      {t2.flightNo} — {t2.route}
+                    </td>
+                    <td className="py-2.5">{formatJalaliDate(t2.departureAt)}</td>
+                    <td className="py-2.5 font-bold">{faMoney(t2.priceIrr)} {t.toman}</td>
+                    <td className="py-2.5">{BOOKING_STATUS_LABEL[t2.status]?.[locale] ?? t2.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
           {data.tickets.length === 0 ? (
             <p style={{ padding: 24, textAlign: 'center', fontSize: 12, color: '#8a96a6', margin: 0 }}>
