@@ -4,6 +4,7 @@ import { Throttle } from '@nestjs/throttler';
 import { BookingService } from '../booking-engine/booking.service';
 import { RefundsService } from '../refunds/refunds.service';
 import {
+  ChangeSeatDto,
   LookupBookingDto,
   SubmitAnonymousRefundDto,
 } from './dto/manage-booking.dtos';
@@ -35,6 +36,20 @@ export class ManageBookingController {
       dto.pnr,
       dto.lastName,
       dto.iban,
+    );
+    return { success: true, data };
+  }
+
+  @Post('change-seat')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({
+    summary: 'تغییر صندلی مسافر (بدون ورود، با کد رزرو + نام خانوادگی)',
+  })
+  async changeSeat(@Body() dto: ChangeSeatDto) {
+    const data = await this.bookings.changeSeatByPnr(
+      dto.pnr,
+      dto.lastName,
+      dto.seatCode.trim().toUpperCase(),
     );
     return { success: true, data };
   }

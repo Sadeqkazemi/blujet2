@@ -69,6 +69,9 @@ const STR: Record<StoredLocale, {
   tripOneWay: string;
   tripRoundTrip: string;
   tripMultiCity: string;
+  tabBook: string;
+  tabManage: string;
+  tabStatus: string;
   lblOrigin: string;
   lblDestination: string;
   lblDepartDate: string;
@@ -128,6 +131,9 @@ const STR: Record<StoredLocale, {
     tripOneWay: 'یک‌طرفه',
     tripRoundTrip: 'رفت و برگشت',
     tripMultiCity: 'چندمسیره',
+    tabBook: 'رزرو پرواز',
+    tabManage: 'مدیریت رزرو',
+    tabStatus: 'وضعیت پرواز',
     lblOrigin: 'مبدا',
     lblDestination: 'مقصد',
     lblDepartDate: 'تاریخ رفت',
@@ -187,6 +193,9 @@ const STR: Record<StoredLocale, {
     tripOneWay: 'One-way',
     tripRoundTrip: 'Round-trip',
     tripMultiCity: 'Multi-city',
+    tabBook: 'Book Flight',
+    tabManage: 'Manage Booking',
+    tabStatus: 'Flight Status',
     lblOrigin: 'From',
     lblDestination: 'To',
     lblDepartDate: 'Departure date',
@@ -246,6 +255,9 @@ const STR: Record<StoredLocale, {
     tripOneWay: 'ذهاب فقط',
     tripRoundTrip: 'ذهاب وإياب',
     tripMultiCity: 'متعدد المدن',
+    tabBook: 'حجز الرحلة',
+    tabManage: 'إدارة الحجز',
+    tabStatus: 'حالة الرحلة',
     lblOrigin: 'من',
     lblDestination: 'إلى',
     lblDepartDate: 'تاريخ المغادرة',

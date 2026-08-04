@@ -7,6 +7,7 @@ import AboutPage from './AboutPage';
 import NotFoundPage from './NotFoundPage';
 import * as useAuthModule from '../../hooks/useAuth';
 import * as useLocaleModule from '../../hooks/useLocale';
+import * as agenciesApi from '../../api/agencies';
 
 function mockLocale(locale: 'fa' | 'en' | 'ar') {
   vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale, setLocale: vi.fn() });
@@ -55,7 +56,13 @@ describe('CustomerLoginPage', () => {
     expect(verifyOtp).toHaveBeenCalledWith('challenge-1', '123456');
   });
 
-  it('signup tab requires name and terms; agency signup submits the mock request', async () => {
+  it('signup tab requires name and terms; agency signup submits the real OTP-verified request', async () => {
+    const otpSpy = vi
+      .spyOn(agenciesApi, 'requestAgencySignupOtp')
+      .mockResolvedValue({ challengeId: 'ag-ch-1' });
+    const createSpy = vi
+      .spyOn(agenciesApi, 'submitAgencyRequest')
+      .mockResolvedValue({ id: 'req-1' });
     renderWithRouter(<CustomerLoginPage />);
 
     await userEvent.click(screen.getByTestId('signin-tab-signup'));
@@ -65,8 +72,23 @@ describe('CustomerLoginPage', () => {
     await userEvent.click(screen.getByTestId('signin-acct-agency'));
     await userEvent.type(screen.getByTestId('agency-name'), 'آژانس سفر آبی');
     await userEvent.type(screen.getByTestId('agency-license'), '1234-5678');
+    await userEvent.type(screen.getByTestId('agency-manager'), 'کامران یوسفی');
+    await userEvent.type(screen.getByTestId('agency-phone'), '09121234567');
     await userEvent.click(screen.getByTestId('agency-signup-btn'));
-    expect(screen.getByTestId('agency-signup-done')).toBeInTheDocument();
+    expect(otpSpy).toHaveBeenCalledWith('09121234567');
+
+    await userEvent.type(await screen.findByTestId('agency-otp-code'), '482913');
+    await userEvent.click(screen.getByTestId('agency-signup-confirm'));
+
+    expect(createSpy).toHaveBeenCalledWith({
+      applicantName: 'آژانس سفر آبی',
+      managerName: 'کامران یوسفی',
+      licenseNo: '1234-5678',
+      phone: '09121234567',
+      challengeId: 'ag-ch-1',
+      code: '482913',
+    });
+    expect(await screen.findByTestId('agency-signup-done')).toBeInTheDocument();
   });
 
   it('toggles to real password login and links to forgot-password', async () => {
