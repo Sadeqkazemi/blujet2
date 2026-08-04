@@ -258,7 +258,7 @@ cannot manually lock seats** (view sold-seat passenger details only).
 
 | Method | Path | Roles | Notes |
 |---|---|---|---|
-| GET | `/reservation/seatmap/:flightInstanceId` | BOARD_CHAIR, SENIOR_MANAGER, IT_MANAGER, CEO | Computed from `AircraftSeatMap` (by the instance's `Flight.aircraftType`) + sold seats (`Passenger.seatCode` on non-CANCELLED bookings) + active `SeatLock`s. Returns `{ flightNo, origin/dest (+ cityFa), departureAt, rows[], cabinLayout, soldCount, lockedCount, freeCount, capacity, occupancyPct }`. Each SOLD seat carries the rich `passenger` `{ fullName, pnr, bookingStatus, nationalId, priceIrr }` that powers the IT/Board seat-map popup, plus a lighter `occupant` `{ pnr, passengerName, bookingStatus }`; locked seats carry `lockExpiresAt` / `lockPassengerName` for the countdown chip. Staff-only (IT cannot lock). |
+| GET | `/reservation/seatmap/:flightInstanceId` | BOARD_CHAIR, SENIOR_MANAGER, IT_MANAGER, CEO | Computed from `AircraftSeatMap` (by the instance's `Flight.aircraftType`) + sold seats (`Passenger.seatCode` on occupying bookings: DRAFT/HELD/PAID/TICKETED with non-expired HELD — same filter as search `takenSeatCodes`; REFUNDED/EXPIRED/CANCELLED free the seat) + active `SeatLock`s. Returns `{ flightNo, origin/dest (+ cityFa), departureAt, rows[], cabinLayout, soldCount, lockedCount, freeCount, capacity, occupancyPct }`. Each SOLD seat carries the rich `passenger` `{ fullName, pnr, bookingStatus, nationalId, priceIrr }` that powers the IT/Board seat-map popup, plus a lighter `occupant` `{ pnr, passengerName, bookingStatus }`; locked seats carry `lockExpiresAt` / `lockPassengerName` for the countdown chip. Staff-only (IT cannot lock). |
 | POST | `/reservation/seatmap/:flightInstanceId/lock` | canSeatLock only (`CEO`/`BOARD_CHAIR`) | `{ seatCode, passengerName?, passengerNationalId?, passengerMobile? }` — 409 if the seat is already sold or actively locked (DB partial-unique-index-backed). PII encrypted+hashed like `ClubMember`. `AuditLog(category=RESERVATION)`. IT_MANAGER → 403. |
 | PATCH | `/reservation/seatmap/locks/:id/release` | canSeatLock only | Any canSeatLock role may release any active lock (the design's «×» chip shows no per-locker ownership filter). Sets `releasedAt`; 409 if already released. Audited. IT_MANAGER → 403. |
 | GET | `/reservation/pnr` | all 4 reservation roles | `q?` (PNR or passenger name). Grouped by flight instance, newest first — the design's «مدیریت رزروها» list. |
@@ -429,6 +429,16 @@ reviewable. Only what Phase 13 actually changes is documented below.
     per-seat conflict check — 409 `POOL_EXHAUSTED` (with which pool:
     `AGENCY` | `CHARTER` | `SYSTEM`) when the requested channel's pool is
     full, even if physical seats remain (they belong to a different pool).
+  - Each passenger `seatCode` is optional: when omitted, the first free
+    seat in the requested cabin is assigned inside the same
+    `SELECT … FOR UPDATE` transaction. Occupying bookings
+    (DRAFT/HELD/PAID/TICKETED, non-expired HELD) and active managerial
+    locks still conflict. HELD/TICKETED seats appear as SOLD on
+    `/reservation/seatmap`; REFUNDED/EXPIRED free them (same filter as
+    search `takenSeatCodes`).
+  - Creating a flight or CEO-registering a price invalidates the Redis
+    search cache for that route/day so newly priced flights appear
+    immediately.
   - `seatsLeft` in search results is unchanged (still physical vacancy per
     cabin) — see DB_SCHEMA's ⚑ scope-cut note; the enforced guarantee is the
     409 above, not the display number.

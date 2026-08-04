@@ -20,6 +20,8 @@
     "test:e2e": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --config ./test/jest-e2e.json",
     "seed": "tsx src/database/seed.ts",
     "seed:prod": "node dist/src/database/seed.js",
+    "prelaunch:reset": "tsx scripts/prelaunch-reset.ts",
+    "prelaunch:verify": "npm run test:e2e -- prelaunch-verify",
     "migration:generate": "typeorm-ts-node-commonjs migration:generate -d src/database/data-source.ts",
     "migration:run": "typeorm-ts-node-commonjs migration:run -d src/database/data-source.ts",
     "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/database/data-source.ts",

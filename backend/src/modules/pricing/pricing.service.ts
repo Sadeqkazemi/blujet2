@@ -17,6 +17,7 @@ import {
   type PriceSuggestionProvider,
 } from '../ai/price-suggestion.provider';
 import { StepUpService } from '../auth/step-up.service';
+import { SearchService } from '../booking-engine/search.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import {
   addIrr,
@@ -56,6 +57,7 @@ export class PricingService {
     @Inject(PRICE_SUGGESTION_PROVIDER)
     private readonly priceSuggestions: PriceSuggestionProvider,
     private readonly stepUp: StepUpService,
+    private readonly search: SearchService,
   ) {}
 
   private withProposalRelations(
@@ -349,6 +351,9 @@ export class PricingService {
       entityId: id,
       metadata: { registeredPriceIrr: price, source },
     });
+
+    // CEO-registered price must replace any cached search card for this day.
+    await this.search.invalidateForInstance(proposal.flightInstanceId);
 
     return this.withProposalRelations(this.proposalRepo.createQueryBuilder('p'))
       .where('p.id = :id', { id })

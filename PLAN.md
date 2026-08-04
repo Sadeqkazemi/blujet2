@@ -19,6 +19,15 @@ below for what's landed from that port so far.
 
 ## Status
 
+- [x] **Pre-launch verification harness (2026-08-04)** — reset script
+  (`npm run prelaunch:reset`), feature checklist
+  `docs/features/prelaunch-verify.md`, and e2e
+  `backend/test/prelaunch-verify.e2e-spec.ts` covering commercial→CEO
+  priced flights (THR↔MHD + extra), mock-OTP customers, seat occupancy on
+  reservation map (incl. auto-assign + post-refund free), full refund to
+  finance, agency refer/approve/reject + API + allotment, IT employee
+  create. Also fixed reservation sold-seat filter to match search
+  (REFUNDED/EXPIRED free seats).
 - [x] Repo scaffold (frontend/backend/ml-service skeletons, design-reference import)
 - [x] Design extraction — all 6 panels + shared shell + `ReservationSystem` read in full; findings folded into `docs/API.md` / `docs/DB_SCHEMA.md`
 - [x] **Phase 1 — staff auth + RBAC + panel shell + dashboard/reporting** — see `docs/features/panel-shell-dashboard.md` for the proven checklist (35 backend + 21 frontend unit + 5 E2E tests, all passing; lint+typecheck clean in both packages). Known deferred scope, not silently dropped: IT Manager's real (service-health) dashboard, day/month/flight chart-mode UI, pixel-diff visual regression — see that doc's scope notes.

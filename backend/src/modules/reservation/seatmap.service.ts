@@ -13,6 +13,7 @@ import { Passenger } from '../../database/entities/passenger.entity';
 import { Airport } from '../../database/entities/airport.entity';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
+import { applyOccupyingBookingFilter } from '../../common/booking-seat-occupancy';
 import {
   decryptPii,
   encryptPii,
@@ -64,13 +65,13 @@ export class SeatmapService {
   }
 
   private async findSoldConflict(flightInstanceId: string, seatCode: string) {
-    return this.passengerRepo
+    const qb = this.passengerRepo
       .createQueryBuilder('p')
       .innerJoin('p.booking', 'b')
       .where('p.seatCode = :seatCode', { seatCode })
-      .andWhere('b.flightInstanceId = :flightInstanceId', { flightInstanceId })
-      .andWhere('b.status != :cancelled', { cancelled: 'CANCELLED' })
-      .getOne();
+      .andWhere('b.flightInstanceId = :flightInstanceId', { flightInstanceId });
+    applyOccupyingBookingFilter(qb);
+    return qb.getOne();
   }
 
   /** The DB's partial unique index only knows `releasedAt IS NULL`, not
@@ -125,18 +126,19 @@ export class SeatmapService {
     );
     const seats = enumerateSeats(map);
 
+    const soldQb = this.passengerRepo
+      .createQueryBuilder('p')
+      .innerJoin('p.booking', 'b')
+      .where('p.seatCode IS NOT NULL')
+      .andWhere('b.flightInstanceId = :flightInstanceId', {
+        flightInstanceId,
+      })
+      .select(['p.seatCode', 'p.fullName', 'p.nationalIdEnc'])
+      .addSelect(['b.pnr', 'b.status', 'b.priceIrr']);
+    applyOccupyingBookingFilter(soldQb);
+
     const [soldPassengers, activeLocks, airports] = await Promise.all([
-      this.passengerRepo
-        .createQueryBuilder('p')
-        .innerJoin('p.booking', 'b')
-        .where('p.seatCode IS NOT NULL')
-        .andWhere('b.flightInstanceId = :flightInstanceId', {
-          flightInstanceId,
-        })
-        .andWhere('b.status != :cancelled', { cancelled: 'CANCELLED' })
-        .select(['p.seatCode', 'p.fullName', 'p.nationalIdEnc'])
-        .addSelect(['b.pnr', 'b.status', 'b.priceIrr'])
-        .getMany(),
+      soldQb.getMany(),
       this.seatLockRepo.find({
         where: { flightInstanceId, ...this.activeLockWhere() },
       }),

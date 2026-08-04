@@ -32,7 +32,8 @@ describe('Phase 16 — agency self-registration (e2e)', () => {
     // creates a User+AgencyProfile+AgencyCreditLine — clean them up so a
     // re-run (or a combined suite run) doesn't hit the phone unique
     // constraint on a second approveRequest for the same number.
-    const phonePrefix = '0912111000';
+    // Phones are stored E.164 (+98…) after Phase prelaunch normalize fix.
+    const phonePrefix = '+98912111000';
     const users = await dataSource.getRepository(User).find({
       where: { phone: Like(`${phonePrefix}%`) },
       select: { id: true },
@@ -93,7 +94,7 @@ describe('Phase 16 — agency self-registration (e2e)', () => {
       .where('r.id = :id', { id: res.body.data.id })
       .getOneOrFail();
     expect(row.status).toBe('PENDING');
-    expect(row.phone).toBe(phone);
+    expect(row.phone).toBe('+989121110001');
     expect(row.email).toBeNull();
     expect(row.city).toBeNull();
   });
@@ -174,10 +175,10 @@ describe('Phase 16 — agency self-registration (e2e)', () => {
       .getRepository(User)
       .findOneByOrFail({ id: approve.body.data.agencyId });
     expect(agencyUser.role).toBe('AGENCY');
-    expect(agencyUser.phone).toBe(phone);
+    expect(agencyUser.phone).toBe('+989121110003');
 
     const smsLog = await dataSource.getRepository(SmsLog).findOne({
-      where: { phone, messageType: 'TEMP_PASSWORD' },
+      where: { phone: '+989121110003', messageType: 'TEMP_PASSWORD' },
       order: { createdAt: 'desc' },
     });
     expect(smsLog).not.toBeNull();

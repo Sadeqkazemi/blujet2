@@ -24,9 +24,15 @@ export class BookingPassengerDto {
   @IsString()
   mobile?: string;
 
-  @ApiProperty({ example: '4A', description: 'صندلی انتخابی این مسافر' })
+  @ApiProperty({
+    example: '4A',
+    description:
+      'صندلی انتخابی؛ اگر خالی باشد سیستم اولین صندلی آزاد همان کابین را تخصیص می‌دهد',
+    required: false,
+  })
+  @IsOptional()
   @IsString()
-  seatCode: string;
+  seatCode?: string;
 }
 
 export class CreateBookingDto {
