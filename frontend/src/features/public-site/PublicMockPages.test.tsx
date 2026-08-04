@@ -131,6 +131,6 @@ describe('NotFoundPage', () => {
     renderWithRouter(<NotFoundPage />);
     expect(screen.getByText('صفحه‌ای که دنبالش بودید پیدا نشد')).toBeInTheDocument();
     expect(screen.getByText('بازگشت به صفحهٔ اصلی')).toHaveAttribute('href', '/');
-    expect(screen.getByText('جستجوی پرواز')).toHaveAttribute('href', '/destinations');
+    expect(screen.getByText('جستجوی پرواز')).toHaveAttribute('href', '/');
   });
 });

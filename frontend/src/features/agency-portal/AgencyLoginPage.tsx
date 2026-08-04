@@ -1077,7 +1077,11 @@ export default function AgencyLoginPage() {
           <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#1f8a5b' }} />
           {t.secureNote}
         </div>
-        <Link to="/signin" style={{ color: '#8a96a6', fontWeight: 700, textDecoration: 'none' }}>
+        <Link
+          to="/signin"
+          data-testid="agency-passenger-link"
+          style={{ color: '#8a96a6', fontWeight: 700, textDecoration: 'none' }}
+        >
           {t.personalLoginLink}
         </Link>
       </div>
