@@ -20,6 +20,7 @@ import type {
   SearchFlightResult,
   SeatMapResult,
   UserProfile,
+  PriceAdvisoryResult,
 } from '../types/public-site';
 import type { ClubCardRequestView, ClubMembershipView } from '../types/club-membership';
 

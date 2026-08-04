@@ -33,6 +33,7 @@ import {
   isValidIranianNationalId,
   normalizeNationalId,
 } from '../../common/pii-crypto';
+import { generateUniquePnr } from '../../common/pnr.util';
 import { enumerateSeats, isKnownSeat } from './seat-layout';
 import { resolveAircraftType } from '../flights/aircraft-type.util';
 import { materializeFlownBookings } from '../flights/flight-lifecycle.util';

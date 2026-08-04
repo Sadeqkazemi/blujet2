@@ -307,6 +307,65 @@ describe('Booking engine (e2e)', () => {
     expect(count).toBe(1);
   });
 
+  it('requires explicit confirmation when the fare changes between HELD and pay', async () => {
+    const instance = await freshInstance();
+    await typeorm.cabinFare.upsert({
+      where: {
+        flightInstanceId_cabin: {
+          flightInstanceId: instance.id,
+          cabin: 'ECONOMY',
+        },
+      },
+      update: { priceIrr: 38_000_000 },
+      create: {
+        flightInstanceId: instance.id,
+        cabin: 'ECONOMY',
+        priceIrr: 38_000_000,
+      },
+    });
+
+    const { accessToken } = await loginAsCustomer(app, '09130000011');
+    const createRes = await request(app.getHttpServer())
+      .post('/bookings')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        flightInstanceId: instance.id,
+        cabin: 'ECONOMY',
+        passengers: [{ fullName: 'تغییر قیمت', seatCode: '2A' }],
+      });
+    expect(createRes.status).toBe(201);
+    expect(createRes.body.data.priceIrr).toBe(38_000_000);
+    const bookingId = createRes.body.data.id;
+
+    await typeorm.cabinFare.update({
+      where: {
+        flightInstanceId_cabin: {
+          flightInstanceId: instance.id,
+          cabin: 'ECONOMY',
+        },
+      },
+      data: { priceIrr: 42_000_000 },
+    });
+
+    const firstPay = await request(app.getHttpServer())
+      .post(`/bookings/${bookingId}/pay`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({});
+    expect(firstPay.status).toBe(201);
+    expect(firstPay.body.data.priceChanged).toBe(true);
+    expect(firstPay.body.data.previousPriceIrr).toBe(38_000_000);
+    expect(firstPay.body.data.currentPriceIrr).toBe(42_000_000);
+
+    const confirmedPay = await request(app.getHttpServer())
+      .post(`/bookings/${bookingId}/pay`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ confirmedPriceIrr: 42_000_000 });
+    expect(confirmedPay.status).toBe(201);
+    expect(confirmedPay.body.data.priceChanged).toBe(false);
+    expect(confirmedPay.body.data.booking.status).toBe('TICKETED');
+    expect(confirmedPay.body.data.booking.priceIrr).toBe(42_000_000);
+  });
+
   it('an expired HELD booking cannot be paid and its seat becomes available again', async () => {
     const instance = await freshInstance();
     const { accessToken } = await loginAsCustomer(app, '09130000008');

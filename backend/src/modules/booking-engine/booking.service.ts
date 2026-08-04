@@ -26,6 +26,7 @@ import {
   isValidIranianNationalId,
   normalizeNationalId,
 } from '../../common/pii-crypto';
+import { generateUniquePnr } from '../../common/pnr.util';
 import { enumerateSeats } from '../reservation/seat-layout';
 import { matchesLastName } from '../../common/passenger-name.util';
 import { resolveAircraftType } from '../flights/aircraft-type.util';

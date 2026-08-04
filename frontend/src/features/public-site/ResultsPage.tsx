@@ -10,6 +10,7 @@ import {
   searchFlights,
 } from '../../api/publicSite';
 import { ApiRequestError } from '../../api/envelope';
+import { formatAdvisoryExplanation } from '../../lib/advisory-text';
 import { useAuth } from '../../hooks/useAuth';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
