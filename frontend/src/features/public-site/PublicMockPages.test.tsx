@@ -7,6 +7,7 @@ import AboutPage from './AboutPage';
 import NotFoundPage from './NotFoundPage';
 import * as useAuthModule from '../../hooks/useAuth';
 import * as useLocaleModule from '../../hooks/useLocale';
+import * as useCareersEnabledModule from '../../hooks/useCareersEnabled';
 
 function mockLocale(locale: 'fa' | 'en' | 'ar') {
   vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale, setLocale: vi.fn() });
@@ -18,6 +19,7 @@ const passwordLogin = vi.fn().mockResolvedValue({ id: 'u1', fullName: 'نگار 
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.spyOn(useCareersEnabledModule, 'useCareersEnabled').mockReturnValue(false);
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status: 'unauthenticated',
     user: null,
@@ -137,6 +139,6 @@ describe('NotFoundPage', () => {
     renderWithRouter(<NotFoundPage />);
     expect(screen.getByText('صفحه‌ای که دنبالش بودید پیدا نشد')).toBeInTheDocument();
     expect(screen.getByText('بازگشت به صفحهٔ اصلی')).toHaveAttribute('href', '/');
-    expect(screen.getByText('جستجوی پرواز')).toHaveAttribute('href', '/destinations');
+    expect(screen.getByText('جستجوی پرواز')).toHaveAttribute('href', '/');
   });
 });
