@@ -50,6 +50,8 @@ export interface CommercialFlightRow {
   departureAt: string;
   capacity: number;
   charterSeats: number;
+  /** Instance base fare (ریال) — shown even before a proposal exists. */
+  basePriceIrr: string | null;
   flight: { flightNo: string; route: { originCode: string; destCode: string } };
   pricing: PricingProposal | null;
 }

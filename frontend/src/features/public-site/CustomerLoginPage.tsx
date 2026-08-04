@@ -8,14 +8,60 @@ import { useAuth } from '../../hooks/useAuth';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { ApiRequestError } from '../../api/envelope';
-import { faDigits } from '../../lib/fa-format';
-import { normalizePhone, phoneOk } from '../../lib/phone';
-import { DEV_OTP_CODE, canDevOtpFallback, isDevOtpMockSend } from '../../lib/dev-otp';
+import { faDigits, latinDigits } from '../../lib/fa-format';
+
+// ورود و ثبتنام — rebuilt to match design-reference/ورود و ثبتنام.dc.html:
+// ورود/ثبت‌نام tabs, کاربر/آژانس segment, OTP with resend countdown.
+// Customer OTP uses the existing auth hooks (verification find-or-creates
+// the account, so the signup tab's OTP is the same flow); agency signup is
+// a mock submit per the "no backend work" scope.
+//
+// The design's own login page has a materially different field layout
+// (email+password-first with Google sign-in, 5-digit OTP) from this real
+// app's phone+OTP-first flow (6-digit OTP, no Google sign-in — out of
+// scope), so most EN/AR strings below were hand-translated to match THIS
+// app's actual fields; a handful of concepts that do line up 1:1 (tab
+// labels, terms/agency note, resend label) were pulled directly from the
+// design bundle's own isEN/isAR ternaries.
 
 const RESEND_SECONDS = 120;
 
-function emailOk(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  boxSizing: 'border-box',
+  padding: '11px 13px',
+  border: '1.5px solid #e3e9f1',
+  borderRadius: 11,
+  fontFamily: 'inherit',
+  fontSize: 13.5,
+  color: '#16202e',
+  background: '#fff',
+  outline: 'none',
+};
+
+function sanitizeMobileInput(raw: string) {
+  return latinDigits(raw).replace(/[^\d]/g, '').slice(0, 11);
+}
+
+function sanitizeOtpInput(raw: string) {
+  return latinDigits(raw).replace(/\D/g, '').slice(0, 6);
+}
+
+const labelStyle: React.CSSProperties = { display: 'block', fontSize: 11.5, fontWeight: 700, color: '#5a6678', marginBottom: 6 };
+
+function primaryBtn(enabled: boolean): React.CSSProperties {
+  return {
+    border: 'none',
+    borderRadius: 11,
+    background: enabled ? '#1668c4' : '#aab8c8',
+    color: '#fff',
+    padding: '12px 0',
+    width: '100%',
+    fontSize: 13.5,
+    fontWeight: 800,
+    cursor: enabled ? 'pointer' : 'not-allowed',
+    fontFamily: 'inherit',
+  };
 }
 
 function useCountdown() {
@@ -561,87 +607,196 @@ export default function CustomerLoginPage() {
 
   return (
     <PublicPageShell>
-      <style>{AUTH_FOCUS_CSS}</style>
-      <div
-        style={{
-          color: '#16202e',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '32px 26px 48px',
-        }}
-      >
-        <div
-          style={{
-            width: 980,
-            maxWidth: '100%',
-            background: '#fff',
-            borderRadius: 26,
-            overflow: 'hidden',
-            boxShadow: '0 50px 110px -38px rgba(13,38,102,.4)',
-            border: '1px solid #e4edf8',
-            display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : '1fr 400px',
-          }}
-        >
-          <div
-            style={{
-              padding: isMobile ? '26px 22px 22px' : '34px 40px 28px',
-              display: 'flex',
-              flexDirection: 'column',
-            }}
-          >
-            {isLogin && !isAgency && (
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 18 }}>
-                <Link
-                  to="/forgot-password"
-                  data-testid="signin-forgot-link"
-                  style={{
-                    textDecoration: 'none',
-                    fontSize: 11.5,
-                    color: '#8a96a6',
-                    fontWeight: 700,
-                    border: '1.5px solid #e6ebf2',
-                    borderRadius: 100,
-                    padding: '8px 15px',
-                  }}
-                >
+      <div style={{ maxWidth: 460, margin: '0 auto', padding: '44px 22px 72px' }}>
+        <div style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 20, boxShadow: '0 24px 54px -28px rgba(13,38,102,.35)', padding: '24px 26px' }}>
+          {/* mode tabs */}
+          <div style={{ display: 'flex', borderBottom: '1.5px solid #eef1f5', marginBottom: 16 }}>
+            {(
+              [
+                ['login', t.tabLogin],
+                ['signup', t.tabSignup],
+              ] as const
+            ).map(([m, lbl]) => (
+              <span
+                key={m}
+                data-testid={`signin-tab-${m}`}
+                onClick={() => {
+                  setMode(m);
+                  resetFlow();
+                  setAgencySubmitted(false);
+                }}
+                style={{
+                  flex: 1,
+                  textAlign: 'center',
+                  padding: '10px 0',
+                  fontSize: 14,
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  color: mode === m ? '#1668c4' : '#6b7787',
+                  borderBottom: mode === m ? '2.5px solid #1668c4' : '2.5px solid transparent',
+                  marginBottom: -1.5,
+                }}
+              >
+                {lbl}
+              </span>
+            ))}
+          </div>
+
+          {/* account segment */}
+          <div style={{ display: 'flex', background: '#eef1f5', borderRadius: 11, padding: 3, marginBottom: 14 }}>
+            <span data-testid="signin-acct-user" onClick={() => { setAcct('user'); resetFlow(); }} style={seg(!isAgency)}>
+              {t.acctUser}
+            </span>
+            <span data-testid="signin-acct-agency" onClick={() => { setAcct('agency'); resetFlow(); }} style={seg(isAgency)}>
+              {t.acctAgency}
+            </span>
+          </div>
+
+          <p style={{ fontSize: 12, color: '#6b7585', margin: '0 0 16px', lineHeight: 1.9 }}>{subtitle}</p>
+          {error && <p style={{ marginBottom: 14, borderRadius: 10, background: '#fef2f2', padding: 10, fontSize: 12, color: '#e5484d' }}>{error}</p>}
+
+          {/* ---- USER LOGIN with password (alternative to OTP) ---- */}
+          {!isAgency && isLogin && !useOtp && (
+            <form onSubmit={(e) => void onPasswordLogin(e)} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={labelStyle}>{t.mobileLabel}</label>
+                <input
+                  data-testid="signin-pw-phone"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  dir="ltr"
+                  value={phone}
+                  onChange={(e) => setPhone(sanitizeMobileInput(e.target.value))}
+                  placeholder="09xxxxxxxxx"
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>{t.passwordLabel}</label>
+                <input type="password" data-testid="signin-pw-password" dir="ltr" value={userPassword} onChange={(e) => setUserPassword(e.target.value)} style={inputStyle} />
+              </div>
+              <button
+                type="submit"
+                data-testid="signin-pw-submit"
+                disabled={busy || !phone.trim() || !userPassword}
+                style={primaryBtn(!busy && !!phone.trim() && !!userPassword)}
+              >
+                {t.loginSubmit}
+              </button>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5 }}>
+                <span data-testid="signin-use-otp" onClick={() => setUseOtp(true)} style={{ color: '#1668c4', fontWeight: 700, cursor: 'pointer' }}>
+                  {t.useOtpLink}
+                </span>
+                <Link to="/forgot-password" style={{ color: '#1668c4', fontWeight: 700, textDecoration: 'none' }}>
                   {t.forgotPassword}
                 </Link>
               </div>
             )}
 
-            <div style={{ display: 'flex', background: '#f1f5fa', borderRadius: 13, padding: 4, marginBottom: 22 }}>
-              <span data-testid="signin-acct-user" onClick={() => switchAcct('user')} style={segStyle(!isAgency)}>
-                {t.acctUser}
-              </span>
-              <span data-testid="signin-acct-agency" onClick={() => switchAcct('agency')} style={segStyle(isAgency)}>
-                {t.acctAgency}
-              </span>
-            </div>
+          {/* ---- USER LOGIN / SIGNUP (same OTP flow; signup adds profile fields) ---- */}
+          {!isAgency && (useOtp || !isLogin) && !challengeId && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void sendOtp();
+              }}
+              style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+            >
+              {!isLogin && (
+                <>
+                  <div>
+                    <label style={labelStyle}>{t.fullNameLabel}</label>
+                    <input data-testid="signup-name" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder={t.namePlaceholder} style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>{t.emailOptionalLabel}</label>
+                    <input data-testid="signup-email" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@email.com" style={inputStyle} />
+                  </div>
+                </>
+              )}
+              <div>
+                <label style={labelStyle}>{t.mobileLabel}</label>
+                <input
+                  data-testid="signin-phone"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  dir="ltr"
+                  value={phone}
+                  onChange={(e) => setPhone(sanitizeMobileInput(e.target.value))}
+                  placeholder="09xxxxxxxxx"
+                  style={inputStyle}
+                />
+              </div>
+              {!isLogin && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5, color: '#5a6678', cursor: 'pointer' }}>
+                  <input type="checkbox" data-testid="signup-terms" checked={terms} onChange={(e) => setTerms(e.target.checked)} />
+                  <span>{t.termsCheckbox}</span>
+                </label>
+              )}
+              <button
+                type="submit"
+                data-testid="signin-request"
+                disabled={busy || !phone.trim() || (!isLogin && (!fullName.trim() || !terms))}
+                style={primaryBtn(!busy && !!phone.trim() && (isLogin || (!!fullName.trim() && terms)))}
+              >
+                {t.getCode}
+              </button>
+              {isLogin && (
+                <>
+                  <p style={{ fontSize: 11, color: '#8a96a6', margin: 0, lineHeight: 1.8, textAlign: 'center' }}>
+                    {t.loginConsentNote}
+                  </p>
+                  <span
+                    data-testid="signin-use-password"
+                    onClick={() => setUseOtp(false)}
+                    style={{ fontSize: 11.5, color: '#1668c4', fontWeight: 700, cursor: 'pointer', textAlign: 'center' }}
+                  >
+                    {t.usePasswordLink}
+                  </span>
+                </>
+              )}
+            </form>
+          )}
 
-            <div style={{ display: 'flex', gap: 21, borderBottom: '1.5px solid #eef1f5', marginBottom: 24 }}>
-              {(
-                [
-                  ['login', t.tabLogin],
-                  ['signup', t.tabSignup],
-                ] as const
-              ).map(([m, lbl]) => (
-                <span
-                  key={m}
-                  data-testid={`signin-tab-${m}`}
-                  onClick={() => switchMode(m)}
-                  style={{
-                    paddingBottom: 11,
-                    fontSize: 14.5,
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    color: mode === m ? '#1668c4' : '#9aa4b2',
-                    borderBottom: mode === m ? '3px solid #1668c4' : '3px solid transparent',
-                    marginBottom: -1.5,
-                  }}
-                >
-                  {lbl}
+          {!isAgency && challengeId && (
+            <form onSubmit={onVerify} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={labelStyle}>{t.otpLabel}</label>
+                <input
+                  data-testid="signin-code"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  dir="ltr"
+                  value={code}
+                  onChange={(e) => setCode(sanitizeOtpInput(e.target.value))}
+                  placeholder="- - - - - -"
+                  maxLength={6}
+                  style={{ ...inputStyle, fontSize: 15, letterSpacing: 4, textAlign: 'center' }}
+                />
+              </div>
+              {import.meta.env.DEV && (
+                <p data-testid="signin-dev-otp-hint" style={{ margin: 0, fontSize: 11, color: '#6b7585', textAlign: 'center' }}>
+                  {locale === 'en' ? 'Dev OTP code: 123456' : 'کد توسعه (OTP): ۱۲۳۴۵۶'}
+                </p>
+              )}
+              <button type="submit" data-testid="signin-verify" disabled={busy || !code.trim()} style={primaryBtn(!busy && !!code.trim())}>
+                {isLogin ? t.confirmLogin : t.confirmSignup}
+              </button>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                {timer.left > 0 ? (
+                  <span data-testid="signin-resend-timer" style={{ fontSize: 11.5, color: '#6b7787' }}>
+                    {t.resendIn} ({fmtTimer(timer.left, locale)})
+                  </span>
+                ) : (
+                  <span data-testid="signin-resend" onClick={() => void sendOtp()} style={{ fontSize: 11.5, color: '#1668c4', fontWeight: 700, cursor: 'pointer' }}>
+                    {t.resend}
+                  </span>
+                )}
+                <span onClick={resetFlow} style={{ fontSize: 11.5, color: '#1668c4', fontWeight: 700, cursor: 'pointer' }}>
+                  {t.editNumber}
                 </span>
               ))}
             </div>

@@ -1,19 +1,26 @@
 import type { INestApplication } from '@nestjs/common';
 import type { App } from 'supertest/types';
 import request from 'supertest';
-import { TypeORMClient } from '../generated/typeorm/client';
-import { TypeORMPg } from '@typeorm/adapter-pg';
+import { DataSource, In } from 'typeorm';
+import { AircraftSeatMap } from '../src/database/entities/aircraft-seat-map.entity';
+import { Booking } from '../src/database/entities/booking.entity';
+import { ClubPointsEntry } from '../src/database/entities/club-points-entry.entity';
+import { Flight } from '../src/database/entities/flight.entity';
+import { FlightInstance } from '../src/database/entities/flight-instance.entity';
+import { LedgerEntry } from '../src/database/entities/ledger-entry.entity';
+import { Passenger } from '../src/database/entities/passenger.entity';
+import { PaymentReconciliation } from '../src/database/entities/payment-reconciliation.entity';
+import { Route } from '../src/database/entities/route.entity';
+import { WalletEntry } from '../src/database/entities/wallet-entry.entity';
+import { FlightInstanceStatus } from '../src/database/enums';
 import { createTestApp } from './helpers/app.helper';
 import { loginAs, loginAsCustomer, stepUpFor } from './helpers/login.helper';
-
-const typeorm = new TypeORMClient({
-  adapter: new TypeORMPg({ connectionString: process.env.DATABASE_URL }),
-});
 
 /** Phase 13 — reservation engine completion Part A: sale window, real
  * inventory pools (agency/charter/public), and aircraft-type change. */
 describe('Phase 13 — reservation engine completion', () => {
   let app: INestApplication<App>;
+  let dataSource: DataSource;
   const AIRCRAFT_SMALL = 'P13-SmallJet'; // 4 economy seats, no business
   const AIRCRAFT_LARGE = 'P13-LargeJet'; // 8 economy seats, no business
   let routeId: string;
@@ -25,89 +32,120 @@ describe('Phase 13 — reservation engine completion', () => {
   let customerToken: string;
   let staffToken: string;
 
+  async function upsertSeatMap(
+    aircraftType: string,
+    fields: Partial<AircraftSeatMap>,
+  ) {
+    const repo = dataSource.getRepository(AircraftSeatMap);
+    const existing = await repo.findOneBy({ aircraftType });
+    if (!existing) {
+      await repo.save(
+        repo.create({ aircraftType, ...fields, updatedAt: new Date() }),
+      );
+    }
+  }
+
   beforeAll(async () => {
     app = await createTestApp();
+    dataSource = app.get(DataSource);
     customerToken = (await loginAsCustomer(app, '09901119901')).accessToken!;
-    staffToken = (await loginAs(app, 'senior.rahimi')).accessToken!;
+    staffToken = (await loginAs(app, 'senior')).accessToken!;
 
-    await typeorm.aircraftSeatMap.upsert({
-      where: { aircraftType: AIRCRAFT_SMALL },
-      update: {},
-      create: {
-        aircraftType: AIRCRAFT_SMALL,
-        businessRowStart: 1,
-        businessRowEnd: 0,
-        businessColsLeft: [],
-        businessColsRight: [],
-        economyRowStart: 1,
-        economyRowEnd: 2,
-        economyColsLeft: ['A'],
-        economyColsRight: ['C'],
-      },
+    await upsertSeatMap(AIRCRAFT_SMALL, {
+      businessRowStart: 1,
+      businessRowEnd: 0,
+      businessColsLeft: [],
+      businessColsRight: [],
+      economyRowStart: 1,
+      economyRowEnd: 2,
+      economyColsLeft: ['A'],
+      economyColsRight: ['C'],
     });
-    await typeorm.aircraftSeatMap.upsert({
-      where: { aircraftType: AIRCRAFT_LARGE },
-      update: {},
-      create: {
-        aircraftType: AIRCRAFT_LARGE,
-        businessRowStart: 1,
-        businessRowEnd: 0,
-        businessColsLeft: [],
-        businessColsRight: [],
-        economyRowStart: 1,
-        economyRowEnd: 4,
-        economyColsLeft: ['A'],
-        economyColsRight: ['C'],
-      },
+    await upsertSeatMap(AIRCRAFT_LARGE, {
+      businessRowStart: 1,
+      businessRowEnd: 0,
+      businessColsLeft: [],
+      businessColsRight: [],
+      economyRowStart: 1,
+      economyRowEnd: 4,
+      economyColsLeft: ['A'],
+      economyColsRight: ['C'],
     });
 
-    const route = await typeorm.route.upsert({
-      where: { originCode_destCode: { originCode: 'THR', destCode: 'ASR' } },
-      update: {},
-      create: { originCode: 'THR', destCode: 'ASR', durationMin: 70 },
+    const routeRepo = dataSource.getRepository(Route);
+    let route = await routeRepo.findOneBy({
+      originCode: 'THR',
+      destCode: 'ASR',
     });
+    if (!route) {
+      route = await routeRepo.save(
+        routeRepo.create({
+          originCode: 'THR',
+          destCode: 'ASR',
+          durationMin: 70,
+        }),
+      );
+    }
     routeId = route.id;
 
-    const flight = await typeorm.flight.upsert({
-      where: { flightNo: 'P13-1' },
-      update: {},
-      create: { flightNo: 'P13-1', routeId, aircraftType: AIRCRAFT_SMALL },
-    });
+    const flightRepo = dataSource.getRepository(Flight);
+    let flight = await flightRepo.findOneBy({ flightNo: 'P13-1' });
+    if (!flight) {
+      flight = await flightRepo.save(
+        flightRepo.create({
+          flightNo: 'P13-1',
+          routeId,
+          aircraftType: AIRCRAFT_SMALL,
+        }),
+      );
+    }
     flightId = flight.id;
   });
 
   afterAll(async () => {
-    const instances = await typeorm.flightInstance.findMany({
-      where: { flightId },
-    });
+    const instances = await dataSource
+      .getRepository(FlightInstance)
+      .createQueryBuilder('fi')
+      .where('fi.flightId = :flightId', { flightId })
+      .getMany();
     const iids = instances.map((i) => i.id);
-    const bookings = await typeorm.booking.findMany({
-      where: { flightInstanceId: { in: iids } },
-    });
+    const bookings =
+      iids.length > 0
+        ? await dataSource
+            .getRepository(Booking)
+            .findBy({ flightInstanceId: In(iids) })
+        : [];
     const bids = bookings.map((b) => b.id);
     // Paying a booking creates LedgerEntry/ClubPointsEntry/WalletEntry rows
     // — must be cleaned up too, or their revenue lingers in reporting's
     // aggregates (which sum LedgerEntry directly) even after the Booking
     // row itself is gone.
-    await typeorm.paymentReconciliation.deleteMany({
-      where: { bookingId: { in: bids } },
-    });
-    await typeorm.ledgerEntry.deleteMany({ where: { bookingId: { in: bids } } });
-    await typeorm.clubPointsEntry.deleteMany({
-      where: { bookingId: { in: bids } },
-    });
-    await typeorm.walletEntry.deleteMany({ where: { bookingId: { in: bids } } });
-    await typeorm.passenger.deleteMany({ where: { bookingId: { in: bids } } });
-    await typeorm.booking.deleteMany({ where: { id: { in: bids } } });
-    await typeorm.flightInstance.deleteMany({ where: { id: { in: iids } } });
-    await typeorm.flight.deleteMany({ where: { id: flightId } });
-    await typeorm.route.deleteMany({ where: { id: routeId } });
-    await typeorm.aircraftSeatMap.deleteMany({
-      where: { aircraftType: { in: [AIRCRAFT_SMALL, AIRCRAFT_LARGE] } },
-    });
+    if (bids.length > 0) {
+      await dataSource
+        .getRepository(PaymentReconciliation)
+        .delete({ bookingId: In(bids) });
+      await dataSource
+        .getRepository(LedgerEntry)
+        .delete({ bookingId: In(bids) });
+      await dataSource
+        .getRepository(ClubPointsEntry)
+        .delete({ bookingId: In(bids) });
+      await dataSource
+        .getRepository(WalletEntry)
+        .delete({ bookingId: In(bids) });
+      await dataSource.getRepository(Passenger).delete({ bookingId: In(bids) });
+      await dataSource.getRepository(Booking).delete({ id: In(bids) });
+    }
+    if (iids.length > 0) {
+      await dataSource.getRepository(FlightInstance).delete({ id: In(iids) });
+    }
+    await dataSource.getRepository(Flight).delete({ id: flightId });
+    await dataSource.getRepository(Route).delete({ id: routeId });
+    await dataSource
+      .getRepository(AircraftSeatMap)
+      .delete({ aircraftType: In([AIRCRAFT_SMALL, AIRCRAFT_LARGE]) });
 
     await app.close();
-    await typeorm.$disconnect();
   });
 
   function freshInstance(overrides: {
@@ -121,8 +159,9 @@ describe('Phase 13 — reservation engine completion', () => {
     const departureAt = new Date(
       Date.now() + (overrides.daysAhead ?? 60) * 24 * 60 * 60 * 1000,
     );
-    return typeorm.flightInstance.create({
-      data: {
+    const flightInstanceRepo = dataSource.getRepository(FlightInstance);
+    return flightInstanceRepo.save(
+      flightInstanceRepo.create({
         flightId,
         departureAt,
         arrivalAt: new Date(departureAt.getTime() + 70 * 60 * 1000),
@@ -131,9 +170,9 @@ describe('Phase 13 — reservation engine completion', () => {
         agencySeatsAllocated: overrides.agencySeatsAllocated ?? 0,
         saleStartsAt: overrides.saleStartsAt ?? null,
         saleEndsAt: overrides.saleEndsAt ?? null,
-        status: 'SCHEDULED',
-      },
-    });
+        status: FlightInstanceStatus.SCHEDULED,
+      }),
+    );
   }
 
   it('excludes an instance whose sale window has ended from search, and rejects booking it', async () => {
@@ -236,7 +275,7 @@ describe('Phase 13 — reservation engine completion', () => {
     const stepUp1 = await stepUpFor(
       app,
       staffToken,
-      'senior.rahimi',
+      'senior',
       'PRICE_CAPACITY_CHANGE',
     );
     const okChange = await request(app.getHttpServer())
@@ -272,25 +311,20 @@ describe('Phase 13 — reservation engine completion', () => {
       .send({})
       .expect(201);
 
-    await typeorm.aircraftSeatMap.upsert({
-      where: { aircraftType: 'P13-EmptyJet' },
-      update: {},
-      create: {
-        aircraftType: 'P13-EmptyJet',
-        businessRowStart: 1,
-        businessRowEnd: 0,
-        businessColsLeft: [],
-        businessColsRight: [],
-        economyRowStart: 1,
-        economyRowEnd: 0,
-        economyColsLeft: [],
-        economyColsRight: [],
-      },
+    await upsertSeatMap('P13-EmptyJet', {
+      businessRowStart: 1,
+      businessRowEnd: 0,
+      businessColsLeft: [],
+      businessColsRight: [],
+      economyRowStart: 1,
+      economyRowEnd: 0,
+      economyColsLeft: [],
+      economyColsRight: [],
     });
     const stepUp2 = await stepUpFor(
       app,
       staffToken,
-      'senior.rahimi',
+      'senior',
       'PRICE_CAPACITY_CHANGE',
     );
     const rejectedChange = await request(app.getHttpServer())
@@ -300,9 +334,9 @@ describe('Phase 13 — reservation engine completion', () => {
     expect(rejectedChange.status).toBe(409);
     expect(rejectedChange.body.error.code).toBe('CAPACITY_BELOW_CONFIRMED');
 
-    await typeorm.aircraftSeatMap.delete({
-      where: { aircraftType: 'P13-EmptyJet' },
-    });
+    await dataSource
+      .getRepository(AircraftSeatMap)
+      .delete({ aircraftType: 'P13-EmptyJet' });
   }, 15000);
 
   it('GET /flights/aircraft-types lists every seat-map type with its real computed capacity', async () => {

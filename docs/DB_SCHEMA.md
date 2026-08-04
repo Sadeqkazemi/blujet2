@@ -325,12 +325,14 @@ hardcodes `resRole:"super"` for the IT panel's mount, and CEO/Chair's own
 access to the same seat map, matching the design's confirmed behavior.
 Reachable nav entries (per `panel-nav.config.ts`, already confirmed in
 Phase 1's extraction): only `BOARD_CHAIR`, `SENIOR_MANAGER`, `IT_MANAGER`
-get a سامانه رزرواسیون/هواپیما sidebar tab — CEO's mount point is coded but
-unreachable from its sidebar, so CEO's `canLock` grant is API-level only
+get a سامانه رزرواسیون/هواپیما sidebar tab — CEO also has `reservation`
+(label **هواپیما**) in `PANEL_NAV`, matching `roleDefs.ceo.access` and the
+approved CEO design screenshots; CEO's `canLock` grant is therefore
+reachable from the sidebar (same as BOARD_CHAIR), not API-level only
 (consistent with the design's own copy naming CEO as an authorized locker)
 and has no UI entry point yet.
 
-- `AircraftSeatMap { id, aircraftType (unique) →Flight.aircraftType, businessRowStart/End, businessColsLeft/Right, economyRowStart/End, economyColsLeft/Right }` — CLAUDE.md: "seat map config lives per aircraft type in the DB, not hardcoded." Seeded once for `"Airbus A320"` (the existing seed flight's type) matching the design's MD-88 mock numbers verbatim: rows 3–6 business 2-2 (16 seats), rows 7–32 economy 2-3 (130 seats) = 146 total.
+- `AircraftSeatMap { id, aircraftType (unique) →Flight.aircraftType, businessRowStart/End, businessColsLeft/Right, economyRowStart/End, economyColsLeft/Right, excludedSeatCodes String[] }` — CLAUDE.md: "seat map config lives per aircraft type in the DB, not hardcoded." Seeded for `"Airbus A320"` (legacy 2-2/2-3 → 146 seats) and `"MD-80"` from the approved cabin chart (`design-reference-v2/MD-80-seatmap.pdf`): First Class rows 3–6 as `A,B|E,F` (16), Economy rows 7–32 as `A,B|D,E,F` minus rear exit/galley seats `28A/B,29A/B,30A/B` (124) = **140** total.
 - `SeatLock { id, flightInstanceId→FlightInstance, seatCode, lockedById→User, passengerName?, passengerNationalIdEnc?, passengerNationalIdHash?, passengerMobileEnc?, releasedById?→User, releasedAt? }` — PII fields follow the same encrypt+hash pattern as `ClubMember`. A partial unique index (`WHERE releasedAt IS NULL`) enforces exactly one active lock per seat at the DB level, not just an app-side check — CLAUDE.md's seat-inventory concurrency rule.
 - `Passenger` gained `nationalIdHash` (same encrypt+hash pattern, needed for the design's «جستجوی مسافر» exact-match search) and `seatCode` (nullable — Phase 1–6 seed passengers predate seat selection).
 - PNR issuance/change/cancel reuses `Booking`/`Passenger` from Phase 2. "New booking" (منوی جستجوی پرواز + صدور PNR) in this component is a **staff-side manual/offline issuance path** (phone/counter bookings), not the public paid-checkout flow — it creates a `TICKETED` booking directly (no `HELD`/`PAID` steps, no payment gateway), clearly distinct from and not a substitute for the public-site booking-and-payment track. Price comes from `FarePricingProposal.registeredPriceIrr` when one exists for that `FlightInstance` (Phase 6), else a documented flat fallback — no ad-hoc dynamic pricing invented here.

@@ -3,7 +3,17 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import * as crypto from 'node:crypto';
 import * as argon2 from 'argon2';
-import { TypeORMService } from '../src/typeorm/typeorm.service';
+import { DataSource } from 'typeorm';
+import { AgencyApiKey } from '../src/database/entities/agency-api-key.entity';
+import { AgencyCreditLine } from '../src/database/entities/agency-credit-line.entity';
+import { AgencyDocument } from '../src/database/entities/agency-document.entity';
+import { AgencyMembershipRequest } from '../src/database/entities/agency-membership-request.entity';
+import { AgencyProfile } from '../src/database/entities/agency-profile.entity';
+import { Booking } from '../src/database/entities/booking.entity';
+import { FlightInstance } from '../src/database/entities/flight-instance.entity';
+import { LedgerEntry } from '../src/database/entities/ledger-entry.entity';
+import { StoredFile } from '../src/database/entities/stored-file.entity';
+import { User } from '../src/database/entities/user.entity';
 import { loginAs, stepUpFor } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
@@ -11,11 +21,11 @@ const AGENCY_PASSWORD = 'AgencyTest@123';
 
 describe('Agency Portal (e2e)', () => {
   let app: INestApplication<App>;
-  let typeorm: TypeORMService;
+  let dataSource: DataSource;
 
   beforeEach(async () => {
     app = await createTestApp();
-    typeorm = app.get(TypeORMService);
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
@@ -33,17 +43,20 @@ describe('Agency Portal (e2e)', () => {
     // Real random digits — the hex→'0' mapping collided on the unique phone column.
     const phone = `+9891${crypto.randomInt(10_000_000, 100_000_000)}`;
     const passwordHash = await argon2.hash(AGENCY_PASSWORD);
-    const user = await typeorm.user.create({
-      data: {
+    const userRepo = dataSource.getRepository(User);
+    const user = await userRepo.save(
+      userRepo.create({
         role: 'AGENCY',
         phone,
         fullName: `آژانس تست ${suffix}`,
         passwordHash,
         isActive: true,
-      },
-    });
-    await typeorm.agencyProfile.create({
-      data: {
+        updatedAt: new Date(),
+      }),
+    );
+    const agencyProfileRepo = dataSource.getRepository(AgencyProfile);
+    await agencyProfileRepo.save(
+      agencyProfileRepo.create({
         userId: user.id,
         licenseNo: `AG-TEST-${suffix}`,
         managerName: 'مدیر تست',
@@ -52,14 +65,16 @@ describe('Agency Portal (e2e)', () => {
         city: 'تهران',
         address: 'آدرس تست',
         tier: 'NORMAL',
-      },
-    });
-    await typeorm.agencyCreditLine.create({
-      data: {
+      }),
+    );
+    const creditLineRepo = dataSource.getRepository(AgencyCreditLine);
+    await creditLineRepo.save(
+      creditLineRepo.create({
         agencyId: user.id,
-        limitIrr: overrides?.limitIrr ?? 1_000_000_000,
-      },
-    });
+        limitIrr: BigInt(overrides?.limitIrr ?? 1_000_000_000),
+        updatedAt: new Date(),
+      }),
+    );
     return { id: user.id, phone };
   }
 
@@ -74,26 +89,31 @@ describe('Agency Portal (e2e)', () => {
   }
 
   async function addAgencySale(agencyId: string, amountIrr: number) {
-    const instance = await typeorm.flightInstance.findFirst();
+    const instance = await dataSource
+      .getRepository(FlightInstance)
+      .createQueryBuilder('fi')
+      .getOne();
     if (!instance) throw new Error('seed flightInstance missing');
-    const booking = await typeorm.booking.create({
-      data: {
+    const bookingRepo = dataSource.getRepository(Booking);
+    const booking = await bookingRepo.save(
+      bookingRepo.create({
         pnr: `TST${crypto.randomUUID().slice(0, 6).toUpperCase()}`,
         flightInstanceId: instance.id,
         channel: 'AGENCY',
         agencyId,
         status: 'TICKETED',
-        priceIrr: amountIrr,
-      },
-    });
-    await typeorm.ledgerEntry.create({
-      data: {
+        priceIrr: BigInt(amountIrr),
+      }),
+    );
+    const ledgerRepo = dataSource.getRepository(LedgerEntry);
+    await ledgerRepo.save(
+      ledgerRepo.create({
         bookingId: booking.id,
         agencyId,
         type: 'SALE',
-        signedAmountIrr: amountIrr,
-      },
-    });
+        signedAmountIrr: BigInt(amountIrr),
+      }),
+    );
     return booking;
   }
 
@@ -120,19 +140,48 @@ describe('Agency Portal (e2e)', () => {
 
   it('POST /auth/agency/login: 403 when the agency is suspended', async () => {
     const agency = await createFreshAgency();
-    await typeorm.agencyProfile.update({
-      where: { userId: agency.id },
-      data: { suspendedAt: new Date(), suspendReason: 'test' },
-    });
+    await dataSource
+      .getRepository(AgencyProfile)
+      .update(
+        { userId: agency.id },
+        { suspendedAt: new Date(), suspendReason: 'test' },
+      );
     const { res } = await loginAsAgency(agency.phone);
     expect(res.status).toBe(403);
   });
 
+  it('suspending an agency revokes its live session — a pre-existing refresh cookie stops working immediately', async () => {
+    const agency = await createFreshAgency();
+    const agent = request.agent(app.getHttpServer());
+    const loginRes = await agent
+      .post('/auth/agency/login')
+      .send({ phone: agency.phone, password: AGENCY_PASSWORD });
+    expect(loginRes.status).toBe(200);
+
+    // The refresh token issued above is still valid at this point.
+    const refreshBeforeSuspend = await agent.post('/auth/refresh');
+    expect(refreshBeforeSuspend.status).toBe(200);
+
+    const senior = await loginAs(app, 'senior');
+    const suspendRes = await request(app.getHttpServer())
+      .patch(`/agencies/${agency.id}/suspend`)
+      .set('Authorization', auth(senior.accessToken))
+      .send({ reason: 'تست امنیتی' });
+    expect(suspendRes.status).toBe(200);
+
+    // The already-issued (and just-rotated) refresh cookie must now fail —
+    // suspension must not require a global logout-all to take effect.
+    const refreshAfterSuspend = await agent.post('/auth/refresh');
+    expect(refreshAfterSuspend.status).toBe(401);
+    expect(refreshAfterSuspend.body.success).toBe(false);
+  });
+
   it('approving a membership request issues a one-time temp password that logs in', async () => {
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
     const suffix = crypto.randomUUID().slice(0, 6);
-    const reqRow = await typeorm.agencyMembershipRequest.create({
-      data: {
+    const membershipRepo = dataSource.getRepository(AgencyMembershipRequest);
+    const reqRow = await membershipRepo.save(
+      membershipRepo.create({
         applicantName: `آژانس جدید ${suffix}`,
         managerName: 'مدیر جدید',
         licenseNo: `AG-NEW-${suffix}`,
@@ -140,8 +189,8 @@ describe('Agency Portal (e2e)', () => {
         phone: `+9892${crypto.randomInt(10_000_000, 100_000_000)}`,
         email: `${suffix}@new.example`,
         status: 'PENDING',
-      },
-    });
+      }),
+    );
     const approveRes = await request(app.getHttpServer())
       .patch(`/agencies/requests/${reqRow.id}/approve`)
       .set('Authorization', auth(commercial.accessToken));
@@ -160,7 +209,7 @@ describe('Agency Portal (e2e)', () => {
   // ── Ownership isolation ──────────────────────────────────────────────
 
   it('a staff JWT gets 403 on /agency-portal/* (AGENCY-only)', async () => {
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const res = await request(app.getHttpServer())
       .get('/agency-portal/dashboard')
       .set('Authorization', auth(senior.accessToken));
@@ -170,7 +219,7 @@ describe('Agency Portal (e2e)', () => {
   it('agency A cannot pay agency B invoice (404, ownership implicit via JWT)', async () => {
     const a = await createFreshAgency();
     const b = await createFreshAgency();
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
     const issueRes = await request(app.getHttpServer())
       .post(`/agencies/${b.id}/invoices`)
       .set('Authorization', auth(commercial.accessToken))
@@ -220,7 +269,7 @@ describe('Agency Portal (e2e)', () => {
 
   it('POST /agency-portal/invoices/:id/pay: settles via the same transactional logic, 409 on double-pay', async () => {
     const agency = await createFreshAgency();
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
     const issueRes = await request(app.getHttpServer())
       .post(`/agencies/${agency.id}/invoices`)
       .set('Authorization', auth(commercial.accessToken))
@@ -262,7 +311,7 @@ describe('Agency Portal (e2e)', () => {
     expect(createRes.status).toBe(201);
     const requestId = createRes.body.data.id;
 
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const approveRes = await request(app.getHttpServer())
       .patch(`/agencies/${agency.id}/credit-requests/${requestId}/decide`)
       .set('Authorization', auth(finance.accessToken))
@@ -290,7 +339,7 @@ describe('Agency Portal (e2e)', () => {
       .set('Authorization', auth(accessToken))
       .send({ requestedLimitIrr: 900_000_000 });
 
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const rejectRes = await request(app.getHttpServer())
       .patch(
         `/agencies/${agency.id}/credit-requests/${createRes.body.data.id}/decide`,
@@ -333,7 +382,7 @@ describe('Agency Portal (e2e)', () => {
     expect(postRes.status).toBe(201);
     expect(postRes.body.data.senderIsAgency).toBe(true);
 
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
     const staffRes = await request(app.getHttpServer())
       .get(`/agencies/${agency.id}/messages`)
       .set('Authorization', auth(commercial.accessToken));
@@ -392,7 +441,7 @@ describe('Agency Portal (e2e)', () => {
     expect(mineRes.body.data).toHaveLength(1);
     expect(mineRes.body.data[0].id).toBe(createRes.body.data.id);
 
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const staffRes = await request(app.getHttpServer())
       .get(`/agencies/${agency.id}/webservice-requests`)
       .set('Authorization', auth(finance.accessToken));
@@ -427,11 +476,11 @@ describe('Agency Portal (e2e)', () => {
       .send({ scope: 'SEARCH_BOOK', months: 1 });
     const requestId = createRes.body.data.id;
 
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const stepUp = await stepUpFor(
       app,
       senior.accessToken!,
-      'senior.rahimi',
+      'senior',
       'API_KEY_ROTATE',
     );
     const approveRes = await request(app.getHttpServer())
@@ -441,9 +490,9 @@ describe('Agency Portal (e2e)', () => {
     expect(approveRes.status).toBe(200);
     expect(approveRes.body.data.status).toBe('APPROVED');
 
-    const keyRow = await typeorm.agencyApiKey.findFirst({
+    const keyRow = await dataSource.getRepository(AgencyApiKey).findOne({
       where: { agencyId: agency.id },
-      orderBy: { activatedAt: 'desc' },
+      order: { activatedAt: 'DESC' },
     });
     expect(keyRow?.scope).toBe('SEARCH_BOOK');
 
@@ -479,7 +528,7 @@ describe('Agency Portal (e2e)', () => {
       .set('Authorization', auth(accessToken))
       .send({ scope: 'FULL', months: 1 });
 
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
     const rejectRes = await request(app.getHttpServer())
       .patch(
         `/agencies/${agency.id}/webservice-requests/${createRes.body.data.id}/decide`,
@@ -489,9 +538,9 @@ describe('Agency Portal (e2e)', () => {
     expect(rejectRes.status).toBe(200);
     expect(rejectRes.body.data.status).toBe('REJECTED');
 
-    const keyRow = await typeorm.agencyApiKey.findFirst({
-      where: { agencyId: agency.id },
-    });
+    const keyRow = await dataSource
+      .getRepository(AgencyApiKey)
+      .findOneBy({ agencyId: agency.id });
     expect(keyRow).toBeNull();
   });
 
@@ -504,11 +553,11 @@ describe('Agency Portal (e2e)', () => {
       .send({ scope: 'SEARCH_BOOK', months: 1 });
     const requestId = createRes.body.data.id;
 
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const stepUp = await stepUpFor(
       app,
       senior.accessToken!,
-      'senior.rahimi',
+      'senior',
       'API_KEY_ROTATE',
     );
     const badRes = await request(app.getHttpServer())
@@ -539,24 +588,30 @@ describe('Agency Portal (e2e)', () => {
   // ── Document review (staff-side) ────────────────────────────────────────
 
   async function seedDocument(agencyId: string) {
-    const stored = await typeorm.storedFile.create({
-      data: {
+    const storedFileRepo = dataSource.getRepository(StoredFile);
+    const stored = await storedFileRepo.save(
+      storedFileRepo.create({
         ownerId: agencyId,
         fileName: 'مجوز-فعالیت.pdf',
         mimeType: 'application/pdf',
         sizeBytes: 12_345,
         path: `/tmp/test-${crypto.randomUUID()}.pdf`,
-      },
-    });
-    return typeorm.agencyDocument.create({
-      data: { agencyId, fileId: stored.id, docType: 'LICENSE' },
-    });
+      }),
+    );
+    const agencyDocumentRepo = dataSource.getRepository(AgencyDocument);
+    return agencyDocumentRepo.save(
+      agencyDocumentRepo.create({
+        agencyId,
+        fileId: stored.id,
+        docType: 'LICENSE',
+      }),
+    );
   }
 
   it('GET /agencies/:id/documents lists uploaded documents PENDING by default', async () => {
     const agency = await createFreshAgency();
     const doc = await seedDocument(agency.id);
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const res = await request(app.getHttpServer())
       .get(`/agencies/${agency.id}/documents`)
       .set('Authorization', auth(senior.accessToken));
@@ -571,7 +626,7 @@ describe('Agency Portal (e2e)', () => {
     const agency = await createFreshAgency();
     const otherAgency = await createFreshAgency();
     const doc = await seedDocument(agency.id);
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
 
     const wrongAgencyRes = await request(app.getHttpServer())
       .patch(`/agencies/${otherAgency.id}/documents/${doc.id}/decide`)

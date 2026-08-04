@@ -7,7 +7,14 @@ import {
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
-import { TypeORMService } from '../../typeorm/typeorm.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { StoredFile } from '../../database/entities/stored-file.entity';
+import { ManagerReferral } from '../../database/entities/manager-referral.entity';
+import { ManagerReferralReport } from '../../database/entities/manager-referral-report.entity';
+import { ManagerMessage } from '../../database/entities/manager-message.entity';
+import { CartableTask } from '../../database/entities/cartable-task.entity';
+import { CartableSourceType } from '../../database/enums';
 import { ErrorCode } from '../../common/errors';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 
@@ -23,7 +30,18 @@ const UPLOAD_DIR =
 
 @Injectable()
 export class FilesService {
-  constructor(private readonly typeorm: TypeORMService) {}
+  constructor(
+    @InjectRepository(StoredFile)
+    private readonly storedFileRepo: Repository<StoredFile>,
+    @InjectRepository(ManagerReferral)
+    private readonly referralRepo: Repository<ManagerReferral>,
+    @InjectRepository(ManagerReferralReport)
+    private readonly reportRepo: Repository<ManagerReferralReport>,
+    @InjectRepository(ManagerMessage)
+    private readonly messageRepo: Repository<ManagerMessage>,
+    @InjectRepository(CartableTask)
+    private readonly cartableTaskRepo: Repository<CartableTask>,
+  ) {}
 
   async store(actor: AuthenticatedUser, file: Express.Multer.File) {
     if (!file) {
@@ -62,15 +80,15 @@ export class FilesService {
     // mojibake. A no-op for pure-ASCII names.
     const fileName = Buffer.from(file.originalname, 'latin1').toString('utf8');
 
-    const stored = await this.typeorm.storedFile.create({
-      data: {
+    const stored = await this.storedFileRepo.save(
+      this.storedFileRepo.create({
         ownerId: actor.id,
         fileName,
         mimeType: file.mimetype,
         sizeBytes: file.size,
         path: diskPath,
-      },
-    });
+      }),
+    );
     return {
       id: stored.id,
       fileName: stored.fileName,
@@ -88,10 +106,15 @@ export class FilesService {
   ): Promise<boolean> {
     if (ownerId === actor.id) return true;
 
-    const referrals = await this.typeorm.managerReferral.findMany({
-      where: { attachments: { array_contains: fileId } },
-      include: { recipients: true },
-    });
+    // Postgres jsonb "contains" (@>) — replaces TypeORM's array_contains
+    // filter, which has no direct TypeORM find-options equivalent.
+    const fileIdJson = JSON.stringify([fileId]);
+
+    const referrals = await this.referralRepo
+      .createQueryBuilder('referral')
+      .leftJoinAndSelect('referral.recipients', 'recipients')
+      .where('referral.attachments @> :fileIdJson::jsonb', { fileIdJson })
+      .getMany();
     for (const r of referrals) {
       if (
         r.fromId === actor.id ||
@@ -100,10 +123,12 @@ export class FilesService {
         return true;
     }
 
-    const reports = await this.typeorm.managerReferralReport.findMany({
-      where: { attachments: { array_contains: fileId } },
-      include: { referral: { include: { recipients: true } } },
-    });
+    const reports = await this.reportRepo
+      .createQueryBuilder('report')
+      .leftJoinAndSelect('report.referral', 'referral')
+      .leftJoinAndSelect('referral.recipients', 'recipients')
+      .where('report.attachments @> :fileIdJson::jsonb', { fileIdJson })
+      .getMany();
     for (const rep of reports) {
       if (
         rep.fromId === actor.id ||
@@ -113,15 +138,16 @@ export class FilesService {
         return true;
     }
 
-    const messages = await this.typeorm.managerMessage.findMany({
-      where: { attachments: { array_contains: fileId } },
-      select: { id: true, fromId: true },
-    });
+    const messages = await this.messageRepo
+      .createQueryBuilder('message')
+      .select(['message.id', 'message.fromId'])
+      .where('message.attachments @> :fileIdJson::jsonb', { fileIdJson })
+      .getMany();
     for (const m of messages) {
       if (m.fromId === actor.id) return true;
-      const delivered = await this.typeorm.cartableTask.count({
+      const delivered = await this.cartableTaskRepo.count({
         where: {
-          sourceType: 'MANAGER_MESSAGE',
+          sourceType: CartableSourceType.MANAGER_MESSAGE,
           sourceId: m.id,
           assigneeId: actor.id,
         },
@@ -133,7 +159,7 @@ export class FilesService {
   }
 
   async read(actor: AuthenticatedUser, id: string) {
-    const stored = await this.typeorm.storedFile.findUnique({ where: { id } });
+    const stored = await this.storedFileRepo.findOne({ where: { id } });
     if (!stored) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,

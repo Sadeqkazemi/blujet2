@@ -1,11 +1,16 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { fetchClubPoints } from '../../api/publicSite';
+import { fetchClubPoints, fetchMyProfile } from '../../api/publicSite';
 import { faDigits } from '../../lib/fa-format';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useT } from '../../lib/i18n';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import {
+  accountTabHref,
+  mobileAccountNavItems,
+  mobileAccountNavLabel,
+} from '../../features/public-site/account/account-nav-items';
 
 const TIER_KEY: Record<string, 'tierSilver' | 'tierGold' | 'tierPlatinum'> = {
   SILVER: 'tierSilver',
@@ -37,11 +42,6 @@ const LANG_OPTIONS: { value: StoredLocale; label: string }[] = [
   { value: 'ar', label: 'العربية' },
 ];
 
-function initials(fullName: string) {
-  const parts = fullName.trim().split(/\s+/);
-  return parts.slice(0, 2).map((p) => p[0] ?? '').join('') || 'کا';
-}
-
 function GlobeIcon({ size = 15 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -68,8 +68,33 @@ function UserFilledIcon({ size = 18 }: { size?: number }) {
   );
 }
 
+function ChevronIcon({ isRTL }: { isRTL: boolean }) {
+  return (
+    <svg
+      width={16}
+      height={16}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="#9aa4b2"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ flex: 'none', transform: isRTL ? 'scaleX(-1)' : undefined }}
+      aria-hidden
+    >
+      <path d="M9 18l6-6-6-6" />
+    </svg>
+  );
+}
+
 function isFlightsRoute(pathname: string) {
-  return pathname === '/' || pathname.startsWith('/results') || pathname.startsWith('/book');
+  return (
+    pathname === '/' ||
+    pathname.startsWith('/results') ||
+    pathname.startsWith('/book') ||
+    pathname.startsWith('/checkout') ||
+    pathname.startsWith('/payment')
+  );
 }
 
 /** Sticky public-site header — matches design-reference-v2 shared shell. */
@@ -84,7 +109,9 @@ export default function PublicHeader() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [loginDrawerOpen, setLoginDrawerOpen] = useState(false);
   const [club, setClub] = useState<{ isMember: boolean; level: string | null; balance: number } | null>(null);
+  const [profileIncomplete, setProfileIncomplete] = useState(false);
 
   const loggedIn = status === 'authenticated' && user?.role === 'USER';
   const notifications = NOTIFICATIONS[locale];
@@ -92,10 +119,17 @@ export default function PublicHeader() {
   const notifCountLabel = locale === 'fa' ? faDigits(notifCount) : String(notifCount);
 
   useEffect(() => {
-    if (!loggedIn) return;
+    if (!loggedIn) {
+      setClub(null);
+      setProfileIncomplete(false);
+      return;
+    }
     fetchClubPoints()
       .then(setClub)
       .catch(() => setClub(null));
+    fetchMyProfile()
+      .then((p) => setProfileIncomplete(p.completionPct < 100))
+      .catch(() => setProfileIncomplete(false));
   }, [loggedIn]);
 
   const navLinks = [
@@ -157,12 +191,81 @@ export default function PublicHeader() {
     </>
   );
 
+  const completeProfileBanner = profileIncomplete ? (
+    <Link
+      to="/account?tab=account-info"
+      data-testid="public-complete-profile"
+      onClick={() => {
+        setMenuOpen(false);
+        setMobileMenuOpen(false);
+      }}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        padding: '10px 12px',
+        background: '#fff7ed',
+        borderBottom: '1px solid #f6dcbb',
+        textDecoration: 'none',
+        color: '#9a5b16',
+        fontSize: '11.5px',
+        fontWeight: 700,
+      }}
+    >
+      <span
+        style={{
+          width: 16,
+          height: 16,
+          borderRadius: '50%',
+          background: '#e5484d',
+          color: '#fff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 10,
+          flex: 'none',
+        }}
+      >
+        !
+      </span>
+      {t('completeProfileLabel')}
+    </Link>
+  ) : null;
+
+  const profileWarnDot = (borderColor: string) =>
+    profileIncomplete ? (
+      <span
+        data-testid="public-profile-incomplete-dot"
+        style={{
+          position: 'absolute',
+          top: -2,
+          right: -2,
+          width: 11,
+          height: 11,
+          borderRadius: '50%',
+          background: '#e5484d',
+          border: `1.5px solid ${borderColor}`,
+        }}
+      />
+    ) : null;
+
   const userMenuItems = (mobileCompact: boolean) => (
     <>
+      {completeProfileBanner}
+      <Link
+        to="/account"
+        onClick={() => setMenuOpen(false)}
+        style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: '11.5px', color: '#16202e', textDecoration: 'none', fontWeight: 600 }}
+      >
+        <span style={{ color: '#1668c4' }}>
+          <UserFilledIcon size={14} />
+        </span>
+        {t('profileLabel')}
+      </Link>
       <Link
         to="/manage-booking"
         onClick={() => setMenuOpen(false)}
-        style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: mobileCompact ? '13.5px' : '13.5px', color: '#16202e', textDecoration: 'none', fontWeight: 600 }}
+        style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: '11.5px', color: '#16202e', textDecoration: 'none', fontWeight: 600 }}
       >
         <span style={{ color: '#1668c4' }}>🧳</span>
         {t('tripsLabel')}
@@ -171,19 +274,27 @@ export default function PublicHeader() {
         <Link
           to="/manage-booking"
           onClick={() => setMenuOpen(false)}
-          style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: '13.5px', color: '#16202e', textDecoration: 'none', fontWeight: 600 }}
+          style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: '11.5px', color: '#16202e', textDecoration: 'none', fontWeight: 600 }}
         >
           <span style={{ color: '#1668c4' }}>↺</span>
           {t('refundLabel')}
         </Link>
       )}
+      <Link
+        to="/club"
+        onClick={() => setMenuOpen(false)}
+        style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: '11.5px', color: '#16202e', textDecoration: 'none', fontWeight: 600 }}
+      >
+        <span style={{ color: '#1668c4' }}>★</span>
+        {t('navLoyalty')}
+      </Link>
       <span
         data-testid="public-logout"
         onClick={() => {
           setMenuOpen(false);
           void signOut();
         }}
-        style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: '13.5px', color: '#e5484d', fontWeight: 600, cursor: 'pointer' }}
+        style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: '11.5px', color: '#e5484d', fontWeight: 600, cursor: 'pointer' }}
       >
         <span>↩</span>
         {t('logoutLabel')}
@@ -202,10 +313,10 @@ export default function PublicHeader() {
       >
         <div
           style={{
-            maxWidth: 1180,
+            maxWidth: 1320,
             margin: '0 auto',
             padding: '0 26px',
-            height: isMobile ? 62 : 86,
+            height: isMobile ? 62 : 70,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -255,7 +366,7 @@ export default function PublicHeader() {
           </Link>
 
           {!isMobile && (
-            <nav style={{ display: 'flex', gap: 30, fontSize: '14.5px', color: '#3b4554', fontWeight: 600, height: '100%', alignItems: 'center' }}>
+            <nav style={{ display: 'flex', gap: 30, fontSize: '16.5px', color: '#3b4554', fontWeight: 600, height: '100%', alignItems: 'center' }}>
               {navLinks.map((link) => (
                 <Link
                   key={link.to}
@@ -448,13 +559,19 @@ export default function PublicHeader() {
                           justifyContent: 'center',
                           fontWeight: 700,
                           fontSize: '13.5px',
+                          position: 'relative',
                         }}
                       >
                         <UserFilledIcon />
+                        {profileWarnDot('#fff')}
                       </div>
                       <div style={{ lineHeight: 1.35, textAlign: isRTL ? 'right' : 'left' }}>
                         <div style={{ fontSize: 13, fontWeight: 700, color: '#16202e' }}>{user.fullName}</div>
-                        {club?.isMember && tierLabel && <div style={{ fontSize: 10, color: '#caa53a', fontWeight: 700 }}>★ {tierLabel}</div>}
+                        {profileIncomplete ? (
+                          <div style={{ fontSize: 10, color: '#e5484d', fontWeight: 700 }}>{t('completeProfileLabel')}</div>
+                        ) : (
+                          club?.isMember && tierLabel && <div style={{ fontSize: 10, color: '#caa53a', fontWeight: 700 }}>★ {tierLabel}</div>
+                        )}
                       </div>
                       <span style={{ fontSize: 10, color: '#6b7787', marginRight: 2 }}>▼</span>
                     </div>
@@ -542,9 +659,11 @@ export default function PublicHeader() {
                       justifyContent: 'center',
                       color: '#fff',
                       cursor: 'pointer',
+                      position: 'relative',
                     }}
                   >
                     <UserOutlineIcon size={19} />
+                    {profileWarnDot('#0d2640')}
                   </span>
                   {menuOpen && (
                     <>
@@ -579,9 +698,12 @@ export default function PublicHeader() {
                   )}
                 </div>
               ) : (
-                <Link
-                  to="/signin"
+                <span
                   data-testid="public-signin-mobile"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    setLoginDrawerOpen(true);
+                  }}
                   style={{
                     width: 36,
                     height: 36,
@@ -590,11 +712,11 @@ export default function PublicHeader() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     color: '#fff',
-                    textDecoration: 'none',
+                    cursor: 'pointer',
                   }}
                 >
                   <UserOutlineIcon size={19} />
-                </Link>
+                </span>
               )}
             </div>
           )}
@@ -625,7 +747,44 @@ export default function PublicHeader() {
             </span>
           </div>
           <div style={{ padding: '4px 24px 0', display: 'flex', flexDirection: 'column' }}>
-            {navLinks.map((link, i) => (
+            <Link
+              to="/"
+              onClick={() => setMobileMenuOpen(false)}
+              style={{
+                padding: '20px 0',
+                textDecoration: 'none',
+                color: '#16202e',
+                fontSize: 17,
+                fontWeight: 700,
+              }}
+            >
+              {t('navFlights')}
+            </Link>
+            {loggedIn &&
+              mobileAccountNavItems().map((item) => (
+                <Link
+                  key={item.key}
+                  to={accountTabHref(item.key)}
+                  data-testid={`public-mobile-account-${item.key}`}
+                  onClick={() => setMobileMenuOpen(false)}
+                  style={{
+                    padding: '20px 0',
+                    textDecoration: 'none',
+                    color: '#16202e',
+                    fontSize: 17,
+                    fontWeight: 700,
+                    borderTop: '1px solid #eef1f5',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 12,
+                  }}
+                >
+                  <span style={{ whiteSpace: 'nowrap' }}>{mobileAccountNavLabel(item, locale)}</span>
+                  <ChevronIcon isRTL={isRTL} />
+                </Link>
+              ))}
+            {navLinks.slice(1).map((link, i, arr) => (
               <Link
                 key={link.to}
                 to={link.to}
@@ -636,44 +795,134 @@ export default function PublicHeader() {
                   color: '#16202e',
                   fontSize: 17,
                   fontWeight: 700,
-                  borderTop: i > 0 ? '1px solid #eef1f5' : undefined,
-                  borderBottom: i === navLinks.length - 1 ? '1px solid #eef1f5' : undefined,
+                  borderTop: '1px solid #eef1f5',
+                  borderBottom: i === arr.length - 1 ? '1px solid #eef1f5' : undefined,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 12,
                 }}
               >
                 {link.label}
+                <ChevronIcon isRTL={isRTL} />
               </Link>
             ))}
           </div>
           <div style={{ marginTop: 'auto', padding: '14px 24px 32px', display: 'flex', flexDirection: 'column', gap: 10 }}>
             {!loggedIn && (
-              <Link
-                to="/signin"
-                onClick={() => setMobileMenuOpen(false)}
-                style={{ textAlign: 'center', padding: 13, border: '1.5px solid #d5e1f0', color: '#0d2640', borderRadius: 10, fontSize: 14, fontWeight: 700, textDecoration: 'none' }}
+              <span
+                data-testid="public-login-drawer-open"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  setLoginDrawerOpen(true);
+                }}
+                style={{ textAlign: 'center', padding: 13, border: '1.5px solid #d5e1f0', color: '#0d2640', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
               >
                 {t('btnLoginOnly')}
-              </Link>
+              </span>
             )}
             {loggedIn && user && (
-              <>
-                <Link
-                  to="/manage-booking"
-                  onClick={() => setMobileMenuOpen(false)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0', textDecoration: 'none', color: '#16202e', fontSize: 14, fontWeight: 700 }}
-                >
-                  🧳 {t('tripsLabel')}
-                </Link>
-                <span
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    void signOut();
-                  }}
-                  style={{ padding: '10px 0', color: '#e5484d', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
-                >
-                  ↩ {t('logoutLabel')}
-                </span>
-              </>
+              <span
+                data-testid="public-logout"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  void signOut();
+                }}
+                style={{ padding: '10px 0', color: '#e5484d', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+              >
+                ↩ {t('logoutLabel')}
+              </span>
             )}
+          </div>
+        </div>
+      )}
+
+      {loginDrawerOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'linear-gradient(165deg,#0d2640,#1668c4)',
+            color: '#fff',
+            zIndex: 210,
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', padding: '26px 20px 18px' }}>
+            <span style={{ fontSize: 22, fontWeight: 800, color: '#fff' }}>{t('loginDrawerTitle')}</span>
+            <span
+              data-testid="public-login-drawer-close"
+              onClick={() => setLoginDrawerOpen(false)}
+              style={{
+                position: 'absolute',
+                [isRTL ? 'left' : 'right']: 20,
+                top: 22,
+                width: 34,
+                height: 34,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 24,
+                color: '#fff',
+                cursor: 'pointer',
+              }}
+            >
+              ×
+            </span>
+          </div>
+          <div style={{ padding: '34px 28px 0', textAlign: 'center' }}>
+            <p style={{ fontSize: 16, lineHeight: 1.7, color: '#dbe7f7', margin: '8px 0 34px' }}>{t('loginWelcome')}</p>
+            <Link
+              to="/signin"
+              onClick={() => setLoginDrawerOpen(false)}
+              style={{
+                display: 'block',
+                padding: 16,
+                background: '#fff',
+                color: '#0d2640',
+                borderRadius: 30,
+                fontSize: '15.5px',
+                fontWeight: 800,
+                textDecoration: 'none',
+                marginBottom: 14,
+              }}
+            >
+              {t('btnLoginOnly')}
+            </Link>
+            <Link
+              to="/club"
+              onClick={() => setLoginDrawerOpen(false)}
+              style={{
+                display: 'block',
+                padding: 16,
+                background: 'transparent',
+                color: '#fff',
+                border: '1.5px solid rgba(255,255,255,.6)',
+                borderRadius: 30,
+                fontSize: '15.5px',
+                fontWeight: 800,
+                textDecoration: 'none',
+                marginBottom: 22,
+              }}
+            >
+              {t('btnJoinClub')}
+            </Link>
+            <Link
+              to="/club"
+              onClick={() => setLoginDrawerOpen(false)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 7,
+                color: '#fff',
+                textDecoration: 'none',
+                fontSize: 14,
+                fontWeight: 700,
+              }}
+            >
+              {t('discoverMoreLabel')} <span>{isRTL ? '←' : '→'}</span>
+            </Link>
           </div>
         </div>
       )}

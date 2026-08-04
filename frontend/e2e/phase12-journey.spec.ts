@@ -21,7 +21,7 @@ test('CEO admins journey: list with real status → open detail → block → un
 });
 
 test('Senior changes their own password and reverts it (امنیت و رمز عبور)', async ({ page }) => {
-  await loginAs(page, 'senior.rahimi');
+  await loginAs(page, 'senior');
   await page.getByRole('link', { name: 'امنیت و رمز عبور' }).click();
   await page.waitForURL('**/panel/security');
 
@@ -48,8 +48,8 @@ test('CEO opens لاگ و رویدادها and sees the real audit table with le
   await expect(page.getByRole('cell', { name: /.+/ }).first()).toBeVisible();
 });
 
-test('Chair saves تنظیمات سامانه (toggle round-trip persists across reload)', async ({ page }) => {
-  await loginAs(page, 'chair');
+test('IT saves تنظیمات سامانه (toggle round-trip persists across reload)', async ({ page }) => {
+  await loginAs(page, 'itadmin');
   await page.getByRole('link', { name: 'تنظیمات سامانه' }).click();
   await page.waitForURL('**/panel/settings');
   await expect(page.getByText('اطلاعات شرکت')).toBeVisible();

@@ -7,7 +7,13 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
 import * as crypto from 'node:crypto';
-import { TypeORMService } from '../../typeorm/typeorm.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { IsNull, Repository } from 'typeorm';
+import { User } from '../../database/entities/user.entity';
+import { TwoFactorChallenge } from '../../database/entities/two-factor-challenge.entity';
+import { RefreshToken } from '../../database/entities/refresh-token.entity';
+import { AgencyProfile } from '../../database/entities/agency-profile.entity';
+import { findOneOrThrow } from '../../database/utils/find-one-or-throw';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
 import { hashRefreshToken } from './auth-token.util';
@@ -15,7 +21,7 @@ import { TWO_FACTOR_PROVIDER } from './providers/two-factor-provider.interface';
 import type { TwoFactorProvider } from './providers/two-factor-provider.interface';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import { CustomerReferralsService } from '../customer-referrals/customer-referrals.service';
-import type { Locale, Role } from '../../../generated/typeorm/enums';
+import type { Locale, Role } from '../../database/enums';
 import { normalizeIranPhone } from '../../common/normalize-iran-phone';
 import { generateOtpCode } from '../../common/generate-otp-code';
 
@@ -59,6 +65,10 @@ const STAFF_ROLES = [
   'SITE_ADMIN',
 ] as const;
 
+function generateSixDigitCode(): string {
+  return generateOtpCode();
+}
+
 function hashToken(token: string): string {
   return hashRefreshToken(token);
 }
@@ -66,7 +76,13 @@ function hashToken(token: string): string {
 @Injectable()
 export class AuthService {
   constructor(
-    private readonly typeorm: TypeORMService,
+    @InjectRepository(User) private readonly userRepo: Repository<User>,
+    @InjectRepository(TwoFactorChallenge)
+    private readonly challengeRepo: Repository<TwoFactorChallenge>,
+    @InjectRepository(RefreshToken)
+    private readonly refreshTokenRepo: Repository<RefreshToken>,
+    @InjectRepository(AgencyProfile)
+    private readonly agencyProfileRepo: Repository<AgencyProfile>,
     private readonly jwt: JwtService,
     private readonly audit: AuditService,
     @Inject(TWO_FACTOR_PROVIDER)
@@ -81,7 +97,7 @@ export class AuthService {
     currentPassword: string,
     newPassword: string,
   ): Promise<void> {
-    const user = await this.typeorm.user.findUniqueOrThrow({
+    const user = await findOneOrThrow(this.userRepo, {
       where: { id: actor.id },
     });
     if (
@@ -94,13 +110,14 @@ export class AuthService {
       });
     }
 
-    await this.typeorm.user.update({
-      where: { id: actor.id },
-      data: {
+    await this.userRepo.update(
+      { id: actor.id },
+      {
         passwordHash: await argon2.hash(newPassword),
         mustChangePassword: false,
+        updatedAt: new Date(),
       },
-    });
+    );
 
     await this.audit.record({
       actorId: actor.id,
@@ -117,7 +134,7 @@ export class AuthService {
    * `preferredLocale` — which the user can change far more often than a
    * short-lived access token gets refreshed — is never stale. */
   async getMe(actor: AuthenticatedUser): Promise<AuthUserView> {
-    const user = await this.typeorm.user.findUniqueOrThrow({
+    const user = await findOneOrThrow(this.userRepo, {
       where: { id: actor.id },
       select: {
         id: true,
@@ -140,9 +157,12 @@ export class AuthService {
     actor: AuthenticatedUser,
     locale: 'FA' | 'EN' | 'AR',
   ): Promise<{ preferredLocale: 'FA' | 'EN' | 'AR' }> {
-    const updated = await this.typeorm.user.update({
+    await this.userRepo.update(
+      { id: actor.id },
+      { preferredLocale: locale, updatedAt: new Date() },
+    );
+    const updated = await findOneOrThrow(this.userRepo, {
       where: { id: actor.id },
-      data: { preferredLocale: locale },
       select: { preferredLocale: true },
     });
     return updated;
@@ -160,13 +180,14 @@ export class AuthService {
     actor: AuthenticatedUser,
     newPassword: string,
   ): Promise<void> {
-    await this.typeorm.user.update({
-      where: { id: actor.id },
-      data: {
+    await this.userRepo.update(
+      { id: actor.id },
+      {
         passwordHash: await argon2.hash(newPassword),
         mustChangePassword: false,
+        updatedAt: new Date(),
       },
-    });
+    );
 
     await this.audit.record({
       actorId: actor.id,
@@ -190,7 +211,9 @@ export class AuthService {
     refreshToken: string;
     user: AuthUserView;
   }> {
-    const user = await this.typeorm.user.findUnique({ where: { phone } });
+    const user = await this.userRepo.findOneBy({
+      phone: normalizeIranPhone(phone),
+    });
     if (!user || user.role !== 'USER' || !user.passwordHash) {
       throw new UnauthorizedException({
         code: ErrorCode.UNAUTHORIZED,
@@ -210,10 +233,10 @@ export class AuthService {
       });
     }
 
-    await this.typeorm.user.update({
-      where: { id: user.id },
-      data: { lastLoginAt: new Date() },
-    });
+    await this.userRepo.update(
+      { id: user.id },
+      { lastLoginAt: new Date(), updatedAt: new Date() },
+    );
 
     const jwtUser: AuthenticatedUser = {
       id: user.id,
@@ -241,9 +264,12 @@ export class AuthService {
   async requestPasswordResetEmail(
     email: string,
   ): Promise<{ challengeId: string }> {
-    const user = await this.typeorm.user.findFirst({
-      where: { email, role: 'USER', emailVerifiedAt: { not: null } },
-    });
+    const user = await this.userRepo
+      .createQueryBuilder('u')
+      .where('u.email = :email', { email })
+      .andWhere('u.role = :role', { role: 'USER' })
+      .andWhere('u."emailVerifiedAt" IS NOT NULL')
+      .getOne();
     if (!user) {
       throw new UnauthorizedException({
         code: ErrorCode.NOT_FOUND,
@@ -257,15 +283,15 @@ export class AuthService {
       });
     }
 
-    const code = generateOtpCode();
-    const challenge = await this.typeorm.twoFactorChallenge.create({
-      data: {
+    const code = generateSixDigitCode();
+    const challenge = await this.challengeRepo.save(
+      this.challengeRepo.create({
         userId: user.id,
         purpose: 'PASSWORD_RESET_EMAIL',
         codeHash: await argon2.hash(code),
         expiresAt: new Date(Date.now() + TWO_FACTOR_TTL_MS),
-      },
-    });
+      }),
+    );
     await this.twoFactorProvider.sendCode(
       { id: user.id, fullName: user.fullName, email: user.email, phone: null },
       code,
@@ -286,9 +312,9 @@ export class AuthService {
     refreshToken: string;
     user: AuthUserView;
   }> {
-    const challenge = await this.typeorm.twoFactorChallenge.findUnique({
+    const challenge = await this.challengeRepo.findOne({
       where: { id: challengeId },
-      include: { user: true },
+      relations: { user: true },
     });
 
     if (!challenge || challenge.purpose !== 'PASSWORD_RESET_EMAIL') {
@@ -318,24 +344,21 @@ export class AuthService {
 
     const codeValid = await argon2.verify(challenge.codeHash, code);
     if (!codeValid) {
-      await this.typeorm.twoFactorChallenge.update({
-        where: { id: challenge.id },
-        data: { attempts: { increment: 1 } },
-      });
+      await this.challengeRepo.increment({ id: challenge.id }, 'attempts', 1);
       throw new UnauthorizedException({
         code: 'TWO_FACTOR_INVALID',
         message: 'کد وارد شده نادرست است.',
       });
     }
 
-    await this.typeorm.twoFactorChallenge.update({
-      where: { id: challenge.id },
-      data: { consumedAt: new Date() },
-    });
-    await this.typeorm.user.update({
-      where: { id: challenge.userId },
-      data: { lastLoginAt: new Date() },
-    });
+    await this.challengeRepo.update(
+      { id: challenge.id },
+      { consumedAt: new Date() },
+    );
+    await this.userRepo.update(
+      { id: challenge.userId },
+      { lastLoginAt: new Date(), updatedAt: new Date() },
+    );
 
     const user = challenge.user;
     const jwtUser: AuthenticatedUser = {
@@ -353,7 +376,7 @@ export class AuthService {
     username: string,
     password: string,
   ): Promise<{ challengeId: string }> {
-    const user = await this.typeorm.user.findUnique({ where: { username } });
+    const user = await this.userRepo.findOneBy({ username });
 
     if (
       !user ||
@@ -380,15 +403,15 @@ export class AuthService {
       });
     }
 
-    const code = generateOtpCode();
-    const challenge = await this.typeorm.twoFactorChallenge.create({
-      data: {
+    const code = generateSixDigitCode();
+    const challenge = await this.challengeRepo.save(
+      this.challengeRepo.create({
         userId: user.id,
         purpose: 'STAFF_LOGIN_2FA',
         codeHash: await argon2.hash(code),
         expiresAt: new Date(Date.now() + TWO_FACTOR_TTL_MS),
-      },
-    });
+      }),
+    );
 
     await this.twoFactorProvider.sendCode(user, code);
 
@@ -404,9 +427,9 @@ export class AuthService {
     refreshToken: string;
     user: AuthUserView;
   }> {
-    const challenge = await this.typeorm.twoFactorChallenge.findUnique({
+    const challenge = await this.challengeRepo.findOne({
       where: { id: challengeId },
-      include: { user: true },
+      relations: { user: true },
     });
 
     if (!challenge || challenge.purpose !== 'STAFF_LOGIN_2FA') {
@@ -436,24 +459,21 @@ export class AuthService {
 
     const codeValid = await argon2.verify(challenge.codeHash, code);
     if (!codeValid) {
-      await this.typeorm.twoFactorChallenge.update({
-        where: { id: challenge.id },
-        data: { attempts: { increment: 1 } },
-      });
+      await this.challengeRepo.increment({ id: challenge.id }, 'attempts', 1);
       throw new UnauthorizedException({
         code: 'TWO_FACTOR_INVALID',
         message: 'کد وارد شده نادرست است.',
       });
     }
 
-    await this.typeorm.twoFactorChallenge.update({
-      where: { id: challenge.id },
-      data: { consumedAt: new Date() },
-    });
-    await this.typeorm.user.update({
-      where: { id: challenge.userId },
-      data: { lastLoginAt: new Date() },
-    });
+    await this.challengeRepo.update(
+      { id: challenge.id },
+      { consumedAt: new Date() },
+    );
+    await this.userRepo.update(
+      { id: challenge.userId },
+      { lastLoginAt: new Date(), updatedAt: new Date() },
+    );
 
     const user = challenge.user;
     const jwtUser: AuthenticatedUser = {
@@ -478,9 +498,8 @@ export class AuthService {
     refreshToken: string;
     user: AuthUserView;
   }> {
-    const user = await this.typeorm.user.findUnique({
-      where: { phone: normalizeIranPhone(phone) },
-      include: { agencyProfile: true },
+    const user = await this.userRepo.findOneBy({
+      phone: normalizeIranPhone(phone),
     });
 
     if (
@@ -500,17 +519,20 @@ export class AuthService {
         message: 'این حساب غیرفعال شده است.',
       });
     }
-    if (user.agencyProfile?.suspendedAt) {
+    const agencyProfile = await this.agencyProfileRepo.findOneBy({
+      userId: user.id,
+    });
+    if (agencyProfile?.suspendedAt) {
       throw new ForbiddenException({
         code: 'ACCOUNT_SUSPENDED',
         message: 'حساب آژانس شما تعلیق شده است.',
       });
     }
 
-    await this.typeorm.user.update({
-      where: { id: user.id },
-      data: { lastLoginAt: new Date() },
-    });
+    await this.userRepo.update(
+      { id: user.id },
+      { lastLoginAt: new Date(), updatedAt: new Date() },
+    );
 
     const jwtUser: AuthenticatedUser = {
       id: user.id,
@@ -531,12 +553,18 @@ export class AuthService {
     phone: string,
     referralCode?: string,
   ): Promise<{ challengeId: string }> {
-    const existing = await this.typeorm.user.findUnique({ where: { phone } });
-    const user = await this.typeorm.user.upsert({
-      where: { phone },
-      update: {},
-      create: { role: 'USER', phone, fullName: phone },
-    });
+    const normalizedPhone = normalizeIranPhone(phone);
+    const existing = await this.userRepo.findOneBy({ phone: normalizedPhone });
+    const user =
+      existing ??
+      (await this.userRepo.save(
+        this.userRepo.create({
+          role: 'USER',
+          phone: normalizedPhone,
+          fullName: normalizedPhone,
+          updatedAt: new Date(),
+        }),
+      ));
     if (!existing) {
       await this.customerReferrals.applyOnSignup(user.id, referralCode);
     }
@@ -547,15 +575,20 @@ export class AuthService {
       });
     }
 
+    await this.challengeRepo.update(
+      { userId: user.id, purpose: 'CUSTOMER_OTP_LOGIN', consumedAt: IsNull() },
+      { consumedAt: new Date() },
+    );
+
     const code = generateOtpCode();
-    const challenge = await this.typeorm.twoFactorChallenge.create({
-      data: {
+    const challenge = await this.challengeRepo.save(
+      this.challengeRepo.create({
         userId: user.id,
         purpose: 'CUSTOMER_OTP_LOGIN',
         codeHash: await argon2.hash(code),
         expiresAt: new Date(Date.now() + TWO_FACTOR_TTL_MS),
-      },
-    });
+      }),
+    );
 
     await this.twoFactorProvider.sendCode(user, code);
 
@@ -571,9 +604,9 @@ export class AuthService {
     refreshToken: string;
     user: AuthUserView;
   }> {
-    const challenge = await this.typeorm.twoFactorChallenge.findUnique({
+    const challenge = await this.challengeRepo.findOne({
       where: { id: challengeId },
-      include: { user: true },
+      relations: { user: true },
     });
 
     if (!challenge || challenge.purpose !== 'CUSTOMER_OTP_LOGIN') {
@@ -603,24 +636,21 @@ export class AuthService {
 
     const codeValid = await argon2.verify(challenge.codeHash, code);
     if (!codeValid) {
-      await this.typeorm.twoFactorChallenge.update({
-        where: { id: challenge.id },
-        data: { attempts: { increment: 1 } },
-      });
+      await this.challengeRepo.increment({ id: challenge.id }, 'attempts', 1);
       throw new UnauthorizedException({
         code: 'TWO_FACTOR_INVALID',
         message: 'کد وارد شده نادرست است.',
       });
     }
 
-    await this.typeorm.twoFactorChallenge.update({
-      where: { id: challenge.id },
-      data: { consumedAt: new Date() },
-    });
-    await this.typeorm.user.update({
-      where: { id: challenge.userId },
-      data: { lastLoginAt: new Date() },
-    });
+    await this.challengeRepo.update(
+      { id: challenge.id },
+      { consumedAt: new Date() },
+    );
+    await this.userRepo.update(
+      { id: challenge.userId },
+      { lastLoginAt: new Date(), updatedAt: new Date() },
+    );
 
     const user = challenge.user;
     const jwtUser: AuthenticatedUser = {
@@ -638,15 +668,17 @@ export class AuthService {
   async requestAgencyPasswordReset(
     phone: string,
   ): Promise<{ challengeId: string }> {
-    const user = await this.typeorm.user.findUnique({
-      where: { phone: normalizeIranPhone(phone) },
-      include: { agencyProfile: true },
+    const user = await this.userRepo.findOneBy({
+      phone: normalizeIranPhone(phone),
     });
+    const agencyProfile = user
+      ? await this.agencyProfileRepo.findOneBy({ userId: user.id })
+      : null;
     if (
       !user ||
       user.role !== 'AGENCY' ||
       !user.isActive ||
-      user.agencyProfile?.suspendedAt
+      agencyProfile?.suspendedAt
     ) {
       throw new UnauthorizedException({
         code: ErrorCode.UNAUTHORIZED,
@@ -654,15 +686,15 @@ export class AuthService {
       });
     }
 
-    const code = generateOtpCode();
-    const challenge = await this.typeorm.twoFactorChallenge.create({
-      data: {
+    const code = generateSixDigitCode();
+    const challenge = await this.challengeRepo.save(
+      this.challengeRepo.create({
         userId: user.id,
         purpose: 'AGENCY_PASSWORD_RESET',
         codeHash: await argon2.hash(code),
         expiresAt: new Date(Date.now() + TWO_FACTOR_TTL_MS),
-      },
-    });
+      }),
+    );
     await this.twoFactorProvider.sendCode(user, code);
     return { challengeId: challenge.id };
   }
@@ -676,9 +708,9 @@ export class AuthService {
     refreshToken: string;
     user: AuthUserView;
   }> {
-    const challenge = await this.typeorm.twoFactorChallenge.findUnique({
+    const challenge = await this.challengeRepo.findOne({
       where: { id: challengeId },
-      include: { user: { include: { agencyProfile: true } } },
+      relations: { user: true },
     });
     if (!challenge || challenge.purpose !== 'AGENCY_PASSWORD_RESET') {
       throw new UnauthorizedException({
@@ -706,23 +738,23 @@ export class AuthService {
     }
     const codeValid = await argon2.verify(challenge.codeHash, code);
     if (!codeValid) {
-      await this.typeorm.twoFactorChallenge.update({
-        where: { id: challenge.id },
-        data: { attempts: { increment: 1 } },
-      });
+      await this.challengeRepo.increment({ id: challenge.id }, 'attempts', 1);
       throw new UnauthorizedException({
         code: 'TWO_FACTOR_INVALID',
         message: 'کد وارد شده نادرست است.',
       });
     }
-    await this.typeorm.twoFactorChallenge.update({
-      where: { id: challenge.id },
-      data: { consumedAt: new Date() },
-    });
+    await this.challengeRepo.update(
+      { id: challenge.id },
+      { consumedAt: new Date() },
+    );
 
-    const updated = await this.typeorm.user.update({
+    await this.userRepo.update(
+      { id: challenge.userId },
+      { mustChangePassword: true, updatedAt: new Date() },
+    );
+    const updated = await findOneOrThrow(this.userRepo, {
       where: { id: challenge.userId },
-      data: { mustChangePassword: true },
     });
 
     const jwtUser: AuthenticatedUser = {
@@ -747,7 +779,7 @@ export class AuthService {
       !this.twoFactorProvider.getLastCode
     )
       return null;
-    const user = await this.typeorm.user.findFirst({ where: { email } });
+    const user = await this.userRepo.findOneBy({ email });
     if (!user) return null;
     return this.twoFactorProvider.getLastCode(user.id) ?? null;
   }
@@ -763,7 +795,9 @@ export class AuthService {
       !this.twoFactorProvider.getLastCode
     )
       return null;
-    const user = await this.typeorm.user.findUnique({ where: { phone } });
+    const user = await this.userRepo.findOneBy({
+      phone: normalizeIranPhone(phone),
+    });
     if (!user) return null;
     return this.twoFactorProvider.getLastCode(user.id) ?? null;
   }
@@ -773,9 +807,9 @@ export class AuthService {
     context: { userAgent?: string; ip?: string },
   ): Promise<{ accessToken: string; refreshToken: string }> {
     const tokenHash = hashToken(presentedToken);
-    const stored = await this.typeorm.refreshToken.findUnique({
+    const stored = await this.refreshTokenRepo.findOne({
       where: { tokenHash },
-      include: { user: true },
+      relations: { user: true },
     });
 
     if (!stored) {
@@ -792,10 +826,10 @@ export class AuthService {
     // user's entire refresh-token family so a stolen token can't keep
     // rotating forever, and force a real re-login everywhere.
     if (stored.revokedAt) {
-      await this.typeorm.refreshToken.updateMany({
-        where: { userId: stored.userId, revokedAt: null },
-        data: { revokedAt: new Date() },
-      });
+      await this.refreshTokenRepo.update(
+        { userId: stored.userId, revokedAt: IsNull() },
+        { revokedAt: new Date() },
+      );
       await this.audit.record({
         actorId: stored.userId,
         actorRole: stored.user.role,
@@ -817,11 +851,32 @@ export class AuthService {
         message: 'نشست شما منقضی شده است.',
       });
     }
+    // Re-check the account's current status on every refresh — isActive
+    // is only checked at login otherwise, so a blocked/suspended account
+    // could keep extending an already-issued refresh token forever.
+    if (!stored.user.isActive) {
+      throw new UnauthorizedException({
+        code: ErrorCode.UNAUTHORIZED,
+        message: 'این حساب مسدود شده است.',
+      });
+    }
+    if (stored.user.role === 'AGENCY') {
+      const profile = await this.agencyProfileRepo.findOne({
+        where: { userId: stored.userId },
+        select: { suspendedAt: true },
+      });
+      if (profile?.suspendedAt) {
+        throw new UnauthorizedException({
+          code: ErrorCode.UNAUTHORIZED,
+          message: 'این حساب مسدود شده است.',
+        });
+      }
+    }
 
-    await this.typeorm.refreshToken.update({
-      where: { id: stored.id },
-      data: { revokedAt: new Date() },
-    });
+    await this.refreshTokenRepo.update(
+      { id: stored.id },
+      { revokedAt: new Date() },
+    );
 
     const accessToken = this.signAccessToken({
       id: stored.user.id,
@@ -835,10 +890,10 @@ export class AuthService {
 
   async logout(presentedToken: string): Promise<void> {
     const tokenHash = hashToken(presentedToken);
-    await this.typeorm.refreshToken.updateMany({
-      where: { tokenHash, revokedAt: null },
-      data: { revokedAt: new Date() },
-    });
+    await this.refreshTokenRepo.update(
+      { tokenHash, revokedAt: IsNull() },
+      { revokedAt: new Date() },
+    );
   }
 
   /**
@@ -852,7 +907,7 @@ export class AuthService {
       !this.twoFactorProvider.getLastCode
     )
       return null;
-    const user = await this.typeorm.user.findUnique({ where: { username } });
+    const user = await this.userRepo.findOneBy({ username });
     if (!user) return null;
     return this.twoFactorProvider.getLastCode(user.id) ?? null;
   }
@@ -869,15 +924,15 @@ export class AuthService {
     context: { userAgent?: string; ip?: string },
   ): Promise<string> {
     const token = crypto.randomBytes(48).toString('hex');
-    await this.typeorm.refreshToken.create({
-      data: {
+    await this.refreshTokenRepo.save(
+      this.refreshTokenRepo.create({
         userId,
         tokenHash: hashToken(token),
         userAgent: context.userAgent,
         ip: context.ip,
         expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
-      },
-    });
+      }),
+    );
     return token;
   }
 }
