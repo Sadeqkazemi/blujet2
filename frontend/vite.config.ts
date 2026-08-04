@@ -22,6 +22,7 @@ const API_PROXY_PREFIXES = [
   'survey',
   'flight-status',
   'club',
+  'customers',
   'flights',
   'flightops',
   'reservation',
@@ -91,6 +92,8 @@ export default defineConfig(({ mode }) => {
     host: '0.0.0.0',
     port: 5173,
     strictPort: true,
+    // Cloudflare quick tunnels / Cursor port previews send a non-localhost Host.
+    allowedHosts: true,
     proxy: devProxy,
   },
   plugins: [
