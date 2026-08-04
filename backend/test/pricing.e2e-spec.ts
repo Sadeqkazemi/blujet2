@@ -5,9 +5,13 @@ import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import * as crypto from 'node:crypto';
+import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
 import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
-import { TypeORMService } from '../src/typeorm/typeorm.service';
+import { AuditLog } from '../src/database/entities/audit-log.entity';
+import { FarePricingProposal } from '../src/database/entities/fare-pricing-proposal.entity';
+import { Flight } from '../src/database/entities/flight.entity';
+import { FlightInstance } from '../src/database/entities/flight-instance.entity';
 import {
   PRICE_SUGGESTION_PROVIDER,
   type PriceSuggestionProvider,
@@ -29,7 +33,7 @@ class FakePriceSuggestionProvider implements PriceSuggestionProvider {
 
 describe('Pricing (e2e)', () => {
   let app: INestApplication<App>;
-  let typeorm: TypeORMService;
+  let dataSource: DataSource;
   let fakeMl: FakePriceSuggestionProvider;
 
   beforeEach(async () => {
@@ -55,7 +59,7 @@ describe('Pricing (e2e)', () => {
     );
     app.useGlobalFilters(new AllExceptionsFilter(logger));
     await app.init();
-    typeorm = app.get(TypeORMService);
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
@@ -63,9 +67,13 @@ describe('Pricing (e2e)', () => {
   });
 
   async function createScheduledInstance() {
-    const flight = await typeorm.flight.findFirstOrThrow();
-    return typeorm.flightInstance.create({
-      data: {
+    const flight = await dataSource
+      .getRepository(Flight)
+      .createQueryBuilder('f')
+      .getOneOrFail();
+    const instanceRepo = dataSource.getRepository(FlightInstance);
+    return instanceRepo.save(
+      instanceRepo.create({
         flightId: flight.id,
         departureAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
         arrivalAt: new Date(
@@ -74,13 +82,13 @@ describe('Pricing (e2e)', () => {
         capacity: 180,
         charterSeats: 60,
         status: 'SCHEDULED',
-      },
-    });
+      }),
+    );
   }
 
   it('Commercial proposes a price for a scheduled flight; re-PUT while PENDING edits it', async () => {
     const instance = await createScheduledInstance();
-    const { accessToken } = await loginAs(app, 'comm.abbasi');
+    const { accessToken } = await loginAs(app, 'comm');
 
     const created = await request(app.getHttpServer())
       .put(`/pricing/flights/${instance.id}/proposal`)
@@ -100,9 +108,12 @@ describe('Pricing (e2e)', () => {
     expect(edited.status).toBe(200);
     expect(edited.body.data.proposedPriceIrr).toBe('39000000');
 
-    const audit = await typeorm.auditLog.findFirst({
-      where: { category: 'PRICING', entityId: created.body.data.id },
-    });
+    const audit = await dataSource
+      .getRepository(AuditLog)
+      .createQueryBuilder('a')
+      .where('a.category = :category', { category: 'PRICING' })
+      .andWhere('a.entityId = :entityId', { entityId: created.body.data.id })
+      .getOne();
     expect(audit).not.toBeNull();
   });
 
@@ -115,7 +126,7 @@ describe('Pricing (e2e)', () => {
       .send({ proposedPriceIrr: 1_000_000 });
     expect(forbidden.status).toBe(403);
 
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
     const notFound = await request(app.getHttpServer())
       .put(`/pricing/flights/${crypto.randomUUID()}/proposal`)
       .set('Authorization', `Bearer ${commercial.accessToken}`)
@@ -131,7 +142,7 @@ describe('Pricing (e2e)', () => {
 
   it('CEO registers with source=PROPOSED; proposal locks; further edits/registers → 409', async () => {
     const instance = await createScheduledInstance();
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
     const created = await request(app.getHttpServer())
       .put(`/pricing/flights/${instance.id}/proposal`)
       .set('Authorization', `Bearer ${commercial.accessToken}`)
@@ -175,7 +186,7 @@ describe('Pricing (e2e)', () => {
 
   it('register with source=AI without a stored suggestion → 409 with a clear message', async () => {
     const instance = await createScheduledInstance();
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
     const created = await request(app.getHttpServer())
       .put(`/pricing/flights/${instance.id}/proposal`)
       .set('Authorization', `Bearer ${commercial.accessToken}`)
@@ -198,7 +209,7 @@ describe('Pricing (e2e)', () => {
 
   it('AI analysis persists suggestions with modelVersion, mutates nothing else, and register {source:AI} uses it', async () => {
     const instance = await createScheduledInstance();
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
     const created = await request(app.getHttpServer())
       .put(`/pricing/flights/${instance.id}/proposal`)
       .set('Authorization', `Bearer ${commercial.accessToken}`)
@@ -228,9 +239,11 @@ describe('Pricing (e2e)', () => {
     expect(analysis.body.data.available).toBe(true);
     expect(analysis.body.data.analyzed).toBeGreaterThanOrEqual(1);
 
-    const stored = await typeorm.farePricingProposal.findUniqueOrThrow({
-      where: { id: proposalId },
-    });
+    const stored = await dataSource
+      .getRepository(FarePricingProposal)
+      .createQueryBuilder('p')
+      .where('p.id = :id', { id: proposalId })
+      .getOneOrFail();
     const suggestion = stored.aiSuggestion as {
       priceIrr: number;
       modelVersion: string;
@@ -258,9 +271,116 @@ describe('Pricing (e2e)', () => {
     expect(registered.body.data.registeredPriceIrr).toBe('39200000');
   });
 
+  it('editing a PENDING proposal after AI analysis clears the stale suggestion — register {source:AI} then 409s', async () => {
+    const instance = await createScheduledInstance();
+    const commercial = await loginAs(app, 'comm');
+    const created = await request(app.getHttpServer())
+      .put(`/pricing/flights/${instance.id}/proposal`)
+      .set('Authorization', `Bearer ${commercial.accessToken}`)
+      .send({ proposedPriceIrr: 38_500_000 });
+    const proposalId = created.body.data.id as string;
+
+    fakeMl.nextResult = {
+      model_version: 'heuristic-test',
+      suggestions: [
+        {
+          proposal_id: proposalId,
+          price_irr: 39_200_000,
+          reason_fa: 'دلیل تستی',
+          factors_fa: ['فاکتور ۱'],
+          season_fa: 'فصل عادی',
+          occasion_fa: 'بدون مناسبت خاص',
+          confidence: 0.8,
+        },
+      ],
+    };
+    const ceo = await loginAs(app, 'ceo');
+    await request(app.getHttpServer())
+      .post('/pricing/proposals/ai-analysis')
+      .set('Authorization', `Bearer ${ceo.accessToken}`);
+
+    // Commercial edits the still-PENDING proposal's price after the AI
+    // suggestion was computed against the old figure.
+    const edited = await request(app.getHttpServer())
+      .put(`/pricing/flights/${instance.id}/proposal`)
+      .set('Authorization', `Bearer ${commercial.accessToken}`)
+      .send({ proposedPriceIrr: 30_000_000 });
+    expect(edited.status).toBe(200);
+
+    const stored = await dataSource
+      .getRepository(FarePricingProposal)
+      .createQueryBuilder('p')
+      .where('p.id = :id', { id: proposalId })
+      .getOneOrFail();
+    expect(stored.aiSuggestion).toBeNull();
+
+    const stepUp = await stepUpFor(
+      app,
+      ceo.accessToken!,
+      'ceo',
+      'PRICE_CAPACITY_CHANGE',
+    );
+    const registered = await request(app.getHttpServer())
+      .patch(`/pricing/proposals/${proposalId}/register`)
+      .set('Authorization', `Bearer ${ceo.accessToken}`)
+      .send({ source: 'AI', ...stepUp });
+    expect(registered.status).toBe(409);
+    expect(registered.body.error.message).toContain('هوش مصنوعی');
+  });
+
+  it('register {source:AI} rejects a suggestion above the CEO-approved legal rate', async () => {
+    const instance = await createScheduledInstance();
+    const commercial = await loginAs(app, 'comm');
+    const created = await request(app.getHttpServer())
+      .put(`/pricing/flights/${instance.id}/proposal`)
+      .set('Authorization', `Bearer ${commercial.accessToken}`)
+      .send({ proposedPriceIrr: 38_500_000, legalRateIrr: 40_000_000 });
+    const proposalId = created.body.data.id as string;
+
+    fakeMl.nextResult = {
+      model_version: 'heuristic-test',
+      suggestions: [
+        {
+          proposal_id: proposalId,
+          price_irr: 55_000_000, // above the 40,000,000 legal ceiling
+          reason_fa: 'دلیل تستی',
+          factors_fa: ['فاکتور ۱'],
+          season_fa: 'فصل عادی',
+          occasion_fa: 'بدون مناسبت خاص',
+          confidence: 0.8,
+        },
+      ],
+    };
+    const ceo = await loginAs(app, 'ceo');
+    await request(app.getHttpServer())
+      .post('/pricing/proposals/ai-analysis')
+      .set('Authorization', `Bearer ${ceo.accessToken}`);
+
+    const stepUp = await stepUpFor(
+      app,
+      ceo.accessToken!,
+      'ceo',
+      'PRICE_CAPACITY_CHANGE',
+    );
+    const registered = await request(app.getHttpServer())
+      .patch(`/pricing/proposals/${proposalId}/register`)
+      .set('Authorization', `Bearer ${ceo.accessToken}`)
+      .send({ source: 'AI', ...stepUp });
+    expect(registered.status).toBe(409);
+    expect(registered.body.error.message).toContain('نرخ قانونی');
+
+    const stored = await dataSource
+      .getRepository(FarePricingProposal)
+      .createQueryBuilder('p')
+      .where('p.id = :id', { id: proposalId })
+      .getOneOrFail();
+    expect(stored.status).toBe('PENDING');
+    expect(stored.registeredPriceIrr).toBeNull();
+  });
+
   it('ml-service down: ai-analysis degrades gracefully (available:false, no 500) and register-by-proposed still works', async () => {
     const instance = await createScheduledInstance();
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
     const created = await request(app.getHttpServer())
       .put(`/pricing/flights/${instance.id}/proposal`)
       .set('Authorization', `Bearer ${commercial.accessToken}`)
@@ -289,7 +409,7 @@ describe('Pricing (e2e)', () => {
 
   it('CEO legal-rate PATCH stores + audits; Finance/Board Chair get 403 everywhere', async () => {
     const instance = await createScheduledInstance();
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
     const created = await request(app.getHttpServer())
       .put(`/pricing/flights/${instance.id}/proposal`)
       .set('Authorization', `Bearer ${commercial.accessToken}`)
@@ -304,7 +424,7 @@ describe('Pricing (e2e)', () => {
     expect(legal.status).toBe(200);
     expect(legal.body.data.legalRateIrr).toBe('45000000');
 
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const listForbidden = await request(app.getHttpServer())
       .get('/pricing/proposals')
       .set('Authorization', `Bearer ${finance.accessToken}`);
@@ -319,7 +439,7 @@ describe('Pricing (e2e)', () => {
 
   it('role-shaped GET: CEO gets pending/registered lists, Commercial gets flight rows joined with proposals', async () => {
     const instance = await createScheduledInstance();
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
     await request(app.getHttpServer())
       .put(`/pricing/flights/${instance.id}/proposal`)
       .set('Authorization', `Bearer ${commercial.accessToken}`)

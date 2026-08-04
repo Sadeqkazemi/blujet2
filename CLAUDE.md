@@ -138,8 +138,8 @@ Management panels (one per role — shared shell, role-scoped tabs):
 │       ├── lib/         # utils, constants, config (fa digits/money/Jalali here)
 │       └── types/       # shared TS types (generated from OpenAPI)
 ├── backend/
-│   ├── typeorm/          # schema.typeorm, migrations, seed
 │   └── src/
+│       ├── database/    # data-source.options.ts, migrations/, entities/, seed.ts
 │       ├── modules/     # one NestJS module per domain:
 │       │                # auth/, users/, flights/, search/, booking/,
 │       │                # payment/, ticketing/, refunds/, club/, wallet/,
@@ -157,6 +157,29 @@ Management panels (one per role — shared shell, role-scoped tabs):
 │   └── pyproject.toml
 └── docker-compose.yml   # local dev: db + redis + backend + ml-service + frontend
 ```
+
+## Panel Data Rules (NON-NEGOTIABLE)
+- **No mock / filler display data** in management panels — starting with
+  **پنل مدیر عامل** and **پنل رئیس هیئت مدیره**, and the **same standard
+  for every panel we add or restyle going forward** (senior, finance,
+  commercial, IT, agency, user, etc.).
+- Lists, tables, KPI cards, charts, logs, cartable items, VIP members,
+  pricing proposals, reservation PNRs, surveys, and reports must come
+  **only from real API responses** backed by the database (or honest
+  zeros from real aggregates).
+- When there is no data: show the design empty state
+  (e.g. «اطلاعاتی یافت نشد» / «کارتابل خالی است») — **never** invent
+  sample rows, fake names, fake timestamps, or design-reference demo
+  arrays in React to “fill” the page.
+- Backend endpoints must not fabricate record-shaped payloads when the
+  DB is empty just to make the UI look busy. Graceful-degradation
+  messages (e.g. «سرویس AI در دسترس نیست») are allowed; fake business
+  records are not.
+- `design-reference/` / `design-reference-v2/` sample arrays are for
+  visual reference only — do **not** copy them into production UI code.
+- `backend/typeorm/seed.ts` remains for **local/dev/E2E** only (never
+  production). Seeded rows are real DB rows for testing; they are not
+  a license to hardcode the same content in the frontend.
 
 ## Workflow Rules
 1. NEVER write feature code before `docs/API.md` and `docs/DB_SCHEMA.md`
@@ -253,12 +276,12 @@ Management panels (one per role — shared shell, role-scoped tabs):
 - Frontend never calls fetch/axios directly in components — only through `src/api/`.
 - Environment variables: validated at startup; `.env.example` always kept current;
   never commit real secrets.
-- Seed data: `backend/typeorm/seed.ts` must stay in sync with the schema and
-  create realistic sample data for every domain (test users with known
+- Seed data: `backend/src/database/seed.ts` must stay in sync with the schema
+  and create realistic sample data for every domain (test users with known
   passwords **for every role**, sample airports/routes/flights with
   schedules and fares, club members in each tier, an agency with credit,
   promo code `BLUE20`, sample bookings in each state) so any feature can be
-  manually exercised right after `typeorm migrate dev`. Update the seed in
+  manually exercised right after `npm run migration:run`. Update the seed in
   the same phase that adds a new table. Seed data is for development only —
   never run against production.
 
@@ -445,14 +468,16 @@ Unchecked items = feature not done. Never mark a feature done by
   postgres (internal only) + redis (internal only) + ml-service (internal
   only) + backend + frontend + Caddy (auto-SSL).
 - Deploys happen ONLY through GitHub Actions (`.github/workflows/deploy.yml`):
-  push to `main` -> tests must pass -> SSH deploy -> `typeorm migrate deploy`.
-  Never deploy by hand-editing files on the server.
+  push to `main` -> tests must pass -> SSH deploy -> `npm run migration:run:prod`
+  (TypeORM). Never deploy by hand-editing files on the server.
 - `main` is always deployable. Feature work happens on branches; merge to
   `main` only when the phase is complete and tests pass.
 - Secrets live in GitHub Actions Secrets and in `/opt/app/.env` on the
   server (chmod 600). Never in the repo, never in logs.
-- DB changes in production use `typeorm migrate deploy` exclusively
-  (never `db push`, never manual SQL).
+- DB changes in production use `npm run migration:run:prod` exclusively
+  (never `synchronize: true`, never manual SQL). Generate migrations with
+  `npm run migration:generate -- src/database/migrations/<Name>` after
+  changing an entity, review the generated SQL, then commit it.
 - Nightly `pg_dump` backups on the server, 7-day retention. A backup is
   only real if it restores: once a month, restore the latest dump into a
   throwaway Postgres container and run a sanity query (row counts on core
@@ -471,7 +496,7 @@ Unchecked items = feature not done. Never mark a feature done by
 - `cd frontend && npm run dev` — frontend dev server
 - `cd ml-service && uvicorn app.main:app --reload` — ML service dev server
 - `cd ml-service && pytest` — ML service tests
-- `cd backend && npx typeorm migrate dev` — apply schema changes
+- `cd backend && npm run migration:run` — apply schema migrations
 - `npm test` (in each package) — run tests
 - `npm run lint && npm run typecheck` — must pass in BOTH packages before
   finishing any phase

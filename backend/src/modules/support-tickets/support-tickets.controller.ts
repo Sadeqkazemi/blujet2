@@ -16,12 +16,13 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import {
+  AdminCreateSupportTicketDto,
   ForwardTicketDto,
   SubmitSupportTicketDto,
   UpdateTicketStatusDto,
 } from './dto/support-ticket.dtos';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import type { SupportTicketStatus } from '../../../generated/typeorm/client';
+import type { SupportTicketStatus } from '../../database/enums';
 
 /** پشتیبانی — public ticket submission (no login), SITE_ADMIN-gated
  * review/forward/status endpoints (see docs/API.md's Phase 20 for the
@@ -36,6 +37,20 @@ export class SupportTicketsController {
   @ApiOperation({ summary: 'ثبت تیکت پشتیبانی (بدون ورود به حساب)' })
   async submit(@Body() dto: SubmitSupportTicketDto) {
     const data = await this.tickets.submit(dto);
+    return { success: true, data };
+  }
+
+  @Post('admin')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SITE_ADMIN')
+  @ApiOperation({
+    summary: 'ثبت تیکت از پنل ادمین سایت (مودال ایجاد تیکت — با بخش و اولویت)',
+  })
+  async createAsAdmin(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Body() dto: AdminCreateSupportTicketDto,
+  ) {
+    const data = await this.tickets.createAsAdmin(actor, dto);
     return { success: true, data };
   }
 

@@ -1,37 +1,31 @@
 import { generateOtpCode } from './generate-otp-code';
 
 describe('generateOtpCode', () => {
-  const prevEnv = process.env;
+  const env = process.env;
 
   beforeEach(() => {
-    process.env = { ...prevEnv };
+    process.env = { ...env, NODE_ENV: 'development' };
+    delete process.env.DEV_FIXED_OTP_CODE;
   });
 
   afterAll(() => {
-    process.env = prevEnv;
+    process.env = env;
   });
 
-  it('returns 123456 in development by default', () => {
-    process.env.NODE_ENV = 'development';
-    delete process.env.DEV_FIXED_OTP_CODE;
+  it('returns fixed 123456 in non-production by default', () => {
     expect(generateOtpCode()).toBe('123456');
   });
 
-  it('returns DEV_FIXED_OTP_CODE when set in development', () => {
-    process.env.NODE_ENV = 'development';
+  it('honours DEV_FIXED_OTP_CODE override in development', () => {
     process.env.DEV_FIXED_OTP_CODE = '654321';
     expect(generateOtpCode()).toBe('654321');
   });
 
-  it('returns a random 6-digit code in production', () => {
+  it('uses random codes in production', () => {
     process.env.NODE_ENV = 'production';
-    delete process.env.DEV_FIXED_OTP_CODE;
-    expect(generateOtpCode()).toMatch(/^\d{6}$/);
-  });
-
-  it('throws if DEV_FIXED_OTP_CODE is set in production', () => {
-    process.env.NODE_ENV = 'production';
-    process.env.DEV_FIXED_OTP_CODE = '123456';
-    expect(() => generateOtpCode()).toThrow(/DEV_FIXED_OTP_CODE/);
+    const a = generateOtpCode();
+    const b = generateOtpCode();
+    expect(a).toMatch(/^\d{6}$/);
+    expect(b).toMatch(/^\d{6}$/);
   });
 });

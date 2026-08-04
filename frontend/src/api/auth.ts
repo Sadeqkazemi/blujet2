@@ -1,10 +1,10 @@
-import { apiGet, apiPatch, apiPost } from './http';
+import { apiGet, apiPatch, apiPost, refreshAccessToken } from './http';
 import { setAccessToken } from './token-store';
-import { latinDigits } from '../lib/fa-format';
+import { latinDigits, normalizeIranMobile } from '../lib/fa-format';
 import type { AuthUser, Locale } from '../types/auth';
 
 function normalizePhone(phone: string) {
-  return latinDigits(phone).replace(/\s/g, '');
+  return normalizeIranMobile(latinDigits(phone).replace(/\s/g, ''));
 }
 
 function normalizeOtpCode(code: string) {
@@ -17,7 +17,7 @@ export function staffLogin(username: string, password: string) {
 
 export async function agencyLogin(phone: string, password: string) {
   const result = await apiPost<{ accessToken: string; user: AuthUser }>('/auth/agency/login', {
-    phone,
+    phone: normalizePhone(phone),
     password,
   });
   setAccessToken(result.accessToken);
@@ -34,9 +34,16 @@ export async function verifyTwoFactor(challengeId: string, code: string) {
 }
 
 export async function refreshSession() {
-  const result = await apiPost<{ accessToken: string }>('/auth/refresh');
-  setAccessToken(result.accessToken);
-  return result;
+  // Routed through the same deduped in-flight request the API-retry
+  // interceptor uses (see http.ts) instead of posting directly — firing a
+  // second, independent /auth/refresh here would race the interceptor's
+  // (or another concurrent caller's) request for the same not-yet-rotated
+  // refresh-token cookie, which the backend's reuse-detection treats as a
+  // stolen-token replay and revokes the whole session for.
+  const ok = await refreshAccessToken();
+  if (!ok) {
+    throw new Error('refresh failed');
+  }
 }
 
 export async function logout() {
@@ -57,6 +64,11 @@ export function updateMyLocale(locale: Locale) {
 
 export function requestOtp(phone: string) {
   return apiPost<{ challengeId: string }>('/auth/otp/request', { phone: normalizePhone(phone) });
+}
+
+/** Dev/E2E only — reads the mock OTP after requestOtp (404 in production). */
+export function fetchDevLastOtp(phone: string) {
+  return apiGet<{ code: string }>(`/auth/_test/last-otp/${encodeURIComponent(normalizePhone(phone))}`);
 }
 
 export type StepUpScope =
@@ -115,7 +127,7 @@ export async function customerPasswordLogin(phone: string, password: string) {
 
 /** Agency forgot-password — step 1: SMS OTP to the agency account phone. */
 export function requestAgencyPasswordReset(phone: string) {
-  return apiPost<{ challengeId: string }>('/auth/agency/password-reset/request', { phone });
+  return apiPost<{ challengeId: string }>('/auth/agency/password-reset/request', { phone: normalizePhone(phone) });
 }
 
 /** Agency forgot-password — step 2: verify OTP and issue a short-lived token for set-password. */

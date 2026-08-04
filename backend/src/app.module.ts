@@ -5,7 +5,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 import { randomUUID } from 'node:crypto';
 import { validateEnv } from './config/env.validation';
-import { TypeORMModule } from './typeorm/typeorm.module';
+import { DatabaseModule } from './database/database.module';
 import { RedisModule } from './redis/redis.module';
 import { HealthModule } from './health/health.module';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
@@ -82,7 +82,7 @@ import { WebservicePricingModule } from './modules/webservice-pricing/webservice
       throttlers: [{ ttl: 60_000, limit: 600 }],
     }),
     CommonModule,
-    TypeORMModule,
+    DatabaseModule,
     RedisModule,
     HealthModule,
     AuthModule,

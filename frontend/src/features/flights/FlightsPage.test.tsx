@@ -6,7 +6,6 @@ import * as pricingApi from '../../api/pricing';
 import * as authApi from '../../api/auth';
 import * as useAuthModule from '../../hooks/useAuth';
 import { mockAuthUserWithRole } from '../../test/mockAuthUser';
-import { parseJalaliDateToIso } from '../../lib/jalali';
 import type {
   AircraftTypeOption,
   AirportEntry,
@@ -151,49 +150,26 @@ describe('FlightsPage', () => {
     expect(screen.getByText('۳٬۸۰۰٬۰۰۰ تومان')).toBeInTheDocument();
   });
 
-  it('add-flight modal: empty submit shows the design message; a full form converts Jalali+toman and calls the API', async () => {
+  it('opens the full-page add-flight form when + افزودن پرواز is clicked', async () => {
     mockRole('SENIOR_MANAGER');
     mockData();
-    const create = vi.spyOn(flightsApi, 'createFlight').mockResolvedValue({
-      ...OVERVIEW.active[0],
-      id: 'new1',
-      derivedStatus: 'ACTIVE',
-    });
+    vi.spyOn(flightsApi, 'fetchAirports').mockResolvedValue([
+      { id: 'a1', code: 'THR', cityFa: 'تهران', tz: 'Asia/Tehran' },
+      { id: 'a2', code: 'MHD', cityFa: 'مشهد', tz: 'Asia/Tehran' },
+    ]);
+    vi.spyOn(flightsApi, 'fetchAircraftTypes').mockResolvedValue([
+      { aircraftType: 'Airbus A320', capacity: 180 },
+    ]);
 
     const { default: userEvent } = await import('@testing-library/user-event');
     render(<FlightsPage />);
 
     await userEvent.click(await screen.findByRole('button', { name: '+ افزودن پرواز' }));
-    const dialog = await screen.findByRole('dialog', { name: 'افزودن پرواز جدید' });
-
-    await userEvent.click(within(dialog).getByRole('button', { name: 'افزودن پرواز' }));
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
-      'لطفاً همه فیلدها را تکمیل کنید.',
-    );
-    expect(create).not.toHaveBeenCalled();
-
-    await userEvent.selectOptions(within(dialog).getByLabelText('مبدأ'), 'THR');
-    await userEvent.selectOptions(within(dialog).getByLabelText('مقصد'), 'MHD');
-    await userEvent.type(within(dialog).getByLabelText('شماره پرواز'), 'ep-901');
-    await userEvent.type(within(dialog).getByLabelText('تاریخ (جلالی)'), '1405/04/25');
-    await userEvent.type(within(dialog).getByLabelText('ساعت'), '08:30');
-    await userEvent.type(within(dialog).getByLabelText('ظرفیت (صندلی)'), '180');
-    await userEvent.type(within(dialog).getByLabelText('قیمت بلیط (تومان)'), '3800000');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'افزودن پرواز' }));
-
-    const expectedDeparture = new Date(parseJalaliDateToIso('1405/04/25')!);
-    expectedDeparture.setHours(8, 30, 0, 0);
-    await waitFor(() =>
-      expect(create).toHaveBeenCalledWith({
-        originCode: 'THR',
-        destCode: 'MHD',
-        flightNo: 'EP-901',
-        departureAt: expectedDeparture.toISOString(),
-        capacity: 180,
-        basePriceIrr: 38_000_000, // 3,800,000 toman → rial
-      }),
-    );
-    expect(await screen.findByText('پرواز جدید «تهران ← مشهد» اضافه شد ✓')).toBeInTheDocument();
+    expect(await screen.findByTestId('add-flight-page')).toBeInTheDocument();
+    expect(screen.getByText('افزودن پرواز جدید')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'ثبت پرواز و ارسال قیمت برای تأیید مدیر عامل' }),
+    ).toBeInTheDocument();
   });
 
   it('flight detail modal shows the real channel breakdown and total revenue', async () => {

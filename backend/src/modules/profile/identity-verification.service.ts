@@ -5,18 +5,27 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as fs from 'node:fs';
-import { TypeORMService } from '../../typeorm/typeorm.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { In, Not, Repository } from 'typeorm';
+import { User } from '../../database/entities/user.entity';
+import { StoredFile } from '../../database/entities/stored-file.entity';
+import { CustomerIdentityVerification } from '../../database/entities/customer-identity-verification.entity';
+import { findOneOrThrow } from '../../database/utils/find-one-or-throw';
 import { ErrorCode } from '../../common/errors';
 import { FilesService } from '../files/files.service';
 import { AuditService } from '../audit/audit.service';
 import { decryptPii } from '../../common/pii-crypto';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import type { CustomerIdentityStatus } from '../../../generated/typeorm/client';
+import type { CustomerIdentityStatus } from '../../database/enums';
 
 @Injectable()
 export class IdentityVerificationService {
   constructor(
-    private readonly typeorm: TypeORMService,
+    @InjectRepository(User) private readonly userRepo: Repository<User>,
+    @InjectRepository(StoredFile)
+    private readonly storedFileRepo: Repository<StoredFile>,
+    @InjectRepository(CustomerIdentityVerification)
+    private readonly civRepo: Repository<CustomerIdentityVerification>,
     private readonly files: FilesService,
     private readonly audit: AuditService,
   ) {}
@@ -32,11 +41,11 @@ export class IdentityVerificationService {
   }
 
   private async getOrCreateRow(userId: string) {
-    return this.typeorm.customerIdentityVerification.upsert({
-      where: { userId },
-      update: {},
-      create: { userId },
-    });
+    const existing = await this.civRepo.findOneBy({ userId });
+    if (existing) return existing;
+    return this.civRepo.save(
+      this.civRepo.create({ userId, updatedAt: new Date() }),
+    );
   }
 
   private shape(
@@ -83,7 +92,7 @@ export class IdentityVerificationService {
   }
 
   async getMine(user: AuthenticatedUser) {
-    const dbUser = await this.typeorm.user.findUniqueOrThrow({
+    const dbUser = await findOneOrThrow(this.userRepo, {
       where: { id: user.id },
       select: { fullName: true, nationalIdEnc: true, birthDate: true },
     });
@@ -91,7 +100,7 @@ export class IdentityVerificationService {
     let idCardFile: { id: string; fileName: string; sizeBytes: number } | null =
       null;
     if (row.idCardFileId) {
-      const file = await this.typeorm.storedFile.findUnique({
+      const file = await this.storedFileRepo.findOne({
         where: { id: row.idCardFileId },
         select: { id: true, fileName: true, sizeBytes: true, ownerId: true },
       });
@@ -115,18 +124,19 @@ export class IdentityVerificationService {
       });
     }
     const stored = await this.files.store(user, file);
-    await this.typeorm.customerIdentityVerification.update({
-      where: { userId: user.id },
-      data: {
+    await this.civRepo.update(
+      { userId: user.id },
+      {
         idCardFileId: stored.id,
         status: row.status === 'REJECTED' ? 'REJECTED' : 'NOT_STARTED',
+        updatedAt: new Date(),
       },
-    });
+    );
     return stored;
   }
 
   async submit(user: AuthenticatedUser) {
-    const dbUser = await this.typeorm.user.findUniqueOrThrow({
+    const dbUser = await findOneOrThrow(this.userRepo, {
       where: { id: user.id },
       select: { fullName: true, nationalIdEnc: true, birthDate: true },
     });
@@ -156,14 +166,15 @@ export class IdentityVerificationService {
       });
     }
 
-    await this.typeorm.customerIdentityVerification.update({
-      where: { userId: user.id },
-      data: {
+    await this.civRepo.update(
+      { userId: user.id },
+      {
         status: 'SUBMITTED',
         submittedAt: new Date(),
         rejectReason: null,
+        updatedAt: new Date(),
       },
-    });
+    );
     return this.getMine(user);
   }
 
@@ -172,27 +183,28 @@ export class IdentityVerificationService {
   /** NOT_STARTED rows (customer opened the tab but never submitted) are
    * not reviewable — the admin queue only lists submitted/decided ones. */
   async adminList() {
-    const rows = await this.typeorm.customerIdentityVerification.findMany({
-      where: { status: { not: 'NOT_STARTED' } },
-      include: {
+    const rows = await this.civRepo.find({
+      where: { status: Not('NOT_STARTED') },
+      relations: { user: true },
+      select: {
         user: {
-          select: {
-            fullName: true,
-            phone: true,
-            nationalIdEnc: true,
-            birthDate: true,
-          },
+          fullName: true,
+          phone: true,
+          nationalIdEnc: true,
+          birthDate: true,
         },
       },
-      orderBy: [{ submittedAt: 'desc' }],
+      order: { submittedAt: 'DESC' },
     });
     const fileIds = rows
       .map((r) => r.idCardFileId)
       .filter((id): id is string => Boolean(id));
-    const files = await this.typeorm.storedFile.findMany({
-      where: { id: { in: fileIds } },
-      select: { id: true, fileName: true },
-    });
+    const files = fileIds.length
+      ? await this.storedFileRepo.find({
+          where: { id: In(fileIds) },
+          select: { id: true, fileName: true },
+        })
+      : [];
     const fileNameById = new Map(files.map((f) => [f.id, f.fileName]));
 
     return rows.map((r) => ({
@@ -214,9 +226,10 @@ export class IdentityVerificationService {
   }
 
   private async adminRequireRow(id: string) {
-    const row = await this.typeorm.customerIdentityVerification.findUnique({
+    const row = await this.civRepo.findOne({
       where: { id },
-      include: { user: { select: { fullName: true, phone: true } } },
+      relations: { user: true },
+      select: { user: { fullName: true, phone: true } },
     });
     if (!row) {
       throw new NotFoundException({
@@ -238,8 +251,8 @@ export class IdentityVerificationService {
         message: 'برای این درخواست کارت ملی بارگذاری نشده است.',
       });
     }
-    const stored = await this.typeorm.storedFile.findUnique({
-      where: { id: row.idCardFileId },
+    const stored = await this.storedFileRepo.findOneBy({
+      id: row.idCardFileId,
     });
     if (!stored || !fs.existsSync(stored.path)) {
       throw new NotFoundException({
@@ -267,10 +280,16 @@ export class IdentityVerificationService {
 
   async adminApprove(actor: AuthenticatedUser, id: string) {
     const row = await this.adminRequireSubmitted(id);
-    const updated = await this.typeorm.customerIdentityVerification.update({
-      where: { id },
-      data: { status: 'APPROVED', reviewedAt: new Date(), rejectReason: null },
-    });
+    await this.civRepo.update(
+      { id },
+      {
+        status: 'APPROVED',
+        reviewedAt: new Date(),
+        rejectReason: null,
+        updatedAt: new Date(),
+      },
+    );
+    const updated = await findOneOrThrow(this.civRepo, { where: { id } });
     await this.audit.record({
       actorId: actor.id,
       actorRole: actor.role,
@@ -289,10 +308,16 @@ export class IdentityVerificationService {
     rejectReason: string,
   ) {
     const row = await this.adminRequireSubmitted(id);
-    const updated = await this.typeorm.customerIdentityVerification.update({
-      where: { id },
-      data: { status: 'REJECTED', reviewedAt: new Date(), rejectReason },
-    });
+    await this.civRepo.update(
+      { id },
+      {
+        status: 'REJECTED',
+        reviewedAt: new Date(),
+        rejectReason,
+        updatedAt: new Date(),
+      },
+    );
+    const updated = await findOneOrThrow(this.civRepo, { where: { id } });
     await this.audit.record({
       actorId: actor.id,
       actorRole: actor.role,

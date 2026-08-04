@@ -3,16 +3,14 @@ import { ApiExcludeEndpoint } from '@nestjs/swagger';
 import {
   HealthCheck,
   HealthCheckService,
-  TypeORMHealthIndicator,
+  TypeOrmHealthIndicator,
 } from '@nestjs/terminus';
-import { TypeORMService } from '../typeorm/typeorm.service';
 
 @Controller('health')
 export class HealthController {
   constructor(
     private readonly health: HealthCheckService,
-    private readonly typeormIndicator: TypeORMHealthIndicator,
-    private readonly typeorm: TypeORMService,
+    private readonly typeOrmIndicator: TypeOrmHealthIndicator,
   ) {}
 
   // Public, unauthenticated, rate-limit-exempt — used by Docker healthcheck + uptime monitoring.
@@ -21,7 +19,7 @@ export class HealthController {
   @HealthCheck()
   check() {
     return this.health.check([
-      () => this.typeormIndicator.pingCheck('database', this.typeorm),
+      () => this.typeOrmIndicator.pingCheck('database'),
       () => ({
         build: {
           status: 'up',

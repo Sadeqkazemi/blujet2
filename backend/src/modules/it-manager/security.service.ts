@@ -1,5 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { TypeORMService } from '../../typeorm/typeorm.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { IsNull, MoreThan, Repository } from 'typeorm';
+import { SecurityPolicy } from '../../database/entities/security-policy.entity';
+import { RefreshToken } from '../../database/entities/refresh-token.entity';
+import { findOneOrThrow } from '../../database/utils/find-one-or-throw';
 import { AuditService } from '../audit/audit.service';
 import { StepUpService } from '../auth/step-up.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
@@ -8,25 +12,31 @@ import type { UpdateSecurityPolicyDto } from './dto/security.dtos';
 @Injectable()
 export class SecurityService {
   constructor(
-    private readonly typeorm: TypeORMService,
+    @InjectRepository(SecurityPolicy)
+    private readonly policyRepo: Repository<SecurityPolicy>,
+    @InjectRepository(RefreshToken)
+    private readonly refreshTokenRepo: Repository<RefreshToken>,
     private readonly audit: AuditService,
     private readonly stepUp: StepUpService,
   ) {}
 
   /** Auto-creates the id=1 singleton with the design's defaults on first read. */
   async getPolicy() {
-    return this.typeorm.securityPolicy.upsert({
-      where: { id: 1 },
-      update: {},
-      create: { id: 1 },
-    });
+    const existing = await this.policyRepo.findOneBy({ id: 1 });
+    if (existing) return existing;
+    return this.policyRepo.save(
+      this.policyRepo.create({ id: 1, updatedAt: new Date() }),
+    );
   }
 
   async updatePolicy(actor: AuthenticatedUser, dto: UpdateSecurityPolicyDto) {
     await this.getPolicy();
-    const updated = await this.typeorm.securityPolicy.update({
+    await this.policyRepo.update(
+      { id: 1 },
+      { ...dto, updatedById: actor.id, updatedAt: new Date() },
+    );
+    const updated = await findOneOrThrow(this.policyRepo, {
       where: { id: 1 },
-      data: { ...dto, updatedById: actor.id },
     });
 
     await this.audit.record({
@@ -43,12 +53,13 @@ export class SecurityService {
   }
 
   async listSessions() {
-    const sessions = await this.typeorm.refreshToken.findMany({
-      where: { revokedAt: null, expiresAt: { gt: new Date() } },
-      include: {
-        user: { select: { id: true, fullName: true, role: true } },
+    const sessions = await this.refreshTokenRepo.find({
+      where: { revokedAt: IsNull(), expiresAt: MoreThan(new Date()) },
+      relations: { user: true },
+      select: {
+        user: { id: true, fullName: true, role: true },
       },
-      orderBy: { createdAt: 'desc' },
+      order: { createdAt: 'DESC' },
     });
     return sessions.map((s) => ({
       id: s.id,
@@ -75,20 +86,21 @@ export class SecurityService {
       stepUpCode,
       'SESSION_REVOKE',
     );
-    const result = await this.typeorm.refreshToken.updateMany({
-      where: { revokedAt: null },
-      data: { revokedAt: new Date() },
-    });
+    const result = await this.refreshTokenRepo.update(
+      { revokedAt: IsNull() },
+      { revokedAt: new Date() },
+    );
+    const revokedCount = result.affected ?? 0;
 
     await this.audit.record({
       actorId: actor.id,
       actorRole: actor.role,
       category: 'SECURITY',
       action: 'خروج اجباری همه نشست‌ها',
-      detail: `${actor.fullName} همه نشست‌های فعال (${result.count} مورد) را خاتمه داد.`,
+      detail: `${actor.fullName} همه نشست‌های فعال (${revokedCount} مورد) را خاتمه داد.`,
       entityType: 'RefreshToken',
     });
 
-    return { revokedCount: result.count };
+    return { revokedCount };
   }
 }
