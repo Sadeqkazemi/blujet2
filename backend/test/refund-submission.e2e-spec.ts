@@ -1,57 +1,78 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { TypeORMService } from '../src/typeorm/typeorm.service';
+import { DataSource } from 'typeorm';
+import { dataSourceOptions } from '../src/database/data-source.options';
+import { AircraftSeatMap } from '../src/database/entities/aircraft-seat-map.entity';
+import { Route } from '../src/database/entities/route.entity';
+import { Flight } from '../src/database/entities/flight.entity';
+import { FlightInstance } from '../src/database/entities/flight-instance.entity';
 import { loginAsCustomer } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
 describe('Customer refund submission (e2e)', () => {
   let app: INestApplication<App>;
-  let typeorm: TypeORMService;
+  let dataSource: DataSource;
   let flightId: string;
   const AIRCRAFT_TYPE = 'RS2E-TestJet';
 
   beforeAll(async () => {
-    const setupApp = await createTestApp();
-    typeorm = setupApp.get(TypeORMService);
+    const setupDataSource = new DataSource(dataSourceOptions);
+    await setupDataSource.initialize();
 
-    await typeorm.aircraftSeatMap.upsert({
-      where: { aircraftType: AIRCRAFT_TYPE },
-      update: {},
-      create: {
-        aircraftType: AIRCRAFT_TYPE,
-        businessRowStart: 1,
-        businessRowEnd: 0,
-        businessColsLeft: [],
-        businessColsRight: [],
-        economyRowStart: 1,
-        economyRowEnd: 2,
-        economyColsLeft: ['A'],
-        economyColsRight: ['C'],
-      },
+    const seatMapRepo = setupDataSource.getRepository(AircraftSeatMap);
+    const existingSeatMap = await seatMapRepo.findOneBy({
+      aircraftType: AIRCRAFT_TYPE,
     });
-    const route = await typeorm.route.upsert({
-      where: { originCode_destCode: { originCode: 'THR', destCode: 'SYZ' } },
-      update: {},
-      create: { originCode: 'THR', destCode: 'SYZ', durationMin: 70 },
+    if (!existingSeatMap) {
+      await seatMapRepo.save(
+        seatMapRepo.create({
+          aircraftType: AIRCRAFT_TYPE,
+          businessRowStart: 1,
+          businessRowEnd: 0,
+          businessColsLeft: [],
+          businessColsRight: [],
+          economyRowStart: 1,
+          economyRowEnd: 2,
+          economyColsLeft: ['A'],
+          economyColsRight: ['C'],
+          updatedAt: new Date(),
+        }),
+      );
+    }
+    const routeRepo = setupDataSource.getRepository(Route);
+    let route = await routeRepo.findOneBy({
+      originCode: 'THR',
+      destCode: 'SYZ',
     });
-    const flight = await typeorm.flight.upsert({
-      where: { flightNo: 'RS-200' },
-      update: {},
-      create: {
-        flightNo: 'RS-200',
-        routeId: route.id,
-        aircraftType: AIRCRAFT_TYPE,
-      },
-    });
+    if (!route) {
+      route = await routeRepo.save(
+        routeRepo.create({
+          originCode: 'THR',
+          destCode: 'SYZ',
+          durationMin: 70,
+        }),
+      );
+    }
+    const flightRepo = setupDataSource.getRepository(Flight);
+    let flight = await flightRepo.findOneBy({ flightNo: 'RS-200' });
+    if (!flight) {
+      flight = await flightRepo.save(
+        flightRepo.create({
+          flightNo: 'RS-200',
+          routeId: route.id,
+          aircraftType: AIRCRAFT_TYPE,
+        }),
+      );
+    }
     flightId = flight.id;
 
-    await setupApp.close();
+    await setupDataSource.destroy();
   });
 
   beforeEach(async () => {
     app = await createTestApp();
-    typeorm = app.get(TypeORMService);
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
@@ -61,15 +82,16 @@ describe('Customer refund submission (e2e)', () => {
   async function bookAndPay(phone: string, daysAhead: number, seatCode = '1A') {
     const { accessToken } = await loginAsCustomer(app, phone);
     const departureAt = new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000);
-    const instance = await typeorm.flightInstance.create({
-      data: {
+    const instanceRepo = dataSource.getRepository(FlightInstance);
+    const instance = await instanceRepo.save(
+      instanceRepo.create({
         flightId,
         departureAt,
         arrivalAt: new Date(departureAt.getTime() + 70 * 60 * 1000),
         capacity: 4,
         status: 'SCHEDULED',
-      },
-    });
+      }),
+    );
     const createRes = await request(app.getHttpServer())
       .post('/bookings')
       .set('Authorization', `Bearer ${accessToken}`)
@@ -88,7 +110,9 @@ describe('Customer refund submission (e2e)', () => {
     return {
       accessToken,
       bookingId,
-      priceIrr: payRes.body.data.booking.priceIrr as number,
+      // Money fields are decimal STRINGs on the wire
+      // (BigInt.prototype.toJSON) — keep as string, compare via BigInt.
+      priceIrr: payRes.body.data.booking.priceIrr as string,
     };
   }
 
@@ -106,10 +130,13 @@ describe('Customer refund submission (e2e)', () => {
     expect(res.status).toBe(201);
     expect(res.body.data.status).toBe('SUBMITTED');
     expect(res.body.data.totalPaidIrr).toBe(priceIrr);
-    expect(res.body.data.refundableIrr).toBeLessThanOrEqual(priceIrr);
-    expect(res.body.data.penaltyAmountIrr + res.body.data.refundableIrr).toBe(
-      priceIrr,
+    expect(BigInt(String(res.body.data.refundableIrr))).toBeLessThanOrEqual(
+      BigInt(priceIrr),
     );
+    expect(
+      BigInt(String(res.body.data.penaltyAmountIrr)) +
+        BigInt(String(res.body.data.refundableIrr)),
+    ).toBe(BigInt(priceIrr));
     // No PII on the submission response (design's cards show none).
     expect(res.body.data.ibanEnc).toBeUndefined();
   });
@@ -135,15 +162,16 @@ describe('Customer refund submission (e2e)', () => {
   it('rejects submitting a refund for a HELD (unpaid) booking', async () => {
     const { accessToken } = await loginAsCustomer(app, '09140000003');
     const departureAt = new Date(Date.now() + 20 * 24 * 60 * 60 * 1000);
-    const instance = await typeorm.flightInstance.create({
-      data: {
+    const instanceRepo = dataSource.getRepository(FlightInstance);
+    const instance = await instanceRepo.save(
+      instanceRepo.create({
         flightId,
         departureAt,
         arrivalAt: new Date(departureAt.getTime() + 70 * 60 * 1000),
         capacity: 4,
         status: 'SCHEDULED',
-      },
-    });
+      }),
+    );
     const createRes = await request(app.getHttpServer())
       .post('/bookings')
       .set('Authorization', `Bearer ${accessToken}`)
@@ -171,7 +199,7 @@ describe('Customer refund submission (e2e)', () => {
       .post('/my/refunds')
       .set('Authorization', `Bearer ${stranger.accessToken}`)
       .send({ bookingId, iban: 'IR820170000000332211009900' });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(404);
   });
 
   it('listMine only returns the caller’s own refund requests', async () => {

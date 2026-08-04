@@ -97,4 +97,7 @@ Still genuinely deferred:
 - Public agency self-registration form (the آژانس همکار tab's signup half) — already explicitly deferred in Phase 3's own docs; this phase doesn't touch it either. Login only works for agencies already approved through the existing staff-side membership-request flow.
 - Forced password-change enforcement on `mustChangePassword: true` — the flag is set and surfaced (same as Phase 8's employee resets) but no login-time enforcement exists for ANY role yet, staff included; not invented here as a one-off for agencies.
 - «فراموشی رمز» (forgot password) self-service flow for the AGENCY role — customers got a real OTP-based flow in Phase 21 and staff's is an intentional "contact IT" non-flow (also Phase 21), but `AgencyLoginPage.tsx` has no recovery link at all and no backend endpoint exists; a locked-out agency currently has no self-service path back into its account.
-- Staff-side UI for credit-requests/webservice-requests decisions (found while building Phase 39's document review, which mirrors these two endpoints' pattern) — `GET/PATCH /agencies/:id/credit-requests` and `.../webservice-requests` are fully built and e2e-tested, but `AgencyDetailPage.tsx` never calls either; every such request is currently decidable only via curl/Supertest, same shape of gap as documents were before Phase 39.
+- Staff-side UI for credit-requests/webservice-requests decisions —
+  **done** (see `docs/API.md` Phase 39 follow-up): `AgencyDetailPage.tsx`
+  cards for both request types with approve/reject wired to the existing
+  staff endpoints.

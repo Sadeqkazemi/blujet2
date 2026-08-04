@@ -90,10 +90,7 @@ export default function AgencyInboxPage() {
   if (!messages) return <p className="p-8 text-sm text-muted">{t.loading}</p>;
 
   return (
-    <div className="p-8">
-      <h1 className="mb-1 text-xl font-black text-ink">{t.heading}</h1>
-      <p className="mb-6 text-sm text-muted">{t.subtitle}</p>
-
+    <div>
       <div className="mb-4 flex flex-col gap-3 rounded-xl border border-border bg-white p-5">
         {messages.length === 0 ? (
           <p className="py-4 text-center text-xs text-muted">{t.empty}</p>

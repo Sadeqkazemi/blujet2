@@ -1,9 +1,29 @@
 export type SeatStatus = 'FREE' | 'SOLD' | 'LOCKED';
 
+/** Rich sold-seat passenger info surfaced in the IT reservation seat map. */
+export interface SeatPassengerInfo {
+  fullName: string;
+  pnr: string;
+  bookingStatus: BookingStatus;
+  nationalId: string | null;
+  priceIrr: string;
+}
+
+/** Lighter sold-seat occupant shape used by the CEO/Board «هواپیما» modal. */
+export interface SeatOccupant {
+  pnr: string;
+  passengerName: string;
+  bookingStatus: BookingStatus;
+}
+
 export interface SeatCell {
   seatCode: string;
   status: SeatStatus;
   lockId: string | null;
+  passenger?: SeatPassengerInfo | null;
+  occupant?: SeatOccupant | null;
+  lockExpiresAt?: string | null;
+  lockPassengerName?: string | null;
 }
 
 export interface SeatRow {
@@ -15,11 +35,18 @@ export interface SeatRow {
 export interface SeatMap {
   flightInstanceId: string;
   aircraftType: string;
+  flightNo: string;
+  originCode?: string;
+  destCode?: string;
+  originCityFa?: string;
+  destCityFa?: string;
+  departureAt: string;
   rows: SeatRow[];
   cabinLayout: Record<'BUSINESS' | 'ECONOMY', { aisleAfterIndex: number }>;
   capacity: number;
   soldCount: number;
   lockedCount: number;
+  freeCount: number;
   occupancyPct: number;
 }
 
@@ -57,7 +84,8 @@ export interface PnrDetail {
   pnr: string;
   status: BookingStatus;
   channel: string;
-  priceIrr: number;
+  // Decimal STRING on the wire (BigInt.prototype.toJSON on the backend).
+  priceIrr: string;
   flightNo: string;
   originCode: string;
   destCode: string;
@@ -75,13 +103,71 @@ export interface FlightSearchResult {
   destCode: string;
   departureAt: string;
   arrivalAt: string;
-  priceIrr: number;
+  priceIrr: string;
   seatsLeft: number;
+}
+
+export interface ReservationChannelShare {
+  key: string;
+  label: string;
+  color: string;
+  count: number;
+  pct: number;
+}
+
+export interface ReservationServiceHealth {
+  name: string;
+  fa: string;
+  ok: boolean;
+  latencyMs: number | null;
+  statusLabel: string;
 }
 
 export interface ReservationDashboardStats {
   todayBookings: number;
   activePnrs: number;
   seatsSold: number;
-  revenueIrr: number;
+  revenueIrr: string;
+  channels: ReservationChannelShare[];
+  services: ReservationServiceHealth[];
+  servicesStable: boolean;
+}
+
+export interface AgencyApiAccessRow {
+  id: string;
+  agencyId: string;
+  name: string;
+  initials: string;
+  keyHint: string;
+  callCount: number;
+  status: 'ACTIVE' | 'SUSPENDED';
+}
+
+export type ReservationFlightStatusKey = 'SELLING' | 'NEAR_FULL' | 'FULL';
+
+/**
+ * Superset of the two reservation flight-row shapes the panels consume:
+ *  - IT «پروازها» table: route / sold / occupancyPct / statusKey.
+ *  - CEO «هواپیما» flights tab: origin/dest city + soldCount/lockedCount/freeCount.
+ * A given API response only fills one set, so the other is optional.
+ */
+export interface ReservationFlightRow {
+  flightInstanceId: string;
+  flightNo: string;
+  aircraftType: string;
+  departureAt: string;
+  capacity: number;
+  // IT reservation flights table
+  route?: string;
+  sold?: number;
+  occupancyPct?: number;
+  statusKey?: ReservationFlightStatusKey;
+  // CEO/Board «هواپیما» flights tab
+  originCode?: string;
+  destCode?: string;
+  originCityFa?: string;
+  destCityFa?: string;
+  soldCount?: number;
+  lockedCount?: number;
+  freeCount?: number;
 }

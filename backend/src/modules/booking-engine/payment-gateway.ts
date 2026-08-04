@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import type { Irr } from '../../common/money';
 
 /**
  * Shetab/IPG abstraction (CLAUDE.md Financial Rules): request → redirect →
@@ -20,8 +21,8 @@ export interface GatewayVerifyResult {
 }
 
 export interface PaymentGateway {
-  request(amountIrr: number, bookingId: string): Promise<GatewayRequestResult>;
-  verify(authority: string, amountIrr: number): Promise<GatewayVerifyResult>;
+  request(amountIrr: Irr, bookingId: string): Promise<GatewayRequestResult>;
+  verify(authority: string, amountIrr: Irr): Promise<GatewayVerifyResult>;
   reverse(refId: string): Promise<void>;
 }
 
@@ -31,7 +32,7 @@ export const PAYMENT_GATEWAY = Symbol('PAYMENT_GATEWAY');
 export class SandboxPaymentGateway implements PaymentGateway {
   private readonly logger = new Logger(SandboxPaymentGateway.name);
 
-  request(amountIrr: number, bookingId: string): Promise<GatewayRequestResult> {
+  request(amountIrr: Irr, bookingId: string): Promise<GatewayRequestResult> {
     const authority = `SBX-${randomUUID()}`;
     this.logger.log(
       `sandbox gateway request: booking=${bookingId} amountIrr=${amountIrr} authority=${authority}`,
@@ -39,7 +40,7 @@ export class SandboxPaymentGateway implements PaymentGateway {
     return Promise.resolve({ authority, redirectUrl: null });
   }
 
-  verify(authority: string, amountIrr: number): Promise<GatewayVerifyResult> {
+  verify(authority: string, amountIrr: Irr): Promise<GatewayVerifyResult> {
     this.logger.log(
       `sandbox gateway verify: authority=${authority} amountIrr=${amountIrr}`,
     );

@@ -33,6 +33,16 @@ export class ReportingController {
     return { success: true, data };
   }
 
+  @Get('flight-sales')
+  @ApiOperation({
+    summary:
+      'Departed flights with per-channel sales — «شماره پرواز» picker on analytic مالی',
+  })
+  async flightSales() {
+    const data = await this.reporting.flightSales();
+    return { success: true, data };
+  }
+
   @Get('kpis')
   @ApiOperation({
     summary:
@@ -60,6 +70,39 @@ export class ReportingController {
   @ApiOperation({ summary: 'Flights <72h out with occupancy below threshold' })
   async lowSalesAlerts() {
     const data = await this.reporting.lowSalesAlerts();
+    return { success: true, data };
+  }
+
+  @Get('finance-dashboard-stats')
+  @Roles('CEO', 'BOARD_CHAIR', 'SENIOR_MANAGER', 'FINANCE_MANAGER')
+  @ApiOperation({
+    summary:
+      'کارت‌های داشبورد اجرایی/مالی — آژانس/مسافر/بلیط/درآمد ماه جاری با روند (پنل مدیر عامل و هم‌ترازها + مدیر مالی)',
+  })
+  async financeDashboardStats() {
+    const data = await this.reporting.financeDashboardStats();
+    return { success: true, data };
+  }
+
+  @Get('commercial-overview')
+  @Roles('COMMERCIAL_MANAGER')
+  @ApiOperation({
+    summary:
+      'Commercial Manager dashboard KPI row — active agencies, passengers this month, pending cooperation requests',
+  })
+  async commercialOverview() {
+    const data = await this.reporting.commercialOverview();
+    return { success: true, data };
+  }
+
+  @Get('site-admin-overview')
+  @Roles('SITE_ADMIN')
+  @ApiOperation({
+    summary:
+      'SITE_ADMIN dashboard KPI row — active agencies, passengers/tickets this month, pending actions',
+  })
+  async siteAdminOverview() {
+    const data = await this.reporting.siteAdminOverview();
     return { success: true, data };
   }
 

@@ -9,20 +9,24 @@ import DashboardRouter from './components/DashboardRouter';
 import TabGate from './components/TabGate';
 import LoginPage from './features/auth/LoginPage';
 import TwoFactorPage from './features/auth/TwoFactorPage';
+import ForcePasswordChangePage from './features/auth/ForcePasswordChangePage';
 import ForgotPasswordPage from './features/auth/ForgotPasswordPage';
 import AgencyLoginPage from './features/agency-portal/AgencyLoginPage';
 import AgencyPortalShell from './features/agency-portal/AgencyPortalShell';
 import AgencyDashboardPage from './features/agency-portal/AgencyDashboardPage';
 import AgencySeatsPage from './features/agency-portal/AgencySeatsPage';
 import AgencyWebservicePage from './features/agency-portal/AgencyWebservicePage';
+import AgencyApiDocsPage from './features/agency-portal/AgencyApiDocsPage';
 import AgencyCreditPage from './features/agency-portal/AgencyCreditPage';
 import AgencySalesPage from './features/agency-portal/AgencySalesPage';
 import AgencyInboxPage from './features/agency-portal/AgencyInboxPage';
 import AgencyProfilePage from './features/agency-portal/AgencyProfilePage';
-import AgenciesListPage from './features/agencies/AgenciesListPage';
+import AgenciesRouter from './features/agencies/AgenciesRouter';
 import AgencyDetailPage from './features/agencies/AgencyDetailPage';
 import RequestDetailPage from './features/agencies/RequestDetailPage';
-import CartablePage from './features/cartable/CartablePage';
+import ReportsRouter from './components/ReportsRouter';
+import CartableRouter from './components/CartableRouter';
+import ClubRouter from './features/club/ClubRouter';
 import ClubPage from './features/club/ClubPage';
 import ClubTierRulesPage from './features/club/ClubTierRulesPage';
 import EmployeesPage from './features/it-manager/EmployeesPage';
@@ -35,11 +39,11 @@ import FlightsPage from './features/flights/FlightsPage';
 import FlightOpsPage from './features/flightops/FlightOpsPage';
 import ReservationPage from './features/reservation/ReservationPage';
 import FinancePage from './features/finance/FinancePage';
-import PassengerReportsPage from './features/passenger-reports/PassengerReportsPage';
 import StaffReportsPage from './features/staff-reports/StaffReportsPage';
 import ManagerReportsPage from './features/manager-reports/ManagerReportsPage';
 import AdminsPage from './features/admins/AdminsPage';
 import SettingsPage from './features/settings/SettingsPage';
+import CommercialWebservicePage from './features/webservice/CommercialWebservicePage';
 import SecurityRouter from './components/SecurityRouter';
 import LogsRouter from './components/LogsRouter';
 import ReferralsRouter from './components/ReferralsRouter';
@@ -48,6 +52,7 @@ import HomeSearchPage from './features/public-site/HomeSearchPage';
 import ResultsPage from './features/public-site/ResultsPage';
 import BookPage from './features/public-site/BookPage';
 import CheckoutPage from './features/public-site/CheckoutPage';
+import PaymentPage from './features/public-site/PaymentPage';
 import TicketPage from './features/public-site/TicketPage';
 import DestinationsPage from './features/public-site/DestinationsPage';
 import PublicClubPage from './features/public-site/PublicClubPage';
@@ -65,7 +70,12 @@ import SurveyPage from './features/survey/SurveyPage';
 import SurveyRouter from './components/SurveyRouter';
 import CareersPage from './features/public-site/CareersPage';
 import CareersApplyPage from './features/public-site/CareersApplyPage';
+import BlogPage from './features/public-site/BlogPage';
+import BlogPostPage from './features/public-site/BlogPostPage';
 import CareersAdminPage from './features/careers/CareersAdminPage';
+import BlogAdminPage from './features/blog/BlogAdminPage';
+import MediaAdminPage from './features/site-content/MediaAdminPage';
+import IdentityAdminPage from './features/identity-admin/IdentityAdminPage';
 
 export default function App() {
   return (
@@ -77,6 +87,7 @@ export default function App() {
           <Route path="/results" element={<ResultsPage />} />
           <Route path="/book/:flightInstanceId" element={<BookPage />} />
           <Route path="/checkout/:bookingId" element={<CheckoutPage />} />
+          <Route path="/payment/:bookingId" element={<PaymentPage />} />
           <Route path="/ticket/:pnr" element={<TicketPage />} />
           <Route path="/destinations" element={<DestinationsPage />} />
           <Route path="/club" element={<PublicClubPage />} />
@@ -93,9 +104,12 @@ export default function App() {
           <Route path="/survey/:token" element={<SurveyPage />} />
           <Route path="/careers" element={<CareersPage />} />
           <Route path="/careers/:jobId/apply" element={<CareersApplyPage />} />
+          <Route path="/blog" element={<BlogPage />} />
+          <Route path="/blog/:slug" element={<BlogPostPage />} />
 
           <Route path="/login" element={<LoginPage />} />
           <Route path="/two-factor" element={<TwoFactorPage />} />
+          <Route path="/required-password-change" element={<ForcePasswordChangePage />} />
           <Route path="/agency/login" element={<AgencyLoginPage />} />
 
           <Route element={<AgencyProtectedRoute />}>
@@ -104,6 +118,7 @@ export default function App() {
               <Route path="seats" element={<AgencySeatsPage />} />
               <Route path="credit" element={<AgencyCreditPage />} />
               <Route path="webservice" element={<AgencyWebservicePage />} />
+              <Route path="apidocs" element={<AgencyApiDocsPage />} />
               <Route path="sales" element={<AgencySalesPage />} />
               <Route path="inbox" element={<AgencyInboxPage />} />
               <Route path="profile" element={<AgencyProfilePage />} />
@@ -114,24 +129,27 @@ export default function App() {
             <Route path="/panel" element={<PanelShell />}>
               <Route index element={<DashboardRouter />} />
               <Route path="agencies" element={<TabGate tabKey="agencies" />}>
-                <Route index element={<AgenciesListPage />} />
+                <Route index element={<AgenciesRouter />} />
                 <Route path="requests/:requestId" element={<RequestDetailPage />} />
                 <Route path=":agencyId" element={<AgencyDetailPage />} />
               </Route>
               <Route path="cartable" element={<TabGate tabKey="cartable" />}>
-                <Route index element={<CartablePage />} />
+                <Route index element={<CartableRouter />} />
               </Route>
               <Route path="referrals" element={<TabGate tabKey="referrals" />}>
                 <Route index element={<ReferralsRouter />} />
               </Route>
               <Route path="club" element={<TabGate tabKey="club" />}>
-                <Route index element={<ClubPage />} />
+                <Route index element={<ClubRouter />} />
               </Route>
               <Route path="vip" element={<TabGate tabKey="vip" />}>
                 <Route index element={<ClubPage />} />
               </Route>
               <Route path="clubrules" element={<TabGate tabKey="clubrules" />}>
                 <Route index element={<ClubTierRulesPage />} />
+              </Route>
+              <Route path="webservice" element={<TabGate tabKey="webservice" />}>
+                <Route index element={<CommercialWebservicePage />} />
               </Route>
               <Route path="survey" element={<TabGate tabKey="survey" />}>
                 <Route index element={<SurveyRouter />} />
@@ -169,6 +187,15 @@ export default function App() {
               <Route path="jobapps" element={<TabGate tabKey="jobapps" />}>
                 <Route index element={<CareersAdminPage />} />
               </Route>
+              <Route path="blog" element={<TabGate tabKey="blog" />}>
+                <Route index element={<BlogAdminPage />} />
+              </Route>
+              <Route path="media" element={<TabGate tabKey="media" />}>
+                <Route index element={<MediaAdminPage />} />
+              </Route>
+              <Route path="kyc" element={<TabGate tabKey="kyc" />}>
+                <Route index element={<IdentityAdminPage />} />
+              </Route>
               <Route path="reservation" element={<TabGate tabKey="reservation" />}>
                 <Route index element={<ReservationPage />} />
               </Route>
@@ -176,7 +203,7 @@ export default function App() {
                 <Route index element={<FinancePage />} />
               </Route>
               <Route path="reports" element={<TabGate tabKey="reports" />}>
-                <Route index element={<PassengerReportsPage />} />
+                <Route index element={<ReportsRouter />} />
               </Route>
               <Route path="staff" element={<TabGate tabKey="staff" />}>
                 <Route index element={<StaffReportsPage />} />

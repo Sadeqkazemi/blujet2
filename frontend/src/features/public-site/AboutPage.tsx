@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react';
 import PublicPageShell from '../../components/public/PublicPageShell';
+import { fetchPublicSiteContent } from '../../api/settings';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
@@ -70,6 +72,17 @@ export default function AboutPage() {
   const { locale } = useLocale();
   const isMobile = useIsMobile();
   const t = STR[locale];
+  const [aboutText, setAboutText] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchPublicSiteContent(locale)
+      .then((res) => setAboutText(res.aboutUsText.trim() || null))
+      .catch(() => {
+        /* static fallback */
+      });
+  }, [locale]);
+
+  const heroDesc = aboutText ?? t.heroDesc;
   const gridCols2 = isMobile ? '1fr' : '1fr 1fr';
   const gridCols3 = isMobile ? '1fr' : 'repeat(3,1fr)';
   const gridCols4 = isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)';
@@ -83,7 +96,7 @@ export default function AboutPage() {
           </div>
           <h1 style={{ fontSize: isMobile ? 24 : 32, fontWeight: 900, margin: '0 0 14px', letterSpacing: '-.6px' }}>{t.heroTitle}</h1>
           <p style={{ fontSize: 14, color: '#c9dcf3', margin: 0, lineHeight: 1.95 }}>
-            {t.heroDesc}
+            {heroDesc}
           </p>
         </div>
       </section>

@@ -24,7 +24,7 @@ async function seedRefundRequest(page: Page): Promise<{ passengerName: string }>
 test('finance journey: KPI cards → detail (شبا + penalty breakdown) → refer → pay → closed case', async ({
   page,
 }) => {
-  await loginAs(page, 'finance.karimi');
+  await loginAs(page, 'finance');
   const { passengerName } = await seedRefundRequest(page);
 
   await page.getByRole('link', { name: /^استرداد بلیط/ }).click();
@@ -67,6 +67,6 @@ test('finance journey: KPI cards → detail (شبا + penalty breakdown) → ref
 });
 
 test('Commercial Manager gets no refunds surface (role isolation)', async ({ page }) => {
-  await loginAs(page, 'comm.abbasi');
+  await loginAs(page, 'comm');
   await expect(page.getByRole('link', { name: /^استرداد بلیط/ })).toHaveCount(0);
 });

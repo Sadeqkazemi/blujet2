@@ -4,7 +4,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { TypeORMService } from '../../typeorm/typeorm.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { IsNull, LessThanOrEqual, MoreThan, Repository } from 'typeorm';
+import { SeatLock } from '../../database/entities/seat-lock.entity';
+import { FlightInstance } from '../../database/entities/flight-instance.entity';
+import { AircraftSeatMap } from '../../database/entities/aircraft-seat-map.entity';
+import { Passenger } from '../../database/entities/passenger.entity';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
 import {
@@ -15,7 +20,7 @@ import {
 } from '../../common/pii-crypto';
 import { enumerateSeats, isKnownSeat } from './seat-layout';
 import { resolveAircraftType } from '../flights/aircraft-type.util';
-import { TypeORM } from '../../../generated/typeorm/client';
+import { isUniqueViolation } from '../../database/utils/pg-errors';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { LockSeatDto, RejectLockDto } from './dto/reservation.dtos';
 
@@ -36,7 +41,14 @@ function hoursFromNow(hours: number): Date {
 @Injectable()
 export class SeatmapService {
   constructor(
-    private readonly typeorm: TypeORMService,
+    @InjectRepository(SeatLock)
+    private readonly seatLockRepo: Repository<SeatLock>,
+    @InjectRepository(FlightInstance)
+    private readonly flightInstanceRepo: Repository<FlightInstance>,
+    @InjectRepository(AircraftSeatMap)
+    private readonly seatMapRepo: Repository<AircraftSeatMap>,
+    @InjectRepository(Passenger)
+    private readonly passengerRepo: Repository<Passenger>,
     private readonly audit: AuditService,
   ) {}
 
@@ -44,7 +56,17 @@ export class SeatmapService {
    * HELD/holdExpiresAt lazy-exclusion pattern: still un-released AND not
    * past its request-decision/hold-to-ticket deadline. */
   private activeLockWhere() {
-    return { releasedAt: null, expiresAt: { gt: new Date() } };
+    return { releasedAt: IsNull(), expiresAt: MoreThan(new Date()) };
+  }
+
+  private async findSoldConflict(flightInstanceId: string, seatCode: string) {
+    return this.passengerRepo
+      .createQueryBuilder('p')
+      .innerJoin('p.booking', 'b')
+      .where('p.seatCode = :seatCode', { seatCode })
+      .andWhere('b.flightInstanceId = :flightInstanceId', { flightInstanceId })
+      .andWhere('b.status != :cancelled', { cancelled: 'CANCELLED' })
+      .getOne();
   }
 
   /** The DB's partial unique index only knows `releasedAt IS NULL`, not
@@ -54,22 +76,23 @@ export class SeatmapService {
    * released lock themselves before proceeding. A conditional update
    * guards a concurrent double-release. */
   private async releaseIfExpired(flightInstanceId: string, seatCode: string) {
-    await this.typeorm.seatLock.updateMany({
-      where: {
+    await this.seatLockRepo.update(
+      {
         flightInstanceId,
         seatCode,
-        releasedAt: null,
-        expiresAt: { lte: new Date() },
+        releasedAt: IsNull(),
+        expiresAt: LessThanOrEqual(new Date()),
       },
-      data: { releasedAt: new Date() },
-    });
+      { releasedAt: new Date() },
+    );
   }
 
   private async getFlightInstanceOrThrow(id: string) {
-    const instance = await this.typeorm.flightInstance.findUnique({
-      where: { id },
-      include: { flight: true },
-    });
+    const instance = await this.flightInstanceRepo
+      .createQueryBuilder('fi')
+      .leftJoinAndSelect('fi.flight', 'flight')
+      .where('fi.id = :id', { id })
+      .getOne();
     if (!instance) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -80,9 +103,7 @@ export class SeatmapService {
   }
 
   private async getSeatMapConfigOrThrow(aircraftType: string) {
-    const map = await this.typeorm.aircraftSeatMap.findUnique({
-      where: { aircraftType },
-    });
+    const map = await this.seatMapRepo.findOneBy({ aircraftType });
     if (!map) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -100,14 +121,17 @@ export class SeatmapService {
     const seats = enumerateSeats(map);
 
     const [soldPassengers, activeLocks] = await Promise.all([
-      this.typeorm.passenger.findMany({
-        where: {
-          seatCode: { not: null },
-          booking: { flightInstanceId, status: { not: 'CANCELLED' } },
-        },
-        select: { seatCode: true },
-      }),
-      this.typeorm.seatLock.findMany({
+      this.passengerRepo
+        .createQueryBuilder('p')
+        .innerJoin('p.booking', 'b')
+        .where('p.seatCode IS NOT NULL')
+        .andWhere('b.flightInstanceId = :flightInstanceId', {
+          flightInstanceId,
+        })
+        .andWhere('b.status != :cancelled', { cancelled: 'CANCELLED' })
+        .select(['p.seatCode'])
+        .getMany(),
+      this.seatLockRepo.find({
         where: { flightInstanceId, ...this.activeLockWhere() },
       }),
     ]);
@@ -144,8 +168,8 @@ export class SeatmapService {
       // business 2-2 vs economy 2-3), so the frontend renders it from
       // this instead of assuming a fixed seat index.
       cabinLayout: {
-        BUSINESS: { aisleAfterIndex: map.businessColsLeft.length },
-        ECONOMY: { aisleAfterIndex: map.economyColsLeft.length },
+        BUSINESS: { aisleAfterIndex: map.businessColsLeft?.length ?? 0 },
+        ECONOMY: { aisleAfterIndex: map.economyColsLeft?.length ?? 0 },
       },
       capacity: seats.length,
       soldCount: soldCodes.size,
@@ -175,12 +199,7 @@ export class SeatmapService {
       });
     }
 
-    const sold = await this.typeorm.passenger.findFirst({
-      where: {
-        seatCode: dto.seatCode,
-        booking: { flightInstanceId, status: { not: 'CANCELLED' } },
-      },
-    });
+    const sold = await this.findSoldConflict(flightInstanceId, dto.seatCode);
     if (sold) {
       throw new ConflictException({
         code: ErrorCode.CONFLICT,
@@ -195,7 +214,7 @@ export class SeatmapService {
       });
     }
 
-    const activeRequesterLocks = await this.typeorm.seatLock.count({
+    const activeRequesterLocks = await this.seatLockRepo.count({
       where: { lockedById: actor.id, ...this.activeLockWhere() },
     });
     if (activeRequesterLocks >= MAX_ACTIVE_MANAGERIAL_LOCKS_PER_REQUESTER) {
@@ -218,27 +237,25 @@ export class SeatmapService {
     await this.releaseIfExpired(flightInstanceId, dto.seatCode);
 
     try {
-      const lock = await this.typeorm.seatLock.create({
-        data: {
+      const lock = await this.seatLockRepo.save(
+        this.seatLockRepo.create({
           flightInstanceId,
           seatCode: dto.seatCode,
           lockedById: actor.id,
           reason: dto.reason,
           classification: dto.classification,
-          discountPct: dto.discountPct,
+          discountPct: dto.discountPct ?? null,
           requesterRank: actor.role,
           approvalStatus: 'PENDING_APPROVAL',
           expiresAt: hoursFromNow(LOCK_REQUEST_TTL_HOURS),
-          passengerName: dto.passengerName,
-          passengerNationalIdEnc: nationalId
-            ? encryptPii(nationalId)
-            : undefined,
-          passengerNationalIdHash: nationalId ? hashPii(nationalId) : undefined,
+          passengerName: dto.passengerName ?? null,
+          passengerNationalIdEnc: nationalId ? encryptPii(nationalId) : null,
+          passengerNationalIdHash: nationalId ? hashPii(nationalId) : null,
           passengerMobileEnc: dto.passengerMobile
             ? encryptPii(dto.passengerMobile)
-            : undefined,
-        },
-      });
+            : null,
+        }),
+      );
 
       await this.audit.record({
         actorId: actor.id,
@@ -252,10 +269,7 @@ export class SeatmapService {
 
       return this.toLockView(lock);
     } catch (err) {
-      if (
-        err instanceof TypeORM.TypeORMClientKnownRequestError &&
-        err.code === 'P2002'
-      ) {
+      if (isUniqueViolation(err)) {
         throw new ConflictException({
           code: ErrorCode.CONFLICT,
           message: 'این صندلی هم‌اکنون توسط شخص دیگری لاک شده است.',
@@ -266,9 +280,7 @@ export class SeatmapService {
   }
 
   private async getPendingLockOrThrow(lockId: string) {
-    const lock = await this.typeorm.seatLock.findUnique({
-      where: { id: lockId },
-    });
+    const lock = await this.seatLockRepo.findOneBy({ id: lockId });
     if (!lock) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -300,15 +312,11 @@ export class SeatmapService {
       });
     }
 
-    const updated = await this.typeorm.seatLock.update({
-      where: { id: lockId },
-      data: {
-        approvalStatus: 'APPROVED',
-        approvedById: actor.id,
-        approvedAt: new Date(),
-        expiresAt: hoursFromNow(LOCK_HOLD_TTL_HOURS),
-      },
-    });
+    lock.approvalStatus = 'APPROVED';
+    lock.approvedById = actor.id;
+    lock.approvedAt = new Date();
+    lock.expiresAt = hoursFromNow(LOCK_HOLD_TTL_HOURS);
+    const updated = await this.seatLockRepo.save(lock);
 
     await this.audit.record({
       actorId: actor.id,
@@ -330,16 +338,12 @@ export class SeatmapService {
   ) {
     const lock = await this.getPendingLockOrThrow(lockId);
 
-    const updated = await this.typeorm.seatLock.update({
-      where: { id: lockId },
-      data: {
-        approvalStatus: 'REJECTED',
-        rejectedById: actor.id,
-        rejectedAt: new Date(),
-        rejectionReason: dto.rejectionReason,
-        releasedAt: new Date(),
-      },
-    });
+    lock.approvalStatus = 'REJECTED';
+    lock.rejectedById = actor.id;
+    lock.rejectedAt = new Date();
+    lock.rejectionReason = dto.rejectionReason;
+    lock.releasedAt = new Date();
+    const updated = await this.seatLockRepo.save(lock);
 
     await this.audit.record({
       actorId: actor.id,
@@ -355,9 +359,7 @@ export class SeatmapService {
   }
 
   async releaseLock(actor: AuthenticatedUser, lockId: string) {
-    const lock = await this.typeorm.seatLock.findUnique({
-      where: { id: lockId },
-    });
+    const lock = await this.seatLockRepo.findOneBy({ id: lockId });
     if (!lock) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -371,10 +373,9 @@ export class SeatmapService {
       });
     }
 
-    const updated = await this.typeorm.seatLock.update({
-      where: { id: lockId },
-      data: { releasedAt: new Date(), releasedById: actor.id },
-    });
+    lock.releasedAt = new Date();
+    lock.releasedById = actor.id;
+    const updated = await this.seatLockRepo.save(lock);
 
     await this.audit.record({
       actorId: actor.id,
@@ -389,7 +390,7 @@ export class SeatmapService {
     return this.toLockView(updated);
   }
 
-  private toLockView(lock: TypeORM.SeatLockGetPayload<Record<string, never>>) {
+  private toLockView(lock: SeatLock) {
     const {
       passengerNationalIdEnc,
       passengerNationalIdHash,

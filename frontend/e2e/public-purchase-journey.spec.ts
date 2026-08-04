@@ -124,33 +124,57 @@ test('golden path: search -> results -> OTP login -> seat+passenger -> pay -> e-
   await expect(page.getByTestId('result-card').first()).toBeVisible();
   await page.getByTestId('result-card').first().getByRole('button', { name: 'انتخاب' }).first().click();
 
-  await page.waitForURL('**/book/**');
+  await page.waitForURL('**/checkout/**');
   await page.getByTestId('otp-phone').fill(phone);
   await page.getByTestId('otp-phone').locator('..').getByRole('button', { name: 'دریافت کد' }).click();
 
   await expect(page.getByTestId('otp-code')).toBeVisible();
-  const otpRes = await page.evaluate(
-    async ({ api, phone }) => (await fetch(`${api}/auth/_test/last-otp/${phone}`)).json(),
-    { api: API_URL, phone },
-  );
-  const otpCode = (otpRes as { data?: { code?: string } }).data?.code;
+  // Prefer on-screen mock hint (dev); otherwise read real mock-SMS code from API.
+  let otpCode: string | undefined;
+  const hint = page.getByTestId('otp-dev-hint');
+  if (await hint.isVisible().catch(() => false)) {
+    otpCode = '123456';
+  } else {
+    const otpRes = await page.evaluate(
+      async ({ api, phone }) => (await fetch(`${api}/auth/_test/last-otp/${phone}`)).json(),
+      { api: API_URL, phone },
+    );
+    otpCode = (otpRes as { data?: { code?: string } }).data?.code;
+  }
   expect(otpCode).toBeTruthy();
   await page.getByTestId('otp-code').fill(otpCode!);
   await page.getByRole('button', { name: 'تأیید و ورود' }).click();
 
-  const freeSeat = page.locator('button[data-testid^="seat-"]:not([disabled])').first();
+  // Step 1 — passenger details (design: تکمیل خرید)
+  await expect(page.getByTestId('checkout-pax-step')).toBeVisible();
+  await page.getByTestId('checkout-pax-first-0').fill('PLAYWRIGHT');
+  await page.getByTestId('checkout-pax-last-0').fill('TESTER');
+  await page.getByTestId('checkout-pax-gender-0').selectOption('male');
+  await page.getByTestId('checkout-pax-nid-0').fill('0012345678');
+  const dobSelects = page.locator('[data-testid="checkout-pax-card-0"] select');
+  await dobSelects.nth(1).selectOption('1');
+  await dobSelects.nth(2).selectOption('1');
+  await dobSelects.nth(3).selectOption('1370');
+  await page.getByTestId('checkout-next').click();
+
+  // Step 2 — extras + seat
+  await expect(page.getByTestId('checkout-extras-step')).toBeVisible();
+  const freeSeat = page.locator('button[data-testid^="checkout-seat-"]:not([disabled])').first();
   await expect(freeSeat).toBeVisible();
   await freeSeat.click();
-  await page.getByTestId('pax-name-0').fill('مسافر تست پلی‌رایت');
-  await page.getByTestId('book-submit').click();
+  await page.getByTestId('checkout-next').click();
 
-  await page.waitForURL('**/checkout/**');
+  // Step 3 — review → create booking → payment
+  await expect(page.getByTestId('checkout-review-step')).toBeVisible();
+  await page.getByTestId('checkout-next').click();
+
+  await page.waitForURL('**/payment/**');
   await expect(page.getByTestId('pay-submit')).toBeVisible();
   await page.getByTestId('pay-submit').click();
 
   await page.waitForURL('**/ticket/**', { timeout: 20_000 });
   await expect(page.getByText('صادر شده')).toBeVisible();
-  await expect(page.getByText('مسافر تست پلی‌رایت')).toBeVisible();
+  await expect(page.getByText('PLAYWRIGHT TESTER')).toBeVisible();
 
   await page.getByTestId('open-refund-form').click();
   await page.getByTestId('refund-iban').fill('IR820170000000332211009900');

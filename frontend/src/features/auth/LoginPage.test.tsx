@@ -14,72 +14,59 @@ function renderLoginPage() {
   );
 }
 
+const baseAuth = {
+  status: 'unauthenticated' as const,
+  user: null,
+  requestLogin: vi.fn(),
+  confirmTwoFactor: vi.fn(),
+  agencyLogin: vi.fn(),
+  signOut: vi.fn(),
+  refreshMe: vi.fn(),
+  requestOtp: vi.fn(),
+  verifyOtp: vi.fn(),
+  passwordLogin: vi.fn(),
+  requestPasswordResetEmail: vi.fn(),
+  verifyPasswordResetEmail: vi.fn(),
+};
+
 describe('LoginPage', () => {
   it('renders RTL with Persian labels', () => {
-    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
-      status: 'unauthenticated',
-      user: null,
-      requestLogin: vi.fn(),
-      confirmTwoFactor: vi.fn(),
-      agencyLogin: vi.fn(),
-      signOut: vi.fn(),
-    });
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue(baseAuth);
     renderLoginPage();
 
     expect(screen.getByText('به سامانهٔ مدیریت داخلی blujet خوش آمدید')).toBeInTheDocument();
     expect(screen.getByLabelText('نام کاربری')).toBeInTheDocument();
     expect(screen.getByLabelText('رمز عبور')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'ورود به پنل من' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'ورود به سامانه' })).toBeInTheDocument();
   });
 
   it('shows an inline Persian validation error when submitted empty', async () => {
-    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
-      status: 'unauthenticated',
-      user: null,
-      requestLogin: vi.fn(),
-      confirmTwoFactor: vi.fn(),
-      agencyLogin: vi.fn(),
-      signOut: vi.fn(),
-    });
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue(baseAuth);
     renderLoginPage();
 
-    await userEvent.click(screen.getByRole('button', { name: 'ورود به پنل من' }));
+    await userEvent.click(screen.getByRole('button', { name: 'ورود به سامانه' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('نام کاربری و رمز عبور را وارد کنید.');
   });
 
   it('shows the server error message when login fails', async () => {
     const requestLogin = vi.fn().mockRejectedValue(new ApiRequestError('UNAUTHORIZED', 'نام کاربری یا رمز عبور نادرست است.', 401));
-    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
-      status: 'unauthenticated',
-      user: null,
-      requestLogin,
-      confirmTwoFactor: vi.fn(),
-      agencyLogin: vi.fn(),
-      signOut: vi.fn(),
-    });
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ ...baseAuth, requestLogin });
     renderLoginPage();
 
-    await userEvent.type(screen.getByLabelText('نام کاربری'), 'finance.karimi');
+    await userEvent.type(screen.getByLabelText('نام کاربری'), 'finance');
     await userEvent.type(screen.getByLabelText('رمز عبور'), 'wrong-password');
-    await userEvent.click(screen.getByRole('button', { name: 'ورود به پنل من' }));
+    await userEvent.click(screen.getByRole('button', { name: 'ورود به سامانه' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('نام کاربری یا رمز عبور نادرست است.');
   });
 
-  it('"فراموشی رمز عبور؟" shows the contact-IT notice, matching the design — staff has no self-service reset', async () => {
-    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
-      status: 'unauthenticated',
-      user: null,
-      requestLogin: vi.fn(),
-      confirmTwoFactor: vi.fn(),
-      agencyLogin: vi.fn(),
-      signOut: vi.fn(),
-    });
+  it('"فراموشی رمز عبور؟" shows the contact-IT toast, matching the design', async () => {
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue(baseAuth);
     renderLoginPage();
 
     await userEvent.click(screen.getByTestId('staff-forgot-password'));
-    expect(
-      await screen.findByText('برای بازیابی رمز عبور، با واحد فناوری اطلاعات (مدیر IT) تماس بگیرید'),
-    ).toBeInTheDocument();
+    expect(await screen.findByTestId('staff-forgot-toast')).toHaveTextContent(
+      'برای بازیابی رمز عبور، با واحد فناوری اطلاعات (مدیر IT) تماس بگیرید',
+    );
   });
 });

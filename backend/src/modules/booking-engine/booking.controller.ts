@@ -7,7 +7,7 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiTags, ApiHeader } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { BookingService } from './booking.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
@@ -99,6 +99,11 @@ export class BookingController {
 
   @Post(':id/pay')
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiHeader({
+    name: 'idempotency-key',
+    required: false,
+    description: 'کلید یکتا برای جلوگیری از پرداخت تکراری',
+  })
   @ApiOperation({
     summary:
       'پرداخت درگاه sandbox، صدور بلیط — قیمت بلافاصله پیش از پرداخت بازبینی می‌شود',
@@ -107,12 +112,18 @@ export class BookingController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body() dto: PayBookingDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    const result = await this.bookings.pay(id, user, {
-      confirmedPriceIrr: dto.confirmedPriceIrr,
-      promoCode: dto.promoCode,
-      paymentMethod: dto.paymentMethod,
-    });
+    const result = await this.bookings.pay(
+      id,
+      user,
+      {
+        confirmedPriceIrr: dto.confirmedPriceIrr,
+        promoCode: dto.promoCode,
+        paymentMethod: dto.paymentMethod,
+      },
+      idempotencyKey,
+    );
     return { success: true, data: result };
   }
 }

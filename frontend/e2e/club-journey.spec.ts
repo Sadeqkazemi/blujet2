@@ -24,7 +24,7 @@ async function seedRequest(page: Page, assignedTo: 'SENIOR' | 'CHAIR') {
 }
 
 test('Senior approves a senior-assigned card request; a chair-assigned one stays read-only', async ({ page }) => {
-  await loginAs(page, 'senior.rahimi');
+  await loginAs(page, 'senior');
   await seedRequest(page, 'SENIOR');
   await seedRequest(page, 'CHAIR');
 
@@ -69,8 +69,8 @@ test('CEO adds a new VIP member and finds them in the directory', async ({ page 
   await page.fill('#vip-name', name);
   await page.fill('#vip-email', `new${Date.now()}@vip.example`);
   await page.fill('#vip-nid', nid);
-  // «طلایی» also exists as a directory filter chip — scope to the modal.
-  await page.getByRole('dialog').getByRole('button', { name: 'طلایی' }).click();
+  // «طلایی» also exists as a directory filter chip — scope to the accordion form.
+  await page.locator('#vip-add-form').getByRole('button', { name: 'طلایی' }).click();
   await page.getByRole('button', { name: 'افزودن به باشگاه' }).click();
 
   await expect(page.getByText(`«${name}» به باشگاه افزوده شد ✓`)).toBeVisible();
@@ -78,6 +78,6 @@ test('CEO adds a new VIP member and finds them in the directory', async ({ page 
 });
 
 test('Finance Manager has no مشتریان VIP nav entry (role isolation)', async ({ page }) => {
-  await loginAs(page, 'finance.karimi');
+  await loginAs(page, 'finance');
   await expect(page.getByRole('link', { name: /^مشتریان VIP/ })).toHaveCount(0);
 });

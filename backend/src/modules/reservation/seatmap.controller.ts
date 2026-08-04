@@ -14,7 +14,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { RESERVATION_ROLES, CAN_LOCK_ROLES } from './reservation-roles';
+import { RESERVATION_ROLES, CAN_SEAT_LOCK_ROLES } from './reservation-roles';
 import { PanelAccessGuard } from '../panels/panel-access.guard';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 
@@ -26,7 +26,10 @@ export class SeatmapController {
   constructor(private readonly seatmap: SeatmapService) {}
 
   @Get(':flightInstanceId')
-  @ApiOperation({ summary: 'نقشهٔ صندلی — آزاد/بیزینس/فروخته‌شده/لاک‌شده' })
+  @ApiOperation({
+    summary:
+      'نقشهٔ صندلی — آزاد/فروخته/قفل + مشخصات مسافر روی صندلی فروخته‌شده (staff)',
+  })
   async get(@Param('flightInstanceId') flightInstanceId: string) {
     return {
       success: true,
@@ -35,9 +38,9 @@ export class SeatmapController {
   }
 
   @Post(':flightInstanceId/lock')
-  @Roles(...CAN_LOCK_ROLES)
+  @Roles(...CAN_SEAT_LOCK_ROLES)
   @ApiOperation({
-    summary: 'درخواست لاک مدیریتی صندلی — در انتظار تأیید یک نقش دیگر',
+    summary: 'درخواست لاک مدیریتی صندلی — در انتظار تأیید یک نقش دیگر (نه IT)',
   })
   async lock(
     @CurrentUser() actor: AuthenticatedUser,
@@ -51,7 +54,7 @@ export class SeatmapController {
   }
 
   @Patch('locks/:id/approve')
-  @Roles(...CAN_LOCK_ROLES)
+  @Roles(...CAN_SEAT_LOCK_ROLES)
   @ApiOperation({
     summary: 'تأیید درخواست لاک مدیریتی — نه توسط درخواست‌کننده',
   })
@@ -63,7 +66,7 @@ export class SeatmapController {
   }
 
   @Patch('locks/:id/reject')
-  @Roles(...CAN_LOCK_ROLES)
+  @Roles(...CAN_SEAT_LOCK_ROLES)
   @ApiOperation({ summary: 'رد درخواست لاک مدیریتی' })
   async reject(
     @CurrentUser() actor: AuthenticatedUser,
@@ -77,7 +80,7 @@ export class SeatmapController {
   }
 
   @Patch('locks/:id/release')
-  @Roles(...CAN_LOCK_ROLES)
+  @Roles(...CAN_SEAT_LOCK_ROLES)
   @ApiOperation({ summary: 'آزادسازی لاک صندلی' })
   async release(
     @CurrentUser() actor: AuthenticatedUser,
