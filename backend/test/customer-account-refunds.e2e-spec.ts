@@ -271,7 +271,7 @@ describe('Customer account refunds (e2e)', () => {
     const admin = await loginAs(app, 'site.admin');
     const finance = await dataSource
       .getRepository(User)
-      .findOneByOrFail({ username: 'finance.karimi' });
+      .findOneByOrFail({ username: 'finance' });
 
     const refer = await request(app.getHttpServer())
       .patch(`/refunds/${submit.body.data.id}/refer`)

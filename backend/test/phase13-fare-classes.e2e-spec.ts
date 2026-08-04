@@ -32,7 +32,7 @@ describe('Phase 13 Part B — fare-class management', () => {
   beforeAll(async () => {
     app = await createTestApp();
     dataSource = app.get(DataSource);
-    staffToken = (await loginAs(app, 'senior.rahimi')).accessToken!;
+    staffToken = (await loginAs(app, 'senior')).accessToken!;
     customerToken = (await loginAsCustomer(app, '09901119920')).accessToken!;
 
     const seatMapRepo = dataSource.getRepository(AircraftSeatMap);

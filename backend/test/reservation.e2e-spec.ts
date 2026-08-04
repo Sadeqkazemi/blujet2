@@ -178,7 +178,11 @@ describe('Reservation (e2e)', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.flightNo).toBeTruthy();
     const sold = res.body.data.rows
-      .flatMap((r: { seats: { seatCode: string; passenger?: { fullName: string } }[] }) => r.seats)
+      .flatMap(
+        (r: {
+          seats: { seatCode: string; passenger?: { fullName: string } }[];
+        }) => r.seats,
+      )
       .find((s: { seatCode: string }) => s.seatCode === '3A');
     expect(sold.passenger.fullName).toBe('لیلا صادقی');
     expect(sold.passenger.nationalId).toBe('0499370899');
@@ -248,13 +252,13 @@ describe('Reservation (e2e)', () => {
 
   it('concurrent lock attempts on the same seat: exactly one succeeds (DB-enforced)', async () => {
     const instance = await createScheduledInstance();
-    const it = await loginAs(app, 'itadmin');
+    const chair = await loginAs(app, 'chair');
 
     const attempts = await Promise.all(
       Array.from({ length: 5 }, () =>
         request(app.getHttpServer())
           .post(`/reservation/seatmap/${instance.id}/lock`)
-          .set(auth(it.accessToken))
+          .set(auth(chair.accessToken))
           .send({
             seatCode: '5B',
             reason: 'تست هم‌زمانی',
@@ -270,12 +274,12 @@ describe('Reservation (e2e)', () => {
 
   it('PATCH release: canLock only, 409 on already-released, seat becomes lockable again', async () => {
     const instance = await createScheduledInstance();
-    const it = await loginAs(app, 'itadmin');
+    const chair = await loginAs(app, 'chair');
     const senior = await loginAs(app, 'senior');
 
     const locked = await request(app.getHttpServer())
       .post(`/reservation/seatmap/${instance.id}/lock`)
-      .set(auth(it.accessToken))
+      .set(auth(chair.accessToken))
       .send({
         seatCode: '6D',
         reason: 'تست آزادسازی',
@@ -290,18 +294,18 @@ describe('Reservation (e2e)', () => {
 
     const released = await request(app.getHttpServer())
       .patch(`/reservation/seatmap/locks/${lockId}/release`)
-      .set(auth(it.accessToken));
+      .set(auth(chair.accessToken));
     expect(released.status).toBe(200);
     expect(released.body.data.releasedAt).not.toBeNull();
 
     const again = await request(app.getHttpServer())
       .patch(`/reservation/seatmap/locks/${lockId}/release`)
-      .set(auth(it.accessToken));
+      .set(auth(chair.accessToken));
     expect(again.status).toBe(409);
 
     const relock = await request(app.getHttpServer())
       .post(`/reservation/seatmap/${instance.id}/lock`)
-      .set(auth(it.accessToken))
+      .set(auth(chair.accessToken))
       .send({ seatCode: '6D', reason: 'رزرو مجدد', classification: 'PAYABLE' });
     expect(relock.status).toBe(201);
   });

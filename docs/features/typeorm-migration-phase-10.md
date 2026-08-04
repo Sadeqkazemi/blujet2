@@ -1,6 +1,6 @@
 # TypeORM migration — Phase 10: refunds
 
-Phase 10 of the TypeORM → TypeORM migration plan. Converts `refunds.service.ts`
+Phase 10 of the Prisma → TypeORM migration plan. Converts `refunds.service.ts`
 (692 lines): staff refund-request queue (list/detail/refer/pay), the public
 purchase-engine customer self-service (submit/list/preview/eligible-bookings),
 the anonymous مدیریت رزرو self-service, and the fare-rule penalty engine's
@@ -36,7 +36,7 @@ and the non-production `createTestRequest()` Playwright fixture helper.
   `hasRefundRequest(bookingId, manager?)` uses
   `createQueryBuilder(RefundRequest,'r').where(...).getCount() > 0` instead
   of `findOneBy({ bookingId })`, which itself hits TS2589 on this entity.
-  Replaces TypeORM's `booking.refundRequests.length > 0` (no such inverse
+  Replaces Prisma's `booking.refundRequests.length > 0` (no such inverse
   relation exists on `Booking` in TypeORM) at every call site: `previewMine`,
   `submitFromCustomer` (checked inside the transaction via the tx manager),
   and `submitAnonymous`. `assertRefundable()`'s signature changed from
@@ -48,7 +48,7 @@ and the non-production `createTestRequest()` Playwright fixture helper.
   codebase to `.create()` a `Booking`; `submitFromCustomer`/
   `submitAnonymous`/`createTestRequest()` all create `RefundRequest`). Fixed
   on `booking.entity.ts` and `refund-request.entity.ts`.
-- **`getOrThrow()`'s TypeORM query joined `booking → flightInstance → flight
+- **`getOrThrow()`'s Prisma query joined `booking → flightInstance → flight
   → route` even though neither `refer()` nor `pay()` reads `request.booking`
   — but `detail()` does** (via the same `getOrThrow()`, spreading `...rest`
   into the response without excluding `booking`), so the nested flight/route
@@ -57,8 +57,8 @@ and the non-production `createTestRequest()` Playwright fixture helper.
   PII-safe partial selects, full `booking`→`flightInstance`→`flight`→`route`
   chain) used by both `list()` and `getOrThrow()`, preserving the existing
   response shape exactly rather than "cleaning up" the seemingly-unused join.
-- **Unique-constraint race handling**: TypeORM's
-  `TypeORMClientKnownRequestError` + `err.code === 'P2002'` +
+- **Unique-constraint race handling**: Prisma's
+  `PrismaClientKnownRequestError` + `err.code === 'P2002'` +
   `err.meta?.target` string-matching becomes TypeORM's `QueryFailedError` +
   `err.driverError.code === '23505'` (Postgres) + `err.driverError.constraint`
   exact-matching against the two relevant unique index names
@@ -67,7 +67,7 @@ and the non-production `createTestRequest()` Playwright fixture helper.
   always conflicts immediately, no retry). A small `isUniqueViolation(err,
   constraintName)` helper centralizes this.
 - **`toCustomerRow()`'s signature changed** from taking a single
-  TypeORM-joined row (`request` with `booking` nested inside) to taking a
+  Prisma-joined row (`request` with `booking` nested inside) to taking a
   `RefundRequest` entity whose `.booking` relation is either query-builder-
   loaded (`listMine`/`getMine`) or manually attached in memory
   (`saved.booking = booking`) right after a `.save()` in
@@ -75,7 +75,7 @@ and the non-production `createTestRequest()` Playwright fixture helper.
   avoiding a redundant re-fetch when the booking (with its
   flightInstance/flight/route already joined) is already in scope from
   the same request.
-- `listEligibleBookings()`'s TypeORM `refundRequests: { none: {} }` filter
+- `listEligibleBookings()`'s Prisma `refundRequests: { none: {} }` filter
   becomes a `NOT EXISTS (SELECT 1 FROM refund_requests rr WHERE
   rr."bookingId" = b.id)` raw subquery condition on the booking query
   builder — the one-request-per-booking invariant is already guaranteed by
@@ -115,6 +115,6 @@ double-booking-guarantee critical path). Then `booking-engine` +
 `customer-referrals` together (shared-transaction boundary, riskiest
 phase), the remaining smaller modules (`blog`, `careers`, `club`,
 `reconciliation`, `sms`, `support-tickets`, `survey`), the seed script, the
-e2e fixture layer, and TypeORM removal. TypeORM remains the active ORM for
+e2e fixture layer, and Prisma removal. Prisma remains the active ORM for
 every module not yet converted; nothing removed until the dedicated
-TypeORM-removal phase.
+Prisma-removal phase.

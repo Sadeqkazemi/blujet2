@@ -1341,7 +1341,9 @@ export class AgenciesService {
   // ── Agency Portal: webservice purchase requests (staff-side review) ────
 
   /** Cross-agency queue for SITE_ADMIN «درخواست وب‌سرویس» tab. */
-  async listAllWebserviceRequests(status?: 'PENDING' | 'APPROVED' | 'REJECTED') {
+  async listAllWebserviceRequests(
+    status?: 'PENDING' | 'APPROVED' | 'REJECTED',
+  ) {
     const qb = this.webserviceRequestRepo
       .createQueryBuilder('r')
       .leftJoin('r.agency', 'agency')
@@ -1350,6 +1352,7 @@ export class AgenciesService {
       .addSelect(['user.fullName'])
       .orderBy('r.createdAt', 'DESC');
     if (status) qb.where('r.status = :status', { status });
+
     const rows = await qb.getMany();
     return rows.map((r) => ({
       id: r.id,

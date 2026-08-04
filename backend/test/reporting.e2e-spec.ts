@@ -76,7 +76,10 @@ describe('Reporting (e2e)', () => {
         aircraftType: AIRCRAFT_TYPE,
       }),
     );
-    const departureAt = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
+    // Backdated (not a future flight) so materializeDepartedInstances flips
+    // it to DEPARTED by the time /reporting/flight-sales reads it — booking
+    // creation only checks instance.status === 'SCHEDULED', not the date.
+    const departureAt = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
     const instanceRepo = dataSource.getRepository(FlightInstance);
     const instance = await instanceRepo.save(
       instanceRepo.create({

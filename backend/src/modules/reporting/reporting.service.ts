@@ -59,6 +59,12 @@ export class ReportingService {
     private readonly bookingRepo: Repository<Booking>,
     @InjectRepository(FlightInstance)
     private readonly flightInstanceRepo: Repository<FlightInstance>,
+    @InjectRepository(Airport)
+    private readonly airportRepo: Repository<Airport>,
+    @InjectRepository(RefundRequest)
+    private readonly refundRequestRepo: Repository<RefundRequest>,
+    @InjectRepository(SupportTicket)
+    private readonly supportTicketRepo: Repository<SupportTicket>,
   ) {}
 
   private buildBuckets(
@@ -500,6 +506,24 @@ export class ReportingService {
     };
   }
 
+  /** Per-flight-instance count of bookings in the given statuses, since
+   * this build's TypeORM has no loadRelationCountAndMap. */
+  private async bookingCountsByInstance(
+    instanceIds: string[],
+    statuses: string[],
+  ): Promise<Map<string, number>> {
+    if (!instanceIds.length) return new Map();
+    const rows = await this.bookingRepo
+      .createQueryBuilder('b')
+      .select('b.flightInstanceId', 'flightInstanceId')
+      .addSelect('COUNT(*)', 'count')
+      .where('b.flightInstanceId IN (:...ids)', { ids: instanceIds })
+      .andWhere('b.status IN (:...statuses)', { statuses })
+      .groupBy('b.flightInstanceId')
+      .getRawMany<{ flightInstanceId: string; count: string }>();
+    return new Map(rows.map((r) => [r.flightInstanceId, Number(r.count)]));
+  }
+
   /** Departed instances + per-channel SALE totals for the «شماره پرواز» picker. */
   async flightSales(): Promise<FlightSalesResult> {
     await materializeDepartedInstances(this.dataSource);
@@ -508,31 +532,31 @@ export class ReportingService {
       .createQueryBuilder('fi')
       .leftJoin('fi.flight', 'flight')
       .leftJoin('flight.route', 'route')
-      .addSelect(['flight.flightNo'])
-      .addSelect(['route.originCode', 'route.destCode'])
+      .select(['fi.id', 'fi.departureAt', 'fi.capacity'])
+      .addSelect(['flight.id', 'flight.flightNo'])
+      .addSelect(['route.id', 'route.originCode', 'route.destCode'])
       .where('fi.status = :status', { status: 'DEPARTED' })
       .orderBy('fi.departureAt', 'DESC')
       .take(FLIGHT_SALES_LIST_LIMIT)
       .getMany();
 
     const instanceIds = instances.map((i) => i.id);
-    const [entries, airports, soldCounts] = await Promise.all([
-      instanceIds.length
-        ? this.ledgerEntryRepo
+    const [counts, entries, airports] = await Promise.all([
+      this.bookingCountsByInstance(instanceIds, ['PAID', 'TICKETED']),
+      instanceIds.length === 0
+        ? Promise.resolve([])
+        : this.ledgerEntryRepo
             .createQueryBuilder('e')
             .leftJoin('e.booking', 'booking')
+            .select(['e.signedAmountIrr'])
             .addSelect(['booking.channel', 'booking.flightInstanceId'])
             .where('e.type = :type', { type: 'SALE' })
             .andWhere('e.bookingId IS NOT NULL')
             .andWhere('booking.flightInstanceId IN (:...ids)', {
               ids: instanceIds,
             })
-            .getMany()
-        : Promise.resolve<LedgerEntry[]>([]),
-      this.dataSource
-        .getRepository(Airport)
-        .find({ select: { code: true, cityFa: true } }),
-      this.bookingCountsByInstance(instanceIds, ['PAID', 'TICKETED']),
+            .getMany(),
+      this.airportRepo.find({ select: { code: true, cityFa: true } }),
     ]);
 
     const cityByCode = new Map(airports.map((a) => [a.code, a.cityFa]));
@@ -576,28 +600,10 @@ export class ReportingService {
           agencyIrr: totals.AGENCY,
           totalIrr,
           capacity: i.capacity,
-          soldSeats: soldCounts.get(i.id) ?? 0,
+          soldSeats: counts.get(i.id) ?? 0,
         };
       }),
     };
-  }
-
-  /** Per-flight-instance count of bookings in the given statuses, since
-   * this build's TypeORM has no loadRelationCountAndMap. */
-  private async bookingCountsByInstance(
-    instanceIds: string[],
-    statuses: string[],
-  ): Promise<Map<string, number>> {
-    if (!instanceIds.length) return new Map();
-    const rows = await this.bookingRepo
-      .createQueryBuilder('b')
-      .select('b.flightInstanceId', 'flightInstanceId')
-      .addSelect('COUNT(*)', 'count')
-      .where('b.flightInstanceId IN (:...ids)', { ids: instanceIds })
-      .andWhere('b.status IN (:...statuses)', { statuses })
-      .groupBy('b.flightInstanceId')
-      .getRawMany<{ flightInstanceId: string; count: string }>();
-    return new Map(rows.map((r) => [r.flightInstanceId, Number(r.count)]));
   }
 
   async completedFlightsSummary(
@@ -1009,63 +1015,61 @@ export class ReportingService {
     ] = await Promise.all([
       this.agencyProfileRepo
         .createQueryBuilder('a')
-        .leftJoin('a.user', 'u')
+        .leftJoin('a.user', 'user')
         .where('a.suspendedAt IS NULL')
-        .andWhere('u.isActive = true')
+        .andWhere('user.isActive = true')
         .getCount(),
       this.passengerRepo
         .createQueryBuilder('p')
         .leftJoin('p.booking', 'booking')
         .where('p.deletedAt IS NULL')
         .andWhere('booking.status IN (:...statuses)', {
-          statuses: [...bookingStatuses],
+          statuses: bookingStatuses,
         })
         .andWhere('booking.createdAt >= :start AND booking.createdAt < :end', {
           start: monthStart,
           end: monthEnd,
         })
         .getCount(),
-      this.bookingRepo.count({
-        where: {
-          status: In([...bookingStatuses]),
-          createdAt: Raw((alias) => `${alias} >= :start AND ${alias} < :end`, {
-            start: monthStart,
-            end: monthEnd,
-          }),
-          deletedAt: IsNull(),
-        },
-      }),
+      this.bookingRepo
+        .createQueryBuilder('b')
+        .where('b.status IN (:...statuses)', { statuses: bookingStatuses })
+        .andWhere('b.createdAt >= :start AND b.createdAt < :end', {
+          start: monthStart,
+          end: monthEnd,
+        })
+        .andWhere('b.deletedAt IS NULL')
+        .getCount(),
       this.passengerRepo
         .createQueryBuilder('p')
         .leftJoin('p.booking', 'booking')
         .where('p.deletedAt IS NULL')
         .andWhere('booking.status IN (:...statuses)', {
-          statuses: [...bookingStatuses],
+          statuses: bookingStatuses,
         })
         .andWhere('booking.createdAt >= :start AND booking.createdAt < :end', {
           start: prevMonthStart,
           end: monthStart,
         })
         .getCount(),
-      this.bookingRepo.count({
-        where: {
-          status: In([...bookingStatuses]),
-          createdAt: Raw((alias) => `${alias} >= :start AND ${alias} < :end`, {
-            start: prevMonthStart,
-            end: monthStart,
-          }),
-          deletedAt: IsNull(),
-        },
-      }),
+      this.bookingRepo
+        .createQueryBuilder('b')
+        .where('b.status IN (:...statuses)', { statuses: bookingStatuses })
+        .andWhere('b.createdAt >= :start AND b.createdAt < :end', {
+          start: prevMonthStart,
+          end: monthStart,
+        })
+        .andWhere('b.deletedAt IS NULL')
+        .getCount(),
       this.agencyMembershipRequestRepo.count({
         where: { status: In(['PENDING', 'REFERRED']) },
       }),
-      this.dataSource
-        .getRepository(RefundRequest)
-        .count({ where: { status: In(['SUBMITTED', 'REVIEW']) } }),
-      this.dataSource
-        .getRepository(SupportTicket)
-        .count({ where: { status: In(['OPEN', 'IN_PROGRESS']) } }),
+      this.refundRequestRepo.count({
+        where: { status: In(['SUBMITTED', 'REVIEW']) },
+      }),
+      this.supportTicketRepo.count({
+        where: { status: In(['OPEN', 'IN_PROGRESS']) },
+      }),
     ]);
 
     return {

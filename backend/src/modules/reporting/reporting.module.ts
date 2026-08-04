@@ -7,6 +7,9 @@ import { AgencyMembershipRequest } from '../../database/entities/agency-membersh
 import { Passenger } from '../../database/entities/passenger.entity';
 import { Booking } from '../../database/entities/booking.entity';
 import { FlightInstance } from '../../database/entities/flight-instance.entity';
+import { Airport } from '../../database/entities/airport.entity';
+import { RefundRequest } from '../../database/entities/refund-request.entity';
+import { SupportTicket } from '../../database/entities/support-ticket.entity';
 import { ReportingController } from './reporting.controller';
 import { ReportingService } from './reporting.service';
 import { PanelsModule } from '../panels/panels.module';
@@ -22,6 +25,9 @@ import { AgenciesModule } from '../agencies/agencies.module';
       Passenger,
       Booking,
       FlightInstance,
+      Airport,
+      RefundRequest,
+      SupportTicket,
     ]),
     PanelsModule,
     AgenciesModule,

@@ -1,7 +1,7 @@
 # TypeORM migration — Phase 4: read-mostly content & config batch
 
-Phase 4 of the TypeORM → TypeORM migration plan. Converts the next 5
-modules from TypeORM to TypeORM: `audit`, `panels`, `settings`,
+Phase 4 of the Prisma → TypeORM migration plan. Converts the next 5
+modules from Prisma to TypeORM: `audit`, `panels`, `settings`,
 `site-content`, `admins` — chosen as a batch because they're mostly
 read-heavy, config/content-shaped, and (with the exception of `admins`)
 low-risk. `admins` was kept in this batch rather than deferred because it
@@ -12,7 +12,7 @@ booking/payment critical path.
 
 1. **`audit`** — `record()`/`managerReports()`/`systemLogs()`/
    `systemLogsBadgeCount()`/`ceoSystemEvents()`. `managerReports()`'s
-   TypeORM `OR` + conditional-spread `where` was rebuilt as an imperative
+   Prisma `OR` + conditional-spread `where` was rebuilt as an imperative
    `FindOptionsWhere` object (mutated field-by-field, not spread-merged) —
    seemingly cosmetic, but necessary: see "New findings" below.
 2. **`panels`** — `getNav()`/`getEmployeeContext()`/`getAccessFlags()`/
@@ -32,12 +32,12 @@ booking/payment critical path.
 5. **`admins`** — the riskiest of the batch: creates `User` rows (first
    `.create()`/`.save()` on `User` in the migration — added its
    `@BeforeInsert()` UUID hook here), and needed a live-session count
-   (`_count.refreshTokens` in TypeORM) with no direct TypeORM equivalent
+   (`_count.refreshTokens` in Prisma) with no direct TypeORM equivalent
    in this project's TypeORM version — see below.
 
 ## New findings
 
-- **No `loadRelationCountAndMap` in this TypeORM version.** TypeORM's
+- **No `loadRelationCountAndMap` in this TypeORM version.** Prisma's
   `_count.select.refreshTokens` (admins.service.ts's "online" derivation)
   has a documented TypeORM analog, `SelectQueryBuilder.loadRelationCountAndMap()`
   — except it doesn't exist on this project's installed `typeorm` build
@@ -51,7 +51,7 @@ booking/payment critical path.
 - **`FindOptionsWhere<T>` blows up TypeScript's recursion limit when `T`
   has a recursive JSON-typed column, combined with conditional object
   spreads.** `AuditLog.category`/`actorRole` filtering via nested
-  `...(cond ? {a} : {})` spreads (mirroring the original TypeORM code
+  `...(cond ? {a} : {})` spreads (mirroring the original Prisma code
   structure) produced "Type instantiation is excessively deep and
   possibly infinite" once combined with `ILike(...)`-augmented array
   variants. Fixed by building the `FindOptionsWhere` object imperatively
@@ -87,7 +87,7 @@ booking/payment critical path.
   pattern from Phase 3. `User` is the first entity in the migration with
   real production write traffic through TypeORM (admin account creation),
   not just a low-traffic content table.
-- **Plain-`@Column` `updatedAt` (TypeORM's `@updatedAt`) needed manual
+- **Plain-`@Column` `updatedAt` (Prisma's `@updatedAt`) needed manual
   setting on every write**, confirmed again across `SystemSetting`,
   `PanelAccessFlag`, `SiteContentBlock`, `SiteDestinationHighlight`,
   `SiteRouteHighlight`, and `User` — consistent with Phase 0's documented
@@ -109,7 +109,7 @@ booking/payment critical path.
 - `npm run test:e2e` — **465/465 passing**, against a freshly reset +
   reseeded database.
 - `git status` — touches only the 5 converted modules' `.module.ts`/
-  `.service.ts` (+ 2 controllers' pure `generated/typeorm` →
+  `.service.ts` (+ 2 controllers' pure `generated/prisma` →
   `database/enums` import rewiring), the 6 entities that gained
   `@BeforeInsert()`/inverse-relation additions, and this doc. Zero
   unrelated application files.
@@ -120,5 +120,5 @@ Phase 5 (per the plan): auth/profile/it-manager — still outside the
 booking/payment critical path, but touching real session/token logic
 for the first time (beyond `admins`' refresh-token revocation), so due
 care on `StepUpService`/JWT-issuance code paths that must keep working
-identically. TypeORM remains the active ORM for every module not yet
+identically. Prisma remains the active ORM for every module not yet
 converted; nothing removed until Phase 14.

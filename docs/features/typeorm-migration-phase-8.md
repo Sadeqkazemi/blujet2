@@ -1,6 +1,6 @@
 # TypeORM migration — Phase 8: flights (flight/inventory/seat-map engine)
 
-Phase 8 of the TypeORM → TypeORM migration plan. Converts `flights.service.ts`
+Phase 8 of the Prisma → TypeORM migration plan. Converts `flights.service.ts`
 (1238 lines) on its own, per Phase 7's plan — the domain-critical flight
 engine: flight/instance CRUD, airports, aircraft-type catalog and
 mid-flight aircraft-type changes, recurring RRULE schedules and their
@@ -34,17 +34,17 @@ HARD-always-counts/SOFT-until-`releaseAt` active-total tracking).
 - **Bulk `.insert()` bypasses `@BeforeInsert()` entity listeners
   entirely** — TypeORM only invokes lifecycle listeners on `save()` with
   entity instances, never on the query-builder's bulk `insert()`/`values()`
-  path. `materializeSchedule()` replaces TypeORM's `createMany({
+  path. `materializeSchedule()` replaces Prisma's `createMany({
   skipDuplicates: true })` with `createQueryBuilder().insert().into(...)
   .values(rows).orIgnore()` (Postgres `ON CONFLICT DO NOTHING`, matching
-  TypeORM's semantics without needing to name the conflicting unique
+  Prisma's semantics without needing to name the conflicting unique
   constraint) — each row's `id` is generated explicitly with
   `randomUUID()` in the row-building step, since the entity's hook never
   fires for this path. The materialized count is read from
   `result.raw.length` (only actually-inserted rows are returned), not
   `result.identifiers`.
 - **`enumerateSeats()`/`isKnownSeat()` (`reservation/seat-layout.ts`) still
-  imported their parameter type from the TypeORM-generated client**, whose
+  imported their parameter type from the Prisma-generated client**, whose
   schema defaults make `businessColsLeft`/`economyColsLeft`/etc.
   effectively non-nullable in the generated type. The TypeORM
   `AircraftSeatMap` entity correctly models these `text[]` columns as
@@ -52,34 +52,34 @@ HARD-always-counts/SOFT-until-`releaseAt` active-total tracking).
   import with a local `AircraftSeatMapLike` structural interface
   (nullable arrays, `?? []` defensively at each use) — safe for the
   several still-unconverted callers (`booking-engine`, `reservation`)
-  since their TypeORM objects are never actually null, and correct for
+  since their Prisma objects are never actually null, and correct for
   this phase's TypeORM caller. This is an ORM-agnostic util now, not tied
   to either client.
 - **`FarePricingProposal` has no inverse relation on `FlightInstance`**
-  (same shape as the Phase 7 finding) — `plan()`'s TypeORM
+  (same shape as the Phase 7 finding) — `plan()`'s Prisma
   `include: { pricing: true }` becomes a second independent query by
   `flightInstanceId`.
 - **`AgencyAllotment.agency.user` PII restriction**: `listAllotments()`'s
-  original TypeORM `include: { agency: { include: { user: true } } }`
+  original Prisma `include: { agency: { include: { user: true } } }`
   loaded the full `User` row just to read `.fullName`; ported as
   `.leftJoin(...).addSelect(['agency.userId', 'user.id', 'user.fullName'])`
   instead of `leftJoinAndSelect`, consistent with every other PII-safe
   relation load in this migration.
 - Same recurring conventions applied throughout: `FlightsService` keeps a
-  `TypeORMService` field solely to call the shared
-  `materializeDepartedInstances()` util (still TypeORM-based — it has
+  `PrismaService` field solely to call the shared
+  `materializeDepartedInstances()` util (still Prisma-based — it has
   other unconverted callers in `reporting`, `flightops`,
   `survey-lifecycle.util.ts`, `pnr.service.ts` — converting it is out of
   scope for this phase and would ripple into modules not yet touched);
   manual grouped `COUNT(*)`/`SUM(*)` raw queries replace every
-  TypeORM `groupBy()` (per-channel completed-report revenue, per-instance
+  Prisma `groupBy()` (per-channel completed-report revenue, per-instance
   sold counts, per-schedule instance counts) with results parsed via
   `BigInt(...)`/`Number(...)` since raw query results are untyped driver
   strings, not transformer-mapped entity columns; `Not()`/`In()`/
-  `IsNull()`/`MoreThan()` operators for TypeORM's `not`/`in`/`null`/`gt`
-  filters; entity mutation + `save()` in place of TypeORM's partial
+  `IsNull()`/`MoreThan()` operators for Prisma's `not`/`in`/`null`/`gt`
+  filters; entity mutation + `save()` in place of Prisma's partial
   `update()` calls, with explicit `if (dto.x !== undefined)` guards per
-  field to replicate TypeORM's undefined-omits-the-field update semantics.
+  field to replicate Prisma's undefined-omits-the-field update semantics.
 
 ## Verification
 
@@ -109,6 +109,6 @@ query-builder `.setLock('pessimistic_write')`). Then `refunds`,
 `reservation` (seat locks — the double-booking-guarantee critical path),
 `booking-engine` + `customer-referrals` together (shared-transaction
 boundary, riskiest phase), then the remaining smaller modules, the seed
-script, e2e fixture layer, and TypeORM removal. TypeORM remains the active
+script, e2e fixture layer, and Prisma removal. Prisma remains the active
 ORM for every module not yet converted; nothing removed until the
-dedicated TypeORM-removal phase.
+dedicated Prisma-removal phase.

@@ -1,6 +1,6 @@
 # TypeORM migration — Phase 12: booking-engine + customer-referrals
 
-Phase 12 of the TypeORM → TypeORM migration plan. Converts `booking-engine`
+Phase 12 of the Prisma → TypeORM migration plan. Converts `booking-engine`
 (the public purchase engine's own DRAFT→HELD→PAID→TICKETED flow: pricing,
 promo codes, wallet, club points, price locks, saved flights, search,
 privacy/GDPR export-delete, and the core `BookingService`) together with
@@ -76,7 +76,7 @@ advance as the riskiest phase in the plan.
   shape as every prior phase) — `privacy.service.ts`'s export/delete flow
   and `booking.service.ts`'s relation-loading helpers both do a separate
   `Passenger` query by `bookingId`, merged via `Map`/object spread.
-- **TypeORM's array-form `$transaction([...])`** (batches independent
+- **Prisma's array-form `$transaction([...])`** (batches independent
   statements atomically) in `privacy.service.ts`'s `deleteMyAccount()`
   converts to `manager.transaction(async (tx) => { await tx.update(...);
   ... })` — distinct from the callback-form `$transaction` conversions
@@ -89,12 +89,12 @@ advance as the riskiest phase in the plan.
   driver returns aggregate results as strings.
 - **`test/club.e2e-spec.ts` broke at tsc-time**: it calls
   `clubPoints.earnForPurchase(tx, ...)` directly with a `tx` sourced from
-  `typeorm.$transaction(...)`, now type-mismatched against the converted
+  `prisma.$transaction(...)`, now type-mismatched against the converted
   method's `EntityManager` parameter. Fixed by sourcing `tx` from
   `app.get(DataSource).manager.transaction(...)` instead — the one test
   file this phase needed to touch.
 - **Tooling gap discovered during verification, not a code bug**:
-  `npx typeorm migrate reset --force` on this TypeORM version applies all
+  `npx prisma migrate reset --force` on this Prisma version applies all
   migrations but does **not** auto-run the seed step (no seed banner/
   output at all), unlike the auto-seeding behavior assumed by this
   migration's established reset routine. A first full e2e run against an
@@ -103,7 +103,7 @@ advance as the riskiest phase in the plan.
   like a systemic regression but was actually ~90 missing seed users.
   Root-caused by checking row counts directly in Postgres mid-run. Fix:
   always follow `migrate reset --force` with an explicit
-  `npx typeorm db seed` before running the e2e suite — noted here since
+  `npx prisma db seed` before running the e2e suite — noted here since
   every future phase's verification step depends on it.
 
 ## Verification
@@ -132,9 +132,9 @@ advance as the riskiest phase in the plan.
 ## What's next
 
 The remaining smaller modules (`blog`, `careers`, `club`, `reconciliation`,
-`sms`, `support-tickets`, `survey`), then the TypeORM-based seed script
-rewrite, then the e2e test-fixture layer conversion (still TypeORM-based
+`sms`, `support-tickets`, `survey`), then the Prisma-based seed script
+rewrite, then the e2e test-fixture layer conversion (still Prisma-based
 throughout, aside from this phase's one-off `club.e2e-spec.ts` fix), then
-infra/CI/TypeORM removal, then the final `CLAUDE.md` update reflecting the
-TypeORM switch. TypeORM remains the active ORM for every module not yet
-converted; nothing removed until the dedicated TypeORM-removal phase.
+infra/CI/Prisma removal, then the final `CLAUDE.md` update reflecting the
+TypeORM switch. Prisma remains the active ORM for every module not yet
+converted; nothing removed until the dedicated Prisma-removal phase.

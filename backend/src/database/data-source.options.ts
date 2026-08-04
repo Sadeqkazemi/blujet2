@@ -78,11 +78,11 @@ import { User } from './entities/user.entity';
 import { WalletEntry } from './entities/wallet-entry.entity';
 
 /**
- * All 77 entities, mirroring typeorm/schema.typeorm's 77 models exactly (see
+ * All 77 entities, mirroring prisma/schema.prisma's 77 models exactly (see
  * docs/features/typeorm-migration-phase-0.md for the entity-authoring
  * conventions this follows). `synchronize` stays false forever: schema
  * changes only ever happen through hand-run migrations (mirrors
- * CLAUDE.md's TypeORM rule "never `db push`, never manual SQL").
+ * CLAUDE.md's Prisma rule "never `db push`, never manual SQL").
  */
 export const dataSourceOptions: DataSourceOptions = {
   type: 'postgres',

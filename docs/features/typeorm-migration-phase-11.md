@@ -1,6 +1,6 @@
 # TypeORM migration — Phase 11: reservation (seat locks + PNR lifecycle)
 
-Phase 11 of the TypeORM → TypeORM migration plan. Converts `reservation`
+Phase 11 of the Prisma → TypeORM migration plan. Converts `reservation`
 (`SeatmapService` + `PnrService`) — the double-booking-guarantee critical
 path: seat map rendering, managerial seat locks (request/approve/reject/
 release, two-step governance), staff PNR search/issue/detail/list, seat
@@ -60,7 +60,7 @@ guarantees involved.
   Phase 9, the flight instance row here).
 - **`issue()`'s conflict-check has a real, preserved asymmetry between its
   pre-transaction check and its in-transaction check**: the outer check
-  filters active locks by `expiresAt > now`, but the original TypeORM
+  filters active locks by `expiresAt > now`, but the original Prisma
   in-transaction check omits that filter entirely (any non-released lock,
   even an expired one, blocks issuance inside the atomic section). This
   reads like it could be tightened, but it's existing behavior, not a
@@ -75,7 +75,7 @@ guarantees involved.
   'defaultTaxIrr'> & { passengers: Passenger[] }` type — the `Omit` is
   required because spreading a class instance drops its prototype methods,
   which the entity's own `@BeforeInsert()` hooks are structurally part of.
-- **`list()`'s TypeORM `OR` search** (PNR contains OR any passenger's
+- **`list()`'s Prisma `OR` search** (PNR contains OR any passenger's
   fullName contains, both case-insensitive) becomes a single raw
   `(b.pnr ILIKE :q OR EXISTS (SELECT 1 FROM passengers p WHERE
   p."bookingId" = b.id AND p."fullName" ILIKE :q))` condition — cheaper
@@ -88,18 +88,18 @@ guarantees involved.
   builder definition serve both the pre-check (ambient manager) and the
   in-transaction check (`tx`) without duplication.
 - `reservation-roles.ts`'s `Role` type import switched from
-  `generated/typeorm/enums` to `database/enums` — a type-only import with
-  no runtime dependency, but still a TypeORM-generated-client reference in
+  `generated/prisma/enums` to `database/enums` — a type-only import with
+  no runtime dependency, but still a Prisma-generated-client reference in
   a module this phase converts, so it's cleaned up alongside everything
   else.
 - `SeatmapService.toLockView()`'s parameter type changed from
-  `TypeORM.SeatLockGetPayload<Record<string, never>>` to the plain
+  `Prisma.SeatLockGetPayload<Record<string, never>>` to the plain
   `SeatLock` entity type.
 - Same recurring conventions applied throughout: `PnrService` keeps a
-  `TypeORMService` field solely to call the shared, still-TypeORM-based
+  `PrismaService` field solely to call the shared, still-Prisma-based
   `materializeFlownBookings()` (per the Phase 8 precedent — it has other
   unconverted callers); `IsNull()`/`MoreThan()`/`LessThanOrEqual()`/`In()`
-  operators replace TypeORM's `null`/`gt`/`lte`/`in` filters; the shared
+  operators replace Prisma's `null`/`gt`/`lte`/`in` filters; the shared
   `isUniqueViolation()` helper (`database/utils/pg-errors.ts`, introduced
   in an earlier phase) replaces the ad-hoc unique-violation check this
   phase would otherwise have duplicated a third time.
@@ -138,6 +138,6 @@ Phase 12 (per the plan): `booking-engine` + `customer-referrals` together
 the public purchase engine's own HELD→PAID→TICKETED flow plus the referral
 program that hooks into it). Then the remaining smaller modules (`blog`,
 `careers`, `club`, `reconciliation`, `sms`, `support-tickets`, `survey`),
-the seed script, the e2e fixture layer, and TypeORM removal. TypeORM remains
+the seed script, the e2e fixture layer, and Prisma removal. Prisma remains
 the active ORM for every module not yet converted; nothing removed until
-the dedicated TypeORM-removal phase.
+the dedicated Prisma-removal phase.

@@ -53,6 +53,7 @@ export class AuditService {
     filters: { category?: AuditCategory; actorRole?: Role; q?: string },
   ) {
     const excludedForCeo: Role[] = ['CEO', 'SENIOR_MANAGER', 'BOARD_CHAIR'];
+
     const base: FindOptionsWhere<AuditLog> = {};
     if (viewerRole === 'CEO') base.actorRole = Not(In(excludedForCeo));
     if (filters.category) base.category = filters.category;
@@ -63,6 +64,7 @@ export class AuditService {
         ? [
             { ...base, action: ILike(`%${filters.q}%`) },
             { ...base, detail: ILike(`%${filters.q}%`) },
+            { ...base, actor: { fullName: ILike(`%${filters.q}%`) } },
           ]
         : base;
 
@@ -71,7 +73,6 @@ export class AuditService {
       order: { createdAt: 'DESC' },
       take: 100,
       relations: { actor: true },
-      select: { actor: { fullName: true } },
     });
 
     // CEO design card shows manager display name + role label.

@@ -1,7 +1,7 @@
 # TypeORM migration — Phase 14: seed script
 
-Phase 14 of the TypeORM → TypeORM migration plan. Converts
-`backend/typeorm/seed.ts` (the ~1550-line dev/test seed script covering all
+Phase 14 of the Prisma → TypeORM migration plan. Converts
+`backend/prisma/seed.ts` (the ~1550-line dev/test seed script covering all
 ~40 domains: staff/customer/agency users, flights/bookings/ledger, agency
 credit/invoices/messages/membership requests, cartable + manager referrals,
 club members/tier rules/card requests, saved passengers/bank
@@ -9,23 +9,23 @@ accounts/referrals/KYC, survey settings/questions, careers settings/job
 postings, blog posts, site-content CMS, pricing proposals, refund penalty
 rules + sample refunds, aircraft seat maps + demo PNR/seat-lock data,
 permission catalog/internal+external services/security policy/employees,
-airport catalog + THR↔DXB/THR↔MHD flight inventory) from `TypeORMClient` to a
+airport catalog + THR↔DXB/THR↔MHD flight inventory) from `PrismaClient` to a
 plain TypeORM `DataSource` built from the same `dataSourceOptions` the app
 itself uses. The entrypoint file path is unchanged
-(`backend/typeorm/seed.ts`), so `typeorm.config.ts`'s `migrations.seed: "tsx
-typeorm/seed.ts"` hook and `npx typeorm db seed` keep working without
+(`backend/prisma/seed.ts`), so `prisma.config.ts`'s `migrations.seed: "tsx
+prisma/seed.ts"` hook and `npx prisma db seed` keep working without
 modification. With this phase, every backend module AND the seed script
-are on TypeORM; only the e2e test-fixture layer (still raw `TypeORMClient`
+are on TypeORM; only the e2e test-fixture layer (still raw `PrismaClient`
 per test file) remains.
 
 ## What changed
 
-- `backend/typeorm/seed.ts`: rewritten top to bottom. `new
+- `backend/prisma/seed.ts`: rewritten top to bottom. `new
   DataSource(dataSourceOptions).initialize().then(main)...finally(()
-  => dataSource.destroy())` replaces `new TypeORMClient({adapter:
-  new TypeORMPg(...)})` / `typeorm.$disconnect()`.
+  => dataSource.destroy())` replaces `new PrismaClient({adapter:
+  new PrismaPg(...)})` / `prisma.$disconnect()`.
 - A small local `upsertBy(repo, where, create, update?)` helper translates
-  every TypeORM `.upsert({where, create, update})` call site: find by
+  every Prisma `.upsert({where, create, update})` call site: find by
   `where`, `repo.merge()` + `.save()` if found and `update` is non-empty,
   otherwise `repo.save(repo.create(create))`. TypeORM's own
   `Repository.upsert()` has different ON-CONFLICT-keyed semantics and
@@ -37,16 +37,16 @@ per test file) remains.
   `MoreThan()`, `In()` operators; query-builder `.getOne()`/`.getMany()`
   for entities with jsonb columns; explicit `where: {}` for
   singleton-lookup `findOne({order})` calls).
-- `ManagerReferral`'s nested `recipients: {create: [...]}` (TypeORM relation
+- `ManagerReferral`'s nested `recipients: {create: [...]}` (Prisma relation
   write) split into a plain loop inserting `ManagerReferralRecipient` rows
   directly after the parent `ManagerReferral` is saved (its composite PK
   is two FK columns, no id-generation needed).
 - Money columns migrated to bigint in an earlier phase (task #164) but the
-  TypeORM seed script still passed plain JS numbers for most of them
+  Prisma seed script still passed plain JS numbers for most of them
   (`priceIrr`, `signedAmountIrr`, `amountIrr`, `limitIrr`, `totalPaidIrr`,
   `penaltyAmountIrr`, `refundableIrr`, `basePriceIrr`,
   `competitorPriceIrr`, `proposedPriceIrr`, `legalRateIrr`,
-  `registeredPriceIrr`) — TypeORM's client coerces `number`→`BigInt`
+  `registeredPriceIrr`) — Prisma's client coerces `number`→`BigInt`
   transparently at the field level, TypeScript does not. Every such value
   is now either a `123n` bigint literal (static constants) or
   `BigInt(x)` (values derived from local business-logic arithmetic, which
@@ -65,8 +65,8 @@ per test file) remains.
   default) that every other already-converted service module sets
   explicitly on every write (confirmed via `grep updatedAt
   auth.service.ts`, which sets it on all 9 of its `User` writes) — but the
-  seed script, freshly translated from TypeORM object literals that relied
-  on TypeORM's automatic `@updatedAt` handling, omitted it everywhere.
+  seed script, freshly translated from Prisma object literals that relied
+  on Prisma's automatic `@updatedAt` handling, omitted it everywhere.
   Root-caused by running the seed against a real reset database and
   reading the first `QueryFailedError`, then systematically auditing
   **every** entity touched by the seed script with `grep -c updatedAt
@@ -87,7 +87,7 @@ per test file) remains.
   everywhere else in the codebase, not a new entity-level hook (a
   `@BeforeInsert()` hook would only cover inserts, not the `.update()`
   calls this script and every other service also need to keep current).
-- **`.findOneBy({})` (TypeORM's `findFirst()`-with-no-filter idiom) throws
+- **`.findOneBy({})` (Prisma's `findFirst()`-with-no-filter idiom) throws
   TS2589 on entities with a jsonb column**, the same class of bug as
   Phase 12's `price-lock.service.ts` finding on `.findOneBy(...)` with a
   real filter — confirmed here on `FlightInstance` (`aiSuggestion` jsonb)
@@ -119,7 +119,7 @@ per test file) remains.
   attempt. Unrelated to the migration itself, noted here only because it
   produced a misleading `ECONNREFUSED` on the first post-restart seed
   attempt that had nothing to do with the seed script's own correctness.
-- **`ManagerReferral`'s nested TypeORM relation-write
+- **`ManagerReferral`'s nested Prisma relation-write
   (`recipients: {create: [...]}`) has no TypeORM equivalent as a single
   call** — split into a parent `.save()` followed by a plain loop of
   `ManagerReferralRecipient` inserts, each keyed by the now-known parent
@@ -140,15 +140,15 @@ per test file) remains.
 ## Verification
 
 - `npx tsc --noEmit` — clean.
-- `npm run lint` — clean on `typeorm/seed.ts` and the 4 entity files this
+- `npm run lint` — clean on `prisma/seed.ts` and the 4 entity files this
   phase touched (incidental `lint --fix` reformatting of unrelated files
   reverted with `git checkout --` before committing, same as every prior
   phase; the 2 pre-existing unrelated errors in
   `auth/dto/{request-otp,verify-otp}.dto.ts` are untouched by this phase).
 - `npm test` (unit) — 71/71 passing (unaffected — no unit tests exercise
   the seed script directly).
-- `npx typeorm migrate reset --force` + `npx typeorm db seed` (the new
-  TypeORM-based script, run via the unchanged `tsx typeorm/seed.ts` hook)
+- `npx prisma migrate reset --force` + `npx prisma db seed` (the new
+  TypeORM-based script, run via the unchanged `tsx prisma/seed.ts` hook)
   — completes cleanly end-to-end against a freshly reset `blujet_test`,
   logging `Seed complete.` and the dev staff password, after three
   iterations fixing the `updatedAt`, `.findOneBy({})`/TS2589, and
@@ -157,7 +157,7 @@ per test file) remains.
   suite's own `beforeAll`/fixture setup runs against the database this
   seed script populates, so a full green run is also an end-to-end proof
   the reseed didn't silently change any seeded data's shape).
-- `git status` — touches only `typeorm/seed.ts` and the 4 entities that
+- `git status` — touches only `prisma/seed.ts` and the 4 entities that
   gained a `@BeforeInsert()` id-generation hook this phase
   (`RefundPenaltyRule`, `AircraftSeatMap`, `Permission`, `InternalService`
   — the other 5 entities audited in the same sweep,
@@ -170,13 +170,13 @@ per test file) remains.
 ## What's next
 
 The e2e test-fixture layer: every `test/*.e2e-spec.ts` file still creates
-its own fixtures via a raw `TypeORMClient` (e.g. `survey.e2e-spec.ts`'s
-`new TypeORMClient({adapter: new TypeORMPg(...)})`) — this is a large,
+its own fixtures via a raw `PrismaClient` (e.g. `survey.e2e-spec.ts`'s
+`new PrismaClient({adapter: new PrismaPg(...)})`) — this is a large,
 dedicated phase given the number of files, and the natural next step now
-that the seed script itself no longer depends on TypeORM. After that:
-infra/CI/TypeORM removal (delete `typeorm/` dir, `generated/typeorm/`,
-`TypeORMModule`, `@typeorm/*` deps, update Dockerfile/CI to TypeORM
+that the seed script itself no longer depends on Prisma. After that:
+infra/CI/Prisma removal (delete `prisma/` dir, `generated/prisma/`,
+`PrismaModule`, `@prisma/*` deps, update Dockerfile/CI to TypeORM
 migrations), then the final `CLAUDE.md` update reflecting the TypeORM
-switch plus a migration summary doc. TypeORM remains the active ORM for
-every e2e fixture; nothing removed until the dedicated TypeORM-removal
+switch plus a migration summary doc. Prisma remains the active ORM for
+every e2e fixture; nothing removed until the dedicated Prisma-removal
 phase.

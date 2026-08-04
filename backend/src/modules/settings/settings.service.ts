@@ -110,6 +110,7 @@ const IT_MANAGER_WRITABLE_KEYS = new Set([
   'sandbox',
   'socialLinks',
   'appDownloadLinks',
+  'supportPhone',
 ]);
 
 @Injectable()

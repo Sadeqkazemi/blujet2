@@ -20,11 +20,12 @@ import { Passenger } from '../../database/entities/passenger.entity';
 import { FlightInstance } from '../../database/entities/flight-instance.entity';
 import { Flight } from '../../database/entities/flight.entity';
 import { Airport } from '../../database/entities/airport.entity';
-import { AgencyApiKey } from '../../database/entities/agency-api-key.entity';
 import { SeatLock } from '../../database/entities/seat-lock.entity';
 import { AircraftSeatMap } from '../../database/entities/aircraft-seat-map.entity';
 import { FarePricingProposal } from '../../database/entities/fare-pricing-proposal.entity';
 import { LedgerEntry } from '../../database/entities/ledger-entry.entity';
+import { InternalService } from '../../database/entities/internal-service.entity';
+import { AgencyApiKey } from '../../database/entities/agency-api-key.entity';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
 import {
@@ -82,6 +83,10 @@ export class PnrService {
     private readonly pricingRepo: Repository<FarePricingProposal>,
     @InjectRepository(LedgerEntry)
     private readonly ledgerRepo: Repository<LedgerEntry>,
+    @InjectRepository(InternalService)
+    private readonly internalServiceRepo: Repository<InternalService>,
+    @InjectRepository(AgencyApiKey)
+    private readonly agencyApiKeyRepo: Repository<AgencyApiKey>,
     @InjectDataSource()
     private readonly dataSource: DataSource,
     private readonly audit: AuditService,
@@ -703,13 +708,23 @@ export class PnrService {
     return this.detail(booking.pnr);
   }
 
+  /**
+   * «پروازها» sub-tab of سامانه رزرواسیون/هواپیما — SCHEDULED instances
+   * with sold/locked/free counts so staff can open a seat map.
+   * Returns one shape covering CEO/Senior/IT/Board Chair tables:
+   * Persian `route`, city fields, and IT occupancy/status keys.
+   */
   async listFlights(query: ListReservationFlightsQueryDto | string = {}) {
-    const q = (typeof query === 'string' ? query : query.q)?.trim().toLowerCase();
+    const q = (typeof query === 'string' ? query : query.q)?.trim();
     await materializeFlownBookings(this.dataSource);
     const airports = await this.airportRepo.find({
       select: { code: true, cityFa: true },
     });
     const cityByCode = new Map(airports.map((a) => [a.code, a.cityFa]));
+
+    // Include past-dated SCHEDULED rows too — the seed (and some E2E
+    // fixtures) keep deliberately-past "SCHEDULED" instances for demos;
+    // staff still need to open their seat maps. Prefer soonest first.
     const instances = await this.flightInstanceRepo
       .createQueryBuilder('fi')
       .leftJoinAndSelect('fi.flight', 'flight')
@@ -718,7 +733,9 @@ export class PnrService {
       .orderBy('fi.departureAt', 'ASC')
       .take(120)
       .getMany();
-    const filtered = q
+
+    const qLower = q?.toLowerCase();
+    const filtered = qLower
       ? instances.filter((instance) => {
           const originCode = instance.flight.route.originCode;
           const destCode = instance.flight.route.destCode;
@@ -726,12 +743,13 @@ export class PnrService {
           const dest = cityByCode.get(destCode) ?? destCode;
           const hay =
             `${instance.flight.flightNo} ${originCode} ${destCode} ${origin} ${dest} ${instance.aircraftTypeOverride ?? instance.flight.aircraftType}`.toLowerCase();
-          return hay.includes(q);
+          return hay.includes(qLower);
         })
       : instances;
     const limited = filtered.slice(0, 60);
+
     const now = new Date();
-    return Promise.all(
+    const rows = await Promise.all(
       limited.map(async (instance) => {
         const aircraftType = resolveAircraftType(instance);
         const map = await this.seatMapRepo.findOneBy({ aircraftType });
@@ -741,26 +759,28 @@ export class PnrService {
             .createQueryBuilder('p')
             .innerJoin('p.booking', 'b')
             .where('p.seatCode IS NOT NULL')
-            .andWhere('b.flightInstanceId = :flightInstanceId', {
-              flightInstanceId: instance.id,
-            })
+            .andWhere('b.flightInstanceId = :id', { id: instance.id })
             .andWhere('b.status != :cancelled', { cancelled: 'CANCELLED' })
             .getCount(),
-          this.seatLockRepo.count({
-            where: {
-              flightInstanceId: instance.id,
-              releasedAt: IsNull(),
-              expiresAt: MoreThanOrEqual(now),
-            },
-          }),
+          this.seatLockRepo
+            .createQueryBuilder('sl')
+            .where('sl.flightInstanceId = :id', { id: instance.id })
+            .andWhere('sl.releasedAt IS NULL')
+            .andWhere('sl.expiresAt > :now', { now })
+            .getCount(),
         ]);
         const originCode = instance.flight.route.originCode;
         const destCode = instance.flight.route.destCode;
         const originCityFa = cityByCode.get(originCode) ?? originCode;
         const destCityFa = cityByCode.get(destCode) ?? destCode;
-        const occupancyPct = capacity > 0 ? Math.round((soldCount / capacity) * 100) : 0;
+        const occupancyPct =
+          capacity > 0 ? Math.round((soldCount / capacity) * 100) : 0;
         const statusKey =
-          occupancyPct >= 100 ? 'FULL' : occupancyPct >= 90 ? 'NEAR_FULL' : 'SELLING';
+          occupancyPct >= 100
+            ? 'FULL'
+            : occupancyPct >= 90
+              ? 'NEAR_FULL'
+              : 'SELLING';
         return {
           flightInstanceId: instance.id,
           flightNo: instance.flight.flightNo,
@@ -781,48 +801,149 @@ export class PnrService {
         };
       }),
     );
+    return rows;
   }
 
   async dashboardStats() {
     const dayStart = new Date();
     dayStart.setHours(0, 0, 0, 0);
 
-    const [todayCount, activePnrCount, soldSeats, revenueRow] =
-      await Promise.all([
-        this.bookingRepo.count({
-          where: { createdAt: MoreThanOrEqual(dayStart) },
-        }),
-        this.bookingRepo.count({
-          where: { status: In(['HELD', 'PAID', 'TICKETED']) },
-        }),
-        this.passengerRepo
-          .createQueryBuilder('p')
-          .innerJoin('p.booking', 'b')
-          .where('p.seatCode IS NOT NULL')
-          .andWhere('b.status != :cancelled', { cancelled: 'CANCELLED' })
-          .getCount(),
-        this.ledgerRepo
-          .createQueryBuilder('l')
-          .select('SUM(l."signedAmountIrr")', 'sum')
-          .where('l.type = :type', { type: 'SALE' })
-          .andWhere('l."bookingId" IS NOT NULL')
-          .getRawOne<{ sum: string | null }>(),
-      ]);
+    const pnrStoreStarted = Date.now();
+    const [
+      todayCount,
+      activePnrCount,
+      soldSeats,
+      revenueRow,
+      channelGroups,
+      toggles,
+    ] = await Promise.all([
+      this.bookingRepo.count({
+        where: { createdAt: MoreThanOrEqual(dayStart) },
+      }),
+      this.bookingRepo.count({
+        where: { status: In(['HELD', 'PAID', 'TICKETED']) },
+      }),
+      this.passengerRepo
+        .createQueryBuilder('p')
+        .innerJoin('p.booking', 'b')
+        .where('p.seatCode IS NOT NULL')
+        .andWhere('b.status != :cancelled', { cancelled: 'CANCELLED' })
+        .getCount(),
+      this.ledgerRepo
+        .createQueryBuilder('l')
+        .select('SUM(l."signedAmountIrr")', 'sum')
+        .where('l.type = :type', { type: 'SALE' })
+        .andWhere('l."bookingId" IS NOT NULL')
+        .getRawOne<{ sum: string | null }>(),
+      this.bookingRepo
+        .createQueryBuilder('b')
+        .select('b.channel', 'channel')
+        .addSelect('COUNT(*)', 'count')
+        .where('b.status NOT IN (:...statuses)', {
+          statuses: ['CANCELLED', 'EXPIRED'],
+        })
+        .groupBy('b.channel')
+        .getRawMany<{ channel: string; count: string }>(),
+      this.internalServiceRepo.find({
+        where: { key: In(['payment', 'api', 'sms', 'search']) },
+        select: { key: true, enabled: true },
+      }),
+    ]);
+    const pnrStoreLatencyMs = Date.now() - pnrStoreStarted;
+
+    const seatInvStarted = Date.now();
+    await this.passengerRepo
+      .createQueryBuilder('p')
+      .where('p.seatCode IS NOT NULL')
+      .getCount();
+    const seatInventoryLatencyMs = Date.now() - seatInvStarted;
+
+    const toggleByKey = new Map(toggles.map((t) => [t.key, t.enabled]));
+    const channelLabel: Record<string, string> = {
+      SYSTEM: 'فروش مستقیم سایت',
+      AGENCY: 'API آژانس‌های همکار',
+      CHARTER: 'فروش چارتر',
+    };
+    const channelColor: Record<string, string> = {
+      SYSTEM: '#3b82f6',
+      AGENCY: '#34d399',
+      CHARTER: '#a855f7',
+    };
+    const channelCounts = channelGroups.map((g) => ({
+      channel: g.channel,
+      count: Number(g.count),
+    }));
+    const channelTotal = channelCounts.reduce((a, g) => a + g.count, 0);
+    const channels =
+      channelTotal === 0
+        ? []
+        : channelCounts
+            .map((g) => ({
+              key: g.channel,
+              label: channelLabel[g.channel] ?? g.channel,
+              color: channelColor[g.channel] ?? '#6b7b94',
+              count: g.count,
+              pct: Math.round((g.count / channelTotal) * 1000) / 10,
+            }))
+            .sort((a, b) => b.count - a.count);
+
+    const svc = (
+      name: string,
+      fa: string,
+      ok: boolean,
+      latencyMs: number | null,
+    ) => ({
+      name,
+      fa,
+      ok,
+      latencyMs,
+      statusLabel: ok ? 'سالم' : 'قطع',
+    });
+
+    const services = [
+      svc('reservation-api', 'سرویس رزرواسیون مرکزی', true, pnrStoreLatencyMs),
+      svc('pnr-store', 'پایگاه ذخیره PNR', true, pnrStoreLatencyMs),
+      svc(
+        'payment-gateway',
+        'درگاه پرداخت',
+        toggleByKey.get('payment') !== false,
+        null,
+      ),
+      svc(
+        'agency-api',
+        'پلتفرم API آژانس‌ها',
+        toggleByKey.get('api') !== false,
+        null,
+      ),
+      svc('seat-inventory', 'موجودی صندلی', true, seatInventoryLatencyMs),
+      svc(
+        'notification-svc',
+        'سرویس اعلان و پیامک',
+        toggleByKey.get('sms') !== false,
+        null,
+      ),
+    ];
 
     return {
       todayBookings: todayCount,
       activePnrs: activePnrCount,
       seatsSold: soldSeats,
       revenueIrr: revenueRow?.sum ? BigInt(revenueRow.sum) : ZERO_IRR,
+      channels,
+      services,
+      servicesStable: services.every((s) => s.ok),
     };
   }
 
+  /** Agencies that already hold an API key — design «دسترسی آژانس‌ها». */
   async agencyApiAccess() {
-    const keyRepo = this.dataSource.getRepository(AgencyApiKey);
-    const keys = await keyRepo.find({
-      relations: { agency: { user: true } },
-      order: { activatedAt: 'DESC' },
-    });
+    const keys = await this.agencyApiKeyRepo
+      .createQueryBuilder('k')
+      .leftJoin('k.agency', 'agency')
+      .leftJoin('agency.user', 'user')
+      .addSelect(['agency.userId', 'user.fullName'])
+      .orderBy('k.activatedAt', 'DESC')
+      .getMany();
     return keys.map((k) => {
       const name = k.agency.user.fullName;
       const initials = name.replace(/\s+/g, '').slice(0, 2) || '؟';
@@ -831,6 +952,7 @@ export class PnrService {
         agencyId: k.agencyId,
         name,
         initials,
+        // Raw key is never stored — only an opaque hint from the key id.
         keyHint: `bjk_••••${k.id.replace(/-/g, '').slice(0, 4)}`,
         callCount: k.callCount,
         status: k.status,

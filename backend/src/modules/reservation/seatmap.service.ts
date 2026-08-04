@@ -5,14 +5,16 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, LessThanOrEqual, MoreThan, Repository } from 'typeorm';
+import { In, IsNull, LessThanOrEqual, MoreThan, Repository } from 'typeorm';
 import { SeatLock } from '../../database/entities/seat-lock.entity';
 import { FlightInstance } from '../../database/entities/flight-instance.entity';
 import { AircraftSeatMap } from '../../database/entities/aircraft-seat-map.entity';
 import { Passenger } from '../../database/entities/passenger.entity';
+import { Airport } from '../../database/entities/airport.entity';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
 import {
+  decryptPii,
   encryptPii,
   hashPii,
   isValidIranianNationalId,
@@ -49,6 +51,8 @@ export class SeatmapService {
     private readonly seatMapRepo: Repository<AircraftSeatMap>,
     @InjectRepository(Passenger)
     private readonly passengerRepo: Repository<Passenger>,
+    @InjectRepository(Airport)
+    private readonly airportRepo: Repository<Airport>,
     private readonly audit: AuditService,
   ) {}
 
@@ -91,6 +95,7 @@ export class SeatmapService {
     const instance = await this.flightInstanceRepo
       .createQueryBuilder('fi')
       .leftJoinAndSelect('fi.flight', 'flight')
+      .leftJoinAndSelect('flight.route', 'route')
       .where('fi.id = :id', { id })
       .getOne();
     if (!instance) {
@@ -120,7 +125,7 @@ export class SeatmapService {
     );
     const seats = enumerateSeats(map);
 
-    const [soldPassengers, activeLocks] = await Promise.all([
+    const [soldPassengers, activeLocks, airports] = await Promise.all([
       this.passengerRepo
         .createQueryBuilder('p')
         .innerJoin('p.booking', 'b')
@@ -129,13 +134,26 @@ export class SeatmapService {
           flightInstanceId,
         })
         .andWhere('b.status != :cancelled', { cancelled: 'CANCELLED' })
-        .select(['p.seatCode'])
+        .select(['p.seatCode', 'p.fullName', 'p.nationalIdEnc'])
+        .addSelect(['b.pnr', 'b.status', 'b.priceIrr'])
         .getMany(),
       this.seatLockRepo.find({
         where: { flightInstanceId, ...this.activeLockWhere() },
       }),
+      this.airportRepo.find({
+        where: {
+          code: In([
+            instance.flight.route.originCode,
+            instance.flight.route.destCode,
+          ]),
+        },
+        select: { code: true, cityFa: true },
+      }),
     ]);
-    const soldCodes = new Set(soldPassengers.map((p) => p.seatCode!));
+    const cityByCode = new Map(airports.map((a) => [a.code, a.cityFa]));
+    const soldByCode = new Map(
+      soldPassengers.map((p) => [p.seatCode!, p] as const),
+    );
     const lockedByCode = new Map(activeLocks.map((l) => [l.seatCode, l]));
 
     const rowsMap = new Map<
@@ -146,22 +164,51 @@ export class SeatmapService {
       if (!rowsMap.has(seat.row)) {
         rowsMap.set(seat.row, { row: seat.row, cabin: seat.cabin, seats: [] });
       }
+      const sold = soldByCode.get(seat.seatCode);
       const lock = lockedByCode.get(seat.seatCode);
-      const status = soldCodes.has(seat.seatCode)
-        ? 'SOLD'
-        : lock
-          ? 'LOCKED'
-          : 'FREE';
+      const status = sold ? 'SOLD' : lock ? 'LOCKED' : 'FREE';
       rowsMap.get(seat.row)!.seats.push({
         seatCode: seat.seatCode,
         status,
         lockId: lock?.id ?? null,
+        // Staff reservation panel only — name of the passenger who holds a
+        // sold seat (IT/CEO/Board/Senior). Lock PII stays encrypted-only.
+        passenger: sold
+          ? {
+              fullName: sold.fullName,
+              pnr: sold.booking.pnr,
+              bookingStatus: sold.booking.status,
+              nationalId: sold.nationalIdEnc
+                ? decryptPii(sold.nationalIdEnc)
+                : null,
+              priceIrr: sold.booking.priceIrr,
+            }
+          : null,
+        // CEO/Board «هواپیما» tab reads the lighter occupant shape.
+        occupant: sold
+          ? {
+              pnr: sold.booking.pnr,
+              passengerName: sold.fullName,
+              bookingStatus: sold.booking.status,
+            }
+          : null,
+        lockExpiresAt: lock?.expiresAt ?? null,
+        lockPassengerName: lock?.passengerName ?? null,
       });
     }
+
+    const originCode = instance.flight.route.originCode;
+    const destCode = instance.flight.route.destCode;
 
     return {
       flightInstanceId,
       aircraftType: resolveAircraftType(instance),
+      flightNo: instance.flight.flightNo,
+      originCode,
+      destCode,
+      originCityFa: cityByCode.get(originCode) ?? originCode,
+      destCityFa: cityByCode.get(destCode) ?? destCode,
+      departureAt: instance.departureAt,
       rows: Array.from(rowsMap.values()).sort((a, b) => a.row - b.row),
       // CLAUDE.md: "seat map config lives per aircraft type in the DB, not
       // hardcoded" — the aisle gap position varies by cabin layout (e.g.
@@ -172,13 +219,17 @@ export class SeatmapService {
         ECONOMY: { aisleAfterIndex: map.economyColsLeft?.length ?? 0 },
       },
       capacity: seats.length,
-      soldCount: soldCodes.size,
+      soldCount: soldByCode.size,
       lockedCount: activeLocks.length,
+      freeCount: Math.max(
+        0,
+        seats.length - soldByCode.size - activeLocks.length,
+      ),
       occupancyPct:
         seats.length === 0
           ? 0
           : Math.round(
-              ((soldCodes.size + activeLocks.length) / seats.length) * 1000,
+              ((soldByCode.size + activeLocks.length) / seats.length) * 1000,
             ) / 10,
     };
   }
@@ -301,7 +352,7 @@ export class SeatmapService {
   }
 
   /** Two-step approval: requesting and approving both stay within
-   * CAN_LOCK_ROLES, but a requester can never approve their own request —
+   * CAN_SEAT_LOCK_ROLES, but a requester can never approve their own request —
    * a real control between the governance roles, not a rubber stamp. */
   async approveLock(actor: AuthenticatedUser, lockId: string) {
     const lock = await this.getPendingLockOrThrow(lockId);

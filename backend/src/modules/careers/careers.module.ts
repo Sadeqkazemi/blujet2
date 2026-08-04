@@ -8,6 +8,7 @@ import { PanelsModule } from '../panels/panels.module';
 import { CareersSettings } from '../../database/entities/careers-settings.entity';
 import { JobPosting } from '../../database/entities/job-posting.entity';
 import { JobApplication } from '../../database/entities/job-application.entity';
+import { StoredFile } from '../../database/entities/stored-file.entity';
 import { User } from '../../database/entities/user.entity';
 
 @Module({
@@ -20,6 +21,7 @@ import { User } from '../../database/entities/user.entity';
       CareersSettings,
       JobPosting,
       JobApplication,
+      StoredFile,
       User,
     ]),
     AuditModule,

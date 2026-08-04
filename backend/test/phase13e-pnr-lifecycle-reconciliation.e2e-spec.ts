@@ -240,7 +240,7 @@ describe('Phase 13 Part E — PNR lifecycle + payment reconciliation', () => {
       .findOneBy({ bookingId });
     expect(reconciliation).not.toBeNull();
     expect(reconciliation!.status).toBe('RESOLVED');
-    // reconciliation is a direct TypeORM read (native bigint); the JSON
+    // reconciliation is a direct Prisma read (native bigint); the JSON
     // response field is a decimal string (BigInt.prototype.toJSON).
     expect(reconciliation!.amountIrr).toBe(
       BigInt(String(paid.body.data.booking.priceIrr)),

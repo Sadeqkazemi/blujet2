@@ -1,11 +1,11 @@
 # TypeORM migration — Phase 18 (final)
 
 Generates a baseline TypeORM migration from the live schema, wires
-`migration:run` into every path that used to run `typeorm migrate deploy`
-(dev, CI, Docker), and removes TypeORM entirely from the repository and
-infrastructure. This is the final phase of the TypeORM → TypeORM migration
+`migration:run` into every path that used to run `prisma migrate deploy`
+(dev, CI, Docker), and removes Prisma entirely from the repository and
+infrastructure. This is the final phase of the Prisma → TypeORM migration
 that began in Phase 0 — the codebase, test suite, and deploy pipeline no
-longer have any dependency on TypeORM.
+longer have any dependency on Prisma.
 
 ## Baseline migration
 
@@ -26,7 +26,7 @@ longer have any dependency on TypeORM.
   enum names, 58 `CREATE TYPE`, 58 `DROP TYPE`, zero duplicates.
 - **Correctness verification** (not just "it ran without error"): applied
   the migration to a fresh empty database and diffed its resulting schema
-  against the live TypeORM-migrated `blujet_test` database via three
+  against the live Prisma-migrated `blujet_test` database via three
   independent `information_schema`/`pg_indexes` queries:
   - Table list: 77 vs 77, byte-identical.
   - Columns (`table.column:type:nullable` for all 700 columns): byte-identical.
@@ -39,58 +39,58 @@ longer have any dependency on TypeORM.
 - `src/database/data-source.ts` (the `typeorm` CLI entry point) now
   imports `dotenv/config` explicitly, since it runs as a standalone script
   outside Nest's `ConfigModule` and needs to load `.env` on its own — this
-  is what `typeorm.config.ts` used to do for the TypeORM CLI.
+  is what `prisma.config.ts` used to do for the Prisma CLI.
 - `test/schema-parity.e2e-spec.ts` (added in Phase 0 to assert the
   entities exactly describe the live Postgres schema, originally run
-  against the TypeORM-migrated database) still passes unchanged against
+  against the Prisma-migrated database) still passes unchanged against
   the schema this migration itself creates — it now doubles as a
   regression guard against the entities and the migration drifting apart.
 
-## Wiring `migration:run` everywhere `typeorm migrate deploy` used to run
+## Wiring `migration:run` everywhere `prisma migrate deploy` used to run
 
-- `package.json` scripts: removed `postinstall: typeorm generate` and the
-  `typeorm.seed` config block; added `migration:generate`, `migration:run`,
+- `package.json` scripts: removed `postinstall: prisma generate` and the
+  `prisma.seed` config block; added `migration:generate`, `migration:run`,
   `migration:revert` (all via `typeorm-ts-node-commonjs`, for dev/CI) and
   `migration:run:prod` / `seed:prod` (plain `typeorm`/`node` against the
   compiled `dist/` output, for the production image — no `ts-node`
   dependency at runtime).
-- `backend/docker-entrypoint.sh`: `npx typeorm migrate deploy` →
-  `npm run migration:run:prod`; `npx tsx typeorm/seed.ts` → `npm run seed:prod`.
-- `backend/Dockerfile`: dropped the `npx typeorm generate` build step and
-  the `typeorm`/`generated`/`typeorm.config.ts` copy steps (migrations now
+- `backend/docker-entrypoint.sh`: `npx prisma migrate deploy` →
+  `npm run migration:run:prod`; `npx tsx prisma/seed.ts` → `npm run seed:prod`.
+- `backend/Dockerfile`: dropped the `npx prisma generate` build step and
+  the `prisma`/`generated`/`prisma.config.ts` copy steps (migrations now
   compile straight into `dist/` alongside everything else, so no extra
   `COPY` is needed for them).
-- `.github/workflows/deploy.yml`: `npx typeorm generate` + `npx typeorm migrate
+- `.github/workflows/deploy.yml`: `npx prisma generate` + `npx prisma migrate
   deploy` → `npm run migration:run`.
 - `docs/RUNBOOK.md` and `CLAUDE.md` (Tech Stack, Repository Structure,
-  Workflow, Deployment, and Commands sections): updated every TypeORM
+  Workflow, Deployment, and Commands sections): updated every Prisma
   command/path reference to its TypeORM equivalent.
 
-## Removing TypeORM from the repo
+## Removing Prisma from the repo
 
-- `backend/typeorm/schema.typeorm` and `backend/typeorm/migrations/*.sql`
+- `backend/prisma/schema.prisma` and `backend/prisma/migrations/*.sql`
   (52 migration files) — deleted. The baseline TypeORM migration is now
   the sole source of schema history going forward.
-- `backend/typeorm/seed.ts` → moved to `backend/src/database/seed.ts`
+- `backend/prisma/seed.ts` → moved to `backend/src/database/seed.ts`
   (already fully TypeORM-based since Phase 14; only its file location and
   relative imports changed). `npm run seed` now points here.
-- `backend/typeorm.config.ts` — deleted.
-- `backend/src/typeorm/` (`TypeORMModule`, `TypeORMService`) — deleted; no
-  longer imported anywhere (`AppModule` no longer imports `TypeORMModule`).
-- `backend/generated/typeorm` (the generated TypeORM client) — deleted
+- `backend/prisma.config.ts` — deleted.
+- `backend/src/prisma/` (`PrismaModule`, `PrismaService`) — deleted; no
+  longer imported anywhere (`AppModule` no longer imports `PrismaModule`).
+- `backend/generated/prisma` (the generated Prisma client) — deleted
   (was already gitignored, so this only affects the local working copy).
-- `@typeorm/client`, `@typeorm/adapter-pg` removed from `dependencies`;
-  `typeorm` removed from `devDependencies`. `dotenv` moved from
+- `@prisma/client`, `@prisma/adapter-pg` removed from `dependencies`;
+  `prisma` removed from `devDependencies`. `dotenv` moved from
   `devDependencies` to `dependencies` (needed at runtime by
   `data-source.ts` in the production image).
-- Fixed the one remaining real (non-comment) TypeORM-generated-client
+- Fixed the one remaining real (non-comment) Prisma-generated-client
   import in application code: `agencies.controller.ts` imported
-  `AgencyMembershipStatus` from `../../../generated/typeorm/enums` — now
+  `AgencyMembershipStatus` from `../../../generated/prisma/enums` — now
   imports from `../../database/enums` (the TypeORM-side enum mirror that's
   existed since Phase 0).
-- Left historical comments that reference "TypeORM" as documentation of
+- Left historical comments that reference "Prisma" as documentation of
   *why* a piece of code looks the way it does (e.g. `pg-errors.ts`
-  explaining it replaces `TypeORMClientKnownRequestError`/`P2002`
+  explaining it replaces `PrismaClientKnownRequestError`/`P2002`
   handling) — these describe design rationale, not a live dependency, and
   deleting them would lose useful context for readers unfamiliar with the
   migration history.
@@ -105,10 +105,10 @@ Full loop run at the end, after every change above landed:
   status`), same as every prior phase.
 - `npm test` (unit) — 71/71 passing, 16/16 suites.
 - Full clean-room e2e run: dropped and recreated `blujet_test` from
-  scratch, ran `npm run migration:run` (TypeORM only, zero TypeORM
+  scratch, ran `npm run migration:run` (TypeORM only, zero Prisma
   involvement anywhere in the loop), ran `npm run seed`, then
   `npm run test:e2e` — **465/465 passing, 54/54 suites**.
 
-This closes out the TypeORM → TypeORM migration. `grep -ri typeorm
+This closes out the Prisma → TypeORM migration. `grep -ri prisma
 backend/src backend/test` now returns only historical-context comments —
 no imports, no config, no runtime dependency.

@@ -33,7 +33,7 @@ const KNOWN_BENIGN_DIFF_PATTERNS: RegExp[] = [
   // Same class of issue for empty-array-default columns (the one
   // enum-array column plus the plain text-array seat-map/job-posting
   // columns): entity `default: []` normalizes to the literal '{}' array
-  // syntax, while TypeORM's migrations wrote `ARRAY[]::"Type"[]` — both
+  // syntax, while Prisma's migrations wrote `ARRAY[]::"Type"[]` — both
   // are the same empty array, just different valid Postgres literal
   // spellings.
   /ALTER COLUMN "\w+" SET DEFAULT '\{\}'$/,
@@ -51,7 +51,7 @@ describe('TypeORM schema parity', () => {
     await dataSource.destroy();
   });
 
-  it('produces only the documented allowlisted diff against the existing TypeORM-migrated schema', async () => {
+  it('produces only the documented allowlisted diff against the existing Prisma-migrated schema', async () => {
     const sqlInMemory = await dataSource.driver.createSchemaBuilder().log();
     const upQueries = sqlInMemory.upQueries.map((q) => q.query);
 

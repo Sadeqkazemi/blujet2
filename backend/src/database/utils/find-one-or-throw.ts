@@ -6,10 +6,10 @@ import type {
 } from 'typeorm';
 
 /**
- * Mirrors TypeORM's `findUniqueOrThrow`/`findFirstOrThrow` — an invariant
+ * Mirrors Prisma's `findUniqueOrThrow`/`findFirstOrThrow` — an invariant
  * assertion ("this row must exist"), not a user-facing lookup. Throws a
  * plain `Error` (not an `HttpException`) so `AllExceptionsFilter` maps a
- * miss to 500/INTERNAL_ERROR, matching TypeORM's own behaviour byte-for-byte
+ * miss to 500/INTERNAL_ERROR, matching Prisma's own behaviour byte-for-byte
  * (a `findUniqueOrThrow` miss is NOT an `HttpException` either). Call sites
  * that want a 404 instead must throw `NotFoundException` themselves — never
  * swap this helper in for that without checking the original behaviour.

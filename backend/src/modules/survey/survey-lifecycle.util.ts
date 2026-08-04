@@ -55,7 +55,7 @@ export async function materializeSurveyInvites(
   if (!settings || !settings.enabled) return;
 
   // Booking has no inverse relation to SurveyInvite (recurring shape across
-  // this codebase) — a LEFT JOIN + IS NULL filter replaces TypeORM's
+  // this codebase) — a LEFT JOIN + IS NULL filter replaces Prisma's
   // relation-null `surveyInvite: null` where clause.
   const pending = await bookingRepo
     .createQueryBuilder('b')

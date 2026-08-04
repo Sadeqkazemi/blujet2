@@ -131,7 +131,7 @@ describe('Flights (e2e)', () => {
       departureAt: new Date(Date.now() + 20 * 24 * 3_600_000),
     });
 
-    const { accessToken } = await loginAs(app, 'senior.rahimi');
+    const { accessToken } = await loginAs(app, 'senior');
     const res = await request(app.getHttpServer())
       .get('/flights/overview')
       .set('Authorization', `Bearer ${accessToken}`);
@@ -168,7 +168,7 @@ describe('Flights (e2e)', () => {
     await addBooking(departed.id, 'SYSTEM', 40_000_000);
     await addBooking(departed.id, 'AGENCY', 20_000_000);
 
-    const { accessToken } = await loginAs(app, 'comm.abbasi');
+    const { accessToken } = await loginAs(app, 'comm');
     const res = await request(app.getHttpServer())
       .get('/flights/overview')
       .set('Authorization', `Bearer ${accessToken}`);
@@ -210,7 +210,7 @@ describe('Flights (e2e)', () => {
   });
 
   it('airports catalog is seeded (Iranian cities + DXB/IST/NJF); roles without the tab get 403', async () => {
-    const { accessToken } = await loginAs(app, 'senior.rahimi');
+    const { accessToken } = await loginAs(app, 'senior');
     const res = await request(app.getHttpServer())
       .get('/flights/airports')
       .set('Authorization', `Bearer ${accessToken}`);
@@ -219,7 +219,7 @@ describe('Flights (e2e)', () => {
     expect(codes).toEqual(expect.arrayContaining(['THR', 'DXB', 'IST', 'NJF']));
     expect(codes.length).toBeGreaterThanOrEqual(23);
 
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const denied = await request(app.getHttpServer())
       .get('/flights/overview')
       .set('Authorization', `Bearer ${finance.accessToken}`);
@@ -227,7 +227,7 @@ describe('Flights (e2e)', () => {
   });
 
   it('POST /flights/airports creates a new airport and rejects duplicates', async () => {
-    const { accessToken } = await loginAs(app, 'comm.abbasi');
+    const { accessToken } = await loginAs(app, 'comm');
     // A timestamp-derived 2-letter suffix has too little entropy (only ~1300
     // combinations) not to occasionally collide with a real seeded IATA code
     // (e.g. it once landed on "ZAH" — Zahedan) — pick against the DB instead.
@@ -258,7 +258,7 @@ describe('Flights (e2e)', () => {
   });
 
   it('POST /flights: validations (same origin/dest, past date, duplicate flightNo on another route) then a clean create', async () => {
-    const { accessToken } = await loginAs(app, 'senior.rahimi');
+    const { accessToken } = await loginAs(app, 'senior');
     const base = {
       originCode: 'THR',
       destCode: 'MHD',
@@ -298,6 +298,37 @@ describe('Flights (e2e)', () => {
     expect(ok.body.data.derivedStatus).toBe('ACTIVE');
     expect(ok.body.data.sold).toBe(0);
 
+    const withExtras = await request(app.getHttpServer())
+      .post('/flights')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        ...base,
+        flightNo: uniqueFlightNo(),
+        capacity: 180,
+        charterSeats: 40,
+        aircraftType: 'Airbus A320',
+      });
+    expect(withExtras.status).toBe(201);
+    const extrasInstance = await dataSource
+      .getRepository(FlightInstance)
+      .createQueryBuilder('fi')
+      .innerJoinAndSelect('fi.flight', 'flight')
+      .where('fi.id = :id', { id: withExtras.body.data.id })
+      .getOneOrFail();
+    expect(extrasInstance.charterSeats).toBe(40);
+    expect(extrasInstance.flight.aircraftType).toBe('Airbus A320');
+
+    const badCharter = await request(app.getHttpServer())
+      .post('/flights')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        ...base,
+        flightNo: uniqueFlightNo(),
+        capacity: 100,
+        charterSeats: 100,
+      });
+    expect(badCharter.status).toBe(400);
+
     const instance = await dataSource
       .getRepository(FlightInstance)
       .createQueryBuilder('fi')
@@ -328,7 +359,7 @@ describe('Flights (e2e)', () => {
     await addBooking(instance.id, 'SYSTEM', 30_000_000);
     await addBooking(instance.id, 'CHARTER', 28_000_000);
 
-    const { accessToken } = await loginAs(app, 'senior.rahimi');
+    const { accessToken } = await loginAs(app, 'senior');
     const res = await request(app.getHttpServer())
       .get(`/flights/${instance.id}`)
       .set('Authorization', `Bearer ${accessToken}`);
@@ -350,7 +381,7 @@ describe('Flights (e2e)', () => {
       capacity: 180,
       charterSeats: 60,
     });
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
 
     const overCap = await request(app.getHttpServer())
       .patch(`/flights/${instance.id}/plan`)
@@ -395,7 +426,7 @@ describe('Flights (e2e)', () => {
     const instance = await createInstance({
       departureAt: new Date(Date.now() + 20 * 24 * 3_600_000),
     });
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const res = await request(app.getHttpServer())
       .patch(`/flights/${instance.id}/plan`)
       .set('Authorization', `Bearer ${senior.accessToken}`)
@@ -415,7 +446,7 @@ describe('Flights (e2e)', () => {
     const future = await createInstance({
       departureAt: new Date(Date.now() + 20 * 24 * 3_600_000),
     });
-    const { accessToken } = await loginAs(app, 'senior.rahimi');
+    const { accessToken } = await loginAs(app, 'senior');
 
     fakeMl.nextResult = null; // ml-service down
     const down = await request(app.getHttpServer())

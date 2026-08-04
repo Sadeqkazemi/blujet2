@@ -80,7 +80,7 @@ describe('Refunds (e2e)', () => {
   it('GET /refunds returns the cards + reconciling KPI counts; PII never in the list', async () => {
     await createRequest('FINANCE');
     await createRequest('SUBMITTED');
-    const { accessToken } = await loginAs(app, 'finance.karimi');
+    const { accessToken } = await loginAs(app, 'finance');
 
     const res = await request(app.getHttpServer())
       .get('/refunds')
@@ -104,7 +104,7 @@ describe('Refunds (e2e)', () => {
 
   it('detail decrypts the شبا for the finance surface; the DB row stays encrypted', async () => {
     const { req } = await createRequest('FINANCE');
-    const { accessToken } = await loginAs(app, 'finance.karimi');
+    const { accessToken } = await loginAs(app, 'finance');
 
     const res = await request(app.getHttpServer())
       .get(`/refunds/${req.id}`)
@@ -138,10 +138,10 @@ describe('Refunds (e2e)', () => {
 
   it('finance reassignment changes assignee + history without changing FINANCE; non-finance assignee → 400', async () => {
     const { req } = await createRequest('FINANCE');
-    const { accessToken } = await loginAs(app, 'finance.karimi');
+    const { accessToken } = await loginAs(app, 'finance');
     const staffer = await dataSource
       .getRepository(User)
-      .findOneByOrFail({ username: 'finance.karimi' });
+      .findOneByOrFail({ username: 'finance' });
 
     const res = await request(app.getHttpServer())
       .patch(`/refunds/${req.id}/refer`)
@@ -165,11 +165,11 @@ describe('Refunds (e2e)', () => {
 
   it('pay is transactional: ledger REFUND row + booking REFUNDED + PAID with processedBy; audited', async () => {
     const { booking, req } = await createRequest('FINANCE');
-    const { accessToken } = await loginAs(app, 'finance.karimi');
+    const { accessToken } = await loginAs(app, 'finance');
     const stepUp = await stepUpFor(
       app,
       accessToken!,
-      'finance.karimi',
+      'finance',
       'REFUND_PAYOUT',
     );
 
@@ -205,11 +205,11 @@ describe('Refunds (e2e)', () => {
 
   it('pay on SUBMITTED → 409 «در انتظار ادمین»; double-pay → 409 with exactly ONE ledger row', async () => {
     const submitted = await createRequest('SUBMITTED');
-    const { accessToken } = await loginAs(app, 'finance.karimi');
+    const { accessToken } = await loginAs(app, 'finance');
     const stepUp1 = await stepUpFor(
       app,
       accessToken!,
-      'finance.karimi',
+      'finance',
       'REFUND_PAYOUT',
     );
 
@@ -224,7 +224,7 @@ describe('Refunds (e2e)', () => {
     const stepUp2 = await stepUpFor(
       app,
       accessToken!,
-      'finance.karimi',
+      'finance',
       'REFUND_PAYOUT',
     );
     const first = await request(app.getHttpServer())
@@ -236,7 +236,7 @@ describe('Refunds (e2e)', () => {
     const stepUp3 = await stepUpFor(
       app,
       accessToken!,
-      'finance.karimi',
+      'finance',
       'REFUND_PAYOUT',
     );
     const replay = await request(app.getHttpServer())
@@ -254,13 +254,13 @@ describe('Refunds (e2e)', () => {
   it('the ledger reconciles: sum of REFUND entries equals the paid requests’ refundable totals', async () => {
     const a = await createRequest('FINANCE', 20_000_000);
     const b = await createRequest('FINANCE', 40_000_000);
-    const { accessToken } = await loginAs(app, 'finance.karimi');
+    const { accessToken } = await loginAs(app, 'finance');
 
     for (const { req } of [a, b]) {
       const stepUp = await stepUpFor(
         app,
         accessToken!,
-        'finance.karimi',
+        'finance',
         'REFUND_PAYOUT',
       );
       const res = await request(app.getHttpServer())

@@ -1,4 +1,4 @@
-/** Mirrors backend/src/database Role enum — keep in sync with docs/DB_SCHEMA.md. */
+/** Mirrors backend/prisma Role enum — keep in sync with docs/DB_SCHEMA.md. */
 export type Role =
   | 'USER'
   | 'AGENCY'
@@ -11,7 +11,7 @@ export type Role =
   | 'BOARD_CHAIR'
   | 'SITE_ADMIN';
 
-/** Mirrors backend/src/database Locale enum. */
+/** Mirrors backend/prisma Locale enum. */
 export type Locale = 'FA' | 'EN' | 'AR';
 
 export interface AuthUser {

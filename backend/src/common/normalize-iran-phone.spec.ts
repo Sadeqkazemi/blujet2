@@ -1,4 +1,8 @@
-import { normalizeIranPhone, toLatinDigits, toLocalIranMobile } from './normalize-iran-phone';
+import {
+  normalizeIranPhone,
+  toLatinDigits,
+  toLocalIranMobile,
+} from './normalize-iran-phone';
 
 describe('toLatinDigits', () => {
   it('converts Persian digits', () => {

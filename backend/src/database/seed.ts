@@ -25,6 +25,7 @@ import {
   AgencyInvoiceStatus,
   AgencyMembershipStatus,
   AgencyTier,
+  AuditCategory,
   BlogCategory,
   BlogPostStatus,
   BookingChannel,
@@ -57,6 +58,7 @@ import { AgencyMessage } from './entities/agency-message.entity';
 import { AgencyProfile } from './entities/agency-profile.entity';
 import { AircraftSeatMap } from './entities/aircraft-seat-map.entity';
 import { Airport } from './entities/airport.entity';
+import { AuditLog } from './entities/audit-log.entity';
 import { BlogPost } from './entities/blog-post.entity';
 import { Booking } from './entities/booking.entity';
 import { CareersSettings } from './entities/careers-settings.entity';
@@ -101,7 +103,7 @@ const dataSource = new DataSource(dataSourceOptions);
 /** Known dev password for every seeded staff account — dev/test only, never production. */
 const STAFF_PASSWORD = 'Blujet@1404';
 
-/** TypeORM-`upsert`-shaped get-or-create-or-update, translated to TypeORM's
+/** Prisma-`upsert`-shaped get-or-create-or-update, translated to TypeORM's
  * find-then-create-or-save idiom (TypeORM's own `.upsert()` has different
  * ON-CONFLICT semantics and doesn't return the resulting entity the way
  * this script's call sites need). */
@@ -138,6 +140,7 @@ async function main() {
     AgencyMembershipRequest,
   );
   const cartableTaskRepo = dataSource.getRepository(CartableTask);
+  const auditLogRepo = dataSource.getRepository(AuditLog);
   const managerReferralRepo = dataSource.getRepository(ManagerReferral);
   const managerReferralRecipientRepo = dataSource.getRepository(
     ManagerReferralRecipient,
@@ -183,25 +186,33 @@ async function main() {
 
   const passwordHash = await argon2.hash(STAFF_PASSWORD);
 
+  // Rename legacy seed usernames so re-seed on existing DBs picks up short logins.
+  await userRepo.update(
+    { username: 'finance.karimi' },
+    { username: 'finance' },
+  );
+  await userRepo.update({ username: 'comm.abbasi' }, { username: 'comm' });
+  await userRepo.update({ username: 'senior.rahimi' }, { username: 'senior' });
+
   const staff: {
     username: string;
     fullName: string;
     role: (typeof Role)[keyof typeof Role];
   }[] = [
-    { username: 'com.ahmadi', fullName: 'رضا احمدی', role: Role.EMPLOYEE },
+    { username: 'com.ahmadi', fullName: 'سمیرا احمدی', role: Role.EMPLOYEE },
     { username: 'itadmin', fullName: 'مهندس علی صدر', role: Role.IT_MANAGER },
     {
-      username: 'comm.abbasi',
+      username: 'comm',
       fullName: 'رضا مرادی',
       role: Role.COMMERCIAL_MANAGER,
     },
     {
-      username: 'finance.karimi',
+      username: 'finance',
       fullName: 'سحر کاظمی',
       role: Role.FINANCE_MANAGER,
     },
     {
-      username: 'senior.rahimi',
+      username: 'senior',
       fullName: 'محمد رحیمی',
       role: Role.SENIOR_MANAGER,
     },
@@ -227,9 +238,9 @@ async function main() {
     );
     staffByUsername.set(s.username, user);
   }
-  const seniorManager = staffByUsername.get('senior.rahimi')!;
-  const commercialManager = staffByUsername.get('comm.abbasi')!;
-  const financeManager = staffByUsername.get('finance.karimi')!;
+  const seniorManager = staffByUsername.get('senior')!;
+  const commercialManager = staffByUsername.get('comm')!;
+  const financeManager = staffByUsername.get('finance')!;
 
   await upsertBy(
     userRepo,
@@ -1544,6 +1555,49 @@ async function main() {
             },
           ],
         },
+        // Extra rows so the finance refunds list can exercise 5-per-page pagination.
+        {
+          passengerName: 'علی نوری',
+          status: RefundStatus.FINANCE,
+          totalPaidIrr: 28_000_000,
+          penaltyPct: 30,
+          assigneeLabel: financeStaffName,
+          history: [
+            {
+              step: 'submitted',
+              labelFa: 'ثبت درخواست کنسلی توسط مشتری — جریمه ٪۳۰',
+              at: '۳ روز پیش · ۱۰:۰۰',
+            },
+            {
+              step: 'review',
+              labelFa: 'بررسی توسط ادمین سایت',
+              at: '۳ روز پیش · ۱۲:۲۰',
+            },
+            {
+              step: 'finance',
+              labelFa: `ارجاع به ${financeStaffName} (کارشناس مالی) توسط ادمین سایت`,
+              at: '۲ روز پیش · ۰۹:۱۰',
+            },
+          ],
+        },
+        {
+          passengerName: 'فاطمه حسینی',
+          status: RefundStatus.REVIEW,
+          totalPaidIrr: 35_000_000,
+          penaltyPct: 50,
+          history: [
+            {
+              step: 'submitted',
+              labelFa: 'ثبت درخواست کنسلی توسط مشتری — جریمه ٪۵۰',
+              at: '۴ روز پیش · ۱۵:۴۵',
+            },
+            {
+              step: 'review',
+              labelFa: 'بررسی توسط ادمین سایت',
+              at: 'دیروز · ۱۱:۰۰',
+            },
+          ],
+        },
       ];
       for (const [index, r] of refundSeeds.entries()) {
         const penaltyAmountIrr = Math.round(
@@ -1807,6 +1861,66 @@ async function main() {
       rank: 'کارشناس',
       referralScope: 'MANAGERS_ONLY',
       createdById: itManager.id,
+      twoFactorEnabled: true,
+      isActive: true,
+      updatedAt: new Date(),
+    },
+    {
+      dept: 'commercial',
+      rank: 'کارشناس',
+      isActive: true,
+      updatedAt: new Date(),
+    },
+  );
+  // Design-reference demo employee (screenshots: سمیرا احمدی / واحد بازرگانی).
+  const designDemoEmployee = await upsertBy(
+    userRepo,
+    { username: 'com.ahmadi' },
+    {
+      role: Role.EMPLOYEE,
+      username: 'com.ahmadi',
+      passwordHash,
+      fullName: 'سمیرا احمدی',
+      dept: 'commercial',
+      rank: 'کارشناس',
+      referralScope: 'MANAGERS_ONLY',
+      createdById: itManager.id,
+      twoFactorEnabled: true,
+      isActive: true,
+      updatedAt: new Date(),
+    },
+    {
+      role: Role.EMPLOYEE,
+      fullName: 'سمیرا احمدی',
+      dept: 'commercial',
+      rank: 'کارشناس',
+      twoFactorEnabled: true,
+      isActive: true,
+      updatedAt: new Date(),
+    },
+  );
+  // Zero-permission employee — used by panels.e2e «no granted permissions» case.
+  const emptyEmployee = await upsertBy(
+    userRepo,
+    { username: 'emp.none' },
+    {
+      role: Role.EMPLOYEE,
+      username: 'emp.none',
+      passwordHash,
+      fullName: 'بدون دسترسی',
+      dept: 'commercial',
+      rank: 'کارشناس',
+      referralScope: 'MANAGERS_ONLY',
+      createdById: itManager.id,
+      twoFactorEnabled: true,
+      isActive: true,
+      updatedAt: new Date(),
+    },
+    {
+      role: Role.EMPLOYEE,
+      dept: 'commercial',
+      rank: 'کارشناس',
+      twoFactorEnabled: true,
       isActive: true,
       updatedAt: new Date(),
     },
@@ -1828,7 +1942,10 @@ async function main() {
     },
   );
   for (const [employee, keys] of [
-    [commercialEmployee, ['ag_list', 'fl_view', 'ct_list', 'ct_process']],
+    // No fl_view — employee sidebar has no مدیریت پروازها (product).
+    [commercialEmployee, ['ag_list', 'ct_list', 'ct_process']],
+    // Design demo: agencies + reports + cartable (screenshot sidebar).
+    [designDemoEmployee, ['ag_list', 'rp_sales', 'ct_list', 'ct_process']],
     [financeEmployee, ['rf_list']],
   ] as const) {
     const perms = await permissionRepo.find({
@@ -1844,6 +1961,116 @@ async function main() {
           grantedById: itManager.id,
         },
       );
+    }
+  }
+  // Drop legacy fl_* grants from commercial demo (tab removed from employee nav).
+  const flightPerms = await permissionRepo.find({
+    where: { key: In(['fl_view', 'fl_manage']) },
+    select: { id: true },
+  });
+  if (flightPerms.length > 0) {
+    await employeePermissionRepo.delete({
+      employeeId: In([commercialEmployee.id, designDemoEmployee.id]),
+      permissionId: In(flightPerms.map((p) => p.id)),
+    });
+  }
+  // Ensure emp.none stays permission-free even on re-seed.
+  await employeePermissionRepo.delete({ employeeId: emptyEmployee.id });
+
+  // Design-demo cartable + referral + activity feed for سمیرا احمدی screenshots.
+  const designCartableCount = await cartableTaskRepo.count({
+    where: { assigneeId: designDemoEmployee.id },
+  });
+  if (designCartableCount === 0) {
+    for (const t of [
+      {
+        assigneeId: designDemoEmployee.id,
+        category: CartableCategory.AGENCY,
+        title: 'پیگیری درخواست عضویت آژانس نگین‌پرواز',
+        description: 'کنترل مدارک و اطلاعات آژانس متقاضی.',
+        senderId: commercialManager.id,
+        senderLabelFa: 'رضا مرادی · مدیر بازرگانی',
+        createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
+      },
+      {
+        assigneeId: designDemoEmployee.id,
+        category: CartableCategory.ADMIN,
+        title: 'هماهنگی تسویه دوره‌ای آژانس‌ها',
+        description: 'پیگیری افزایش اعتبار و تسویه ماه جاری.',
+        senderLabelFa: 'مدیر بازرگانی',
+        createdAt: new Date(Date.now() - 28 * 60 * 60 * 1000),
+      },
+      {
+        assigneeId: designDemoEmployee.id,
+        category: CartableCategory.MANAGER,
+        title: 'صدور بلیط گروهی تهران–کیش',
+        description: 'رزرو گروهی ۸ نفره برای مسیر تهران–کیش.',
+        senderId: commercialManager.id,
+        senderLabelFa: 'رضا مرادی · مدیر بازرگانی',
+        createdAt: new Date(Date.now() - 40 * 60 * 60 * 1000),
+      },
+    ]) {
+      await cartableTaskRepo.save(cartableTaskRepo.create(t));
+    }
+  }
+
+  const designReferralCount = await managerReferralRecipientRepo.count({
+    where: { recipientId: designDemoEmployee.id },
+  });
+  if (designReferralCount === 0) {
+    const designReferral = await managerReferralRepo.save(
+      managerReferralRepo.create({
+        fromId: commercialManager.id,
+        title: 'بررسی درخواست همکاری آژانس نگین پرواز',
+        body: 'اولویت با بررسی مجوز بند «ب» است.',
+        priority: ReferralPriority.HIGH,
+        status: ReferralStatus.SENT,
+      }),
+    );
+    await managerReferralRecipientRepo.save(
+      managerReferralRecipientRepo.create({
+        referralId: designReferral.id,
+        recipientId: designDemoEmployee.id,
+      }),
+    );
+    await cartableTaskRepo.save(
+      cartableTaskRepo.create({
+        assigneeId: designDemoEmployee.id,
+        category: CartableCategory.MANAGER,
+        title: designReferral.title,
+        description: 'کنترل مدارک و اطلاعات آژانس متقاضی و ثبت گزارش',
+        senderId: commercialManager.id,
+        senderLabelFa: 'رضا مرادی · مدیر بازرگانی',
+        sourceType: 'MANAGER_REFERRAL',
+        sourceId: designReferral.id,
+      }),
+    );
+  }
+
+  const designActivityCount = await auditLogRepo
+    .createQueryBuilder('a')
+    .where('a.actorId = :actorId', { actorId: designDemoEmployee.id })
+    .getCount();
+  if (designActivityCount === 0) {
+    for (const a of [
+      {
+        actorId: designDemoEmployee.id,
+        actorRole: Role.EMPLOYEE,
+        category: AuditCategory.AGENCY,
+        action: 'تماس با آژانس پارسیان‌گشت',
+        detail: 'پیگیری تسویه دوره‌ای و درخواست افزایش اعتبار.',
+        createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+      },
+      {
+        actorId: designDemoEmployee.id,
+        actorRole: Role.EMPLOYEE,
+        category: AuditCategory.RESERVATION,
+        action: 'صدور ۸ بلیط گروهی',
+        detail: 'رزرو گروهی مسیر تهران–کیش برای ۸ مسافر.',
+        createdAt: new Date(Date.now() - 26 * 60 * 60 * 1000),
+      },
+    ]) {
+      await auditLogRepo.save(auditLogRepo.create(a));
     }
   }
 

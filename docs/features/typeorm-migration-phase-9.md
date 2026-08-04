@@ -1,6 +1,6 @@
 # TypeORM migration — Phase 9: agencies + agency-portal
 
-Phase 9 of the TypeORM → TypeORM migration plan. Converts `agencies` and
+Phase 9 of the Prisma → TypeORM migration plan. Converts `agencies` and
 `agency-portal` together, since `agency-portal.service.ts` creates
 `AgencyDocument`/`AgencyCreditRequest`/`AgencyWebserviceRequest` and reuses
 `AgenciesService` heavily for credit/invoices/messages/API-keys. First
@@ -26,7 +26,7 @@ pessimistic-lock conversion in the migration.
 
 ## New findings
 
-- **First pessimistic-lock conversion**: TypeORM's raw
+- **First pessimistic-lock conversion**: Prisma's raw
   `SELECT ... FOR UPDATE` inside `settle()` becomes
   `this.profileRepo.manager.transaction(async (tx) => tx
   .createQueryBuilder(AgencyProfile, 'a')
@@ -87,7 +87,7 @@ pessimistic-lock conversion in the migration.
   `createQueryBuilder('r').where('r.id = :id', { id }).getOne()`.
 - `agency-portal.service.ts`'s `uploadDocument()` originally read
   `mimeType` off `FilesService.store()`'s return value, which only
-  includes `id`/`fileName`/`sizeBytes` (no `mimeType`) — the TypeORM
+  includes `id`/`fileName`/`sizeBytes` (no `mimeType`) — the Prisma
   version instead re-queried the created `AgencyDocument` with its `file`
   relation joined. Ported the same way: `documentRepo.findOne({ where:
   { id: saved.id }, relations: { file: true } })` after the initial save.
@@ -127,6 +127,6 @@ double-booking-guarantee critical path), `booking-engine` +
 `customer-referrals` together (shared-transaction boundary, riskiest
 phase), the remaining smaller modules (`blog`, `careers`, `club`,
 `reconciliation`, `sms`, `support-tickets`, `survey`), the seed script,
-the e2e fixture layer, and TypeORM removal. TypeORM remains the active ORM
+the e2e fixture layer, and Prisma removal. Prisma remains the active ORM
 for every module not yet converted; nothing removed until the dedicated
-TypeORM-removal phase.
+Prisma-removal phase.

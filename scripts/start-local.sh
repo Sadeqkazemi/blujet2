@@ -95,14 +95,9 @@ if [[ ! -d frontend/node_modules ]]; then
 fi
 
 echo "▶ Applying database migrations…"
-(set +e
- cd backend
- npm run migration:run
- if [[ $? -ne 0 ]]; then
-   npm run migration:run
- fi
- npm run seed 2>/dev/null || true
-)
+(cd backend && npm run migration:run)
+echo "▶ Seeding database…"
+(cd backend && npm run seed 2>/dev/null || true)
 
 echo "▶ Building backend…"
 (cd backend && npx nest build)

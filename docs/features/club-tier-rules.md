@@ -23,7 +23,7 @@ behavior where `level` never changes except via an explicit manual
 ## Acceptance checklist
 
 - [x] `GET /club/tier-rules` returns the singleton row (seeded via
-      `typeorm/seed.ts`) with `goldMinPoints`, `platinumMinPoints`,
+      `prisma/seed.ts`) with `goldMinPoints`, `platinumMinPoints`,
       `cardRequestMinPoints`, `updatedAt`, `updatedByLabelFa`, and a
       computed 3-row `preview` array (SILVER/GOLD/PLATINUM with min/max
       point range) — accessible only to `COMMERCIAL_MANAGER`

@@ -47,7 +47,8 @@ export class CareersPublicController {
   @Throttle({ default: { limit: 120, ttl: 60_000 } })
   @ApiOperation({ summary: 'تصویر آگهی فرصت شغلی (عمومی)' })
   async readMedia(@Param('fileId') fileId: string, @Res() res: Response) {
-    const { mimeType, fileName, stream } = await this.careers.readPublicMedia(fileId);
+    const { mimeType, fileName, stream } =
+      await this.careers.readPublicMedia(fileId);
     res.setHeader('Content-Type', mimeType);
     res.setHeader(
       'Content-Disposition',

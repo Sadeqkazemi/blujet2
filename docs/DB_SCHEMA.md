@@ -1,6 +1,6 @@
 # DB_SCHEMA.md — blujet data model
 
-Source of truth: `backend/src/database/schema.typeorm` (generated from this doc once
+Source of truth: `backend/prisma/schema.prisma` (generated from this doc once
 approved). This file groups entities by the phase that introduces them, per
 `CLAUDE.md`'s workflow rule ("one feature = backend endpoint + tests +
 frontend page, fully working, before starting the next feature").
@@ -54,7 +54,7 @@ enforce "a user has exactly one identity"):
 
 Constraint: exactly one of `phone`/`username` is non-null depending on role
 (`USER`/`AGENCY` → phone; everything else → username). Enforced in the
-`auth` module's DTOs, not at the DB level (TypeORM can't express XOR
+`auth` module's DTOs, not at the DB level (Prisma can't express XOR
 constraints cleanly).
 
 **Design-mock deviation**: the employee-panel login (`SiteData.authStaff`)
@@ -269,7 +269,7 @@ explicitly listed under Phase 12 in `PLAN.md` — not built, not stubbed.
 - `User` gained Phase-8 columns directly (mirrors how Phase 3/4 extended
   shared tables rather than a parallel `Employee` table): `dept` (free
   string — design lets IT create custom departments beyond
-  commercial/finance/IT/sales, so this is intentionally not a TypeORM enum),
+  commercial/finance/IT/sales, so this is intentionally not a Prisma enum),
   `rank`, `referralScope: MANAGERS_ONLY|ALL_STAFF` (captured at creation
   per the design's «دسترسی ارجاعات» picker; consumed by the referral system
   once `EMPLOYEE` joins `EXEC_ROLES`, which it doesn't yet — captured
@@ -936,13 +936,13 @@ data, computed lazily, no fabrication, no invented signals.
 read by `reporting.service.ts`'s completed-flights query and
 `flights.service.ts`'s پروازهای انجام‌شده list, but no code path — no
 cron, no endpoint — ever transitions an instance from `SCHEDULED` to
-`DEPARTED` once its `departureAt` passes. Only `typeorm/seed.ts` sets it
+`DEPARTED` once its `departureAt` passes. Only `prisma/seed.ts` sets it
 by hand for historical demo rows. So every "completed flights" report has
 been running against whatever the seed happened to backdate, never a
 real flight that actually departed during a live session. Fixed with the
 same lazy/computed pattern used for `HELD`→`EXPIRED` bookings and Part
 C/D's expiry filters — no cron:
-- `materializeDepartedInstances(typeorm)` (new shared util,
+- `materializeDepartedInstances(prisma)` (new shared util,
   `backend/src/modules/flights/flight-lifecycle.util.ts`): one bulk
   `updateMany({ where: { status: 'SCHEDULED', departureAt: { lte: now } },
   data: { status: 'DEPARTED' } })`. Called at the top of every place that
@@ -964,7 +964,7 @@ new manual action once the flight has actually departed — this is a real
 operational action (ops reviewing the manifest after departure), not a
 fabricated automatic flag.
 - New enum values: `BookingStatus` gains `NO_SHOW`, `FLOWN`.
-- `materializeFlownBookings(typeorm)` (same util file): after
+- `materializeFlownBookings(prisma)` (same util file): after
   materializing departed instances, bulk-flips every `TICKETED` booking
   whose instance is now `DEPARTED` to `FLOWN`.
 - `PnrService.markNoShow` (new) — only from `TICKETED` or `FLOWN`
@@ -1345,7 +1345,7 @@ doesn't assume silent inclusion):
 **Tests**: `test/phase18-panel-access.e2e-spec.ts` (new) covers
 SITE_ADMIN's full real-access list + confirms it never gets
 suspend/credit/settle/api-key/create-member/update-level/pay; EMPLOYEE
-tests use the two permission combinations already in `typeorm/seed.ts`
+tests use the two permission combinations already in `prisma/seed.ts`
 (`sales.moradi`: `ag_list`+`fl_view`; a freshly IT_MANAGER-granted
 `rf_list`+`rf_details`+`rf_process` employee; a freshly granted
 `pr_propose` employee) to prove per-key granularity, plus one check that
@@ -1409,7 +1409,7 @@ Two new tables, both intentionally kept separate rather than unified
 into one "message" model (see docs/API.md's Phase 20 section for the
 full reasoning):
 
-```typeorm
+```prisma
 model ContactMessage {
   id        String   @id @default(uuid())
   name      String
@@ -1535,7 +1535,7 @@ values for them.
 New table only — `AgencyApiKey`/`AgencyApiScope`/`AgencyApiKeyStatus`
 already existed (Phase 3) and are unchanged.
 
-```typeorm
+```prisma
 enum AgencyWebserviceRequestStatus {
   PENDING
   APPROVED
@@ -1578,7 +1578,7 @@ model AgencyWebserviceRequest {
 One new nullable column — no new table. See docs/API.md's Phase 24
 section for the full feature scope and explicit deferrals.
 
-```typeorm
+```prisma
 model FlightInstance {
   // ...existing fields unchanged...
 
@@ -1779,7 +1779,7 @@ only, reuses the existing `TwoFactorChallenge` table exactly like Phase 2's
 See `docs/API.md`'s matching section. Bookmarks a specific flight instance
 + cabin for the logged-in customer (same granularity as `PriceLock`).
 
-```typeorm
+```prisma
 model SavedFlight {
   id               String         @id @default(uuid())
   userId           String
@@ -1803,7 +1803,7 @@ delete. Application cap: 20 rows per user (enforced in service, not DB).
 See `docs/API.md`'s matching section. Per-user address book for checkout
 autofill — separate from booking-scoped `Passenger` rows.
 
-```typeorm
+```prisma
 model SavedPassenger {
   id             String   @id @default(uuid())
   userId         String
@@ -1833,7 +1833,7 @@ cap: 20 rows per user; duplicate national ID per user rejected in service.
 Customer refund payout destination — card PAN + Iranian sheba (IBAN).
 Encrypted at rest like other PII; sheba deduped per user via `shebaHash`.
 
-```typeorm
+```prisma
 model SavedBankAccount {
   id          String   @id @default(uuid())
   userId      String
@@ -1863,7 +1863,7 @@ per user; duplicate sheba per user rejected in service.
 Invite-friends program for the public user panel — distinct from Phase 4
 `ManagerReferral` (staff workflow).
 
-```typeorm
+```prisma
 // User.referralCode String? @unique — lazily assigned per customer
 
 enum CustomerReferralStatus {
@@ -1901,7 +1901,7 @@ National-ID card KYC for refunds/high-value purchases. **No selfie**
 (CLAUDE.md). Customer submit/status and SITE_ADMIN approve/reject are
 both implemented; the admin queue is `/panel/kyc`.
 
-```typeorm
+```prisma
 enum CustomerIdentityStatus {
   NOT_STARTED
   SUBMITTED
@@ -1944,7 +1944,7 @@ shapes. One new singleton-pattern table (`ClubTierRule`, always exactly
 one row) alongside the existing Phase 5 `ClubMember`/`ClubCardRequest`
 models — not a new module, extends the existing `club` module.
 
-```typeorm
+```prisma
 model ClubTierRule {
   id                   String   @id @default(uuid())
   goldMinPoints        Int      @default(5000)
@@ -1970,7 +1970,7 @@ model ClubTierRule {
   already told on day one.
 - `SILVER` has no column — its threshold is fixed at `0` in code (never
   stored, never editable), matching the design's disabled `"۰"` input.
-- `typeorm/seed.ts` creates the single default row so `GET
+- `prisma/seed.ts` creates the single default row so `GET
   /club/tier-rules` never has to lazily create one in a normal dev/seed
   environment (the lazy-create fallback exists only for defense in
   depth, e.g. a fresh DB that skipped seeding).
@@ -1986,7 +1986,7 @@ lazy materialization via the survey module's own reads, new
 non-ml-service AI provider, real token-based usage logging). New
 `survey` module. Five new models:
 
-```typeorm
+```prisma
 model SurveySettings {
   id            String   @id @default(uuid())
   enabled       Boolean  @default(true)
@@ -2055,10 +2055,10 @@ Plus, on the `User` model: `surveySettingsEdits SurveySettings[]
 as `clubTierRuleEdits` (Phase 65).
 
 - `SurveySettings` — singleton (application-enforced, same pattern as
-  Phase 65's `ClubTierRule`); `typeorm/seed.ts` creates the one default
+  Phase 65's `ClubTierRule`); `prisma/seed.ts` creates the one default
   row (`enabled: true`, design's default title).
 - `SurveyQuestion` — not a singleton; IT manager CRUDs a flat list.
-  `typeorm/seed.ts` seeds the same 5 default questions the design ships
+  `prisma/seed.ts` seeds the same 5 default questions the design ships
   with (`رضایت کلی از سفر` / `برخورد و کیفیت خدمه پروازی` / `دقت در
   زمان پرواز` / `راحتی صندلی و کابین` / `سرعت پذیرش و چک‌این`), in that
   order. Deleting one is a hard delete (this is configuration, not
@@ -2096,7 +2096,7 @@ as `clubTierRuleEdits` (Phase 65).
   the existing audit-log table under a new `AuditCategory.SURVEY` value
   (added alongside the existing ten), matching how every other
   manager-editable settings screen in this codebase is already audited.
-- `SmsMessageType` (the TypeORM enum backing `SmsLog.messageType`, plus
+- `SmsMessageType` (the Prisma enum backing `SmsLog.messageType`, plus
   the mirrored TS union in `sms-provider.interface.ts`) gained a new
   `SURVEY_INVITE` value — this **does** require a migration (corrects an
   earlier draft assumption that it was TS-only).
@@ -2113,7 +2113,7 @@ listing/application pages and the application-review UI have no design
 file — only the SITE_ADMIN posting-management card grid does). New
 `careers` module, three new models:
 
-```typeorm
+```prisma
 enum JobType {
   FULL_TIME
   REMOTE
@@ -2214,7 +2214,7 @@ Plus, on the `User` model: `jobApplicationsAssigned JobApplication[]
 @relation("JobApplicationAssignee")`.
 
 - `CareersSettings` — singleton (same pattern as `SurveySettings`);
-  `typeorm/seed.ts` creates the one default row (`enabled: true`).
+  `prisma/seed.ts` creates the one default row (`enabled: true`).
 - `JobPosting.generalReqs`/`specialReqs` are native Postgres string
   arrays (`String[]`) — the admin's newline-separated textarea is
   split/joined at the API boundary, matching how the design itself
@@ -2398,7 +2398,7 @@ matching the new wire format on purpose.
 
 Migration `20260731140000_blog_posts`.
 
-```typeorm
+```prisma
 enum BlogCategory { NEWS GUIDE DEST OFFERS }
 enum BlogPostStatus { DRAFT PUBLISHED SCHEDULED }
 
@@ -2435,7 +2435,7 @@ Plus on `StoredFile`: `blogCoverFor BlogPost? @relation("BlogPostCover")`.
 
 ## Phase E — Site content CMS
 
-```typeorm
+```prisma
 enum SiteContentBlockKey { HERO_BANNER ANNOUNCEMENT_BAR PROMO_BANNER }
 
 model SiteMediaAsset {

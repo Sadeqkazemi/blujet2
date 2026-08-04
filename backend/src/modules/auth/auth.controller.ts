@@ -155,11 +155,10 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const { accessToken, refreshToken, user } =
-      await this.auth.verifyAgencyPasswordResetOtp(
-        dto.challengeId,
-        dto.code,
-        { userAgent: req.headers['user-agent'], ip: req.ip },
-      );
+      await this.auth.verifyAgencyPasswordResetOtp(dto.challengeId, dto.code, {
+        userAgent: req.headers['user-agent'],
+        ip: req.ip,
+      });
     setRefreshCookie(res, refreshToken);
     return { success: true, data: { accessToken, user } };
   }

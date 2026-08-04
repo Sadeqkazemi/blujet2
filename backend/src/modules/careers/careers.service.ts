@@ -114,6 +114,53 @@ export class CareersService {
   }
 
   // ── Public job listing ──────────────────────────────────────────────
+  private mediaUrl(fileId: string | null): string | null {
+    return fileId ? `/careers/media/${fileId}` : null;
+  }
+
+  private serializePosting<
+    T extends {
+      id: string;
+      title: string;
+      dept: string;
+      city: string;
+      type: string;
+      description: string;
+      generalReqs: string[] | null;
+      specialReqs: string[] | null;
+      active: boolean;
+      imageFileId: string | null;
+      createdAt: Date;
+      updatedAt: Date;
+    },
+  >(j: T) {
+    return {
+      id: j.id,
+      title: j.title,
+      dept: j.dept,
+      city: j.city,
+      type: j.type,
+      description: j.description,
+      generalReqs: j.generalReqs,
+      specialReqs: j.specialReqs,
+      active: j.active,
+      imageFileId: j.imageFileId,
+      imageUrl: this.mediaUrl(j.imageFileId),
+      createdAt: j.createdAt,
+      updatedAt: j.updatedAt,
+    };
+  }
+
+  private async assertImageFile(ownerId: string, fileId: string) {
+    const file = await this.storedFileRepo.findOneBy({ id: fileId, ownerId });
+    if (!file || !file.mimeType.startsWith('image/')) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'تصویر آگهی معتبر نیست یا متعلق به شما نیست.',
+      });
+    }
+  }
+
   async listActiveJobs() {
     const jobs = await this.jobPostingRepo.find({
       where: { active: true },
@@ -125,6 +172,9 @@ export class CareersService {
       dept: j.dept,
       city: j.city,
       type: j.type,
+      description: j.description,
+      imageFileId: j.imageFileId,
+      imageUrl: this.mediaUrl(j.imageFileId),
     }));
   }
 
@@ -142,14 +192,24 @@ export class CareersService {
       dept: job.dept,
       city: job.city,
       type: job.type,
+      description: job.description,
       generalReqs: job.generalReqs,
       specialReqs: job.specialReqs,
+      imageFileId: job.imageFileId,
+      imageUrl: this.mediaUrl(job.imageFileId),
     };
   }
 
   async readPublicMedia(fileId: string) {
     const file = await this.storedFileRepo.findOneBy({ id: fileId });
     if (!file || !fs.existsSync(file.path)) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'تصویر یافت نشد.',
+      });
+    }
+    const linked = await this.jobPostingRepo.countBy({ imageFileId: fileId });
+    if (linked === 0) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
         message: 'تصویر یافت نشد.',
@@ -164,12 +224,28 @@ export class CareersService {
 
   // ── SITE_ADMIN: job-posting CRUD ─────────────────────────────────────
   async listAllPostings() {
-    return this.jobPostingRepo.find({ order: { createdAt: 'DESC' } });
+    const rows = await this.jobPostingRepo.find({
+      order: { createdAt: 'DESC' },
+    });
+    return rows.map((j) => this.serializePosting(j));
   }
 
   async createPosting(actor: AuthenticatedUser, dto: CreateJobPostingDto) {
+    if (dto.imageFileId) {
+      await this.assertImageFile(actor.id, dto.imageFileId);
+    }
     const posting = await this.jobPostingRepo.save(
-      this.jobPostingRepo.create({ ...dto, updatedAt: new Date() }),
+      this.jobPostingRepo.create({
+        title: dto.title,
+        dept: dto.dept,
+        city: dto.city,
+        type: dto.type,
+        generalReqs: dto.generalReqs,
+        specialReqs: dto.specialReqs,
+        description: dto.description ?? '',
+        imageFileId: dto.imageFileId ?? null,
+        updatedAt: new Date(),
+      }),
     );
     await this.audit.record({
       actorId: actor.id,
@@ -180,7 +256,7 @@ export class CareersService {
       entityType: 'JobPosting',
       entityId: posting.id,
     });
-    return posting;
+    return this.serializePosting(posting);
   }
 
   async updatePosting(
@@ -195,6 +271,9 @@ export class CareersService {
         message: 'فرصت شغلی یافت نشد.',
       });
     }
+    if (dto.imageFileId) {
+      await this.assertImageFile(actor.id, dto.imageFileId);
+    }
     Object.assign(existing, dto, { updatedAt: new Date() });
     const updated = await this.jobPostingRepo.save(existing);
     await this.audit.record({
@@ -206,7 +285,7 @@ export class CareersService {
       entityType: 'JobPosting',
       entityId: updated.id,
     });
-    return updated;
+    return this.serializePosting(updated);
   }
 
   // ── Public application submission ───────────────────────────────────

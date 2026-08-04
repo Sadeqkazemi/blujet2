@@ -1100,7 +1100,7 @@ and tier-benefits grid. BluBank block deferred (no backing schema).
   for the header chip / price-lock eligibility checks.
 - Seed: links test USER `+989120000001` (نگار رضایی) to the seeded GOLD
   `ClubMember` row and backfills a ledger entry when missing so manual
-  testing works immediately after `typeorm db seed`.
+  testing works immediately after `prisma db seed`.
 
 ### SITE_ADMIN — ارجاع درخواست‌های کارت SUBMITTED
 Completes the member-initiated card-request flow started above: after a
@@ -2001,7 +2001,7 @@ unilaterally.
 
 `AgencyDocument` (Agency Portal track, self-service upload) has had a
 real `status` enum (`PENDING`/`APPROVED`/`REJECTED`) since it shipped,
-and its own TypeORM comment said so explicitly: *"Staff-side review is
+and its own Prisma comment said so explicitly: *"Staff-side review is
 deferred... every row stays PENDING until that workflow is built."*
 `POST /agency-portal/documents` (agency uploads a license/contract) has
 always worked, but no staff endpoint could see or decide on the result —
@@ -2500,7 +2500,7 @@ just a passive settings screen.
 ### New: `GET /club/tier-rules`, `PATCH /club/tier-rules`
 - Roles: `COMMERCIAL_MANAGER` only (see access-list note above).
 - `GET` returns the single `ClubTierRule` row (seeded once via
-  `typeorm/seed.ts`, lazily created on first read if somehow absent):
+  `prisma/seed.ts`, lazily created on first read if somehow absent):
   `{ goldMinPoints, platinumMinPoints, cardRequestMinPoints, updatedAt,
   updatedByLabelFa }`.
 - `PATCH` body: `{ goldMinPoints, platinumMinPoints, cardRequestMinPoints }`
@@ -2526,7 +2526,7 @@ just a passive settings screen.
   now also loads the current `ClubTierRule` row and sets
   `ClubMember.level` to the highest tier whose `minPoints <= points`
   (`PLATINUM` > `GOLD` > `SILVER`, `SILVER` always the floor). This runs
-  inside the same TypeORM transaction as the points-ledger write, so tier
+  inside the same Prisma transaction as the points-ledger write, so tier
   and points always change atomically.
 - This only affects members going forward (a rules save does **not**
   retroactively recompute every existing member's tier — the design's
@@ -2594,7 +2594,7 @@ manager's own file. No other role's design file mentions a `survey` tab.
   draft above proposed hooking into `materializeFlownBookings`'s three
   existing call sites (`reporting.service.ts`, `flightops.service.ts`,
   `flights.service.ts`); the actual implementation instead adds a new
-  `materializeSurveyInvites(typeorm, sms)` (in
+  `materializeSurveyInvites(prisma, sms)` (in
   `backend/src/modules/survey/survey-lifecycle.util.ts`) that itself
   calls `materializeFlownBookings` first, then creates a `SurveyInvite`
   + sends the SMS for every `FLOWN` booking that doesn't have one yet
@@ -2641,7 +2641,7 @@ SMS body is a short Persian message containing the survey link
 back to `http://localhost:5173` in dev if unset) — no existing var in
 `.env.example` served this purpose; needed to build a link inside an SMS
 body rather than just delivering a code, unlike existing OTP messages.
-Unlike the draft's assumption, `SmsMessageType` **is** also a TypeORM
+Unlike the draft's assumption, `SmsMessageType` **is** also a Prisma
 enum (`SmsLog.messageType`), not just the TS union in
 `sms-provider.interface.ts` — both were extended with `SURVEY_INVITE` in
 the same migration that added the new tables.

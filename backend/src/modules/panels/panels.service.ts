@@ -37,7 +37,9 @@ export class PanelsService {
     if (user.role !== 'EMPLOYEE') {
       const items = PANEL_NAV[user.role] ?? [];
       if (user.role === 'SITE_ADMIN') {
-        return items.filter((item) => !SITE_ADMIN_SIDEBAR_DENYLIST.has(item.key));
+        return items.filter(
+          (item) => !SITE_ADMIN_SIDEBAR_DENYLIST.has(item.key),
+        );
       }
       return items;
     }

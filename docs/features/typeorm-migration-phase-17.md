@@ -1,24 +1,24 @@
 # TypeORM migration — Phase 17
 
-Converts the remaining e2e spec files off `TypeORMService` to TypeORM
+Converts the remaining e2e spec files off `PrismaService` to TypeORM
 (`DataSource`/`Repository`), completing the e2e test-suite side of the
-TypeORM → TypeORM migration. Combined with Phase 15 (fixture-layer helpers)
-and Phase 16 (remaining core `src/` TypeORM dependencies), this closes out
-all application and test code — the only TypeORM surface left in the repo
-after this phase is `backend/typeorm/` itself (schema, migrations, the
-TypeORM CLI config) and the generated TypeORM client, both scoped for
+Prisma → TypeORM migration. Combined with Phase 15 (fixture-layer helpers)
+and Phase 16 (remaining core `src/` Prisma dependencies), this closes out
+all application and test code — the only Prisma surface left in the repo
+after this phase is `backend/prisma/` itself (schema, migrations, the
+Prisma CLI config) and the generated Prisma client, both scoped for
 removal in Phase 18.
 
 ## Scope
 
 44 files changed, none of them behavior changes — purely an ORM swap
-(TypeORM Client calls → TypeORM `Repository`/`DataSource` calls), preserving
+(Prisma Client calls → TypeORM `Repository`/`DataSource` calls), preserving
 every test's assertions and scenario coverage exactly as they were:
 
 - `test/helpers/login.helper.ts` — `loginAs()`/`stepUpFor()` now resolve the
   acting user via `app.get(DataSource).getRepository(User)` instead of
-  `typeorm.user.findUniqueOrThrow`.
-- 39 `test/*.e2e-spec.ts` files converted off `TypeORMService` (full list:
+  `prisma.user.findUniqueOrThrow`.
+- 39 `test/*.e2e-spec.ts` files converted off `PrismaService` (full list:
   `agencies`, `agency-portal`, `audit`, `auth`, `bank-accounts`,
   `booking-engine`, `cartable`, `club`, `customer-account-refunds`,
   `customer-identity`, `customer-referrals`, `employee-cartable`, `files`,
@@ -43,9 +43,9 @@ every test's assertions and scenario coverage exactly as they were:
      shared fixtures like a flight/route/seat-map before the per-test app
      boots): a standalone `new DataSource(dataSourceOptions)` —
      `await ds.initialize()` … `await ds.destroy()`.
-2. **TypeORM → TypeORM call mapping** — `findUnique(OrThrow)` →
+2. **Prisma → TypeORM call mapping** — `findUnique(OrThrow)` →
    `findOneBy`/`findOneByOrFail`; `findFirst(OrThrow)` → `findOneBy`/
-   `findOneByOrFail`, or query-builder with `.innerJoin()` when the TypeORM
+   `findOneByOrFail`, or query-builder with `.innerJoin()` when the Prisma
    `where` filtered on a nested relation; `findMany` → `.find()`;
    `create` → `repo.save(repo.create({...}))`; `createMany` →
    `repo.save(repo.create([...]))` (array); `update` → `repo.update()`;
@@ -111,19 +111,19 @@ failing test first" debugging discipline.
   phase never touched, confirmed via `git status` before/after.
 - `npm test` (unit) — 71/71 passing, 16/16 suites.
 - `npm run test:e2e` against a freshly reset + reseeded `blujet_test`
-  database (`typeorm migrate reset --force`, then `tsx typeorm/seed.ts`) —
+  database (`prisma migrate reset --force`, then `tsx prisma/seed.ts`) —
   **465/465 passing, 54/54 suites**, run twice (once before the
   `PromoCode`/`CabinFare`/`SavedFlightsService` fixes surfaced 3 failures
   in `purchase-extras.e2e-spec.ts`, once clean after).
 
 ## What's left for Phase 18
 
-The only remaining TypeORM surface in the repository:
-`backend/typeorm/` (schema, migrations, seed script since relocated in
-Phase 14, `typeorm.config.ts`), the generated TypeORM client
-(`backend/generated/typeorm`), `backend/src/typeorm/` (the `TypeORMModule`/
-`TypeORMService` wrapper, now fully unused), and the `@typeorm/*` npm
+The only remaining Prisma surface in the repository:
+`backend/prisma/` (schema, migrations, seed script since relocated in
+Phase 14, `prisma.config.ts`), the generated Prisma client
+(`backend/generated/prisma`), `backend/src/prisma/` (the `PrismaModule`/
+`PrismaService` wrapper, now fully unused), and the `@prisma/*` npm
 dependencies + Dockerfile/CI references. Phase 18 will: generate a
 baseline TypeORM migration from the current schema and wire
-`migration:run` into the deploy path, then remove TypeORM entirely from the
+`migration:run` into the deploy path, then remove Prisma entirely from the
 repo and infra.

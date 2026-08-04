@@ -134,7 +134,9 @@ describe('Panels (e2e)', () => {
       { key: 'cartable', labelFa: 'کارتابل', implemented: true },
       { key: 'referrals', labelFa: 'ارجاعات', implemented: true },
     ]);
-    expect(res.body.data.map((t: { key: string }) => t.key)).not.toContain('flights');
+    expect(res.body.data.map((t: { key: string }) => t.key)).not.toContain(
+      'flights',
+    );
   });
 
   it('com.ahmadi (design demo employee) gets agencies + reports + cartable + referrals, never flights', async () => {

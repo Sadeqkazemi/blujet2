@@ -16,14 +16,16 @@ import { normalizeIranPhone } from '../../common/normalize-iran-phone';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import { SupportTicketStatus } from '../../database/enums';
 import type {
-  AdminCreateSupportTicketDto,
   SubmitSupportTicketDto,
+  AdminCreateSupportTicketDto,
 } from './dto/support-ticket.dtos';
+
+/** Staff-created tickets without a phone use this sentinel (schema requires a string). */
+const STAFF_TICKET_PHONE_SENTINEL = '09000000000';
 
 function generateTrackingCode(): string {
   return `TK${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
 }
-const STAFF_TICKET_PHONE_SENTINEL = '09000000000';
 
 const CUSTOMER_TICKET_SELECT = {
   id: true,
@@ -68,7 +70,11 @@ export class SupportTicketsService {
     return { id: ticket.id, trackingCode: ticket.trackingCode };
   }
 
-  async createAsAdmin(actor: AuthenticatedUser, dto: AdminCreateSupportTicketDto) {
+  /** SITE_ADMIN create-ticket modal — sets dept/priority at insert time. */
+  async createAsAdmin(
+    actor: AuthenticatedUser,
+    dto: AdminCreateSupportTicketDto,
+  ) {
     const phoneRaw = dto.requesterPhone?.trim();
     const phone = phoneRaw
       ? normalizeIranPhone(phoneRaw)
@@ -92,6 +98,7 @@ export class SupportTicketsService {
         ],
       }),
     );
+
     await this.audit.record({
       actorId: actor.id,
       actorRole: actor.role,
@@ -101,6 +108,7 @@ export class SupportTicketsService {
       entityType: 'SupportTicket',
       entityId: ticket.id,
     });
+
     return ticket;
   }
 

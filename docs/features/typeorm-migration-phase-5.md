@@ -1,6 +1,6 @@
 # TypeORM migration — Phase 5: auth, profile, it-manager
 
-Phase 5 of the TypeORM → TypeORM migration plan. The first phase touching
+Phase 5 of the Prisma → TypeORM migration plan. The first phase touching
 real session/token-issuance code paths: staff login + mandatory 2FA,
 customer phone+OTP login, agency login, JWT issuance, refresh-token
 rotation with reuse (theft) detection, step-up re-authentication, and
@@ -27,7 +27,7 @@ policy, external service config, backups).
    must atomically unset the old default and set the new one).
 3. **`it-manager`** — `EmployeesService` (employee account creation is a
    transaction: create the `User` row + bulk-create its
-   `EmployeePermission` grants atomically, mirroring TypeORM's nested
+   `EmployeePermission` grants atomically, mirroring Prisma's nested
    `employeePermissions: { create: [...] }` write), `SecurityService`
    (password policy singleton, site-wide logout-all), `ItServicesService`
    (internal/external service config, SMS log), `BackupsService` (real
@@ -36,7 +36,7 @@ policy, external service config, backups).
 ## New findings
 
 - **`Repository.manager.transaction()` is the TypeORM equivalent of
-  `typeorm.$transaction()`.** Used for `BankAccountsService.create()`/
+  `prisma.$transaction()`.** Used for `BankAccountsService.create()`/
   `update()` (unset-old-default + set-new-default) and
   `EmployeesService.create()`/`resetPassword()` (User write +
   dependent-row write). Pattern: `this.someRepo.manager.transaction(async
@@ -51,11 +51,11 @@ policy, external service config, backups).
   inverse (`@OneToOne` pointing at a `@ManyToOne` isn't a valid TypeORM
   pairing, and changing `AgencyProfile`'s own decorator risks an
   unreviewed schema-parity change this late in the migration), every
-  call site that used TypeORM's `include: { agencyProfile: true }`
+  call site that used Prisma's `include: { agencyProfile: true }`
   (`agencyLogin`, `requestAgencyPasswordReset`, `refresh()`'s AGENCY
   branch) was ported as two independent queries — fetch `User`, then
   fetch `AgencyProfile` by `userId` — matching what `refresh()` already
-  did in the original TypeORM code.
+  did in the original Prisma code.
 - **`verifyAgencyPasswordResetOtp`'s original `include` fetched
   `agencyProfile` but never read it** — confirmed by re-reading the
   method body; the TypeORM version drops the unused fetch entirely
@@ -71,11 +71,11 @@ policy, external service config, backups).
   find-or-create shape as Phase 3's `SiteContentBlock` — no UUID needed,
   just an explicit `updatedAt` on the synthesized first row.
 - Same recurring conventions from Phases 3–4 applied throughout: manual
-  `updatedAt: new Date()` on every write against an entity with TypeORM's
+  `updatedAt: new Date()` on every write against an entity with Prisma's
   `@updatedAt` (plain `@Column`, not `@UpdateDateColumn`); `findOneOrThrow`
   for former `findUniqueOrThrow`/`findFirstOrThrow` call sites;
   `ILike`/`In`/`IsNull`/`MoreThan(OrEqual)`/`Not` operators replacing
-  TypeORM's `contains`/`in`/`null`/`gte`/`gt`/`not` filters.
+  Prisma's `contains`/`in`/`null`/`gte`/`gt`/`not` filters.
 
 ## Verification
 
@@ -99,5 +99,5 @@ policy, external service config, backups).
 ## What's next
 
 Phase 6 (per the plan): staff operations — the next non-critical-path
-batch. TypeORM remains the active ORM for every module not yet converted;
+batch. Prisma remains the active ORM for every module not yet converted;
 nothing removed until Phase 14.

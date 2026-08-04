@@ -187,7 +187,7 @@ export class ClubService {
 
   async listMembers(
     query: { level?: ClubTier; q?: string },
-    _actor?: AuthenticatedUser,
+    actor?: AuthenticatedUser,
   ) {
     const qb = this.clubMemberRepo.createQueryBuilder('m');
     if (query.level) qb.andWhere('m.level = :level', { level: query.level });
@@ -223,8 +223,15 @@ export class ClubService {
       if (m.cardStatus === ClubCardStatus.ISSUED) issuedCards += 1;
     }
 
+    const includeNationalId = actor?.role === 'SITE_ADMIN';
+
     return {
-      members: members.map(toMemberView),
+      members: members.map((m) => ({
+        ...toMemberView(m),
+        ...(includeNationalId
+          ? { nationalId: decryptPii(m.nationalIdEnc) }
+          : {}),
+      })),
       kpis: {
         totalMembers: all.length,
         issuedCards,
@@ -423,7 +430,7 @@ export class ClubService {
     return requests;
   }
 
-  /** SITE_ADMIN track: queue of member-initiated SUBMITTED card requests. */
+  /** SITE_ADMIN track: all card requests (refer only allowed on SUBMITTED). */
   async listSubmittedRequests() {
     const requests = await this.cardRequestRepo
       .createQueryBuilder('r')
@@ -438,9 +445,6 @@ export class ClubService {
         'member.joinDate',
         'member.nationalIdEnc',
       ])
-      .where('r.status = :status', {
-        status: ClubCardRequestStatus.SUBMITTED,
-      })
       .orderBy('r.createdAt', 'DESC')
       .getMany();
     return requests.map((r) => ({

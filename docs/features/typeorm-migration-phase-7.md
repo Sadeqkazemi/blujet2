@@ -1,6 +1,6 @@
 # TypeORM migration — Phase 7: flight/pricing read side (pricing, flightops, webservice-pricing, passenger-reports)
 
-Phase 7 of the TypeORM → TypeORM migration plan. Converts the CEO/Commercial
+Phase 7 of the Prisma → TypeORM migration plan. Converts the CEO/Commercial
 fare-pricing-proposal workflow (incl. the ML advisory pricing suggestion
 loop), the نیرا manifest-submission ops board, IT Manager's webservice
 plan pricing, and the finance/commercial passenger search report.
@@ -81,10 +81,10 @@ risk-sensitive enough to warrant its own dedicated phase.
   as typeof target.aiSuggestion` in `runAiAnalysis()` — TypeScript
   correctly refuses the direct assignment since `PersistedAiSuggestion`
   has no index signature satisfying `JsonValue`'s structural constraint.
-- **TypeORM's `undefined`-omits-the-field update semantics must be ported
-  explicitly.** `upsertProposal()`'s original TypeORM `update: {
+- **Prisma's `undefined`-omits-the-field update semantics must be ported
+  explicitly.** `upsertProposal()`'s original Prisma `update: {
   legalRateIrr: dto.legalRateIrr, note: dto.note, ... }` left those fields
-  unchanged when the DTO field was `undefined` (TypeORM strips `undefined`
+  unchanged when the DTO field was `undefined` (Prisma strips `undefined`
   keys from `data`); the TypeORM entity-mutation equivalent needs an
   explicit `if (dto.legalRateIrr !== undefined) existing.legalRateIrr =
   dto.legalRateIrr;` guard per field, or assigning `undefined` directly
@@ -126,5 +126,5 @@ UPDATE`/optimistic-locking double-booking guarantees). Then
 `reservation` (seat locks), `booking-engine` + `customer-referrals`
 together (shared-transaction boundary, riskiest phase), then the
 remaining smaller modules, the seed script, e2e fixture layer, and
-TypeORM removal. TypeORM remains the active ORM for every module not yet
-converted; nothing removed until the dedicated TypeORM-removal phase.
+Prisma removal. Prisma remains the active ORM for every module not yet
+converted; nothing removed until the dedicated Prisma-removal phase.

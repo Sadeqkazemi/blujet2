@@ -435,7 +435,8 @@ export class FlightsController {
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
   @RequiresPermission('fl_manage')
   @ApiOperation({
-    summary: 'افزودن پرواز جدید — مشخصات + هواپیما/چارتر؛ سپس کلاس نرخی و پیشنهاد قیمت جداگانه',
+    summary:
+      'افزودن پرواز جدید — مشخصات + هواپیما/چارتر؛ سپس کلاس نرخی و پیشنهاد قیمت جداگانه',
   })
   async create(
     @CurrentUser() actor: AuthenticatedUser,

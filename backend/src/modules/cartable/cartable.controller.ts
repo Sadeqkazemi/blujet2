@@ -62,7 +62,9 @@ export class CartableController {
   @Post('manager-message')
   @Roles('EMPLOYEE')
   @RequiresPermission('ct_process')
-  @ApiOperation({ summary: 'ارسال پیام مستقیم به مدیر — تحویل در کارتابل مدیر' })
+  @ApiOperation({
+    summary: 'ارسال پیام مستقیم به مدیر — تحویل در کارتابل مدیر',
+  })
   async sendManagerMessage(
     @CurrentUser() actor: AuthenticatedUser,
     @Body() dto: SendEmployeeManagerMessageDto,

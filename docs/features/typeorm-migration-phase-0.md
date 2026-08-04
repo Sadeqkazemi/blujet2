@@ -1,8 +1,8 @@
 # TypeORM migration — Phase 0 spike findings
 
-Phase 0 of the TypeORM → TypeORM migration (see the full 16-phase plan
+Phase 0 of the Prisma → TypeORM migration (see the full 16-phase plan
 discussed with the user). Goal: answer every open technical question about
-mapping TypeORM entities onto the *existing* TypeORM-created schema, before
+mapping TypeORM entities onto the *existing* Prisma-created schema, before
 writing the other 73 entities and touching any of the 36 business modules.
 
 **Scope of this phase:** 4 hand-written entities (`ContactMessage`,
@@ -10,14 +10,14 @@ writing the other 73 entities and touching any of the 36 business modules.
 cases in the schema, plus a Gate A test (`test/schema-parity.e2e-spec.ts`)
 that boots a standalone TypeORM `DataSource` (not through Nest DI —
 `AppModule` is untouched) and asserts the schema builder has nothing to do
-against the live, TypeORM-migrated database. No service code was touched;
+against the live, Prisma-migrated database. No service code was touched;
 zero runtime behaviour change.
 
 ## Findings
 
 ### 1. Composite/named uniques: `@Index({ unique: true })`, never `@Unique()`
 
-Verified directly against `pg_constraint`: TypeORM's `@@unique`/`@unique`
+Verified directly against `pg_constraint`: Prisma's `@@unique`/`@unique`
 always compiles to a plain `CREATE UNIQUE INDEX`, **never** an
 `ADD CONSTRAINT ... UNIQUE`. TypeORM's `@Unique()` decorator always
 generates a real constraint — even with a matching name, it diffs forever
@@ -32,13 +32,13 @@ unique across all 77 models must use:
 Same applies to single-column unique columns — do not use
 `@Column({ unique: true })` shorthand either; use an explicit named
 `@Index(..., { unique: true })` so the constraint/index name matches
-TypeORM's `..._key` convention exactly.
+Prisma's `..._key` convention exactly.
 
 ### 2. Partial unique index — decorator route works cleanly
 
 `seat_locks_active_seat_unique` (`UNIQUE ON (flightInstanceId, seatCode)
 WHERE "releasedAt" IS NULL`) — the schema's only hand-written DDL with no
-plain TypeORM-schema equivalent — round-trips with **zero diff** using:
+plain Prisma-schema equivalent — round-trips with **zero diff** using:
 
 ```ts
 @Index('seat_locks_active_seat_unique', ['flightInstanceId', 'seatCode'], {
@@ -52,21 +52,21 @@ migration needed for this index in Phase 2.
 
 ### 3. `@UpdateDateColumn` — don't use it; plain `@Column`, no default
 
-Live-DB check (`\d careers_settings`) confirms TypeORM's `@updatedAt` sets
+Live-DB check (`\d careers_settings`) confirms Prisma's `@updatedAt` sets
 the value client-side on every write — the column has **no** DB default,
 unlike `createdAt`'s `DEFAULT CURRENT_TIMESTAMP`. `@UpdateDateColumn` wants
 a DB default and diffs against a no-default column. Resolution: every
 `@updatedAt` field (23 across the schema) becomes a plain
 `@Column({ type: 'timestamp', precision: 3 })` with **no** default, and the
 service layer must set `updatedAt: new Date()` explicitly on every write in
-Phase 2+ — the same discipline TypeORM gave for free. Flag this explicitly
+Phase 2+ — the same discipline Prisma gave for free. Flag this explicitly
 in every phase's review (grep for `.update(`/`.save(` on `updatedAt`-bearing
 entities).
 
 ### 4. `CURRENT_TIMESTAMP` vs `now()` — known TypeORM normalization quirk (allowlisted)
 
 `@CreateDateColumn`/timestamp defaults need `default: () => 'CURRENT_TIMESTAMP'`
-to match TypeORM's DDL. TypeORM's own `normalizeDatetimeFunction()` then
+to match Prisma's DDL. TypeORM's own `normalizeDatetimeFunction()` then
 rewrites a precision-less `CURRENT_TIMESTAMP` to `"now()"` internally — but
 its schema-*introspection* path does not reciprocally normalize a live
 `CURRENT_TIMESTAMP` default before comparing. Verified via
@@ -96,7 +96,7 @@ column in the schema. Two findings:
   in an early Phase 0 run. **Never use a function-returning-raw-SQL default
   on an enum-typed column** (scalar or array) — provide a literal instead.
 - With `default: []` (a literal empty array), the diff becomes a benign
-  textual mismatch: TypeORM emits `'{}'`, TypeORM's migration wrote
+  textual mismatch: TypeORM emits `'{}'`, Prisma's migration wrote
   `ARRAY[]::"BookingChannel"[]` — both are the same empty array, different
   valid Postgres literal spellings. Allowlisted in the parity test for the
   same "genuinely equivalent, not worth a DB touch in Phase 0" reason as
@@ -131,15 +131,15 @@ defaults, and indexes before that.
 | Timestamps | `@Column({ type: 'timestamp', precision: 3 })` (not `timestamptz`) |
 | `createdAt` | `@CreateDateColumn({ type: 'timestamp', precision: 3, default: () => 'CURRENT_TIMESTAMP' })` — expect the benign `now()` diff, allowlist it |
 | `updatedAt` | Plain `@Column({ type: 'timestamp', precision: 3 })`, **no** `@UpdateDateColumn`, no default — set explicitly on every write |
-| Enums | `@Column({ type: 'enum', enum: X, enumName: 'X' })` — `enumName` mandatory, must equal the Postgres type name TypeORM created |
+| Enums | `@Column({ type: 'enum', enum: X, enumName: 'X' })` — `enumName` mandatory, must equal the Postgres type name Prisma created |
 | Enum arrays | Add `array: true`; give literal defaults only, never a raw-SQL function default |
 | Money | `@Column({ type: 'bigint', transformer: bigintTransformer })` — see `src/database/transformers/bigint.transformer.ts` |
 | JSON | `@Column({ type: 'jsonb' })` |
 | String/other arrays | `@Column({ type: 'text', array: true })` |
-| UUID PK | `@PrimaryColumn({ type: 'text' })` + a `@BeforeInsert` assigning `randomUUID()` (TypeORM generates UUIDs client-side; no DB default exists) |
+| UUID PK | `@PrimaryColumn({ type: 'text' })` + a `@BeforeInsert` assigning `randomUUID()` (Prisma generates UUIDs client-side; no DB default exists) |
 | Composite/named unique | `@Index('exact_name', [...cols], { unique: true })` — **never** `@Unique()` or `@Column({ unique: true })` (finding 1) |
 | Partial index | `@Index('name', [...cols], { unique: true, where: '"col" IS NULL' })` — confirmed working (finding 2) |
-| FK actions | `@ManyToOne(..., { onDelete: 'CASCADE' })` matching TypeORM's `onDelete` exactly |
+| FK actions | `@ManyToOne(..., { onDelete: 'CASCADE' })` matching Prisma's `onDelete` exactly |
 
 ## Verification
 

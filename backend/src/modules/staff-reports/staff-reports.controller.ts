@@ -25,8 +25,7 @@ export class StaffReportsController {
   @Get('mine')
   @Roles('EMPLOYEE')
   @ApiOperation({
-    summary:
-      'گزارش‌های من — فید فعالیت خود کارمند از AuditLog (پنل کارمند)',
+    summary: 'گزارش‌های من — فید فعالیت خود کارمند از AuditLog (پنل کارمند)',
   })
   async myActivity(@CurrentUser() actor: AuthenticatedUser) {
     const data = await this.staffReports.myActivity(actor);
