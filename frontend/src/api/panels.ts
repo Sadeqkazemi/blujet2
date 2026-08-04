@@ -1,8 +1,12 @@
 import { apiGet, apiPatch } from './http';
-import type { PanelAccessFlag, PanelNavItem } from '../types/panels';
+import type { EmployeeContext, PanelAccessFlag, PanelNavItem } from '../types/panels';
 
 export function fetchNav() {
   return apiGet<PanelNavItem[]>('/panels/nav');
+}
+
+export function fetchEmployeeContext() {
+  return apiGet<EmployeeContext>('/panels/employee-context');
 }
 
 export function fetchAccessFlags() {

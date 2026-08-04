@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import PanelsAccessPage from './PanelsAccessPage';
 import * as panelsApi from '../../api/panels';
 import * as useAuthModule from '../../hooks/useAuth';
+import { mockAuthUserWithRole } from '../../test/mockAuthUser';
 import type { PanelAccessFlag } from '../../types/panels';
 import type { Role } from '../../types/auth';
 
@@ -15,7 +16,7 @@ const FLAGS: PanelAccessFlag[] = [
 function mockRole(role: Role) {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status: 'authenticated',
-    user: { id: 'u1', fullName: 'کاربر تست', role },
+    user: mockAuthUserWithRole(role),
     requestLogin: vi.fn(),
     confirmTwoFactor: vi.fn(),
     agencyLogin: vi.fn(),
@@ -42,14 +43,32 @@ describe('PanelsAccessPage', () => {
     expect(screen.getByRole('switch', { name: 'پنل مدیر مالی' })).toHaveAttribute('aria-checked', 'false');
   });
 
-  it('IT_MANAGER gets the read-only view: informational copy + disabled switches', async () => {
+  it('IT_MANAGER gets the read-only card grid view', async () => {
     mockRole('IT_MANAGER');
-    vi.spyOn(panelsApi, 'fetchAccessFlags').mockResolvedValue(FLAGS);
 
     render(<PanelsAccessPage />);
     expect(
       await screen.findByText(/تعیین سطح دسترسی ورود در اختیار مدیر عامل است/),
     ).toBeInTheDocument();
-    expect(screen.getByRole('switch', { name: 'پنل مدیر مالی' })).toBeDisabled();
+    expect(screen.getByText('پنل کارمند')).toBeInTheDocument();
+    expect(screen.getByText('پنل مدیر عامل')).toBeInTheDocument();
+    expect(screen.queryByRole('switch', { name: 'پنل مدیر مالی' })).not.toBeInTheDocument();
+  });
+
+  it('CEO dark card grid shows status pills and flips access', async () => {
+    mockRole('CEO');
+    vi.spyOn(panelsApi, 'fetchAccessFlags').mockResolvedValue(FLAGS);
+    const setSpy = vi
+      .spyOn(panelsApi, 'setAccessFlag')
+      .mockResolvedValue({ panelKey: 'FINANCE', enabled: false, updatedAt: '2026-07-17T00:00:00.000Z' });
+
+    render(<PanelsAccessPage />);
+    expect(await screen.findByText(/واحدها توسط مدیر IT مدیریت می‌شود/)).toBeInTheDocument();
+    expect(screen.getByText('دسترسی فعال')).toBeInTheDocument();
+    expect(screen.getByText('دسترسی مسدود')).toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('switch', { name: 'پنل مدیر مالی' }));
+    await waitFor(() => expect(setSpy).toHaveBeenCalledWith('FINANCE', false));
   });
 });

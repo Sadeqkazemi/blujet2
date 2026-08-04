@@ -1,7 +1,17 @@
 import { BadRequestException } from '@nestjs/common';
+import type { EntityManager } from 'typeorm';
+import { PromoCode } from '../../database/entities/promo-code.entity';
+import { PromoRedemption } from '../../database/entities/promo-redemption.entity';
 import { ErrorCode } from '../../common/errors';
-import type { TypeORM } from '../../../generated/typeorm/client';
-import type { CabinClass } from '../../../generated/typeorm/enums';
+import type { CabinClass } from '../../database/enums';
+import {
+  type Irr,
+  ZERO_IRR,
+  maxIrr,
+  minIrr,
+  pctOfIrr,
+  subIrr,
+} from '../../common/money';
 
 /**
  * Validates + computes the discount for a promo code and records the
@@ -11,7 +21,7 @@ import type { CabinClass } from '../../../generated/typeorm/enums';
  * payment never leaves an orphaned redemption.
  */
 export async function applyPromoCode(
-  tx: TypeORM.TransactionClient,
+  manager: EntityManager,
   params: {
     code: string;
     userId: string;
@@ -19,10 +29,10 @@ export async function applyPromoCode(
     originCode: string;
     destCode: string;
     cabin: CabinClass;
-    priceIrr: number;
+    priceIrr: Irr;
   },
-): Promise<{ discountIrr: number; finalPriceIrr: number }> {
-  const promo = await tx.promoCode.findUnique({ where: { code: params.code } });
+): Promise<{ discountIrr: Irr; finalPriceIrr: Irr }> {
+  const promo = await manager.findOneBy(PromoCode, { code: params.code });
   if (!promo || !promo.active) {
     throw new BadRequestException({
       code: ErrorCode.VALIDATION_FAILED,
@@ -62,7 +72,7 @@ export async function applyPromoCode(
   }
 
   if (promo.maxRedemptions !== null) {
-    const totalUses = await tx.promoRedemption.count({
+    const totalUses = await manager.count(PromoRedemption, {
       where: { promoCodeId: promo.id },
     });
     if (totalUses >= promo.maxRedemptions) {
@@ -73,7 +83,7 @@ export async function applyPromoCode(
     }
   }
   if (promo.maxPerUser !== null) {
-    const userUses = await tx.promoRedemption.count({
+    const userUses = await manager.count(PromoRedemption, {
       where: { promoCodeId: promo.id, userId: params.userId },
     });
     if (userUses >= promo.maxPerUser) {
@@ -86,18 +96,18 @@ export async function applyPromoCode(
 
   const discountIrr =
     promo.type === 'PERCENT'
-      ? Math.round((params.priceIrr * promo.value) / 100)
-      : Math.min(promo.value, params.priceIrr);
-  const finalPriceIrr = Math.max(params.priceIrr - discountIrr, 0);
+      ? pctOfIrr(params.priceIrr, Number(promo.value))
+      : minIrr(promo.value, params.priceIrr);
+  const finalPriceIrr = maxIrr(subIrr(params.priceIrr, discountIrr), ZERO_IRR);
 
-  await tx.promoRedemption.create({
-    data: {
+  await manager.save(
+    manager.create(PromoRedemption, {
       promoCodeId: promo.id,
       bookingId: params.bookingId,
       userId: params.userId,
       discountIrr,
-    },
-  });
+    }),
+  );
 
   return { discountIrr, finalPriceIrr };
 }

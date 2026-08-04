@@ -1,7 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { loginAs } from './helpers/login.helper';
+import { loginAs, loginAsCustomer } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
 /** Phase 20: تماس با ما + پشتیبانی — real ContactMessage inbox and a
@@ -66,7 +66,7 @@ describe('Phase 20 — contact + support tickets (e2e)', () => {
     });
 
     it('403s for a non-SITE_ADMIN staff role', async () => {
-      const { accessToken } = await loginAs(app, 'finance.karimi');
+      const { accessToken } = await loginAs(app, 'finance');
       const res = await request(app.getHttpServer())
         .get('/contact')
         .set('Authorization', `Bearer ${accessToken}`);
@@ -90,6 +90,68 @@ describe('Phase 20 — contact + support tickets (e2e)', () => {
     });
   });
 
+  describe('GET /my/support-tickets (USER account)', () => {
+    it('401s without login', async () => {
+      const res = await request(app.getHttpServer()).get('/my/support-tickets');
+      expect(res.status).toBe(401);
+    });
+
+    it('lists tickets linked by userId and by matching phone', async () => {
+      const phone = '09120000001';
+      await request(app.getHttpServer()).post('/support-tickets').send({
+        requesterName: 'نگار رضایی',
+        requesterPhone: phone,
+        subject: 'سوال قبل از ورود',
+        body: 'این تیکت با شمارهٔ تلفن ثبت شده.',
+      });
+
+      const { accessToken } = await loginAsCustomer(app, phone);
+
+      const submitRes = await request(app.getHttpServer())
+        .post('/my/support-tickets')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          requesterName: 'نگار رضایی',
+          requesterPhone: phone,
+          subject: 'سوال بعد از ورود',
+          body: 'این تیکت از پنل کاربر ثبت شده.',
+        });
+      expect(submitRes.status).toBe(201);
+
+      const listRes = await request(app.getHttpServer())
+        .get('/my/support-tickets')
+        .set('Authorization', `Bearer ${accessToken}`);
+
+      expect(listRes.status).toBe(200);
+      expect(listRes.body.data.length).toBeGreaterThanOrEqual(2);
+      const subjects = listRes.body.data.map(
+        (t: { subject: string }) => t.subject,
+      );
+      expect(subjects).toContain('سوال قبل از ورود');
+      expect(subjects).toContain('سوال بعد از ورود');
+    });
+
+    it('404s when requesting another user ticket by id', async () => {
+      const other = await request(app.getHttpServer())
+        .post('/support-tickets')
+        .send({
+          requesterName: 'دیگری',
+          requesterPhone: '09129999999',
+          subject: 'خصوصی',
+          body: 'نباید دیده شود.',
+        });
+      const id = other.body.data.id as string;
+
+      // Not 09120000002 — that phone is claimed by src/database/seed.ts's AGENCY
+      // fixture ("آژانس blujet"), and this route is USER-only (@Roles('USER')).
+      const { accessToken } = await loginAsCustomer(app, '09120000102');
+      const res = await request(app.getHttpServer())
+        .get(`/my/support-tickets/${id}`)
+        .set('Authorization', `Bearer ${accessToken}`);
+      expect(res.status).toBe(404);
+    });
+  });
+
   describe('SITE_ADMIN ticket review workflow', () => {
     async function submitTicket() {
       const res = await request(app.getHttpServer())
@@ -109,7 +171,7 @@ describe('Phase 20 — contact + support tickets (e2e)', () => {
     });
 
     it('403s the list endpoint for a non-SITE_ADMIN staff role', async () => {
-      const { accessToken } = await loginAs(app, 'finance.karimi');
+      const { accessToken } = await loginAs(app, 'finance');
       const res = await request(app.getHttpServer())
         .get('/support-tickets')
         .set('Authorization', `Bearer ${accessToken}`);

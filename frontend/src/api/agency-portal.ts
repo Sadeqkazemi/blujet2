@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPostForm } from './http';
+import { apiGet, apiGetBlob, apiPost, apiPostForm } from './http';
 import type {
   AgencyAllotmentRow,
   AgencyApiKeySummary,
@@ -48,6 +48,10 @@ export function fetchSales() {
   return apiGet<AgencySalesReport>('/agency-portal/sales');
 }
 
+export function downloadSalesExport() {
+  return apiGetBlob('/agency-portal/sales/export');
+}
+
 export function fetchInbox() {
   return apiGet<AgencyMessage[]>('/agency-portal/inbox');
 }
@@ -81,6 +85,12 @@ export function requestWebservice(scope: AgencyApiScope, months: 1 | 3 | 12, not
 
 export function fetchMyWebserviceRequests() {
   return apiGet<AgencyWebserviceRequest[]>('/agency-portal/webservice-requests');
+}
+
+export function fetchAgencyPortalWebservicePlans() {
+  return apiGet<{ plans: { months: 1 | 3 | 12; priceIrr: number }[] }>(
+    '/agency-portal/webservice-plans',
+  );
 }
 
 export function fetchApiKeys() {

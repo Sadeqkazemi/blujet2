@@ -16,7 +16,7 @@ const HIT: PassengerReportHit = {
   departureAt: '2026-08-01T05:00:00.000Z',
   seatCode: '4C',
   cabin: 'BUSINESS',
-  priceIrr: 420_000_000,
+  priceIrr: '420000000',
 };
 
 describe('PassengerReportsPage', () => {
@@ -29,7 +29,7 @@ describe('PassengerReportsPage', () => {
     await user.click(screen.getByRole('button', { name: 'جستجو' }));
 
     expect(searchSpy).toHaveBeenCalledWith('نگار');
-    expect(await screen.findByText('نگار رضایی')).toBeInTheDocument();
+    expect((await screen.findAllByText('نگار رضایی')).length).toBeGreaterThan(0);
     expect(screen.getByText('BJDEMO1')).toBeInTheDocument();
     expect(screen.getByText(/۰۴۹\*+۹/)).toBeInTheDocument();
     expect(screen.getByText(/بیزنس/)).toBeInTheDocument();

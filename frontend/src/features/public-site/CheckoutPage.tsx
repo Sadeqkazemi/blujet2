@@ -1,132 +1,363 @@
-import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
+  createBooking,
   fetchClubPoints,
   fetchMyBooking,
-  fetchWallet,
-  payBooking,
-  topupWallet,
+  fetchSavedPassengers,
+  fetchSeatMap,
 } from '../../api/publicSite';
 import { ApiRequestError } from '../../api/envelope';
-import {
-  canPayWithMethod,
-  canPayWithPoints,
-  canPayWithWallet,
-  pickDefaultPaymentMethod,
-  pointsNeededForPrice,
-  type CheckoutPaymentMethod,
-} from '../../lib/checkout-payment';
-import { faDigits, faMoney, parseTomanToRial } from '../../lib/fa-format';
-import { GATEWAY_CHECKOUT_ENABLED } from '../../lib/payment-config';
-import { formatJalaliDateTime } from '../../lib/jalali';
-import type { BookingDetail } from '../../types/public-site';
+import { useAuth } from '../../hooks/useAuth';
+import { useLocale } from '../../hooks/useLocale';
+import { useIsMobile } from '../../hooks/useIsMobile';
+import { localeMoney } from '../../lib/fa-format';
+import type { BookingDetail, CabinClass, SavedPassenger, SeatMapCell } from '../../types/public-site';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import FlowStepper from '../../components/public/FlowStepper';
+import { CHECKOUT_COPY } from './checkout/checkout-copy';
+import {
+  clearCheckoutDraft,
+  loadCheckoutDraft,
+  saveCheckoutDraft,
+} from './checkout/checkout-draft';
+import CheckoutStepBar from './checkout/CheckoutStepBar';
+import ExtrasStep from './checkout/ExtrasStep';
+import FlightSummaryCard from './checkout/FlightSummaryCard';
+import PassengerStep from './checkout/PassengerStep';
+import PricingSidebar from './checkout/PricingSidebar';
+import ReviewStep from './checkout/ReviewStep';
+import OtpLoginInline from './OtpLoginInline';
+import {
+  defaultExtras,
+  emptyPassenger,
+  passengerFullName,
+  type CheckoutDraft,
+  type CheckoutWizardStep,
+  type ExtraServiceState,
+  type FlightSnapshot,
+  type PassengerFormDraft,
+} from './checkout/checkout-types';
+import {
+  buildMd80Seats,
+  looksLikeLegacyA320SeatPayload,
+  looksLikeMd80SeatPayload,
+  mapLegacyTakenSeatsToMd80,
+  shouldUseMd80SeatMap,
+} from './checkout/md80-seat-layout';
+
+const BUSINESS_SEAT_MIN_POINTS = 15_000;
+const STEP_ORDER: CheckoutWizardStep[] = ['pax', 'extras', 'review'];
+
+function isPassengerComplete(p: PassengerFormDraft): boolean {
+  if (!p.firstNameLatin.trim() || !p.lastNameLatin.trim() || !p.gender) return false;
+  if (!p.birthDay || !p.birthMonth || !p.birthYear) return false;
+  if (p.docType === 'NATIONAL_ID') return p.nationalId.trim().length >= 10;
+  return p.passportNo.trim().length >= 5;
+}
 
 export default function CheckoutPage() {
   const { bookingId } = useParams<{ bookingId: string }>();
+  const [params] = useSearchParams();
+  const location = useLocation();
   const navigate = useNavigate();
-  const [booking, setBooking] = useState<BookingDetail | null>(null);
-  const [walletBalanceIrr, setWalletBalanceIrr] = useState<number | null>(null);
-  const [clubPoints, setClubPoints] = useState<{ isMember: boolean; balance: number } | null>(null);
+  const { locale } = useLocale();
+  const { status } = useAuth();
+  const isMobile = useIsMobile();
+  const t = CHECKOUT_COPY[locale];
+
+  const isWizard = bookingId === 'new';
+
+  const [heldBooking, setHeldBooking] = useState<BookingDetail | null>(null);
+  const [draft, setDraft] = useState<CheckoutDraft | null>(null);
+  const [step, setStep] = useState<CheckoutWizardStep>('pax');
+  const [passengers, setPassengers] = useState<PassengerFormDraft[]>([emptyPassenger('')]);
+  const [extras, setExtras] = useState<ExtraServiceState[]>(defaultExtras());
+  const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
+  const [seats, setSeats] = useState<SeatMapCell[] | null>(null);
+  const [savedPassengers, setSavedPassengers] = useState<SavedPassenger[]>([]);
+  const [clubBalance, setClubBalance] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [payError, setPayError] = useState<string | null>(null);
-  const [priceChange, setPriceChange] = useState<{ previousPriceIrr: number; currentPriceIrr: number } | null>(null);
-  const [paying, setPaying] = useState(false);
-  const [promoCode, setPromoCode] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<CheckoutPaymentMethod>('WALLET');
-  const [topupAmount, setTopupAmount] = useState('');
-  const [topupBusy, setTopupBusy] = useState(false);
-  const methodInitialized = useRef(false);
 
+  // Load held booking (legacy /payment-bound path)
   useEffect(() => {
-    if (!bookingId) return;
+    if (!bookingId || bookingId === 'new') return;
     fetchMyBooking(bookingId)
-      .then(setBooking)
-      .catch(() => setLoadError('رزرو یافت نشد.'));
-    fetchWallet()
-      .then((w) => setWalletBalanceIrr(w.balanceIrr))
-      .catch(() => setWalletBalanceIrr(0));
-    fetchClubPoints()
-      .then((p) => setClubPoints({ isMember: p.isMember, balance: p.balance }))
-      .catch(() => setClubPoints({ isMember: false, balance: 0 }));
-  }, [bookingId]);
+      .then(setHeldBooking)
+      .catch(() => setLoadError(t.notFound));
+  }, [bookingId, t.notFound]);
 
-  const amountDue = priceChange?.currentPriceIrr ?? booking?.priceIrr ?? 0;
-
+  // Resolve wizard draft from location state, query, or sessionStorage.
+  // Must run even while OTP gate is showing so cities survive login remount.
   useEffect(() => {
-    if (!booking || methodInitialized.current) return;
-    if (walletBalanceIrr === null || clubPoints === null) return;
+    if (!isWizard) return;
+    const stateFlight = (location.state as { flight?: FlightSnapshot; cabin?: CabinClass } | null)
+      ?.flight;
+    const stateCabin = (location.state as { cabin?: CabinClass } | null)?.cabin;
+    const fromStorage = loadCheckoutDraft();
+    const flightInstanceId =
+      params.get('flightInstanceId') || stateFlight?.flightInstanceId || fromStorage?.flightInstanceId;
+    const cabin =
+      (params.get('cabin') as CabinClass | null) ||
+      stateCabin ||
+      fromStorage?.cabin ||
+      'ECONOMY';
+    const originFromQuery = (params.get('origin') || '').toUpperCase();
+    const destFromQuery = (params.get('dest') || '').toUpperCase();
 
-    setPaymentMethod(
-      pickDefaultPaymentMethod({
-        gatewayEnabled: GATEWAY_CHECKOUT_ENABLED,
-        walletBalanceIrr,
-        isClubMember: clubPoints.isMember,
-        clubPointsBalance: clubPoints.balance,
-        priceIrr: amountDue,
-      }),
-    );
-    methodInitialized.current = true;
-  }, [booking, walletBalanceIrr, clubPoints, amountDue]);
+    const mergeFlight = (base: FlightSnapshot): FlightSnapshot => ({
+      ...base,
+      originCode:
+        base.originCode && base.originCode !== '—'
+          ? base.originCode
+          : originFromQuery || fromStorage?.flight.originCode || base.originCode,
+      destCode:
+        base.destCode && base.destCode !== '—'
+          ? base.destCode
+          : destFromQuery || fromStorage?.flight.destCode || base.destCode,
+      flightNo: base.flightNo !== '—' ? base.flightNo : fromStorage?.flight.flightNo || base.flightNo,
+      priceIrr:
+        base.priceIrr && base.priceIrr !== '0'
+          ? base.priceIrr
+          : fromStorage?.flight.priceIrr || base.priceIrr,
+      aircraftType: base.aircraftType || fromStorage?.flight.aircraftType,
+      departureAt: base.departureAt || fromStorage?.flight.departureAt || new Date().toISOString(),
+      arrivalAt: base.arrivalAt || fromStorage?.flight.arrivalAt || new Date().toISOString(),
+    });
 
-  const payOpts = {
-    gatewayEnabled: GATEWAY_CHECKOUT_ENABLED,
-    walletBalanceIrr,
-    isClubMember: clubPoints?.isMember ?? false,
-    clubPointsBalance: clubPoints?.balance ?? 0,
-    priceIrr: amountDue,
-  };
-
-  const canPay = canPayWithMethod(paymentMethod, payOpts);
-  const walletShortfallIrr =
-    walletBalanceIrr !== null && walletBalanceIrr < amountDue ? amountDue - walletBalanceIrr : 0;
-  const showTopup =
-    paymentMethod === 'WALLET' &&
-    walletBalanceIrr !== null &&
-    walletShortfallIrr > 0 &&
-    !GATEWAY_CHECKOUT_ENABLED;
-
-  async function onTopup() {
-    const amountRial = parseTomanToRial(topupAmount);
-    if (amountRial === null || amountRial <= 0) {
-      setPayError('مبلغ شارژ معتبر وارد کنید.');
+    if (stateFlight) {
+      const d: CheckoutDraft = {
+        flightInstanceId: stateFlight.flightInstanceId,
+        cabin,
+        selectedSeats: fromStorage?.selectedSeats ?? [],
+        flight: mergeFlight(stateFlight),
+      };
+      setDraft(d);
+      saveCheckoutDraft(d);
+      setSelectedSeats(d.selectedSeats);
       return;
     }
-    setPayError(null);
-    setTopupBusy(true);
+    if (fromStorage && (!flightInstanceId || fromStorage.flightInstanceId === flightInstanceId)) {
+      const d: CheckoutDraft = {
+        ...fromStorage,
+        cabin,
+        flight: mergeFlight(fromStorage.flight),
+      };
+      setDraft(d);
+      saveCheckoutDraft(d);
+      setSelectedSeats(d.selectedSeats);
+      return;
+    }
+    if (flightInstanceId) {
+      const d: CheckoutDraft = {
+        flightInstanceId,
+        cabin,
+        selectedSeats: [],
+        flight: mergeFlight({
+          flightInstanceId,
+          flightNo: 'BJ',
+          originCode: originFromQuery || 'THR',
+          destCode: destFromQuery || 'MHD',
+          departureAt: new Date().toISOString(),
+          arrivalAt: new Date().toISOString(),
+          priceIrr: '0',
+        }),
+      };
+      setDraft(d);
+      saveCheckoutDraft(d);
+      return;
+    }
+    setLoadError(t.notFound);
+  }, [isWizard, location.state, params, t.notFound]);
+
+  useEffect(() => {
+    if (!draft) return;
+    // Full aircraft map. For MD-80, if the API is empty or still on legacy
+    // lettering, fall back to the PDF chart inventory so the picker is never blank.
+    const aircraft = draft.flight.aircraftType ?? 'MD-80';
+    fetchSeatMap(draft.flightInstanceId)
+      .then((m) => {
+        const useMd80 = shouldUseMd80SeatMap(aircraft, m.seats);
+        if (useMd80 && !looksLikeMd80SeatPayload(m.seats)) {
+          const takenRaw = m.seats.filter((s) => s.status === 'TAKEN').map((s) => s.seatCode);
+          const taken = looksLikeLegacyA320SeatPayload(m.seats)
+            ? mapLegacyTakenSeatsToMd80(takenRaw)
+            : takenRaw;
+          setSeats(buildMd80Seats(taken));
+          return;
+        }
+        setSeats(m.seats.length ? m.seats : useMd80 ? buildMd80Seats() : []);
+      })
+      .catch(() => {
+        const useMd80 = shouldUseMd80SeatMap(aircraft, []);
+        setSeats(useMd80 ? buildMd80Seats() : []);
+      });
+  }, [draft]);
+
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    fetchSavedPassengers()
+      .then(setSavedPassengers)
+      .catch(() => setSavedPassengers([]));
+    fetchClubPoints()
+      .then((c) => setClubBalance(c.balance))
+      .catch(() => setClubBalance(0));
+  }, [status]);
+
+  // Keep passenger seat codes in sync with selected seats
+  useEffect(() => {
+    if (!isWizard) return;
+    setPassengers((prev) => {
+      if (selectedSeats.length === 0) {
+        return prev.length ? prev : [emptyPassenger('')];
+      }
+      return selectedSeats.map((seat, i) => ({
+        ...(prev[i] ?? emptyPassenger(seat)),
+        seatCode: seat,
+      }));
+    });
+  }, [selectedSeats, isWizard]);
+
+  // Design: business seats need ≥15,000 club points (hint + locked styling).
+  const businessLocked = clubBalance < BUSINESS_SEAT_MIN_POINTS;
+
+  const nextLabel = useMemo(() => {
+    if (step === 'pax') return t.nextPax;
+    if (step === 'extras') return t.nextExtras;
+    return t.nextReview;
+  }, [step, t]);
+
+  function toggleSeat(seatCode: string) {
+    setSelectedSeats((prev) => {
+      const next = prev.includes(seatCode)
+        ? prev.filter((s) => s !== seatCode)
+        : [...prev, seatCode];
+      if (draft) {
+        const updated = { ...draft, selectedSeats: next };
+        setDraft(updated);
+        saveCheckoutDraft(updated);
+      }
+      return next;
+    });
+  }
+
+  function toggleExtra(id: ExtraServiceState['id']) {
+    setExtras((arr) => arr.map((e) => (e.id === id ? { ...e, selected: !e.selected } : e)));
+  }
+
+  function goNext() {
+    setError(null);
+    if (step === 'pax') {
+      if (passengers.some((p) => !isPassengerComplete(p))) {
+        setError(t.completePaxError);
+        return;
+      }
+      setStep('extras');
+      return;
+    }
+    if (step === 'extras') {
+      // Seat selection is optional per design («انتخاب صندلی (اختیاری)»).
+      setStep('review');
+      return;
+    }
+    void submitBooking();
+  }
+
+  function goBack() {
+    setError(null);
+    const idx = STEP_ORDER.indexOf(step);
+    if (idx > 0) setStep(STEP_ORDER[idx - 1]!);
+  }
+
+  function resolveSeatCodesForBooking(): string[] | null {
+    if (!draft) return null;
+    const needed = passengers.length;
+    const picked = selectedSeats.filter((code) => {
+      const cell = seats?.find((s) => s.seatCode === code);
+      return cell?.cabin === draft.cabin && cell.status === 'FREE';
+    });
+    if (picked.length >= needed) return picked.slice(0, needed);
+    const used = new Set(picked);
+    const free = (seats ?? [])
+      .filter((s) => s.cabin === draft.cabin && s.status === 'FREE' && !used.has(s.seatCode))
+      .map((s) => s.seatCode);
+    const result = [...picked];
+    for (const code of free) {
+      if (result.length >= needed) break;
+      result.push(code);
+    }
+    return result.length >= needed ? result : null;
+  }
+
+  async function submitBooking() {
+    if (!draft) return;
+    if (status !== 'authenticated') {
+      navigate('/signin', { state: { from: location.pathname + location.search } });
+      return;
+    }
+    if (passengers.some((p) => !isPassengerComplete(p))) {
+      setError(t.completePaxError);
+      setStep('pax');
+      return;
+    }
+    const seatCodes = resolveSeatCodesForBooking();
+    if (!seatCodes) {
+      setError(
+        locale === 'en'
+          ? 'No free seats left for this cabin.'
+          : 'صندلی خالی برای این کلاس باقی نمانده است.',
+      );
+      setStep('extras');
+      return;
+    }
+    setBusy(true);
+    setError(null);
     try {
-      const result = await topupWallet(amountRial);
-      setWalletBalanceIrr(result.balanceIrr);
-      setTopupAmount('');
+      const booking = await createBooking({
+        flightInstanceId: draft.flightInstanceId,
+        cabin: draft.cabin,
+        passengers: passengers.map((p, i) => ({
+          fullName: passengerFullName(p),
+          nationalId: p.docType === 'NATIONAL_ID' ? p.nationalId || undefined : undefined,
+          seatCode: seatCodes[i]!,
+        })),
+      });
+      clearCheckoutDraft();
+      navigate(`/payment/${booking.id}`);
     } catch (err) {
-      setPayError(err instanceof ApiRequestError ? err.message : 'خطا در شارژ کیف پول.');
+      if (err instanceof ApiRequestError && err.code === 'UNAUTHORIZED') {
+        setError(
+          locale === 'en'
+            ? 'Your session expired. Please sign in again.'
+            : 'نشست شما منقضی شده است. لطفاً دوباره وارد شوید.',
+        );
+        navigate('/signin', { state: { from: location.pathname + location.search } });
+        return;
+      }
+      setError(err instanceof ApiRequestError ? err.message : t.notFound);
     } finally {
-      setTopupBusy(false);
+      setBusy(false);
     }
   }
 
-  async function onPay(confirmedPriceIrr?: number) {
-    if (!bookingId || !canPay) return;
-    setPayError(null);
-    setPaying(true);
-    try {
-      const result = await payBooking(bookingId, {
-        confirmedPriceIrr,
-        promoCode: promoCode.trim() || undefined,
-        paymentMethod,
-      });
-      if (result.priceChanged) {
-        setPriceChange(result);
-        methodInitialized.current = false;
-        return;
-      }
-      navigate(`/ticket/${result.booking.pnr}`);
-    } catch (err) {
-      setPayError(err instanceof ApiRequestError ? err.message : 'خطا در پرداخت.');
-    } finally {
-      setPaying(false);
-    }
+  // Auth gate for wizard — design requires login before passenger entry
+  if (isWizard && status === 'loading') {
+    return (
+      <PublicPageShell>
+        <p className="p-8 text-sm text-[#6b7b94]">{t.loading}</p>
+      </PublicPageShell>
+    );
+  }
+  if (isWizard && status === 'unauthenticated') {
+    return (
+      <PublicPageShell>
+        <div className="p-6">
+          <OtpLoginInline />
+        </div>
+      </PublicPageShell>
+    );
   }
 
   if (loadError) {
@@ -136,197 +367,228 @@ export default function CheckoutPage() {
       </PublicPageShell>
     );
   }
-  if (!booking) {
-    return (
-      <PublicPageShell>
-        <p className="p-8 text-sm text-[#6b7b94]">در حال بارگذاری…</p>
-      </PublicPageShell>
-    );
-  }
 
-  if (booking.status === 'EXPIRED') {
+  // Legacy held-booking summary (after booking already created)
+  if (!isWizard) {
+    if (!heldBooking) {
+      return (
+        <PublicPageShell>
+          <p className="p-8 text-sm text-[#6b7b94]">{t.loading}</p>
+        </PublicPageShell>
+      );
+    }
+    if (heldBooking.status === 'EXPIRED') {
+      return (
+        <PublicPageShell>
+          <div className="mx-auto max-w-md p-8 text-center">
+            <p className="mb-4 text-sm text-red-600">{t.expired}</p>
+            <button
+              onClick={() => navigate('/')}
+              className="rounded-lg bg-[#1668c4] px-6 py-2.5 text-sm font-bold text-white"
+            >
+              {t.searchAgain}
+            </button>
+          </div>
+        </PublicPageShell>
+      );
+    }
+    // Redirect held bookings straight into payment — wizard already happened
     return (
       <PublicPageShell>
-        <div className="mx-auto max-w-md p-8 text-center">
-          <p className="mb-4 text-sm text-red-600">مهلت نگهداری این رزرو به پایان رسیده است.</p>
-          <button onClick={() => navigate('/')} className="rounded-lg bg-[#1668c4] px-6 py-2.5 text-sm font-bold text-white">
-            جستجوی مجدد
+        <FlowStepper current="checkout" onBack={() => navigate(-1)} />
+        <div className="mx-auto max-w-lg p-6">
+          <FlightSummaryCard
+            flight={{
+              flightInstanceId: heldBooking.flightInstanceId,
+              flightNo: heldBooking.flightNo,
+              originCode: heldBooking.originCode,
+              destCode: heldBooking.destCode,
+              departureAt: heldBooking.departureAt,
+              arrivalAt: heldBooking.arrivalAt,
+              priceIrr: heldBooking.priceIrr,
+            }}
+            cabin={heldBooking.cabin}
+            locale={locale}
+          />
+          <div className="mt-4 rounded-2xl border border-[#eef1f5] bg-white p-5">
+            <div className="mb-3 text-[11px] font-black text-[#0d2640]">{t.enterPax}</div>
+            {heldBooking.passengers.map((p) => (
+              <div key={p.seatCode} className="mb-1 flex justify-between text-xs text-[#6b7b94]">
+                <span>{p.fullName}</span>
+                <span dir="ltr">{p.seatCode}</span>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={() => navigate(`/payment/${bookingId}`)}
+            data-testid="continue-to-payment"
+            className="mt-4 w-full rounded-xl bg-[#1668c4] px-6 py-3 text-sm font-bold text-white"
+          >
+            {t.nextPay}
           </button>
         </div>
       </PublicPageShell>
     );
   }
 
-  const walletDisabled =
-    walletBalanceIrr !== null && !canPayWithWallet(walletBalanceIrr, amountDue);
-  const pointsDisabled =
-    !clubPoints?.isMember ||
-    !canPayWithPoints(clubPoints?.isMember ?? false, clubPoints?.balance ?? 0, amountDue);
+  if (!draft) {
+    return (
+      <PublicPageShell>
+        <p className="p-8 text-sm text-[#6b7b94]">{t.loading}</p>
+      </PublicPageShell>
+    );
+  }
 
-  const methods: { key: CheckoutPaymentMethod; label: string; disabled?: boolean; hint?: string }[] = [
-    {
-      key: 'GATEWAY',
-      label: GATEWAY_CHECKOUT_ENABLED ? 'درگاه پرداخت' : 'درگاه پرداخت (به‌زودی)',
-      disabled: !GATEWAY_CHECKOUT_ENABLED,
-    },
-    {
-      key: 'WALLET',
-      label: `کیف پول${walletBalanceIrr !== null ? ` (${faMoney(walletBalanceIrr)} تومان)` : ''}`,
-      disabled: walletDisabled,
-      hint: walletDisabled ? 'موجودی کافی نیست — کیف پول را شارژ کنید' : undefined,
-    },
-    {
-      key: 'POINTS',
-      label: `امتیاز باشگاه مشتریان${
-        clubPoints?.isMember ? ` (${faDigits(String(clubPoints.balance))} امتیاز)` : ''
-      }`,
-      disabled: pointsDisabled,
-      hint: clubPoints?.isMember && pointsDisabled
-        ? `حداقل ${faDigits(String(pointsNeededForPrice(amountDue)))} امتیاز لازم است`
-        : !clubPoints?.isMember
-          ? 'فقط برای اعضای باشگاه'
-          : undefined,
-    },
-  ];
+  const priceIrr =
+    draft.flight.priceIrr && draft.flight.priceIrr !== '0'
+      ? draft.flight.priceIrr
+      : String(397_000_000 * Math.max(1, passengers.length));
+  const extrasIrr =
+    extras.filter((e) => e.selected).reduce((s, e) => s + e.priceToman, 0) * 10;
+  const grandIrr = Number(priceIrr) + extrasIrr;
+  const grandDisplay = localeMoney(grandIrr, locale);
+
+  const stepBody = (
+    <>
+      {step === 'pax' && (
+        <PassengerStep
+          locale={locale}
+          passengers={passengers}
+          onChange={setPassengers}
+          savedPassengers={savedPassengers}
+        />
+      )}
+      {step === 'extras' && (
+        <ExtrasStep
+          locale={locale}
+          extras={extras}
+          onToggleExtra={toggleExtra}
+          seats={seats}
+          selectedSeats={selectedSeats}
+          onToggleSeat={toggleSeat}
+          businessLocked={businessLocked}
+          bookedCabin={draft?.cabin ?? 'ECONOMY'}
+          aircraftType={draft?.flight.aircraftType ?? 'MD-80'}
+        />
+      )}
+      {step === 'review' && (
+        <ReviewStep
+          locale={locale}
+          passengers={passengers}
+          extras={extras}
+          selectedSeats={selectedSeats}
+        />
+      )}
+    </>
+  );
+
+  // Explicit mobile/desktop trees (design bundle) — do not rely on Tailwind
+  // breakpoints alone; Cursor/device preview can desync CSS media queries.
+  if (isMobile) {
+    return (
+      <PublicPageShell>
+        <div
+          className="flex items-center gap-3 border-b border-[#eef1f5] bg-white px-4 py-3"
+          data-testid="checkout-mobile-titlebar"
+        >
+          <button
+            type="button"
+            onClick={() => (step === 'pax' ? navigate(-1) : goBack())}
+            data-testid="checkout-mobile-back"
+            className="flex h-9 w-9 flex-none items-center justify-center rounded-full border border-[#e6eaf0] bg-[#f3f5f8] text-[#0d2640]"
+          >
+            →
+          </button>
+          <span className="text-sm font-extrabold text-[#16202e]">{t.title}</span>
+        </div>
+
+        <div
+          className="mx-auto flex w-full max-w-[1180px] flex-col gap-[15px] px-3.5 py-3.5 pb-28"
+          data-testid="checkout-mobile-main"
+        >
+          <FlightSummaryCard flight={draft.flight} cabin={draft.cabin} locale={locale} />
+          {stepBody}
+          {error && (
+            <div
+              className="rounded-[10px] border border-[#f5c6c6] bg-[#fdecec] px-3.5 py-2.5 text-xs font-semibold text-[#c0343a]"
+              data-testid="checkout-error"
+            >
+              {error}
+            </div>
+          )}
+          {/* Design: full CTA in price card + sticky duplicate at bottom */}
+          <PricingSidebar
+            locale={locale}
+            priceIrr={priceIrr}
+            paxCount={Math.max(1, passengers.length)}
+            extras={extras}
+            nextLabel={nextLabel}
+            onNext={goNext}
+            onBack={goBack}
+            canBack={step !== 'pax'}
+            busy={busy}
+            error={error}
+          />
+        </div>
+
+        <div
+          className="fixed bottom-0 left-0 right-0 z-[80] flex items-center justify-between gap-2.5 border-t border-[#e6eaf0] bg-white px-4 py-2.5 shadow-[0_-8px_24px_-14px_rgba(13,38,102,.3)]"
+          data-testid="checkout-mobile-sticky"
+        >
+          {step !== 'pax' && (
+            <button
+              type="button"
+              onClick={goBack}
+              className="flex h-12 w-12 flex-none items-center justify-center rounded-xl border border-[#e6eaf0] bg-[#f2f5f9]"
+            >
+              →
+            </button>
+          )}
+          <div className="min-w-0">
+            <div className="text-[10.5px] text-[#9aa4b2]">{t.total}</div>
+            <div className="whitespace-nowrap text-[15px] font-black text-[#1668c4]">
+              {grandDisplay} {t.toman}
+            </div>
+          </div>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={goNext}
+            data-testid="checkout-next-mobile"
+            className="flex h-12 max-w-[220px] flex-1 items-center justify-center rounded-xl bg-[#1668c4] text-[12.5px] font-extrabold text-white disabled:opacity-60"
+          >
+            {busy ? t.loading : nextLabel}
+          </button>
+        </div>
+      </PublicPageShell>
+    );
+  }
 
   return (
     <PublicPageShell>
-    <FlowStepper current="checkout" onBack={() => navigate(-1)} />
-    <div className="mx-auto max-w-lg p-6">
-      <h1 className="mb-4 text-lg font-extrabold text-[#0d2640]">تکمیل خرید</h1>
-      <div className="mb-4 rounded-2xl border border-[#e5e9f0] bg-white p-5">
-        <div className="mb-2 flex items-center justify-between text-sm">
-          <span className="font-bold text-[#0d2640]">{booking.flightNo}</span>
-          <span className="text-[#6b7b94]">
-            {booking.originCode} ← {booking.destCode}
-          </span>
+      <CheckoutStepBar current={step} locale={locale} />
+      <div
+        className="mx-auto grid max-w-[1180px] items-start gap-2.5 px-6 py-5"
+        data-testid="checkout-desktop-main"
+        style={{ gridTemplateColumns: 'minmax(0, 1fr) 340px' }}
+      >
+        <div className="flex min-w-0 flex-col gap-[15px]">
+          <FlightSummaryCard flight={draft.flight} cabin={draft.cabin} locale={locale} />
+          {stepBody}
         </div>
-        <div className="mb-3 text-xs text-[#6b7b94]">{formatJalaliDateTime(booking.departureAt)}</div>
-        <div className="flex flex-col gap-1">
-          {booking.passengers.map((p) => (
-            <div key={p.seatCode} className="flex justify-between text-xs text-[#6b7b94]">
-              <span>{p.fullName}</span>
-              <span className="font-num">{p.seatCode}</span>
-            </div>
-          ))}
-        </div>
+        <PricingSidebar
+          locale={locale}
+          priceIrr={priceIrr}
+          paxCount={Math.max(1, passengers.length)}
+          extras={extras}
+          nextLabel={nextLabel}
+          onNext={goNext}
+          onBack={goBack}
+          canBack={step !== 'pax'}
+          busy={busy}
+          error={error}
+        />
       </div>
-
-      {priceChange ? (
-        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-5">
-          <p className="mb-2 text-xs text-amber-800">قیمت این پرواز تغییر کرده است.</p>
-          <p className="font-num mb-4 text-sm font-extrabold text-amber-900">
-            قیمت جدید: {faMoney(priceChange.currentPriceIrr)} تومان
-          </p>
-          <button
-            disabled={paying || !canPay}
-            onClick={() => onPay(priceChange.currentPriceIrr)}
-            data-testid="confirm-new-price"
-            className="rounded-lg bg-[#1668c4] px-6 py-2.5 text-sm font-bold text-white disabled:opacity-60"
-          >
-            تأیید قیمت جدید و پرداخت
-          </button>
-        </div>
-      ) : (
-        <div className="rounded-2xl border border-[#e5e9f0] bg-white p-5">
-          <div className="mb-4">
-            <label htmlFor="promo-code" className="mb-1.5 block text-xs text-[#6b7b94]">
-              کد تخفیف
-            </label>
-            <input
-              id="promo-code"
-              data-testid="promo-code-input"
-              value={promoCode}
-              onChange={(e) => setPromoCode(e.target.value)}
-              placeholder="مثال: BLUE20"
-              className="w-full rounded-lg border border-[#e5e9f0] px-3.5 py-2.5 text-sm outline-none focus:border-[#1668c4]"
-            />
-          </div>
-
-          <div className="mb-4">
-            <div className="mb-1.5 text-xs text-[#6b7b94]">روش پرداخت</div>
-            <div className="flex flex-col gap-2">
-              {methods.map((m) => (
-                <label
-                  key={m.key}
-                  className={`flex flex-col gap-0.5 rounded-lg border px-3.5 py-2.5 text-xs ${
-                    m.disabled ? 'cursor-not-allowed border-[#e5e9f0] text-[#9fb0c7]' : 'cursor-pointer border-[#e5e9f0]'
-                  } ${paymentMethod === m.key && !m.disabled ? 'border-[#1668c4]' : ''}`}
-                >
-                  <span className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      name="payment-method"
-                      disabled={m.disabled}
-                      checked={paymentMethod === m.key}
-                      onChange={() => setPaymentMethod(m.key)}
-                      data-testid={`payment-method-${m.key}`}
-                    />
-                    {m.label}
-                  </span>
-                  {m.hint && <span className="pr-6 text-[10px] leading-5 text-[#9fb0c7]">{m.hint}</span>}
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {showTopup && (
-            <div
-              className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4"
-              data-testid="checkout-wallet-topup"
-            >
-              <p className="mb-2 text-xs text-amber-900">
-                برای پرداخت این رزرو حداقل {faMoney(walletShortfallIrr)} تومان دیگر شارژ کنید.
-              </p>
-              <label htmlFor="checkout-topup-amount" className="mb-1.5 block text-xs text-[#6b7b94]">
-                مبلغ شارژ (تومان)
-              </label>
-              <div className="flex gap-2">
-                <input
-                  id="checkout-topup-amount"
-                  data-testid="checkout-topup-amount"
-                  value={topupAmount}
-                  onChange={(e) => setTopupAmount(e.target.value)}
-                  placeholder={faMoney(walletShortfallIrr)}
-                  className="min-w-0 flex-1 rounded-lg border border-[#e5e9f0] px-3.5 py-2.5 text-sm outline-none focus:border-[#1668c4]"
-                />
-                <button
-                  type="button"
-                  disabled={topupBusy}
-                  onClick={onTopup}
-                  data-testid="checkout-topup-submit"
-                  className="shrink-0 rounded-lg bg-[#0d2640] px-4 py-2.5 text-xs font-bold text-white disabled:opacity-60"
-                >
-                  {topupBusy ? '…' : 'شارژ'}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {payError && <p className="mb-4 rounded-lg bg-red-50 p-3 text-xs text-red-600">{payError}</p>}
-
-          <div className="mb-4 flex items-center justify-between">
-            <span className="text-xs text-[#6b7b94]">مبلغ قابل پرداخت</span>
-            <span className="font-num text-lg font-black text-[#1668c4]">{faMoney(booking.priceIrr)} تومان</span>
-          </div>
-          <button
-            disabled={paying || !canPay}
-            onClick={() => onPay()}
-            data-testid="pay-submit"
-            className="w-full rounded-lg bg-[#1668c4] px-6 py-3 text-sm font-bold text-white disabled:opacity-60"
-          >
-            {paying ? 'در حال پرداخت…' : 'پرداخت و صدور بلیط'}
-          </button>
-          {!canPay && (
-            <p className="mt-2 text-center text-[10px] text-[#9fb0c7]" data-testid="pay-blocked-hint">
-              {showTopup
-                ? 'پس از شارژ کافی کیف پول، دکمه پرداخت فعال می‌شود.'
-                : 'روش پرداخت انتخاب‌شده برای این مبلغ در دسترس نیست.'}
-            </p>
-          )}
-        </div>
-      )}
-    </div>
     </PublicPageShell>
   );
 }

@@ -1,33 +1,46 @@
+import { Injectable } from '@nestjs/common';
 import { Controller, Get, Module, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Injectable } from '@nestjs/common';
-import { TypeORMService } from '../../typeorm/typeorm.service';
+import { InjectRepository, TypeOrmModule } from '@nestjs/typeorm';
+import { In, Not, Repository } from 'typeorm';
+import { User } from '../../database/entities/user.entity';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { EmployeePermissionGuard } from '../../common/guards/employee-permission.guard';
+import { RequiresPermission } from '../../common/decorators/requires-permission.decorator';
 import {
   EXEC_ROLES,
   ROLE_LABELS_FA,
   STAFF_ROLES,
 } from '../../common/exec-roles';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
+import type { Role } from '../../database/enums';
 
 @Injectable()
 export class StaffDirectoryService {
-  constructor(private readonly typeorm: TypeORMService) {}
+  constructor(
+    @InjectRepository(User) private readonly userRepo: Repository<User>,
+  ) {}
 
   /** Active staff accounts for the transfer/refer/recipient pickers — never
-   * includes customers/agencies, never includes the caller themselves. */
-  async list(excludeUserId: string) {
-    const users = await this.typeorm.user.findMany({
+   * includes customers/agencies, never includes the caller themselves.
+   * EMPLOYEE callers only see exec managers (message-to-manager picker). */
+  async list(excludeUserId: string, actorRole?: AuthenticatedUser['role']) {
+    const roles: Role[] =
+      actorRole === 'EMPLOYEE'
+        ? [...EXEC_ROLES, 'IT_MANAGER', 'SITE_ADMIN']
+        : [...STAFF_ROLES];
+
+    const users = await this.userRepo.find({
       where: {
-        role: { in: [...STAFF_ROLES] },
+        role: In(roles),
         isActive: true,
-        id: { not: excludeUserId },
+        id: Not(excludeUserId),
       },
       select: { id: true, fullName: true, role: true },
-      orderBy: { fullName: 'asc' },
+      order: { fullName: 'ASC' },
     });
     return users.map((u) => ({ ...u, roleLabelFa: ROLE_LABELS_FA[u.role] }));
   }
@@ -35,20 +48,22 @@ export class StaffDirectoryService {
 
 @ApiTags('staff-directory')
 @Controller('staff-directory')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(...EXEC_ROLES)
+@UseGuards(JwtAuthGuard, RolesGuard, EmployeePermissionGuard)
+@Roles(...EXEC_ROLES, 'EMPLOYEE')
 export class StaffDirectoryController {
   constructor(private readonly staffDirectory: StaffDirectoryService) {}
 
   @Get()
+  @RequiresPermission('ct_process')
   @ApiOperation({ summary: 'فهرست کارکنان فعال برای انتخاب مقصد انتقال/ارجاع' })
   async list(@CurrentUser() actor: AuthenticatedUser) {
-    const data = await this.staffDirectory.list(actor.id);
+    const data = await this.staffDirectory.list(actor.id, actor.role);
     return { success: true, data };
   }
 }
 
 @Module({
+  imports: [TypeOrmModule.forFeature([User])],
   controllers: [StaffDirectoryController],
   providers: [StaffDirectoryService],
   exports: [StaffDirectoryService],

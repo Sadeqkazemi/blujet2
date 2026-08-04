@@ -1,11 +1,12 @@
 import { Controller, Get, Param, Query, Req } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
 import { SearchService } from './search.service';
-import { PriceAdvisoryService } from './price-advisory.service';
+import { SearchAdvisoryService } from './search-advisory.service';
 import { SearchFlightsDto } from './dto/search-flights.dto';
-import { PriceAdvisoryDto } from './dto/price-advisory.dto';
+import { SearchAdvisoryDto } from './dto/search-advisory.dto';
+import { SearchPriceCalendarDto } from './dto/search-price-calendar.dto';
 
 /** Fully public — no login required to browse flights, matching every
  * airline site's golden path (login only becomes necessary at booking). */
@@ -14,7 +15,7 @@ import { PriceAdvisoryDto } from './dto/price-advisory.dto';
 export class SearchController {
   constructor(
     private readonly search: SearchService,
-    private readonly priceAdvisory: PriceAdvisoryService,
+    private readonly searchAdvisory: SearchAdvisoryService,
   ) {}
 
   @Get('airports')
@@ -58,5 +59,34 @@ export class SearchController {
   @ApiOperation({ summary: 'نقشه صندلی برای انتخاب صندلی هنگام خرید' })
   async seatMap(@Param('id') id: string) {
     return { success: true, data: await this.search.seatMap(id) };
+  }
+
+  @Get('price-calendar')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @ApiOperation({ summary: 'تقویم قیمت ۷روزه برای نوار نتایج پرواز' })
+  async priceCalendar(@Query() query: SearchPriceCalendarDto) {
+    const data = await this.search.priceCalendar(
+      query.origin,
+      query.dest,
+      query.date,
+    );
+    return { success: true, data };
+  }
+
+  @Get('advisory')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @ApiOperation({
+    summary:
+      'رادار هوشمند قیمت — توصیه خرید/انتظار (advisory، degrade امن)',
+  })
+  async getAdvisory(@Query() query: SearchAdvisoryDto, @Req() req: Request) {
+    const requestId = req.headers['x-request-id'];
+    const data = await this.searchAdvisory.advise(
+      query.origin,
+      query.dest,
+      query.date,
+      typeof requestId === 'string' ? requestId : undefined,
+    );
+    return { success: true, data };
   }
 }

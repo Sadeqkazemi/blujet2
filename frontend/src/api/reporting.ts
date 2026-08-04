@@ -2,6 +2,9 @@ import { apiGet } from './http';
 import type {
   AgencySettlementsResult,
   CompletedFlightsSummary,
+  EmployeeActivityResult,
+  FinanceDashboardStats,
+  FlightSalesResult,
   KpiResult,
   LowSalesAlert,
   PassengerReportHit,
@@ -10,6 +13,8 @@ import type {
   RevenueMixResult,
   SalesChartPeriod,
   StaffReportsResult,
+  CommercialOverview,
+  SiteAdminOverview,
 } from '../types/reporting';
 
 function toQueryString(query: PeriodQuery): string {
@@ -26,6 +31,10 @@ export function fetchSalesChart(query: PeriodQuery) {
   return apiGet<SalesChartPeriod[]>(`/reporting/sales-chart?${toQueryString(query)}`);
 }
 
+export function fetchFlightSales() {
+  return apiGet<FlightSalesResult>('/reporting/flight-sales');
+}
+
 export function fetchKpis(query: PeriodQuery) {
   return apiGet<KpiResult>(`/reporting/kpis?${toQueryString(query)}`);
 }
@@ -36,6 +45,18 @@ export function fetchCompletedFlightsSummary(query: PeriodQuery) {
 
 export function fetchLowSalesAlerts() {
   return apiGet<LowSalesAlert[]>('/reporting/low-sales-alerts');
+}
+
+export function fetchFinanceDashboardStats() {
+  return apiGet<FinanceDashboardStats>('/reporting/finance-dashboard-stats');
+}
+
+export function fetchCommercialOverview() {
+  return apiGet<CommercialOverview>('/reporting/commercial-overview');
+}
+
+export function fetchSiteAdminOverview() {
+  return apiGet<SiteAdminOverview>('/reporting/site-admin-overview');
 }
 
 export function fetchRecentTransactions() {
@@ -57,4 +78,9 @@ export function searchPassengers(q: string) {
 export function fetchStaffReports(staffId?: string) {
   const qs = staffId ? `?staffId=${encodeURIComponent(staffId)}` : '';
   return apiGet<StaffReportsResult>(`/staff-reports${qs}`);
+}
+
+/** EMPLOYEE activity feed for «گزارش‌های من» */
+export function fetchMyActivity() {
+  return apiGet<EmployeeActivityResult>('/staff-reports/mine');
 }

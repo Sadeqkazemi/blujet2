@@ -1,21 +1,59 @@
 export type SalesGranularity = 'day' | 'month' | 'q3' | 'q6' | 'year' | 'flight';
 
+// Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON on
+// the backend — a JS number can't safely hold IRR amounts above 2^53).
 export interface SalesChartPeriod {
   periodKey: string;
   startDate: string;
   endDate: string;
-  systemIrr: number;
-  charterIrr: number;
-  agencyIrr: number;
+  systemIrr: string;
+  charterIrr: string;
+  agencyIrr: string;
+}
+
+export interface KpiTrends {
+  revenuePct: number;
+  profitPct: number;
+  operatingCostPct: number;
+  agencyDebtPct: number;
+}
+
+export interface CommercialOverview {
+  activeAgencies: number;
+  passengersThisMonth: number;
+  pendingAgencyRequests: number;
+}
+
+/** SITE_ADMIN dashboard KPI row — design پنل ادمین سایت */
+export interface SiteAdminOverview {
+  activeAgencies: number;
+  passengersThisMonth: number;
+  ticketsSoldThisMonth: number;
+  pendingActionCount: number;
+  agenciesTrendPct: number | null;
+  passengersTrendPct: number | null;
+  ticketsTrendPct: number | null;
 }
 
 export interface KpiResult {
-  revenueIrr: number;
-  profitIrr: number;
+  revenueIrr: string;
+  profitIrr: string;
   marginPct: number;
-  operatingCostIrr: number;
-  agencyDebtIrr: number;
+  operatingCostIrr: string;
+  agencyDebtIrr: string;
   agencyDebtCount: number;
+  trends: KpiTrends;
+}
+
+export interface FinanceDashboardStats {
+  activeAgencies: number;
+  activeAgenciesTrendPct: number;
+  passengersThisMonth: number;
+  passengersTrendPct: number;
+  ticketsSoldThisMonth: number;
+  ticketsTrendPct: number;
+  revenueThisMonthIrr: string;
+  revenueTrendPct: number;
 }
 
 export interface CompletedFlightsSummary {
@@ -23,6 +61,26 @@ export interface CompletedFlightsSummary {
   totalSeats: number;
   soldSeats: number;
   unsoldSeats: number;
+}
+
+export interface FlightSalesRow {
+  flightInstanceId: string;
+  flightNo: string;
+  originCode: string;
+  destCode: string;
+  originCityFa: string;
+  destCityFa: string;
+  departureAt: string;
+  systemIrr: string;
+  charterIrr: string;
+  agencyIrr: string;
+  totalIrr: string;
+  capacity: number;
+  soldSeats: number;
+}
+
+export interface FlightSalesResult {
+  rows: FlightSalesRow[];
 }
 
 export interface LowSalesAlert {
@@ -47,13 +105,17 @@ export interface PeriodQuery {
 
 export type LedgerType = 'SALE' | 'REFUND' | 'SETTLEMENT' | 'COMMISSION';
 
+export type TransactionStatusTone = 'success' | 'warning' | 'danger';
+
 export interface RecentTransaction {
   id: string;
   type: LedgerType;
   titleFa: string;
   party: string;
   occurredAt: string;
-  signedAmountIrr: number;
+  signedAmountIrr: string;
+  statusFa: string;
+  statusTone: TransactionStatusTone;
 }
 
 export interface RecentTransactionsResult {
@@ -64,12 +126,12 @@ export interface RecentTransactionsResult {
 export interface RevenueMixChannel {
   channel: 'SYSTEM' | 'CHARTER' | 'AGENCY';
   labelFa: string;
-  amountIrr: number;
+  amountIrr: string;
   pct: number;
 }
 
 export interface RevenueMixResult {
-  totalIrr: number;
+  totalIrr: string;
   channels: RevenueMixChannel[];
 }
 
@@ -78,8 +140,8 @@ export type SettlementStatus = 'SETTLED' | 'PENDING' | 'OVERDUE';
 export interface AgencySettlementRow {
   agencyId: string;
   agencyName: string;
-  totalIrr: number;
-  paidIrr: number;
+  totalIrr: string;
+  paidIrr: string;
   paidPct: number;
   dueAt: string | null;
   overdueDays: number;
@@ -89,7 +151,7 @@ export interface AgencySettlementRow {
 
 export interface AgencySettlementsResult {
   rows: AgencySettlementRow[];
-  outstandingIrr: number;
+  outstandingIrr: string;
 }
 
 export interface PassengerReportHit {
@@ -103,7 +165,7 @@ export interface PassengerReportHit {
   departureAt: string;
   seatCode: string | null;
   cabin: 'BUSINESS' | 'ECONOMY' | null;
-  priceIrr: number;
+  priceIrr: string;
 }
 
 export interface StaffReportsResult {
@@ -118,4 +180,17 @@ export interface StaffReportsResult {
     at: string;
   }[];
   newEmployeeEvents: { id: string; detail: string; at: string }[];
+}
+
+/** EMPLOYEE «گزارش‌های من» — GET /staff-reports/mine */
+export interface EmployeeActivityItem {
+  id: string;
+  title: string;
+  detail: string;
+  category: string;
+  at: string;
+}
+
+export interface EmployeeActivityResult {
+  items: EmployeeActivityItem[];
 }

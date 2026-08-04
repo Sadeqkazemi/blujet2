@@ -229,17 +229,34 @@ banner: «۱ پیشنهاد مدیر بازرگانی → ۲ تحلیل هوش �
 ## Phase 7 — Refunds
 
 Grounded in extraction of the Finance Manager's استرداد بلیط tab (the
-primary payout surface), the customer/site-admin submission flow (their
-tracks, not built here), and `site-data.js`'s `refunds` shapes. Lifecycle:
+primary payout surface), the customer/site-admin submission flow, and
+`site-data.js`'s `refunds` shapes. Lifecycle:
 مشتری ثبت → ادمین سایت ارجاع → مدیر مالی پرداخت, tracked as
 `SUBMITTED → REVIEW → FINANCE → PAID`.
 
-- `RefundRequest { id, bookingId→Booking, passengerName, nidEnc?/mobileEnc? (PII encrypted like everywhere else — the mocks store plaintext), ibanEnc (24-digit شبا, encrypted at rest, returned only to the finance surface), totalPaidIrr, penaltyPct, penaltyAmountIrr, refundableIrr, status: SUBMITTED|REVIEW|FINANCE|PAID, assigneeId→User? (finance staffer — the design's refer sets assignee WITHOUT advancing status; payment still happens from the finance manager's view), processedById→User?, paidAt?, history Json[] of {step, labelFa, at}, createdAt }` — real FK to Booking (⚑ fixes the mocks' `RF-{length+1044}` id-collision scheme).
+- `RefundRequest { id, trackingCode String @unique, bookingId String @unique→Booking, passengerName, nidEnc?/mobileEnc? (PII encrypted like everywhere else — the mocks store plaintext), ibanEnc (24-digit شبا, encrypted at rest, returned only to the finance surface), totalPaidIrr, penaltyPct, penaltyAmountIrr, refundableIrr, status: SUBMITTED|REVIEW|FINANCE|PAID, assigneeId→User? (finance staffer; SITE_ADMIN referral of a customer-created request advances it to FINANCE, while later finance reassignment only changes the assignee), processedById→User?, paidAt?, history Json[] of {step, labelFa, at}, createdAt }` — real FK to Booking. `trackingCode` is generated server-side as an opaque short `RF-XXXXXXXX` code with collision retry; it is display/search identity only, never authorization. Existing rows are backfilled in the migration before the unique/not-null constraint is applied (⚑ fixes the mocks' `RF-{length+1044}` id-collision scheme without exposing UUIDs as customer tracking codes).
 - `RefundPenaltyRule { id, minHoursBeforeDeparture, penaltyPct, labelFa }` — ⚑ the mocks contain THREE inconsistent penalty schemes (customer engine: 30/50/70/100 by hours-to-departure; a dead two-bracket 30/80 settings editor; seeds hardcoding ٪۳۰). The customer panel's 4-bracket engine is the only actually-executed rule, so it becomes the seeded, server-side source of truth: ≥72h→30٪, 24–72h→50٪, 3–24h→70٪, <3h→100٪ (غیرقابل استرداد). Penalty is computed server-side at request creation; the static settings editor is dead UI and is not built.
 - ⚑ **Real financial effect on pay** (the mocks only flip a status field): `PATCH pay` runs in one transaction — `LedgerEntry(type=REFUND, signedAmountIrr = −refundableIrr, bookingId, createdBy)`, `Booking.status → REFUNDED`, request → `PAID` + `processedById/paidAt` + history row, `AuditLog(category=REFUND)`. Double-pay guarded (409). The actual bank transfer to the شبا stays out-of-band until the PaymentGateway lands on the public track — the ledger row is the system of record.
-- No reject action exists anywhere in the finance design — none is built (status enum stays minimal; a site-admin-side rejection belongs to that track).
-- `REVIEW` is unreachable via any mock action (admin refer jumps straight to FINANCE) — kept in the enum for the site-admin track's future use; this track never sets it.
-- Submission/site-admin referral belong to the customer/site-admin tracks — until they land, requests come from seed + the established non-production `_test` hook pattern for E2E.
+- No reject action exists anywhere in the finance design — none is built;
+  the status enum stays minimal.
+- `REVIEW` remains a valid imported/migration state. The real SITE_ADMIN
+  refer operation accepts `SUBMITTED|REVIEW`, appends both actual review
+  and finance-referral history events, and commits `FINANCE` atomically;
+  no read endpoint mutates status merely because an admin opened a row.
+- Customer submission and SITE_ADMIN/finance processing are now real. The
+  account-tab completion adds no other table: eligible bookings are a
+  server query over owned `Booking` + `FlightInstance` with
+  `NOT EXISTS RefundRequest`; rule cards read `RefundPenaltyRule`; tracking
+  uses the existing `history` JSON. Only `RefundRequest.trackingCode`
+  requires a migration.
+- Penalty previews are never persisted and never authoritative. The
+  submission transaction re-reads the booking, locks/guards the one-request
+  invariant, recomputes the current bracket, and stores the resulting
+  integer IRR snapshot (`totalPaidIrr`, `penaltyAmountIrr`,
+  `refundableIrr`). A unique `bookingId` constraint is added to
+  `RefundRequest` so two concurrent submissions for one booking cannot
+  both succeed; the service maps the losing insert to stable 409
+  `CONFLICT`.
 
 ## Phase 8 — Employee management (IT Manager)
 
@@ -308,12 +325,14 @@ hardcodes `resRole:"super"` for the IT panel's mount, and CEO/Chair's own
 access to the same seat map, matching the design's confirmed behavior.
 Reachable nav entries (per `panel-nav.config.ts`, already confirmed in
 Phase 1's extraction): only `BOARD_CHAIR`, `SENIOR_MANAGER`, `IT_MANAGER`
-get a سامانه رزرواسیون/هواپیما sidebar tab — CEO's mount point is coded but
-unreachable from its sidebar, so CEO's `canLock` grant is API-level only
+get a سامانه رزرواسیون/هواپیما sidebar tab — CEO also has `reservation`
+(label **هواپیما**) in `PANEL_NAV`, matching `roleDefs.ceo.access` and the
+approved CEO design screenshots; CEO's `canLock` grant is therefore
+reachable from the sidebar (same as BOARD_CHAIR), not API-level only
 (consistent with the design's own copy naming CEO as an authorized locker)
 and has no UI entry point yet.
 
-- `AircraftSeatMap { id, aircraftType (unique) →Flight.aircraftType, businessRowStart/End, businessColsLeft/Right, economyRowStart/End, economyColsLeft/Right }` — CLAUDE.md: "seat map config lives per aircraft type in the DB, not hardcoded." Seeded once for `"Airbus A320"` (the existing seed flight's type) matching the design's MD-88 mock numbers verbatim: rows 3–6 business 2-2 (16 seats), rows 7–32 economy 2-3 (130 seats) = 146 total.
+- `AircraftSeatMap { id, aircraftType (unique) →Flight.aircraftType, businessRowStart/End, businessColsLeft/Right, economyRowStart/End, economyColsLeft/Right, excludedSeatCodes String[] }` — CLAUDE.md: "seat map config lives per aircraft type in the DB, not hardcoded." Seeded for `"Airbus A320"` (legacy 2-2/2-3 → 146 seats) and `"MD-80"` from the approved cabin chart (`design-reference-v2/MD-80-seatmap.pdf`): First Class rows 3–6 as `A,B|E,F` (16), Economy rows 7–32 as `A,B|D,E,F` minus rear exit/galley seats `28A/B,29A/B,30A/B` (124) = **140** total.
 - `SeatLock { id, flightInstanceId→FlightInstance, seatCode, lockedById→User, passengerName?, passengerNationalIdEnc?, passengerNationalIdHash?, passengerMobileEnc?, releasedById?→User, releasedAt? }` — PII fields follow the same encrypt+hash pattern as `ClubMember`. A partial unique index (`WHERE releasedAt IS NULL`) enforces exactly one active lock per seat at the DB level, not just an app-side check — CLAUDE.md's seat-inventory concurrency rule.
 - `Passenger` gained `nationalIdHash` (same encrypt+hash pattern, needed for the design's «جستجوی مسافر» exact-match search) and `seatCode` (nullable — Phase 1–6 seed passengers predate seat selection).
 - PNR issuance/change/cancel reuses `Booking`/`Passenger` from Phase 2. "New booking" (منوی جستجوی پرواز + صدور PNR) in this component is a **staff-side manual/offline issuance path** (phone/counter bookings), not the public paid-checkout flow — it creates a `TICKETED` booking directly (no `HELD`/`PAID` steps, no payment gateway), clearly distinct from and not a substitute for the public-site booking-and-payment track. Price comes from `FarePricingProposal.registeredPriceIrr` when one exists for that `FlightInstance` (Phase 6), else a documented flat fallback — no ad-hoc dynamic pricing invented here.
@@ -889,13 +908,21 @@ the user's explicit scope (2026-07-22): **management panel only**
 `ExternalServiceConfig` entry with no code behind it). Added
 `backend/src/common/sms/kavenegar-sms.provider.ts` implementing the same
 `SmsProvider` interface, calling Kavenegar's real send API
-(`https://api.kavenegar.com/v1/{key}/sms/send.json`). `sms.module.ts` now
-factory-switches on `SMS_PROVIDER`: `"kavenegar"` (+ `KAVENEGAR_API_KEY`,
-optional `KAVENEGAR_SENDER_LINE`) uses the real driver; anything else —
-the dev/test default — keeps `MockSmsProvider`, so the existing test
-suite never makes a real network call. Failures (bad credit, invalid
-line, network error) are reported as real `SmsLog(status: FAILED)` rows
-via the existing `SmsService`, never fabricated as success.
+(`https://api.kavenegar.com/v1/{key}/sms/send.json`). `sms.module.ts`
+permanently binds `SMS_PROVIDER` to `KavenegarSmsProvider`; the class
+itself checks the `ext_kavenegar` `ExternalServiceConfig` row (Phase 28's
+IT Manager panel → سرویس‌های خارجی) on every send and falls back to
+`MockSmsProvider` whenever it's disabled or has no key configured. The
+API key is **not** a server env var — it's the same encrypted-at-rest
+(`apiKeyEncrypted`, via `encryptPii`), IT_MANAGER-editable mechanism
+already used for زرین‌پال/آمادئوس/نشان, so it can be set/rotated live
+from the panel with no server access or restart. `KAVENEGAR_SENDER_LINE`
+remains the one SMS-related env var (the approved originator line — not
+a secret, optional). The seed `ext_kavenegar` row ships disabled/keyless,
+so the existing test suite never makes a real network call. Failures
+(bad credit, invalid line, network error) are reported as real
+`SmsLog(status: FAILED)` rows via the existing `SmsService`, never
+fabricated as success.
 
 ---
 
@@ -1202,11 +1229,10 @@ step anywhere in the project.
   (CLAUDE.md: booking/payment must keep working regardless of AI/profile
   state; national ID stays optional at the DTO level exactly as it is
   today — this phase does not make it required to book).
-- ⚑ **Explicitly not built this phase**: saved-passengers CRUD, bank
-  cards, active-sessions list, invite-friends, and any document/selfie
-  upload — all real sections of the same design page, all out of scope
-  for a "notify when incomplete" feature. Flagged here so a future phase
-  doesn't assume they were silently included.
+- ⚑ **Explicitly not built in Phase 17**: bank cards, invite-friends,
+  and any document/selfie upload — all real sections of the same design
+  page. Active-sessions moved to its own section below; saved-passengers
+  shipped separately.
 
 ## Phase 18 — SITE_ADMIN + EMPLOYEE panel access
 
@@ -1748,6 +1774,169 @@ only, reuses the existing `TwoFactorChallenge` table exactly like Phase 2's
   401s with a generic message — same non-oracle posture Phase 21's
   `customer/login-password` already uses for phone+password.
 
+## پنل کاربر — نشان‌شده‌ها (`SavedFlight`)
+
+See `docs/API.md`'s matching section. Bookmarks a specific flight instance
++ cabin for the logged-in customer (same granularity as `PriceLock`).
+
+```typeorm
+model SavedFlight {
+  id               String         @id @default(uuid())
+  userId           String
+  user             User           @relation("SavedFlightOwner", ...)
+  flightInstanceId String
+  flightInstance   FlightInstance @relation(...)
+  cabin            CabinClass
+  createdAt        DateTime       @default(now())
+
+  @@unique([userId, flightInstanceId, cabin])
+  @@index([userId, createdAt])
+  @@map("saved_flights")
+}
+```
+
+Migration: `20260731120000_saved_flights`. Cascades on user/instance
+delete. Application cap: 20 rows per user (enforced in service, not DB).
+
+## پنل کاربر — مسافران ذخیره‌شده (`SavedPassenger`)
+
+See `docs/API.md`'s matching section. Per-user address book for checkout
+autofill — separate from booking-scoped `Passenger` rows.
+
+```typeorm
+model SavedPassenger {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation("SavedPassengerOwner", ...)
+  fullName       String
+  latinName      String
+  nationalIdEnc  String?
+  nationalIdHash String?
+  passportNoEnc  String?
+  mobileEnc      String?
+  isChild        Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([userId, nationalIdHash])
+  @@map("saved_passengers")
+}
+```
+
+Migration: `20260731130000_saved_passengers`. PII columns follow the same
+AES-256-GCM + HMAC hash pattern as `ClubMember`/`Passenger`. Application
+cap: 20 rows per user; duplicate national ID per user rejected in service.
+
+## پنل کاربر — حساب‌های بانکی (`SavedBankAccount`)
+
+Customer refund payout destination — card PAN + Iranian sheba (IBAN).
+Encrypted at rest like other PII; sheba deduped per user via `shebaHash`.
+
+```typeorm
+model SavedBankAccount {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation("SavedBankAccountOwner", ...)
+  bankName    String
+  bankShort   String
+  brandColor  String
+  cardPanEnc  String?
+  cardLast4   String?
+  shebaEnc    String
+  shebaHash   String
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([userId, shebaHash])
+  @@map("saved_bank_accounts")
+}
+```
+
+Migration: `20260731140000_saved_bank_accounts`. Application cap: 5 rows
+per user; duplicate sheba per user rejected in service.
+
+## پنل کاربر — معرفی دوستان (Customer Referral)
+
+Invite-friends program for the public user panel — distinct from Phase 4
+`ManagerReferral` (staff workflow).
+
+```typeorm
+// User.referralCode String? @unique — lazily assigned per customer
+
+enum CustomerReferralStatus {
+  SIGNED_UP   // registered with referrer's code
+  BOOKED      // reserved for future use
+  REWARDED    // first ticketed booking completed; points credited
+}
+
+model CustomerReferral {
+  id             String                 @id @default(uuid())
+  referrerUserId String
+  referrer       User                   @relation("CustomerReferralsMade", ...)
+  referredUserId String                 @unique
+  referred       User                   @relation("CustomerReferralReceived", ...)
+  status         CustomerReferralStatus @default(SIGNED_UP)
+  pointsAwarded  Int                    @default(0)
+  firstBookingId String?                @unique
+  firstBooking   Booking?               @relation("CustomerReferralFirstBooking", ...)
+  rewardedAt     DateTime?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  @@index([referrerUserId, createdAt])
+  @@map("customer_referrals")
+}
+```
+
+Migration: `20260731150000_customer_referrals`. Reward constant: 500
+points per successful first booking (server-side in
+`CustomerReferralsService`).
+
+## پنل کاربر — احراز هویت (`CustomerIdentityVerification`)
+
+National-ID card KYC for refunds/high-value purchases. **No selfie**
+(CLAUDE.md). Customer submit/status and SITE_ADMIN approve/reject are
+both implemented; the admin queue is `/panel/kyc`.
+
+```typeorm
+enum CustomerIdentityStatus {
+  NOT_STARTED
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+model CustomerIdentityVerification {
+  id           String                 @id @default(uuid())
+  userId       String                 @unique
+  user         User                   @relation("UserIdentityVerification", ...)
+  status       CustomerIdentityStatus @default(NOT_STARTED)
+  idCardFileId String?                // StoredFile id
+  submittedAt  DateTime?
+  reviewedAt   DateTime?
+  rejectReason String?
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+
+  @@map("customer_identity_verifications")
+}
+```
+
+Migration: `20260731160000_customer_identity`. Profile step is computed
+from `User.fullName` + `nationalIdEnc` + `birthDate` (not stored here).
+The development seed creates one `SUBMITTED` verification with a real
+tiny PNG `StoredFile`, so `/panel/kyc` and its protected file-streaming
+endpoint can be exercised immediately after seeding.
+
+## پنل کاربر — نشست‌های فعال (reuse `RefreshToken`)
+
+See `docs/API.md`'s matching section. No new table — customer-facing
+list/revoke over existing `RefreshToken` rows (`userAgent`, `ip`,
+`revokedAt`), scoped to `userId = caller.id`.
+
 ## Phase 65 — قوانین باشگاه مشتریان (Club Tier Rules)
 
 See `docs/API.md`'s Phase 65 section for the full reasoning and endpoint
@@ -2117,3 +2306,186 @@ and asserts `kpis().revenueIrr` is unchanged and still reconciles with
 (391/391) after the fix — the sales-chart/kpis reconciliation test that
 had failed in every one of the last several full-suite runs this session
 now passes deterministically.
+
+---
+
+## Int → BigInt migration: every IRR money column
+
+Closes the "known technical debt" flagged during Phase 3 seed data: every
+IRR-denominated column was Postgres `integer` (Int32 ceiling ~2.14e9 IRR ≈
+214,000,000 toman) — fine for a single ticket price, but a real agency
+credit line or a yearly revenue KPI aggregate can plausibly exceed that.
+User explicitly reviewed and approved the migration (and the direct
+`ALTER COLUMN` approach over an expand/contract dual-column pattern,
+appropriate since this is still pre-launch with no live production
+traffic) before it started, given it touches the entire financial core.
+
+**Schema**: all 27 IRR columns — `FlightInstance.basePriceIrr`,
+`CabinFare.priceIrr`, `FareRule.{priceIrr,taxIrr}`,
+`Booking.{priceIrr,taxIrr}`, `PaymentReconciliation.amountIrr`,
+`LedgerEntry.signedAmountIrr`, `AgencyAllotment.contractPriceIrr`,
+`AgencyCreditLine.limitIrr`, `AgencyInvoice.amountIrr`,
+`AgencyCreditRequest.requestedLimitIrr`,
+`AgencyWebserviceRequest.priceIrr`,
+`FarePricingProposal.{basePriceIrr,competitorPriceIrr,proposedPriceIrr,legalRateIrr,registeredPriceIrr}`,
+`RefundRequest.{totalPaidIrr,penaltyAmountIrr,refundableIrr}`,
+`PromoCode.value` (dual percent/fixed — a FIXED-type code's value is an
+IRR amount), `PromoRedemption.discountIrr`, `WalletEntry.signedAmountIrr`,
+`PriceLock.{lockedPriceIrr,feeIrr}`, `AiUsageLog.costIrr` — converted
+`Int`/`Int?` → `BigInt`/`BigInt?`. Non-money `Int` fields (seat counts,
+percentages like `penaltyPct`/`discountPct`, token counts, byte sizes,
+minutes) deliberately untouched. Single migration
+`20260731061249_money_columns_int_to_bigint`: plain
+`ALTER COLUMN ... TYPE BIGINT` per column — Postgres's standard widening
+conversion, no data loss, applied cleanly to both the dev and test
+databases with existing data present.
+
+**New shared infrastructure** (CLAUDE.md: "Money is NEVER a float. All
+arithmetic through a single money utility module" — this module didn't
+actually exist yet before this migration; it does now):
+- `backend/src/common/money.ts` — `Irr = bigint`, plus `addIrr`/`subIrr`/
+  `negateIrr`/`pctOfIrr` (integer-percent, half-away-from-zero rounding)/
+  `roundIrrTo` (round to nearest step, e.g. the business-cabin multiplier's
+  "nearest 100,000 IRR")/`divRoundBigInt` (bigint division with the same
+  rounding, used for margin %, revenue-mix %, paid %, average-fare
+  derivations)/`compareIrr`/`maxIrr`/`minIrr`/`isPositiveIrr`/
+  `isNegativeIrr`/`isZeroIrr`/`toIrr` (parses a DTO value, throws on a
+  non-integer). Every service touching money now goes through this
+  instead of hand-rolled bigint arithmetic.
+- `backend/src/common/bigint-json.ts` — `BigInt.prototype.toJSON` patched
+  to render as a decimal string (`JSON.stringify` throws on a raw
+  `bigint`; a JS `number` can't safely represent amounts above 2^53
+  anyway, so every money field in every API response is now a **string**,
+  e.g. `{"priceIrr": "5000000"}`). Imported for its side effect in
+  `main.ts` (real app) and `test/jest-setup.ts` (e2e tests).
+- `backend/src/common/dto/irr.decorator.ts` — `@IsIrrAmount()` (accepts a
+  bigint/integer-number/numeric-string), `@MinIrrAmount(min: bigint)`
+  (bigint-safe stand-in for class-validator's own `@Min()`, which
+  mishandles bigint), `@TransformToIrr()` (converts the validated value to
+  `bigint` via `class-transformer`). Applied to every DTO field where a
+  client submits one of the 27 columns as input (agency credit-limit
+  updates, invoice amounts, wallet top-up, booking payment confirmation,
+  fare-rule/pricing-proposal prices, ...).
+
+**ML-boundary exception** (the only place a bigint is deliberately
+converted back to a plain `number`): `flights.service.ts`/
+`pricing.service.ts`'s `runAiAnalysis()`, building the outbound
+`PriceSuggestionItem[]` payload sent to the internal FastAPI pricing
+service. Justified because ML output is advisory-only (CLAUDE.md ML
+Service Rules — never authoritative, never sets a bookable price by
+itself) and every real fare amount is far below 2^53, so no precision is
+lost in practice; the suggestion only becomes an authoritative
+`registeredPriceIrr` when a CEO explicitly registers it, at which point
+`pricing.service.ts`'s `register()` converts it back to `Irr` via
+`toIrr()`.
+
+**Testing**: full backend unit suite 50/50; full backend e2e suite
+391/392 (the one remaining failure is the pre-existing, previously
+documented Phase-51 timeout flake on `flight-engine-completion.e2e-spec.ts`'s
+Y/B/M fare-class test, confirmed unrelated to this migration by re-running
+it with a longer timeout, which passes with correct values); `tsc
+--noEmit` and `eslint` clean on the backend; frontend `tsc`/lint show no
+new errors; frontend unit suite 327/327, 72 files.
+Two intentional test-behavior changes (not weakened assertions):
+`agencies.e2e-spec.ts`'s "rejects a limit beyond the Int32 ceiling" test
+is obsolete by design (removing that ceiling was the point of the
+migration) and now proves the validation guard against a negative limit
+instead; `reporting.e2e-spec.ts`'s "money fields are raw integers"
+assertion flips from `typeof === 'number'` to `typeof === 'string'`,
+matching the new wire format on purpose.
+
+## Phase D — Blog CMS (`BlogPost`)
+
+Migration `20260731140000_blog_posts`.
+
+```typeorm
+enum BlogCategory { NEWS GUIDE DEST OFFERS }
+enum BlogPostStatus { DRAFT PUBLISHED SCHEDULED }
+
+model BlogPost {
+  id          String         @id @default(uuid())
+  title       String
+  slug        String         @unique
+  body        String         @db.Text
+  category    BlogCategory
+  status      BlogPostStatus @default(DRAFT)
+  coverFileId String?        @unique
+  coverFile   StoredFile?    @relation("BlogPostCover", ...)
+  authorId    String
+  author      User           @relation("BlogPostAuthor", ...)
+  viewCount   Int            @default(0)
+  publishedAt DateTime?
+  scheduledAt DateTime?
+  deletedAt   DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  @@map("blog_posts")
+}
+```
+
+Plus on `User`: `blogPostsAuthored BlogPost[] @relation("BlogPostAuthor")`.
+Plus on `StoredFile`: `blogCoverFor BlogPost? @relation("BlogPostCover")`.
+
+- `slug` is unique; auto-generated from title when omitted at create time.
+- Public visibility: `PUBLISHED`, or `SCHEDULED` with `scheduledAt <= now()`.
+- Soft-delete via `deletedAt`; admin list excludes deleted rows.
+- `PANEL_NAV.SITE_ADMIN` gains `{ key: 'blog', implemented: true }`.
+- Seed: five sample posts (three published, one draft, one future-scheduled)
+  authored by `site.admin`.
+
+## Phase E — Site content CMS
+
+```typeorm
+enum SiteContentBlockKey { HERO_BANNER ANNOUNCEMENT_BAR PROMO_BANNER }
+
+model SiteMediaAsset {
+  id           String     @id @default(uuid())
+  storedFileId String     @unique
+  label        String
+  uploadedById String
+  deletedAt    DateTime?
+  createdAt    DateTime   @default(now())
+  @@map("site_media_assets")
+}
+
+model SiteContentBlock {
+  key          SiteContentBlockKey @id
+  enabled      Boolean             @default(true)
+  title        String              @default("")
+  subtitle     String              @default("")
+  buttonText   String              @default("")
+  badgeText    String              @default("")
+  imageFileId  String?             @unique
+  updatedById  String?
+  updatedAt    DateTime            @updatedAt
+  @@map("site_content_blocks")
+}
+
+model SiteDestinationHighlight {
+  id          String    @id @default(uuid())
+  airportCode String
+  priceIrr    BigInt
+  imageFileId String?   @unique
+  sortOrder   Int       @default(0)
+  deletedAt   DateTime?
+  @@map("site_destination_highlights")
+}
+
+model SiteRouteHighlight {
+  id              String    @id @default(uuid())
+  fromAirportCode String
+  toAirportCode   String
+  priceIrr        BigInt
+  sortOrder       Int       @default(0)
+  deletedAt       DateTime?
+  @@map("site_route_highlights")
+}
+```
+
+Plus on `User`: `siteMediaUploaded`, `siteContentBlockUpdates`.
+Plus on `StoredFile`: `siteMediaAsset`, `contentBlockImage`, `destHighlightFor`.
+
+- Prices stored as IRR (`BigInt`); UI converts to toman at render time only.
+- Blocks auto-created with Persian defaults on first admin/public read if missing.
+- `PANEL_NAV.SITE_ADMIN` gains `{ key: 'media', implemented: true }`.
+- Seed: three blocks + five routes + four destinations matching home mock data.

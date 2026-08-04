@@ -15,11 +15,12 @@ a broken fetch-and-error dashboard. Building IT's actual dashboard is a
 later phase.
 
 **Scope note on chart granularity**: `q3`/`q6`/`year` are wired end-to-end
-(backend + frontend). `day`/`month`/`flight` granularities are implemented
-and tested on the **backend** (bucket logic + flight-scoped queries) but the
-**frontend** mode switcher shows a "این حالت نمایش در فاز بعدی تکمیل
-می‌شود" placeholder for them rather than a Jalali day-picker / flight search
-UI — that UI work is deferred to the next pass, not silently dropped.
+(backend + frontend). `day`/`month` granularities are implemented on the
+**backend** (bucket logic + flight-scoped queries) and now wired on the
+**frontend** via shared `SalesChartControls` + `JalaliDatePicker` on the
+shared dashboard and both finance views (ops + analytic). `flight` mode
+remains on dashboard/analytic views only (flight search input). See
+`docs/features/panel-sidebar-badges-day-picker.md`.
 
 ## Acceptance checklist
 
@@ -68,11 +69,13 @@ UI — that UI work is deferred to the next pass, not silently dropped.
 - [x] KPI cards render Persian digits + تومان formatting — `frontend/src/lib/fa-format.test.ts`; rendered end-to-end in `frontend/src/features/dashboard/DashboardPage.test.tsx`
 - [x] Sales chart renders legend/bars, selection toggles, table-view fallback — `frontend/src/components/SalesBarChart.test.tsx`
 - [x] Dashboard loading/error states render — `DashboardPage.test.tsx` › the success and error-message cases
-- [x] Day/month/flight modes show the deferred-scope message rather than a broken fetch — `DashboardPage.test.tsx` › "disables the day/month/flight modes..."
+- [x] Executive `DashboardPage` (CEO/Chair/Senior) matches design-reference-v2 dark dashboard: KPI cards آژانس/مسافر/بلیط/درآمد, low-sales 72h banner, گزارش مالی channel bar+tiles (not bar chart), کارتابل widget — `DashboardPage.test.tsx`
+- [x] Across reporting dashboards: exactly **one** low-sales banner (`alerts[0]`); remaining alerts open in the header notification bell — `DashboardPage.test.tsx` › `'shows only one low-sales banner and puts the rest in notifications'`
+- [x] Day/month/flight modes show the deferred-scope message rather than a broken fetch — superseded: day/month now use `SalesChartControls` + `JalaliDatePicker` (Phase C, `panel-sidebar-badges-day-picker.md`); flight mode uses flight-no input on dashboard/analytic finance views
 - [x] 2FA step component test (renders after password submit, not before) — `frontend/src/features/auth/TwoFactorPage.test.tsx` (Phase 32). Writing the "not before" case caught a real bug: `TwoFactorPage` called `navigate('/login')` during render instead of in a `useEffect`, so React Router's own guard silently dropped the navigation — visiting `/login/2fa` directly with no `challengeId` in location state rendered a blank page instead of redirecting. Fixed by moving the call into a `useEffect` keyed on `challengeId`; see PLAN.md's Phase 32 entry.
 
 ### E2E (Playwright)
-- [x] Full staff login journey (password → 2FA → dashboard) per role, landing on that role's dashboard with only its permitted tabs — `frontend/e2e/staff-login-journey.spec.ts`, parametrized over finance.karimi/ceo/itadmin
+- [x] Full staff login journey (password → 2FA → dashboard) per role, landing on that role's dashboard with only its permitted tabs — `frontend/e2e/staff-login-journey.spec.ts`, parametrized over finance/ceo/itadmin
 - [x] A role whose dashboard isn't implemented (IT) gets the coming-soon placeholder honestly, not an error — same spec, `hasSalesDashboard: false` case
 - [x] An unauthenticated visitor is redirected to `/login` — same spec
 - [x] A "coming soon" tab renders without crashing — same spec

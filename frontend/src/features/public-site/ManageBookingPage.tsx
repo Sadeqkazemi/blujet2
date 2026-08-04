@@ -187,7 +187,7 @@ export default function ManageBookingPage() {
   const [refundOpen, setRefundOpen] = useState(false);
   const [iban, setIban] = useState('');
   const [refundError, setRefundError] = useState<string | null>(null);
-  const [refundResult, setRefundResult] = useState<{ penaltyPct: number; refundableIrr: number; penaltyAmountIrr: number } | null>(null);
+  const [refundResult, setRefundResult] = useState<{ penaltyPct: number; refundableIrr: string; penaltyAmountIrr: string } | null>(null);
 
   async function lookup(e: React.FormEvent) {
     e.preventDefault();

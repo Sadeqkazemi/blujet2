@@ -59,7 +59,7 @@ describe('SecurityPage', () => {
 
     render(<SecurityPage />);
     const user = userEvent.setup();
-    const toggle = await screen.findByRole('switch', { name: 'الزام نماد' });
+    const toggle = await screen.findByRole('switch', { name: 'الزام کاراکتر ویژه' });
     await user.click(toggle);
 
     await waitFor(() => expect(updateSpy).toHaveBeenCalledWith({ requireSymbol: false }));

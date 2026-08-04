@@ -3,10 +3,13 @@ import type {
   AircraftTypeOption,
   AirportEntry,
   AllotmentRow,
+  CreateFareRulePayload,
+  FareRuleRow,
   FlightDetail,
   FlightRow,
   FlightsOverview,
   PlanResult,
+  UpdateFareRulePayload,
 } from '../types/flights';
 
 export function fetchFlightsOverview() {
@@ -15,6 +18,10 @@ export function fetchFlightsOverview() {
 
 export function fetchAirports() {
   return apiGet<AirportEntry[]>('/flights/airports');
+}
+
+export function createAirport(payload: { cityFa: string; code: string; tz?: string }) {
+  return apiPost<AirportEntry>('/flights/airports', payload);
 }
 
 export function fetchAircraftTypes() {
@@ -28,6 +35,8 @@ export interface CreateFlightPayload {
   departureAt: string;
   capacity: number;
   basePriceIrr: number;
+  aircraftType?: string;
+  charterSeats?: number;
 }
 
 export function createFlight(payload: CreateFlightPayload) {
@@ -38,8 +47,16 @@ export function fetchFlightDetail(id: string) {
   return apiGet<FlightDetail>(`/flights/${id}`);
 }
 
-export function planFlight(id: string, priceIrr: number, agencySeats: number) {
-  return apiPatch<PlanResult>(`/flights/${id}/plan`, { priceIrr, agencySeats });
+export function planFlight(
+  id: string,
+  payload: {
+    priceIrr: number;
+    agencySeats: number;
+    saleStartsAt?: string;
+    saleEndsAt?: string;
+  },
+) {
+  return apiPatch<PlanResult>(`/flights/${id}/plan`, payload);
 }
 
 export function changeFlightAircraft(
@@ -63,11 +80,33 @@ export function fetchAllotments(instanceId: string) {
 
 export function createAllotment(
   instanceId: string,
-  dto: { agencyId: string; seatsAllocated: number },
+  dto: {
+    agencyId: string;
+    seatsAllocated: number;
+    type?: 'SOFT' | 'HARD';
+    releaseAt?: string;
+    contractPriceIrr?: number;
+  },
 ) {
   return apiPost<AllotmentRow>(`/flights/${instanceId}/allotments`, dto);
 }
 
 export function deleteAllotment(instanceId: string, allotmentId: string) {
   return apiDelete<{ id: string }>(`/flights/${instanceId}/allotments/${allotmentId}`);
+}
+
+export function fetchFareRules(instanceId: string) {
+  return apiGet<FareRuleRow[]>(`/flights/${instanceId}/fare-rules`);
+}
+
+export function createFareRule(instanceId: string, dto: CreateFareRulePayload) {
+  return apiPost<FareRuleRow>(`/flights/${instanceId}/fare-rules`, dto);
+}
+
+export function updateFareRule(instanceId: string, ruleId: string, dto: UpdateFareRulePayload) {
+  return apiPatch<FareRuleRow>(`/flights/${instanceId}/fare-rules/${ruleId}`, dto);
+}
+
+export function deleteFareRule(instanceId: string, ruleId: string) {
+  return apiDelete<{ success: boolean }>(`/flights/${instanceId}/fare-rules/${ruleId}`);
 }

@@ -13,3 +13,7 @@ export function fetchManagerReports(filters: {
   const qs = params.toString();
   return apiGet<ManagerReportRow[]>(`/audit/manager-reports${qs ? `?${qs}` : ''}`);
 }
+
+export function fetchLogsBadgeCount() {
+  return apiGet<{ count: number }>('/audit/logs/badge-count');
+}

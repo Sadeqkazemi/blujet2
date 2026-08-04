@@ -1,10 +1,98 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
+/** NestJS route prefixes — dev proxy sends these to the backend so a single
+ * forwarded port (5173) is enough when previewing in Cursor/browser.
+ * Prefixes that also exist as React Router pages must bypass the proxy for
+ * browser navigations (Accept: text/html) so the SPA can render them. */
+const API_PROXY_PREFIXES = [
+  'auth',
+  'search',
+  'bookings',
+  'manage-booking',
+  'my',
+  'agency-portal',
+  'settings',
+  'site-content',
+  'blog',
+  'contact',
+  'careers',
+  'survey',
+  'flight-status',
+  'club',
+  'flights',
+  'flightops',
+  'reservation',
+  'pricing',
+  'refunds',
+  'agencies',
+  'cartable',
+  'referrals',
+  'manager-messages',
+  'files',
+  'reporting',
+  'passenger-reports',
+  'staff-reports',
+  'panels',
+  'admins',
+  'audit',
+  'it',
+  'support-tickets',
+  'identity-verifications',
+  'reconciliation',
+  'webservice',
+  'health',
+  'docs',
+] as const
+
+/** SPA paths that share a prefix with NestJS APIs (e.g. `/careers` page vs
+ * `/careers/jobs` API). HTML navigations for these must not be proxied. */
+const SPA_OVERLAPPING_PREFIXES = new Set([
+  'careers',
+  'club',
+  'blog',
+  'contact',
+  'flight-status',
+  'support',
+])
+
+function shouldBypassProxyForSpa(
+  prefix: string,
+  req: { headers: { accept?: string }; url?: string },
+): string | undefined {
+  if (!SPA_OVERLAPPING_PREFIXES.has(prefix)) return undefined
+  const accept = req.headers.accept ?? ''
+  if (accept.includes('text/html')) return req.url
+  return undefined
+}
+
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '')
+  /** Override when backend PORT ≠ 3000 (see frontend/.env.example). */
+  const apiProxyTarget = env.VITE_DEV_API_PROXY || 'http://127.0.0.1:3000'
+
+  const devProxy = Object.fromEntries(
+    API_PROXY_PREFIXES.map((prefix) => [
+      `/${prefix}`,
+      {
+        target: apiProxyTarget,
+        changeOrigin: true,
+        bypass: (req: { headers: { accept?: string }; url?: string }) =>
+          shouldBypassProxyForSpa(prefix, req),
+      },
+    ]),
+  )
+
+  return {
+  server: {
+    host: '0.0.0.0',
+    port: 5173,
+    strictPort: true,
+    proxy: devProxy,
+  },
   plugins: [
     react(),
     tailwindcss(),
@@ -35,4 +123,5 @@ export default defineConfig({
       },
     }),
   ],
+  }
 })

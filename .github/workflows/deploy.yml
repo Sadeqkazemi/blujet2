@@ -44,7 +44,7 @@ jobs:
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
       - run: cp .env.test .env
-      - run: npx typeorm migrate deploy
+      - run: npm run migration:run
       - run: npm run lint
       - run: npm run build
       - run: npm test

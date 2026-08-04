@@ -14,14 +14,14 @@ const API_URL = process.env.E2E_API_URL ?? 'http://localhost:3000';
 async function staffLoginViaApi(request: import('@playwright/test').APIRequestContext) {
   for (let attempt = 0; attempt < 6; attempt++) {
     const loginRes = await request.post(`${API_URL}/auth/staff/login`, {
-      data: { username: 'comm.abbasi', password: STAFF_PASSWORD },
+      data: { username: 'comm', password: STAFF_PASSWORD },
     });
     if (loginRes.status() === 429) {
       await new Promise((resolve) => setTimeout(resolve, 21_000));
       continue;
     }
     const { challengeId } = (await loginRes.json()).data as { challengeId: string };
-    const codeRes = await request.get(`${API_URL}/auth/_test/last-code/comm.abbasi`);
+    const codeRes = await request.get(`${API_URL}/auth/_test/last-code/comm`);
     const { code } = (await codeRes.json()).data as { code: string };
     const verifyRes = await request.post(`${API_URL}/auth/staff/login/verify`, {
       data: { challengeId, code },
@@ -89,7 +89,7 @@ test('agency sends an inbox message and sees it in the thread', async ({ page })
 test('role isolation: a staff login never reaches /agency, an agency login never reaches /panel', async ({
   page,
 }) => {
-  await loginAs(page, 'senior.rahimi');
+  await loginAs(page, 'senior');
   await page.goto('/agency');
   await page.waitForURL('**/panel');
 

@@ -1,2 +1,0 @@
--- AlterEnum
-ALTER TYPE "TwoFactorPurpose" ADD VALUE 'PASSWORD_RESET_EMAIL';

@@ -3,6 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { ApiRequestError } from '../../api/envelope';
 import { requestAgencySignupOtp, submitAgencyRequest } from '../../api/agencies';
+import {
+  requestAgencyPasswordReset,
+  setPassword as apiSetPassword,
+  verifyAgencyPasswordReset,
+} from '../../api/auth';
 import { AgencyLoginLayout } from './AgencyLoginLayout';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 
@@ -43,6 +48,23 @@ const STR: Record<StoredLocale, {
   otpConfirm: string;
   doneTitle: string;
   agencyNote: string;
+  forgotPassword: string;
+  forgotTitle: string;
+  forgotSub: string;
+  forgotSendCode: string;
+  forgotConfirmCode: string;
+  forgotNewPassword: string;
+  forgotRepeatPassword: string;
+  forgotSave: string;
+  forgotDone: string;
+  forgotBack: string;
+  forgotIncompletePhone: string;
+  forgotIncompleteOtp: string;
+  forgotShortPassword: string;
+  forgotMismatch: string;
+  forgotSendFallback: string;
+  forgotVerifyFallback: string;
+  forgotSaveFallback: string;
 }> = {
   fa: {
     tabLogin: 'ورود',
@@ -71,6 +93,23 @@ const STR: Record<StoredLocale, {
     otpConfirm: 'تأیید و ثبت درخواست',
     doneTitle: 'درخواست همکاری شما ثبت شد.',
     agencyNote: 'حساب آژانس پس از تأیید مدارک و مجوز فعالیت توسط کارشناسان blujet فعال می‌شود و به پنل B2B با نرخ‌های ویژه دسترسی خواهید داشت.',
+    forgotPassword: 'فراموشی رمز عبور؟',
+    forgotTitle: 'بازیابی رمز عبور آژانس',
+    forgotSub: 'شماره تماس ثبت‌شدهٔ آژانس را وارد کنید تا کد تأیید پیامک شود.',
+    forgotSendCode: 'ارسال کد تأیید',
+    forgotConfirmCode: 'تأیید کد',
+    forgotNewPassword: 'رمز عبور جدید',
+    forgotRepeatPassword: 'تکرار رمز عبور',
+    forgotSave: 'ذخیره رمز جدید',
+    forgotDone: 'رمز عبور با موفقیت تغییر کرد. اکنون می‌توانید وارد شوید.',
+    forgotBack: 'بازگشت به ورود',
+    forgotIncompletePhone: 'شماره موبایل معتبر وارد کنید.',
+    forgotIncompleteOtp: 'کد ۶ رقمی را کامل وارد کنید.',
+    forgotShortPassword: 'رمز عبور باید حداقل ۸ کاراکتر باشد.',
+    forgotMismatch: 'تکرار رمز با رمز جدید یکسان نیست.',
+    forgotSendFallback: 'خطا در ارسال کد تأیید.',
+    forgotVerifyFallback: 'کد وارد شده نادرست است.',
+    forgotSaveFallback: 'خطا در ذخیره رمز عبور.',
   },
   en: {
     tabLogin: 'Log in',
@@ -99,6 +138,23 @@ const STR: Record<StoredLocale, {
     otpConfirm: 'Verify & Submit Request',
     doneTitle: 'Your partnership request has been submitted.',
     agencyNote: "Agency accounts are activated after blujet reviews your license and documents, unlocking special B2B rates.",
+    forgotPassword: 'Forgot password?',
+    forgotTitle: 'Reset Agency Password',
+    forgotSub: 'Enter your agency phone number to receive a verification code by SMS.',
+    forgotSendCode: 'Send Verification Code',
+    forgotConfirmCode: 'Verify Code',
+    forgotNewPassword: 'New Password',
+    forgotRepeatPassword: 'Confirm Password',
+    forgotSave: 'Save New Password',
+    forgotDone: 'Password changed successfully. You can now log in.',
+    forgotBack: 'Back to login',
+    forgotIncompletePhone: 'Enter a valid mobile number.',
+    forgotIncompleteOtp: 'Enter the full 6-digit code.',
+    forgotShortPassword: 'Password must be at least 8 characters.',
+    forgotMismatch: 'Password confirmation does not match.',
+    forgotSendFallback: 'Error sending the verification code.',
+    forgotVerifyFallback: 'The code entered is incorrect.',
+    forgotSaveFallback: 'Error saving the new password.',
   },
   ar: {
     tabLogin: 'تسجيل الدخول',
@@ -127,11 +183,28 @@ const STR: Record<StoredLocale, {
     otpConfirm: 'تأكيد وإرسال الطلب',
     doneTitle: 'تم تقديم طلب الشراكة الخاص بك.',
     agencyNote: 'تُفعَّل حسابات الوكالات بعد مراجعة blujet لترخيصك ومستنداتك، لتحصل على أسعار B2B خاصة.',
+    forgotPassword: 'نسيت كلمة المرور؟',
+    forgotTitle: 'استعادة كلمة مرور الوكالة',
+    forgotSub: 'أدخل رقم هاتف الوكالة المسجّل ليصلك رمز التحقق عبر رسالة نصية.',
+    forgotSendCode: 'إرسال رمز التحقق',
+    forgotConfirmCode: 'تأكيد الرمز',
+    forgotNewPassword: 'كلمة مرور جديدة',
+    forgotRepeatPassword: 'تأكيد كلمة المرور',
+    forgotSave: 'حفظ كلمة المرور الجديدة',
+    forgotDone: 'تم تغيير كلمة المرور بنجاح. يمكنك تسجيل الدخول الآن.',
+    forgotBack: 'العودة إلى تسجيل الدخول',
+    forgotIncompletePhone: 'أدخل رقم جوال صالحًا.',
+    forgotIncompleteOtp: 'أدخل الرمز المكوّن من 6 أرقام كاملاً.',
+    forgotShortPassword: 'يجب أن تتكوّن كلمة المرور من 8 أحرف على الأقل.',
+    forgotMismatch: 'تكرار كلمة المرور غير مطابق.',
+    forgotSendFallback: 'خطأ في إرسال رمز التحقق.',
+    forgotVerifyFallback: 'الرمز المُدخل غير صحيح.',
+    forgotSaveFallback: 'خطأ في حفظ كلمة المرور الجديدة.',
   },
 };
 
 function AgencyLoginForm() {
-  const { agencyLogin } = useAuth();
+  const { agencyLogin, signOut } = useAuth();
   const { locale } = useLocale();
   const t = STR[locale];
   const navigate = useNavigate();
@@ -139,6 +212,7 @@ function AgencyLoginForm() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [forgotOpen, setForgotOpen] = useState(false);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -149,8 +223,8 @@ function AgencyLoginForm() {
     setError(null);
     setSubmitting(true);
     try {
-      await agencyLogin(phone.trim(), password);
-      navigate('/agency', { replace: true });
+      const loggedIn = await agencyLogin(phone.trim(), password);
+      navigate(loggedIn.mustChangePassword ? '/required-password-change' : '/agency', { replace: true });
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.loginFailedFallback);
     } finally {
@@ -159,48 +233,240 @@ function AgencyLoginForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
-      <div>
-        <label htmlFor="phone" className="mb-1.5 block text-[11.5px] text-muted">
-          {t.phoneLabel}
-        </label>
-        <input
-          id="phone"
-          className="ltr w-full rounded-lg border border-border bg-white px-3.5 py-2.5 text-sm text-ink outline-none focus:border-accent"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          autoComplete="tel"
-          placeholder={locale === 'fa' ? '۰۹xxxxxxxxx' : '09xxxxxxxxx'}
-        />
-      </div>
-      <div>
-        <label htmlFor="password" className="mb-1.5 block text-[11.5px] text-muted">
-          {t.passwordLabel}
-        </label>
-        <input
-          id="password"
-          type="password"
-          className="ltr w-full rounded-lg border border-border bg-white px-3.5 py-2.5 text-sm text-ink outline-none focus:border-accent"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          autoComplete="current-password"
-        />
-      </div>
+    <>
+      <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
+        <div>
+          <label htmlFor="phone" className="mb-1.5 block text-[11.5px] text-muted">
+            {t.phoneLabel}
+          </label>
+          <input
+            id="phone"
+            className="ltr w-full rounded-lg border border-border bg-white px-3.5 py-2.5 text-sm text-ink outline-none focus:border-accent"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            autoComplete="tel"
+            placeholder={locale === 'fa' ? '۰۹xxxxxxxxx' : '09xxxxxxxxx'}
+          />
+        </div>
+        <div>
+          <label htmlFor="password" className="mb-1.5 block text-[11.5px] text-muted">
+            {t.passwordLabel}
+          </label>
+          <input
+            id="password"
+            type="password"
+            className="ltr w-full rounded-lg border border-border bg-white px-3.5 py-2.5 text-sm text-ink outline-none focus:border-accent"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+          />
+        </div>
 
-      {error && (
-        <p role="alert" className="text-xs text-danger">
-          {error}
-        </p>
+        <button
+          type="button"
+          data-testid="agency-forgot-link"
+          onClick={() => setForgotOpen(true)}
+          className="self-start text-[11.5px] font-bold text-accent"
+        >
+          {t.forgotPassword}
+        </button>
+
+        {error && (
+          <p role="alert" className="text-xs text-danger">
+            {error}
+          </p>
+        )}
+
+        <button
+          type="submit"
+          disabled={submitting}
+          className="mt-2 rounded-lg bg-accent py-2.5 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-60"
+        >
+          {submitting ? t.loginChecking : t.loginSubmit}
+        </button>
+      </form>
+
+      {forgotOpen && (
+        <AgencyForgotPasswordModal
+          t={t}
+          locale={locale}
+          onClose={() => setForgotOpen(false)}
+          onSignedOut={() => void signOut()}
+        />
       )}
+    </>
+  );
+}
 
-      <button
-        type="submit"
-        disabled={submitting}
-        className="mt-2 rounded-lg bg-accent py-2.5 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-60"
+function AgencyForgotPasswordModal({
+  t,
+  locale,
+  onClose,
+  onSignedOut,
+}: {
+  t: (typeof STR)['fa'];
+  locale: StoredLocale;
+  onClose: () => void;
+  onSignedOut: () => void | Promise<void>;
+}) {
+  const [step, setStep] = useState<'phone' | 'otp' | 'password' | 'done'>('phone');
+  const [phone, setPhone] = useState('');
+  const [challengeId, setChallengeId] = useState('');
+  const [code, setCode] = useState('');
+  const [pass1, setPass1] = useState('');
+  const [pass2, setPass2] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function sendCode(e: FormEvent) {
+    e.preventDefault();
+    if (!/^09\d{9}$/.test(phone.trim())) {
+      setError(t.forgotIncompletePhone);
+      return;
+    }
+    setError(null);
+    setSubmitting(true);
+    try {
+      const { challengeId: id } = await requestAgencyPasswordReset(phone.trim());
+      setChallengeId(id);
+      setStep('otp');
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t.forgotSendFallback);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function verifyCode(e: FormEvent) {
+    e.preventDefault();
+    if (code.trim().length !== 6) {
+      setError(t.forgotIncompleteOtp);
+      return;
+    }
+    setError(null);
+    setSubmitting(true);
+    try {
+      await verifyAgencyPasswordReset(challengeId, code.trim());
+      setStep('password');
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t.forgotVerifyFallback);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function savePassword(e: FormEvent) {
+    e.preventDefault();
+    if (pass1.length < 8) {
+      setError(t.forgotShortPassword);
+      return;
+    }
+    if (pass1 !== pass2) {
+      setError(t.forgotMismatch);
+      return;
+    }
+    setError(null);
+    setSubmitting(true);
+    try {
+      await apiSetPassword(pass1);
+      await onSignedOut();
+      setStep('done');
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t.forgotSaveFallback);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div
+      data-testid="agency-forgot-modal"
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-[#0d2640]/55 p-5"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl"
       >
-        {submitting ? t.loginChecking : t.loginSubmit}
-      </button>
-    </form>
+        <h2 className="mb-1 text-sm font-black text-ink">{t.forgotTitle}</h2>
+        {step !== 'done' && (
+          <p className="mb-4 text-[11.5px] leading-6 text-muted">{t.forgotSub}</p>
+        )}
+
+        {step === 'phone' && (
+          <form onSubmit={(e) => void sendCode(e)} className="flex flex-col gap-3">
+            <input
+              data-testid="agency-forgot-phone"
+              dir="ltr"
+              className="w-full rounded-lg border border-border px-3.5 py-2.5 text-sm"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder={locale === 'fa' ? '۰۹xxxxxxxxx' : '09xxxxxxxxx'}
+            />
+            {error && <p role="alert" className="text-xs text-danger">{error}</p>}
+            <button type="submit" disabled={submitting} className="rounded-lg bg-accent py-2.5 text-sm font-bold text-white disabled:opacity-60">
+              {t.forgotSendCode}
+            </button>
+          </form>
+        )}
+
+        {step === 'otp' && (
+          <form onSubmit={(e) => void verifyCode(e)} className="flex flex-col gap-3">
+            <label className="text-[11.5px] text-muted">{t.otpLabel(phone)}</label>
+            <input
+              data-testid="agency-forgot-code"
+              dir="ltr"
+              inputMode="numeric"
+              maxLength={6}
+              className="font-num text-center text-lg tracking-[0.4em]"
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+            />
+            {error && <p role="alert" className="text-xs text-danger">{error}</p>}
+            <button type="submit" disabled={submitting} className="rounded-lg bg-accent py-2.5 text-sm font-bold text-white disabled:opacity-60">
+              {t.forgotConfirmCode}
+            </button>
+          </form>
+        )}
+
+        {step === 'password' && (
+          <form onSubmit={(e) => void savePassword(e)} className="flex flex-col gap-3">
+            <input
+              data-testid="agency-forgot-pass1"
+              type="password"
+              dir="ltr"
+              placeholder={t.forgotNewPassword}
+              className="w-full rounded-lg border border-border px-3.5 py-2.5 text-sm"
+              value={pass1}
+              onChange={(e) => setPass1(e.target.value)}
+            />
+            <input
+              data-testid="agency-forgot-pass2"
+              type="password"
+              dir="ltr"
+              placeholder={t.forgotRepeatPassword}
+              className="w-full rounded-lg border border-border px-3.5 py-2.5 text-sm"
+              value={pass2}
+              onChange={(e) => setPass2(e.target.value)}
+            />
+            {error && <p role="alert" className="text-xs text-danger">{error}</p>}
+            <button type="submit" disabled={submitting} className="rounded-lg bg-accent py-2.5 text-sm font-bold text-white disabled:opacity-60">
+              {t.forgotSave}
+            </button>
+          </form>
+        )}
+
+        {step === 'done' && (
+          <p data-testid="agency-forgot-done" className="text-[12.5px] leading-loose text-muted">
+            {t.forgotDone}
+          </p>
+        )}
+
+        <button type="button" onClick={onClose} className="mt-4 w-full text-xs font-bold text-muted">
+          {t.forgotBack}
+        </button>
+      </div>
+    </div>
   );
 }
 

@@ -14,16 +14,18 @@ export interface AgencyListRow {
   city: string;
   tier: AgencyTier;
   isActive: boolean;
-  limitIrr: number;
-  usedIrr: number;
-  remainingIrr: number;
+  // Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON
+  // on the backend — a JS number can't safely hold IRR amounts above 2^53).
+  limitIrr: string;
+  usedIrr: string;
+  remainingIrr: string;
   pendingInvoiceCount: number;
 }
 
 export interface AgencyListKpis {
   activeCount: number;
-  totalCreditGrantedIrr: number;
-  totalUsedIrr: number;
+  totalCreditGrantedIrr: string;
+  totalUsedIrr: string;
   pendingSettlementCount: number;
 }
 
@@ -46,9 +48,9 @@ export interface AgencyAuditRow {
 }
 
 export interface AgencyCredit {
-  limitIrr: number;
-  usedIrr: number;
-  remainingIrr: number;
+  limitIrr: string;
+  usedIrr: string;
+  remainingIrr: string;
 }
 
 export interface AgencyDetail {
@@ -66,9 +68,39 @@ export interface AgencyDetail {
   suspendReason: string | null;
   joinedAt: string;
   credit: AgencyCredit;
-  stats: { totalSalesIrr: number; ticketsIssued: number; passengers: number };
+  stats: { totalSalesIrr: string; ticketsIssued: number; passengers: number };
   activityScore?: AgencyActivityScore;
   recentActivity: AgencyAuditRow[];
+  commercialExtras?: AgencyCommercialExtras;
+}
+
+export interface AgencyFlightSoldRow {
+  routeFa: string;
+  flightNo: string;
+  departAt: string;
+  seatCount: number;
+  salesIrr: number;
+}
+
+export interface AgencyPurchasedService {
+  name: string;
+  purchasedAt: string;
+  expiresAt: string | null;
+  statusLabel: string;
+  status: 'ACTIVE' | 'EXPIRED';
+}
+
+export interface AgencyCommercialExtras {
+  flightsSold: AgencyFlightSoldRow[];
+  purchasedServices: AgencyPurchasedService[];
+  financeSummary: { paidTotalIrr: number; unpaidTotalIrr: number };
+  transactions: {
+    id: string;
+    titleFa: string;
+    occurredAt: string;
+    signedAmountIrr: number;
+    ref: string | null;
+  }[];
 }
 
 export interface AgencyMembershipRequest {
@@ -107,7 +139,7 @@ export interface AgencyInvoice {
   issuedById: string;
   issuedAt: string;
   dueAt: string;
-  amountIrr: number;
+  amountIrr: string;
   status: AgencyInvoiceStatus;
   paidAt: string | null;
 }

@@ -16,6 +16,10 @@ export default function AgencyProtectedRoute() {
     return <Navigate to="/agency/login" replace />;
   }
 
+  if (user?.mustChangePassword) {
+    return <Navigate to="/required-password-change" replace />;
+  }
+
   // Agency Portal is AGENCY-only — a staff session belongs in /panel, not here.
   if (user?.role !== 'AGENCY') {
     return <Navigate to="/panel" replace />;

@@ -5,10 +5,11 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 import { randomUUID } from 'node:crypto';
 import { validateEnv } from './config/env.validation';
-import { TypeORMModule } from './typeorm/typeorm.module';
+import { DatabaseModule } from './database/database.module';
 import { RedisModule } from './redis/redis.module';
 import { HealthModule } from './health/health.module';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
+import { CommonModule } from './common/common.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { PanelsModule } from './modules/panels/panels.module';
 import { ReportingModule } from './modules/reporting/reporting.module';
@@ -40,6 +41,10 @@ import { FlightStatusModule } from './modules/flight-status/flight-status.module
 import { FlightopsModule } from './modules/flightops/flightops.module';
 import { SurveyModule } from './modules/survey/survey.module';
 import { CareersModule } from './modules/careers/careers.module';
+import { BlogModule } from './modules/blog/blog.module';
+import { SiteContentModule } from './modules/site-content/site-content.module';
+import { CustomerReferralsModule } from './modules/customer-referrals/customer-referrals.module';
+import { WebservicePricingModule } from './modules/webservice-pricing/webservice-pricing.module';
 
 @Module({
   imports: [
@@ -75,7 +80,8 @@ import { CareersModule } from './modules/careers/careers.module';
     ThrottlerModule.forRoot({
       throttlers: [{ ttl: 60_000, limit: 600 }],
     }),
-    TypeORMModule,
+    CommonModule,
+    DatabaseModule,
     RedisModule,
     HealthModule,
     AuthModule,
@@ -102,6 +108,7 @@ import { CareersModule } from './modules/careers/careers.module';
     BookingEngineModule,
     ReconciliationModule,
     ProfileModule,
+    CustomerReferralsModule,
     ManageBookingModule,
     ContactModule,
     SupportTicketsModule,
@@ -109,6 +116,9 @@ import { CareersModule } from './modules/careers/careers.module';
     FlightopsModule,
     SurveyModule,
     CareersModule,
+    BlogModule,
+    SiteContentModule,
+    WebservicePricingModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
