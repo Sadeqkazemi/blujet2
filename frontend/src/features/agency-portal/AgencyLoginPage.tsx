@@ -1,5 +1,5 @@
-import { useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRef, useState, type CSSProperties, type FormEvent } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { ApiRequestError } from '../../api/envelope';
 import { requestAgencySignupOtp, submitAgencyRequest } from '../../api/agencies';
@@ -8,67 +8,83 @@ import {
   setPassword as apiSetPassword,
   verifyAgencyPasswordReset,
 } from '../../api/auth';
-import { AgencyLoginLayout } from './AgencyLoginLayout';
+import { AgencyLoginLayout, AGENCY_LOGIN_GOLD, AGENCY_LOGIN_NAVY } from './AgencyLoginLayout';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
+import { faDigits } from '../../lib/fa-format';
 
-// ورود آژانس همکار — no design-mock counterpart exists for this login/
-// signup screen at all (per the ⚑ product decision in docs/API.md's
-// Agency Portal section: the design never specified a login mechanism for
-// AGENCY accounts), so every string below is hand-translated rather than
-// pulled from design-reference-v2/پنل آژانس.dc.html's own isEN/isAR
-// ternaries (those only cover the post-login dashboard content). A few
-// concepts that DO overlap with the customer signup form (license number,
-// manager name, terms checkbox) reuse the exact wording already
-// established in CustomerLoginPage.tsx's agency-signup tab for consistency.
+const GOLD = AGENCY_LOGIN_GOLD;
+const NAVY = AGENCY_LOGIN_NAVY;
+const OTP_LEN = 6;
 
-const STR: Record<StoredLocale, {
-  tabLogin: string;
-  tabSignup: string;
-  phoneLabel: string;
-  passwordLabel: string;
-  loginRequiredError: string;
-  loginFailedFallback: string;
-  loginChecking: string;
-  loginSubmit: string;
-  agencyNameLabel: string;
-  agencyNamePlaceholder: string;
-  licenseLabel: string;
-  managerLabel: string;
-  managerPlaceholder: string;
-  phoneMobileLabel: string;
-  termsCheckbox: string;
-  signupIncompleteError: string;
-  signupSendCodeFallback: string;
-  signupSending: string;
-  signupSubmit: string;
-  otpLabel: (phone: string) => string;
-  otpIncompleteError: string;
-  otpSubmitFallback: string;
-  otpSubmitting: string;
-  otpConfirm: string;
-  doneTitle: string;
-  agencyNote: string;
-  forgotPassword: string;
-  forgotTitle: string;
-  forgotSub: string;
-  forgotSendCode: string;
-  forgotConfirmCode: string;
-  forgotNewPassword: string;
-  forgotRepeatPassword: string;
-  forgotSave: string;
-  forgotDone: string;
-  forgotBack: string;
-  forgotIncompletePhone: string;
-  forgotIncompleteOtp: string;
-  forgotShortPassword: string;
-  forgotMismatch: string;
-  forgotSendFallback: string;
-  forgotVerifyFallback: string;
-  forgotSaveFallback: string;
-}> = {
+const STR: Record<
+  StoredLocale,
+  {
+    tabLogin: string;
+    tabSignup: string;
+    titleLogin: string;
+    titleSignup: string;
+    titleOtp: string;
+    subtitleLogin: string;
+    subtitleSignup: string;
+    phoneLabel: string;
+    passwordLabel: string;
+    loginRequiredError: string;
+    loginFailedFallback: string;
+    loginChecking: string;
+    loginSubmit: string;
+    agencyNameLabel: string;
+    agencyNamePlaceholder: string;
+    licenseLabel: string;
+    managerLabel: string;
+    managerPlaceholder: string;
+    phoneMobileLabel: string;
+    phoneHintEmpty: string;
+    phoneHintOk: string;
+    phoneHintBad: string;
+    termsLinkLabel: string;
+    termsSuffix: string;
+    signupIncompleteError: string;
+    signupSendCodeFallback: string;
+    signupSending: string;
+    signupSubmit: string;
+    otpLabel: (phone: string) => string;
+    otpIncompleteError: string;
+    otpSubmitFallback: string;
+    otpSubmitting: string;
+    otpConfirm: string;
+    editPhone: string;
+    resend: string;
+    doneTitle: string;
+    agencyNote: string;
+    secureNote: string;
+    personalLoginLink: string;
+    forgotPassword: string;
+    forgotTitle: string;
+    forgotSub: string;
+    forgotSendCode: string;
+    forgotConfirmCode: string;
+    forgotNewPassword: string;
+    forgotRepeatPassword: string;
+    forgotSave: string;
+    forgotDone: string;
+    forgotBack: string;
+    forgotIncompletePhone: string;
+    forgotIncompleteOtp: string;
+    forgotShortPassword: string;
+    forgotMismatch: string;
+    forgotSendFallback: string;
+    forgotVerifyFallback: string;
+    forgotSaveFallback: string;
+  }
+> = {
   fa: {
     tabLogin: 'ورود',
-    tabSignup: 'ثبت‌نام',
+    tabSignup: 'ثبت‌نام آژانس',
+    titleLogin: 'ورود آژانس همکار',
+    titleSignup: 'ثبت‌نام آژانس',
+    titleOtp: 'کد تأیید را وارد کن',
+    subtitleLogin: 'با شماره موبایل ثبت‌شده‌ی آژانس وارد پنل B2B شوید.',
+    subtitleSignup: 'اطلاعات آژانس را وارد کنید تا درخواست همکاری با blujet ثبت شود.',
     phoneLabel: 'شماره تماس آژانس',
     passwordLabel: 'رمز عبور',
     loginRequiredError: 'شماره تماس و رمز عبور را وارد کنید.',
@@ -80,8 +96,12 @@ const STR: Record<StoredLocale, {
     licenseLabel: 'شماره مجوز بند ب',
     managerLabel: 'نام مدیر آژانس',
     managerPlaceholder: 'نام مسئول',
-    phoneMobileLabel: 'شماره موبایل',
-    termsCheckbox: 'قوانین و مقررات و حریم خصوصی blujet را می‌پذیرم.',
+    phoneMobileLabel: 'شماره موبایل آژانس',
+    phoneHintEmpty: 'مثال: ۰۹۱۲۳۴۵۶۷۸۹',
+    phoneHintOk: '✓ شماره معتبر است',
+    phoneHintBad: 'شماره باید با ۰۹ شروع شود و ۱۱ رقم باشد',
+    termsLinkLabel: 'قوانین و مقررات',
+    termsSuffix: 'و ضوابط همکاری B2B blujet را می‌پذیرم.',
     signupIncompleteError: 'همهٔ فیلدها را کامل و شرایط را تأیید کنید.',
     signupSendCodeFallback: 'خطا در ارسال کد تأیید.',
     signupSending: 'در حال ارسال…',
@@ -91,8 +111,13 @@ const STR: Record<StoredLocale, {
     otpSubmitFallback: 'خطا در ثبت درخواست.',
     otpSubmitting: 'در حال ثبت…',
     otpConfirm: 'تأیید و ثبت درخواست',
+    editPhone: '✎ ویرایش شماره',
+    resend: 'ارسال مجدد کد',
     doneTitle: 'درخواست همکاری شما ثبت شد.',
-    agencyNote: 'حساب آژانس پس از تأیید مدارک و مجوز فعالیت توسط کارشناسان blujet فعال می‌شود و به پنل B2B با نرخ‌های ویژه دسترسی خواهید داشت.',
+    agencyNote:
+      'حساب آژانس پس از تأیید مدارک و مجوز فعالیت توسط کارشناسان blujet فعال می‌شود و به نرخ‌های ویژه B2B و کمیسیون دسترسی خواهید داشت.',
+    secureNote: 'ورود امن با کد یک‌بارمصرف',
+    personalLoginLink: 'ورود کاربر عادی ←',
     forgotPassword: 'فراموشی رمز عبور؟',
     forgotTitle: 'بازیابی رمز عبور آژانس',
     forgotSub: 'شماره تماس ثبت‌شدهٔ آژانس را وارد کنید تا کد تأیید پیامک شود.',
@@ -113,31 +138,45 @@ const STR: Record<StoredLocale, {
   },
   en: {
     tabLogin: 'Log in',
-    tabSignup: 'Sign up',
+    tabSignup: 'Register agency',
+    titleLogin: 'Agency partner log in',
+    titleSignup: 'Register your agency',
+    titleOtp: 'Enter verification code',
+    subtitleLogin: 'Log in with your registered agency mobile number to access the B2B panel.',
+    subtitleSignup: 'Enter your agency details to request a B2B partnership with blujet.',
     phoneLabel: 'Agency Phone Number',
     passwordLabel: 'Password',
     loginRequiredError: 'Enter your phone number and password.',
     loginFailedFallback: 'Login failed. Please try again.',
     loginChecking: 'Checking…',
     loginSubmit: 'Log In to Agency Panel',
-    agencyNameLabel: 'Agency Name',
-    agencyNamePlaceholder: 'Company/agency name',
-    licenseLabel: 'License Number (Category B)',
-    managerLabel: 'Agency Manager Name',
+    agencyNameLabel: 'Agency name',
+    agencyNamePlaceholder: 'Company / agency name',
+    licenseLabel: 'License number',
+    managerLabel: 'Manager name',
     managerPlaceholder: "Manager's name",
-    phoneMobileLabel: 'Mobile Number',
-    termsCheckbox: "I accept blujet's Terms & Conditions and Privacy Policy.",
+    phoneMobileLabel: 'Agency mobile number',
+    phoneHintEmpty: 'e.g. 09123456789',
+    phoneHintOk: '✓ Looks good',
+    phoneHintBad: 'Number must start with 09 and be 11 digits',
+    termsLinkLabel: 'Terms & Conditions',
+    termsSuffix: ' and B2B Partnership Policy of blujet.',
     signupIncompleteError: 'Complete all fields and accept the terms.',
     signupSendCodeFallback: 'Error sending the verification code.',
     signupSending: 'Sending…',
-    signupSubmit: 'Submit Request & Get Code',
+    signupSubmit: 'Submit request & get code',
     otpLabel: (phone) => `6-digit verification code (sent by SMS to ${phone})`,
     otpIncompleteError: 'Enter the full 6-digit code.',
     otpSubmitFallback: 'Error submitting the request.',
     otpSubmitting: 'Submitting…',
-    otpConfirm: 'Verify & Submit Request',
+    otpConfirm: 'Confirm & submit request',
+    editPhone: '✎ Edit number',
+    resend: 'Resend code',
     doneTitle: 'Your partnership request has been submitted.',
-    agencyNote: "Agency accounts are activated after blujet reviews your license and documents, unlocking special B2B rates.",
+    agencyNote:
+      'Agency accounts are activated after blujet reviews your license and documents, unlocking special B2B fares and commission rates.',
+    secureNote: 'Secure OTP sign-in',
+    personalLoginLink: 'Personal account login →',
     forgotPassword: 'Forgot password?',
     forgotTitle: 'Reset Agency Password',
     forgotSub: 'Enter your agency phone number to receive a verification code by SMS.',
@@ -158,7 +197,12 @@ const STR: Record<StoredLocale, {
   },
   ar: {
     tabLogin: 'تسجيل الدخول',
-    tabSignup: 'إنشاء حساب',
+    tabSignup: 'تسجيل الوكالة',
+    titleLogin: 'تسجيل دخول الوكالة الشريكة',
+    titleSignup: 'تسجيل وكالتك',
+    titleOtp: 'أدخل رمز التحقق',
+    subtitleLogin: 'سجّل الدخول برقم هاتف الوكالة المسجّل للوصول إلى لوحة B2B.',
+    subtitleSignup: 'أدخل بيانات الوكالة لتقديم طلب الشراكة مع blujet.',
     phoneLabel: 'رقم هاتف الوكالة',
     passwordLabel: 'كلمة المرور',
     loginRequiredError: 'أدخل رقم الهاتف وكلمة المرور.',
@@ -166,23 +210,32 @@ const STR: Record<StoredLocale, {
     loginChecking: 'جارٍ التحقق…',
     loginSubmit: 'تسجيل الدخول إلى لوحة الوكالة',
     agencyNameLabel: 'اسم الوكالة',
-    agencyNamePlaceholder: 'اسم الشركة/الوكالة',
-    licenseLabel: 'رقم الترخيص (الفئة ب)',
-    managerLabel: 'اسم مدير الوكالة',
+    agencyNamePlaceholder: 'اسم الشركة / الوكالة',
+    licenseLabel: 'رقم الترخيص',
+    managerLabel: 'اسم المدير',
     managerPlaceholder: 'اسم المدير',
-    phoneMobileLabel: 'رقم الجوال',
-    termsCheckbox: 'أوافق على الشروط والأحكام وسياسة الخصوصية الخاصة بـ blujet.',
+    phoneMobileLabel: 'رقم جوال الوكالة',
+    phoneHintEmpty: 'مثال: 09123456789',
+    phoneHintOk: '✓ الرقم صحيح',
+    phoneHintBad: 'يجب أن يبدأ الرقم بـ 09 ويتكون من 11 رقمًا',
+    termsLinkLabel: 'الشروط والأحكام',
+    termsSuffix: ' وسياسة شراكة B2B لـ blujet.',
     signupIncompleteError: 'أكمل جميع الحقول ووافق على الشروط.',
     signupSendCodeFallback: 'خطأ في إرسال رمز التحقق.',
     signupSending: 'جارٍ الإرسال…',
-    signupSubmit: 'إرسال الطلب والحصول على الرمز',
+    signupSubmit: 'إرسال الطلب واستلام الرمز',
     otpLabel: (phone) => `رمز التحقق المكوّن من 6 أرقام (أُرسل عبر الرسائل القصيرة إلى ${phone})`,
     otpIncompleteError: 'أدخل الرمز المكوّن من 6 أرقام كاملاً.',
     otpSubmitFallback: 'خطأ في إرسال الطلب.',
     otpSubmitting: 'جارٍ الإرسال…',
     otpConfirm: 'تأكيد وإرسال الطلب',
+    editPhone: '✎ تعديل الرقم',
+    resend: 'إعادة إرسال الرمز',
     doneTitle: 'تم تقديم طلب الشراكة الخاص بك.',
-    agencyNote: 'تُفعَّل حسابات الوكالات بعد مراجعة blujet لترخيصك ومستنداتك، لتحصل على أسعار B2B خاصة.',
+    agencyNote:
+      'تُفعَّل حسابات الوكالات بعد مراجعة blujet لترخيصك ومستنداتك، لتحصل على أسعار B2B ونسب عمولة خاصة.',
+    secureNote: 'تسجيل دخول آمن برمز لمرة واحدة',
+    personalLoginLink: 'تسجيل دخول شخصي ←',
     forgotPassword: 'نسيت كلمة المرور؟',
     forgotTitle: 'استعادة كلمة مرور الوكالة',
     forgotSub: 'أدخل رقم هاتف الوكالة المسجّل ليصلك رمز التحقق عبر رسالة نصية.',
@@ -203,6 +256,46 @@ const STR: Record<StoredLocale, {
   },
 };
 
+function sanitizeMobileInput(raw: string): string {
+  return raw
+    .replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
+    .replace(/\D/g, '')
+    .slice(0, 11);
+}
+
+function primaryButtonStyle(enabled: boolean): CSSProperties {
+  return {
+    height: 56,
+    borderRadius: 13,
+    background: enabled ? NAVY : '#c3cedd',
+    color: '#fff',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: 15,
+    fontWeight: 800,
+    cursor: enabled ? 'pointer' : 'not-allowed',
+    boxShadow: enabled ? '0 14px 30px -12px rgba(13,38,64,.55)' : 'none',
+    border: 'none',
+    fontFamily: 'inherit',
+    width: '100%',
+    transition: 'background .2s',
+  };
+}
+
+const inputStyle: CSSProperties = {
+  width: '100%',
+  height: 52,
+  border: '1.5px solid #dfe6ef',
+  borderRadius: 13,
+  background: '#fafbfd',
+  padding: '0 14px',
+  fontSize: 13.5,
+  color: '#16202e',
+  boxSizing: 'border-box',
+  fontFamily: 'inherit',
+};
+
 function AgencyLoginForm() {
   const { agencyLogin, signOut } = useAuth();
   const { locale } = useLocale();
@@ -213,6 +306,11 @@ function AgencyLoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [forgotOpen, setForgotOpen] = useState(false);
+
+  const phoneValid = /^09\d{9}$/.test(phone.trim()) || /^\+989\d{9}$/.test(phone.trim());
+  const phoneHint = phone === '' ? t.phoneHintEmpty : phoneValid ? t.phoneHintOk : t.phoneHintBad;
+  const phoneHintColor = phone === '' ? '#9aa7b8' : phoneValid ? '#1f8a5b' : '#d64545';
+  const formLooksReady = phone.trim().length > 0 && password.trim().length > 0;
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -234,31 +332,60 @@ function AgencyLoginForm() {
 
   return (
     <>
-      <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
+      <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }} noValidate>
         <div>
-          <label htmlFor="phone" className="mb-1.5 block text-[11.5px] text-muted">
+          <label htmlFor="phone" style={{ display: 'block', fontSize: 12, color: '#42506a', fontWeight: 700, marginBottom: 8 }}>
             {t.phoneLabel}
           </label>
-          <input
-            id="phone"
-            className="ltr w-full rounded-lg border border-border bg-white px-3.5 py-2.5 text-sm text-ink outline-none focus:border-accent"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            autoComplete="tel"
-            placeholder={locale === 'fa' ? '۰۹xxxxxxxxx' : '09xxxxxxxxx'}
-          />
+          <div style={{ position: 'relative' }}>
+            <input
+              id="phone"
+              className="agency-signin-input"
+              type="tel"
+              dir="ltr"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              autoComplete="tel"
+              placeholder="0912 345 6789"
+              style={{
+                ...inputStyle,
+                height: 54,
+                padding: '0 16px 0 52px',
+                fontSize: 16,
+                fontWeight: 700,
+                letterSpacing: 1,
+              }}
+            />
+            <span
+              style={{
+                position: 'absolute',
+                left: 14,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                fontSize: 12,
+                color: '#9aa7b8',
+                fontWeight: 700,
+              }}
+            >
+              +98
+            </span>
+          </div>
+          <div style={{ fontSize: 11, color: phoneHintColor, marginTop: 7, fontWeight: 600 }}>{phoneHint}</div>
         </div>
+
         <div>
-          <label htmlFor="password" className="mb-1.5 block text-[11.5px] text-muted">
+          <label htmlFor="password" style={{ display: 'block', fontSize: 12, color: '#42506a', fontWeight: 700, marginBottom: 8 }}>
             {t.passwordLabel}
           </label>
           <input
             id="password"
+            className="agency-signin-input"
             type="password"
-            className="ltr w-full rounded-lg border border-border bg-white px-3.5 py-2.5 text-sm text-ink outline-none focus:border-accent"
+            dir="ltr"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
+            style={inputStyle}
           />
         </div>
 
@@ -266,22 +393,28 @@ function AgencyLoginForm() {
           type="button"
           data-testid="agency-forgot-link"
           onClick={() => setForgotOpen(true)}
-          className="self-start text-[11.5px] font-bold text-accent"
+          style={{
+            alignSelf: 'flex-start',
+            fontSize: 11.5,
+            fontWeight: 700,
+            color: NAVY,
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            padding: 0,
+          }}
         >
           {t.forgotPassword}
         </button>
 
         {error && (
-          <p role="alert" className="text-xs text-danger">
+          <p role="alert" style={{ margin: 0, fontSize: 12, color: '#e5484d' }}>
             {error}
           </p>
         )}
 
-        <button
-          type="submit"
-          disabled={submitting}
-          className="mt-2 rounded-lg bg-accent py-2.5 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-60"
-        >
+        <button type="submit" disabled={submitting} style={primaryButtonStyle(formLooksReady && !submitting)}>
           {submitting ? t.loginChecking : t.loginSubmit}
         </button>
       </form>
@@ -381,62 +514,94 @@ function AgencyForgotPasswordModal({
   return (
     <div
       data-testid="agency-forgot-modal"
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-[#0d2640]/55 p-5"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 200,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'rgba(13,38,64,.55)',
+        padding: 20,
+      }}
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl"
+        style={{
+          width: '100%',
+          maxWidth: 380,
+          borderRadius: 18,
+          background: '#fff',
+          padding: 24,
+          boxShadow: '0 40px 100px -30px rgba(4,16,34,.6)',
+        }}
       >
-        <h2 className="mb-1 text-sm font-black text-ink">{t.forgotTitle}</h2>
+        <h2 style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 900, color: '#16202e' }}>{t.forgotTitle}</h2>
         {step !== 'done' && (
-          <p className="mb-4 text-[11.5px] leading-6 text-muted">{t.forgotSub}</p>
+          <p style={{ margin: '0 0 16px', fontSize: 11.5, lineHeight: 1.8, color: '#7d8ba0' }}>{t.forgotSub}</p>
         )}
 
         {step === 'phone' && (
-          <form onSubmit={(e) => void sendCode(e)} className="flex flex-col gap-3">
+          <form onSubmit={(e) => void sendCode(e)} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <input
               data-testid="agency-forgot-phone"
               dir="ltr"
-              className="w-full rounded-lg border border-border px-3.5 py-2.5 text-sm"
+              className="agency-signin-input"
+              style={inputStyle}
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e) => setPhone(sanitizeMobileInput(e.target.value))}
               placeholder={locale === 'fa' ? '۰۹xxxxxxxxx' : '09xxxxxxxxx'}
             />
-            {error && <p role="alert" className="text-xs text-danger">{error}</p>}
-            <button type="submit" disabled={submitting} className="rounded-lg bg-accent py-2.5 text-sm font-bold text-white disabled:opacity-60">
+            {error && (
+              <p role="alert" style={{ margin: 0, fontSize: 12, color: '#e5484d' }}>
+                {error}
+              </p>
+            )}
+            <button type="submit" disabled={submitting} style={primaryButtonStyle(!submitting)}>
               {t.forgotSendCode}
             </button>
           </form>
         )}
 
         {step === 'otp' && (
-          <form onSubmit={(e) => void verifyCode(e)} className="flex flex-col gap-3">
-            <label className="text-[11.5px] text-muted">{t.otpLabel(phone)}</label>
+          <form onSubmit={(e) => void verifyCode(e)} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <label style={{ fontSize: 11.5, color: '#7d8ba0' }}>{t.otpLabel(phone)}</label>
             <input
               data-testid="agency-forgot-code"
               dir="ltr"
               inputMode="numeric"
               maxLength={6}
-              className="font-num text-center text-lg tracking-[0.4em]"
+              style={{
+                ...inputStyle,
+                textAlign: 'center',
+                fontSize: 18,
+                letterSpacing: '0.4em',
+                fontFamily: "'Roboto Mono', monospace",
+              }}
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
             />
-            {error && <p role="alert" className="text-xs text-danger">{error}</p>}
-            <button type="submit" disabled={submitting} className="rounded-lg bg-accent py-2.5 text-sm font-bold text-white disabled:opacity-60">
+            {error && (
+              <p role="alert" style={{ margin: 0, fontSize: 12, color: '#e5484d' }}>
+                {error}
+              </p>
+            )}
+            <button type="submit" disabled={submitting} style={primaryButtonStyle(!submitting)}>
               {t.forgotConfirmCode}
             </button>
           </form>
         )}
 
         {step === 'password' && (
-          <form onSubmit={(e) => void savePassword(e)} className="flex flex-col gap-3">
+          <form onSubmit={(e) => void savePassword(e)} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <input
               data-testid="agency-forgot-pass1"
               type="password"
               dir="ltr"
               placeholder={t.forgotNewPassword}
-              className="w-full rounded-lg border border-border px-3.5 py-2.5 text-sm"
+              className="agency-signin-input"
+              style={inputStyle}
               value={pass1}
               onChange={(e) => setPass1(e.target.value)}
             />
@@ -445,24 +610,43 @@ function AgencyForgotPasswordModal({
               type="password"
               dir="ltr"
               placeholder={t.forgotRepeatPassword}
-              className="w-full rounded-lg border border-border px-3.5 py-2.5 text-sm"
+              className="agency-signin-input"
+              style={inputStyle}
               value={pass2}
               onChange={(e) => setPass2(e.target.value)}
             />
-            {error && <p role="alert" className="text-xs text-danger">{error}</p>}
-            <button type="submit" disabled={submitting} className="rounded-lg bg-accent py-2.5 text-sm font-bold text-white disabled:opacity-60">
+            {error && (
+              <p role="alert" style={{ margin: 0, fontSize: 12, color: '#e5484d' }}>
+                {error}
+              </p>
+            )}
+            <button type="submit" disabled={submitting} style={primaryButtonStyle(!submitting)}>
               {t.forgotSave}
             </button>
           </form>
         )}
 
         {step === 'done' && (
-          <p data-testid="agency-forgot-done" className="text-[12.5px] leading-loose text-muted">
+          <p data-testid="agency-forgot-done" style={{ margin: 0, fontSize: 12.5, lineHeight: 1.9, color: '#5a6678' }}>
             {t.forgotDone}
           </p>
         )}
 
-        <button type="button" onClick={onClose} className="mt-4 w-full text-xs font-bold text-muted">
+        <button
+          type="button"
+          onClick={onClose}
+          style={{
+            marginTop: 16,
+            width: '100%',
+            fontSize: 12,
+            fontWeight: 700,
+            color: '#8a96a6',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+          }}
+        >
           {t.forgotBack}
         </button>
       </div>
@@ -470,7 +654,7 @@ function AgencyForgotPasswordModal({
   );
 }
 
-function AgencySignupForm() {
+function AgencySignupForm({ onDoneNote }: { onDoneNote?: boolean }) {
   const { locale } = useLocale();
   const t = STR[locale];
   const [step, setStep] = useState<'form' | 'otp' | 'done'>('form');
@@ -480,16 +664,39 @@ function AgencySignupForm() {
   const [phone, setPhone] = useState('');
   const [accepted, setAccepted] = useState(false);
   const [challengeId, setChallengeId] = useState<string | null>(null);
-  const [code, setCode] = useState('');
+  const [otp, setOtp] = useState<string[]>(Array(OTP_LEN).fill(''));
+  const otpRefs = useRef<Array<HTMLInputElement | null>>([]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const phoneValid = /^09\d{9}$/.test(phone.trim());
+  const nameMin = locale === 'en' ? 2 : 3;
   const formValid =
     applicantName.trim().length >= 2 &&
-    managerName.trim().length >= 2 &&
+    managerName.trim().length >= nameMin &&
     licenseNo.trim().length >= 2 &&
-    /^09\d{9}$/.test(phone.trim()) &&
+    phoneValid &&
     accepted;
+  const code = otp.join('');
+  const otpOk = otp.every((v) => v !== '');
+  const phoneHint = phone === '' ? t.phoneHintEmpty : phoneValid ? t.phoneHintOk : t.phoneHintBad;
+  const phoneHintColor = phone === '' ? '#9aa7b8' : phoneValid ? '#1f8a5b' : '#d64545';
+  const displayPhone = locale === 'en' ? phone : faDigits(phone);
+
+  function onOtpChange(index: number, raw: string) {
+    const digit = raw
+      .replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
+      .replace(/\D/g, '')
+      .slice(-1);
+    const next = otp.slice();
+    next[index] = digit;
+    setOtp(next);
+    if (digit && index < OTP_LEN - 1) otpRefs.current[index + 1]?.focus();
+  }
+
+  function onOtpKeyDown(index: number, key: string) {
+    if (key === 'Backspace' && !otp[index] && index > 0) otpRefs.current[index - 1]?.focus();
+  }
 
   async function onSubmitForm(e: FormEvent) {
     e.preventDefault();
@@ -502,7 +709,22 @@ function AgencySignupForm() {
     try {
       const { challengeId: id } = await requestAgencySignupOtp(phone.trim());
       setChallengeId(id);
+      setOtp(Array(OTP_LEN).fill(''));
       setStep('otp');
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t.signupSendCodeFallback);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function onResend() {
+    setError(null);
+    setSubmitting(true);
+    try {
+      const { challengeId: id } = await requestAgencySignupOtp(phone.trim());
+      setChallengeId(id);
+      setOtp(Array(OTP_LEN).fill(''));
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.signupSendCodeFallback);
     } finally {
@@ -512,7 +734,7 @@ function AgencySignupForm() {
 
   async function onSubmitOtp(e: FormEvent) {
     e.preventDefault();
-    if (!challengeId || code.trim().length !== 6) {
+    if (!challengeId || code.length !== OTP_LEN) {
       setError(t.otpIncompleteError);
       return;
     }
@@ -525,7 +747,7 @@ function AgencySignupForm() {
         licenseNo: licenseNo.trim(),
         phone: phone.trim(),
         challengeId,
-        code: code.trim(),
+        code,
       });
       setStep('done');
     } catch (err) {
@@ -537,40 +759,85 @@ function AgencySignupForm() {
 
   if (step === 'done') {
     return (
-      <div className="rounded-xl border border-border bg-[#eef4fb] p-5 text-center text-[12.5px] leading-loose text-[#3b556f]">
-        {t.doneTitle} {t.agencyNote}
+      <div
+        style={{
+          borderRadius: 14,
+          border: '1px solid #f0e3bf',
+          background: '#fbf7ec',
+          padding: 18,
+          textAlign: 'center',
+          fontSize: 12.5,
+          lineHeight: 1.9,
+          color: '#6b5620',
+        }}
+      >
+        {t.doneTitle} {onDoneNote !== false ? t.agencyNote : null}
       </div>
     );
   }
 
   if (step === 'otp') {
     return (
-      <form onSubmit={onSubmitOtp} className="flex flex-col gap-4" noValidate>
+      <form onSubmit={(e) => void onSubmitOtp(e)} style={{ display: 'flex', flexDirection: 'column', gap: 16 }} noValidate>
         <div>
-          <label htmlFor="signup-code" className="mb-1.5 block text-[11.5px] text-muted">
-            {t.otpLabel(phone)}
-          </label>
-          <input
-            id="signup-code"
-            dir="ltr"
-            inputMode="numeric"
-            maxLength={6}
-            className="font-num h-[46px] w-full rounded-xl border border-border bg-[#f8fafc] px-3.5 text-center text-lg tracking-[0.4em] text-ink outline-none focus:border-accent"
-            value={code}
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-            autoComplete="one-time-code"
-          />
+          <div style={{ fontSize: 12, color: '#42506a', fontWeight: 700, marginBottom: 10 }}>
+            {t.otpLabel('')} <span dir="ltr" style={{ color: NAVY }}>{displayPhone}</span>
+          </div>
+          <div style={{ display: 'flex', gap: 10, direction: 'ltr' }}>
+            {otp.map((v, i) => (
+              <input
+                key={i}
+                ref={(el) => {
+                  otpRefs.current[i] = el;
+                }}
+                type="tel"
+                inputMode="numeric"
+                maxLength={1}
+                aria-label={i === 0 ? t.otpLabel(phone) : undefined}
+                value={v}
+                onChange={(e) => onOtpChange(i, e.target.value)}
+                onKeyDown={(e) => onOtpKeyDown(i, e.key)}
+                style={{
+                  flex: 1,
+                  width: '100%',
+                  height: 60,
+                  border: `1.5px solid ${v ? NAVY : '#dfe6ef'}`,
+                  borderRadius: 13,
+                  background: v ? '#f4f6f9' : '#fafbfd',
+                  textAlign: 'center',
+                  fontSize: 22,
+                  fontWeight: 800,
+                  color: '#16202e',
+                  padding: 0,
+                  fontFamily: 'inherit',
+                }}
+              />
+            ))}
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12 }}>
+          <button
+            type="button"
+            onClick={() => setStep('form')}
+            style={{ color: '#8a96a6', fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+          >
+            {t.editPhone}
+          </button>
+          <button
+            type="button"
+            onClick={() => void onResend()}
+            disabled={submitting}
+            style={{ color: NAVY, fontWeight: 800, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+          >
+            {t.resend}
+          </button>
         </div>
         {error && (
-          <p role="alert" className="text-xs text-danger">
+          <p role="alert" style={{ margin: 0, fontSize: 12, color: '#e5484d' }}>
             {error}
           </p>
         )}
-        <button
-          type="submit"
-          disabled={submitting}
-          className="mt-2 rounded-lg bg-accent py-2.5 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-60"
-        >
+        <button type="submit" disabled={submitting || !otpOk} style={primaryButtonStyle(!submitting && otpOk)}>
           {submitting ? t.otpSubmitting : t.otpConfirm}
         </button>
       </form>
@@ -578,81 +845,152 @@ function AgencySignupForm() {
   }
 
   return (
-    <form onSubmit={onSubmitForm} className="flex flex-col gap-4" noValidate>
-      <div className="grid grid-cols-2 gap-3">
+    <form onSubmit={(e) => void onSubmitForm(e)} style={{ display: 'flex', flexDirection: 'column', gap: 14 }} noValidate>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <div>
-          <label htmlFor="applicantName" className="mb-1.5 block text-[11.5px] text-muted">
+          <label htmlFor="applicantName" style={{ display: 'block', fontSize: 12, color: '#42506a', fontWeight: 700, marginBottom: 8 }}>
             {t.agencyNameLabel}
           </label>
           <input
             id="applicantName"
-            className="w-full rounded-lg border border-border bg-white px-3.5 py-2.5 text-sm text-ink outline-none focus:border-accent"
+            className="agency-signin-input"
             value={applicantName}
             onChange={(e) => setApplicantName(e.target.value)}
             placeholder={t.agencyNamePlaceholder}
+            style={inputStyle}
           />
         </div>
         <div>
-          <label htmlFor="licenseNo" className="mb-1.5 block text-[11.5px] text-muted">
+          <label htmlFor="licenseNo" style={{ display: 'block', fontSize: 12, color: '#42506a', fontWeight: 700, marginBottom: 8 }}>
             {t.licenseLabel}
           </label>
           <input
             id="licenseNo"
+            className="agency-signin-input"
             dir="ltr"
-            className="w-full rounded-lg border border-border bg-white px-3.5 py-2.5 text-sm text-ink outline-none focus:border-accent"
             value={licenseNo}
             onChange={(e) => setLicenseNo(e.target.value)}
             placeholder="XXXX-XXXX"
+            style={inputStyle}
           />
         </div>
       </div>
+
       <div>
-        <label htmlFor="managerName" className="mb-1.5 block text-[11.5px] text-muted">
+        <label htmlFor="managerName" style={{ display: 'block', fontSize: 12, color: '#42506a', fontWeight: 700, marginBottom: 8 }}>
           {t.managerLabel}
         </label>
         <input
           id="managerName"
-          className="w-full rounded-lg border border-border bg-white px-3.5 py-2.5 text-sm text-ink outline-none focus:border-accent"
+          className="agency-signin-input"
           value={managerName}
           onChange={(e) => setManagerName(e.target.value)}
           placeholder={t.managerPlaceholder}
+          style={inputStyle}
         />
       </div>
+
       <div>
-        <label htmlFor="signup-phone" className="mb-1.5 block text-[11.5px] text-muted">
+        <label htmlFor="signup-phone" style={{ display: 'block', fontSize: 12, color: '#42506a', fontWeight: 700, marginBottom: 8 }}>
           {t.phoneMobileLabel}
         </label>
-        <input
-          id="signup-phone"
-          dir="ltr"
-          className="w-full rounded-lg border border-border bg-white px-3.5 py-2.5 text-sm text-ink outline-none focus:border-accent"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          placeholder="09xxxxxxxxx"
-        />
+        <div style={{ position: 'relative' }}>
+          <input
+            id="signup-phone"
+            className="agency-signin-input"
+            type="tel"
+            dir="ltr"
+            value={phone}
+            onChange={(e) => setPhone(sanitizeMobileInput(e.target.value))}
+            placeholder="0912 345 6789"
+            maxLength={11}
+            style={{
+              ...inputStyle,
+              height: 54,
+              padding: '0 16px 0 52px',
+              fontSize: 16,
+              fontWeight: 700,
+              letterSpacing: 1,
+            }}
+          />
+          <span
+            style={{
+              position: 'absolute',
+              left: 14,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              fontSize: 12,
+              color: '#9aa7b8',
+              fontWeight: 700,
+            }}
+          >
+            +98
+          </span>
+        </div>
+        <div style={{ fontSize: 11, color: phoneHintColor, marginTop: 7, fontWeight: 600 }}>{phoneHint}</div>
       </div>
-      <label className="flex items-center gap-2 text-[11.5px] text-[#3b4554]">
-        <input type="checkbox" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} />
-        {t.termsCheckbox}
-      </label>
+
+      <div
+        role="checkbox"
+        aria-checked={accepted}
+        tabIndex={0}
+        onClick={() => setAccepted((v) => !v)}
+        onKeyDown={(e) => {
+          if (e.key === ' ' || e.key === 'Enter') {
+            e.preventDefault();
+            setAccepted((v) => !v);
+          }
+        }}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          fontSize: 11.5,
+          color: '#3b4554',
+          cursor: 'pointer',
+        }}
+      >
+        <span
+          style={{
+            width: 19,
+            height: 19,
+            border: `1.5px solid ${accepted ? GOLD : '#ccd3dd'}`,
+            borderRadius: 6,
+            flex: 'none',
+            background: accepted ? GOLD : '#fff',
+            color: '#fff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 11,
+          }}
+        >
+          {accepted ? '✓' : ''}
+        </span>
+        {/* Hidden native checkbox for testing / a11y label association */}
+        <input
+          type="checkbox"
+          checked={accepted}
+          onChange={(e) => setAccepted(e.target.checked)}
+          style={{ position: 'absolute', opacity: 0, width: 1, height: 1 }}
+          aria-hidden
+          tabIndex={-1}
+        />
+        <Link to="/support" style={{ color: GOLD, fontWeight: 700, textDecoration: 'none' }} onClick={(e) => e.stopPropagation()}>
+          {t.termsLinkLabel}
+        </Link>
+        <span>{t.termsSuffix}</span>
+      </div>
 
       {error && (
-        <p role="alert" className="text-xs text-danger">
+        <p role="alert" style={{ margin: 0, fontSize: 12, color: '#e5484d' }}>
           {error}
         </p>
       )}
 
-      <button
-        type="submit"
-        disabled={submitting || !formValid}
-        className="mt-2 rounded-lg bg-accent py-2.5 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-60"
-      >
+      <button type="submit" disabled={submitting || !formValid} style={primaryButtonStyle(!submitting && formValid)}>
         {submitting ? t.signupSending : t.signupSubmit}
       </button>
-
-      <div className="rounded-xl border border-[#dce8f7] bg-[#eef4fb] p-3 text-[11px] leading-loose text-[#3b556f]">
-        {t.agencyNote}
-      </div>
     </form>
   );
 }
@@ -664,28 +1002,85 @@ export default function AgencyLoginPage() {
 
   return (
     <AgencyLoginLayout>
-      <div className="mb-5 flex gap-5 border-b border-border">
-        <button
-          type="button"
-          onClick={() => setTab('login')}
-          className={`-mb-px border-b-[3px] pb-2.5 text-[13.5px] font-extrabold ${
-            tab === 'login' ? 'border-accent text-accent' : 'border-transparent text-muted'
-          }`}
-        >
-          {t.tabLogin}
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab('signup')}
-          className={`-mb-px border-b-[3px] pb-2.5 text-[13.5px] font-extrabold ${
-            tab === 'signup' ? 'border-accent text-accent' : 'border-transparent text-muted'
-          }`}
-        >
-          {t.tabSignup}
-        </button>
+      <div style={{ display: 'flex', gap: 21, borderBottom: '1.5px solid #eef1f5', marginBottom: 22 }}>
+        {(
+          [
+            ['login', t.tabLogin],
+            ['signup', t.tabSignup],
+          ] as const
+        ).map(([key, label]) => {
+          const active = tab === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setTab(key)}
+              style={{
+                paddingBottom: 11,
+                fontSize: 14.5,
+                fontWeight: 800,
+                color: active ? NAVY : '#9aa4b2',
+                borderBottom: `3px solid ${active ? GOLD : 'transparent'}`,
+                cursor: 'pointer',
+                marginBottom: -1.5,
+                background: 'none',
+                borderTop: 'none',
+                borderLeft: 'none',
+                borderRight: 'none',
+                fontFamily: 'inherit',
+              }}
+            >
+              {label}
+            </button>
+          );
+        })}
       </div>
 
+      <h1 style={{ fontSize: 21, fontWeight: 900, margin: '0 0 8px' }}>
+        {tab === 'login' ? t.titleLogin : t.titleSignup}
+      </h1>
+      <p style={{ fontSize: 12.5, color: '#7d8ba0', margin: '0 0 20px', lineHeight: 2 }}>
+        {tab === 'login' ? t.subtitleLogin : t.subtitleSignup}
+      </p>
+
       {tab === 'login' ? <AgencyLoginForm /> : <AgencySignupForm />}
+
+      <div
+        style={{
+          marginTop: 18,
+          background: '#fbf7ec',
+          border: '1px solid #f0e3bf',
+          borderRadius: 12,
+          padding: 11,
+          fontSize: 11.5,
+          color: '#6b5620',
+          lineHeight: 1.9,
+        }}
+      >
+        {t.agencyNote}
+      </div>
+
+      <div
+        style={{
+          marginTop: 'auto',
+          paddingTop: 22,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 7,
+          fontSize: 11,
+          color: '#9aa7b8',
+          fontWeight: 600,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#1f8a5b' }} />
+          {t.secureNote}
+        </div>
+        <Link to="/signin" style={{ color: '#8a96a6', fontWeight: 700, textDecoration: 'none' }}>
+          {t.personalLoginLink}
+        </Link>
+      </div>
     </AgencyLoginLayout>
   );
 }
