@@ -37,6 +37,10 @@ interface Tier {
   range: Record<StoredLocale, string>;
   border: string;
   head: string;
+  accent: string;
+  iconBg: string;
+  tierIcon: string;
+  popular?: boolean;
   perks: Record<StoredLocale, string>[];
 }
 
@@ -46,6 +50,9 @@ const TIERS: Tier[] = [
     range: { fa: '۰ تا ۵٬۰۰۰ امتیاز', en: '0–5,000 points', ar: 'من ٠ إلى ٥٬٠٠٠ نقطة' },
     border: '#e6eaf0',
     head: 'linear-gradient(135deg,#9aa7b8,#6f7d90)',
+    accent: '#6f7d90',
+    iconBg: '#eef1f5',
+    tierIcon: '☆',
     perks: [
       { fa: '۲٪ کش‌بک در هر خرید', en: '2% cashback per purchase', ar: 'استرداد نقدي ٢٪ في كل عملية شراء' },
       { fa: 'جمع‌آوری امتیاز پایه', en: 'Base point accrual', ar: 'تجميع نقاط أساسي' },
@@ -58,6 +65,10 @@ const TIERS: Tier[] = [
     range: { fa: '۵٬۰۰۰ تا ۱۵٬۰۰۰ امتیاز', en: '5,000–15,000 points', ar: 'من ٥٬٠٠٠ إلى ١٥٬٠٠٠ نقطة' },
     border: '#caa53a',
     head: 'linear-gradient(135deg,#caa53a,#9a7d22)',
+    accent: '#caa53a',
+    iconBg: '#fff7e6',
+    tierIcon: '★',
+    popular: true,
     perks: [
       { fa: '۵٪ کش‌بک در هر خرید', en: '5% cashback per purchase', ar: 'استرداد نقدي ٥٪ في كل عملية شراء' },
       { fa: 'ارتقای رایگان به بیزنس', en: 'Free upgrade to Business', ar: 'ترقية مجانية إلى درجة الأعمال' },
@@ -70,6 +81,9 @@ const TIERS: Tier[] = [
     range: { fa: 'بالای ۱۵٬۰۰۰ امتیاز', en: 'Above 15,000 points', ar: 'أكثر من ١٥٬٠٠٠' },
     border: '#1668c4',
     head: 'linear-gradient(135deg,#1668c4,#0d2640)',
+    accent: '#1668c4',
+    iconBg: '#eef4fb',
+    tierIcon: '◆',
     perks: [
       { fa: '۷٪ کش‌بک + هدایای ویژه', en: '7% cashback + special gifts', ar: 'استرداد نقدي ٧٪ + هدايا خاصة' },
       { fa: 'ارتقای تضمینی صندلی', en: 'Guaranteed seat upgrade', ar: 'ترقية مقعد مضمونة' },
@@ -93,10 +107,31 @@ const EARN: Item[] = [
   { icon: '★', title: { fa: 'ماموریت‌ها', en: 'Missions', ar: 'المهام' }, desc: { fa: 'با تکمیل ماموریت‌ها امتیاز جمع کنید.', en: 'Complete missions to earn more points.', ar: 'أكمل المهام لجمع المزيد من النقاط.' } },
 ];
 
-const SERVICES: (Item & { bg: string; color: string })[] = [
-  { icon: '🚗', title: { fa: 'درخواست خودرو', en: 'Car Request', ar: 'طلب سيارة' }, desc: { fa: 'رزرو خودرو فرودگاه تا مقصد با تخفیف ویژه اعضا.', en: 'Book airport-to-destination car service at a special member discount.', ar: 'حجز سيارة من المطار إلى الوجهة بخصم خاص للأعضاء.' }, bg: '#eef4fb', color: '#1668c4' },
-  { icon: '↑', title: { fa: 'ارتقای صندلی', en: 'Seat Upgrade', ar: 'ترقية المقعد' }, desc: { fa: 'ارتقای رایگان یا تخفیف‌دار به کلاس بیزنس.', en: 'Free or discounted upgrade to Business class.', ar: 'ترقية مجانية أو بخصم إلى درجة الأعمال.' }, bg: '#fff7e6', color: '#caa53a' },
-  { icon: '⚑', title: { fa: 'پذیرش ویژه', en: 'Priority Reception', ar: 'استقبال خاص' }, desc: { fa: 'چک‌این سریع و پذیرش اختصاصی بدون صف.', en: 'Fast check-in and dedicated reception with no queues.', ar: 'تسجيل وصول سريع واستقبال حصري دون طابور.' }, bg: '#e8f5ee', color: '#1f8a5b' },
+const SERVICES: (Item & { grad: string; shadow: string; blob: string })[] = [
+  {
+    icon: '🚗',
+    title: { fa: 'درخواست خودرو', en: 'Car Request', ar: 'طلب سيارة' },
+    desc: { fa: 'رزرو خودرو فرودگاه تا مقصد با تخفیف ویژه اعضا.', en: 'Book airport-to-destination car service at a special member discount.', ar: 'حجز سيارة من المطار إلى الوجهة بخصم خاص للأعضاء.' },
+    grad: 'linear-gradient(135deg,#1668c4,#0d3b66)',
+    shadow: '0 10px 24px -8px rgba(22,104,196,.45)',
+    blob: '#eef4fb',
+  },
+  {
+    icon: '↑',
+    title: { fa: 'ارتقای صندلی', en: 'Seat Upgrade', ar: 'ترقية المقعد' },
+    desc: { fa: 'ارتقای رایگان یا تخفیف‌دار به کلاس بیزنس.', en: 'Free or discounted upgrade to Business class.', ar: 'ترقية مجانية أو بخصم إلى درجة الأعمال.' },
+    grad: 'linear-gradient(135deg,#caa53a,#9a7d22)',
+    shadow: '0 10px 24px -8px rgba(202,165,58,.45)',
+    blob: '#fff7e6',
+  },
+  {
+    icon: '⚑',
+    title: { fa: 'پذیرش ویژه', en: 'Priority Reception', ar: 'استقبال خاص' },
+    desc: { fa: 'چک‌این سریع و پذیرش اختصاصی بدون صف.', en: 'Fast check-in and dedicated reception with no queues.', ar: 'تسجيل وصول سريع واستقبال حصري دون طابور.' },
+    grad: 'linear-gradient(135deg,#1f8a5b,#0e4a30)',
+    shadow: '0 10px 24px -8px rgba(31,138,91,.45)',
+    blob: '#e8f5ee',
+  },
 ];
 
 const STR: Record<StoredLocale, {
@@ -109,10 +144,28 @@ const STR: Record<StoredLocale, {
   tiersSub: string;
   cardBadge: string;
   cardHeading: string;
-  cardIntro: string;
   earnHeading: string;
   servicesHeading: string;
   memberPointsLabel: string;
+  mostPopular: string;
+  cardIntroPre: string;
+  cardThresholdPoints: string;
+  cardIntroPost: string;
+  silverCardLabel: string;
+  goldCardLabel: string;
+  platCardLabel: string;
+  silverRange: string;
+  goldRange: string;
+  platRange: string;
+  requestCard: string;
+  samanChip: string;
+  samanHeading: string;
+  samanSub: string;
+  samanPlaceholder: string;
+  samanSubmit: string;
+  ctaHeading: string;
+  ctaDesc: string;
+  ctaButton: string;
 }> = {
   fa: {
     heroBadge: 'باشگاه مشتریان blujet',
@@ -124,10 +177,28 @@ const STR: Record<StoredLocale, {
     tiersSub: 'هر چه بیشتر پرواز کنید، به سطح بالاتر و مزایای بیشتر می‌رسید.',
     cardBadge: 'صدور کارت بلوجت',
     cardHeading: 'با رسیدن به حد امتیاز، کارت بگیرید',
-    cardIntro: 'به محض رسیدن به آستانه‌ی ۵٬۰۰۰ امتیاز، واجد شرایط دریافت کارت عضویت می‌شوید. درخواست شما برای ادمین سایت ارسال و سپس برای تأیید به رئیس هیئت مدیره یا مدیر ارشد ارجاع می‌شود؛ پس از تأیید، کارت برای مسافر صادر می‌گردد.',
     earnHeading: 'چطور امتیاز بگیرم؟',
     servicesHeading: 'خدمات ویژه‌ی اعضا',
     memberPointsLabel: 'امتیاز باشگاه',
+    mostPopular: 'پرکاربردترین',
+    cardIntroPre: 'به محض رسیدن به آستانه‌ی',
+    cardThresholdPoints: '۵٬۰۰۰ امتیاز',
+    cardIntroPost: '، واجد شرایط دریافت کارت عضویت می‌شوید. درخواست شما برای ادمین سایت ارسال و سپس برای تأیید به رئیس هیئت مدیره یا مدیر ارشد ارجاع می‌شود؛ پس از تأیید، کارت برای مسافر صادر می‌گردد.',
+    silverCardLabel: 'کارت نقره‌ای',
+    goldCardLabel: 'کارت طلایی',
+    platCardLabel: 'کارت پلاتین',
+    silverRange: '۰–۵٬۰۰۰ امتیاز',
+    goldRange: '۵٬۰۰۰–۱۵٬۰۰۰',
+    platRange: '۱۵٬۰۰۰+',
+    requestCard: 'درخواست صدور کارت',
+    samanChip: 'SAMAN',
+    samanHeading: 'خرید اقساطی بلیط با کارت بانک سامان',
+    samanSub: 'شماره کارت بانک سامان خود را وارد کنید تا از امکان خرید اقساطی بلیط بهره‌مند شوید.',
+    samanPlaceholder: 'شماره ۱۶ رقمی کارت',
+    samanSubmit: 'ثبت کارت',
+    ctaHeading: 'همین حالا عضو طلایی شوید',
+    ctaDesc: 'با اولین خرید بلیط، عضو باشگاه مشتریان blujet شوید و از کش‌بک و مزایای اختصاصی بهره‌مند شوید.',
+    ctaButton: 'عضویت رایگان',
   },
   en: {
     heroBadge: 'blujet Loyalty Club',
@@ -139,10 +210,28 @@ const STR: Record<StoredLocale, {
     tiersSub: 'The more you fly, the higher your tier and the greater your rewards.',
     cardBadge: 'blujet Card Issuance',
     cardHeading: 'Reach the point threshold, get your card',
-    cardIntro: 'Once you reach 5,000 points, you become eligible for a membership card. Your request is sent to the site admin and then referred to the Board Chair or Senior Manager for approval; once approved, the card is issued to the traveler.',
     earnHeading: 'How do I earn points?',
     servicesHeading: 'Exclusive Member Services',
     memberPointsLabel: 'Club points',
+    mostPopular: 'Most Popular',
+    cardIntroPre: 'Once you reach the',
+    cardThresholdPoints: '5,000-point',
+    cardIntroPost: ' threshold, you become eligible for a membership card. Your request is sent to the site admin and then referred to the Board Chair or Senior Manager for approval; once approved, the card is issued to the traveler.',
+    silverCardLabel: 'Silver card',
+    goldCardLabel: 'Gold card',
+    platCardLabel: 'Platinum card',
+    silverRange: '0–5,000 pts',
+    goldRange: '5,000–15,000',
+    platRange: '15,000+',
+    requestCard: 'Request Card Issuance',
+    samanChip: 'SAMAN',
+    samanHeading: 'Buy tickets in installments with your Saman Bank card',
+    samanSub: 'Enter your Saman Bank card number to unlock installment ticket purchases.',
+    samanPlaceholder: '16-digit card number',
+    samanSubmit: 'Register card',
+    ctaHeading: 'Become a Gold Member Today',
+    ctaDesc: 'Join the blujet Loyalty Club with your first ticket purchase and enjoy cashback and exclusive perks.',
+    ctaButton: 'Join for Free',
   },
   ar: {
     heroBadge: 'نادي عملاء blujet',
@@ -154,10 +243,28 @@ const STR: Record<StoredLocale, {
     tiersSub: 'كلما زاد سفرك، ارتقيت إلى فئة أعلى وحصلت على مزايا أكبر.',
     cardBadge: 'إصدار بطاقة blujet',
     cardHeading: 'عند بلوغ حد النقاط، احصل على بطاقتك',
-    cardIntro: 'بمجرد بلوغ عتبة ٥٬٠٠٠ نقطة، تصبح مؤهلاً للحصول على بطاقة العضوية. يُرسل طلبك إلى مسؤول الموقع ثم يُحال إلى رئيس مجلس الإدارة أو المدير الأول للموافقة؛ وبعد الموافقة، تُصدر البطاقة للمسافر.',
     earnHeading: 'كيف أجمع النقاط؟',
     servicesHeading: 'خدمات حصرية للأعضاء',
     memberPointsLabel: 'نقاط النادي',
+    mostPopular: 'الأكثر شيوعًا',
+    cardIntroPre: 'بمجرد بلوغ عتبة',
+    cardThresholdPoints: '٥٬٠٠٠ نقطة',
+    cardIntroPost: '، تصبح مؤهلاً للحصول على بطاقة العضوية. يُرسل طلبك إلى مسؤول الموقع ثم يُحال إلى رئيس مجلس الإدارة أو المدير الأول للموافقة؛ وبعد الموافقة، تُصدر البطاقة للمسافر.',
+    silverCardLabel: 'بطاقة فضية',
+    goldCardLabel: 'بطاقة ذهبية',
+    platCardLabel: 'بطاقة بلاتينية',
+    silverRange: '٠–٥٬٠٠٠',
+    goldRange: '٥٬٠٠٠–١٥٬٠٠٠',
+    platRange: '١٥٬٠٠٠+',
+    requestCard: 'طلب إصدار البطاقة',
+    samanChip: 'SAMAN',
+    samanHeading: 'شراء التذاكر بالتقسيط ببطاقة بنك سامان',
+    samanSub: 'أدخل رقم بطاقة بنك سامان للاستفادة من شراء التذاكر بالتقسيط.',
+    samanPlaceholder: 'رقم البطاقة المكوّن من 16 رقمًا',
+    samanSubmit: 'تسجيل البطاقة',
+    ctaHeading: 'انضم كعضو ذهبي اليوم',
+    ctaDesc: 'انضم إلى نادي blujet مع أول عملية شراء تذكرة واستمتع بالاسترداد النقدي والمزايا الحصرية.',
+    ctaButton: 'انضمام مجاني',
   },
 };
 
@@ -208,13 +315,14 @@ export default function PublicClubPage() {
             {!loggedIn && (
               <Link
                 to="/signin"
+                data-testid="club-join-hero"
                 style={{ background: '#fff', color: '#1668c4', padding: '11px 24px', borderRadius: 12, fontSize: '13.5px', fontWeight: 800, textDecoration: 'none' }}
               >
                 {t.joinFree}
               </Link>
             )}
             <Link
-              to={loggedIn ? '/manage-booking' : '/signin'}
+              to={loggedIn ? '/account' : '/signin'}
               style={{ textDecoration: 'none', background: '#ffffff22', border: '1px solid #ffffff55', color: '#fff', padding: '11px 21px', borderRadius: 12, fontSize: '13.5px', fontWeight: 700 }}
             >
               {t.myAccount}
@@ -241,18 +349,103 @@ export default function PublicClubPage() {
           <h2 style={{ fontSize: 27, fontWeight: 900, color: '#0d2640', margin: '0 0 10px' }}>{t.tiersHeading}</h2>
           <p style={{ fontSize: '13.5px', color: '#6b7585', margin: 0 }}>{t.tiersSub}</p>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: gridCols3, gap: 18 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: gridCols3, gap: 22, alignItems: 'start' }}>
           {TIERS.map((tier) => (
-            <div key={tier.name.fa} style={{ background: '#fff', border: `2px solid ${tier.border}`, borderRadius: 18, overflow: 'hidden' }}>
-              <div style={{ background: tier.head, color: '#fff', padding: 16, textAlign: 'center' }}>
-                <div style={{ fontSize: 18, fontWeight: 900 }}>{tier.name[locale]}</div>
-                <div style={{ fontSize: '11.5px', opacity: 0.9, marginTop: 4 }}>{tier.range[locale]}</div>
+            <div
+              key={tier.name.fa}
+              data-testid={`club-tier-${tier.name.en.toLowerCase()}`}
+              style={{
+                background: '#fff',
+                border: `2px solid ${tier.border}`,
+                borderRadius: 20,
+                overflow: 'hidden',
+                position: 'relative',
+                boxShadow: tier.popular ? '0 22px 50px -24px rgba(202,165,58,.45)' : undefined,
+                marginTop: tier.popular && !isMobile ? 0 : tier.popular ? 0 : 0,
+              }}
+            >
+              {tier.popular && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 14,
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    background: '#fff',
+                    color: tier.accent,
+                    fontSize: '10.5px',
+                    fontWeight: 800,
+                    padding: '5px 14px',
+                    borderRadius: 20,
+                    boxShadow: '0 6px 16px rgba(13,38,102,.18)',
+                    zIndex: 2,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {t.mostPopular}
+                </div>
+              )}
+              <div style={{ background: tier.head, color: '#fff', padding: '34px 20px 24px', textAlign: 'center' }}>
+                <div
+                  style={{
+                    width: 58,
+                    height: 58,
+                    borderRadius: '50%',
+                    background: 'rgba(255,255,255,.2)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 12px',
+                    fontSize: 24,
+                  }}
+                >
+                  {tier.tierIcon}
+                </div>
+                <div style={{ fontSize: 19, fontWeight: 900 }}>{tier.name[locale]}</div>
+                <div
+                  style={{
+                    display: 'inline-block',
+                    marginTop: 9,
+                    background: 'rgba(255,255,255,.18)',
+                    padding: '5px 14px',
+                    borderRadius: 16,
+                    fontSize: 11,
+                    fontWeight: 700,
+                  }}
+                >
+                  {tier.range[locale]}
+                </div>
               </div>
-              <div style={{ padding: 15 }}>
+              <div style={{ padding: '8px 20px 18px' }}>
                 {tier.perks.map((pk) => (
-                  <div key={pk.fa} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', fontSize: 12, color: '#3b4554' }}>
-                    <span style={{ color: '#1f8a5b', fontWeight: 800 }}>✓</span>
-                    {pk[locale]}
+                  <div
+                    key={pk.fa}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 11,
+                      padding: '11px 0',
+                      borderBottom: '1px solid #f4f6fa',
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 30,
+                        height: 30,
+                        borderRadius: 9,
+                        background: tier.iconBg,
+                        color: tier.accent,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flex: 'none',
+                        fontSize: 13,
+                        fontWeight: 800,
+                      }}
+                    >
+                      ✓
+                    </span>
+                    <span style={{ fontSize: '12.5px', color: '#3b4554', fontWeight: 600 }}>{pk[locale]}</span>
                   </div>
                 ))}
               </div>
@@ -263,63 +456,265 @@ export default function PublicClubPage() {
 
       {/* MEMBERSHIP CARD ISSUANCE */}
       <section style={{ maxWidth: 1320, margin: '0 auto', padding: '28px 22px 14px' }}>
-        <div style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 18, padding: 24 }}>
-          <div style={{ textAlign: 'center', marginBottom: 28 }}>
-            <div style={{ display: 'inline-block', background: '#eef4fb', color: '#1668c4', padding: '5px 11px', borderRadius: 20, fontSize: '11.5px', fontWeight: 800, marginBottom: 12 }}>
+        <div
+          data-testid="club-card-issuance"
+          style={{
+            background: 'linear-gradient(135deg,#0d2640,#16406e)',
+            border: '1px solid #1668c4',
+            borderRadius: 18,
+            padding: 24,
+            position: 'relative',
+            overflow: 'hidden',
+          }}
+        >
+          <div style={{ position: 'absolute', top: -70, left: -50, width: 220, height: 220, borderRadius: '50%', background: '#ffffff0d' }} />
+          <div style={{ position: 'relative', textAlign: 'center', marginBottom: 28 }}>
+            <div style={{ display: 'inline-block', background: '#ffffff1a', color: '#aac4e2', padding: '5px 11px', borderRadius: 20, fontSize: '11.5px', fontWeight: 800, marginBottom: 12 }}>
               {t.cardBadge}
             </div>
-            <h2 style={{ fontSize: '21.5px', fontWeight: 900, color: '#0d2640', margin: '0 0 10px' }}>{t.cardHeading}</h2>
-            <p style={{ fontSize: 13, color: '#6b7585', lineHeight: 1.8, maxWidth: 680, margin: '0 auto' }}>
-              {t.cardIntro}
+            <h2 style={{ fontSize: '21.5px', fontWeight: 900, color: '#fff', margin: '0 0 10px' }}>{t.cardHeading}</h2>
+            <p style={{ fontSize: 13, color: '#aac4e2', margin: 0, lineHeight: 1.8, maxWidth: 680, marginInline: 'auto' }}>
+              {t.cardIntroPre} <b style={{ color: '#fff' }}>{t.cardThresholdPoints}</b>
+              {t.cardIntroPost}
             </p>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: gridCols4, gap: 11 }}>
-            {CARD_STEPS.map((s) => (
-              <div key={s.title.fa} style={{ textAlign: 'center', background: '#f7faff', border: '1px solid #e6eefb', borderRadius: 15, padding: '18px 13px' }}>
-                <div style={{ width: 46, height: 46, borderRadius: '50%', background: '#1668c4', color: '#fff', fontWeight: 900, fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 13px' }}>
+          <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: 11 }}>
+            {CARD_STEPS.map((s, idx) => (
+              <div
+                key={s.title.fa}
+                style={{
+                  textAlign: 'center',
+                  background: idx === 3 ? '#e8c65a22' : '#ffffff12',
+                  border: idx === 3 ? '1px solid #e8c65a55' : '1px solid #ffffff1f',
+                  borderRadius: 15,
+                  padding: '18px 13px',
+                }}
+              >
+                <div
+                  style={{
+                    width: 46,
+                    height: 46,
+                    borderRadius: '50%',
+                    background: idx === 3 ? '#e8c65a' : '#fff',
+                    color: '#0d2640',
+                    fontWeight: 900,
+                    fontSize: 16,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 13px',
+                  }}
+                >
                   {s.value?.[locale]}
                 </div>
-                <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#0d2640', marginBottom: 6 }}>{s.title[locale]}</div>
-                <div style={{ fontSize: '11.5px', color: '#6b7585', lineHeight: 1.7 }}>{s.desc?.[locale]}</div>
+                <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#fff', marginBottom: 6 }}>{s.title[locale]}</div>
+                <div style={{ fontSize: '11.5px', color: idx === 3 ? '#dfeaf7' : '#aac4e2', lineHeight: 1.7 }}>{s.desc?.[locale]}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ position: 'relative', display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 18 }}>
+            {[
+              { label: t.silverCardLabel, range: t.silverRange, dot: '#c8cfd9', border: '#ffffff26' },
+              { label: t.goldCardLabel, range: t.goldRange, dot: '#e8c65a', border: '#e8c65a55' },
+              { label: t.platCardLabel, range: t.platRange, dot: '#7fb2f0', border: '#ffffff26' },
+            ].map((card) => (
+              <div
+                key={card.label}
+                style={{
+                  flex: 1,
+                  minWidth: 200,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 9,
+                  border: `1.5px solid ${card.border}`,
+                  borderRadius: 13,
+                  padding: '11px 13px',
+                }}
+              >
+                <span style={{ width: 13, height: 13, borderRadius: '50%', background: card.dot, flex: 'none' }} />
+                <span style={{ fontSize: '12.5px', fontWeight: 800, color: '#fff' }}>{card.label}</span>
+                <span style={{ marginInlineStart: 'auto', fontSize: '11.5px', color: '#aac4e2', fontWeight: 600 }}>{card.range}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ position: 'relative', textAlign: 'center', marginTop: 22 }}>
+            <Link
+              to={loggedIn ? '/account' : '/signin'}
+              data-testid="club-request-card"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                background: '#fff',
+                color: '#0d2640',
+                padding: '13px 28px',
+                borderRadius: 12,
+                fontSize: '13.5px',
+                fontWeight: 800,
+                textDecoration: 'none',
+              }}
+            >
+              {t.requestCard}
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* EARN */}
+      <section style={{ maxWidth: 1320, margin: '0 auto', padding: '14px 22px 14px' }}>
+        <div style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 18, padding: 24 }}>
+          <h2 style={{ fontSize: '21.5px', fontWeight: 900, color: '#0d2640', margin: '0 0 26px', textAlign: 'center' }}>{t.earnHeading}</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: 16 }}>
+            {EARN.map((e) => (
+              <div key={e.title.fa} style={{ textAlign: 'center' }}>
+                <div style={{ width: 60, height: 60, borderRadius: 16, background: '#eef4fb', color: '#1668c4', fontSize: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
+                  {e.icon}
+                </div>
+                <div style={{ fontSize: '13.5px', fontWeight: 800, marginBottom: 6, color: '#0d2640' }}>{e.title[locale]}</div>
+                <div style={{ fontSize: '11.5px', color: '#6b7585', lineHeight: 1.7 }}>{e.desc?.[locale]}</div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* EARN */}
-      <section style={{ maxWidth: 1320, margin: '0 auto', padding: '28px 22px 14px' }}>
-        <div style={{ textAlign: 'center', marginBottom: 26 }}>
-          <h2 style={{ fontSize: 22, fontWeight: 900, color: '#0d2640', margin: '0 0 8px' }}>{t.earnHeading}</h2>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: gridCols4, gap: 14 }}>
-          {EARN.map((e) => (
-            <div key={e.title.fa} style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 16, padding: '20px 16px', textAlign: 'center' }}>
-              <div style={{ width: 48, height: 48, borderRadius: 14, background: '#eef4fb', color: '#1668c4', fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
-                {e.icon}
-              </div>
-              <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#0d2640', marginBottom: 6 }}>{e.title[locale]}</div>
-              <div style={{ fontSize: '11.5px', color: '#6b7585', lineHeight: 1.7 }}>{e.desc?.[locale]}</div>
+      {/* SAMAN BANK BANNER — presentational; card registration lives in account panel */}
+      <section style={{ maxWidth: 1320, margin: '0 auto', padding: '14px 22px' }}>
+        <div
+          data-testid="club-saman-banner"
+          style={{
+            background: 'linear-gradient(120deg,#0f3d3a,#146b5e 60%,#1c8a72)',
+            borderRadius: 20,
+            padding: isMobile ? 20 : 26,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 22,
+            flexWrap: 'wrap',
+            flexDirection: isMobile ? 'column' : 'row',
+            position: 'relative',
+            overflow: 'hidden',
+          }}
+        >
+          <div style={{ position: 'absolute', left: -40, top: -40, width: 180, height: 180, borderRadius: '50%', background: 'rgba(255,255,255,.06)' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 18, position: 'relative', zIndex: 1, flex: '1 1 420px', minWidth: 280, flexDirection: isMobile ? 'column' : 'row', textAlign: isMobile ? 'center' : 'inherit' }}>
+            <div style={{ width: 58, height: 58, borderRadius: 15, background: '#fff', color: '#146b5e', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 13, flex: 'none' }}>
+              {t.samanChip}
             </div>
-          ))}
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: '18.5px', fontWeight: 900, color: '#fff' }}>{t.samanHeading}</div>
+              <div style={{ fontSize: '12.5px', color: '#bfe6da', marginTop: 8, maxWidth: 380, lineHeight: 1.8 }}>{t.samanSub}</div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', position: 'relative', zIndex: 1, flex: '1 1 340px', width: isMobile ? '100%' : undefined }}>
+            <input
+              readOnly
+              placeholder={t.samanPlaceholder}
+              dir="ltr"
+              style={{
+                flex: 1,
+                minWidth: 200,
+                background: 'rgba(255,255,255,.12)',
+                border: '1.5px solid rgba(255,255,255,.35)',
+                borderRadius: 12,
+                padding: '15px 16px',
+                fontSize: '13.5px',
+                color: '#fff',
+                fontFamily: 'inherit',
+                textAlign: 'center',
+              }}
+            />
+            <Link
+              to={loggedIn ? '/account' : '/signin'}
+              style={{
+                background: '#fff',
+                color: '#146b5e',
+                padding: '15px 28px',
+                borderRadius: 12,
+                fontSize: '13.5px',
+                fontWeight: 800,
+                whiteSpace: 'nowrap',
+                textDecoration: 'none',
+              }}
+            >
+              {t.samanSubmit}
+            </Link>
+          </div>
         </div>
       </section>
 
       {/* MEMBER SERVICES */}
-      <section style={{ maxWidth: 1320, margin: '0 auto', padding: '28px 22px 47px' }}>
-        <div style={{ textAlign: 'center', marginBottom: 26 }}>
-          <h2 style={{ fontSize: 22, fontWeight: 900, color: '#0d2640', margin: '0 0 8px' }}>{t.servicesHeading}</h2>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: gridCols3, gap: 14 }}>
-          {SERVICES.map((s) => (
-            <div key={s.title.fa} style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 16, padding: 20 }}>
-              <div style={{ width: 46, height: 46, borderRadius: 13, background: s.bg, color: s.color, fontSize: 19, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 13 }}>
-                {s.icon}
+      <section style={{ maxWidth: 1320, margin: '0 auto', padding: '28px 22px 16px' }}>
+        <h2 style={{ fontSize: '21.5px', fontWeight: 900, color: '#0d2640', margin: '0 0 22px' }}>{t.servicesHeading}</h2>
+        {isMobile ? (
+          <div style={{ display: 'flex', justifyContent: 'space-around', gap: 14, padding: '4px 2px 8px' }}>
+            {SERVICES.map((s) => (
+              <div key={s.title.fa} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 9, flex: 'none', width: 78 }}>
+                <div
+                  style={{
+                    width: 58,
+                    height: 58,
+                    borderRadius: 16,
+                    background: s.grad,
+                    color: '#fff',
+                    fontSize: 22,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: s.shadow,
+                  }}
+                >
+                  {s.icon}
+                </div>
+                <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#16202e', textAlign: 'center', lineHeight: 1.4 }}>{s.title[locale]}</div>
               </div>
-              <div style={{ fontSize: 14, fontWeight: 800, color: '#0d2640', marginBottom: 7 }}>{s.title[locale]}</div>
-              <div style={{ fontSize: 12, color: '#6b7585', lineHeight: 1.8 }}>{s.desc?.[locale]}</div>
-            </div>
-          ))}
+            ))}
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: gridCols3, gap: 18 }}>
+            {SERVICES.map((s) => (
+              <div key={s.title.fa} style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 18, padding: 22, position: 'relative', overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', top: -30, left: -30, width: 110, height: 110, borderRadius: '50%', background: s.blob }} />
+                <div
+                  style={{
+                    position: 'relative',
+                    width: 58,
+                    height: 58,
+                    borderRadius: 16,
+                    background: s.grad,
+                    color: '#fff',
+                    fontSize: 22,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: 18,
+                    boxShadow: s.shadow,
+                  }}
+                >
+                  {s.icon}
+                </div>
+                <div style={{ position: 'relative', fontSize: '15.5px', fontWeight: 800, marginBottom: 8, color: '#16202e' }}>{s.title[locale]}</div>
+                <div style={{ position: 'relative', fontSize: 12, color: '#6b7585', lineHeight: 1.8 }}>{s.desc?.[locale]}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* CTA */}
+      <section style={{ maxWidth: 1320, margin: '0 auto', padding: '16px 22px 41px' }}>
+        <div data-testid="club-cta" style={{ background: 'linear-gradient(135deg,#caa53a,#9a7d22)', color: '#fff', borderRadius: 20, padding: 29, textAlign: 'center' }}>
+          <h2 style={{ fontSize: 25, fontWeight: 900, margin: '0 0 12px' }}>{t.ctaHeading}</h2>
+          <p style={{ fontSize: '13.5px', color: '#fff', opacity: 0.92, margin: '0 0 24px' }}>{t.ctaDesc}</p>
+          {!loggedIn && (
+            <Link
+              to="/signin"
+              data-testid="club-join-cta"
+              style={{ display: 'inline-block', background: '#fff', color: '#9a7d22', padding: '11px 28px', borderRadius: 12, fontSize: '14.5px', fontWeight: 800, textDecoration: 'none' }}
+            >
+              {t.ctaButton}
+            </Link>
+          )}
         </div>
       </section>
     </PublicPageShell>

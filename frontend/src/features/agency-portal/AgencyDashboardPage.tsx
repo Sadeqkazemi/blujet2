@@ -138,6 +138,7 @@ function KpiCard({
 
 export default function AgencyDashboardPage() {
   const { locale } = useLocale();
+  const isMobile = useIsMobile();
   const t = STR[locale];
   const isMobile = useIsMobile(900);
   const [data, setData] = useState<AgencyDashboard | null>(null);

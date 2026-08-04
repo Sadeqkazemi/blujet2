@@ -78,7 +78,7 @@ describe('ManageBookingPage', () => {
     await userEvent.type(screen.getByTestId('mb-lastname'), 'ناشناس');
     await userEvent.click(screen.getByTestId('mb-lookup'));
 
-    expect(await screen.findByTestId('mb-lookup-error')).toHaveTextContent('رزرو یافت نشد.');
+    expect(await screen.findByTestId('mb-not-found')).toHaveTextContent('رزروی یافت نشد');
   });
 
   it('submits a real anonymous refund and shows the real computed penalty breakdown', async () => {
@@ -117,8 +117,24 @@ describe('ManageBookingPage', () => {
     expect(submit).toHaveBeenCalledWith('BJ4X2K', 'رضایی', 'IR820170000000332211009900');
   });
 
-  it('disables تغییر صندلی and دانلود بلیط as not-yet-built', async () => {
+  it('opens the seat map, changes the seat via the real endpoint, and downloads the ticket', async () => {
     vi.spyOn(publicSiteApi, 'lookupBookingByPnrAndLastName').mockResolvedValue(BOOKING);
+    vi.spyOn(publicSiteApi, 'fetchSeatMap').mockResolvedValue({
+      flightInstanceId: 'fi-1',
+      seats: [
+        { seatCode: '12A', row: 12, cabin: 'ECONOMY', status: 'TAKEN' },
+        { seatCode: '12B', row: 12, cabin: 'ECONOMY', status: 'TAKEN' },
+        { seatCode: '12C', row: 12, cabin: 'ECONOMY', status: 'FREE' },
+        { seatCode: '3A', row: 3, cabin: 'BUSINESS', status: 'FREE' },
+      ],
+    });
+    const change = vi.spyOn(publicSiteApi, 'changeSeatByPnr').mockResolvedValue({
+      ...BOOKING,
+      passengers: [
+        { fullName: 'نگار رضایی', seatCode: '12C' },
+        { fullName: 'آرش رضایی', seatCode: '12B' },
+      ],
+    });
     renderPage();
 
     await userEvent.type(screen.getByTestId('mb-pnr'), 'BJ4X2K');
@@ -126,8 +142,19 @@ describe('ManageBookingPage', () => {
     await userEvent.click(screen.getByTestId('mb-lookup'));
     await screen.findByTestId('mb-pnr-show');
 
-    expect(screen.getByRole('button', { name: /تغییر صندلی/ })).toBeDisabled();
-    expect(screen.getByRole('button', { name: /دانلود بلیط/ })).toBeDisabled();
+    expect(screen.getByTestId('mb-download-ticket')).toBeEnabled();
+
+    await userEvent.click(screen.getByTestId('mb-change-seat'));
+    await screen.findByTestId('mb-seat-modal');
+
+    // Business seats never render for an economy booking.
+    expect(screen.queryByTestId('mb-seat-3A')).not.toBeInTheDocument();
+    expect(screen.getByTestId('mb-seat-12A')).toBeDisabled();
+
+    await userEvent.click(screen.getByTestId('mb-seat-12C'));
+
+    expect(change).toHaveBeenCalledWith('BJ4X2K', 'رضایی', '12C');
+    expect(await screen.findByTestId('mb-seat-changed')).toBeInTheDocument();
   });
 
   it('renders translated heading, labels, and result in English', async () => {
@@ -185,6 +212,6 @@ describe('ManageBookingPage', () => {
     await userEvent.type(screen.getByTestId('mb-lastname'), 'ناشناس');
     await userEvent.click(screen.getByTestId('mb-lookup'));
 
-    expect(await screen.findByTestId('mb-lookup-error')).toHaveTextContent('لم يتم العثور على الحجز.');
+    expect(await screen.findByTestId('mb-not-found')).toHaveTextContent('لم يتم العثور على الحجز');
   });
 });

@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import {
   createExternalService,
@@ -11,11 +12,45 @@ import {
 import { faDigits, faPercent } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import Modal from '../../components/Modal';
+import {
+  StaffAlert,
+  StaffCountPill,
+  StaffPanelCard,
+  StaffPanelPageHeader,
+  StaffPrimaryButton,
+  StaffSecondaryButton,
+  StaffToggle,
+} from '../../components/staff-panel-ui';
+import { STAFF_PANEL } from '../../lib/staff-panel-theme';
+import { staffInnerTile, staffInput, staffStatusStyle } from '../../lib/staff-panel-styles';
 import type { ExternalService, InternalService, SmsLogResult } from '../../types/it-manager';
 
 const SMS_MESSAGE_TYPE_LABEL: Record<string, string> = {
   OTP: 'کد یکبار مصرف',
   TEMP_PASSWORD: 'رمز موقت',
+};
+
+const inputStyle: CSSProperties = {
+  ...staffInput,
+  width: '100%',
+  padding: 12,
+  fontSize: 12,
+  boxSizing: 'border-box',
+};
+
+const labelStyle: CSSProperties = {
+  display: 'block',
+  marginBottom: 4,
+  fontWeight: 800,
+  fontSize: 12,
+  color: STAFF_PANEL.text,
+};
+
+const serviceCardStyle: CSSProperties = {
+  background: STAFF_PANEL.cardBg,
+  border: `1px solid ${STAFF_PANEL.cardBorder}`,
+  borderRadius: 14,
+  padding: 12,
 };
 
 export default function ServicesPage() {
@@ -171,6 +206,9 @@ export default function ServicesPage() {
     }
   }
 
+  const activeCount = internal.filter((s) => s.enabled).length + external.filter((s) => s.enabled).length;
+  const totalCount = internal.length + external.length;
+
   return (
     <div className="px-[21px] pb-[34px] pt-[18px]">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
@@ -241,8 +279,9 @@ export default function ServicesPage() {
             >
               {smsLog.enabled ? 'فعال' : 'غیرفعال'}
             </span>
-          </div>
-          <div className="mb-4 flex gap-6 text-xs">
+          }
+        >
+          <div style={{ marginBottom: 16, display: 'flex', gap: 24, fontSize: 11 }}>
             <div>
               <span className="font-num font-black text-[#34d399]">{faDigits(smsLog.todaySuccessCount)}</span>{' '}
               <span className="text-[#6b7b94]">ارسال موفق امروز</span>
@@ -272,7 +311,7 @@ export default function ServicesPage() {
               </div>
             ))}
           </div>
-        </div>
+        </StaffPanelCard>
       )}
 
       <div className="mb-3 flex items-center justify-between">
@@ -285,9 +324,15 @@ export default function ServicesPage() {
           className="rounded-lg bg-[#3b82f6] px-3 py-1.5 text-[11px] font-bold text-white transition hover:brightness-110"
         >
           افزودن سرویس خارجی
-        </button>
+        </StaffPrimaryButton>
       </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+          gap: 12,
+        }}
+      >
         {external.map((s) => (
           <div key={s.id} className="rounded-xl border border-[#1f2a3d] bg-[#141d2e] p-3">
             <div className="mb-2 flex items-start justify-between gap-2">
@@ -411,7 +456,7 @@ export default function ServicesPage() {
             onChange={(e) => setEditForm({ ...editForm, endpoint: e.target.value })}
             className="ltr w-full rounded-lg border border-[#1f2a3d] p-3 text-xs outline-none transition focus:border-[#3b82f6]"
           />
-          <div className="mt-3 grid grid-cols-2 gap-3">
+          <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
               <label className="mb-1 block text-xs font-bold text-[#e7ecf3]" htmlFor="edit-svc-method">
                 متد

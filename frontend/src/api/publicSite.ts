@@ -124,6 +124,14 @@ export function submitAnonymousRefund(pnr: string, lastName: string, iban: strin
   });
 }
 
+export function changeSeatByPnr(pnr: string, lastName: string, seatCode: string) {
+  return apiPost<BookingDetail>('/manage-booking/change-seat', {
+    pnr,
+    lastName,
+    seatCode,
+  });
+}
+
 export function fetchWallet() {
   // Decimal STRING on the wire (BigInt.prototype.toJSON on the backend).
   return apiGet<{ balanceIrr: string }>('/my/wallet');

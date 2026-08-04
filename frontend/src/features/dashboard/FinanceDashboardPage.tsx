@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import {
   fetchCompletedFlightsSummary,
   fetchFinanceDashboardStats,
@@ -15,6 +14,16 @@ import type {
   SalesGranularity,
 } from '../../types/reporting';
 import SalesBarChart from '../../components/SalesBarChart';
+import {
+  StaffCartableWidget,
+  StaffFlightsSummaryGrid,
+  StaffKpiCard,
+  StaffPanelCard,
+  StaffPanelPageHeader,
+  staffSegmentedControl,
+} from '../../components/staff-panel-ui';
+import { STAFF_PANEL } from '../../lib/staff-panel-theme';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 const CHART_MODES: { key: SalesGranularity; label: string }[] = [
   { key: 'q3', label: '۳ ماهه' },
@@ -60,6 +69,7 @@ function StatCard({
 }
 
 export default function FinanceDashboardPage() {
+  const isMobile = useIsMobile();
   const [stats, setStats] = useState<FinanceDashboardStats | null>(null);
   const [granularity, setGranularity] = useState<SalesGranularity>('q6');
   const [periodKey, setPeriodKey] = useState<string | null>(null);
@@ -118,26 +128,39 @@ export default function FinanceDashboardPage() {
         <p className="mt-1 text-sm text-[#6b7b94]">نمای کلی فروش و کارهای در انتظار اقدام</p>
       </div>
 
-      {error && <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">{error}</p>}
+      {error && (
+        <p style={{ marginBottom: 16, fontSize: 13, color: STAFF_PANEL.danger }}>{error}</p>
+      )}
 
       {stats && (
-        <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-          <StatCard
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)',
+            gap: 13,
+            marginBottom: 24,
+          }}
+        >
+          <StaffKpiCard
             label="آژانس فعال"
             value={faDigits(stats.activeAgencies)}
-            trendPct={stats.activeAgenciesTrendPct}
-            iconClass="bg-accent/10 text-accent"
+            trend={trendLabel(stats.activeAgenciesTrendPct)}
+            trendUp={stats.activeAgenciesTrendPct >= 0}
+            iconBg={STAFF_PANEL.accentSoft}
+            iconColor={STAFF_PANEL.accent}
             icon={
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <path d="M3 21h18M6 21V5a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v16M19 21V10a1 1 0 0 0-1-1h-3" />
               </svg>
             }
           />
-          <StatCard
+          <StaffKpiCard
             label="مسافر این ماه"
             value={faDigits(stats.passengersThisMonth)}
-            trendPct={stats.passengersTrendPct}
-            iconClass="bg-[#a855f71a] text-[#a855f7]"
+            trend={trendLabel(stats.passengersTrendPct)}
+            trendUp={stats.passengersTrendPct >= 0}
+            iconBg="rgba(168,85,247,0.16)"
+            iconColor={STAFF_PANEL.purple}
             icon={
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <circle cx="9" cy="8" r="3.2" />
@@ -145,11 +168,13 @@ export default function FinanceDashboardPage() {
               </svg>
             }
           />
-          <StatCard
+          <StaffKpiCard
             label="بلیط فروخته‌شده"
             value={faDigits(stats.ticketsSoldThisMonth)}
-            trendPct={stats.ticketsTrendPct}
-            iconClass="bg-[#10b98118] text-[#059669]"
+            trend={trendLabel(stats.ticketsTrendPct)}
+            trendUp={stats.ticketsTrendPct >= 0}
+            iconBg="rgba(16,185,129,0.16)"
+            iconColor={STAFF_PANEL.success}
             icon={
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <path d="M3 9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2 2 2 0 0 0 0 4 2 2 0 0 1-2 2H5a2 2 0 0 1-2-2 2 2 0 0 0 0-4z" />
@@ -157,11 +182,13 @@ export default function FinanceDashboardPage() {
               </svg>
             }
           />
-          <StatCard
+          <StaffKpiCard
             label="درآمد (تومان)"
             value={faMoney(stats.revenueThisMonthIrr)}
-            trendPct={stats.revenueTrendPct}
-            iconClass="bg-[#f59e0b18] text-[#b45309]"
+            trend={trendLabel(stats.revenueTrendPct)}
+            trendUp={stats.revenueTrendPct >= 0}
+            iconBg="rgba(245,158,11,0.16)"
+            iconColor={STAFF_PANEL.warning}
             icon={
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <rect x="3" y="6" width="18" height="13" rx="2" />
@@ -183,6 +210,7 @@ export default function FinanceDashboardPage() {
               {CHART_MODES.map((m) => (
                 <button
                   key={m.key}
+                  type="button"
                   onClick={() => setGranularity(m.key)}
                   className={`rounded-md px-3 py-1.5 text-[11px] transition ${
                     granularity === m.key ? 'bg-[#3b82f6] font-bold text-white' : 'text-[#6b7b94] hover:text-white'
@@ -221,7 +249,7 @@ export default function FinanceDashboardPage() {
           {loading ? (
             <p className="py-10 text-center text-sm text-[#6b7b94]">در حال بارگذاری…</p>
           ) : (
-            <SalesBarChart periods={periods} selectedPeriodKey={periodKey} onSelectPeriod={setPeriodKey} />
+            <SalesBarChart dark periods={periods} selectedPeriodKey={periodKey} onSelectPeriod={setPeriodKey} />
           )}
 
           {flights && (
@@ -244,7 +272,7 @@ export default function FinanceDashboardPage() {
               </div>
             </div>
           )}
-        </div>
+        </StaffPanelCard>
 
         {cartable && (
           <section className="rounded-xl border border-[#1f2a3d] bg-[#141d2e] p-5">

@@ -40,3 +40,24 @@ export class SubmitAnonymousRefundDto {
   @Length(26, 26)
   iban: string;
 }
+
+export class ChangeSeatDto {
+  @ApiProperty({ example: 'BJ4X2K', description: 'کد رزرو (PNR)' })
+  @IsString()
+  @MinLength(4)
+  pnr: string;
+
+  @ApiProperty({
+    example: 'رضایی',
+    description: 'نام خانوادگی مسافر — حداقل ۳ کاراکتر',
+    minLength: 3,
+  })
+  @IsString()
+  @MinLength(3, { message: 'نام خانوادگی باید حداقل ۳ کاراکتر باشد.' })
+  lastName: string;
+
+  @ApiProperty({ example: '12A', description: 'کد صندلی جدید' })
+  @IsString()
+  @MinLength(2)
+  seatCode: string;
+}

@@ -78,6 +78,7 @@ export default function ResultsPage() {
 
   const [airports, setAirports] = useState<Airport[]>([]);
   const [results, setResults] = useState<SearchFlightResult[] | null>(null);
+  const [returnResults, setReturnResults] = useState<SearchFlightResult[] | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -114,9 +115,10 @@ export default function ResultsPage() {
   }, [status]);
 
   useEffect(() => {
-    if (!origin || !dest || !date) return;
+    if (!parsed || !origin || !dest || !date) return;
     let cancelled = false;
     setResults(null);
+    setReturnResults(null);
     setSearchError(null);
     setAiState('idle');
     setAdvisory(null);
@@ -255,7 +257,35 @@ export default function ResultsPage() {
     resultsPager.setPage(1);
   }
 
-  if (!origin || !dest || !date) {
+  const cabinLabels = useMemo(
+    () => ({
+      ECONOMY: CABIN_LABEL.ECONOMY[locale],
+      BUSINESS: CABIN_LABEL.BUSINESS[locale],
+    }),
+    [locale],
+  );
+
+  const cardLabels = useMemo(
+    () => ({
+      direct: t.direct,
+      oneStop: t.oneStop,
+      seatsLeft: t.seatsLeft,
+      select: t.select,
+      toman: t.toman,
+      priceLock: t.priceLock,
+      saveFlight: t.saveFlight,
+      savedFlight: t.savedFlight,
+      analyzing: t.aiAnalyzing,
+      detailsBook: t.detailsBook,
+      flightDetails: t.flightDetails,
+      flightNo: t.flightNo,
+      aircraft: t.aircraft,
+      lowSeats: t.lowSeats,
+    }),
+    [t],
+  );
+
+  if (!parsed || !origin || !dest || !date) {
     return (
       <PublicPageShell>
         <div style={{ maxWidth: 720, margin: '0 auto', padding: '40px 26px', textAlign: 'center' }}>

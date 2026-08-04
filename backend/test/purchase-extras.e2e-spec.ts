@@ -164,6 +164,17 @@ describe('Purchase extras: promo codes, wallet, club points, price lock (e2e)', 
     );
   }
 
+  /** Price-lock fees are billed from the wallet, so lock tests pre-fund it. */
+  async function topupWallet(
+    accessToken: string | undefined,
+    amountIrr = 100_000_000,
+  ) {
+    await request(app.getHttpServer())
+      .post('/my/wallet/topup')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ amountIrr });
+  }
+
   // ── Promo codes ─────────────────────────────────────────────────────
 
   it('applies a PERCENT promo code at payment and posts the discounted amount to the ledger', async () => {
@@ -355,6 +366,7 @@ describe('Purchase extras: promo codes, wallet, club points, price lock (e2e)', 
   it('lets a gold member lock a price, then books at that price even after the market price moves', async () => {
     const { accessToken, userId } = await loginAsCustomer(app, phoneFor(9));
     await linkGoldMember(userId!);
+    await topupWallet(accessToken);
     const instance = await freshInstance(44);
 
     const lockRes = await request(app.getHttpServer())
@@ -416,6 +428,7 @@ describe('Purchase extras: promo codes, wallet, club points, price lock (e2e)', 
   it('rejects a second active price lock for the same flight+cabin', async () => {
     const { accessToken, userId } = await loginAsCustomer(app, phoneFor(10));
     await linkGoldMember(userId!);
+    await topupWallet(accessToken);
     const instance = await freshInstance(45);
 
     const first = await request(app.getHttpServer())
@@ -434,6 +447,7 @@ describe('Purchase extras: promo codes, wallet, club points, price lock (e2e)', 
   it('lets a member cancel an active lock', async () => {
     const { accessToken, userId } = await loginAsCustomer(app, phoneFor(11));
     await linkGoldMember(userId!);
+    await topupWallet(accessToken);
     const instance = await freshInstance(46);
 
     const created = await request(app.getHttpServer())
@@ -451,6 +465,7 @@ describe('Purchase extras: promo codes, wallet, club points, price lock (e2e)', 
   it('GET /my/price-locks includes the locked flight route/number/departure, not just raw ids', async () => {
     const { accessToken, userId } = await loginAsCustomer(app, phoneFor(12));
     await linkGoldMember(userId!);
+    await topupWallet(accessToken);
     const instance = await freshInstance(47);
 
     await request(app.getHttpServer())
@@ -474,6 +489,7 @@ describe('Purchase extras: promo codes, wallet, club points, price lock (e2e)', 
   it('a booking created against an active lock is flagged isPriceLocked; an ordinary booking is not', async () => {
     const { accessToken, userId } = await loginAsCustomer(app, phoneFor(13));
     await linkGoldMember(userId!);
+    await topupWallet(accessToken);
     const lockedInstance = await freshInstance(48);
 
     await request(app.getHttpServer())
@@ -501,5 +517,37 @@ describe('Purchase extras: promo codes, wallet, club points, price lock (e2e)', 
         passengers: [{ fullName: 'بدون قفل', seatCode: '7B' }],
       });
     expect(ordinaryBooking.body.data.isPriceLocked).toBe(false);
+  });
+
+  it('bills the lock fee from the wallet and rejects a lock when the balance cannot cover it', async () => {
+    const { accessToken, userId } = await loginAsCustomer(app, phoneFor(14));
+    await linkGoldMember(userId!);
+    const instance = await freshInstance(50);
+
+    // No wallet balance yet → creating a lock must fail with 409.
+    const broke = await request(app.getHttpServer())
+      .post('/my/price-locks')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ flightInstanceId: instance.id, cabin: 'ECONOMY' });
+    expect(broke.status).toBe(409);
+
+    await topupWallet(accessToken, 50_000_000);
+    const balBefore = await request(app.getHttpServer())
+      .get('/my/wallet')
+      .set('Authorization', `Bearer ${accessToken}`);
+    const before = Number(balBefore.body.data.balanceIrr);
+
+    const lockRes = await request(app.getHttpServer())
+      .post('/my/price-locks')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ flightInstanceId: instance.id, cabin: 'ECONOMY' });
+    expect(lockRes.status).toBe(201);
+    const feeIrr = Number(lockRes.body.data.feeIrr);
+    expect(feeIrr).toBeGreaterThan(0);
+
+    const balAfter = await request(app.getHttpServer())
+      .get('/my/wallet')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(Number(balAfter.body.data.balanceIrr)).toBe(before - feeIrr);
   });
 });

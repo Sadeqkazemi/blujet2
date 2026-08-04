@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { fetchItDashboard } from '../../api/it-manager';
 import { faDigits, faPercent } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
+import { StaffPanelCard, StaffPanelPageHeader } from '../../components/staff-panel-ui';
+import { STAFF_PANEL } from '../../lib/staff-panel-theme';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import type { ItDashboardData } from '../../types/it-manager';
 
 const EVENT_DOT: Record<string, string> = {
@@ -26,6 +29,7 @@ type KpiDef = {
 
 export default function ItDashboardPage() {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [data, setData] = useState<ItDashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -226,7 +230,7 @@ export default function ItDashboardPage() {
                 </div>
               ))}
             </div>
-          </section>
+          </StaffPanelCard>
 
           <section className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[15px]">
             <h2 className="mb-3.5 text-[14.5px] font-extrabold text-white">رویدادهای اخیر</h2>
@@ -249,7 +253,7 @@ export default function ItDashboardPage() {
                 ))}
               </ul>
             )}
-          </section>
+          </StaffPanelCard>
         </div>
       </div>
     </div>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { dayjs, isoDateAtNoon, toIsoDateOnly } from '../lib/jalali';
 import { faDigits } from '../lib/fa-format';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 const WEEKDAYS = ['ش', 'ی', 'د', 'س', 'چ', 'پ', 'ج'];
 const MONTH_NAMES = [
@@ -240,7 +241,8 @@ export default function JalaliDatePicker({
               );
             })}
           </div>
-        </div>
+          </div>
+        </>
       )}
     </div>
   );
