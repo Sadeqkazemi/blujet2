@@ -43,6 +43,7 @@ describe('MyReferralsPage', () => {
       deptLabelFa: 'بازرگانی',
       rank: 'کارشناس',
       permissionLabelsFa: [],
+      permissionKeys: [],
     });
   });
 

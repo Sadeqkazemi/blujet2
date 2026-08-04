@@ -15,4 +15,6 @@ export interface EmployeeContext {
   deptLabelFa: string;
   rank: string | null;
   permissionLabelsFa: string[];
+  /** Raw granted permission keys (e.g. 'ag_list', 'ag_requests'). */
+  permissionKeys: string[];
 }
