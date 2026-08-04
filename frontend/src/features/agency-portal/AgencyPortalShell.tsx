@@ -4,6 +4,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { fetchInbox, fetchProfile } from '../../api/agency-portal';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import LogoutConfirmModal from '../../components/LogoutConfirmModal';
 import AgencyPortalHeader from './AgencyPortalHeader';
 import AgencyPortalSidebar from './AgencyPortalSidebar';
 import { AGENCY_PAGE_META, agencyNavKeyFromPath } from './agency-nav-config';
@@ -28,6 +29,8 @@ export default function AgencyPortalShell() {
   const [agencyName, setAgencyName] = useState(user?.fullName ?? '');
   const [licenseNo, setLicenseNo] = useState<string | null>(null);
   const [inboxCount, setInboxCount] = useState(0);
+  const [logoutOpen, setLogoutOpen] = useState(false);
+  const [logoutBusy, setLogoutBusy] = useState(false);
 
   useEffect(() => {
     fetchProfile()
@@ -44,9 +47,17 @@ export default function AgencyPortalShell() {
   }, []);
 
   async function onSignOut() {
-    await signOut();
-    navigate('/agency/login', { replace: true });
+    setLogoutBusy(true);
+    try {
+      await signOut();
+      navigate('/agency/login', { replace: true });
+    } finally {
+      setLogoutBusy(false);
+      setLogoutOpen(false);
+    }
   }
+
+  const requestLogout = () => setLogoutOpen(true);
 
   return (
     <div
@@ -64,7 +75,7 @@ export default function AgencyPortalShell() {
         isMobile={isMobile}
         activeKey={activeKey}
         agencyName={agencyName}
-        onSignOut={() => void onSignOut()}
+        onSignOut={requestLogout}
       />
 
       {!isMobile && (
@@ -73,7 +84,7 @@ export default function AgencyPortalShell() {
           agencyName={agencyName}
           licenseNo={licenseNo}
           inboxCount={inboxCount}
-          onSignOut={() => void onSignOut()}
+          onSignOut={requestLogout}
         />
       )}
 
@@ -140,6 +151,15 @@ export default function AgencyPortalShell() {
         </div>
         <Outlet />
       </main>
+
+      <LogoutConfirmModal
+        open={logoutOpen}
+        busy={logoutBusy}
+        onCancel={() => {
+          if (!logoutBusy) setLogoutOpen(false);
+        }}
+        onConfirm={() => void onSignOut()}
+      />
     </div>
   );
 }

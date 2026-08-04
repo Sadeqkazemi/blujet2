@@ -40,6 +40,7 @@ describe('LoginPage', () => {
     expect(screen.getByRole('button', { name: 'ورود به سامانه' })).toBeInTheDocument();
     expect(screen.getByTestId('staff-passenger-link')).toHaveAttribute('href', '/signin');
     expect(screen.getByTestId('staff-agency-link')).toHaveAttribute('href', '/agency/login');
+    expect(screen.getByTestId('staff-login-home-logo')).toHaveAttribute('href', '/');
   });
 
   it('shows an inline Persian validation error when submitted empty', async () => {

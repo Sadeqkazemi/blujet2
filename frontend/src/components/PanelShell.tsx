@@ -17,6 +17,7 @@ import { isLowSalesRole } from '../types/panel-shell';
 import PanelNotificationBell, { type PanelNotificationItem } from './PanelNotificationBell';
 import PanelNotifBell from './PanelNotifBell';
 import PanelSearchBox from './PanelSearchBox';
+import LogoutConfirmModal from './LogoutConfirmModal';
 import { PANEL_BRAND_PLANE_ICON, panelNavIcon } from './panel-nav-icons';
 
 const ROLE_LABELS: Record<string, string> = {
@@ -68,6 +69,8 @@ export default function PanelShell() {
   const [nav, setNav] = useState<PanelNavItem[] | null>(null);
   const [badges, setBadges] = useState<Record<string, NavBadge>>({});
   const [notifications, setNotifications] = useState<PanelNotificationItem[]>([]);
+  const [logoutOpen, setLogoutOpen] = useState(false);
+  const [logoutBusy, setLogoutBusy] = useState(false);
   const [lowSalesAlerts, setLowSalesAlerts] = useState<LowSalesAlert[]>([]);
   const [employeeCtx, setEmployeeCtx] = useState<EmployeeContext | null>(null);
 
@@ -328,9 +331,40 @@ export default function PanelShell() {
   }, [visibleNav, navKeys, user?.role, lowSalesAlerts]);
 
   async function onSignOut() {
-    await signOut();
-    navigate('/login', { replace: true });
+    setLogoutBusy(true);
+    try {
+      await signOut();
+      navigate('/login', { replace: true });
+    } finally {
+      setLogoutBusy(false);
+      setLogoutOpen(false);
+    }
   }
+
+  const logoutButton = (
+    <button
+      type="button"
+      data-testid="panel-logout"
+      onClick={() => setLogoutOpen(true)}
+      className="mt-2 flex w-full items-center gap-2 rounded-[11px] px-[11px] py-2.5 text-[12.5px] font-bold text-[#f87171] transition hover:bg-[rgba(248,113,113,.1)]"
+    >
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden
+      >
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+        <path d="M16 17l5-5-5-5M21 12H9" />
+      </svg>
+      خروج از حساب
+    </button>
+  );
 
   const roleLabel = user ? (ROLE_LABELS[user.role] ?? user.role) : '';
   const brandSub =
@@ -446,42 +480,25 @@ export default function PanelShell() {
                 {user?.role === 'EMPLOYEE' ? (
                   <div className="truncate text-[10px] text-[#6b7b94]">{employeeFooterSub}</div>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => void onSignOut()}
-                    className="text-[10.5px] text-[#9fb0c7] transition hover:text-white"
-                  >
-                    خروج از حساب
-                  </button>
+                  <div className="truncate text-[10px] text-[#6b7b94]">دسترسی فعال</div>
                 )}
               </div>
-              {user?.role === 'EMPLOYEE' && (
-                <button
-                  type="button"
-                  onClick={() => void onSignOut()}
-                  title="خروج"
-                  aria-label="خروج از حساب"
-                  className="flex-none text-[#6b7b94] transition hover:text-white"
-                >
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                    <path d="M16 17l5-5-5-5M21 12H9" />
-                  </svg>
-                </button>
-              )}
             </div>
+            {logoutButton}
           </div>
         ) : (
-          <div className="mt-auto border-t border-panel-border pt-3">
-            <button
-              onClick={() => void onSignOut()}
-              className="w-full rounded-[11px] border border-panel-border py-2 text-xs text-panel-muted transition hover:bg-white/5"
-            >
-              خروج از حساب
-            </button>
-          </div>
+          <div className="mt-auto border-t border-panel-border pt-3">{logoutButton}</div>
         )}
       </aside>
+
+      <LogoutConfirmModal
+        open={logoutOpen}
+        busy={logoutBusy}
+        onCancel={() => {
+          if (!logoutBusy) setLogoutOpen(false);
+        }}
+        onConfirm={() => void onSignOut()}
+      />
 
       <main className="min-w-0 flex-1 overflow-y-auto">
         {executiveShell ? (

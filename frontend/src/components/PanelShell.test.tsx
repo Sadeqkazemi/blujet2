@@ -247,4 +247,35 @@ describe('PanelShell', () => {
     expect(screen.queryByText('احراز هویت مشتریان')).not.toBeInTheDocument();
     expect(screen.queryByText('تنظیمات سامانه')).not.toBeInTheDocument();
   });
+
+  it('opens a confirm modal before signing out', async () => {
+    const signOut = vi.fn().mockResolvedValue(undefined);
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      status: 'authenticated',
+      user: { id: 'u1', fullName: 'مدیر مالی', role: 'FINANCE_MANAGER', preferredLocale: 'FA' },
+      requestLogin: vi.fn(),
+      confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
+      signOut,
+    });
+    vi.spyOn(panelsApi, 'fetchNav').mockResolvedValue([
+      { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
+    ]);
+    vi.spyOn(reportingApi, 'fetchLowSalesAlerts').mockResolvedValue([]);
+
+    const { default: userEvent } = await import('@testing-library/user-event');
+    renderShell();
+
+    await userEvent.click(await screen.findByTestId('panel-logout'));
+    expect(screen.getByTestId('logout-confirm-modal')).toBeInTheDocument();
+    expect(screen.getByText('خروج از حساب کاربری')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId('logout-cancel'));
+    expect(screen.queryByTestId('logout-confirm-modal')).not.toBeInTheDocument();
+    expect(signOut).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByTestId('panel-logout'));
+    await userEvent.click(screen.getByTestId('logout-confirm'));
+    await waitFor(() => expect(signOut).toHaveBeenCalledTimes(1));
+  });
 });
