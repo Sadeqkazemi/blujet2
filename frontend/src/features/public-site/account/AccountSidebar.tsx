@@ -2,7 +2,7 @@ import type { AuthUser } from '../../../types/auth';
 import { faDigits } from '../../../lib/fa-format';
 import { useLocale, type StoredLocale } from '../../../hooks/useLocale';
 import type { TabKey } from './account-types';
-import { sidebarAccountNavItems } from './account-nav-items';
+import { accountNavByGroup, sidebarAccountNavItems } from './account-nav-items';
 
 const TIER_LABEL: Record<string, Record<StoredLocale, string>> = {
   SILVER: { fa: 'عضو نقره‌ای باشگاه', en: 'Silver Club Member', ar: 'عضو فضية النادي' },
@@ -224,6 +224,16 @@ export default function AccountSidebar({
       : t.newMember;
 
   const sidebarNav = sidebarAccountNavItems();
+  const primaryNav = accountNavByGroup('primary').filter((item) => item.showInSidebar);
+  const accountNav = accountNavByGroup('account').filter((item) => item.showInSidebar);
+  // Prefer grouped lists when both groups have items; fall back to flat filter.
+  const navGroups =
+    primaryNav.length > 0 || accountNav.length > 0
+      ? [
+          { key: 'primary' as const, items: primaryNav },
+          { key: 'account' as const, items: accountNav },
+        ].filter((g) => g.items.length > 0)
+      : [{ key: 'primary' as const, items: sidebarNav }];
 
   return (
     <aside
@@ -326,14 +336,19 @@ export default function AccountSidebar({
         </div>
       </div>
       <div style={{ padding: 9 }}>
-        {sidebarNav.map((item) => (
-          <NavButton
-            key={item.key}
-            tabKey={item.key}
-            label={item.label[locale]}
-            active={tab === item.key}
-            onSelect={() => onTabChange(item.key)}
-          />
+        {navGroups.map((group, groupIdx) => (
+          <div key={group.key}>
+            {groupIdx > 0 && <div style={{ height: 6 }} />}
+            {group.items.map((item) => (
+              <NavButton
+                key={item.key}
+                tabKey={item.key}
+                label={item.label[locale]}
+                active={tab === item.key}
+                onSelect={() => onTabChange(item.key)}
+              />
+            ))}
+          </div>
         ))}
         <div style={{ height: 1, background: '#eef1f5', margin: '11px 6px 7px' }} />
         <button

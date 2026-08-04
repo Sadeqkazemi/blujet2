@@ -7,7 +7,7 @@ export type AccountNavItem = {
   key: TabKey;
   group: AccountNavGroup;
   label: Record<StoredLocale, string>;
-  /** Show in the account page sidebar */
+  /** Show in the account page sidebar (desktop) */
   showInSidebar: boolean;
   /** Show in the public-site mobile hamburger drawer */
   showInMobileMenu: boolean;
@@ -33,84 +33,84 @@ export const ACCOUNT_NAV_ITEMS: AccountNavItem[] = [
     key: 'trips',
     group: 'primary',
     label: { fa: 'سفرها و خریدها', en: 'Trips & Purchases', ar: 'الرحلات والمشتريات' },
-    showInSidebar: false,
+    showInSidebar: true,
     showInMobileMenu: true,
   },
   {
     key: 'refunds',
     group: 'primary',
     label: { fa: 'استرداد بلیط', en: 'Refund Ticket', ar: 'استرداد التذكرة' },
-    showInSidebar: false,
+    showInSidebar: true,
     showInMobileMenu: true,
   },
   {
     key: 'wallet',
     group: 'primary',
     label: { fa: 'کیف پول و امتیاز', en: 'Wallet & Points', ar: 'المحفظة والنقاط' },
-    showInSidebar: false,
+    showInSidebar: true,
     showInMobileMenu: true,
   },
   {
     key: 'club',
     group: 'primary',
     label: { fa: 'باشگاه مشتریان', en: 'Loyalty Club', ar: 'نادي الولاء' },
-    showInSidebar: false,
-    showInMobileMenu: false,
+    showInSidebar: true,
+    showInMobileMenu: true,
   },
   {
     key: 'saved',
     group: 'account',
     label: { fa: 'نشان‌شده‌ها', en: 'Saved', ar: 'المحفوظة' },
-    showInSidebar: false,
+    showInSidebar: true,
     showInMobileMenu: true,
   },
   {
     key: 'price-locks',
     group: 'account',
     label: { fa: 'قفل قیمت', en: 'Price Lock', ar: 'قفل السعر' },
-    showInSidebar: false,
+    showInSidebar: true,
     showInMobileMenu: true,
   },
   {
     key: 'passengers',
     group: 'account',
     label: { fa: 'مسافران', en: 'Passengers', ar: 'المسافرون' },
-    showInSidebar: false,
+    showInSidebar: true,
     showInMobileMenu: true,
   },
   {
     key: 'tickets',
     group: 'account',
     label: { fa: 'پیام به پشتیبانی', en: 'Message Support', ar: 'رسالة للدعم' },
-    showInSidebar: false,
+    showInSidebar: true,
     showInMobileMenu: true,
   },
   {
     key: 'identity',
     group: 'account',
     label: { fa: 'احراز هویت', en: 'Identity Verification', ar: 'التحقق من الهوية' },
-    showInSidebar: false,
+    showInSidebar: true,
     showInMobileMenu: true,
   },
   {
     key: 'security',
     group: 'account',
     label: { fa: 'امنیت حساب', en: 'Account Security', ar: 'أمان الحساب' },
-    showInSidebar: false,
+    showInSidebar: true,
     showInMobileMenu: true,
   },
   {
     key: 'banks',
     group: 'account',
     label: { fa: 'حساب‌های بانکی', en: 'Bank Accounts', ar: 'الحسابات البنكية' },
-    showInSidebar: false,
+    showInSidebar: true,
     showInMobileMenu: true,
   },
   {
     key: 'referral',
     group: 'account',
     label: { fa: 'معرفی دوستان', en: 'Invite Friends', ar: 'دعوة الأصدقاء' },
-    showInSidebar: false,
+    showInSidebar: true,
     showInMobileMenu: true,
   },
 ];
