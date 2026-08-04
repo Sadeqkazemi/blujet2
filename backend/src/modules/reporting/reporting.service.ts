@@ -11,6 +11,9 @@ import { AgencyMembershipRequest } from '../../database/entities/agency-membersh
 import { Passenger } from '../../database/entities/passenger.entity';
 import { Booking } from '../../database/entities/booking.entity';
 import { FlightInstance } from '../../database/entities/flight-instance.entity';
+import { Airport } from '../../database/entities/airport.entity';
+import { RefundRequest } from '../../database/entities/refund-request.entity';
+import { SupportTicket } from '../../database/entities/support-ticket.entity';
 import {
   ZERO_IRR,
   absIrr,
@@ -499,48 +502,37 @@ export class ReportingService {
 
   /** Departed instances + per-channel SALE totals for the «شماره پرواز» picker. */
   async flightSales(): Promise<FlightSalesResult> {
-    await materializeDepartedInstances(this.typeorm);
+    await materializeDepartedInstances(this.dataSource);
 
-    const instances = await this.typeorm.flightInstance.findMany({
-      where: { status: 'DEPARTED' },
-      orderBy: { departureAt: 'desc' },
-      take: FLIGHT_SALES_LIST_LIMIT,
-      select: {
-        id: true,
-        departureAt: true,
-        capacity: true,
-        flight: {
-          select: {
-            flightNo: true,
-            route: { select: { originCode: true, destCode: true } },
-          },
-        },
-        _count: {
-          select: {
-            bookings: { where: { status: { in: ['PAID', 'TICKETED'] } } },
-          },
-        },
-      },
-    });
+    const instances = await this.flightInstanceRepo
+      .createQueryBuilder('fi')
+      .leftJoin('fi.flight', 'flight')
+      .leftJoin('flight.route', 'route')
+      .addSelect(['flight.flightNo'])
+      .addSelect(['route.originCode', 'route.destCode'])
+      .where('fi.status = :status', { status: 'DEPARTED' })
+      .orderBy('fi.departureAt', 'DESC')
+      .take(FLIGHT_SALES_LIST_LIMIT)
+      .getMany();
 
     const instanceIds = instances.map((i) => i.id);
-    const [entries, airports] = await Promise.all([
-      instanceIds.length === 0
-        ? Promise.resolve([])
-        : this.typeorm.ledgerEntry.findMany({
-            where: {
-              type: 'SALE',
-              bookingId: { not: null },
-              booking: { flightInstanceId: { in: instanceIds } },
-            },
-            select: {
-              signedAmountIrr: true,
-              booking: {
-                select: { channel: true, flightInstanceId: true },
-              },
-            },
-          }),
-      this.typeorm.airport.findMany({ select: { code: true, cityFa: true } }),
+    const [entries, airports, soldCounts] = await Promise.all([
+      instanceIds.length
+        ? this.ledgerEntryRepo
+            .createQueryBuilder('e')
+            .leftJoin('e.booking', 'booking')
+            .addSelect(['booking.channel', 'booking.flightInstanceId'])
+            .where('e.type = :type', { type: 'SALE' })
+            .andWhere('e.bookingId IS NOT NULL')
+            .andWhere('booking.flightInstanceId IN (:...ids)', {
+              ids: instanceIds,
+            })
+            .getMany()
+        : Promise.resolve<LedgerEntry[]>([]),
+      this.dataSource
+        .getRepository(Airport)
+        .find({ select: { code: true, cityFa: true } }),
+      this.bookingCountsByInstance(instanceIds, ['PAID', 'TICKETED']),
     ]);
 
     const cityByCode = new Map(airports.map((a) => [a.code, a.cityFa]));
@@ -584,7 +576,7 @@ export class ReportingService {
           agencyIrr: totals.AGENCY,
           totalIrr,
           capacity: i.capacity,
-          soldSeats: i._count.bookings,
+          soldSeats: soldCounts.get(i.id) ?? 0,
         };
       }),
     };
@@ -1015,50 +1007,65 @@ export class ReportingService {
       awaitingRefunds,
       openSupportTickets,
     ] = await Promise.all([
-      this.typeorm.agencyProfile.count({
-        where: { suspendedAt: null, user: { isActive: true } },
-      }),
-      this.typeorm.passenger.count({
+      this.agencyProfileRepo
+        .createQueryBuilder('a')
+        .leftJoin('a.user', 'u')
+        .where('a.suspendedAt IS NULL')
+        .andWhere('u.isActive = true')
+        .getCount(),
+      this.passengerRepo
+        .createQueryBuilder('p')
+        .leftJoin('p.booking', 'booking')
+        .where('p.deletedAt IS NULL')
+        .andWhere('booking.status IN (:...statuses)', {
+          statuses: [...bookingStatuses],
+        })
+        .andWhere('booking.createdAt >= :start AND booking.createdAt < :end', {
+          start: monthStart,
+          end: monthEnd,
+        })
+        .getCount(),
+      this.bookingRepo.count({
         where: {
-          deletedAt: null,
-          booking: {
-            status: { in: [...bookingStatuses] },
-            createdAt: { gte: monthStart, lt: monthEnd },
-          },
+          status: In([...bookingStatuses]),
+          createdAt: Raw((alias) => `${alias} >= :start AND ${alias} < :end`, {
+            start: monthStart,
+            end: monthEnd,
+          }),
+          deletedAt: IsNull(),
         },
       }),
-      this.typeorm.booking.count({
+      this.passengerRepo
+        .createQueryBuilder('p')
+        .leftJoin('p.booking', 'booking')
+        .where('p.deletedAt IS NULL')
+        .andWhere('booking.status IN (:...statuses)', {
+          statuses: [...bookingStatuses],
+        })
+        .andWhere('booking.createdAt >= :start AND booking.createdAt < :end', {
+          start: prevMonthStart,
+          end: monthStart,
+        })
+        .getCount(),
+      this.bookingRepo.count({
         where: {
-          status: { in: [...bookingStatuses] },
-          createdAt: { gte: monthStart, lt: monthEnd },
-          deletedAt: null,
+          status: In([...bookingStatuses]),
+          createdAt: Raw((alias) => `${alias} >= :start AND ${alias} < :end`, {
+            start: prevMonthStart,
+            end: monthStart,
+          }),
+          deletedAt: IsNull(),
         },
       }),
-      this.typeorm.passenger.count({
-        where: {
-          deletedAt: null,
-          booking: {
-            status: { in: [...bookingStatuses] },
-            createdAt: { gte: prevMonthStart, lt: monthStart },
-          },
-        },
+      this.agencyMembershipRequestRepo.count({
+        where: { status: In(['PENDING', 'REFERRED']) },
       }),
-      this.typeorm.booking.count({
-        where: {
-          status: { in: [...bookingStatuses] },
-          createdAt: { gte: prevMonthStart, lt: monthStart },
-          deletedAt: null,
-        },
-      }),
-      this.typeorm.agencyMembershipRequest.count({
-        where: { status: { in: ['PENDING', 'REFERRED'] } },
-      }),
-      this.typeorm.refundRequest.count({
-        where: { status: { in: ['SUBMITTED', 'REVIEW'] } },
-      }),
-      this.typeorm.supportTicket.count({
-        where: { status: { in: ['OPEN', 'IN_PROGRESS'] } },
-      }),
+      this.dataSource
+        .getRepository(RefundRequest)
+        .count({ where: { status: In(['SUBMITTED', 'REVIEW']) } }),
+      this.dataSource
+        .getRepository(SupportTicket)
+        .count({ where: { status: In(['OPEN', 'IN_PROGRESS']) } }),
     ]);
 
     return {

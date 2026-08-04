@@ -185,7 +185,10 @@ export class ClubService {
     return member;
   }
 
-  async listMembers(query: { level?: ClubTier; q?: string }) {
+  async listMembers(
+    query: { level?: ClubTier; q?: string },
+    _actor?: AuthenticatedUser,
+  ) {
     const qb = this.clubMemberRepo.createQueryBuilder('m');
     if (query.level) qb.andWhere('m.level = :level', { level: query.level });
     if (query.q) {
