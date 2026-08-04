@@ -21,3 +21,4 @@ ml-service/*.egg-info/
 .DS_Store
 __pycache__/
 *.pyc
+dump.rdb
