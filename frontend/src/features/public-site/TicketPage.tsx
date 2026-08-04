@@ -5,6 +5,7 @@ import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import type { BookingDetail } from '../../types/public-site';
 import PublicPageShell from '../../components/public/PublicPageShell';
+import FlightPathPlane from '../../components/public/FlightPathPlane';
 import TicketBarcode from '../../components/public/TicketBarcode';
 
 const CABIN_LABEL: Record<string, Record<StoredLocale, string>> = {
@@ -145,7 +146,7 @@ export default function TicketPage() {
               </div>
               <div className="relative border-t-2 border-dashed border-[#d5e1f0]">
                 <span className="absolute -top-2.5 right-1/2 translate-x-1/2 bg-white px-1.5 text-sm text-[#1668c4]">
-                  ✈
+                  <FlightPathPlane rtl={locale !== 'en'} size={14} />
                 </span>
               </div>
               <div className="mt-1.5">{formatDeparture(booking.departureAt, locale)}</div>

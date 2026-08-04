@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PublicPageShell from '../../components/public/PublicPageShell';
+import FlightPathPlane from '../../components/public/FlightPathPlane';
 import JalaliDatePicker from '../../components/JalaliDatePicker';
 import { fetchAirports } from '../../api/publicSite';
 import { lookupFlightStatus } from '../../api/flight-status';
@@ -380,7 +381,9 @@ export default function FlightStatusPage() {
                 </div>
                 <div style={{ flex: 1, textAlign: 'center', color: '#8a96a6', fontSize: 11 }}>
                   <div style={{ borderTop: '2px dashed #d5e1f0', margin: '8px 20px', position: 'relative' }}>
-                    <span style={{ position: 'absolute', top: -10, right: '50%', transform: 'translateX(50%)', background: '#fff', padding: '0 8px', color: '#1668c4' }}>✈</span>
+                    <span style={{ position: 'absolute', top: -10, right: '50%', transform: 'translateX(50%)', background: '#fff', padding: '0 8px', color: '#1668c4' }}>
+                      <FlightPathPlane rtl={locale !== 'en'} size={14} />
+                    </span>
                   </div>
                 </div>
                 <div style={{ textAlign: 'center' }}>

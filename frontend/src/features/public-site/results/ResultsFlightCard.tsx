@@ -1,3 +1,4 @@
+import FlightPathPlane from '../../../components/public/FlightPathPlane';
 import type { StoredLocale } from '../../../hooks/useLocale';
 import { faDigits, localeMoney } from '../../../lib/fa-format';
 import { formatJalaliDate } from '../../../lib/jalali';
@@ -103,7 +104,7 @@ export default function ResultsFlightCard({
                 fontSize: 21,
               }}
             >
-              ✈
+              <FlightPathPlane rtl={isRTL} size={21} style={{ color: '#6b7787' }} />
             </div>
             <span style={{ fontSize: 13.5, color: '#16202e', fontWeight: 700, textAlign: 'center' }}>{airline}</span>
           </div>
@@ -118,7 +119,7 @@ export default function ResultsFlightCard({
             <div style={{ fontSize: 13, color: '#6b7787', marginBottom: 6 }}>{dur}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, justifyContent: 'center' }}>
               <span style={{ flex: 1, height: 1.5, background: '#e0e5ec' }} />
-              <span style={{ color: '#c2cad4', fontSize: 14.5 }}>✈</span>
+              <FlightPathPlane rtl={isRTL} size={14.5} style={{ color: '#c2cad4' }} />
               <span style={{ flex: 1, height: 1.5, background: '#e0e5ec' }} />
             </div>
             <div style={{ marginTop: 8 }}>

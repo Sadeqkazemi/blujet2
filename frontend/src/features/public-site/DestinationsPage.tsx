@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchPublicHomeContent } from '../../api/site-content';
 import PublicPageShell from '../../components/public/PublicPageShell';
+import FlightPathPlane from '../../components/public/FlightPathPlane';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { formatToman } from '../../lib/fa-format';
@@ -478,7 +479,9 @@ export default function DestinationsPage() {
                   </span>
                   <span style={{ display: 'block', fontSize: '10.5px', color: '#8a96a6' }}>{r.freq[locale]}</span>
                 </span>
-                <span style={{ color: '#1668c4', fontSize: 15 }}>✈</span>
+                <span style={{ color: '#1668c4', fontSize: 15 }}>
+                  <FlightPathPlane rtl={locale !== 'en'} size={15} style={{ color: '#1668c4' }} />
+                </span>
                 <span style={{ lineHeight: 1.6, textAlign: 'left' }}>
                   <span style={{ display: 'block', fontSize: '13.5px', fontWeight: 800, color: '#0d2640' }}>
                     {r.toName[locale]}{' '}
