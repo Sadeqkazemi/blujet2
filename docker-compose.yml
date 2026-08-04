@@ -25,5 +25,18 @@ services:
       timeout: 5s
       retries: 10
 
+  ml-service:
+    build: ./ml-service
+    environment:
+      INTERNAL_TOKEN: change-me
+      LOG_LEVEL: info
+    ports:
+      - '8000:8000'
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   db_data:
