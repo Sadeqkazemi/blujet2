@@ -52,8 +52,7 @@ export class SearchController {
   @Get('advisory')
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @ApiOperation({
-    summary:
-      'رادار هوشمند قیمت — توصیه خرید/انتظار (advisory، degrade امن)',
+    summary: 'رادار هوشمند قیمت — توصیه خرید/انتظار (advisory، degrade امن)',
   })
   async getAdvisory(@Query() query: SearchAdvisoryDto, @Req() req: Request) {
     const requestId = req.headers['x-request-id'];

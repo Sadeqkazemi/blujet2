@@ -3,6 +3,7 @@ import { CareersService } from './careers.service';
 import { CareersSettings } from '../../database/entities/careers-settings.entity';
 import { JobPosting } from '../../database/entities/job-posting.entity';
 import { JobApplication } from '../../database/entities/job-application.entity';
+import { StoredFile } from '../../database/entities/stored-file.entity';
 import { User } from '../../database/entities/user.entity';
 import { AuditService } from '../audit/audit.service';
 
@@ -12,6 +13,7 @@ function makeService(userFind: jest.Mock) {
     {} as Repository<CareersSettings>,
     {} as Repository<JobPosting>,
     {} as Repository<JobApplication>,
+    {} as Repository<StoredFile>,
     userRepo,
     {} as AuditService,
   );

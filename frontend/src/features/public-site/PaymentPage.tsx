@@ -305,7 +305,6 @@ function PaymentPricingAside({
 }
 
 function PaymentMethodsSection({
-  locale,
   t,
   paymentMethod,
   setPaymentMethod,
@@ -315,7 +314,6 @@ function PaymentMethodsSection({
   promoCode,
   setPromoCode,
 }: {
-  locale: StoredLocale;
   t: (typeof PAYMENT_COPY)[StoredLocale];
   paymentMethod: PaymentMethod;
   setPaymentMethod: (m: PaymentMethod) => void;
@@ -534,7 +532,6 @@ export default function PaymentPage() {
 
   const paymentMethods = (
     <PaymentMethodsSection
-      locale={locale}
       t={t}
       paymentMethod={paymentMethod}
       setPaymentMethod={setPaymentMethod}

@@ -436,7 +436,7 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, on
                 <ChevronIcon isRTL={isRTL} />
               </Link>
             ))}
-            {AGENCY_NAV_ITEMS.map((item, i) => (
+            {AGENCY_NAV_ITEMS.map((item) => (
               <Link
                 key={item.key}
                 to={item.path}

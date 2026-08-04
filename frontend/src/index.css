@@ -28,11 +28,19 @@
      background, card/sidebar fill, and nested highlight boxes inside a
      card. */
   --color-panel-canvas: #0f1623;
+  --color-panel-bg: #0f1623;
   --color-panel-surface: #141d2e;
+  --color-panel-card: #141d2e;
   --color-panel-surface-2: #182236;
+  --color-panel-elevated: #18223a;
   --color-panel-ink: #e7ecf3;
+  --color-panel-text: #e7ecf3;
   --color-panel-muted: #9fb0c7;
   --color-panel-muted-2: #8fa1bb;
+  --color-panel-border: #1f2a3d;
+  --color-panel-border-2: #28344c;
+  --color-panel-accent: #3b82f6;
+  --color-panel-link: #60a5fa;
 }
 
 html,

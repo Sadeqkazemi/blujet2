@@ -15,6 +15,7 @@ import {
   EMPLOYEE_SECTION_NAV,
   PANEL_ACCESS_TOGGLE_RIGHTS,
   PANEL_NAV,
+  SITE_ADMIN_SIDEBAR_DENYLIST,
   PanelNavItem,
 } from './panel-nav.config';
 import { PERMISSION_CATALOG } from '../it-manager/permission-catalog';
@@ -33,7 +34,15 @@ export class PanelsService {
   ) {}
 
   async getNav(user: AuthenticatedUser): Promise<PanelNavItem[]> {
-    if (user.role !== 'EMPLOYEE') return PANEL_NAV[user.role] ?? [];
+    if (user.role !== 'EMPLOYEE') {
+      const items = PANEL_NAV[user.role] ?? [];
+      if (user.role === 'SITE_ADMIN') {
+        return items.filter(
+          (item) => !SITE_ADMIN_SIDEBAR_DENYLIST.has(item.key),
+        );
+      }
+      return items;
+    }
 
     const grants = await this.employeePermissionRepo.find({
       where: { employeeId: user.id },
@@ -101,8 +110,13 @@ export class PanelsService {
       cartable: 'کارتابل',
       referrals: 'ارجاعات',
     };
+    for (const [sectionKey, section] of Object.entries(EMPLOYEE_SECTION_NAV)) {
+      sectionLabels[sectionKey] = section.labelFa;
+    }
     for (const entry of PERMISSION_CATALOG) {
-      sectionLabels[entry.sectionKey] = entry.sectionLabelFa;
+      if (!sectionLabels[entry.sectionKey]) {
+        sectionLabels[entry.sectionKey] = entry.sectionLabelFa;
+      }
     }
 
     const grantedSectionKeys = new Set<string>();

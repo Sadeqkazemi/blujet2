@@ -76,7 +76,10 @@ describe('Reporting (e2e)', () => {
         aircraftType: AIRCRAFT_TYPE,
       }),
     );
-    const departureAt = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
+    // Backdated (not a future flight) so materializeDepartedInstances flips
+    // it to DEPARTED by the time /reporting/flight-sales reads it — booking
+    // creation only checks instance.status === 'SCHEDULED', not the date.
+    const departureAt = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
     const instanceRepo = dataSource.getRepository(FlightInstance);
     const instance = await instanceRepo.save(
       instanceRepo.create({
@@ -274,6 +277,34 @@ describe('Reporting (e2e)', () => {
       BigInt(String(res.body.data[0].charterIrr)) +
       BigInt(String(res.body.data[0].agencyIrr));
     expect(total).toBeGreaterThan(0n);
+  });
+
+  it('flight-sales lists departed instances with channel totals for the picker', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/reporting/flight-sales')
+      .set('Authorization', `Bearer ${ceoToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data.rows)).toBe(true);
+    expect(res.body.data.rows.length).toBeGreaterThan(0);
+    const row = res.body.data.rows.find(
+      (r: { flightNo: string }) => r.flightNo === ownFlightNo,
+    );
+    expect(row).toBeDefined();
+    expect(row).toEqual(
+      expect.objectContaining({
+        flightInstanceId: expect.any(String),
+        flightNo: ownFlightNo,
+        originCityFa: expect.any(String),
+        destCityFa: expect.any(String),
+        departureAt: expect.any(String),
+        systemIrr: expect.anything(),
+        charterIrr: expect.anything(),
+        agencyIrr: expect.anything(),
+        totalIrr: expect.anything(),
+        capacity: expect.any(Number),
+        soldSeats: expect.any(Number),
+      }),
+    );
   });
 
   it('completed-flights-summary reconciles: sold + unsold === total seats', async () => {

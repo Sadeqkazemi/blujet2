@@ -15,7 +15,13 @@ import { ErrorCode } from '../../common/errors';
 import { normalizeIranPhone } from '../../common/normalize-iran-phone';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import { SupportTicketStatus } from '../../database/enums';
-import type { SubmitSupportTicketDto } from './dto/support-ticket.dtos';
+import type {
+  SubmitSupportTicketDto,
+  AdminCreateSupportTicketDto,
+} from './dto/support-ticket.dtos';
+
+/** Staff-created tickets without a phone use this sentinel (schema requires a string). */
+const STAFF_TICKET_PHONE_SENTINEL = '09000000000';
 
 function generateTrackingCode(): string {
   return `TK${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
@@ -62,6 +68,48 @@ export class SupportTicketsService {
       }),
     );
     return { id: ticket.id, trackingCode: ticket.trackingCode };
+  }
+
+  /** SITE_ADMIN create-ticket modal — sets dept/priority at insert time. */
+  async createAsAdmin(
+    actor: AuthenticatedUser,
+    dto: AdminCreateSupportTicketDto,
+  ) {
+    const phoneRaw = dto.requesterPhone?.trim();
+    const phone = phoneRaw
+      ? normalizeIranPhone(phoneRaw)
+      : STAFF_TICKET_PHONE_SENTINEL;
+    const ticket = await this.ticketRepo.save(
+      this.ticketRepo.create({
+        trackingCode: generateTrackingCode(),
+        requesterName: dto.requesterName,
+        requesterPhone: phone,
+        subject: dto.subject,
+        body: dto.body,
+        dept: dto.dept,
+        priority: dto.priority,
+        updatedAt: new Date(),
+        history: [
+          {
+            step: 'submitted',
+            labelFa: `ثبت تیکت توسط ${actor.fullName} (ادمین سایت)`,
+            at: new Date().toISOString(),
+          },
+        ],
+      }),
+    );
+
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'SYSTEM',
+      action: 'ثبت تیکت پشتیبانی توسط ادمین',
+      detail: `تیکت ${ticket.trackingCode} («${ticket.subject}») توسط ${actor.fullName} ثبت شد.`,
+      entityType: 'SupportTicket',
+      entityId: ticket.id,
+    });
+
+    return ticket;
   }
 
   async submitForUser(actor: AuthenticatedUser, dto: SubmitSupportTicketDto) {

@@ -132,7 +132,7 @@ describe('Flightops (e2e)', () => {
   // ── Role gate ───────────────────────────────────────────────────────
 
   it('403s for a role outside the flightops set (SENIOR_MANAGER, EMPLOYEE)', async () => {
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const seniorRes = await request(app.getHttpServer())
       .get('/flightops')
       .set('Authorization', auth(senior.accessToken));
@@ -145,19 +145,19 @@ describe('Flightops (e2e)', () => {
     expect(employeeRes.status).toBe(403);
   });
 
-  it('200s for all 4 design-confirmed roles', async () => {
-    for (const username of [
-      'ceo',
-      'site.admin',
-      'finance.karimi',
-      'comm.abbasi',
-    ]) {
+  it('200s for SITE_ADMIN / FINANCE / COMMERCIAL; CEO is outside the set', async () => {
+    for (const username of ['site.admin', 'finance', 'comm']) {
       const { accessToken } = await loginAs(app, username);
       const res = await request(app.getHttpServer())
         .get('/flightops')
         .set('Authorization', auth(accessToken));
       expect(res.status).toBe(200);
     }
+    const ceo = await loginAs(app, 'ceo');
+    const ceoRes = await request(app.getHttpServer())
+      .get('/flightops')
+      .set('Authorization', auth(ceo.accessToken));
+    expect(ceoRes.status).toBe(403);
   });
 
   // ── List: KPIs + auto-close + نیرا materialization ────────────────────
@@ -170,7 +170,7 @@ describe('Flightops (e2e)', () => {
       seatCode: '4C',
     });
 
-    const { accessToken } = await loginAs(app, 'ceo');
+    const { accessToken } = await loginAs(app, 'site.admin');
     const res = await request(app.getHttpServer())
       .get('/flightops')
       .set('Authorization', auth(accessToken));
@@ -199,7 +199,7 @@ describe('Flightops (e2e)', () => {
 
   it('leaves an instance well outside the window open, with no نیرا submission', async () => {
     const instance = await createInstance(48);
-    const { accessToken } = await loginAs(app, 'ceo');
+    const { accessToken } = await loginAs(app, 'site.admin');
     const res = await request(app.getHttpServer())
       .get('/flightops')
       .set('Authorization', auth(accessToken));
@@ -214,7 +214,7 @@ describe('Flightops (e2e)', () => {
 
   it('submitting twice is a no-op — provider called once, timestamp unchanged', async () => {
     const instance = await createInstance(2);
-    const { accessToken } = await loginAs(app, 'ceo');
+    const { accessToken } = await loginAs(app, 'site.admin');
 
     const first = await request(app.getHttpServer())
       .get(`/flightops/${instance.id}`)
@@ -237,7 +237,7 @@ describe('Flightops (e2e)', () => {
     await addSoldPassenger(openInstance.id);
     await addSoldPassenger(openInstance.id);
 
-    const { accessToken } = await loginAs(app, 'ceo');
+    const { accessToken } = await loginAs(app, 'site.admin');
     const res = await request(app.getHttpServer())
       .get('/flightops')
       .set('Authorization', auth(accessToken));
@@ -294,7 +294,7 @@ describe('Flightops (e2e)', () => {
       }),
     );
 
-    const { accessToken } = await loginAs(app, 'ceo');
+    const { accessToken } = await loginAs(app, 'site.admin');
     const res = await request(app.getHttpServer())
       .get(`/flightops/${instance.id}`)
       .set('Authorization', auth(accessToken));
@@ -315,7 +315,7 @@ describe('Flightops (e2e)', () => {
   });
 
   it('404 for a missing or CANCELLED instance', async () => {
-    const { accessToken } = await loginAs(app, 'ceo');
+    const { accessToken } = await loginAs(app, 'site.admin');
     const missingRes = await request(app.getHttpServer())
       .get(`/flightops/${crypto.randomUUID()}`)
       .set('Authorization', auth(accessToken));

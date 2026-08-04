@@ -42,6 +42,9 @@ export class SettingsPublicController {
   async getSiteContent(@Query('locale') locale?: PublicContentLocale) {
     const loc =
       locale === 'en' || locale === 'ar' || locale === 'fa' ? locale : 'fa';
-    return { success: true, data: await this.settings.getPublicSiteContent(loc) };
+    return {
+      success: true,
+      data: await this.settings.getPublicSiteContent(loc),
+    };
   }
 }

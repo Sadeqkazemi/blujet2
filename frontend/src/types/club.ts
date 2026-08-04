@@ -13,6 +13,8 @@ export interface ClubMember {
   cardStatus: ClubCardStatus;
   cardNo: string | null;
   issuedByLabelFa: string | null;
+  /** Decrypted for SITE_ADMIN only (profiles + VIP Excel export). */
+  nationalId?: string;
 }
 
 export interface ClubMembersResult {
@@ -27,7 +29,7 @@ export interface ClubMembersResult {
 }
 
 export interface ClubSubmittedCardRequest extends ClubCardRequest {
-  status: 'SUBMITTED';
+  status: ClubCardRequestStatus;
   member: ClubCardRequest['member'] & {
     birthDate: string | null;
     joinDate: string;

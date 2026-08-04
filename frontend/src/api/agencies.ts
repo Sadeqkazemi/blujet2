@@ -156,6 +156,14 @@ export function fetchAgencyWebserviceRequests(id: string) {
   );
 }
 
+/** SITE_ADMIN / commercial — all agencies' webservice purchase requests */
+export function fetchAllWebserviceRequests(status?: 'PENDING' | 'APPROVED' | 'REJECTED') {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+  return apiGet<import('../types/agency-portal').AgencyWebserviceQueueRow[]>(
+    `/agencies/webservice-requests${qs}`,
+  );
+}
+
 export function decideAgencyWebserviceRequest(
   id: string,
   reqId: string,

@@ -49,7 +49,7 @@ describe('Phase 13 — reservation engine completion', () => {
     app = await createTestApp();
     dataSource = app.get(DataSource);
     customerToken = (await loginAsCustomer(app, '09901119901')).accessToken!;
-    staffToken = (await loginAs(app, 'senior.rahimi')).accessToken!;
+    staffToken = (await loginAs(app, 'senior')).accessToken!;
 
     await upsertSeatMap(AIRCRAFT_SMALL, {
       businessRowStart: 1,
@@ -275,7 +275,7 @@ describe('Phase 13 — reservation engine completion', () => {
     const stepUp1 = await stepUpFor(
       app,
       staffToken,
-      'senior.rahimi',
+      'senior',
       'PRICE_CAPACITY_CHANGE',
     );
     const okChange = await request(app.getHttpServer())
@@ -324,7 +324,7 @@ describe('Phase 13 — reservation engine completion', () => {
     const stepUp2 = await stepUpFor(
       app,
       staffToken,
-      'senior.rahimi',
+      'senior',
       'PRICE_CAPACITY_CHANGE',
     );
     const rejectedChange = await request(app.getHttpServer())

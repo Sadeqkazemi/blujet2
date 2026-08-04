@@ -171,7 +171,7 @@ describe('Phase 27 — EMPLOYEE fl_manage/ag_settle/fn_invoices (e2e)', () => {
       expect(denied.status).toBe(403);
     });
 
-    it('fl_manage unlocks the "flights" nav tab', async () => {
+    it('fl_manage grants API access but never adds a "flights" nav tab — «مدیریت پروازها» stays out of the employee sidebar per product', async () => {
       const { username } = await createEmployeeWithPermissions('commercial', [
         'fl_manage',
       ]);
@@ -182,7 +182,7 @@ describe('Phase 27 — EMPLOYEE fl_manage/ag_settle/fn_invoices (e2e)', () => {
         .set('Authorization', `Bearer ${accessToken}`);
       expect(nav.status).toBe(200);
       const keys = (nav.body.data as { key: string }[]).map((n) => n.key);
-      expect(keys).toContain('flights');
+      expect(keys).not.toContain('flights');
     });
   });
 
@@ -338,7 +338,7 @@ describe('Phase 27 — EMPLOYEE fl_manage/ag_settle/fn_invoices (e2e)', () => {
   });
 
   it("doesn't affect non-EMPLOYEE roles: SENIOR_MANAGER still has full flights + agencies access despite holding zero EmployeePermission rows", async () => {
-    const { accessToken } = await loginAs(app, 'senior.rahimi');
+    const { accessToken } = await loginAs(app, 'senior');
     const agency = await dataSource
       .getRepository(AgencyProfile)
       .createQueryBuilder('a')

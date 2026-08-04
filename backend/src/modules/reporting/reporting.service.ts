@@ -11,6 +11,9 @@ import { AgencyMembershipRequest } from '../../database/entities/agency-membersh
 import { Passenger } from '../../database/entities/passenger.entity';
 import { Booking } from '../../database/entities/booking.entity';
 import { FlightInstance } from '../../database/entities/flight-instance.entity';
+import { Airport } from '../../database/entities/airport.entity';
+import { RefundRequest } from '../../database/entities/refund-request.entity';
+import { SupportTicket } from '../../database/entities/support-ticket.entity';
 import {
   ZERO_IRR,
   absIrr,
@@ -24,6 +27,7 @@ import {
   Bucket,
   CompletedFlightsSummary,
   FinanceDashboardStats,
+  FlightSalesResult,
   KpiResult,
   KpiTrends,
   SalesChartPeriod,
@@ -33,6 +37,7 @@ import {
 
 const LOW_SALES_WINDOW_HOURS = 72;
 const LOW_SALES_OCCUPANCY_THRESHOLD = 0.6;
+const FLIGHT_SALES_LIST_LIMIT = 60;
 
 @Injectable()
 export class ReportingService {
@@ -54,6 +59,12 @@ export class ReportingService {
     private readonly bookingRepo: Repository<Booking>,
     @InjectRepository(FlightInstance)
     private readonly flightInstanceRepo: Repository<FlightInstance>,
+    @InjectRepository(Airport)
+    private readonly airportRepo: Repository<Airport>,
+    @InjectRepository(RefundRequest)
+    private readonly refundRequestRepo: Repository<RefundRequest>,
+    @InjectRepository(SupportTicket)
+    private readonly supportTicketRepo: Repository<SupportTicket>,
   ) {}
 
   private buildBuckets(
@@ -513,6 +524,88 @@ export class ReportingService {
     return new Map(rows.map((r) => [r.flightInstanceId, Number(r.count)]));
   }
 
+  /** Departed instances + per-channel SALE totals for the «شماره پرواز» picker. */
+  async flightSales(): Promise<FlightSalesResult> {
+    await materializeDepartedInstances(this.dataSource);
+
+    const instances = await this.flightInstanceRepo
+      .createQueryBuilder('fi')
+      .leftJoin('fi.flight', 'flight')
+      .leftJoin('flight.route', 'route')
+      .select(['fi.id', 'fi.departureAt', 'fi.capacity'])
+      .addSelect(['flight.id', 'flight.flightNo'])
+      .addSelect(['route.id', 'route.originCode', 'route.destCode'])
+      .where('fi.status = :status', { status: 'DEPARTED' })
+      .orderBy('fi.departureAt', 'DESC')
+      .take(FLIGHT_SALES_LIST_LIMIT)
+      .getMany();
+
+    const instanceIds = instances.map((i) => i.id);
+    const [counts, entries, airports] = await Promise.all([
+      this.bookingCountsByInstance(instanceIds, ['PAID', 'TICKETED']),
+      instanceIds.length === 0
+        ? Promise.resolve([])
+        : this.ledgerEntryRepo
+            .createQueryBuilder('e')
+            .leftJoin('e.booking', 'booking')
+            .select(['e.signedAmountIrr'])
+            .addSelect(['booking.channel', 'booking.flightInstanceId'])
+            .where('e.type = :type', { type: 'SALE' })
+            .andWhere('e.bookingId IS NOT NULL')
+            .andWhere('booking.flightInstanceId IN (:...ids)', {
+              ids: instanceIds,
+            })
+            .getMany(),
+      this.airportRepo.find({ select: { code: true, cityFa: true } }),
+    ]);
+
+    const cityByCode = new Map(airports.map((a) => [a.code, a.cityFa]));
+    const totalsByInstance = new Map<
+      string,
+      { SYSTEM: Irr; CHARTER: Irr; AGENCY: Irr }
+    >();
+    for (const entry of entries) {
+      const instanceId = entry.booking?.flightInstanceId;
+      const channel = entry.booking?.channel;
+      if (!instanceId || !channel) continue;
+      const cur = totalsByInstance.get(instanceId) ?? {
+        SYSTEM: ZERO_IRR,
+        CHARTER: ZERO_IRR,
+        AGENCY: ZERO_IRR,
+      };
+      cur[channel] = addIrr(cur[channel], entry.signedAmountIrr);
+      totalsByInstance.set(instanceId, cur);
+    }
+
+    return {
+      rows: instances.map((i) => {
+        const totals = totalsByInstance.get(i.id) ?? {
+          SYSTEM: ZERO_IRR,
+          CHARTER: ZERO_IRR,
+          AGENCY: ZERO_IRR,
+        };
+        const totalIrr = addIrr(totals.SYSTEM, totals.CHARTER, totals.AGENCY);
+        const originCode = i.flight.route.originCode;
+        const destCode = i.flight.route.destCode;
+        return {
+          flightInstanceId: i.id,
+          flightNo: i.flight.flightNo,
+          originCode,
+          destCode,
+          originCityFa: cityByCode.get(originCode) ?? originCode,
+          destCityFa: cityByCode.get(destCode) ?? destCode,
+          departureAt: i.departureAt.toISOString(),
+          systemIrr: totals.SYSTEM,
+          charterIrr: totals.CHARTER,
+          agencyIrr: totals.AGENCY,
+          totalIrr,
+          capacity: i.capacity,
+          soldSeats: counts.get(i.id) ?? 0,
+        };
+      }),
+    };
+  }
+
   async completedFlightsSummary(
     granularity: SalesGranularity,
     params: {
@@ -881,5 +974,114 @@ export class ReportingService {
       ]);
 
     return { activeAgencies, passengersThisMonth, pendingAgencyRequests };
+  }
+
+  /** SITE_ADMIN dashboard KPI row — design-reference-v2/پنل ادمین سایت.dc.html */
+  async siteAdminOverview(): Promise<{
+    activeAgencies: number;
+    passengersThisMonth: number;
+    ticketsSoldThisMonth: number;
+    pendingActionCount: number;
+    agenciesTrendPct: number | null;
+    passengersTrendPct: number | null;
+    ticketsTrendPct: number | null;
+  }> {
+    const now = new Date();
+    const monthStart = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
+    );
+    const monthEnd = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
+    );
+    const prevMonthStart = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1),
+    );
+    const bookingStatuses = ['PAID', 'TICKETED'] as const;
+
+    const momPct = (current: number, previous: number): number | null => {
+      if (previous <= 0) return null;
+      return Math.round(((current - previous) / previous) * 100);
+    };
+
+    const [
+      activeAgencies,
+      passengersThisMonth,
+      ticketsSoldThisMonth,
+      passengersPrevMonth,
+      ticketsPrevMonth,
+      pendingAgencyRequests,
+      awaitingRefunds,
+      openSupportTickets,
+    ] = await Promise.all([
+      this.agencyProfileRepo
+        .createQueryBuilder('a')
+        .leftJoin('a.user', 'user')
+        .where('a.suspendedAt IS NULL')
+        .andWhere('user.isActive = true')
+        .getCount(),
+      this.passengerRepo
+        .createQueryBuilder('p')
+        .leftJoin('p.booking', 'booking')
+        .where('p.deletedAt IS NULL')
+        .andWhere('booking.status IN (:...statuses)', {
+          statuses: bookingStatuses,
+        })
+        .andWhere('booking.createdAt >= :start AND booking.createdAt < :end', {
+          start: monthStart,
+          end: monthEnd,
+        })
+        .getCount(),
+      this.bookingRepo
+        .createQueryBuilder('b')
+        .where('b.status IN (:...statuses)', { statuses: bookingStatuses })
+        .andWhere('b.createdAt >= :start AND b.createdAt < :end', {
+          start: monthStart,
+          end: monthEnd,
+        })
+        .andWhere('b.deletedAt IS NULL')
+        .getCount(),
+      this.passengerRepo
+        .createQueryBuilder('p')
+        .leftJoin('p.booking', 'booking')
+        .where('p.deletedAt IS NULL')
+        .andWhere('booking.status IN (:...statuses)', {
+          statuses: bookingStatuses,
+        })
+        .andWhere('booking.createdAt >= :start AND booking.createdAt < :end', {
+          start: prevMonthStart,
+          end: monthStart,
+        })
+        .getCount(),
+      this.bookingRepo
+        .createQueryBuilder('b')
+        .where('b.status IN (:...statuses)', { statuses: bookingStatuses })
+        .andWhere('b.createdAt >= :start AND b.createdAt < :end', {
+          start: prevMonthStart,
+          end: monthStart,
+        })
+        .andWhere('b.deletedAt IS NULL')
+        .getCount(),
+      this.agencyMembershipRequestRepo.count({
+        where: { status: In(['PENDING', 'REFERRED']) },
+      }),
+      this.refundRequestRepo.count({
+        where: { status: In(['SUBMITTED', 'REVIEW']) },
+      }),
+      this.supportTicketRepo.count({
+        where: { status: In(['OPEN', 'IN_PROGRESS']) },
+      }),
+    ]);
+
+    return {
+      activeAgencies,
+      passengersThisMonth,
+      ticketsSoldThisMonth,
+      pendingActionCount:
+        pendingAgencyRequests + awaitingRefunds + openSupportTickets,
+      // Agency count is a stock metric — MoM % only for flow metrics.
+      agenciesTrendPct: null,
+      passengersTrendPct: momPct(passengersThisMonth, passengersPrevMonth),
+      ticketsTrendPct: momPct(ticketsSoldThisMonth, ticketsPrevMonth),
+    };
   }
 }

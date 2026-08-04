@@ -365,6 +365,8 @@ export class FlightsService {
       departureAt: string;
       capacity: number;
       basePriceIrr: Irr;
+      aircraftType?: string;
+      charterSeats?: number;
     },
   ) {
     if (dto.originCode === dto.destCode) {
@@ -390,8 +392,35 @@ export class FlightsService {
       });
     }
 
+    const charterSeats = dto.charterSeats ?? 0;
+    if (charterSeats >= dto.capacity) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'تعهد چارتری باید کمتر از تعداد صندلی موجود باشد.',
+      });
+    }
+
+    const aircraftType =
+      (dto.aircraftType ?? 'Airbus A320').trim() || 'Airbus A320';
+    if (dto.aircraftType) {
+      const map = await this.seatMapRepo.findOneBy({ aircraftType });
+      if (!map) {
+        throw new BadRequestException({
+          code: ErrorCode.VALIDATION_FAILED,
+          message: 'نوع هواپیمای انتخاب‌شده در کاتالوگ نیست.',
+        });
+      }
+    }
+
     const route = await this.findOrCreateRoute(dto.originCode, dto.destCode);
+    const existingFlight = await this.flightRepo.findOneBy({
+      flightNo: dto.flightNo,
+    });
     const flight = await this.findOrCreateFlight(dto.flightNo, route.id);
+    if (dto.aircraftType && !existingFlight) {
+      flight.aircraftType = aircraftType;
+      await this.flightRepo.save(flight);
+    }
 
     const created = await this.instanceRepo.save(
       this.instanceRepo.create({
@@ -399,9 +428,12 @@ export class FlightsService {
         departureAt,
         arrivalAt: new Date(departureAt.getTime() + route.durationMin * 60_000),
         capacity: dto.capacity,
-        charterSeats: 0,
+        charterSeats,
         status: 'SCHEDULED',
         basePriceIrr: dto.basePriceIrr,
+        ...(existingFlight && dto.aircraftType
+          ? { aircraftTypeOverride: aircraftType }
+          : {}),
       }),
     );
     const instance = await this.instanceRepo

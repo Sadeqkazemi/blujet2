@@ -142,7 +142,7 @@ describe('Phase 18 — SITE_ADMIN + EMPLOYEE panel access (e2e)', () => {
       const member = await createClubMember();
       const finance = await dataSource
         .getRepository(User)
-        .findOneByOrFail({ username: 'finance.karimi' });
+        .findOneByOrFail({ username: 'finance' });
 
       const checks: Array<[string, () => Promise<request.Response>]> = [
         [
@@ -281,7 +281,7 @@ describe('Phase 18 — SITE_ADMIN + EMPLOYEE panel access (e2e)', () => {
       const reqRow = await createAgencyRequest();
       const comm = await dataSource
         .getRepository(User)
-        .findOneByOrFail({ username: 'comm.abbasi' });
+        .findOneByOrFail({ username: 'comm' });
 
       const res = await request(app.getHttpServer())
         .patch(`/agencies/requests/${reqRow.id}/refer`)
@@ -293,7 +293,7 @@ describe('Phase 18 — SITE_ADMIN + EMPLOYEE panel access (e2e)', () => {
 
   // ── EMPLOYEE ────────────────────────────────────────────────────────
   describe('EMPLOYEE', () => {
-    it('sales.moradi (seeded with ag_list + fl_view) can list agencies and flights overview, but not agency detail/requests (no ag_info/ag_requests)', async () => {
+    it('sales.moradi (seeded with ag_list, no fl_view) can list agencies but not flights overview or agency detail/requests (no fl_view/ag_info/ag_requests)', async () => {
       const { accessToken } = await loginAs(app, 'sales.moradi');
       const agency = await dataSource
         .getRepository(AgencyProfile)
@@ -308,7 +308,7 @@ describe('Phase 18 — SITE_ADMIN + EMPLOYEE panel access (e2e)', () => {
       const overview = await request(app.getHttpServer())
         .get('/flights/overview')
         .set('Authorization', `Bearer ${accessToken}`);
-      expect(overview.status).toBe(200);
+      expect(overview.status).toBe(403);
 
       const detail = await request(app.getHttpServer())
         .get(`/agencies/${agency.userId}`)
@@ -350,7 +350,7 @@ describe('Phase 18 — SITE_ADMIN + EMPLOYEE panel access (e2e)', () => {
       const refund = await createRefundRequest();
       const finance = await dataSource
         .getRepository(User)
-        .findOneByOrFail({ username: 'finance.karimi' });
+        .findOneByOrFail({ username: 'finance' });
 
       const list = await request(app.getHttpServer())
         .get('/refunds')
@@ -415,7 +415,7 @@ describe('Phase 18 — SITE_ADMIN + EMPLOYEE panel access (e2e)', () => {
     });
 
     it("doesn't affect non-EMPLOYEE roles: FINANCE_MANAGER still has full refunds access despite holding zero EmployeePermission rows", async () => {
-      const { accessToken } = await loginAs(app, 'finance.karimi');
+      const { accessToken } = await loginAs(app, 'finance');
       const refund = await createRefundRequest();
 
       const res = await request(app.getHttpServer())

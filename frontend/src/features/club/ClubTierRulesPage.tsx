@@ -24,6 +24,9 @@ const TIER_SWATCH: Record<ClubTier, string> = {
   PLATINUM: '#1d4ed8',
 };
 
+const inputClass =
+  'font-num h-11 w-full rounded-[10px] border border-[#28344c] bg-[#0f1726] px-3 text-center text-[13px] text-[#e7ecf3] outline-none';
+
 function rangeLabel(minPoints: number, maxPoints: number | null): string {
   const min = faDigits(minPoints);
   if (maxPoints === null) return `بیش از ${min}`;
@@ -93,34 +96,44 @@ export default function ClubTierRulesPage() {
   }
 
   if (!rules) {
-    return <p className="p-8 text-sm text-muted">{error ?? 'در حال بارگذاری…'}</p>;
+    return <p className="px-[21px] py-8 text-sm text-[#6b7b94]">{error ?? 'در حال بارگذاری…'}</p>;
   }
 
   return (
-    <div className="p-8">
-      <h1 className="mb-1 text-xl font-black text-ink">قوانین باشگاه مشتریان</h1>
-      <p className="mb-6 text-sm text-muted">
-        این قوانین حد نصاب امتیاز هر سطح عضویت را تعیین می‌کنند و برای تمام اعضای باشگاه مشتریان به‌صورت یکسان اعمال
-        می‌شوند.
-      </p>
+    <div className="flex flex-col gap-[15px] px-[21px] pb-[34px] pt-[18px]">
+      <div>
+        <h1 className="m-0 text-[20.5px] font-black text-white">قوانین باشگاه مشتریان</h1>
+        <p className="mt-1 text-[11.5px] text-[#6b7b94]">
+          تعیین حد نصاب امتیاز برای هر سطح عضویت باشگاه مشتریان — برای همه اعضا یکسان اعمال می‌شود
+        </p>
+      </div>
 
-      {notice && <p className="mb-4 rounded-lg bg-[#10b98115] p-3 text-sm text-[#059669]">{notice}</p>}
-      {error && <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">{error}</p>}
+      {notice && (
+        <p className="rounded-[12px] bg-[rgba(52,211,153,.12)] p-3 text-sm text-[#34d399]">{notice}</p>
+      )}
+      {error && <p className="rounded-[12px] bg-[rgba(248,113,113,.12)] p-3 text-sm text-[#f87171]">{error}</p>}
 
-      <div className="mb-6 rounded-xl border border-border bg-white p-5">
-        <div className="mb-4 text-sm font-bold text-ink">حد نصاب امتیاز سطوح عضویت</div>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="flex items-center gap-2 rounded-xl border border-[rgba(59,130,246,.25)] bg-[rgba(59,130,246,.08)] px-3 py-[11px] text-[11.5px] text-[#9fb0c7]">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="2" className="flex-none">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 8v5M12 16h.01" />
+        </svg>
+        این قوانین حد نصاب امتیاز هر سطح عضویت را تعیین می‌کنند و برای تمام اعضای باشگاه مشتریان به‌صورت یکسان
+        اعمال می‌شوند.
+      </div>
+
+      <div className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] px-[19px] py-[18px]">
+        <div className="mb-4 flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-[#3b82f6]" />
+          <h2 className="m-0 text-[14.5px] font-extrabold text-white">حد نصاب امتیاز سطوح عضویت</h2>
+        </div>
+        <div className="grid grid-cols-1 gap-[13px] md:grid-cols-3">
           <div>
-            <label className="mb-1.5 block text-[11.5px] text-muted">نقره‌ای (شروع)</label>
-            <input
-              value="۰"
-              disabled
-              dir="ltr"
-              className="font-num h-11 w-full rounded-lg border border-border bg-surface px-3 text-center text-sm text-muted outline-none"
-            />
+            <label className="mb-[7px] block text-[11.5px] text-[#9fb0c7]">نقره‌ای (شروع)</label>
+            <input value="۰" disabled dir="ltr" className={`${inputClass} text-[#5a6678]`} />
           </div>
           <div>
-            <label htmlFor="ctr-gold" className="mb-1.5 block text-[11.5px] text-muted">
+            <label htmlFor="ctr-gold" className="mb-[7px] block text-[11.5px] text-[#9fb0c7]">
               حد نصاب طلایی
             </label>
             <input
@@ -130,11 +143,11 @@ export default function ClubTierRulesPage() {
               onChange={(e) => setGoldInput(e.target.value)}
               dir="ltr"
               inputMode="numeric"
-              className="font-num h-11 w-full rounded-lg border border-border bg-white px-3 text-center text-sm text-ink outline-none"
+              className={inputClass}
             />
           </div>
           <div>
-            <label htmlFor="ctr-platinum" className="mb-1.5 block text-[11.5px] text-muted">
+            <label htmlFor="ctr-platinum" className="mb-[7px] block text-[11.5px] text-[#9fb0c7]">
               حد نصاب پلاتین
             </label>
             <input
@@ -144,13 +157,13 @@ export default function ClubTierRulesPage() {
               onChange={(e) => setPlatinumInput(e.target.value)}
               dir="ltr"
               inputMode="numeric"
-              className="font-num h-11 w-full rounded-lg border border-border bg-white px-3 text-center text-sm text-ink outline-none"
+              className={inputClass}
             />
           </div>
         </div>
 
         <div className="mt-4">
-          <label htmlFor="ctr-card" className="mb-1.5 block text-[11.5px] text-muted">
+          <label htmlFor="ctr-card" className="mb-[7px] block text-[11.5px] text-[#9fb0c7]">
             حد نصاب امتیاز برای درخواست صدور کارت عضویت
           </label>
           <input
@@ -160,7 +173,7 @@ export default function ClubTierRulesPage() {
             onChange={(e) => setCardInput(e.target.value)}
             dir="ltr"
             inputMode="numeric"
-            className="font-num h-11 max-w-[260px] w-full rounded-lg border border-border bg-white px-3 text-center text-sm text-ink outline-none"
+            className={`${inputClass} max-w-[260px]`}
           />
         </div>
 
@@ -169,40 +182,43 @@ export default function ClubTierRulesPage() {
           data-testid="ctr-save"
           disabled={saving}
           onClick={() => void onSave()}
-          className="mt-5 rounded-lg bg-accent px-6 py-2.5 text-xs font-bold text-white transition hover:brightness-110 disabled:opacity-60"
+          className="mt-[18px] inline-flex h-[46px] items-center justify-center rounded-[11px] bg-[#3b82f6] px-[22px] text-[12.5px] font-extrabold text-white transition hover:brightness-110 disabled:opacity-60"
         >
           {saving ? 'در حال ذخیره…' : 'ذخیره قوانین'}
         </button>
 
         {rules.updatedByLabelFa && (
-          <p className="mt-3 text-[11px] text-muted">
+          <p className="mt-3 text-[11px] text-[#6b7b94]">
             آخرین تغییر: {formatJalaliDateTime(rules.updatedAt)} توسط {rules.updatedByLabelFa}
           </p>
         )}
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-border bg-white">
-        <div className="border-b border-border px-5 py-3">
-          <div className="text-sm font-bold text-ink">پیش‌نمایش سطوح</div>
+      <div className="overflow-hidden rounded-[14px] border border-[#1f2a3d] bg-[#141d2e]">
+        <div className="border-b border-[#1f2a3d] px-[15px] py-3">
+          <h2 className="m-0 text-[14.5px] font-extrabold text-white">پیش‌نمایش سطوح</h2>
         </div>
-        <div className="grid grid-cols-3 border-b border-border px-5 py-2.5 text-[10.5px] font-bold text-muted">
+        <div className="grid grid-cols-3 border-b border-[#1f2a3d] px-[15px] py-2.5 text-[10.5px] font-bold text-[#6b7b94]">
           <span>سطح</span>
           <span>محدوده امتیاز</span>
           <span>رنگ نمایش</span>
         </div>
         {rules.preview.map((row) => (
-          <div key={row.tier} className="grid grid-cols-3 items-center border-b border-border/60 px-5 py-3 text-xs last:border-b-0">
-            <span className="font-bold text-ink">{TIER_LABEL[row.tier]}</span>
-            <span dir="ltr" className="font-num text-muted">
+          <div
+            key={row.tier}
+            className="grid grid-cols-3 items-center border-b border-[#1a2436] px-[15px] py-[11px] text-xs last:border-b-0"
+          >
+            <span className="font-bold text-[#e7ecf3]">{TIER_LABEL[row.tier]}</span>
+            <span dir="ltr" className="font-num text-[#9fb0c7]">
               {rangeLabel(row.minPoints, row.maxPoints)}
             </span>
-            <span className="flex items-center gap-2">
+            <span className="flex items-center gap-[7px]">
               <span
                 data-testid={`ctr-swatch-${row.tier}`}
-                className="h-4 w-4 rounded"
+                className="h-4 w-4 rounded-[5px]"
                 style={{ background: TIER_SWATCH[row.tier] }}
               />
-              <span dir="ltr" className="font-num text-[10.5px] text-muted">
+              <span dir="ltr" className="font-num text-[10.5px] text-[#9fb0c7]">
                 {TIER_SWATCH[row.tier]}
               </span>
             </span>

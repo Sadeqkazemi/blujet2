@@ -347,12 +347,7 @@ describe('Careers (e2e)', () => {
       expect(list.status).toBe(200);
       expect(list.body.data.length).toBeGreaterThan(0);
 
-      for (const username of [
-        'ceo',
-        'itadmin',
-        'comm.abbasi',
-        'finance.karimi',
-      ]) {
+      for (const username of ['ceo', 'itadmin', 'comm', 'finance']) {
         const { accessToken } = await loginAs(app, username);
         const forbidden = await request(app.getHttpServer())
           .get('/careers/applications')
@@ -410,7 +405,7 @@ describe('Careers (e2e)', () => {
       const admin = await loginAs(app, 'site.admin');
       const commercial = await dataSource
         .getRepository(User)
-        .findOneByOrFail({ username: 'comm.abbasi' });
+        .findOneByOrFail({ username: 'comm' });
 
       const referred = await request(app.getHttpServer())
         .patch(`/careers/applications/${appId}/refer`)

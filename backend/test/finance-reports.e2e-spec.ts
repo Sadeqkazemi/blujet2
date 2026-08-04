@@ -32,7 +32,7 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
   // ── recent transactions ────────────────────────────────────────────────
 
   it('GET /reporting/recent-transactions: finance manager gets real ledger rows with party labels; other roles 403', async () => {
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const res = await request(app.getHttpServer())
       .get('/reporting/recent-transactions')
       .set('Authorization', auth(finance.accessToken));
@@ -54,7 +54,7 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
   });
 
   it('GET /reporting/kpis: returns trend percentages alongside KPI values', async () => {
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const res = await request(app.getHttpServer())
       .get('/reporting/kpis?granularity=q6')
       .set('Authorization', auth(finance.accessToken));
@@ -75,8 +75,8 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
     expect(trends).toHaveProperty('agencyDebtPct');
   });
 
-  it('GET /reporting/finance-dashboard-stats: finance manager gets real dashboard cards; other roles 403', async () => {
-    const finance = await loginAs(app, 'finance.karimi');
+  it('GET /reporting/finance-dashboard-stats: executive + finance roles get real dashboard cards; others 403', async () => {
+    const finance = await loginAs(app, 'finance');
     const res = await request(app.getHttpServer())
       .get('/reporting/finance-dashboard-stats')
       .set('Authorization', auth(finance.accessToken));
@@ -95,9 +95,45 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
     expect(typeof data.activeAgenciesTrendPct).toBe('number');
 
     const ceo = await loginAs(app, 'ceo');
-    const forbidden = await request(app.getHttpServer())
+    const ceoRes = await request(app.getHttpServer())
       .get('/reporting/finance-dashboard-stats')
       .set('Authorization', auth(ceo.accessToken));
+    expect(ceoRes.status).toBe(200);
+    expect(ceoRes.body.data.activeAgencies).toBeGreaterThan(0);
+
+    const commercial = await loginAs(app, 'comm');
+    const forbidden = await request(app.getHttpServer())
+      .get('/reporting/finance-dashboard-stats')
+      .set('Authorization', auth(commercial.accessToken));
+    expect(forbidden.status).toBe(403);
+  });
+
+  it('GET /reporting/site-admin-overview: SITE_ADMIN gets KPI row; others 403', async () => {
+    const siteAdmin = await loginAs(app, 'site.admin');
+    const res = await request(app.getHttpServer())
+      .get('/reporting/site-admin-overview')
+      .set('Authorization', auth(siteAdmin.accessToken));
+    expect(res.status).toBe(200);
+    const data = res.body.data as {
+      activeAgencies: number;
+      passengersThisMonth: number;
+      ticketsSoldThisMonth: number;
+      pendingActionCount: number;
+      agenciesTrendPct: number | null;
+      passengersTrendPct: number | null;
+      ticketsTrendPct: number | null;
+    };
+    expect(data.activeAgencies).toBeGreaterThan(0);
+    expect(data.passengersThisMonth).toBeGreaterThanOrEqual(0);
+    expect(data.ticketsSoldThisMonth).toBeGreaterThanOrEqual(0);
+    expect(data.pendingActionCount).toBeGreaterThanOrEqual(0);
+    expect(data).toHaveProperty('passengersTrendPct');
+    expect(data).toHaveProperty('ticketsTrendPct');
+
+    const finance = await loginAs(app, 'finance');
+    const forbidden = await request(app.getHttpServer())
+      .get('/reporting/site-admin-overview')
+      .set('Authorization', auth(finance.accessToken));
     expect(forbidden.status).toBe(403);
   });
 
@@ -126,7 +162,7 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
   // ── agency settlements ─────────────────────────────────────────────────
 
   it('GET /reporting/agency-settlements: per-agency paid ratio + status from real invoices; finance only', async () => {
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const res = await request(app.getHttpServer())
       .get('/reporting/agency-settlements')
       .set('Authorization', auth(finance.accessToken));
@@ -147,7 +183,7 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
     expect(overdue!.overdueDays).toBeGreaterThan(0);
     expect(Number(outstandingIrr)).toBeGreaterThan(0);
 
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
     const forbidden = await request(app.getHttpServer())
       .get('/reporting/agency-settlements')
       .set('Authorization', auth(commercial.accessToken));
@@ -155,7 +191,7 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
   });
 
   it('FINANCE_MANAGER can now trigger the Phase 3 invoice remind (design: settlements row action)', async () => {
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const settleRes = await request(app.getHttpServer())
       .get('/reporting/agency-settlements')
       .set('Authorization', auth(finance.accessToken));
@@ -211,7 +247,7 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
       }),
     );
 
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const res = await request(app.getHttpServer())
       .get(
         `/passenger-reports/search?q=${encodeURIComponent(`مسافر گزارش ${suffix}`)}`,
@@ -260,7 +296,7 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
       }),
     );
 
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const res = await request(app.getHttpServer())
       .get(`/passenger-reports/search?q=${nationalId}`)
       .set('Authorization', auth(finance.accessToken));
@@ -296,7 +332,7 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
       }),
     );
 
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const res = await request(app.getHttpServer())
       .get('/staff-reports')
       .set('Authorization', auth(finance.accessToken));
@@ -324,7 +360,7 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
       .getRepository(User)
       .findOneByOrFail({ role: 'EMPLOYEE', dept: In(['commercial', 'sales']) });
 
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const res = await request(app.getHttpServer())
       .get(`/staff-reports?staffId=${commEmployee.id}`)
       .set('Authorization', auth(finance.accessToken));
@@ -333,7 +369,7 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
   });
 
   it('staff reports: roles without the tab (SENIOR_MANAGER) get 403', async () => {
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const res = await request(app.getHttpServer())
       .get('/staff-reports')
       .set('Authorization', auth(senior.accessToken));

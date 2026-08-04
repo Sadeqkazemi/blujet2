@@ -17,6 +17,9 @@ describe('ReportingService (unit)', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
     );
   });
 

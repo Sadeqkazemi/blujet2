@@ -41,7 +41,7 @@ describe('EMPLOYEE cartable (e2e)', () => {
   async function seedTaskFor(assigneeId: string) {
     const commercial = await dataSource
       .getRepository(User)
-      .findOneByOrFail({ username: 'comm.abbasi' });
+      .findOneByOrFail({ username: 'comm' });
     const repo = dataSource.getRepository(CartableTask);
     return repo.save(
       repo.create({
@@ -121,7 +121,7 @@ describe('EMPLOYEE cartable (e2e)', () => {
     ]);
     const manager = await dataSource
       .getRepository(User)
-      .findOneByOrFail({ username: 'comm.abbasi' });
+      .findOneByOrFail({ username: 'comm' });
     const { accessToken } = await loginAs(app, username);
 
     const send = await request(app.getHttpServer())
@@ -135,7 +135,7 @@ describe('EMPLOYEE cartable (e2e)', () => {
       .get('/cartable')
       .set(
         'Authorization',
-        `Bearer ${(await loginAs(app, 'comm.abbasi')).accessToken}`,
+        `Bearer ${(await loginAs(app, 'comm')).accessToken}`,
       );
     expect(
       mgrCartable.body.data.tasks.some((t: { title: string }) =>

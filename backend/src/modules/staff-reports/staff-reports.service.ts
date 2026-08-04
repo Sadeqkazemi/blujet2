@@ -90,4 +90,22 @@ export class StaffReportsService {
       })),
     };
   }
+
+  /** EMPLOYEE «گزارش‌های من» — own AuditLog feed (design activity cards). */
+  async myActivity(actor: AuthenticatedUser) {
+    const rows = await this.auditLogRepo.find({
+      where: { actorId: actor.id },
+      order: { createdAt: 'DESC' },
+      take: 40,
+    });
+    return {
+      items: rows.map((r) => ({
+        id: r.id,
+        title: r.action,
+        detail: r.detail,
+        category: r.category,
+        at: r.createdAt.toISOString(),
+      })),
+    };
+  }
 }

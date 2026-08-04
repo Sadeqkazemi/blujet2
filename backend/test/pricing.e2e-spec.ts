@@ -88,7 +88,7 @@ describe('Pricing (e2e)', () => {
 
   it('Commercial proposes a price for a scheduled flight; re-PUT while PENDING edits it', async () => {
     const instance = await createScheduledInstance();
-    const { accessToken } = await loginAs(app, 'comm.abbasi');
+    const { accessToken } = await loginAs(app, 'comm');
 
     const created = await request(app.getHttpServer())
       .put(`/pricing/flights/${instance.id}/proposal`)
@@ -126,7 +126,7 @@ describe('Pricing (e2e)', () => {
       .send({ proposedPriceIrr: 1_000_000 });
     expect(forbidden.status).toBe(403);
 
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
     const notFound = await request(app.getHttpServer())
       .put(`/pricing/flights/${crypto.randomUUID()}/proposal`)
       .set('Authorization', `Bearer ${commercial.accessToken}`)
@@ -142,7 +142,7 @@ describe('Pricing (e2e)', () => {
 
   it('CEO registers with source=PROPOSED; proposal locks; further edits/registers → 409', async () => {
     const instance = await createScheduledInstance();
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
     const created = await request(app.getHttpServer())
       .put(`/pricing/flights/${instance.id}/proposal`)
       .set('Authorization', `Bearer ${commercial.accessToken}`)
@@ -186,7 +186,7 @@ describe('Pricing (e2e)', () => {
 
   it('register with source=AI without a stored suggestion → 409 with a clear message', async () => {
     const instance = await createScheduledInstance();
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
     const created = await request(app.getHttpServer())
       .put(`/pricing/flights/${instance.id}/proposal`)
       .set('Authorization', `Bearer ${commercial.accessToken}`)
@@ -209,7 +209,7 @@ describe('Pricing (e2e)', () => {
 
   it('AI analysis persists suggestions with modelVersion, mutates nothing else, and register {source:AI} uses it', async () => {
     const instance = await createScheduledInstance();
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
     const created = await request(app.getHttpServer())
       .put(`/pricing/flights/${instance.id}/proposal`)
       .set('Authorization', `Bearer ${commercial.accessToken}`)
@@ -273,7 +273,7 @@ describe('Pricing (e2e)', () => {
 
   it('editing a PENDING proposal after AI analysis clears the stale suggestion — register {source:AI} then 409s', async () => {
     const instance = await createScheduledInstance();
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
     const created = await request(app.getHttpServer())
       .put(`/pricing/flights/${instance.id}/proposal`)
       .set('Authorization', `Bearer ${commercial.accessToken}`)
@@ -330,7 +330,7 @@ describe('Pricing (e2e)', () => {
 
   it('register {source:AI} rejects a suggestion above the CEO-approved legal rate', async () => {
     const instance = await createScheduledInstance();
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
     const created = await request(app.getHttpServer())
       .put(`/pricing/flights/${instance.id}/proposal`)
       .set('Authorization', `Bearer ${commercial.accessToken}`)
@@ -380,7 +380,7 @@ describe('Pricing (e2e)', () => {
 
   it('ml-service down: ai-analysis degrades gracefully (available:false, no 500) and register-by-proposed still works', async () => {
     const instance = await createScheduledInstance();
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
     const created = await request(app.getHttpServer())
       .put(`/pricing/flights/${instance.id}/proposal`)
       .set('Authorization', `Bearer ${commercial.accessToken}`)
@@ -409,7 +409,7 @@ describe('Pricing (e2e)', () => {
 
   it('CEO legal-rate PATCH stores + audits; Finance/Board Chair get 403 everywhere', async () => {
     const instance = await createScheduledInstance();
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
     const created = await request(app.getHttpServer())
       .put(`/pricing/flights/${instance.id}/proposal`)
       .set('Authorization', `Bearer ${commercial.accessToken}`)
@@ -424,7 +424,7 @@ describe('Pricing (e2e)', () => {
     expect(legal.status).toBe(200);
     expect(legal.body.data.legalRateIrr).toBe('45000000');
 
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const listForbidden = await request(app.getHttpServer())
       .get('/pricing/proposals')
       .set('Authorization', `Bearer ${finance.accessToken}`);
@@ -439,7 +439,7 @@ describe('Pricing (e2e)', () => {
 
   it('role-shaped GET: CEO gets pending/registered lists, Commercial gets flight rows joined with proposals', async () => {
     const instance = await createScheduledInstance();
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
     await request(app.getHttpServer())
       .put(`/pricing/flights/${instance.id}/proposal`)
       .set('Authorization', `Bearer ${commercial.accessToken}`)

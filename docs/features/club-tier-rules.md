@@ -7,11 +7,9 @@ workflow rule 1.
 Commercial Manager panel tab (`clubrules`), found in the earlier
 design-bundle audit: `design-reference-v2/پنل مدیر بازرگانی.dc.html`'s
 own `titles.clubrules`/`subs.clubrules` and the `showClubRules` markup
-block (lines 723–747 of that file). Access restricted to `CEO` and
-`COMMERCIAL_MANAGER` only — confirmed against that file's own
-`roleDefs.access` arrays (only `super` and `commercial` list
-`clubrules`) and against every other executive-panel design file (none
-of them mention a `clubrules` tab at all).
+block (lines 723–747 of that file). Access restricted to
+`COMMERCIAL_MANAGER` only — the CEO design sidebar has no `clubrules`
+entry; commercial panel owns this tab.
 
 Lets a manager configure the point thresholds that define each club
 membership tier (`نقره‌ای`/`طلایی`/`پلاتین` — SILVER/GOLD/PLATINUM), plus
@@ -28,11 +26,10 @@ behavior where `level` never changes except via an explicit manual
       `prisma/seed.ts`) with `goldMinPoints`, `platinumMinPoints`,
       `cardRequestMinPoints`, `updatedAt`, `updatedByLabelFa`, and a
       computed 3-row `preview` array (SILVER/GOLD/PLATINUM with min/max
-      point range) — accessible only to `CEO`/`COMMERCIAL_MANAGER`
-      (401/403 for every other role, including `SENIOR_MANAGER` and
-      `BOARD_CHAIR` who have no `clubrules` access per the design) —
+      point range) — accessible only to `COMMERCIAL_MANAGER`
+      (401/403 for every other role, including `CEO`) —
       `club.e2e-spec.ts` › "GET returns the seeded defaults + computed
-      preview for CEO and COMMERCIAL_MANAGER; other roles get 403"
+      preview for COMMERCIAL_MANAGER; other roles get 403"
 - [x] `PATCH /club/tier-rules` accepts `{ goldMinPoints,
       platinumMinPoints, cardRequestMinPoints }`, validates all three
       are non-negative integers and `goldMinPoints < platinumMinPoints`,
@@ -62,17 +59,13 @@ behavior where `level` never changes except via an explicit manual
       thresholds), inline validation error display, a "ذخیره قوانین"
       save button, and the read-only 3-row tier-preview table — matching
       `design-reference-v2/پنل مدیر بازرگانی.dc.html`'s layout
-- [x] `PANEL_NAV` gains a `clubrules` key for `CEO` and
-      `COMMERCIAL_MANAGER` only (`backend/src/modules/panels/panel-nav.config.ts`)
+- [x] `PANEL_NAV` gains a `clubrules` key for `COMMERCIAL_MANAGER` only
+      (`backend/src/modules/panels/panel-nav.config.ts`)
 - [x] Backend (Jest + Supertest): integration tests for `GET`/`PATCH`
-      `/club/tier-rules` — happy path, 401/403 for non-`CEO`/
-      `COMMERCIAL_MANAGER` roles (including `SENIOR_MANAGER`/
-      `BOARD_CHAIR`), 400 on invalid ordering/negative values, audit-log
-      entry created. Unit test for `ClubPointsService.syncCache`'s tier
-      recompute (crossing into GOLD, crossing into PLATINUM, staying in
-      SILVER, redemption dropping a member back a tier). — 4 pre-existing
-      + 9 new tests in `club.e2e-spec.ts` (13/13 passing), 8/8 passing in
-      `club-tier.spec.ts`
+      `/club/tier-rules` — happy path, 401/403 for non-`COMMERCIAL_MANAGER`
+      roles (including `CEO`), 400 on invalid ordering/negative values,
+      audit-log entry created. Unit test for `ClubPointsService.syncCache`'s
+      tier recompute — `club.e2e-spec.ts` + `club-tier.spec.ts`
 - [x] Frontend (Vitest + RTL): form rendering, validation messages,
       save success/error states, tier-preview table rendering with
       real-shaped data. — `ClubTierRulesPage.test.tsx`, 4/4 passing

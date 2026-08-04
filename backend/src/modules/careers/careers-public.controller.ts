@@ -4,12 +4,14 @@ import {
   Get,
   Param,
   Post,
+  Res,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
+import type { Response } from 'express';
 import { CareersService, RESUME_MAX_BYTES } from './careers.service';
 import { ApplyJobDto } from './dto/careers.dtos';
 
@@ -39,6 +41,20 @@ export class CareersPublicController {
   @ApiOperation({ summary: 'جزئیات یک فرصت شغلی' })
   async getPublicJob(@Param('id') id: string) {
     return { success: true, data: await this.careers.getPublicJob(id) };
+  }
+
+  @Get('media/:fileId')
+  @Throttle({ default: { limit: 120, ttl: 60_000 } })
+  @ApiOperation({ summary: 'تصویر آگهی فرصت شغلی (عمومی)' })
+  async readMedia(@Param('fileId') fileId: string, @Res() res: Response) {
+    const { mimeType, fileName, stream } =
+      await this.careers.readPublicMedia(fileId);
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename*=UTF-8''${encodeURIComponent(fileName)}`,
+    );
+    stream.pipe(res);
   }
 
   @Post('jobs/:id/apply')

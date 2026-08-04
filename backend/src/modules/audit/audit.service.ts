@@ -64,14 +64,22 @@ export class AuditService {
         ? [
             { ...base, action: ILike(`%${filters.q}%`) },
             { ...base, detail: ILike(`%${filters.q}%`) },
+            { ...base, actor: { fullName: ILike(`%${filters.q}%`) } },
           ]
         : base;
 
-    return this.auditRepo.find({
+    const rows = await this.auditRepo.find({
       where,
       order: { createdAt: 'DESC' },
       take: 100,
+      relations: { actor: true },
     });
+
+    // CEO design card shows manager display name + role label.
+    return rows.map(({ actor, ...r }) => ({
+      ...r,
+      actorName: actor.fullName,
+    }));
   }
 
   /** IT Manager's "لاگ و رویدادها" — system-category + account-management entries. */

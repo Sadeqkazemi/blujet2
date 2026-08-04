@@ -13,7 +13,7 @@ import { ApiRequestError } from '../../api/envelope';
 import { useAuth } from '../../hooks/useAuth';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
-import { formatToman, localeMoney } from '../../lib/fa-format';
+import { localeMoney } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
 import { airportCityLabel, airportCityName } from '../../lib/airport-cities';
 import type {
@@ -24,11 +24,12 @@ import type {
   SearchFlightResult,
 } from '../../types/public-site';
 import PublicPageShell from '../../components/public/PublicPageShell';
+import Pagination from '../../components/Pagination';
+import { usePagination } from '../../hooks/usePagination';
 import ResultsAiRadar from './results/ResultsAiRadar';
 import ResultsEditSearchModal from './results/ResultsEditSearchModal';
 import ResultsFlightCard from './results/ResultsFlightCard';
 import { RESULTS_COPY } from './results/results-copy';
-import { demoFlightsForThrMhd, isThrMhdRoute } from './results/results-demo-flights';
 import {
   depHourBucket,
   flightAirlineLabel,
@@ -37,7 +38,6 @@ import {
 } from './results/results-utils';
 
 const GOLD_TIER_LEVELS = ['GOLD', 'PLATINUM'];
-const PAGE_SIZE = 5;
 
 type RealLockResult =
   | { kind: 'success'; lock: PriceLock }
@@ -81,7 +81,6 @@ export default function ResultsPage() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
 
   const [fStops, setFStops] = useState<'all' | 'direct' | 'one'>('all');
   const [fTime, setFTime] = useState<'all' | 'morning' | 'noon' | 'evening'>('all');
@@ -121,7 +120,6 @@ export default function ResultsPage() {
     setSearchError(null);
     setAiState('idle');
     setAdvisory(null);
-    setPage(1);
     setExpandedId(null);
 
     const timeout = window.setTimeout(() => {
@@ -154,14 +152,8 @@ export default function ResultsPage() {
   const cityLabel = (code: string) =>
     airportCityLabel(code, locale, airportMap.get(code)?.cityFa);
 
-  /** API results, or design-reference demo flights for THR↔MHD while loading / when inventory is empty. */
-  const effectiveResults = useMemo(() => {
-    const demo =
-      isThrMhdRoute(origin, dest) && date ? demoFlightsForThrMhd(origin, dest, date) : [];
-    if (results === null) return demo.length > 0 ? demo : null;
-    if (results.length > 0) return results;
-    return demo.length > 0 ? demo : [];
-  }, [results, origin, dest, date]);
+  /** Real search API only — never invent demo flights when inventory is empty. */
+  const effectiveResults = results;
 
   const airlines = useMemo(() => {
     const set = new Set<string>();
@@ -178,8 +170,7 @@ export default function ResultsPage() {
     return sortFlights(list, sort);
   }, [effectiveResults, fStops, fTime, fAirline, sort]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredResults.length / PAGE_SIZE));
-  const pagedResults = filteredResults.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const resultsPager = usePagination(filteredResults);
 
   const aiPickId = useMemo(() => {
     if (!advisory || advisory.recommendation !== 'buy' || filteredResults.length === 0) return null;
@@ -261,7 +252,7 @@ export default function ResultsPage() {
     setFStops('all');
     setFTime('all');
     setFAirline('all');
-    setPage(1);
+    resultsPager.setPage(1);
   }
 
   if (!origin || !dest || !date) {
@@ -453,7 +444,7 @@ export default function ResultsPage() {
           }}
         >
           <span style={{ fontSize: 13.5, color: '#5a6678' }}>
-            {copy.flightsCount(filteredResults.length, page, totalPages)}
+            {copy.flightsCount(filteredResults.length, resultsPager.page, resultsPager.totalPages)}
           </span>
           <div style={{ display: 'flex', background: '#fff', border: '1px solid #eef1f5', borderRadius: 12, overflow: 'hidden' }}>
             {(
@@ -468,7 +459,7 @@ export default function ResultsPage() {
                 type="button"
                 onClick={() => {
                   setSort(k);
-                  setPage(1);
+                  resultsPager.setPage(1);
                 }}
                 style={{
                   padding: '9px 14px',
@@ -650,7 +641,7 @@ export default function ResultsPage() {
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
-          {pagedResults.map((r) => {
+          {resultsPager.pageItems.map((r) => {
             const cabin = primaryCabin(r);
             if (!cabin) return null;
             return (
@@ -761,71 +752,12 @@ export default function ResultsPage() {
           </div>
         )}
 
-        {filteredResults.length > PAGE_SIZE && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 26 }}>
-            <button
-              type="button"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              style={{
-                height: 42,
-                padding: '0 15px',
-                border: '1px solid #e6eaf0',
-                borderRadius: 11,
-                background: '#fff',
-                color: '#5a6678',
-                fontSize: 13,
-                fontWeight: 700,
-                cursor: page <= 1 ? 'default' : 'pointer',
-                opacity: page <= 1 ? 0.5 : 1,
-                fontFamily: 'inherit',
-              }}
-            >
-              {copy.prevLabel}
-            </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => setPage(p)}
-                style={{
-                  width: 42,
-                  height: 42,
-                  border: p === page ? '1px solid #1668c4' : '1px solid #e6eaf0',
-                  borderRadius: 11,
-                  background: p === page ? '#1668c4' : '#fff',
-                  color: p === page ? '#fff' : '#5a6678',
-                  fontSize: 13.5,
-                  fontWeight: p === page ? 800 : 600,
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
-                }}
-              >
-                {formatToman(p, locale)}
-              </button>
-            ))}
-            <button
-              type="button"
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              style={{
-                height: 42,
-                padding: '0 15px',
-                border: '1px solid #e6eaf0',
-                borderRadius: 11,
-                background: '#fff',
-                color: '#5a6678',
-                fontSize: 13,
-                fontWeight: 700,
-                cursor: page >= totalPages ? 'default' : 'pointer',
-                opacity: page >= totalPages ? 0.5 : 1,
-                fontFamily: 'inherit',
-              }}
-            >
-              {copy.nextLabel}
-            </button>
-          </div>
-        )}
+        <Pagination
+          page={resultsPager.page}
+          totalPages={resultsPager.totalPages}
+          onChange={resultsPager.setPage}
+          variant="light"
+        />
       </div>
 
       <ResultsEditSearchModal

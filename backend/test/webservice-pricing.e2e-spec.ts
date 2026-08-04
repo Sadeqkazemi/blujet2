@@ -72,7 +72,7 @@ describe('Webservice pricing (e2e)', () => {
   }
 
   it('COMMERCIAL_MANAGER patches plan prices; agency portal reads them on new requests', async () => {
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
 
     const patchRes = await request(app.getHttpServer())
       .patch('/webservice/pricing')
@@ -115,7 +115,7 @@ describe('Webservice pricing (e2e)', () => {
   });
 
   it('FINANCE_MANAGER cannot patch webservice pricing (403)', async () => {
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const res = await request(app.getHttpServer())
       .patch('/webservice/pricing')
       .set('Authorization', `Bearer ${finance.accessToken}`)
