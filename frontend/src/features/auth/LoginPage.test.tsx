@@ -72,4 +72,22 @@ describe('LoginPage', () => {
       'برای بازیابی رمز عبور، با واحد فناوری اطلاعات (مدیر IT) تماس بگیرید',
     );
   });
+
+  it('toggles password visibility with an eye icon control', async () => {
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue(baseAuth);
+    renderLoginPage();
+
+    const input = screen.getByLabelText('رمز عبور');
+    expect(input).toHaveAttribute('type', 'password');
+
+    await userEvent.click(screen.getByTestId('staff-toggle-password'));
+    expect(input).toHaveAttribute('type', 'text');
+    expect(screen.getByTestId('staff-toggle-password')).toHaveAttribute(
+      'aria-label',
+      'پنهان کردن رمز عبور',
+    );
+
+    await userEvent.click(screen.getByTestId('staff-toggle-password'));
+    expect(input).toHaveAttribute('type', 'password');
+  });
 });
