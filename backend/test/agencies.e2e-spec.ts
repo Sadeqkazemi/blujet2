@@ -2,19 +2,29 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import * as crypto from 'node:crypto';
-import { TypeORMService } from '../src/typeorm/typeorm.service';
+import { DataSource } from 'typeorm';
+import { User } from '../src/database/entities/user.entity';
+import { AgencyProfile } from '../src/database/entities/agency-profile.entity';
+import { AgencyCreditLine } from '../src/database/entities/agency-credit-line.entity';
+import { AgencyMembershipRequest } from '../src/database/entities/agency-membership-request.entity';
+import { AgencyInvoice } from '../src/database/entities/agency-invoice.entity';
+import { AgencyApiKey } from '../src/database/entities/agency-api-key.entity';
+import { FlightInstance } from '../src/database/entities/flight-instance.entity';
+import { Booking } from '../src/database/entities/booking.entity';
+import { LedgerEntry } from '../src/database/entities/ledger-entry.entity';
+import { AuditLog } from '../src/database/entities/audit-log.entity';
 import { loginAs, stepUpFor } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
 describe('Agencies (e2e)', () => {
   let app: INestApplication<App>;
-  let typeorm: TypeORMService;
+  let dataSource: DataSource;
 
   // Fresh app per test — avoids leaking the shared login-route throttle budget
   // across tests (matches panels.e2e-spec.ts's convention for this module).
   beforeEach(async () => {
     app = await createTestApp();
-    typeorm = app.get(TypeORMService);
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
@@ -25,17 +35,20 @@ describe('Agencies (e2e)', () => {
    * mutation-heavy tests never depend on execution order. */
   async function createFreshAgency(overrides?: { limitIrr?: number }) {
     const suffix = crypto.randomUUID().slice(0, 8);
-    const user = await typeorm.user.create({
-      data: {
+    const userRepo = dataSource.getRepository(User);
+    const user = await userRepo.save(
+      userRepo.create({
         role: 'AGENCY',
         // Hex→'0' mapping collided as test users accumulated (unique-phone flake) — use real random digits.
         phone: `+9891${crypto.randomInt(10_000_000, 100_000_000)}`,
         fullName: `آژانس تست ${suffix}`,
         isActive: true,
-      },
-    });
-    await typeorm.agencyProfile.create({
-      data: {
+        updatedAt: new Date(),
+      }),
+    );
+    const agencyProfileRepo = dataSource.getRepository(AgencyProfile);
+    await agencyProfileRepo.save(
+      agencyProfileRepo.create({
         userId: user.id,
         licenseNo: `AG-TEST-${suffix}`,
         managerName: 'مدیر تست',
@@ -44,46 +57,54 @@ describe('Agencies (e2e)', () => {
         city: 'تهران',
         address: 'آدرس تست',
         tier: 'NORMAL',
-      },
-    });
-    await typeorm.agencyCreditLine.create({
-      data: {
+      }),
+    );
+    const creditLineRepo = dataSource.getRepository(AgencyCreditLine);
+    await creditLineRepo.save(
+      creditLineRepo.create({
         agencyId: user.id,
-        limitIrr: overrides?.limitIrr ?? 1_000_000_000,
-      },
-    });
+        limitIrr: BigInt(overrides?.limitIrr ?? 1_000_000_000),
+        updatedAt: new Date(),
+      }),
+    );
     return user.id;
   }
 
   async function addAgencySale(agencyId: string, amountIrr: number) {
-    const instance = await typeorm.flightInstance.findFirst();
+    const instance = await dataSource
+      .getRepository(FlightInstance)
+      .createQueryBuilder('fi')
+      .getOne();
     if (!instance) throw new Error('seed flightInstance missing');
-    const booking = await typeorm.booking.create({
-      data: {
+    const bookingRepo = dataSource.getRepository(Booking);
+    const booking = await bookingRepo.save(
+      bookingRepo.create({
         pnr: `TST${crypto.randomUUID().slice(0, 6).toUpperCase()}`,
         flightInstanceId: instance.id,
         channel: 'AGENCY',
         agencyId,
         status: 'TICKETED',
-        priceIrr: amountIrr,
-      },
-    });
-    await typeorm.ledgerEntry.create({
-      data: {
+        priceIrr: BigInt(amountIrr),
+      }),
+    );
+    const ledgerRepo = dataSource.getRepository(LedgerEntry);
+    await ledgerRepo.save(
+      ledgerRepo.create({
         bookingId: booking.id,
         agencyId,
         type: 'SALE',
-        signedAmountIrr: amountIrr,
-      },
-    });
+        signedAmountIrr: BigInt(amountIrr),
+      }),
+    );
   }
 
   async function createFreshMembershipRequest(
     status: 'PENDING' | 'REFERRED' = 'PENDING',
   ) {
     const suffix = crypto.randomUUID().slice(0, 8);
-    return typeorm.agencyMembershipRequest.create({
-      data: {
+    const repo = dataSource.getRepository(AgencyMembershipRequest);
+    return repo.save(
+      repo.create({
         applicantName: `متقاضی تست ${suffix}`,
         managerName: 'مدیر متقاضی',
         licenseNo: `AG-REQ-${suffix}`,
@@ -91,14 +112,14 @@ describe('Agencies (e2e)', () => {
         phone: `+9892${crypto.randomInt(10_000_000, 100_000_000)}`,
         email: `${suffix}@applicant.example`,
         status,
-      },
-    });
+      }),
+    );
   }
 
   // ── Listing & detail ────────────────────────────────────────────────
 
   it('GET /agencies returns the same 4 KPI cards for all 3 agency-tab roles', async () => {
-    for (const username of ['senior', 'finance', 'comm']) {
+    for (const username of ['senior.rahimi', 'finance.karimi', 'comm.abbasi']) {
       const { accessToken } = await loginAs(app, username);
       const res = await request(app.getHttpServer())
         .get('/agencies')
@@ -134,12 +155,11 @@ describe('Agencies (e2e)', () => {
   it('GET /agencies?q= searches by manager name', async () => {
     const suffix = crypto.randomUUID().slice(0, 6);
     const agencyId = await createFreshAgency();
-    await typeorm.agencyProfile.update({
-      where: { userId: agencyId },
-      data: { managerName: `جستجوپذیر-${suffix}` },
-    });
+    await dataSource
+      .getRepository(AgencyProfile)
+      .update({ userId: agencyId }, { managerName: `جستجوپذیر-${suffix}` });
 
-    const { accessToken } = await loginAs(app, 'senior');
+    const { accessToken } = await loginAs(app, 'senior.rahimi');
     const res = await request(app.getHttpServer())
       .get(`/agencies?q=${encodeURIComponent(`جستجوپذیر-${suffix}`)}`)
       .set('Authorization', `Bearer ${accessToken}`);
@@ -153,7 +173,7 @@ describe('Agencies (e2e)', () => {
     await addAgencySale(debtor, 500_000_000);
     const healthy = await createFreshAgency();
 
-    const { accessToken } = await loginAs(app, 'comm');
+    const { accessToken } = await loginAs(app, 'comm.abbasi');
     const res = await request(app.getHttpServer())
       .get('/agencies?debtorsOnly=true')
       .set('Authorization', `Bearer ${accessToken}`);
@@ -168,7 +188,7 @@ describe('Agencies (e2e)', () => {
     await addAgencySale(agencyId, 300_000_000);
     await addAgencySale(agencyId, 200_000_000);
 
-    const { accessToken } = await loginAs(app, 'senior');
+    const { accessToken } = await loginAs(app, 'senior.rahimi');
     const res = await request(app.getHttpServer())
       .get(`/agencies/${agencyId}`)
       .set('Authorization', `Bearer ${accessToken}`);
@@ -184,13 +204,13 @@ describe('Agencies (e2e)', () => {
   it('activityScore is included for Finance/Commercial but omitted for Senior Manager', async () => {
     const agencyId = await createFreshAgency();
 
-    const senior = await loginAs(app, 'senior');
+    const senior = await loginAs(app, 'senior.rahimi');
     const seniorRes = await request(app.getHttpServer())
       .get(`/agencies/${agencyId}`)
       .set('Authorization', `Bearer ${senior.accessToken}`);
     expect(seniorRes.body.data.activityScore).toBeUndefined();
 
-    const finance = await loginAs(app, 'finance');
+    const finance = await loginAs(app, 'finance.karimi');
     const financeRes = await request(app.getHttpServer())
       .get(`/agencies/${agencyId}`)
       .set('Authorization', `Bearer ${finance.accessToken}`);
@@ -204,48 +224,53 @@ describe('Agencies (e2e)', () => {
 
   it('activityScore matches the confirmed formula exactly: seatsSold*10 + paidInvoices*100 - unpaidInvoices*60 + (isActive?40:0)', async () => {
     const agencyId = await createFreshAgency();
-    const instance = await typeorm.flightInstance.findFirstOrThrow();
-    const commercial = await typeorm.user.findFirstOrThrow({
-      where: { username: 'comm' },
-    });
+    const instance = await dataSource
+      .getRepository(FlightInstance)
+      .createQueryBuilder('fi')
+      .getOneOrFail();
+    const commercial = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ username: 'comm.abbasi' });
 
     // 2 ticketed bookings, 1 paid invoice, 1 unpaid invoice, agency active
     // -> 2*10 + 1*100 - 1*60 + 40 = 100 (BRONZE, since < 400).
+    const bookingRepo = dataSource.getRepository(Booking);
     for (let i = 0; i < 2; i++) {
-      await typeorm.booking.create({
-        data: {
+      await bookingRepo.save(
+        bookingRepo.create({
           pnr: `SCR${crypto.randomUUID().slice(0, 6).toUpperCase()}`,
           flightInstanceId: instance.id,
           channel: 'AGENCY',
           agencyId,
           status: 'TICKETED',
-          priceIrr: 100_000_000,
-        },
-      });
+          priceIrr: 100_000_000n,
+        }),
+      );
     }
-    await typeorm.agencyInvoice.create({
-      data: {
+    const invoiceRepo = dataSource.getRepository(AgencyInvoice);
+    await invoiceRepo.save(
+      invoiceRepo.create({
         agencyId,
         invoiceNo: `SCR-PAID-${crypto.randomUUID().slice(0, 8)}`,
         issuedById: commercial.id,
         dueAt: new Date(),
-        amountIrr: 50_000_000,
+        amountIrr: 50_000_000n,
         status: 'PAID',
         paidAt: new Date(),
-      },
-    });
-    await typeorm.agencyInvoice.create({
-      data: {
+      }),
+    );
+    await invoiceRepo.save(
+      invoiceRepo.create({
         agencyId,
         invoiceNo: `SCR-UNPAID-${crypto.randomUUID().slice(0, 8)}`,
         issuedById: commercial.id,
         dueAt: new Date(),
-        amountIrr: 50_000_000,
+        amountIrr: 50_000_000n,
         status: 'UNPAID',
-      },
-    });
+      }),
+    );
 
-    const { accessToken } = await loginAs(app, 'finance');
+    const { accessToken } = await loginAs(app, 'finance.karimi');
     const res = await request(app.getHttpServer())
       .get(`/agencies/${agencyId}`)
       .set('Authorization', `Bearer ${accessToken}`);
@@ -262,7 +287,7 @@ describe('Agencies (e2e)', () => {
     const agencyId = await createFreshAgency();
     await addAgencySale(agencyId, 400_000_000);
 
-    const { accessToken } = await loginAs(app, 'finance');
+    const { accessToken } = await loginAs(app, 'finance.karimi');
     const res = await request(app.getHttpServer())
       .patch(`/agencies/${agencyId}/credit`)
       .set('Authorization', `Bearer ${accessToken}`)
@@ -272,15 +297,17 @@ describe('Agencies (e2e)', () => {
     expect(res.body.data.limitIrr).toBe('2000000000');
     expect(res.body.data.usedIrr).toBe('400000000');
 
-    const auditRow = await typeorm.auditLog.findFirst({
-      where: {
-        category: 'AGENCY',
-        entityType: 'AgencyProfile',
-        entityId: agencyId,
+    const auditRow = await dataSource
+      .getRepository(AuditLog)
+      .createQueryBuilder('a')
+      .where('a.category = :category', { category: 'AGENCY' })
+      .andWhere('a.entityType = :entityType', { entityType: 'AgencyProfile' })
+      .andWhere('a.entityId = :entityId', { entityId: agencyId })
+      .andWhere('a.action = :action', {
         action: 'تغییر سقف اعتبار آژانس',
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+      })
+      .orderBy('a.createdAt', 'DESC')
+      .getOne();
     expect(auditRow).not.toBeNull();
   });
 
@@ -288,7 +315,7 @@ describe('Agencies (e2e)', () => {
     const agencyId = await createFreshAgency();
     await addAgencySale(agencyId, 700_000_000);
 
-    const { accessToken } = await loginAs(app, 'finance');
+    const { accessToken } = await loginAs(app, 'finance.karimi');
     const res = await request(app.getHttpServer())
       .post(`/agencies/${agencyId}/settle`)
       .set('Authorization', `Bearer ${accessToken}`);
@@ -296,18 +323,21 @@ describe('Agencies (e2e)', () => {
     expect(res.status).toBe(201);
     expect(res.body.data.settledIrr).toBe('700000000');
 
-    const sum = await typeorm.ledgerEntry.aggregate({
-      where: { agencyId, type: { in: ['SALE', 'SETTLEMENT'] } },
-      _sum: { signedAmountIrr: true },
-    });
-    expect(sum._sum.signedAmountIrr).toBe(0n);
+    const sumRow = await dataSource
+      .getRepository(LedgerEntry)
+      .createQueryBuilder('l')
+      .select('SUM(l.signedAmountIrr)', 'sum')
+      .where('l.agencyId = :agencyId', { agencyId })
+      .andWhere('l.type IN (:...types)', { types: ['SALE', 'SETTLEMENT'] })
+      .getRawOne<{ sum: string | null }>();
+    expect(BigInt(sumRow!.sum ?? '0')).toBe(0n);
   });
 
   it('two concurrent POST /settle calls on the same agency settle exactly once — no phantom credit from a double-settlement race', async () => {
     const agencyId = await createFreshAgency();
     await addAgencySale(agencyId, 500_000_000);
 
-    const { accessToken } = await loginAs(app, 'finance');
+    const { accessToken } = await loginAs(app, 'finance.karimi');
     const [first, second] = await Promise.all([
       request(app.getHttpServer())
         .post(`/agencies/${agencyId}/settle`)
@@ -320,17 +350,20 @@ describe('Agencies (e2e)', () => {
     const statuses = [first.status, second.status].sort();
     expect(statuses).toEqual([201, 409]);
 
-    const settlementCount = await typeorm.ledgerEntry.count({
-      where: { agencyId, type: 'SETTLEMENT' },
-    });
+    const settlementCount = await dataSource
+      .getRepository(LedgerEntry)
+      .countBy({ agencyId, type: 'SETTLEMENT' });
     expect(settlementCount).toBe(1);
 
     // The critical invariant: outstanding never goes negative (phantom credit).
-    const sum = await typeorm.ledgerEntry.aggregate({
-      where: { agencyId, type: { in: ['SALE', 'SETTLEMENT'] } },
-      _sum: { signedAmountIrr: true },
-    });
-    expect(sum._sum.signedAmountIrr).toBe(0n);
+    const sumRow = await dataSource
+      .getRepository(LedgerEntry)
+      .createQueryBuilder('l')
+      .select('SUM(l.signedAmountIrr)', 'sum')
+      .where('l.agencyId = :agencyId', { agencyId })
+      .andWhere('l.type IN (:...types)', { types: ['SALE', 'SETTLEMENT'] })
+      .getRawOne<{ sum: string | null }>();
+    expect(BigInt(sumRow!.sum ?? '0')).toBe(0n);
   });
 
   // Money columns are now BigInt (no Int32 ceiling by design — that's the
@@ -340,7 +373,7 @@ describe('Agencies (e2e)', () => {
   // that guard against a genuinely invalid input (negative) instead.
   it('PATCH credit rejects a negative limit with 400, not a DB 500', async () => {
     const agencyId = await createFreshAgency();
-    const { accessToken } = await loginAs(app, 'finance');
+    const { accessToken } = await loginAs(app, 'finance.karimi');
     const res = await request(app.getHttpServer())
       .patch(`/agencies/${agencyId}/credit`)
       .set('Authorization', `Bearer ${accessToken}`)
@@ -351,7 +384,7 @@ describe('Agencies (e2e)', () => {
 
   it('POST /settle is 403 for COMMERCIAL_MANAGER', async () => {
     const agencyId = await createFreshAgency();
-    const { accessToken } = await loginAs(app, 'comm');
+    const { accessToken } = await loginAs(app, 'comm.abbasi');
     const res = await request(app.getHttpServer())
       .post(`/agencies/${agencyId}/settle`)
       .set('Authorization', `Bearer ${accessToken}`);
@@ -362,7 +395,7 @@ describe('Agencies (e2e)', () => {
 
   it('PATCH suspend without a reason -> 400', async () => {
     const agencyId = await createFreshAgency();
-    const { accessToken } = await loginAs(app, 'senior');
+    const { accessToken } = await loginAs(app, 'senior.rahimi');
     const res = await request(app.getHttpServer())
       .patch(`/agencies/${agencyId}/suspend`)
       .set('Authorization', `Bearer ${accessToken}`)
@@ -372,7 +405,7 @@ describe('Agencies (e2e)', () => {
 
   it('PATCH reactivate clears suspendedAt/suspendReason', async () => {
     const agencyId = await createFreshAgency();
-    const { accessToken } = await loginAs(app, 'senior');
+    const { accessToken } = await loginAs(app, 'senior.rahimi');
 
     await request(app.getHttpServer())
       .patch(`/agencies/${agencyId}/suspend`)
@@ -392,7 +425,7 @@ describe('Agencies (e2e)', () => {
 
   it('approving a request creates both User(role=AGENCY) and AgencyProfile transactionally', async () => {
     const reqRow = await createFreshMembershipRequest('PENDING');
-    const { accessToken } = await loginAs(app, 'comm');
+    const { accessToken } = await loginAs(app, 'comm.abbasi');
 
     const res = await request(app.getHttpServer())
       .patch(`/agencies/requests/${reqRow.id}/approve`)
@@ -400,17 +433,19 @@ describe('Agencies (e2e)', () => {
     expect(res.status).toBe(200);
 
     const newAgencyId = res.body.data.agencyId as string;
-    const user = await typeorm.user.findUnique({ where: { id: newAgencyId } });
-    const profile = await typeorm.agencyProfile.findUnique({
-      where: { userId: newAgencyId },
-    });
+    const user = await dataSource
+      .getRepository(User)
+      .findOneBy({ id: newAgencyId });
+    const profile = await dataSource
+      .getRepository(AgencyProfile)
+      .findOneBy({ userId: newAgencyId });
     expect(user?.role).toBe('AGENCY');
     expect(profile).not.toBeNull();
   });
 
   it('rejecting a request sets status without creating any User/AgencyProfile', async () => {
     const reqRow = await createFreshMembershipRequest('PENDING');
-    const { accessToken } = await loginAs(app, 'senior');
+    const { accessToken } = await loginAs(app, 'senior.rahimi');
 
     const res = await request(app.getHttpServer())
       .patch(`/agencies/requests/${reqRow.id}/reject`)
@@ -419,18 +454,18 @@ describe('Agencies (e2e)', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.status).toBe('REJECTED');
 
-    const usersWithThisPhone = await typeorm.user.findMany({
-      where: { phone: reqRow.phone },
-    });
+    const usersWithThisPhone = await dataSource
+      .getRepository(User)
+      .find({ where: { phone: reqRow.phone } });
     expect(usersWithThisPhone).toHaveLength(0);
   });
 
   it('PATCH .../refer is 403 for FINANCE_MANAGER', async () => {
     const reqRow = await createFreshMembershipRequest('PENDING');
-    const senior = await typeorm.user.findFirstOrThrow({
-      where: { username: 'senior' },
-    });
-    const { accessToken } = await loginAs(app, 'finance');
+    const senior = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ username: 'senior.rahimi' });
+    const { accessToken } = await loginAs(app, 'finance.karimi');
 
     const res = await request(app.getHttpServer())
       .patch(`/agencies/requests/${reqRow.id}/refer`)
@@ -441,7 +476,7 @@ describe('Agencies (e2e)', () => {
 
   it('approving an already-decided request -> 409, not a silent overwrite', async () => {
     const reqRow = await createFreshMembershipRequest('PENDING');
-    const { accessToken } = await loginAs(app, 'comm');
+    const { accessToken } = await loginAs(app, 'comm.abbasi');
 
     const first = await request(app.getHttpServer())
       .patch(`/agencies/requests/${reqRow.id}/approve`)
@@ -458,7 +493,7 @@ describe('Agencies (e2e)', () => {
 
   it('POST .../api-key for a non-Senior-Manager role -> 403', async () => {
     const agencyId = await createFreshAgency();
-    const { accessToken } = await loginAs(app, 'finance');
+    const { accessToken } = await loginAs(app, 'finance.karimi');
     const res = await request(app.getHttpServer())
       .post(`/agencies/${agencyId}/api-key`)
       .set('Authorization', `Bearer ${accessToken}`)
@@ -468,11 +503,11 @@ describe('Agencies (e2e)', () => {
 
   it('the raw API key is returned once at creation and the DB only stores a hash', async () => {
     const agencyId = await createFreshAgency();
-    const { accessToken } = await loginAs(app, 'senior');
+    const { accessToken } = await loginAs(app, 'senior.rahimi');
     const stepUp = await stepUpFor(
       app,
       accessToken!,
-      'senior',
+      'senior.rahimi',
       'API_KEY_ROTATE',
     );
     const res = await request(app.getHttpServer())
@@ -483,20 +518,20 @@ describe('Agencies (e2e)', () => {
     expect(res.status).toBe(201);
     expect(typeof res.body.data.rawKey).toBe('string');
 
-    const row = await typeorm.agencyApiKey.findUnique({
-      where: { id: res.body.data.id },
-    });
+    const row = await dataSource
+      .getRepository(AgencyApiKey)
+      .findOneBy({ id: res.body.data.id });
     expect(row?.keyHash).not.toBe(res.body.data.rawKey);
     expect(row).not.toHaveProperty('rawKey');
   });
 
   it('regenerating a key changes its stored hash (old key hash no longer matches)', async () => {
     const agencyId = await createFreshAgency();
-    const { accessToken } = await loginAs(app, 'senior');
+    const { accessToken } = await loginAs(app, 'senior.rahimi');
     const stepUp1 = await stepUpFor(
       app,
       accessToken!,
-      'senior',
+      'senior.rahimi',
       'API_KEY_ROTATE',
     );
     const created = await request(app.getHttpServer())
@@ -504,15 +539,15 @@ describe('Agencies (e2e)', () => {
       .set('Authorization', `Bearer ${accessToken}`)
       .send({ scope: 'FULL', ...stepUp1 });
     const originalHash = (
-      await typeorm.agencyApiKey.findUnique({
-        where: { id: created.body.data.id },
-      })
+      await dataSource
+        .getRepository(AgencyApiKey)
+        .findOneBy({ id: created.body.data.id })
     )?.keyHash;
 
     const stepUp2 = await stepUpFor(
       app,
       accessToken!,
-      'senior',
+      'senior.rahimi',
       'API_KEY_ROTATE',
     );
     const regenerated = await request(app.getHttpServer())
@@ -522,9 +557,9 @@ describe('Agencies (e2e)', () => {
 
     expect(regenerated.status).toBe(200);
     const newHash = (
-      await typeorm.agencyApiKey.findUnique({
-        where: { id: created.body.data.id },
-      })
+      await dataSource
+        .getRepository(AgencyApiKey)
+        .findOneBy({ id: created.body.data.id })
     )?.keyHash;
     expect(newHash).not.toBe(originalHash);
   });
@@ -538,21 +573,21 @@ describe('Agencies (e2e)', () => {
       dueAt: new Date(Date.now() + 86_400_000).toISOString(),
     };
 
-    const senior = await loginAs(app, 'senior');
+    const senior = await loginAs(app, 'senior.rahimi');
     const seniorRes = await request(app.getHttpServer())
       .post(`/agencies/${agencyId}/invoices`)
       .set('Authorization', `Bearer ${senior.accessToken}`)
       .send(body);
     expect(seniorRes.status).toBe(403);
 
-    const finance = await loginAs(app, 'finance');
+    const finance = await loginAs(app, 'finance.karimi');
     const financeRes = await request(app.getHttpServer())
       .post(`/agencies/${agencyId}/invoices`)
       .set('Authorization', `Bearer ${finance.accessToken}`)
       .send(body);
     expect(financeRes.status).toBe(403);
 
-    const commercial = await loginAs(app, 'comm');
+    const commercial = await loginAs(app, 'comm.abbasi');
     const commercialRes = await request(app.getHttpServer())
       .post(`/agencies/${agencyId}/invoices`)
       .set('Authorization', `Bearer ${commercial.accessToken}`)
@@ -562,7 +597,7 @@ describe('Agencies (e2e)', () => {
 
   it('GET .../invoices is 200 (read) for all 3 roles', async () => {
     const agencyId = await createFreshAgency();
-    for (const username of ['senior', 'finance', 'comm']) {
+    for (const username of ['senior.rahimi', 'finance.karimi', 'comm.abbasi']) {
       const { accessToken } = await loginAs(app, username);
       const res = await request(app.getHttpServer())
         .get(`/agencies/${agencyId}/invoices`)
@@ -573,7 +608,7 @@ describe('Agencies (e2e)', () => {
 
   it('paying an invoice writes exactly one SETTLEMENT ledger entry and is idempotent (double pay -> 409)', async () => {
     const agencyId = await createFreshAgency();
-    const commercial = await loginAs(app, 'comm');
+    const commercial = await loginAs(app, 'comm.abbasi');
     const issued = await request(app.getHttpServer())
       .post(`/agencies/${agencyId}/invoices`)
       .set('Authorization', `Bearer ${commercial.accessToken}`)
@@ -583,7 +618,7 @@ describe('Agencies (e2e)', () => {
       });
     const invoiceId = issued.body.data.id as string;
 
-    const finance = await loginAs(app, 'finance');
+    const finance = await loginAs(app, 'finance.karimi');
     const pay1 = await request(app.getHttpServer())
       .patch(`/agencies/${agencyId}/invoices/${invoiceId}/pay`)
       .set('Authorization', `Bearer ${finance.accessToken}`);
@@ -594,29 +629,33 @@ describe('Agencies (e2e)', () => {
       .set('Authorization', `Bearer ${finance.accessToken}`);
     expect(pay2.status).toBe(409);
 
-    const settlementEntries = await typeorm.ledgerEntry.count({
-      where: { agencyId, type: 'SETTLEMENT', signedAmountIrr: -150_000_000 },
-    });
+    const settlementEntries = await dataSource
+      .getRepository(LedgerEntry)
+      .countBy({
+        agencyId,
+        type: 'SETTLEMENT',
+        signedAmountIrr: -150_000_000n,
+      });
     expect(settlementEntries).toBe(1);
   });
 
   it('GET/POST .../messages is 403 for SENIOR_MANAGER and FINANCE_MANAGER', async () => {
     const agencyId = await createFreshAgency();
 
-    const senior = await loginAs(app, 'senior');
+    const senior = await loginAs(app, 'senior.rahimi');
     const seniorGet = await request(app.getHttpServer())
       .get(`/agencies/${agencyId}/messages`)
       .set('Authorization', `Bearer ${senior.accessToken}`);
     expect(seniorGet.status).toBe(403);
 
-    const finance = await loginAs(app, 'finance');
+    const finance = await loginAs(app, 'finance.karimi');
     const financePost = await request(app.getHttpServer())
       .post(`/agencies/${agencyId}/messages`)
       .set('Authorization', `Bearer ${finance.accessToken}`)
       .send({ body: 'سلام' });
     expect(financePost.status).toBe(403);
 
-    const commercial = await loginAs(app, 'comm');
+    const commercial = await loginAs(app, 'comm.abbasi');
     const commercialRes = await request(app.getHttpServer())
       .post(`/agencies/${agencyId}/messages`)
       .set('Authorization', `Bearer ${commercial.accessToken}`)
@@ -628,8 +667,8 @@ describe('Agencies (e2e)', () => {
 
   it('two simultaneous PATCH .../credit calls do not crash, last write wins, and both are audited', async () => {
     const agencyId = await createFreshAgency();
-    const seniorA = await loginAs(app, 'senior');
-    const financeB = await loginAs(app, 'finance');
+    const seniorA = await loginAs(app, 'senior.rahimi');
+    const financeB = await loginAs(app, 'finance.karimi');
 
     const [resA, resB] = await Promise.all([
       request(app.getHttpServer())
@@ -644,19 +683,21 @@ describe('Agencies (e2e)', () => {
 
     expect([resA.status, resB.status]).toEqual([200, 200]);
 
-    const finalLine = await typeorm.agencyCreditLine.findUniqueOrThrow({
-      where: { agencyId },
-    });
+    const finalLine = await dataSource
+      .getRepository(AgencyCreditLine)
+      .findOneByOrFail({ agencyId });
     expect([1_100_000_000n, 1_200_000_000n]).toContain(finalLine.limitIrr);
 
-    const auditRows = await typeorm.auditLog.findMany({
-      where: {
-        category: 'AGENCY',
-        entityType: 'AgencyProfile',
-        entityId: agencyId,
+    const auditRows = await dataSource
+      .getRepository(AuditLog)
+      .createQueryBuilder('a')
+      .where('a.category = :category', { category: 'AGENCY' })
+      .andWhere('a.entityType = :entityType', { entityType: 'AgencyProfile' })
+      .andWhere('a.entityId = :entityId', { entityId: agencyId })
+      .andWhere('a.action = :action', {
         action: 'تغییر سقف اعتبار آژانس',
-      },
-    });
+      })
+      .getMany();
     expect(auditRows).toHaveLength(2);
   });
 });

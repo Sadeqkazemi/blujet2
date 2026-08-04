@@ -1,4 +1,13 @@
-import type { TypeORMService } from '../../src/typeorm/typeorm.service';
+import { In, type DataSource } from 'typeorm';
+import { User } from '../../src/database/entities/user.entity';
+import { ClubMember } from '../../src/database/entities/club-member.entity';
+import { ClubCardRequest } from '../../src/database/entities/club-card-request.entity';
+import { ClubPointsEntry } from '../../src/database/entities/club-points-entry.entity';
+import { SavedPassenger } from '../../src/database/entities/saved-passenger.entity';
+import { SavedBankAccount } from '../../src/database/entities/saved-bank-account.entity';
+import { SavedFlight } from '../../src/database/entities/saved-flight.entity';
+import { CustomerIdentityVerification } from '../../src/database/entities/customer-identity-verification.entity';
+import { StoredFile } from '../../src/database/entities/stored-file.entity';
 import { normalizeIranPhone } from '../../src/common/normalize-iran-phone';
 
 /** Removes user-scoped rows left over from prior e2e runs so suites that
@@ -7,66 +16,65 @@ import { normalizeIranPhone } from '../../src/common/normalize-iran-phone';
  * before storing them, so the lookup must normalize too — matching on
  * the raw local-form strings never found the rows, silently no-opping. */
 export async function resetCustomerPhones(
-  typeorm: TypeORMService,
+  dataSource: DataSource,
   phones: string[],
 ) {
   const normalized = phones.map(normalizeIranPhone);
-  const users = await typeorm.user.findMany({
-    where: { phone: { in: normalized } },
+  const userRepo = dataSource.getRepository(User);
+  const users = await userRepo.find({
+    where: { phone: In(normalized) },
     select: { id: true },
   });
   const userIds = users.map((u) => u.id);
   if (userIds.length === 0) return;
 
-  const linkedMembers = await typeorm.clubMember.findMany({
-    where: { userId: { in: userIds } },
+  const clubMemberRepo = dataSource.getRepository(ClubMember);
+  const linkedMembers = await clubMemberRepo.find({
+    where: { userId: In(userIds) },
     select: { id: true },
   });
   const memberIds = linkedMembers.map((m) => m.id);
   if (memberIds.length > 0) {
-    await typeorm.clubCardRequest.deleteMany({
-      where: { memberId: { in: memberIds } },
-    });
-    await typeorm.clubPointsEntry.deleteMany({
-      where: { clubMemberId: { in: memberIds } },
-    });
-    await typeorm.clubMember.updateMany({
-      where: { id: { in: memberIds } },
-      data: { userId: null, cardStatus: 'NONE', cardNo: null, points: 0 },
-    });
+    await dataSource
+      .getRepository(ClubCardRequest)
+      .delete({ memberId: In(memberIds) });
+    await dataSource
+      .getRepository(ClubPointsEntry)
+      .delete({ clubMemberId: In(memberIds) });
+    await clubMemberRepo.update(
+      { id: In(memberIds) },
+      { userId: null, cardStatus: 'NONE', cardNo: null, points: 0 },
+    );
   }
 
-  await typeorm.savedPassenger.deleteMany({
-    where: { userId: { in: userIds } },
-  });
-  await typeorm.savedBankAccount.deleteMany({
-    where: { userId: { in: userIds } },
-  });
-  await typeorm.savedFlight.deleteMany({
-    where: { userId: { in: userIds } },
-  });
+  await dataSource
+    .getRepository(SavedPassenger)
+    .delete({ userId: In(userIds) });
+  await dataSource
+    .getRepository(SavedBankAccount)
+    .delete({ userId: In(userIds) });
+  await dataSource.getRepository(SavedFlight).delete({ userId: In(userIds) });
 
-  const identityRows = await typeorm.customerIdentityVerification.findMany({
-    where: { userId: { in: userIds } },
+  const identityRepo = dataSource.getRepository(CustomerIdentityVerification);
+  const identityRows = await identityRepo.find({
+    where: { userId: In(userIds) },
     select: { idCardFileId: true },
   });
   const fileIds = identityRows
     .map((r) => r.idCardFileId)
     .filter((id): id is string => Boolean(id));
-  await typeorm.customerIdentityVerification.deleteMany({
-    where: { userId: { in: userIds } },
-  });
+  await identityRepo.delete({ userId: In(userIds) });
   if (fileIds.length > 0) {
-    await typeorm.storedFile.deleteMany({ where: { id: { in: fileIds } } });
+    await dataSource.getRepository(StoredFile).delete({ id: In(fileIds) });
   }
 
-  await typeorm.user.updateMany({
-    where: { id: { in: userIds } },
-    data: {
+  await userRepo.update(
+    { id: In(userIds) },
+    {
       fullName: '',
       nationalIdEnc: null,
       nationalIdHash: null,
       birthDate: null,
     },
-  });
+  );
 }
