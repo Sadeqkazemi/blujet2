@@ -3,6 +3,7 @@ import type {
   ClubCardRequest,
   ClubMember,
   ClubMembersResult,
+  ClubSubmittedCardRequest,
   ClubTier,
   ClubTierRules,
 } from '../types/club';
@@ -35,6 +36,14 @@ export function issueClubCard(id: string) {
 
 export function fetchCardRequests() {
   return apiGet<ClubCardRequest[]>('/club/card-requests');
+}
+
+export function fetchSubmittedCardRequests() {
+  return apiGet<ClubSubmittedCardRequest[]>('/club/submitted-card-requests');
+}
+
+export function referCardRequest(id: string, assignedTo: 'SENIOR' | 'CHAIR') {
+  return apiPatch<ClubCardRequest>(`/club/card-requests/${id}/refer`, { assignedTo });
 }
 
 export function approveCardRequest(id: string) {

@@ -52,7 +52,7 @@ export class UpdateRefundRulesDto {
 @ApiTags('settings')
 @Controller('settings')
 @UseGuards(JwtAuthGuard, RolesGuard, PanelAccessGuard)
-@Roles('BOARD_CHAIR', 'IT_MANAGER')
+@Roles('IT_MANAGER', 'SITE_ADMIN')
 export class SettingsController {
   constructor(private readonly settings: SettingsService) {}
 
@@ -79,7 +79,7 @@ export class SettingsController {
   }
 
   @Patch('refund-rules')
-  @Roles('BOARD_CHAIR')
+  @Roles('IT_MANAGER')
   @ApiOperation({
     summary:
       'تغییر درصد جریمهٔ بازه‌های واقعی استرداد — همان جدولی که موتور فاز ۷ می‌خواند',

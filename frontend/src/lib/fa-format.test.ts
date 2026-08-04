@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { arDigits, faDigits, faMoney, faPercent, formatLocalePercent, formatToman, localeMoney } from './fa-format';
+import {
+  arDigits,
+  faDigits,
+  faMoney,
+  faMoneyCompact,
+  faMoneyCompactNumber,
+  faPercent,
+  formatLocalePercent,
+  formatToman,
+  localeMoney,
+} from './fa-format';
 
 describe('faDigits', () => {
   it('converts Latin digits to Persian digits', () => {
@@ -22,6 +32,28 @@ describe('faMoney', () => {
 
   it('handles zero', () => {
     expect(faMoney(0)).toBe('۰');
+  });
+
+  it('accepts a decimal string, the real API wire shape for IRR fields', () => {
+    expect(faMoney('127680000000')).toBe('۱۲٬۷۶۸٬۰۰۰٬۰۰۰');
+  });
+});
+
+describe('faMoneyCompact', () => {
+  it('formats large amounts as میلیارد تومان-scale labels', () => {
+    // 3_320_000_000_000 IRR → 332_000_000_000 تومان → ۳۳۲ میلیارد
+    expect(faMoneyCompact('3320000000000')).toBe('۳۳۲ میلیارد');
+  });
+
+  it('formats mid amounts as میلیون', () => {
+    // 90_000_000 IRR → 9_000_000 تومان → ۹ میلیون
+    expect(faMoneyCompact(90_000_000)).toBe('۹ میلیون');
+  });
+});
+
+describe('faMoneyCompactNumber', () => {
+  it('returns the scaled number without the unit word', () => {
+    expect(faMoneyCompactNumber('3320000000000')).toBe('۳۳۲');
   });
 });
 
@@ -65,5 +97,9 @@ describe('localeMoney', () => {
     expect(localeMoney(380_000_000, 'fa')).toBe('۳۸٬۰۰۰٬۰۰۰');
     expect(localeMoney(380_000_000, 'en')).toBe('38,000,000');
     expect(localeMoney(380_000_000, 'ar')).toBe('٣٨٬٠٠٠٬٠٠٠');
+  });
+
+  it('accepts a decimal string, the real API wire shape for IRR fields', () => {
+    expect(localeMoney('380000000', 'fa')).toBe('۳۸٬۰۰۰٬۰۰۰');
   });
 });

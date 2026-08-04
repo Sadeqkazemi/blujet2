@@ -4,9 +4,12 @@ import { describe, expect, it, vi } from 'vitest';
 import AgenciesListPage from './AgenciesListPage';
 import * as agenciesApi from '../../api/agencies';
 import * as useAuthModule from '../../hooks/useAuth';
+import { mockAuthUserWithRole } from '../../test/mockAuthUser';
 import type { AgencyListResult, AgencyMembershipRequest } from '../../types/agencies';
 import type { Role } from '../../types/auth';
 
+// Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON on
+// the backend — a JS number can't safely hold IRR amounts above 2^53).
 const LIST: AgencyListResult = {
   agencies: [
     {
@@ -17,9 +20,9 @@ const LIST: AgencyListResult = {
       city: 'تهران',
       tier: 'GOLD',
       isActive: true,
-      limitIrr: 1_800_000_000,
-      usedIrr: 310_000_000,
-      remainingIrr: 1_490_000_000,
+      limitIrr: '1800000000',
+      usedIrr: '310000000',
+      remainingIrr: '1490000000',
       pendingInvoiceCount: 1,
     },
     {
@@ -30,16 +33,16 @@ const LIST: AgencyListResult = {
       city: 'مشهد',
       tier: 'SILVER',
       isActive: false,
-      limitIrr: 900_000_000,
-      usedIrr: 1_330_000_000,
-      remainingIrr: -430_000_000,
+      limitIrr: '900000000',
+      usedIrr: '1330000000',
+      remainingIrr: '-430000000',
       pendingInvoiceCount: 1,
     },
   ],
   kpis: {
     activeCount: 1,
-    totalCreditGrantedIrr: 2_700_000_000,
-    totalUsedIrr: 1_640_000_000,
+    totalCreditGrantedIrr: '2700000000',
+    totalUsedIrr: '1640000000',
     pendingSettlementCount: 2,
   },
 };
@@ -65,7 +68,7 @@ const REQUESTS: AgencyMembershipRequest[] = [
 function mockRole(role: Role) {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status: 'authenticated',
-    user: { id: 'u1', fullName: 'کاربر تست', role },
+    user: mockAuthUserWithRole(role),
     requestLogin: vi.fn(),
     confirmTwoFactor: vi.fn(),
     agencyLogin: vi.fn(),
@@ -131,7 +134,7 @@ describe('AgenciesListPage', () => {
     vi.spyOn(agenciesApi, 'fetchAgencyRequests').mockResolvedValue(REQUESTS);
     const settle = vi
       .spyOn(agenciesApi, 'settleAgency')
-      .mockResolvedValue({ settledIrr: 1_330_000_000, ledgerEntryId: 'l1' });
+      .mockResolvedValue({ settledIrr: '1330000000', ledgerEntryId: 'l1' });
 
     const { default: userEvent } = await import('@testing-library/user-event');
     renderPage();

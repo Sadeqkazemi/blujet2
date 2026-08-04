@@ -1,13 +1,23 @@
 import { BadRequestException } from '@nestjs/common';
+import type { DataSource } from 'typeorm';
 import { ReportingService } from './reporting.service';
-import { TypeORMService } from '../../typeorm/typeorm.service';
 import { AgenciesService } from '../agencies/agencies.service';
 
 describe('ReportingService (unit)', () => {
   let service: ReportingService;
 
   beforeEach(() => {
-    service = new ReportingService({} as TypeORMService, {} as AgenciesService);
+    service = new ReportingService(
+      {} as DataSource,
+      {} as AgenciesService,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
   });
 
   describe('buildBuckets', () => {

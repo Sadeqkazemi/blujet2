@@ -1315,17 +1315,82 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   corrected to say so plainly rather than leave an inaccurate design
   citation standing. Real Kavenegar SMS driver also added in this window
   (user provided the vendor, not part of Careers itself):
-  `KavenegarSmsProvider` behind the existing `SmsProvider` interface,
-  `sms.module.ts` factory-switches on `SMS_PROVIDER=kavenegar` +
-  `KAVENEGAR_API_KEY` (+ optional `KAVENEGAR_SENDER_LINE`), defaults to
-  `MockSmsProvider` everywhere else so the test suite never makes a real
-  network call — activation needs the user's real API key, not committed
-  anywhere. Backend: 16 e2e + 4 unit tests. Frontend: 12 page tests + 2
+  `KavenegarSmsProvider` behind the existing `SmsProvider` interface.
+  **Revised after the user asked whether the key could instead be
+  managed from پنل مدیر IT**: rather than a server env var, the provider
+  reads the pre-existing `ExternalServiceConfig(key:"ext_kavenegar")` row
+  (Phase 28's IT-panel-managed, encrypted-at-rest external-service
+  mechanism already used for زرین‌پال/آمادئوس/نشان) on every send, and
+  falls back to `MockSmsProvider` whenever it's disabled or keyless — so
+  the real key is set/rotated live from the panel, never committed
+  anywhere or held in `.env`. `KAVENEGAR_SENDER_LINE` remains the one
+  non-secret env var. Backend: 16 e2e + 4 unit tests. Frontend: 12 page tests + 2
   hook tests + 1 footer test = 15 new tests. Full backend e2e suite:
   392/392 passing. Full backend unit suite: 48/48 passing. Full frontend
   suite: 325/325 passing, 75 files. `tsc --noEmit` and lint clean on both
   packages. See `docs/features/careers.md` for the full checked-off
   acceptance checklist.
+- [x] **SITE_ADMIN club referral (merged PR #34)** — completes user-initiated
+  card-request flow: `GET /club/submitted-card-requests`, `PATCH
+  /club/card-requests/:id/refer`, `ClubPage.tsx` SITE_ADMIN branch.
+- [x] **User panel — نشان‌شده‌ها (saved flights)** — `SavedFlight` model +
+  `GET/POST/DELETE /my/saved-flights`; `AccountPage` `saved` tab +
+  `ResultsPage` bookmark button. See `docs/features/saved-flights.md`.
+- [x] **User panel — مسافران ذخیره‌شده (saved passengers)** — `SavedPassenger`
+  model + `GET/POST/PATCH/DELETE /my/saved-passengers`; `AccountPage`
+  `passengers` tab CRUD + `BookPage` autofill chips + profile-tab preview block. See
+  `docs/features/saved-passengers.md`.
+- [x] **User panel — نشست‌های فعال (active sessions, merged PR #39)** —
+  `GET/DELETE /my/sessions` over `RefreshToken`; `AccountSecuritySessions`
+  on security tab. See `docs/features/active-sessions.md`.
+- [x] **User panel — حساب‌های بانکی (merged PR #40)** — `SavedBankAccount`
+  model (PAN/SHEBA encrypted at rest, masked in responses) +
+  `GET/POST/PATCH/DELETE /my/bank-accounts` with default-account toggle;
+  `AccountBankAccountsTab` on the `banks` tab. See
+  `docs/features/bank-accounts.md`.
+- [x] **User panel — معرفی دوستان (merged PR #41)** — `CustomerReferral`
+  model + `User.referralCode`; `GET /my/referral` dashboard; optional
+  `ref` code on OTP signup creates the `SIGNED_UP` link; first ticketed
+  booking by a referred user awards 500 club points to the referrer
+  (idempotent, points ledger). `AccountReferralTab` on the `referral`
+  tab. See `docs/features/customer-referral.md`.
+- [x] **User panel — احراز هویت (merged PR #42)** — `CustomerIdentityVerification`
+  model (`NOT_STARTED/SUBMITTED/APPROVED/REJECTED`); `GET /my/identity` +
+  `POST /my/identity/id-card` (upload via `FilesService`) + `POST
+  /my/identity/submit`. Explicit design cut per CLAUDE.md: **no selfie
+  step** — profile identity fields + national-ID-card upload only.
+  `AccountIdentityTab` on the `identity` tab. See
+  `docs/features/customer-identity.md`.
+- [x] **پنل ادمین سایت — احراز هویت مشتریان (merged PR #43)** — staff side
+  of the KYC flow (the `APPROVED`/`REJECTED` transitions must be
+  reachable; no design tab exists, so it follows the `jobapps`
+  review-queue pattern): new `kyc` tab in `PANEL_NAV.SITE_ADMIN`,
+  `GET /identity-verifications` (+ `/:id/id-card` streaming) and
+  `PATCH /:id/approve|reject` (reject reason required, shown to the
+  customer who can re-submit), audit-logged. `IdentityAdminPage` at
+  `/panel/kyc`. See `docs/features/customer-identity.md`.
+- [x] **Post-merge user-panel documentation/seed sync** — `PLAN.md` now
+  records merged PRs #39–#43 instead of leaving active sessions unchecked;
+  `docs/openapi.json` regenerated with all new user-panel/KYC routes;
+  development seed gains a real `SUBMITTED` KYC row + tiny PNG so the
+  admin review/download flow is immediately exercisable. The seed's old
+  demo-booking loop was also made idempotent (`Booking.upsert` plus
+  passenger/SALE existence checks): running the seed twice had previously
+  failed on globally unique demo PNRs after flight instances changed.
+- [x] **User panel — complete refund tab (account refunds)** — closes the
+  gap between `design-reference-v2/پنل کاربر.dc.html` and the previous
+  amount/status-only list: live eligible bookings + penalty previews,
+  API-driven four-bracket rules, saved-bank/manual-IBAN confirmation,
+  short tracking codes and real four-stage history. Backend adds
+  `GET /my/refunds/eligible-bookings|rules`, `POST /my/refunds/preview`,
+  enriched list/detail/submit responses, unique tracking/booking
+  constraints (including a two-client concurrency test), and fixes the
+  previously unreachable production payout path by advancing SITE_ADMIN
+  referrals to `FINANCE`. Frontend: `AccountRefundsTab` in fa/en/ar +
+  responsive states and a real Playwright account-refund journey. Full
+  clean-database backend E2E: 429/429; frontend: 366/366; focused
+  Playwright journey: 1/1; see
+  `docs/features/customer-account-refunds.md`.
 - [x] **Bug fix (senior review, found while chasing the "pre-existing"
   reporting flake): revenue reporting polluted by agency debt-calibration
   ledger rows.** The `reporting.e2e-spec.ts` sales-chart/kpis
@@ -1352,11 +1417,185 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   392/392 — the flake that failed in every prior full-suite run this
   session is gone for real, not just quieted by DB timing. See
   `docs/DB_SCHEMA.md`'s matching entry for the full technical writeup.
+- [x] **Int → BigInt migration for every IRR money column** (closes the
+  "Known technical debt" note below — user explicitly reviewed and
+  approved this before it started, given the blast radius). All 27
+  IRR-denominated columns (`priceIrr`, `taxIrr`, `amountIrr`,
+  `signedAmountIrr`, `limitIrr`, `requestedLimitIrr`,
+  `contractPriceIrr`, `competitorPriceIrr`, `proposedPriceIrr`,
+  `legalRateIrr`, `registeredPriceIrr`, `totalPaidIrr`,
+  `penaltyAmountIrr`, `refundableIrr`, `discountIrr`, `lockedPriceIrr`,
+  `feeIrr`, `costIrr`, `basePriceIrr`, `PromoCode.value`) converted from
+  Postgres `integer` (Int32 ceiling ~2.14e9 IRR ≈ 214M toman — a real
+  agency credit line or yearly revenue aggregate can plausibly exceed
+  that) to `bigint`, via a single widening migration
+  (`20260731061249_money_columns_int_to_bigint`, plain
+  `ALTER COLUMN ... TYPE BIGINT` — no data loss, no downtime concern
+  pre-launch). Non-money `Int` fields (seat counts, percentages like
+  `penaltyPct`/`discountPct`, token counts, byte sizes, minutes) were
+  deliberately left untouched.
+  - New `backend/src/common/money.ts` — the single shared money-arithmetic
+    utility CLAUDE.md requires (`Irr = bigint`, `addIrr`/`subIrr`/
+    `negateIrr`/`pctOfIrr`/`roundIrrTo`/`divRoundBigInt`/`compareIrr`/
+    `maxIrr`/`minIrr`/`toIrr`) — every money computation in the backend
+    now routes through it instead of ad hoc bigint arithmetic, so a
+    `bigint + number` type error (which TypeScript catches, unlike the
+    old silent-Int32-overflow risk) can't hide a mixed-type bug.
+  - New `backend/src/common/bigint-json.ts` — patches
+    `BigInt.prototype.toJSON` so every money field serializes as a
+    decimal **string** in API responses (`JSON.stringify` throws on a raw
+    bigint; a JS `number` can't safely hold amounts above 2^53 anyway, so
+    string was already the correct wire shape for money). Imported once
+    in `main.ts` (real app) and `test/jest-setup.ts` (e2e).
+  - New `backend/src/common/dto/irr.decorator.ts` — `@IsIrrAmount()` /
+    `@MinIrrAmount(min)` / `@TransformToIrr()`, a bigint-safe replacement
+    for `@IsInt()`/`@Min()`/plain-number DTO fields (class-validator's own
+    `@Min()` mishandles bigint). Applied to every DTO field where a
+    client submits one of the 27 money columns (agency credit/invoice
+    amounts, wallet top-up, booking payment confirmation, fare-rule/
+    pricing-proposal prices, ...).
+  - ML-boundary exception, explicitly scoped and commented at only two
+    call sites (`flights.service.ts`/`pricing.service.ts` `runAiAnalysis()`
+    building the outbound `PriceSuggestionItem[]` payload): converts
+    `Irr` to a plain `number` for the FastAPI pricing-suggestion request,
+    since that's an advisory-only, one-way signal (CLAUDE.md ML Service
+    Rules — never authoritative, never round-tripped back into a stored
+    field without going through NestJS's own re-pricing/registration
+    logic) and every real fare amount is far below 2^53.
+  - Full backend unit suite: 50/50 passing. Full backend e2e suite:
+    391/392 passing (the one remaining failure is the pre-existing
+    documented Phase-51 timeout flake on
+    `flight-engine-completion.e2e-spec.ts`'s Y/B/M fare-class test —
+    confirmed unrelated to this migration by re-running with a longer
+    timeout, which passes with fully correct values). `tsc --noEmit` and
+    `eslint` clean on the backend. Frontend `tsc`/lint: no new errors
+    (17 pre-existing, unrelated `AuthUser.preferredLocale` errors remain,
+    verified present in the untouched baseline); frontend unit suite:
+    327/327 passing, 72 files. `frontend/src/lib/fa-format.ts` and every
+    page/type touching one of the 27 fields updated for the
+    string-on-the-wire reality.
+  - Two intentional test-behavior changes, not weakened assertions:
+    `agencies.e2e-spec.ts`'s "PATCH credit rejects a limit beyond the
+    Int32 rial ceiling" is obsolete by design (removing that ceiling was
+    the point) and now proves the validation guard against a negative
+    limit instead; `reporting.e2e-spec.ts`'s "money fields are raw
+    integers" assertion flips from `typeof === 'number'` to
+    `typeof === 'string'`, matching the new wire format on purpose.
+- [x] **Staff auth surfaces — forced password change + login polish** —
+  closes the long-deferred `mustChangePassword` enforcement gap (IT/admin
+  temp-password resets previously set the flag but never blocked panel
+  access): `GET /auth/me` and login responses now expose
+  `mustChangePassword`; `JwtAuthGuard` returns `403 PASSWORD_CHANGE_REQUIRED`
+  on every JWT-protected staff/agency route except `/auth/me`,
+  `/auth/change-password`, and `/auth/logout`; frontend
+  `ForcePasswordChangePage` at `/required-password-change` gates
+  `ProtectedRoute`/`AgencyProtectedRoute` until `POST /auth/change-password`
+  clears the flag. Staff login/2FA polish: design-aligned button copy
+  («ورود به سامانه»), bottom toast for forgot-password (contact IT),
+  SVG feature icons in `StaffLoginLayout`, 2FA back link. Backend: 1 new
+  e2e case in `auth.e2e-spec.ts` (22 total passing). Frontend: 19 auth
+  unit tests passing across `LoginPage`, `TwoFactorPage`,
+  `ForcePasswordChangePage`. See `docs/features/staff-auth-surfaces.md`.
+- [x] **Forgot-password v2 visual parity** — redesigned
+  `/forgot-password` to match `design-reference-v2/فراموشی رمز.dc.html`: 960px
+  two-column card, gradient visual panel (SVG plane, hidden <768px), header with
+  locale switcher + back chip, 3-step stepper, +98 phone prefix with hints,
+  6-cell OTP (backend stays 6-digit), password strength meter, secure footer
+  note. Phone **and** email paths kept in all locales (Phase 51 unchanged).
+  Frontend: 10 Vitest tests in `ForgotPasswordPage.test.tsx`. See
+  `docs/features/forgot-password-v2-visual.md`.
+
+- [x] **Panel sidebar badges + Jalali day-picker (Phase C)** — referrals
+  sidebar badge (purple: SENIOR_MANAGER `awaitingReport`, EMPLOYEE
+  `awaitingMyReport`); badge pills aligned to nav-row end; finance-ops view
+  now uses shared `SalesChartControls` with day/month Jalali filtering (not
+  just q3/q6/year). Tests: 3 PanelShell + 1 Dashboard month + 1 Finance
+  day-mode. See `docs/features/panel-sidebar-badges-day-picker.md`.
+
+- [x] **EMPLOYEE cartable (Phase B)** — permission-gated `cartable` tab for
+  EMPLOYEE (`ct_list` / `ct_process` in `PERMISSION_CATALOG` + `EMPLOYEE_SECTION_NAV`);
+  `GET/PATCH approve /cartable/*`, `POST/GET /cartable/manager-message*`,
+  `GET /cartable/manager-recipients`, `GET /panels/employee-context`; frontend
+  `EmployeeCartablePage` (message-to-manager + «انجام شد ✓») via `CartableRouter`;
+  `EmployeeDashboardPage` KPI cards (open cartable, pending referrals, unit) +
+  permission chips. Tests: 6 backend e2e + 4 EmployeeCartable Vitest + 5
+  EmployeeDashboard Vitest. See `docs/features/employee-cartable.md`.
+
+- [x] **SITE_ADMIN blog CMS (Phase D)** — `BlogPost` table + admin CRUD
+  (`/blog/admin/*`) + public listing/detail (`/blog/posts*`, `/blog/covers/:id`);
+  `blog` tab in SITE_ADMIN nav; `BlogAdminPage` (KPI row, category chips,
+  editor, post list); public `/blog` + `/blog/:slug` pages with fa/en/ar.
+  Media tab deferred. Tests: 5 backend e2e + 5 admin Vitest + 4 public Vitest.
+  See `docs/features/site-admin-blog.md` + `docs/features/public-blog.md`.
+
+- [x] **SITE_ADMIN media CMS (Phase E)** — `SiteMediaAsset`, `SiteContentBlock`,
+  `SiteDestinationHighlight`, `SiteRouteHighlight` + admin CRUD
+  (`/site-content/admin/*`) + public home payload (`GET /site-content/home`,
+  `GET /site-content/media/:fileId`); `media` tab in SITE_ADMIN nav;
+  `MediaAdminPage` (library, banners, destinations, routes); `HomeSearchPage`
+  wired to CMS with static fallbacks. Social/app/support/jobs in media tab
+  deferred. Tests: 8 backend e2e + 4 MediaAdmin Vitest + updated HomeSearch Vitest.
+  See `docs/features/site-admin-media.md`.
+
+- [x] **SITE_ADMIN settings — app links + support contact (Phase F)** —
+  `appDownloadLinks` in `SystemSetting`; SITE_ADMIN can PATCH social +
+  contact + app links; public `GET /settings/app-links` and
+  `/settings/support-contact`; `SettingsPage` contact/app sections;
+  `HomeSearchPage` app band wired to store URLs. Tests: extended
+  `phase12.e2e-spec.ts` + SettingsPage + HomeSearchPage Vitest.
+  See `docs/features/site-admin-settings-links.md`.
+
+- [x] **Contact page — support contact wiring (Phase G)** —
+  `ContactPage` reads `GET /settings/support-contact` for phone/email
+  channel cards (static fallbacks on failure; address/hours unchanged).
+  Tests: extended `ContactPage.test.tsx`.
+  See `docs/features/contact-support-contact-wiring.md`.
+
+- [x] **Destinations page — CMS highlights wiring (Phase H)** —
+  `DestinationsPage` reads `GET /site-content/home` to override destination
+  prices/images and popular routes (static catalog metadata unchanged).
+  Tests: `DestinationsPage.test.tsx`.
+  See `docs/features/destinations-cms-wiring.md`.
+
+- [x] **SITE_ADMIN static site pages CMS (Phase I)** —
+  «صفحات سایت» list in `MediaAdminPage`; SITE_ADMIN PATCH for page text keys;
+  public `GET /settings/site-content`; About/Contact/TravelInfo wired (fa).
+  Tests: `MediaAdminPage.test.tsx`, extended `phase12.e2e-spec.ts`.
+  See `docs/features/site-admin-static-pages.md`.
+
+- [x] **Public gaps closure — i18n, visual, AI radar, CMS locale, agency recovery (2026-07-31)** —
+  Split purchase flow per design: `CheckoutPage` (review) → new `PaymentPage`
+  (promo + pay + hold timer, fa/en/ar, two-column layout). `BookPage`/`TicketPage`/
+  `FlowStepper` i18n. `ResultsPage`: removed mock flights; wired
+  `GET /search/advisory` + `GET /search/price-calendar`. CMS multilocale:
+  `GET /settings/site-content?locale=`, `GET /site-content/home?locale=`,
+  `contactOfficeHours` setting, block locale defaults. Agency:
+  `POST /auth/agency/password-reset/*`, `GET /agency-portal/sales/export` (CSV).
+  Backend e2e: `search-advisory.e2e-spec.ts`. Frontend: 413 tests green.
+  See branch `cursor/public-gaps-i18n-visual-9b91`.
+
+- [x] **Full-project code review + critical-fix batch (2026-08-01)** — a 6-way parallel review across financial/booking core, auth/RBAC, admin-panel backend, frontend RTL/Jalali/i18n, ml-service, and infra/deployment surfaced 26 findings. Fixed the 7 highest-severity ones in this batch (backend-only; the remaining findings are frontend/perf/infra items, not yet scheduled):
+  - `agencies.service.ts` `settle()`: was a bare read-then-insert with no lock — two concurrent settlements could both read the same "outstanding" figure and double-credit the agency. Now locks the agency's profile row (`SELECT ... FOR UPDATE`) and re-reads the ledger sum inside the same transaction as the insert. New concurrency e2e test (two parallel `POST /settle` calls → exactly one 201, ledger sum stays 0).
+  - `pricing.service.ts` `register()`: an AI-sourced suggestion could be registered as the bookable fare with zero bound check, violating CLAUDE.md's "an ML suggestion can never set a bookable price by itself." Now rejects an AI suggestion that exceeds the CEO-approved `legalRateIrr` ceiling. New e2e test.
+  - `pricing.service.ts` `upsertProposal()`: editing a still-PENDING proposal's price didn't clear a previously computed `aiSuggestion`, so a stale AI price (computed against the old figures) stayed registerable. Now clears `aiSuggestion` on every edit. New e2e test.
+  - `reservation/pnr.service.ts` `issue()` and `changeSeat()`: both had a classic TOCTOU race — the seat-sold/lock check ran as a plain read before the write, no row lock, no DB constraint backing it, so two concurrent requests for the same seat could both succeed (violates CLAUDE.md's "exactly one of two concurrent buyers of the last seat may succeed"). Both now lock the flight instance's row and re-check inside the same transaction as the write. New 5-parallel-request concurrency e2e tests for both.
+  - `auth.service.ts` `refresh()`: blocking/suspending a staff or agency account only checked `isActive`/`suspendedAt` at login — an already-issued refresh token kept working (and kept extending itself) after the account was blocked. `refresh()` now rechecks account status on every call, and `admins.service.ts` `setBlocked()` / `agencies.service.ts` `suspend()` now proactively revoke that user's outstanding refresh tokens (not a global logout-all). New e2e tests for both staff and agency accounts.
+  - `settings.service.ts` `update()`: `PATCH /settings` let IT_MANAGER write BOARD_CHAIR-only keys (payment-gateway toggles, company/brand identity) since the endpoint only checked the class-level role list, not per-key. Now enforces per-key scoping server-side (the frontend already hid these fields from IT, but authorization must not rely on hidden UI alone) — `socialLinks`/`appDownloadLinks` (site-services links IT does manage) stay writable alongside the operational toggles.
+  - This batch was originally committed on a since-diverged branch and reconciled onto `main` on 2026-08-02: `agencies.service.ts` `settle()` and `settings.service.ts`'s per-key IT scope needed adapting to `main`'s BigInt money columns; `pnr.service.ts` `issue()` already had its own independent row-locked fix on `main`, so only `changeSeat()` needed the lock added here. `pricing.e2e-spec.ts`'s two new register tests needed real step-up challenge/code (main added mandatory step-up to `register()` after this batch was written). Full backend e2e suite has a large pre-existing failure count unrelated to this batch — nearly every failure traces to a broken `loginAsCustomer` test helper (customer OTP flow), not to anything touched here; the specific tests this batch added/touched (agencies, pricing, reservation, phase12 settings) all pass.
 
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is
 "done" only when every checklist item in its `docs/features/<name>.md` has
 a passing test — see `docs/features/panel-shell-dashboard.md` for Phase 1.
+
+- [x] **SITE_ADMIN panel dark-align (2026-08-03)** — nav order/labels to
+  `پنل ادمین سایت.dc.html`; brand subtitle «پنل مدیریت» + avatar «اس»;
+  refund/tickets nav badges; dark cartable; dashboard 4-KPI + agency/refund/
+  cartable widgets; `GET /reporting/site-admin-overview`; dark Agencies +
+  Flights (flightops) + Club + Refunds + Tickets + **مدیریت سایت** +
+  **درخواست‌های استخدام**; cartable already dark for SITE_ADMIN; sidebar
+  drops blog/kyc/settings; global **10 records/page**; refunds + tickets
+  search. See `docs/features/site-admin-panel-align.md`.
 
 ## Notable findings from design extraction (informs later phases)
 
@@ -1376,16 +1615,9 @@ a passing test — see `docs/features/panel-shell-dashboard.md` for Phase 1.
 
 ## Known technical debt (pre-launch, not blocking current phases)
 
-- All IRR money columns (`priceIrr`, `signedAmountIrr`, `limitIrr`,
-  `amountIrr`) are Postgres `integer` (max ~2.14e9 ≈ 214,000,000 toman).
-  Fine for per-ticket/per-invoice amounts and current seed data, but a
-  large agency's credit line or a yearly revenue aggregate could
-  plausibly exceed that. Needs an `Int` → `BigInt` migration (with a
-  matching TypeORM/TS + JSON-serialization review, since `bigint` doesn't
-  `JSON.stringify` by default) before real financial figures are trusted
-  at scale — surfaced during Phase 3 seed data, not fixed inline to avoid
-  disturbing already-tested Phase 1 code without discussing the blast
-  radius first.
+- ~~All IRR money columns are Postgres `integer` (Int32 ceiling).~~
+  **Resolved** — see the "Int → BigInt migration" entry above. Every
+  money column is now `bigint`, end to end.
 
 ## Commands
 
@@ -1395,8 +1627,8 @@ See `CLAUDE.md` → Commands. `docker compose up -d` starts Postgres+Redis;
 
 - `cd backend && npm run seed` — (re)seeds one dev account per role, all
   sharing the password `Blujet@1404` (see `backend/typeorm/seed.ts` — dev
-  usernames: `ceo`, `chair`, `senior.rahimi`, `finance.karimi`,
-  `comm.abbasi`, `itadmin`, `site.admin`, `com.ahmadi`), plus 6 months of
+  usernames: `ceo`, `chair`, `senior`, `finance`,
+  `comm`, `itadmin`, `site.admin`, `com.ahmadi`), plus 6 months of
   sample flights/bookings so the dashboard has real numbers to show.
 - Backend tests need a local Postgres reachable at the `DATABASE_URL` in
   `backend/.env` (dev db) and `backend/.env.test` (test db, `blujet_test`) —

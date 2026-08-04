@@ -6,7 +6,9 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
-import { TypeORMService } from '../../typeorm/typeorm.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { EmployeePermission } from '../../database/entities/employee-permission.entity';
 import { REQUIRES_PERMISSION_KEY } from '../decorators/requires-permission.decorator';
 import { AuthenticatedUser } from '../types/authenticated-user';
 import { ErrorCode } from '../errors';
@@ -24,7 +26,8 @@ import { ErrorCode } from '../errors';
 export class EmployeePermissionGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
-    private readonly typeorm: TypeORMService,
+    @InjectRepository(EmployeePermission)
+    private readonly employeePermissionRepo: Repository<EmployeePermission>,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -40,9 +43,12 @@ export class EmployeePermissionGuard implements CanActivate {
     );
     if (!keys || keys.length === 0) return true;
 
-    const grant = await this.typeorm.employeePermission.findFirst({
-      where: { employeeId: user.id, permission: { key: { in: keys } } },
-    });
+    const grant = await this.employeePermissionRepo
+      .createQueryBuilder('ep')
+      .innerJoin('ep.permission', 'p')
+      .where('ep.employeeId = :employeeId', { employeeId: user.id })
+      .andWhere('p.key IN (:...keys)', { keys })
+      .getOne();
     if (!grant) {
       throw new ForbiddenException({
         code: ErrorCode.FORBIDDEN,

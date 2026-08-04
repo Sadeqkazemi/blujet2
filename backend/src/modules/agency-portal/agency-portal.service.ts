@@ -3,12 +3,24 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { TypeORMService } from '../../typeorm/typeorm.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { In, MoreThanOrEqual, Not, IsNull, Repository } from 'typeorm';
+import { AgencyProfile } from '../../database/entities/agency-profile.entity';
+import { AgencyDocument } from '../../database/entities/agency-document.entity';
+import { AgencyCreditRequest } from '../../database/entities/agency-credit-request.entity';
+import { AgencyWebserviceRequest } from '../../database/entities/agency-webservice-request.entity';
+import { AgencyAllotment } from '../../database/entities/agency-allotment.entity';
+import { LedgerEntry } from '../../database/entities/ledger-entry.entity';
+import { Booking } from '../../database/entities/booking.entity';
+import { Passenger } from '../../database/entities/passenger.entity';
 import { AuditService } from '../audit/audit.service';
 import { CartableService } from '../cartable/cartable.service';
 import { AgenciesService } from '../agencies/agencies.service';
 import { FilesService } from '../files/files.service';
+import { WebservicePricingService } from '../webservice-pricing/webservice-pricing.service';
 import { ErrorCode } from '../../common/errors';
+import { ZERO_IRR, addIrr, divRoundBigInt, toIrr } from '../../common/money';
+import type { Irr } from '../../common/money';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type {
   RequestWebserviceDto,
@@ -23,28 +35,40 @@ const CREDIT_REVIEW_ROLES = [
 
 const SOLD_STATUSES = ['PAID', 'TICKETED'] as const;
 
-// Phase 23: server-computed prices from the design's own plan catalog
-// (تومان × 10 → ریال). Never accept a client-supplied price.
-const WEBSERVICE_PLAN_PRICES_IRR: Record<number, number> = {
-  1: 45_000_000,
-  3: 120_000_000,
-  12: 420_000_000,
-};
+// Phase 23: server-computed prices from the commercial-manager plan catalog
+// (stored in SystemSetting, editable via PATCH /webservice/pricing).
+// Never accept a client-supplied price.
 
 @Injectable()
 export class AgencyPortalService {
   constructor(
-    private readonly typeorm: TypeORMService,
+    @InjectRepository(AgencyProfile)
+    private readonly profileRepo: Repository<AgencyProfile>,
+    @InjectRepository(AgencyDocument)
+    private readonly documentRepo: Repository<AgencyDocument>,
+    @InjectRepository(AgencyCreditRequest)
+    private readonly creditRequestRepo: Repository<AgencyCreditRequest>,
+    @InjectRepository(AgencyWebserviceRequest)
+    private readonly webserviceRequestRepo: Repository<AgencyWebserviceRequest>,
+    @InjectRepository(AgencyAllotment)
+    private readonly allotmentRepo: Repository<AgencyAllotment>,
+    @InjectRepository(LedgerEntry)
+    private readonly ledgerRepo: Repository<LedgerEntry>,
+    @InjectRepository(Booking)
+    private readonly bookingRepo: Repository<Booking>,
+    @InjectRepository(Passenger)
+    private readonly passengerRepo: Repository<Passenger>,
     private readonly audit: AuditService,
     private readonly cartable: CartableService,
     private readonly agencies: AgenciesService,
     private readonly files: FilesService,
+    private readonly webservicePricing: WebservicePricingService,
   ) {}
 
   private async getOwnProfileOrThrow(actor: AuthenticatedUser) {
-    const profile = await this.typeorm.agencyProfile.findUnique({
+    const profile = await this.profileRepo.findOne({
       where: { userId: actor.id },
-      include: { user: true },
+      relations: { user: true },
     });
     if (!profile) {
       throw new NotFoundException({
@@ -66,53 +90,49 @@ export class AgencyPortalService {
 
     const [
       credit,
-      salesThisMonth,
+      salesThisMonthRow,
       ticketsIssuedTotal,
       seatsSoldThisMonth,
       salesRows,
     ] = await Promise.all([
       this.agencies.getCredit(id),
-      this.typeorm.ledgerEntry.aggregate({
-        // Real ticket sales only — excludes AgenciesService.resetTestDebt's
-        // bookingless debt-line calibration rows (see ReportingService's
-        // kpis() for the full explanation).
+      this.ledgerRepo
+        .createQueryBuilder('l')
+        .select('SUM(l."signedAmountIrr")', 'sum')
+        .where('l."agencyId" = :id', { id })
+        .andWhere('l.type = :type', { type: 'SALE' })
+        .andWhere('l."bookingId" IS NOT NULL')
+        .andWhere('l."occurredAt" >= :startOfMonth', { startOfMonth })
+        .getRawOne<{ sum: string | null }>(),
+      this.bookingRepo.count({
+        where: { agencyId: id, status: In([...SOLD_STATUSES]) },
+      }),
+      this.passengerRepo
+        .createQueryBuilder('p')
+        .innerJoin('p.booking', 'b')
+        .where('b."agencyId" = :id', { id })
+        .andWhere('b.status IN (:...statuses)', {
+          statuses: [...SOLD_STATUSES],
+        })
+        .andWhere('b."createdAt" >= :startOfMonth', { startOfMonth })
+        .getCount(),
+      this.ledgerRepo.find({
         where: {
           agencyId: id,
-          type: 'SALE',
-          bookingId: { not: null },
-          occurredAt: { gte: startOfMonth },
-        },
-        _sum: { signedAmountIrr: true },
-      }),
-      this.typeorm.booking.count({
-        where: { agencyId: id, status: { in: [...SOLD_STATUSES] } },
-      }),
-      this.typeorm.passenger.count({
-        where: {
-          booking: {
-            agencyId: id,
-            status: { in: [...SOLD_STATUSES] },
-            createdAt: { gte: startOfMonth },
-          },
-        },
-      }),
-      this.typeorm.ledgerEntry.findMany({
-        where: {
-          agencyId: id,
-          type: 'SALE',
-          bookingId: { not: null },
-          occurredAt: { gte: sixMonthsAgo },
+          type: 'SALE' as never,
+          bookingId: Not(IsNull()),
+          occurredAt: MoreThanOrEqual(sixMonthsAgo),
         },
         select: { signedAmountIrr: true, occurredAt: true },
       }),
     ]);
 
-    const monthBuckets = new Map<string, number>();
+    const monthBuckets = new Map<string, Irr>();
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       monthBuckets.set(
         `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
-        0,
+        ZERO_IRR,
       );
     }
     for (const row of salesRows) {
@@ -120,7 +140,7 @@ export class AgencyPortalService {
       if (monthBuckets.has(key)) {
         monthBuckets.set(
           key,
-          (monthBuckets.get(key) ?? 0) + row.signedAmountIrr,
+          addIrr(monthBuckets.get(key) ?? ZERO_IRR, row.signedAmountIrr),
         );
       }
     }
@@ -128,7 +148,9 @@ export class AgencyPortalService {
     return {
       credit,
       kpis: {
-        salesThisMonthIrr: salesThisMonth._sum.signedAmountIrr ?? 0,
+        salesThisMonthIrr: salesThisMonthRow?.sum
+          ? BigInt(salesThisMonthRow.sum)
+          : ZERO_IRR,
         ticketsIssuedTotal,
         seatsSoldThisMonth,
       },
@@ -143,9 +165,9 @@ export class AgencyPortalService {
 
   async ledger(actor: AuthenticatedUser) {
     await this.getOwnProfileOrThrow(actor);
-    return this.typeorm.ledgerEntry.findMany({
+    return this.ledgerRepo.find({
       where: { agencyId: actor.id },
-      orderBy: { occurredAt: 'desc' },
+      order: { occurredAt: 'DESC' },
       take: 20,
     });
   }
@@ -169,7 +191,7 @@ export class AgencyPortalService {
 
   async requestCreditIncrease(
     actor: AuthenticatedUser,
-    dto: { requestedLimitIrr: number; note?: string },
+    dto: { requestedLimitIrr: Irr; note?: string },
   ) {
     await this.getOwnProfileOrThrow(actor);
     const current = await this.agencies.getCredit(actor.id);
@@ -180,13 +202,13 @@ export class AgencyPortalService {
       });
     }
 
-    const request = await this.typeorm.agencyCreditRequest.create({
-      data: {
+    const request = await this.creditRequestRepo.save(
+      this.creditRequestRepo.create({
         agencyId: actor.id,
         requestedLimitIrr: dto.requestedLimitIrr,
-        note: dto.note,
-      },
-    });
+        note: dto.note ?? null,
+      }),
+    );
 
     await this.cartable.createTasksForRoles([...CREDIT_REVIEW_ROLES], {
       category: 'AGENCY',
@@ -210,9 +232,9 @@ export class AgencyPortalService {
 
   async myCreditRequests(actor: AuthenticatedUser) {
     await this.getOwnProfileOrThrow(actor);
-    return this.typeorm.agencyCreditRequest.findMany({
+    return this.creditRequestRepo.find({
       where: { agencyId: actor.id },
-      orderBy: { createdAt: 'desc' },
+      order: { createdAt: 'DESC' },
     });
   }
 
@@ -222,14 +244,28 @@ export class AgencyPortalService {
     await this.getOwnProfileOrThrow(actor);
     const id = actor.id;
 
-    const bookings = await this.typeorm.booking.findMany({
+    const bookings = await this.bookingRepo.find({
       where: { agencyId: id },
-      include: {
-        passengers: { select: { id: true } },
-        flightInstance: { include: { flight: { include: { route: true } } } },
+      relations: {
+        flightInstance: { flight: { route: true } },
       },
-      orderBy: { createdAt: 'desc' },
+      order: { createdAt: 'DESC' },
     });
+
+    const passengerCounts = bookings.length
+      ? await this.passengerRepo
+          .createQueryBuilder('p')
+          .select('p."bookingId"', 'bookingId')
+          .addSelect('COUNT(*)', 'count')
+          .where('p."bookingId" IN (:...ids)', {
+            ids: bookings.map((b) => b.id),
+          })
+          .groupBy('p."bookingId"')
+          .getRawMany<{ bookingId: string; count: string }>()
+      : [];
+    const passengerCountByBooking = new Map<string, number>(
+      passengerCounts.map((row) => [row.bookingId, Number(row.count)]),
+    );
 
     const tickets = bookings.map((b) => ({
       pnr: b.pnr,
@@ -238,7 +274,7 @@ export class AgencyPortalService {
       route: `${b.flightInstance.flight.route.originCode} → ${b.flightInstance.flight.route.destCode}`,
       departureAt: b.flightInstance.departureAt,
       priceIrr: b.priceIrr,
-      passengerCount: b.passengers.length,
+      passengerCount: passengerCountByBooking.get(b.id) ?? 0,
     }));
 
     const perFlightMap = new Map<
@@ -247,7 +283,7 @@ export class AgencyPortalService {
         flightNo: string;
         route: string;
         ticketsCount: number;
-        salesIrr: number;
+        salesIrr: Irr;
       }
     >();
     const soldBookings = bookings.filter((b) =>
@@ -259,20 +295,25 @@ export class AgencyPortalService {
         flightNo: key,
         route: `${b.flightInstance.flight.route.originCode} → ${b.flightInstance.flight.route.destCode}`,
         ticketsCount: 0,
-        salesIrr: 0,
+        salesIrr: ZERO_IRR,
       };
       existing.ticketsCount += 1;
-      existing.salesIrr += b.priceIrr;
+      existing.salesIrr = addIrr(existing.salesIrr, b.priceIrr);
       perFlightMap.set(key, existing);
     }
 
-    const totalSalesIrr = soldBookings.reduce((s, b) => s + b.priceIrr, 0);
+    const totalSalesIrr = soldBookings.reduce(
+      (s, b) => addIrr(s, b.priceIrr),
+      ZERO_IRR,
+    );
     const ticketsIssued = soldBookings.length;
     const refundedCount = bookings.filter(
       (b) => b.status === 'REFUNDED',
     ).length;
-    const avgFareIrr =
-      ticketsIssued > 0 ? Math.round(totalSalesIrr / ticketsIssued) : 0;
+    const avgFareIrr: Irr =
+      ticketsIssued > 0
+        ? divRoundBigInt(totalSalesIrr, BigInt(ticketsIssued))
+        : ZERO_IRR;
     const refundRatePct =
       bookings.length > 0
         ? Math.round((refundedCount / bookings.length) * 1000) / 10
@@ -283,6 +324,24 @@ export class AgencyPortalService {
       perFlight: Array.from(perFlightMap.values()),
       summary: { totalSalesIrr, ticketsIssued, avgFareIrr, refundRatePct },
     };
+  }
+
+  /** CSV export for agency sales — UTF-8 BOM for Excel Persian compatibility. */
+  async salesCsv(actor: AuthenticatedUser): Promise<string> {
+    const report = await this.sales(actor);
+    const header = 'PNR,Flight,Route,Departure,Status,Passengers,AmountIRR';
+    const rows = report.tickets.map((t) =>
+      [
+        t.pnr,
+        t.flightNo,
+        `"${t.route}"`,
+        t.departureAt.toISOString(),
+        t.status,
+        t.passengerCount,
+        String(t.priceIrr),
+      ].join(','),
+    );
+    return `\uFEFF${header}\n${rows.join('\n')}\n`;
   }
 
   // ── Inbox ────────────────────────────────────────────────────────────
@@ -319,13 +378,19 @@ export class AgencyPortalService {
 
   async documents(actor: AuthenticatedUser) {
     await this.getOwnProfileOrThrow(actor);
-    return this.typeorm.agencyDocument.findMany({
+    const docs = await this.documentRepo.find({
       where: { agencyId: actor.id },
-      include: {
-        file: { select: { fileName: true, sizeBytes: true, mimeType: true } },
-      },
-      orderBy: { createdAt: 'desc' },
+      relations: { file: true },
+      order: { createdAt: 'DESC' },
     });
+    return docs.map((d) => ({
+      ...d,
+      file: {
+        fileName: d.file.fileName,
+        sizeBytes: d.file.sizeBytes,
+        mimeType: d.file.mimeType,
+      },
+    }));
   }
 
   async uploadDocument(
@@ -335,12 +400,31 @@ export class AgencyPortalService {
   ) {
     await this.getOwnProfileOrThrow(actor);
     const stored = await this.files.store(actor, file);
-    return this.typeorm.agencyDocument.create({
-      data: { agencyId: actor.id, fileId: stored.id, docType: dto.docType },
-      include: {
-        file: { select: { fileName: true, sizeBytes: true, mimeType: true } },
-      },
+    const saved = await this.documentRepo.save(
+      this.documentRepo.create({
+        agencyId: actor.id,
+        fileId: stored.id,
+        docType: dto.docType,
+      }),
+    );
+    const doc = await this.documentRepo.findOne({
+      where: { id: saved.id },
+      relations: { file: true },
     });
+    if (!doc) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'مدرک یافت نشد.',
+      });
+    }
+    return {
+      ...doc,
+      file: {
+        fileName: doc.file.fileName,
+        sizeBytes: doc.file.sizeBytes,
+        mimeType: doc.file.mimeType,
+      },
+    };
   }
 
   // ── Phase 16: real seat allotments (replaces AgencySeatsPage mock) ─────
@@ -349,12 +433,10 @@ export class AgencyPortalService {
     await this.getOwnProfileOrThrow(actor);
     const id = actor.id;
 
-    const rows = await this.typeorm.agencyAllotment.findMany({
+    const rows = await this.allotmentRepo.find({
       where: { agencyId: id },
-      include: {
-        flightInstance: { include: { flight: { include: { route: true } } } },
-      },
-      orderBy: { createdAt: 'desc' },
+      relations: { flightInstance: { flight: { route: true } } },
+      order: { createdAt: 'DESC' },
     });
 
     const now = new Date();
@@ -363,11 +445,11 @@ export class AgencyPortalService {
         // No allotmentId FK on Booking (see docs/DB_SCHEMA.md Phase 16 ⚑ —
         // "book against own allotment" isn't built yet) — consumed is
         // derived from this agency's real bookings on the same flight.
-        const usedSeats = await this.typeorm.booking.count({
+        const usedSeats = await this.bookingRepo.count({
           where: {
             agencyId: id,
             flightInstanceId: r.flightInstanceId,
-            status: { in: [...SOLD_STATUSES] },
+            status: In([...SOLD_STATUSES]),
           },
         });
         return {
@@ -390,19 +472,44 @@ export class AgencyPortalService {
   // ── Phase 23: real webservice (B2B API) purchase requests ──────────────
   // (replaces AgencyWebservicePage mock's local-only "requested"/"keyShown")
 
+  async assertAgency(actor: AuthenticatedUser) {
+    await this.getOwnProfileOrThrow(actor);
+  }
+
+  async webservicePlans() {
+    const prices = await this.webservicePricing.getPlanPrices();
+    return {
+      plans: ([1, 3, 12] as const).map((months) => ({
+        months,
+        // Wire format consistency: every *Irr field is a decimal string in
+        // responses (see docs/API.md) — this one is JSON-stored (not a
+        // TypeORM BigInt column) but still IRR money, so it goes through the
+        // same Irr/bigint-string path as every other price field.
+        priceIrr: toIrr(prices[months]),
+      })),
+    };
+  }
+
   async requestWebservice(actor: AuthenticatedUser, dto: RequestWebserviceDto) {
     await this.getOwnProfileOrThrow(actor);
-    const priceIrr = WEBSERVICE_PLAN_PRICES_IRR[dto.months];
+    const planPrices = await this.webservicePricing.getPlanPrices();
+    const planPriceIrr = planPrices[dto.months];
+    if (!planPriceIrr) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'مدت اشتراک نامعتبر است.',
+      });
+    }
 
-    const request = await this.typeorm.agencyWebserviceRequest.create({
-      data: {
+    const request = await this.webserviceRequestRepo.save(
+      this.webserviceRequestRepo.create({
         agencyId: actor.id,
         scope: dto.scope,
         months: dto.months,
-        priceIrr,
-        note: dto.note,
-      },
-    });
+        priceIrr: toIrr(planPriceIrr),
+        note: dto.note ?? null,
+      }),
+    );
 
     const scopeFa =
       dto.scope === 'FULL' ? 'فروش کامل (صدور بلیط)' : 'جستجو و رزرو';
@@ -418,7 +525,7 @@ export class AgencyPortalService {
       actorRole: actor.role,
       category: 'AGENCY',
       action: 'درخواست خرید وب‌سرویس آژانس',
-      detail: `آژانس «${actor.fullName}» درخواست وب‌سرویس با دامنه ${dto.scope} به مدت ${dto.months} ماه به مبلغ ${priceIrr} ریال ثبت کرد.`,
+      detail: `آژانس «${actor.fullName}» درخواست وب‌سرویس با دامنه ${dto.scope} به مدت ${dto.months} ماه به مبلغ ${planPriceIrr} ریال ثبت کرد.`,
       entityType: 'AgencyWebserviceRequest',
       entityId: request.id,
     });
@@ -428,9 +535,9 @@ export class AgencyPortalService {
 
   async myWebserviceRequests(actor: AuthenticatedUser) {
     await this.getOwnProfileOrThrow(actor);
-    return this.typeorm.agencyWebserviceRequest.findMany({
+    return this.webserviceRequestRepo.find({
       where: { agencyId: actor.id },
-      orderBy: { createdAt: 'desc' },
+      order: { createdAt: 'DESC' },
     });
   }
 

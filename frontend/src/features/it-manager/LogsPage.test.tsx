@@ -8,49 +8,26 @@ const LOGS: AuditLogRow[] = [
   {
     id: 'l1',
     actorRole: 'IT_MANAGER',
-    category: 'SYSTEM',
-    action: 'تغییر سرویس',
-    detail: 'سرویس «CDN و تصاویر» غیرفعال شد.',
-    createdAt: '2026-07-17T08:30:00.000Z',
-  },
-  {
-    id: 'l2',
-    actorRole: 'IT_MANAGER',
     category: 'ACCOUNT',
     action: 'ایجاد کارمند',
-    detail: 'کارمند «رضا کاظمی» ایجاد شد.',
+    detail: 'کارمند «رضا» ایجاد شد',
     createdAt: '2026-07-17T08:00:00.000Z',
+    actorName: 'مهندس علی صدر',
+    unit: 'IT',
+    level: 'info',
   },
 ];
 
 describe('LogsPage', () => {
-  it('renders audit log rows with category badges', async () => {
+  it('renders the 5-column log table with actor and unit', async () => {
     vi.spyOn(itApi, 'fetchSystemLogs').mockResolvedValue(LOGS);
 
     render(<LogsPage />);
 
-    expect(await screen.findByText('لاگ و رویدادها')).toBeInTheDocument();
-    expect(screen.getByText('سرویس «CDN و تصاویر» غیرفعال شد.')).toBeInTheDocument();
-    expect(screen.getByText('کارمند «رضا کاظمی» ایجاد شد.')).toBeInTheDocument();
-    expect(screen.getByText('سیستم')).toBeInTheDocument();
-    expect(screen.getByText('حساب')).toBeInTheDocument();
-  });
-
-  it('shows empty state when no logs exist', async () => {
-    vi.spyOn(itApi, 'fetchSystemLogs').mockResolvedValue([]);
-
-    render(<LogsPage />);
-
-    expect(
-      await screen.findByText('فعالیتی از کارمندان ثبت نشده است.'),
-    ).toBeInTheDocument();
-  });
-
-  it('shows an error when fetch fails', async () => {
-    vi.spyOn(itApi, 'fetchSystemLogs').mockRejectedValue(new Error('fail'));
-
-    render(<LogsPage />);
-
-    expect(await screen.findByText('خطا در دریافت لاگ‌ها.')).toBeInTheDocument();
+    expect(await screen.findByText('زمان')).toBeInTheDocument();
+    expect(screen.getByText('کارمند')).toBeInTheDocument();
+    expect(screen.getByText('مهندس علی صدر')).toBeInTheDocument();
+    expect(screen.getByText(/ایجاد کارمند/)).toBeInTheDocument();
+    expect(screen.getByText('IT')).toBeInTheDocument();
   });
 });

@@ -28,7 +28,8 @@ test('IT Manager creates an employee, grants a permission, resets their password
   // Employees list orders newest-first, so the row just created is #1 —
   // matched by name only since prior runs may have left same-named rows.
   const row = page.locator('li', { hasText: 'کارمند سناریوی تست' }).first();
-  await row.getByRole('button', { name: 'مسدود کردن' }).click();
+  await row.getByRole('button', { name: 'تعلیق' }).click();
+  await page.getByRole('button', { name: 'تعلیق حساب' }).click();
   await expect(row.getByText('مسدود')).toBeVisible();
 });
 
@@ -40,8 +41,10 @@ test('IT Manager toggles an internal service off and back on', async ({ page }) 
   const toggle = page.getByRole('switch', { name: 'CDN و تصاویر' });
   const wasOn = (await toggle.getAttribute('aria-checked')) === 'true';
   await toggle.click();
+  await page.getByRole('button', { name: wasOn ? 'غیرفعال کن' : 'فعال کن' }).click();
   await expect(toggle).toHaveAttribute('aria-checked', String(!wasOn));
   await toggle.click();
+  await page.getByRole('button', { name: wasOn ? 'فعال کن' : 'غیرفعال کن' }).click();
   await expect(toggle).toHaveAttribute('aria-checked', String(wasOn));
 });
 

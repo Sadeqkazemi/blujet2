@@ -8,7 +8,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { EmployeePermissionGuard } from '../../common/guards/employee-permission.guard';
 import { RequiresPermission } from '../../common/decorators/requires-permission.decorator';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import type { AuditCategory, Role } from '../../../generated/typeorm/enums';
+import type { AuditCategory, Role } from '../../database/enums';
 
 @ApiTags('audit')
 @Controller('audit')
@@ -46,6 +46,14 @@ export class AuditController {
   async systemLogs() {
     const data = await this.audit.systemLogs();
     return { success: true, data };
+  }
+
+  @Get('logs/badge-count')
+  @Roles('IT_MANAGER')
+  @ApiOperation({ summary: 'شمارندهٔ badge سایدبار لاگ IT (۷ روز اخیر)' })
+  async logsBadgeCount() {
+    const count = await this.audit.systemLogsBadgeCount();
+    return { success: true, data: { count } };
   }
 
   @Get('system-events')

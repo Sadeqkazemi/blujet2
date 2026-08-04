@@ -1,7 +1,16 @@
 import { Injectable } from '@nestjs/common';
-import { TypeORMService } from '../../typeorm/typeorm.service';
-import type { AuditCategory, Role } from '../../../generated/typeorm/enums';
-import type { TypeORM } from '../../../generated/typeorm/client';
+import { InjectRepository } from '@nestjs/typeorm';
+import {
+  FindOptionsWhere,
+  ILike,
+  In,
+  MoreThanOrEqual,
+  Not,
+  Repository,
+} from 'typeorm';
+import { AuditLog } from '../../database/entities/audit-log.entity';
+import type { AuditCategory, Role } from '../../database/enums';
+import type { JsonValue } from '../../database/json-types';
 
 export interface RecordAuditEntryInput {
   actorId: string;
@@ -17,15 +26,21 @@ export interface RecordAuditEntryInput {
 
 @Injectable()
 export class AuditService {
-  constructor(private readonly typeorm: TypeORMService) {}
+  constructor(
+    @InjectRepository(AuditLog)
+    private readonly auditRepo: Repository<AuditLog>,
+  ) {}
 
   async record(input: RecordAuditEntryInput) {
-    return this.typeorm.auditLog.create({
-      data: {
+    return this.auditRepo.save(
+      this.auditRepo.create({
         ...input,
-        metadata: input.metadata as TypeORM.InputJsonValue | undefined,
-      },
-    });
+        entityType: input.entityType ?? null,
+        entityId: input.entityId ?? null,
+        metadata: (input.metadata as JsonValue | undefined) ?? null,
+        requestId: input.requestId ?? null,
+      }),
+    );
   }
 
   /**
@@ -38,34 +53,81 @@ export class AuditService {
     filters: { category?: AuditCategory; actorRole?: Role; q?: string },
   ) {
     const excludedForCeo: Role[] = ['CEO', 'SENIOR_MANAGER', 'BOARD_CHAIR'];
+    const base: FindOptionsWhere<AuditLog> = {};
+    if (viewerRole === 'CEO') base.actorRole = Not(In(excludedForCeo));
+    if (filters.category) base.category = filters.category;
+    if (filters.actorRole) base.actorRole = filters.actorRole;
 
-    return this.typeorm.auditLog.findMany({
-      where: {
-        ...(viewerRole === 'CEO'
-          ? { actorRole: { notIn: excludedForCeo } }
-          : {}),
-        ...(filters.category ? { category: filters.category } : {}),
-        ...(filters.actorRole ? { actorRole: filters.actorRole } : {}),
-        ...(filters.q
-          ? {
-              OR: [
-                { action: { contains: filters.q, mode: 'insensitive' } },
-                { detail: { contains: filters.q, mode: 'insensitive' } },
-              ],
-            }
-          : {}),
-      },
-      orderBy: { createdAt: 'desc' },
+    const where: FindOptionsWhere<AuditLog> | FindOptionsWhere<AuditLog>[] =
+      filters.q
+        ? [
+            { ...base, action: ILike(`%${filters.q}%`) },
+            { ...base, detail: ILike(`%${filters.q}%`) },
+          ]
+        : base;
+
+    const rows = await this.auditRepo.find({
+      where,
+      order: { createdAt: 'DESC' },
       take: 100,
+      relations: { actor: true },
+      select: { actor: { fullName: true } },
     });
+
+    // CEO design card shows manager display name + role label.
+    return rows.map(({ actor, ...r }) => ({
+      ...r,
+      actorName: actor.fullName,
+    }));
   }
 
   /** IT Manager's "لاگ و رویدادها" — system-category + account-management entries. */
   async systemLogs() {
-    return this.typeorm.auditLog.findMany({
-      where: { OR: [{ category: 'SYSTEM' }, { category: 'ACCOUNT' }] },
-      orderBy: { createdAt: 'desc' },
+    const rows = await this.auditRepo.find({
+      where: [{ category: 'SYSTEM' }, { category: 'ACCOUNT' }],
+      order: { createdAt: 'DESC' },
       take: 100,
+      relations: { actor: true },
+      select: {
+        actor: { fullName: true, dept: true, role: true },
+      },
+    });
+
+    const unitLabel = (dept: string | null | undefined, role: Role) => {
+      if (dept === 'commercial') return 'بازرگانی';
+      if (dept === 'finance') return 'مالی';
+      if (dept === 'it') return 'IT';
+      if (dept === 'sales') return 'فروش';
+      if (role === 'IT_MANAGER') return 'IT';
+      return '—';
+    };
+
+    const levelOf = (category: AuditCategory): 'info' | 'warn' | 'error' => {
+      if (category === 'SECURITY') return 'warn';
+      return 'info';
+    };
+
+    return rows.map((r) => ({
+      id: r.id,
+      actorRole: r.actorRole,
+      category: r.category,
+      action: r.action,
+      detail: r.detail,
+      createdAt: r.createdAt,
+      actorName: r.actor.fullName,
+      unit: unitLabel(r.actor.dept, r.actor.role),
+      level: levelOf(r.category),
+    }));
+  }
+
+  /** Lightweight count for the IT sidebar badge on «لاگ و رویدادها». */
+  async systemLogsBadgeCount() {
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    return this.auditRepo.count({
+      where: [
+        { category: 'SYSTEM', createdAt: MoreThanOrEqual(since) },
+        { category: 'ACCOUNT', createdAt: MoreThanOrEqual(since) },
+      ],
     });
   }
 
@@ -73,10 +135,11 @@ export class AuditService {
    * (unlike managerReports' exclusions). The level chip is a presentational
    * mapping only: SECURITY→WARN, financial categories→OK, else INFO. */
   async ceoSystemEvents() {
-    const rows = await this.typeorm.auditLog.findMany({
-      orderBy: { createdAt: 'desc' },
+    const rows = await this.auditRepo.find({
+      order: { createdAt: 'DESC' },
       take: 100,
-      include: { actor: { select: { fullName: true } } },
+      relations: { actor: true },
+      select: { actor: { fullName: true } },
     });
 
     const OK_CATEGORIES = new Set(['FINANCE', 'REFUND', 'PRICING', 'AGENCY']);
