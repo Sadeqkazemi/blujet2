@@ -34,7 +34,7 @@ function formatSupportPhone(phone: string, locale: StoredLocale): string {
 
 const STATIC_CHANNELS: { icon: string; bg: string; color: string; title: Tr; value: Tr; ltr: boolean; kind: 'address' | 'hours' }[] = [
   { icon: '📍', bg: '#eef9f1', color: '#1f8a5b', title: { fa: 'دفتر مرکزی', en: 'Head Office', ar: 'المكتب الرئيسي' }, value: { fa: 'تهران، خیابان ولیعصر، برج blujet، طبقه ۱۲', en: 'Tehran, Valiasr St, blujet Tower, 12th Floor', ar: 'طهران، شارع ولي‌عصر، برج blujet، الطابق ١٢' }, ltr: false, kind: 'address' },
-  { icon: '🕑', bg: '#fbf0ef', color: '#d64545', title: { fa: 'ساعات کاری دفتر', en: 'Office Hours', ar: 'ساعات عمل المكتب' }, value: { fa: 'شنبه تا چهارشنبه، ۸ تا ۱۷', en: 'Saturday to Wednesday, 8 to 17', ar: 'من السبت إلى الأربعاء، من الساعة ٨ إلى ١٧' }, ltr: false, kind: 'hours' },
+  { icon: '🕑', bg: '#f3eefb', color: '#7c4dbb', title: { fa: 'ساعات کاری دفتر', en: 'Office Hours', ar: 'ساعات عمل المكتب' }, value: { fa: 'شنبه تا چهارشنبه، ۸ تا ۱۷', en: 'Saturday to Wednesday, 8 to 17', ar: 'من السبت إلى الأربعاء، من الساعة ٨ إلى ١٧' }, ltr: false, kind: 'hours' },
 ];
 
 const SUPPORT_CHANNEL_META = {
@@ -193,21 +193,27 @@ export default function ContactPage() {
 
   return (
     <PublicPageShell>
-      <section style={{ background: 'linear-gradient(150deg,#0d2640,#124a86)', color: '#fff', padding: '41px 22px 35px', textAlign: 'center' }}>
-        <h1 style={{ fontSize: isMobile ? 24 : 30, fontWeight: 900, margin: '0 0 10px', letterSpacing: '-.5px' }}>{t.heroTitle}</h1>
-        <p style={{ fontSize: 13, color: '#c9dcf3', margin: 0 }}>{t.heroDesc}</p>
+      <section style={{ background: 'linear-gradient(135deg,#0d2640,#16406e)', color: '#fff', padding: '37px 22px' }}>
+        <div style={{ maxWidth: 820, margin: '0 auto', textAlign: 'center' }}>
+          <h1 style={{ fontSize: isMobile ? 24 : 29, fontWeight: 900, margin: '0 0 10px', letterSpacing: '-.5px' }}>{t.heroTitle}</h1>
+          <p style={{ fontSize: '13.5px', color: '#aac4e2', margin: 0 }}>{t.heroDesc}</p>
+        </div>
       </section>
 
-      <div style={{ maxWidth: 1080, margin: '0 auto', padding: '31px 22px 55px', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.2fr', gap: 22, alignItems: 'start' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ maxWidth: 1320, margin: '40px auto 0', padding: '0 26px 56px', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.2fr', gap: 20, alignItems: 'stretch' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
           {channels.map((c) => (
-            <div key={c.title.fa} style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 15, padding: '16px 17px', display: 'flex', alignItems: 'center', gap: 13 }}>
-              <div style={{ width: 44, height: 44, borderRadius: 12, background: c.bg, color: c.color, fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
+            <div key={c.title.fa} style={{ flex: 1, background: '#fff', border: '1px solid #eef1f5', borderRadius: 14, padding: 15, display: 'flex', gap: 11, alignItems: 'center' }}>
+              <div style={{ width: 48, height: 48, borderRadius: 13, background: c.bg, color: c.color, fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
                 {c.icon}
               </div>
               <div>
-                <div style={{ fontSize: 12.5, fontWeight: 800, color: '#0d2640' }}>{c.title[locale]}</div>
-                <div data-testid={c.title.en === 'Email' ? 'contact-support-email' : c.title.en === '24-Hour Support Line' ? 'contact-support-phone' : undefined} style={{ fontSize: 12, color: '#5a6678', marginTop: 3 }} dir={c.ltr ? 'ltr' : undefined}>
+                <div style={{ fontSize: '11.5px', color: '#9aa4b2' }}>{c.title[locale]}</div>
+                <div
+                  data-testid={c.title.en === 'Email' ? 'contact-support-email' : c.title.en === '24-Hour Support Line' ? 'contact-support-phone' : undefined}
+                  style={{ fontSize: c.ltr ? '13.5px' : '12.5px', fontWeight: 800, marginTop: 2, lineHeight: c.ltr ? undefined : 1.7 }}
+                  dir={c.ltr ? 'ltr' : undefined}
+                >
                   {c.value}
                 </div>
               </div>
@@ -215,25 +221,25 @@ export default function ContactPage() {
           ))}
         </div>
 
-        <div style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 18, padding: '22px 24px' }}>
-          <h2 style={{ fontSize: 16, fontWeight: 900, color: '#0d2640', margin: '0 0 6px' }}>{t.formHeading}</h2>
-          <p style={{ fontSize: 12, color: '#8a96a6', margin: '0 0 16px', lineHeight: 1.8 }}>{t.formSub}</p>
+        <div style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 16, padding: 20 }}>
+          <h2 style={{ fontSize: 16, fontWeight: 800, color: '#0d2640', margin: '0 0 4px' }}>{t.formHeading}</h2>
+          <p style={{ fontSize: '11.5px', color: '#9aa4b2', margin: '0 0 20px', lineHeight: 1.8 }}>{t.formSub}</p>
 
           {sent ? (
-            <div data-testid="contact-sent" style={{ background: '#eef9f1', border: '1px solid #bfe6cc', borderRadius: 12, padding: '22px 16px', textAlign: 'center' }}>
-              <div style={{ fontSize: 22, color: '#1f8a5b', marginBottom: 8 }}>✓</div>
-              <div style={{ fontSize: 14, fontWeight: 800, color: '#0d2640', marginBottom: 4 }}>{t.sentTitle}</div>
-              <div style={{ fontSize: 11.5, color: '#5a6678' }}>{t.sentBody}</div>
+            <div data-testid="contact-sent" style={{ background: '#eef9f1', border: '1px solid #2ea36b', borderRadius: 13, padding: 16, textAlign: 'center' }}>
+              <div style={{ fontSize: 27, color: '#1f8a5b', marginBottom: 8 }}>✓</div>
+              <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#1f8a5b', marginBottom: 4 }}>{t.sentTitle}</div>
+              <div style={{ fontSize: '11.5px', color: '#5a6678' }}>{t.sentBody}</div>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 11 }}>
+              <div style={{ display: 'flex', gap: 11, flexDirection: isMobile ? 'column' : 'row' }}>
                 <input
                   data-testid="contact-name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder={t.namePlaceholder}
-                  style={{ padding: '11px 13px', border: '1.5px solid #e3e9f1', borderRadius: 11, fontFamily: 'inherit', fontSize: 12.5, outline: 'none' }}
+                  style={{ flex: 1, height: 48, border: '1.5px solid #e2e7ee', borderRadius: 11, background: '#fafbfd', padding: '0 11px', fontFamily: 'inherit', fontSize: '12.5px', outline: 'none' }}
                 />
                 <input
                   data-testid="contact-phone"
@@ -241,7 +247,7 @@ export default function ContactPage() {
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder={t.phonePlaceholder}
-                  style={{ padding: '11px 13px', border: '1.5px solid #e3e9f1', borderRadius: 11, fontFamily: 'inherit', fontSize: 12.5, outline: 'none' }}
+                  style={{ flex: 1, height: 48, border: '1.5px solid #e2e7ee', borderRadius: 11, background: '#fafbfd', padding: '0 11px', fontFamily: 'inherit', fontSize: '12.5px', outline: 'none' }}
                 />
               </div>
               <input
@@ -249,7 +255,7 @@ export default function ContactPage() {
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
                 placeholder={t.subjectPlaceholder}
-                style={{ padding: '11px 13px', border: '1.5px solid #e3e9f1', borderRadius: 11, fontFamily: 'inherit', fontSize: 12.5, outline: 'none' }}
+                style={{ height: 48, border: '1.5px solid #e2e7ee', borderRadius: 11, background: '#fafbfd', padding: '0 11px', fontFamily: 'inherit', fontSize: '12.5px', outline: 'none' }}
               />
               <textarea
                 data-testid="contact-msg"
@@ -257,15 +263,15 @@ export default function ContactPage() {
                 onChange={(e) => setMsg(e.target.value)}
                 placeholder={t.msgPlaceholder}
                 rows={5}
-                style={{ padding: '11px 13px', border: '1.5px solid #e3e9f1', borderRadius: 11, fontFamily: 'inherit', fontSize: 12.5, outline: 'none', resize: 'vertical' }}
+                style={{ minHeight: 120, border: '1.5px solid #e2e7ee', borderRadius: 11, background: '#fafbfd', padding: 11, fontFamily: 'inherit', fontSize: '12.5px', outline: 'none', resize: 'vertical' }}
               />
-              {error && <p style={{ margin: 0, fontSize: 11.5, color: '#d64545' }}>{error}</p>}
+              {error && <p style={{ margin: 0, fontSize: '11.5px', color: '#d64545' }}>{error}</p>}
               <button
                 type="button"
                 data-testid="contact-submit"
                 disabled={!canSubmit || submitting}
                 onClick={() => void onSubmit()}
-                style={{ alignSelf: 'flex-start', border: 'none', borderRadius: 11, background: canSubmit && !submitting ? '#1668c4' : '#aab8c8', color: '#fff', padding: '11px 26px', fontSize: 13, fontWeight: 800, cursor: canSubmit && !submitting ? 'pointer' : 'not-allowed', fontFamily: 'inherit' }}
+                style={{ width: '100%', height: 52, border: 'none', borderRadius: 12, background: canSubmit && !submitting ? '#1668c4' : '#aab8c8', color: '#fff', fontSize: '13.5px', fontWeight: 800, cursor: canSubmit && !submitting ? 'pointer' : 'not-allowed', fontFamily: 'inherit' }}
               >
                 {t.sendLabel}
               </button>

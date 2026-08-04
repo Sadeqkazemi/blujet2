@@ -1,8 +1,12 @@
+import type { CSSProperties } from 'react';
 import { useEffect, useState } from 'react';
 import { fetchSystemLogs } from '../../api/it-manager';
 import Pagination from '../../components/Pagination';
 import { usePagination } from '../../hooks/usePagination';
 import { formatJalaliDateTime } from '../../lib/jalali';
+import { StaffAlert, StaffPanelCard, StaffPanelPageHeader } from '../../components/staff-panel-ui';
+import { STAFF_PANEL } from '../../lib/staff-panel-theme';
+import { staffCard, staffStatusStyle } from '../../lib/staff-panel-styles';
 import type { AuditLogRow } from '../../types/it-manager';
 
 const LEVEL_LABEL: Record<AuditLogRow['level'], { label: string; className: string }> = {

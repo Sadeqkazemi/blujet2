@@ -2,6 +2,15 @@ import { useCallback, useEffect, useState } from 'react';
 import { fetchActiveSessions, fetchSecurityPolicy, logoutAllSessions, updateSecurityPolicy } from '../../api/it-manager';
 import { faDigits } from '../../lib/fa-format';
 import { useStepUp } from '../../hooks/useStepUp';
+import {
+  StaffAlert,
+  StaffPanelCard,
+  StaffPanelPageHeader,
+  StaffSecondaryButton,
+  StaffToggle,
+} from '../../components/staff-panel-ui';
+import { STAFF_PANEL } from '../../lib/staff-panel-theme';
+import Modal from '../../components/Modal';
 import type { ActiveSession, SecurityPolicy } from '../../types/it-manager';
 
 const TOGGLES: { key: keyof SecurityPolicy; title: string; desc: string }[] = [
@@ -120,7 +129,7 @@ export default function SecurityPage() {
               </div>
             ))}
           </div>
-        </section>
+        </StaffPanelCard>
 
         <div className="flex flex-col gap-[15px]">
           <section className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[17px]">
@@ -145,7 +154,7 @@ export default function SecurityPage() {
                 </span>
               </div>
             </div>
-          </section>
+          </StaffPanelCard>
 
           <section className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[17px]">
             <div className="mb-1 flex items-center justify-between gap-2">
@@ -221,7 +230,7 @@ export default function SecurityPage() {
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
       {stepUp.modal}
     </div>

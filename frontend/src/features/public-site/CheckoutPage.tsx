@@ -564,6 +564,22 @@ export default function CheckoutPage() {
     );
   }
 
+  const sidebarLabels = {
+    paymentDetails: t.paymentDetails,
+    description: t.description,
+    amountToman: t.amountToman,
+    ticketPrice: t.ticketPrice,
+    adult: t.adult,
+    taxesFees: t.taxesFees,
+    total: t.total,
+    toman: t.toman,
+    securePayment: t.securePayment,
+    agreeTermsPrefix: t.agreeTermsPrefix,
+    siteTerms: t.siteTerms,
+    agreeTermsSuffix: t.agreeTermsSuffix,
+    continueToPayment: t.continueToPayment,
+  };
+
   return (
     <PublicPageShell>
       <CheckoutStepBar current={step} locale={locale} />

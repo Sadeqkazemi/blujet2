@@ -15,6 +15,13 @@ import Modal from '../../components/Modal';
 import Pagination from '../../components/Pagination';
 import { usePagination } from '../../hooks/usePagination';
 import JalaliDatePicker from '../../components/JalaliDatePicker';
+import {
+  StaffAlert,
+  StaffCountPill,
+  StaffPanelPageHeader,
+  StaffPrimaryButton,
+} from '../../components/staff-panel-ui';
+import { STAFF_PANEL } from '../../lib/staff-panel-theme';
 import ComposeMessageModal from './ComposeMessageModal';
 import type {
   CartableCategory,
@@ -256,25 +263,55 @@ export default function CartablePage() {
       )}
 
       {hasChairGate && (
-        <section className="mb-6 rounded-xl border border-[#f59e0b40] bg-[#f59e0b0d] p-5">
-          <h2 className="text-sm font-bold text-[#92400e]">ارجاع و ارسال گزارش به رئیس هیئت مدیره</h2>
-          <p className="mt-1 text-[11px] leading-relaxed text-[#92400e]/80">
+        <section
+          style={{
+            marginBottom: 24,
+            borderRadius: 14,
+            border: `1px solid rgba(245,158,11,0.35)`,
+            background: 'rgba(245,158,11,0.08)',
+            padding: 16,
+          }}
+        >
+          <h2 style={{ fontSize: 13, fontWeight: 800, color: STAFF_PANEL.warning, margin: 0 }}>
+            ارجاع و ارسال گزارش به رئیس هیئت مدیره
+          </h2>
+          <p style={{ marginTop: 4, fontSize: 11, lineHeight: 1.6, color: STAFF_PANEL.navMuted }}>
             دسترسی کامل کارتابل و ارجاعات مخصوص مدیر ارشد و مدیر عامل است؛ ارسال گزارش به رئیس هیئت مدیره
             نیازمند مجوز ایشان است.
           </p>
-          <div className="mt-3">
+          <div style={{ marginTop: 12 }}>
             {chairPerm?.status === 'APPROVED' ? (
               <span className="rounded-full bg-[#34d39924] px-3 py-1.5 text-xs font-bold text-[#34d399]">
                 مجوز تأیید شد ✓
               </span>
             ) : chairPerm?.status === 'PENDING' ? (
-              <span className="rounded-full bg-[#f59e0b24] px-3 py-1.5 text-xs font-bold text-[#b45309]">
+              <span
+                style={{
+                  borderRadius: 20,
+                  background: 'rgba(245,158,11,0.15)',
+                  padding: '6px 12px',
+                  fontSize: 11,
+                  fontWeight: 800,
+                  color: STAFF_PANEL.warning,
+                }}
+              >
                 درخواست ارسال شد — در انتظار تأیید
               </span>
             ) : (
               <button
+                type="button"
                 onClick={() => void onRequestChairPerm()}
-                className="rounded-lg bg-[#b45309] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#92400e]"
+                style={{
+                  borderRadius: 10,
+                  background: STAFF_PANEL.warning,
+                  color: '#fff',
+                  padding: '8px 14px',
+                  fontSize: 11.5,
+                  fontWeight: 800,
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
               >
                 درخواست مجوز از رئیس هیئت مدیره
               </button>
@@ -595,8 +632,9 @@ export default function CartablePage() {
             </p>
           )}
 
-          <div className="mt-4 flex justify-end gap-2">
+          <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
             <button
+              type="button"
               onClick={() => void onDecide('transfer')}
               disabled={!transferTo}
               className={`rounded-lg border px-4 py-2 text-xs font-bold transition disabled:opacity-50 ${
@@ -608,12 +646,24 @@ export default function CartablePage() {
               انتقال
             </button>
             <button
+              type="button"
               onClick={() => void onDecide('reject')}
-              className="rounded-lg bg-danger px-4 py-2 text-xs font-bold text-white transition hover:bg-danger/90"
+              style={{
+                borderRadius: 10,
+                background: STAFF_PANEL.danger,
+                color: '#fff',
+                padding: '8px 16px',
+                fontSize: 11.5,
+                fontWeight: 800,
+                border: 'none',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
             >
               انصراف
             </button>
             <button
+              type="button"
               onClick={() => void onDecide('approve')}
               className="rounded-lg bg-[#34d399] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#2bb583]"
             >

@@ -94,7 +94,8 @@ describe('PublicClubPage', () => {
 
   it('points the join button at the customer sign-in page when logged out', () => {
     renderWithRouter(<PublicClubPage />);
-    expect(screen.getByText('عضویت رایگان')).toHaveAttribute('href', '/signin');
+    expect(screen.getByTestId('club-join-hero')).toHaveAttribute('href', '/signin');
+    expect(screen.getByTestId('club-join-cta')).toHaveAttribute('href', '/signin');
   });
 
   it('renders translated tiers and CTA in English', () => {
@@ -105,7 +106,8 @@ describe('PublicClubPage', () => {
     expect(screen.getAllByText('Gold').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Platinum').length).toBeGreaterThan(0);
     expect(screen.getByText('Reach the point threshold, get your card')).toBeInTheDocument();
-    expect(screen.getByText('Join for Free')).toHaveAttribute('href', '/signin');
+    expect(screen.getByTestId('club-join-hero')).toHaveAttribute('href', '/signin');
+    expect(screen.getByTestId('club-join-cta')).toHaveAttribute('href', '/signin');
   });
 
   it('renders translated tiers in Arabic', () => {

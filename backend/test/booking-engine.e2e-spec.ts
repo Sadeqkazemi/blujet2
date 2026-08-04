@@ -120,6 +120,23 @@ describe('Booking engine (e2e)', () => {
     );
   }
 
+  it('GET /search/airports excludes e2e fixture city names', async () => {
+    await typeorm.airport.create({
+      data: { code: 'QZZ', cityFa: 'شهر آزمایش الف', tz: 'Asia/Tehran' },
+    });
+
+    const res = await request(app.getHttpServer()).get('/search/airports');
+    expect(res.status).toBe(200);
+    const cities = (res.body.data as { cityFa: string; code: string }[]).map(
+      (a) => a.cityFa,
+    );
+    expect(cities).not.toContain('شهر آزمایش الف');
+    expect(cities).not.toEqual(expect.arrayContaining([expect.stringMatching(/^شهر تست/)]));
+    expect(cities).toContain('تهران');
+
+    await typeorm.airport.deleteMany({ where: { code: 'QZZ' } });
+  });
+
   it('search returns the flight with both cabins priced and seatsLeft', async () => {
     const instance = await freshInstance();
     const date = instance.departureAt.toISOString().slice(0, 10);

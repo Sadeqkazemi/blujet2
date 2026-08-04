@@ -62,6 +62,7 @@ function lowSalesNotifItems(alerts: LowSalesAlert[]): PanelNotificationItem[] {
 
 export default function PanelShell() {
   const { user, signOut } = useAuth();
+  const isMobile = useIsMobile();
   const navigate = useNavigate();
   const location = useLocation();
   const [nav, setNav] = useState<PanelNavItem[] | null>(null);
@@ -355,6 +356,107 @@ export default function PanelShell() {
   const onDashboard = /^\/panel\/?$/.test(location.pathname);
   const showExecNotifChrome = executiveShell && isLowSalesRole(user?.role) && !onDashboard;
   const notifAlerts = lowSalesAlerts.slice(1);
+
+  function isActive(key: string) {
+    const path = navPath(key);
+    return key === 'dashboard'
+      ? location.pathname === '/panel' || location.pathname === '/panel/'
+      : location.pathname.startsWith(path);
+  }
+
+  const sidebarContent = (
+    <>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 8px 14px' }}>
+        <div
+          style={{
+            width: 38,
+            height: 38,
+            borderRadius: 10,
+            background: STAFF_PANEL.accent,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#fff',
+            flex: 'none',
+          }}
+        >
+          <svg width="21" height="21" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M21 15.5v-1.6l-7.5-4.6V4.2a1.5 1.5 0 0 0-3 0v5.1L3 13.9v1.6l7.5-2.3v4.4l-2 1.4v1.3l3.5-1 3.5 1v-1.3l-2-1.4v-4.4L21 15.5z" />
+          </svg>
+        </div>
+        <div style={{ lineHeight: 1.3 }}>
+          <div style={{ fontWeight: 900, fontSize: 15.5, color: '#fff' }}>blujet</div>
+          <div style={{ fontSize: 10, color: STAFF_PANEL.textMuted }}>پنل مدیریت</div>
+        </div>
+      </div>
+
+      <div style={{ padding: '0 5px 11px' }}>
+        <div style={{ display: 'block', fontSize: 10, color: STAFF_PANEL.textMuted, marginBottom: 6, paddingRight: 3 }}>
+          نقش این پنل
+        </div>
+        <div
+          data-testid="panel-shell-role"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 7,
+            background: STAFF_PANEL.roleBadgeBg,
+            border: `1px solid ${STAFF_PANEL.roleBadgeBorder}`,
+            borderRadius: 10,
+            padding: '9px 11px',
+          }}
+        >
+          <span
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              background: STAFF_PANEL.accent,
+              flex: 'none',
+            }}
+          />
+          <span style={{ fontSize: 12, fontWeight: 800, color: STAFF_PANEL.text }}>{roleLabel}</span>
+        </div>
+      </div>
+
+      <nav style={{ display: 'flex', flexDirection: 'column', gap: 5, flex: 1, overflowY: 'auto' }}>
+        {nav === null && <div style={{ padding: '10px 11px', fontSize: 12, color: STAFF_PANEL.textMuted }}>در حال بارگذاری…</div>}
+        {nav?.length === 0 && (
+          <div style={{ padding: '10px 11px', fontSize: 12, color: STAFF_PANEL.textMuted }}>تبی برای این نقش تعریف نشده است.</div>
+        )}
+        {nav?.map((item) => (
+          <NavItem
+            key={item.key}
+            item={item}
+            active={isActive(item.key)}
+            badge={badges[item.key]}
+            onNavigate={() => setMobileMenuOpen(false)}
+          />
+        ))}
+      </nav>
+
+      <button
+        type="button"
+        data-testid="panel-shell-signout"
+        onClick={() => void onSignOut()}
+        style={{
+          marginTop: 'auto',
+          width: '100%',
+          padding: '10px 11px',
+          borderRadius: 10,
+          border: `1px solid ${STAFF_PANEL.sidebarBorder}`,
+          background: 'transparent',
+          color: STAFF_PANEL.navMuted,
+          fontSize: 12,
+          fontWeight: 700,
+          cursor: 'pointer',
+          fontFamily: 'inherit',
+        }}
+      >
+        خروج از حساب
+      </button>
+    </>
+  );
 
   return (
     <div dir="rtl" className="flex min-h-screen bg-panel-canvas font-sans text-panel-ink">

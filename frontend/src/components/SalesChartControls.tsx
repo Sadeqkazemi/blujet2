@@ -64,6 +64,11 @@ export default function SalesChartControls({
   const monthOptions = useMemo(() => recentJalaliMonths(), []);
   const dark = theme === 'dark';
 
+  const inactiveSegmented = dark ? 'text-[#9fb0c7] hover:text-white' : 'text-muted hover:text-ink';
+  const inactivePill = dark
+    ? 'bg-[#18223a] text-[#9fb0c7] hover:bg-[#1f2a3d]'
+    : 'bg-surface text-text-2 hover:bg-surface-2';
+
   const modeButtons = modes.map((m) => (
     <button
       key={m.key}

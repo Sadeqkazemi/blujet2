@@ -39,6 +39,7 @@ import { changeOwnPassword, setPassword } from '../../api/auth';
 import { faDigits, faMoney, parseTomanToRial } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import type { BookingDetail, PriceLock, SavedFlight, SavedPassenger, SavedBankAccount, CustomerReferralDashboard, CustomerIdentityView, ActiveSession, UserProfile } from '../../types/public-site';
 import AccountSecuritySessions from './AccountSecuritySessions';
 import type { ClubMembershipView } from '../../types/club-membership';
@@ -143,14 +144,38 @@ const STR: Record<StoredLocale, {
   bannerText: (pct: string) => string;
   bannerCompleteBtn: string;
   bannerLaterBtn: string;
+  lblUserCode: string;
+  lblMemberSince: string;
+  btnSecurity: string;
+  profileCompletionHint: string;
+  hdrProfileIncomplete: string;
+  subProfileIncomplete: string;
+  statCompletedTrips: string;
+  statLoyaltyPoints: string;
+  statWalletBalance: string;
+  statSavedPassengers: string;
+  fieldNotSet: string;
   // trips
+  tripsHeading: string;
+  tripsSub: string;
   tripsEmptyText: string;
+  tripsEmptySub: string;
+  bookFlightBtn: string;
   searchFlightLink: string;
   pnrLabel: string;
   priceLockedBadge: string;
   viewTicketLink: string;
+  downloadTicketBtn: string;
+  detailsLink: string;
+  requestRefundBtn: string;
   // wallet
   walletBalanceHeading: string;
+  loyaltyPointsHeading: string;
+  pointsUnit: string;
+  pointsLogHeading: string;
+  noTransactionsHeading: string;
+  noTransactionsSub: string;
+  topupBtn: string;
   topupAmountLabel: string;
   topupPlaceholder: string;
   topupSubmit: string;
@@ -163,6 +188,8 @@ const STR: Record<StoredLocale, {
   notMemberText: string;
   joinFreeBtn: string;
   // price-locks
+  locksHeading: string;
+  locksSub: string;
   locksEmptyText: string;
   lockedRatePrefix: string;
   feePrefix: string;
@@ -179,7 +206,11 @@ const STR: Record<StoredLocale, {
   penaltyPrefix: string;
   penaltySuffix: string;
   // tickets
+  ticketsHeading: string;
+  ticketsSub: string;
+  ticketsNewBtn: string;
   ticketsEmptyText: string;
+  ticketsEmptySub: string;
   ticketsNewLink: string;
   ticketsTrackingLabel: string;
   ticketsHistoryHeading: string;
@@ -197,6 +228,9 @@ const STR: Record<StoredLocale, {
   passwordErrorFallback: string;
   passwordMismatch: string;
   passwordTooShort: string;
+  sidebarPointsLabel: string;
+  sidebarWalletLink: string;
+  sidebarLogout: string;
 }> = {
   fa: {
     defaultUserName: 'کاربر',
@@ -237,12 +271,36 @@ const STR: Record<StoredLocale, {
     bannerText: (pct) => `پروفایل شما ${pct}٪ تکمیل شده است. برای تکمیل، اطلاعات هویتی خود را وارد کنید.`,
     bannerCompleteBtn: 'تکمیل پروفایل',
     bannerLaterBtn: 'بعداً',
-    tripsEmptyText: 'هنوز سفری ثبت نکرده‌اید.',
+    lblUserCode: 'کد کاربری',
+    lblMemberSince: 'عضویت از',
+    btnSecurity: 'تنظیمات امنیت',
+    profileCompletionHint: 'با تکمیل شماره گذرنامه و تأیید ایمیل، پروفایل را کامل کنید و ۲۰۰ امتیاز بگیرید.',
+    hdrProfileIncomplete: 'پروفایل شما تکمیل نشده است',
+    subProfileIncomplete: 'برای استفاده کامل از امکانات (رزرو سریع‌تر، احراز هویت و صدور کارت)، اطلاعات هویتی، ایمیل و آدرس خود را تکمیل کنید.',
+    statCompletedTrips: 'سفرهای انجام‌شده',
+    statLoyaltyPoints: 'امتیاز باشگاه',
+    statWalletBalance: 'موجودی کیف پول',
+    statSavedPassengers: 'مسافران ذخیره‌شده',
+    fieldNotSet: 'تکمیل نشده',
+    tripsHeading: 'سفرها و خریدهای من',
+    tripsSub: 'لیست پروازهای رزرو شده، وضعیت بلیط و جزئیات سفر.',
+    tripsEmptyText: 'هنوز سفری ثبت نکرده‌اید',
+    tripsEmptySub: 'اولین پرواز خود را جستجو کنید و بلیط را آنلاین بخرید.',
+    bookFlightBtn: 'جستجوی پرواز',
     searchFlightLink: 'جستجوی پرواز',
     pnrLabel: 'کد رزرو',
     priceLockedBadge: '🔒 قیمت قفل‌شده',
     viewTicketLink: 'مشاهده بلیط',
+    downloadTicketBtn: 'دانلود PDF',
+    detailsLink: 'جزئیات ‹',
+    requestRefundBtn: 'درخواست استرداد',
     walletBalanceHeading: 'موجودی کیف پول',
+    loyaltyPointsHeading: 'امتیاز باشگاه',
+    pointsUnit: 'امتیاز',
+    pointsLogHeading: 'گردش امتیاز',
+    noTransactionsHeading: 'تراکنشی ثبت نشده است!',
+    noTransactionsSub: 'با خرید بلیط یا استفاده از خدمات، امتیاز و گردش کیف پول اینجا نمایش داده می‌شود.',
+    topupBtn: 'شارژ کیف پول',
     topupAmountLabel: 'مبلغ شارژ (تومان)',
     topupPlaceholder: 'مثلاً ۵۰۰۰۰۰',
     topupSubmit: 'شارژ کیف پول',
@@ -253,6 +311,8 @@ const STR: Record<StoredLocale, {
     viewClubLink: 'مشاهده شرایط و سطوح باشگاه ←',
     notMemberText: 'هنوز عضو باشگاه مشتریان نیستید.',
     joinFreeBtn: 'عضویت رایگان',
+    locksHeading: 'قفل قیمت',
+    locksSub: 'پروازهایی که نرخ آن‌ها را برای مدت محدود قفل کرده‌اید.',
     locksEmptyText: 'هنوز قفل قیمتی ثبت نکرده‌اید. در نتایج جستجوی پرواز، روی «🔒 قفل قیمت» بزنید (ویژه اعضای طلایی و بالاتر باشگاه مشتریان).',
     lockedRatePrefix: 'نرخ قفل‌شده: ',
     feePrefix: ' · کارمزد: ',
@@ -266,7 +326,11 @@ const STR: Record<StoredLocale, {
     refundableAmountPrefix: 'مبلغ قابل استرداد: ',
     penaltyPrefix: 'جریمه ',
     penaltySuffix: '٪',
+    ticketsHeading: 'پیام به پشتیبانی',
+    ticketsSub: 'پیگیری گفت‌وگوهای شما با تیم پشتیبانی',
+    ticketsNewBtn: 'تیکت جدید',
     ticketsEmptyText: 'هنوز تیکتی ثبت نکرده‌اید.',
+    ticketsEmptySub: 'صندوق درخواست‌های پشتیبانی شما خالی است.',
     ticketsNewLink: 'ارسال پیام جدید به پشتیبانی',
     ticketsTrackingLabel: 'کد پیگیری',
     ticketsHistoryHeading: 'رویدادها',
@@ -283,6 +347,9 @@ const STR: Record<StoredLocale, {
     passwordErrorFallback: 'خطا در تغییر رمز عبور.',
     passwordMismatch: 'تکرار رمز عبور جدید مطابقت ندارد.',
     passwordTooShort: 'رمز عبور جدید باید حداقل ۶ کاراکتر باشد.',
+    sidebarPointsLabel: 'امتیاز باشگاه',
+    sidebarWalletLink: 'کیف پول ›',
+    sidebarLogout: 'خروج از حساب',
   },
   en: {
     defaultUserName: 'User',
@@ -323,12 +390,36 @@ const STR: Record<StoredLocale, {
     bannerText: (pct) => `Your profile is ${pct}% complete. Enter your identity info to finish it.`,
     bannerCompleteBtn: 'Complete Profile',
     bannerLaterBtn: 'Later',
-    tripsEmptyText: "You haven't booked any trips yet.",
+    lblUserCode: 'User code',
+    lblMemberSince: 'member since',
+    btnSecurity: 'Security Settings',
+    profileCompletionHint: 'Complete your passport number and verify your email to finish your profile and earn 200 points.',
+    hdrProfileIncomplete: 'Your profile is incomplete',
+    subProfileIncomplete: 'Complete your identity, email, and address info to fully use the features (faster booking, verification, and card issuance).',
+    statCompletedTrips: 'Completed Trips',
+    statLoyaltyPoints: 'Loyalty Points',
+    statWalletBalance: 'Wallet Balance',
+    statSavedPassengers: 'Saved Passengers',
+    fieldNotSet: 'Not completed',
+    tripsHeading: 'My Trips & Purchases',
+    tripsSub: 'Your booked flights, ticket status, and trip details.',
+    tripsEmptyText: "You haven't booked any trips yet",
+    tripsEmptySub: 'Search for your first flight and buy a ticket online.',
+    bookFlightBtn: 'Search Flights',
     searchFlightLink: 'Search Flights',
     pnrLabel: 'PNR',
     priceLockedBadge: '🔒 Price Locked',
     viewTicketLink: 'View Ticket',
+    downloadTicketBtn: 'Download PDF',
+    detailsLink: 'Details ‹',
+    requestRefundBtn: 'Request Refund',
     walletBalanceHeading: 'Wallet Balance',
+    loyaltyPointsHeading: 'Loyalty Points',
+    pointsUnit: 'points',
+    pointsLogHeading: 'Points History',
+    noTransactionsHeading: 'No transactions recorded yet!',
+    noTransactionsSub: 'Points and wallet activity will appear here once you buy a ticket or use a service.',
+    topupBtn: 'Top Up Wallet',
     topupAmountLabel: 'Top-Up Amount (Toman)',
     topupPlaceholder: 'e.g. 500000',
     topupSubmit: 'Top Up Wallet',
@@ -339,6 +430,8 @@ const STR: Record<StoredLocale, {
     viewClubLink: 'View club tiers & terms ←',
     notMemberText: "You're not a loyalty club member yet.",
     joinFreeBtn: 'Join for Free',
+    locksHeading: 'Price Lock',
+    locksSub: 'Flights whose fares you have locked for a limited time.',
     locksEmptyText: 'You haven’t locked any prices yet. On the flight results page, click “🔒 Price Lock” (available to Gold-tier club members and above).',
     lockedRatePrefix: 'Locked rate: ',
     feePrefix: ' · Fee: ',
@@ -352,7 +445,11 @@ const STR: Record<StoredLocale, {
     refundableAmountPrefix: 'Refundable amount: ',
     penaltyPrefix: '',
     penaltySuffix: '% penalty',
+    ticketsHeading: 'Message Support',
+    ticketsSub: 'Track your conversations with the support team',
+    ticketsNewBtn: 'New Ticket',
     ticketsEmptyText: 'You have not submitted any support tickets yet.',
+    ticketsEmptySub: 'Your support ticket inbox is empty.',
     ticketsNewLink: 'Send a new message to support',
     ticketsTrackingLabel: 'Tracking code',
     ticketsHistoryHeading: 'Timeline',
@@ -369,6 +466,9 @@ const STR: Record<StoredLocale, {
     passwordErrorFallback: 'Error changing password.',
     passwordMismatch: 'New password confirmation does not match.',
     passwordTooShort: 'New password must be at least 6 characters.',
+    sidebarPointsLabel: 'Loyalty Points',
+    sidebarWalletLink: 'Wallet ›',
+    sidebarLogout: 'Sign Out',
   },
   ar: {
     defaultUserName: 'مستخدم',
@@ -409,12 +509,36 @@ const STR: Record<StoredLocale, {
     bannerText: (pct) => `ملفك الشخصي مكتمل بنسبة ${pct}٪. أدخل معلومات هويتك لإكماله.`,
     bannerCompleteBtn: 'إكمال الملف الشخصي',
     bannerLaterBtn: 'لاحقًا',
-    tripsEmptyText: 'لم تحجز أي رحلة بعد.',
+    lblUserCode: 'رمز المستخدم',
+    lblMemberSince: 'عضو منذ',
+    btnSecurity: 'إعدادات الأمان',
+    profileCompletionHint: 'أكمل رقم جواز السفر وتحقق من بريدك الإلكتروني لإنهاء ملفك الشخصي والحصول على ٢٠٠ نقطة.',
+    hdrProfileIncomplete: 'ملفك الشخصي غير مكتمل',
+    subProfileIncomplete: 'أكمل معلومات هويتك وبريدك وعنوانك لاستخدام جميع الميزات (حجز أسرع، التحقق، وإصدار البطاقة).',
+    statCompletedTrips: 'الرحلات المكتملة',
+    statLoyaltyPoints: 'نقاط النادي',
+    statWalletBalance: 'رصيد المحفظة',
+    statSavedPassengers: 'المسافرون المحفوظون',
+    fieldNotSet: 'لم يكتمل',
+    tripsHeading: 'رحلاتي ومشترياتي',
+    tripsSub: 'قائمة الرحلات المحجوزة وحالة التذكرة وتفاصيل السفر.',
+    tripsEmptyText: 'لم تحجز أي رحلة بعد',
+    tripsEmptySub: 'ابحث عن رحلتك الأولى واشترِ التذكرة عبر الإنترنت.',
+    bookFlightBtn: 'البحث عن رحلة',
     searchFlightLink: 'البحث عن رحلة',
     pnrLabel: 'رمز الحجز',
     priceLockedBadge: '🔒 السعر مقفل',
     viewTicketLink: 'عرض التذكرة',
+    downloadTicketBtn: 'تنزيل PDF',
+    detailsLink: 'التفاصيل ‹',
+    requestRefundBtn: 'طلب الاسترداد',
     walletBalanceHeading: 'رصيد المحفظة',
+    loyaltyPointsHeading: 'نقاط النادي',
+    pointsUnit: 'نقطة',
+    pointsLogHeading: 'سجل النقاط',
+    noTransactionsHeading: 'لا توجد معاملات مسجّلة بعد!',
+    noTransactionsSub: 'ستظهر نقاطك وحركة المحفظة هنا عند شراء تذكرة أو استخدام خدمة.',
+    topupBtn: 'شحن المحفظة',
     topupAmountLabel: 'مبلغ الشحن (تومان)',
     topupPlaceholder: 'مثلاً ٥٠٠٠٠٠',
     topupSubmit: 'شحن المحفظة',
@@ -425,6 +549,8 @@ const STR: Record<StoredLocale, {
     viewClubLink: 'عرض شروط ومستويات النادي ←',
     notMemberText: 'لست عضوًا في نادي العملاء بعد.',
     joinFreeBtn: 'انضمام مجاني',
+    locksHeading: 'قفل السعر',
+    locksSub: 'الرحلات التي أقفلت أسعارها لفترة محدودة.',
     locksEmptyText: 'لم تُقفل أي سعر بعد. في صفحة نتائج البحث عن الرحلات، اضغط “🔒 قفل السعر” (متاح لأعضاء المستوى الذهبي فما فوق).',
     lockedRatePrefix: 'السعر المقفل: ',
     feePrefix: ' · الرسوم: ',
@@ -438,7 +564,11 @@ const STR: Record<StoredLocale, {
     refundableAmountPrefix: 'المبلغ القابل للاسترداد: ',
     penaltyPrefix: '',
     penaltySuffix: '٪ جزاء',
+    ticketsHeading: 'رسالة للدعم',
+    ticketsSub: 'تتبع محادثاتك مع فريق الدعم',
+    ticketsNewBtn: 'تذكرة جديدة',
     ticketsEmptyText: 'لم تُقدّم أي تذكرة دعم بعد.',
+    ticketsEmptySub: 'صندوق طلبات الدعم الخاص بك فارغ.',
     ticketsNewLink: 'إرسال رسالة جديدة للدعم',
     ticketsTrackingLabel: 'رمز التتبع',
     ticketsHistoryHeading: 'الأحداث',
@@ -455,12 +585,16 @@ const STR: Record<StoredLocale, {
     passwordErrorFallback: 'خطأ في تغيير كلمة المرور.',
     passwordMismatch: 'تأكيد كلمة المرور الجديدة غير متطابق.',
     passwordTooShort: 'يجب أن تكون كلمة المرور الجديدة ٦ أحرف على الأقل.',
+    sidebarPointsLabel: 'نقاط النادي',
+    sidebarWalletLink: 'المحفظة ›',
+    sidebarLogout: 'تسجيل الخروج',
   },
 };
 
 export default function AccountPage() {
   const { status, user, signOut } = useAuth();
   const { locale } = useLocale();
+  const isMobile = useIsMobile();
   const t = STR[locale];
   const isMobile = useIsMobile();
   const navigate = useNavigate();
@@ -1002,70 +1136,149 @@ export default function AccountPage() {
         )}
 
         {tab === 'trips' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 16, padding: 18 }}>
+            <h2 style={{ fontSize: 17, fontWeight: 800, margin: '0 0 6px', color: '#0d2640' }}>{t.tripsHeading}</h2>
+            <p style={{ fontSize: '11.5px', color: '#8a96a6', margin: '0 0 20px' }}>{t.tripsSub}</p>
             {bookings === null && <p style={{ fontSize: 13, color: '#6b7787' }}>{t.loading}</p>}
             {bookings?.length === 0 && (
-              <div style={{ background: '#fff', border: '1px dashed #e5e9f0', borderRadius: 16, padding: 40, textAlign: 'center', color: '#8a96a6', fontSize: 13 }}>
-                {t.tripsEmptyText}{' '}
-                <Link to="/" style={{ color: '#1668c4', fontWeight: 700 }}>
-                  {t.searchFlightLink}
+              <div style={{ textAlign: 'center', padding: '50px 20px 34px' }}>
+                <div style={{ width: 84, height: 84, margin: '0 auto 20px', borderRadius: 24, background: '#fef6e6', color: '#e0a53a', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h15A1.5 1.5 0 0 1 21 8.5v2.2a1.6 1.6 0 0 0 0 2.6v2.2A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 15.5v-2.2a1.6 1.6 0 0 0 0-2.6Z" />
+                    <path d="M14 7v12" strokeDasharray="1.5 2.5" />
+                  </svg>
+                  <span style={{ position: 'absolute', top: -6, left: -6, width: 26, height: 26, borderRadius: 8, background: '#f0a83c', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 900, border: '3px solid #fff' }}>!</span>
+                </div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: '#16202e' }}>{t.tripsEmptyText}</div>
+                <div style={{ fontSize: 12, color: '#9aa4b2', marginTop: 8 }}>{t.tripsEmptySub}</div>
+                <Link
+                  to="/"
+                  style={{ display: 'inline-flex', marginTop: 18, height: 46, padding: '0 22px', alignItems: 'center', justifyContent: 'center', borderRadius: 12, background: '#1668c4', color: '#fff', fontSize: '12.5px', fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}
+                >
+                  {t.bookFlightBtn}
                 </Link>
               </div>
             )}
-            {bookings?.map((b) => {
-              const st = STATUS_LABEL[b.status] ?? { label: { fa: b.status, en: b.status, ar: b.status }, bg: '#f1f4f8', color: '#5a6678' };
-              return (
-                <div key={b.id} data-testid="account-trip" style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 16, padding: '16px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: '#0d2640' }}>
-                      {b.originCode} <span style={{ color: '#b9c2cf' }}>←</span> {b.destCode}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+              {bookings?.map((b) => {
+                const st = STATUS_LABEL[b.status] ?? { label: { fa: b.status, en: b.status, ar: b.status }, bg: '#f1f4f8', color: '#5a6678' };
+                const isUpcoming = b.status === 'TICKETED' || b.status === 'PAID' || b.status === 'HELD';
+                return (
+                  <div key={b.id} data-testid="account-trip" style={{ border: '1px solid #eef1f5', borderRadius: 14, padding: '12px 14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 11 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+                        <div style={{ lineHeight: 1.5 }}>
+                          <div style={{ fontSize: 14, fontWeight: 800, color: '#16202e' }}>
+                            {b.originCode} <span style={{ color: '#9aa4b2' }}>←</span> {b.destCode}
+                          </div>
+                          <div style={{ fontSize: '11.5px', color: '#9aa4b2' }}>
+                            {b.flightNo} · {formatJalaliDateTime(b.departureAt)}
+                          </div>
+                        </div>
+                        <span style={{ fontSize: 11, fontFamily: 'Roboto Mono, monospace', color: '#5a6678', background: '#f6f8fb', padding: '4px 10px', borderRadius: 8 }} dir="ltr">
+                          {b.pnr}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
+                        {b.isPriceLocked && (
+                          <span data-testid="trip-price-locked-badge" style={{ fontSize: '10.5px', fontWeight: 700, color: '#9a7d22', background: '#fff7e6', padding: '5px 11px', borderRadius: 18 }}>
+                            {t.priceLockedBadge}
+                          </span>
+                        )}
+                        <span style={{ fontSize: '11.5px', fontWeight: 700, color: st.color, background: st.bg, padding: '5px 11px', borderRadius: 18 }}>{st.label[locale]}</span>
+                        <div style={{ textAlign: locale === 'en' ? 'right' : 'left' }}>
+                          <div style={{ fontSize: '14.5px', fontWeight: 900, color: '#1668c4' }}>{faMoney(b.priceIrr)}</div>
+                          <div style={{ fontSize: 10, color: '#9aa4b2' }}>{t.toman}</div>
+                        </div>
+                      </div>
                     </div>
-                    <div style={{ fontSize: 11.5, color: '#8a96a6', marginTop: 4 }}>
-                      {b.flightNo} · {formatJalaliDateTime(b.departureAt)} · {t.pnrLabel} <span dir="ltr">{b.pnr}</span>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 14, paddingTop: 11, borderTop: '1px solid #f2f4f7', alignItems: 'center', flexWrap: 'wrap' }}>
+                      {b.pnr && (
+                        <Link
+                          to={`/ticket/${b.pnr}`}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '11.5px', color: '#1668c4', border: '1.5px solid #1668c4', padding: '7px 12px', borderRadius: 9, fontWeight: 700, textDecoration: 'none' }}
+                        >
+                          ↓ {t.downloadTicketBtn}
+                        </Link>
+                      )}
+                      {isUpcoming && b.pnr && (
+                        <Link
+                          to={`/manage-booking?pnr=${encodeURIComponent(b.pnr)}`}
+                          style={{ fontSize: '11.5px', color: '#e5484d', border: '1.5px solid #f3c9cc', padding: '7px 12px', borderRadius: 9, fontWeight: 700, textDecoration: 'none' }}
+                        >
+                          {t.requestRefundBtn}
+                        </Link>
+                      )}
+                      {b.pnr && (
+                        <Link to={`/ticket/${b.pnr}`} style={{ marginInlineStart: 'auto', fontSize: 11, color: '#9aa4b2', fontWeight: 600, textDecoration: 'none' }}>
+                          {t.detailsLink}
+                        </Link>
+                      )}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    {b.isPriceLocked && (
-                      <span data-testid="trip-price-locked-badge" style={{ fontSize: 10.5, fontWeight: 800, background: '#fff7e6', color: '#9a7d22', padding: '5px 12px', borderRadius: 14 }}>
-                        {t.priceLockedBadge}
-                      </span>
-                    )}
-                    <span style={{ fontSize: 10.5, fontWeight: 800, background: st.bg, color: st.color, padding: '5px 12px', borderRadius: 14 }}>{st.label[locale]}</span>
-                    <Link to={b.pnr ? `/ticket/${b.pnr}` : '#'} style={{ fontSize: 11.5, color: '#1668c4', fontWeight: 700, textDecoration: 'none' }}>
-                      {t.viewTicketLink}
-                    </Link>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         )}
 
         {tab === 'wallet' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ background: 'linear-gradient(120deg,#1668c4,#0d3b66)', borderRadius: 18, padding: '22px 24px', color: '#fff' }}>
-              <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 6 }}>{t.walletBalanceHeading}</div>
-              <div data-testid="wallet-balance" style={{ fontSize: 26, fontWeight: 900 }}>
-                {wallet ? faMoney(wallet.balanceIrr) : '—'} <span style={{ fontSize: 12, fontWeight: 400 }}>{t.toman}</span>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 15 }}>
+              <div style={{ background: 'linear-gradient(135deg,#1668c4,#0d3b66)', borderRadius: 16, padding: 18, color: '#fff', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ fontSize: '11.5px', opacity: 0.85, marginBottom: 10 }}>{t.walletBalanceHeading}</div>
+                <div data-testid="wallet-balance" style={{ fontSize: 27, fontWeight: 900 }}>
+                  {wallet ? faMoney(wallet.balanceIrr) : '—'}{' '}
+                  <span style={{ fontSize: '12.5px', opacity: 0.8, fontWeight: 400 }}>{t.toman}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => document.getElementById('wallet-topup-form')?.scrollIntoView({ behavior: 'smooth' })}
+                  style={{ marginTop: 16, alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 7, background: '#fff', color: '#0d3b66', fontSize: 12, fontWeight: 800, padding: '9px 15px', borderRadius: 10, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+                >
+                  + {t.topupBtn}
+                </button>
+              </div>
+              <div style={{ background: 'linear-gradient(135deg,#caa53a,#9a7d22)', borderRadius: 16, padding: 18, color: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <div style={{ fontSize: '11.5px', opacity: 0.9, marginBottom: 10 }}>{t.loyaltyPointsHeading}</div>
+                <div style={{ fontSize: 27, fontWeight: 900 }}>
+                  {club ? faDigits(club.balance) : '—'}{' '}
+                  <span style={{ fontSize: '12.5px', opacity: 0.8, fontWeight: 400 }}>{t.pointsUnit}</span>
+                </div>
               </div>
             </div>
-            <form onSubmit={onTopup} style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 16, padding: '18px 20px', display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <div style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 16, padding: 18, flex: 1 }}>
+              <h3 style={{ fontSize: 14.5, fontWeight: 800, margin: '0 0 16px', color: '#0d2640' }}>{t.pointsLogHeading}</h3>
+              <div style={{ textAlign: 'center', padding: '34px 10px 14px' }}>
+                <div style={{ width: 64, height: 64, margin: '0 auto 16px', borderRadius: 18, background: '#fef6e6', color: '#e0a53a', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                  <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 11V7.5A1.5 1.5 0 0 0 19.5 6H5a2 2 0 0 1 0-4h13" />
+                    <path d="M3 4v14a2 2 0 0 0 2 2h14.5a1.5 1.5 0 0 0 1.5-1.5V15" />
+                    <path d="M21 11h-4a2 2 0 0 0 0 4h4Z" />
+                  </svg>
+                  <span style={{ position: 'absolute', top: -6, left: -6, width: 22, height: 22, borderRadius: 7, background: '#f0a83c', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 900, border: '3px solid #fff' }}>!</span>
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: '#16202e' }}>{t.noTransactionsHeading}</div>
+                <div style={{ fontSize: 11, color: '#9aa4b2', marginTop: 6 }}>{t.noTransactionsSub}</div>
+              </div>
+            </div>
+            <form id="wallet-topup-form" onSubmit={onTopup} style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 16, padding: 18, display: 'flex', gap: 11, alignItems: 'flex-end', flexWrap: 'wrap' }}>
               <div style={{ flex: '1 1 200px' }}>
-                <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#5a6678', marginBottom: 6 }}>{t.topupAmountLabel}</label>
+                <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 700, color: '#5a6678', marginBottom: 6 }}>{t.topupAmountLabel}</label>
                 <input
                   data-testid="wallet-topup-amount"
                   dir="ltr"
                   value={topupAmount}
                   onChange={(e) => setTopupAmount(e.target.value)}
                   placeholder={t.topupPlaceholder}
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '10px 13px', border: '1.5px solid #e3e9f1', borderRadius: 10, fontFamily: 'inherit', fontSize: 13 }}
+                  style={{ width: '100%', boxSizing: 'border-box', height: 46, border: '1.5px solid #e2e7ee', borderRadius: 11, background: '#fafbfd', padding: '0 12px', fontFamily: 'inherit', fontSize: '12.5px', outline: 'none' }}
                 />
               </div>
               <button
                 type="submit"
                 data-testid="wallet-topup-submit"
                 disabled={topupBusy}
-                style={{ border: 'none', borderRadius: 10, background: '#1668c4', color: '#fff', padding: '11px 22px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
+                style={{ border: 'none', borderRadius: 11, background: '#1668c4', color: '#fff', padding: '11px 22px', height: 46, fontSize: '12.5px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
               >
                 {t.topupSubmit}
               </button>
@@ -1100,18 +1313,21 @@ export default function AccountPage() {
         )}
 
         {tab === 'price-locks' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {lockError && <p role="alert" style={{ fontSize: 12, color: '#e5484d' }}>{lockError}</p>}
+          <div style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 16, padding: 18 }}>
+            <h2 style={{ fontSize: 17, fontWeight: 800, margin: '0 0 6px', color: '#0d2640' }}>{t.locksHeading}</h2>
+            <p style={{ fontSize: '11.5px', color: '#8a96a6', margin: '0 0 20px' }}>{t.locksSub}</p>
+            {lockError && <p role="alert" style={{ fontSize: 12, color: '#e5484d', marginBottom: 12 }}>{lockError}</p>}
             {priceLocks === null && <p style={{ fontSize: 13, color: '#6b7787' }}>{t.loading}</p>}
             {priceLocks?.length === 0 && (
-              <div style={{ background: '#fff', border: '1px dashed #e5e9f0', borderRadius: 16, padding: 40, textAlign: 'center', color: '#8a96a6', fontSize: 13 }}>
+              <div style={{ textAlign: 'center', padding: '34px 20px 24px', color: '#8a96a6', fontSize: 13, lineHeight: 1.8 }}>
                 {t.locksEmptyText}
               </div>
             )}
-            {priceLocks?.map((l) => {
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+              {priceLocks?.map((l) => {
               const st = LOCK_STATUS_LABEL[l.status] ?? { label: { fa: l.status, en: l.status, ar: l.status }, bg: '#f1f4f8', color: '#5a6678' };
               return (
-                <div key={l.id} data-testid="account-price-lock" style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 16, padding: '16px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                <div key={l.id} data-testid="account-price-lock" style={{ border: '1px solid #eef1f5', borderRadius: 14, padding: '13px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 800, color: '#0d2640' }}>
                       {l.flight.originCode} <span style={{ color: '#b9c2cf' }}>←</span> {l.flight.destCode}
@@ -1145,6 +1361,7 @@ export default function AccountPage() {
                 </div>
               );
             })}
+            </div>
           </div>
         )}
 
@@ -1211,24 +1428,37 @@ export default function AccountPage() {
         {tab === 'refunds' && <AccountRefundsTab />}
 
         {tab === 'tickets' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {ticketsError && <p role="alert" style={{ fontSize: 12, color: '#e5484d' }}>{ticketsError}</p>}
-            <div style={{ marginBottom: 4 }}>
-              <Link to="/support" style={{ fontSize: 12.5, color: '#1668c4', fontWeight: 700, textDecoration: 'none' }}>
-                {t.ticketsNewLink} →
+          <div style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 16, padding: 18 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 6 }}>
+              <h2 style={{ fontSize: 17, fontWeight: 800, margin: 0, whiteSpace: 'nowrap', color: '#0d2640' }}>{t.ticketsHeading}</h2>
+              <Link
+                to="/support"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '11.5px', fontWeight: 700, background: '#1668c4', color: '#fff', padding: '9px 13px', borderRadius: 10, textDecoration: 'none', whiteSpace: 'nowrap' }}
+              >
+                + {t.ticketsNewBtn}
               </Link>
             </div>
+            <p style={{ fontSize: '11.5px', color: '#8a96a6', margin: '0 0 20px' }}>{t.ticketsSub}</p>
+            {ticketsError && <p role="alert" style={{ fontSize: 12, color: '#e5484d', marginBottom: 12 }}>{ticketsError}</p>}
             {tickets === null && <p style={{ fontSize: 13, color: '#6b7787' }}>{t.loading}</p>}
             {tickets?.length === 0 && (
-              <div style={{ background: '#fff', border: '1px dashed #e5e9f0', borderRadius: 16, padding: 40, textAlign: 'center', color: '#8a96a6', fontSize: 13 }}>
-                {t.ticketsEmptyText}
+              <div style={{ textAlign: 'center', padding: '40px 20px 24px' }}>
+                <div style={{ width: 72, height: 72, margin: '0 auto 18px', borderRadius: 20, background: '#fef6e6', color: '#e0a53a', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                  <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  </svg>
+                  <span style={{ position: 'absolute', top: -6, left: -6, width: 24, height: 24, borderRadius: 7, background: '#f0a83c', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 900, border: '3px solid #fff' }}>!</span>
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 800, color: '#16202e' }}>{t.ticketsEmptySub}</div>
+                <div style={{ fontSize: '11.5px', color: '#9aa4b2', marginTop: 7 }}>{t.ticketsEmptyText}</div>
               </div>
             )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
             {tickets?.map((tk) => {
               const st = TICKET_STATUS_LABEL[tk.status];
               const expanded = expandedTicketId === tk.id;
               return (
-                <div key={tk.id} data-testid="account-ticket" style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 16, overflow: 'hidden' }}>
+                <div key={tk.id} data-testid="account-ticket" style={{ border: '1px solid #eef1f5', borderRadius: 14, padding: '13px 14px', cursor: 'pointer' }}>
                   <button
                     type="button"
                     onClick={() => setExpandedTicketId(expanded ? null : tk.id)}
@@ -1270,6 +1500,7 @@ export default function AccountPage() {
                 </div>
               );
             })}
+            </div>
           </div>
         )}
 
@@ -1349,5 +1580,61 @@ export default function AccountPage() {
         </main>
       </div>
     </PublicPageShell>
+  );
+}
+
+function SidebarNavItem({
+  tb,
+  active,
+  locale,
+  onSelect,
+}: {
+  tb: { key: TabKey; icon: string };
+  active: boolean;
+  locale: StoredLocale;
+  onSelect: () => void;
+}) {
+  const barSide = locale === 'en' ? 'left' : 'right';
+  return (
+    <button
+      type="button"
+      data-testid={`account-tab-${tb.key}`}
+      onClick={onSelect}
+      style={{
+        position: 'relative',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 11,
+        width: '100%',
+        padding: '9px 12px',
+        borderRadius: 11,
+        border: 'none',
+        cursor: 'pointer',
+        fontSize: locale === 'en' ? 12 : 13,
+        whiteSpace: 'nowrap',
+        fontWeight: active ? 800 : 600,
+        color: active ? '#1668c4' : '#3b4554',
+        background: active ? '#eef4fb' : 'transparent',
+        marginBottom: 2,
+        fontFamily: 'inherit',
+        textAlign: locale === 'en' ? 'left' : 'right',
+      }}
+    >
+      <span
+        style={{
+          position: 'absolute',
+          [barSide]: -1,
+          top: '50%',
+          transform: 'translateY(-50%)',
+          width: 3,
+          height: active ? 18 : 0,
+          borderRadius: 3,
+          background: '#1668c4',
+          transition: 'height .15s',
+        }}
+      />
+      <span style={{ width: 20, textAlign: 'center', flex: 'none' }}>{tb.icon}</span>
+      {TAB_LABEL[tb.key][locale]}
+    </button>
   );
 }

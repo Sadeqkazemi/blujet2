@@ -36,11 +36,11 @@ describe('AgencyInboxPage', () => {
     });
 
     render(<AgencyInboxPage />);
-    expect(await screen.findByText('لطفاً فاکتور را تسویه بفرمایید.')).toBeInTheDocument();
+    expect(await screen.findByTestId('agency-inbox-body')).toHaveTextContent('لطفاً فاکتور را تسویه بفرمایید.');
 
     const user = userEvent.setup();
-    await user.type(screen.getByPlaceholderText('پیام خود را بنویسید…'), 'حتماً تا پنجشنبه پرداخت می‌شود.');
-    await user.click(screen.getByRole('button', { name: 'ارسال' }));
+    await user.type(screen.getByPlaceholderText('پاسخ خود را بنویسید…'), 'حتماً تا پنجشنبه پرداخت می‌شود.');
+    await user.click(screen.getByRole('button', { name: 'ارسال پاسخ' }));
 
     await waitFor(() => expect(postSpy).toHaveBeenCalledWith('حتماً تا پنجشنبه پرداخت می‌شود.'));
   });

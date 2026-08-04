@@ -61,6 +61,11 @@ async function pickToday() {
   await userEvent.click(screen.getByTestId('home-date-today'));
 }
 
+async function pickAirport(testId: string, code: string) {
+  await userEvent.click(screen.getByTestId(testId));
+  await userEvent.click(screen.getByTestId(`${testId}-option-${code}`));
+}
+
 const CMS_HOME = {
   blocks: [
     {
