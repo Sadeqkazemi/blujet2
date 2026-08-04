@@ -9,7 +9,7 @@ const ROWS: AdminRow[] = [
   {
     id: 'a1',
     fullName: 'سحر کاظمی',
-    username: 'finance.karimi',
+    username: 'finance',
     email: 'finance@blujet.example',
     role: 'FINANCE_MANAGER',
     roleLabelFa: 'مدیر مالی',
@@ -53,10 +53,18 @@ describe('AdminsPage', () => {
     await user.type(screen.getByLabelText('نام و نام خانوادگی'), 'مدیر تازه');
     await user.type(screen.getByLabelText('ایمیل سازمانی'), 'new@blujet.example');
     await user.type(screen.getByLabelText('نام کاربری'), 'new.admin');
-    await user.type(screen.getByLabelText('رمز عبور اولیه (حداقل ۶ کاراکتر)'), '123');
-    await user.click(screen.getByRole('button', { name: 'ایجاد حساب و ارسال رمز' }));
+    await user.type(screen.getByLabelText('رمز عبور ورود (حداقل ۶ کاراکتر)'), '123');
+    await user.click(screen.getByRole('button', { name: 'افزودن و تعیین دسترسی' }));
 
     expect(await screen.findByRole('alert')).toBeInTheDocument();
     expect(createSpy).not.toHaveBeenCalled();
+  });
+
+  it('shows the design empty-state copy when there are no managers', async () => {
+    vi.spyOn(adminsApi, 'fetchAdmins').mockResolvedValue([]);
+    render(<AdminsPage />);
+    expect(await screen.findByText('هنوز اطلاعاتی وارد نشده است.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'مدیران', level: 1 })).toBeInTheDocument();
+    expect(screen.getByText('کاربران مدیریتی، افزودن و تعیین سطوح دسترسی')).toBeInTheDocument();
   });
 });

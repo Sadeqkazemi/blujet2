@@ -15,6 +15,8 @@ describe('CommercialWebservicePage', () => {
 
     render(<CommercialWebservicePage />);
     expect(await screen.findByText('وب سرویس')).toBeInTheDocument();
+    expect(screen.getByText('وب‌سرویس جستجو و رزرو پرواز')).toBeInTheDocument();
+    expect(screen.getByText('وب‌سرویس فروش کامل')).toBeInTheDocument();
 
     const user = userEvent.setup();
     const month1 = screen.getByLabelText('۱ ماهه (تومان)');

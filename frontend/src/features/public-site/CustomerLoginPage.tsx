@@ -4,8 +4,7 @@ import PublicPageShell from '../../components/public/PublicPageShell';
 import { useAuth } from '../../hooks/useAuth';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { ApiRequestError } from '../../api/envelope';
-import { requestAgencySignupOtp, submitAgencyRequest } from '../../api/agencies';
-import { faDigits } from '../../lib/fa-format';
+import { faDigits, latinDigits } from '../../lib/fa-format';
 
 // ورود و ثبتنام — rebuilt to match design-reference/ورود و ثبتنام.dc.html:
 // ورود/ثبت‌نام tabs, کاربر/آژانس segment, OTP with resend countdown.
@@ -32,8 +31,18 @@ const inputStyle: React.CSSProperties = {
   borderRadius: 11,
   fontFamily: 'inherit',
   fontSize: 13.5,
+  color: '#16202e',
+  background: '#fff',
   outline: 'none',
 };
+
+function sanitizeMobileInput(raw: string) {
+  return latinDigits(raw).replace(/[^\d]/g, '').slice(0, 11);
+}
+
+function sanitizeOtpInput(raw: string) {
+  return latinDigits(raw).replace(/\D/g, '').slice(0, 6);
+}
 
 const labelStyle: React.CSSProperties = { display: 'block', fontSize: 11.5, fontWeight: 700, color: '#5a6678', marginBottom: 6 };
 
@@ -468,7 +477,17 @@ export default function CustomerLoginPage() {
             <form onSubmit={(e) => void onPasswordLogin(e)} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
                 <label style={labelStyle}>{t.mobileLabel}</label>
-                <input data-testid="signin-pw-phone" dir="ltr" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="09xxxxxxxxx" style={inputStyle} />
+                <input
+                  data-testid="signin-pw-phone"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  dir="ltr"
+                  value={phone}
+                  onChange={(e) => setPhone(sanitizeMobileInput(e.target.value))}
+                  placeholder="09xxxxxxxxx"
+                  style={inputStyle}
+                />
               </div>
               <div>
                 <label style={labelStyle}>{t.passwordLabel}</label>
@@ -516,7 +535,17 @@ export default function CustomerLoginPage() {
               )}
               <div>
                 <label style={labelStyle}>{t.mobileLabel}</label>
-                <input data-testid="signin-phone" dir="ltr" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="09xxxxxxxxx" style={inputStyle} />
+                <input
+                  data-testid="signin-phone"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  dir="ltr"
+                  value={phone}
+                  onChange={(e) => setPhone(sanitizeMobileInput(e.target.value))}
+                  placeholder="09xxxxxxxxx"
+                  style={inputStyle}
+                />
               </div>
               {!isLogin && (
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5, color: '#5a6678', cursor: 'pointer' }}>
@@ -555,13 +584,22 @@ export default function CustomerLoginPage() {
                 <label style={labelStyle}>{t.otpLabel}</label>
                 <input
                   data-testid="signin-code"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
                   dir="ltr"
                   value={code}
-                  onChange={(e) => setCode(e.target.value)}
+                  onChange={(e) => setCode(sanitizeOtpInput(e.target.value))}
                   placeholder="- - - - - -"
+                  maxLength={6}
                   style={{ ...inputStyle, fontSize: 15, letterSpacing: 4, textAlign: 'center' }}
                 />
               </div>
+              {import.meta.env.DEV && (
+                <p data-testid="signin-dev-otp-hint" style={{ margin: 0, fontSize: 11, color: '#6b7585', textAlign: 'center' }}>
+                  {locale === 'en' ? 'Dev OTP code: 123456' : 'کد توسعه (OTP): ۱۲۳۴۵۶'}
+                </p>
+              )}
               <button type="submit" data-testid="signin-verify" disabled={busy || !code.trim()} style={primaryBtn(!busy && !!code.trim())}>
                 {isLogin ? t.confirmLogin : t.confirmSignup}
               </button>

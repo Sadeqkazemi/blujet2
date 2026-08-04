@@ -19,11 +19,22 @@ export class StaffReportsQueryDto {
 @ApiTags('staff-reports')
 @Controller('staff-reports')
 @UseGuards(JwtAuthGuard, RolesGuard, PanelAccessGuard)
-@Roles('FINANCE_MANAGER', 'COMMERCIAL_MANAGER')
 export class StaffReportsController {
   constructor(private readonly staffReports: StaffReportsService) {}
 
+  @Get('mine')
+  @Roles('EMPLOYEE')
+  @ApiOperation({
+    summary:
+      'گزارش‌های من — فید فعالیت خود کارمند از AuditLog (پنل کارمند)',
+  })
+  async myActivity(@CurrentUser() actor: AuthenticatedUser) {
+    const data = await this.staffReports.myActivity(actor);
+    return { success: true, data };
+  }
+
   @Get()
+  @Roles('FINANCE_MANAGER', 'COMMERCIAL_MANAGER')
   @ApiOperation({
     summary:
       'گزارش عملکرد کارمندان واحد خود مدیر — فید واقعی از AuditLog، ایزوله per-dept',

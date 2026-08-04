@@ -35,6 +35,8 @@ export interface CreateFlightPayload {
   departureAt: string;
   capacity: number;
   basePriceIrr: number;
+  aircraftType?: string;
+  charterSeats?: number;
 }
 
 export function createFlight(payload: CreateFlightPayload) {

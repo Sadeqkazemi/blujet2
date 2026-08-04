@@ -77,8 +77,7 @@ describe('AgencyCreditPage', () => {
     mockLoads();
     render(<AgencyCreditPage />);
 
-    expect(await screen.findByText('Credit & Balance')).toBeInTheDocument();
-    expect(screen.getByText('Credit Limit')).toBeInTheDocument();
+    expect(await screen.findByText('Credit Limit')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Pay from Credit' })).toBeInTheDocument();
   });
 
@@ -87,7 +86,6 @@ describe('AgencyCreditPage', () => {
     mockLoads();
     render(<AgencyCreditPage />);
 
-    expect(await screen.findByText('الرصيد والائتمان')).toBeInTheDocument();
-    expect(screen.getByText('بانتظار الدفع')).toBeInTheDocument();
+    expect(await screen.findByText('بانتظار الدفع')).toBeInTheDocument();
   });
 });

@@ -24,6 +24,17 @@ export interface CommercialOverview {
   pendingAgencyRequests: number;
 }
 
+/** SITE_ADMIN dashboard KPI row — design پنل ادمین سایت */
+export interface SiteAdminOverview {
+  activeAgencies: number;
+  passengersThisMonth: number;
+  ticketsSoldThisMonth: number;
+  pendingActionCount: number;
+  agenciesTrendPct: number | null;
+  passengersTrendPct: number | null;
+  ticketsTrendPct: number | null;
+}
+
 export interface KpiResult {
   revenueIrr: string;
   profitIrr: string;
@@ -50,6 +61,26 @@ export interface CompletedFlightsSummary {
   totalSeats: number;
   soldSeats: number;
   unsoldSeats: number;
+}
+
+export interface FlightSalesRow {
+  flightInstanceId: string;
+  flightNo: string;
+  originCode: string;
+  destCode: string;
+  originCityFa: string;
+  destCityFa: string;
+  departureAt: string;
+  systemIrr: string;
+  charterIrr: string;
+  agencyIrr: string;
+  totalIrr: string;
+  capacity: number;
+  soldSeats: number;
+}
+
+export interface FlightSalesResult {
+  rows: FlightSalesRow[];
 }
 
 export interface LowSalesAlert {
@@ -149,4 +180,17 @@ export interface StaffReportsResult {
     at: string;
   }[];
   newEmployeeEvents: { id: string; detail: string; at: string }[];
+}
+
+/** EMPLOYEE «گزارش‌های من» — GET /staff-reports/mine */
+export interface EmployeeActivityItem {
+  id: string;
+  title: string;
+  detail: string;
+  category: string;
+  at: string;
+}
+
+export interface EmployeeActivityResult {
+  items: EmployeeActivityItem[];
 }
