@@ -3,7 +3,10 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import SurveyResultsPage from './SurveyResultsPage';
 import * as surveyApi from '../../api/survey';
+import * as useAuthModule from '../../hooks/useAuth';
+import { mockAuthUserWithRole } from '../../test/mockAuthUser';
 import type { SurveyResults } from '../../types/survey';
+import type { Role } from '../../types/auth';
 
 const RESULTS: SurveyResults = {
   disabled: false,
@@ -20,20 +23,35 @@ const RESULTS: SurveyResults = {
   ],
 };
 
+function mockRole(role: Role) {
+  vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+    status: 'authenticated',
+    user: mockAuthUserWithRole(role),
+    requestLogin: vi.fn(),
+    confirmTwoFactor: vi.fn(),
+    agencyLogin: vi.fn(),
+    signOut: vi.fn(),
+  });
+}
+
 describe('SurveyResultsPage', () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it('renders the per-flight results table', async () => {
+  it('CEO dark layout: route title, stars, and AI analyze link', async () => {
+    mockRole('CEO');
     vi.spyOn(surveyApi, 'fetchSurveyResults').mockResolvedValue(RESULTS);
     render(<SurveyResultsPage />);
 
-    expect(await screen.findByText('EP-821')).toBeInTheDocument();
+    expect(await screen.findByText('تهران ← دبی')).toBeInTheDocument();
+    expect(screen.getByText(/EP-821/)).toBeInTheDocument();
     expect(screen.getByTestId('survey-result-row')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /تحلیل نظرات/ })).toBeInTheDocument();
   });
 
   it('shows the disabled banner instead of an empty-state when the survey is off', async () => {
+    mockRole('CEO');
     vi.spyOn(surveyApi, 'fetchSurveyResults').mockResolvedValue({ disabled: true, flights: [] });
     render(<SurveyResultsPage />);
 
@@ -43,14 +61,15 @@ describe('SurveyResultsPage', () => {
   });
 
   it('calls analyze and renders the returned summary', async () => {
+    mockRole('CEO');
     vi.spyOn(surveyApi, 'fetchSurveyResults').mockResolvedValue(RESULTS);
     const analyze = vi
       .spyOn(surveyApi, 'analyzeSurveyFlight')
       .mockResolvedValue({ summary: 'در کل رضایت بالا بود.' });
     render(<SurveyResultsPage />);
-    await screen.findByText('EP-821');
+    await screen.findByText('تهران ← دبی');
 
-    await userEvent.click(screen.getByText('تحلیل با هوش مصنوعی'));
+    await userEvent.click(screen.getByRole('button', { name: /تحلیل نظرات/ }));
 
     await waitFor(() => expect(analyze).toHaveBeenCalledWith('fi-1'));
     expect(await screen.findByTestId('survey-ai-summary')).toHaveTextContent(

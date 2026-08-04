@@ -91,6 +91,56 @@
         ]
       }
     },
+    "/auth/agency/password-reset/request": {
+      "post": {
+        "operationId": "AuthController_agencyPasswordResetRequest",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgencyPasswordResetRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "بازیابی رمز آژانس — درخواست OTP پیامکی",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/agency/password-reset/verify": {
+      "post": {
+        "operationId": "AuthController_agencyPasswordResetVerify",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgencyPasswordResetVerifyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "بازیابی رمز آژانس — تأیید OTP و صدور توکن",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/auth/otp/request": {
       "post": {
         "operationId": "AuthController_requestOtp",
@@ -454,6 +504,45 @@
         ]
       }
     },
+    "/my/sessions": {
+      "get": {
+        "operationId": "MySessionsController_listMine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست نشست‌های فعال مشتری",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/my/sessions/{id}": {
+      "delete": {
+        "operationId": "MySessionsController_revoke",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "پایان نشست دستگاه دیگر",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
     "/audit/manager-reports": {
       "get": {
         "operationId": "AuditController_managerReports",
@@ -509,6 +598,21 @@
         ]
       }
     },
+    "/audit/logs/badge-count": {
+      "get": {
+        "operationId": "AuditController_logsBadgeCount",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "شمارندهٔ badge سایدبار لاگ IT (۷ روز اخیر)",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
     "/audit/system-events": {
       "get": {
         "operationId": "AuditController_ceoSystemEvents",
@@ -524,6 +628,21 @@
         ]
       }
     },
+    "/my/referral": {
+      "get": {
+        "operationId": "MyReferralController_getMine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "کد معرف، آمار و فهرست دوستان دعوت‌شده",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
     "/panels/nav": {
       "get": {
         "operationId": "PanelsController_getNav",
@@ -534,6 +653,21 @@
           }
         },
         "summary": "Caller's role-scoped sidebar — server-computed, never client-decided",
+        "tags": [
+          "panels"
+        ]
+      }
+    },
+    "/panels/employee-context": {
+      "get": {
+        "operationId": "PanelsController_getEmployeeContext",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "اطلاعات داشبورد کارمند — واحد و دسترسی‌ها",
         "tags": [
           "panels"
         ]
@@ -643,6 +777,21 @@
           }
         },
         "summary": "Channel-split sales bars, shared identically by all 6 panels dashboards",
+        "tags": [
+          "reporting"
+        ]
+      }
+    },
+    "/reporting/flight-sales": {
+      "get": {
+        "operationId": "ReportingController_flightSales",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Departed flights with per-channel sales — «شماره پرواز» picker on analytic مالی",
         "tags": [
           "reporting"
         ]
@@ -796,6 +945,36 @@
           }
         },
         "summary": "Flights <72h out with occupancy below threshold",
+        "tags": [
+          "reporting"
+        ]
+      }
+    },
+    "/reporting/finance-dashboard-stats": {
+      "get": {
+        "operationId": "ReportingController_financeDashboardStats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "کارت‌های داشبورد اجرایی/مالی — آژانس/مسافر/بلیط/درآمد ماه جاری با روند (پنل مدیر عامل و هم‌ترازها + مدیر مالی)",
+        "tags": [
+          "reporting"
+        ]
+      }
+    },
+    "/reporting/commercial-overview": {
+      "get": {
+        "operationId": "ReportingController_commercialOverview",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Commercial Manager dashboard KPI row — active agencies, passengers this month, pending cooperation requests",
         "tags": [
           "reporting"
         ]
@@ -1873,6 +2052,61 @@
         ]
       }
     },
+    "/cartable/manager-recipients": {
+      "get": {
+        "operationId": "CartableController_managerRecipients",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست مدیران برای ارسال پیام — کارمند",
+        "tags": [
+          "cartable"
+        ]
+      }
+    },
+    "/cartable/manager-message": {
+      "post": {
+        "operationId": "CartableController_sendManagerMessage",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendEmployeeManagerMessageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ارسال پیام مستقیم به مدیر — تحویل در کارتابل مدیر",
+        "tags": [
+          "cartable"
+        ]
+      }
+    },
+    "/cartable/manager-message/sent": {
+      "get": {
+        "operationId": "CartableController_sentManagerMessages",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "پیام‌های ارسالی کارمند به مدیران",
+        "tags": [
+          "cartable"
+        ]
+      }
+    },
     "/cartable/chair-permission": {
       "post": {
         "operationId": "CartableController_requestChairPermission",
@@ -2415,6 +2649,55 @@
         ]
       }
     },
+    "/club/submitted-card-requests": {
+      "get": {
+        "operationId": "ClubController_listSubmittedRequests",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "درخواست‌های SUBMITTED در انتظار ارجاع — فقط ادمین سایت",
+        "tags": [
+          "club"
+        ]
+      }
+    },
+    "/club/card-requests/{id}/refer": {
+      "patch": {
+        "operationId": "ClubController_referRequest",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReferCardRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "ارجاع درخواست SUBMITTED به مدیر ارشد یا رئیس هیئت مدیره",
+        "tags": [
+          "club"
+        ]
+      }
+    },
     "/club/_test/card-request": {
       "post": {
         "operationId": "ClubController_createTestRequest",
@@ -2511,6 +2794,36 @@
           }
         },
         "summary": "تغییر قوانین حد نصاب امتیاز سطوح باشگاه مشتریان",
+        "tags": [
+          "club"
+        ]
+      }
+    },
+    "/my/club/membership": {
+      "get": {
+        "operationId": "MyClubController_getMembership",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "اطلاعات عضویت باشگاه مشتریان مشتری جاری",
+        "tags": [
+          "club"
+        ]
+      }
+    },
+    "/my/club/card-request": {
+      "post": {
+        "operationId": "MyClubController_submitCardRequest",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ثبت درخواست صدور کارت عضویت باشگاه",
         "tags": [
           "club"
         ]
@@ -3316,6 +3629,61 @@
         ]
       }
     },
+    "/my/refunds/eligible-bookings": {
+      "get": {
+        "operationId": "RefundsCustomerController_eligibleBookings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست رزروهای قابل استرداد با پیش‌نمایش جریمه",
+        "tags": [
+          "refunds"
+        ]
+      }
+    },
+    "/my/refunds/rules": {
+      "get": {
+        "operationId": "RefundsCustomerController_rules",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "قوانین جاری جریمه استرداد برای نمایش به مشتری",
+        "tags": [
+          "refunds"
+        ]
+      }
+    },
+    "/my/refunds/preview": {
+      "post": {
+        "operationId": "RefundsCustomerController_preview",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewRefundDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "بازمحاسبه مالکیت، امکان استرداد و جریمه پیش از تأیید",
+        "tags": [
+          "refunds"
+        ]
+      }
+    },
     "/my/refunds/{id}": {
       "get": {
         "operationId": "RefundsCustomerController_getMine",
@@ -3358,7 +3726,7 @@
             "description": ""
           }
         },
-        "summary": "نقشهٔ صندلی — آزاد/بیزینس/فروخته‌شده/لاک‌شده",
+        "summary": "نقشهٔ صندلی — آزاد/فروخته/قفل + مشخصات مسافر روی صندلی فروخته‌شده (staff)",
         "tags": [
           "reservation"
         ]
@@ -3392,7 +3760,7 @@
             "description": ""
           }
         },
-        "summary": "درخواست لاک مدیریتی صندلی — در انتظار تأیید یک نقش دیگر",
+        "summary": "درخواست لاک مدیریتی صندلی — در انتظار تأیید یک نقش دیگر (نه IT)",
         "tags": [
           "reservation"
         ]
@@ -3634,6 +4002,31 @@
         ]
       }
     },
+    "/reservation/flights": {
+      "get": {
+        "operationId": "PnrController_listFlights",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "جستجو در شماره پرواز، کد فرودگاه یا نام شهر",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست پروازهای آینده برای تب پروازها / باز کردن نقشهٔ صندلی",
+        "tags": [
+          "reservation"
+        ]
+      }
+    },
     "/reservation/search": {
       "get": {
         "operationId": "PnrController_search",
@@ -3720,7 +4113,22 @@
             "description": ""
           }
         },
-        "summary": "آمار واقعی رزروها — بدون داده جعلی سلامت سرویس",
+        "summary": "آمار واقعی رزروها + تفکیک کانال + وضعیت سرویس‌های وابسته (بر اساس toggle/latency واقعی)",
+        "tags": [
+          "reservation"
+        ]
+      }
+    },
+    "/reservation/agency-api-access": {
+      "get": {
+        "operationId": "PnrController_agencyApiAccess",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست آژانس‌هایی که کلید API دارند — تب دسترسی آژانس‌ها",
         "tags": [
           "reservation"
         ]
@@ -3818,6 +4226,92 @@
           }
         },
         "summary": "نقشه صندلی برای انتخاب صندلی هنگام خرید",
+        "tags": [
+          "search"
+        ]
+      }
+    },
+    "/search/price-calendar": {
+      "get": {
+        "operationId": "SearchController_priceCalendar",
+        "parameters": [
+          {
+            "name": "origin",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "THR",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dest",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "MHD",
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-08-01",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تقویم قیمت ۷روزه برای نوار نتایج پرواز",
+        "tags": [
+          "search"
+        ]
+      }
+    },
+    "/search/advisory": {
+      "get": {
+        "operationId": "SearchController_getAdvisory",
+        "parameters": [
+          {
+            "name": "origin",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "THR",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dest",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "MHD",
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-08-01",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "رادار هوشمند قیمت — توصیه خرید/انتظار (advisory، degrade امن)",
         "tags": [
           "search"
         ]
@@ -3928,6 +4422,15 @@
             "name": "id",
             "required": true,
             "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": false,
+            "in": "header",
+            "description": "کلید یکتا برای جلوگیری از پرداخت تکراری",
             "schema": {
               "type": "string"
             }
@@ -4066,6 +4569,68 @@
           }
         },
         "summary": "لغو قفل قیمت فعال",
+        "tags": [
+          "purchase-extras"
+        ]
+      }
+    },
+    "/my/saved-flights": {
+      "get": {
+        "operationId": "MySavedFlightsController_listMine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست پروازهای ذخیره‌شده مشتری",
+        "tags": [
+          "purchase-extras"
+        ]
+      },
+      "post": {
+        "operationId": "MySavedFlightsController_save",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveFlightDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ذخیره پرواز برای رزرو بعدی",
+        "tags": [
+          "purchase-extras"
+        ]
+      }
+    },
+    "/my/saved-flights/{id}": {
+      "delete": {
+        "operationId": "MySavedFlightsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "حذف پرواز از نشان‌شده‌ها",
         "tags": [
           "purchase-extras"
         ]
@@ -4238,6 +4803,21 @@
         ]
       }
     },
+    "/agency-portal/sales/export": {
+      "get": {
+        "operationId": "AgencyPortalController_salesExport",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "خروجی CSV فروش آژانس برای Excel",
+        "tags": [
+          "agency-portal"
+        ]
+      }
+    },
     "/agency-portal/inbox": {
       "get": {
         "operationId": "AgencyPortalController_inbox",
@@ -4344,6 +4924,21 @@
         ]
       }
     },
+    "/agency-portal/webservice-plans": {
+      "get": {
+        "operationId": "AgencyPortalController_webservicePlans",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "قیمت‌های فعلی پلن‌های وب‌سرویس (ریال)",
+        "tags": [
+          "agency-portal"
+        ]
+      }
+    },
     "/agency-portal/webservice-requests": {
       "post": {
         "operationId": "AgencyPortalController_requestWebservice",
@@ -4397,6 +4992,44 @@
         ]
       }
     },
+    "/webservice/pricing": {
+      "get": {
+        "operationId": "WebservicePricingController_getPricing",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "قیمت پلن‌های وب‌سرویس B2B (ریال)",
+        "tags": [
+          "webservice-pricing"
+        ]
+      },
+      "patch": {
+        "operationId": "WebservicePricingController_updatePricing",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateWebservicePricingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "به‌روزرسانی قیمت پلن‌های ۱/۳/۱۲ ماهه — فقط مدیر بازرگانی",
+        "tags": [
+          "webservice-pricing"
+        ]
+      }
+    },
     "/flights/overview": {
       "get": {
         "operationId": "FlightsController_overview",
@@ -4422,6 +5055,29 @@
           }
         },
         "summary": "کاتالوگ فرودگاه‌ها برای فرم افزودن پرواز",
+        "tags": [
+          "flights"
+        ]
+      },
+      "post": {
+        "operationId": "FlightsController_createAirport",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAirportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "افزودن شهر/فرودگاه جدید به کاتالوگ",
         "tags": [
           "flights"
         ]
@@ -4461,7 +5117,7 @@
             "description": ""
           }
         },
-        "summary": "افزودن پرواز جدید (مودال طراحی)",
+        "summary": "افزودن پرواز جدید — مشخصات + هواپیما/چارتر؛ سپس کلاس نرخی و پیشنهاد قیمت جداگانه",
         "tags": [
           "flights"
         ]
@@ -5062,6 +5718,80 @@
         ]
       }
     },
+    "/settings/social-links": {
+      "get": {
+        "operationId": "SettingsPublicController_getSocialLinks",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "لینک‌های فعال شبکه‌های اجتماعی برای فوتر سایت",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/settings/app-links": {
+      "get": {
+        "operationId": "SettingsPublicController_getAppLinks",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "لینک‌های دانلود اپلیکیشن برای صفحهٔ اصلی",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/settings/support-contact": {
+      "get": {
+        "operationId": "SettingsPublicController_getSupportContact",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تلفن و ایمیل پشتیبانی نمایش‌داده‌شده در سایت",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/settings/site-content": {
+      "get": {
+        "operationId": "SettingsPublicController_getSiteContent",
+        "parameters": [
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "fa",
+                "en",
+                "ar"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "متن صفحات عمومی ثابت (درباره ما، قوانین، …)",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
     "/reconciliation": {
       "get": {
         "operationId": "ReconciliationController_list",
@@ -5184,6 +5914,336 @@
           }
         },
         "summary": "تأیید کد ایمیل",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/my/saved-passengers": {
+      "get": {
+        "operationId": "MySavedPassengersController_listMine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست مسافران ذخیره‌شده مشتری",
+        "tags": [
+          "profile"
+        ]
+      },
+      "post": {
+        "operationId": "MySavedPassengersController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSavedPassengerDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "افزودن مسافر به دفترچه آدرس",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/my/saved-passengers/{id}": {
+      "patch": {
+        "operationId": "MySavedPassengersController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSavedPassengerDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "ویرایش مسافر ذخیره‌شده",
+        "tags": [
+          "profile"
+        ]
+      },
+      "delete": {
+        "operationId": "MySavedPassengersController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "حذف مسافر از دفترچه",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/my/bank-accounts": {
+      "get": {
+        "operationId": "MyBankAccountsController_listMine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست حساب‌های بانکی مشتری",
+        "tags": [
+          "profile"
+        ]
+      },
+      "post": {
+        "operationId": "MyBankAccountsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBankAccountDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ثبت کارت/شبای جدید",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/my/bank-accounts/{id}": {
+      "patch": {
+        "operationId": "MyBankAccountsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBankAccountDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تنظیم حساب پیش‌فرض",
+        "tags": [
+          "profile"
+        ]
+      },
+      "delete": {
+        "operationId": "MyBankAccountsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "حذف حساب بانکی",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/my/identity": {
+      "get": {
+        "operationId": "MyIdentityController_getMine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "وضعیت احراز هویت و مراحل تکمیل",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/my/identity/id-card": {
+      "post": {
+        "operationId": "MyIdentityController_uploadIdCard",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "بارگذاری تصویر کارت ملی (PDF/PNG/JPG)",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/my/identity/submit": {
+      "post": {
+        "operationId": "MyIdentityController_submit",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ثبت و ارسال مدارک برای بررسی",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/identity-verifications": {
+      "get": {
+        "operationId": "IdentityAdminController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست درخواست‌های احراز هویت مشتریان",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/identity-verifications/{id}/id-card": {
+      "get": {
+        "operationId": "IdentityAdminController_getIdCard",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "دریافت تصویر کارت ملی یک درخواست",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/identity-verifications/{id}/approve": {
+      "patch": {
+        "operationId": "IdentityAdminController_approve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "تأیید احراز هویت مشتری",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/identity-verifications/{id}/reject": {
+      "patch": {
+        "operationId": "IdentityAdminController_reject",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectIdentityVerificationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "رد احراز هویت مشتری با ذکر دلیل",
         "tags": [
           "profile"
         ]
@@ -5434,6 +6494,68 @@
           }
         },
         "summary": "تغییر وضعیت تیکت",
+        "tags": [
+          "support-tickets"
+        ]
+      }
+    },
+    "/my/support-tickets": {
+      "get": {
+        "operationId": "MySupportTicketsController_listMine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست تیکت‌های پشتیبانی مشتری جاری",
+        "tags": [
+          "support-tickets"
+        ]
+      },
+      "post": {
+        "operationId": "MySupportTicketsController_submit",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitSupportTicketDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ثبت تیکت پشتیبانی از پنل کاربر (با ورود)",
+        "tags": [
+          "support-tickets"
+        ]
+      }
+    },
+    "/my/support-tickets/{id}": {
+      "get": {
+        "operationId": "MySupportTicketsController_getMine",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "جزئیات یک تیکت پشتیبانی مشتری",
         "tags": [
           "support-tickets"
         ]
@@ -6085,6 +7207,583 @@
           "careers"
         ]
       }
+    },
+    "/blog/admin/stats": {
+      "get": {
+        "operationId": "BlogAdminController_stats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "آمار KPI بلاگ (منتشرشده، پیش‌نویس، بازدید)",
+        "tags": [
+          "blog"
+        ]
+      }
+    },
+    "/blog/admin/posts": {
+      "get": {
+        "operationId": "BlogAdminController_list",
+        "parameters": [
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "NEWS",
+                "GUIDE",
+                "DEST",
+                "OFFERS",
+                "all"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست همهٔ مقالات (با فیلتر دسته‌بندی)",
+        "tags": [
+          "blog"
+        ]
+      },
+      "post": {
+        "operationId": "BlogAdminController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBlogPostDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ایجاد مقالهٔ جدید",
+        "tags": [
+          "blog"
+        ]
+      }
+    },
+    "/blog/admin/posts/{id}": {
+      "get": {
+        "operationId": "BlogAdminController_getOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "جزئیات یک مقاله برای ویرایش",
+        "tags": [
+          "blog"
+        ]
+      },
+      "patch": {
+        "operationId": "BlogAdminController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBlogPostDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "ویرایش مقاله",
+        "tags": [
+          "blog"
+        ]
+      },
+      "delete": {
+        "operationId": "BlogAdminController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "حذف نرم مقاله",
+        "tags": [
+          "blog"
+        ]
+      }
+    },
+    "/blog/posts": {
+      "get": {
+        "operationId": "BlogPublicController_list",
+        "parameters": [
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "NEWS",
+                "GUIDE",
+                "DEST",
+                "OFFERS"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "فهرست مقالات منتشرشده",
+        "tags": [
+          "blog"
+        ]
+      }
+    },
+    "/blog/posts/{slug}": {
+      "get": {
+        "operationId": "BlogPublicController_detail",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "جزئیات یک مقالهٔ منتشرشده",
+        "tags": [
+          "blog"
+        ]
+      }
+    },
+    "/blog/covers/{fileId}": {
+      "get": {
+        "operationId": "BlogPublicController_cover",
+        "parameters": [
+          {
+            "name": "fileId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "دریافت تصویر کاور مقالهٔ منتشرشده",
+        "tags": [
+          "blog"
+        ]
+      }
+    },
+    "/site-content/admin/library": {
+      "get": {
+        "operationId": "SiteContentAdminController_library",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "کتابخانهٔ تصاویر سایت",
+        "tags": [
+          "site-content"
+        ]
+      },
+      "post": {
+        "operationId": "SiteContentAdminController_addLibrary",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddLibraryAssetDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "افزودن تصویر به کتابخانه",
+        "tags": [
+          "site-content"
+        ]
+      }
+    },
+    "/site-content/admin/library/{id}": {
+      "delete": {
+        "operationId": "SiteContentAdminController_removeLibrary",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "حذف نرم تصویر از کتابخانه",
+        "tags": [
+          "site-content"
+        ]
+      }
+    },
+    "/site-content/admin/blocks": {
+      "get": {
+        "operationId": "SiteContentAdminController_blocks",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "بلوک‌های بنر صفحهٔ اصلی",
+        "tags": [
+          "site-content"
+        ]
+      }
+    },
+    "/site-content/admin/blocks/{key}": {
+      "patch": {
+        "operationId": "SiteContentAdminController_updateBlock",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateContentBlockDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "ویرایش یک بلوک بنر",
+        "tags": [
+          "site-content"
+        ]
+      }
+    },
+    "/site-content/admin/destinations": {
+      "get": {
+        "operationId": "SiteContentAdminController_destinations",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "مقاصد محبوب",
+        "tags": [
+          "site-content"
+        ]
+      },
+      "post": {
+        "operationId": "SiteContentAdminController_createDestination",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDestinationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "افزودن مقصد محبوب",
+        "tags": [
+          "site-content"
+        ]
+      }
+    },
+    "/site-content/admin/destinations/{id}": {
+      "patch": {
+        "operationId": "SiteContentAdminController_updateDestination",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDestinationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "ویرایش مقصد محبوب",
+        "tags": [
+          "site-content"
+        ]
+      },
+      "delete": {
+        "operationId": "SiteContentAdminController_deleteDestination",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "حذف مقصد محبوب",
+        "tags": [
+          "site-content"
+        ]
+      }
+    },
+    "/site-content/admin/routes": {
+      "get": {
+        "operationId": "SiteContentAdminController_routes",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "مسیرهای پرتردد",
+        "tags": [
+          "site-content"
+        ]
+      },
+      "post": {
+        "operationId": "SiteContentAdminController_createRoute",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRouteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "افزودن مسیر پرتردد",
+        "tags": [
+          "site-content"
+        ]
+      }
+    },
+    "/site-content/admin/routes/{id}": {
+      "patch": {
+        "operationId": "SiteContentAdminController_updateRoute",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRouteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "ویرایش مسیر پرتردد",
+        "tags": [
+          "site-content"
+        ]
+      },
+      "delete": {
+        "operationId": "SiteContentAdminController_deleteRoute",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "حذف مسیر پرتردد",
+        "tags": [
+          "site-content"
+        ]
+      }
+    },
+    "/site-content/home": {
+      "get": {
+        "operationId": "SiteContentPublicController_home",
+        "parameters": [
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "fa",
+                "en",
+                "ar"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "محتوای CMS صفحهٔ اصلی",
+        "tags": [
+          "site-content"
+        ]
+      }
+    },
+    "/site-content/media/{fileId}": {
+      "get": {
+        "operationId": "SiteContentPublicController_media",
+        "parameters": [
+          {
+            "name": "fileId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "دریافت تصویر محتوای سایت",
+        "tags": [
+          "site-content"
+        ]
+      }
     }
   },
   "info": {
@@ -6109,7 +7808,7 @@
         "properties": {
           "username": {
             "type": "string",
-            "example": "finance.karimi",
+            "example": "finance",
             "description": "Staff username"
           },
           "password": {
@@ -6161,6 +7860,34 @@
           "password"
         ]
       },
+      "AgencyPasswordResetRequestDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "example": "+989120000002"
+          }
+        },
+        "required": [
+          "phone"
+        ]
+      },
+      "AgencyPasswordResetVerifyDto": {
+        "type": "object",
+        "properties": {
+          "challengeId": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "example": "123456"
+          }
+        },
+        "required": [
+          "challengeId",
+          "code"
+        ]
+      },
       "RequestOtpDto": {
         "type": "object",
         "properties": {
@@ -6168,6 +7895,11 @@
             "type": "string",
             "example": "09121234567",
             "description": "شماره موبایل مشتری"
+          },
+          "referralCode": {
+            "type": "string",
+            "example": "NEGAR-4152",
+            "description": "کد معرف (فقط برای ثبت‌نام اول)"
           }
         },
         "required": [
@@ -6233,8 +7965,9 @@
         "properties": {
           "newPassword": {
             "type": "string",
-            "description": "رمز عبور جدید — حداقل ۸ کاراکتر",
-            "minLength": 8
+            "description": "رمز عبور جدید — حداقل ۸ کاراکتر با حروف بزرگ/کوچک، عدد و نماد",
+            "minLength": 8,
+            "example": "Blujet@1404"
           }
         },
         "required": [
@@ -6362,9 +8095,9 @@
         "type": "object",
         "properties": {
           "limitIrr": {
-            "type": "number",
-            "example": 1800000000,
-            "description": "سقف اعتبار به ریال"
+            "type": "string",
+            "example": "1800000000",
+            "description": "سقف اعتبار به ریال (رشته یا عدد صحیح)"
           }
         },
         "required": [
@@ -6426,9 +8159,9 @@
         "type": "object",
         "properties": {
           "amountIrr": {
-            "type": "number",
-            "example": 800000000,
-            "description": "مبلغ فاکتور به ریال"
+            "type": "string",
+            "example": "800000000",
+            "description": "مبلغ فاکتور به ریال (رشته یا عدد صحیح)"
           },
           "dueAt": {
             "type": "string",
@@ -6549,6 +8282,24 @@
           "phone",
           "challengeId",
           "code"
+        ]
+      },
+      "SendEmployeeManagerMessageDto": {
+        "type": "object",
+        "properties": {
+          "toId": {
+            "type": "string",
+            "description": "شناسه مدیر مقصد"
+          },
+          "body": {
+            "type": "string",
+            "description": "متن پیام",
+            "example": "لطفاً در مورد قرارداد آژانس راهنمایی کنید."
+          }
+        },
+        "required": [
+          "toId",
+          "body"
         ]
       },
       "ResolveCartableDto": {
@@ -6732,6 +8483,22 @@
         },
         "required": [
           "level"
+        ]
+      },
+      "ReferCardRequestDto": {
+        "type": "object",
+        "properties": {
+          "assignedTo": {
+            "type": "string",
+            "enum": [
+              "SENIOR",
+              "CHAIR"
+            ],
+            "description": "مدیر ارشد یا رئیس هیئت مدیره — تنها دو مقصد ارجاع طراحی"
+          }
+        },
+        "required": [
+          "assignedTo"
         ]
       },
       "UpdateTierRulesDto": {
@@ -6973,13 +8740,13 @@
         "type": "object",
         "properties": {
           "proposedPriceIrr": {
-            "type": "number",
-            "example": 38500000,
+            "type": "string",
+            "example": "38500000",
             "description": "نرخ پیشنهادی به ریال"
           },
           "legalRateIrr": {
-            "type": "number",
-            "example": 42000000,
+            "type": "string",
+            "example": "42000000",
             "description": "نرخ قانونی/مصوب به ریال"
           },
           "note": {
@@ -6995,8 +8762,8 @@
         "type": "object",
         "properties": {
           "legalRateIrr": {
-            "type": "number",
-            "example": 42000000,
+            "type": "string",
+            "example": "42000000",
             "description": "نرخ قانونی (مصوب سازمان هواپیمایی) به ریال"
           }
         },
@@ -7063,7 +8830,9 @@
         "type": "object",
         "properties": {
           "bookingId": {
-            "type": "string"
+            "type": "string",
+            "description": "شناسه رزرو متعلق به مشتری جاری",
+            "example": "c2c3954d-b315-40d2-a663-bad2d310bec2"
           },
           "iban": {
             "type": "string",
@@ -7074,6 +8843,19 @@
         "required": [
           "bookingId",
           "iban"
+        ]
+      },
+      "PreviewRefundDto": {
+        "type": "object",
+        "properties": {
+          "bookingId": {
+            "type": "string",
+            "description": "شناسه رزرو متعلق به مشتری جاری",
+            "example": "c2c3954d-b315-40d2-a663-bad2d310bec2"
+          }
+        },
+        "required": [
+          "bookingId"
         ]
       },
       "LockSeatDto": {
@@ -7237,8 +9019,8 @@
         "type": "object",
         "properties": {
           "confirmedPriceIrr": {
-            "type": "number",
-            "description": "Client-confirmed price from the checkout screen. Required to complete payment when the price changed since booking creation (re-price guard) — CLAUDE.md: \"if the price changed, show the new price and require explicit user confirmation before charging.\""
+            "type": "string",
+            "description": "Client-confirmed price from the checkout screen (decimal string or integer). Required to complete payment when the price changed since booking creation (re-price guard) — CLAUDE.md: \"if the price changed, show the new price and require explicit user confirmation before charging.\""
           },
           "promoCode": {
             "type": "string",
@@ -7258,8 +9040,8 @@
         "type": "object",
         "properties": {
           "amountIrr": {
-            "type": "number",
-            "example": 5000000
+            "type": "string",
+            "example": "5000000"
           }
         },
         "required": [
@@ -7285,13 +9067,34 @@
           "cabin"
         ]
       },
+      "SaveFlightDto": {
+        "type": "object",
+        "properties": {
+          "flightInstanceId": {
+            "type": "string",
+            "example": "00000000-0000-0000-0000-000000000001"
+          },
+          "cabin": {
+            "type": "string",
+            "enum": [
+              "ECONOMY",
+              "BUSINESS"
+            ],
+            "example": "ECONOMY"
+          }
+        },
+        "required": [
+          "flightInstanceId",
+          "cabin"
+        ]
+      },
       "RequestCreditIncreaseDto": {
         "type": "object",
         "properties": {
           "requestedLimitIrr": {
-            "type": "number",
-            "example": 2000000000,
-            "description": "سقف اعتبار درخواستی به ریال"
+            "type": "string",
+            "example": "2000000000",
+            "description": "سقف اعتبار درخواستی به ریال (رشته یا عدد صحیح)"
           },
           "note": {
             "type": "string",
@@ -7363,6 +9166,55 @@
           "months"
         ]
       },
+      "UpdateWebservicePricingDto": {
+        "type": "object",
+        "properties": {
+          "month1PriceIrr": {
+            "type": "number",
+            "description": "قیمت پلن ۱ ماهه (ریال)",
+            "example": 45000000
+          },
+          "month3PriceIrr": {
+            "type": "number",
+            "description": "قیمت پلن ۳ ماهه (ریال)",
+            "example": 120000000
+          },
+          "month12PriceIrr": {
+            "type": "number",
+            "description": "قیمت پلن ۱۲ ماهه (ریال)",
+            "example": 420000000
+          }
+        },
+        "required": [
+          "month1PriceIrr",
+          "month3PriceIrr",
+          "month12PriceIrr"
+        ]
+      },
+      "CreateAirportDto": {
+        "type": "object",
+        "properties": {
+          "cityFa": {
+            "type": "string",
+            "description": "نام شهر",
+            "example": "وان"
+          },
+          "code": {
+            "type": "string",
+            "description": "کد IATA فرودگاه",
+            "example": "VAS"
+          },
+          "tz": {
+            "type": "string",
+            "description": "منطقه زمانی IANA",
+            "example": "Asia/Tehran"
+          }
+        },
+        "required": [
+          "cityFa",
+          "code"
+        ]
+      },
       "CreateFlightDto": {
         "type": "object",
         "properties": {
@@ -7391,9 +9243,19 @@
             "example": 180
           },
           "basePriceIrr": {
-            "type": "number",
+            "type": "string",
             "description": "قیمت پایه (ریال)",
-            "example": 38000000
+            "example": "38000000"
+          },
+          "aircraftType": {
+            "type": "string",
+            "description": "نوع هواپیما (از کاتالوگ aircraft-types)",
+            "example": "Airbus A320"
+          },
+          "charterSeats": {
+            "type": "number",
+            "description": "تعهد چارتری (صندلی) — باید کمتر از ظرفیت باشد",
+            "example": 60
           }
         },
         "required": [
@@ -7457,9 +9319,9 @@
         "type": "object",
         "properties": {
           "priceIrr": {
-            "type": "number",
+            "type": "string",
             "description": "نرخ برنامه‌ریزی (ریال)",
-            "example": 39000000
+            "example": "39000000"
           },
           "agencySeats": {
             "type": "number",
@@ -7519,9 +9381,9 @@
             "example": "Y"
           },
           "priceIrr": {
-            "type": "number",
+            "type": "string",
             "description": "قیمت (ریال)",
-            "example": 30000000
+            "example": "30000000"
           },
           "seatsAllocated": {
             "type": "number",
@@ -7529,9 +9391,9 @@
             "example": 20
           },
           "taxIrr": {
-            "type": "number",
+            "type": "string",
             "description": "مالیات/عوارض (ریال)",
-            "example": 0
+            "example": "0"
           },
           "refundable": {
             "type": "boolean"
@@ -7575,13 +9437,13 @@
         "type": "object",
         "properties": {
           "priceIrr": {
-            "type": "number"
+            "type": "string"
           },
           "seatsAllocated": {
             "type": "number"
           },
           "taxIrr": {
-            "type": "number"
+            "type": "string"
           },
           "refundable": {
             "type": "boolean"
@@ -7636,7 +9498,7 @@
             "description": "موعد آزادسازی خودکار (فقط برای نوع SOFT، UTC ISO)"
           },
           "contractPriceIrr": {
-            "type": "number",
+            "type": "string",
             "description": "نرخ قراردادی این آژانس (ریال)"
           }
         },
@@ -7814,6 +9676,117 @@
           "code"
         ]
       },
+      "CreateSavedPassengerDto": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string",
+            "example": "محمد رضایی"
+          },
+          "latinName": {
+            "type": "string",
+            "example": "MOHAMMAD REZAEI",
+            "description": "Latin ticket name"
+          },
+          "nationalId": {
+            "type": "string",
+            "example": "0012345679"
+          },
+          "passportNo": {
+            "type": "string",
+            "example": "A22113344"
+          },
+          "mobile": {
+            "type": "string",
+            "example": "09121234567"
+          },
+          "isChild": {
+            "type": "boolean",
+            "example": false
+          }
+        },
+        "required": [
+          "fullName",
+          "latinName"
+        ]
+      },
+      "UpdateSavedPassengerDto": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string",
+            "example": "محمد رضایی"
+          },
+          "latinName": {
+            "type": "string",
+            "example": "MOHAMMAD REZAEI"
+          },
+          "nationalId": {
+            "type": "object",
+            "example": "0012345679",
+            "nullable": true
+          },
+          "passportNo": {
+            "type": "object",
+            "example": "A22113344",
+            "nullable": true
+          },
+          "mobile": {
+            "type": "object",
+            "example": "09121234567",
+            "nullable": true
+          },
+          "isChild": {
+            "type": "boolean",
+            "example": false
+          }
+        }
+      },
+      "CreateBankAccountDto": {
+        "type": "object",
+        "properties": {
+          "cardNo": {
+            "type": "string",
+            "example": "6104337112344521",
+            "description": "۱۶ رقم کارت (فارسی یا لاتین)"
+          },
+          "sheba": {
+            "type": "string",
+            "example": "IR820540102680020817909002"
+          },
+          "bankName": {
+            "type": "string",
+            "example": "بانک ملت"
+          }
+        },
+        "required": [
+          "cardNo",
+          "sheba"
+        ]
+      },
+      "UpdateBankAccountDto": {
+        "type": "object",
+        "properties": {
+          "isDefault": {
+            "type": "boolean",
+            "example": true
+          }
+        }
+      },
+      "RejectIdentityVerificationDto": {
+        "type": "object",
+        "properties": {
+          "rejectReason": {
+            "type": "string",
+            "description": "دلیل رد مدارک — به کاربر در تب احراز هویت نمایش داده می‌شود",
+            "example": "تصویر کارت ملی ناخوانا است؛ لطفاً تصویر واضح‌تری بارگذاری کنید.",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "rejectReason"
+        ]
+      },
       "LookupBookingDto": {
         "type": "object",
         "properties": {
@@ -7825,7 +9798,8 @@
           "lastName": {
             "type": "string",
             "example": "رضایی",
-            "description": "نام خانوادگی مسافر"
+            "description": "نام خانوادگی مسافر — حداقل ۳ کاراکتر",
+            "minLength": 3
           }
         },
         "required": [
@@ -7844,7 +9818,8 @@
           "lastName": {
             "type": "string",
             "example": "رضایی",
-            "description": "نام خانوادگی مسافر"
+            "description": "نام خانوادگی مسافر — حداقل ۳ کاراکتر",
+            "minLength": 3
           },
           "iban": {
             "type": "string",
@@ -8187,6 +10162,214 @@
           "nationalId",
           "phone"
         ]
+      },
+      "CreateBlogPostDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "example": "راهنمای کامل چک‌این آنلاین پروازهای داخلی"
+          },
+          "body": {
+            "type": "string",
+            "example": "متن مقاله…"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "NEWS",
+              "GUIDE",
+              "DEST",
+              "OFFERS"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "PUBLISHED",
+              "SCHEDULED"
+            ],
+            "default": "DRAFT"
+          },
+          "coverFileId": {
+            "type": "string",
+            "description": "StoredFile id from POST /files"
+          },
+          "scheduledAt": {
+            "type": "string",
+            "description": "Required when status is SCHEDULED (ISO 8601 UTC)"
+          },
+          "slug": {
+            "type": "string",
+            "description": "URL slug — auto-generated if omitted"
+          }
+        },
+        "required": [
+          "title",
+          "body",
+          "category"
+        ]
+      },
+      "UpdateBlogPostDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "NEWS",
+              "GUIDE",
+              "DEST",
+              "OFFERS"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "PUBLISHED",
+              "SCHEDULED"
+            ]
+          },
+          "coverFileId": {
+            "type": "object",
+            "nullable": true
+          },
+          "scheduledAt": {
+            "type": "object"
+          },
+          "slug": {
+            "type": "string"
+          }
+        }
+      },
+      "AddLibraryAssetDto": {
+        "type": "object",
+        "properties": {
+          "storedFileId": {
+            "type": "string",
+            "description": "StoredFile id from POST /files"
+          },
+          "label": {
+            "type": "string",
+            "example": "hero-istanbul.jpg"
+          }
+        },
+        "required": [
+          "storedFileId"
+        ]
+      },
+      "UpdateContentBlockDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "title": {
+            "type": "string"
+          },
+          "subtitle": {
+            "type": "string"
+          },
+          "buttonText": {
+            "type": "string"
+          },
+          "badgeText": {
+            "type": "string"
+          },
+          "imageFileId": {
+            "type": "object",
+            "nullable": true
+          }
+        }
+      },
+      "CreateDestinationDto": {
+        "type": "object",
+        "properties": {
+          "airportCode": {
+            "type": "string",
+            "example": "IST"
+          },
+          "priceIrr": {
+            "type": "number",
+            "description": "Price in IRR (integer)"
+          },
+          "imageFileId": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "airportCode",
+          "priceIrr"
+        ]
+      },
+      "UpdateDestinationDto": {
+        "type": "object",
+        "properties": {
+          "airportCode": {
+            "type": "string"
+          },
+          "priceIrr": {
+            "type": "number"
+          },
+          "imageFileId": {
+            "type": "object",
+            "nullable": true
+          },
+          "sortOrder": {
+            "type": "number"
+          }
+        }
+      },
+      "CreateRouteDto": {
+        "type": "object",
+        "properties": {
+          "fromAirportCode": {
+            "type": "string",
+            "example": "THR"
+          },
+          "toAirportCode": {
+            "type": "string",
+            "example": "MHD"
+          },
+          "priceIrr": {
+            "type": "number"
+          },
+          "sortOrder": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "fromAirportCode",
+          "toAirportCode",
+          "priceIrr"
+        ]
+      },
+      "UpdateRouteDto": {
+        "type": "object",
+        "properties": {
+          "fromAirportCode": {
+            "type": "string"
+          },
+          "toAirportCode": {
+            "type": "string"
+          },
+          "priceIrr": {
+            "type": "number"
+          },
+          "sortOrder": {
+            "type": "number"
+          }
+        }
       }
     }
   }

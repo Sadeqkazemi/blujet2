@@ -1,62 +1,105 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { TypeORMService } from '../src/typeorm/typeorm.service';
+import { DataSource, In } from 'typeorm';
+import { dataSourceOptions } from '../src/database/data-source.options';
+import { AircraftSeatMap } from '../src/database/entities/aircraft-seat-map.entity';
+import { Booking } from '../src/database/entities/booking.entity';
+import { Flight } from '../src/database/entities/flight.entity';
+import { FlightInstance } from '../src/database/entities/flight-instance.entity';
+import { LedgerEntry } from '../src/database/entities/ledger-entry.entity';
+import { Passenger } from '../src/database/entities/passenger.entity';
+import { PaymentReconciliation } from '../src/database/entities/payment-reconciliation.entity';
+import { Route } from '../src/database/entities/route.entity';
 import { loginAsCustomer } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
+async function upsertSeatMap(
+  ds: DataSource,
+  aircraftType: string,
+  fields: {
+    businessRowStart: number;
+    businessRowEnd: number;
+    businessColsLeft: string[];
+    businessColsRight: string[];
+    economyRowStart: number;
+    economyRowEnd: number;
+    economyColsLeft: string[];
+    economyColsRight: string[];
+  },
+) {
+  const repo = ds.getRepository(AircraftSeatMap);
+  const existing = await repo.findOneBy({ aircraftType });
+  if (existing) return existing;
+  return repo.save(
+    repo.create({ aircraftType, ...fields, updatedAt: new Date() }),
+  );
+}
+
+async function upsertRoute(
+  ds: DataSource,
+  originCode: string,
+  destCode: string,
+  durationMin: number,
+) {
+  const repo = ds.getRepository(Route);
+  const existing = await repo.findOneBy({ originCode, destCode });
+  if (existing) return existing;
+  return repo.save(repo.create({ originCode, destCode, durationMin }));
+}
+
+async function upsertFlight(
+  ds: DataSource,
+  flightNo: string,
+  routeId: string,
+  aircraftType: string,
+) {
+  const repo = ds.getRepository(Flight);
+  const existing = await repo.findOneBy({ flightNo });
+  if (existing) return existing;
+  return repo.save(repo.create({ flightNo, routeId, aircraftType }));
+}
+
 describe('Booking engine (e2e)', () => {
   let app: INestApplication<App>;
-  let typeorm: TypeORMService;
+  let dataSource: DataSource;
 
   let routeId: string;
   let flightId: string;
   const AIRCRAFT_TYPE = 'BE2E-TestJet';
 
   beforeAll(async () => {
-    const setupApp = await createTestApp();
-    typeorm = setupApp.get(TypeORMService);
+    const setupDataSource = new DataSource(dataSourceOptions);
+    await setupDataSource.initialize();
 
-    await typeorm.aircraftSeatMap.upsert({
-      where: { aircraftType: AIRCRAFT_TYPE },
-      update: {},
-      create: {
-        aircraftType: AIRCRAFT_TYPE,
-        businessRowStart: 1,
-        businessRowEnd: 1,
-        businessColsLeft: ['A'],
-        businessColsRight: ['C'],
-        economyRowStart: 2,
-        economyRowEnd: 3,
-        economyColsLeft: ['A', 'B'],
-        economyColsRight: ['C'],
-      },
+    await upsertSeatMap(setupDataSource, AIRCRAFT_TYPE, {
+      businessRowStart: 1,
+      businessRowEnd: 1,
+      businessColsLeft: ['A'],
+      businessColsRight: ['C'],
+      economyRowStart: 2,
+      economyRowEnd: 3,
+      economyColsLeft: ['A', 'B'],
+      economyColsRight: ['C'],
     });
 
-    const route = await typeorm.route.upsert({
-      where: { originCode_destCode: { originCode: 'THR', destCode: 'KIH' } },
-      update: {},
-      create: { originCode: 'THR', destCode: 'KIH', durationMin: 90 },
-    });
+    const route = await upsertRoute(setupDataSource, 'THR', 'KIH', 90);
     routeId = route.id;
 
-    const flight = await typeorm.flight.upsert({
-      where: { flightNo: 'BE-100' },
-      update: {},
-      create: {
-        flightNo: 'BE-100',
-        routeId,
-        aircraftType: AIRCRAFT_TYPE,
-      },
-    });
+    const flight = await upsertFlight(
+      setupDataSource,
+      'BE-100',
+      routeId,
+      AIRCRAFT_TYPE,
+    );
     flightId = flight.id;
 
-    await setupApp.close();
+    await setupDataSource.destroy();
   });
 
   beforeEach(async () => {
     app = await createTestApp();
-    typeorm = app.get(TypeORMService);
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
@@ -65,15 +108,16 @@ describe('Booking engine (e2e)', () => {
 
   async function freshInstance(daysAhead = 40) {
     const departureAt = new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000);
-    return typeorm.flightInstance.create({
-      data: {
+    const repo = dataSource.getRepository(FlightInstance);
+    return repo.save(
+      repo.create({
         flightId,
         departureAt,
         arrivalAt: new Date(departureAt.getTime() + 90 * 60 * 1000),
         capacity: 6,
         status: 'SCHEDULED',
-      },
-    });
+      }),
+    );
   }
 
   it('search returns the flight with both cabins priced and seatsLeft', async () => {
@@ -138,11 +182,15 @@ describe('Booking engine (e2e)', () => {
     expect(payRes.body.data.priceChanged).toBe(false);
     expect(payRes.body.data.booking.status).toBe('TICKETED');
 
-    const ledger = await typeorm.ledgerEntry.findFirst({
-      where: { bookingId, type: 'SALE' },
-    });
+    const ledger = await dataSource
+      .getRepository(LedgerEntry)
+      .findOneBy({ bookingId, type: 'SALE' });
     expect(ledger).toBeTruthy();
-    expect(ledger!.signedAmountIrr).toBe(payRes.body.data.booking.priceIrr);
+    // ledger is a direct TypeORM read (native bigint); the JSON response
+    // field is a decimal string (BigInt.prototype.toJSON) — compare same-type.
+    expect(ledger!.signedAmountIrr).toBe(
+      BigInt(String(payRes.body.data.booking.priceIrr)),
+    );
   });
 
   it('a booking cannot be paid twice', async () => {
@@ -246,12 +294,16 @@ describe('Booking engine (e2e)', () => {
       .send(payload);
 
     expect(first.body.data.id).toBe(second.body.data.id);
-    const count = await typeorm.booking.count({
-      where: {
-        flightInstanceId: instance.id,
-        passengers: { some: { seatCode: '3B' } },
-      },
-    });
+    // Booking has no reverse `passengers` relation declared, so a
+    // nested-relation filter needs an explicit join rather than
+    // repo.countBy/find with a nested `where`.
+    const count = await dataSource
+      .getRepository(Booking)
+      .createQueryBuilder('b')
+      .innerJoin(Passenger, 'p', 'p."bookingId" = b.id')
+      .where('b."flightInstanceId" = :fid', { fid: instance.id })
+      .andWhere('p."seatCode" = :seat', { seat: '3B' })
+      .getCount();
     expect(count).toBe(1);
   });
 
@@ -328,10 +380,12 @@ describe('Booking engine (e2e)', () => {
       });
     const bookingId = createRes.body.data.id;
 
-    await typeorm.booking.update({
-      where: { id: bookingId },
-      data: { holdExpiresAt: new Date(Date.now() - 1000) },
-    });
+    await dataSource
+      .getRepository(Booking)
+      .update(
+        { id: bookingId },
+        { holdExpiresAt: new Date(Date.now() - 1000) },
+      );
 
     const payRes = await request(app.getHttpServer())
       .post(`/bookings/${bookingId}/pay`)
@@ -339,9 +393,9 @@ describe('Booking engine (e2e)', () => {
       .send({});
     expect(payRes.status).toBe(409);
 
-    const updated = await typeorm.booking.findUniqueOrThrow({
-      where: { id: bookingId },
-    });
+    const updated = await dataSource
+      .getRepository(Booking)
+      .findOneByOrFail({ id: bookingId });
     expect(updated.status).toBe('EXPIRED');
 
     const seatmapRes = await request(app.getHttpServer()).get(
@@ -353,40 +407,75 @@ describe('Booking engine (e2e)', () => {
     expect(seat.status).toBe('FREE');
   });
 
+  it('an idempotency-key retry on payment returns the same ticketed booking, not a double charge', async () => {
+    const instance = await freshInstance();
+    const { accessToken } = await loginAsCustomer(app, '09130000011');
+    const key = `pay-idem-${instance.id}`;
+
+    const createRes = await request(app.getHttpServer())
+      .post('/bookings')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        flightInstanceId: instance.id,
+        cabin: 'ECONOMY',
+        passengers: [{ fullName: 'پرداخت تکراری', seatCode: '3A' }],
+      });
+    expect(createRes.status).toBe(201);
+    const bookingId = createRes.body.data.id;
+
+    const first = await request(app.getHttpServer())
+      .post(`/bookings/${bookingId}/pay`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .set('Idempotency-Key', key)
+      .send({});
+    expect(first.status).toBe(201);
+    expect(first.body.data.booking.status).toBe('TICKETED');
+
+    const second = await request(app.getHttpServer())
+      .post(`/bookings/${bookingId}/pay`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .set('Idempotency-Key', key)
+      .send({});
+    expect(second.status).toBe(201);
+    expect(second.body.data.booking.id).toBe(first.body.data.booking.id);
+
+    const reconCount = await dataSource
+      .getRepository(PaymentReconciliation)
+      .countBy({ bookingId });
+    expect(reconCount).toBe(1);
+  });
+
   // ── Mandatory concurrency test (CLAUDE.md) ───────────────────────────
 
   it('two concurrent buyers of the LAST seat — exactly one succeeds, inventory never goes negative', async () => {
     const oneSeatType = `${AIRCRAFT_TYPE}-1SEAT`;
-    await typeorm.aircraftSeatMap.upsert({
-      where: { aircraftType: oneSeatType },
-      update: {},
-      create: {
-        aircraftType: oneSeatType,
-        businessRowStart: 1,
-        businessRowEnd: 0,
-        businessColsLeft: [],
-        businessColsRight: [],
-        economyRowStart: 1,
-        economyRowEnd: 1,
-        economyColsLeft: ['A'],
-        economyColsRight: [],
-      },
+    await upsertSeatMap(dataSource, oneSeatType, {
+      businessRowStart: 1,
+      businessRowEnd: 0,
+      businessColsLeft: [],
+      businessColsRight: [],
+      economyRowStart: 1,
+      economyRowEnd: 1,
+      economyColsLeft: ['A'],
+      economyColsRight: [],
     });
-    const oneSeatFlight = await typeorm.flight.upsert({
-      where: { flightNo: 'BE-101' },
-      update: {},
-      create: { flightNo: 'BE-101', routeId, aircraftType: oneSeatType },
-    });
+    const oneSeatFlight = await upsertFlight(
+      dataSource,
+      'BE-101',
+      routeId,
+      oneSeatType,
+    );
     const departureAt = new Date(Date.now() + 45 * 24 * 60 * 60 * 1000);
-    const instance = await typeorm.flightInstance.create({
-      data: {
+    const instanceRepo = dataSource.getRepository(FlightInstance);
+    const instance = await instanceRepo.save(
+      instanceRepo.create({
         flightId: oneSeatFlight.id,
         departureAt,
         arrivalAt: new Date(departureAt.getTime() + 90 * 60 * 1000),
         capacity: 1,
         status: 'SCHEDULED',
-      },
-    });
+      }),
+    );
 
     const buyerA = await loginAsCustomer(app, '09130000009');
     const buyerB = await loginAsCustomer(app, '09130000010');
@@ -413,11 +502,9 @@ describe('Booking engine (e2e)', () => {
     const statuses = [resA.status, resB.status].sort();
     expect(statuses).toEqual([201, 409]);
 
-    const activeBookings = await typeorm.booking.count({
-      where: {
-        flightInstanceId: instance.id,
-        status: { in: ['HELD', 'PAID', 'TICKETED'] },
-      },
+    const activeBookings = await dataSource.getRepository(Booking).countBy({
+      flightInstanceId: instance.id,
+      status: In(['HELD', 'PAID', 'TICKETED']),
     });
     expect(activeBookings).toBe(1);
   });

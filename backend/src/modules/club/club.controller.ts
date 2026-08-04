@@ -15,6 +15,7 @@ import {
   ListMembersQueryDto,
   UpdateLevelDto,
   UpdateTierRulesDto,
+  ReferCardRequestDto,
 } from './dto/club.dtos';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -39,8 +40,11 @@ export class ClubController {
   @Get('members')
   @Roles('CEO', 'BOARD_CHAIR', 'SENIOR_MANAGER', 'SITE_ADMIN')
   @ApiOperation({ summary: 'اعضای باشگاه + کارت‌های KPI (فیلتر سطح/جستجو)' })
-  async listMembers(@Query() query: ListMembersQueryDto) {
-    const data = await this.club.listMembers(query);
+  async listMembers(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Query() query: ListMembersQueryDto,
+  ) {
+    const data = await this.club.listMembers(query, actor);
     return { success: true, data };
   }
 
@@ -89,6 +93,31 @@ export class ClubController {
     return { success: true, data };
   }
 
+  @Get('submitted-card-requests')
+  @Roles('SITE_ADMIN')
+  @ApiOperation({
+    summary:
+      'صف درخواست‌های صدور کارت برای ادمین سایت (همه وضعیت‌ها؛ ارجاع فقط روی SUBMITTED)',
+  })
+  async listSubmittedRequests() {
+    const data = await this.club.listSubmittedRequests();
+    return { success: true, data };
+  }
+
+  @Patch('card-requests/:id/refer')
+  @Roles('SITE_ADMIN')
+  @ApiOperation({
+    summary: 'ارجاع درخواست SUBMITTED به مدیر ارشد یا رئیس هیئت مدیره',
+  })
+  async referRequest(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: ReferCardRequestDto,
+  ) {
+    const data = await this.club.referRequest(actor, id, dto.assignedTo);
+    return { success: true, data };
+  }
+
   @Post('_test/card-request')
   @ApiOperation({
     summary: 'E2E only — creates a fresh REFERRED request; 404 in production',
@@ -126,11 +155,10 @@ export class ClubController {
     return { success: true, data };
   }
 
-  // پنل مدیر بازرگانی.dc.html's "clubrules" tab — only CEO/COMMERCIAL_MANAGER
-  // list this key in that design's own roleDefs.access arrays; no other
-  // executive-panel design file mentions a clubrules tab at all.
+  // پنل مدیر بازرگانی.dc.html's "clubrules" tab — COMMERCIAL_MANAGER only
+  // (CEO design sidebar has no clubrules entry).
   @Get('tier-rules')
-  @Roles('CEO', 'COMMERCIAL_MANAGER')
+  @Roles('COMMERCIAL_MANAGER')
   @ApiOperation({ summary: 'قوانین حد نصاب امتیاز سطوح باشگاه مشتریان' })
   async getTierRules() {
     const data = await this.club.getTierRules();
@@ -138,7 +166,7 @@ export class ClubController {
   }
 
   @Patch('tier-rules')
-  @Roles('CEO', 'COMMERCIAL_MANAGER')
+  @Roles('COMMERCIAL_MANAGER')
   @ApiOperation({ summary: 'تغییر قوانین حد نصاب امتیاز سطوح باشگاه مشتریان' })
   async updateTierRules(
     @CurrentUser() actor: AuthenticatedUser,

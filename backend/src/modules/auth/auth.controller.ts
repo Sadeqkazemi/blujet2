@@ -29,7 +29,12 @@ import { CustomerPasswordLoginDto } from './dto/customer-password-login.dto';
 import { UpdateLocaleDto } from './dto/update-locale.dto';
 import { RequestPasswordResetEmailDto } from './dto/request-password-reset-email.dto';
 import { VerifyPasswordResetEmailDto } from './dto/verify-password-reset-email.dto';
+import {
+  AgencyPasswordResetRequestDto,
+  AgencyPasswordResetVerifyDto,
+} from './dto/agency-password-reset.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { SkipMustChangePassword } from '../../common/decorators/skip-must-change-password.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -131,6 +136,34 @@ export class AuthController {
     return { success: true, data: { accessToken, user } };
   }
 
+  @Post('agency/password-reset/request')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({ summary: 'بازیابی رمز آژانس — درخواست OTP پیامکی' })
+  async agencyPasswordResetRequest(@Body() dto: AgencyPasswordResetRequestDto) {
+    const result = await this.auth.requestAgencyPasswordReset(dto.phone);
+    return { success: true, data: result };
+  }
+
+  @Post('agency/password-reset/verify')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({ summary: 'بازیابی رمز آژانس — تأیید OTP و صدور توکن' })
+  async agencyPasswordResetVerify(
+    @Body() dto: AgencyPasswordResetVerifyDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { accessToken, refreshToken, user } =
+      await this.auth.verifyAgencyPasswordResetOtp(
+        dto.challengeId,
+        dto.code,
+        { userAgent: req.headers['user-agent'], ip: req.ip },
+      );
+    setRefreshCookie(res, refreshToken);
+    return { success: true, data: { accessToken, user } };
+  }
+
   @Post('otp/request')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
@@ -141,7 +174,7 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Challenge issued' })
   @ApiResponse({ status: 403, description: 'Account suspended' })
   async requestOtp(@Body() dto: RequestOtpDto) {
-    const result = await this.auth.requestOtp(dto.phone);
+    const result = await this.auth.requestOtp(dto.phone, dto.referralCode);
     return { success: true, data: result };
   }
 
@@ -205,6 +238,7 @@ export class AuthController {
 
   @Post('logout')
   @HttpCode(HttpStatus.OK)
+  @SkipMustChangePassword()
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Revoke the current refresh token' })
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
@@ -217,6 +251,7 @@ export class AuthController {
   }
 
   @Get('me')
+  @SkipMustChangePassword()
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: "Current authenticated user's identity and role" })
   async me(@CurrentUser() user: AuthenticatedUser) {
@@ -240,6 +275,7 @@ export class AuthController {
 
   @Post('change-password')
   @HttpCode(HttpStatus.OK)
+  @SkipMustChangePassword()
   @UseGuards(JwtAuthGuard)
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @ApiOperation({
@@ -262,7 +298,7 @@ export class AuthController {
   @Post('set-password')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('USER')
+  @Roles('USER', 'AGENCY')
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @ApiOperation({
     summary:

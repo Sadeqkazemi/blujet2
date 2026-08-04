@@ -1,11 +1,11 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import FlightsPage from './FlightsPage';
 import * as flightsApi from '../../api/flights';
 import * as pricingApi from '../../api/pricing';
 import * as authApi from '../../api/auth';
 import * as useAuthModule from '../../hooks/useAuth';
-import { parseJalaliDateToIso } from '../../lib/jalali';
+import { mockAuthUserWithRole } from '../../test/mockAuthUser';
 import type {
   AircraftTypeOption,
   AirportEntry,
@@ -33,6 +33,8 @@ const FUTURE_ROW: FutureFlightRow = {
   basePriceIrr: null,
   agencySeatsAllocated: null,
   aiSuggestion: {
+    // Advisory-only ML output — a plain JSON number, unlike the other Irr
+    // fields on this page (see types/flights.ts).
     priceIrr: 41_000_000,
     reason: 'با توجه به فصل تابستان، نرخ پیشنهادی هم‌تراز رقباست.',
     factors: ['فصل: اوج سفر'],
@@ -56,7 +58,9 @@ const OVERVIEW: FlightsOverview = {
       capacity: 180,
       charterSeats: 60,
       sold: 152,
-      basePriceIrr: 38_000_000,
+      // Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON
+      // on the backend).
+      basePriceIrr: '38000000',
       derivedStatus: 'SELLING',
     },
     {
@@ -68,7 +72,7 @@ const OVERVIEW: FlightsOverview = {
       capacity: 140,
       charterSeats: 0,
       sold: 0,
-      basePriceIrr: 15_000_000,
+      basePriceIrr: '15000000',
       derivedStatus: 'CANCELLED',
     },
   ],
@@ -81,17 +85,17 @@ const OVERVIEW: FlightsOverview = {
         destCode: 'DXB',
         departureAt: '2026-07-10T08:30:00.000Z',
         tickets: 3,
-        basePriceIrr: 30_000_000,
-        avgPriceIrr: 40_000_000,
-        revenueIrr: 120_000_000,
-        channelRevenueIrr: { SYSTEM: 80_000_000, CHARTER: 0, AGENCY: 40_000_000 },
-        profitIrr: 30_000_000,
-        lossIrr: 0,
+        basePriceIrr: '30000000',
+        avgPriceIrr: '40000000',
+        revenueIrr: '120000000',
+        channelRevenueIrr: { SYSTEM: '80000000', CHARTER: '0', AGENCY: '40000000' },
+        profitIrr: '30000000',
+        lossIrr: '0',
       },
     ],
     kpis: {
-      totalSalesIrr: 120_000_000,
-      totalProfitIrr: 30_000_000,
+      totalSalesIrr: '120000000',
+      totalProfitIrr: '30000000',
       totalTickets: 3,
       flightCount: 1,
     },
@@ -102,11 +106,11 @@ const OVERVIEW: FlightsOverview = {
 const DETAIL: FlightDetail = {
   ...OVERVIEW.active[0],
   channels: [
-    { channel: 'SYSTEM', seats: 80, revenueIrr: 3_040_000_000 },
-    { channel: 'CHARTER', seats: 45, revenueIrr: 1_710_000_000 },
-    { channel: 'AGENCY', seats: 27, revenueIrr: 1_026_000_000 },
+    { channel: 'SYSTEM', seats: 80, revenueIrr: '3040000000' },
+    { channel: 'CHARTER', seats: 45, revenueIrr: '1710000000' },
+    { channel: 'AGENCY', seats: 27, revenueIrr: '1026000000' },
   ],
-  totalRevenueIrr: 5_776_000_000,
+  totalRevenueIrr: '5776000000',
   occupancyPct: 84,
   aircraftType: 'Airbus A320',
 };
@@ -114,7 +118,7 @@ const DETAIL: FlightDetail = {
 function mockRole(role: Role) {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status: 'authenticated',
-    user: { id: 'me', fullName: 'کاربر تست', role },
+    user: mockAuthUserWithRole(role, { id: 'me' }),
     requestLogin: vi.fn(),
     confirmTwoFactor: vi.fn(),
     agencyLogin: vi.fn(),
@@ -146,49 +150,26 @@ describe('FlightsPage', () => {
     expect(screen.getByText('۳٬۸۰۰٬۰۰۰ تومان')).toBeInTheDocument();
   });
 
-  it('add-flight modal: empty submit shows the design message; a full form converts Jalali+toman and calls the API', async () => {
+  it('opens the full-page add-flight form when + افزودن پرواز is clicked', async () => {
     mockRole('SENIOR_MANAGER');
     mockData();
-    const create = vi.spyOn(flightsApi, 'createFlight').mockResolvedValue({
-      ...OVERVIEW.active[0],
-      id: 'new1',
-      derivedStatus: 'ACTIVE',
-    });
+    vi.spyOn(flightsApi, 'fetchAirports').mockResolvedValue([
+      { id: 'a1', code: 'THR', cityFa: 'تهران', tz: 'Asia/Tehran' },
+      { id: 'a2', code: 'MHD', cityFa: 'مشهد', tz: 'Asia/Tehran' },
+    ]);
+    vi.spyOn(flightsApi, 'fetchAircraftTypes').mockResolvedValue([
+      { aircraftType: 'Airbus A320', capacity: 180 },
+    ]);
 
     const { default: userEvent } = await import('@testing-library/user-event');
     render(<FlightsPage />);
 
     await userEvent.click(await screen.findByRole('button', { name: '+ افزودن پرواز' }));
-    const dialog = await screen.findByRole('dialog', { name: 'افزودن پرواز جدید' });
-
-    await userEvent.click(within(dialog).getByRole('button', { name: 'افزودن پرواز' }));
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
-      'لطفاً همه فیلدها را تکمیل کنید.',
-    );
-    expect(create).not.toHaveBeenCalled();
-
-    await userEvent.selectOptions(within(dialog).getByLabelText('مبدأ'), 'THR');
-    await userEvent.selectOptions(within(dialog).getByLabelText('مقصد'), 'MHD');
-    await userEvent.type(within(dialog).getByLabelText('شماره پرواز'), 'ep-901');
-    await userEvent.type(within(dialog).getByLabelText('تاریخ (جلالی)'), '1405/04/25');
-    await userEvent.type(within(dialog).getByLabelText('ساعت'), '08:30');
-    await userEvent.type(within(dialog).getByLabelText('ظرفیت (صندلی)'), '180');
-    await userEvent.type(within(dialog).getByLabelText('قیمت بلیط (تومان)'), '3800000');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'افزودن پرواز' }));
-
-    const expectedDeparture = new Date(parseJalaliDateToIso('1405/04/25')!);
-    expectedDeparture.setHours(8, 30, 0, 0);
-    await waitFor(() =>
-      expect(create).toHaveBeenCalledWith({
-        originCode: 'THR',
-        destCode: 'MHD',
-        flightNo: 'EP-901',
-        departureAt: expectedDeparture.toISOString(),
-        capacity: 180,
-        basePriceIrr: 38_000_000, // 3,800,000 toman → rial
-      }),
-    );
-    expect(await screen.findByText('پرواز جدید «تهران ← مشهد» اضافه شد ✓')).toBeInTheDocument();
+    expect(await screen.findByTestId('add-flight-page')).toBeInTheDocument();
+    expect(screen.getByText('افزودن پرواز جدید')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'ثبت پرواز و ارسال قیمت برای تأیید مدیر عامل' }),
+    ).toBeInTheDocument();
   });
 
   it('flight detail modal shows the real channel breakdown and total revenue', async () => {
@@ -215,7 +196,7 @@ describe('FlightsPage', () => {
     mockData();
     const planSpy = vi.spyOn(flightsApi, 'planFlight').mockResolvedValue({
       id: 'fu1',
-      basePriceIrr: 41_000_000,
+      basePriceIrr: '41000000',
       agencySeatsAllocated: 50,
       directSeats: 70,
       proposalPending: false,
@@ -237,11 +218,15 @@ describe('FlightsPage', () => {
     expect(within(dialog).getByLabelText('نرخ نهایی (تومان)')).toHaveValue('4100000');
 
     const agencyInput = within(dialog).getByLabelText(/تخصیص صندلی آژانس/);
-    await userEvent.clear(agencyInput);
-    await userEvent.type(agencyInput, '50');
+    fireEvent.change(agencyInput, { target: { value: '50' } });
     await userEvent.click(within(dialog).getByRole('button', { name: 'ثبت نرخ و تخصیص صندلی' }));
 
-    await waitFor(() => expect(planSpy).toHaveBeenCalledWith('fu1', 41_000_000, 50));
+    await waitFor(() =>
+      expect(planSpy).toHaveBeenCalledWith(
+        'fu1',
+        expect.objectContaining({ priceIrr: 41_000_000, agencySeats: 50 }),
+      ),
+    );
     expect(await screen.findByText(/نرخ و تخصیص صندلی تهران ← دبی ثبت شد ✓/)).toBeInTheDocument();
   });
 
@@ -267,15 +252,19 @@ describe('FlightsPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('Commercial additionally gets the embedded Phase 6 pricing section', async () => {
+  it('Commercial shows cities tab and embedded pricing on active tab', async () => {
     mockRole('COMMERCIAL_MANAGER');
     mockData();
     vi.spyOn(pricingApi, 'fetchCommercialPricing').mockResolvedValue({ flights: [] });
 
     render(<FlightsPage />);
-    expect(
-      await screen.findByText('تعیین قیمت پرواز و ارسال به مدیر عامل'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('تعیین قیمت پرواز و ارسال به مدیر عامل')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'پروازهای آینده' })).not.toBeInTheDocument();
+
+    const { default: userEvent } = await import('@testing-library/user-event');
+    await userEvent.click(screen.getByRole('button', { name: 'شهرهای پروازی' }));
+    expect(await screen.findByText('شهرهای دارای پرواز')).toBeInTheDocument();
+    expect(screen.getByText('تهران')).toBeInTheDocument();
   });
 
   it('Senior does NOT get the pricing section', async () => {

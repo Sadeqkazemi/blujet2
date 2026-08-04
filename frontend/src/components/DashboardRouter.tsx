@@ -1,15 +1,13 @@
 import { useOutletContext } from 'react-router-dom';
 import DashboardPage from '../features/dashboard/DashboardPage';
+import FinanceDashboardPage from '../features/dashboard/FinanceDashboardPage';
+import CommercialDashboardPage from '../features/dashboard/CommercialDashboardPage';
 import ItDashboardPage from '../features/it-manager/ItDashboardPage';
 import SiteAdminDashboardPage from '../features/dashboard/SiteAdminDashboardPage';
 import EmployeeDashboardPage from '../features/dashboard/EmployeeDashboardPage';
 import ComingSoonPage from './ComingSoonPage';
 import { useAuth } from '../hooks/useAuth';
-import type { PanelNavItem } from '../types/panels';
-
-interface PanelShellContext {
-  nav: PanelNavItem[] | null;
-}
+import type { PanelShellContext } from '../types/panel-shell';
 
 /**
  * The shared sales/KPI dashboard only backs the roles reporting.controller
@@ -32,7 +30,9 @@ export default function DashboardRouter() {
   }
 
   if (user?.role === 'IT_MANAGER') return <ItDashboardPage />;
+  if (user?.role === 'FINANCE_MANAGER') return <FinanceDashboardPage />;
   if (user?.role === 'SITE_ADMIN') return <SiteAdminDashboardPage />;
   if (user?.role === 'EMPLOYEE') return <EmployeeDashboardPage />;
+  if (user?.role === 'COMMERCIAL_MANAGER') return <CommercialDashboardPage />;
   return <DashboardPage />;
 }

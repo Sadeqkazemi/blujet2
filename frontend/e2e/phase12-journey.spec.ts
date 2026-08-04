@@ -21,7 +21,7 @@ test('CEO admins journey: list with real status → open detail → block → un
 });
 
 test('Senior changes their own password and reverts it (امنیت و رمز عبور)', async ({ page }) => {
-  await loginAs(page, 'senior.rahimi');
+  await loginAs(page, 'senior');
   await page.getByRole('link', { name: 'امنیت و رمز عبور' }).click();
   await page.waitForURL('**/panel/security');
 
@@ -48,8 +48,8 @@ test('CEO opens لاگ و رویدادها and sees the real audit table with le
   await expect(page.getByRole('cell', { name: /.+/ }).first()).toBeVisible();
 });
 
-test('Chair saves تنظیمات سامانه (toggle round-trip persists across reload)', async ({ page }) => {
-  await loginAs(page, 'chair');
+test('IT saves تنظیمات سامانه (toggle round-trip persists across reload)', async ({ page }) => {
+  await loginAs(page, 'itadmin');
   await page.getByRole('link', { name: 'تنظیمات سامانه' }).click();
   await page.waitForURL('**/panel/settings');
   await expect(page.getByText('اطلاعات شرکت')).toBeVisible();
@@ -72,7 +72,7 @@ test('Chair saves تنظیمات سامانه (toggle round-trip persists across
   await expect(page.getByText('تنظیمات ذخیره شد ✓')).toBeVisible();
 });
 
-test('IT opens دسترسی به پنل‌ها read-only (disabled switches + informational copy)', async ({
+test('IT opens دسترسی به پنل‌ها read-only (card grid + informational copy)', async ({
   page,
 }) => {
   await loginAs(page, 'itadmin');
@@ -80,7 +80,7 @@ test('IT opens دسترسی به پنل‌ها read-only (disabled switches + in
   await page.waitForURL('**/panel/panels');
 
   await expect(page.getByText(/تعیین سطح دسترسی ورود در اختیار مدیر عامل است/)).toBeVisible();
-  const firstSwitch = page.getByRole('switch').first();
-  await expect(firstSwitch).toBeVisible();
-  await expect(firstSwitch).toBeDisabled();
+  await expect(page.getByText('پنل کارمند')).toBeVisible();
+  await expect(page.getByText('پنل مدیر عامل')).toBeVisible();
+  await expect(page.getByRole('switch')).toHaveCount(0);
 });

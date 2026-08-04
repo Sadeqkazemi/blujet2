@@ -1,8 +1,58 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { TypeORMService } from '../../typeorm/typeorm.service';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { In, Repository } from 'typeorm';
+import { SystemSetting } from '../../database/entities/system-setting.entity';
+import { RefundPenaltyRule } from '../../database/entities/refund-penalty-rule.entity';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
+import {
+  DEFAULT_SOCIAL_LINKS,
+  parseSocialLinks,
+  publicSocialLinks,
+} from '../../common/social-links.util';
+import {
+  DEFAULT_APP_DOWNLOAD_LINKS,
+  parseAppDownloadLinks,
+  publicAppDownloadLinks,
+} from '../../common/app-download-links.util';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
+
+const SITE_ADMIN_PATCH_KEYS = new Set([
+  'socialLinks',
+  'supportEmail',
+  'supportPhone',
+  'appDownloadLinks',
+  'homeHeroTitle',
+  'homeHeroSubtitle',
+  'aboutUsText',
+  'contactAddress',
+  'contactOfficeHours',
+  'termsText',
+  ...(
+    [
+      'homeHeroTitle',
+      'homeHeroSubtitle',
+      'aboutUsText',
+      'contactAddress',
+      'contactOfficeHours',
+      'termsText',
+    ] as const
+  ).flatMap((base) => [`${base}_en`, `${base}_ar`] as const),
+]);
+
+type LocaleContentBase =
+  | 'homeHeroTitle'
+  | 'homeHeroSubtitle'
+  | 'aboutUsText'
+  | 'contactAddress'
+  | 'contactOfficeHours'
+  | 'termsText';
+
+export type PublicContentLocale = 'fa' | 'en' | 'ar';
 
 /** Every storable key with its server-side default. Unknown keys are
  * rejected — the settings table never becomes a free-form dumping ground. */
@@ -27,21 +77,56 @@ export const SETTING_DEFAULTS: Record<string, unknown> = {
   homeHeroSubtitle: 'بهترین قیمت بلیط هواپیما را با blujet پیدا کنید',
   aboutUsText: 'blujet یک پلتفرم آنلاین رزرو بلیط هواپیما است.',
   contactAddress: 'تهران، ایران',
+  contactOfficeHours: 'شنبه تا پنج‌شنبه ۸:۰۰ تا ۲۰:۰۰ — جمعه‌ها تعطیل',
   termsText: 'قوانین و مقررات استفاده از خدمات blujet.',
+  homeHeroTitle_en: 'Fly anywhere you want',
+  homeHeroSubtitle_en: 'Find the best flight prices with blujet',
+  aboutUsText_en: 'blujet is an online platform for booking airline tickets.',
+  contactAddress_en: 'Tehran, Iran',
+  contactOfficeHours_en: 'Sat–Thu 8:00–20:00 — closed on Fridays',
+  termsText_en: 'Terms and conditions for using blujet services.',
+  homeHeroTitle_ar: 'سافر إلى أي مكان تريده',
+  homeHeroSubtitle_ar: 'اعثر على أفضل أسعار التذاكر مع blujet',
+  aboutUsText_ar: 'blujet منصة إلكترونية لحجز تذاكر الطيران.',
+  contactAddress_ar: 'طهران، إيران',
+  contactOfficeHours_ar: 'السبت–الخميس ٨:٠٠–٢٠:٠٠ — مغلق يوم الجمعة',
+  termsText_ar: 'الشروط والأحكام لاستخدام خدمات blujet.',
+  // IT Manager / SITE_ADMIN settings tab — footer social links.
+  socialLinks: DEFAULT_SOCIAL_LINKS,
+  // SITE_ADMIN settings tab — app download buttons on the home page.
+  appDownloadLinks: DEFAULT_APP_DOWNLOAD_LINKS,
 };
+
+/** IT_MANAGER's settings screen only ever shows these operational toggles
+ * plus site-services links (design: پنل مدیر IT — «سرویس‌های سایت»).
+ * Payment gateways and brand/company identity are Board Chair-only — the
+ * controller shares the endpoint between both roles, so per-key scoping is
+ * enforced here, server-side, not by hiding UI alone. */
+const IT_MANAGER_WRITABLE_KEYS = new Set([
+  'maintenance',
+  'registration',
+  'charterSale',
+  'apiPublic',
+  'sandbox',
+  'socialLinks',
+  'appDownloadLinks',
+]);
 
 @Injectable()
 export class SettingsService {
   constructor(
-    private readonly typeorm: TypeORMService,
+    @InjectRepository(SystemSetting)
+    private readonly settingRepo: Repository<SystemSetting>,
+    @InjectRepository(RefundPenaltyRule)
+    private readonly refundRuleRepo: Repository<RefundPenaltyRule>,
     private readonly audit: AuditService,
   ) {}
 
   async getAll() {
     const [stored, refundRules] = await Promise.all([
-      this.typeorm.systemSetting.findMany(),
-      this.typeorm.refundPenaltyRule.findMany({
-        orderBy: { minHoursBeforeDeparture: 'desc' },
+      this.settingRepo.find(),
+      this.refundRuleRepo.find({
+        order: { minHoursBeforeDeparture: 'DESC' },
       }),
     ]);
     const byKey = new Map(stored.map((s) => [s.key, s.value]));
@@ -64,6 +149,16 @@ export class SettingsService {
 
   async update(actor: AuthenticatedUser, patch: Record<string, unknown>) {
     const keys = Object.keys(patch);
+    if (actor.role === 'SITE_ADMIN') {
+      const forbidden = keys.filter((k) => !SITE_ADMIN_PATCH_KEYS.has(k));
+      if (forbidden.length > 0) {
+        throw new ForbiddenException({
+          code: ErrorCode.FORBIDDEN,
+          message:
+            'ادمین سایت فقط می‌تواند لینک‌های اجتماعی، تماس پشتیبانی، لینک اپلیکیشن و متن صفحات عمومی را ویرایش کند.',
+        });
+      }
+    }
     const unknown = keys.filter((k) => !(k in SETTING_DEFAULTS));
     if (keys.length === 0 || unknown.length > 0) {
       throw new BadRequestException({
@@ -75,6 +170,28 @@ export class SettingsService {
       });
     }
     for (const key of keys) {
+      if (key === 'socialLinks') {
+        try {
+          patch[key] = parseSocialLinks(patch[key]);
+        } catch {
+          throw new BadRequestException({
+            code: ErrorCode.VALIDATION_FAILED,
+            message: 'فرمت لینک‌های شبکه‌های اجتماعی نامعتبر است.',
+          });
+        }
+        continue;
+      }
+      if (key === 'appDownloadLinks') {
+        try {
+          patch[key] = parseAppDownloadLinks(patch[key]);
+        } catch {
+          throw new BadRequestException({
+            code: ErrorCode.VALIDATION_FAILED,
+            message: 'فرمت لینک‌های دانلود اپلیکیشن نامعتبر است.',
+          });
+        }
+        continue;
+      }
       const expected = typeof SETTING_DEFAULTS[key];
       if (typeof patch[key] !== expected) {
         throw new BadRequestException({
@@ -83,17 +200,37 @@ export class SettingsService {
         });
       }
     }
+    if (actor.role === 'IT_MANAGER') {
+      const outOfScope = keys.filter((k) => !IT_MANAGER_WRITABLE_KEYS.has(k));
+      if (outOfScope.length > 0) {
+        throw new ForbiddenException({
+          code: ErrorCode.FORBIDDEN,
+          message: `کلید (${outOfScope.join('، ')}) در اختیار مدیر IT نیست.`,
+        });
+      }
+    }
 
     for (const key of keys) {
-      await this.typeorm.systemSetting.upsert({
-        where: { key },
-        update: { value: patch[key] as object, updatedById: actor.id },
-        create: {
-          key,
-          value: patch[key] as object,
-          updatedById: actor.id,
-        },
-      });
+      const existing = await this.settingRepo
+        .createQueryBuilder('s')
+        .where('s.key = :key', { key })
+        .getOne();
+      const value = patch[key] as SystemSetting['value'];
+      if (existing) {
+        existing.value = value;
+        existing.updatedById = actor.id;
+        existing.updatedAt = new Date();
+        await this.settingRepo.save(existing);
+      } else {
+        await this.settingRepo.save(
+          this.settingRepo.create({
+            key,
+            value,
+            updatedById: actor.id,
+            updatedAt: new Date(),
+          }),
+        );
+      }
     }
 
     await this.audit.record({
@@ -127,8 +264,8 @@ export class SettingsService {
       }
     }
 
-    const existing = await this.typeorm.refundPenaltyRule.findMany({
-      where: { id: { in: rules.map((r) => r.id) } },
+    const existing = await this.refundRuleRepo.find({
+      where: { id: In(rules.map((r) => r.id)) },
     });
     if (existing.length !== rules.length) {
       throw new BadRequestException({
@@ -138,10 +275,10 @@ export class SettingsService {
     }
 
     for (const rule of rules) {
-      await this.typeorm.refundPenaltyRule.update({
-        where: { id: rule.id },
-        data: { penaltyPct: rule.penaltyPct },
-      });
+      await this.refundRuleRepo.update(
+        { id: rule.id },
+        { penaltyPct: rule.penaltyPct },
+      );
     }
 
     await this.audit.record({
@@ -154,5 +291,51 @@ export class SettingsService {
     });
 
     return this.getAll();
+  }
+
+  /** Public footer — enabled social links only, no auth required. */
+  async getPublicSocialLinks() {
+    const all = await this.getAll();
+    const links = parseSocialLinks(all.settings.socialLinks);
+    return { links: publicSocialLinks(links) };
+  }
+
+  /** Public home page — configured app store links with non-empty URLs. */
+  async getPublicAppLinks() {
+    const all = await this.getAll();
+    const links = parseAppDownloadLinks(all.settings.appDownloadLinks);
+    return { links: publicAppDownloadLinks(links) };
+  }
+
+  /** Public site chrome — support phone and email shown on contact/home. */
+  async getPublicSupportContact() {
+    const all = await this.getAll();
+    return {
+      phone: String(all.settings.supportPhone ?? SETTING_DEFAULTS.supportPhone),
+      email: String(all.settings.supportEmail ?? SETTING_DEFAULTS.supportEmail),
+    };
+  }
+
+  /** Public static page copy edited from the SITE_ADMIN media tab. */
+  async getPublicSiteContent(locale: PublicContentLocale = 'fa') {
+    const all = await this.getAll();
+    const pick = (base: LocaleContentBase) => {
+      if (locale !== 'fa') {
+        const localized = all.settings[`${base}_${locale}`];
+        if (typeof localized === 'string' && localized.trim()) {
+          return localized;
+        }
+      }
+      const fallback = all.settings[base] ?? SETTING_DEFAULTS[base];
+      return typeof fallback === 'string' ? fallback : String(fallback);
+    };
+    return {
+      homeHeroTitle: pick('homeHeroTitle'),
+      homeHeroSubtitle: pick('homeHeroSubtitle'),
+      aboutUsText: pick('aboutUsText'),
+      contactAddress: pick('contactAddress'),
+      contactOfficeHours: pick('contactOfficeHours'),
+      termsText: pick('termsText'),
+    };
   }
 }

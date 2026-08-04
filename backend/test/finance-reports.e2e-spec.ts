@@ -2,18 +2,23 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import * as crypto from 'node:crypto';
-import { TypeORMService } from '../src/typeorm/typeorm.service';
+import { DataSource, In } from 'typeorm';
+import { FlightInstance } from '../src/database/entities/flight-instance.entity';
+import { Booking } from '../src/database/entities/booking.entity';
+import { Passenger } from '../src/database/entities/passenger.entity';
+import { User } from '../src/database/entities/user.entity';
+import { AuditLog } from '../src/database/entities/audit-log.entity';
 import { encryptPii, hashPii } from '../src/common/pii-crypto';
 import { loginAs } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
 describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () => {
   let app: INestApplication<App>;
-  let typeorm: TypeORMService;
+  let dataSource: DataSource;
 
   beforeEach(async () => {
     app = await createTestApp();
-    typeorm = app.get(TypeORMService);
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
@@ -27,7 +32,7 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
   // ── recent transactions ────────────────────────────────────────────────
 
   it('GET /reporting/recent-transactions: finance manager gets real ledger rows with party labels; other roles 403', async () => {
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const res = await request(app.getHttpServer())
       .get('/reporting/recent-transactions')
       .set('Authorization', auth(finance.accessToken));
@@ -38,11 +43,97 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
     expect(row).toHaveProperty('titleFa');
     expect(row).toHaveProperty('party');
     expect(row).toHaveProperty('signedAmountIrr');
+    expect(row).toHaveProperty('statusFa');
+    expect(row).toHaveProperty('statusTone');
 
     const ceo = await loginAs(app, 'ceo');
     const forbidden = await request(app.getHttpServer())
       .get('/reporting/recent-transactions')
       .set('Authorization', auth(ceo.accessToken));
+    expect(forbidden.status).toBe(403);
+  });
+
+  it('GET /reporting/kpis: returns trend percentages alongside KPI values', async () => {
+    const finance = await loginAs(app, 'finance');
+    const res = await request(app.getHttpServer())
+      .get('/reporting/kpis?granularity=q6')
+      .set('Authorization', auth(finance.accessToken));
+    expect(res.status).toBe(200);
+    const { trends, revenueIrr } = res.body.data as {
+      revenueIrr: string;
+      trends: {
+        revenuePct: number;
+        profitPct: number;
+        operatingCostPct: number;
+        agencyDebtPct: number;
+      };
+    };
+    expect(Number(revenueIrr)).toBeGreaterThan(0);
+    expect(trends).toHaveProperty('revenuePct');
+    expect(trends).toHaveProperty('profitPct');
+    expect(trends).toHaveProperty('operatingCostPct');
+    expect(trends).toHaveProperty('agencyDebtPct');
+  });
+
+  it('GET /reporting/finance-dashboard-stats: executive + finance roles get real dashboard cards; others 403', async () => {
+    const finance = await loginAs(app, 'finance');
+    const res = await request(app.getHttpServer())
+      .get('/reporting/finance-dashboard-stats')
+      .set('Authorization', auth(finance.accessToken));
+    expect(res.status).toBe(200);
+    const data = res.body.data as {
+      activeAgencies: number;
+      passengersThisMonth: number;
+      ticketsSoldThisMonth: number;
+      revenueThisMonthIrr: string;
+      activeAgenciesTrendPct: number;
+    };
+    expect(data.activeAgencies).toBeGreaterThan(0);
+    expect(data.passengersThisMonth).toBeGreaterThanOrEqual(0);
+    expect(data.ticketsSoldThisMonth).toBeGreaterThanOrEqual(0);
+    expect(Number(data.revenueThisMonthIrr)).toBeGreaterThanOrEqual(0);
+    expect(typeof data.activeAgenciesTrendPct).toBe('number');
+
+    const ceo = await loginAs(app, 'ceo');
+    const ceoRes = await request(app.getHttpServer())
+      .get('/reporting/finance-dashboard-stats')
+      .set('Authorization', auth(ceo.accessToken));
+    expect(ceoRes.status).toBe(200);
+    expect(ceoRes.body.data.activeAgencies).toBeGreaterThan(0);
+
+    const commercial = await loginAs(app, 'comm');
+    const forbidden = await request(app.getHttpServer())
+      .get('/reporting/finance-dashboard-stats')
+      .set('Authorization', auth(commercial.accessToken));
+    expect(forbidden.status).toBe(403);
+  });
+
+  it('GET /reporting/site-admin-overview: SITE_ADMIN gets KPI row; others 403', async () => {
+    const siteAdmin = await loginAs(app, 'site.admin');
+    const res = await request(app.getHttpServer())
+      .get('/reporting/site-admin-overview')
+      .set('Authorization', auth(siteAdmin.accessToken));
+    expect(res.status).toBe(200);
+    const data = res.body.data as {
+      activeAgencies: number;
+      passengersThisMonth: number;
+      ticketsSoldThisMonth: number;
+      pendingActionCount: number;
+      agenciesTrendPct: number | null;
+      passengersTrendPct: number | null;
+      ticketsTrendPct: number | null;
+    };
+    expect(data.activeAgencies).toBeGreaterThan(0);
+    expect(data.passengersThisMonth).toBeGreaterThanOrEqual(0);
+    expect(data.ticketsSoldThisMonth).toBeGreaterThanOrEqual(0);
+    expect(data.pendingActionCount).toBeGreaterThanOrEqual(0);
+    expect(data).toHaveProperty('passengersTrendPct');
+    expect(data).toHaveProperty('ticketsTrendPct');
+
+    const finance = await loginAs(app, 'finance');
+    const forbidden = await request(app.getHttpServer())
+      .get('/reporting/site-admin-overview')
+      .set('Authorization', auth(finance.accessToken));
     expect(forbidden.status).toBe(403);
   });
 
@@ -54,19 +145,24 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
       .get('/reporting/revenue-mix?granularity=year')
       .set('Authorization', auth(ceo.accessToken));
     expect(res.status).toBe(200);
+    // Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON)
+    // — parsed here for a display-only sum; individual channel sums here are
+    // far below 2^53 so Number() loses no precision.
     const { totalIrr, channels } = res.body.data as {
-      totalIrr: number;
-      channels: { channel: string; amountIrr: number; pct: number }[];
+      totalIrr: string;
+      channels: { channel: string; amountIrr: string; pct: number }[];
     };
     expect(channels).toHaveLength(3);
-    expect(channels.reduce((s, c) => s + c.amountIrr, 0)).toBe(totalIrr);
-    expect(totalIrr).toBeGreaterThan(0);
+    expect(channels.reduce((s, c) => s + Number(c.amountIrr), 0)).toBe(
+      Number(totalIrr),
+    );
+    expect(Number(totalIrr)).toBeGreaterThan(0);
   });
 
   // ── agency settlements ─────────────────────────────────────────────────
 
   it('GET /reporting/agency-settlements: per-agency paid ratio + status from real invoices; finance only', async () => {
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const res = await request(app.getHttpServer())
       .get('/reporting/agency-settlements')
       .set('Authorization', auth(finance.accessToken));
@@ -78,16 +174,16 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
         status: string;
         overdueDays: number;
       }[];
-      outstandingIrr: number;
+      outstandingIrr: string;
     };
     expect(rows.length).toBeGreaterThan(0);
     // Seed: the silver agency has an OVERDUE invoice (due 2026-06-05).
     const overdue = rows.find((r) => r.status === 'OVERDUE');
     expect(overdue).toBeDefined();
     expect(overdue!.overdueDays).toBeGreaterThan(0);
-    expect(outstandingIrr).toBeGreaterThan(0);
+    expect(Number(outstandingIrr)).toBeGreaterThan(0);
 
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const commercial = await loginAs(app, 'comm');
     const forbidden = await request(app.getHttpServer())
       .get('/reporting/agency-settlements')
       .set('Authorization', auth(commercial.accessToken));
@@ -95,7 +191,7 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
   });
 
   it('FINANCE_MANAGER can now trigger the Phase 3 invoice remind (design: settlements row action)', async () => {
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const settleRes = await request(app.getHttpServer())
       .get('/reporting/agency-settlements')
       .set('Authorization', auth(finance.accessToken));
@@ -123,30 +219,35 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
     // own throwaway flights/instances for unrelated aircraft types with no
     // matching AircraftSeatMap row, so an unfiltered findFirst() can pick
     // one of those and make `cabin` resolve to null non-deterministically.
-    const instance = await typeorm.flightInstance.findFirstOrThrow({
-      where: { flight: { aircraftType: 'Airbus A320' } },
-    });
+    const instance = await dataSource
+      .getRepository(FlightInstance)
+      .createQueryBuilder('fi')
+      .innerJoin('fi.flight', 'f')
+      .where('f.aircraftType = :type', { type: 'Airbus A320' })
+      .getOneOrFail();
     const nationalId = '0499370899'; // valid checksum test ID
-    const booking = await typeorm.booking.create({
-      data: {
+    const bookingRepo = dataSource.getRepository(Booking);
+    const booking = await bookingRepo.save(
+      bookingRepo.create({
         pnr: `PR${suffix.toUpperCase()}`,
         flightInstanceId: instance.id,
         channel: 'SYSTEM',
         status: 'TICKETED',
-        priceIrr: 42_000_000,
-      },
-    });
-    await typeorm.passenger.create({
-      data: {
+        priceIrr: 42_000_000n,
+      }),
+    );
+    const passengerRepo = dataSource.getRepository(Passenger);
+    await passengerRepo.save(
+      passengerRepo.create({
         bookingId: booking.id,
         fullName: `مسافر گزارش ${suffix}`,
         nationalIdEnc: encryptPii(nationalId),
         nationalIdHash: hashPii(nationalId),
         seatCode: '4C',
-      },
-    });
+      }),
+    );
 
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const res = await request(app.getHttpServer())
       .get(
         `/passenger-reports/search?q=${encodeURIComponent(`مسافر گزارش ${suffix}`)}`,
@@ -167,30 +268,35 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
     // own throwaway flights/instances for unrelated aircraft types with no
     // matching AircraftSeatMap row, so an unfiltered findFirst() can pick
     // one of those and make `cabin` resolve to null non-deterministically.
-    const instance = await typeorm.flightInstance.findFirstOrThrow({
-      where: { flight: { aircraftType: 'Airbus A320' } },
-    });
+    const instance = await dataSource
+      .getRepository(FlightInstance)
+      .createQueryBuilder('fi')
+      .innerJoin('fi.flight', 'f')
+      .where('f.aircraftType = :type', { type: 'Airbus A320' })
+      .getOneOrFail();
     const nationalId = '1287960649';
-    const booking = await typeorm.booking.create({
-      data: {
+    const bookingRepo = dataSource.getRepository(Booking);
+    const booking = await bookingRepo.save(
+      bookingRepo.create({
         pnr: `PN${suffix.toUpperCase()}`,
         flightInstanceId: instance.id,
         channel: 'SYSTEM',
         status: 'TICKETED',
-        priceIrr: 38_000_000,
-      },
-    });
-    await typeorm.passenger.create({
-      data: {
+        priceIrr: 38_000_000n,
+      }),
+    );
+    const passengerRepo = dataSource.getRepository(Passenger);
+    await passengerRepo.save(
+      passengerRepo.create({
         bookingId: booking.id,
         fullName: `مسافر کدملی ${suffix}`,
         nationalIdEnc: encryptPii(nationalId),
         nationalIdHash: hashPii(nationalId),
         seatCode: '12B',
-      },
-    });
+      }),
+    );
 
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const res = await request(app.getHttpServer())
       .get(`/passenger-reports/search?q=${nationalId}`)
       .set('Authorization', auth(finance.accessToken));
@@ -212,20 +318,21 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
 
   it('GET /staff-reports: finance manager sees only finance-dept employees and their real audit feed', async () => {
     // Give the seeded finance employee a real audited action.
-    const finEmployee = await typeorm.user.findFirstOrThrow({
-      where: { role: 'EMPLOYEE', dept: 'finance' },
-    });
-    await typeorm.auditLog.create({
-      data: {
+    const finEmployee = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ role: 'EMPLOYEE', dept: 'finance' });
+    const auditRepo = dataSource.getRepository(AuditLog);
+    await auditRepo.save(
+      auditRepo.create({
         actorId: finEmployee.id,
         actorRole: 'EMPLOYEE',
         category: 'FINANCE',
         action: 'ثبت تسویه آزمایشی',
         detail: 'اقدام آزمایشی کارمند مالی برای تست گزارش کارمندان',
-      },
-    });
+      }),
+    );
 
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const res = await request(app.getHttpServer())
       .get('/staff-reports')
       .set('Authorization', auth(finance.accessToken));
@@ -238,8 +345,8 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
     expect(reports.some((r) => r.staffId === finEmployee.id)).toBe(true);
 
     // Dept isolation: no commercial/sales-dept employee ever appears.
-    const commEmployees = await typeorm.user.findMany({
-      where: { role: 'EMPLOYEE', dept: { in: ['commercial', 'sales'] } },
+    const commEmployees = await dataSource.getRepository(User).find({
+      where: { role: 'EMPLOYEE', dept: In(['commercial', 'sales']) },
       select: { id: true },
     });
     for (const c of commEmployees) {
@@ -249,11 +356,11 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
   });
 
   it('GET /staff-reports?staffId= filters to one employee; a foreign-dept staffId yields an empty feed', async () => {
-    const commEmployee = await typeorm.user.findFirstOrThrow({
-      where: { role: 'EMPLOYEE', dept: { in: ['commercial', 'sales'] } },
-    });
+    const commEmployee = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ role: 'EMPLOYEE', dept: In(['commercial', 'sales']) });
 
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const res = await request(app.getHttpServer())
       .get(`/staff-reports?staffId=${commEmployee.id}`)
       .set('Authorization', auth(finance.accessToken));
@@ -262,7 +369,7 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
   });
 
   it('staff reports: roles without the tab (SENIOR_MANAGER) get 403', async () => {
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const res = await request(app.getHttpServer())
       .get('/staff-reports')
       .set('Authorization', auth(senior.accessToken));

@@ -1,10 +1,10 @@
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import TicketPage from './TicketPage';
 import * as publicSiteApi from '../../api/publicSite';
 import * as useAuthModule from '../../hooks/useAuth';
+import * as useLocaleModule from '../../hooks/useLocale';
 import type { BookingDetail } from '../../types/public-site';
 
 const TICKETED: BookingDetail = {
@@ -12,7 +12,7 @@ const TICKETED: BookingDetail = {
   pnr: 'BJABC123',
   status: 'TICKETED',
   cabin: 'ECONOMY',
-  priceIrr: 380_000_000,
+  priceIrr: '380000000',
   holdExpiresAt: null,
   flightInstanceId: 'fi-1',
   flightNo: 'BJ-100',
@@ -24,7 +24,7 @@ const TICKETED: BookingDetail = {
   passengers: [{ fullName: 'علی رضایی', seatCode: '2A' }],
 };
 
-function renderPage() {
+function renderPage(locale: 'fa' | 'en' | 'ar' = 'fa') {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status: 'unauthenticated',
     user: null,
@@ -33,6 +33,7 @@ function renderPage() {
     agencyLogin: vi.fn(),
     signOut: vi.fn(),
   });
+  vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale, setLocale: vi.fn() });
   return render(
     <MemoryRouter initialEntries={['/ticket/BJABC123']}>
       <Routes>
@@ -48,28 +49,16 @@ describe('TicketPage', () => {
     renderPage();
 
     expect(await screen.findByText('BJABC123')).toBeInTheDocument();
+    expect(screen.getByTestId('ticket-barcode')).toBeInTheDocument();
     expect(screen.getByText('علی رضایی')).toBeInTheDocument();
-    expect(screen.getByTestId('open-refund-form')).toBeInTheDocument();
+    expect(screen.queryByTestId('open-refund-form')).not.toBeInTheDocument();
   });
 
-  it('submits a refund request and shows the penalty breakdown', async () => {
+  it('renders English strings when locale is en', async () => {
     vi.spyOn(publicSiteApi, 'fetchBookingByPnr').mockResolvedValue(TICKETED);
-    vi.spyOn(publicSiteApi, 'submitRefund').mockResolvedValue({
-      id: 'r1',
-      bookingId: 'b1',
-      status: 'SUBMITTED',
-      penaltyPct: 30,
-      penaltyAmountIrr: 114_000_000,
-      refundableIrr: 266_000_000,
-      totalPaidIrr: 380_000_000,
-      createdAt: new Date().toISOString(),
-    });
-    renderPage();
+    renderPage('en');
 
-    await userEvent.click(await screen.findByTestId('open-refund-form'));
-    await userEvent.type(screen.getByTestId('refund-iban'), 'IR820170000000332211009900');
-    await userEvent.click(screen.getByTestId('submit-refund'));
-
-    expect(await screen.findByText(/درخواست استرداد ثبت شد/)).toBeInTheDocument();
+    expect(await screen.findByText('E-ticket')).toBeInTheDocument();
+    expect(screen.queryByText('Request ticket refund')).not.toBeInTheDocument();
   });
 });

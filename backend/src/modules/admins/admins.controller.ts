@@ -27,7 +27,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PanelAccessGuard } from '../panels/panel-access.guard';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import type { Role } from '../../../generated/typeorm/enums';
+import type { Role } from '../../database/enums';
 
 const CREATABLE_ROLES = [
   'SENIOR_MANAGER',

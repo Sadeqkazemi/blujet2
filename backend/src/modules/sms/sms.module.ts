@@ -1,26 +1,23 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { SmsService } from './sms.service';
-import {
-  SMS_PROVIDER,
-  type SmsProvider,
-} from '../../common/sms/sms-provider.interface';
+import { SMS_PROVIDER } from '../../common/sms/sms-provider.interface';
 import { MockSmsProvider } from '../../common/sms/mock-sms.provider';
 import { KavenegarSmsProvider } from '../../common/sms/kavenegar-sms.provider';
+import { SmsLog } from '../../database/entities/sms-log.entity';
+import { ExternalServiceConfig } from '../../database/entities/external-service-config.entity';
 
-// SMS_PROVIDER=kavenegar + KAVENEGAR_API_KEY switches to the real vendor
-// (see docs/DB_SCHEMA.md Phase 14 / ext_kavenegar); anything else — the
-// dev/test default — keeps using MockSmsProvider, so the existing test
-// suite never makes a real network call.
+// KavenegarSmsProvider checks the ExternalServiceConfig(key:"ext_kavenegar")
+// row (IT Manager panel, Phase 28) on every send and falls back to
+// MockSmsProvider whenever it's disabled or has no key configured — see
+// its own doc comment. The seed row ships with no key, so the existing
+// test suite never makes a real network call without any env var needed.
 @Module({
+  imports: [TypeOrmModule.forFeature([SmsLog, ExternalServiceConfig])],
   providers: [
     SmsService,
-    {
-      provide: SMS_PROVIDER,
-      useFactory: (): SmsProvider =>
-        process.env.SMS_PROVIDER === 'kavenegar'
-          ? new KavenegarSmsProvider()
-          : new MockSmsProvider(),
-    },
+    MockSmsProvider,
+    { provide: SMS_PROVIDER, useClass: KavenegarSmsProvider },
   ],
   exports: [SmsService],
 })

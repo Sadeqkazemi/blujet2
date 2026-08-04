@@ -3,31 +3,49 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { TypeORMService } from '../../typeorm/typeorm.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { In, Repository } from 'typeorm';
+import { User } from '../../database/entities/user.entity';
+import { EmployeePermission } from '../../database/entities/employee-permission.entity';
+import { PanelAccessFlag } from '../../database/entities/panel-access-flag.entity';
+import { findOneOrThrow } from '../../database/utils/find-one-or-throw';
 import { AuditService } from '../audit/audit.service';
 import {
   ALL_PANEL_KEYS,
   EMPLOYEE_SECTION_NAV,
   PANEL_ACCESS_TOGGLE_RIGHTS,
   PANEL_NAV,
+  SITE_ADMIN_SIDEBAR_DENYLIST,
   PanelNavItem,
 } from './panel-nav.config';
+import { PERMISSION_CATALOG } from '../it-manager/permission-catalog';
 import { AuthenticatedUser } from '../../common/types/authenticated-user';
 import { ErrorCode } from '../../common/errors';
 
 @Injectable()
 export class PanelsService {
   constructor(
-    private readonly typeorm: TypeORMService,
+    @InjectRepository(User) private readonly userRepo: Repository<User>,
+    @InjectRepository(EmployeePermission)
+    private readonly employeePermissionRepo: Repository<EmployeePermission>,
+    @InjectRepository(PanelAccessFlag)
+    private readonly panelAccessFlagRepo: Repository<PanelAccessFlag>,
     private readonly audit: AuditService,
   ) {}
 
   async getNav(user: AuthenticatedUser): Promise<PanelNavItem[]> {
-    if (user.role !== 'EMPLOYEE') return PANEL_NAV[user.role] ?? [];
+    if (user.role !== 'EMPLOYEE') {
+      const items = PANEL_NAV[user.role] ?? [];
+      if (user.role === 'SITE_ADMIN') {
+        return items.filter((item) => !SITE_ADMIN_SIDEBAR_DENYLIST.has(item.key));
+      }
+      return items;
+    }
 
-    const grants = await this.typeorm.employeePermission.findMany({
+    const grants = await this.employeePermissionRepo.find({
       where: { employeeId: user.id },
-      select: { permission: { select: { key: true } } },
+      relations: { permission: true },
+      select: { permission: { key: true } },
     });
     const grantedKeys = new Set(grants.map((g) => g.permission.key));
 
@@ -55,6 +73,77 @@ export class PanelsService {
     return items;
   }
 
+  /** Dashboard context for پنل کارمند.dc.html — dept label + granted perm chips. */
+  async getEmployeeContext(user: AuthenticatedUser) {
+    if (user.role !== 'EMPLOYEE') {
+      throw new ForbiddenException({
+        code: ErrorCode.FORBIDDEN,
+        message: 'این endpoint فقط برای کارمند است.',
+      });
+    }
+
+    const employee = await findOneOrThrow(this.userRepo, {
+      where: { id: user.id },
+      select: { dept: true, rank: true },
+    });
+
+    const deptLabels: Record<string, string> = {
+      commercial: 'بازرگانی',
+      sales: 'فروش',
+      finance: 'مالی',
+      it: 'فناوری اطلاعات',
+      site: 'پشتیبانی سایت',
+    };
+
+    const grants = await this.employeePermissionRepo.find({
+      where: { employeeId: user.id },
+      relations: { permission: true },
+      select: {
+        permission: { key: true, labelFa: true, sectionKey: true },
+      },
+    });
+
+    const sectionLabels: Record<string, string> = {
+      dashboard: 'داشبورد',
+      cartable: 'کارتابل',
+      referrals: 'ارجاعات',
+    };
+    for (const [sectionKey, section] of Object.entries(EMPLOYEE_SECTION_NAV)) {
+      sectionLabels[sectionKey] = section.labelFa;
+    }
+    for (const entry of PERMISSION_CATALOG) {
+      if (!sectionLabels[entry.sectionKey]) {
+        sectionLabels[entry.sectionKey] = entry.sectionLabelFa;
+      }
+    }
+
+    const grantedSectionKeys = new Set<string>();
+    for (const [sectionKey, section] of Object.entries(EMPLOYEE_SECTION_NAV)) {
+      if (
+        section.wiredKeys.some((key) =>
+          grants.some((g) => g.permission.key === key),
+        )
+      ) {
+        grantedSectionKeys.add(sectionKey);
+      }
+    }
+
+    const permissionLabels = [
+      'داشبورد',
+      ...Array.from(grantedSectionKeys)
+        .map((key) => sectionLabels[key] ?? key)
+        .filter((label) => label !== 'داشبورد'),
+      'ارجاعات',
+    ];
+
+    return {
+      dept: employee.dept,
+      deptLabelFa: deptLabels[employee.dept ?? ''] ?? employee.dept ?? '—',
+      rank: employee.rank,
+      permissionLabelsFa: permissionLabels,
+    };
+  }
+
   async getAccessFlags(role: AuthenticatedUser['role']) {
     // Phase 12: IT_MANAGER has no toggle rights but reads the full flag set
     // for its informational tab; the PATCH route never allows it to write.
@@ -62,8 +151,8 @@ export class PanelsService {
       role === 'IT_MANAGER'
         ? (PANEL_ACCESS_TOGGLE_RIGHTS.SENIOR_MANAGER ?? [])
         : (PANEL_ACCESS_TOGGLE_RIGHTS[role] ?? []);
-    const rows = await this.typeorm.panelAccessFlag.findMany({
-      where: { panelKey: { in: togglable } },
+    const rows = await this.panelAccessFlagRepo.find({
+      where: { panelKey: In(togglable) },
     });
     const byKey = new Map(rows.map((r) => [r.panelKey, r]));
 
@@ -87,11 +176,12 @@ export class PanelsService {
       });
     }
 
-    const flag = await this.typeorm.panelAccessFlag.upsert({
-      where: { panelKey },
-      update: { enabled, updatedById: actor.id },
-      create: { panelKey, enabled, updatedById: actor.id },
-    });
+    const updatedAt = new Date();
+    await this.panelAccessFlagRepo.upsert(
+      { panelKey, enabled, updatedById: actor.id, updatedAt },
+      ['panelKey'],
+    );
+    const flag = await this.panelAccessFlagRepo.findOneByOrFail({ panelKey });
 
     await this.audit.record({
       actorId: actor.id,
@@ -116,9 +206,7 @@ export class PanelsService {
     const key = selfKeyByRole[role];
     if (!key) return;
 
-    const flag = await this.typeorm.panelAccessFlag.findUnique({
-      where: { panelKey: key },
-    });
+    const flag = await this.panelAccessFlagRepo.findOneBy({ panelKey: key });
     if (flag && !flag.enabled) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,

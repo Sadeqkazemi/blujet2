@@ -1,9 +1,15 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsInt, Min } from 'class-validator';
+import {
+  IsIrrAmount,
+  MinIrrAmount,
+  TransformToIrr,
+} from '../../../common/dto/irr.decorator';
+import type { Irr } from '../../../common/money';
 
 export class TopupWalletDto {
-  @ApiProperty({ example: 5_000_000 })
-  @IsInt()
-  @Min(10_000)
-  amountIrr: number;
+  @ApiProperty({ example: '5000000', type: String })
+  @IsIrrAmount()
+  @MinIrrAmount(10_000n)
+  @TransformToIrr()
+  amountIrr: Irr;
 }

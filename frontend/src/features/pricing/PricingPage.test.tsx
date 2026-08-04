@@ -5,16 +5,19 @@ import PricingPage from './PricingPage';
 import * as pricingApi from '../../api/pricing';
 import * as authApi from '../../api/auth';
 import * as useAuthModule from '../../hooks/useAuth';
+import { mockAuthUserWithRole } from '../../test/mockAuthUser';
 import type { CeoPricingResult, CommercialPricingResult, PricingProposal } from '../../types/pricing';
 import type { Role } from '../../types/auth';
 
+// Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON on
+// the backend — a JS number can't safely hold IRR amounts above 2^53).
 const PROPOSAL: PricingProposal = {
   id: 'pp1',
   flightInstanceId: 'fi1',
-  basePriceIrr: 38_000_000,
-  competitorPriceIrr: 39_000_000,
-  proposedPriceIrr: 38_500_000,
-  legalRateIrr: 42_000_000,
+  basePriceIrr: '38000000',
+  competitorPriceIrr: '39000000',
+  proposedPriceIrr: '38500000',
+  legalRateIrr: '42000000',
   note: 'قیمت کمی پایین‌تر از رقبا برای پرکردن صندلی‌های آزاد.',
   status: 'PENDING',
   registeredPriceIrr: null,
@@ -51,7 +54,7 @@ const REGISTERED: PricingProposal = {
   ...PROPOSAL,
   id: 'pp3',
   status: 'REGISTERED',
-  registeredPriceIrr: 38_500_000,
+  registeredPriceIrr: '38500000',
   approvedBy: { id: 'u2', fullName: 'محمد رحیمی', role: 'CEO' },
   approvedAt: '2026-07-15T00:00:00.000Z',
 };
@@ -65,6 +68,7 @@ const COMMERCIAL_DATA: CommercialPricingResult = {
       departureAt: '2026-07-27T08:30:00.000Z',
       capacity: 180,
       charterSeats: 60,
+      basePriceIrr: '38000000',
       flight: { flightNo: 'EP-821', route: { originCode: 'THR', destCode: 'DXB' } },
       pricing: PROPOSAL,
     },
@@ -73,6 +77,8 @@ const COMMERCIAL_DATA: CommercialPricingResult = {
       departureAt: '2026-08-06T08:30:00.000Z',
       capacity: 180,
       charterSeats: 60,
+      // No base — modal opens empty so validation can be exercised.
+      basePriceIrr: null,
       flight: { flightNo: 'EP-822', route: { originCode: 'THR', destCode: 'IST' } },
       pricing: null,
     },
@@ -81,6 +87,7 @@ const COMMERCIAL_DATA: CommercialPricingResult = {
       departureAt: '2026-08-16T08:30:00.000Z',
       capacity: 180,
       charterSeats: 60,
+      basePriceIrr: '38000000',
       flight: { flightNo: 'EP-823', route: { originCode: 'MHD', destCode: 'KIH' } },
       pricing: REGISTERED,
     },
@@ -90,7 +97,7 @@ const COMMERCIAL_DATA: CommercialPricingResult = {
 function mockRole(role: Role) {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status: 'authenticated',
-    user: { id: 'me', fullName: 'کاربر تست', role },
+    user: mockAuthUserWithRole(role, { id: 'me' }),
     requestLogin: vi.fn(),
     confirmTwoFactor: vi.fn(),
     agencyLogin: vi.fn(),
@@ -126,6 +133,17 @@ describe('PricingPage', () => {
     // Registered list with the locked badge.
     expect(screen.getByText('قیمت‌های ثبت‌شده')).toBeInTheDocument();
     expect(screen.getByText('قفل‌شده')).toBeInTheDocument();
+  });
+
+  it('CEO empty pending list shows the design empty state', async () => {
+    mockRole('CEO');
+    vi.spyOn(pricingApi, 'fetchCeoPricing').mockResolvedValue({ pending: [], registered: [] });
+
+    renderPage();
+
+    expect(await screen.findByText('در انتظار تأیید مدیر عامل')).toBeInTheDocument();
+    expect(screen.getByText('اطلاعاتی یافت نشد')).toBeInTheDocument();
+    expect(screen.queryByText('قیمت‌های ثبت‌شده')).not.toBeInTheDocument();
   });
 
   it('CEO registering with AI calls the API with source=AI', async () => {
@@ -176,6 +194,11 @@ describe('PricingPage', () => {
     expect(screen.getByRole('button', { name: 'ویرایش پیشنهاد' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'تعیین قیمت' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'قفل‌شده' })).toBeDisabled();
+    // Subtitle shows base + competitor for rows that already have a proposal.
+    expect(screen.getAllByText(/پایه/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/رقبا/).length).toBeGreaterThan(0);
+    // Proposed rate column shows the pending proposal amount (rial→toman).
+    expect(screen.getAllByText('۳٬۸۵۰٬۰۰۰ تومان').length).toBeGreaterThan(0);
   });
 
   it('Commercial set-price modal validates the proposed price and submits toman→rial', async () => {
@@ -202,5 +225,36 @@ describe('PricingPage', () => {
       }),
     );
     expect(await screen.findByText('نرخ پیشنهادی برای تأیید به مدیر عامل ارسال شد ✓')).toBeInTheDocument();
+  });
+
+  it('Commercial pricing list paginates at 10 rows per page', async () => {
+    mockRole('COMMERCIAL_MANAGER');
+    const many: CommercialPricingResult = {
+      flights: Array.from({ length: 12 }, (_, i) => ({
+        id: `fi-page-${i + 1}`,
+        departureAt: '2026-08-06T08:30:00.000Z',
+        capacity: 180,
+        charterSeats: 60,
+        basePriceIrr: '38000000',
+        flight: {
+          flightNo: `EP-${800 + i}`,
+          route: { originCode: 'THR', destCode: 'DXB' },
+        },
+        pricing: null,
+      })),
+    };
+    vi.spyOn(pricingApi, 'fetchCommercialPricing').mockResolvedValue(many);
+
+    const { default: userEvent } = await import('@testing-library/user-event');
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('button', { name: 'تعیین قیمت' })).toHaveLength(10);
+    });
+    expect(screen.getByTestId('pagination')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'بعدی' }));
+    await waitFor(() => {
+      expect(screen.getAllByRole('button', { name: 'تعیین قیمت' })).toHaveLength(2);
+    });
   });
 });

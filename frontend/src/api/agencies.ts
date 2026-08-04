@@ -52,7 +52,8 @@ export function updateAgencyCredit(id: string, limitIrr: number) {
 }
 
 export function settleAgency(id: string) {
-  return apiPost<{ settledIrr: number; ledgerEntryId: string }>(`/agencies/${id}/settle`);
+  // settledIrr is a decimal STRING on the wire (BigInt.prototype.toJSON).
+  return apiPost<{ settledIrr: string; ledgerEntryId: string }>(`/agencies/${id}/settle`);
 }
 
 export function fetchAgencyRequests(status?: AgencyMembershipStatus) {
@@ -134,4 +135,42 @@ export function decideAgencyDocument(id: string, docId: string, approve: boolean
 
 export function notifyAllDebtors() {
   return apiPost<{ notifiedCount: number }>('/agencies/debtors/notify-all');
+}
+
+export function fetchAgencyCreditRequests(id: string) {
+  return apiGet<import('../types/agency-portal').AgencyCreditRequest[]>(
+    `/agencies/${id}/credit-requests`,
+  );
+}
+
+export function decideAgencyCreditRequest(id: string, reqId: string, approve: boolean) {
+  return apiPatch<import('../types/agency-portal').AgencyCreditRequest>(
+    `/agencies/${id}/credit-requests/${reqId}/decide`,
+    { approve },
+  );
+}
+
+export function fetchAgencyWebserviceRequests(id: string) {
+  return apiGet<import('../types/agency-portal').AgencyWebserviceRequest[]>(
+    `/agencies/${id}/webservice-requests`,
+  );
+}
+
+/** SITE_ADMIN / commercial — all agencies' webservice purchase requests */
+export function fetchAllWebserviceRequests(status?: 'PENDING' | 'APPROVED' | 'REJECTED') {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+  return apiGet<import('../types/agency-portal').AgencyWebserviceQueueRow[]>(
+    `/agencies/webservice-requests${qs}`,
+  );
+}
+
+export function decideAgencyWebserviceRequest(
+  id: string,
+  reqId: string,
+  dto: { approve: boolean; stepUpChallengeId?: string; stepUpCode?: string },
+) {
+  return apiPatch<import('../types/agency-portal').AgencyWebserviceRequest>(
+    `/agencies/${id}/webservice-requests/${reqId}/decide`,
+    dto,
+  );
 }

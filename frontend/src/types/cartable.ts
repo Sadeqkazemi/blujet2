@@ -4,7 +4,8 @@ export type CartableSourceType =
   | 'MANAGER_MESSAGE'
   | 'MANAGER_REFERRAL'
   | 'AGENCY_REQUEST'
-  | 'CHAIR_PERMISSION';
+  | 'CHAIR_PERMISSION'
+  | 'EMPLOYEE_MESSAGE';
 
 export interface CartableTask {
   id: string;
@@ -113,4 +114,19 @@ export interface SendMessageResult {
   message: { id: string; subject: string };
   deliveredCount: number;
   warning?: 'PARTIAL_DELIVERY';
+}
+
+export interface EmployeeManagerRecipient {
+  id: string;
+  fullName: string;
+  role: string;
+  roleLabelFa: string;
+  isOwnManager: boolean;
+}
+
+export interface SentEmployeeManagerMessage {
+  id: string;
+  toName: string;
+  body: string;
+  createdAt: string;
 }

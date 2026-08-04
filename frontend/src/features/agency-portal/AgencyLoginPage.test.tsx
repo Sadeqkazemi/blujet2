@@ -6,15 +6,16 @@ import AgencyLoginPage from './AgencyLoginPage';
 import * as useAuthModule from '../../hooks/useAuth';
 import * as useLocaleModule from '../../hooks/useLocale';
 import * as agenciesApi from '../../api/agencies';
+import * as authApi from '../../api/auth';
 
-function mockAuth(agencyLogin = vi.fn()) {
+function mockAuth(agencyLogin = vi.fn(), signOut = vi.fn()) {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status: 'unauthenticated',
     user: null,
     requestLogin: vi.fn(),
     confirmTwoFactor: vi.fn(),
     agencyLogin,
-    signOut: vi.fn(),
+    signOut,
   });
 }
 
@@ -129,5 +130,44 @@ describe('AgencyLoginPage', () => {
     await user.click(screen.getByRole('button', { name: 'إنشاء حساب' }));
     expect(screen.getByLabelText('اسم الوكالة')).toBeInTheDocument();
     expect(screen.getByLabelText('رقم الترخيص (الفئة ب)')).toBeInTheDocument();
+  });
+
+  it('forgot password: requests OTP, verifies, sets password, shows done', async () => {
+    const signOut = vi.fn().mockResolvedValue(undefined);
+    mockAuth(vi.fn(), signOut);
+    const requestReset = vi
+      .spyOn(authApi, 'requestAgencyPasswordReset')
+      .mockResolvedValue({ challengeId: 'ch-reset' });
+    const verifyReset = vi.spyOn(authApi, 'verifyAgencyPasswordReset').mockResolvedValue({
+      accessToken: 'tok',
+      user: { id: 'a1', fullName: 'آژانس', role: 'AGENCY', mustChangePassword: false },
+    });
+    const setPassword = vi.spyOn(authApi, 'setPassword').mockResolvedValue({ changed: true });
+
+    render(
+      <MemoryRouter>
+        <AgencyLoginPage />
+      </MemoryRouter>,
+    );
+
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId('agency-forgot-link'));
+    expect(screen.getByTestId('agency-forgot-modal')).toBeInTheDocument();
+
+    await user.type(screen.getByTestId('agency-forgot-phone'), '09121234567');
+    await user.click(screen.getByRole('button', { name: 'ارسال کد تأیید' }));
+    expect(requestReset).toHaveBeenCalledWith('09121234567');
+
+    await user.type(screen.getByTestId('agency-forgot-code'), '482913');
+    await user.click(screen.getByRole('button', { name: 'تأیید کد' }));
+    expect(verifyReset).toHaveBeenCalledWith('ch-reset', '482913');
+
+    await user.type(screen.getByTestId('agency-forgot-pass1'), 'NewPass@1404');
+    await user.type(screen.getByTestId('agency-forgot-pass2'), 'NewPass@1404');
+    await user.click(screen.getByRole('button', { name: 'ذخیره رمز جدید' }));
+
+    expect(setPassword).toHaveBeenCalledWith('NewPass@1404');
+    expect(signOut).toHaveBeenCalled();
+    expect(await screen.findByTestId('agency-forgot-done')).toBeInTheDocument();
   });
 });

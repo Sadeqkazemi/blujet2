@@ -18,6 +18,7 @@ export interface SurveyStats {
   recentResponses: {
     id: string;
     flightNo: string;
+    route: string;
     rating: number;
     comment: string | null;
     at: string;

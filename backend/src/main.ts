@@ -9,6 +9,7 @@ import * as path from 'node:path';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { initSentry } from './common/sentry';
+import './common/bigint-json';
 
 initSentry();
 
