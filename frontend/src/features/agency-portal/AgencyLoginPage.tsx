@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { ApiRequestError } from '../../api/envelope';
 import { requestAgencySignupOtp, submitAgencyRequest } from '../../api/agencies';
@@ -65,6 +65,8 @@ const STR: Record<StoredLocale, {
   forgotSendFallback: string;
   forgotVerifyFallback: string;
   forgotSaveFallback: string;
+  passengerQuestion: string;
+  passengerLoginLink: string;
 }> = {
   fa: {
     tabLogin: 'ورود',
@@ -110,6 +112,8 @@ const STR: Record<StoredLocale, {
     forgotSendFallback: 'خطا در ارسال کد تأیید.',
     forgotVerifyFallback: 'کد وارد شده نادرست است.',
     forgotSaveFallback: 'خطا در ذخیره رمز عبور.',
+    passengerQuestion: 'مسافر هستید؟',
+    passengerLoginLink: 'ورود و ثبت‌نام مشتریان',
   },
   en: {
     tabLogin: 'Log in',
@@ -155,6 +159,8 @@ const STR: Record<StoredLocale, {
     forgotSendFallback: 'Error sending the verification code.',
     forgotVerifyFallback: 'The code entered is incorrect.',
     forgotSaveFallback: 'Error saving the new password.',
+    passengerQuestion: 'Are you a passenger?',
+    passengerLoginLink: 'Customer login & signup',
   },
   ar: {
     tabLogin: 'تسجيل الدخول',
@@ -200,6 +206,8 @@ const STR: Record<StoredLocale, {
     forgotSendFallback: 'خطأ في إرسال رمز التحقق.',
     forgotVerifyFallback: 'الرمز المُدخل غير صحيح.',
     forgotSaveFallback: 'خطأ في حفظ كلمة المرور الجديدة.',
+    passengerQuestion: 'هل أنت مسافر؟',
+    passengerLoginLink: 'تسجيل دخول وإنشاء حساب العملاء',
   },
 };
 
@@ -686,6 +694,13 @@ export default function AgencyLoginPage() {
       </div>
 
       {tab === 'login' ? <AgencyLoginForm /> : <AgencySignupForm />}
+
+      <div className="mt-6 border-t border-border pt-4 text-center text-[12px] leading-7 text-muted">
+        {t.passengerQuestion}{' '}
+        <Link to="/signin" data-testid="agency-passenger-link" className="font-bold text-accent no-underline">
+          {t.passengerLoginLink}
+        </Link>
+      </div>
     </AgencyLoginLayout>
   );
 }

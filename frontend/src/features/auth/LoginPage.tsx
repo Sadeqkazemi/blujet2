@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { ApiRequestError } from '../../api/envelope';
 import { StaffLoginLayout } from './StaffLoginLayout';
@@ -146,6 +146,21 @@ export default function LoginPage() {
           <span className="font-bold text-accent">واحد فناوری اطلاعات (مدیر IT)</span> انجام می‌شود.
         </p>
       </form>
+
+      <div className="mt-5 border-t border-[#eef1f6] pt-4 text-center text-[11.5px] leading-7 text-[#64748b]">
+        <div>
+          مسافر هستید؟{' '}
+          <Link to="/signin" data-testid="staff-passenger-link" className="font-bold text-accent no-underline">
+            ورود و ثبت‌نام مشتریان
+          </Link>
+        </div>
+        <div>
+          آژانس همکار هستید؟{' '}
+          <Link to="/agency/login" data-testid="staff-agency-link" className="font-bold text-accent no-underline">
+            ورود و ثبت‌نام آژانس
+          </Link>
+        </div>
+      </div>
 
       {toast && (
         <div

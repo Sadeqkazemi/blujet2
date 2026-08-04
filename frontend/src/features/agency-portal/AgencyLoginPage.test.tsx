@@ -170,4 +170,14 @@ describe('AgencyLoginPage', () => {
     expect(signOut).toHaveBeenCalled();
     expect(await screen.findByTestId('agency-forgot-done')).toBeInTheDocument();
   });
+
+  it('links to the separate customer sign-in page', () => {
+    mockAuth();
+    render(
+      <MemoryRouter>
+        <AgencyLoginPage />
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId('agency-passenger-link')).toHaveAttribute('href', '/signin');
+  });
 });
