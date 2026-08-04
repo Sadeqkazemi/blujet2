@@ -74,7 +74,7 @@ describe('LoginPage', () => {
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ ...baseAuth, requestLogin });
     renderLoginPage();
 
-    await userEvent.type(screen.getByLabelText('نام کاربری'), 'finance.karimi');
+    await userEvent.type(screen.getByLabelText('نام کاربری'), 'finance');
     await userEvent.type(screen.getByLabelText('رمز عبور'), 'wrong-password');
     await userEvent.click(screen.getByRole('button', { name: 'ورود به سامانه' }));
 

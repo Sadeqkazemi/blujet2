@@ -116,7 +116,10 @@ describe('ClubPage', () => {
     expect(screen.getByText('کارت‌های صادرشده')).toBeInTheDocument();
     expect(screen.getByText('درخواست در انتظار')).toBeInTheDocument();
     expect(screen.getByText('توزیع سطوح عضویت')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /تعریف مشتری VIP جدید/ })).toBeInTheDocument();
+    expect(
+      screen.getByText('تأیید درخواست‌های ارجاع‌شده و صدور کارت عضویت'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'تعریف مشتری VIP جدید' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'همه سطوح' })).toBeInTheDocument();
     expect(screen.getByPlaceholderText('جستجو در نام، ایمیل، شماره ملی یا کارت…')).toBeInTheDocument();
 
@@ -126,7 +129,7 @@ describe('ClubPage', () => {
     // Member without a card gets the direct-issue button.
     expect(screen.getByText('بدون کارت')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'صدور کارت' })).toBeInTheDocument();
-    // CEO reviews requests via the modal, not inline buttons.
+    // CEO opens request detail via the row button (design: whole-row click).
     expect(screen.getByRole('button', { name: 'بررسی درخواست' })).toBeInTheDocument();
   });
 
@@ -183,6 +186,7 @@ describe('ClubPage', () => {
     const { default: userEvent } = await import('@testing-library/user-event');
     renderPage();
 
+    // Direct ClubPage still supports SITE_ADMIN refer flow (ClubRouter uses SiteAdminClubPage).
     expect(await screen.findByText('درخواست‌های در انتظار ارجاع')).toBeInTheDocument();
     expect(screen.getByText('ارجاع‌شده به مدیران')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /تعریف مشتری VIP جدید/ })).not.toBeInTheDocument();
@@ -206,7 +210,9 @@ describe('ClubPage', () => {
     const { default: userEvent } = await import('@testing-library/user-event');
     renderPage();
 
-    await userEvent.click(await screen.findByRole('button', { name: /تعریف مشتری VIP جدید/ }));
+    // Design: accordion at the bottom (not a modal).
+    await userEvent.click(await screen.findByRole('button', { name: 'تعریف مشتری VIP جدید' }));
+    expect(screen.getByRole('region', { name: 'فرم تعریف مشتری VIP جدید' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'افزودن به باشگاه' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('نام، ایمیل و شماره ملی الزامی است.');
     expect(create).not.toHaveBeenCalled();

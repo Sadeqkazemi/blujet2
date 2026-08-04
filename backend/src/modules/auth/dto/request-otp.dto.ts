@@ -5,7 +5,7 @@ import { toLatinDigits } from '../../../common/normalize-iran-phone';
 
 export class RequestOtpDto {
   @ApiProperty({ example: '09121234567', description: 'شماره موبایل مشتری' })
-  @Transform(({ value }) =>
+  @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? toLatinDigits(value).replace(/\s/g, '') : value,
   )
   @Matches(/^09\d{9}$/, { message: 'شماره موبایل معتبر نیست.' })

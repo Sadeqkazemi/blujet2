@@ -1,10 +1,18 @@
 import { Global, Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { User } from '../database/entities/user.entity';
+import { EmployeePermission } from '../database/entities/employee-permission.entity';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { EmployeePermissionGuard } from './guards/employee-permission.guard';
 
-/** Shared guards/decorators used across feature modules. */
+/** Shared guards/decorators used across feature modules. Global so every
+ * feature module's `@UseGuards(EmployeePermissionGuard)`/JwtAuthGuard can
+ * resolve their repository dependencies without each module separately
+ * registering User/EmployeePermission via TypeOrmModule.forFeature. */
 @Global()
 @Module({
-  providers: [JwtAuthGuard],
-  exports: [JwtAuthGuard],
+  imports: [TypeOrmModule.forFeature([User, EmployeePermission])],
+  providers: [JwtAuthGuard, EmployeePermissionGuard],
+  exports: [JwtAuthGuard, EmployeePermissionGuard, TypeOrmModule],
 })
 export class CommonModule {}

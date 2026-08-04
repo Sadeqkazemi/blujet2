@@ -66,7 +66,7 @@ describe('Phase 20 — contact + support tickets (e2e)', () => {
     });
 
     it('403s for a non-SITE_ADMIN staff role', async () => {
-      const { accessToken } = await loginAs(app, 'finance.karimi');
+      const { accessToken } = await loginAs(app, 'finance');
       const res = await request(app.getHttpServer())
         .get('/contact')
         .set('Authorization', `Bearer ${accessToken}`);
@@ -142,7 +142,9 @@ describe('Phase 20 — contact + support tickets (e2e)', () => {
         });
       const id = other.body.data.id as string;
 
-      const { accessToken } = await loginAsCustomer(app, '09120000002');
+      // Not 09120000002 — that phone is claimed by src/database/seed.ts's AGENCY
+      // fixture ("آژانس blujet"), and this route is USER-only (@Roles('USER')).
+      const { accessToken } = await loginAsCustomer(app, '09120000102');
       const res = await request(app.getHttpServer())
         .get(`/my/support-tickets/${id}`)
         .set('Authorization', `Bearer ${accessToken}`);
@@ -169,7 +171,7 @@ describe('Phase 20 — contact + support tickets (e2e)', () => {
     });
 
     it('403s the list endpoint for a non-SITE_ADMIN staff role', async () => {
-      const { accessToken } = await loginAs(app, 'finance.karimi');
+      const { accessToken } = await loginAs(app, 'finance');
       const res = await request(app.getHttpServer())
         .get('/support-tickets')
         .set('Authorization', `Bearer ${accessToken}`);

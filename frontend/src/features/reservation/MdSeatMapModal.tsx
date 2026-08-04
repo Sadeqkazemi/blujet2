@@ -10,11 +10,13 @@ import { airportCityName } from '../../lib/airport-cities';
 import { faDigits, faMoney } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import {
+  isMd80Aircraft,
   md80SectionForRow,
   MD80_MAIN_CABIN_EXTRA_ROW_END,
 } from '../public-site/checkout/md80-seat-layout';
+import ReservationMd80SeatMap from './ReservationMd80SeatMap';
 import type { FlightRow } from '../../types/flights';
-import type { SeatCell, SeatMap, SeatStatus } from '../../types/reservation';
+import type { BookingStatus, SeatCell, SeatMap, SeatStatus } from '../../types/reservation';
 
 type Props = {
   flight: FlightRow;
@@ -31,6 +33,18 @@ const BAND_LABEL: Record<CabinBand, string> = {
   BUSINESS: 'کلاس بیزینس (Business)',
   MCE: 'کابین اصلی با فضای پا بیشتر (Main Cabin Extra)',
   ECONOMY: 'کلاس اقتصادی (Economy)',
+};
+
+const STATUS_LABEL: Record<BookingStatus, string> = {
+  DRAFT: 'پیش‌نویس',
+  HELD: 'در انتظار',
+  PAID: 'پرداخت‌شده',
+  TICKETED: 'صادرشده',
+  CANCELLED: 'لغوشده',
+  EXPIRED: 'منقضی',
+  REFUNDED: 'مستردشده',
+  FLOWN: 'پرواز شده',
+  NO_SHOW: 'عدم حضور',
 };
 
 function bandForRow(row: number): CabinBand {
@@ -64,18 +78,32 @@ function formatCountdown(expiresAt: string | null | undefined, now: number): str
 
 function seatVisual(
   status: SeatStatus,
-  classification: SeatCell['lockClassification'],
   selected: boolean,
   highlight: boolean,
 ): { bg: string; border: string } {
   if (selected) return { bg: '#f59e0b', border: '#fff' };
   if (highlight) return { bg: '#f59e0b', border: '#fbbf24' };
   if (status === 'SOLD') return { bg: '#3b82f6', border: '#3b82f6' };
-  if (status === 'LOCKED') {
-    if (classification === 'FREE') return { bg: '#a855f7', border: '#a855f7' };
-    return { bg: '#f59e0b', border: '#f59e0b' };
-  }
+  if (status === 'LOCKED') return { bg: '#f59e0b', border: '#f59e0b' };
   return { bg: '#141d2e', border: '#3a4a66' };
+}
+
+function seatPassengerName(seat: SeatCell): string {
+  return seat.passenger?.fullName?.trim() || seat.occupant?.passengerName?.trim() || '';
+}
+
+function seatBookingStatus(seat: SeatCell): BookingStatus | null {
+  return seat.passenger?.bookingStatus ?? seat.occupant?.bookingStatus ?? null;
+}
+
+function seatStatusLabel(seat: SeatCell): string {
+  const status = seatBookingStatus(seat);
+  if (!status) return '—';
+  return STATUS_LABEL[status] ?? status;
+}
+
+function seatPnr(seat: SeatCell): string | null {
+  return seat.passenger?.pnr ?? seat.occupant?.pnr ?? null;
 }
 
 export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onChanged }: Props) {
@@ -116,16 +144,14 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
     let free = 0;
     let tempLock = 0;
     let sold = 0;
-    let blocked = 0;
     for (const row of seatMap?.rows ?? []) {
       for (const s of row.seats) {
         if (s.status === 'FREE') free += 1;
         else if (s.status === 'SOLD') sold += 1;
-        else if (s.status === 'LOCKED' && s.lockClassification === 'FREE') blocked += 1;
         else if (s.status === 'LOCKED') tempLock += 1;
       }
     }
-    return { free, tempLock, sold, blocked };
+    return { free, tempLock, sold, blocked: 0 };
   }, [seatMap]);
 
   const lockedList = useMemo(() => {
@@ -144,6 +170,15 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
     });
   }, [seatMap]);
 
+  const seatsByCode = useMemo(() => {
+    const map = new Map<string, SeatCell>();
+    for (const row of seatMap?.rows ?? []) {
+      for (const s of row.seats) map.set(s.seatCode, s);
+    }
+    return map;
+  }, [seatMap]);
+
+  const useMd80Chart = isMd80Aircraft(seatMap?.aircraftType ?? 'MD-80');
   async function onSearch() {
     const q = query.trim();
     if (!q) {
@@ -340,6 +375,14 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
 
           {loading || !seatMap ? (
             <p className="py-10 text-center text-xs text-[#6b7b94]">در حال بارگذاری نقشهٔ صندلی…</p>
+          ) : useMd80Chart ? (
+            <ReservationMd80SeatMap
+              seatsByCode={seatsByCode}
+              selectedSeatCode={lockSeatCode ?? infoSeat?.seatCode ?? null}
+              highlightSeatCode={highlightCode}
+              canLock
+              onSeatClick={onSeatClick}
+            />
           ) : (
             <div className="mx-auto w-max max-w-full">
               {rowsWithBands.map(({ row, band, showDivider }) => {
@@ -360,7 +403,8 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
                         const selected =
                           lockSeatCode === s.seatCode || infoSeat?.seatCode === s.seatCode;
                         const highlight = highlightCode === s.seatCode;
-                        const v = seatVisual(s.status, s.lockClassification, selected, highlight);
+                        const v = seatVisual(s.status, selected, highlight);
+                        const name = seatPassengerName(s);
                         return (
                           <span key={s.seatCode} className="flex items-center gap-1.5">
                             <button
@@ -369,11 +413,7 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
                               onClick={() => onSeatClick(s)}
                               className="h-[28px] w-[28px] rounded-[7px] border-[1.5px]"
                               style={{ background: v.bg, borderColor: v.border }}
-                              title={
-                                s.occupant?.passengerName
-                                  ? `${s.seatCode} — ${s.occupant.passengerName}`
-                                  : s.seatCode
-                              }
+                              title={name ? `${s.seatCode} — ${name}` : s.seatCode}
                             />
                             {idx === aisleAfter - 1 && (
                               <span
@@ -386,7 +426,6 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
                           </span>
                         );
                       })}
-                      {/* When aisle is after last seat (unusual), still show row num */}
                       {aisleAfter >= row.seats.length && (
                         <span className="font-num w-5 text-center text-[9px] font-bold text-[#6b7b94]">
                           {faDigits(row.row)}
@@ -424,37 +463,37 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
                 <div className="rounded-[10px] border border-[#1f2a3d] bg-[#141d2e] px-3 py-2">
                   <div className="text-[10px] text-[#6b7b94]">نام مسافر</div>
                   <div className="mt-0.5 text-[12.5px] font-extrabold text-white">
-                    {infoSeat.occupant?.passengerName?.trim() || '—'}
+                    {seatPassengerName(infoSeat) || '—'}
                   </div>
                 </div>
                 <div className="rounded-[10px] border border-[#1f2a3d] bg-[#141d2e] px-3 py-2">
                   <div className="text-[10px] text-[#6b7b94]">کد ملی</div>
                   <div className="font-num mt-0.5 text-[12.5px] font-extrabold text-white" dir="ltr">
-                    {infoSeat.occupant?.maskedNationalId
-                      ? faDigits(infoSeat.occupant.maskedNationalId)
+                    {infoSeat.passenger?.nationalId
+                      ? faDigits(infoSeat.passenger.nationalId)
                       : '—'}
                   </div>
                 </div>
                 <div className="rounded-[10px] border border-[#1f2a3d] bg-[#141d2e] px-3 py-2">
                   <div className="text-[10px] text-[#6b7b94]">تاریخ پرواز</div>
                   <div className="font-num mt-0.5 text-[12.5px] font-extrabold text-white">
-                    {infoSeat.occupant?.departureAt
-                      ? formatJalaliDateTime(infoSeat.occupant.departureAt)
+                    {seatMap?.departureAt
+                      ? formatJalaliDateTime(seatMap.departureAt)
                       : '—'}
                   </div>
                 </div>
                 <div className="rounded-[10px] border border-[#1f2a3d] bg-[#141d2e] px-3 py-2">
                   <div className="text-[10px] text-[#6b7b94]">وضعیت</div>
                   <div className="mt-0.5 text-[12.5px] font-extrabold text-[#60a5fa]">
-                    {infoSeat.occupant?.statusFa ?? '—'}
+                    {seatStatusLabel(infoSeat)}
                   </div>
                 </div>
               </div>
-              {infoSeat.occupant?.pnr && (
+              {seatPnr(infoSeat) && (
                 <div className="mt-2 text-[11px] text-[#9fb0c7]">
                   PNR:{' '}
                   <span className="font-num font-bold text-white" dir="ltr">
-                    {infoSeat.occupant.pnr}
+                    {seatPnr(infoSeat)}
                   </span>
                 </div>
               )}

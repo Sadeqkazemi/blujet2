@@ -47,14 +47,16 @@ function renderPage() {
 }
 
 describe('CareersApplyPage', () => {
-  it('renders the job title, requirements and requires first/last name, national id and phone', async () => {
+  it('renders the job title, requirements and the design-matched application form', async () => {
     vi.spyOn(careersApi, 'fetchJobDetail').mockResolvedValue(JOB);
     renderPage();
 
     expect(await screen.findByText('کارشناس پشتیبانی مسافران')).toBeInTheDocument();
     expect(screen.getByText('حداقل ۲ سال سابقه')).toBeInTheDocument();
     expect(screen.getByText('آشنایی با Excel')).toBeInTheDocument();
-    expect(screen.getByTestId('apply-submit')).toBeDisabled();
+    expect(screen.getByText('استخدام')).toBeInTheDocument();
+    expect(screen.getByText('اطلاعات شخصی')).toBeInTheDocument();
+    expect(screen.getByTestId('apply-submit')).toBeEnabled();
   });
 
   it('shows a not-found message for an unknown or inactive job', async () => {
@@ -78,7 +80,6 @@ describe('CareersApplyPage', () => {
     await userEvent.type(screen.getByTestId('apply-phone'), '09121234567');
 
     const submit = screen.getByTestId('apply-submit');
-    expect(submit).toBeEnabled();
     await userEvent.click(submit);
 
     expect(apply).toHaveBeenCalledWith(
@@ -100,6 +101,20 @@ describe('CareersApplyPage', () => {
     await userEvent.upload(screen.getByTestId('apply-resume'), file, { applyAccept: false });
 
     expect(await screen.findByText('فقط فایل PDF مجاز است.')).toBeInTheDocument();
-    expect(screen.getByTestId('apply-submit')).toBeDisabled();
+  });
+
+  it('shows a toast when required fields are missing', async () => {
+    vi.spyOn(careersApi, 'fetchJobDetail').mockResolvedValue(JOB);
+    const apply = vi.spyOn(careersApi, 'applyToJob').mockResolvedValue({ id: 'app1' });
+    const { default: userEvent } = await import('@testing-library/user-event');
+    renderPage();
+
+    await screen.findByText('کارشناس پشتیبانی مسافران');
+    await userEvent.click(screen.getByTestId('apply-submit'));
+
+    expect(
+      await screen.findByText('لطفاً حداقل نام، نام خانوادگی، کد ملی و شماره تماس را وارد کنید'),
+    ).toBeInTheDocument();
+    expect(apply).not.toHaveBeenCalled();
   });
 });

@@ -51,17 +51,20 @@ set and chart shape across every panel report.
 | Method | Path | Roles | Notes |
 |---|---|---|---|
 | GET | `/reporting/sales-chart` | CEO, BOARD_CHAIR, SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | Query: `granularity=day\|month\|q3\|q6\|year\|flight`, `month?`, `date?`, `flightNo?`. Returns per-period `{ label, systemIrr, charterIrr, agencyIrr }[]` — computed server-side from `LedgerEntry`, grouped by `Booking.channel`. |
+| GET | `/reporting/flight-sales` | same | «شماره پرواز» picker for the analytic مالی tab: departed `FlightInstance` rows (newest first, cap 60) with per-channel SALE sums, route cities, seats. `{ rows: [{ flightInstanceId, flightNo, originCode, destCode, originCityFa, destCityFa, departureAt, systemIrr, charterIrr, agencyIrr, totalIrr, capacity, soldSeats }] }`. The CEO/analytic UI collapses rows that share the same `flightNo` into one card (summed channel sales + seats) and shows cards only after the user searches (no default list). |
 | GET | `/reporting/kpis` | same | Query: `granularity`, `periodKey?` (selected bar/day/month) → `{ revenueIrr, profitIrr, marginPct, operatingCostIrr, agencyDebtIrr, agencyDebtCount, trend: {...} }`. Re-scopes to the selected period, matching the "KPIs re-scope when a chart month is selected" rule. |
 | GET | `/reporting/completed-flights-summary` | same | Same `granularity`/`periodKey` filter → `{ flightCount, totalSeats, soldSeats, unsoldSeats }`, synced to the same period as the chart. |
 | GET | `/reporting/flight-sales` | same | Card-picker list for مالی «شماره پرواز» mode: `{ flightNo, originCode, destCode, departureAt, tickets, systemIrr, charterIrr, agencyIrr, totalIrr }[]` aggregated from real `LedgerEntry(SALE)` rows with a booking, newest departure first. |
 | GET | `/reporting/low-sales-alerts` | CEO, BOARD_CHAIR, SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | Flights &lt;72h out with occupancy below threshold — the design's recurring amber banner, currently hardcoded in every panel; this endpoint replaces the hardcoded copy with a real query. |
 | GET | `/reporting/commercial-overview` | COMMERCIAL_MANAGER | Commercial dashboard KPI row: `{ activeAgencies, passengersThisMonth, pendingAgencyRequests }`. |
+| GET | `/reporting/site-admin-overview` | SITE_ADMIN | Site-admin dashboard KPI row (design «آژانس فعال / مسافر این ماه / بلیط فروخته‌شده / درخواست در انتظار اقدام»): `{ activeAgencies, passengersThisMonth, ticketsSoldThisMonth, pendingActionCount, agenciesTrendPct, passengersTrendPct, ticketsTrendPct }` — `pendingActionCount` = pending/referred agency requests + SUBMITTED/REVIEW refunds + OPEN/IN_PROGRESS support tickets; trend fields are MoM % (null when previous month is 0 / N/A). |
+| GET | `/reporting/finance-dashboard-stats` | CEO, BOARD_CHAIR, SENIOR_MANAGER, FINANCE_MANAGER | Dashboard KPI row matching the design cards: `{ activeAgencies, activeAgenciesTrendPct, passengersThisMonth, passengersTrendPct, ticketsSoldThisMonth, ticketsTrendPct, revenueThisMonthIrr, revenueTrendPct }`. Widened beyond FINANCE_MANAGER so CEO/Chair/Senior dashboards can render آژانس فعال / مسافر این ماه / بلیط فروخته‌شده / درآمد without a duplicate endpoint. |
 
 ### Manager activity / audit feed (`backend/src/modules/audit/`)
 
 | Method | Path | Roles | Notes |
 |---|---|---|---|
-| GET | `/audit/manager-reports` | CEO (excludes CEO/SENIOR_MANAGER/BOARD_CHAIR as actor), BOARD_CHAIR (sees all), SENIOR_MANAGER (sees all) | Query: `category?`, `actorRole?`, `date?`, `q?` (search). Role-specific exclusion filters are server-side per the confirmed per-panel behavior — never left to the frontend to hide rows. |
+| GET | `/audit/manager-reports` | CEO (excludes CEO/SENIOR_MANAGER/BOARD_CHAIR as actor), BOARD_CHAIR (sees all), SENIOR_MANAGER (sees all) | Query: `category?`, `actorRole?`, `q?` (search action/detail/actor name). Each row includes `actorName`. Role-specific exclusion filters are server-side per the confirmed per-panel behavior — never left to the frontend to hide rows. |
 | GET | `/audit/logs` | IT_MANAGER | `category=SYSTEM` + account-management entries — IT's "لاگ و رویدادها" tab. |
 | POST | `/audit` | internal (called by other modules, not directly by clients) | Every write in every later-phase module calls this — not a public endpoint. |
 
@@ -231,32 +234,36 @@ tabs to them; no new backend endpoints.
 
 ## Phase 9 — Reservation system (seat lock / PNR)
 
-Roles: `BOARD_CHAIR`, `SENIOR_MANAGER`, `IT_MANAGER` have the reachable
-سامانه رزرواسیون/هواپیما nav entry (per `panel-nav.config.ts`); `CEO` is
-authorized at the API level too (⚑ product decision, see `docs/DB_SCHEMA.md`
-→ Phase 9) but has no reachable nav entry, matching Phase 1's confirmed
-extraction. `canLock` = `CEO`/`BOARD_CHAIR`/`IT_MANAGER`; `SENIOR_MANAGER`
-is view-only on every endpoint below (403 on the write ones).
+Roles: `CEO` + `BOARD_CHAIR` (nav label **هواپیما**) and `IT_MANAGER`
+(سامانه رزرواسیون) have the reachable reservation nav entry per
+`panel-nav.config.ts`. `SENIOR_MANAGER` stays authorized at the API level
+(⚑ product decision, see `docs/DB_SCHEMA.md` → Phase 9) but — per the
+2026-08-03 senior-panel trim — no longer has a reachable nav entry; it is
+view-only. `canLock` (PNR cancel / change-seat / manual issue / no-show) =
+`CEO`/`BOARD_CHAIR`/`IT_MANAGER`. Seat-map managerial lock/release/approve/
+reject is narrower: `canSeatLock` = `CEO`/`BOARD_CHAIR` only — **IT Manager
+cannot manually lock seats** (view sold-seat passenger details only).
+`SENIOR_MANAGER` is view-only on every write endpoint below (403).
 
 ### `backend/src/modules/reservation/`
 
 | Method | Path | Roles | Notes |
 |---|---|---|---|
-| GET | `/reservation/seatmap/:flightInstanceId` | BOARD_CHAIR, SENIOR_MANAGER, IT_MANAGER, CEO | Computed from `AircraftSeatMap` (by the instance's `Flight.aircraftType`) + sold seats (`Passenger.seatCode` on non-CANCELLED bookings) + active `SeatLock`s. Returns `{ rows[], cabinLayout, soldCount, lockedCount, capacity, occupancyPct }` (`cabinLayout` added Phase 30). Each seat cell may include `lockExpiresAt` / `lockClassification` when locked (Board Chair MD seat-map countdown + company-block coloring). Occupied / locked seats also carry a staff-display `occupant` object: `{ passengerName, maskedNationalId, pnr, statusFa, departureAt }` — full national ID is never returned (masked like passenger-reports); free seats have `occupant: null`. |
-| POST | `/reservation/seatmap/:flightInstanceId/lock` | canLock only | `{ seatCode, passengerName?, passengerNationalId?, passengerMobile? }` — 409 if the seat is already sold or actively locked (DB partial-unique-index-backed). PII encrypted+hashed like `ClubMember`. `AuditLog(category=RESERVATION)`. |
-| PATCH | `/reservation/seatmap/locks/:id/release` | canLock only | Any canLock role may release any active lock (the design's «×» chip shows no per-locker ownership filter). Sets `releasedAt`; 409 if already released. Audited. |
+| GET | `/reservation/seatmap/:flightInstanceId` | BOARD_CHAIR, SENIOR_MANAGER, IT_MANAGER, CEO | Computed from `AircraftSeatMap` (by the instance's `Flight.aircraftType`) + sold seats (`Passenger.seatCode` on non-CANCELLED bookings) + active `SeatLock`s. Returns `{ flightNo, origin/dest (+ cityFa), departureAt, rows[], cabinLayout, soldCount, lockedCount, freeCount, capacity, occupancyPct }`. Each SOLD seat carries the rich `passenger` `{ fullName, pnr, bookingStatus, nationalId, priceIrr }` that powers the IT/Board seat-map popup, plus a lighter `occupant` `{ pnr, passengerName, bookingStatus }`; locked seats carry `lockExpiresAt` / `lockPassengerName` for the countdown chip. Staff-only (IT cannot lock). |
+| POST | `/reservation/seatmap/:flightInstanceId/lock` | canSeatLock only (`CEO`/`BOARD_CHAIR`) | `{ seatCode, passengerName?, passengerNationalId?, passengerMobile? }` — 409 if the seat is already sold or actively locked (DB partial-unique-index-backed). PII encrypted+hashed like `ClubMember`. `AuditLog(category=RESERVATION)`. IT_MANAGER → 403. |
+| PATCH | `/reservation/seatmap/locks/:id/release` | canSeatLock only | Any canSeatLock role may release any active lock (the design's «×» chip shows no per-locker ownership filter). Sets `releasedAt`; 409 if already released. Audited. IT_MANAGER → 403. |
 | GET | `/reservation/pnr` | all 4 reservation roles | `q?` (PNR or passenger name). Grouped by flight instance, newest first — the design's «مدیریت رزروها» list. |
 | GET | `/reservation/pnr/:pnr` | all 4 | Full detail incl. passenger + boarding-pass fields. 404 if not found. |
 | PATCH | `/reservation/pnr/:pnr/seat` | canLock only | `{ seatCode }` — «تغییر رزرو»; 409 if the target seat is sold/locked by someone else; 409 if the booking is CANCELLED. Audited. |
 | PATCH | `/reservation/pnr/:pnr/cancel` | canLock only | «لغو رزرو» → `BookingStatus.CANCELLED`; releases the seat for resale; 409 if already CANCELLED. Audited. |
 | GET | `/reservation/search` | all 4 | `origin`, `dest`, `date` (Jalali, converted) → matching `SCHEDULED` `FlightInstance`s with a computed price (`FarePricingProposal.registeredPriceIrr` if REGISTERED, else a documented flat fallback — no invented dynamic pricing) and free-seat count. |
 | POST | `/reservation/pnr` | canLock only | «صدور PNR و بلیط» — staff-side **manual/offline** issuance (phone/counter booking): `{ flightInstanceId, seatCode, passengerName, passengerNationalId?, passengerMobile? }` → creates a `TICKETED` `Booking`+`Passenger` directly (no HELD/PAID steps — no payment gateway involved, distinct from the public paid-checkout track) + a `LedgerEntry(type=SALE)`. 409 if the seat is sold/locked. Audited. |
-| GET | `/reservation/dashboard-stats` | all 4 | Real counts only (today's bookings, active PNRs, seats sold, revenue) — the design's "microservices health" cards are **not** ported (they'd describe infrastructure that doesn't exist in this monolith; CLAUDE.md forbids fabricated status data). |
+| GET | `/reservation/dashboard-stats` | all 4 | Real counts (today's bookings, active PNRs, seats sold, revenue) plus `channels[]` (share of non-cancelled bookings by `Booking.channel`) and `services[]` (dependent toggles from `InternalService` + measured DB latencies — no invented uptime). |
+| GET | `/reservation/agency-api-access` | all 4 | Agencies that already have an `AgencyApiKey` — masked key hint (`bjk_••••…`), lifetime `callCount`, ACTIVE/SUSPENDED. Empty list → design empty state. |
+| GET | `/reservation/flights` | all 4 | `q?` — SCHEDULED instances with sold/capacity/occupancy and statusKey `SELLING`/`NEAR_FULL`/`FULL` for the design «پروازها» table. |
 | POST | `/reservation/_test/flight-instance` | all 4 | E2E only — creates a fresh SCHEDULED instance with a randomized far-future date (avoids collisions across repeated test runs); always 404s in production. Same pattern as `club`'s and `pricing`'s own `_test/*` seeding hooks. |
 
-Deliberately not built this phase (see `docs/DB_SCHEMA.md`'s Phase 9 note):
-agency API access (duplicates Phase 3's `AgencyApiKey`), flight/schedule/
-capacity creation (Phase 10's own scope).
+Flight/schedule **creation** stays on Phase 10's `/flights/*` (not this shell).
 
 ---
 
@@ -367,11 +374,13 @@ stays untouched on the same page).
 - POST `/flights/airports` — `{ cityFa, code, tz? }` — add a city/airport
   to the catalog (Commercial «شهرهای پروازی» tab); 409 on duplicate code or
   city name; audited.
-- POST `/flights` — «افزودن پرواز» modal `{ originCode, destCode,
-  flightNo, departureDate (Jalali), departureTime, capacity,
-  basePriceToman }` — find-or-create Route/Flight, create instance;
-  validation per design («لطفاً همه فیلدها را تکمیل کنید.») plus server
-  rules (origin≠dest, future date, capacity/price bounds); audited.
+- POST `/flights` — full-page «افزودن پرواز جدید» (Commercial design):
+  `{ originCode, destCode, flightNo, departureAt (UTC ISO), capacity,
+  basePriceIrr, aircraftType?, charterSeats? }` — find-or-create
+  Route/Flight, create instance; optional aircraft/charter applied at
+  create. Client then posts fare-rules + `PUT .../proposal` for CEO
+  approval. Server rules: origin≠dest, future date, charterSeats &lt;
+  capacity, aircraft in seat-map catalog; audited.
 - GET `/flights/:instanceId` — flight detail modal: sold/cap, ضریب اشغال,
   قیمت پایه, real channel breakdown (seats + revenue per سیستمی/چارتری/
   آژانس) and مجموع درآمد from bookings.
@@ -617,6 +626,7 @@ panels that carry these tabs. Design findings that scope this phase:
 
 | Method | Path | Roles | Notes |
 |---|---|---|---|
+| GET | `/staff-reports/mine` | EMPLOYEE | «گزارش‌های من» — فید فعالیت خود کارمند از `AuditLog` (`{ items: [{ id, title, detail, category, at }] }`). |
 | GET | `/staff-reports` | FINANCE_MANAGER, COMMERCIAL_MANAGER | «گزارش عملکرد کارمندان»: EMPLOYEE-role users whose `dept` maps to the caller (finance→FINANCE_MANAGER, sales/commercial→COMMERCIAL_MANAGER) + their `AuditLog` action feed (action, category, detail, at), `staffId?` filter for the per-employee tabs. Also returns the «کارمند جدید توسط مدیر IT اضافه شد» banner rows — real `AuditLog(category=ACCOUNT)` employee-creation events for the caller's dept, not a fabricated notification. |
 
 Deliberately not in scope (documented, not dropped): Excel/PDF exports
@@ -679,13 +689,14 @@ panels. Key ⚑ decisions:
 |---|---|---|---|
 | GET | `/audit/system-events` | CEO | «لاگ‌ها و رویدادهای سامانه» — latest 100 real `AuditLog` rows (all actors incl. CEO itself, unlike `/audit/manager-reports`) with the presentational level mapping above. |
 
-### `backend/src/modules/settings/` (new) — BOARD_CHAIR, IT_MANAGER
+### `backend/src/modules/settings/` — IT_MANAGER, SITE_ADMIN
+(BOARD_CHAIR no longer has the تنظیمات سامانه tab or settings API access.)
 
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/settings` | All `SystemSetting` key-values with server defaults (companyName, supportEmail, supportPhone, gateway toggles mellat/saman/zarin, global toggles maintenance/registration/charterSale/apiPublic/sandbox, brandColor, **socialLinks** — five fixed networks: instagram/telegram/whatsapp/linkedin/x, each `{ id, name, url, enabled }`) + the real `RefundPenaltyRule` brackets. |
 | PATCH | `/settings` | Partial key-value update; validated per key; audited (SYSTEM). `socialLinks` patch: array of partial entries; enabled links require non-empty URL (max 500 chars); unknown network ids rejected. |
-| PATCH | `/settings/refund-rules` | BOARD_CHAIR only — updates the REAL Phase 7 `RefundPenaltyRule.penaltyPct` per bracket (0–100 validated); audited. The refund engine keeps reading these same rows. |
+| PATCH | `/settings/refund-rules` | IT_MANAGER only — updates the REAL Phase 7 `RefundPenaltyRule.penaltyPct` per bracket (0–100 validated); audited. The refund engine keeps reading these same rows. |
 | GET | `/settings/social-links` | **Public** (no auth) — returns `{ links: [{ id, name, url }] }` for enabled networks with non-empty URLs; bare hostnames normalized to `https://`. Rate-limited. |
 
 ### `backend/src/modules/panels/` (change)
@@ -1016,6 +1027,10 @@ side anyway.
 - `PATCH /support-tickets/:id/status` (new, `SITE_ADMIN` only) —
   `{ status }` ∈ `OPEN | IN_PROGRESS | ANSWERED | CLOSED`. Appends a
   `history` entry.
+- `POST /support-tickets/admin` (`SITE_ADMIN` only) — create from the
+  panel «ایجاد تیکت» modal: `{ subject, requesterName, requesterPhone?,
+  dept: SITE|AGENCY, priority: HIGH|MEDIUM|LOW, body }`. Phone optional
+  (sentinel stored when omitted). Audited.
 - Both forward and status-change actions are audit-logged
   (`category: 'SYSTEM'` — no new `AuditCategory` enum value was added for
   a scoped-down v1 feature). No audit row on the anonymous submission
@@ -1096,17 +1111,19 @@ Completes the member-initiated card-request flow started above: after a
 USER submits via `POST /my/club/card-request`, the request sits in
 `SUBMITTED` until SITE_ADMIN refers it from the پنل ادمین سایت `club` tab.
 
-- `GET /club/submitted-card-requests` (new, `SITE_ADMIN` only) — list
-  `SUBMITTED` requests with member detail (incl. decrypted national ID for
-  this admin review surface only) + history timeline. Exec panels'
-  `GET /club/card-requests` still excludes SUBMITTED.
-- `PATCH /club/card-requests/:id/refer` (new, `SITE_ADMIN` only) — body
+- `GET /club/submitted-card-requests` (`SITE_ADMIN` only) — list of **all**
+  card-request statuses for the admin queue (SUBMITTED / REFERRED /
+  APPROVED / REJECTED) with member detail (incl. decrypted national ID)
+  + history timeline. Refer action still only succeeds on SUBMITTED.
+  Exec panels' `GET /club/card-requests` still excludes SUBMITTED.
+- `PATCH /club/card-requests/:id/refer` (`SITE_ADMIN` only) — body
   `{ assignedTo: 'SENIOR' | 'CHAIR' }`; `SUBMITTED → REFERRED`, appends a
   history step, audited. `409` if not SUBMITTED.
-- `GET /club/members` KPI payload gains `submittedRequests` count (SUBMITTED
-  rows) alongside existing `pendingRequests` (REFERRED rows).
-- Frontend: `ClubPage.tsx` gains a `SITE_ADMIN` role branch — submitted
-  queue + refer modal (مدیر ارشد / رئیس هیئت مدیره picker); no approve/reject.
+- `GET /club/members` KPI payload includes `submittedRequests` (SUBMITTED)
+  alongside `pendingRequests` (REFERRED). For `SITE_ADMIN` only, each
+  member row also includes decrypted `nationalId` (profiles + VIP Excel).
+- Frontend: `SiteAdminClubPage` (via `ClubRouter`) — dark 3-KPI layout,
+  card-request queue, member profiles, VIP-ready list + Excel download.
 
 ### پنل کاربر — نشان‌شده‌ها (`/account` → تب `saved`)
 Closes the «نشان‌شده‌ها» tab in `design-reference-v2/پنل کاربر.dc.html`:
@@ -1262,7 +1279,7 @@ All endpoints below are `JwtAuthGuard` + `RolesGuard`,
 - `GET /my/refunds/rules` (new) — the current four customer-readable
   brackets sorted by `minHoursBeforeDeparture DESC`:
   `{ minHoursBeforeDeparture, penaltyPct, labelFa, isRefundable }[]`.
-  This is read-only; BOARD_CHAIR's existing settings endpoint remains the
+  This is read-only; IT_MANAGER's settings endpoint remains the
   only rule editor.
 - `POST /my/refunds/preview` (new) — body `{ bookingId }`; repeats
   ownership/status/no-prior-request checks and returns
@@ -1431,6 +1448,13 @@ request/decide pattern exactly, for a new `AgencyWebserviceRequest`.
 
 ### Agencies (staff-side review)
 
+- `GET /agencies/webservice-requests` — cross-agency queue for the
+  SITE_ADMIN «درخواست وب‌سرویس» tab (`SITE_ADMIN`, `COMMERCIAL_MANAGER`,
+  `SENIOR_MANAGER`). Optional `?status=PENDING|APPROVED|REJECTED`. Each
+  row includes `agencyId`, `agencyName`, `city`, `licenseNo` plus the
+  same request fields as the per-agency list. Must be registered
+  **before** `GET /agencies/:id/...` so `:id` does not capture
+  `webservice-requests`.
 - `GET /agencies/:id/webservice-requests` — list, same
   `AGENCY_TAB_ROLES` guard as credit requests (no per-method narrowing).
 - `PATCH /agencies/:id/webservice-requests/:reqId/decide` — body
@@ -1504,11 +1528,12 @@ sc-if blocks: **not** gate/baggage/delay tracking — the design's own copy
 is "فروش هر پرواز ۵ ساعت مانده به زمان پرواز به‌صورت خودکار بسته می‌شود و
 لیست کامل مسافران به‌صورت اتومات در سامانه نیرا بارگذاری می‌گردد" (sale
 auto-closes 5h before departure; the full passenger list auto-uploads to
-سامانه نیرا, Iran's civil aviation manifest system). Only `super`(CEO)/
-`siteAdmin`/`finance`/`commercial` have `flightops` in that file's
-`roleDefs` — no other design file references the key at all.
+سامانه نیرا, Iran's civil aviation manifest system). The CEO design
+sidebar has no `flightops` entry — API access is
+`SITE_ADMIN` / `FINANCE_MANAGER` / `COMMERCIAL_MANAGER` (SITE_ADMIN nav
+exposes the tab).
 
-- `GET /flightops` (new; `CEO`, `SITE_ADMIN`, `FINANCE_MANAGER`,
+- `GET /flightops` (new; `SITE_ADMIN`, `FINANCE_MANAGER`,
   `COMMERCIAL_MANAGER`) — KPI counts (کل پروازها / باز / بسته‌شده-در‌نیرا /
   مجموع مسافران) + row list, scoped to `SCHEDULED` instances only, ordered
   by soonest departure. Each read lazily materializes any instance that
@@ -2459,13 +2484,8 @@ pass unmodified; 2 new tests (en, ar). See
 Found during the earlier design-bundle audit: `design-reference-v2/پنل
 مدیر بازرگانی.dc.html` has a `clubrules` tab
 ("تعیین حد نصاب امتیاز برای هر سطح عضویت باشگاه مشتریان — برای همه اعضا
-یکسان اعمال می‌شود") that was never built. Per that same design file's
-own `roleDefs.access` arrays, only `super` (CEO) and `commercial`
-(COMMERCIAL_MANAGER) list `clubrules` — `finance` (FINANCE_MANAGER) and
-`siteAdmin` (SITE_ADMIN) do not, and no other executive-panel design file
-(`پنل مدیر ارشد.dc.html`, `پنل رئیس هیئت مدیره.dc.html`, etc.) mentions
-`clubrules` at all — so this stays CEO + COMMERCIAL_MANAGER only, not the
-broader access pattern some other tabs use.
+یکسان اعمال می‌شود"). The CEO design sidebar (`پنل مدیر عامل.dc.html`)
+has no `clubrules` entry — so this tab/API is COMMERCIAL_MANAGER only.
 
 Today `ClubMember.level` (SILVER/GOLD/PLATINUM) is set once at creation
 and only ever changed by an explicit `PATCH /club/members/:id/level`
@@ -2482,7 +2502,7 @@ balance changes (a real purchase earning points, or a redemption) — not
 just a passive settings screen.
 
 ### New: `GET /club/tier-rules`, `PATCH /club/tier-rules`
-- Roles: `CEO`, `COMMERCIAL_MANAGER` only (see access-list note above).
+- Roles: `COMMERCIAL_MANAGER` only (see access-list note above).
 - `GET` returns the single `ClubTierRule` row (seeded once via
   `typeorm/seed.ts`, lazily created on first read if somehow absent):
   `{ goldMinPoints, platinumMinPoints, cardRequestMinPoints, updatedAt,
@@ -2863,11 +2883,14 @@ this stays SITE_ADMIN-only.
 ### New (SITE_ADMIN only): `GET/POST/PATCH /careers/postings`
 - `GET /careers/postings` → all postings (active + inactive).
 - `POST /careers/postings` body `{ title, dept, city, type,
-  generalReqs, specialReqs }` → creates, `active: true` by default.
+  generalReqs, specialReqs, description?, imageFileId? }` → creates,
+  `active: true` by default. `imageFileId` from `POST /files`.
 - `PATCH /careers/postings/:id` body: any subset of the create fields
   plus `active?` (the design's per-card "غیرفعال کردن آگهی"/"فعال کردن
   آگهی" toggle folds into this same endpoint rather than a separate
-  route, since it's just one more editable field).
+  route, since it's just one more editable field) and optional
+  `description` / `imageFileId` (null clears image).
+- `GET /careers/media/:fileId` (public) streams a posting cover image.
 - Both write an audit-log entry (`AuditCategory.CONTENT`).
 
 ### New (SITE_ADMIN only): `GET /careers/applications`, `GET /careers/applications/:id`, `GET /careers/applications/:id/resume`, `PATCH /careers/applications/:id/refer`, `PATCH /careers/applications/:id/hire`, `PATCH /careers/applications/:id/reject`

@@ -1,13 +1,22 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { TypeORMService } from '../src/typeorm/typeorm.service';
+import { DataSource, In } from 'typeorm';
+import { AircraftSeatMap } from '../src/database/entities/aircraft-seat-map.entity';
+import { AuditLog } from '../src/database/entities/audit-log.entity';
+import { Booking } from '../src/database/entities/booking.entity';
+import { Flight } from '../src/database/entities/flight.entity';
+import { FlightInstance } from '../src/database/entities/flight-instance.entity';
+import { LedgerEntry } from '../src/database/entities/ledger-entry.entity';
+import { Passenger } from '../src/database/entities/passenger.entity';
+import { PaymentReconciliation } from '../src/database/entities/payment-reconciliation.entity';
+import { SeatLock } from '../src/database/entities/seat-lock.entity';
 import { loginAs } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
 describe('Reservation (e2e)', () => {
   let app: INestApplication<App>;
-  let typeorm: TypeORMService;
+  let dataSource: DataSource;
   // Phase 13D: a global per-requester active-lock cap now means leftover
   // SeatLock rows from repeated manual runs against a persistent dev DB
   // can spuriously trip the cap in later runs — clean up what each test
@@ -16,33 +25,37 @@ describe('Reservation (e2e)', () => {
 
   beforeEach(async () => {
     app = await createTestApp();
-    typeorm = app.get(TypeORMService);
+    dataSource = app.get(DataSource);
     createdInstanceIds = [];
   });
 
   afterEach(async () => {
     if (createdInstanceIds.length) {
-      await typeorm.seatLock.deleteMany({
-        where: { flightInstanceId: { in: createdInstanceIds } },
-      });
-      const passengers = await typeorm.passenger.findMany({
-        where: { booking: { flightInstanceId: { in: createdInstanceIds } } },
-        select: { bookingId: true },
-      });
+      await dataSource
+        .getRepository(SeatLock)
+        .delete({ flightInstanceId: In(createdInstanceIds) });
+      const passengers = await dataSource
+        .getRepository(Passenger)
+        .createQueryBuilder('p')
+        .innerJoin('p.booking', 'b')
+        .where('b.flightInstanceId IN (:...ids)', { ids: createdInstanceIds })
+        .getMany();
       const bookingIds = passengers.map((p) => p.bookingId);
-      await typeorm.paymentReconciliation.deleteMany({
-        where: { bookingId: { in: bookingIds } },
-      });
-      await typeorm.ledgerEntry.deleteMany({
-        where: { bookingId: { in: bookingIds } },
-      });
-      await typeorm.passenger.deleteMany({
-        where: { bookingId: { in: bookingIds } },
-      });
-      await typeorm.booking.deleteMany({ where: { id: { in: bookingIds } } });
-      await typeorm.flightInstance.deleteMany({
-        where: { id: { in: createdInstanceIds } },
-      });
+      if (bookingIds.length) {
+        await dataSource
+          .getRepository(PaymentReconciliation)
+          .delete({ bookingId: In(bookingIds) });
+        await dataSource
+          .getRepository(LedgerEntry)
+          .delete({ bookingId: In(bookingIds) });
+        await dataSource
+          .getRepository(Passenger)
+          .delete({ bookingId: In(bookingIds) });
+        await dataSource.getRepository(Booking).delete({ id: In(bookingIds) });
+      }
+      await dataSource
+        .getRepository(FlightInstance)
+        .delete({ id: In(createdInstanceIds) });
     }
     await app.close();
   });
@@ -52,18 +65,22 @@ describe('Reservation (e2e)', () => {
   }
 
   async function createScheduledInstance() {
-    const flight = await typeorm.flight.findFirstOrThrow();
+    const flight = await dataSource
+      .getRepository(Flight)
+      .createQueryBuilder('f')
+      .getOneOrFail();
     const departureAt = new Date(Date.now() + 20 * 24 * 60 * 60 * 1000);
-    const instance = await typeorm.flightInstance.create({
-      data: {
+    const instanceRepo = dataSource.getRepository(FlightInstance);
+    const instance = await instanceRepo.save(
+      instanceRepo.create({
         flightId: flight.id,
         departureAt,
         arrivalAt: new Date(departureAt.getTime() + 3 * 60 * 60 * 1000),
         capacity: 180,
         charterSeats: 60,
         status: 'SCHEDULED',
-      },
-    });
+      }),
+    );
     createdInstanceIds.push(instance.id);
     return instance;
   }
@@ -129,8 +146,9 @@ describe('Reservation (e2e)', () => {
     // of the seed's 2-3) proves the endpoint reads the real config per
     // aircraft rather than always returning the same fixed number.
     const customType = `WIDE-${Date.now()}`;
-    await typeorm.aircraftSeatMap.create({
-      data: {
+    const seatMapRepo = dataSource.getRepository(AircraftSeatMap);
+    await seatMapRepo.save(
+      seatMapRepo.create({
         aircraftType: customType,
         businessRowStart: 1,
         businessRowEnd: 1,
@@ -140,12 +158,17 @@ describe('Reservation (e2e)', () => {
         economyRowEnd: 2,
         economyColsLeft: ['A', 'B', 'C'],
         economyColsRight: ['D', 'E'],
-      },
-    });
-    const flight = await typeorm.flight.findFirstOrThrow();
+        updatedAt: new Date(),
+      }),
+    );
+    const flight = await dataSource
+      .getRepository(Flight)
+      .createQueryBuilder('f')
+      .getOneOrFail();
     const departureAt = new Date(Date.now() + 21 * 24 * 60 * 60 * 1000);
-    const customInstance = await typeorm.flightInstance.create({
-      data: {
+    const instanceRepo = dataSource.getRepository(FlightInstance);
+    const customInstance = await instanceRepo.save(
+      instanceRepo.create({
         flightId: flight.id,
         departureAt,
         arrivalAt: new Date(departureAt.getTime() + 3 * 60 * 60 * 1000),
@@ -153,8 +176,8 @@ describe('Reservation (e2e)', () => {
         charterSeats: 0,
         status: 'SCHEDULED',
         aircraftTypeOverride: customType,
-      },
-    });
+      }),
+    );
     createdInstanceIds.push(customInstance.id);
 
     const customRes = await request(app.getHttpServer())
@@ -165,15 +188,40 @@ describe('Reservation (e2e)', () => {
       ECONOMY: { aisleAfterIndex: 3 },
     });
 
-    await typeorm.aircraftSeatMap.delete({
-      where: { aircraftType: customType },
-    });
+    await seatMapRepo.delete({ aircraftType: customType });
+  });
+
+  it('GET /reservation/seatmap/:id includes sold-seat passenger details for staff', async () => {
+    const instance = await createScheduledInstance();
+    const chair = await loginAs(app, 'chair');
+    const issued = await request(app.getHttpServer())
+      .post('/reservation/pnr')
+      .set(auth(chair.accessToken))
+      .send({
+        flightInstanceId: instance.id,
+        seatCode: '3A',
+        passengerName: 'لیلا صادقی',
+        passengerNationalId: '0499370899',
+      });
+    expect(issued.status).toBe(201);
+
+    const res = await request(app.getHttpServer())
+      .get(`/reservation/seatmap/${instance.id}`)
+      .set(auth((await loginAs(app, 'itadmin')).accessToken));
+    expect(res.status).toBe(200);
+    expect(res.body.data.flightNo).toBeTruthy();
+    const sold = res.body.data.rows
+      .flatMap((r: { seats: { seatCode: string; passenger?: { fullName: string } }[] }) => r.seats)
+      .find((s: { seatCode: string }) => s.seatCode === '3A');
+    expect(sold.passenger.fullName).toBe('لیلا صادقی');
+    expect(sold.passenger.nationalId).toBe('0499370899');
   });
 
   it('POST lock: canLock roles only, 409 on already-locked, encrypted PII never returned, audited', async () => {
     const instance = await createScheduledInstance();
     const chair = await loginAs(app, 'chair');
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
+    const it = await loginAs(app, 'itadmin');
 
     const forbidden = await request(app.getHttpServer())
       .post(`/reservation/seatmap/${instance.id}/lock`)
@@ -186,6 +234,16 @@ describe('Reservation (e2e)', () => {
         passengerNationalId: '0499370899',
       });
     expect(forbidden.status).toBe(403);
+
+    const itForbidden = await request(app.getHttpServer())
+      .post(`/reservation/seatmap/${instance.id}/lock`)
+      .set(auth(it.accessToken))
+      .send({
+        seatCode: '3B',
+        reason: 'تست IT',
+        classification: 'PAYABLE',
+      });
+    expect(itForbidden.status).toBe(403);
 
     const ok = await request(app.getHttpServer())
       .post(`/reservation/seatmap/${instance.id}/lock`)
@@ -211,13 +269,13 @@ describe('Reservation (e2e)', () => {
       });
     expect(dup.status).toBe(409);
 
-    const audit = await typeorm.auditLog.findFirst({
-      where: {
-        category: 'RESERVATION',
-        entityType: 'SeatLock',
-        entityId: ok.body.data.id,
-      },
-    });
+    const audit = await dataSource
+      .getRepository(AuditLog)
+      .createQueryBuilder('a')
+      .where('a.category = :category', { category: 'RESERVATION' })
+      .andWhere('a.entityType = :entityType', { entityType: 'SeatLock' })
+      .andWhere('a.entityId = :entityId', { entityId: ok.body.data.id })
+      .getOne();
     expect(audit).not.toBeNull();
   });
 
@@ -246,7 +304,7 @@ describe('Reservation (e2e)', () => {
   it('PATCH release: canLock only, 409 on already-released, seat becomes lockable again', async () => {
     const instance = await createScheduledInstance();
     const it = await loginAs(app, 'itadmin');
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
 
     const locked = await request(app.getHttpServer())
       .post(`/reservation/seatmap/${instance.id}/lock`)
@@ -298,7 +356,7 @@ describe('Reservation (e2e)', () => {
   it('POST /reservation/pnr issues a TICKETED booking directly (no payment step), 409 on unavailable seat, audited', async () => {
     const instance = await createScheduledInstance();
     const chair = await loginAs(app, 'chair');
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
 
     const forbidden = await issuePnr(senior.accessToken, instance.id, '7A');
     expect(forbidden.status).toBe(403);
@@ -313,26 +371,51 @@ describe('Reservation (e2e)', () => {
     expect(issued.body.data.status).toBe('TICKETED');
     expect(issued.body.data.passenger.seatCode).toBe('7A');
 
-    const booking = await typeorm.booking.findUniqueOrThrow({
-      where: { pnr: issued.body.data.pnr },
-    });
+    const booking = await dataSource
+      .getRepository(Booking)
+      .findOneByOrFail({ pnr: issued.body.data.pnr });
     expect(booking.status).toBe('TICKETED');
-    const ledger = await typeorm.ledgerEntry.findFirst({
-      where: { bookingId: booking.id, type: 'SALE' },
-    });
+    const ledger = await dataSource
+      .getRepository(LedgerEntry)
+      .findOneBy({ bookingId: booking.id, type: 'SALE' });
     expect(ledger).not.toBeNull();
 
     const conflict = await issuePnr(chair.accessToken, instance.id, '7A');
     expect(conflict.status).toBe(409);
 
-    const audit = await typeorm.auditLog.findFirst({
-      where: {
-        category: 'RESERVATION',
-        action: 'صدور دستی PNR',
-        entityId: booking.id,
-      },
-    });
+    const audit = await dataSource
+      .getRepository(AuditLog)
+      .createQueryBuilder('a')
+      .where('a.category = :category', { category: 'RESERVATION' })
+      .andWhere('a.action = :action', { action: 'صدور دستی PNR' })
+      .andWhere('a.entityId = :entityId', { entityId: booking.id })
+      .getOne();
     expect(audit).not.toBeNull();
+  });
+
+  it('concurrent POST /reservation/pnr for the same seat: exactly one TICKETED booking is created', async () => {
+    const instance = await createScheduledInstance();
+    const chair = await loginAs(app, 'chair');
+
+    const attempts = await Promise.all(
+      Array.from({ length: 5 }, (_, i) =>
+        issuePnr(chair.accessToken, instance.id, '16A', `مسافر ${i}`),
+      ),
+    );
+    const succeeded = attempts.filter((r) => r.status === 201);
+    const conflicted = attempts.filter((r) => r.status === 409);
+    expect(succeeded.length).toBe(1);
+    expect(conflicted.length).toBe(4);
+
+    const ticketedForSeat = await dataSource
+      .getRepository(Passenger)
+      .createQueryBuilder('p')
+      .innerJoin('p.booking', 'b')
+      .where('p.seatCode = :seatCode', { seatCode: '16A' })
+      .andWhere('b.flightInstanceId = :instanceId', { instanceId: instance.id })
+      .andWhere('b.status != :status', { status: 'CANCELLED' })
+      .getCount();
+    expect(ticketedForSeat).toBe(1);
   });
 
   it('GET /reservation/pnr lists grouped by flight and q= filters by PNR/passenger', async () => {
@@ -378,7 +461,7 @@ describe('Reservation (e2e)', () => {
   it('PATCH /reservation/pnr/:pnr/seat changes seat; 409 on a taken seat and on a CANCELLED booking', async () => {
     const instance = await createScheduledInstance();
     const chair = await loginAs(app, 'chair');
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const a = await issuePnr(chair.accessToken, instance.id, '10A', 'مسافر آ');
     const b = await issuePnr(chair.accessToken, instance.id, '10B', 'مسافر ب');
 
@@ -411,6 +494,36 @@ describe('Reservation (e2e)', () => {
     expect(onCancelled.status).toBe(409);
   });
 
+  it('concurrent PATCH .../seat from two different PNRs targeting the same free seat: exactly one succeeds', async () => {
+    const instance = await createScheduledInstance();
+    const chair = await loginAs(app, 'chair');
+    const a = await issuePnr(chair.accessToken, instance.id, '17A', 'مسافر آ');
+    const b = await issuePnr(chair.accessToken, instance.id, '17B', 'مسافر ب');
+
+    const [resA, resB] = await Promise.all([
+      request(app.getHttpServer())
+        .patch(`/reservation/pnr/${a.body.data.pnr}/seat`)
+        .set(auth(chair.accessToken))
+        .send({ seatCode: '18A' }),
+      request(app.getHttpServer())
+        .patch(`/reservation/pnr/${b.body.data.pnr}/seat`)
+        .set(auth(chair.accessToken))
+        .send({ seatCode: '18A' }),
+    ]);
+    const statuses = [resA.status, resB.status].sort();
+    expect(statuses).toEqual([200, 409]);
+
+    const holdersOfSeat = await dataSource
+      .getRepository(Passenger)
+      .createQueryBuilder('p')
+      .innerJoin('p.booking', 'b')
+      .where('p.seatCode = :seatCode', { seatCode: '18A' })
+      .andWhere('b.flightInstanceId = :instanceId', { instanceId: instance.id })
+      .andWhere('b.status != :status', { status: 'CANCELLED' })
+      .getCount();
+    expect(holdersOfSeat).toBe(1);
+  });
+
   it('PATCH /reservation/pnr/:pnr/cancel frees the seat for resale; 409 if already cancelled', async () => {
     const instance = await createScheduledInstance();
     const it = await loginAs(app, 'itadmin');
@@ -437,10 +550,12 @@ describe('Reservation (e2e)', () => {
   it('GET /reservation/search finds SCHEDULED instances on origin/dest/date with computed price + free seats', async () => {
     const instance = await createScheduledInstance();
     const { accessToken } = await loginAs(app, 'chair');
-    const flight = await typeorm.flight.findUniqueOrThrow({
-      where: { id: instance.flightId },
-      include: { route: true },
-    });
+    const flight = await dataSource
+      .getRepository(Flight)
+      .createQueryBuilder('f')
+      .innerJoinAndSelect('f.route', 'route')
+      .where('f.id = :id', { id: instance.flightId })
+      .getOneOrFail();
 
     const res = await request(app.getHttpServer())
       .get(
@@ -468,14 +583,42 @@ describe('Reservation (e2e)', () => {
     // — a JS number can't safely hold IRR amounts above 2^53.
     expect(typeof res.body.data.revenueIrr).toBe('string');
     expect(/^-?\d+$/.test(String(res.body.data.revenueIrr))).toBe(true);
+    expect(Array.isArray(res.body.data.channels)).toBe(true);
+    expect(Array.isArray(res.body.data.services)).toBe(true);
+    expect(typeof res.body.data.servicesStable).toBe('boolean');
+  });
+
+  it('GET /reservation/agency-api-access lists agencies that hold API keys', async () => {
+    const { accessToken } = await loginAs(app, 'itadmin');
+    const res = await request(app.getHttpServer())
+      .get('/reservation/agency-api-access')
+      .set(auth(accessToken));
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  it('GET /reservation/flights returns SCHEDULED instances with occupancy', async () => {
+    const { accessToken } = await loginAs(app, 'itadmin');
+    const res = await request(app.getHttpServer())
+      .get('/reservation/flights')
+      .set(auth(accessToken));
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+    if (res.body.data.length > 0) {
+      const row = res.body.data[0];
+      expect(row).toHaveProperty('flightNo');
+      expect(row).toHaveProperty('sold');
+      expect(row).toHaveProperty('capacity');
+      expect(['SELLING', 'NEAR_FULL', 'FULL']).toContain(row.statusKey);
+    }
   });
 
   // ── Role isolation ──────────────────────────────────────────────────
 
   it('FINANCE_MANAGER and COMMERCIAL_MANAGER get 403 on every /reservation/* endpoint', async () => {
     const instance = await createScheduledInstance();
-    const finance = await loginAs(app, 'finance.karimi');
-    const commercial = await loginAs(app, 'comm.abbasi');
+    const finance = await loginAs(app, 'finance');
+    const commercial = await loginAs(app, 'comm');
 
     for (const { accessToken } of [finance, commercial]) {
       const res = await request(app.getHttpServer())
@@ -489,7 +632,7 @@ describe('Reservation (e2e)', () => {
     const instance = await createScheduledInstance();
     const it = await loginAs(app, 'itadmin');
     const issued = await issuePnr(it.accessToken, instance.id, '14D');
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
 
     const readSeatmap = await request(app.getHttpServer())
       .get(`/reservation/seatmap/${instance.id}`)

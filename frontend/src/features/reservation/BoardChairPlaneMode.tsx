@@ -28,6 +28,12 @@ import type { PnrDetail, PnrGroup, ReservationDashboardStats } from '../../types
 
 type Tab = 'dash' | 'pnr' | 'agency' | 'flights';
 
+/** Design: PNR | مسیر | مسافر | وضعیت — gap + isolate so LTR PNR doesn't stick to route */
+const RECENT_PNR_GRID =
+  'grid grid-cols-[minmax(7rem,1fr)_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,0.9fr)] gap-x-2.5 items-center';
+const PNR_CODE_CELL =
+  'font-num font-bold text-[#60a5fa] [direction:ltr] [unicode-bidi:isolate] text-right';
+
 const STATUS_LABEL: Record<string, { label: string; className: string; color: string; bg: string }> = {
   TICKETED: {
     label: 'صادرشده',
@@ -530,7 +536,9 @@ export default function BoardChairPlaneMode() {
             <div className="border-b border-[#1f2a3d] px-[15px] py-3 text-[13px] font-extrabold text-white">
               آخرین رزروهای ثبت‌شده
             </div>
-            <div className="grid grid-cols-[1fr_1.4fr_1fr_0.9fr] border-b border-[#1f2a3d] px-[15px] py-[11px] text-[10.5px] font-bold text-[#6b7b94]">
+            <div
+              className={`${RECENT_PNR_GRID} border-b border-[#1f2a3d] px-[15px] py-[11px] text-[10.5px] font-bold text-[#6b7b94]`}
+            >
               <span>PNR</span>
               <span>مسیر</span>
               <span>مسافر</span>
@@ -546,13 +554,11 @@ export default function BoardChairPlaneMode() {
                     key={r.pnr}
                     type="button"
                     onClick={() => void openPnrDetail(r.pnr)}
-                    className="grid w-full grid-cols-[1fr_1.4fr_1fr_0.9fr] items-center border-b border-[#16202e] px-[15px] py-3 text-start text-xs last:border-b-0"
+                    className={`${RECENT_PNR_GRID} w-full border-b border-[#16202e] px-[15px] py-3 text-start text-xs last:border-b-0 hover:bg-[#18223a]`}
                   >
-                    <span className="font-num font-bold text-[#60a5fa]" dir="ltr">
-                      {r.pnr}
-                    </span>
-                    <span className="text-[#cdd6e3]">{r.route}</span>
-                    <span className="text-[#9fb0c7]">{r.passenger}</span>
+                    <span className={PNR_CODE_CELL}>{r.pnr}</span>
+                    <span className="min-w-0 truncate text-[#cdd6e3]">{r.route}</span>
+                    <span className="min-w-0 truncate text-[#9fb0c7]">{r.passenger}</span>
                     <span
                       className="w-max rounded-[14px] px-2.5 py-0.5 text-[10px] font-bold"
                       style={{ color: st.color, background: st.bg }}
@@ -609,7 +615,7 @@ export default function BoardChairPlaneMode() {
 
       {tab === 'flights' && (
         <section className="overflow-hidden rounded-[14px] border border-[#1f2a3d] bg-[#141d2e]">
-          <div className="grid grid-cols-[1.6fr_1fr_1.2fr_1fr_0.9fr] border-b border-[#1f2a3d] px-[15px] py-[11px] text-[10.5px] font-bold text-[#6b7b94]">
+          <div className="grid grid-cols-[1.6fr_1fr_1.2fr_1fr_0.9fr] gap-x-3.5 border-b border-[#1f2a3d] px-[15px] py-[11px] text-[10.5px] font-bold text-[#6b7b94]">
             <span>مسیر</span>
             <span>شماره پرواز</span>
             <span>تاریخ / ساعت</span>
@@ -628,10 +634,12 @@ export default function BoardChairPlaneMode() {
                   key={f.id}
                   type="button"
                   onClick={() => void openSeatMap(f)}
-                  className="grid w-full grid-cols-[1.6fr_1fr_1.2fr_1fr_0.9fr] items-center border-b border-[#16202e] px-[15px] py-3 text-start text-xs last:border-b-0 hover:bg-[#101827]"
+                  className="grid w-full grid-cols-[1.6fr_1fr_1.2fr_1fr_0.9fr] items-center gap-x-3.5 border-b border-[#16202e] px-[15px] py-3 text-start text-xs last:border-b-0 hover:bg-[#101827]"
                 >
-                  <span className="font-bold text-[#e7ecf3]">{routeFa(f.originCode, f.destCode)}</span>
-                  <span className="font-num text-[#9fb0c7]" dir="ltr">
+                  <span className="min-w-0 truncate font-bold text-[#e7ecf3]">
+                    {routeFa(f.originCode, f.destCode)}
+                  </span>
+                  <span className="font-num text-[#9fb0c7] [direction:ltr] [unicode-bidi:isolate] text-right">
                     {f.flightNo}
                   </span>
                   <span className="text-[#9fb0c7]">

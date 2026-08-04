@@ -43,7 +43,8 @@ interface SalesChartControlsProps {
   flightNo: string;
   onFlightNoChange: (v: string) => void;
   onApplyFlightNo: () => void;
-  variant?: 'pill' | 'segmented' | 'panel';
+  variant?: 'pill' | 'segmented';
+  theme?: 'light' | 'dark';
 }
 
 export default function SalesChartControls({
@@ -58,9 +59,10 @@ export default function SalesChartControls({
   onFlightNoChange,
   onApplyFlightNo,
   variant = 'pill',
+  theme = 'light',
 }: SalesChartControlsProps) {
   const monthOptions = useMemo(() => recentJalaliMonths(), []);
-  const isPanel = variant === 'panel';
+  const dark = theme === 'dark';
 
   const modeButtons = modes.map((m) => (
     <button
@@ -68,19 +70,19 @@ export default function SalesChartControls({
       type="button"
       onClick={() => onGranularityChange(m.key)}
       className={
-        variant === 'segmented' || isPanel
-          ? `rounded-md px-3 py-1.5 text-[11px] transition ${
+        dark
+          ? `rounded-lg px-[11px] py-1.5 text-[11px] transition ${
               granularity === m.key
-                ? isPanel
-                  ? 'bg-[#3b82f6] font-bold text-white'
-                  : 'bg-accent font-bold text-white'
-                : isPanel
-                  ? 'text-[#6b7b94] hover:text-[#e7ecf3]'
-                  : 'text-muted hover:text-ink'
+                ? 'bg-[#3b82f6] font-extrabold text-white'
+                : 'font-medium text-[#9fb0c7] hover:text-white'
             }`
-          : `rounded-full px-3 py-1.5 text-xs font-medium transition ${
-              granularity === m.key ? 'bg-accent text-white' : 'bg-surface text-text-2 hover:bg-surface-2'
-            }`
+          : variant === 'segmented'
+            ? `rounded-md px-3 py-1.5 text-[11px] transition ${
+                granularity === m.key ? 'bg-accent font-bold text-white' : 'text-muted hover:text-ink'
+              }`
+            : `rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                granularity === m.key ? 'bg-accent text-white' : 'bg-surface text-text-2 hover:bg-surface-2'
+              }`
       }
     >
       {m.label}
@@ -91,10 +93,10 @@ export default function SalesChartControls({
     <div className="flex flex-col gap-3">
       <div
         className={
-          variant === 'segmented'
-            ? 'flex gap-1 rounded-lg border border-border bg-body p-1'
-            : isPanel
-              ? 'flex gap-1 rounded-lg border border-[#28344c] bg-[#18223a] p-1'
+          dark
+            ? 'flex flex-wrap gap-[5px] rounded-[11px] border border-[#28344c] bg-[#18223a] p-[3px]'
+            : variant === 'segmented'
+              ? 'flex gap-1 rounded-lg border border-border bg-body p-1'
               : 'flex flex-wrap gap-1.5'
         }
       >
@@ -104,8 +106,8 @@ export default function SalesChartControls({
       {granularity === 'day' && (
         <div
           className={
-            isPanel
-              ? 'max-w-xs rounded-lg border border-[#28344c] bg-[#18223a]'
+            dark
+              ? 'max-w-xs rounded-[11px] border border-[#28344c] bg-[#18223a]'
               : 'max-w-xs rounded-lg border border-border bg-surface'
           }
         >
@@ -125,15 +127,19 @@ export default function SalesChartControls({
               key={m.periodStart}
               type="button"
               onClick={() => onSelectedMonthStartChange(m.periodStart)}
-              className={`rounded-full px-3 py-1 text-[11px] font-medium transition ${
-                selectedMonthStart === m.periodStart
-                  ? isPanel
-                    ? 'bg-[#3b82f6] text-white'
-                    : 'bg-accent text-white'
-                  : isPanel
-                    ? 'border border-[#28344c] bg-[#18223a] text-[#9fb0c7] hover:text-[#e7ecf3]'
-                    : 'bg-surface text-text-2 hover:bg-surface-2'
-              }`}
+              className={
+                dark
+                  ? `rounded-[9px] border px-3 py-1.5 text-[11px] font-medium transition ${
+                      selectedMonthStart === m.periodStart
+                        ? 'border-[#3b82f6] bg-[#3b82f6] font-bold text-white'
+                        : 'border-[#28344c] bg-[#18223a] text-[#9fb0c7] hover:text-white'
+                    }`
+                  : `rounded-full px-3 py-1 text-[11px] font-medium transition ${
+                      selectedMonthStart === m.periodStart
+                        ? 'bg-accent text-white'
+                        : 'bg-surface text-text-2 hover:bg-surface-2'
+                    }`
+              }
             >
               {m.label}
             </button>
@@ -141,8 +147,9 @@ export default function SalesChartControls({
         </div>
       )}
 
-      {granularity === 'flight' && !isPanel && (
-        <div className="flex max-w-sm gap-2">
+      {/* Dark analytic مالی owns its own flight search+cards (design). */}
+      {granularity === 'flight' && !dark && (
+        <div className="flex max-w-md gap-2">
           <input
             dir="ltr"
             aria-label="شماره پرواز"
@@ -151,7 +158,7 @@ export default function SalesChartControls({
             onKeyDown={(e) => {
               if (e.key === 'Enter') onApplyFlightNo();
             }}
-            placeholder="EP-821"
+            placeholder="جستجوی شماره پرواز یا مسیر…"
             className="font-num h-10 flex-1 rounded-lg border border-border px-3 text-xs outline-none"
           />
           <button

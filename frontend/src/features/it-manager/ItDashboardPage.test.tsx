@@ -36,10 +36,23 @@ describe('ItDashboardPage', () => {
 
     render(<ItDashboardPage />);
 
-    expect(await screen.findByText('همه سامانه‌ها سالم')).toBeInTheDocument();
+    expect(await screen.findByText('داشبورد فنی')).toBeInTheDocument();
+    expect(screen.getByText('نمای کلی سلامت زیرساخت و سرویس‌های blujet')).toBeInTheDocument();
+    expect(screen.getByText('همه سامانه‌ها سالم')).toBeInTheDocument();
     expect(screen.getByText('سرویس فعال')).toBeInTheDocument();
     expect(screen.getByText('آپ‌تایم ۳۰ روز')).toBeInTheDocument();
+    expect(screen.getByText('سلامت سرویس‌ها')).toBeInTheDocument();
+    expect(screen.getByText('استفاده از منابع سرور')).toBeInTheDocument();
     expect(screen.getByText('موتور جستجوی پرواز')).toBeInTheDocument();
     expect(screen.getByText('کارمند «رضا کاظمی» ایجاد شد.')).toBeInTheDocument();
+  });
+
+  it('shows empty events copy when there are no recent events', async () => {
+    vi.spyOn(itApi, 'fetchItDashboard').mockResolvedValue({
+      ...DATA,
+      recentEvents: [],
+    });
+    render(<ItDashboardPage />);
+    expect(await screen.findByText('رویدادی ثبت نشده است.')).toBeInTheDocument();
   });
 });

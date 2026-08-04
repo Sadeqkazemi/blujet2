@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { dayjs } from '../lib/jalali';
 import type { PeriodQuery, SalesGranularity } from '../types/reporting';
 
-/** Design order: روزانه / ماهانه / ۳ ماهه / ۶ ماهه / سالانه / شماره پرواز */
+/** Order matches design-reference-v2 finance filter chips. */
 const ALL_MODES: { key: SalesGranularity; label: string }[] = [
   { key: 'day', label: 'روزانه' },
   { key: 'month', label: 'ماهانه' },
@@ -27,10 +27,7 @@ export function useSalesChartQuery(options: { includeFlightMode?: boolean } = {}
   const [appliedFlightNo, setAppliedFlightNo] = useState('');
 
   const modes = useMemo(
-    () =>
-      includeFlightMode
-        ? ALL_MODES
-        : ALL_MODES.filter((m) => m.key !== 'flight'),
+    () => (includeFlightMode ? ALL_MODES : ALL_MODES.filter((m) => m.key !== 'flight')),
     [includeFlightMode],
   );
 

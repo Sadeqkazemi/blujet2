@@ -2,7 +2,15 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import * as crypto from 'node:crypto';
-import { TypeORMService } from '../src/typeorm/typeorm.service';
+import { DataSource } from 'typeorm';
+import { Flight } from '../src/database/entities/flight.entity';
+import { FlightInstance } from '../src/database/entities/flight-instance.entity';
+import { Booking } from '../src/database/entities/booking.entity';
+import { RefundRequest } from '../src/database/entities/refund-request.entity';
+import { AgencyMembershipRequest } from '../src/database/entities/agency-membership-request.entity';
+import { ClubMember } from '../src/database/entities/club-member.entity';
+import { AgencyProfile } from '../src/database/entities/agency-profile.entity';
+import { User } from '../src/database/entities/user.entity';
 import { encryptPii, hashPii } from '../src/common/pii-crypto';
 import { loginAs } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
@@ -17,11 +25,11 @@ import { createTestApp } from './helpers/app.helper';
  */
 describe('Phase 18 — SITE_ADMIN + EMPLOYEE panel access (e2e)', () => {
   let app: INestApplication<App>;
-  let typeorm: TypeORMService;
+  let dataSource: DataSource;
 
   beforeEach(async () => {
     app = await createTestApp();
-    typeorm = app.get(TypeORMService);
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
@@ -31,67 +39,75 @@ describe('Phase 18 — SITE_ADMIN + EMPLOYEE panel access (e2e)', () => {
   async function createRefundRequest(
     status: 'SUBMITTED' | 'FINANCE' = 'SUBMITTED',
   ) {
-    const flight = await typeorm.flight.findFirstOrThrow();
-    const instance = await typeorm.flightInstance.create({
-      data: {
+    const flight = await dataSource
+      .getRepository(Flight)
+      .createQueryBuilder('f')
+      .getOneOrFail();
+    const instanceRepo = dataSource.getRepository(FlightInstance);
+    const instance = await instanceRepo.save(
+      instanceRepo.create({
         flightId: flight.id,
         departureAt: new Date(Date.now() + 7 * 24 * 3_600_000),
         arrivalAt: new Date(Date.now() + 7 * 24 * 3_600_000 + 3 * 3_600_000),
         capacity: 180,
         charterSeats: 0,
         status: 'SCHEDULED',
-      },
-    });
-    const booking = await typeorm.booking.create({
-      data: {
+      }),
+    );
+    const bookingRepo = dataSource.getRepository(Booking);
+    const booking = await bookingRepo.save(
+      bookingRepo.create({
         pnr: `P18${crypto.randomUUID().slice(0, 6).toUpperCase()}`,
         flightInstanceId: instance.id,
         channel: 'SYSTEM',
         status: 'TICKETED',
-        priceIrr: 20_000_000,
-      },
-    });
-    return typeorm.refundRequest.create({
-      data: {
+        priceIrr: 20_000_000n,
+      }),
+    );
+    const refundRepo = dataSource.getRepository(RefundRequest);
+    return refundRepo.save(
+      refundRepo.create({
         trackingCode: `RF-${crypto.randomBytes(4).toString('hex').toUpperCase()}`,
         bookingId: booking.id,
         passengerName: `مسافر ${crypto.randomUUID().slice(0, 4)}`,
         ibanEnc: encryptPii('IR820170000000332211009900'),
         nidEnc: encryptPii('0012345679'),
-        totalPaidIrr: 20_000_000,
+        totalPaidIrr: 20_000_000n,
         penaltyPct: 30,
-        penaltyAmountIrr: 6_000_000,
-        refundableIrr: 14_000_000,
+        penaltyAmountIrr: 6_000_000n,
+        refundableIrr: 14_000_000n,
         status,
         history: [{ step: 'submitted', labelFa: 'ثبت درخواست', at: 'اکنون' }],
-      },
-    });
+      }),
+    );
   }
 
   async function createAgencyRequest() {
-    return typeorm.agencyMembershipRequest.create({
-      data: {
+    const repo = dataSource.getRepository(AgencyMembershipRequest);
+    return repo.save(
+      repo.create({
         applicantName: 'آژانس تست فاز ۱۸',
         managerName: 'مدیر تست',
         licenseNo: `LC${crypto.randomUUID().slice(0, 6)}`,
         city: 'تهران',
         phone: `0912${Math.floor(1_000_000 + Math.random() * 8_000_000)}`,
         status: 'PENDING',
-      },
-    });
+      }),
+    );
   }
 
   async function createClubMember() {
-    return typeorm.clubMember.create({
-      data: {
+    const repo = dataSource.getRepository(ClubMember);
+    return repo.save(
+      repo.create({
         fullName: 'عضو تست فاز ۱۸',
         email: `member${crypto.randomUUID().slice(0, 6)}@example.com`,
         nationalIdEnc: encryptPii('0012345679'),
         nationalIdHash: hashPii('0012345679'),
         level: 'SILVER',
         cardStatus: 'NONE',
-      },
-    });
+      }),
+    );
   }
 
   async function createEmployeeWithPermissions(
@@ -118,12 +134,15 @@ describe('Phase 18 — SITE_ADMIN + EMPLOYEE panel access (e2e)', () => {
   describe('SITE_ADMIN', () => {
     it('gets the confirmed real access: agencies list/detail, club members/issue-card, refunds list/detail/refer, passenger-reports search, cartable', async () => {
       const { accessToken } = await loginAs(app, 'site.admin');
-      const agency = await typeorm.agencyProfile.findFirstOrThrow();
+      const agency = await dataSource
+        .getRepository(AgencyProfile)
+        .createQueryBuilder('a')
+        .getOneOrFail();
       const refund = await createRefundRequest();
       const member = await createClubMember();
-      const finance = await typeorm.user.findUniqueOrThrow({
-        where: { username: 'finance.karimi' },
-      });
+      const finance = await dataSource
+        .getRepository(User)
+        .findOneByOrFail({ username: 'finance.karimi' });
 
       const checks: Array<[string, () => Promise<request.Response>]> = [
         [
@@ -204,7 +223,10 @@ describe('Phase 18 — SITE_ADMIN + EMPLOYEE panel access (e2e)', () => {
 
     it('never gets agency write powers (suspend/credit) or club create/level or refund pay', async () => {
       const { accessToken } = await loginAs(app, 'site.admin');
-      const agency = await typeorm.agencyProfile.findFirstOrThrow();
+      const agency = await dataSource
+        .getRepository(AgencyProfile)
+        .createQueryBuilder('a')
+        .getOneOrFail();
       const refund = await createRefundRequest();
       const dummyId = '00000000-0000-0000-0000-000000000000';
 
@@ -257,9 +279,9 @@ describe('Phase 18 — SITE_ADMIN + EMPLOYEE panel access (e2e)', () => {
     it('can refer an agency membership request', async () => {
       const { accessToken } = await loginAs(app, 'site.admin');
       const reqRow = await createAgencyRequest();
-      const comm = await typeorm.user.findUniqueOrThrow({
-        where: { username: 'comm.abbasi' },
-      });
+      const comm = await dataSource
+        .getRepository(User)
+        .findOneByOrFail({ username: 'comm.abbasi' });
 
       const res = await request(app.getHttpServer())
         .patch(`/agencies/requests/${reqRow.id}/refer`)
@@ -273,7 +295,10 @@ describe('Phase 18 — SITE_ADMIN + EMPLOYEE panel access (e2e)', () => {
   describe('EMPLOYEE', () => {
     it('sales.moradi (seeded with ag_list + fl_view) can list agencies and flights overview, but not agency detail/requests (no ag_info/ag_requests)', async () => {
       const { accessToken } = await loginAs(app, 'sales.moradi');
-      const agency = await typeorm.agencyProfile.findFirstOrThrow();
+      const agency = await dataSource
+        .getRepository(AgencyProfile)
+        .createQueryBuilder('a')
+        .getOneOrFail();
 
       const listAgencies = await request(app.getHttpServer())
         .get('/agencies')
@@ -323,9 +348,9 @@ describe('Phase 18 — SITE_ADMIN + EMPLOYEE panel access (e2e)', () => {
       ]);
       const { accessToken } = await loginAs(app, username);
       const refund = await createRefundRequest();
-      const finance = await typeorm.user.findUniqueOrThrow({
-        where: { username: 'finance.karimi' },
-      });
+      const finance = await dataSource
+        .getRepository(User)
+        .findOneByOrFail({ username: 'finance.karimi' });
 
       const list = await request(app.getHttpServer())
         .get('/refunds')
@@ -355,17 +380,21 @@ describe('Phase 18 — SITE_ADMIN + EMPLOYEE panel access (e2e)', () => {
         'pr_propose',
       ]);
       const { accessToken } = await loginAs(app, username);
-      const flight = await typeorm.flight.findFirstOrThrow();
-      const instance = await typeorm.flightInstance.create({
-        data: {
+      const flight = await dataSource
+        .getRepository(Flight)
+        .createQueryBuilder('f')
+        .getOneOrFail();
+      const instanceRepo = dataSource.getRepository(FlightInstance);
+      const instance = await instanceRepo.save(
+        instanceRepo.create({
           flightId: flight.id,
           departureAt: new Date(Date.now() + 10 * 24 * 3_600_000),
           arrivalAt: new Date(Date.now() + 10 * 24 * 3_600_000 + 3 * 3_600_000),
           capacity: 180,
           charterSeats: 0,
           status: 'SCHEDULED',
-        },
-      });
+        }),
+      );
 
       const list = await request(app.getHttpServer())
         .get('/pricing/proposals')

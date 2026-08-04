@@ -51,6 +51,7 @@ and `backend/test/files.e2e-spec.ts` (3 tests), run via `npm run test:e2e`.
 
 ### Frontend — `frontend/src/features/{cartable,referrals}/*.test.tsx` (Vitest+RTL, 9 tests)
 - [x] کارتابل tab: 3 KPI filter cards, count pill, «ایجاد پیام» button, task rows with category badge + «ارسال از:» line + «بررسی»; empty state «کارتابل خالی است ✓» — `CartablePage.test.tsx: 'renders KPI filter cards, count pill, task rows and the compose button'` + `'shows the empty state when the cartable is empty'`
+- [x] CEO/Chair/Senior dark shell: page title «کارتابل» + subtitle «کارهای در انتظار اقدام شما», icon KPI cards, «کارتابل من» card with date chip + compose — same test asserts subtitle + «کارتابل من»
 - [x] Review modal: required «نظر مدیر», staff-directory transfer select, تأیید/انصراف/انتقال with انتقال disabled until a target is picked — `'the review modal requires a manager note before deciding'` + `'the transfer button stays disabled until a target manager is picked'`
 - [x] Finance/Commercial-only chairman-gate banner with request/pending/approved states — `'Finance Manager sees the chairman-permission gate with the request button'` (+ CEO-absence asserted in the first test); state transitions covered by backend loop test + live verification
 - [x] ارجاعات tab: KPI cards, table with the 4 status badges + priority + Jalali dates, creation modal (recipient chips, priority, Jalali due), detail with reports thread + sender actions — `ReferralsPage.test.tsx` (5 tests, incl. the Phase 29 attachment tests below).

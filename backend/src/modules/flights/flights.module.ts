@@ -1,4 +1,18 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { FlightInstance } from '../../database/entities/flight-instance.entity';
+import { Flight } from '../../database/entities/flight.entity';
+import { Route } from '../../database/entities/route.entity';
+import { Airport } from '../../database/entities/airport.entity';
+import { AircraftSeatMap } from '../../database/entities/aircraft-seat-map.entity';
+import { Schedule } from '../../database/entities/schedule.entity';
+import { FareRule } from '../../database/entities/fare-rule.entity';
+import { AgencyAllotment } from '../../database/entities/agency-allotment.entity';
+import { AgencyProfile } from '../../database/entities/agency-profile.entity';
+import { Booking } from '../../database/entities/booking.entity';
+import { Passenger } from '../../database/entities/passenger.entity';
+import { SeatLock } from '../../database/entities/seat-lock.entity';
+import { FarePricingProposal } from '../../database/entities/fare-pricing-proposal.entity';
 import { FlightsController } from './flights.controller';
 import { FlightsService } from './flights.service';
 import { PanelsModule } from '../panels/panels.module';
@@ -7,7 +21,27 @@ import { AiModule } from '../ai/ai.module';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [PanelsModule, AuditModule, AiModule, AuthModule],
+  imports: [
+    TypeOrmModule.forFeature([
+      FlightInstance,
+      Flight,
+      Route,
+      Airport,
+      AircraftSeatMap,
+      Schedule,
+      FareRule,
+      AgencyAllotment,
+      AgencyProfile,
+      Booking,
+      Passenger,
+      SeatLock,
+      FarePricingProposal,
+    ]),
+    PanelsModule,
+    AuditModule,
+    AiModule,
+    AuthModule,
+  ],
   controllers: [FlightsController],
   providers: [FlightsService],
 })

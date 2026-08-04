@@ -8,7 +8,6 @@ import { PanelAccessGuard } from '../panels/panel-access.guard';
 import { EmployeePermissionGuard } from '../../common/guards/employee-permission.guard';
 
 export const FLIGHTOPS_ROLES = [
-  'CEO',
   'SITE_ADMIN',
   'FINANCE_MANAGER',
   'COMMERCIAL_MANAGER',

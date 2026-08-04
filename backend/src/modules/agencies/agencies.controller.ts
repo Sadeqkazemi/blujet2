@@ -30,7 +30,7 @@ import { PanelAccessGuard } from '../panels/panel-access.guard';
 import { EmployeePermissionGuard } from '../../common/guards/employee-permission.guard';
 import { RequiresPermission } from '../../common/decorators/requires-permission.decorator';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import type { AgencyMembershipStatus } from '../../../generated/typeorm/enums';
+import type { AgencyMembershipStatus } from '../../database/enums';
 
 const AGENCY_TAB_ROLES = [
   'SENIOR_MANAGER',
@@ -78,6 +78,19 @@ export class AgenciesController {
   @ApiOperation({ summary: 'جزئیات درخواست عضویت + تاریخچه ارجاع' })
   async getRequest(@Param('id') id: string) {
     const data = await this.agencies.getRequest(id);
+    return { success: true, data };
+  }
+
+  @Get('webservice-requests')
+  @Roles('SITE_ADMIN', 'COMMERCIAL_MANAGER', 'SENIOR_MANAGER')
+  @ApiOperation({
+    summary:
+      'صف درخواست‌های خرید وب‌سرویس همه آژانس‌ها (تب «درخواست وب‌سرویس» پنل ادمین سایت)',
+  })
+  async listAllWebserviceRequests(
+    @Query('status') status?: 'PENDING' | 'APPROVED' | 'REJECTED',
+  ) {
+    const data = await this.agencies.listAllWebserviceRequests(status);
     return { success: true, data };
   }
 

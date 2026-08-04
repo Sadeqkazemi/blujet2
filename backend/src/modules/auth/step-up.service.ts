@@ -1,12 +1,16 @@
 import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import * as crypto from 'node:crypto';
-import { TypeORMService } from '../../typeorm/typeorm.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { User } from '../../database/entities/user.entity';
+import { TwoFactorChallenge } from '../../database/entities/two-factor-challenge.entity';
+import { findOneOrThrow } from '../../database/utils/find-one-or-throw';
 import { AuditService } from '../audit/audit.service';
 import { TWO_FACTOR_PROVIDER } from './providers/two-factor-provider.interface';
 import type { TwoFactorProvider } from './providers/two-factor-provider.interface';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import type { StepUpScope } from '../../../generated/typeorm/enums';
+import type { StepUpScope } from '../../database/enums';
 
 const STEP_UP_TTL_MS = 2 * 60 * 1000;
 const STEP_UP_MAX_ATTEMPTS = 5;
@@ -22,7 +26,9 @@ function generateSixDigitCode(): string {
 @Injectable()
 export class StepUpService {
   constructor(
-    private readonly typeorm: TypeORMService,
+    @InjectRepository(User) private readonly userRepo: Repository<User>,
+    @InjectRepository(TwoFactorChallenge)
+    private readonly challengeRepo: Repository<TwoFactorChallenge>,
     private readonly audit: AuditService,
     @Inject(TWO_FACTOR_PROVIDER)
     private readonly twoFactorProvider: TwoFactorProvider,
@@ -32,19 +38,19 @@ export class StepUpService {
     actor: AuthenticatedUser,
     scope: StepUpScope,
   ): Promise<{ challengeId: string }> {
-    const user = await this.typeorm.user.findUniqueOrThrow({
+    const user = await findOneOrThrow(this.userRepo, {
       where: { id: actor.id },
     });
     const code = generateSixDigitCode();
-    const challenge = await this.typeorm.twoFactorChallenge.create({
-      data: {
+    const challenge = await this.challengeRepo.save(
+      this.challengeRepo.create({
         userId: actor.id,
         purpose: 'STEP_UP_VERIFICATION',
         scope,
         codeHash: await argon2.hash(code),
         expiresAt: new Date(Date.now() + STEP_UP_TTL_MS),
-      },
-    });
+      }),
+    );
 
     await this.twoFactorProvider.sendCode(user, code);
 
@@ -60,9 +66,7 @@ export class StepUpService {
     code: string,
     scope: StepUpScope,
   ): Promise<void> {
-    const challenge = await this.typeorm.twoFactorChallenge.findUnique({
-      where: { id: challengeId },
-    });
+    const challenge = await this.challengeRepo.findOneBy({ id: challengeId });
 
     if (
       !challenge ||
@@ -96,20 +100,17 @@ export class StepUpService {
 
     const codeValid = await argon2.verify(challenge.codeHash, code);
     if (!codeValid) {
-      await this.typeorm.twoFactorChallenge.update({
-        where: { id: challenge.id },
-        data: { attempts: { increment: 1 } },
-      });
+      await this.challengeRepo.increment({ id: challenge.id }, 'attempts', 1);
       throw new UnauthorizedException({
         code: 'TWO_FACTOR_INVALID',
         message: 'کد وارد شده نادرست است.',
       });
     }
 
-    await this.typeorm.twoFactorChallenge.update({
-      where: { id: challenge.id },
-      data: { consumedAt: new Date() },
-    });
+    await this.challengeRepo.update(
+      { id: challenge.id },
+      { consumedAt: new Date() },
+    );
 
     await this.audit.record({
       actorId: actor.id,

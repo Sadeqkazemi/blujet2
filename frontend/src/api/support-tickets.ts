@@ -3,6 +3,7 @@ import type {
   ContactMessageRow,
   ForwardTarget,
   MySupportTicketRow,
+  SupportTicketDept,
   SupportTicketRow,
   SupportTicketStatus,
 } from '../types/support-tickets';
@@ -32,6 +33,17 @@ export function submitMySupportTicket(dto: {
   body: string;
 }) {
   return apiPost<{ id: string; trackingCode: string }>('/my/support-tickets', dto);
+}
+
+export function createAdminSupportTicket(dto: {
+  subject: string;
+  requesterName: string;
+  requesterPhone?: string;
+  dept: SupportTicketDept;
+  priority: 'HIGH' | 'MEDIUM' | 'LOW';
+  body: string;
+}) {
+  return apiPost<SupportTicketRow>('/support-tickets/admin', dto);
 }
 
 export function fetchSupportTickets(filters: { status?: SupportTicketStatus } = {}) {

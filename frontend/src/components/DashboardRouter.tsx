@@ -8,11 +8,7 @@ import SiteAdminDashboardPage from '../features/dashboard/SiteAdminDashboardPage
 import EmployeeDashboardPage from '../features/dashboard/EmployeeDashboardPage';
 import ComingSoonPage from './ComingSoonPage';
 import { useAuth } from '../hooks/useAuth';
-import type { PanelNavItem } from '../types/panels';
-
-interface PanelShellContext {
-  nav: PanelNavItem[] | null;
-}
+import type { PanelShellContext } from '../types/panel-shell';
 
 /**
  * The shared sales/KPI dashboard only backs the roles reporting.controller
