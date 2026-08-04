@@ -6,14 +6,18 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as argon2 from 'argon2';
-import { TypeORMService } from '../../typeorm/typeorm.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { In, IsNull, Repository } from 'typeorm';
+import { User } from '../../database/entities/user.entity';
+import { RefreshToken } from '../../database/entities/refresh-token.entity';
+import { findOneOrThrow } from '../../database/utils/find-one-or-throw';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
 import { generateTempPassword } from '../../common/temp-password';
 import { SmsService } from '../sms/sms.service';
 import { StepUpService } from '../auth/step-up.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import type { Role } from '../../../generated/typeorm/enums';
+import type { Role } from '../../database/enums';
 
 const ROLE_LABEL_FA: Partial<Record<Role, string>> = {
   SENIOR_MANAGER: 'مدیر ارشد',
@@ -52,7 +56,9 @@ const MANAGED_ROLES: Partial<Record<Role, Role[]>> = {
 @Injectable()
 export class AdminsService {
   constructor(
-    private readonly typeorm: TypeORMService,
+    @InjectRepository(User) private readonly userRepo: Repository<User>,
+    @InjectRepository(RefreshToken)
+    private readonly refreshTokenRepo: Repository<RefreshToken>,
     private readonly audit: AuditService,
     private readonly sms: SmsService,
     private readonly stepUp: StepUpService,
@@ -63,7 +69,7 @@ export class AdminsService {
   }
 
   private async getManagedOrThrow(actor: AuthenticatedUser, id: string) {
-    const target = await this.typeorm.user.findUnique({ where: { id } });
+    const target = await this.userRepo.findOneBy({ id });
     if (!target || target.deletedAt) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -89,41 +95,43 @@ export class AdminsService {
     const allAdminRoles = MANAGED_ROLES.CEO!;
     const now = new Date();
 
-    const users = await this.typeorm.user.findMany({
-      where: { role: { in: allAdminRoles }, deletedAt: null },
-      select: {
-        id: true,
-        fullName: true,
-        username: true,
-        email: true,
-        role: true,
-        lastLoginAt: true,
-        isActive: true,
-        _count: {
-          select: {
-            refreshTokens: {
-              where: { revokedAt: null, expiresAt: { gt: now } },
-            },
-          },
-        },
-      },
-      orderBy: { createdAt: 'asc' },
+    const users = await this.userRepo.find({
+      where: { role: In(allAdminRoles), deletedAt: IsNull() },
+      order: { createdAt: 'ASC' },
     });
 
-    return users.map((u) => ({
-      id: u.id,
-      fullName: u.fullName,
-      username: u.username,
-      email: u.email,
-      role: u.role,
-      roleLabelFa: ROLE_LABEL_FA[u.role] ?? u.role,
-      lastLoginAt: u.lastLoginAt?.toISOString() ?? null,
-      isActive: u.isActive,
-      // Real derivation — an unexpired, unrevoked refresh token means a live
-      // session; never a fabricated presence flag.
-      online: u._count.refreshTokens > 0,
-      managedByCaller: managed.includes(u.role) && u.id !== actor.id,
-    }));
+    // Real derivation — an unexpired, unrevoked refresh token means a live
+    // session; never a fabricated presence flag.
+    const userIds = users.map((u) => u.id);
+    const activeCounts = userIds.length
+      ? await this.refreshTokenRepo
+          .createQueryBuilder('rt')
+          .select('rt.userId', 'userId')
+          .addSelect('COUNT(*)', 'count')
+          .where('rt.userId IN (:...userIds)', { userIds })
+          .andWhere('rt.revokedAt IS NULL')
+          .andWhere('rt.expiresAt > :now', { now })
+          .groupBy('rt.userId')
+          .getRawMany<{ userId: string; count: string }>()
+      : [];
+    const activeCountByUserId = new Map(
+      activeCounts.map((r) => [r.userId, parseInt(r.count, 10)]),
+    );
+
+    return users.map((u) => {
+      return {
+        id: u.id,
+        fullName: u.fullName,
+        username: u.username,
+        email: u.email,
+        role: u.role,
+        roleLabelFa: ROLE_LABEL_FA[u.role] ?? u.role,
+        lastLoginAt: u.lastLoginAt?.toISOString() ?? null,
+        isActive: u.isActive,
+        online: (activeCountByUserId.get(u.id) ?? 0) > 0,
+        managedByCaller: managed.includes(u.role) && u.id !== actor.id,
+      };
+    });
   }
 
   async create(
@@ -153,8 +161,8 @@ export class AdminsService {
       });
     }
 
-    const existing = await this.typeorm.user.findFirst({
-      where: { OR: [{ username: dto.username }, { email: dto.email }] },
+    const existing = await this.userRepo.findOne({
+      where: [{ username: dto.username }, { email: dto.email }],
     });
     if (existing) {
       throw new ConflictException({
@@ -164,8 +172,8 @@ export class AdminsService {
     }
 
     const passwordHash = await argon2.hash(dto.password);
-    const user = await this.typeorm.user.create({
-      data: {
+    const user = await this.userRepo.save(
+      this.userRepo.create({
         role: dto.role,
         username: dto.username,
         email: dto.email,
@@ -174,8 +182,9 @@ export class AdminsService {
         mustChangePassword: true,
         twoFactorEnabled: true,
         isActive: true,
-      },
-    });
+        updatedAt: new Date(),
+      }),
+    );
 
     // Phase 14: a real send now backs this claim — SmsService logs a
     // genuine FAILED row when the account has no phone on file (create
@@ -209,19 +218,20 @@ export class AdminsService {
   async setBlocked(actor: AuthenticatedUser, id: string, blocked: boolean) {
     const target = await this.getManagedOrThrow(actor, id);
 
-    const updated = await this.typeorm.user.update({
-      where: { id },
-      data: { isActive: !blocked },
-    });
+    await this.userRepo.update(
+      { id },
+      { isActive: !blocked, updatedAt: new Date() },
+    );
+    const updated = await findOneOrThrow(this.userRepo, { where: { id } });
 
     if (blocked) {
       // Revoke this account's outstanding sessions immediately — isActive
       // alone doesn't kill an already-issued refresh token until its next
       // use, and a global logout-all would affect every other user too.
-      await this.typeorm.refreshToken.updateMany({
-        where: { userId: id, revokedAt: null },
-        data: { revokedAt: new Date() },
-      });
+      await this.refreshTokenRepo.update(
+        { userId: id, revokedAt: IsNull() },
+        { revokedAt: new Date() },
+      );
     }
 
     await this.audit.record({
@@ -253,10 +263,10 @@ export class AdminsService {
     const tempPassword = dto.password ?? generateTempPassword();
     const passwordHash = await argon2.hash(tempPassword);
 
-    await this.typeorm.user.update({
-      where: { id },
-      data: { passwordHash, mustChangePassword: true },
-    });
+    await this.userRepo.update(
+      { id },
+      { passwordHash, mustChangePassword: true, updatedAt: new Date() },
+    );
 
     // Phase 14: same real-send treatment as create() — matches this
     // method's own default (anything not 'email' is sms).

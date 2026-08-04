@@ -1,73 +1,83 @@
 import type { INestApplication } from '@nestjs/common';
 import type { App } from 'supertest/types';
 import request from 'supertest';
-import { TypeORMClient } from '../generated/typeorm/client';
-import { TypeORMPg } from '@typeorm/adapter-pg';
+import { DataSource, In } from 'typeorm';
+import { AuditLog } from '../src/database/entities/audit-log.entity';
+import { Booking } from '../src/database/entities/booking.entity';
+import { ClubPointsEntry } from '../src/database/entities/club-points-entry.entity';
+import { FareRule } from '../src/database/entities/fare-rule.entity';
+import { Flight } from '../src/database/entities/flight.entity';
+import { FlightInstance } from '../src/database/entities/flight-instance.entity';
+import { LedgerEntry } from '../src/database/entities/ledger-entry.entity';
+import { Passenger } from '../src/database/entities/passenger.entity';
+import { PaymentReconciliation } from '../src/database/entities/payment-reconciliation.entity';
+import { Route } from '../src/database/entities/route.entity';
+import { Schedule } from '../src/database/entities/schedule.entity';
+import { WalletEntry } from '../src/database/entities/wallet-entry.entity';
+import { CabinClass, FlightInstanceStatus } from '../src/database/enums';
 import { createTestApp } from './helpers/app.helper';
 import { loginAs, loginAsCustomer } from './helpers/login.helper';
 import { RedisService } from '../src/redis/redis.service';
-
-const typeorm = new TypeORMClient({
-  adapter: new TypeORMPg({ connectionString: process.env.DATABASE_URL }),
-});
 
 /** Covers the flight-engine completion work: recurring schedules (RRULE),
  * 1-stop connection search, Y/B/M fare classes, the PAID step in the
  * booking state machine, and soft delete via the GDPR flow. */
 describe('Flight engine completion', () => {
   let app: INestApplication<App>;
+  let dataSource: DataSource;
 
   beforeAll(async () => {
     app = await createTestApp();
+    dataSource = app.get(DataSource);
   });
 
   afterAll(async () => {
     // Clean up everything this spec created — other suites (reservation,
     // finance-reports) pick instances by ordering and break on leftovers.
-    const flights = await typeorm.flight.findMany({
-      where: {
-        flightNo: {
-          in: [
-            'BJ-77',
-            'BJ-78',
-            'BJ-81',
-            'BJ-82',
-            'BJ-83',
-            'BJ-84',
-            'BJ-85',
-            'BJ-86',
-          ],
-        },
-      },
+    const flights = await dataSource.getRepository(Flight).findBy({
+      flightNo: In([
+        'BJ-77',
+        'BJ-78',
+        'BJ-81',
+        'BJ-82',
+        'BJ-83',
+        'BJ-84',
+        'BJ-85',
+        'BJ-86',
+      ]),
     });
     const fids = flights.map((f) => f.id);
-    const instances = await typeorm.flightInstance.findMany({
-      where: { flightId: { in: fids } },
-    });
+    const instances =
+      fids.length > 0
+        ? await dataSource
+            .getRepository(FlightInstance)
+            .createQueryBuilder('fi')
+            .where('fi.flightId IN (:...fids)', { fids })
+            .getMany()
+        : [];
     const iids = instances.map((i) => i.id);
-    const bookings = await typeorm.booking.findMany({
-      where: { flightInstanceId: { in: iids } },
-    });
+    const bookings = await dataSource
+      .getRepository(Booking)
+      .findBy({ flightInstanceId: In(iids) });
     const bids = bookings.map((b) => b.id);
-    await typeorm.paymentReconciliation.deleteMany({
-      where: { bookingId: { in: bids } },
-    });
-    await typeorm.ledgerEntry.deleteMany({ where: { bookingId: { in: bids } } });
-    await typeorm.clubPointsEntry.deleteMany({
-      where: { bookingId: { in: bids } },
-    });
-    await typeorm.walletEntry.deleteMany({ where: { bookingId: { in: bids } } });
-    await typeorm.passenger.deleteMany({ where: { bookingId: { in: bids } } });
-    await typeorm.booking.deleteMany({ where: { id: { in: bids } } });
-    await typeorm.fareRule.deleteMany({
-      where: { flightInstanceId: { in: iids } },
-    });
-    await typeorm.flightInstance.deleteMany({ where: { id: { in: iids } } });
-    await typeorm.schedule.deleteMany({ where: { flightId: { in: fids } } });
-    await typeorm.flight.deleteMany({ where: { id: { in: fids } } });
+    await dataSource
+      .getRepository(PaymentReconciliation)
+      .delete({ bookingId: In(bids) });
+    await dataSource.getRepository(LedgerEntry).delete({ bookingId: In(bids) });
+    await dataSource
+      .getRepository(ClubPointsEntry)
+      .delete({ bookingId: In(bids) });
+    await dataSource.getRepository(WalletEntry).delete({ bookingId: In(bids) });
+    await dataSource.getRepository(Passenger).delete({ bookingId: In(bids) });
+    await dataSource.getRepository(Booking).delete({ id: In(bids) });
+    await dataSource
+      .getRepository(FareRule)
+      .delete({ flightInstanceId: In(iids) });
+    await dataSource.getRepository(FlightInstance).delete({ id: In(iids) });
+    await dataSource.getRepository(Schedule).delete({ flightId: In(fids) });
+    await dataSource.getRepository(Flight).delete({ id: In(fids) });
 
     await app.close();
-    await typeorm.$disconnect();
   });
 
   async function makeInstance(opts: {
@@ -77,40 +87,43 @@ describe('Flight engine completion', () => {
     departureAt: Date;
     durationMin?: number;
   }) {
-    const route = await typeorm.route.upsert({
-      where: {
-        originCode_destCode: {
+    const routeRepo = dataSource.getRepository(Route);
+    let route = await routeRepo.findOneBy({
+      originCode: opts.originCode,
+      destCode: opts.destCode,
+    });
+    if (!route) {
+      route = await routeRepo.save(
+        routeRepo.create({
           originCode: opts.originCode,
           destCode: opts.destCode,
-        },
-      },
-      update: {},
-      create: {
-        originCode: opts.originCode,
-        destCode: opts.destCode,
-        durationMin: opts.durationMin ?? 90,
-      },
-    });
-    const flight = await typeorm.flight.upsert({
-      where: { flightNo: opts.flightNo },
-      update: {},
-      create: {
-        flightNo: opts.flightNo,
-        routeId: route.id,
-        aircraftType: 'Airbus A320',
-      },
-    });
-    return typeorm.flightInstance.create({
-      data: {
+          durationMin: opts.durationMin ?? 90,
+        }),
+      );
+    }
+    const flightRepo = dataSource.getRepository(Flight);
+    let flight = await flightRepo.findOneBy({ flightNo: opts.flightNo });
+    if (!flight) {
+      flight = await flightRepo.save(
+        flightRepo.create({
+          flightNo: opts.flightNo,
+          routeId: route.id,
+          aircraftType: 'Airbus A320',
+        }),
+      );
+    }
+    const flightInstanceRepo = dataSource.getRepository(FlightInstance);
+    return flightInstanceRepo.save(
+      flightInstanceRepo.create({
         flightId: flight.id,
         departureAt: opts.departureAt,
         arrivalAt: new Date(
           opts.departureAt.getTime() + (opts.durationMin ?? 90) * 60_000,
         ),
         capacity: 146,
-        status: 'SCHEDULED',
-      },
-    });
+        status: FlightInstanceStatus.SCHEDULED,
+      }),
+    );
   }
 
   it('creates a recurring schedule from an RRULE and materializes future instances idempotently', async () => {
@@ -131,7 +144,9 @@ describe('Flight engine completion', () => {
     expect(res.body.data.materialized).toBeGreaterThanOrEqual(6);
     const scheduleId = res.body.data.scheduleId;
 
-    const count1 = await typeorm.flightInstance.count({ where: { scheduleId } });
+    const count1 = await dataSource
+      .getRepository(FlightInstance)
+      .count({ where: { scheduleId } });
     expect(count1).toBe(res.body.data.materialized);
 
     // re-materializing must not duplicate (unique scheduleId+departureAt)
@@ -219,24 +234,27 @@ describe('Flight engine completion', () => {
       flightNo: 'BJ-84',
       departureAt: dep,
     });
-    await typeorm.fareRule.createMany({
-      data: [
-        {
-          flightInstanceId: instance.id,
-          cabin: 'ECONOMY',
-          classCode: 'Y',
-          priceIrr: 30_000_000,
-          seatsAllocated: 1,
-        },
-        {
-          flightInstanceId: instance.id,
-          cabin: 'ECONOMY',
-          classCode: 'B',
-          priceIrr: 40_000_000,
-          seatsAllocated: 2,
-        },
-      ],
-    });
+    const fareRuleRepo = dataSource.getRepository(FareRule);
+    for (const r of [
+      {
+        flightInstanceId: instance.id,
+        cabin: CabinClass.ECONOMY,
+        classCode: 'Y',
+        priceIrr: 30_000_000n,
+        seatsAllocated: 1,
+        taxIrr: 0n,
+      },
+      {
+        flightInstanceId: instance.id,
+        cabin: CabinClass.ECONOMY,
+        classCode: 'B',
+        priceIrr: 40_000_000n,
+        seatsAllocated: 2,
+        taxIrr: 0n,
+      },
+    ]) {
+      await fareRuleRepo.save(fareRuleRepo.create(r));
+    }
 
     // Search results are cached by route+date (SEARCH_TTL_SECONDS = 5min),
     // not by instance id — re-running this suite within that window for the
@@ -273,9 +291,9 @@ describe('Flight engine completion', () => {
       .expect(201);
     expect(booking.body.data.priceIrr).toBe('30000000');
 
-    const row = await typeorm.booking.findUniqueOrThrow({
-      where: { id: booking.body.data.id },
-    });
+    const row = await dataSource
+      .getRepository(Booking)
+      .findOneByOrFail({ id: booking.body.data.id });
     expect(row.fareClassCode).toBe('Y');
 
     // Y bucket (1 seat) is now consumed → price moves to B
@@ -321,10 +339,13 @@ describe('Flight engine completion', () => {
     expect(paid.body.data.priceChanged).toBe(false);
     expect(paid.body.data.booking.status).toBe('TICKETED');
 
-    const audit = await typeorm.auditLog.findFirst({
-      where: { entityId: booking.body.data.id, action: 'پرداخت و صدور بلیط' },
-      orderBy: { createdAt: 'desc' },
-    });
+    const audit = await dataSource
+      .getRepository(AuditLog)
+      .createQueryBuilder('a')
+      .where('a.entityId = :entityId', { entityId: booking.body.data.id })
+      .andWhere('a.action = :action', { action: 'پرداخت و صدور بلیط' })
+      .orderBy('a.createdAt', 'DESC')
+      .getOne();
     const metadata = audit?.metadata as { gatewayRefId?: string };
     expect(metadata.gatewayRefId).toMatch(/^SBXREF-/);
   });
@@ -360,18 +381,18 @@ describe('Flight engine completion', () => {
       .set('Authorization', `Bearer ${customer.accessToken}`)
       .expect(200);
 
-    const passengers = await typeorm.passenger.findMany({
-      where: { bookingId: booking.body.data.id },
-    });
+    const passengers = await dataSource
+      .getRepository(Passenger)
+      .findBy({ bookingId: booking.body.data.id });
     expect(passengers).toHaveLength(1);
     expect(passengers[0].deletedAt).not.toBeNull();
     expect(passengers[0].fullName).toBe('کاربر حذف‌شده');
     expect(passengers[0].nationalIdEnc).toBeNull();
 
     // financial record survives (soft delete, never hard delete)
-    const bookingRow = await typeorm.booking.findUnique({
-      where: { id: booking.body.data.id },
-    });
+    const bookingRow = await dataSource
+      .getRepository(Booking)
+      .findOneBy({ id: booking.body.data.id });
     expect(bookingRow).not.toBeNull();
   });
 });
