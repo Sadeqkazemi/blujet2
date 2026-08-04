@@ -9,11 +9,10 @@ import { SeatLock } from '../../database/entities/seat-lock.entity';
 import { RedisService } from '../../redis/redis.service';
 import { getCabinPrice } from './pricing';
 import type { Irr } from '../../common/money';
+import { applyOccupyingBookingFilter } from '../../common/booking-seat-occupancy';
 import { enumerateSeats } from '../reservation/seat-layout';
 import { resolveAircraftType } from '../flights/aircraft-type.util';
 import type { CabinClass } from '../../database/enums';
-
-const ACTIVE_BOOKING_STATUSES = ['DRAFT', 'HELD', 'PAID', 'TICKETED'] as const;
 
 // CLAUDE.md: search-result cache TTL 5-10 min; Redis is never the source of
 // truth for seats/bookings — availability is still re-checked (takenSeatCodes
@@ -388,23 +387,17 @@ export class SearchService {
    * before the lazy-expiry sweep runs on that row). */
   async takenSeatCodes(flightInstanceId: string): Promise<Set<string>> {
     const now = new Date();
+    const qb = this.passengerRepo
+      .createQueryBuilder('p')
+      .innerJoin('p.booking', 'b')
+      .select(['p.seatCode'])
+      .where('p.seatCode IS NOT NULL')
+      .andWhere('b.flightInstanceId = :flightInstanceId', {
+        flightInstanceId,
+      });
+    applyOccupyingBookingFilter(qb, now);
     const [passengers, locks] = await Promise.all([
-      this.passengerRepo
-        .createQueryBuilder('p')
-        .innerJoin('p.booking', 'b')
-        .select(['p.seatCode'])
-        .where('p.seatCode IS NOT NULL')
-        .andWhere('b.flightInstanceId = :flightInstanceId', {
-          flightInstanceId,
-        })
-        .andWhere('b.status IN (:...statuses)', {
-          statuses: [...ACTIVE_BOOKING_STATUSES],
-        })
-        .andWhere('(b.status != :held OR b."holdExpiresAt" > :now)', {
-          held: 'HELD',
-          now,
-        })
-        .getMany(),
+      qb.getMany(),
       this.seatLockRepo.find({
         where: {
           flightInstanceId,
@@ -480,28 +473,21 @@ export class SearchService {
     MANAGERIAL: number;
   }> {
     const now = new Date();
+    const channelQb = this.passengerRepo
+      .createQueryBuilder('p')
+      .innerJoin('p.booking', 'b')
+      .select('b.channel', 'channel')
+      .addSelect('COUNT(*)', 'count')
+      .where('p.seatCode IS NOT NULL')
+      .andWhere('b.flightInstanceId = :flightInstanceId', {
+        flightInstanceId,
+      });
+    applyOccupyingBookingFilter(channelQb, now);
     const [channelRows, lockCount] = await Promise.all([
-      this.passengerRepo
-        .createQueryBuilder('p')
-        .innerJoin('p.booking', 'b')
-        .select('b.channel', 'channel')
-        .addSelect('COUNT(*)', 'count')
-        .where('p.seatCode IS NOT NULL')
-        .andWhere('b.flightInstanceId = :flightInstanceId', {
-          flightInstanceId,
-        })
-        .andWhere('b.status IN (:...statuses)', {
-          statuses: [...ACTIVE_BOOKING_STATUSES],
-        })
-        .andWhere('(b.status != :held OR b."holdExpiresAt" > :now)', {
-          held: 'HELD',
-          now,
-        })
-        .groupBy('b.channel')
-        .getRawMany<{
-          channel: 'SYSTEM' | 'CHARTER' | 'AGENCY';
-          count: string;
-        }>(),
+      channelQb.groupBy('b.channel').getRawMany<{
+        channel: 'SYSTEM' | 'CHARTER' | 'AGENCY';
+        count: string;
+      }>(),
       this.seatLockRepo.count({
         where: {
           flightInstanceId,

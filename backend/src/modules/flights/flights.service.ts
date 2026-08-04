@@ -32,6 +32,7 @@ import {
   type PriceSuggestionProvider,
 } from '../ai/price-suggestion.provider';
 import { StepUpService } from '../auth/step-up.service';
+import { SearchService } from '../booking-engine/search.service';
 import type { PersistedAiSuggestion } from '../pricing/pricing.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import {
@@ -85,6 +86,7 @@ export class FlightsService {
     @Inject(PRICE_SUGGESTION_PROVIDER)
     private readonly priceSuggestions: PriceSuggestionProvider,
     private readonly stepUp: StepUpService,
+    private readonly search: SearchService,
   ) {}
 
   private async soldByInstance(
@@ -452,6 +454,10 @@ export class FlightsService {
       entityType: 'FlightInstance',
       entityId: instance.id,
     });
+
+    // New instances must appear on the next public search for that day —
+    // never behind a Redis hit from an earlier empty result for the route.
+    await this.search.invalidateForInstance(instance.id);
 
     return { ...this.baseRow(instance, 0), derivedStatus: 'ACTIVE' as const };
   }

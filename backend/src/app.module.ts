@@ -80,6 +80,10 @@ import { CustomersModule } from './modules/customers/customers.module';
     // unaffected by this default.
     ThrottlerModule.forRoot({
       throttlers: [{ ttl: 60_000, limit: 600 }],
+      // E2E golden-path suites log in many staff roles in one process;
+      // auth endpoints use a stricter @Throttle(5/min) that would flake
+      // those tests. Production / local `start:dev` keep full rate limits.
+      skipIf: () => process.env.NODE_ENV === 'test',
     }),
     CommonModule,
     DatabaseModule,

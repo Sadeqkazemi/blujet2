@@ -230,22 +230,7 @@ export class BookingService {
     const seatsByCode = new Map(
       enumerateSeats(map).map((s) => [s.seatCode, s]),
     );
-    const requestedCodes = dto.passengers.map((p) => p.seatCode);
-    if (new Set(requestedCodes).size !== requestedCodes.length) {
-      throw new BadRequestException({
-        code: ErrorCode.VALIDATION_FAILED,
-        message: 'صندلی تکراری انتخاب شده است.',
-      });
-    }
-    for (const code of requestedCodes) {
-      const seat = seatsByCode.get(code);
-      if (!seat || seat.cabin !== dto.cabin) {
-        throw new BadRequestException({
-          code: ErrorCode.VALIDATION_FAILED,
-          message: `صندلی ${code} در کلاس ${dto.cabin === 'BUSINESS' ? 'بیزینس' : 'اکونومی'} معتبر نیست.`,
-        });
-      }
-    }
+    const cabinSeats = enumerateSeats(map).filter((s) => s.cabin === dto.cabin);
 
     for (const p of dto.passengers) {
       if (
@@ -304,12 +289,38 @@ export class BookingService {
         .getOne();
 
       const taken = await this.search.takenSeatCodes(instance.id);
-      const conflict = requestedCodes.find((c) => taken.has(c));
-      if (conflict) {
-        throw new ConflictException({
-          code: ErrorCode.CONFLICT,
-          message: `صندلی ${conflict} هم‌اکنون در دسترس نیست.`,
-        });
+      // Resolve seats inside the lock: customer-chosen codes, or first free
+      // cabin seat when the client omitted seatCode (سیستم انتخاب می‌کند).
+      const assignedCodes: string[] = [];
+      for (const p of dto.passengers) {
+        const explicit = p.seatCode?.trim();
+        if (explicit) {
+          const seat = seatsByCode.get(explicit);
+          if (!seat || seat.cabin !== dto.cabin) {
+            throw new BadRequestException({
+              code: ErrorCode.VALIDATION_FAILED,
+              message: `صندلی ${explicit} در کلاس ${dto.cabin === 'BUSINESS' ? 'بیزینس' : 'اکونومی'} معتبر نیست.`,
+            });
+          }
+          if (taken.has(explicit) || assignedCodes.includes(explicit)) {
+            throw new ConflictException({
+              code: ErrorCode.CONFLICT,
+              message: `صندلی ${explicit} هم‌اکنون در دسترس نیست.`,
+            });
+          }
+          assignedCodes.push(explicit);
+          continue;
+        }
+        const auto = cabinSeats.find(
+          (s) => !taken.has(s.seatCode) && !assignedCodes.includes(s.seatCode),
+        );
+        if (!auto) {
+          throw new ConflictException({
+            code: ErrorCode.POOL_EXHAUSTED,
+            message: 'صندلی خالی در این کلاس باقی نمانده است.',
+          });
+        }
+        assignedCodes.push(auto.seatCode);
       }
 
       // This booking is always channel SYSTEM (public/direct sale) — must
@@ -347,14 +358,14 @@ export class BookingService {
         }),
       );
 
-      const passengerEntities = dto.passengers.map((p) => {
+      const passengerEntities = dto.passengers.map((p, idx) => {
         const nationalId = p.nationalId
           ? normalizeNationalId(p.nationalId)
           : undefined;
         return tx.create(Passenger, {
           bookingId: created.id,
           fullName: p.fullName,
-          seatCode: p.seatCode,
+          seatCode: assignedCodes[idx],
           nationalIdEnc: nationalId ? encryptPii(nationalId) : null,
           nationalIdHash: nationalId ? hashPii(nationalId) : null,
           mobileEnc: p.mobile ? encryptPii(p.mobile) : null,

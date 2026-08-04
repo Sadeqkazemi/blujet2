@@ -29,6 +29,7 @@ import { RefreshToken } from '../../database/entities/refresh-token.entity';
 import { AuditService } from '../audit/audit.service';
 import { CartableService } from '../cartable/cartable.service';
 import { ErrorCode } from '../../common/errors';
+import { normalizeIranPhone } from '../../common/normalize-iran-phone';
 import { generateTempPassword } from '../../common/temp-password';
 import { StepUpService } from '../auth/step-up.service';
 import { SmsService } from '../sms/sms.service';
@@ -124,16 +125,22 @@ export class AgenciesService {
    * (that only happens once staff approve). See docs/DB_SCHEMA.md Phase 16
    * for why this doesn't reuse TwoFactorChallenge. */
   async requestPublicOtp(phone: string): Promise<{ challengeId: string }> {
+    const normalized = normalizeIranPhone(phone);
     const code = generateSixDigitCode();
     const challenge = await this.requestOtpRepo.save(
       this.requestOtpRepo.create({
-        phone,
+        phone: normalized,
         codeHash: await argon2.hash(code),
         expiresAt: new Date(Date.now() + REQUEST_OTP_TTL_MS),
       }),
     );
     await this.twoFactorProvider.sendCode(
-      { id: challenge.id, fullName: 'متقاضی همکاری آژانس', email: null, phone },
+      {
+        id: challenge.id,
+        fullName: 'متقاضی همکاری آژانس',
+        email: null,
+        phone: normalized,
+      },
       code,
     );
     return { challengeId: challenge.id };
@@ -149,10 +156,11 @@ export class AgenciesService {
     challengeId: string;
     code: string;
   }): Promise<{ id: string }> {
+    const phone = normalizeIranPhone(dto.phone);
     const challenge = await this.requestOtpRepo.findOneBy({
       id: dto.challengeId,
     });
-    if (!challenge || challenge.phone !== dto.phone) {
+    if (!challenge || challenge.phone !== phone) {
       throw new UnauthorizedException({
         code: 'TWO_FACTOR_INVALID',
         message: 'کد تأیید نامعتبر است.',
@@ -196,7 +204,7 @@ export class AgenciesService {
         applicantName: dto.applicantName,
         managerName: dto.managerName,
         licenseNo: dto.licenseNo,
-        phone: dto.phone,
+        phone,
         status: 'PENDING',
       }),
     );
@@ -807,10 +815,11 @@ export class AgenciesService {
 
     const { agencyUserId } = await this.profileRepo.manager.transaction(
       async (tx) => {
+        const agencyPhone = normalizeIranPhone(request.phone);
         const user = await tx.save(
           tx.create(User, {
             role: 'AGENCY',
-            phone: request.phone,
+            phone: agencyPhone,
             email: request.email,
             fullName: request.applicantName,
             passwordHash,
@@ -824,7 +833,7 @@ export class AgenciesService {
             userId: user.id,
             licenseNo: request.licenseNo,
             managerName: request.managerName,
-            phone: request.phone,
+            phone: agencyPhone,
             // Public pre-registration (Phase 16) collects neither — staff
             // fill these in during onboarding, same as the street address.
             email: request.email ?? '',
@@ -859,7 +868,7 @@ export class AgenciesService {
     // Phase 16: a real SMS now confirms approval + delivers access instead
     // of the temp password only ever appearing in the API response.
     await this.sms.send(
-      request.phone,
+      normalizeIranPhone(request.phone),
       `درخواست همکاری آژانس شما تأیید شد. رمز عبور موقت شما در بلوجت: ${tempPassword}`,
       'TEMP_PASSWORD',
     );

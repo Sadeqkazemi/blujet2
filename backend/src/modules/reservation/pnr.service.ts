@@ -28,6 +28,7 @@ import { InternalService } from '../../database/entities/internal-service.entity
 import { AgencyApiKey } from '../../database/entities/agency-api-key.entity';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
+import { applyOccupyingBookingFilter } from '../../common/booking-seat-occupancy';
 import {
   encryptPii,
   hashPii,
@@ -103,8 +104,8 @@ export class PnrService {
       .createQueryBuilder(Passenger, 'p')
       .innerJoin('p.booking', 'b')
       .where('p.seatCode = :seatCode', { seatCode })
-      .andWhere('b.flightInstanceId = :flightInstanceId', { flightInstanceId })
-      .andWhere('b.status != :cancelled', { cancelled: 'CANCELLED' });
+      .andWhere('b.flightInstanceId = :flightInstanceId', { flightInstanceId });
+    applyOccupyingBookingFilter(qb);
     if (excludeBookingId) {
       qb.andWhere('p.bookingId != :excludeBookingId', { excludeBookingId });
     }
@@ -393,13 +394,15 @@ export class PnrService {
     }[] = [];
     for (const instance of instances) {
       const [soldCount, map, pricing] = await Promise.all([
-        this.passengerRepo
-          .createQueryBuilder('p')
-          .innerJoin('p.booking', 'b')
-          .where('p.seatCode IS NOT NULL')
-          .andWhere('b.flightInstanceId = :id', { id: instance.id })
-          .andWhere('b.status != :cancelled', { cancelled: 'CANCELLED' })
-          .getCount(),
+        (() => {
+          const qb = this.passengerRepo
+            .createQueryBuilder('p')
+            .innerJoin('p.booking', 'b')
+            .where('p.seatCode IS NOT NULL')
+            .andWhere('b.flightInstanceId = :id', { id: instance.id });
+          applyOccupyingBookingFilter(qb);
+          return qb.getCount();
+        })(),
         this.seatMapRepo.findOneBy({
           aircraftType: resolveAircraftType(instance),
         }),
@@ -755,13 +758,15 @@ export class PnrService {
         const map = await this.seatMapRepo.findOneBy({ aircraftType });
         const capacity = map ? enumerateSeats(map).length : instance.capacity;
         const [soldCount, lockedCount] = await Promise.all([
-          this.passengerRepo
-            .createQueryBuilder('p')
-            .innerJoin('p.booking', 'b')
-            .where('p.seatCode IS NOT NULL')
-            .andWhere('b.flightInstanceId = :id', { id: instance.id })
-            .andWhere('b.status != :cancelled', { cancelled: 'CANCELLED' })
-            .getCount(),
+          (() => {
+            const qb = this.passengerRepo
+              .createQueryBuilder('p')
+              .innerJoin('p.booking', 'b')
+              .where('p.seatCode IS NOT NULL')
+              .andWhere('b.flightInstanceId = :id', { id: instance.id });
+            applyOccupyingBookingFilter(qb);
+            return qb.getCount();
+          })(),
           this.seatLockRepo
             .createQueryBuilder('sl')
             .where('sl.flightInstanceId = :id', { id: instance.id })
@@ -827,7 +832,9 @@ export class PnrService {
         .createQueryBuilder('p')
         .innerJoin('p.booking', 'b')
         .where('p.seatCode IS NOT NULL')
-        .andWhere('b.status != :cancelled', { cancelled: 'CANCELLED' })
+        .andWhere('b.status IN (:...occupyingStatuses)', {
+          occupyingStatuses: ['DRAFT', 'HELD', 'PAID', 'TICKETED'],
+        })
         .getCount(),
       this.ledgerRepo
         .createQueryBuilder('l')
