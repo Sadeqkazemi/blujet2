@@ -45,6 +45,9 @@ jobs:
       - run: npm ci
       - run: cp .env.test .env
       - run: npm run migration:run
+      # E2E suites expect seeded staff/users/flights (ceo, finance, …).
+      # Migrations alone leave an empty schema → systemic 401 / User-not-found.
+      - run: npm run seed
       - run: npm run lint
       - run: npm run build
       - run: npm test

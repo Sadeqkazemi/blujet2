@@ -11,7 +11,7 @@ import { Airport } from '../../database/entities/airport.entity';
 import { RefundRequest } from '../../database/entities/refund-request.entity';
 import { Role } from '../../database/enums';
 import { ErrorCode } from '../../common/errors';
-import { decryptPii } from '../../common/pii-crypto';
+import { tryDecryptPii } from '../../common/pii-crypto';
 import {
   normalizeIranPhone,
   toLatinDigits,
@@ -100,9 +100,7 @@ export class CustomersService {
     const customers = users.map((u) => {
       const incomplete = isIncomplete(u);
       const club = clubByUser.get(u.id);
-      const nationalId = u.nationalIdEnc
-        ? decryptPii(u.nationalIdEnc)
-        : null;
+      const nationalId = tryDecryptPii(u.nationalIdEnc);
       return {
         id: u.id,
         fullName: u.fullName?.trim() || '',
@@ -152,9 +150,7 @@ export class CustomersService {
     }
 
     const incomplete = isIncomplete(user);
-    const nationalId = user.nationalIdEnc
-      ? decryptPii(user.nationalIdEnc)
-      : null;
+    const nationalId = tryDecryptPii(user.nationalIdEnc);
 
     const club = await this.clubRepo.findOne({ where: { userId: user.id } });
 

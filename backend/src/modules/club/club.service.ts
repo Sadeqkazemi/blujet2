@@ -19,7 +19,7 @@ import { ErrorCode } from '../../common/errors';
 import {
   encryptPii,
   hashPii,
-  decryptPii,
+  tryDecryptPii,
   isValidIranianNationalId,
   normalizeNationalId,
 } from '../../common/pii-crypto';
@@ -229,7 +229,7 @@ export class ClubService {
       members: members.map((m) => ({
         ...toMemberView(m),
         ...(includeNationalId
-          ? { nationalId: decryptPii(m.nationalIdEnc) }
+          ? { nationalId: tryDecryptPii(m.nationalIdEnc) }
           : {}),
       })),
       kpis: {
@@ -458,7 +458,7 @@ export class ClubService {
         level: r.member.level,
         birthDate: r.member.birthDate,
         joinDate: r.member.joinDate,
-        nationalId: decryptPii(r.member.nationalIdEnc),
+        nationalId: tryDecryptPii(r.member.nationalIdEnc),
       },
       level: r.level,
       points: r.points,

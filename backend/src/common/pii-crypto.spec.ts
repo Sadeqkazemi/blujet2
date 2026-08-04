@@ -4,6 +4,7 @@ import {
   hashPii,
   isValidIranianNationalId,
   normalizeNationalId,
+  tryDecryptPii,
 } from './pii-crypto';
 
 describe('pii-crypto (unit)', () => {
@@ -17,6 +18,13 @@ describe('pii-crypto (unit)', () => {
     expect(a).not.toBe(b);
     expect(decryptPii(a)).toBe('0012345679');
     expect(decryptPii(b)).toBe('0012345679');
+  });
+
+  it('tryDecryptPii returns null for missing or undecryptable ciphertext', () => {
+    expect(tryDecryptPii(null)).toBeNull();
+    expect(tryDecryptPii(undefined)).toBeNull();
+    expect(tryDecryptPii('not-valid-ciphertext')).toBeNull();
+    expect(tryDecryptPii(encryptPii('0012345679'))).toBe('0012345679');
   });
 
   it('hash is deterministic for the same input and differs for different inputs', () => {

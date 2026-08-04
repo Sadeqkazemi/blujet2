@@ -5,6 +5,7 @@
   "testRegex": ".e2e-spec.ts$",
   "maxWorkers": 1,
   "testTimeout": 20000,
+  "globalSetup": "<rootDir>/global-setup.ts",
   "setupFiles": ["<rootDir>/jest-setup.ts"],
   "moduleNameMapper": {
     "^(\\.{1,2}/.*)\\.js$": "$1"

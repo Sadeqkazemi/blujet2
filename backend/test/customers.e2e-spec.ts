@@ -49,11 +49,13 @@ describe('Customers (SITE_ADMIN) (e2e)', () => {
       },
     );
 
-    // Incomplete customer (no national ID).
+    // Incomplete customer (no national ID) — unique phone so re-runs on a
+    // shared seeded DB don't collide with users_phone_key.
+    const incompletePhone = `+98919${Date.now().toString().slice(-7)}`;
     await userRepo.save(
       userRepo.create({
         role: Role.USER,
-        phone: '+989199998877',
+        phone: incompletePhone,
         fullName: '',
         isActive: true,
         updatedAt: new Date(),

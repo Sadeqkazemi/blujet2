@@ -25,6 +25,7 @@ import {
   hashPii,
   isValidIranianNationalId,
   normalizeNationalId,
+  tryDecryptPii,
 } from '../../common/pii-crypto';
 import type {
   ApplyJobDto,
@@ -421,7 +422,7 @@ export class CareersService {
     const q = query.q?.trim().toLowerCase();
     const filtered = q
       ? rows.filter((a) => {
-          const nid = decryptPii(a.nationalIdEnc);
+          const nid = tryDecryptPii(a.nationalIdEnc) ?? '';
           const hay =
             `${a.firstName} ${a.lastName} ${nid} ${a.phone} ${a.email ?? ''}`.toLowerCase();
           return hay.includes(q);
@@ -432,7 +433,7 @@ export class CareersService {
       id: a.id,
       name: `${a.firstName} ${a.lastName}`,
       jobTitle: a.jobTitleSnapshot,
-      nationalId: decryptPii(a.nationalIdEnc),
+      nationalId: tryDecryptPii(a.nationalIdEnc),
       phone: a.phone,
       email: a.email,
       at: a.createdAt,
@@ -458,7 +459,7 @@ export class CareersService {
       id: a.id,
       name: `${a.firstName} ${a.lastName}`,
       jobTitle: a.jobTitleSnapshot,
-      nationalId: decryptPii(a.nationalIdEnc),
+      nationalId: tryDecryptPii(a.nationalIdEnc),
       fatherName: a.fatherName,
       birthDate: a.birthDate,
       phone: a.phone,
