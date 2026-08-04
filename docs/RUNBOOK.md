@@ -91,10 +91,10 @@ docker compose -f docker-compose.prod.yml up -d
 git checkout main                 # return HEAD to main once stable
 ```
 
-The backend container runs `prisma migrate deploy` automatically on
-startup (see `backend/docker-entrypoint.sh`) — rolling back code does NOT
+The backend container runs `npm run migration:run:prod` (TypeORM) automatically
+on startup (see `backend/docker-entrypoint.sh`) — rolling back code does NOT
 undo an already-applied schema migration. Check
-`backend/prisma/migrations/` before rolling back a release that touched
+`backend/src/database/migrations/` before rolling back a release that touched
 the schema, and restore from backup if the migration needs to be reversed.
 
 ## First-time server setup
