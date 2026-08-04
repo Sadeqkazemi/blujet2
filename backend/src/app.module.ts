@@ -50,6 +50,7 @@ import { WebservicePricingModule } from './modules/webservice-pricing/webservice
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: ['.env.local', '.env'],
       validate: validateEnv,
     }),
     LoggerModule.forRoot({

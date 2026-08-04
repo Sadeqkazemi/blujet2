@@ -15,10 +15,6 @@ import type { StepUpScope } from '../../database/enums';
 const STEP_UP_TTL_MS = 2 * 60 * 1000;
 const STEP_UP_MAX_ATTEMPTS = 5;
 
-function generateSixDigitCode(): string {
-  return crypto.randomInt(0, 1_000_000).toString().padStart(6, '0');
-}
-
 /** Phase 15 — a fresh re-authentication challenge required immediately
  * before a high-risk write, on top of (not instead of) the actor's
  * existing session JWT. Reuses TwoFactorChallenge and the same delivery

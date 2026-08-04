@@ -365,7 +365,7 @@ describe('Auth (e2e)', () => {
   // ── Public purchase engine: customer OTP login ──────────────────────
 
   it('OTP request creates a fresh USER on first login and reuses it on repeat requests', async () => {
-    const phone = '09120000001';
+    const phone = '09121234567';
     const first = await request(app.getHttpServer())
       .post('/auth/otp/request')
       .send({ phone });
@@ -386,6 +386,33 @@ describe('Auth (e2e)', () => {
       phone: normalizeIranPhone(phone),
     });
     expect(user2.id).toBe(user1.id);
+  });
+
+  it('OTP request with Persian digits resolves the seeded customer account', async () => {
+    const requestRes = await request(app.getHttpServer())
+      .post('/auth/otp/request')
+      .send({ phone: '۰۹۱۲۰۰۰۰۰۰۱' });
+    expect(requestRes.status).toBe(200);
+
+    const seeded = await typeorm.user.findUniqueOrThrow({
+      where: { phone: '+989120000001' },
+    });
+    expect(seeded.fullName).toBe('نگار رضایی');
+
+    const codeRes = await request(app.getHttpServer()).get(
+      '/auth/_test/last-otp/09120000001',
+    );
+    expect(codeRes.status).toBe(200);
+
+    const verifyRes = await request(app.getHttpServer())
+      .post('/auth/otp/verify')
+      .send({
+        challengeId: requestRes.body.data.challengeId,
+        code: codeRes.body.data.code,
+      });
+    expect(verifyRes.status).toBe(200);
+    expect(verifyRes.body.data.user.id).toBe(seeded.id);
+    expect(verifyRes.body.data.user.fullName).toBe('نگار رضایی');
   });
 
   it('rejects a malformed phone number with 400', async () => {
@@ -421,8 +448,28 @@ describe('Auth (e2e)', () => {
     expect(String(setCookie)).toContain('blujet_refresh=');
   });
 
+  it('accepts Persian-digit OTP codes', async () => {
+    const phone = '09127654321';
+    const requestRes = await request(app.getHttpServer())
+      .post('/auth/otp/request')
+      .send({ phone });
+    const challengeId = requestRes.body.data.challengeId as string;
+
+    const codeRes = await request(app.getHttpServer()).get(
+      `/auth/_test/last-otp/${phone}`,
+    );
+    const latinCode = codeRes.body.data.code as string;
+    const persianCode = latinCode.replace(/\d/g, (d: string) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)]);
+
+    const verifyRes = await request(app.getHttpServer())
+      .post('/auth/otp/verify')
+      .send({ challengeId, code: persianCode });
+    expect(verifyRes.status).toBe(200);
+    expect(verifyRes.body.data.user.role).toBe('USER');
+  });
+
   it('rejects a wrong OTP code without consuming the challenge', async () => {
-    const phone = '09120000003';
+    const phone = '09120000099';
     const requestRes = await request(app.getHttpServer())
       .post('/auth/otp/request')
       .send({ phone });

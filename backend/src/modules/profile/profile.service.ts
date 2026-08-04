@@ -22,10 +22,7 @@ import { TWO_FACTOR_PROVIDER } from '../auth/providers/two-factor-provider.inter
 import type { TwoFactorProvider } from '../auth/providers/two-factor-provider.interface';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { UpdateProfileDto } from './dto/profile.dtos';
-
-function generateSixDigitCode(): string {
-  return crypto.randomInt(0, 1_000_000).toString().padStart(6, '0');
-}
+import { generateOtpCode } from '../../common/generate-otp-code';
 
 const EMAIL_VERIFY_TTL_MS = 2 * 60 * 1000;
 const EMAIL_VERIFY_MAX_ATTEMPTS = 5;

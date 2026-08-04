@@ -45,6 +45,7 @@ import type { Irr } from '../../common/money';
 import { TWO_FACTOR_PROVIDER } from '../auth/providers/two-factor-provider.interface';
 import type { TwoFactorProvider } from '../auth/providers/two-factor-provider.interface';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
+import { generateOtpCode } from '../../common/generate-otp-code';
 import type {
   AgencyApiScope,
   AgencyApiKeyStatus,
@@ -64,10 +65,6 @@ function generateApiKeySecret(): string {
 
 function generateInvoiceNo(): string {
   return `INV-${Date.now().toString(36).toUpperCase()}${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
-}
-
-function generateSixDigitCode(): string {
-  return crypto.randomInt(0, 1_000_000).toString().padStart(6, '0');
 }
 
 const DECIDABLE_STATUSES: AgencyMembershipStatus[] = ['PENDING', 'REFERRED'];
