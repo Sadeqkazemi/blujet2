@@ -12,6 +12,7 @@ import { In, Repository } from 'typeorm';
 import { CareersSettings } from '../../database/entities/careers-settings.entity';
 import { JobPosting } from '../../database/entities/job-posting.entity';
 import { JobApplication } from '../../database/entities/job-application.entity';
+import { StoredFile } from '../../database/entities/stored-file.entity';
 import { User } from '../../database/entities/user.entity';
 import type { JsonValue } from '../../database/json-types';
 import { AuditService } from '../audit/audit.service';
@@ -66,6 +67,8 @@ export class CareersService {
     private readonly jobPostingRepo: Repository<JobPosting>,
     @InjectRepository(JobApplication)
     private readonly jobApplicationRepo: Repository<JobApplication>,
+    @InjectRepository(StoredFile)
+    private readonly storedFileRepo: Repository<StoredFile>,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
     private readonly audit: AuditService,
@@ -141,6 +144,21 @@ export class CareersService {
       type: job.type,
       generalReqs: job.generalReqs,
       specialReqs: job.specialReqs,
+    };
+  }
+
+  async readPublicMedia(fileId: string) {
+    const file = await this.storedFileRepo.findOneBy({ id: fileId });
+    if (!file || !fs.existsSync(file.path)) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'تصویر یافت نشد.',
+      });
+    }
+    return {
+      mimeType: file.mimeType,
+      fileName: file.fileName,
+      stream: fs.createReadStream(file.path),
     };
   }
 

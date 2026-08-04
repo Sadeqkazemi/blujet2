@@ -1342,20 +1342,15 @@ export class AgenciesService {
 
   /** Cross-agency queue for SITE_ADMIN «درخواست وب‌سرویس» tab. */
   async listAllWebserviceRequests(status?: 'PENDING' | 'APPROVED' | 'REJECTED') {
-    const rows = await this.prisma.agencyWebserviceRequest.findMany({
-      where: status ? { status } : undefined,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        agency: {
-          select: {
-            userId: true,
-            city: true,
-            licenseNo: true,
-            user: { select: { fullName: true } },
-          },
-        },
-      },
-    });
+    const qb = this.webserviceRequestRepo
+      .createQueryBuilder('r')
+      .leftJoin('r.agency', 'agency')
+      .leftJoin('agency.user', 'user')
+      .addSelect(['agency.userId', 'agency.city', 'agency.licenseNo'])
+      .addSelect(['user.fullName'])
+      .orderBy('r.createdAt', 'DESC');
+    if (status) qb.where('r.status = :status', { status });
+    const rows = await qb.getMany();
     return rows.map((r) => ({
       id: r.id,
       agencyId: r.agencyId,

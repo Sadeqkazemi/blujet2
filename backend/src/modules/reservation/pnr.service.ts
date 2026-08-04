@@ -20,6 +20,7 @@ import { Passenger } from '../../database/entities/passenger.entity';
 import { FlightInstance } from '../../database/entities/flight-instance.entity';
 import { Flight } from '../../database/entities/flight.entity';
 import { Airport } from '../../database/entities/airport.entity';
+import { AgencyApiKey } from '../../database/entities/agency-api-key.entity';
 import { SeatLock } from '../../database/entities/seat-lock.entity';
 import { AircraftSeatMap } from '../../database/entities/aircraft-seat-map.entity';
 import { FarePricingProposal } from '../../database/entities/fare-pricing-proposal.entity';
@@ -43,6 +44,7 @@ import type {
   FinalizeLockDto,
   IssuePnrDto,
   ListPnrQueryDto,
+  ListReservationFlightsQueryDto,
   SearchFlightsQueryDto,
 } from './dto/reservation.dtos';
 
@@ -701,6 +703,86 @@ export class PnrService {
     return this.detail(booking.pnr);
   }
 
+  async listFlights(query: ListReservationFlightsQueryDto | string = {}) {
+    const q = (typeof query === 'string' ? query : query.q)?.trim().toLowerCase();
+    await materializeFlownBookings(this.dataSource);
+    const airports = await this.airportRepo.find({
+      select: { code: true, cityFa: true },
+    });
+    const cityByCode = new Map(airports.map((a) => [a.code, a.cityFa]));
+    const instances = await this.flightInstanceRepo
+      .createQueryBuilder('fi')
+      .leftJoinAndSelect('fi.flight', 'flight')
+      .leftJoinAndSelect('flight.route', 'route')
+      .where('fi.status = :status', { status: 'SCHEDULED' })
+      .orderBy('fi.departureAt', 'ASC')
+      .take(120)
+      .getMany();
+    const filtered = q
+      ? instances.filter((instance) => {
+          const originCode = instance.flight.route.originCode;
+          const destCode = instance.flight.route.destCode;
+          const origin = cityByCode.get(originCode) ?? originCode;
+          const dest = cityByCode.get(destCode) ?? destCode;
+          const hay =
+            `${instance.flight.flightNo} ${originCode} ${destCode} ${origin} ${dest} ${instance.aircraftTypeOverride ?? instance.flight.aircraftType}`.toLowerCase();
+          return hay.includes(q);
+        })
+      : instances;
+    const limited = filtered.slice(0, 60);
+    const now = new Date();
+    return Promise.all(
+      limited.map(async (instance) => {
+        const aircraftType = resolveAircraftType(instance);
+        const map = await this.seatMapRepo.findOneBy({ aircraftType });
+        const capacity = map ? enumerateSeats(map).length : instance.capacity;
+        const [soldCount, lockedCount] = await Promise.all([
+          this.passengerRepo
+            .createQueryBuilder('p')
+            .innerJoin('p.booking', 'b')
+            .where('p.seatCode IS NOT NULL')
+            .andWhere('b.flightInstanceId = :flightInstanceId', {
+              flightInstanceId: instance.id,
+            })
+            .andWhere('b.status != :cancelled', { cancelled: 'CANCELLED' })
+            .getCount(),
+          this.seatLockRepo.count({
+            where: {
+              flightInstanceId: instance.id,
+              releasedAt: IsNull(),
+              expiresAt: MoreThanOrEqual(now),
+            },
+          }),
+        ]);
+        const originCode = instance.flight.route.originCode;
+        const destCode = instance.flight.route.destCode;
+        const originCityFa = cityByCode.get(originCode) ?? originCode;
+        const destCityFa = cityByCode.get(destCode) ?? destCode;
+        const occupancyPct = capacity > 0 ? Math.round((soldCount / capacity) * 100) : 0;
+        const statusKey =
+          occupancyPct >= 100 ? 'FULL' : occupancyPct >= 90 ? 'NEAR_FULL' : 'SELLING';
+        return {
+          flightInstanceId: instance.id,
+          flightNo: instance.flight.flightNo,
+          aircraftType,
+          originCode,
+          destCode,
+          originCityFa,
+          destCityFa,
+          route: `${originCityFa} ← ${destCityFa}`,
+          departureAt: instance.departureAt,
+          capacity,
+          sold: soldCount,
+          soldCount,
+          lockedCount,
+          freeCount: Math.max(0, capacity - soldCount - lockedCount),
+          occupancyPct,
+          statusKey,
+        };
+      }),
+    );
+  }
+
   async dashboardStats() {
     const dayStart = new Date();
     dayStart.setHours(0, 0, 0, 0);
@@ -733,6 +815,27 @@ export class PnrService {
       seatsSold: soldSeats,
       revenueIrr: revenueRow?.sum ? BigInt(revenueRow.sum) : ZERO_IRR,
     };
+  }
+
+  async agencyApiAccess() {
+    const keyRepo = this.dataSource.getRepository(AgencyApiKey);
+    const keys = await keyRepo.find({
+      relations: { agency: { user: true } },
+      order: { activatedAt: 'DESC' },
+    });
+    return keys.map((k) => {
+      const name = k.agency.user.fullName;
+      const initials = name.replace(/\s+/g, '').slice(0, 2) || '؟';
+      return {
+        id: k.id,
+        agencyId: k.agencyId,
+        name,
+        initials,
+        keyHint: `bjk_••••${k.id.replace(/-/g, '').slice(0, 4)}`,
+        callCount: k.callCount,
+        status: k.status,
+      };
+    });
   }
 
   /**

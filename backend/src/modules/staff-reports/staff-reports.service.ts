@@ -93,9 +93,9 @@ export class StaffReportsService {
 
   /** EMPLOYEE «گزارش‌های من» — own AuditLog feed (design activity cards). */
   async myActivity(actor: AuthenticatedUser) {
-    const rows = await this.prisma.auditLog.findMany({
+    const rows = await this.auditLogRepo.find({
       where: { actorId: actor.id },
-      orderBy: { createdAt: 'desc' },
+      order: { createdAt: 'DESC' },
       take: 40,
     });
     return {
