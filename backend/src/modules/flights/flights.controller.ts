@@ -391,7 +391,16 @@ export class FlightsController {
   // fl_manage (Phase 27) additionally unlocks every write endpoint —
   // create/schedule/ai-analysis/plan/aircraft/fare-rule/allotment.
   @Get('overview')
-  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  // Reservation shell (Board Chair / CEO / IT) reads the same active list
+  // for the design's «پروازها» tab; writes stay on commercial/senior roles.
+  @Roles(
+    'SENIOR_MANAGER',
+    'COMMERCIAL_MANAGER',
+    'EMPLOYEE',
+    'BOARD_CHAIR',
+    'CEO',
+    'IT_MANAGER',
+  )
   @RequiresPermission('fl_view')
   @ApiOperation({
     summary: 'کل تب مدیریت پروازها: KPI + فعال/انجام‌شده/آینده',

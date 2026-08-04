@@ -65,6 +65,15 @@ const STAFF_ROLES = [
   'SITE_ADMIN',
 ] as const;
 
+/** Design login uses «chairman»; seed account is «chair». */
+const STAFF_USERNAME_ALIASES: Record<string, string> = {
+  chairman: 'chair',
+};
+
+function resolveStaffUsername(username: string): string {
+  return STAFF_USERNAME_ALIASES[username] ?? username;
+}
+
 function generateSixDigitCode(): string {
   return generateOtpCode();
 }

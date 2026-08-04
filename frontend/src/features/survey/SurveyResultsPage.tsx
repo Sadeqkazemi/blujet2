@@ -3,7 +3,33 @@ import { analyzeSurveyFlight, fetchSurveyResults } from '../../api/survey';
 import { useAuth } from '../../hooks/useAuth';
 import { faDigits } from '../../lib/fa-format';
 import { formatJalaliDate } from '../../lib/jalali';
+import PanelAlert from '../panel/PanelAlert';
+import {
+  panelAlertWarning,
+  panelBtnPrimary,
+  panelCard,
+  panelMuted,
+  panelMuted2,
+  panelTitle,
+} from '../panel/panel-theme';
 import type { SurveyResultRow } from '../../types/survey';
+
+function RatingStars({ rating }: { rating: number }) {
+  const rounded = Math.round(rating);
+  return (
+    <div className="flex justify-end gap-0.5" aria-label={`امتیاز ${faDigits(rating)} از ۵`}>
+      {[1, 2, 3, 4, 5].map((i) => (
+        <span
+          key={i}
+          className="text-sm leading-none"
+          style={{ color: i <= rounded ? '#f59e0b' : '#3a4a63' }}
+        >
+          ★
+        </span>
+      ))}
+    </div>
+  );
+}
 
 /** CEO/SENIOR_MANAGER/BOARD_CHAIR — «نظرسنجی مسافران»: نتایج فقط‌خواندنی
  * به تفکیک پرواز + خلاصهٔ هوش مصنوعی نظرات هر پرواز. پیکربندی نزد مدیر

@@ -1,9 +1,9 @@
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './hooks/useAuth';
 import { LocaleProvider } from './hooks/useLocale';
 import ProtectedRoute from './components/ProtectedRoute';
 import AgencyProtectedRoute from './components/AgencyProtectedRoute';
-import PanelShell from './components/PanelShell';
+import PanelShell from './features/panel/PanelShell';
 import ComingSoonPage from './components/ComingSoonPage';
 import DashboardRouter from './components/DashboardRouter';
 import TabGate from './components/TabGate';
@@ -41,7 +41,7 @@ import ReservationPage from './features/reservation/ReservationPage';
 import FinancePage from './features/finance/FinancePage';
 import StaffReportsPage from './features/staff-reports/StaffReportsPage';
 import ManagerReportsPage from './features/manager-reports/ManagerReportsPage';
-import AdminsPage from './features/admins/AdminsPage';
+import AdminsRouter from './components/AdminsRouter';
 import SettingsPage from './features/settings/SettingsPage';
 import CommercialWebservicePage from './features/webservice/CommercialWebservicePage';
 import SecurityRouter from './components/SecurityRouter';
@@ -108,6 +108,7 @@ export default function App() {
           <Route path="/blog/:slug" element={<BlogPostPage />} />
 
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/staff/login" element={<Navigate to="/login" replace />} />
           <Route path="/two-factor" element={<TwoFactorPage />} />
           <Route path="/required-password-change" element={<ForcePasswordChangePage />} />
           <Route path="/agency/login" element={<AgencyLoginPage />} />
@@ -215,7 +216,7 @@ export default function App() {
                 <Route index element={<PanelsAccessPage />} />
               </Route>
               <Route path="admins" element={<TabGate tabKey="admins" />}>
-                <Route index element={<AdminsPage />} />
+                <Route index element={<AdminsRouter />} />
               </Route>
               <Route path="settings" element={<TabGate tabKey="settings" />}>
                 <Route index element={<SettingsPage />} />

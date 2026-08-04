@@ -91,6 +91,8 @@ export default defineConfig(({ mode }) => {
     host: '0.0.0.0',
     port: 5173,
     strictPort: true,
+    // Cloud Agent / localtunnel / Cursor forwarded hosts (dev only)
+    allowedHosts: true,
     proxy: devProxy,
   },
   plugins: [

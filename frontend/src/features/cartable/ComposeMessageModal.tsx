@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import Modal from '../../components/Modal';
 import { sendManagerMessage } from '../../api/cartable';
 import type { ManagerMessageDept } from '../../types/cartable';
+import PanelModal from '../panel/PanelModal';
+import { panelBtnGhost, panelBtnPrimary, panelInput, panelMuted, panelText } from '../panel/panel-theme';
 
 const DEPT_OPTIONS: { value: ManagerMessageDept; label: string }[] = [
   { value: 'FINANCE', label: 'واحد مالی' },
@@ -110,6 +111,6 @@ export default function ComposeMessageModal({ onClose, onSent, theme = 'light' }
           ارسال پیام
         </button>
       </div>
-    </Modal>
+    </PanelModal>
   );
 }

@@ -193,6 +193,7 @@ describe('FinancePage', () => {
 
   it('CEO gets the analytic view: sales chart + revenue mix, no transactions/settlements', async () => {
     mockRole('CEO');
+    vi.spyOn(reportingApi, 'fetchKpis').mockResolvedValue(KPIS);
     vi.spyOn(reportingApi, 'fetchSalesChart').mockResolvedValue([
       {
         periodKey: '2026-07-01',

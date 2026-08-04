@@ -1,9 +1,10 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import TwoFactorPage from './TwoFactorPage';
 import { ApiRequestError } from '../../api/envelope';
+import * as authApi from '../../api/auth';
 import * as useAuthModule from '../../hooks/useAuth';
 import { mockAuthUserWithRole } from '../../test/mockAuthUser';
 
@@ -22,10 +23,15 @@ const baseAuth = {
   verifyPasswordResetEmail: vi.fn(),
 };
 
-function renderTwoFactorPage(challengeId: string | null = 'chal-1') {
+function renderTwoFactorPage(challengeId: string | null = 'chal-1', username?: string) {
   return render(
     <MemoryRouter
-      initialEntries={[{ pathname: '/two-factor', state: challengeId ? { challengeId } : null }]}
+      initialEntries={[
+        {
+          pathname: '/two-factor',
+          state: challengeId ? { challengeId, ...(username ? { username } : {}) } : null,
+        },
+      ]}
     >
       <Routes>
         <Route path="/login" element={<div>صفحه ورود</div>} />
@@ -38,6 +44,10 @@ function renderTwoFactorPage(challengeId: string | null = 'chal-1') {
 }
 
 describe('TwoFactorPage', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+
   it('renders after a password submit carried a challengeId — Persian labels, 6-digit code input', () => {
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue(baseAuth);
     renderTwoFactorPage();
@@ -50,17 +60,55 @@ describe('TwoFactorPage', () => {
 
   it('redirects to /login instead of rendering when no challengeId is present', async () => {
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue(baseAuth);
+    sessionStorage.clear();
     renderTwoFactorPage(null);
 
     expect(await screen.findByText('صفحه ورود')).toBeInTheDocument();
     expect(screen.queryByText('تأیید هویت دومرحله‌ای')).not.toBeInTheDocument();
   });
 
+  it('restores challengeId from sessionStorage after a page refresh', async () => {
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue(baseAuth);
+    vi.spyOn(authApi, 'fetchDevLastStaffCode').mockResolvedValue({ code: '482913' });
+    sessionStorage.setItem(
+      'blujet_staff_2fa',
+      JSON.stringify({ challengeId: 'stored-chal', username: 'chair' }),
+    );
+
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/two-factor', state: null }]}>
+        <Routes>
+          <Route path="/login" element={<div>صفحه ورود</div>} />
+          <Route path="/two-factor" element={<TwoFactorPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('تأیید هویت دومرحله‌ای')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByLabelText('کد تأیید')).toHaveValue('482913');
+    });
+  });
+
+  it('auto-fills the dev 2FA code when username is carried from login', async () => {
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue(baseAuth);
+    vi.spyOn(authApi, 'fetchDevLastStaffCode').mockResolvedValue({ code: '482913' });
+    renderTwoFactorPage('chal-1', 'chair');
+
+    await waitFor(() => {
+      expect(screen.getByTestId('staff-2fa-dev-hint')).toHaveTextContent('482913');
+    });
+    expect(screen.getByLabelText('کد تأیید')).toHaveValue('482913');
+  });
+
   it('shows an inline Persian validation error for an incomplete code, without calling confirmTwoFactor', async () => {
     const confirmTwoFactor = vi.fn();
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ ...baseAuth, confirmTwoFactor });
+    vi.spyOn(authApi, 'fetchDevLastStaffCode').mockRejectedValue(new Error('not available'));
+    sessionStorage.clear();
     renderTwoFactorPage();
 
+    await userEvent.clear(screen.getByLabelText('کد تأیید'));
     await userEvent.type(screen.getByLabelText('کد تأیید'), '123');
     await userEvent.click(screen.getByRole('button', { name: 'تأیید و ورود' }));
 

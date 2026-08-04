@@ -16,6 +16,18 @@ import Pagination from '../../components/Pagination';
 import { usePagination } from '../../hooks/usePagination';
 import JalaliDatePicker from '../../components/JalaliDatePicker';
 import ComposeMessageModal from './ComposeMessageModal';
+import PanelAlert from '../panel/PanelAlert';
+import PanelModal from '../panel/PanelModal';
+import {
+  panelBtnGhost,
+  panelBtnPrimary,
+  panelCard,
+  panelInput,
+  panelMuted,
+  panelMuted2,
+  panelText,
+  panelTitle,
+} from '../panel/panel-theme';
 import type {
   CartableCategory,
   CartableListResult,
@@ -119,6 +131,16 @@ const CATEGORY_META: Record<
     ),
   },
 };
+
+function relativeFa(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  if (diffMs < 60_000) return 'همین الان';
+  const mins = Math.floor(diffMs / 60_000);
+  if (mins < 60) return `${faDigits(mins)} دقیقه پیش`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${faDigits(hours)} ساعت پیش`;
+  return formatJalaliDateTime(iso);
+}
 
 export default function CartablePage() {
   const { user } = useAuth();
@@ -256,11 +278,11 @@ export default function CartablePage() {
       )}
 
       {hasChairGate && (
-        <section className="mb-6 rounded-xl border border-[#f59e0b40] bg-[#f59e0b0d] p-5">
-          <h2 className="text-sm font-bold text-[#92400e]">ارجاع و ارسال گزارش به رئیس هیئت مدیره</h2>
-          <p className="mt-1 text-[11px] leading-relaxed text-[#92400e]/80">
-            دسترسی کامل کارتابل و ارجاعات مخصوص مدیر ارشد و مدیر عامل است؛ ارسال گزارش به رئیس هیئت مدیره
-            نیازمند مجوز ایشان است.
+        <section className="mb-6 rounded-[14px] border border-[rgba(245,158,11,.35)] bg-[rgba(245,158,11,.08)] p-5">
+          <h2 className="text-sm font-bold text-[#fbbf24]">ارجاع و ارسال گزارش به رئیس هیئت مدیره</h2>
+          <p className="mt-1 text-[11px] leading-relaxed text-[#fbbf24]/80">
+            دسترسی کامل کارتابل و ارجاعات مخصوص مدیر ارشد و مدیر عامل است؛ ارسال گزارش به رئیس هیئت مدیره نیازمند مجوز
+            ایشان است.
           </p>
           <div className="mt-3">
             {chairPerm?.status === 'APPROVED' ? (
@@ -268,13 +290,14 @@ export default function CartablePage() {
                 مجوز تأیید شد ✓
               </span>
             ) : chairPerm?.status === 'PENDING' ? (
-              <span className="rounded-full bg-[#f59e0b24] px-3 py-1.5 text-xs font-bold text-[#b45309]">
+              <span className="rounded-full bg-[rgba(245,158,11,.16)] px-3 py-1.5 text-xs font-bold text-[#f59e0b]">
                 درخواست ارسال شد — در انتظار تأیید
               </span>
             ) : (
               <button
+                type="button"
                 onClick={() => void onRequestChairPerm()}
-                className="rounded-lg bg-[#b45309] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#92400e]"
+                className="rounded-lg bg-[#f59e0b] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#d97706]"
               >
                 درخواست مجوز از رئیس هیئت مدیره
               </button>
@@ -544,6 +567,25 @@ export default function CartablePage() {
             <div className={`mt-0.5 text-xs font-bold ${dark ? 'text-[#e7ecf3]' : 'text-ink'}`}>
               {reviewTask.senderLabelFa ?? reviewTask.sender?.fullName ?? '—'}
             </div>
+          }
+        >
+          <div className="mb-3 flex items-center gap-2">
+            <span className={`rounded-full px-2.5 py-0.5 text-[10.5px] font-bold ${badge.className}`}>{badge.label}</span>
+          </div>
+          <div className="mb-1 text-[15px] font-extrabold text-white">{reviewTask.title}</div>
+          <p className={`mb-4 text-[11.5px] leading-relaxed ${panelMuted}`}>{reviewTask.description}</p>
+
+          <div className="mb-4 flex items-center gap-3 rounded-[11px] bg-[#0f1726] px-[13px] py-[11px]">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#28344c] text-[11px] font-extrabold text-white">
+              {(reviewTask.sender?.fullName ?? '؟').slice(0, 2)}
+            </span>
+            <div className="min-w-0 flex-1 leading-snug">
+              <div className={`text-[10px] ${panelMuted}`}>ارسال‌کننده‌ی درخواست</div>
+              <div className={`text-xs font-bold ${panelText}`}>
+                {reviewTask.senderLabelFa ?? reviewTask.sender?.fullName ?? '—'}
+              </div>
+            </div>
+            <span className={`text-[10.5px] ${panelMuted2}`}>{relativeFa(reviewTask.createdAt)}</span>
           </div>
 
           <label

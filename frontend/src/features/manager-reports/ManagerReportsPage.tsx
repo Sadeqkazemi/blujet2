@@ -67,6 +67,12 @@ function isToday(iso: string): boolean {
   return isSameJalaliDay(iso, new Date().toISOString());
 }
 
+function isTodayTehran(iso: string): boolean {
+  const today = dayjs().tz('Asia/Tehran').format('YYYY-MM-DD');
+  const rowDay = dayjs(iso).tz('Asia/Tehran').format('YYYY-MM-DD');
+  return rowDay === today;
+}
+
 export default function ManagerReportsPage() {
   const { user } = useAuth();
   const dark =

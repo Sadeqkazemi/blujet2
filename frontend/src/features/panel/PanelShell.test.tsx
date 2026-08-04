@@ -1,12 +1,12 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import PanelShell from './PanelShell';
-import * as panelsApi from '../api/panels';
-import * as cartableApi from '../api/cartable';
-import * as refundsApi from '../api/refunds';
-import * as reportingApi from '../api/reporting';
-import * as useAuthModule from '../hooks/useAuth';
+import * as panelsApi from '../../api/panels';
+import * as cartableApi from '../../api/cartable';
+import * as refundsApi from '../../api/refunds';
+import * as reportingApi from '../../api/reporting';
+import * as useAuthModule from '../../hooks/useAuth';
 
 function renderShell() {
   return render(
@@ -17,6 +17,37 @@ function renderShell() {
 }
 
 describe('PanelShell', () => {
+  beforeEach(() => {
+    vi.spyOn(panelsApi, 'fetchPanelSelfStatus').mockResolvedValue({
+      panelKey: 'FINANCE',
+      enabled: true,
+    });
+  });
+
+  it('shows a blocked screen when the role panel is disabled', async () => {
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      status: 'authenticated',
+      user: { id: 'u5', fullName: 'مدیر عامل', role: 'CEO', preferredLocale: 'FA' },
+      requestLogin: vi.fn(),
+      confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
+      signOut: vi.fn(),
+    });
+    vi.spyOn(panelsApi, 'fetchNav').mockResolvedValue([
+      { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
+    ]);
+    vi.spyOn(panelsApi, 'fetchPanelSelfStatus').mockResolvedValue({
+      panelKey: 'CEO',
+      enabled: false,
+    });
+
+    renderShell();
+
+    expect(await screen.findByTestId('panel-blocked')).toBeInTheDocument();
+    expect(screen.getByText(/پنل مدیر عامل غیرفعال است/)).toBeInTheDocument();
+    expect(screen.queryByTestId('panel-sidebar')).not.toBeInTheDocument();
+  });
+
   it('shows sidebar badges for cartable, refund queue, and new staff events', async () => {
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
       status: 'authenticated',

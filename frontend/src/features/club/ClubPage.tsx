@@ -251,7 +251,6 @@ export default function ClubPage() {
         birthDate,
       });
       setNotice(`«${form.fullName.trim()}» به باشگاه افزوده شد ✓`);
-      setAddOpen(false);
       setForm({ fullName: '', email: '', birth: '', nationalId: '', level: 'SILVER' });
       setAddError(null);
       await load();
@@ -663,9 +662,9 @@ export default function ClubPage() {
                 );
               })}
             </div>
-          )}
-        </div>
-
+          ) : undefined
+        }
+      >
         {!isSenior && (
           <div className="relative mb-3.5">
             <span className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-[#6b7b94]">
@@ -702,6 +701,10 @@ export default function ClubPage() {
             نمایش <span className="font-extrabold text-[#cdd9ec]">{faDigits(members.length)}</span> عضو
           </div>
         )}
+
+        <p className={`mb-3 text-[11.5px] ${panelMuted}`}>
+          نمایش <span className="font-num font-extrabold text-[#cdd9ec]">{faDigits(members.length)}</span> عضو
+        </p>
 
         {loading ? (
           <p className={`py-6 text-center text-sm ${dark ? 'text-[#6b7b94]' : 'text-muted'}`}>
@@ -789,7 +792,9 @@ export default function ClubPage() {
                 className={dark ? 'rounded-xl border border-[#1f2a3d] bg-[#101a2c] px-3 py-3' : 'py-3'}
               >
                 <div
-                  className={`flex flex-wrap items-center gap-3 ${isSenior ? 'cursor-pointer' : ''}`}
+                  className={`flex flex-wrap items-center gap-3 ${panelElevated} p-3 ${
+                    isSenior ? 'cursor-pointer transition hover:border-panel-accent/40' : ''
+                  }`}
                   onClick={() => isSenior && setExpandedMember(expandedMember === m.id ? null : m.id)}
                 >
                   <span
@@ -829,6 +834,10 @@ export default function ClubPage() {
                       <span className="ltr">{m.email}</span> · امتیاز{' '}
                       <span className="font-num font-bold">{faPoints(m.points)}</span>
                     </div>
+                  </div>
+                  <div className="shrink-0 text-center">
+                    <div className={`text-[9.5px] ${panelMuted}`}>امتیاز</div>
+                    <div className="font-num text-[12.5px] font-extrabold text-panel-text">{faPoints(m.points)}</div>
                   </div>
                   {m.cardStatus === 'ISSUED' ? (
                     <span

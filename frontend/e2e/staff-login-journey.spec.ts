@@ -14,7 +14,7 @@ const ROLE_CASES = [
     username: 'finance',
     roleLabel: 'مدیر مالی',
     expectedTabs: ['داشبورد', 'آژانس‌ها', 'گزارش مسافران', 'گزارش کارمندان', 'مالی', 'استرداد بلیط', 'کارتابل'],
-    dashboardMarkers: ['کل درآمد', 'نمودار فروش'],
+    dashboardMarkers: ['آژانس فعال', 'نمودار فروش'],
   },
   {
     username: 'ceo',

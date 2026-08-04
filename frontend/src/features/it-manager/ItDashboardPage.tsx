@@ -4,6 +4,10 @@ import { fetchItDashboard } from '../../api/it-manager';
 import { faDigits, faPercent } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import type { ItDashboardData } from '../../types/it-manager';
+import PanelAlert from '../panel/PanelAlert';
+import PanelCard from '../panel/PanelCard';
+import PanelStatCard from '../panel/PanelStatCard';
+import { panelLink, panelMuted, panelMuted2 } from '../panel/panel-theme';
 
 const EVENT_DOT: Record<string, string> = {
   SECURITY: 'bg-[#f59e0b]',
@@ -143,9 +147,11 @@ export default function ItDashboardPage() {
 
       <div className="mb-[18px] grid grid-cols-2 gap-[13px] md:grid-cols-4">
         {kpis.map((k) => (
-          <button
+          <PanelStatCard
             key={k.label}
-            type="button"
+            label={k.label}
+            value={k.value}
+            trend={k.trend}
             onClick={k.onClick}
             className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-3.5 text-right transition hover:border-[#3b82f6]"
           >
@@ -226,7 +232,7 @@ export default function ItDashboardPage() {
                 </div>
               ))}
             </div>
-          </section>
+          </PanelCard>
 
           <section className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[15px]">
             <h2 className="mb-3.5 text-[14.5px] font-extrabold text-white">رویدادهای اخیر</h2>
@@ -249,7 +255,7 @@ export default function ItDashboardPage() {
                 ))}
               </ul>
             )}
-          </section>
+          </PanelCard>
         </div>
       </div>
     </div>

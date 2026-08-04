@@ -3,6 +3,7 @@ interface StatTileProps {
   value: string;
   sublabel?: string;
   tone?: 'accent' | 'good' | 'warning' | 'critical';
+  variant?: 'light' | 'panel';
 }
 
 const TONE_CLASSES: Record<NonNullable<StatTileProps['tone']>, string> = {

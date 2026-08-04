@@ -143,7 +143,7 @@ export default function EmployeeDashboardPage() {
               </span>
             ))}
           </div>
-        </section>
+        </PanelCard>
       )}
 
       {nav === null && <p className="text-xs text-[#6b7b94]">در حال بارگذاری…</p>}

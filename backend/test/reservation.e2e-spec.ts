@@ -97,6 +97,39 @@ describe('Reservation (e2e)', () => {
     expect(res.body.data.capacity).toBe(146); // 16 business + 130 economy per seed config
     expect(res.body.data.soldCount).toBe(0);
     expect(res.body.data.rows.length).toBe(30); // rows 3-6 + 7-32
+    const freeSeat = res.body.data.rows[0].seats[0];
+    expect(freeSeat.occupant).toBeNull();
+  });
+
+  it('GET /reservation/seatmap/:id includes masked occupant info on sold seats', async () => {
+    const instance = await createScheduledInstance();
+    const chair = await loginAs(app, 'chair');
+    const issued = await request(app.getHttpServer())
+      .post('/reservation/pnr')
+      .set(auth(chair.accessToken))
+      .send({
+        flightInstanceId: instance.id,
+        seatCode: '3A',
+        passengerName: 'یاسمن قاسمی',
+        passengerNationalId: '0499370899',
+      });
+    expect(issued.status).toBe(201);
+
+    const res = await request(app.getHttpServer())
+      .get(`/reservation/seatmap/${instance.id}`)
+      .set(auth(chair.accessToken));
+    expect(res.status).toBe(200);
+    const sold = res.body.data.rows
+      .flatMap((r: { seats: { seatCode: string; status: string; occupant: unknown }[] }) => r.seats)
+      .find((s: { seatCode: string }) => s.seatCode === '3A');
+    expect(sold.status).toBe('SOLD');
+    expect(sold.occupant).toMatchObject({
+      passengerName: 'یاسمن قاسمی',
+      statusFa: 'رزرو قطعی',
+      pnr: issued.body.data.pnr,
+    });
+    expect(sold.occupant.maskedNationalId).toMatch(/^049\*+9$/);
+    expect(sold.occupant.maskedNationalId).not.toBe('0499370899');
   });
 
   it('GET /reservation/seatmap/:id returns cabinLayout.aisleAfterIndex reflecting the real per-aircraft column split, not a fixed assumption', async () => {

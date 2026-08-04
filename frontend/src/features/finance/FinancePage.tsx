@@ -28,6 +28,23 @@ import { dayjs, formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali'
 import SalesBarChart from '../../components/SalesBarChart';
 import SalesChartControls from '../../components/SalesChartControls';
 import { useSalesChartQuery } from '../../hooks/useSalesChartQuery';
+import {
+  panelAlertSuccess,
+  panelAlertWarning,
+  panelBtnPrimary,
+  panelCard,
+  panelCardPadded,
+  panelElevated,
+  panelElevatedPadded,
+  panelInput,
+  panelListDivider,
+  panelMuted,
+  panelMuted2,
+  panelSubtitle,
+  panelText,
+  panelTitle,
+  panelValueSm,
+} from '../panel/panel-theme';
 import type {
   AgencySettlementsResult,
   CompletedFlightsSummary,
@@ -40,16 +57,33 @@ import type {
 } from '../../types/reporting';
 import type { ReconciliationItem } from '../../types/reconciliation';
 
+/** Compact تومان for flight cards (میلیون / میلیارد) — display only. */
+function faMoneyCompact(amountRial: string | number): string {
+  const toman = Math.round(Number(amountRial) / 10);
+  if (toman >= 1_000_000_000) {
+    const v = (toman / 1_000_000_000).toFixed(1).replace(/\.0$/, '');
+    return `${faDigits(v)} میلیارد`;
+  }
+  if (toman >= 1_000_000) {
+    return `${faDigits(Math.round(toman / 1_000_000))} میلیون`;
+  }
+  return faMoney(amountRial);
+}
+
+function flightRouteFa(originCode: string, destCode: string): string {
+  return `${airportCityName(originCode, 'fa')} ↔ ${airportCityName(destCode, 'fa')}`;
+}
+
 const SETTLEMENT_STATUS: Record<SettlementStatus, { label: string; className: string }> = {
-  SETTLED: { label: 'تسویه شد', className: 'bg-[#10b98124] text-[#059669]' },
-  PENDING: { label: 'در انتظار پرداخت', className: 'bg-[#f59e0b24] text-[#b45309]' },
-  OVERDUE: { label: 'معوق', className: 'bg-danger/15 text-danger' },
+  SETTLED: { label: 'تسویه شد', className: 'bg-[rgba(52,211,153,.16)] text-[#34d399]' },
+  PENDING: { label: 'در انتظار پرداخت', className: 'bg-[rgba(245,158,11,.16)] text-[#fbbf24]' },
+  OVERDUE: { label: 'معوق', className: 'bg-[rgba(248,113,113,.16)] text-[#f87171]' },
 };
 
 const MIX_COLORS_LIGHT: Record<string, string> = {
   SYSTEM: '#1668c4',
   CHARTER: '#a855f7',
-  AGENCY: '#059669',
+  AGENCY: '#34d399',
 };
 
 const MIX_COLORS_DARK: Record<string, string> = {
@@ -169,16 +203,16 @@ function CompletedFlightsCard({
 }
 
 const TX_STATUS_CLASS: Record<string, string> = {
-  success: 'bg-[#10b98124] text-[#059669]',
-  warning: 'bg-[#f59e0b24] text-[#b45309]',
-  danger: 'bg-danger/15 text-danger',
+  success: 'bg-[rgba(52,211,153,.16)] text-[#34d399]',
+  warning: 'bg-[rgba(245,158,11,.16)] text-[#fbbf24]',
+  danger: 'bg-[rgba(248,113,113,.16)] text-[#f87171]',
 };
 
 const TX_ICON_CLASS: Record<string, string> = {
-  SALE: 'bg-accent/10 text-accent',
-  SETTLEMENT: 'bg-[#10b98118] text-[#059669]',
-  COMMISSION: 'bg-[#f59e0b18] text-[#b45309]',
-  REFUND: 'bg-danger/10 text-danger',
+  SALE: 'bg-[rgba(59,130,246,.16)] text-[#3b82f6]',
+  SETTLEMENT: 'bg-[rgba(52,211,153,.16)] text-[#34d399]',
+  COMMISSION: 'bg-[rgba(245,158,11,.16)] text-[#fbbf24]',
+  REFUND: 'bg-[rgba(248,113,113,.16)] text-[#f87171]',
 };
 
 function trendBadge(pct: number): string {
@@ -202,19 +236,27 @@ function FinanceKpiCard({
   iconClass: string;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-white p-4">
+    <div className={`${panelCard} p-4`}>
       <div className="mb-3 flex items-center justify-between">
         <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${iconClass}`}>●</span>
         {countBadge ? (
-          <span className="rounded-full bg-danger/10 px-2 py-0.5 text-[10px] font-bold text-danger">{countBadge}</span>
+          <span className="rounded-full bg-[rgba(248,113,113,.16)] px-2 py-0.5 text-[10px] font-bold text-[#f87171]">
+            {countBadge}
+          </span>
         ) : trendPct !== undefined ? (
-          <span className="rounded-full bg-[#10b98118] px-2 py-0.5 text-[10px] font-bold text-[#059669]">
+          <span
+            className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+              trendPct >= 0
+                ? 'bg-[rgba(52,211,153,.16)] text-[#34d399]'
+                : 'bg-[rgba(248,113,113,.16)] text-[#f87171]'
+            }`}
+          >
             {trendBadge(trendPct)}
           </span>
         ) : null}
       </div>
-      <div className="font-num text-lg font-black text-ink">{value}</div>
-      <div className="mt-1 text-[11px] text-muted">
+      <div className={panelValueSm}>{value}</div>
+      <div className={`mt-1 text-[11px] ${panelMuted}`}>
         {label}
         {sublabel ? ` · ${sublabel}` : ''}
       </div>
@@ -259,41 +301,39 @@ function ReconciliationQueueCard({
   }
 
   return (
-    <div className="mb-6 rounded-xl border border-border bg-white p-5">
+    <div className={`mb-6 ${panelCardPadded}`}>
       <div className="mb-1 flex items-center justify-between gap-2">
-        <div className="text-sm font-bold text-ink">صف مغایرت‌های پرداخت</div>
-        <span className="rounded-full bg-danger/10 px-3 py-1 text-[11px] font-extrabold text-danger">
+        <div className={panelTitle}>صف مغایرت‌های پرداخت</div>
+        <span className="rounded-full bg-[rgba(248,113,113,.16)] px-3 py-1 text-[11px] font-extrabold text-[#f87171]">
           {faDigits(items.length)} مورد
         </span>
       </div>
-      <div className="mb-4 text-[11px] text-muted">
+      <div className={`mb-4 ${panelSubtitle}`}>
         پرداخت‌هایی که با موفقیت انجام شده‌اند اما صدور بلیط آن‌ها کامل نشده است
       </div>
-      {items.length === 0 && (
-        <p className="text-xs text-muted">موردی برای بررسی وجود ندارد.</p>
-      )}
+      {items.length === 0 && <p className={`text-xs ${panelMuted}`}>موردی برای بررسی وجود ندارد.</p>}
       <div className="flex flex-col gap-3">
         {itemsPager.pageItems.map((item) => (
           <div
             key={item.id}
             data-testid="reconciliation-item"
-            className="rounded-xl border border-border/70 bg-body/50 px-4 py-3"
+            className={`rounded-xl border border-panel-border-2 ${panelElevated} px-4 py-3`}
           >
             <div className="flex flex-wrap items-center gap-4">
               <div className="min-w-[110px] text-xs">
-                <div className="text-[9px] text-muted">کد رزرو</div>
-                <div className="font-num font-extrabold text-ink">{item.pnr}</div>
+                <div className={`text-[9px] ${panelMuted}`}>کد رزرو</div>
+                <div className={`font-num font-extrabold ${panelText}`}>{item.pnr}</div>
               </div>
               <div className="min-w-[110px] text-xs">
-                <div className="text-[9px] text-muted">شناسه درگاه</div>
-                <div className="font-num font-bold">{item.gatewayRefId}</div>
+                <div className={`text-[9px] ${panelMuted}`}>شناسه درگاه</div>
+                <div className={`font-num font-bold ${panelText}`}>{item.gatewayRefId}</div>
               </div>
               <div className="min-w-[110px] text-xs">
-                <div className="text-[9px] text-muted">مبلغ</div>
-                <div className="font-num font-bold">{faMoney(item.amountIrr)} تومان</div>
+                <div className={`text-[9px] ${panelMuted}`}>مبلغ</div>
+                <div className={`font-num font-bold ${panelText}`}>{faMoney(item.amountIrr)} تومان</div>
               </div>
-              <div className="min-w-[110px] text-xs">
-                <div className="text-[9px] text-muted">تاریخ</div>
+              <div className={`min-w-[110px] text-xs ${panelText}`}>
+                <div className={`text-[9px] ${panelMuted}`}>تاریخ</div>
                 <div>{formatJalaliDateTime(item.createdAt)}</div>
               </div>
               <button
@@ -302,26 +342,30 @@ function ReconciliationQueueCard({
                   setError(null);
                   setNote('');
                 }}
-                className="mr-auto rounded-lg border border-accent/30 bg-accent/10 px-3 py-1.5 text-[11px] font-extrabold text-accent transition hover:bg-accent/20"
+                className={`mr-auto ${PANEL_ACCENT_BTN}`}
               >
                 رفع مغایرت
               </button>
             </div>
             {openId === item.id && (
-              <div className="mt-3 flex flex-col gap-2 border-t border-border/60 pt-3">
-                {error && <p role="alert" className="text-[11px] text-danger">{error}</p>}
+              <div className="mt-3 flex flex-col gap-2 border-t border-panel-border-2 pt-3">
+                {error && (
+                  <p role="alert" className="text-[11px] text-[#f87171]">
+                    {error}
+                  </p>
+                )}
                 <textarea
                   data-testid="reconciliation-note"
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   placeholder="توضیح رفع مغایرت (مثلاً: بلیط دستی صادر و مغایرت رفع شد.)"
-                  className="w-full rounded-lg border border-border p-2 text-xs"
+                  className={`w-full p-2 ${panelInput}`}
                   rows={2}
                 />
                 <button
                   disabled={busy}
                   onClick={() => void submit(item.id)}
-                  className="self-start rounded-lg bg-accent px-4 py-1.5 text-[11px] font-extrabold text-white disabled:opacity-50"
+                  className={`self-start ${panelBtnPrimary} disabled:opacity-50`}
                 >
                   {busy ? 'در حال ثبت…' : 'ثبت رفع مغایرت'}
                 </button>
@@ -395,9 +439,9 @@ function FinanceOpsView() {
     }
   }
 
-  if (error) return <p className="p-8 text-sm text-danger">{error}</p>;
+  if (error) return <p className="text-sm text-[#f87171]">{error}</p>;
   if (!chart.isQueryReady || !kpis || !flights || !tx || !mix || !settlements || !reconciliation)
-    return <p className="p-8 text-sm text-muted">در حال بارگذاری…</p>;
+    return <p className={`text-sm ${panelMuted}`}>در حال بارگذاری…</p>;
 
   const periodLabel =
     chart.granularity === 'year'
@@ -417,36 +461,34 @@ function FinanceOpsView() {
       label: `کل درآمد · ${periodLabel}`,
       value: faMoney(kpis.revenueIrr),
       trendPct: kpis.trends.revenuePct,
-      iconClass: 'bg-[#10b98118] text-[#059669]',
+      iconClass: 'bg-[rgba(52,211,153,.16)] text-[#34d399]',
     },
     {
       label: `سود خالص · حاشیه ${faPercent(kpis.marginPct)}`,
       value: faMoney(kpis.profitIrr),
       trendPct: kpis.trends.profitPct,
-      iconClass: 'bg-accent/10 text-accent',
+      iconClass: 'bg-[rgba(59,130,246,.16)] text-[#3b82f6]',
     },
     {
       label: 'هزینه عملیاتی',
       value: faMoney(kpis.operatingCostIrr),
       trendPct: kpis.trends.operatingCostPct,
-      iconClass: 'bg-[#f59e0b18] text-[#b45309]',
+      iconClass: 'bg-[rgba(245,158,11,.16)] text-[#fbbf24]',
     },
     {
       label: 'مطالبات معوق آژانس‌ها',
       value: faMoney(kpis.agencyDebtIrr),
       countBadge: faDigits(kpis.agencyDebtCount),
-      iconClass: 'bg-danger/10 text-danger',
+      iconClass: 'bg-[rgba(248,113,113,.16)] text-[#f87171]',
     },
   ];
 
   return (
     <>
-      {notice && (
-        <p className="mb-4 rounded-lg bg-[#10b98118] p-3 text-xs font-bold text-[#059669]">{notice}</p>
-      )}
+      {notice && <p className={`mb-4 ${panelAlertSuccess}`}>{notice}</p>}
 
       <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
-        <span className="text-[11px] text-muted">بازهٔ گزارش:</span>
+        <span className={`text-[11px] ${panelMuted}`}>بازهٔ گزارش:</span>
         <SalesChartControls
           modes={chart.modes}
           granularity={chart.granularity}
@@ -458,7 +500,7 @@ function FinanceOpsView() {
           flightNo={chart.flightNo}
           onFlightNoChange={chart.setFlightNo}
           onApplyFlightNo={chart.applyFlightNo}
-          variant="segmented"
+          variant="panel"
         />
       </div>
 
@@ -477,10 +519,10 @@ function FinanceOpsView() {
       </div>
 
       <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-[1.7fr_1fr]">
-        <div className="rounded-xl border border-border bg-white p-5">
+        <div className={panelCardPadded}>
           <div className="mb-1 flex items-center justify-between">
-            <div className="text-sm font-bold text-ink">تراکنش‌های مالی اخیر</div>
-            <span className="rounded-lg bg-body px-3 py-1 text-[11px] font-bold text-muted">
+            <div className={panelTitle}>تراکنش‌های مالی اخیر</div>
+            <span className={`rounded-lg ${panelElevated} px-3 py-1 text-[11px] font-bold ${panelMuted}`}>
               {faDigits(tx.totalCount)} تراکنش
             </span>
           </div>
@@ -489,13 +531,13 @@ function FinanceOpsView() {
             {txPager.pageItems.map((t) => (
               <div key={t.id} className="flex items-center gap-3 py-2.5 text-xs">
                 <span
-                  className={`flex h-9 w-9 flex-none items-center justify-center rounded-lg text-sm ${TX_ICON_CLASS[t.type] ?? 'bg-body text-muted'}`}
+                  className={`flex h-9 w-9 flex-none items-center justify-center rounded-lg text-sm ${TX_ICON_CLASS[t.type] ?? `${panelElevated} ${panelMuted}`}`}
                 >
                   {t.type === 'REFUND' ? '↩' : t.type === 'COMMISSION' ? '₪' : '✓'}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <div className="font-extrabold text-ink">{t.titleFa}</div>
-                  <div className="mt-0.5 text-[10px] text-muted">
+                  <div className={`font-extrabold ${panelText}`}>{t.titleFa}</div>
+                  <div className={`mt-0.5 text-[10px] ${panelMuted}`}>
                     {t.party} · {formatJalaliDateTime(t.occurredAt)}
                   </div>
                 </div>
@@ -506,7 +548,7 @@ function FinanceOpsView() {
                 </span>
                 <span
                   className={`font-num font-black whitespace-nowrap ${
-                    Number(t.signedAmountIrr) >= 0 && t.type !== 'REFUND' ? 'text-[#059669]' : 'text-danger'
+                    Number(t.signedAmountIrr) >= 0 && t.type !== 'REFUND' ? 'text-[#34d399]' : 'text-[#f87171]'
                   }`}
                 >
                   {Number(t.signedAmountIrr) >= 0 ? '+' : '−'} {faMoney(Math.abs(Number(t.signedAmountIrr)))}
@@ -524,45 +566,45 @@ function FinanceOpsView() {
         <RevenueMixCard mix={mix} />
       </div>
 
-      <div className="rounded-xl border border-border bg-white p-5">
+      <div className={panelCardPadded}>
         <div className="mb-1 flex items-center justify-between gap-2">
-          <div className="text-sm font-bold text-ink">تسویه‌حساب آژانس‌های همکار</div>
-          <span className="rounded-full bg-danger/10 px-3 py-1 text-[11px] font-extrabold text-danger">
+          <div className={panelTitle}>تسویه‌حساب آژانس‌های همکار</div>
+          <span className="rounded-full bg-[rgba(248,113,113,.16)] px-3 py-1 text-[11px] font-extrabold text-[#f87171]">
             مجموع مطالبات: {faMoney(settlements.outstandingIrr)} تومان
           </span>
         </div>
-        <div className="mb-4 text-[11px] text-muted">وضعیت پرداخت دوره‌ای و مطالبات معوق</div>
+        <div className={`mb-4 ${panelSubtitle}`}>وضعیت پرداخت دوره‌ای و مطالبات معوق</div>
         <div className="flex flex-col gap-3">
           {settlementsPager.pageItems.map((s) => {
             const st = SETTLEMENT_STATUS[s.status];
             return (
               <div
                 key={s.agencyId}
-                className="flex flex-wrap items-center gap-4 rounded-xl border border-border/70 bg-body/50 px-4 py-3"
+                className={`flex flex-wrap items-center gap-4 rounded-xl border border-panel-border-2 ${panelElevated} px-4 py-3`}
               >
                 <div className="min-w-[140px]">
-                  <div className="text-xs font-extrabold text-ink">{s.agencyName}</div>
+                  <div className={`text-xs font-extrabold ${panelText}`}>{s.agencyName}</div>
                   {s.dueAt && (
-                    <div className="mt-0.5 text-[10px] text-muted">سررسید: {formatJalaliDate(s.dueAt)}</div>
+                    <div className={`mt-0.5 text-[10px] ${panelMuted}`}>سررسید: {formatJalaliDate(s.dueAt)}</div>
                   )}
                 </div>
-                <div className="min-w-[110px] text-xs">
-                  <div className="text-[9px] text-muted">مبلغ دوره</div>
+                <div className={`min-w-[110px] text-xs ${panelText}`}>
+                  <div className={`text-[9px] ${panelMuted}`}>مبلغ دوره</div>
                   <div className="font-num font-bold">{faMoney(s.totalIrr)} تومان</div>
                 </div>
                 <div className="min-w-[140px] flex-1">
-                  <div className="mb-1 flex items-center justify-between text-[10px]">
-                    <span className="text-muted">پرداخت‌شده</span>
+                  <div className={`mb-1 flex items-center justify-between text-[10px] ${panelMuted}`}>
+                    <span>پرداخت‌شده</span>
                     <span className="font-num font-extrabold">{faPercent(s.paidPct)}</span>
                   </div>
-                  <div className="h-1.5 overflow-hidden rounded bg-border/60">
+                  <div className="h-1.5 overflow-hidden rounded bg-panel-border-2">
                     <div
                       className={`h-full rounded ${
                         s.status === 'SETTLED'
-                          ? 'bg-[#059669]'
+                          ? 'bg-[#34d399]'
                           : s.status === 'OVERDUE'
-                            ? 'bg-danger'
-                            : 'bg-[#f59e0b]'
+                            ? 'bg-[#f87171]'
+                            : 'bg-[#fbbf24]'
                       }`}
                       style={{ width: `${s.paidPct}%` }}
                     />
@@ -575,7 +617,7 @@ function FinanceOpsView() {
                 {s.remindInvoiceId && (
                   <button
                     onClick={() => void onRemind(s.agencyId, s.remindInvoiceId!, s.agencyName)}
-                    className="rounded-lg border border-accent/30 bg-accent/10 px-3 py-1.5 text-[11px] font-extrabold text-accent transition hover:bg-accent/20"
+                    className={PANEL_ACCENT_BTN}
                   >
                     ارسال یادآوری
                   </button>
@@ -1005,6 +1047,27 @@ function FinanceAnalyticView() {
   const [selectedFlightNo, setSelectedFlightNo] = useState<string | null>(null);
   const [flightSearch, setFlightSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const isFlightMode = chart.granularity === 'flight';
+
+  useEffect(() => {
+    if (!isFlightMode) return;
+    let cancelled = false;
+    fetchFlightSales()
+      .then((rows) => {
+        if (cancelled) return;
+        setFlightSales(rows);
+        if (rows.length > 0 && !chart.query.flightNo) {
+          chart.selectFlightNo(rows[0].flightNo);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setError('خطا در دریافت لیست پروازها.');
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load list when entering flight mode
+  }, [isFlightMode]);
 
   // Bar / day / month modes: existing chart + period-scoped KPIs.
   useEffect(() => {

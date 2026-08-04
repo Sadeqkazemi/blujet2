@@ -12,6 +12,16 @@ import Pagination from '../../components/Pagination';
 import { usePagination } from '../../hooks/usePagination';
 import { TIER_LABELS, statusBadge } from './agency-labels';
 import type { AgencyListResult, AgencyListRow, AgencyMembershipRequest } from '../../types/agencies';
+import PanelAlert from '../panel/PanelAlert';
+import PanelCard from '../panel/PanelCard';
+import {
+  panelBtnPrimary,
+  panelCard,
+  panelInput,
+  panelMuted,
+  panelSegmentBtn,
+  panelSegmented,
+} from '../panel/panel-theme';
 
 type SubTab = 'list' | 'credit';
 
@@ -238,6 +248,7 @@ export default function AgenciesListPage() {
               {faDigits(debtors.length)} آژانس
             </span>
             <button
+              type="button"
               onClick={() => void onNotifyAll()}
               className="mr-auto flex items-center gap-1.5 rounded-[9px] bg-[#3b82f6] px-[11px] py-[7px] text-[11.5px] font-bold text-white transition hover:brightness-110"
             >
@@ -294,7 +305,7 @@ export default function AgenciesListPage() {
       )}
 
       {!isCommercial && (
-        <div className="mb-4 flex gap-1.5">
+        <div className={`mb-4 ${panelSegmented} w-max`}>
           {(
             [
               { key: 'list', label: 'آژانس‌های همکار' },
@@ -358,6 +369,7 @@ export default function AgenciesListPage() {
                   {settled ? 'تسویه شد' : 'در انتظار پرداخت'}
                 </span>
                 <button
+                  type="button"
                   disabled={settled || settlingId === a.id}
                   onClick={() => void onSettle(a)}
                   className={`rounded-lg px-3 py-2 text-xs font-bold transition ${
@@ -379,6 +391,7 @@ export default function AgenciesListPage() {
             return (
               <li key={a.id}>
                 <button
+                  type="button"
                   onClick={() => navigate(`/panel/agencies/${a.id}`)}
                   className="flex w-full flex-wrap items-center gap-4 rounded-xl border border-panel-border bg-panel-surface p-4 text-right transition hover:border-accent/40"
                 >
@@ -395,7 +408,7 @@ export default function AgenciesListPage() {
                   <div className="w-44">
                     <div className="mb-1 flex items-center justify-between text-[10px] text-panel-muted">
                       <span>اعتبار (مانده / سقف)</span>
-                      <span className="font-num">
+                      <span>
                         {faMoney(Math.max(Number(a.remainingIrr), 0))} / {faMoney(a.limitIrr)}
                       </span>
                     </div>

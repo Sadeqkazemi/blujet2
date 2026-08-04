@@ -137,6 +137,21 @@ describe('Phase 11 — finance tab, passenger reports, staff reports (e2e)', () 
     expect(forbidden.status).toBe(403);
   });
 
+  it('GET /reporting/executive-dashboard-stats: CEO gets dashboard cards; finance manager 403', async () => {
+    const ceo = await loginAs(app, 'ceo');
+    const res = await request(app.getHttpServer())
+      .get('/reporting/executive-dashboard-stats')
+      .set('Authorization', auth(ceo.accessToken));
+    expect(res.status).toBe(200);
+    expect(res.body.data.activeAgencies).toBeGreaterThan(0);
+
+    const finance = await loginAs(app, 'finance.karimi');
+    const forbidden = await request(app.getHttpServer())
+      .get('/reporting/executive-dashboard-stats')
+      .set('Authorization', auth(finance.accessToken));
+    expect(forbidden.status).toBe(403);
+  });
+
   // ── revenue mix ────────────────────────────────────────────────────────
 
   it('GET /reporting/revenue-mix: per-channel sums add up to the total, pcts computed', async () => {

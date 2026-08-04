@@ -14,6 +14,8 @@ export function fetchSeatMap(flightInstanceId: string) {
   return apiGet<SeatMap>(`/reservation/seatmap/${flightInstanceId}`);
 }
 
+export type LockClassification = 'FREE' | 'DISCOUNTED' | 'PAYABLE';
+
 export function lockSeat(
   flightInstanceId: string,
   dto: {

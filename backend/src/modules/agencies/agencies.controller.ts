@@ -49,7 +49,9 @@ export class AgenciesController {
   // before ':id' so Nest/Express doesn't match them as an :id param first.
 
   @Get()
-  @Roles('SITE_ADMIN', 'EMPLOYEE', ...AGENCY_TAB_ROLES)
+  // BOARD_CHAIR / CEO / IT_MANAGER: read-only for ReservationSystem's
+  // «دسترسی آژانس‌ها» tab (design-reference-v2); mutations stay on AGENCY_TAB_ROLES.
+  @Roles('SITE_ADMIN', 'EMPLOYEE', 'BOARD_CHAIR', 'CEO', 'IT_MANAGER', ...AGENCY_TAB_ROLES)
   // ag_settle/fn_invoices act on a specific agency (settle/pay/remind
   // below), which is only reachable by first loading this list — an
   // EMPLOYEE holding only one of those two keys would otherwise have a
@@ -210,8 +212,9 @@ export class AgenciesController {
   }
 
   @Get(':id/api-key')
-  @Roles('SENIOR_MANAGER')
-  @ApiOperation({ summary: 'لیست کلیدهای API — فقط مدیر ارشد' })
+  // Read widened for ReservationSystem «دسترسی آژانس‌ها»; issue/rotate stay Senior-only.
+  @Roles('SENIOR_MANAGER', 'BOARD_CHAIR', 'CEO', 'IT_MANAGER')
+  @ApiOperation({ summary: 'لیست کلیدهای API' })
   async listApiKeys(@Param('id') id: string) {
     const data = await this.agencies.listApiKeys(id);
     return { success: true, data };

@@ -15,6 +15,11 @@ export function staffLogin(username: string, password: string) {
   return apiPost<{ challengeId: string }>('/auth/staff/login', { username, password });
 }
 
+/** Dev/E2E only — reads the mock staff 2FA code after staffLogin (404 in production). */
+export function fetchDevLastStaffCode(username: string) {
+  return apiGet<{ code: string }>(`/auth/_test/last-code/${encodeURIComponent(username)}`);
+}
+
 export async function agencyLogin(phone: string, password: string) {
   const result = await apiPost<{ accessToken: string; user: AuthUser }>('/auth/agency/login', {
     phone: normalizePhone(phone),

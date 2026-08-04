@@ -1,26 +1,74 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { fetchDevLastStaffCode } from '../../api/auth';
 import { useAuth } from '../../hooks/useAuth';
 import { ApiRequestError } from '../../api/envelope';
 import { StaffLoginLayout } from './StaffLoginLayout';
 
+const STORAGE_KEY = 'blujet_staff_2fa';
+
 interface LocationState {
   challengeId?: string;
+  username?: string;
+}
+
+function readStored2fa(): LocationState | null {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as LocationState;
+  } catch {
+    return null;
+  }
 }
 
 export default function TwoFactorPage() {
   const { confirmTwoFactor } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const challengeId = (location.state as LocationState | null)?.challengeId;
+  const routerState = (location.state as LocationState | null) ?? {};
+  const storedState = useMemo(readStored2fa, []);
+
+  const challengeId = routerState.challengeId ?? storedState?.challengeId;
+  const username = routerState.username ?? storedState?.username;
 
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [devCodeHint, setDevCodeHint] = useState<string | null>(null);
+  const [devCodeError, setDevCodeError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!challengeId) navigate('/login', { replace: true });
   }, [challengeId, navigate]);
+
+  // Persist across refresh — React Router state is lost on reload.
+  useEffect(() => {
+    if (routerState.challengeId && routerState.username) {
+      sessionStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ challengeId: routerState.challengeId, username: routerState.username }),
+      );
+    }
+  }, [routerState.challengeId, routerState.username]);
+
+  useEffect(() => {
+    if (!username) return;
+    let cancelled = false;
+    fetchDevLastStaffCode(username)
+      .then(({ code: devCode }) => {
+        if (cancelled) return;
+        setCode(devCode);
+        setDevCodeHint(devCode);
+        setDevCodeError(null);
+      })
+      .catch(() => {
+        if (!cancelled) setDevCodeHint(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [username]);
 
   if (!challengeId) {
     return null;
@@ -35,12 +83,25 @@ export default function TwoFactorPage() {
     setError(null);
     setSubmitting(true);
     try {
-      const loggedIn = await confirmTwoFactor(challengeId!, code.trim());
+      const loggedIn = await confirmTwoFactor(challengeId, code.trim());
+      sessionStorage.removeItem(STORAGE_KEY);
       navigate(loggedIn.mustChangePassword ? '/required-password-change' : '/panel', { replace: true });
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : 'خطا در تأیید کد.');
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function reloadDevCode() {
+    if (!username) return;
+    setDevCodeError(null);
+    try {
+      const { code: devCode } = await fetchDevLastStaffCode(username);
+      setCode(devCode);
+      setDevCodeHint(devCode);
+    } catch {
+      setDevCodeError('کد تأیید یافت نشد. به صفحه ورود برگردید و دوباره تلاش کنید.');
     }
   }
 
@@ -54,8 +115,37 @@ export default function TwoFactorPage() {
       </div>
       <div className="mb-1.5 text-[19px] font-black text-[#0f172a]">تأیید هویت دومرحله‌ای</div>
       <div className="mb-5 text-[11.5px] leading-[1.9] text-[#64748b]">
-        کد ۶ رقمی ارسال‌شده به موبایل ثبت‌شده را وارد کنید.
+        {devCodeHint
+          ? 'کد تأیید به‌صورت خودکار پر شده است. در production کد به موبایل ثبت‌شده ارسال می‌شود.'
+          : 'کد ۶ رقمی ارسال‌شده به موبایل ثبت‌شده را وارد کنید.'}
       </div>
+
+      {username && (
+        <div
+          data-testid="staff-2fa-dev-hint"
+          className="mb-4 rounded-[10px] border border-[#bfdbfe] bg-[#eff6ff] px-3 py-2.5 text-[11px] leading-[1.9] text-[#1e40af]"
+        >
+          {devCodeHint ? (
+            <p>
+              کد تأیید:{' '}
+              <span dir="ltr" className="font-mono font-bold tracking-widest">
+                {devCodeHint}
+              </span>
+            </p>
+          ) : devCodeError ? (
+            <p role="status">{devCodeError}</p>
+          ) : (
+            <p>در حال دریافت کد تأیید از سرور…</p>
+          )}
+          <button
+            type="button"
+            onClick={() => void reloadDevCode()}
+            className="mt-1 text-[11px] font-bold text-accent"
+          >
+            دریافت مجدد کد
+          </button>
+        </div>
+      )}
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
         <div>

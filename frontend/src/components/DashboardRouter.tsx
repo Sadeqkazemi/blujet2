@@ -1,5 +1,6 @@
 import { useOutletContext } from 'react-router-dom';
 import DashboardPage from '../features/dashboard/DashboardPage';
+import ExecutiveDashboardPage from '../features/dashboard/executive/ExecutiveDashboardPage';
 import FinanceDashboardPage from '../features/dashboard/FinanceDashboardPage';
 import CommercialDashboardPage from '../features/dashboard/CommercialDashboardPage';
 import ItDashboardPage from '../features/it-manager/ItDashboardPage';
@@ -25,7 +26,11 @@ export default function DashboardRouter() {
   const { user } = useAuth();
   const dashboardEntry = nav?.find((item) => item.key === 'dashboard');
 
-  if (nav !== null && dashboardEntry && !dashboardEntry.implemented) {
+  if (nav === null) {
+    return <p className="text-sm text-panel-muted">در حال بارگذاری…</p>;
+  }
+
+  if (dashboardEntry && !dashboardEntry.implemented) {
     return <ComingSoonPage />;
   }
 
@@ -34,5 +39,8 @@ export default function DashboardRouter() {
   if (user?.role === 'SITE_ADMIN') return <SiteAdminDashboardPage />;
   if (user?.role === 'EMPLOYEE') return <EmployeeDashboardPage />;
   if (user?.role === 'COMMERCIAL_MANAGER') return <CommercialDashboardPage />;
+  if (user?.role === 'CEO' || user?.role === 'BOARD_CHAIR' || user?.role === 'SENIOR_MANAGER') {
+    return <ExecutiveDashboardPage />;
+  }
   return <DashboardPage />;
 }

@@ -38,6 +38,7 @@ import type {
   SeatCell,
   SeatMap,
 } from '../../types/reservation';
+import BoardChairPlaneMode from './BoardChairPlaneMode';
 
 /**
  * Merge of three reservation panels:
@@ -51,6 +52,13 @@ const RECENT_PNR_GRID =
   'grid grid-cols-[minmax(7rem,1fr)_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,0.9fr)] gap-x-2.5 items-center';
 const PNR_CODE_CELL =
   'font-num font-bold text-[#60a5fa] [direction:ltr] [unicode-bidi:isolate] text-right';
+
+const SUB_TABS: [SubTab, string][] = [
+  ['dashboard', 'داشبورد'],
+  ['pnr', 'مدیریت رزروها'],
+  ['seatmap', 'نقشهٔ صندلی'],
+  ['new', 'رزرو جدید'],
+];
 
 export default function ReservationPage() {
   const { user } = useAuth();
@@ -921,6 +929,10 @@ function ExecReservationView() {
     user?.role === 'SENIOR_MANAGER';
   const canLock = user?.role === 'CEO' || user?.role === 'BOARD_CHAIR' || user?.role === 'IT_MANAGER';
 
+  return <ReservationTabs canLock={user?.role === 'CEO' || user?.role === 'IT_MANAGER'} />;
+}
+
+function ReservationTabs({ canLock }: { canLock: boolean }) {
   const [subTab, setSubTab] = useState<SubTab>('pnr');
   const [stats, setStats] = useState<ReservationDashboardStats | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -1327,10 +1339,10 @@ function ExecReservationView() {
             value={pnrQuery}
             onChange={(e) => setPnrQuery(e.target.value)}
             placeholder="جستجو با کد PNR یا نام مسافر…"
-            className="mb-4 h-[42px] w-full rounded-xl border border-border bg-white px-4 text-xs outline-none transition focus:border-accent"
+            className={`mb-4 h-[42px] w-full px-4 ${panelInput}`}
           />
           {pnrGroups.length === 0 ? (
-            <p className="py-6 text-center text-xs text-muted">رزروی یافت نشد.</p>
+            <p className={`py-6 text-center text-xs ${panelMuted}`}>رزروی یافت نشد.</p>
           ) : (
             <div className="flex flex-col gap-4">
               {pnrGroupsPager.pageItems.map((g) => (
@@ -1345,9 +1357,9 @@ function ExecReservationView() {
                     >
                       نقشهٔ صندلی {g.flightNo}
                     </button>
-                    <span className="text-muted">{formatJalaliDate(g.departureAt)}</span>
+                    <span className={panelMuted}>{formatJalaliDate(g.departureAt)}</span>
                   </div>
-                  <ul className="divide-y divide-border">
+                  <ul className="divide-y divide-panel-border">
                     {g.rows.map((r) => {
                       const st = STATUS_LABEL[r.status] ?? {
                         label: r.status,
@@ -1358,7 +1370,7 @@ function ExecReservationView() {
                           <button
                             type="button"
                             onClick={() => void openPnrDetail(r.pnr)}
-                            className="ltr font-num font-bold text-text-2 underline decoration-dashed underline-offset-4"
+                            className={`ltr font-num font-bold ${panelMuted2} underline decoration-dashed underline-offset-4`}
                           >
                             {r.pnr}
                           </button>
@@ -1516,15 +1528,15 @@ function ExecReservationView() {
                 {STATUS_LABEL[detail.status]?.label}
               </span>
             </div>
-            <div className="flex items-center justify-between text-lg font-black">
+            <div className={`flex items-center justify-between text-lg font-black ${panelText}`}>
               <span className="ltr">{detail.originCode}</span>
               <span>✈</span>
               <span className="ltr">{detail.destCode}</span>
             </div>
-            <div className="mt-3 flex flex-wrap gap-4 border-t border-white/15 pt-3 text-[11px]">
+            <div className="mt-3 flex flex-wrap gap-4 border-t border-panel-border pt-3 text-[11px]">
               <div>
-                <div className="text-white/50">مسافر</div>
-                <div className="font-bold">{detail.passenger?.fullName ?? '—'}</div>
+                <div className={panelMuted}>مسافر</div>
+                <div className={`font-bold ${panelText}`}>{detail.passenger?.fullName ?? '—'}</div>
               </div>
               <div>
                 <div className="text-white/50">صندلی</div>
@@ -1533,11 +1545,11 @@ function ExecReservationView() {
                 </div>
               </div>
               <div>
-                <div className="text-white/50">تاریخ</div>
-                <div className="font-bold">{formatJalaliDateTime(detail.departureAt)}</div>
+                <div className={panelMuted}>تاریخ</div>
+                <div className={`font-bold ${panelText}`}>{formatJalaliDateTime(detail.departureAt)}</div>
               </div>
               <div>
-                <div className="text-white/50">مبلغ</div>
+                <div className={panelMuted}>مبلغ</div>
                 <div className="font-bold text-[#34d399]">{faMoney(detail.priceIrr)} تومان</div>
               </div>
             </div>
@@ -1590,7 +1602,7 @@ function ExecReservationView() {
               این رزرو لغو شده است.
             </p>
           )}
-        </Modal>
+        </PanelModal>
       )}
     </div>
   );

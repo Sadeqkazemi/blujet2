@@ -1,4 +1,15 @@
 export type SeatStatus = 'FREE' | 'SOLD' | 'LOCKED';
+export type LockClassification = 'FREE' | 'DISCOUNTED' | 'PAYABLE';
+export type LockApprovalStatus = 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
+
+/** Staff-display occupant on a sold/locked seat (national ID always masked). */
+export interface SeatOccupant {
+  passengerName: string | null;
+  maskedNationalId: string | null;
+  pnr: string | null;
+  statusFa: string;
+  departureAt: string;
+}
 
 /** Rich sold-seat passenger info surfaced in the IT reservation seat map. */
 export interface SeatPassengerInfo {
@@ -55,6 +66,10 @@ export interface SeatLockView {
   flightInstanceId: string;
   seatCode: string;
   lockedById: string;
+  reason?: string;
+  classification?: LockClassification;
+  discountPct?: number | null;
+  approvalStatus?: LockApprovalStatus;
   passengerName: string | null;
   releasedById: string | null;
   releasedAt: string | null;

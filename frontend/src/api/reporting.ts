@@ -43,12 +43,20 @@ export function fetchCompletedFlightsSummary(query: PeriodQuery) {
   return apiGet<CompletedFlightsSummary>(`/reporting/completed-flights-summary?${toQueryString(query)}`);
 }
 
+export function fetchFlightSales() {
+  return apiGet<FlightSalesRow[]>('/reporting/flight-sales');
+}
+
 export function fetchLowSalesAlerts() {
   return apiGet<LowSalesAlert[]>('/reporting/low-sales-alerts');
 }
 
 export function fetchFinanceDashboardStats() {
   return apiGet<FinanceDashboardStats>('/reporting/finance-dashboard-stats');
+}
+
+export function fetchExecutiveDashboardStats() {
+  return apiGet<FinanceDashboardStats>('/reporting/executive-dashboard-stats');
 }
 
 export function fetchCommercialOverview() {

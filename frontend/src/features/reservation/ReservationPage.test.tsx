@@ -3,6 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import ReservationPage from './ReservationPage';
 import * as reservationApi from '../../api/reservation';
+import * as agenciesApi from '../../api/agencies';
+import * as flightsApi from '../../api/flights';
 import * as useAuthModule from '../../hooks/useAuth';
 import { mockAuthUserWithRole } from '../../test/mockAuthUser';
 import type {

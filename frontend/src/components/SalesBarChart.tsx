@@ -43,6 +43,11 @@ export default function SalesBarChart({
     (p) => Number(p.systemIrr) + Number(p.charterIrr) + Number(p.agencyIrr),
   );
   const max = Math.max(1, ...totals);
+  const isPanel = variant === 'panel';
+  const legendClass = isPanel ? 'text-xs text-[#9fb0c7]' : 'text-xs text-text-2';
+  const toggleClass = isPanel ? 'text-[11px] text-[#6b7b94] underline decoration-dotted' : 'text-[11px] text-muted underline decoration-dotted';
+  const tableHeadClass = isPanel ? 'border-b border-[#28344c] text-[#6b7b94]' : 'border-b border-border text-muted';
+  const tableRowClass = isPanel ? 'border-b border-[#28344c]/60 text-[#e7ecf3]' : 'border-b border-border/60 font-num';
 
   return (
     <div>

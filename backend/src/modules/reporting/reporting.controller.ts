@@ -84,6 +84,17 @@ export class ReportingController {
     return { success: true, data };
   }
 
+  @Get('executive-dashboard-stats')
+  @Roles('CEO', 'BOARD_CHAIR', 'SENIOR_MANAGER')
+  @ApiOperation({
+    summary:
+      'کارت‌های داشبورد مدیر عامل/ارشد/رئیس — آژانس/مسافر/بلیط/درآمد ماه جاری با روند',
+  })
+  async executiveDashboardStats() {
+    const data = await this.reporting.financeDashboardStats();
+    return { success: true, data };
+  }
+
   @Get('commercial-overview')
   @Roles('COMMERCIAL_MANAGER')
   @ApiOperation({
@@ -120,6 +131,16 @@ export class ReportingController {
   @ApiOperation({ summary: 'ترکیب درآمد بر اساس کانال فروش' })
   async revenueMix(@Query() query: PeriodQueryDto) {
     const data = await this.reporting.revenueMix(query.granularity, query);
+    return { success: true, data };
+  }
+
+  @Get('flight-sales')
+  @ApiOperation({
+    summary:
+      'لیست فروش به‌ازای شماره پرواز — کارت‌های حالت «شماره پرواز» در مالی',
+  })
+  async flightSales() {
+    const data = await this.reporting.flightSalesList();
     return { success: true, data };
   }
 

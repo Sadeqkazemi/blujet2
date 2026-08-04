@@ -54,6 +54,7 @@ set and chart shape across every panel report.
 | GET | `/reporting/flight-sales` | same | «شماره پرواز» picker for the analytic مالی tab: departed `FlightInstance` rows (newest first, cap 60) with per-channel SALE sums, route cities, seats. `{ rows: [{ flightInstanceId, flightNo, originCode, destCode, originCityFa, destCityFa, departureAt, systemIrr, charterIrr, agencyIrr, totalIrr, capacity, soldSeats }] }`. The CEO/analytic UI collapses rows that share the same `flightNo` into one card (summed channel sales + seats) and shows cards only after the user searches (no default list). |
 | GET | `/reporting/kpis` | same | Query: `granularity`, `periodKey?` (selected bar/day/month) → `{ revenueIrr, profitIrr, marginPct, operatingCostIrr, agencyDebtIrr, agencyDebtCount, trend: {...} }`. Re-scopes to the selected period, matching the "KPIs re-scope when a chart month is selected" rule. |
 | GET | `/reporting/completed-flights-summary` | same | Same `granularity`/`periodKey` filter → `{ flightCount, totalSeats, soldSeats, unsoldSeats }`, synced to the same period as the chart. |
+| GET | `/reporting/flight-sales` | same | Card-picker list for مالی «شماره پرواز» mode: `{ flightNo, originCode, destCode, departureAt, tickets, systemIrr, charterIrr, agencyIrr, totalIrr }[]` aggregated from real `LedgerEntry(SALE)` rows with a booking, newest departure first. |
 | GET | `/reporting/low-sales-alerts` | CEO, BOARD_CHAIR, SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | Flights &lt;72h out with occupancy below threshold — the design's recurring amber banner, currently hardcoded in every panel; this endpoint replaces the hardcoded copy with a real query. |
 | GET | `/reporting/commercial-overview` | COMMERCIAL_MANAGER | Commercial dashboard KPI row: `{ activeAgencies, passengersThisMonth, pendingAgencyRequests }`. |
 | GET | `/reporting/site-admin-overview` | SITE_ADMIN | Site-admin dashboard KPI row (design «آژانس فعال / مسافر این ماه / بلیط فروخته‌شده / درخواست در انتظار اقدام»): `{ activeAgencies, passengersThisMonth, ticketsSoldThisMonth, pendingActionCount, agenciesTrendPct, passengersTrendPct, ticketsTrendPct }` — `pendingActionCount` = pending/referred agency requests + SUBMITTED/REVIEW refunds + OPEN/IN_PROGRESS support tickets; trend fields are MoM % (null when previous month is 0 / N/A). |
@@ -355,7 +356,10 @@ both — Commercial's tab already hosts Phase 6's pricing section, which
 stays untouched on the same page).
 
 - GET `/flights/overview` — the tab's data in one call: KPI row (پرواز
-  فعال / صندلی فروخته‌شده / میانگین ضریب اشغال) + the three lists:
+  فعال / صندلی فروخته‌شده / میانگین ضریب اشغال) + the three lists
+  (read also allowed for `BOARD_CHAIR` / `CEO` / `IT_MANAGER` so the
+  ReservationSystem «پروازها» tab can list active instances; writes stay
+  on Senior/Commercial/Employee):
   - `active`: SCHEDULED instances — route label, flightNo, Jalali
     date/time, sold/capacity (+ derived status فعال/در حال فروش/تکمیل/لغو
     شده), basePriceIrr.

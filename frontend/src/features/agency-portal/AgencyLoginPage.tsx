@@ -65,6 +65,9 @@ const STR: Record<StoredLocale, {
   forgotSendFallback: string;
   forgotVerifyFallback: string;
   forgotSaveFallback: string;
+  staffQuestion: string;
+  staffLoginLink: string;
+  staffLoginHint: string;
 }> = {
   fa: {
     tabLogin: 'ورود',
@@ -110,6 +113,10 @@ const STR: Record<StoredLocale, {
     forgotSendFallback: 'خطا در ارسال کد تأیید.',
     forgotVerifyFallback: 'کد وارد شده نادرست است.',
     forgotSaveFallback: 'خطا در ذخیره رمز عبور.',
+    staffQuestion: 'کارمند یا مدیر هستید؟',
+    staffLoginLink: 'ورود مدیران و کارمندان',
+    staffLoginHint:
+      'ورود مدیران و کارمندان از صفحهٔ جداگانهٔ سامانه انجام می‌شود — با نام کاربری (مثلاً ceo) وارد شوید.',
   },
   en: {
     tabLogin: 'Log in',
@@ -155,6 +162,10 @@ const STR: Record<StoredLocale, {
     forgotSendFallback: 'Error sending the verification code.',
     forgotVerifyFallback: 'The code entered is incorrect.',
     forgotSaveFallback: 'Error saving the new password.',
+    staffQuestion: 'Staff or manager?',
+    staffLoginLink: 'Staff & Manager Login',
+    staffLoginHint:
+      'Managers and staff sign in on a separate page — use your username (e.g. ceo), not your agency phone number.',
   },
   ar: {
     tabLogin: 'تسجيل الدخول',
@@ -200,6 +211,10 @@ const STR: Record<StoredLocale, {
     forgotSendFallback: 'خطأ في إرسال رمز التحقق.',
     forgotVerifyFallback: 'الرمز المُدخل غير صحيح.',
     forgotSaveFallback: 'خطأ في حفظ كلمة المرور الجديدة.',
+    staffQuestion: 'هل أنت موظف أو مدير؟',
+    staffLoginLink: 'تسجيل دخول الموظفين والمديرين',
+    staffLoginHint:
+      'يسجّل المديرون والموظفون الدخول من صفحة منفصلة — استخدم اسم المستخدم (مثل ceo) وليس رقم هاتف الوكالة.',
   },
 };
 
@@ -226,7 +241,12 @@ function AgencyLoginForm() {
       const loggedIn = await agencyLogin(phone.trim(), password);
       navigate(loggedIn.mustChangePassword ? '/required-password-change' : '/agency', { replace: true });
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : t.loginFailedFallback);
+      const looksLikeUsername = /[a-zA-Z]/.test(phone.trim()) && !/^(\+98|0)?9\d{9}$/.test(phone.trim());
+      if (looksLikeUsername) {
+        setError(t.staffLoginHint);
+      } else {
+        setError(err instanceof ApiRequestError ? err.message : t.loginFailedFallback);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -686,6 +706,13 @@ export default function AgencyLoginPage() {
       </div>
 
       {tab === 'login' ? <AgencyLoginForm /> : <AgencySignupForm />}
+
+      <p className="mt-6 border-t border-border pt-4 text-center text-[11px] text-muted">
+        {t.staffQuestion}{' '}
+        <a href="/login" className="font-bold text-accent no-underline">
+          {t.staffLoginLink}
+        </a>
+      </p>
     </AgencyLoginLayout>
   );
 }

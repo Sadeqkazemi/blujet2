@@ -126,7 +126,7 @@ function FinancialSummaryCard({ mix }: { mix: RevenueMixResult }) {
           </div>
         </div>
       </div>
-    </div>
+    </PanelCard>
   );
 }
 
@@ -179,7 +179,7 @@ function CartableWidget({ cartable }: { cartable: CartableListResult }) {
       >
         مشاهده‌ی همه‌ی کارها ←
       </Link>
-    </div>
+    </PanelCard>
   );
 }
 
@@ -242,7 +242,7 @@ export default function CommercialDashboardPage() {
             </KpiIcon>
           }
         />
-        <KpiCard
+        <PanelStatCard
           label="مسافر این ماه"
           value={faDigits(overview.passengersThisMonth)}
           icon={
@@ -256,7 +256,7 @@ export default function CommercialDashboardPage() {
             </KpiIcon>
           }
         />
-        <KpiCard
+        <PanelStatCard
           label="درخواست همکاری آژانس‌ها"
           value={faDigits(overview.pendingAgencyRequests)}
           icon={

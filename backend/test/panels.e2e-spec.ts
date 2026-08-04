@@ -110,6 +110,26 @@ describe('Panels (e2e)', () => {
     ]);
   });
 
+  it('returns the confirmed tab set for BOARD_CHAIR', async () => {
+    const { accessToken } = await loginAs(app, 'chair');
+    const res = await request(app.getHttpServer())
+      .get('/panels/nav')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(res.status).toBe(200);
+    const keys = res.body.data.map((t: { key: string }) => t.key);
+    expect(keys).toEqual([
+      'dashboard',
+      'admins',
+      'finance',
+      'cartable',
+      'settings',
+      'club',
+      'reservation',
+      'mgrreports',
+      'survey',
+    ]);
+  });
+
   it('an EMPLOYEE with no granted permissions still gets dashboard + referrals, not an error', async () => {
     const { accessToken } = await loginAs(app, 'emp.none');
     const res = await request(app.getHttpServer())
@@ -232,6 +252,67 @@ describe('Panels (e2e)', () => {
       .set('Authorization', `Bearer ${accessToken}`)
       .send({ enabled: false });
     expect(res.status).toBe(403);
+  });
+
+  it('GET /panels/self-status: CEO sees enabled=true by default', async () => {
+    const { accessToken } = await loginAs(app, 'ceo');
+    const res = await request(app.getHttpServer())
+      .get('/panels/self-status')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual({ panelKey: 'CEO', enabled: true });
+  });
+
+  it('GET /panels/self-status: BOARD_CHAIR is never gated by panel-access flags', async () => {
+    await typeorm.panelAccessFlag.upsert({
+      where: { panelKey: 'BOARD_CHAIR' },
+      update: { enabled: false },
+      create: { panelKey: 'BOARD_CHAIR', enabled: false },
+    });
+
+    const { accessToken } = await loginAs(app, 'chair');
+    const res = await request(app.getHttpServer())
+      .get('/panels/self-status')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual({ panelKey: null, enabled: true });
+
+    const reporting = await request(app.getHttpServer())
+      .get('/reporting/kpis?granularity=q6')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(reporting.status).toBe(200);
+
+    await typeorm.panelAccessFlag.update({
+      where: { panelKey: 'BOARD_CHAIR' },
+      data: { enabled: true },
+    });
+  });
+
+  it('when SENIOR_MANAGER disables CEO panel, CEO gets 404 on reporting and self-status shows disabled', async () => {
+    const senior = await loginAs(app, 'senior.rahimi');
+    const ceo = await loginAs(app, 'ceo');
+
+    await request(app.getHttpServer())
+      .patch('/panels/access/CEO')
+      .set('Authorization', `Bearer ${senior.accessToken}`)
+      .send({ enabled: false })
+      .expect(200);
+
+    const status = await request(app.getHttpServer())
+      .get('/panels/self-status')
+      .set('Authorization', `Bearer ${ceo.accessToken}`);
+    expect(status.status).toBe(200);
+    expect(status.body.data.enabled).toBe(false);
+
+    const blocked = await request(app.getHttpServer())
+      .get('/reporting/kpis?granularity=q6')
+      .set('Authorization', `Bearer ${ceo.accessToken}`);
+    expect(blocked.status).toBe(404);
+
+    await request(app.getHttpServer())
+      .patch('/panels/access/CEO')
+      .set('Authorization', `Bearer ${senior.accessToken}`)
+      .send({ enabled: true });
   });
 
   it('two simultaneous toggles of the same panel from two CEO sessions do not crash and leave a consistent final state', async () => {

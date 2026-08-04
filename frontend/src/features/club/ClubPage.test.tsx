@@ -142,7 +142,7 @@ describe('ClubPage', () => {
 
     expect(await screen.findByText('درخواست‌های صدور کارت (ارجاع‌شده)')).toBeInTheDocument();
     expect(screen.queryByText('کل اعضای باشگاه')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'تعریف مشتری VIP جدید' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /تعریف مشتری VIP جدید/ })).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText('جستجو در نام، ایمیل، شماره ملی یا کارت…')).not.toBeInTheDocument();
 
     expect(await screen.findByRole('button', { name: 'تأیید و صدور کارت' })).toBeInTheDocument();
@@ -189,7 +189,7 @@ describe('ClubPage', () => {
     // Direct ClubPage still supports SITE_ADMIN refer flow (ClubRouter uses SiteAdminClubPage).
     expect(await screen.findByText('درخواست‌های در انتظار ارجاع')).toBeInTheDocument();
     expect(screen.getByText('ارجاع‌شده به مدیران')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'تعریف مشتری VIP جدید' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /تعریف مشتری VIP جدید/ })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'بررسی و ارجاع' })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'بررسی و ارجاع' }));

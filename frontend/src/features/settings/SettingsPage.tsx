@@ -9,6 +9,17 @@ import { SOCIAL_LINK_IDS } from '../../types/social-links';
 import type { AppDownloadLinkEntry, AppLinkId } from '../../types/app-links';
 import { APP_LINK_IDS } from '../../types/app-links';
 import { SocialIcon, socialBrandColor } from '../../components/public/SocialIcon';
+import PanelAlert from '../panel/PanelAlert';
+import {
+  panelBtnPrimary,
+  panelCard,
+  panelCardPadded,
+  panelInput,
+  panelMuted,
+  panelSubtitle,
+  panelText,
+  panelTitle,
+} from '../panel/panel-theme';
 
 const GATEWAYS: { key: string; name: string; desc: string }[] = [
   { key: 'gatewayMellat', name: 'درگاه بانک ملت', desc: 'درگاه اصلی پرداخت' },
@@ -86,6 +97,7 @@ const GLOBAL_TOGGLES: {
 function Toggle({ on, onToggle, label }: { on: boolean; onToggle: () => void; label: string }) {
   return (
     <button
+      type="button"
       role="switch"
       aria-checked={on}
       aria-label={label}
@@ -169,6 +181,7 @@ export default function SettingsPage() {
   async function onSave() {
     setSaving(true);
     setNotice(null);
+    setError(null);
     try {
       const patch = isSiteAdmin
         ? {
@@ -344,7 +357,7 @@ export default function SettingsPage() {
               این درصدها همان بازه‌های واقعی موتور استرداد (فاز ۷) هستند — تغییر اینجا مستقیماً در محاسبهٔ
               جریمهٔ استرداد اعمال می‌شود.
             </p>
-            <div className="flex flex-col gap-3">
+            <div className="mt-4 flex flex-col gap-3">
               {data.refundRules.map((r: RefundRuleRow) => (
                 <div key={r.id}>
                   <label htmlFor={`rule-${r.id}`} className={labelClass}>
@@ -509,6 +522,7 @@ export default function SettingsPage() {
       </div>
 
       <button
+        type="button"
         disabled={saving}
         onClick={() => void onSave()}
         className="mt-6 rounded-[9px] bg-[#3b82f6] px-6 py-2.5 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-60"

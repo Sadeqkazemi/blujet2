@@ -54,6 +54,14 @@ export function useSalesChartQuery(options: { includeFlightMode?: boolean } = {}
     setPeriodKey(null);
   }
 
+  /** Set + apply in one step (flight card click / auto-select). */
+  function selectFlightNo(next: string) {
+    const normalized = next.trim().toUpperCase();
+    setFlightNo(normalized);
+    setAppliedFlightNo(normalized);
+    setPeriodKey(null);
+  }
+
   return {
     modes,
     granularity,
@@ -69,5 +77,6 @@ export function useSalesChartQuery(options: { includeFlightMode?: boolean } = {}
     flightNo,
     setFlightNo,
     applyFlightNo,
+    selectFlightNo,
   };
 }

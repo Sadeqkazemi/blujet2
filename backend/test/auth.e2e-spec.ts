@@ -37,6 +37,16 @@ describe('Auth (e2e)', () => {
     expect(res.body.error.code).toBe('UNAUTHORIZED');
   });
 
+  it('accepts the design alias «chairman» for the BOARD_CHAIR seed account «chair»', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/auth/staff/login')
+      .send({ username: 'chairman', password: 'Blujet@1404' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.challengeId).toBeTruthy();
+  });
+
   it('rejects login for a suspended account with 403 ACCOUNT_SUSPENDED', async () => {
     const userRepo = dataSource.getRepository(User);
     const user = await userRepo.findOneByOrFail({ username: 'site.admin' });
