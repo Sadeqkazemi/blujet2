@@ -101,7 +101,7 @@ const dataSource = new DataSource(dataSourceOptions);
 /** Known dev password for every seeded staff account — dev/test only, never production. */
 const STAFF_PASSWORD = 'Blujet@1404';
 
-/** Prisma-`upsert`-shaped get-or-create-or-update, translated to TypeORM's
+/** TypeORM-`upsert`-shaped get-or-create-or-update, translated to TypeORM's
  * find-then-create-or-save idiom (TypeORM's own `.upsert()` has different
  * ON-CONFLICT semantics and doesn't return the resulting entity the way
  * this script's call sites need). */

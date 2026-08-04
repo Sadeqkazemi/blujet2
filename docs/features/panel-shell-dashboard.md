@@ -54,7 +54,7 @@ remains on dashboard/analytic views only (flight search input). See
 - [x] `marginPct` is derived, never hardcoded — `reporting.e2e-spec.ts` › "marginPct is derived..."
 - [x] `completed-flights-summary` reconciles `sold + unsold === total` — `reporting.e2e-spec.ts` › "completed-flights-summary reconciles..."
 - [x] `low-sales-alerts` only returns flights under the occupancy threshold — `reporting.e2e-spec.ts` › "low-sales-alerts only returns flights..."
-- [x] Aggregates computed in SQL/service layer, never shipped as raw rows to the frontend for client-side summing — verified by code review of `reporting.service.ts` (Prisma queries + server-side reduce, nothing summed in React)
+- [x] Aggregates computed in SQL/service layer, never shipped as raw rows to the frontend for client-side summing — verified by code review of `reporting.service.ts` (TypeORM queries + server-side reduce, nothing summed in React)
 - [x] Money is a raw integer IRR in every response — `reporting.e2e-spec.ts` › "money fields are raw integers..."; frontend applies `faMoney`/`faDigits` at render time only (`frontend/src/lib/fa-format.ts`, unit-tested)
 
 ### Manager activity / audit feed

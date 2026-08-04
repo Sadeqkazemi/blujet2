@@ -97,11 +97,11 @@ fi
 echo "▶ Applying database migrations…"
 (set +e
  cd backend
- npx prisma migrate deploy
+ npm run migration:run
  if [[ $? -ne 0 ]]; then
-   npx prisma migrate dev --name init --skip-seed
+   npm run migration:run
  fi
- npx prisma db seed 2>/dev/null || true
+ npm run seed 2>/dev/null || true
 )
 
 echo "▶ Building backend…"

@@ -4,7 +4,7 @@ export interface SeatCell {
   cabin: 'BUSINESS' | 'ECONOMY';
 }
 
-/** Structural shape shared by the Prisma-generated `AircraftSeatMap` (still
+/** Structural shape shared by the TypeORM-generated `AircraftSeatMap` (still
  * used by unconverted callers) and the TypeORM entity (which correctly
  * models these `text[]` columns as nullable) — accepting either lets this
  * util stay ORM-agnostic during the migration. */

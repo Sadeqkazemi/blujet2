@@ -13,7 +13,7 @@
   service worker, offline shell, app icons). PWA setup is part of Phase 1,
   not an afterthought.
 - Backend: NestJS (TypeScript, modular architecture)
-- Database: PostgreSQL via Prisma
+- Database: PostgreSQL via TypeORM
 - Cache / rate limiting: Redis (search-result cache TTL 5–10 min; Redis is
   NEVER the source of truth for seats or bookings)
 - ML service: FastAPI (Python 3.12) — price suggestion & flight
@@ -44,7 +44,7 @@
 │       ├── lib/         # utils, constants, config
 │       └── types/       # shared TS types (generated from OpenAPI)
 ├── backend/
-│   ├── prisma/          # schema.prisma, migrations, seed
+│   ├── typeorm/          # schema.typeorm, migrations, seed
 │   └── src/
 │       ├── modules/     # one NestJS module per domain:
 │       │                # auth/, users/, flights/, search/, booking/,
@@ -109,11 +109,11 @@
 - Frontend never calls fetch/axios directly in components — only through `src/api/`.
 - Environment variables: validated at startup; `.env.example` always kept current;
   never commit real secrets.
-- Seed data: `backend/prisma/seed.ts` must stay in sync with the schema and
+- Seed data: `backend/src/database/seed.ts` must stay in sync with the schema and
   create realistic sample data for every domain (test users with known
   passwords, sample airports/routes/flights with schedules and fares,
   sample bookings in each state) so any feature can be manually exercised
-  right after `prisma migrate dev`. Update the seed in the same phase that
+  right after `typeorm migrate dev`. Update the seed in the same phase that
   adds a new table. Seed data is for development only — never run against
   production.
 
@@ -284,13 +284,13 @@ Unchecked items = feature not done. Never mark a feature done by
   postgres (internal only) + redis (internal only) + ml-service (internal
   only) + backend + frontend + Caddy (auto-SSL).
 - Deploys happen ONLY through GitHub Actions (`.github/workflows/deploy.yml`):
-  push to `main` -> tests must pass -> SSH deploy -> `prisma migrate deploy`.
+  push to `main` -> tests must pass -> SSH deploy -> `typeorm migrate deploy`.
   Never deploy by hand-editing files on the server.
 - `main` is always deployable. Feature work happens on branches; merge to
   `main` only when the phase is complete and tests pass.
 - Secrets live in GitHub Actions Secrets and in `/opt/app/.env` on the
   server (chmod 600). Never in the repo, never in logs.
-- DB changes in production use `prisma migrate deploy` exclusively
+- DB changes in production use `typeorm migrate deploy` exclusively
   (never `db push`, never manual SQL).
 - Nightly `pg_dump` backups on the server, 7-day retention. A backup is
   only real if it restores: once a month, restore the latest dump into a
@@ -310,7 +310,7 @@ Unchecked items = feature not done. Never mark a feature done by
 - `cd frontend && npm run dev` — frontend dev server
 - `cd ml-service && uvicorn app.main:app --reload` — ML service dev server
 - `cd ml-service && pytest` — ML service tests
-- `cd backend && npx prisma migrate dev` — apply schema changes
+- `cd backend && npx typeorm migrate dev` — apply schema changes
 - `npm test` (in each package) — run tests
 - `npm run lint && npm run typecheck` — must pass in BOTH packages before
   finishing any phase

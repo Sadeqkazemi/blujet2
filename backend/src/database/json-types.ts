@@ -1,4 +1,4 @@
-/** Shared alias for `jsonb` columns — matches Prisma's `Json` type
+/** Shared alias for `jsonb` columns — matches TypeORM's `Json` type
  * (effectively `unknown`, no compile-time shape) so the migration stays
  * behaviour-neutral. Several columns have documented-but-untyped shapes in
  * service code comments (e.g. `FlightInstance.aiSuggestion`); giving them

@@ -106,7 +106,7 @@ export class FilesService {
   ): Promise<boolean> {
     if (ownerId === actor.id) return true;
 
-    // Postgres jsonb "contains" (@>) — replaces Prisma's array_contains
+    // Postgres jsonb "contains" (@>) — replaces TypeORM's array_contains
     // filter, which has no direct TypeORM find-options equivalent.
     const fileIdJson = JSON.stringify([fileId]);
 

@@ -3,7 +3,7 @@
 ## Scope
 
 Converted the remaining 11 `test/*.e2e-spec.ts` files that still talked to
-Prisma directly (via `PrismaClient`/`PrismaPg` in each file's own fixture
+TypeORM directly (via `TypeORMClient`/`TypeORMPg` in each file's own fixture
 setup/teardown, independent of the app's own TypeORM `DataSource`) to use
 TypeORM repositories instead:
 
@@ -19,7 +19,7 @@ TypeORM repositories instead:
 - `test/site-content.e2e-spec.ts`
 - `test/survey.e2e-spec.ts`
 
-All 11 confirmed to have zero remaining `prisma.`/`PrismaClient`/`PrismaPg`
+All 11 confirmed to have zero remaining `typeorm.`/`TypeORMClient`/`TypeORMPg`
 references, and each is individually tsc-clean.
 
 ## DataSource access patterns used
@@ -78,11 +78,11 @@ phase:
   `upsertSeatMap(aircraftType, fields)` helper (find-then-create-if-missing),
   reused for three distinct seat maps.
 - `phase14-sms-provider.e2e-spec.ts` — `IsNull()` for `phone: null`
-  filters, `Like('p14.%')` for the cleanup delete (Prisma's `startsWith`).
+  filters, `Like('p14.%')` for the cleanup delete (TypeORM's `startsWith`).
 - `survey.e2e-spec.ts` (462 lines, most complex conversion) — `afterAll`'s
   `SurveyResponse` cleanup does a two-step delete (find matching
   `SurveyInvite` ids by `bookingId: In(createdBookingIds)`, then delete
-  `SurveyResponse` rows by `inviteId: In(inviteIds)`) since Prisma's
+  `SurveyResponse` rows by `inviteId: In(inviteIds)`) since TypeORM's
   original nested-relation delete has no direct TypeORM equivalent for a
   DELETE with an implicit join.
 

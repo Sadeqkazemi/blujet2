@@ -14,7 +14,7 @@ explicit merge decision (2026-07-18) was: **keep this track's schema and
 modules as-is, and port only the genuinely-missing customer-facing half
 (search/booking/payment/refund-submission, and still-pending price-lock/
 promo/wallet/points-ledger/GDPR/public frontend) onto this schema**,
-rather than reconciling two incompatible Prisma histories. See "Phase 13"
+rather than reconciling two incompatible TypeORM histories. See "Phase 13"
 below for what's landed from that port so far.
 
 ## Status
@@ -22,8 +22,8 @@ below for what's landed from that port so far.
 - [x] Repo scaffold (frontend/backend/ml-service skeletons, design-reference import)
 - [x] Design extraction — all 6 panels + shared shell + `ReservationSystem` read in full; findings folded into `docs/API.md` / `docs/DB_SCHEMA.md`
 - [x] **Phase 1 — staff auth + RBAC + panel shell + dashboard/reporting** — see `docs/features/panel-shell-dashboard.md` for the proven checklist (35 backend + 21 frontend unit + 5 E2E tests, all passing; lint+typecheck clean in both packages). Known deferred scope, not silently dropped: IT Manager's real (service-health) dashboard, day/month/flight chart-mode UI, pixel-diff visual regression — see that doc's scope notes.
-- [x] Phase 2 — flight/booking core (minimal read-side slice for reporting) — done as part of Phase 1's Prisma schema (Route/Flight/FlightInstance/Booking/LedgerEntry), since reporting needed real data to aggregate
-- [x] **Phase 3 — Agencies (list/detail/credit/settlement/membership requests)** — backend: Prisma schema/migration/seed + full `agencies` module (all endpoints from `docs/API.md`'s Phase 3 table, role-reconciled), 25 integration tests (60 backend total). Frontend: آژانس‌ها list/detail/request pages with per-role differences (Senior: API keys; Finance: read+settle; Commercial: نمای کلی/مالی/مکاتبه‌ها sub-tabs, invoices, chat, debtors panel), 10 new Vitest+RTL tests (31 total) and 5 Playwright journeys. All checklist items in `docs/features/agencies.md` proven except the explicitly deferred ones listed at its end (Excel export, invoice description, refer-UI → Phase 4, agency-portal-side suspension). Lint+typecheck clean in both packages.
+- [x] Phase 2 — flight/booking core (minimal read-side slice for reporting) — done as part of Phase 1's TypeORM schema (Route/Flight/FlightInstance/Booking/LedgerEntry), since reporting needed real data to aggregate
+- [x] **Phase 3 — Agencies (list/detail/credit/settlement/membership requests)** — backend: TypeORM schema/migration/seed + full `agencies` module (all endpoints from `docs/API.md`'s Phase 3 table, role-reconciled), 25 integration tests (60 backend total). Frontend: آژانس‌ها list/detail/request pages with per-role differences (Senior: API keys; Finance: read+settle; Commercial: نمای کلی/مالی/مکاتبه‌ها sub-tabs, invoices, chat, debtors panel), 10 new Vitest+RTL tests (31 total) and 5 Playwright journeys. All checklist items in `docs/features/agencies.md` proven except the explicitly deferred ones listed at its end (Excel export, invoice description, refer-UI → Phase 4, agency-portal-side suspension). Lint+typecheck clean in both packages.
 - [x] **Phase 4 — Cartable, referrals, manager messaging** — implemented end-to-end (docs approved 2026-07-17): 7 new tables, five backend modules (cartable با تأیید/رد/انتقال + نظر مدیر اجباری، ارجاعات مدیر ارشد با چرخه گزارش کامل، پیام سازمانی با تحویل به کارتابل، staff-directory، آپلود فایل), 23 backend tests + 9 Vitest + 3 Playwright loops. Totals now: 83 backend / 40 frontend / 14 Playwright, all green. Two explicitly deferred UI pieces (attachment chips UI → Phase 5, Jalali date-picker popover → shared component in Phase 5/7) listed at the end of `docs/features/cartable-referrals.md`. Merged to main (PR #3).
 - [x] **Phase 5 — VIP club** — implemented end-to-end: ClubMember/ClubCardRequest schema (national ID checksum-validated, AES-256-GCM encrypted + HMAC hash for exact search), club module with the ⚑-approved authority rules (CEO/Chair approve any REFERRED, Senior only senior-assigned; direct issuance audited; tier change Senior-only), CEO/Chair rich layout + Senior simple layout, 13 backend tests + 4 Vitest + 4 Playwright journeys. Totals: 92 backend / 44 frontend / 18 Playwright. Merged to main (PR #4).
 - [x] **Phase 6 — Ticket pricing proposals** — implemented end-to-end (docs approved 2026-07-17): FarePricingProposal FK-linked to FlightInstance (fixes the mocks' incompatible id schemes), pricing module with the locked-forever registration rule + CEO legal-rate path, the FIRST REAL ml-service (FastAPI price-suggestion: internal token, versioned heuristic, 11 pytest) behind a NestJS AiProvider client (2s timeout, graceful degradation — proven by a Playwright journey that runs with the real uvicorn service AND one with it down). CEO tab + Commercial pricing section (inside its مدیریت پروازها tab, per design). 8 backend + 5 Vitest + 3 Playwright new tests. Totals: 100 backend / 49 frontend / 21 Playwright / 11 pytest. Merged to main (PR #5).
@@ -549,7 +549,7 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   this file being updated) and one was real: `AgencyDocument.status`
   had existed since the model shipped but no staff endpoint could ever
   see or decide on an upload, so every document sat `PENDING` forever
-  (the Prisma model's own comment said as much). Built the same
+  (the TypeORM model's own comment said as much). Built the same
   request/decide pattern already used twice in this codebase (credit-
   requests, webservice-requests): `GET /agencies/:id/documents` +
   `PATCH .../documents/:docId/decide` (`AGENCY_TAB_ROLES`, no step-up —
@@ -908,7 +908,7 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   manual e2e runs this session (confirmed by re-running the same 3 files
   in isolation and watching the expected revenue totals drift between
   runs). With the user's explicit consent, reset the test DB
-  (`prisma migrate reset --force` + reseed) and reran: `flights`/
+  (`typeorm migrate reset --force` + reseed) and reran: `flights`/
   `reporting` are clean on a fresh DB (confirming those were pollution,
   not regressions); `flight-engine-completion`'s one test still times out
   (20s) even in isolation on a clean DB — a genuine pre-existing flake
@@ -1626,7 +1626,7 @@ See `CLAUDE.md` → Commands. `docker compose up -d` starts Postgres+Redis;
 `cd ml-service && uvicorn app.main:app --reload` for the three services.
 
 - `cd backend && npm run seed` — (re)seeds one dev account per role, all
-  sharing the password `Blujet@1404` (see `backend/prisma/seed.ts` — dev
+  sharing the password `Blujet@1404` (see `backend/src/database/seed.ts` — dev
   usernames: `ceo`, `chair`, `senior`, `finance`,
   `comm`, `itadmin`, `site.admin`, `com.ahmadi`), plus 6 months of
   sample flights/bookings so the dashboard has real numbers to show.

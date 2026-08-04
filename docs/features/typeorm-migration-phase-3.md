@@ -1,27 +1,27 @@
 # TypeORM migration — Phase 3: first live conversions
 
-Phase 3 of the Prisma → TypeORM migration plan. `DatabaseModule` goes live
-in `AppModule` (registered alongside `PrismaModule`, not replacing it),
+Phase 3 of the TypeORM → TypeORM migration plan. `DatabaseModule` goes live
+in `AppModule` (registered alongside `TypeORMModule`, not replacing it),
 and the first 5 modules — deliberately the smallest, simplest ones — are
-converted from `PrismaService` calls to TypeORM repositories. This is the
+converted from `TypeORMService` calls to TypeORM repositories. This is the
 reference conversion every later phase copies the pattern from.
 
 ## Shared helpers added
 
 - `src/database/database.module.ts` — `@Global()` module wrapping
-  `TypeOrmModule.forRoot(dataSourceOptions)`, mirroring `PrismaModule`'s
+  `TypeOrmModule.forRoot(dataSourceOptions)`, mirroring `TypeORMModule`'s
   shape. Individual feature modules additionally import
   `TypeOrmModule.forFeature([...])` for `@InjectRepository` as they
   convert.
-- `src/database/utils/find-one-or-throw.ts` — mirrors Prisma's
+- `src/database/utils/find-one-or-throw.ts` — mirrors TypeORM's
   `findUniqueOrThrow`/`findFirstOrThrow`. Throws a plain `Error` (not an
   `HttpException`) so `AllExceptionsFilter` still maps a miss to
-  500/INTERNAL_ERROR, matching Prisma's own behaviour. Not yet consumed by
+  500/INTERNAL_ERROR, matching TypeORM's own behaviour. Not yet consumed by
   a call site — Phase 3's 5 modules didn't need it — but ready for
   modules that use `findUniqueOrThrow` as an invariant assertion.
 - `src/database/utils/pg-errors.ts` — `isUniqueViolation(err)` /
   `constraintName(err)`, replacing
-  `PrismaClientKnownRequestError`/`P2002` checks via Postgres SQLSTATE
+  `TypeORMClientKnownRequestError`/`P2002` checks via Postgres SQLSTATE
   `23505` on `QueryFailedError`. Not yet consumed — no Phase 3 module hits
   a unique constraint on write — but ready for later phases (e.g.
   `support-tickets`'s tracking-code collision retry).
@@ -31,15 +31,15 @@ reference conversion every later phase copies the pattern from.
 1. **`contact`** — `submit()`/`listRecent()`. Reference exemplar: create +
    save, `find` with `order`/`take`.
 2. **`staff-directory`** — `list()`. `In()`/`Not()` operators replace
-   Prisma's `{ in: [...] }`/`{ not: ... }`.
-3. **`flight-status`** — `lookup()`. The only non-trivial one: Prisma's
+   TypeORM's `{ in: [...] }`/`{ not: ... }`.
+3. **`flight-status`** — `lookup()`. The only non-trivial one: TypeORM's
    `mode: 'insensitive'` equals has no TypeORM find-options equivalent,
    so this uses `createQueryBuilder` with `ILIKE` (a bare `ILIKE`, no `%`
    wildcards, is an exact case-insensitive match — same semantics as
-   Prisma's `equals` + `insensitive`) plus `innerJoinAndSelect` for the
+   TypeORM's `equals` + `insensitive`) plus `innerJoinAndSelect` for the
    two-level `flight.route` relation.
 4. **`manager-messages`** — `send()`/`sent()`.
-5. **`files`** — `store()`/`canRead()`/`read()`. `canRead()`'s Prisma
+5. **`files`** — `store()`/`canRead()`/`read()`. `canRead()`'s TypeORM
    `attachments: { array_contains: fileId }` filter (on
    `ManagerReferral`, `ManagerReferralReport`, `ManagerMessage`) has no
    TypeORM find-options equivalent either — replaced with a raw
@@ -49,7 +49,7 @@ reference conversion every later phase copies the pattern from.
 
 ## New findings
 
-- **UUID generation gap.** Prisma generated `@default(uuid())` primary
+- **UUID generation gap.** TypeORM generated `@default(uuid())` primary
   keys client-side; the Phase 2 entities had no equivalent, since Phase 2
   only proved schema parity and never wrote a row via TypeORM. Solved
   per-entity, added only as each entity's owning module gets its first
@@ -65,7 +65,7 @@ reference conversion every later phase copies the pattern from.
   demand, exactly as Phase 2's doc predicted later phases would need to.
 - **Cross-entity JSON containment has no query-builder shortcut.** Confirmed
   during implementation, not just anticipated: TypeORM's `FindOptionsWhere`
-  has no operator for jsonb containment (unlike Prisma's
+  has no operator for jsonb containment (unlike TypeORM's
   `array_contains`), so any future module touching a `Json`-typed
   "list of ids" column needs the same raw `@>` pattern, not a `Like`/`In`
   substitute.
@@ -95,5 +95,5 @@ reference conversion every later phase copies the pattern from.
 
 Phase 4 (per the plan): the next batch — read-mostly content & config
 modules (audit, settings, site-content, panels, admins, etc.) — following
-the same pattern established here. Prisma remains the active ORM for
+the same pattern established here. TypeORM remains the active ORM for
 every module not yet converted; nothing is removed until Phase 14.

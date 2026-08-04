@@ -1,18 +1,18 @@
 """One-off codegen used to produce the initial draft of all 77 TypeORM
-entities in src/database/entities/ from the live, Prisma-migrated
-database (Phase 2 of the Prisma -> TypeORM migration — see
+entities in src/database/entities/ from the live, TypeORM-migrated
+database (Phase 2 of the TypeORM -> TypeORM migration — see
 docs/features/typeorm-migration-phase-0.md for the entity-authoring
 conventions this encodes, e.g. @Index({unique:true}) never @Unique(),
 explicit foreignKeyConstraintName/primaryKeyConstraintName matching
-Prisma's naming, literal (not raw-SQL-function) defaults on enum columns).
+TypeORM's naming, literal (not raw-SQL-function) defaults on enum columns).
 
 Not meant to be re-run as-is: it reads from /tmp/full_metadata.json, a
 one-time dump of information_schema/pg_catalog metadata (columns, PKs,
-FKs, indexes) plus a parse of prisma/schema.prisma for model->table
+FKs, indexes) plus a parse of typeorm/schema.typeorm for model->table
 names and @relation field metadata, assembled via ad-hoc psql queries
 during that phase. Kept here as a reference for later phases (7 more
 tables' worth of PII/relation nuance can come up) and to be deleted
-once Prisma is fully removed (Phase 14), not as a repeatable tool.
+once TypeORM is fully removed (Phase 14), not as a repeatable tool.
 """
 
 import json, re, os

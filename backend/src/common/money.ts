@@ -1,7 +1,7 @@
 /**
  * Single money-arithmetic utility (CLAUDE.md: "Money is NEVER a float. All
  * arithmetic through a single money utility module."). Every IRR-denominated
- * column is a Postgres `bigint` (Prisma `BigInt`, JS `bigint`) — Int32 tops
+ * column is a Postgres `bigint` (TypeORM `BigInt`, JS `bigint`) — Int32 tops
  * out at ~2.1B IRR (~214M toman), which real aggregates (KPI revenue, agency
  * credit lines, wallet balances) can exceed. `bigint` cannot mix with
  * `number` via `+`/`-`/`*`, so all money math goes through here instead of

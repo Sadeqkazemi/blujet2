@@ -203,7 +203,7 @@ Classification legend: `UNCHANGED`, `I18N_ADDED`, `RESPONSIVE_ADDED`,
 - File: `design-reference-v2/پنل ادمین سایت.dc.html`
 - Old counterpart: `design-reference/پنل ادمین سایت.dc.html`
 - Status: CONTENT_CHANGED
-- Notes: Correctly zero i18n/matchMedia markers. Gained a full Careers admin surface: `SiteData.addJob`, `getJobs`, `updateJob`, `toggleJob`, `getJobApplications`, `updateJobApplication`, `getCareersSettings`, `toggleCareers` — this is the backend-management counterpart of the new public فرصت‌های شغلی pages (job postings + applicant review), and will need a Jobs/JobApplications domain added to `docs/API.md`/`docs/DB_SCHEMA.md`/Prisma schema before implementation, per Workflow Rule #1. Remainder of the diff is the same `SETUP`-mode empty-state pattern.
+- Notes: Correctly zero i18n/matchMedia markers. Gained a full Careers admin surface: `SiteData.addJob`, `getJobs`, `updateJob`, `toggleJob`, `getJobApplications`, `updateJobApplication`, `getCareersSettings`, `toggleCareers` — this is the backend-management counterpart of the new public فرصت‌های شغلی pages (job postings + applicant review), and will need a Jobs/JobApplications domain added to `docs/API.md`/`docs/DB_SCHEMA.md`/TypeORM schema before implementation, per Workflow Rule #1. Remainder of the diff is the same `SETUP`-mode empty-state pattern.
 
 ## پنل کارمند (Employee panel)
 - File: `design-reference-v2/پنل کارمند.dc.html`

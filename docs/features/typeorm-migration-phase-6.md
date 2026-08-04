@@ -1,6 +1,6 @@
 # TypeORM migration — Phase 6: staff operations (cartable, referrals, staff-reports, reporting)
 
-Phase 6 of the Prisma → TypeORM migration plan. Converts the "staff
+Phase 6 of the TypeORM → TypeORM migration plan. Converts the "staff
 operations" batch: the manager cartable (unified task inbox), manager
 referrals (delegate-and-report workflow, incl. attachments and chair
 report permissions), the per-manager «گزارش کارمندان» staff feed, and
@@ -31,11 +31,11 @@ agency settlements, commercial overview).
    KPIs (revenue/profit/margin/operating-cost + agency-debt trend),
    finance dashboard stats, completed-flights summary, low-sales alerts,
    recent transactions, revenue mix, agency settlements, commercial
-   overview. The one method still calling Prisma directly is
+   overview. The one method still calling TypeORM directly is
    `completedFlightsSummary()`'s call to `materializeDepartedInstances()`
-   — that util's signature is still `(prisma: PrismaService)` because the
+   — that util's signature is still `(typeorm: TypeORMService)` because the
    `flights` module hasn't been converted yet; `ReportingService` keeps a
-   `PrismaService` field solely for that one call, same cross-module
+   `TypeORMService` field solely for that one call, same cross-module
    boundary already established for `AgenciesService` (also unconverted,
    injected via DI, no shared transaction).
 
@@ -63,12 +63,12 @@ agency settlements, commercial overview).
   select, then fetch invoices by `agencyId IN (...)`) merged via a
   `Map<agencyId, AgencyInvoice[]>` — the same "no inverse relation"
   pattern already established for `AgencyProfile` ↔ `User` in Phase 5.
-- **`ReportingService.recentTransactions()`** — Prisma's nested
+- **`ReportingService.recentTransactions()`** — TypeORM's nested
   `booking.passengers` with `take: 1` (first passenger's name, no
   `orderBy`) has no direct TypeORM equivalent through a query-builder
   join. Ported as a separate `passengerRepo.find({ where: { bookingId:
   In(bookingIds) } })` call, picking the first row per `bookingId` in
-  JS via a `Map` — matches Prisma's original "arbitrary first row"
+  JS via a `Map` — matches TypeORM's original "arbitrary first row"
   semantics exactly (neither version orders the passengers).
 - **`bookingCountsByInstance()`** — a new shared private helper in
   `ReportingService` for the manual grouped `COUNT(*)` pattern (per-
@@ -79,12 +79,12 @@ agency settlements, commercial overview).
 - **Local dev/test database mismatch discovered mid-phase**: the e2e
   suite's `.env.test` points at a separate `blujet_test` database (per
   `test/jest-setup.ts`'s `dotenv.config({ path: '.env.test' })`), not the
-  `blujet` dev database `.env`/`prisma.config.ts` point at by default —
+  `blujet` dev database `.env`/`typeorm.config.ts` point at by default —
   confirmed against `.github/workflows/deploy.yml`, which does
-  `cp .env.test .env` before `prisma migrate deploy` in CI. Resetting
+  `cp .env.test .env` before `typeorm migrate deploy` in CI. Resetting
   `blujet` (the default) before an e2e run is a no-op for e2e
   correctness; the reset must target `blujet_test` explicitly
-  (`DATABASE_URL=...blujet_test... npx prisma migrate reset --force`,
+  (`DATABASE_URL=...blujet_test... npx typeorm migrate reset --force`,
   then seed the same way) or stale data accumulates across runs and
   produces flaky-looking cross-run pollution (extra rows with old
   timestamps) that has nothing to do with the code under test.
@@ -112,6 +112,6 @@ agency settlements, commercial overview).
 ## What's next
 
 Phase 7 (per the plan): flight/pricing read side (`flights`, `pricing`,
-`flightops`, `webservice-pricing`). Prisma remains the active ORM for
+`flightops`, `webservice-pricing`). TypeORM remains the active ORM for
 every module not yet converted; nothing removed until the dedicated
-Prisma-removal phase.
+TypeORM-removal phase.

@@ -1,10 +1,10 @@
-# TypeORM migration — Phase 16: remaining core src Prisma dependencies
+# TypeORM migration — Phase 16: remaining core src TypeORM dependencies
 
 ## Scope
 
-After Phase 15, `PrismaService` was still injected in a handful of core
+After Phase 15, `TypeORMService` was still injected in a handful of core
 `src/` files — not because those modules were unconverted, but because they
-called one shared, still-Prisma-based utility (`flight-lifecycle.util.ts`),
+called one shared, still-TypeORM-based utility (`flight-lifecycle.util.ts`),
 or because two guards and the health check had never been touched:
 
 - `src/modules/flights/flight-lifecycle.util.ts` —
@@ -16,11 +16,11 @@ or because two guards and the health check had never been touched:
   `EmployeePermission` joined to `Permission`.
 - `src/common/guards/jwt-auth.guard.ts` — one `findUnique` on `User` for
   the `mustChangePassword` gate.
-- `src/health/health.controller.ts` — Terminus's `PrismaHealthIndicator`.
+- `src/health/health.controller.ts` — Terminus's `TypeORMHealthIndicator`.
 
 All four converted to TypeORM (`DataSource`/`Repository`) this phase,
-closing out every remaining Prisma dependency in `src/` outside the
-`src/prisma/` module itself (kept intentionally — still needed by the
+closing out every remaining TypeORM dependency in `src/` outside the
+`src/typeorm/` module itself (kept intentionally — still needed by the
 ~39 not-yet-converted e2e spec files, see Phase 17).
 
 ## Changes
@@ -31,18 +31,18 @@ closing out every remaining Prisma dependency in `src/` outside the
   query-builder `innerJoin` (Booking → FlightInstance) to find eligible
   bookings, then a query-builder `UPDATE ... WHERE id IN (...)`.
 - `flights.service.ts`, `reservation/pnr.service.ts`,
-  `reporting.service.ts`, `survey/survey.service.ts`: `PrismaService`
+  `reporting.service.ts`, `survey/survey.service.ts`: `TypeORMService`
   constructor param replaced with `@InjectDataSource() dataSource:
-  DataSource`; all `materializeX(this.prisma)` calls became
+  DataSource`; all `materializeX(this.typeorm)` calls became
   `materializeX(this.dataSource)`.
 - `survey/survey-lifecycle.util.ts`: `materializeSurveyInvites()`'s first
-  parameter changed from `PrismaService` to `DataSource`.
-- `common/guards/employee-permission.guard.ts`: the Prisma
+  parameter changed from `TypeORMService` to `DataSource`.
+- `common/guards/employee-permission.guard.ts`: the TypeORM
   `employeePermission.findFirst({where:{employeeId, permission:{key:{in:
   keys}}}})` became a query-builder `innerJoin('ep.permission','p')` +
   `where('ep.employeeId = :employeeId')` + `andWhere('p.key IN
   (:...keys)')`.
-- `common/guards/jwt-auth.guard.ts`: `prisma.user.findUnique({where:{id},
+- `common/guards/jwt-auth.guard.ts`: `typeorm.user.findUnique({where:{id},
   select:{mustChangePassword:true}})` became
   `userRepo.findOne({where:{id}, select:{mustChangePassword:true}})`.
 - `common/common.module.ts`: now imports `TypeOrmModule.forFeature([User,
@@ -53,14 +53,14 @@ closing out every remaining Prisma dependency in `src/` outside the
   repository dependency without each module separately registering
   `EmployeePermission` — `CommonModule` is `@Global()`, so this is
   sufficient app-wide.
-- `health/health.controller.ts`: `PrismaHealthIndicator.pingCheck('database',
-  this.prisma)` became `TypeOrmHealthIndicator.pingCheck('database')` (no
+- `health/health.controller.ts`: `TypeORMHealthIndicator.pingCheck('database',
+  this.typeorm)` became `TypeOrmHealthIndicator.pingCheck('database')` (no
   connection argument needed — it resolves the default `DataSource`
   itself via `@nestjs/typeorm`, already registered globally by
   `TypeOrmModule.forRoot()` in `AppModule`). `TerminusModule` already
   provides `TypeOrmHealthIndicator`, so no module wiring changes needed
   beyond the controller.
-- `reporting/reporting.service.spec.ts`: unit test's `{} as PrismaService`
+- `reporting/reporting.service.spec.ts`: unit test's `{} as TypeORMService`
   stub updated to `{} as DataSource`.
 
 ## Bug found and fixed (pre-existing, unrelated to this migration)

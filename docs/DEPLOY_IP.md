@@ -36,7 +36,7 @@ apt-get install -y docker-compose-plugin   # اگر با اسکریپت بالا
    docker compose -f docker-compose.prod.yml up -d --build
    ```
    اولین بار چند دقیقه طول می‌کشد (بیلد فرانت‌اند + بک‌اند + ml-service).
-   مهاجرت‌های دیتابیس (`prisma migrate deploy`) به‌طور خودکار قبل از
+   مهاجرت‌های دیتابیس (`typeorm migrate deploy`) به‌طور خودکار قبل از
    بالا آمدن بک‌اند اجرا می‌شوند.
 
 4. **بررسی سلامت:**
@@ -67,7 +67,7 @@ apt-get install -y docker-compose-plugin   # اگر با اسکریپت بالا
 ## حساب‌های نمونه (فقط اگر `SEED_ON_START=true` بوده)
 
 رمز مشترک همه نقش‌ها: `Blujet@1404` (نام کاربری‌ها در
-`backend/prisma/seed.ts` — مثل `ceo`, `chair`, `senior`,
+`backend/src/database/seed.ts` — مثل `ceo`, `chair`, `senior`,
 `finance`, `comm`, `itadmin`, `site.admin`).
 
 **قبل از استفاده واقعی و در دسترس عموم قرار دادن سرور، این حساب‌های نمونه

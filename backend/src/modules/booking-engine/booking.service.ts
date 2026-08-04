@@ -397,7 +397,7 @@ export class BookingService {
     // ran in the same transaction, so its `priceLock` relation reflects the
     // claim already — `usableLock` (resolved earlier) is kept as the
     // reliable signal that this booking actually consumed a lock, matching
-    // the original Prisma code's own caution about staleness.
+    // the original TypeORM code's own caution about staleness.
     const detail = this.toDetail(bookingWithRelations);
     return usableLock ? { ...detail, isPriceLocked: true } : detail;
   }

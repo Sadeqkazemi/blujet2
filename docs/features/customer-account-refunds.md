@@ -74,7 +74,7 @@ account-page integration test in `AccountPage.test.tsx`; Playwright journey
 
 ## Completion gate
 
-- [x] Prisma generate/migrate/seed all succeed.
+- [x] TypeORM generate/migrate/seed all succeed.
 - [x] Backend unit + E2E, frontend Vitest, Playwright journey, lint and
       typecheck all pass.
 - [x] `docs/openapi.json`, `docs/API.md`, `docs/DB_SCHEMA.md`, generated

@@ -483,7 +483,7 @@ export class AgencyPortalService {
         months,
         // Wire format consistency: every *Irr field is a decimal string in
         // responses (see docs/API.md) — this one is JSON-stored (not a
-        // Prisma BigInt column) but still IRR money, so it goes through the
+        // TypeORM BigInt column) but still IRR money, so it goes through the
         // same Irr/bigint-string path as every other price field.
         priceIrr: toIrr(prices[months]),
       })),
