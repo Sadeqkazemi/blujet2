@@ -117,7 +117,7 @@ export default function AgencySeatsPage() {
                 ).map(([label, val, color]) => (
                   <div key={label} className="rounded-xl border border-[#eef1f5] bg-[#fafbfd] p-3 text-center">
                     <div className="mb-1 text-[10.5px] text-[#8a96a6]">{label}</div>
-                    <div className="font-num text-lg font-black" style={{ color }}>
+                    <div className="text-lg font-black" style={{ color }}>
                       {faDigits(val)}
                     </div>
                   </div>

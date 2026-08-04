@@ -6,7 +6,11 @@ import {
 } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import * as crypto from 'node:crypto';
-import { TypeORMService } from '../../typeorm/typeorm.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { User } from '../../database/entities/user.entity';
+import { TwoFactorChallenge } from '../../database/entities/two-factor-challenge.entity';
+import { findOneOrThrow } from '../../database/utils/find-one-or-throw';
 import { ErrorCode } from '../../common/errors';
 import {
   decryptPii,
@@ -17,7 +21,6 @@ import {
 import { TWO_FACTOR_PROVIDER } from '../auth/providers/two-factor-provider.interface';
 import type { TwoFactorProvider } from '../auth/providers/two-factor-provider.interface';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import type { User } from '../../../generated/typeorm/client';
 import type { UpdateProfileDto } from './dto/profile.dtos';
 
 function generateSixDigitCode(): string {
@@ -30,7 +33,9 @@ const EMAIL_VERIFY_MAX_ATTEMPTS = 5;
 @Injectable()
 export class ProfileService {
   constructor(
-    private readonly typeorm: TypeORMService,
+    @InjectRepository(User) private readonly userRepo: Repository<User>,
+    @InjectRepository(TwoFactorChallenge)
+    private readonly challengeRepo: Repository<TwoFactorChallenge>,
     @Inject(TWO_FACTOR_PROVIDER)
     private readonly twoFactorProvider: TwoFactorProvider,
   ) {}
@@ -60,7 +65,7 @@ export class ProfileService {
   }
 
   async getProfile(actor: AuthenticatedUser) {
-    const user = await this.typeorm.user.findUniqueOrThrow({
+    const user = await findOneOrThrow(this.userRepo, {
       where: { id: actor.id },
     });
     return this.shape(user);
@@ -91,9 +96,12 @@ export class ProfileService {
       data.passportNoEnc = encryptPii(dto.passportNo);
     }
 
-    const user = await this.typeorm.user.update({
+    await this.userRepo.update(
+      { id: actor.id },
+      { ...data, updatedAt: new Date() },
+    );
+    const user = await findOneOrThrow(this.userRepo, {
       where: { id: actor.id },
-      data,
     });
     return this.shape(user);
   }
@@ -101,7 +109,7 @@ export class ProfileService {
   async requestEmailVerify(
     actor: AuthenticatedUser,
   ): Promise<{ challengeId: string }> {
-    const user = await this.typeorm.user.findUniqueOrThrow({
+    const user = await findOneOrThrow(this.userRepo, {
       where: { id: actor.id },
     });
     if (!user.email) {
@@ -112,14 +120,14 @@ export class ProfileService {
     }
 
     const code = generateSixDigitCode();
-    const challenge = await this.typeorm.twoFactorChallenge.create({
-      data: {
+    const challenge = await this.challengeRepo.save(
+      this.challengeRepo.create({
         userId: actor.id,
         purpose: 'EMAIL_VERIFY',
         codeHash: await argon2.hash(code),
         expiresAt: new Date(Date.now() + EMAIL_VERIFY_TTL_MS),
-      },
-    });
+      }),
+    );
     await this.twoFactorProvider.sendCode(
       { id: user.id, fullName: user.fullName, email: user.email, phone: null },
       code,
@@ -132,9 +140,7 @@ export class ProfileService {
     challengeId: string,
     code: string,
   ): Promise<{ verified: true }> {
-    const challenge = await this.typeorm.twoFactorChallenge.findUnique({
-      where: { id: challengeId },
-    });
+    const challenge = await this.challengeRepo.findOneBy({ id: challengeId });
     if (
       !challenge ||
       challenge.purpose !== 'EMAIL_VERIFY' ||
@@ -166,24 +172,21 @@ export class ProfileService {
 
     const codeValid = await argon2.verify(challenge.codeHash, code);
     if (!codeValid) {
-      await this.typeorm.twoFactorChallenge.update({
-        where: { id: challenge.id },
-        data: { attempts: { increment: 1 } },
-      });
+      await this.challengeRepo.increment({ id: challenge.id }, 'attempts', 1);
       throw new UnauthorizedException({
         code: 'TWO_FACTOR_INVALID',
         message: 'کد وارد شده نادرست است.',
       });
     }
 
-    await this.typeorm.twoFactorChallenge.update({
-      where: { id: challenge.id },
-      data: { consumedAt: new Date() },
-    });
-    await this.typeorm.user.update({
-      where: { id: actor.id },
-      data: { emailVerifiedAt: new Date() },
-    });
+    await this.challengeRepo.update(
+      { id: challenge.id },
+      { consumedAt: new Date() },
+    );
+    await this.userRepo.update(
+      { id: actor.id },
+      { emailVerifiedAt: new Date(), updatedAt: new Date() },
+    );
 
     return { verified: true };
   }

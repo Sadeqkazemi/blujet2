@@ -44,6 +44,21 @@ export class CreateJobPostingDto {
   @IsArray()
   @IsString({ each: true })
   specialReqs: string[];
+
+  @ApiPropertyOptional({
+    example: 'همکاری با تیم پشتیبانی مشتریان در تماس‌های تلفنی و تیکت.',
+    description: 'متن توضیحی آگهی (نمایش در صفحه استخدام)',
+  })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional({
+    description: 'StoredFile id from POST /files — تصویر آگهی',
+  })
+  @IsOptional()
+  @IsString()
+  imageFileId?: string | null;
 }
 
 export class UpdateJobPostingDto {
@@ -86,6 +101,16 @@ export class UpdateJobPostingDto {
   @IsOptional()
   @IsBoolean()
   active?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional({ description: 'StoredFile id — null clears image' })
+  @IsOptional()
+  @IsString()
+  imageFileId?: string | null;
 }
 
 export class UpdateCareersSettingsDto {

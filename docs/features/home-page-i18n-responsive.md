@@ -42,12 +42,14 @@ formatted with locale-appropriate digits/separators via the new
       future schema work needing `docs/DB_SCHEMA.md` coverage + approval
       before it's built
 - [x] Responsive: hero height/title size, search-card fields (row → 2-col
-      grid), popular-routes/quick-links/offers/destinations grids (5/4 cols
-      → 2 cols), mid-banner/club-band/app-band (row → column) all switch at
-      the shared `useIsMobile()` breakpoint (767px), matching the design
-      bundle's own `isMobile` layout values — implemented; not separately
-      unit-tested beyond the existing `useIsMobile` hook tests (same
-      boolean drives every branch, no new logic)
+      grid), services + special-offers horizontal scroll (2 cards visible,
+      `.hscroll`, no visible scrollbar), popular-destinations + loyalty/app
+      carousel hidden on mobile, mid-banner (row → column) all switch at
+      the shared `useIsMobile()` breakpoint (767px), matching
+      `design-reference-v2/صفحه اصلی.dc.html` — **layout frozen**; do not
+      change without explicit user approval
+      — `HomeSearchPage.test.tsx` › "responsive layout (frozen)" describe
+      block (desktop grid vs mobile hscroll + hidden sections)
 - [x] Error messages (airport-list load failure, missing
       origin/dest/date, same-city validation) are locale-aware; fa text
       unchanged from before this phase so all 4 pre-existing tests still

@@ -9,6 +9,7 @@ import * as useLocaleModule from '../../hooks/useLocale';
 import * as publicSiteApi from '../../api/publicSite';
 import * as supportTicketsApi from '../../api/support-tickets';
 import * as authApi from '../../api/auth';
+import * as useIsMobileModule from '../../hooks/useIsMobile';
 import type { BookingDetail, PriceLock, RefundRequestView, SavedFlight, SavedPassenger, SavedBankAccount, CustomerReferralDashboard, CustomerIdentityView, ActiveSession, UserProfile } from '../../types/public-site';
 import type { ClubMembershipView } from '../../types/club-membership';
 import type { MySupportTicketRow } from '../../types/support-tickets';
@@ -237,15 +238,16 @@ const TICKET: MySupportTicketRow = {
   updatedAt: '2026-07-01T00:00:00.000Z',
 };
 
-function renderPage() {
+function renderPage(initialEntry = '/account') {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <AccountPage />
     </MemoryRouter>,
   );
 }
 
 beforeEach(() => {
+  vi.spyOn(useIsMobileModule, 'useIsMobile').mockReturnValue(false);
   vi.spyOn(publicSiteApi, 'fetchMyBookings').mockResolvedValue([BOOKING]);
   vi.spyOn(publicSiteApi, 'fetchWallet').mockResolvedValue({ balanceIrr: '2500000' });
   vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({ isMember: true, level: 'GOLD', balance: 12450 });
@@ -274,16 +276,13 @@ describe('AccountPage', () => {
 
   it('switches to the wallet tab and shows the real balance', async () => {
     mockAuth('authenticated');
-    renderPage();
-    await userEvent.click(screen.getByTestId('account-tab-wallet'));
+    renderPage('/account?tab=wallet');
     expect(await screen.findByTestId('wallet-balance')).toHaveTextContent('۲۵۰٬۰۰۰');
   });
 
   it('switches to the club tab and shows tier banner + issued card', async () => {
     mockAuth('authenticated');
-    renderPage();
-    await screen.findByTestId('account-trip');
-    await userEvent.click(screen.getByTestId('account-tab-club'));
+    renderPage('/account?tab=club');
     expect(await screen.findByTestId('club-card-tracker')).toBeInTheDocument();
     expect(screen.getByText('عضو طلایی')).toBeInTheDocument();
     expect(screen.getByText('GOLD-8842')).toBeInTheDocument();
@@ -291,8 +290,7 @@ describe('AccountPage', () => {
 
   it('switches to the passengers tab and lists saved passengers with meta line', async () => {
     mockAuth('authenticated');
-    renderPage();
-    await userEvent.click(screen.getByTestId('account-tab-passengers'));
+    renderPage('/account?tab=passengers');
     const row = await screen.findByTestId('account-passenger');
     expect(row).toHaveTextContent('محمد رضایی');
     expect(row).toHaveTextContent('MOHAMMAD REZAEI · A22113344');
@@ -307,9 +305,8 @@ describe('AccountPage', () => {
       latinName: 'SARA AHMADI',
       passportNo: 'B99887766',
     });
-    renderPage();
-    await userEvent.click(screen.getByTestId('account-tab-passengers'));
-    await userEvent.click(screen.getByTestId('passengers-add-open'));
+    renderPage('/account?tab=passengers');
+    await userEvent.click(await screen.findByTestId('passengers-add-open'));
     await userEvent.type(screen.getByLabelText('نام و نام خانوادگی'), 'سارا احمدی');
     await userEvent.type(screen.getByLabelText('نام لاتین (روی بلیط)'), 'Sara Ahmadi');
     await userEvent.type(screen.getByLabelText('شماره گذرنامه'), 'B99887766');
@@ -328,8 +325,7 @@ describe('AccountPage', () => {
   it('removes a saved passenger', async () => {
     mockAuth('authenticated');
     const remove = vi.spyOn(publicSiteApi, 'removeSavedPassenger').mockResolvedValue({ removed: true });
-    renderPage();
-    await userEvent.click(screen.getByTestId('account-tab-passengers'));
+    renderPage('/account?tab=passengers');
     await screen.findByTestId('account-passenger');
     await userEvent.click(screen.getByLabelText('حذف'));
     await vi.waitFor(() => expect(remove).toHaveBeenCalledWith('sp-1'));
@@ -337,16 +333,14 @@ describe('AccountPage', () => {
 
   it('switches to the refunds tab and shows the real refund', async () => {
     mockAuth('authenticated');
-    renderPage();
-    await userEvent.click(screen.getByTestId('account-tab-refunds'));
+    renderPage('/account?tab=refunds');
     expect(await screen.findByTestId('refund-tracking')).toHaveTextContent('در حال بررسی');
   });
 
   it('switches to the tickets tab and lists support tickets', async () => {
     mockAuth('authenticated');
     vi.spyOn(supportTicketsApi, 'fetchMySupportTickets').mockResolvedValue([TICKET]);
-    renderPage();
-    await userEvent.click(screen.getByTestId('account-tab-tickets'));
+    renderPage('/account?tab=tickets');
     expect(await screen.findByTestId('account-ticket')).toHaveTextContent('مشکل در پرداخت');
     expect(screen.getByText('TKAABBCCDD', { exact: false })).toBeInTheDocument();
   });
@@ -354,8 +348,7 @@ describe('AccountPage', () => {
   it('switches to the security tab and lists active sessions with revoke', async () => {
     mockAuth('authenticated');
     const revoke = vi.spyOn(publicSiteApi, 'revokeMySession').mockResolvedValue({ revoked: true });
-    renderPage();
-    await userEvent.click(screen.getByTestId('account-tab-security'));
+    renderPage('/account?tab=security');
     expect(await screen.findByTestId('account-sessions')).toBeInTheDocument();
     expect(screen.getByTestId('session-current-badge')).toBeInTheDocument();
     expect(screen.getByText('Chrome · Windows')).toBeInTheDocument();
@@ -368,8 +361,7 @@ describe('AccountPage', () => {
   it('switches to the security tab and sets password via OTP flow API', async () => {
     mockAuth('authenticated');
     const setPw = vi.spyOn(authApi, 'setPassword').mockResolvedValue({ changed: true });
-    renderPage();
-    await userEvent.click(screen.getByTestId('account-tab-security'));
+    renderPage('/account?tab=security');
     await userEvent.type(document.getElementById('acct-pw-new')!, 'secret12');
     await userEvent.type(document.getElementById('acct-pw-confirm')!, 'secret12');
     await userEvent.click(screen.getByTestId('account-save-password'));
@@ -388,8 +380,7 @@ describe('AccountPage', () => {
       cardMasked: '6219 8619 •••• 7730',
       isDefault: false,
     });
-    renderPage();
-    await userEvent.click(screen.getByTestId('account-tab-banks'));
+    renderPage('/account?tab=banks');
     expect(await screen.findByTestId('account-banks')).toBeInTheDocument();
     expect(screen.getByText('بانک ملت')).toBeInTheDocument();
     expect(screen.getByTestId('bank-default-badge')).toBeInTheDocument();
@@ -409,8 +400,7 @@ describe('AccountPage', () => {
     Object.assign(navigator, {
       clipboard: { writeText: vi.fn().mockResolvedValue(undefined) },
     });
-    renderPage();
-    await userEvent.click(screen.getByTestId('account-tab-referral'));
+    renderPage('/account?tab=referral');
     expect(await screen.findByTestId('account-referral')).toBeInTheDocument();
     expect(screen.getByTestId('referral-code')).toHaveTextContent('NEGAR-4152');
     expect(screen.getByTestId('kpi-invited')).toHaveTextContent('۳');
@@ -422,8 +412,7 @@ describe('AccountPage', () => {
 
   it('switches to the identity tab and shows incomplete steps with profile link', async () => {
     mockAuth('authenticated');
-    renderPage();
-    await userEvent.click(screen.getByTestId('account-tab-identity'));
+    renderPage('/account?tab=identity');
     expect(await screen.findByTestId('account-identity')).toBeInTheDocument();
     expect(screen.getByText('احراز هویت شما هنوز کامل نشده است')).toBeInTheDocument();
     expect(screen.getByTestId('identity-go-profile')).toBeInTheDocument();
@@ -437,27 +426,23 @@ describe('AccountPage', () => {
     const submit = vi
       .spyOn(publicSiteApi, 'submitIdentityVerification')
       .mockResolvedValue({ ...IDENTITY_READY, status: 'SUBMITTED', canSubmit: false });
-    renderPage();
-    await userEvent.click(screen.getByTestId('account-tab-identity'));
+    renderPage('/account?tab=identity');
     expect(await screen.findByTestId('identity-submit')).toBeInTheDocument();
     await userEvent.click(screen.getByTestId('identity-submit'));
     await vi.waitFor(() => expect(submit).toHaveBeenCalled());
   });
 
-  it('shows saved passengers on the profile tab and opens add modal from there', async () => {
+  it('shows saved passengers on the passengers tab and opens add modal', async () => {
     mockAuth('authenticated');
-    renderPage();
-    await userEvent.click(screen.getByTestId('account-tab-profile'));
-    expect(await screen.findByTestId('profile-saved-pax')).toBeInTheDocument();
-    expect(screen.getAllByTestId('profile-saved-pax-row')).toHaveLength(1);
+    renderPage('/account?tab=passengers');
+    expect(await screen.findByTestId('account-passenger')).toBeInTheDocument();
     expect(screen.getByText('MOHAMMAD REZAEI · A22113344')).toBeInTheDocument();
 
-    await userEvent.click(screen.getByTestId('profile-saved-pax-add'));
+    await userEvent.click(screen.getByTestId('passengers-add-open'));
     expect(await screen.findByTestId('passengers-form-modal')).toBeInTheDocument();
-    expect(screen.getByTestId('account-passengers')).toBeInTheDocument();
   });
 
-  it('shows an incomplete-profile banner and saves identity fields from the profile tab', async () => {
+  it('shows an incomplete-profile banner and saves identity fields from the account-info tab', async () => {
     mockAuth('authenticated');
     const update = vi.spyOn(publicSiteApi, 'updateMyProfile').mockResolvedValue({
       ...PROFILE,
@@ -468,7 +453,8 @@ describe('AccountPage', () => {
 
     expect(await screen.findByTestId('profile-incomplete-banner')).toHaveTextContent('۲۰٪');
 
-    await userEvent.click(screen.getByTestId('account-tab-profile'));
+    await userEvent.click(screen.getByTestId('account-tab-account-info'));
+    await userEvent.click(await screen.findByTestId('profile-edit-toggle'));
     const nationalIdInput = await screen.findByLabelText('کد ملی');
     await userEvent.type(nationalIdInput, '0012345679');
     await userEvent.click(screen.getByRole('button', { name: 'ذخیره اطلاعات' }));
@@ -481,15 +467,14 @@ describe('AccountPage', () => {
     });
   });
 
-  it('downloads a real data export as JSON', async () => {
+  it('downloads a real data export as JSON from the security tab', async () => {
     mockAuth('authenticated');
     const exportSpy = vi.spyOn(publicSiteApi, 'fetchPrivacyExport').mockResolvedValue({ user: PROFILE });
     const createObjectURL = vi.fn().mockReturnValue('blob:mock-url');
     const revokeObjectURL = vi.fn();
     vi.stubGlobal('URL', { ...URL, createObjectURL, revokeObjectURL });
 
-    renderPage();
-    await userEvent.click(screen.getByTestId('account-tab-profile'));
+    renderPage('/account?tab=security');
     await userEvent.click(screen.getByTestId('privacy-export-button'));
 
     await vi.waitFor(() => expect(exportSpy).toHaveBeenCalled());
@@ -499,13 +484,12 @@ describe('AccountPage', () => {
     vi.unstubAllGlobals();
   });
 
-  it('deletes the account only after explicit confirmation, then signs out', async () => {
+  it('deletes the account only after explicit confirmation from the security tab, then signs out', async () => {
     const signOut = vi.fn().mockResolvedValue(undefined);
     mockAuth('authenticated', signOut);
     const deleteSpy = vi.spyOn(publicSiteApi, 'deleteMyAccount').mockResolvedValue({ deleted: true });
 
-    renderPage();
-    await userEvent.click(screen.getByTestId('account-tab-profile'));
+    renderPage('/account?tab=security');
     await userEvent.click(screen.getByTestId('privacy-delete-open'));
 
     expect(screen.getByTestId('privacy-delete-confirm')).toBeInTheDocument();
@@ -531,8 +515,7 @@ describe('AccountPage', () => {
 
   it('switches to the saved tab and lists bookmarked flights with book action', async () => {
     mockAuth('authenticated');
-    renderPage();
-    await userEvent.click(screen.getByTestId('account-tab-saved'));
+    renderPage('/account?tab=saved');
     expect(await screen.findByTestId('account-saved-flights')).toBeInTheDocument();
     expect(screen.getByText('تهران ← مشهد')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'رزرو' })).toBeInTheDocument();
@@ -541,8 +524,7 @@ describe('AccountPage', () => {
   it('switches to the price-locks tab and lists a real lock with its route, price, fee, and cancel action', async () => {
     mockAuth('authenticated');
     vi.spyOn(publicSiteApi, 'fetchMyPriceLocks').mockResolvedValue([LOCK]);
-    renderPage();
-    await userEvent.click(screen.getByTestId('account-tab-price-locks'));
+    renderPage('/account?tab=price-locks');
 
     const row = await screen.findByTestId('account-price-lock');
     expect(row).toHaveTextContent('THR');
@@ -556,8 +538,7 @@ describe('AccountPage', () => {
     mockAuth('authenticated');
     vi.spyOn(publicSiteApi, 'fetchMyPriceLocks').mockResolvedValue([LOCK]);
     const cancel = vi.spyOn(publicSiteApi, 'cancelPriceLock').mockResolvedValue({ ...LOCK, status: 'CANCELLED' });
-    renderPage();
-    await userEvent.click(screen.getByTestId('account-tab-price-locks'));
+    renderPage('/account?tab=price-locks');
     await screen.findByTestId('account-price-lock');
 
     await userEvent.click(screen.getByTestId('cancel-price-lock-pl-1'));
@@ -570,8 +551,7 @@ describe('AccountPage', () => {
   it('tops up the wallet using Persian-digit input, converting toman to rial correctly (regression: raw Number()*10 silently produced NaN)', async () => {
     mockAuth('authenticated');
     const topup = vi.spyOn(publicSiteApi, 'topupWallet').mockResolvedValue({ balanceIrr: '5000000' });
-    renderPage();
-    await userEvent.click(screen.getByTestId('account-tab-wallet'));
+    renderPage('/account?tab=wallet');
 
     await userEvent.type(screen.getByTestId('wallet-topup-amount'), '۵۰۰٬۰۰۰');
     await userEvent.click(screen.getByTestId('wallet-topup-submit'));
@@ -582,20 +562,43 @@ describe('AccountPage', () => {
   it('renders translated tab labels and the club tier in English', async () => {
     mockLocale('en');
     mockAuth('authenticated');
-    renderPage();
-    expect(screen.getByTestId('account-tab-club')).toHaveTextContent('Loyalty Club');
-    expect(screen.getByTestId('account-tab-refunds')).toHaveTextContent('Refunds');
-    await userEvent.click(screen.getByTestId('account-tab-club'));
+    renderPage('/account?tab=profile');
+    expect(screen.getByTestId('account-tab-profile')).toHaveTextContent('My Profile');
+    expect(screen.getByTestId('account-tab-account-info')).toHaveTextContent('Account Information');
+    expect(screen.queryByTestId('account-tab-club')).not.toBeInTheDocument();
+    renderPage('/account?tab=club');
     expect(await screen.findByText('Gold Member')).toBeInTheDocument();
   });
 
   it('renders translated tab labels and the club tier in Arabic', async () => {
     mockLocale('ar');
     mockAuth('authenticated');
-    renderPage();
-    expect(screen.getByTestId('account-tab-club')).toHaveTextContent('نادي الولاء');
-    expect(screen.getByTestId('account-tab-wallet')).toHaveTextContent('المحفظة');
-    await userEvent.click(screen.getByTestId('account-tab-club'));
+    renderPage('/account?tab=profile');
+    expect(screen.getByTestId('account-tab-profile')).toHaveTextContent('ملفي الشخصي');
+    expect(screen.getByTestId('account-tab-account-info')).toHaveTextContent('معلومات الحساب');
+    expect(screen.queryByTestId('account-tab-wallet')).not.toBeInTheDocument();
+    renderPage('/account?tab=club');
     expect(await screen.findByText('عضو ذهبية')).toBeInTheDocument();
+  });
+
+  it('shows only profile and account-info links in the sidebar', async () => {
+    mockAuth('authenticated');
+    renderPage('/account?tab=profile');
+    expect(screen.getByTestId('account-tab-profile')).toBeInTheDocument();
+    expect(screen.getByTestId('account-tab-account-info')).toBeInTheDocument();
+    expect(screen.queryByTestId('account-tab-trips')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('account-tab-wallet')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('account-tab-security')).not.toBeInTheDocument();
+  });
+
+  it('renders profile stats in a 2-column grid on mobile', async () => {
+    vi.spyOn(useIsMobileModule, 'useIsMobile').mockReturnValue(true);
+    mockAuth('authenticated');
+    renderPage();
+    await userEvent.click(screen.getByTestId('account-tab-profile'));
+    const grid = await screen.findByTestId('profile-stats-grid');
+    expect(grid).toHaveStyle({ gridTemplateColumns: 'repeat(2, 1fr)' });
+    expect(screen.getByTestId('account-sidebar')).toBeInTheDocument();
+    expect(screen.getByTestId('profile-incomplete-notice')).toBeInTheDocument();
   });
 });

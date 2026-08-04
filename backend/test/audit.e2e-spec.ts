@@ -1,7 +1,10 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { TypeORMService } from '../src/typeorm/typeorm.service';
+import { DataSource, In } from 'typeorm';
+import { dataSourceOptions } from '../src/database/data-source.options';
+import { User } from '../src/database/entities/user.entity';
+import { AuditLog } from '../src/database/entities/audit-log.entity';
 import { loginAs } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
@@ -18,16 +21,17 @@ describe('Audit (e2e)', () => {
   });
 
   beforeAll(async () => {
-    const setupApp = await createTestApp();
-    const setupTypeORM = setupApp.get(TypeORMService);
+    const setupDataSource = new DataSource(dataSourceOptions);
+    await setupDataSource.initialize();
 
-    const users = await setupTypeORM.user.findMany({
-      where: { username: { in: ['finance.karimi', 'senior.rahimi', 'ceo'] } },
+    const users = await setupDataSource.getRepository(User).find({
+      where: { username: In(['finance.karimi', 'senior.rahimi', 'ceo']) },
     });
     const byUsername = Object.fromEntries(users.map((u) => [u.username, u]));
 
-    await setupTypeORM.auditLog.createMany({
-      data: [
+    const auditRepo = setupDataSource.getRepository(AuditLog);
+    await auditRepo.save(
+      auditRepo.create([
         {
           actorId: byUsername['finance.karimi'].id,
           actorRole: 'FINANCE_MANAGER',
@@ -49,10 +53,10 @@ describe('Audit (e2e)', () => {
           action: 'تأیید قیمت',
           detail: 'test entry from ceo',
         },
-      ],
-    });
+      ]),
+    );
 
-    await setupApp.close();
+    await setupDataSource.destroy();
   });
 
   it("CEO's manager-reports excludes CEO/SENIOR_MANAGER/BOARD_CHAIR as actor", async () => {

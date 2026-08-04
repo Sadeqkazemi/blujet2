@@ -1,4 +1,4 @@
-import { Role } from '../../../generated/typeorm/enums';
+import { Role } from '../../database/enums';
 
 export interface PanelNavItem {
   key: string;
@@ -7,6 +7,13 @@ export interface PanelNavItem {
    * a "به‌زودی" placeholder on the frontend until its phase lands. */
   implemented: boolean;
 }
+
+/**
+ * SITE_ADMIN sidebar must never surface these keys (product request 2026-08).
+ * Kept as an explicit denylist so a future accidental re-add to PANEL_NAV
+ * cannot ship them again without also deleting this set.
+ */
+export const SITE_ADMIN_SIDEBAR_DENYLIST = new Set(['blog', 'kyc', 'settings']);
 
 /**
  * Server-computed per-role sidebar, confirmed from a full read of each
@@ -20,65 +27,64 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
   // out rather than shipped as a dead tab; see Phase 18 notes in
   // `blog` added in Phase D (real CMS backend).
   // `media` added in Phase E (site content CMS backend).
+  // Order/labels match design-reference-v2/پنل ادمین سایت.dc.html
+  // roleDefs.siteAdmin.access (visible sidebar). Blog/KYC/settings are
+  // reachable via routes for other workflows but deliberately omitted from
+  // the SITE_ADMIN sidebar per product request (2026-08).
   SITE_ADMIN: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
-    { key: 'agencies', labelFa: 'مدیریت آژانس‌ها', implemented: true },
-    { key: 'flightops', labelFa: 'پروازها', implemented: true },
+    { key: 'agencies', labelFa: 'آژانس‌ها', implemented: true },
+    { key: 'flightops', labelFa: 'پرواز', implemented: true },
     { key: 'reports', labelFa: 'گزارش مسافران', implemented: true },
-    { key: 'cartable', labelFa: 'کارتابل', implemented: true },
     { key: 'club', labelFa: 'باشگاه مشتریان', implemented: true },
     { key: 'refund', labelFa: 'استرداد بلیط', implemented: true },
-    { key: 'tickets', labelFa: 'تیکت‌های پشتیبانی', implemented: true },
-    { key: 'blog', labelFa: 'مدیریت بلاگ', implemented: true },
+    { key: 'cartable', labelFa: 'کارتابل', implemented: true },
+    { key: 'tickets', labelFa: 'تیکت‌ها', implemented: true },
     { key: 'media', labelFa: 'مدیریت سایت', implemented: true },
-    { key: 'jobapps', labelFa: 'فرصت‌های شغلی', implemented: true },
-    // Staff side of the customer KYC flow (/my/identity, Phase 17) — the
-    // APPROVED/REJECTED transitions have to be reachable somewhere; no
-    // design tab exists for it, so it follows the jobapps queue pattern.
-    { key: 'kyc', labelFa: 'احراز هویت مشتریان', implemented: true },
-    { key: 'settings', labelFa: 'تنظیمات سامانه', implemented: true },
+    { key: 'jobapps', labelFa: 'درخواست‌های استخدام', implemented: true },
   ],
+  // Order matches design-reference-v2/پنل مدیر عامل.dc.html sidebar
+  // (settings is display:none there). clubrules stays on COMMERCIAL_MANAGER;
+  // flightops stays on SITE_ADMIN. `reservation` (label هواپیما) is in
+  // roleDefs.ceo.access and the approved CEO screenshots — same key/label
+  // as BOARD_CHAIR.
   CEO: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
-    { key: 'flightops', labelFa: 'پروازها', implemented: true },
     { key: 'admins', labelFa: 'مدیران', implemented: true },
     { key: 'finance', labelFa: 'مالی', implemented: true },
     { key: 'cartable', labelFa: 'کارتابل', implemented: true },
     { key: 'club', labelFa: 'مشتریان VIP', implemented: true },
+    { key: 'survey', labelFa: 'نظرسنجی مسافران', implemented: true },
     { key: 'mgrreports', labelFa: 'گزارش مدیران', implemented: true },
+    { key: 'reservation', labelFa: 'هواپیما', implemented: true },
     { key: 'pricing', labelFa: 'تعیین قیمت بلیط', implemented: true },
-    { key: 'clubrules', labelFa: 'قوانین باشگاه مشتریان', implemented: true },
     { key: 'panels', labelFa: 'دسترسی به پنل‌ها', implemented: true },
     { key: 'security', labelFa: 'امنیت و رمز عبور', implemented: true },
     { key: 'logs', labelFa: 'لاگ و رویدادها', implemented: true },
-    { key: 'survey', labelFa: 'نظرسنجی مسافران', implemented: true },
   ],
   BOARD_CHAIR: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
     { key: 'admins', labelFa: 'مدیران', implemented: true },
     { key: 'finance', labelFa: 'مالی', implemented: true },
     { key: 'cartable', labelFa: 'کارتابل', implemented: true },
-    { key: 'settings', labelFa: 'تنظیمات سامانه', implemented: true },
     { key: 'club', labelFa: 'مشتریان VIP', implemented: true },
     { key: 'reservation', labelFa: 'هواپیما', implemented: true },
     { key: 'mgrreports', labelFa: 'گزارش مدیران', implemented: true },
     { key: 'survey', labelFa: 'نظرسنجی مسافران', implemented: true },
   ],
+  // Senior Manager sidebar — mirrors CEO executive tabs for shared surfaces;
+  // `reservation` labeled هواپیما like CEO (content: ExecReservationView).
   SENIOR_MANAGER: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
-    { key: 'agencies', labelFa: 'آژانس‌ها', implemented: true },
-    { key: 'flights', labelFa: 'مدیریت پروازها', implemented: true },
     { key: 'admins', labelFa: 'مدیران و ادمین‌ها', implemented: true },
-    { key: 'reports', labelFa: 'گزارش مسافران', implemented: true },
     { key: 'finance', labelFa: 'مالی', implemented: true },
     { key: 'cartable', labelFa: 'کارتابل', implemented: true },
-    { key: 'referrals', labelFa: 'ارجاعات', implemented: true },
     { key: 'mgrreports', labelFa: 'گزارش مدیران', implemented: true },
     { key: 'vip', labelFa: 'مشتریان VIP', implemented: true },
+    { key: 'survey', labelFa: 'نظرسنجی مسافران', implemented: true },
+    { key: 'reservation', labelFa: 'هواپیما', implemented: true },
     { key: 'panels', labelFa: 'دسترسی به پنل‌ها', implemented: true },
     { key: 'security', labelFa: 'امنیت و رمز عبور', implemented: true },
-    { key: 'reservation', labelFa: 'سامانه رزرواسیون', implemented: true },
-    { key: 'survey', labelFa: 'نظرسنجی مسافران', implemented: true },
   ],
   FINANCE_MANAGER: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
@@ -147,8 +153,12 @@ export const EMPLOYEE_SECTION_NAV: Record<
   string,
   { labelFa: string; wiredKeys: string[] }
 > = {
+  // Order + labels match design-reference-v2/پنل کارمند.dc.html + user
+  // screenshots (سمیرا احمدی). «مدیریت پروازها» removed from employee
+  // sidebar per product — fl_* stays permission-catalog only, no tab.
+  // finance / IT sections stay unwired — no dead tabs.
   agencies: {
-    labelFa: 'آژانس‌ها',
+    labelFa: 'مدیریت آژانس‌ها',
     wiredKeys: [
       'ag_list',
       'ag_requests',
@@ -157,13 +167,12 @@ export const EMPLOYEE_SECTION_NAV: Record<
       'fn_invoices',
     ],
   },
-  flights: { labelFa: 'مدیریت پروازها', wiredKeys: ['fl_view', 'fl_manage'] },
-  pricing: { labelFa: 'تعیین قیمت بلیط', wiredKeys: ['pr_propose'] },
-  reports: { labelFa: 'گزارش مسافران', wiredKeys: ['rp_sales', 'rp_finance'] },
+  pricing: { labelFa: 'نرخ‌گذاری', wiredKeys: ['pr_propose'] },
   refund: {
     labelFa: 'استرداد بلیط',
     wiredKeys: ['rf_list', 'rf_details', 'rf_process'],
   },
+  reports: { labelFa: 'گزارش‌ها', wiredKeys: ['rp_sales', 'rp_finance'] },
   cartable: {
     labelFa: 'کارتابل',
     wiredKeys: ['ct_list', 'ct_process'],

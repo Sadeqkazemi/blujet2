@@ -7,7 +7,7 @@ import * as panelsApi from '../../api/panels';
 import type { PanelNavItem } from '../../types/panels';
 
 function Shell({ nav }: { nav: PanelNavItem[] | null }) {
-  return <Outlet context={{ nav }} />;
+  return <Outlet context={{ nav, lowSalesAlerts: [] }} />;
 }
 
 function renderWithNav(nav: PanelNavItem[] | null) {
@@ -28,7 +28,7 @@ describe('EmployeeDashboardPage', () => {
       dept: 'commercial',
       deptLabelFa: 'بازرگانی',
       rank: 'کارشناس',
-      permissionLabelsFa: ['داشبورد', 'آژانس‌ها', 'مدیریت پروازها', 'کارتابل', 'ارجاعات'],
+      permissionLabelsFa: ['داشبورد', 'مدیریت آژانس‌ها', 'گزارش‌ها', 'کارتابل', 'ارجاعات'],
     });
     vi.spyOn(cartableApi, 'fetchMyReferrals').mockResolvedValue({
       referrals: [],
@@ -36,7 +36,7 @@ describe('EmployeeDashboardPage', () => {
     });
   });
 
-  it('renders a link for each granted section from the real server-computed nav', async () => {
+  it('shows permission chips from employee context (no flights)', async () => {
     vi.spyOn(cartableApi, 'fetchCartable').mockResolvedValue({
       tasks: [],
       counts: { ADMIN: 0, AGENCY: 0, MANAGER: 0 },
@@ -44,12 +44,16 @@ describe('EmployeeDashboardPage', () => {
     });
     renderWithNav([
       { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
-      { key: 'agencies', labelFa: 'آژانس‌ها', implemented: true },
-      { key: 'flights', labelFa: 'مدیریت پروازها', implemented: true },
+      { key: 'agencies', labelFa: 'مدیریت آژانس‌ها', implemented: true },
+      { key: 'reports', labelFa: 'گزارش‌ها', implemented: true },
+      { key: 'cartable', labelFa: 'کارتابل', implemented: true },
+      { key: 'referrals', labelFa: 'ارجاعات', implemented: true },
     ]);
 
-    expect(await screen.findByRole('link', { name: /آژانس‌ها/ })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /مدیریت پروازها/ })).toHaveAttribute('href', '/panel/flights');
+    expect(await screen.findByText('دسترسی‌های شما در این واحد')).toBeInTheDocument();
+    expect(screen.getByText('مدیریت آژانس‌ها')).toBeInTheDocument();
+    expect(screen.getByText('گزارش‌ها')).toBeInTheDocument();
+    expect(screen.queryByText('مدیریت پروازها')).not.toBeInTheDocument();
   });
 
   it('shows KPI cards for cartable count, referrals count, and unit label', async () => {
@@ -69,30 +73,38 @@ describe('EmployeeDashboardPage', () => {
     });
     expect(screen.getByText('۳')).toBeInTheDocument();
     expect(screen.getByText('۲')).toBeInTheDocument();
-    expect(screen.getByText('بازرگانی')).toBeInTheDocument();
+    expect(screen.getAllByText('بازرگانی').length).toBeGreaterThan(0);
   });
 
   it('shows a no-access message when nothing has been granted yet', async () => {
+    vi.spyOn(panelsApi, 'fetchEmployeeContext').mockResolvedValue({
+      dept: 'commercial',
+      deptLabelFa: 'بازرگانی',
+      rank: 'کارشناس',
+      permissionLabelsFa: ['داشبورد', 'ارجاعات'],
+    });
     renderWithNav([{ key: 'dashboard', labelFa: 'داشبورد', implemented: true }]);
 
-    expect(
-      await screen.findByText('هنوز هیچ دسترسی برای شما توسط مدیر IT فعال نشده است.'),
-    ).toBeInTheDocument();
+    expect(await screen.findByTestId('employee-no-access')).toBeInTheDocument();
   });
 
-  it('shows the always-present referrals card alongside the no-access message when no IT permission is granted yet', async () => {
+  it('still shows no-access when only referrals is present (always-on tab)', async () => {
+    vi.spyOn(panelsApi, 'fetchEmployeeContext').mockResolvedValue({
+      dept: 'commercial',
+      deptLabelFa: 'بازرگانی',
+      rank: 'کارشناس',
+      permissionLabelsFa: ['داشبورد', 'ارجاعات'],
+    });
     renderWithNav([
       { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
       { key: 'referrals', labelFa: 'ارجاعات', implemented: true },
     ]);
 
-    expect(await screen.findByText('ارجاعات')).toBeInTheDocument();
-    expect(
-      screen.getByText('هنوز هیچ دسترسی برای شما توسط مدیر IT فعال نشده است.'),
-    ).toBeInTheDocument();
+    expect(await screen.findByTestId('employee-no-access')).toBeInTheDocument();
+    expect(screen.getByText('ارجاعات')).toBeInTheDocument();
   });
 
-  it('hides the no-access message once a real IT-granted section exists alongside referrals', async () => {
+  it('hides the no-access message once a real IT-granted section exists', async () => {
     vi.spyOn(cartableApi, 'fetchCartable').mockResolvedValue({
       tasks: [],
       counts: { ADMIN: 0, AGENCY: 0, MANAGER: 0 },
@@ -100,13 +112,11 @@ describe('EmployeeDashboardPage', () => {
     });
     renderWithNav([
       { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
-      { key: 'agencies', labelFa: 'آژانس‌ها', implemented: true },
+      { key: 'agencies', labelFa: 'مدیریت آژانس‌ها', implemented: true },
       { key: 'referrals', labelFa: 'ارجاعات', implemented: true },
     ]);
 
-    expect(await screen.findByText('ارجاعات')).toBeInTheDocument();
-    expect(
-      screen.queryByText('هنوز هیچ دسترسی برای شما توسط مدیر IT فعال نشده است.'),
-    ).not.toBeInTheDocument();
+    await screen.findByText('دسترسی‌های شما در این واحد');
+    expect(screen.queryByTestId('employee-no-access')).not.toBeInTheDocument();
   });
 });

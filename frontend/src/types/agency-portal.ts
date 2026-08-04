@@ -136,6 +136,14 @@ export interface AgencyWebserviceRequest {
   createdAt: string;
 }
 
+/** Cross-agency queue row for SITE_ADMIN webservice tab */
+export interface AgencyWebserviceQueueRow extends AgencyWebserviceRequest {
+  agencyId: string;
+  agencyName: string;
+  city: string;
+  licenseNo: string;
+}
+
 export interface AgencyApiKeySummary {
   id: string;
   scope: AgencyApiScope | 'SEARCH_ONLY';

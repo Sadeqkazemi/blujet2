@@ -1574,10 +1574,28 @@ list (مدیریت رزرو, تماس با ما + پشتیبانی, فراموش
   Backend e2e: `search-advisory.e2e-spec.ts`. Frontend: 413 tests green.
   See branch `cursor/public-gaps-i18n-visual-9b91`.
 
+- [x] **Full-project code review + critical-fix batch (2026-08-01)** — a 6-way parallel review across financial/booking core, auth/RBAC, admin-panel backend, frontend RTL/Jalali/i18n, ml-service, and infra/deployment surfaced 26 findings. Fixed the 7 highest-severity ones in this batch (backend-only; the remaining findings are frontend/perf/infra items, not yet scheduled):
+  - `agencies.service.ts` `settle()`: was a bare read-then-insert with no lock — two concurrent settlements could both read the same "outstanding" figure and double-credit the agency. Now locks the agency's profile row (`SELECT ... FOR UPDATE`) and re-reads the ledger sum inside the same transaction as the insert. New concurrency e2e test (two parallel `POST /settle` calls → exactly one 201, ledger sum stays 0).
+  - `pricing.service.ts` `register()`: an AI-sourced suggestion could be registered as the bookable fare with zero bound check, violating CLAUDE.md's "an ML suggestion can never set a bookable price by itself." Now rejects an AI suggestion that exceeds the CEO-approved `legalRateIrr` ceiling. New e2e test.
+  - `pricing.service.ts` `upsertProposal()`: editing a still-PENDING proposal's price didn't clear a previously computed `aiSuggestion`, so a stale AI price (computed against the old figures) stayed registerable. Now clears `aiSuggestion` on every edit. New e2e test.
+  - `reservation/pnr.service.ts` `issue()` and `changeSeat()`: both had a classic TOCTOU race — the seat-sold/lock check ran as a plain read before the write, no row lock, no DB constraint backing it, so two concurrent requests for the same seat could both succeed (violates CLAUDE.md's "exactly one of two concurrent buyers of the last seat may succeed"). Both now lock the flight instance's row and re-check inside the same transaction as the write. New 5-parallel-request concurrency e2e tests for both.
+  - `auth.service.ts` `refresh()`: blocking/suspending a staff or agency account only checked `isActive`/`suspendedAt` at login — an already-issued refresh token kept working (and kept extending itself) after the account was blocked. `refresh()` now rechecks account status on every call, and `admins.service.ts` `setBlocked()` / `agencies.service.ts` `suspend()` now proactively revoke that user's outstanding refresh tokens (not a global logout-all). New e2e tests for both staff and agency accounts.
+  - `settings.service.ts` `update()`: `PATCH /settings` let IT_MANAGER write BOARD_CHAIR-only keys (payment-gateway toggles, company/brand identity) since the endpoint only checked the class-level role list, not per-key. Now enforces per-key scoping server-side (the frontend already hid these fields from IT, but authorization must not rely on hidden UI alone) — `socialLinks`/`appDownloadLinks` (site-services links IT does manage) stay writable alongside the operational toggles.
+  - This batch was originally committed on a since-diverged branch and reconciled onto `main` on 2026-08-02: `agencies.service.ts` `settle()` and `settings.service.ts`'s per-key IT scope needed adapting to `main`'s BigInt money columns; `pnr.service.ts` `issue()` already had its own independent row-locked fix on `main`, so only `changeSeat()` needed the lock added here. `pricing.e2e-spec.ts`'s two new register tests needed real step-up challenge/code (main added mandatory step-up to `register()` after this batch was written). Full backend e2e suite has a large pre-existing failure count unrelated to this batch — nearly every failure traces to a broken `loginAsCustomer` test helper (customer OTP flow), not to anything touched here; the specific tests this batch added/touched (agencies, pricing, reservation, phase12 settings) all pass.
+
 Each phase = backend endpoints + tests + frontend page(s), fully working,
 before the next phase starts, per `CLAUDE.md` workflow rules. A phase is
 "done" only when every checklist item in its `docs/features/<name>.md` has
 a passing test — see `docs/features/panel-shell-dashboard.md` for Phase 1.
+
+- [x] **SITE_ADMIN panel dark-align (2026-08-03)** — nav order/labels to
+  `پنل ادمین سایت.dc.html`; brand subtitle «پنل مدیریت» + avatar «اس»;
+  refund/tickets nav badges; dark cartable; dashboard 4-KPI + agency/refund/
+  cartable widgets; `GET /reporting/site-admin-overview`; dark Agencies +
+  Flights (flightops) + Club + Refunds + Tickets + **مدیریت سایت** +
+  **درخواست‌های استخدام**; cartable already dark for SITE_ADMIN; sidebar
+  drops blog/kyc/settings; global **10 records/page**; refunds + tickets
+  search. See `docs/features/site-admin-panel-align.md`.
 
 ## Notable findings from design extraction (informs later phases)
 
@@ -1609,8 +1627,8 @@ See `CLAUDE.md` → Commands. `docker compose up -d` starts Postgres+Redis;
 
 - `cd backend && npm run seed` — (re)seeds one dev account per role, all
   sharing the password `Blujet@1404` (see `backend/typeorm/seed.ts` — dev
-  usernames: `ceo`, `chair`, `senior.rahimi`, `finance.karimi`,
-  `comm.abbasi`, `itadmin`, `site.admin`, `com.ahmadi`), plus 6 months of
+  usernames: `ceo`, `chair`, `senior`, `finance`,
+  `comm`, `itadmin`, `site.admin`, `com.ahmadi`), plus 6 months of
   sample flights/bookings so the dashboard has real numbers to show.
 - Backend tests need a local Postgres reachable at the `DATABASE_URL` in
   `backend/.env` (dev db) and `backend/.env.test` (test db, `blujet_test`) —

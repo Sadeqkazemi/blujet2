@@ -1,6 +1,11 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { User } from '../../database/entities/user.entity';
+import { TwoFactorChallenge } from '../../database/entities/two-factor-challenge.entity';
+import { RefreshToken } from '../../database/entities/refresh-token.entity';
+import { AgencyProfile } from '../../database/entities/agency-profile.entity';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { MySessionsController } from './my-sessions.controller';
@@ -15,6 +20,12 @@ import { SmsModule } from '../sms/sms.module';
 
 @Module({
   imports: [
+    TypeOrmModule.forFeature([
+      User,
+      TwoFactorChallenge,
+      RefreshToken,
+      AgencyProfile,
+    ]),
     PassportModule,
     JwtModule.register({
       secret: process.env.JWT_ACCESS_SECRET,
