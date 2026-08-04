@@ -2,13 +2,14 @@ import { DataSource } from 'typeorm';
 import { dataSourceOptions } from '../src/database/data-source.options';
 
 /**
- * Gate A — boots a standalone TypeORM DataSource (NOT through Nest DI;
- * AppModule doesn't import DatabaseModule yet) against the same e2e
- * Postgres database Prisma's migrations created, and asserts the schema
- * builder has nothing left to do beyond a documented allowlist of
- * known-benign patterns — i.e. all 77 entities describe the existing
- * tables byte-for-byte (or provably-equivalent-but-textually-different).
- * This is the same check `typeorm migration:generate` runs internally.
+ * Boots a standalone TypeORM DataSource against the e2e Postgres database
+ * (created by `InitialSchema`, the baseline migration under
+ * `src/database/migrations/`) and asserts the schema builder has nothing
+ * left to do beyond a documented allowlist of known-benign patterns — i.e.
+ * all 77 entities describe the existing tables byte-for-byte (or
+ * provably-equivalent-but-textually-different). This is the same check
+ * `typeorm migration:generate` runs internally, and guards against the
+ * entities and the migration drifting apart over time.
  *
  * Any upQuery NOT matching the allowlist below means an entity's column
  * type/nullability/default/index/relation genuinely doesn't match the

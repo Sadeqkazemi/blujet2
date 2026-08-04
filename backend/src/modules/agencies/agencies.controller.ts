@@ -30,7 +30,7 @@ import { PanelAccessGuard } from '../panels/panel-access.guard';
 import { EmployeePermissionGuard } from '../../common/guards/employee-permission.guard';
 import { RequiresPermission } from '../../common/decorators/requires-permission.decorator';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import type { AgencyMembershipStatus } from '../../../generated/prisma/enums';
+import type { AgencyMembershipStatus } from '../../database/enums';
 
 const AGENCY_TAB_ROLES = [
   'SENIOR_MANAGER',

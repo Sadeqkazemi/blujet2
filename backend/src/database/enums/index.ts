@@ -1,9 +1,7 @@
 /**
- * TypeORM-side mirror of every enum in prisma/schema.prisma (58 total).
- * Same shape as `generated/prisma/enums.ts` (identical string union
- * values) so code can move between the two representations without a
- * cast during the Prisma/TypeORM coexistence period. Source of truth
- * is schema.prisma — keep in sync until Phase 14 removes Prisma.
+ * Every enum used across the TypeORM entity set. Source of truth for enum
+ * values — keep in sync with the columns declared in
+ * `src/database/entities/*.entity.ts` and the baseline migration.
  */
 
 export const Role = {

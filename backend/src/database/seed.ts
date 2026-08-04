@@ -12,13 +12,13 @@ import {
   MoreThan,
   Repository,
 } from 'typeorm';
-import { dataSourceOptions } from '../src/database/data-source.options';
-import { encryptPii, hashPii } from '../src/common/pii-crypto';
+import { dataSourceOptions } from './data-source.options';
+import { encryptPii, hashPii } from '../common/pii-crypto';
 import {
   EXTERNAL_SERVICE_SEED,
   INTERNAL_SERVICE_SEED,
   PERMISSION_CATALOG,
-} from '../src/modules/it-manager/permission-catalog';
+} from '../modules/it-manager/permission-catalog';
 import {
   AgencyApiKeyStatus,
   AgencyApiScope,
@@ -48,53 +48,53 @@ import {
   RefundStatus,
   Role,
   SiteContentBlockKey,
-} from '../src/database/enums';
-import { AgencyApiKey } from '../src/database/entities/agency-api-key.entity';
-import { AgencyCreditLine } from '../src/database/entities/agency-credit-line.entity';
-import { AgencyInvoice } from '../src/database/entities/agency-invoice.entity';
-import { AgencyMembershipRequest } from '../src/database/entities/agency-membership-request.entity';
-import { AgencyMessage } from '../src/database/entities/agency-message.entity';
-import { AgencyProfile } from '../src/database/entities/agency-profile.entity';
-import { AircraftSeatMap } from '../src/database/entities/aircraft-seat-map.entity';
-import { Airport } from '../src/database/entities/airport.entity';
-import { BlogPost } from '../src/database/entities/blog-post.entity';
-import { Booking } from '../src/database/entities/booking.entity';
-import { CareersSettings } from '../src/database/entities/careers-settings.entity';
-import { CartableTask } from '../src/database/entities/cartable-task.entity';
-import { ClubCardRequest } from '../src/database/entities/club-card-request.entity';
-import { ClubMember } from '../src/database/entities/club-member.entity';
-import { ClubPointsEntry } from '../src/database/entities/club-points-entry.entity';
-import { ClubTierRule } from '../src/database/entities/club-tier-rule.entity';
-import { CustomerIdentityVerification } from '../src/database/entities/customer-identity-verification.entity';
-import { CustomerReferral } from '../src/database/entities/customer-referral.entity';
-import { EmployeePermission } from '../src/database/entities/employee-permission.entity';
-import { ExternalServiceConfig } from '../src/database/entities/external-service-config.entity';
-import { FarePricingProposal } from '../src/database/entities/fare-pricing-proposal.entity';
-import { Flight } from '../src/database/entities/flight.entity';
-import { FlightInstance } from '../src/database/entities/flight-instance.entity';
-import { InternalService } from '../src/database/entities/internal-service.entity';
-import { JobPosting } from '../src/database/entities/job-posting.entity';
-import { LedgerEntry } from '../src/database/entities/ledger-entry.entity';
-import { ManagerReferral } from '../src/database/entities/manager-referral.entity';
-import { ManagerReferralRecipient } from '../src/database/entities/manager-referral-recipient.entity';
-import { ManagerReferralReport } from '../src/database/entities/manager-referral-report.entity';
-import { Passenger } from '../src/database/entities/passenger.entity';
-import { Permission } from '../src/database/entities/permission.entity';
-import { RefundPenaltyRule } from '../src/database/entities/refund-penalty-rule.entity';
-import { RefundRequest } from '../src/database/entities/refund-request.entity';
-import { Route } from '../src/database/entities/route.entity';
-import { SavedBankAccount } from '../src/database/entities/saved-bank-account.entity';
-import { SavedPassenger } from '../src/database/entities/saved-passenger.entity';
-import { SeatLock } from '../src/database/entities/seat-lock.entity';
-import { SecurityPolicy } from '../src/database/entities/security-policy.entity';
-import { SiteContentBlock } from '../src/database/entities/site-content-block.entity';
-import { SiteDestinationHighlight } from '../src/database/entities/site-destination-highlight.entity';
-import { SiteRouteHighlight } from '../src/database/entities/site-route-highlight.entity';
-import { StoredFile } from '../src/database/entities/stored-file.entity';
-import { SurveyQuestion } from '../src/database/entities/survey-question.entity';
-import { SurveySettings } from '../src/database/entities/survey-settings.entity';
-import { User } from '../src/database/entities/user.entity';
-import type { JsonValue } from '../src/database/json-types';
+} from './enums';
+import { AgencyApiKey } from './entities/agency-api-key.entity';
+import { AgencyCreditLine } from './entities/agency-credit-line.entity';
+import { AgencyInvoice } from './entities/agency-invoice.entity';
+import { AgencyMembershipRequest } from './entities/agency-membership-request.entity';
+import { AgencyMessage } from './entities/agency-message.entity';
+import { AgencyProfile } from './entities/agency-profile.entity';
+import { AircraftSeatMap } from './entities/aircraft-seat-map.entity';
+import { Airport } from './entities/airport.entity';
+import { BlogPost } from './entities/blog-post.entity';
+import { Booking } from './entities/booking.entity';
+import { CareersSettings } from './entities/careers-settings.entity';
+import { CartableTask } from './entities/cartable-task.entity';
+import { ClubCardRequest } from './entities/club-card-request.entity';
+import { ClubMember } from './entities/club-member.entity';
+import { ClubPointsEntry } from './entities/club-points-entry.entity';
+import { ClubTierRule } from './entities/club-tier-rule.entity';
+import { CustomerIdentityVerification } from './entities/customer-identity-verification.entity';
+import { CustomerReferral } from './entities/customer-referral.entity';
+import { EmployeePermission } from './entities/employee-permission.entity';
+import { ExternalServiceConfig } from './entities/external-service-config.entity';
+import { FarePricingProposal } from './entities/fare-pricing-proposal.entity';
+import { Flight } from './entities/flight.entity';
+import { FlightInstance } from './entities/flight-instance.entity';
+import { InternalService } from './entities/internal-service.entity';
+import { JobPosting } from './entities/job-posting.entity';
+import { LedgerEntry } from './entities/ledger-entry.entity';
+import { ManagerReferral } from './entities/manager-referral.entity';
+import { ManagerReferralRecipient } from './entities/manager-referral-recipient.entity';
+import { ManagerReferralReport } from './entities/manager-referral-report.entity';
+import { Passenger } from './entities/passenger.entity';
+import { Permission } from './entities/permission.entity';
+import { RefundPenaltyRule } from './entities/refund-penalty-rule.entity';
+import { RefundRequest } from './entities/refund-request.entity';
+import { Route } from './entities/route.entity';
+import { SavedBankAccount } from './entities/saved-bank-account.entity';
+import { SavedPassenger } from './entities/saved-passenger.entity';
+import { SeatLock } from './entities/seat-lock.entity';
+import { SecurityPolicy } from './entities/security-policy.entity';
+import { SiteContentBlock } from './entities/site-content-block.entity';
+import { SiteDestinationHighlight } from './entities/site-destination-highlight.entity';
+import { SiteRouteHighlight } from './entities/site-route-highlight.entity';
+import { StoredFile } from './entities/stored-file.entity';
+import { SurveyQuestion } from './entities/survey-question.entity';
+import { SurveySettings } from './entities/survey-settings.entity';
+import { User } from './entities/user.entity';
+import type { JsonValue } from './json-types';
 
 const dataSource = new DataSource(dataSourceOptions);
 
@@ -166,9 +166,7 @@ async function main() {
   const siteDestinationHighlightRepo = dataSource.getRepository(
     SiteDestinationHighlight,
   );
-  const farePricingProposalRepo = dataSource.getRepository(
-    FarePricingProposal,
-  );
+  const farePricingProposalRepo = dataSource.getRepository(FarePricingProposal);
   const refundPenaltyRuleRepo = dataSource.getRepository(RefundPenaltyRule);
   const refundRequestRepo = dataSource.getRepository(RefundRequest);
   const aircraftSeatMapRepo = dataSource.getRepository(AircraftSeatMap);
@@ -185,12 +183,28 @@ async function main() {
 
   const passwordHash = await argon2.hash(STAFF_PASSWORD);
 
-  const staff: { username: string; fullName: string; role: typeof Role[keyof typeof Role] }[] = [
+  const staff: {
+    username: string;
+    fullName: string;
+    role: (typeof Role)[keyof typeof Role];
+  }[] = [
     { username: 'com.ahmadi', fullName: 'رضا احمدی', role: Role.EMPLOYEE },
     { username: 'itadmin', fullName: 'مهندس علی صدر', role: Role.IT_MANAGER },
-    { username: 'comm.abbasi', fullName: 'رضا مرادی', role: Role.COMMERCIAL_MANAGER },
-    { username: 'finance.karimi', fullName: 'سحر کاظمی', role: Role.FINANCE_MANAGER },
-    { username: 'senior.rahimi', fullName: 'محمد رحیمی', role: Role.SENIOR_MANAGER },
+    {
+      username: 'comm.abbasi',
+      fullName: 'رضا مرادی',
+      role: Role.COMMERCIAL_MANAGER,
+    },
+    {
+      username: 'finance.karimi',
+      fullName: 'سحر کاظمی',
+      role: Role.FINANCE_MANAGER,
+    },
+    {
+      username: 'senior.rahimi',
+      fullName: 'محمد رحیمی',
+      role: Role.SENIOR_MANAGER,
+    },
     { username: 'ceo', fullName: 'محمد رحیمی', role: Role.CEO },
     { username: 'chair', fullName: 'رئیس هیئت مدیره', role: Role.BOARD_CHAIR },
     { username: 'site.admin', fullName: 'ادمین سایت', role: Role.SITE_ADMIN },
@@ -270,16 +284,17 @@ async function main() {
   );
 
   const now = new Date();
-  const channels: Array<typeof BookingChannel[keyof typeof BookingChannel]> = [
-    BookingChannel.SYSTEM,
-    BookingChannel.CHARTER,
-    BookingChannel.AGENCY,
-  ];
+  const channels: Array<(typeof BookingChannel)[keyof typeof BookingChannel]> =
+    [BookingChannel.SYSTEM, BookingChannel.CHARTER, BookingChannel.AGENCY];
 
   // Sample bookings/ledger entries are only generated once — re-running the
   // seed (e.g. after a later phase adds more seed data) must stay idempotent.
   const existingBookingCount = await bookingRepo.count();
-  for (let monthsAgo = 0; existingBookingCount === 0 && monthsAgo < 6; monthsAgo++) {
+  for (
+    let monthsAgo = 0;
+    existingBookingCount === 0 && monthsAgo < 6;
+    monthsAgo++
+  ) {
     for (let day = 0; day < 4; day++) {
       const departureAt = new Date(now);
       departureAt.setMonth(departureAt.getMonth() - monthsAgo);
@@ -300,7 +315,8 @@ async function main() {
       );
 
       for (const channel of channels) {
-        const seatCount = channel === 'SYSTEM' ? 60 : channel === 'CHARTER' ? 45 : 30;
+        const seatCount =
+          channel === 'SYSTEM' ? 60 : channel === 'CHARTER' ? 45 : 30;
         const priceIrr = 38_000_000;
 
         for (let i = 0; i < seatCount; i += 10) {
@@ -397,11 +413,25 @@ async function main() {
   // credit-used derivation real (but modest) numbers: gold stays under its
   // limit, silver goes over it (matches its "suspended for overdue debt"
   // seed narrative above).
-  const anyInstance = await flightInstanceRepo.createQueryBuilder('fi').getOne();
+  const anyInstance = await flightInstanceRepo
+    .createQueryBuilder('fi')
+    .getOne();
   if (anyInstance) {
-    const agencyBookingSeeds: { agencyId: string; count: number; pricePerTicketIrr: bigint }[] = [
-      { agencyId: agencyUserGold.id, count: 4, pricePerTicketIrr: 190_000_000n },
-      { agencyId: agencyUserSilver.id, count: 7, pricePerTicketIrr: 190_000_000n },
+    const agencyBookingSeeds: {
+      agencyId: string;
+      count: number;
+      pricePerTicketIrr: bigint;
+    }[] = [
+      {
+        agencyId: agencyUserGold.id,
+        count: 4,
+        pricePerTicketIrr: 190_000_000n,
+      },
+      {
+        agencyId: agencyUserSilver.id,
+        count: 7,
+        pricePerTicketIrr: 190_000_000n,
+      },
     ];
     for (const s of agencyBookingSeeds) {
       for (let i = 0; i < s.count; i++) {
@@ -525,7 +555,7 @@ async function main() {
     city: string;
     phone: string;
     email: string;
-    status: typeof AgencyMembershipStatus[keyof typeof AgencyMembershipStatus];
+    status: (typeof AgencyMembershipStatus)[keyof typeof AgencyMembershipStatus];
     referredToId?: string;
     reviewNote?: string;
     reviewedById?: string;
@@ -589,7 +619,7 @@ async function main() {
   if (existingCartableCount === 0) {
     const cartableSeeds: {
       assigneeId: string;
-      category: typeof CartableCategory[keyof typeof CartableCategory];
+      category: (typeof CartableCategory)[keyof typeof CartableCategory];
       title: string;
       description: string;
       senderId?: string;
@@ -600,7 +630,8 @@ async function main() {
         assigneeId: ceo.id,
         category: CartableCategory.ADMIN,
         title: 'درخواست مرخصی تیم پشتیبانی',
-        description: 'درخواست هماهنگی مرخصی سه‌نفره تیم پشتیبانی برای هفته آینده.',
+        description:
+          'درخواست هماهنگی مرخصی سه‌نفره تیم پشتیبانی برای هفته آینده.',
         senderLabelFa: 'علی حسینی · پشتیبانی',
         createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
       },
@@ -608,7 +639,8 @@ async function main() {
         assigneeId: ceo.id,
         category: CartableCategory.AGENCY,
         title: 'درخواست افزایش سقف اعتبار آژانس blujet',
-        description: 'آژانس blujet درخواست افزایش سقف اعتبار برای فصل پیک سفر دارد.',
+        description:
+          'آژانس blujet درخواست افزایش سقف اعتبار برای فصل پیک سفر دارد.',
         senderId: commercialManager.id,
         senderLabelFa: 'رضا مرادی · مدیر بازرگانی',
         createdAt: new Date(Date.now() - 26 * 60 * 60 * 1000),
@@ -617,7 +649,8 @@ async function main() {
         assigneeId: ceo.id,
         category: CartableCategory.MANAGER,
         title: 'گزارش انحراف بودجه تبلیغات',
-        description: 'انحراف ۱۲٪ نسبت به بودجه مصوب تبلیغات — نیازمند تصمیم مدیریت.',
+        description:
+          'انحراف ۱۲٪ نسبت به بودجه مصوب تبلیغات — نیازمند تصمیم مدیریت.',
         senderId: financeManager.id,
         senderLabelFa: 'سحر کاظمی · مدیر مالی',
         createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
@@ -635,7 +668,8 @@ async function main() {
         assigneeId: financeManager.id,
         category: CartableCategory.AGENCY,
         title: 'بررسی تسویه معوق آژانس پرواز آسیا',
-        description: 'بدهی معوق بیش از ۳۰ روز — نیازمند تصمیم درباره ادامه همکاری.',
+        description:
+          'بدهی معوق بیش از ۳۰ روز — نیازمند تصمیم درباره ادامه همکاری.',
         senderId: commercialManager.id,
         senderLabelFa: 'رضا مرادی · مدیر بازرگانی',
         createdAt: new Date(Date.now() - 8 * 60 * 60 * 1000),
@@ -666,8 +700,8 @@ async function main() {
     const referralSeeds: {
       title: string;
       body: string;
-      priority: typeof ReferralPriority[keyof typeof ReferralPriority];
-      status: typeof ReferralStatus[keyof typeof ReferralStatus];
+      priority: (typeof ReferralPriority)[keyof typeof ReferralPriority];
+      status: (typeof ReferralStatus)[keyof typeof ReferralStatus];
       recipientIds: string[];
       dueAt?: Date;
       report?: { fromId: string; body: string };
@@ -754,7 +788,8 @@ async function main() {
               sourceType: 'MANAGER_REFERRAL',
               sourceId: referral.id,
               status: r.status === 'REPORTED' ? 'APPROVED' : 'OPEN',
-              resolutionNote: r.status === 'REPORTED' ? 'گزارش ثبت و ارسال شد.' : undefined,
+              resolutionNote:
+                r.status === 'REPORTED' ? 'گزارش ثبت و ارسال شد.' : undefined,
               resolvedAt: r.status === 'REPORTED' ? new Date() : undefined,
             }),
           );
@@ -835,8 +870,16 @@ async function main() {
         status: ClubCardRequestStatus.REFERRED,
         assignedTo: ClubCardAssignee.SENIOR,
         history: [
-          { step: 'submitted', labelFa: 'رسیدن به حد امتیاز و ثبت درخواست صدور کارت', at: '۱۴۰۵/۰۴/۰۲ - ۱۰:۱۲' },
-          { step: 'referred', labelFa: 'ارجاع به مدیر ارشد توسط ادمین سایت', at: '۱۴۰۵/۰۴/۰۲ - ۱۱:۳۰' },
+          {
+            step: 'submitted',
+            labelFa: 'رسیدن به حد امتیاز و ثبت درخواست صدور کارت',
+            at: '۱۴۰۵/۰۴/۰۲ - ۱۰:۱۲',
+          },
+          {
+            step: 'referred',
+            labelFa: 'ارجاع به مدیر ارشد توسط ادمین سایت',
+            at: '۱۴۰۵/۰۴/۰۲ - ۱۱:۳۰',
+          },
         ] as JsonValue,
       }),
     );
@@ -848,8 +891,16 @@ async function main() {
         status: ClubCardRequestStatus.REFERRED,
         assignedTo: ClubCardAssignee.CHAIR,
         history: [
-          { step: 'submitted', labelFa: 'رسیدن به حد امتیاز و ثبت درخواست صدور کارت', at: '۱۴۰۵/۰۴/۱۰ - ۰۹:۰۵' },
-          { step: 'referred', labelFa: 'ارجاع به رئیس هیئت مدیره توسط ادمین سایت', at: '۱۴۰۵/۰۴/۱۰ - ۱۰:۴۵' },
+          {
+            step: 'submitted',
+            labelFa: 'رسیدن به حد امتیاز و ثبت درخواست صدور کارت',
+            at: '۱۴۰۵/۰۴/۱۰ - ۰۹:۰۵',
+          },
+          {
+            step: 'referred',
+            labelFa: 'ارجاع به رئیس هیئت مدیره توسط ادمین سایت',
+            at: '۱۴۰۵/۰۴/۱۰ - ۱۰:۴۵',
+          },
         ] as JsonValue,
       }),
     );
@@ -862,9 +913,21 @@ async function main() {
         assignedTo: ClubCardAssignee.CHAIR,
         cardNo: 'GOLD-8842',
         history: [
-          { step: 'submitted', labelFa: 'رسیدن به حد امتیاز و ثبت درخواست صدور کارت', at: '۱۴۰۴/۰۳/۱۲ - ۰۸:۲۰' },
-          { step: 'referred', labelFa: 'ارجاع به رئیس هیئت مدیره توسط ادمین سایت', at: '۱۴۰۴/۰۳/۱۲ - ۰۹:۱۵' },
-          { step: 'approved', labelFa: 'تأیید و صدور کارت طلایی', at: '۱۴۰۴/۰۳/۱۳ - ۱۲:۴۰' },
+          {
+            step: 'submitted',
+            labelFa: 'رسیدن به حد امتیاز و ثبت درخواست صدور کارت',
+            at: '۱۴۰۴/۰۳/۱۲ - ۰۸:۲۰',
+          },
+          {
+            step: 'referred',
+            labelFa: 'ارجاع به رئیس هیئت مدیره توسط ادمین سایت',
+            at: '۱۴۰۴/۰۳/۱۲ - ۰۹:۱۵',
+          },
+          {
+            step: 'approved',
+            labelFa: 'تأیید و صدور کارت طلایی',
+            at: '۱۴۰۴/۰۳/۱۳ - ۱۲:۴۰',
+          },
         ] as JsonValue,
       }),
     );
@@ -873,16 +936,23 @@ async function main() {
   // ── Phase 65: club tier rules (singleton row, seeded once) ─────────────
   const existingTierRuleCount = await clubTierRuleRepo.count();
   if (existingTierRuleCount === 0) {
-    await clubTierRuleRepo.save(clubTierRuleRepo.create({ updatedAt: new Date() }));
+    await clubTierRuleRepo.save(
+      clubTierRuleRepo.create({ updatedAt: new Date() }),
+    );
   }
 
   // Link the test USER to the seeded club member + backfill ledger so
   // GET /my/club/membership works for manual testing after seed.
   const testUser = await userRepo.findOneBy({ phone: '+989120000001' });
-  const negarMember = await clubMemberRepo.findOneBy({ fullName: 'نگار رضایی' });
+  const negarMember = await clubMemberRepo.findOneBy({
+    fullName: 'نگار رضایی',
+  });
   if (testUser && negarMember) {
     if (!negarMember.userId) {
-      await clubMemberRepo.update({ id: negarMember.id }, { userId: testUser.id });
+      await clubMemberRepo.update(
+        { id: negarMember.id },
+        { userId: testUser.id },
+      );
     }
     const entryCount = await clubPointsEntryRepo.count({
       where: { clubMemberId: negarMember.id },
@@ -965,18 +1035,38 @@ async function main() {
       const friendPhones: {
         phone: string;
         fullName: string;
-        status: typeof CustomerReferralStatus[keyof typeof CustomerReferralStatus];
+        status: (typeof CustomerReferralStatus)[keyof typeof CustomerReferralStatus];
         points: number;
       }[] = [
-        { phone: '09180000091', fullName: 'رضا مرادی', status: CustomerReferralStatus.REWARDED, points: 500 },
-        { phone: '09180000092', fullName: 'سمیرا کریمی', status: CustomerReferralStatus.REWARDED, points: 500 },
-        { phone: '09180000093', fullName: 'آرش هاشمی', status: CustomerReferralStatus.SIGNED_UP, points: 0 },
+        {
+          phone: '09180000091',
+          fullName: 'رضا مرادی',
+          status: CustomerReferralStatus.REWARDED,
+          points: 500,
+        },
+        {
+          phone: '09180000092',
+          fullName: 'سمیرا کریمی',
+          status: CustomerReferralStatus.REWARDED,
+          points: 500,
+        },
+        {
+          phone: '09180000093',
+          fullName: 'آرش هاشمی',
+          status: CustomerReferralStatus.SIGNED_UP,
+          points: 0,
+        },
       ];
       for (const f of friendPhones) {
         const referred = await upsertBy(
           userRepo,
           { phone: f.phone },
-          { role: Role.USER, phone: f.phone, fullName: f.fullName, updatedAt: new Date() },
+          {
+            role: Role.USER,
+            phone: f.phone,
+            fullName: f.fullName,
+            updatedAt: new Date(),
+          },
           { fullName: f.fullName, updatedAt: new Date() },
         );
         await customerReferralRepo.save(
@@ -1045,7 +1135,9 @@ async function main() {
   // ── Phase 66: passenger survey settings + default question list ────────
   const existingSurveySettingsCount = await surveySettingsRepo.count();
   if (existingSurveySettingsCount === 0) {
-    await surveySettingsRepo.save(surveySettingsRepo.create({ updatedAt: new Date() }));
+    await surveySettingsRepo.save(
+      surveySettingsRepo.create({ updatedAt: new Date() }),
+    );
   }
   const existingSurveyQuestionCount = await surveyQuestionRepo.count();
   if (existingSurveyQuestionCount === 0) {
@@ -1057,14 +1149,18 @@ async function main() {
       'سرعت پذیرش و چک‌این',
     ];
     for (const [order, label] of defaultQuestions.entries()) {
-      await surveyQuestionRepo.save(surveyQuestionRepo.create({ label, order }));
+      await surveyQuestionRepo.save(
+        surveyQuestionRepo.create({ label, order }),
+      );
     }
   }
 
   // ── Phase 67: careers settings + default job postings ──────────────────
   const existingCareersSettingsCount = await careersSettingsRepo.count();
   if (existingCareersSettingsCount === 0) {
-    await careersSettingsRepo.save(careersSettingsRepo.create({ updatedAt: new Date() }));
+    await careersSettingsRepo.save(
+      careersSettingsRepo.create({ updatedAt: new Date() }),
+    );
   }
   const existingJobPostingCount = await jobPostingRepo.count();
   if (existingJobPostingCount === 0) {
@@ -1105,7 +1201,9 @@ async function main() {
         specialReqs: ['آشنایی با قراردادهای آژانسی'],
       },
     ]) {
-      await jobPostingRepo.save(jobPostingRepo.create({ ...p, updatedAt: new Date() }));
+      await jobPostingRepo.save(
+        jobPostingRepo.create({ ...p, updatedAt: new Date() }),
+      );
     }
   }
 
@@ -1165,7 +1263,9 @@ async function main() {
         scheduledAt: new Date(Date.now() + 14 * 24 * 3_600_000),
       },
     ]) {
-      await blogPostRepo.save(blogPostRepo.create({ ...p, updatedAt: new Date() }));
+      await blogPostRepo.save(
+        blogPostRepo.create({ ...p, updatedAt: new Date() }),
+      );
     }
   }
 
@@ -1209,11 +1309,36 @@ async function main() {
       );
     }
     for (const h of [
-      { fromAirportCode: 'THR', toAirportCode: 'MHD', priceIrr: 16_000_000n, sortOrder: 0 },
-      { fromAirportCode: 'THR', toAirportCode: 'IST', priceIrr: 42_000_000n, sortOrder: 1 },
-      { fromAirportCode: 'THR', toAirportCode: 'DXB', priceIrr: 38_000_000n, sortOrder: 2 },
-      { fromAirportCode: 'MHD', toAirportCode: 'KIH', priceIrr: 21_000_000n, sortOrder: 3 },
-      { fromAirportCode: 'SYZ', toAirportCode: 'THR', priceIrr: 14_500_000n, sortOrder: 4 },
+      {
+        fromAirportCode: 'THR',
+        toAirportCode: 'MHD',
+        priceIrr: 16_000_000n,
+        sortOrder: 0,
+      },
+      {
+        fromAirportCode: 'THR',
+        toAirportCode: 'IST',
+        priceIrr: 42_000_000n,
+        sortOrder: 1,
+      },
+      {
+        fromAirportCode: 'THR',
+        toAirportCode: 'DXB',
+        priceIrr: 38_000_000n,
+        sortOrder: 2,
+      },
+      {
+        fromAirportCode: 'MHD',
+        toAirportCode: 'KIH',
+        priceIrr: 21_000_000n,
+        sortOrder: 3,
+      },
+      {
+        fromAirportCode: 'SYZ',
+        toAirportCode: 'THR',
+        priceIrr: 14_500_000n,
+        sortOrder: 4,
+      },
     ]) {
       await siteRouteHighlightRepo.save(
         siteRouteHighlightRepo.create({ ...h, updatedAt: new Date() }),
@@ -1236,7 +1361,9 @@ async function main() {
   if (existingProposalCount === 0) {
     // Two future SCHEDULED instances so the pricing list has fresh rows.
     for (const daysAhead of [10, 20]) {
-      const departureAt = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
+      const departureAt = new Date(
+        now.getTime() + daysAhead * 24 * 60 * 60 * 1000,
+      );
       await flightInstanceRepo.save(
         flightInstanceRepo.create({
           flightId: flight.id,
@@ -1295,22 +1422,40 @@ async function main() {
   // ── Phase 7: penalty rules (design's 4-bracket engine) + refund seeds ──
   if ((await refundPenaltyRuleRepo.count()) === 0) {
     for (const rule of [
-      { minHoursBeforeDeparture: 72, penaltyPct: 30, labelFa: 'بیش از ۷۲ ساعت مانده به پرواز' },
-      { minHoursBeforeDeparture: 24, penaltyPct: 50, labelFa: 'بین ۲۴ تا ۷۲ ساعت مانده' },
-      { minHoursBeforeDeparture: 3, penaltyPct: 70, labelFa: 'بین ۳ تا ۲۴ ساعت مانده' },
-      { minHoursBeforeDeparture: 0, penaltyPct: 100, labelFa: 'کمتر از ۳ ساعت / پس از پرواز' },
+      {
+        minHoursBeforeDeparture: 72,
+        penaltyPct: 30,
+        labelFa: 'بیش از ۷۲ ساعت مانده به پرواز',
+      },
+      {
+        minHoursBeforeDeparture: 24,
+        penaltyPct: 50,
+        labelFa: 'بین ۲۴ تا ۷۲ ساعت مانده',
+      },
+      {
+        minHoursBeforeDeparture: 3,
+        penaltyPct: 70,
+        labelFa: 'بین ۳ تا ۲۴ ساعت مانده',
+      },
+      {
+        minHoursBeforeDeparture: 0,
+        penaltyPct: 100,
+        labelFa: 'کمتر از ۳ ساعت / پس از پرواز',
+      },
     ]) {
       await refundPenaltyRuleRepo.save(refundPenaltyRuleRepo.create(rule));
     }
   }
 
   if ((await refundRequestRepo.count()) === 0) {
-    const someBooking = await bookingRepo.findOneBy({ status: BookingStatus.TICKETED });
+    const someBooking = await bookingRepo.findOneBy({
+      status: BookingStatus.TICKETED,
+    });
     if (someBooking) {
       const financeStaffName = 'مریم کاظمی';
       const refundSeeds: {
         passengerName: string;
-        status: typeof RefundStatus[keyof typeof RefundStatus];
+        status: (typeof RefundStatus)[keyof typeof RefundStatus];
         totalPaidIrr: number;
         penaltyPct: number;
         assigneeLabel?: string;
@@ -1322,7 +1467,11 @@ async function main() {
           totalPaidIrr: 25_000_000,
           penaltyPct: 30,
           history: [
-            { step: 'submitted', labelFa: 'ثبت درخواست کنسلی توسط مشتری — جریمه ٪۳۰', at: 'امروز · ۰۹:۱۵' },
+            {
+              step: 'submitted',
+              labelFa: 'ثبت درخواست کنسلی توسط مشتری — جریمه ٪۳۰',
+              at: 'امروز · ۰۹:۱۵',
+            },
           ],
         },
         {
@@ -1331,8 +1480,16 @@ async function main() {
           totalPaidIrr: 31_000_000,
           penaltyPct: 30,
           history: [
-            { step: 'submitted', labelFa: 'ثبت درخواست کنسلی توسط مشتری — جریمه ٪۳۰', at: 'دیروز · ۱۶:۰۲' },
-            { step: 'review', labelFa: 'بررسی توسط ادمین سایت', at: 'امروز · ۰۸:۴۰' },
+            {
+              step: 'submitted',
+              labelFa: 'ثبت درخواست کنسلی توسط مشتری — جریمه ٪۳۰',
+              at: 'دیروز · ۱۶:۰۲',
+            },
+            {
+              step: 'review',
+              labelFa: 'بررسی توسط ادمین سایت',
+              at: 'امروز · ۰۸:۴۰',
+            },
           ],
         },
         {
@@ -1342,9 +1499,21 @@ async function main() {
           penaltyPct: 50,
           assigneeLabel: financeStaffName,
           history: [
-            { step: 'submitted', labelFa: 'ثبت درخواست کنسلی توسط مشتری — جریمه ٪۵۰', at: '۲ روز پیش · ۱۱:۲۰' },
-            { step: 'review', labelFa: 'بررسی توسط ادمین سایت', at: '۲ روز پیش · ۱۴:۰۵' },
-            { step: 'finance', labelFa: `ارجاع به ${financeStaffName} (کارشناس مالی) توسط ادمین سایت`, at: 'دیروز · ۰۹:۳۰' },
+            {
+              step: 'submitted',
+              labelFa: 'ثبت درخواست کنسلی توسط مشتری — جریمه ٪۵۰',
+              at: '۲ روز پیش · ۱۱:۲۰',
+            },
+            {
+              step: 'review',
+              labelFa: 'بررسی توسط ادمین سایت',
+              at: '۲ روز پیش · ۱۴:۰۵',
+            },
+            {
+              step: 'finance',
+              labelFa: `ارجاع به ${financeStaffName} (کارشناس مالی) توسط ادمین سایت`,
+              at: 'دیروز · ۰۹:۳۰',
+            },
           ],
         },
         {
@@ -1353,21 +1522,42 @@ async function main() {
           totalPaidIrr: 41_000_000,
           penaltyPct: 30,
           history: [
-            { step: 'submitted', labelFa: 'ثبت درخواست کنسلی توسط مشتری — جریمه ٪۳۰', at: 'هفته پیش' },
-            { step: 'review', labelFa: 'بررسی توسط ادمین سایت', at: 'هفته پیش' },
-            { step: 'finance', labelFa: 'ارجاع به مدیر مالی توسط ادمین سایت', at: '۶ روز پیش' },
-            { step: 'paid', labelFa: 'تأیید، واریز وجه و بستن پرونده توسط مدیر مالی', at: '۵ روز پیش' },
+            {
+              step: 'submitted',
+              labelFa: 'ثبت درخواست کنسلی توسط مشتری — جریمه ٪۳۰',
+              at: 'هفته پیش',
+            },
+            {
+              step: 'review',
+              labelFa: 'بررسی توسط ادمین سایت',
+              at: 'هفته پیش',
+            },
+            {
+              step: 'finance',
+              labelFa: 'ارجاع به مدیر مالی توسط ادمین سایت',
+              at: '۶ روز پیش',
+            },
+            {
+              step: 'paid',
+              labelFa: 'تأیید، واریز وجه و بستن پرونده توسط مدیر مالی',
+              at: '۵ روز پیش',
+            },
           ],
         },
       ];
       for (const [index, r] of refundSeeds.entries()) {
-        const penaltyAmountIrr = Math.round((r.totalPaidIrr * r.penaltyPct) / 100);
+        const penaltyAmountIrr = Math.round(
+          (r.totalPaidIrr * r.penaltyPct) / 100,
+        );
         const refundBooking = await bookingRepo.save(
           bookingRepo.create({
             pnr: `RFSEED${String(index + 1).padStart(2, '0')}`,
             flightInstanceId: someBooking.flightInstanceId,
             channel: someBooking.channel,
-            status: r.status === 'PAID' ? BookingStatus.REFUNDED : BookingStatus.TICKETED,
+            status:
+              r.status === 'PAID'
+                ? BookingStatus.REFUNDED
+                : BookingStatus.TICKETED,
             priceIrr: BigInt(r.totalPaidIrr),
             taxIrr: someBooking.taxIrr,
             userId: someBooking.userId,
@@ -1554,12 +1744,10 @@ async function main() {
   const itManager = staffByUsername.get('itadmin')!;
 
   for (const p of PERMISSION_CATALOG) {
-    await upsertBy(
-      permissionRepo,
-      { dept: p.dept, key: p.key },
-      p,
-      { sectionLabelFa: p.sectionLabelFa, labelFa: p.labelFa },
-    );
+    await upsertBy(permissionRepo, { dept: p.dept, key: p.key }, p, {
+      sectionLabelFa: p.sectionLabelFa,
+      labelFa: p.labelFa,
+    });
   }
 
   for (const s of INTERNAL_SERVICE_SEED) {
@@ -1601,7 +1789,11 @@ async function main() {
     { enabled: false, updatedAt: new Date() },
   );
 
-  await upsertBy(securityPolicyRepo, { id: 1 }, { id: 1, updatedAt: new Date() });
+  await upsertBy(
+    securityPolicyRepo,
+    { id: 1 },
+    { id: 1, updatedAt: new Date() },
+  );
 
   const commercialEmployee = await upsertBy(
     userRepo,
@@ -1639,12 +1831,18 @@ async function main() {
     [commercialEmployee, ['ag_list', 'fl_view', 'ct_list', 'ct_process']],
     [financeEmployee, ['rf_list']],
   ] as const) {
-    const perms = await permissionRepo.find({ where: { key: In(keys as unknown as string[]) } });
+    const perms = await permissionRepo.find({
+      where: { key: In(keys as unknown as string[]) },
+    });
     for (const perm of perms) {
       await upsertBy(
         employeePermissionRepo,
         { employeeId: employee.id, permissionId: perm.id },
-        { employeeId: employee.id, permissionId: perm.id, grantedById: itManager.id },
+        {
+          employeeId: employee.id,
+          permissionId: perm.id,
+          grantedById: itManager.id,
+        },
       );
     }
   }
@@ -1658,7 +1856,8 @@ async function main() {
         assigneeId: commercialEmployee.id,
         category: CartableCategory.ADMIN,
         title: 'بررسی قرارداد همکاری آژانس جدید',
-        description: 'نسخه پیش‌نویس قرارداد همکاری آژانس «پرواز آسیا» برای بازبینی واحد بازرگانی.',
+        description:
+          'نسخه پیش‌نویس قرارداد همکاری آژانس «پرواز آسیا» برای بازبینی واحد بازرگانی.',
         senderId: commercialManager.id,
         senderLabelFa: 'رضا مرادی · مدیر بازرگانی',
         createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000),
@@ -1667,7 +1866,8 @@ async function main() {
         assigneeId: commercialEmployee.id,
         category: CartableCategory.AGENCY,
         title: 'پیگیری درخواست عضویت آژانس کیان‌سیر',
-        description: 'مدارک آژانس کیان‌سیر تکمیل شده — لطفاً صحت مجوز را بررسی کنید.',
+        description:
+          'مدارک آژانس کیان‌سیر تکمیل شده — لطفاً صحت مجوز را بررسی کنید.',
         senderLabelFa: 'ادمین سایت',
         createdAt: new Date(Date.now() - 20 * 60 * 60 * 1000),
       },
@@ -1707,7 +1907,10 @@ async function main() {
   }
 
   // Seeded per-route durations (the add-flight form has no arrival input).
-  await routeRepo.update({ originCode: 'THR', destCode: 'DXB' }, { durationMin: 180 });
+  await routeRepo.update(
+    { originCode: 'THR', destCode: 'DXB' },
+    { durationMin: 180 },
+  );
 
   // Base prices for existing instances so the active/completed tables have
   // the design's «قیمت پایه/نرخ اصلی» figures without fabricating margins.

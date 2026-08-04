@@ -114,7 +114,7 @@ export class ClubService {
       order: { createdAt: 'ASC' },
     });
     if (existing) return existing;
-    // Defense in depth only — prisma/seed.ts creates this row normally.
+    // Defense in depth only — src/database/seed.ts creates this row normally.
     return this.tierRuleRepo.save(
       this.tierRuleRepo.create({ updatedAt: new Date() }),
     );

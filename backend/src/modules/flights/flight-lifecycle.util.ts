@@ -6,7 +6,7 @@ import { FlightInstanceStatus, BookingStatus } from '../../database/enums';
 
 /** Lazily flips SCHEDULED instances past their departureAt to DEPARTED —
  * no cron job. Nothing previously wrote this transition (only
- * prisma/seed.ts backdated demo rows by hand); every real reader of
+ * src/database/seed.ts backdated demo rows by hand); every real reader of
  * "DEPARTED" now calls this first. See docs/DB_SCHEMA.md Phase 13 Part E. */
 export async function materializeDepartedInstances(
   dataSource: DataSource,

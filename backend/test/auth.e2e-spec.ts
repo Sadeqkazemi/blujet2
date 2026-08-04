@@ -397,7 +397,7 @@ describe('Auth (e2e)', () => {
 
   it('logs a customer in with the correct OTP code and issues USER-role tokens', async () => {
     // Not 0912000000[1-3]/0913000000[1-3] — those phones are claimed by
-    // prisma/seed.ts's fixture agencies/users, so a "fresh USER" test using
+    // src/database/seed.ts's fixture agencies/users, so a "fresh USER" test using
     // one of them would actually hit a pre-existing, differently-roled account.
     const phone = '09120000102';
     const requestRes = await request(app.getHttpServer())

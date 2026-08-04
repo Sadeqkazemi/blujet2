@@ -1,12 +1,12 @@
 #!/bin/sh
 set -e
 
-echo "Running prisma migrate deploy..."
-npx prisma migrate deploy
+echo "Running database migrations..."
+npm run migration:run:prod
 
 if [ "$SEED_ON_START" = "true" ]; then
   echo "Seeding database..."
-  npx tsx prisma/seed.ts || true
+  npm run seed:prod || true
 fi
 
 exec "$@"
