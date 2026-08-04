@@ -168,5 +168,5 @@ export const dataSourceOptions: DataSourceOptions = {
     User,
     WalletEntry,
   ],
-  migrations: [],
+  migrations: [__dirname + '/migrations/*{.ts,.js}'],
 };

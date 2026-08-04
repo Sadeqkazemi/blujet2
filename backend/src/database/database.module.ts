@@ -3,12 +3,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { dataSourceOptions } from './data-source.options';
 
 /**
- * Coexists with TypeORMModule for the length of the TypeORM -> TypeORM
- * migration (see docs/features/typeorm-migration-phase-0.md and -phase-2.md).
- * @Global() so `DataSource`/`EntityManager` are injectable anywhere,
- * mirroring TypeORMModule's shape — individual feature modules additionally
- * import `TypeOrmModule.forFeature([...])` for `@InjectRepository` as they
- * get converted, module by module, in later phases.
+ * @Global() so `DataSource`/`EntityManager` are injectable anywhere;
+ * individual feature modules additionally import
+ * `TypeOrmModule.forFeature([...])` for `@InjectRepository`.
  */
 @Global()
 @Module({
