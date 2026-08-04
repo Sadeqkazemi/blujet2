@@ -78,7 +78,38 @@ describe('PublicHeader — logged-in user', () => {
     expect(screen.queryByText('Log in / Sign up')).not.toBeInTheDocument();
     await userEvent.click(screen.getByTestId('public-user-menu-toggle'));
     expect(await screen.findByText('12450')).toBeInTheDocument();
-    expect(screen.getByText('View Profile')).toHaveAttribute('href', '/account');
+    expect(screen.queryByText('View Profile')).not.toBeInTheDocument();
+  });
+
+  it('highlights Flights nav on the results route', () => {
+    mockLocale();
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      status: 'unauthenticated',
+      user: null,
+      requestLogin: vi.fn(),
+      confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
+      signOut: vi.fn(),
+    });
+
+    renderHeader('/results?from=THR&to=MHD');
+    const flightsLink = screen.getByRole('link', { name: 'پرواز' });
+    expect(flightsLink).toHaveStyle({ color: '#1668c4' });
+  });
+
+  it('does not show travel info in the nav', () => {
+    mockLocale();
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      status: 'unauthenticated',
+      user: null,
+      requestLogin: vi.fn(),
+      confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
+      signOut: vi.fn(),
+    });
+
+    renderHeader();
+    expect(screen.queryByText('اطلاعات سفر')).not.toBeInTheDocument();
   });
 
   it('highlights Flights nav on the results route', () => {

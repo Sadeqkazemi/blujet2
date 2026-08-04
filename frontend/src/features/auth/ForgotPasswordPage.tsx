@@ -1,20 +1,23 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
+import AuthVisualPanel from '../../components/auth/AuthVisualPanel';
+import { OtpCells, OTP_LEN, isOtpComplete } from '../../components/auth/OtpCells';
+import { AUTH_FOCUS_CSS, authBtn } from '../../components/auth/auth-styles';
 import { useAuth } from '../../hooks/useAuth';
 import { setPassword as apiSetPassword } from '../../api/auth';
 import { ApiRequestError } from '../../api/envelope';
 import { faDigits } from '../../lib/fa-format';
+import { normalizePhone, phoneOk } from '../../lib/phone';
+import { DEV_OTP_CODE, isDevOtpMockSend } from '../../lib/dev-otp';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { DIR, FONT } from '../../lib/i18n';
 
 // فراموشی رمز — visual parity with design-reference-v2/فراموشی رمز.dc.html.
-// Backend unchanged (Phase 51): phone OTP + email reset in every locale.
+// fa/ar: phone OTP; en: email code — per design, no method toggle.
 // OTP cells are 6-digit to match the real backend (design mock shows 5).
 
 const RESEND_SECONDS = 120;
-const OTP_LEN = 6;
 
-type Method = 'phone' | 'email';
 type Step = 'id' | 'code' | 'password' | 'done';
 
 const inputStyle: CSSProperties = {
@@ -87,6 +90,7 @@ const STR: Record<
     errCode: string;
     errSave: string;
     p2Mismatch: string;
+    devOtpHint: string;
   }
 > = {
   fa: {
@@ -142,6 +146,7 @@ const STR: Record<
     errCode: 'کد وارد شده نادرست است.',
     errSave: 'خطا در ذخیره رمز عبور.',
     p2Mismatch: 'رمزها یکسان نیستند',
+    devOtpHint: 'کد تست (محیط توسعه): ',
   },
   en: {
     stepPhone: 'Mobile',
@@ -196,6 +201,7 @@ const STR: Record<
     errCode: 'The code entered is incorrect.',
     errSave: 'Error saving the new password.',
     p2Mismatch: "Passwords don't match",
+    devOtpHint: 'Dev test code: ',
   },
   ar: {
     stepPhone: 'رقم الجوال',
@@ -250,19 +256,9 @@ const STR: Record<
     errCode: 'الرمز المُدخل غير صحيح.',
     errSave: 'خطأ في حفظ كلمة المرور الجديدة.',
     p2Mismatch: 'كلمتا المرور غير متطابقتين',
+    devOtpHint: 'رمز الاختبار (بيئة التطوير): ',
   },
 };
-
-function normalizePhone(raw: string): string {
-  return raw
-    .replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
-    .replace(/\D/g, '')
-    .slice(0, 11);
-}
-
-function phoneOk(phone: string): boolean {
-  return /^09\d{9}$/.test(phone);
-}
 
 function emailOk(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -283,144 +279,6 @@ function stepIndex(step: Step): number {
   return 4;
 }
 
-function btnStyle(ok: boolean, green = false): CSSProperties {
-  return {
-    height: 56,
-    borderRadius: 13,
-    border: 'none',
-    background: ok ? (green ? '#1f8a5b' : '#1668c4') : '#c3cedd',
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: 800,
-    cursor: ok ? 'pointer' : 'not-allowed',
-    boxShadow: ok
-      ? green
-        ? '0 14px 30px -12px rgba(31,138,91,.6)'
-        : '0 14px 30px -12px rgba(22,104,196,.65)'
-      : 'none',
-    fontFamily: 'inherit',
-    width: '100%',
-    transition: 'background .2s',
-  };
-}
-
-function OtpCells({
-  digits,
-  onChange,
-  onComplete,
-}: {
-  digits: string[];
-  onChange: (next: string[]) => void;
-  onComplete?: () => void;
-}) {
-  const refs = useRef<(HTMLInputElement | null)[]>([]);
-
-  const setDigit = useCallback(
-    (index: number, value: string) => {
-      const d = value.replace(/[۰-۹]/g, (x) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(x))).replace(/\D/g, '').slice(-1);
-      const next = digits.slice();
-      next[index] = d;
-      onChange(next);
-      if (d && index < OTP_LEN - 1) {
-        refs.current[index + 1]?.focus();
-      }
-      if (d && index === OTP_LEN - 1 && next.every((v) => v !== '')) {
-        onComplete?.();
-      }
-    },
-    [digits, onChange, onComplete],
-  );
-
-  const onKeyDown = (index: number, e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && !digits[index] && index > 0) {
-      refs.current[index - 1]?.focus();
-    }
-  };
-
-  return (
-    <div style={{ display: 'flex', gap: 10, direction: 'ltr' }}>
-      {digits.map((v, i) => (
-        <input
-          key={i}
-          ref={(el) => {
-            refs.current[i] = el;
-          }}
-          data-testid={`fp-code-cell-${i}`}
-          type="tel"
-          inputMode="numeric"
-          autoComplete={i === 0 ? 'one-time-code' : 'off'}
-          maxLength={1}
-          dir="ltr"
-          value={v}
-          onChange={(e) => setDigit(i, e.target.value)}
-          onKeyDown={(e) => onKeyDown(i, e)}
-          style={{
-            flex: 1,
-            width: '100%',
-            height: 60,
-            border: `1.5px solid ${v ? '#1668c4' : '#dfe6ef'}`,
-            borderRadius: 13,
-            background: v ? '#f3f7fc' : '#fafbfd',
-            textAlign: 'center',
-            fontSize: 22,
-            fontWeight: 800,
-            color: '#16202e',
-            padding: 0,
-            outline: 'none',
-            fontFamily: 'inherit',
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-
-function VisualPanel({ title, subtitle }: { title: string; subtitle: string }) {
-  return (
-    <div
-      data-testid="fp-visual-panel"
-      style={{
-        background: 'linear-gradient(160deg,#0d2640,#1668c4)',
-        position: 'relative',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'flex-end',
-        padding: '30px 28px',
-      }}
-    >
-      <div style={{ position: 'absolute', top: -80, left: -60, width: 260, height: 260, borderRadius: '50%', background: '#ffffff14' }} />
-      <div style={{ position: 'absolute', top: 130, right: -50, width: 150, height: 150, borderRadius: '50%', background: '#ffffff0d' }} />
-      <svg viewBox="0 0 400 600" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0.5 }}>
-        <path d="M 430 560 C 300 430, 210 320, 60 150" fill="none" stroke="rgba(255,255,255,.55)" strokeWidth="2" strokeDasharray="2 12" strokeLinecap="round" />
-      </svg>
-      <svg
-        viewBox="0 0 200 80"
-        aria-hidden
-        style={{
-          position: 'absolute',
-          top: '11%',
-          left: '-10%',
-          width: '120%',
-          animation: 'fpPlaneFloat 7s ease-in-out infinite',
-          filter: 'drop-shadow(0 30px 40px rgba(5,18,36,.45))',
-          pointerEvents: 'none',
-        }}
-      >
-        <path
-          d="M10 45 L190 35 L160 42 L175 55 L140 50 L120 65 L100 50 L65 55 L80 42 L50 35 Z"
-          fill="rgba(255,255,255,0.92)"
-        />
-        <path d="M95 50 L105 50 L102 58 L98 58 Z" fill="#1668c4" />
-      </svg>
-      <div style={{ position: 'relative', color: '#fff' }}>
-        <div style={{ fontSize: 21, fontWeight: 900, lineHeight: 1.7, marginBottom: 10, whiteSpace: 'pre-line' }}>{title}</div>
-        <p style={{ fontSize: 12, color: '#d6e4f7', lineHeight: 2.1, margin: 0 }}>{subtitle}</p>
-      </div>
-    </div>
-  );
-}
-
 export default function ForgotPasswordPage() {
   const { requestOtp, verifyOtp, requestPasswordResetEmail, verifyPasswordResetEmail, signOut } = useAuth();
   const { locale, setLocale } = useLocale();
@@ -431,11 +289,12 @@ export default function ForgotPasswordPage() {
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia('(max-width:767px)').matches : false,
   );
-  const [method, setMethod] = useState<Method>('phone');
+  const method = locale === 'en' ? 'email' : 'phone';
   const [step, setStep] = useState<Step>('id');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [challengeId, setChallengeId] = useState('');
+  const [otpSendMocked, setOtpSendMocked] = useState(false);
   const [otpDigits, setOtpDigits] = useState<string[]>(() => Array(OTP_LEN).fill(''));
   const [pass1, setPass1] = useState('');
   const [pass2, setPass2] = useState('');
@@ -463,7 +322,7 @@ export default function ForgotPasswordPage() {
   const timer = locale === 'fa' ? faDigits(rawTimer) : rawTimer;
 
   const idOk = method === 'phone' ? phoneOk(phone) : emailOk(email);
-  const otpOk = otpDigits.every((d) => d !== '');
+  const otpOk = isOtpComplete(otpDigits);
   const strength = passwordStrength(pass1);
   const passOk = pass1.length >= 8 && pass1 === pass2;
 
@@ -501,6 +360,15 @@ export default function ForgotPasswordPage() {
     setError(null);
     setSubmitting(true);
     try {
+      if (method === 'phone' && isDevOtpMockSend()) {
+        setOtpSendMocked(true);
+        setChallengeId('');
+        setOtpDigits(Array(OTP_LEN).fill(''));
+        setStep('code');
+        setLeft(RESEND_SECONDS);
+        return;
+      }
+      setOtpSendMocked(false);
       const id =
         method === 'phone' ? await requestOtp!(phone.trim()) : await requestPasswordResetEmail!(email.trim());
       setChallengeId(id);
@@ -522,7 +390,13 @@ export default function ForgotPasswordPage() {
     setSubmitting(true);
     try {
       if (method === 'phone') {
-        await verifyOtp!(challengeId, code.trim());
+        let cid = challengeId;
+        if (otpSendMocked && !cid) {
+          cid = await requestOtp!(phone.trim());
+          setChallengeId(cid);
+          setOtpSendMocked(false);
+        }
+        await verifyOtp!(cid, code.trim());
       } else {
         await verifyPasswordResetEmail!(challengeId, code.trim());
       }
@@ -557,21 +431,13 @@ export default function ForgotPasswordPage() {
     }
   }
 
-  const seg = (on: boolean): CSSProperties => ({
-    flex: 1,
-    textAlign: 'center',
-    padding: '8px 0',
-    borderRadius: 9,
-    fontSize: 12.5,
-    fontWeight: on ? 700 : 600,
-    color: on ? '#1668c4' : '#6b7585',
-    background: on ? '#fff' : 'transparent',
-    boxShadow: on ? '0 2px 7px rgba(13,38,102,.14)' : 'none',
-    cursor: 'pointer',
-  });
-
   const langLabel = locale === 'en' ? 'EN' : locale === 'ar' ? 'AR' : 'FA';
-  const cycleLocale = () => setLocale(locale === 'fa' ? 'en' : locale === 'en' ? 'ar' : 'fa');
+  const cycleLocale = () => {
+    setLocale(locale === 'fa' ? 'en' : locale === 'en' ? 'ar' : 'fa');
+    setStep('id');
+    setOtpDigits(Array(OTP_LEN).fill(''));
+    setError(null);
+  };
 
   const phoneHint =
     phone === ''
@@ -586,17 +452,7 @@ export default function ForgotPasswordPage() {
 
   return (
     <>
-      <style>{`
-        @keyframes fpPlaneFloat {
-          0%, 100% { transform: translateY(0) rotate(0deg); }
-          50% { transform: translateY(-16px) rotate(-1.5deg); }
-        }
-        .fp-input:focus {
-          outline: none;
-          border-color: #1668c4 !important;
-          background: #f3f7fc !important;
-        }
-      `}</style>
+      <style>{AUTH_FOCUS_CSS}</style>
       <div
         dir={dir}
         style={{
@@ -734,21 +590,13 @@ export default function ForgotPasswordPage() {
                 }}
                 style={{ display: 'flex', flexDirection: 'column', gap: 16 }}
               >
-                <div style={{ display: 'flex', background: '#eef1f5', borderRadius: 11, padding: 3, marginBottom: 2 }}>
-                  <span data-testid="fp-method-phone" onClick={() => setMethod('phone')} style={seg(method === 'phone')}>
-                    {t.methodPhone}
-                  </span>
-                  <span data-testid="fp-method-email" onClick={() => setMethod('email')} style={seg(method === 'email')}>
-                    {t.methodEmail}
-                  </span>
-                </div>
                 {method === 'phone' ? (
                   <div>
                     <div style={{ fontSize: 12, color: '#42506a', fontWeight: 700, marginBottom: 8 }}>{t.phoneLabel}</div>
                     <div style={{ position: 'relative' }}>
                       <input
                         data-testid="fp-id"
-                        className="fp-input"
+                        className="auth-input"
                         dir="ltr"
                         value={phone}
                         onChange={(e) => setPhone(normalizePhone(e.target.value))}
@@ -767,7 +615,7 @@ export default function ForgotPasswordPage() {
                     <div style={{ fontSize: 12, color: '#42506a', fontWeight: 700, marginBottom: 8 }}>{t.emailLabel}</div>
                     <input
                       data-testid="fp-email"
-                      className="fp-input"
+                      className="auth-input"
                       dir="ltr"
                       type="email"
                       value={email}
@@ -781,7 +629,7 @@ export default function ForgotPasswordPage() {
                   type="submit"
                   data-testid="fp-send"
                   disabled={!idOk || submitting}
-                  style={btnStyle(idOk && !submitting)}
+                  style={authBtn(idOk && !submitting)}
                 >
                   {t.sendCode}
                 </button>
@@ -797,13 +645,39 @@ export default function ForgotPasswordPage() {
                       {method === 'phone' ? displayPhone : email}
                     </span>
                   </div>
-                  <OtpCells digits={otpDigits} onChange={setOtpDigits} />
+                  <OtpCells
+                    key={challengeId || (otpSendMocked ? 'mock-otp' : 'otp')}
+                    digits={otpDigits}
+                    onChange={setOtpDigits}
+                    testIdPrefix="fp-code-cell"
+                    autoFocus
+                  />
+                  {method === 'phone' && isDevOtpMockSend() && (
+                    <div
+                      data-testid="fp-dev-otp-hint"
+                      style={{
+                        marginTop: 10,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: '#1668c4',
+                        background: '#eef4fb',
+                        border: '1px solid #dce8f7',
+                        borderRadius: 10,
+                        padding: '8px 10px',
+                      }}
+                    >
+                      {t.devOtpHint}
+                      {locale === 'fa' ? faDigits(DEV_OTP_CODE) : DEV_OTP_CODE}
+                    </div>
+                  )}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12 }}>
                   <span
                     data-testid="fp-edit-id"
                     onClick={() => {
                       setStep('id');
+                      setOtpSendMocked(false);
+                      setChallengeId('');
                       setOtpDigits(Array(OTP_LEN).fill(''));
                     }}
                     style={{ color: '#8a96a6', fontWeight: 700, cursor: 'pointer' }}
@@ -824,7 +698,13 @@ export default function ForgotPasswordPage() {
                     </span>
                   )}
                 </div>
-                <button type="submit" data-testid="fp-verify" disabled={!otpOk || submitting} style={btnStyle(otpOk && !submitting)}>
+                <button
+                  type="button"
+                  data-testid="fp-verify"
+                  onClick={() => void confirmCode()}
+                  aria-disabled={!otpOk || submitting}
+                  style={authBtn(otpOk && !submitting)}
+                >
                   {t.confirmCode}
                 </button>
               </form>
@@ -837,7 +717,7 @@ export default function ForgotPasswordPage() {
                   <input
                     type="password"
                     data-testid="fp-pass1"
-                    className="fp-input"
+                    className="auth-input"
                     dir="ltr"
                     value={pass1}
                     onChange={(e) => setPass1(e.target.value)}
@@ -858,7 +738,7 @@ export default function ForgotPasswordPage() {
                   <input
                     type="password"
                     data-testid="fp-pass2"
-                    className="fp-input"
+                    className="auth-input"
                     dir="ltr"
                     value={pass2}
                     onChange={(e) => setPass2(e.target.value)}
@@ -872,7 +752,7 @@ export default function ForgotPasswordPage() {
                     {pass2 && pass1 !== pass2 ? t.p2Mismatch : ''}
                   </div>
                 </div>
-                <button type="submit" data-testid="fp-save" disabled={!passOk || submitting} style={btnStyle(passOk && !submitting, true)}>
+                <button type="submit" data-testid="fp-save" disabled={!passOk || submitting} style={authBtn(passOk && !submitting, true)}>
                   {t.savePassword}
                 </button>
               </form>
@@ -937,7 +817,7 @@ export default function ForgotPasswordPage() {
             </div>
           </div>
 
-          {!isMobile && <VisualPanel title={t.visualTitle} subtitle={t.visualSub} />}
+          {!isMobile && <AuthVisualPanel title={t.visualTitle} subtitle={t.visualSub} testId="fp-visual-panel" />}
         </div>
       </div>
     </>

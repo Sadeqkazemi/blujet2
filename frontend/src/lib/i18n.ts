@@ -46,10 +46,14 @@ const DICT = {
   tierPlatinum: { fa: 'پلاتین', en: 'Platinum', ar: 'بلاتيني' },
 
   footerTagline: {
-    fa: 'رزرو آنلاین بلیط پروازهای داخلی و بین‌المللی با بهترین قیمت و خدمات باشگاه مشتریان.',
+    fa: 'رزرو آنلاین بلیط پروازهای داخلی و بین‌المللی با بهترین قیمت و امتیازهای باشگاه مشتریان.',
     en: 'Book domestic and international flights online at the best prices, with loyalty club benefits.',
     ar: 'احجز رحلاتك الداخلية والدولية عبر الإنترنت بأفضل الأسعار، مع مزايا نادي العملاء.',
   },
+  badgeTrust: { fa: 'نماد اعتماد الکترونیکی', en: 'e-Trust Seal', ar: 'رمز الثقة الإلكترونية' },
+  badgeGuild: { fa: 'انجمن صنفی دفاتر خدمات مسافرتی', en: 'Travel Agencies Guild', ar: 'اتحاد وكالات السفر' },
+  badgeSamandehi: { fa: 'ساماندهی', en: 'Samandehi Registered', ar: 'ساماندهی' },
+  badgeIata: { fa: 'عضو IATA', en: 'IATA Member', ar: 'عضو IATA' },
   footerColServices: { fa: 'خدمات', en: 'Services', ar: 'الخدمات' },
   footerColCompany: { fa: 'شرکت', en: 'Company', ar: 'الشركة' },
   footerColSupport: { fa: 'پشتیبانی', en: 'Support', ar: 'الدعم' },

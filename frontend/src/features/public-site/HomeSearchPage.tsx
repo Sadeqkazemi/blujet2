@@ -454,6 +454,8 @@ export default function HomeSearchPage() {
         <div style={{ maxWidth: 1180, margin: '0 auto', padding: '12px 26px 0', color: '#e5484d', fontSize: 13 }}>{loadError}</div>
       )}
 
+  return (
+    <PublicPageShell beforeHeader={announcementBar}>
       <section style={{ background: '#f6f8fb' }}>
         <div style={{ position: 'relative', height: isMobile ? 380 : 500, overflow: 'hidden', background: heroImage ? undefined : 'linear-gradient(110deg,#0d2640 0%,#123a63 50%,#1668c4 100%)' }}>
           {heroImage && (

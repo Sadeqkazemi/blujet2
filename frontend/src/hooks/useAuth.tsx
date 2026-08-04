@@ -17,6 +17,8 @@ interface AuthContextValue {
   // predates the customer track) keeps type-checking without change.
   requestOtp?: (phone: string) => Promise<string>;
   verifyOtp?: (challengeId: string, code: string) => Promise<AuthUser>;
+  /** Dev-only fallback when mock OTP send is active but the backend is offline. */
+  devMockOtpLogin?: (phone: string, fullName?: string) => Promise<AuthUser>;
   // Phase 21 — optional customer email/phone+password login, alongside OTP.
   passwordLogin?: (phone: string, password: string) => Promise<AuthUser>;
   // Phase 51 — فراموشی رمز email path, alongside the phone+OTP path above.
@@ -80,6 +82,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return loggedInUser;
   }, []);
 
+  const devMockOtpLogin = useCallback(async (phone: string, fullName?: string) => {
+    const mockUser: AuthUser = {
+      id: `dev-${phone.replace(/\D/g, '')}`,
+      fullName: fullName?.trim() || phone,
+      role: 'USER',
+      preferredLocale: 'FA',
+      mustChangePassword: false,
+    };
+    setUser(mockUser);
+    setStatus('authenticated');
+    return mockUser;
+  }, []);
+
   const passwordLogin = useCallback(async (phone: string, password: string) => {
     const { user: loggedInUser } = await authApi.customerPasswordLogin(phone, password);
     setUser(loggedInUser);
@@ -128,6 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refreshMe,
       requestOtp,
       verifyOtp,
+      devMockOtpLogin,
       passwordLogin,
       requestPasswordResetEmail,
       verifyPasswordResetEmail,
@@ -142,6 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refreshMe,
       requestOtp,
       verifyOtp,
+      devMockOtpLogin,
       passwordLogin,
       requestPasswordResetEmail,
       verifyPasswordResetEmail,

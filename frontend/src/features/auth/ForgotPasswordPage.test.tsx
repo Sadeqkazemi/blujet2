@@ -121,7 +121,8 @@ describe('ForgotPasswordPage', () => {
     expect(await screen.findByText('کد وارد شده نادرست است.')).toBeInTheDocument();
   });
 
-  it('walks the email path — request/verify/set-password use the real email endpoints', async () => {
+  it('walks the email path in English locale — request/verify/set-password use the real email endpoints', async () => {
+    mockLocale('en');
     const requestPasswordResetEmail = vi.fn().mockResolvedValue('email-challenge-1');
     const verifyPasswordResetEmail = vi.fn().mockResolvedValue({ id: 'u1', fullName: 'مشتری تست', role: 'USER' });
     const signOut = vi.fn().mockResolvedValue(undefined);
@@ -129,7 +130,6 @@ describe('ForgotPasswordPage', () => {
     const setPassword = vi.spyOn(authApi, 'setPassword').mockResolvedValue({ changed: true });
 
     renderPage();
-    await userEvent.click(screen.getByTestId('fp-method-email'));
     await userEvent.type(screen.getByTestId('fp-email'), 'negar@example.com');
     await userEvent.click(screen.getByTestId('fp-send'));
     expect(requestPasswordResetEmail).toHaveBeenCalledWith('negar@example.com');
@@ -147,23 +147,24 @@ describe('ForgotPasswordPage', () => {
     expect(signOut).toHaveBeenCalled();
   });
 
-  it('renders translated labels and the method toggle in English', async () => {
+  it('renders translated labels in English with email-only recovery', async () => {
     mockLocale('en');
     mockAuth();
     renderPage();
     expect(screen.getByText('Reset your password')).toBeInTheDocument();
-    expect(screen.getByTestId('fp-method-email')).toHaveTextContent('Email');
+    expect(screen.getByTestId('fp-email')).toBeInTheDocument();
+    expect(screen.queryByTestId('fp-method-phone')).not.toBeInTheDocument();
     expect(screen.getByTestId('fp-secure-note')).toHaveTextContent('Secure connection');
-    await userEvent.click(screen.getByTestId('fp-method-email'));
     expect(screen.getByText("Enter your account's verified email to receive a recovery code by email.")).toBeInTheDocument();
   });
 
-  it('renders translated labels in Arabic', () => {
+  it('renders translated labels in Arabic with phone-only recovery', () => {
     mockLocale('ar');
     mockAuth();
     renderPage();
     expect(screen.getByText('استعادة تعيين كلمة المرور')).toBeInTheDocument();
-    expect(screen.getByTestId('fp-method-phone')).toHaveTextContent('الجوال');
+    expect(screen.getByTestId('fp-id')).toBeInTheDocument();
+    expect(screen.queryByTestId('fp-method-email')).not.toBeInTheDocument();
   });
 
   it('cycles locale via the header switcher', async () => {

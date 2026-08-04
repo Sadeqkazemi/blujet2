@@ -62,7 +62,7 @@ describe('PublicFooter — desktop', () => {
     expect(screen.getByText('عضو IATA')).toBeInTheDocument();
   });
 
-  it('hides the careers link when disabled, shows it when enabled', () => {
+  it('renders company links without blog or careers', () => {
     mockLocale('fa');
     const { rerender } = renderFooter();
     expect(screen.queryByText('فرصت‌های شغلی')).not.toBeInTheDocument();
