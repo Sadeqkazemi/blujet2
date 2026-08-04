@@ -2,7 +2,14 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import * as crypto from 'node:crypto';
-import { TypeORMService } from '../src/typeorm/typeorm.service';
+import { DataSource } from 'typeorm';
+import { ClubMember } from '../src/database/entities/club-member.entity';
+import { ClubCardRequest } from '../src/database/entities/club-card-request.entity';
+import { ClubPointsEntry } from '../src/database/entities/club-points-entry.entity';
+import { ClubTierRule } from '../src/database/entities/club-tier-rule.entity';
+import { AuditLog } from '../src/database/entities/audit-log.entity';
+import { FlightInstance } from '../src/database/entities/flight-instance.entity';
+import { Booking } from '../src/database/entities/booking.entity';
 import { loginAs, loginAsCustomer } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 import { resetCustomerPhones } from './helpers/customer-state.helper';
@@ -26,12 +33,29 @@ function validNationalId(): string {
 
 describe('Club (e2e)', () => {
   let app: INestApplication<App>;
-  let typeorm: TypeORMService;
+  let dataSource: DataSource;
+
+  async function findLatestAudit(where: {
+    category: string;
+    entityType: string;
+    entityId: string;
+  }) {
+    return dataSource
+      .getRepository(AuditLog)
+      .createQueryBuilder('a')
+      .where('a.category = :category', { category: where.category })
+      .andWhere('a.entityType = :entityType', {
+        entityType: where.entityType,
+      })
+      .andWhere('a.entityId = :entityId', { entityId: where.entityId })
+      .orderBy('a.createdAt', 'DESC')
+      .getOne();
+  }
 
   beforeEach(async () => {
     app = await createTestApp();
-    typeorm = app.get(TypeORMService);
-    await resetCustomerPhones(typeorm, [
+    dataSource = app.get(DataSource);
+    await resetCustomerPhones(dataSource, [
       '09180000001',
       '09180000002',
       '09180000003',
@@ -46,8 +70,9 @@ describe('Club (e2e)', () => {
     cardStatus?: 'NONE' | 'ISSUED';
   }) {
     const nid = validNationalId();
-    return typeorm.clubMember.create({
-      data: {
+    const repo = dataSource.getRepository(ClubMember);
+    return repo.save(
+      repo.create({
         fullName: `عضو تست ${crypto.randomUUID().slice(0, 6)}`,
         email: `${crypto.randomUUID().slice(0, 8)}@club.example`,
         nationalIdEnc: encryptPii(nid),
@@ -55,30 +80,32 @@ describe('Club (e2e)', () => {
         points: 6000,
         level: 'GOLD',
         cardStatus: overrides?.cardStatus ?? 'NONE',
-        cardNo: overrides?.cardStatus === 'ISSUED' ? 'GOLD-0001' : undefined,
-      },
-    });
+        cardNo: overrides?.cardStatus === 'ISSUED' ? 'GOLD-0001' : null,
+      }),
+    );
   }
 
   async function createReferredRequest(assignedTo: 'SENIOR' | 'CHAIR') {
     const member = await createFreshMember();
-    const req = await typeorm.clubCardRequest.create({
-      data: {
+    const repo = dataSource.getRepository(ClubCardRequest);
+    const req = await repo.save(
+      repo.create({
         memberId: member.id,
         level: 'GOLD',
         points: 6000,
         status: 'REFERRED',
         assignedTo,
         history: [{ step: 'referred', labelFa: 'ارجاع تستی', at: 'اکنون' }],
-      },
-    });
+      }),
+    );
     return { member, req };
   }
 
   async function createSubmittedRequest() {
     const nid = validNationalId();
-    const member = await typeorm.clubMember.create({
-      data: {
+    const memberRepo = dataSource.getRepository(ClubMember);
+    const member = await memberRepo.save(
+      memberRepo.create({
         fullName: `عضو ارجاع ${crypto.randomUUID().slice(0, 6)}`,
         email: `${crypto.randomUUID().slice(0, 8)}@submit.example`,
         nationalIdEnc: encryptPii(nid),
@@ -86,10 +113,11 @@ describe('Club (e2e)', () => {
         points: 6000,
         level: 'GOLD',
         cardStatus: 'REVIEW',
-      },
-    });
-    const req = await typeorm.clubCardRequest.create({
-      data: {
+      }),
+    );
+    const reqRepo = dataSource.getRepository(ClubCardRequest);
+    const req = await reqRepo.save(
+      reqRepo.create({
         memberId: member.id,
         level: 'GOLD',
         points: 6000,
@@ -101,8 +129,8 @@ describe('Club (e2e)', () => {
             at: 'اکنون',
           },
         ],
-      },
-    });
+      }),
+    );
     return { member, req, nid };
   }
 
@@ -131,7 +159,7 @@ describe('Club (e2e)', () => {
       members.every((m) => !('nationalIdEnc' in m) && !('nationalIdHash' in m)),
     ).toBe(true);
 
-    const finance = await loginAs(app, 'finance.karimi');
+    const finance = await loginAs(app, 'finance');
     const forbidden = await request(app.getHttpServer())
       .get('/club/members')
       .set('Authorization', `Bearer ${finance.accessToken}`);
@@ -140,15 +168,16 @@ describe('Club (e2e)', () => {
 
   it('national-ID search matches exactly via the hash; plaintext never stored', async () => {
     const nid = validNationalId();
-    await typeorm.clubMember.create({
-      data: {
+    const memberRepo = dataSource.getRepository(ClubMember);
+    await memberRepo.save(
+      memberRepo.create({
         fullName: 'قابل‌جستجو',
         email: 'search@club.example',
         nationalIdEnc: encryptPii(nid),
         nationalIdHash: hashPii(nid),
         level: 'SILVER',
-      },
-    });
+      }),
+    );
 
     const { accessToken } = await loginAs(app, 'chair');
     const res = await request(app.getHttpServer())
@@ -161,14 +190,14 @@ describe('Club (e2e)', () => {
       ),
     ).toBe(true);
 
-    const row = await typeorm.clubMember.findFirst({
-      where: { nationalIdHash: hashPii(nid) },
-    });
+    const row = await dataSource
+      .getRepository(ClubMember)
+      .findOneBy({ nationalIdHash: hashPii(nid) });
     expect(row!.nationalIdEnc).not.toContain(nid);
   });
 
   it('POST /club/members: SENIOR 403; bad checksum 400; duplicate 409; stored encrypted', async () => {
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const dto = {
       fullName: 'عضو جدید',
       email: `${crypto.randomUUID().slice(0, 8)}@new.example`,
@@ -210,7 +239,7 @@ describe('Club (e2e)', () => {
       .send({ level: 'PLATINUM' });
     expect(forbidden.status).toBe(403);
 
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
     const ok = await request(app.getHttpServer())
       .patch(`/club/members/${member.id}/level`)
       .set('Authorization', `Bearer ${senior.accessToken}`)
@@ -218,12 +247,10 @@ describe('Club (e2e)', () => {
     expect(ok.status).toBe(200);
     expect(ok.body.data.level).toBe('PLATINUM');
 
-    const audit = await typeorm.auditLog.findFirst({
-      where: {
-        category: 'CLUB',
-        entityType: 'ClubMember',
-        entityId: member.id,
-      },
+    const audit = await findLatestAudit({
+      category: 'CLUB',
+      entityType: 'ClubMember',
+      entityId: member.id,
     });
     expect(audit).not.toBeNull();
   });
@@ -245,12 +272,10 @@ describe('Club (e2e)', () => {
       .set('Authorization', `Bearer ${accessToken}`);
     expect(again.status).toBe(409);
 
-    const audit = await typeorm.auditLog.findFirst({
-      where: {
-        category: 'CLUB',
-        entityType: 'ClubMember',
-        entityId: member.id,
-      },
+    const audit = await findLatestAudit({
+      category: 'CLUB',
+      entityType: 'ClubMember',
+      entityId: member.id,
     });
     expect(audit).not.toBeNull();
   });
@@ -268,7 +293,7 @@ describe('Club (e2e)', () => {
     expect(row.status).toBe('SUBMITTED');
     expect(row.member.nationalId).toBe(nid);
 
-    for (const username of ['ceo', 'senior.rahimi', 'chair']) {
+    for (const username of ['ceo', 'senior', 'chair']) {
       const { accessToken } = await loginAs(app, username);
       const forbidden = await request(app.getHttpServer())
         .get('/club/submitted-card-requests')
@@ -291,12 +316,10 @@ describe('Club (e2e)', () => {
     const history = referred.body.data.history as { step: string }[];
     expect(history.some((h) => h.step === 'referred')).toBe(true);
 
-    const audit = await typeorm.auditLog.findFirst({
-      where: {
-        category: 'CLUB',
-        entityType: 'ClubCardRequest',
-        entityId: req.id,
-      },
+    const audit = await findLatestAudit({
+      category: 'CLUB',
+      entityType: 'ClubCardRequest',
+      entityId: req.id,
     });
     expect(audit).not.toBeNull();
 
@@ -316,15 +339,16 @@ describe('Club (e2e)', () => {
 
   it('GET /club/card-requests never returns SUBMITTED rows', async () => {
     const member = await createFreshMember();
-    await typeorm.clubCardRequest.create({
-      data: {
+    const reqRepo = dataSource.getRepository(ClubCardRequest);
+    await reqRepo.save(
+      reqRepo.create({
         memberId: member.id,
         level: 'GOLD',
         points: 6000,
         status: 'SUBMITTED',
         history: [],
-      },
-    });
+      }),
+    );
 
     const { accessToken } = await loginAs(app, 'ceo');
     const res = await request(app.getHttpServer())
@@ -347,9 +371,9 @@ describe('Club (e2e)', () => {
     expect(res.body.data.status).toBe('APPROVED');
     expect(res.body.data.cardNo).toMatch(/^GOLD-\d{4}$/);
 
-    const updatedMember = await typeorm.clubMember.findUniqueOrThrow({
-      where: { id: member.id },
-    });
+    const updatedMember = await dataSource
+      .getRepository(ClubMember)
+      .findOneByOrFail({ id: member.id });
     expect(updatedMember.cardStatus).toBe('ISSUED');
     expect(updatedMember.cardNo).toBe(res.body.data.cardNo);
     expect(updatedMember.issuedByLabelFa).toBe('مدیر عامل (تأیید درخواست)');
@@ -361,7 +385,7 @@ describe('Club (e2e)', () => {
 
   it('Senior can approve only senior-assigned requests: CHAIR-assigned → 403, SENIOR-assigned → 200', async () => {
     const chairAssigned = await createReferredRequest('CHAIR');
-    const senior = await loginAs(app, 'senior.rahimi');
+    const senior = await loginAs(app, 'senior');
 
     const forbidden = await request(app.getHttpServer())
       .patch(`/club/card-requests/${chairAssigned.req.id}/approve`)
@@ -385,9 +409,9 @@ describe('Club (e2e)', () => {
     expect(rejected.status).toBe(200);
     expect(rejected.body.data.status).toBe('REJECTED');
 
-    const updatedMember = await typeorm.clubMember.findUniqueOrThrow({
-      where: { id: member.id },
-    });
+    const updatedMember = await dataSource
+      .getRepository(ClubMember)
+      .findOneByOrFail({ id: member.id });
     expect(updatedMember.cardStatus).toBe('NONE');
 
     const again = await request(app.getHttpServer())
@@ -397,28 +421,22 @@ describe('Club (e2e)', () => {
   });
 
   describe('tier rules (Phase 65)', () => {
-    it('GET returns the seeded defaults + computed preview for CEO and COMMERCIAL_MANAGER; other roles get 403', async () => {
-      const ceo = await loginAs(app, 'ceo');
-      const ceoRes = await request(app.getHttpServer())
+    it('GET returns the seeded defaults + computed preview for COMMERCIAL_MANAGER; other roles get 403', async () => {
+      const commercial = await loginAs(app, 'comm');
+      const commercialRes = await request(app.getHttpServer())
         .get('/club/tier-rules')
-        .set('Authorization', `Bearer ${ceo.accessToken}`);
-      expect(ceoRes.status).toBe(200);
-      expect(ceoRes.body.data.goldMinPoints).toBe(5000);
-      expect(ceoRes.body.data.platinumMinPoints).toBe(15000);
-      expect(ceoRes.body.data.cardRequestMinPoints).toBe(5000);
-      expect(ceoRes.body.data.preview).toEqual([
+        .set('Authorization', `Bearer ${commercial.accessToken}`);
+      expect(commercialRes.status).toBe(200);
+      expect(commercialRes.body.data.goldMinPoints).toBe(5000);
+      expect(commercialRes.body.data.platinumMinPoints).toBe(15000);
+      expect(commercialRes.body.data.cardRequestMinPoints).toBe(5000);
+      expect(commercialRes.body.data.preview).toEqual([
         { tier: 'SILVER', minPoints: 0, maxPoints: 4999 },
         { tier: 'GOLD', minPoints: 5000, maxPoints: 14999 },
         { tier: 'PLATINUM', minPoints: 15000, maxPoints: null },
       ]);
 
-      const commercial = await loginAs(app, 'comm.abbasi');
-      const commercialRes = await request(app.getHttpServer())
-        .get('/club/tier-rules')
-        .set('Authorization', `Bearer ${commercial.accessToken}`);
-      expect(commercialRes.status).toBe(200);
-
-      for (const username of ['finance.karimi', 'senior.rahimi', 'chair']) {
+      for (const username of ['ceo', 'finance', 'senior', 'chair']) {
         const { accessToken } = await loginAs(app, username);
         const res = await request(app.getHttpServer())
           .get('/club/tier-rules')
@@ -428,7 +446,7 @@ describe('Club (e2e)', () => {
     });
 
     it('PATCH rejects goldMinPoints >= platinumMinPoints with VALIDATION_FAILED', async () => {
-      const { accessToken } = await loginAs(app, 'ceo');
+      const { accessToken } = await loginAs(app, 'comm');
       const res = await request(app.getHttpServer())
         .patch('/club/tier-rules')
         .set('Authorization', `Bearer ${accessToken}`)
@@ -442,7 +460,7 @@ describe('Club (e2e)', () => {
     });
 
     it('PATCH updates the singleton row, is reflected on the next GET, and is audited', async () => {
-      const { accessToken } = await loginAs(app, 'comm.abbasi');
+      const { accessToken } = await loginAs(app, 'comm');
       const patchRes = await request(app.getHttpServer())
         .patch('/club/tier-rules')
         .set('Authorization', `Bearer ${accessToken}`)
@@ -461,14 +479,14 @@ describe('Club (e2e)', () => {
       expect(getRes.body.data.goldMinPoints).toBe(4000);
       expect(getRes.body.data.platinumMinPoints).toBe(12000);
 
-      const rule = await typeorm.clubTierRule.findFirstOrThrow();
-      const audit = await typeorm.auditLog.findFirst({
-        where: {
-          category: 'CLUB',
-          entityType: 'ClubTierRule',
-          entityId: rule.id,
-        },
-        orderBy: { createdAt: 'desc' },
+      const rule = await dataSource
+        .getRepository(ClubTierRule)
+        .find({ take: 1 })
+        .then((rows) => rows[0]);
+      const audit = await findLatestAudit({
+        category: 'CLUB',
+        entityType: 'ClubTierRule',
+        entityId: rule.id,
       });
       expect(audit).not.toBeNull();
 
@@ -485,37 +503,40 @@ describe('Club (e2e)', () => {
 
     it('a real points credit recomputes ClubMember.level from the current rules, with no separate action', async () => {
       const suffix = crypto.randomUUID().slice(0, 6);
-      const member = await typeorm.clubMember.create({
-        data: {
+      const memberRepo = dataSource.getRepository(ClubMember);
+      const member = await memberRepo.save(
+        memberRepo.create({
           fullName: `عضو تست ${suffix}`,
           email: `${crypto.randomUUID().slice(0, 8)}@club.example`,
           nationalIdEnc: encryptPii(validNationalId()),
           nationalIdHash: hashPii(crypto.randomUUID()),
           points: 0,
           level: 'SILVER',
-        },
-      });
-      const instance = await typeorm.flightInstance.findFirstOrThrow();
-      const booking = await typeorm.booking.create({
-        data: {
+        }),
+      );
+      const instance = await dataSource
+        .getRepository(FlightInstance)
+        .createQueryBuilder('fi')
+        .getOneOrFail();
+      const bookingRepo = dataSource.getRepository(Booking);
+      const booking = await bookingRepo.save(
+        bookingRepo.create({
           pnr: `TR${suffix.toUpperCase()}`,
           flightInstanceId: instance.id,
           channel: 'SYSTEM',
           status: 'TICKETED',
-          priceIrr: 2_000_000_000,
-        },
-      });
+          priceIrr: 2_000_000_000n,
+        }),
+      );
 
       const clubPoints = app.get(ClubPointsService);
       // 2,000,000,000 IRR at 100,000 IRR/point = 20,000 points — comfortably
       // past the seeded PLATINUM threshold (15,000).
-      await typeorm.$transaction((tx) =>
+      await dataSource.manager.transaction((tx) =>
         clubPoints.earnForPurchase(tx, member.id, 2_000_000_000n, booking.id),
       );
 
-      const updated = await typeorm.clubMember.findUniqueOrThrow({
-        where: { id: member.id },
-      });
+      const updated = await memberRepo.findOneByOrFail({ id: member.id });
       expect(updated.points).toBe(20000);
       expect(updated.level).toBe('PLATINUM');
     });
@@ -528,20 +549,23 @@ describe('Club (e2e)', () => {
     userId: string,
     points: number,
   ) {
-    await typeorm.clubMember.updateMany({
-      where: { userId },
-      data: { userId: null },
-    });
-    await typeorm.clubPointsEntry.deleteMany({
-      where: { clubMemberId: memberId },
-    });
-    await typeorm.clubPointsEntry.create({
-      data: { clubMemberId: memberId, type: 'EARN', signedPoints: points },
-    });
-    await typeorm.clubMember.update({
-      where: { id: memberId },
-      data: { userId, points, cardStatus: 'NONE', cardNo: null },
-    });
+    const memberRepo = dataSource.getRepository(ClubMember);
+    await memberRepo.update({ userId }, { userId: null });
+    await dataSource
+      .getRepository(ClubPointsEntry)
+      .delete({ clubMemberId: memberId });
+    const pointsEntryRepo = dataSource.getRepository(ClubPointsEntry);
+    await pointsEntryRepo.save(
+      pointsEntryRepo.create({
+        clubMemberId: memberId,
+        type: 'EARN',
+        signedPoints: points,
+      }),
+    );
+    await memberRepo.update(
+      { id: memberId },
+      { userId, points, cardStatus: 'NONE', cardNo: null },
+    );
   }
 
   it('GET /my/club/membership returns full view for a linked member; 403 for staff', async () => {
@@ -576,9 +600,9 @@ describe('Club (e2e)', () => {
     expect(submit.status).toBe(201);
     expect(submit.body.data.status).toBe('SUBMITTED');
 
-    const memberAfter = await typeorm.clubMember.findUniqueOrThrow({
-      where: { id: member.id },
-    });
+    const memberAfter = await dataSource
+      .getRepository(ClubMember)
+      .findOneByOrFail({ id: member.id });
     expect(memberAfter.cardStatus).toBe('REVIEW');
 
     const duplicate = await request(app.getHttpServer())

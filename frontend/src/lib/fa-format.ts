@@ -51,6 +51,45 @@ export function faMoney(amountRial: number | string): string {
 }
 
 /**
+ * Compact IRR→تومان label for executive charts/KPIs (design: میلیارد / میلیون).
+ * Rial→toman conversion still happens only here alongside `faMoney`.
+ */
+export function faMoneyCompact(amountRial: number | string): string {
+  const toman = Math.round(Number(amountRial) / 10);
+  const billion = toman / 1_000_000_000;
+  if (billion >= 1) {
+    const rounded = Math.round(billion * 10) / 10;
+    const raw = Number.isInteger(rounded)
+      ? rounded.toLocaleString('en-US')
+      : rounded.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    return `${faDigits(raw.replace(/,/g, '٬').replace('.', '٫'))} میلیارد`;
+  }
+  const million = Math.round(toman / 1_000_000);
+  return `${faDigits(million.toLocaleString('en-US').replace(/,/g, '٬'))} میلیون`;
+}
+
+/**
+ * Scaled number only (no unit word) for chart channel tiles / bar tops when
+ * the unit is shown separately (e.g. «میلیارد تومان» in the caption).
+ */
+export function faMoneyCompactNumber(amountRial: number | string): string {
+  const toman = Math.round(Number(amountRial) / 10);
+  const billion = toman / 1_000_000_000;
+  if (billion >= 1) {
+    const rounded = Math.round(billion * 10) / 10;
+    const raw = Number.isInteger(rounded)
+      ? rounded.toLocaleString('en-US')
+      : rounded.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    return faDigits(raw.replace(/,/g, '٬').replace('.', '٫'));
+  }
+  const million = Math.round(toman / 1_000_000);
+  if (million >= 1) {
+    return faDigits(million.toLocaleString('en-US').replace(/,/g, '٬'));
+  }
+  return faMoney(amountRial);
+}
+
+/**
  * Locale-aware version of `faMoney`: converts a real IRR amount from the API
  * to toman (rial ÷ 10 — still the only place that division happens) and
  * formats it with the active locale's digits/separators via `formatToman`.
@@ -74,6 +113,15 @@ export function latinDigits(value: string): string {
   return value
     .replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
     .replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
+}
+
+/** Normalizes Iranian mobile input to Latin digits only (max 11 chars). */
+export function normalizeIranMobile(raw: string): string {
+  return latinDigits(raw).replace(/\D/g, '').slice(0, 11);
+}
+
+export function isValidIranMobile(phone: string): boolean {
+  return /^09\d{9}$/.test(phone);
 }
 
 /**

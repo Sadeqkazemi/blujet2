@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import PaymentPage from './PaymentPage';
 import * as publicSiteApi from '../../api/publicSite';
 import * as useAuthModule from '../../hooks/useAuth';
+import * as useIsMobileModule from '../../hooks/useIsMobile';
 import type { BookingDetail } from '../../types/public-site';
 
 const BOOKING: BookingDetail = {
@@ -126,5 +127,15 @@ describe('PaymentPage', () => {
 
     expect(await screen.findByText('مهلت نگهداری این رزرو به پایان رسیده است.')).toBeInTheDocument();
     expect(screen.queryByTestId('pay-submit')).not.toBeInTheDocument();
+  });
+
+  it('shows pay button inside pricing aside on mobile without a sticky footer', async () => {
+    vi.spyOn(useIsMobileModule, 'useIsMobile').mockReturnValue(true);
+    vi.spyOn(publicSiteApi, 'fetchMyBooking').mockResolvedValue(BOOKING);
+    renderPage();
+
+    expect(await screen.findByTestId('pay-submit')).toBeInTheDocument();
+    expect(screen.getByTestId('payment-pricing-aside')).toBeInTheDocument();
+    expect(screen.queryByTestId('payment-mobile-sticky')).not.toBeInTheDocument();
   });
 });

@@ -1,17 +1,20 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { TypeORMService } from '../src/typeorm/typeorm.service';
+import { DataSource } from 'typeorm';
+import { User } from '../src/database/entities/user.entity';
+import { CustomerReferral } from '../src/database/entities/customer-referral.entity';
 import { loginAs, loginAsCustomer } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
+import { normalizeIranPhone } from '../src/common/normalize-iran-phone';
 
 describe('Customer referrals (e2e)', () => {
   let app: INestApplication<App>;
-  let typeorm: TypeORMService;
+  let dataSource: DataSource;
 
   beforeEach(async () => {
     app = await createTestApp();
-    typeorm = app.get(TypeORMService);
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
@@ -58,12 +61,12 @@ describe('Customer referrals (e2e)', () => {
       });
     expect(verify.status).toBe(200);
 
-    const referred = await typeorm.user.findUniqueOrThrow({
-      where: { phone: newPhone },
-    });
-    const row = await typeorm.customerReferral.findUnique({
-      where: { referredUserId: referred.id },
-    });
+    const referred = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ phone: normalizeIranPhone(newPhone) });
+    const row = await dataSource
+      .getRepository(CustomerReferral)
+      .findOneBy({ referredUserId: referred.id });
     expect(row?.status).toBe('SIGNED_UP');
   });
 

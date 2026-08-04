@@ -1,7 +1,9 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { TypeORMService } from '../src/typeorm/typeorm.service';
+import { DataSource } from 'typeorm';
+import { User } from '../src/database/entities/user.entity';
+import { CustomerIdentityVerification } from '../src/database/entities/customer-identity-verification.entity';
 import { encryptPii } from '../src/common/pii-crypto';
 import { loginAs, loginAsCustomer } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
@@ -15,12 +17,12 @@ const PNG_BYTES = Buffer.from(
 /** SITE_ADMIN KYC review queue — the staff side of /my/identity. */
 describe('Identity admin review (e2e)', () => {
   let app: INestApplication<App>;
-  let typeorm: TypeORMService;
+  let dataSource: DataSource;
 
   beforeEach(async () => {
     app = await createTestApp();
-    typeorm = app.get(TypeORMService);
-    await resetCustomerPhones(typeorm, [
+    dataSource = app.get(DataSource);
+    await resetCustomerPhones(dataSource, [
       '09180000201',
       '09180000202',
       '09180000203',
@@ -36,15 +38,15 @@ describe('Identity admin review (e2e)', () => {
    * verification row id. */
   async function submitAsCustomer(phone: string) {
     const { accessToken, userId } = await loginAsCustomer(app, phone);
-    await typeorm.user.update({
-      where: { id: userId! },
-      data: {
+    await dataSource.getRepository(User).update(
+      { id: userId! },
+      {
         fullName: 'مشتری تست کیوسی',
         nationalIdEnc: encryptPii('0012345679'),
         nationalIdHash: `hash-${phone}`,
         birthDate: new Date('1990-01-01'),
       },
-    });
+    );
     const upload = await request(app.getHttpServer())
       .post('/my/identity/id-card')
       .set('Authorization', `Bearer ${accessToken}`)
@@ -57,9 +59,9 @@ describe('Identity admin review (e2e)', () => {
       .post('/my/identity/submit')
       .set('Authorization', `Bearer ${accessToken}`);
     expect(submit.status).toBe(201);
-    const row = await typeorm.customerIdentityVerification.findUniqueOrThrow({
-      where: { userId: userId! },
-    });
+    const row = await dataSource
+      .getRepository(CustomerIdentityVerification)
+      .findOneByOrFail({ userId: userId! });
     return { rowId: row.id, customerToken: accessToken!, userId: userId! };
   }
 

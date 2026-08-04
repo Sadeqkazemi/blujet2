@@ -1,5 +1,7 @@
 @import "tailwindcss";
 @import "@fontsource-variable/vazirmatn";
+@import "@fontsource/roboto-mono/400.css";
+@import "@fontsource/roboto-mono/700.css";
 
 @theme {
   --font-sans: 'Vazirmatn Variable', Vazirmatn, sans-serif;
@@ -19,6 +21,26 @@
   --color-surface: #eef1f5;
   --color-surface-2: #eef4fb;
   --color-danger: #e5484d;
+
+  /* Management-panel dark theme (staff panels only — sampled from the
+     design reference bundle, not reused from the light public-site tokens
+     above). Canvas < surface < surface-2 is a 3-tier depth ladder: page
+     background, card/sidebar fill, and nested highlight boxes inside a
+     card. */
+  --color-panel-canvas: #0f1623;
+  --color-panel-bg: #0f1623;
+  --color-panel-surface: #141d2e;
+  --color-panel-card: #141d2e;
+  --color-panel-surface-2: #182236;
+  --color-panel-elevated: #18223a;
+  --color-panel-ink: #e7ecf3;
+  --color-panel-text: #e7ecf3;
+  --color-panel-muted: #9fb0c7;
+  --color-panel-muted-2: #8fa1bb;
+  --color-panel-border: #1f2a3d;
+  --color-panel-border-2: #28344c;
+  --color-panel-accent: #3b82f6;
+  --color-panel-link: #60a5fa;
 }
 
 html,
@@ -42,4 +64,20 @@ body {
 
 .font-num {
   font-family: var(--font-mono);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Horizontal scroll without visible scrollbar (design bundle .hscroll) */
+.hscroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.hscroll::-webkit-scrollbar {
+  display: none;
 }

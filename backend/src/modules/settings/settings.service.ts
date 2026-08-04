@@ -3,7 +3,10 @@ import {
   ForbiddenException,
   Injectable,
 } from '@nestjs/common';
-import { TypeORMService } from '../../typeorm/typeorm.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { In, Repository } from 'typeorm';
+import { SystemSetting } from '../../database/entities/system-setting.entity';
+import { RefundPenaltyRule } from '../../database/entities/refund-penalty-rule.entity';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
 import {
@@ -94,18 +97,36 @@ export const SETTING_DEFAULTS: Record<string, unknown> = {
   appDownloadLinks: DEFAULT_APP_DOWNLOAD_LINKS,
 };
 
+/** IT_MANAGER's settings screen only ever shows these operational toggles
+ * plus site-services links (design: پنل مدیر IT — «سرویس‌های سایت»).
+ * Payment gateways and brand/company identity are Board Chair-only — the
+ * controller shares the endpoint between both roles, so per-key scoping is
+ * enforced here, server-side, not by hiding UI alone. */
+const IT_MANAGER_WRITABLE_KEYS = new Set([
+  'maintenance',
+  'registration',
+  'charterSale',
+  'apiPublic',
+  'sandbox',
+  'socialLinks',
+  'appDownloadLinks',
+]);
+
 @Injectable()
 export class SettingsService {
   constructor(
-    private readonly typeorm: TypeORMService,
+    @InjectRepository(SystemSetting)
+    private readonly settingRepo: Repository<SystemSetting>,
+    @InjectRepository(RefundPenaltyRule)
+    private readonly refundRuleRepo: Repository<RefundPenaltyRule>,
     private readonly audit: AuditService,
   ) {}
 
   async getAll() {
     const [stored, refundRules] = await Promise.all([
-      this.typeorm.systemSetting.findMany(),
-      this.typeorm.refundPenaltyRule.findMany({
-        orderBy: { minHoursBeforeDeparture: 'desc' },
+      this.settingRepo.find(),
+      this.refundRuleRepo.find({
+        order: { minHoursBeforeDeparture: 'DESC' },
       }),
     ]);
     const byKey = new Map(stored.map((s) => [s.key, s.value]));
@@ -179,17 +200,37 @@ export class SettingsService {
         });
       }
     }
+    if (actor.role === 'IT_MANAGER') {
+      const outOfScope = keys.filter((k) => !IT_MANAGER_WRITABLE_KEYS.has(k));
+      if (outOfScope.length > 0) {
+        throw new ForbiddenException({
+          code: ErrorCode.FORBIDDEN,
+          message: `کلید (${outOfScope.join('، ')}) در اختیار مدیر IT نیست.`,
+        });
+      }
+    }
 
     for (const key of keys) {
-      await this.typeorm.systemSetting.upsert({
-        where: { key },
-        update: { value: patch[key] as object, updatedById: actor.id },
-        create: {
-          key,
-          value: patch[key] as object,
-          updatedById: actor.id,
-        },
-      });
+      const existing = await this.settingRepo
+        .createQueryBuilder('s')
+        .where('s.key = :key', { key })
+        .getOne();
+      const value = patch[key] as SystemSetting['value'];
+      if (existing) {
+        existing.value = value;
+        existing.updatedById = actor.id;
+        existing.updatedAt = new Date();
+        await this.settingRepo.save(existing);
+      } else {
+        await this.settingRepo.save(
+          this.settingRepo.create({
+            key,
+            value,
+            updatedById: actor.id,
+            updatedAt: new Date(),
+          }),
+        );
+      }
     }
 
     await this.audit.record({
@@ -223,8 +264,8 @@ export class SettingsService {
       }
     }
 
-    const existing = await this.typeorm.refundPenaltyRule.findMany({
-      where: { id: { in: rules.map((r) => r.id) } },
+    const existing = await this.refundRuleRepo.find({
+      where: { id: In(rules.map((r) => r.id)) },
     });
     if (existing.length !== rules.length) {
       throw new BadRequestException({
@@ -234,10 +275,10 @@ export class SettingsService {
     }
 
     for (const rule of rules) {
-      await this.typeorm.refundPenaltyRule.update({
-        where: { id: rule.id },
-        data: { penaltyPct: rule.penaltyPct },
-      });
+      await this.refundRuleRepo.update(
+        { id: rule.id },
+        { penaltyPct: rule.penaltyPct },
+      );
     }
 
     await this.audit.record({

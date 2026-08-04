@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { fetchBookingByPnr, submitRefund } from '../../api/publicSite';
-import { ApiRequestError } from '../../api/envelope';
+import { fetchBookingByPnr } from '../../api/publicSite';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
-import { formatLocalePercent, localeMoney } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import type { BookingDetail } from '../../types/public-site';
 import PublicPageShell from '../../components/public/PublicPageShell';
+import TicketBarcode from '../../components/public/TicketBarcode';
 
 const CABIN_LABEL: Record<string, Record<StoredLocale, string>> = {
   ECONOMY: { fa: 'اکونومی', en: 'Economy', ar: 'اقتصادية' },
@@ -27,12 +26,6 @@ const STR: Record<
     passengers: string;
     showAtCheckin: string;
     downloadPrint: string;
-    refundRequest: string;
-    ibanLabel: string;
-    ibanPlaceholder: string;
-    submitRefund: string;
-    refundError: string;
-    refundSuccess: (refundable: string, penalty: string) => string;
   }
 > = {
   fa: {
@@ -47,13 +40,6 @@ const STR: Record<
     passengers: 'مسافران',
     showAtCheckin: 'این کارت را هنگام پذیرش نشان دهید',
     downloadPrint: 'دانلود / چاپ بلیط',
-    refundRequest: 'درخواست استرداد بلیط',
-    ibanLabel: 'شماره شبا',
-    ibanPlaceholder: 'IR820170000000332211009900',
-    submitRefund: 'ثبت درخواست استرداد',
-    refundError: 'خطا در ثبت درخواست استرداد.',
-    refundSuccess: (refundable, penalty) =>
-      `درخواست استرداد ثبت شد — مبلغ قابل استرداد: ${refundable} تومان (جریمه ${penalty})`,
   },
   en: {
     loading: 'Loading…',
@@ -67,13 +53,6 @@ const STR: Record<
     passengers: 'Passengers',
     showAtCheckin: 'Show this card at check-in',
     downloadPrint: 'Download / print ticket',
-    refundRequest: 'Request ticket refund',
-    ibanLabel: 'IBAN',
-    ibanPlaceholder: 'IR820170000000332211009900',
-    submitRefund: 'Submit refund request',
-    refundError: 'Failed to submit refund request.',
-    refundSuccess: (refundable, penalty) =>
-      `Refund request submitted — refundable amount: ${refundable} Toman (penalty ${penalty})`,
   },
   ar: {
     loading: 'جارٍ التحميل…',
@@ -87,13 +66,6 @@ const STR: Record<
     passengers: 'المسافرون',
     showAtCheckin: 'اعرض هذه البطاقة عند تسجيل الوصول',
     downloadPrint: 'تنزيل / طباعة التذكرة',
-    refundRequest: 'طلب استرداد التذكرة',
-    ibanLabel: 'رقم الآيبان',
-    ibanPlaceholder: 'IR820170000000332211009900',
-    submitRefund: 'تقديم طلب الاسترداد',
-    refundError: 'فشل تقديم طلب الاسترداد.',
-    refundSuccess: (refundable, penalty) =>
-      `تم تقديم طلب الاسترداد — المبلغ القابل للاسترداد: ${refundable} تومان (غرامة ${penalty})`,
   },
 };
 
@@ -113,9 +85,6 @@ export default function TicketPage() {
 
   const [booking, setBooking] = useState<BookingDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showRefundForm, setShowRefundForm] = useState(false);
-  const [iban, setIban] = useState('');
-  const [refundResult, setRefundResult] = useState<string | null>(null);
 
   useEffect(() => {
     if (!pnr) return;
@@ -123,25 +92,6 @@ export default function TicketPage() {
       .then(setBooking)
       .catch(() => setError(t.notFound));
   }, [pnr, t.notFound]);
-
-  async function onSubmitRefund(e: React.FormEvent) {
-    e.preventDefault();
-    if (!booking) return;
-    setError(null);
-    try {
-      const r = await submitRefund(booking.id, iban);
-      const penalty =
-        locale === 'en'
-          ? `${r.penaltyPct}%`
-          : formatLocalePercent(r.penaltyPct, locale);
-      setRefundResult(
-        t.refundSuccess(`${localeMoney(r.refundableIrr, locale)}`, penalty),
-      );
-      setShowRefundForm(false);
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : t.refundError);
-    }
-  }
 
   if (error && !booking) {
     return (
@@ -248,11 +198,14 @@ export default function TicketPage() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between border-t border-[#f2f4f7] bg-[#fafbfd] px-6 py-3.5">
-            <span className="text-[10px] text-[#8a96a6]">{t.showAtCheckin}</span>
-            <span className="font-num text-lg tracking-[3px] text-[#0d2640]" aria-hidden>
-              ▮▯▮▮▯▮▯▮▮▯▮▮
-            </span>
+          <div className="flex items-center justify-between gap-3.5 border-t border-[#f2f4f7] bg-[#fafbfd] px-6 py-3.5">
+            <TicketBarcode value={booking.pnr} />
+            <div className="min-w-0 text-left" dir="ltr">
+              <div className="text-[10px] leading-relaxed text-[#9aa4b2]">
+                {booking.pnr} · {booking.flightNo}
+              </div>
+              <div className="mt-1 text-[10px] text-[#8a96a6]">{t.showAtCheckin}</div>
+            </div>
           </div>
         </div>
 
@@ -262,46 +215,6 @@ export default function TicketPage() {
         >
           {t.downloadPrint}
         </button>
-
-        {booking.status === 'TICKETED' && (
-          <div className="mt-6">
-            {refundResult && (
-              <p className="mb-3 rounded-lg bg-emerald-50 p-3 text-xs text-emerald-700">{refundResult}</p>
-            )}
-            {error && <p className="mb-3 rounded-lg bg-red-50 p-3 text-xs text-red-600">{error}</p>}
-            {!refundResult &&
-              (showRefundForm ? (
-                <form onSubmit={onSubmitRefund} className="rounded-2xl border border-[#eef1f5] bg-white p-4">
-                  <label htmlFor="iban" className="mb-1.5 block text-xs text-[#6b7b94]">
-                    {t.ibanLabel}
-                  </label>
-                  <input
-                    id="iban"
-                    data-testid="refund-iban"
-                    value={iban}
-                    onChange={(e) => setIban(e.target.value)}
-                    placeholder={t.ibanPlaceholder}
-                    className="font-num mb-3 w-full rounded-lg border border-[#eef1f5] px-3.5 py-2.5 text-sm outline-none focus:border-[#1668c4]"
-                  />
-                  <button
-                    type="submit"
-                    data-testid="submit-refund"
-                    className="rounded-lg bg-[#1668c4] px-5 py-2.5 text-xs font-bold text-white"
-                  >
-                    {t.submitRefund}
-                  </button>
-                </form>
-              ) : (
-                <button
-                  onClick={() => setShowRefundForm(true)}
-                  data-testid="open-refund-form"
-                  className="text-xs font-bold text-red-600 underline decoration-dotted"
-                >
-                  {t.refundRequest}
-                </button>
-              ))}
-          </div>
-        )}
       </div>
     </PublicPageShell>
   );

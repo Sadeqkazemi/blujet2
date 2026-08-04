@@ -1,5 +1,15 @@
 import { Injectable } from '@nestjs/common';
-import { TypeORMService } from '../../typeorm/typeorm.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { In, IsNull, Repository } from 'typeorm';
+import { User } from '../../database/entities/user.entity';
+import { Booking } from '../../database/entities/booking.entity';
+import { Passenger } from '../../database/entities/passenger.entity';
+import { RefundRequest } from '../../database/entities/refund-request.entity';
+import { WalletEntry } from '../../database/entities/wallet-entry.entity';
+import { PriceLock } from '../../database/entities/price-lock.entity';
+import { ClubMember } from '../../database/entities/club-member.entity';
+import { ClubPointsEntry } from '../../database/entities/club-points-entry.entity';
+import { RefreshToken } from '../../database/entities/refresh-token.entity';
 import { decryptPii } from '../../common/pii-crypto';
 
 /**
@@ -8,55 +18,87 @@ import { decryptPii } from '../../common/pii-crypto';
  */
 @Injectable()
 export class PrivacyService {
-  constructor(private readonly typeorm: TypeORMService) {}
+  constructor(
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
+    @InjectRepository(Booking)
+    private readonly bookingRepo: Repository<Booking>,
+    @InjectRepository(Passenger)
+    private readonly passengerRepo: Repository<Passenger>,
+    @InjectRepository(RefundRequest)
+    private readonly refundRepo: Repository<RefundRequest>,
+    @InjectRepository(WalletEntry)
+    private readonly walletRepo: Repository<WalletEntry>,
+    @InjectRepository(PriceLock)
+    private readonly priceLockRepo: Repository<PriceLock>,
+    @InjectRepository(ClubMember)
+    private readonly clubMemberRepo: Repository<ClubMember>,
+    @InjectRepository(ClubPointsEntry)
+    private readonly pointsRepo: Repository<ClubPointsEntry>,
+    @InjectRepository(RefreshToken)
+    private readonly refreshTokenRepo: Repository<RefreshToken>,
+  ) {}
 
   async exportMyData(userId: string) {
     const [user, bookings, refunds, walletEntries, priceLocks, member] =
       await Promise.all([
-        this.typeorm.user.findUniqueOrThrow({
-          where: { id: userId },
-          select: {
-            id: true,
-            phone: true,
-            fullName: true,
-            email: true,
-            createdAt: true,
-          },
-        }),
-        this.typeorm.booking.findMany({
+        this.userRepo.findOneByOrFail({ id: userId }),
+        this.bookingRepo
+          .createQueryBuilder('b')
+          .leftJoinAndSelect('b.flightInstance', 'flightInstance')
+          .leftJoinAndSelect('flightInstance.flight', 'flight')
+          .leftJoinAndSelect('flight.route', 'route')
+          .where('b.userId = :userId', { userId })
+          .orderBy('b.createdAt', 'DESC')
+          .getMany(),
+        // RefundRequest has a recursive JsonValue `history` column, which
+        // makes bare find/findOneBy/update hit TS2589 — query-builder
+        // sidesteps it (same fix as refunds.service.ts).
+        this.refundRepo
+          .createQueryBuilder('r')
+          .innerJoin('r.booking', 'b')
+          .where('b.userId = :userId', { userId })
+          .orderBy('r.createdAt', 'DESC')
+          .getMany(),
+        this.walletRepo.find({
           where: { userId },
-          include: {
-            passengers: true,
-            flightInstance: {
-              include: { flight: { include: { route: true } } },
-            },
-          },
-          orderBy: { createdAt: 'desc' },
+          order: { createdAt: 'DESC' },
         }),
-        this.typeorm.refundRequest.findMany({
-          where: { booking: { userId } },
-          orderBy: { createdAt: 'desc' },
-        }),
-        this.typeorm.walletEntry.findMany({
+        this.priceLockRepo.find({
           where: { userId },
-          orderBy: { createdAt: 'desc' },
+          order: { createdAt: 'DESC' },
         }),
-        this.typeorm.priceLock.findMany({
-          where: { userId },
-          orderBy: { createdAt: 'desc' },
-        }),
-        this.typeorm.clubMember.findUnique({ where: { userId } }),
+        this.clubMemberRepo.findOneBy({ userId }),
       ]);
 
+    const bookingIds = bookings.map((b) => b.id);
+    const passengers = bookingIds.length
+      ? await this.passengerRepo.find({
+          where: { bookingId: In(bookingIds) },
+        })
+      : [];
+    const passengersByBooking = new Map<string, Passenger[]>();
+    for (const p of passengers) {
+      const list = passengersByBooking.get(p.bookingId) ?? [];
+      list.push(p);
+      passengersByBooking.set(p.bookingId, list);
+    }
+
     const pointsEntries = member
-      ? await this.typeorm.clubPointsEntry.findMany({
+      ? await this.pointsRepo.find({
           where: { clubMemberId: member.id },
-          orderBy: { createdAt: 'desc' },
+          order: { createdAt: 'DESC' },
         })
       : [];
 
     return {
-      user,
+      user: {
+        id: user.id,
+        phone: user.phone,
+        fullName: user.fullName,
+        email: user.email,
+        createdAt: user.createdAt,
+      },
       bookings: bookings.map((b) => ({
         id: b.id,
         pnr: b.pnr,
@@ -69,7 +111,7 @@ export class PrivacyService {
         destCode: b.flightInstance.flight.route.destCode,
         departureAt: b.flightInstance.departureAt,
         createdAt: b.createdAt,
-        passengers: b.passengers.map((p) => ({
+        passengers: (passengersByBooking.get(b.id) ?? []).map((p) => ({
           fullName: p.fullName,
           seatCode: p.seatCode,
           nationalId: p.nationalIdEnc ? decryptPii(p.nationalIdEnc) : null,
@@ -105,41 +147,48 @@ export class PrivacyService {
    * revoked so no session survives the deletion.
    */
   async deleteMyAccount(userId: string) {
-    const bookings = await this.typeorm.booking.findMany({
+    const bookings = await this.bookingRepo.find({
       where: { userId },
       select: { id: true },
     });
     const bookingIds = bookings.map((b) => b.id);
 
-    await this.typeorm.$transaction([
-      this.typeorm.passenger.updateMany({
-        where: { bookingId: { in: bookingIds } },
-        data: {
-          fullName: 'کاربر حذف‌شده',
-          nationalIdEnc: null,
-          nationalIdHash: null,
-          mobileEnc: null,
-          deletedAt: new Date(),
-        },
-      }),
-      this.typeorm.booking.updateMany({
-        where: { id: { in: bookingIds } },
-        data: { contactPhone: null },
-      }),
-      this.typeorm.refreshToken.updateMany({
-        where: { userId, revokedAt: null },
-        data: { revokedAt: new Date() },
-      }),
-      this.typeorm.user.update({
-        where: { id: userId },
-        data: {
+    await this.userRepo.manager.transaction(async (tx) => {
+      if (bookingIds.length) {
+        await tx.update(
+          Passenger,
+          { bookingId: In(bookingIds) },
+          {
+            fullName: 'کاربر حذف‌شده',
+            nationalIdEnc: null,
+            nationalIdHash: null,
+            mobileEnc: null,
+            deletedAt: new Date(),
+          },
+        );
+        await tx.update(
+          Booking,
+          { id: In(bookingIds) },
+          { contactPhone: null },
+        );
+      }
+      await tx.update(
+        RefreshToken,
+        { userId, revokedAt: IsNull() },
+        { revokedAt: new Date() },
+      );
+      await tx.update(
+        User,
+        { id: userId },
+        {
           isActive: false,
           deletedAt: new Date(),
           phone: null,
           email: null,
           fullName: 'کاربر حذف‌شده',
+          updatedAt: new Date(),
         },
-      }),
-    ]);
+      );
+    });
   }
 }

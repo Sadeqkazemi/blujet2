@@ -1,4 +1,4 @@
-import type { Role } from '../../generated/typeorm/enums';
+import type { Role } from '../database/enums';
 
 /** The 5 roles whose panels have a کارتابل tab (per the confirmed design). */
 export const EXEC_ROLES = [
