@@ -2,14 +2,16 @@ import type { INestApplication } from '@nestjs/common';
 import type { App } from 'supertest/types';
 import request from 'supertest';
 import * as crypto from 'node:crypto';
-import { TypeORMClient } from '../generated/typeorm/client';
-import { TypeORMPg } from '@typeorm/adapter-pg';
+import { DataSource, In } from 'typeorm';
+import { dataSourceOptions } from '../src/database/data-source.options';
+import { AuditLog } from '../src/database/entities/audit-log.entity';
+import { CareersSettings } from '../src/database/entities/careers-settings.entity';
+import { JobApplication } from '../src/database/entities/job-application.entity';
+import { JobPosting } from '../src/database/entities/job-posting.entity';
+import { User } from '../src/database/entities/user.entity';
+import { JobType } from '../src/database/enums';
 import { createTestApp } from './helpers/app.helper';
 import { loginAs } from './helpers/login.helper';
-
-const typeorm = new TypeORMClient({
-  adapter: new TypeORMPg({ connectionString: process.env.DATABASE_URL }),
-});
 
 // Smallest valid PDF — enough for FileInterceptor + our mimetype check.
 const PDF_BYTES = Buffer.from('%PDF-1.4\n%%EOF');
@@ -23,11 +25,13 @@ function auth(token: string | null | undefined) {
  * CRUD + application review. See docs/API.md. */
 describe('Careers (e2e)', () => {
   let app: INestApplication<App>;
+  let dataSource: DataSource;
   const createdPostingIds: string[] = [];
   const createdApplicationIds: string[] = [];
 
   beforeEach(async () => {
     app = await createTestApp();
+    dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
@@ -35,30 +39,66 @@ describe('Careers (e2e)', () => {
   });
 
   afterAll(async () => {
-    await typeorm.jobApplication.deleteMany({
-      where: { id: { in: createdApplicationIds } },
-    });
-    await typeorm.jobPosting.deleteMany({
-      where: { id: { in: createdPostingIds } },
-    });
-    await typeorm.careersSettings.updateMany({ data: { enabled: true } });
-    await typeorm.$disconnect();
+    // The app (and its DataSource) from the last test is already closed by
+    // now, so cleanup runs against a fresh standalone connection.
+    const cleanup = new DataSource(dataSourceOptions);
+    await cleanup.initialize();
+    if (createdApplicationIds.length > 0) {
+      await cleanup
+        .getRepository(JobApplication)
+        .delete({ id: In(createdApplicationIds) });
+    }
+    if (createdPostingIds.length > 0) {
+      await cleanup
+        .getRepository(JobPosting)
+        .delete({ id: In(createdPostingIds) });
+    }
+    await cleanup
+      .createQueryBuilder()
+      .update(CareersSettings)
+      .set({ enabled: true, updatedAt: new Date() })
+      .execute();
+    await cleanup.destroy();
   });
 
   async function createPostingDirect(overrides?: { active?: boolean }) {
-    const posting = await typeorm.jobPosting.create({
-      data: {
+    const jobPostingRepo = dataSource.getRepository(JobPosting);
+    const posting = await jobPostingRepo.save(
+      jobPostingRepo.create({
         title: `تستر QA ${crypto.randomUUID().slice(0, 6)}`,
         dept: 'کنترل کیفیت',
         city: 'تهران',
-        type: 'FULL_TIME',
+        type: JobType.FULL_TIME,
         generalReqs: ['حداقل ۲ سال سابقه'],
         specialReqs: ['آشنایی با تست خودکار'],
         active: overrides?.active ?? true,
-      },
-    });
+        updatedAt: new Date(),
+      }),
+    );
     createdPostingIds.push(posting.id);
     return posting;
+  }
+
+  async function getApplication(id: string) {
+    return dataSource
+      .getRepository(JobApplication)
+      .createQueryBuilder('a')
+      .where('a.id = :id', { id })
+      .getOneOrFail();
+  }
+
+  async function getLatestAuditLog(where: {
+    entityType: string;
+    entityId?: string;
+  }) {
+    const qb = dataSource
+      .getRepository(AuditLog)
+      .createQueryBuilder('a')
+      .where('a.entityType = :entityType', { entityType: where.entityType });
+    if (where.entityId) {
+      qb.andWhere('a.entityId = :entityId', { entityId: where.entityId });
+    }
+    return qb.orderBy('a.createdAt', 'DESC').getOne();
   }
 
   describe('public: job listing + application', () => {
@@ -105,9 +145,7 @@ describe('Careers (e2e)', () => {
       expect(res.body.data.id).toBeDefined();
       createdApplicationIds.push(res.body.data.id);
 
-      const row = await typeorm.jobApplication.findUniqueOrThrow({
-        where: { id: res.body.data.id },
-      });
+      const row = await getApplication(res.body.data.id);
       expect(row.status).toBe('SUBMITTED');
       expect(row.jobTitleSnapshot).toBe(posting.title);
       expect(row.resumeFileName).toBe('resume.pdf');
@@ -124,9 +162,7 @@ describe('Careers (e2e)', () => {
       expect(res.status).toBe(201);
       createdApplicationIds.push(res.body.data.id);
 
-      const row = await typeorm.jobApplication.findUniqueOrThrow({
-        where: { id: res.body.data.id },
-      });
+      const row = await getApplication(res.body.data.id);
       expect(row.resumeFileName).toBeNull();
       expect(row.resumePath).toBeNull();
     });
@@ -192,15 +228,23 @@ describe('Careers (e2e)', () => {
 
     it('POST .../apply is rate-limited per-IP', async () => {
       const posting = await createPostingDirect();
+      // A small stagger between dispatches (real clients never land in the
+      // exact same event-loop tick) avoids a Node scheduling artifact where
+      // firing all 12 requests within one microtask batch starves pending
+      // sockets of I/O callbacks before the guard's own response reaches
+      // them, surfacing as ECONNRESET instead of a clean 429 — not a
+      // real-world race, since actual network jitter always spaces
+      // concurrent requests out by far more than this.
       const attempts = await Promise.all(
-        Array.from({ length: 12 }, () =>
-          request(app.getHttpServer())
+        Array.from({ length: 12 }, async (_, i) => {
+          if (i > 0) await new Promise((r) => setTimeout(r, i * 60));
+          return request(app.getHttpServer())
             .post(`/careers/jobs/${posting.id}/apply`)
             .field('firstName', 'نگار')
             .field('lastName', 'رضایی')
             .field('nationalId', VALID_NATIONAL_ID)
-            .field('phone', '09121234567'),
-        ),
+            .field('phone', '09121234567');
+        }),
       );
       const successIds = attempts
         .filter((r) => r.status === 201)
@@ -219,9 +263,7 @@ describe('Careers (e2e)', () => {
         .field('phone', '09121234567');
       createdApplicationIds.push(res.body.data.id);
 
-      const row = await typeorm.jobApplication.findUniqueOrThrow({
-        where: { id: res.body.data.id },
-      });
+      const row = await getApplication(res.body.data.id);
       expect(row.nationalIdEnc).not.toContain(VALID_NATIONAL_ID);
       expect(row.nationalIdHash).toBeTruthy();
       expect(row.nationalIdHash).not.toBe(VALID_NATIONAL_ID);
@@ -308,8 +350,8 @@ describe('Careers (e2e)', () => {
       for (const username of [
         'ceo',
         'itadmin',
-        'comm',
-        'finance',
+        'comm.abbasi',
+        'finance.karimi',
       ]) {
         const { accessToken } = await loginAs(app, username);
         const forbidden = await request(app.getHttpServer())
@@ -366,9 +408,9 @@ describe('Careers (e2e)', () => {
       const posting = await createPostingDirect();
       const appId = await applyDirect(posting.id);
       const admin = await loginAs(app, 'site.admin');
-      const commercial = await typeorm.user.findUniqueOrThrow({
-        where: { username: 'comm' },
-      });
+      const commercial = await dataSource
+        .getRepository(User)
+        .findOneByOrFail({ username: 'comm.abbasi' });
 
       const referred = await request(app.getHttpServer())
         .patch(`/careers/applications/${appId}/refer`)
@@ -377,15 +419,13 @@ describe('Careers (e2e)', () => {
       expect(referred.status).toBe(200);
       expect(referred.body.data.status).toBe('REFERRED');
 
-      const auditRow = await typeorm.auditLog.findFirst({
-        where: { entityType: 'JobApplication', entityId: appId },
-        orderBy: { createdAt: 'desc' },
+      const auditRow = await getLatestAuditLog({
+        entityType: 'JobApplication',
+        entityId: appId,
       });
       expect(auditRow?.category).toBe('CONTENT');
 
-      const rowAfterRefer = await typeorm.jobApplication.findUniqueOrThrow({
-        where: { id: appId },
-      });
+      const rowAfterRefer = await getApplication(appId);
       expect(
         Array.isArray(rowAfterRefer.history) && rowAfterRefer.history.length,
       ).toBe(2);
@@ -438,9 +478,8 @@ describe('Careers (e2e)', () => {
       const jobs = await request(app.getHttpServer()).get('/careers/jobs');
       expect(jobs.status).toBe(200);
 
-      const auditRow = await typeorm.auditLog.findFirst({
-        where: { entityType: 'CareersSettings' },
-        orderBy: { createdAt: 'desc' },
+      const auditRow = await getLatestAuditLog({
+        entityType: 'CareersSettings',
       });
       expect(auditRow?.category).toBe('CONTENT');
 

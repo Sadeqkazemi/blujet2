@@ -1,5 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { TypeORMService } from '../../typeorm/typeorm.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { MoreThanOrEqual, Repository } from 'typeorm';
+import { InternalService } from '../../database/entities/internal-service.entity';
+import { ExternalServiceConfig } from '../../database/entities/external-service-config.entity';
+import { SmsLog } from '../../database/entities/sms-log.entity';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
 import { encryptPii } from '../../common/pii-crypto';
@@ -8,7 +12,6 @@ import type {
   CreateExternalServiceDto,
   UpdateExternalServiceDto,
 } from './dto/services.dtos';
-import type { ExternalServiceConfig } from '../../../generated/typeorm/client';
 
 function toExternalView(s: ExternalServiceConfig) {
   const { apiKeyEncrypted, ...rest } = s;
@@ -25,16 +28,19 @@ function maskPhone(phone: string | null): string | null {
 @Injectable()
 export class ItServicesService {
   constructor(
-    private readonly typeorm: TypeORMService,
+    @InjectRepository(InternalService)
+    private readonly internalServiceRepo: Repository<InternalService>,
+    @InjectRepository(ExternalServiceConfig)
+    private readonly externalServiceConfigRepo: Repository<ExternalServiceConfig>,
+    @InjectRepository(SmsLog)
+    private readonly smsLogRepo: Repository<SmsLog>,
     private readonly audit: AuditService,
   ) {}
 
   async list() {
     const [internal, external] = await Promise.all([
-      this.typeorm.internalService.findMany({ orderBy: { nameFa: 'asc' } }),
-      this.typeorm.externalServiceConfig.findMany({
-        orderBy: { nameFa: 'asc' },
-      }),
+      this.internalServiceRepo.find({ order: { nameFa: 'ASC' } }),
+      this.externalServiceConfigRepo.find({ order: { nameFa: 'ASC' } }),
     ]);
     return { internal, external: external.map(toExternalView) };
   }
@@ -44,19 +50,18 @@ export class ItServicesService {
     key: string,
     enabled: boolean,
   ) {
-    const service = await this.typeorm.internalService.findUnique({
-      where: { key },
-    });
+    const service = await this.internalServiceRepo.findOneBy({ key });
     if (!service) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
         message: 'سرویس یافت نشد.',
       });
     }
-    const updated = await this.typeorm.internalService.update({
-      where: { key },
-      data: { enabled },
-    });
+    await this.internalServiceRepo.update(
+      { key },
+      { enabled, updatedAt: new Date() },
+    );
+    const updated = await this.internalServiceRepo.findOneByOrFail({ key });
 
     await this.audit.record({
       actorId: actor.id,
@@ -75,8 +80,8 @@ export class ItServicesService {
     actor: AuthenticatedUser,
     dto: CreateExternalServiceDto,
   ) {
-    const created = await this.typeorm.externalServiceConfig.create({
-      data: {
+    const created = await this.externalServiceConfigRepo.save(
+      this.externalServiceConfigRepo.create({
         key: `ext_${Date.now().toString(36)}`,
         nameFa: dto.nameFa,
         provider: dto.provider,
@@ -85,8 +90,9 @@ export class ItServicesService {
         timeoutMs: dto.timeoutMs ?? 30000,
         apiKeyEncrypted: dto.apiKey ? encryptPii(dto.apiKey) : null,
         sandbox: dto.sandbox ?? false,
-      },
-    });
+        updatedAt: new Date(),
+      }),
+    );
 
     await this.audit.record({
       actorId: actor.id,
@@ -102,9 +108,7 @@ export class ItServicesService {
   }
 
   private async getExternalOrThrow(id: string) {
-    const service = await this.typeorm.externalServiceConfig.findUnique({
-      where: { id },
-    });
+    const service = await this.externalServiceConfigRepo.findOneBy({ id });
     if (!service) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -121,12 +125,16 @@ export class ItServicesService {
   ) {
     const service = await this.getExternalOrThrow(id);
     const { apiKey, ...rest } = dto;
-    const updated = await this.typeorm.externalServiceConfig.update({
-      where: { id },
-      data: {
+    await this.externalServiceConfigRepo.update(
+      { id },
+      {
         ...rest,
         ...(apiKey ? { apiKeyEncrypted: encryptPii(apiKey) } : {}),
+        updatedAt: new Date(),
       },
+    );
+    const updated = await this.externalServiceConfigRepo.findOneByOrFail({
+      id,
     });
 
     await this.audit.record({
@@ -144,7 +152,7 @@ export class ItServicesService {
 
   async removeExternal(actor: AuthenticatedUser, id: string) {
     const service = await this.getExternalOrThrow(id);
-    await this.typeorm.externalServiceConfig.delete({ where: { id } });
+    await this.externalServiceConfigRepo.delete({ id });
 
     await this.audit.record({
       actorId: actor.id,
@@ -187,13 +195,17 @@ export class ItServicesService {
           : `اتصال ناموفق: ${err instanceof Error ? err.message : 'خطای نامشخص'}`;
     }
 
-    const updated = await this.typeorm.externalServiceConfig.update({
-      where: { id },
-      data: {
+    await this.externalServiceConfigRepo.update(
+      { id },
+      {
         lastTestAt: new Date(),
         lastTestOk: ok,
         lastTestMessage: message,
+        updatedAt: new Date(),
       },
+    );
+    const updated = await this.externalServiceConfigRepo.findOneByOrFail({
+      id,
     });
 
     await this.audit.record({
@@ -217,15 +229,15 @@ export class ItServicesService {
 
     const [service, todaySuccessCount, todayFailedCount, recent] =
       await Promise.all([
-        this.typeorm.internalService.findUnique({ where: { key: 'sms' } }),
-        this.typeorm.smsLog.count({
-          where: { status: 'SUCCESS', createdAt: { gte: dayStart } },
+        this.internalServiceRepo.findOneBy({ key: 'sms' }),
+        this.smsLogRepo.count({
+          where: { status: 'SUCCESS', createdAt: MoreThanOrEqual(dayStart) },
         }),
-        this.typeorm.smsLog.count({
-          where: { status: 'FAILED', createdAt: { gte: dayStart } },
+        this.smsLogRepo.count({
+          where: { status: 'FAILED', createdAt: MoreThanOrEqual(dayStart) },
         }),
-        this.typeorm.smsLog.findMany({
-          orderBy: { createdAt: 'desc' },
+        this.smsLogRepo.find({
+          order: { createdAt: 'DESC' },
           take: 50,
         }),
       ]);
