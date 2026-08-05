@@ -565,7 +565,7 @@ describe('AccountPage', () => {
     renderPage('/account?tab=profile');
     expect(screen.getByTestId('account-tab-profile')).toHaveTextContent('My Profile');
     expect(screen.getByTestId('account-tab-account-info')).toHaveTextContent('Account Information');
-    expect(screen.queryByTestId('account-tab-club')).not.toBeInTheDocument();
+    expect(screen.getByTestId('account-tab-club')).toHaveTextContent('Loyalty Club');
     renderPage('/account?tab=club');
     expect(await screen.findByText('Gold Member')).toBeInTheDocument();
   });
@@ -576,19 +576,28 @@ describe('AccountPage', () => {
     renderPage('/account?tab=profile');
     expect(screen.getByTestId('account-tab-profile')).toHaveTextContent('ملفي الشخصي');
     expect(screen.getByTestId('account-tab-account-info')).toHaveTextContent('معلومات الحساب');
-    expect(screen.queryByTestId('account-tab-wallet')).not.toBeInTheDocument();
+    expect(screen.getByTestId('account-tab-wallet')).toHaveTextContent('المحفظة والنقاط');
     renderPage('/account?tab=club');
     expect(await screen.findByText('عضو ذهبية')).toBeInTheDocument();
   });
 
-  it('shows only profile and account-info links in the sidebar', async () => {
+  it('shows all panel section links in the desktop sidebar', async () => {
     mockAuth('authenticated');
     renderPage('/account?tab=profile');
     expect(screen.getByTestId('account-tab-profile')).toBeInTheDocument();
     expect(screen.getByTestId('account-tab-account-info')).toBeInTheDocument();
-    expect(screen.queryByTestId('account-tab-trips')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('account-tab-wallet')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('account-tab-security')).not.toBeInTheDocument();
+    expect(screen.getByTestId('account-tab-trips')).toBeInTheDocument();
+    expect(screen.getByTestId('account-tab-refunds')).toBeInTheDocument();
+    expect(screen.getByTestId('account-tab-wallet')).toBeInTheDocument();
+    expect(screen.getByTestId('account-tab-club')).toBeInTheDocument();
+    expect(screen.getByTestId('account-tab-saved')).toBeInTheDocument();
+    expect(screen.getByTestId('account-tab-price-locks')).toBeInTheDocument();
+    expect(screen.getByTestId('account-tab-passengers')).toBeInTheDocument();
+    expect(screen.getByTestId('account-tab-tickets')).toBeInTheDocument();
+    expect(screen.getByTestId('account-tab-identity')).toBeInTheDocument();
+    expect(screen.getByTestId('account-tab-security')).toBeInTheDocument();
+    expect(screen.getByTestId('account-tab-banks')).toBeInTheDocument();
+    expect(screen.getByTestId('account-tab-referral')).toBeInTheDocument();
   });
 
   it('renders profile stats in a 2-column grid on mobile', async () => {
