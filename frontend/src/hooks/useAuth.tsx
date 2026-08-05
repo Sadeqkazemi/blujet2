@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import * as authApi from '../api/auth';
 import type { AuthUser } from '../types/auth';
+import { AUTH_TOAST, useOptionalToast } from '../components/feedback';
 
 type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
 
@@ -29,6 +30,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>('loading');
   const [user, setUser] = useState<AuthUser | null>(null);
+  const toast = useOptionalToast();
 
   useEffect(() => {
     let cancelled = false;
@@ -54,50 +56,70 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return challengeId;
   }, []);
 
-  const confirmTwoFactor = useCallback(async (challengeId: string, code: string) => {
-    const { user: loggedInUser } = await authApi.verifyTwoFactor(challengeId, code);
-    setUser(loggedInUser);
-    setStatus('authenticated');
-    return loggedInUser;
-  }, []);
+  const confirmTwoFactor = useCallback(
+    async (challengeId: string, code: string) => {
+      const { user: loggedInUser } = await authApi.verifyTwoFactor(challengeId, code);
+      setUser(loggedInUser);
+      setStatus('authenticated');
+      toast?.success(AUTH_TOAST.loginSuccess);
+      return loggedInUser;
+    },
+    [toast],
+  );
 
-  const agencyLogin = useCallback(async (phone: string, password: string) => {
-    const { user: loggedInUser } = await authApi.agencyLogin(phone, password);
-    setUser(loggedInUser);
-    setStatus('authenticated');
-    return loggedInUser;
-  }, []);
+  const agencyLogin = useCallback(
+    async (phone: string, password: string) => {
+      const { user: loggedInUser } = await authApi.agencyLogin(phone, password);
+      setUser(loggedInUser);
+      setStatus('authenticated');
+      toast?.success(AUTH_TOAST.loginSuccess);
+      return loggedInUser;
+    },
+    [toast],
+  );
 
   const requestOtp = useCallback(async (phone: string) => {
     const { challengeId } = await authApi.requestOtp(phone);
     return challengeId;
   }, []);
 
-  const verifyOtp = useCallback(async (challengeId: string, code: string) => {
-    const { user: loggedInUser } = await authApi.verifyOtp(challengeId, code);
-    setUser(loggedInUser);
-    setStatus('authenticated');
-    return loggedInUser;
-  }, []);
+  const verifyOtp = useCallback(
+    async (challengeId: string, code: string) => {
+      const { user: loggedInUser } = await authApi.verifyOtp(challengeId, code);
+      setUser(loggedInUser);
+      setStatus('authenticated');
+      toast?.success(AUTH_TOAST.loginSuccess);
+      return loggedInUser;
+    },
+    [toast],
+  );
 
-  const passwordLogin = useCallback(async (phone: string, password: string) => {
-    const { user: loggedInUser } = await authApi.customerPasswordLogin(phone, password);
-    setUser(loggedInUser);
-    setStatus('authenticated');
-    return loggedInUser;
-  }, []);
+  const passwordLogin = useCallback(
+    async (phone: string, password: string) => {
+      const { user: loggedInUser } = await authApi.customerPasswordLogin(phone, password);
+      setUser(loggedInUser);
+      setStatus('authenticated');
+      toast?.success(AUTH_TOAST.loginSuccess);
+      return loggedInUser;
+    },
+    [toast],
+  );
 
   const requestPasswordResetEmail = useCallback(async (email: string) => {
     const { challengeId } = await authApi.requestPasswordResetEmail(email);
     return challengeId;
   }, []);
 
-  const verifyPasswordResetEmail = useCallback(async (challengeId: string, code: string) => {
-    const { user: loggedInUser } = await authApi.verifyPasswordResetEmail(challengeId, code);
-    setUser(loggedInUser);
-    setStatus('authenticated');
-    return loggedInUser;
-  }, []);
+  const verifyPasswordResetEmail = useCallback(
+    async (challengeId: string, code: string) => {
+      const { user: loggedInUser } = await authApi.verifyPasswordResetEmail(challengeId, code);
+      setUser(loggedInUser);
+      setStatus('authenticated');
+      toast?.success(AUTH_TOAST.loginSuccess);
+      return loggedInUser;
+    },
+    [toast],
+  );
 
   const signOut = useCallback(async () => {
     // Best-effort server-side revoke — a failed/rate-limited call must never
@@ -107,8 +129,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setUser(null);
       setStatus('unauthenticated');
+      toast?.info(AUTH_TOAST.logoutSuccess);
     }
-  }, []);
+  }, [toast]);
 
   const refreshMe = useCallback(async () => {
     const me = await authApi.fetchMe();

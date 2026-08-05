@@ -1,6 +1,7 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './hooks/useAuth';
 import { LocaleProvider } from './hooks/useLocale';
+import { LoadingProvider, ToastProvider } from './components/feedback';
 import ProtectedRoute from './components/ProtectedRoute';
 import AgencyProtectedRoute from './components/AgencyProtectedRoute';
 import PanelShell from './components/PanelShell';
@@ -81,8 +82,10 @@ import IdentityAdminPage from './features/identity-admin/IdentityAdminPage';
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <LocaleProvider>
+      <ToastProvider>
+        <LoadingProvider>
+          <AuthProvider>
+            <LocaleProvider>
         <Routes>
           <Route path="/" element={<HomeSearchPage />} />
           <Route path="/results" element={<ResultsPage />} />
@@ -231,8 +234,10 @@ export default function App() {
 
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
-        </LocaleProvider>
-      </AuthProvider>
+            </LocaleProvider>
+          </AuthProvider>
+        </LoadingProvider>
+      </ToastProvider>
     </BrowserRouter>
   );
 }

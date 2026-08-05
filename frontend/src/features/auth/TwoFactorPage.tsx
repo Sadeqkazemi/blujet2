@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { ApiRequestError } from '../../api/envelope';
+import { useLoading, useToast } from '../../components/feedback';
 import { StaffLoginLayout } from './StaffLoginLayout';
 
 interface LocationState {
@@ -10,6 +11,8 @@ interface LocationState {
 
 export default function TwoFactorPage() {
   const { confirmTwoFactor } = useAuth();
+  const toast = useToast();
+  const loading = useLoading();
   const navigate = useNavigate();
   const location = useLocation();
   const challengeId = (location.state as LocationState | null)?.challengeId;
@@ -34,13 +37,17 @@ export default function TwoFactorPage() {
     }
     setError(null);
     setSubmitting(true);
+    loading.show('در حال تأیید هویت…');
     try {
       const loggedIn = await confirmTwoFactor(challengeId!, code.trim());
       navigate(loggedIn.mustChangePassword ? '/required-password-change' : '/panel', { replace: true });
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : 'خطا در تأیید کد.');
+      const msg = err instanceof ApiRequestError ? err.message : 'خطا در تأیید کد.';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSubmitting(false);
+      loading.hide();
     }
   }
 

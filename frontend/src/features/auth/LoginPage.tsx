@@ -1,7 +1,8 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { ApiRequestError } from '../../api/envelope';
+import { useLoading, useToast } from '../../components/feedback';
 import { StaffLoginLayout } from './StaffLoginLayout';
 
 const FORGOT_TOAST =
@@ -9,20 +10,15 @@ const FORGOT_TOAST =
 
 export default function LoginPage() {
   const { requestLogin } = useAuth();
+  const toast = useToast();
+  const loading = useLoading();
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (!toast) return;
-    const timer = window.setTimeout(() => setToast(null), 2800);
-    return () => window.clearTimeout(timer);
-  }, [toast]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -32,13 +28,17 @@ export default function LoginPage() {
     }
     setError(null);
     setSubmitting(true);
+    loading.show('در حال بررسی اطلاعات ورود…');
     try {
       const challengeId = await requestLogin(username.trim(), password);
       navigate('/two-factor', { state: { challengeId } });
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : 'خطا در ورود. دوباره تلاش کنید.');
+      const msg = err instanceof ApiRequestError ? err.message : 'خطا در ورود. دوباره تلاش کنید.';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSubmitting(false);
+      loading.hide();
     }
   }
 
@@ -103,16 +103,16 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between">
-          <label className="flex cursor-pointer items-center gap-2 text-[11.5px] whitespace-nowrap text-[#334155]">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          <label className="flex cursor-pointer items-center gap-2 text-[11.5px] text-[#334155]">
             <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
             مرا به خاطر بسپار
           </label>
           <button
             type="button"
             data-testid="staff-forgot-password"
-            onClick={() => setToast(FORGOT_TOAST)}
-            className="cursor-pointer text-[11.5px] font-semibold whitespace-nowrap text-accent"
+            onClick={() => toast.info(FORGOT_TOAST)}
+            className="cursor-pointer text-[11.5px] font-semibold text-accent"
           >
             فراموشی رمز عبور؟
           </button>
@@ -161,17 +161,6 @@ export default function LoginPage() {
           </Link>
         </div>
       </div>
-
-      {toast && (
-        <div
-          role="status"
-          data-testid="staff-forgot-toast"
-          className="fixed bottom-6 left-1/2 z-[9000] flex max-w-[90vw] -translate-x-1/2 items-center gap-2 rounded-xl border border-[#1e293b] bg-[#0f172a] px-4 py-3 text-[12.5px] font-bold text-[#f1f5f9] shadow-xl"
-        >
-          <span className="flex h-[22px] w-[22px] flex-none items-center justify-center rounded-full bg-[#34d39933] text-[12px] text-[#34d399]">✓</span>
-          <span>{toast}</span>
-        </div>
-      )}
     </StaffLoginLayout>
   );
 }

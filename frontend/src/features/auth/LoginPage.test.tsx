@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
+import { LoadingProvider, ToastProvider } from '../../components/feedback';
 import LoginPage from './LoginPage';
 import { ApiRequestError } from '../../api/envelope';
 import * as useAuthModule from '../../hooks/useAuth';
@@ -9,7 +10,11 @@ import * as useAuthModule from '../../hooks/useAuth';
 function renderLoginPage() {
   return render(
     <MemoryRouter>
-      <LoginPage />
+      <ToastProvider>
+        <LoadingProvider>
+          <LoginPage />
+        </LoadingProvider>
+      </ToastProvider>
     </MemoryRouter>,
   );
 }
@@ -59,7 +64,8 @@ describe('LoginPage', () => {
     await userEvent.type(screen.getByLabelText('رمز عبور'), 'wrong-password');
     await userEvent.click(screen.getByRole('button', { name: 'ورود به سامانه' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('نام کاربری یا رمز عبور نادرست است.');
+    expect(await screen.findByTestId('toast-error')).toHaveTextContent('نام کاربری یا رمز عبور نادرست است.');
+    expect(screen.getByText('نام کاربری یا رمز عبور نادرست است.', { selector: 'p[role="alert"]' })).toBeInTheDocument();
   });
 
   it('"فراموشی رمز عبور؟" shows the contact-IT toast, matching the design', async () => {
@@ -67,7 +73,7 @@ describe('LoginPage', () => {
     renderLoginPage();
 
     await userEvent.click(screen.getByTestId('staff-forgot-password'));
-    expect(await screen.findByTestId('staff-forgot-toast')).toHaveTextContent(
+    expect(await screen.findByTestId('toast-info')).toHaveTextContent(
       'برای بازیابی رمز عبور، با واحد فناوری اطلاعات (مدیر IT) تماس بگیرید',
     );
   });

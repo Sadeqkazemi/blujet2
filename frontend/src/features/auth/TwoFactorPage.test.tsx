@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
+import { LoadingProvider, ToastProvider } from '../../components/feedback';
 import TwoFactorPage from './TwoFactorPage';
 import { ApiRequestError } from '../../api/envelope';
 import * as useAuthModule from '../../hooks/useAuth';
@@ -27,12 +28,16 @@ function renderTwoFactorPage(challengeId: string | null = 'chal-1') {
     <MemoryRouter
       initialEntries={[{ pathname: '/two-factor', state: challengeId ? { challengeId } : null }]}
     >
-      <Routes>
-        <Route path="/login" element={<div>صفحه ورود</div>} />
-        <Route path="/panel" element={<div>پنل من</div>} />
-        <Route path="/required-password-change" element={<div>تغییر اجباری</div>} />
-        <Route path="/two-factor" element={<TwoFactorPage />} />
-      </Routes>
+      <ToastProvider>
+        <LoadingProvider>
+          <Routes>
+            <Route path="/login" element={<div>صفحه ورود</div>} />
+            <Route path="/panel" element={<div>پنل من</div>} />
+            <Route path="/required-password-change" element={<div>تغییر اجباری</div>} />
+            <Route path="/two-factor" element={<TwoFactorPage />} />
+          </Routes>
+        </LoadingProvider>
+      </ToastProvider>
     </MemoryRouter>,
   );
 }
@@ -103,6 +108,7 @@ describe('TwoFactorPage', () => {
     await userEvent.type(screen.getByLabelText('کد تأیید'), '000000');
     await userEvent.click(screen.getByRole('button', { name: 'تأیید و ورود' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('کد وارد شده نادرست است.');
+    expect(await screen.findByTestId('toast-error')).toHaveTextContent('کد وارد شده نادرست است.');
+    expect(screen.getByText('کد وارد شده نادرست است.', { selector: 'p[role="alert"]' })).toBeInTheDocument();
   });
 });
