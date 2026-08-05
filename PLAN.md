@@ -19,6 +19,8 @@ below for what's landed from that port so far.
 
 ## Status
 
+- [x] **Sandbox multi-role operational UAT gate (2026-08-05)** — converted the cross-role acceptance audit into a repeatable, flow-selectable runner (`scripts/run-sandbox-multirole-uat.mjs`) over the existing database-backed E2E and Playwright proofs, with a fail-closed guard against accidental browser mutations on a non-local environment. Live smoke evaluation against `http://202.133.90.31` is recorded in `docs/features/sandbox-multirole-operational-uat.md`. Release decision is **NO-GO for real passenger sales** until HTTPS, production seed cleanup, real SMS/OTP, a certified payment gateway, and the documented agency/incomplete-profile product gaps are resolved.
+
 - [x] Repo scaffold (frontend/backend/ml-service skeletons, design-reference import)
 - [x] Design extraction — all 6 panels + shared shell + `ReservationSystem` read in full; findings folded into `docs/API.md` / `docs/DB_SCHEMA.md`
 - [x] **Phase 1 — staff auth + RBAC + panel shell + dashboard/reporting** — see `docs/features/panel-shell-dashboard.md` for the proven checklist (35 backend + 21 frontend unit + 5 E2E tests, all passing; lint+typecheck clean in both packages). Known deferred scope, not silently dropped: IT Manager's real (service-health) dashboard, day/month/flight chart-mode UI, pixel-diff visual regression — see that doc's scope notes.
