@@ -990,7 +990,7 @@ export default function HomeSearchCard({
                   <span style={{ fontSize: 13, fontWeight: 800, color: '#16202e', whiteSpace: 'nowrap' }}>
                     {cityName(r.fromCode)} <span style={{ color: '#b9c2cf', fontWeight: 600 }}>{locale === 'en' ? '→' : '←'}</span> {cityName(r.toCode)}
                   </span>
-                  <PlaneIcon />
+                  <PlaneIcon rtl={isRTL} />
                 </div>
                 <div style={{ fontSize: 11, color: '#9aa4b2' }}>
                   {t.fromPrice}{' '}
