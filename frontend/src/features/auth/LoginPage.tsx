@@ -103,8 +103,8 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between">
-          <label className="flex cursor-pointer items-center gap-2 text-[11.5px] whitespace-nowrap text-[#334155]">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          <label className="flex cursor-pointer items-center gap-2 text-[11.5px] text-[#334155]">
             <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
             مرا به خاطر بسپار
           </label>
@@ -112,7 +112,7 @@ export default function LoginPage() {
             type="button"
             data-testid="staff-forgot-password"
             onClick={() => setToast(FORGOT_TOAST)}
-            className="cursor-pointer text-[11.5px] font-semibold whitespace-nowrap text-accent"
+            className="cursor-pointer text-[11.5px] font-semibold text-accent"
           >
             فراموشی رمز عبور؟
           </button>
@@ -166,7 +166,7 @@ export default function LoginPage() {
         <div
           role="status"
           data-testid="staff-forgot-toast"
-          className="fixed bottom-6 left-1/2 z-[9000] flex max-w-[90vw] -translate-x-1/2 items-center gap-2 rounded-xl border border-[#1e293b] bg-[#0f172a] px-4 py-3 text-[12.5px] font-bold text-[#f1f5f9] shadow-xl"
+          className="fixed inset-x-4 bottom-5 z-[9000] mx-auto flex max-w-[min(420px,90vw)] items-center gap-2 rounded-xl border border-[#1e293b] bg-[#0f172a] px-4 py-3 text-[12.5px] font-bold text-[#f1f5f9] shadow-xl sm:inset-x-auto sm:left-1/2 sm:bottom-6 sm:-translate-x-1/2"
         >
           <span className="flex h-[22px] w-[22px] flex-none items-center justify-center rounded-full bg-[#34d39933] text-[12px] text-[#34d399]">✓</span>
           <span>{toast}</span>
