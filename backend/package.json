@@ -26,7 +26,9 @@
     "migration:run:prod": "typeorm migration:run -d dist/database/data-source.js",
     "data:audit:prod": "node dist/database/production-data-reset.js",
     "data:reset:prod": "node dist/database/production-data-reset.js --execute-reset",
-    "accounts:bootstrap:prod": "node dist/database/bootstrap-panel-accounts.js"
+    "accounts:bootstrap:prod": "node dist/database/bootstrap-panel-accounts.js",
+    "accounts:bootstrap:temporary:prod": "node dist/database/bootstrap-temporary-panel-accounts.js",
+    "accounts:cleanup:temporary:prod": "node dist/database/cleanup-temporary-panel-accounts.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
