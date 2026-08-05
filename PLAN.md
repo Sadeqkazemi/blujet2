@@ -1646,6 +1646,12 @@ a passing test — see `docs/features/panel-shell-dashboard.md` for Phase 1.
   backend becomes healthy without replacing server secrets or volumes. See
   `docs/features/production-backend-artifacts.md`.
 
+- [x] **Flight-status control alignment (2026-08-05)** - aligned the public
+  flight-number, route, date, and search controls to the approved 56px field
+  height; added a single-line Jalali date trigger and regression coverage.
+  Verified with 527 frontend tests, lint, production build, and browser
+  measurements. See `docs/features/flight-status-control-alignment.md`.
+
 ## Notable findings from design extraction (informs later phases)
 
 - Several panels contain orphaned tabs/handlers (coded, unreachable from

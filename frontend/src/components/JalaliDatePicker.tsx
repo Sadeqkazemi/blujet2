@@ -49,6 +49,8 @@ interface JalaliDatePickerProps {
   theme?: 'light' | 'dark';
   /** Compact single-line trigger (toolbar chips in dark panels). */
   compact?: boolean;
+  /** Full-height single-line trigger for standard form fields. */
+  singleLine?: boolean;
 }
 
 /** Jalali (شمسی) date picker — CLAUDE.md requires Jalali everywhere users pick dates. */
@@ -63,6 +65,7 @@ export default function JalaliDatePicker({
   isRTL = true,
   theme = 'light',
   compact = false,
+  singleLine = false,
 }: JalaliDatePickerProps) {
   const [open, setOpen] = useState(false);
   const [viewMonth, setViewMonth] = useState(() => (value ? dayjs(value).calendar('jalali') : dayjs().calendar('jalali')));
@@ -106,16 +109,27 @@ export default function JalaliDatePicker({
         onClick={() => setOpen((v) => !v)}
         style={{
           cursor: 'pointer',
-          padding: compact ? '0 10px' : '5px 13px',
+          padding: compact ? '0 10px' : singleLine ? '0 15px' : '5px 13px',
           display: 'flex',
-          flexDirection: compact ? 'row' : 'column',
-          alignItems: compact ? 'center' : undefined,
-          justifyContent: 'center',
+          flexDirection: compact || singleLine ? 'row' : 'column',
+          alignItems: compact || singleLine ? 'center' : undefined,
+          justifyContent: singleLine ? 'space-between' : 'center',
           gap: compact ? 6 : undefined,
-          height: compact ? 38 : '100%',
+          height: singleLine ? '100%' : compact ? 38 : '100%',
+          boxSizing: 'border-box',
         }}
       >
-        {compact ? (
+        {singleLine ? (
+          <>
+            <span style={{ fontSize: 14, fontWeight: 700, color: valueColor, whiteSpace: 'nowrap' }}>
+              {value ? displayValue : placeholder}
+            </span>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={mutedColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="5" width="18" height="16" rx="2" />
+              <path d="M3 10h18M8 3v4M16 3v4" />
+            </svg>
+          </>
+        ) : compact ? (
           <>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={mutedColor} strokeWidth="1.9">
               <rect x="3" y="4" width="18" height="17" rx="2" />
