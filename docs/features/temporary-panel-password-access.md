@@ -11,9 +11,15 @@ automatically; it does not disable staff 2FA globally.
   `COMMERCIAL_MANAGER`, `FINANCE_MANAGER`, `SENIOR_MANAGER`, `CEO`, and
   `BOARD_CHAIR` — `temporary-panel-accounts.spec.ts`.
 - [ ] Bootstrap usernames are restricted to the reserved `uat.` namespace,
-  passwords are cryptographically random and never committed or printed to
+  passwords are cryptographically random 16-character values made only from
+  English letters and digits, and are never committed or printed to
   GitHub Actions logs, and the one-time credential file is mode `0600` on the
   server — workflow/script inspection plus `temporary-panel-accounts.spec.ts`.
+- [ ] The owner-approved password-format migration rotates all seven existing
+  active and unexpired temporary accounts atomically, preserves their original
+  expiry, revokes their active refresh sessions, replaces the root-only
+  credential file atomically, and runs at most once — rotation script/workflow
+  inspection plus `temporary-panel-accounts.spec.ts`.
 - [ ] The seven passwords remain unchanged for the lifetime of the accounts;
   repeated deploys cannot recreate or rotate them — deploy sentinel check.
 - [ ] A valid, unexpired temporary account can complete `/auth/staff/login`

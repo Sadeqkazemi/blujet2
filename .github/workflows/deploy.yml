@@ -116,4 +116,28 @@ jobs:
               touch "$sentinel"
               chmod 600 "$sentinel"
             fi
+            # Owner-approved one-time migration to easier-to-type temporary
+            # passwords. The script preserves the existing seven-day expiry,
+            # rotates all accounts atomically, and revokes active sessions.
+            rotation_sentinel=/root/.blujet-temporary-panel-password-format-v1-complete
+            if [ ! -f "$rotation_sentinel" ]; then
+              umask 077
+              temporary_credentials="$(mktemp /root/blujet-temporary-panel-credentials.json.XXXXXX)"
+              cleanup_temporary_credentials() {
+                if [ -n "${temporary_credentials:-}" ]; then
+                  rm -f "$temporary_credentials"
+                fi
+              }
+              trap cleanup_temporary_credentials EXIT
+              docker compose -f docker-compose.prod.yml exec -T \
+                -e TEMP_PANEL_ROTATE_CONFIRM=ROTATE_TEMPORARY_PANEL_PASSWORDS_ALPHANUMERIC_V1 \
+                backend node dist/database/rotate-temporary-panel-passwords.js --execute \
+                > "$temporary_credentials"
+              chmod 600 "$temporary_credentials"
+              mv -f "$temporary_credentials" "$credentials"
+              temporary_credentials=
+              touch "$rotation_sentinel"
+              chmod 600 "$rotation_sentinel"
+              trap - EXIT
+            fi
             docker image prune -f

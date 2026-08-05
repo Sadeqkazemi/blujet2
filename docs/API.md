@@ -3090,3 +3090,7 @@ production-UAT account may instead return
 temporaryAccessExpiresAt }` and set the refresh cookie directly. The bypass is
 account-scoped, audited, hard-capped at seven days, and returns
 `TEMPORARY_ACCESS_EXPIRED` after its deadline. Ordinary staff 2FA is unchanged.
+Temporary UAT credentials use a 16-character, letters-and-digits-only format.
+The owner-approved one-time format migration is an offline operation (there is
+no password-rotation HTTP endpoint), preserves the existing access deadline,
+and revokes active refresh sessions after replacing the Argon2 hashes.

@@ -1,8 +1,11 @@
-import { randomBytes } from 'node:crypto';
+import { randomInt } from 'node:crypto';
 import type { Role } from './enums';
 
 export const TEMPORARY_PANEL_ACCESS_MAX_MS = 7 * 24 * 60 * 60 * 1000;
 export const TEMPORARY_PANEL_USERNAME_PREFIX = 'uat.';
+export const TEMPORARY_PANEL_PASSWORD_LENGTH = 16;
+const TEMPORARY_PANEL_PASSWORD_ALPHABET =
+  'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
 export const TEMPORARY_PANEL_ACCOUNTS = [
   { username: 'uat.siteadmin', role: 'SITE_ADMIN', fullName: 'UAT Site Admin' },
@@ -71,5 +74,11 @@ export function createTemporaryPanelExpiry(now = new Date()): Date {
 }
 
 export function generateTemporaryPanelPassword(): string {
-  return `Bj!UAT7-${randomBytes(18).toString('base64url')}`;
+  return Array.from(
+    { length: TEMPORARY_PANEL_PASSWORD_LENGTH },
+    () =>
+      TEMPORARY_PANEL_PASSWORD_ALPHABET[
+        randomInt(TEMPORARY_PANEL_PASSWORD_ALPHABET.length)
+      ],
+  ).join('');
 }
