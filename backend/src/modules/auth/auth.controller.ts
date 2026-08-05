@@ -54,12 +54,18 @@ function isCookieSecure(): boolean {
   return process.env.NODE_ENV === 'production';
 }
 
-function setRefreshCookie(res: Response, token: string) {
+function setRefreshCookie(res: Response, token: string, expiresAt?: Date) {
+  const maxAge = expiresAt
+    ? Math.max(
+        0,
+        Math.min(REFRESH_COOKIE_MAX_AGE_MS, expiresAt.getTime() - Date.now()),
+      )
+    : REFRESH_COOKIE_MAX_AGE_MS;
   res.cookie(REFRESH_COOKIE, token, {
     httpOnly: true,
     secure: isCookieSecure(),
     sameSite: 'strict',
-    maxAge: REFRESH_COOKIE_MAX_AGE_MS,
+    maxAge,
     path: '/auth',
   });
 }
@@ -82,9 +88,24 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Challenge issued' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   @ApiResponse({ status: 403, description: 'Account suspended' })
-  async staffLogin(@Body() dto: StaffLoginDto) {
-    const result = await this.auth.staffLogin(dto.username, dto.password);
-    return { success: true, data: result };
+  async staffLogin(
+    @Body() dto: StaffLoginDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.auth.staffLogin(dto.username, dto.password, {
+      userAgent: req.headers['user-agent'],
+      ip: req.ip,
+    });
+    if (result.loginMode === 'TWO_FACTOR') {
+      return { success: true, data: result };
+    }
+    const { refreshToken, temporaryAccessExpiresAt, ...publicResult } = result;
+    setRefreshCookie(res, refreshToken, new Date(temporaryAccessExpiresAt));
+    return {
+      success: true,
+      data: { ...publicResult, temporaryAccessExpiresAt },
+    };
   }
 
   @Post('staff/login/verify')
