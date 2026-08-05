@@ -116,4 +116,147 @@ jobs:
               touch "$sentinel"
               chmod 600 "$sentinel"
             fi
+            # Owner-approved one-time migration to easier-to-type temporary
+            # passwords. The script preserves the existing seven-day expiry,
+            # rotates all accounts atomically, and revokes active sessions.
+            rotation_sentinel=/root/.blujet-temporary-panel-password-format-v1-complete
+            if [ ! -f "$rotation_sentinel" ]; then
+              umask 077
+              temporary_credentials="$(mktemp /root/blujet-temporary-panel-credentials.json.XXXXXX)"
+              cleanup_temporary_credentials() {
+                if [ -n "${temporary_credentials:-}" ]; then
+                  rm -f "$temporary_credentials"
+                fi
+              }
+              trap cleanup_temporary_credentials EXIT
+              docker compose -f docker-compose.prod.yml exec -T \
+                -e TEMP_PANEL_ROTATE_CONFIRM=ROTATE_TEMPORARY_PANEL_PASSWORDS_ALPHANUMERIC_V1 \
+                backend node dist/database/rotate-temporary-panel-passwords.js --execute \
+                > "$temporary_credentials"
+              chmod 600 "$temporary_credentials"
+              mv -f "$temporary_credentials" "$credentials"
+              temporary_credentials=
+              touch "$rotation_sentinel"
+              chmod 600 "$rotation_sentinel"
+              trap - EXIT
+            fi
+            docker image prune -f
+name: CI & Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: blujet
+          POSTGRES_PASSWORD: blujet
+          POSTGRES_DB: blujet_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U blujet"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: cp .env.test .env
+      - run: npm run migration:run
+      # E2E suites expect seeded staff/users/flights (ceo, finance, …).
+      # Migrations alone leave an empty schema → systemic 401 / User-not-found.
+      - run: npm run seed
+      - run: npm run lint
+      - run: npm run build
+      - run: npm test
+      - run: npm run test:e2e
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+      - run: npm test
+
+  ml-service:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ml-service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -e ".[dev]"
+      - run: pytest
+
+  deploy:
+    needs: [backend, frontend, ml-service]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -e
+            cd /opt/app
+            git pull origin main
+            docker compose -f docker-compose.prod.yml build
+            docker compose -f docker-compose.prod.yml up -d --wait
+            # One-time, owner-approved UAT access while Kavenegar is repaired.
+            # Credentials never enter Actions logs: stdout is redirected on the
+            # server into a root-only file. The sentinel prevents password
+            # rotation/recreation on later deploys; DB-level expiry is 7 days.
+            credentials=/root/blujet-temporary-panel-credentials.json
+            sentinel=/root/.blujet-temporary-panel-bootstrap-complete
+            if [ ! -f "$sentinel" ]; then
+              umask 077
+              docker compose -f docker-compose.prod.yml exec -T \
+                -e TEMP_PANEL_BOOTSTRAP_CONFIRM=CREATE_7_DAY_PANEL_TEST_ACCOUNTS \
+                backend node dist/database/bootstrap-temporary-panel-accounts.js --execute \
+                > "$credentials"
+              chmod 600 "$credentials"
+              touch "$sentinel"
+              chmod 600 "$sentinel"
+            fi
             docker image prune -f
