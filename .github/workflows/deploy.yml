@@ -99,5 +99,21 @@ jobs:
             cd /opt/app
             git pull origin main
             docker compose -f docker-compose.prod.yml build
-            docker compose -f docker-compose.prod.yml up -d
+            docker compose -f docker-compose.prod.yml up -d --wait
+            # One-time, owner-approved UAT access while Kavenegar is repaired.
+            # Credentials never enter Actions logs: stdout is redirected on the
+            # server into a root-only file. The sentinel prevents password
+            # rotation/recreation on later deploys; DB-level expiry is 7 days.
+            credentials=/root/blujet-temporary-panel-credentials.json
+            sentinel=/root/.blujet-temporary-panel-bootstrap-complete
+            if [ ! -f "$sentinel" ]; then
+              umask 077
+              docker compose -f docker-compose.prod.yml exec -T \
+                -e TEMP_PANEL_BOOTSTRAP_CONFIRM=CREATE_7_DAY_PANEL_TEST_ACCOUNTS \
+                backend node dist/database/bootstrap-temporary-panel-accounts.js --execute \
+                > "$credentials"
+              chmod 600 "$credentials"
+              touch "$sentinel"
+              chmod 600 "$sentinel"
+            fi
             docker image prune -f
