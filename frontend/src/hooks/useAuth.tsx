@@ -1,13 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import * as authApi from '../api/auth';
 import type { AuthUser } from '../types/auth';
+import type { StaffLoginResult } from '../api/auth';
 
 type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
 
 interface AuthContextValue {
   status: AuthStatus;
   user: AuthUser | null;
-  requestLogin: (username: string, password: string) => Promise<string>;
+  requestLogin: (username: string, password: string) => Promise<StaffLoginResult>;
   confirmTwoFactor: (challengeId: string, code: string) => Promise<AuthUser>;
   agencyLogin: (phone: string, password: string) => Promise<AuthUser>;
   signOut: () => Promise<void>;
@@ -50,8 +51,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const requestLogin = useCallback(async (username: string, password: string) => {
-    const { challengeId } = await authApi.staffLogin(username, password);
-    return challengeId;
+    const result = await authApi.staffLogin(username, password);
+    if (result.loginMode === 'TEMPORARY_PASSWORD_ONLY') {
+      setUser(result.user);
+      setStatus('authenticated');
+    }
+    return result;
   }, []);
 
   const confirmTwoFactor = useCallback(async (challengeId: string, code: string) => {
