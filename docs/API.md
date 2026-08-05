@@ -3080,3 +3080,13 @@ continues through the authenticated `/admins` endpoints.
 Because staff 2FA is mandatory, the same offline operation verifies that an
 active Kavenegar configuration exists and can establish its initial encrypted
 API key when the database is clean; the key is never part of an API payload.
+
+## Temporary panel UAT access (Kavenegar recovery window)
+
+`POST /auth/staff/login` normally returns
+`{ loginMode: "TWO_FACTOR", challengeId }`. Only a reserved, unexpired
+production-UAT account may instead return
+`{ loginMode: "TEMPORARY_PASSWORD_ONLY", accessToken, user,
+temporaryAccessExpiresAt }` and set the refresh cookie directly. The bypass is
+account-scoped, audited, hard-capped at seven days, and returns
+`TEMPORARY_ACCESS_EXPIRED` after its deadline. Ordinary staff 2FA is unchanged.

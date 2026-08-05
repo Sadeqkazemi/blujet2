@@ -2502,3 +2502,13 @@ The operation also requires an active `ExternalServiceConfig(key =
 with an operator-supplied API key encrypted by `PII_ENCRYPTION_KEY` in the same
 transaction. This resolves the mandatory-2FA bootstrap dependency without a
 temporary authentication bypass.
+
+## Temporary panel UAT access (2026-08-05)
+
+`User.temporaryPasswordOnlyUntil` is a nullable `timestamp(3)`. It is non-null
+only for controlled `uat.*` panel accounts. Such an account can use
+password-only staff login only before this timestamp and never for more than
+seven days from creation. Its access and refresh tokens cannot outlive the
+timestamp. All ordinary staff retain mandatory 2FA. Cleanup deactivates the
+account, clears its password hash, and revokes its sessions while preserving
+audit and business references.
