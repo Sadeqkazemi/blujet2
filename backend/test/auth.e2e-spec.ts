@@ -2,7 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import * as argon2 from 'argon2';
 import { App } from 'supertest/types';
-import { DataSource } from 'typeorm';
+import { DataSource, IsNull } from 'typeorm';
 import { User } from '../src/database/entities/user.entity';
 import { TwoFactorChallenge } from '../src/database/entities/two-factor-challenge.entity';
 import { AuditLog } from '../src/database/entities/audit-log.entity';
@@ -11,6 +11,7 @@ import { MockTwoFactorProvider } from '../src/modules/auth/providers/mock-two-fa
 import { loginAs } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 import { normalizeIranPhone } from '../src/common/normalize-iran-phone';
+import { RefreshToken } from '../src/database/entities/refresh-token.entity';
 
 describe('Auth (e2e)', () => {
   let app: INestApplication<App>;
@@ -58,8 +59,127 @@ describe('Auth (e2e)', () => {
       .send({ username: 'finance', password: 'Blujet@1404' });
 
     expect(res.status).toBe(200);
+    expect(res.body.data.loginMode).toBe('TWO_FACTOR');
     expect(res.body.data.challengeId).toBeDefined();
     expect(res.body.data.accessToken).toBeUndefined();
+  });
+
+  it('allows only an unexpired reserved UAT account to bypass OTP and caps/revokes its session at expiry', async () => {
+    const userRepo = dataSource.getRepository(User);
+    const now = new Date();
+    const deadline = new Date(now.getTime() + 5 * 60 * 1000);
+    const passwordHash = await argon2.hash('UatOnly!Password7');
+    let user = await userRepo.findOneBy({ username: 'uat.it' });
+    if (user) {
+      await userRepo.update(
+        { id: user.id },
+        {
+          role: 'IT_MANAGER',
+          passwordHash,
+          twoFactorEnabled: false,
+          temporaryPasswordOnlyUntil: deadline,
+          isActive: true,
+          deletedAt: null,
+          createdAt: now,
+          updatedAt: now,
+          mustChangePassword: false,
+        },
+      );
+      user = await userRepo.findOneByOrFail({ id: user.id });
+    } else {
+      user = await userRepo.save(
+        userRepo.create({
+          role: 'IT_MANAGER',
+          phone: null,
+          username: 'uat.it',
+          passwordHash,
+          email: null,
+          fullName: 'UAT IT Manager',
+          twoFactorEnabled: false,
+          twoFactorSecret: null,
+          temporaryPasswordOnlyUntil: deadline,
+          isActive: true,
+          deletedAt: null,
+          createdAt: now,
+          updatedAt: now,
+          createdById: null,
+          dept: null,
+          lastLoginAt: null,
+          mustChangePassword: false,
+          rank: null,
+          referralScope: null,
+          nationalIdEnc: null,
+          nationalIdHash: null,
+          passportNoEnc: null,
+          birthDate: null,
+          emailVerifiedAt: null,
+          preferredLocale: 'FA',
+          referralCode: null,
+        }),
+      );
+    }
+
+    const agent = request.agent(app.getHttpServer());
+    const login = await agent
+      .post('/auth/staff/login')
+      .send({ username: 'uat.it', password: 'UatOnly!Password7' });
+
+    expect(login.status).toBe(200);
+    expect(login.body.data.loginMode).toBe('TEMPORARY_PASSWORD_ONLY');
+    expect(login.body.data.challengeId).toBeUndefined();
+    expect(login.body.data.accessToken).toBeDefined();
+    expect(login.body.data.temporaryAccessExpiresAt).toBe(
+      deadline.toISOString(),
+    );
+    expect(String(login.headers['set-cookie'])).toContain('blujet_refresh=');
+
+    const refreshRow = await dataSource
+      .getRepository(RefreshToken)
+      .findOneOrFail({
+        where: { userId: user.id },
+        order: { createdAt: 'DESC' },
+      });
+    expect(refreshRow.expiresAt.getTime()).toBeLessThanOrEqual(
+      deadline.getTime(),
+    );
+    const audit = await dataSource.getRepository(AuditLog).findOne({
+      where: {
+        actorId: user.id,
+        category: 'SECURITY',
+        action: 'ورود آزمایشی موقت بدون OTP',
+      },
+      order: { createdAt: 'DESC' },
+    });
+    expect(audit).not.toBeNull();
+    expect(JSON.stringify(audit)).not.toContain('UatOnly!Password7');
+
+    await userRepo.update(
+      { id: user.id },
+      { temporaryPasswordOnlyUntil: new Date(Date.now() - 1000) },
+    );
+    const expiredRefresh = await agent.post('/auth/refresh');
+    expect(expiredRefresh.status).toBe(401);
+    expect(expiredRefresh.body.error.code).toBe('TEMPORARY_ACCESS_EXPIRED');
+
+    const expiredLogin = await request(app.getHttpServer())
+      .post('/auth/staff/login')
+      .send({ username: 'uat.it', password: 'UatOnly!Password7' });
+    expect(expiredLogin.status).toBe(403);
+    expect(expiredLogin.body.error.code).toBe('TEMPORARY_ACCESS_EXPIRED');
+
+    const activeTokens = await dataSource.getRepository(RefreshToken).count({
+      where: { userId: user.id, revokedAt: IsNull() },
+    });
+    expect(activeTokens).toBe(0);
+    await userRepo.update(
+      { id: user.id },
+      {
+        isActive: false,
+        passwordHash: null,
+        temporaryPasswordOnlyUntil: null,
+        deletedAt: new Date(),
+      },
+    );
   });
 
   it('rejects a wrong 2FA code and increments attempts, without consuming the challenge', async () => {
