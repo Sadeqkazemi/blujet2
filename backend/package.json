@@ -25,7 +25,8 @@
     "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/database/data-source.ts",
     "migration:run:prod": "typeorm migration:run -d dist/database/data-source.js",
     "data:audit:prod": "node dist/database/production-data-reset.js",
-    "data:reset:prod": "node dist/database/production-data-reset.js --execute-reset"
+    "data:reset:prod": "node dist/database/production-data-reset.js --execute-reset",
+    "accounts:bootstrap:prod": "node dist/database/bootstrap-panel-accounts.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

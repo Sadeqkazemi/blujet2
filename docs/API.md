@@ -3069,3 +3069,14 @@ media tab «صفحات سایت» section.
 | GET | `/settings/site-content` | public | Static page copy for public rendering. |
 
 See `docs/features/site-admin-static-pages.md`.
+# Operational account bootstrap (2026-08-05)
+
+Initial management-panel accounts are created only through the offline
+`accounts:bootstrap:prod` operation documented in `docs/RUNBOOK.md`. It adds no
+HTTP endpoint: account owners, usernames, roles, and 2FA mobile numbers arrive
+through standard input on the server, and one-time temporary passwords are
+returned only after an atomic database commit. Normal account administration
+continues through the authenticated `/admins` endpoints.
+Because staff 2FA is mandatory, the same offline operation verifies that an
+active Kavenegar configuration exists and can establish its initial encrypted
+API key when the database is clean; the key is never part of an API payload.

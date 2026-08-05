@@ -2489,3 +2489,16 @@ Plus on `StoredFile`: `siteMediaAsset`, `contentBlockImage`, `destHighlightFor`.
 - Blocks auto-created with Persian defaults on first admin/public read if missing.
 - `PANEL_NAV.SITE_ADMIN` gains `{ key: 'media', implemented: true }`.
 - Seed: three blocks + five routes + four destinations matching home mock data.
+# Operational account bootstrap (2026-08-05)
+
+The initial production management accounts use the existing `User` model; no
+schema change is required. The offline bootstrap sets a named owner, unique
+username, unique normalized Iranian mobile, management `Role`, Argon2
+`passwordHash`, `twoFactorEnabled=true`, `isActive=true`, and
+`mustChangePassword=true`. It never updates an existing identity and inserts
+the requested set in one transaction.
+The operation also requires an active `ExternalServiceConfig(key =
+"ext_kavenegar")`; on a clean database it may create that existing-schema row
+with an operator-supplied API key encrypted by `PII_ENCRYPTION_KEY` in the same
+transaction. This resolves the mandatory-2FA bootstrap dependency without a
+temporary authentication bypass.

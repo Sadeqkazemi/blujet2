@@ -1656,6 +1656,14 @@ a passing test — see `docs/features/panel-shell-dashboard.md` for Phase 1.
   Verified with 527 frontend tests, lint, production build, and browser
   measurements. See `docs/features/flight-status-control-alignment.md`.
 
+- [x] **Secure production panel-account bootstrap (2026-08-05)** - added a
+  fail-closed, stdin-driven operation for named management account owners with
+  unique SMS-2FA mobiles, generated one-time passwords, Argon2 hashes,
+  first-login password rotation, atomic audit records, and initial encrypted
+  Kavenegar configuration to avoid the IT-panel/2FA bootstrap deadlock. No
+  credentials or contact details are stored in Git. See
+  `docs/features/production-panel-accounts.md` and `docs/RUNBOOK.md`.
+
 ## Notable findings from design extraction (informs later phases)
 
 - Several panels contain orphaned tabs/handlers (coded, unreachable from
