@@ -279,7 +279,8 @@ export default function FlightStatusPage() {
                   value={flightNo}
                   onChange={(e) => setFlightNo(e.target.value)}
                   placeholder={t.flightNoPlaceholder}
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '11px 13px', border: '1.5px solid #e3e9f1', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none' }}
+                  className="font-num"
+                  style={{ width: '100%', boxSizing: 'border-box', height: 56, padding: '0 15px', border: '1.5px solid #e2e7ee', borderRadius: 12, background: '#fafbfd', fontSize: 15, fontWeight: 700, color: '#16202e', outline: 'none' }}
                 />
               </div>
             ) : (
@@ -293,7 +294,7 @@ export default function FlightStatusPage() {
                     data-testid="fs-origin"
                     value={origin}
                     onChange={(e) => setOrigin(e.target.value)}
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '11px 13px', border: '1.5px solid #e3e9f1', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff' }}
+                    style={{ width: '100%', boxSizing: 'border-box', height: 56, padding: '0 15px', border: '1.5px solid #e2e7ee', borderRadius: 12, fontFamily: 'inherit', fontSize: 14, fontWeight: 700, color: '#16202e', outline: 'none', background: '#fafbfd' }}
                   >
                     <option value="">{t.selectPlaceholder}</option>
                     {airports.map((a) => (
@@ -312,7 +313,7 @@ export default function FlightStatusPage() {
                     data-testid="fs-dest"
                     value={dest}
                     onChange={(e) => setDest(e.target.value)}
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '11px 13px', border: '1.5px solid #e3e9f1', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', background: '#fff' }}
+                    style={{ width: '100%', boxSizing: 'border-box', height: 56, padding: '0 15px', border: '1.5px solid #e2e7ee', borderRadius: 12, fontFamily: 'inherit', fontSize: 14, fontWeight: 700, color: '#16202e', outline: 'none', background: '#fafbfd' }}
                   >
                     <option value="">{t.selectPlaceholder}</option>
                     {airports.map((a) => (
@@ -324,14 +325,22 @@ export default function FlightStatusPage() {
                 </div>
               </>
             )}
-            <div style={{ flex: '1 1 150px', border: '1.5px solid #e3e9f1', borderRadius: 11 }}>
-              <JalaliDatePicker label={t.dateFieldLabel} value={dateIso} onChange={setDateIso} testId="fs-date" />
+            <div style={{ flex: '1 1 150px' }}>
+              <div style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#5a6678', marginBottom: 6 }}>
+                {t.dateFieldLabel}
+              </div>
+              <div
+                data-testid="fs-date-control"
+                style={{ height: 56, boxSizing: 'border-box', border: '1.5px solid #e2e7ee', borderRadius: 12, background: '#fafbfd' }}
+              >
+                <JalaliDatePicker label={t.dateFieldLabel} value={dateIso} onChange={setDateIso} testId="fs-date" singleLine />
+              </div>
             </div>
             <button
               type="submit"
               data-testid="fs-search"
               disabled={!canSearch || searching}
-              style={{ flex: 'none', border: 'none', borderRadius: 11, background: canSearch && !searching ? '#1668c4' : '#aab8c8', color: '#fff', padding: '12px 26px', fontSize: 13.5, fontWeight: 800, cursor: canSearch && !searching ? 'pointer' : 'not-allowed', fontFamily: 'inherit' }}
+              style={{ flex: 'none', height: 56, border: 'none', borderRadius: 12, background: canSearch && !searching ? '#1668c4' : '#aab8c8', color: '#fff', padding: '0 30px', fontSize: 14, fontWeight: 800, cursor: canSearch && !searching ? 'pointer' : 'not-allowed', fontFamily: 'inherit' }}
             >
               {searching ? t.searchingBtn : t.searchBtn}
             </button>

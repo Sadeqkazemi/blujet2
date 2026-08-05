@@ -59,6 +59,26 @@ function renderPage() {
 }
 
 describe('FlightStatusPage', () => {
+  it('aligns flight-status form controls to the approved field dimensions', async () => {
+    renderPage();
+
+    expect(screen.getByTestId('fs-flightno')).toHaveStyle({
+      height: '56px',
+      borderRadius: '12px',
+      background: '#fafbfd',
+    });
+    expect(screen.getByTestId('fs-date-control')).toHaveStyle({
+      height: '56px',
+      borderRadius: '12px',
+      background: '#fafbfd',
+    });
+
+    await userEvent.click(screen.getByTestId('fs-mode-route'));
+    expect(screen.getByTestId('fs-origin')).toHaveStyle({ height: '56px' });
+    expect(screen.getByTestId('fs-dest')).toHaveStyle({ height: '56px' });
+    expect(screen.getByTestId('fs-search')).toHaveStyle({ height: '56px' });
+  });
+
   it('looks up a real flight by flight number and shows the real result', async () => {
     const lookup = vi.spyOn(flightStatusApi, 'lookupFlightStatus').mockResolvedValue(RESULT);
     renderPage();
