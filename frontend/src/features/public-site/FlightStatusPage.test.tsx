@@ -66,6 +66,8 @@ describe('FlightStatusPage', () => {
       height: '56px',
       borderRadius: '12px',
       background: '#fafbfd',
+      direction: 'ltr',
+      textAlign: 'right',
     });
     expect(screen.getByTestId('fs-date-control')).toHaveStyle({
       height: '56px',

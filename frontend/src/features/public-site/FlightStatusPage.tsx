@@ -280,7 +280,7 @@ export default function FlightStatusPage() {
                   onChange={(e) => setFlightNo(e.target.value)}
                   placeholder={t.flightNoPlaceholder}
                   className="font-num"
-                  style={{ width: '100%', boxSizing: 'border-box', height: 56, padding: '0 15px', border: '1.5px solid #e2e7ee', borderRadius: 12, background: '#fafbfd', fontSize: 15, fontWeight: 700, color: '#16202e', outline: 'none' }}
+                  style={{ width: '100%', boxSizing: 'border-box', height: 56, padding: '0 15px', border: '1.5px solid #e2e7ee', borderRadius: 12, background: '#fafbfd', fontSize: 15, fontWeight: 700, color: '#16202e', direction: 'ltr', textAlign: 'right', outline: 'none' }}
                 />
               </div>
             ) : (
