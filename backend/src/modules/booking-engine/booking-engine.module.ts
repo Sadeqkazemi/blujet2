@@ -39,7 +39,11 @@ import { PrivacyService } from './privacy.service';
 import { AuditModule } from '../audit/audit.module';
 import { CustomerReferralsModule } from '../customer-referrals/customer-referrals.module';
 import { AiModule } from '../ai/ai.module';
-import { PAYMENT_GATEWAY, SandboxPaymentGateway } from './payment-gateway';
+import {
+  PAYMENT_GATEWAY,
+  SandboxPaymentGateway,
+  UnavailablePaymentGateway,
+} from './payment-gateway';
 
 @Module({
   imports: [
@@ -90,7 +94,22 @@ import { PAYMENT_GATEWAY, SandboxPaymentGateway } from './payment-gateway';
     PrivacyService,
     // PAYMENT_GATEWAY env var selects the driver; sandbox is the only one
     // until a real Shetab/PSP contract exists — the interface is final.
-    { provide: PAYMENT_GATEWAY, useClass: SandboxPaymentGateway },
+    SandboxPaymentGateway,
+    UnavailablePaymentGateway,
+    {
+      provide: PAYMENT_GATEWAY,
+      inject: [SandboxPaymentGateway, UnavailablePaymentGateway],
+      useFactory: (
+        sandbox: SandboxPaymentGateway,
+        unavailable: UnavailablePaymentGateway,
+      ) => {
+        const selected = process.env.PAYMENT_GATEWAY?.toLowerCase();
+        const production = process.env.NODE_ENV === 'production';
+        if (!production && (selected === 'sandbox' || !selected))
+          return sandbox;
+        return unavailable;
+      },
+    },
   ],
   exports: [SearchService, BookingService],
 })

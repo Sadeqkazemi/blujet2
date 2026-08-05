@@ -52,6 +52,9 @@ export class User {
   @Column({ type: 'text', nullable: true })
   twoFactorSecret!: string | null;
 
+  @Column({ type: 'timestamp', precision: 3, nullable: true })
+  temporaryPasswordOnlyUntil!: Date | null;
+
   @Column({ type: 'boolean', default: true })
   isActive!: boolean;
 

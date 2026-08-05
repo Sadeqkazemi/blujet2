@@ -4,7 +4,9 @@ import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { fetchDevLastOtp } from '../../api/auth';
 import { ApiRequestError } from '../../api/envelope';
 import { faDigits, isValidIranMobile, normalizeIranMobile } from '../../lib/fa-format';
-import { isMockOtpEnabled, MOCK_CUSTOMER_OTP_CODE } from '../../lib/mock-customer-otp';
+
+const SHOW_TEST_OTP =
+  import.meta.env.DEV && import.meta.env.VITE_SHOW_TEST_OTP === 'true';
 
 const STR: Record<
   StoredLocale,
@@ -101,12 +103,12 @@ export default function OtpLoginInline() {
       const issuedChallengeId = await requestOtp(normalizedPhone);
       setChallengeId(issuedChallengeId);
       setCode('');
-      if (isMockOtpEnabled()) {
+      if (SHOW_TEST_OTP) {
         try {
           const { code: devOtp } = await fetchDevLastOtp(normalizedPhone);
           setDevCode(devOtp);
         } catch {
-          setDevCode(MOCK_CUSTOMER_OTP_CODE);
+          setDevCode(null);
         }
       }
     } catch (err) {

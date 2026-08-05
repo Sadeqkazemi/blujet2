@@ -11,8 +11,24 @@ function normalizeOtpCode(code: string) {
   return latinDigits(code).replace(/\D/g, '');
 }
 
-export function staffLogin(username: string, password: string) {
-  return apiPost<{ challengeId: string }>('/auth/staff/login', { username, password });
+export type StaffLoginResult =
+  | { loginMode: 'TWO_FACTOR'; challengeId: string }
+  | {
+      loginMode: 'TEMPORARY_PASSWORD_ONLY';
+      accessToken: string;
+      user: AuthUser;
+      temporaryAccessExpiresAt: string;
+    };
+
+export async function staffLogin(username: string, password: string) {
+  const result = await apiPost<StaffLoginResult>('/auth/staff/login', {
+    username,
+    password,
+  });
+  if (result.loginMode === 'TEMPORARY_PASSWORD_ONLY') {
+    setAccessToken(result.accessToken);
+  }
+  return result;
 }
 
 export async function agencyLogin(phone: string, password: string) {

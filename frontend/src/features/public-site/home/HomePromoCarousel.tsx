@@ -19,7 +19,6 @@ type PromoCopy = {
   appStore: string;
   googlePlay: string;
   bazaarMyket: string;
-  appMockup: string;
 };
 
 export default function HomePromoCarousel({
@@ -153,8 +152,8 @@ export default function HomePromoCarousel({
                   })}
                 </div>
               </div>
-              <div style={{ flex: 'none', width: 230, height: 172, borderRadius: 18, background: 'linear-gradient(160deg,#cfe0f5,#e8eef6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#5e7fa8', fontFamily: 'Roboto Mono, monospace', fontSize: 11 }}>
-                {t.appMockup}
+              <div aria-hidden="true" style={{ flex: 'none', width: 230, height: 172, borderRadius: 18, background: 'linear-gradient(160deg,#cfe0f5,#e8eef6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: 78, height: 142, borderRadius: 18, border: '5px solid #fff', background: 'linear-gradient(180deg,#1668c4,#0d3b66)', boxShadow: '0 14px 28px -14px rgba(13,59,102,.65)' }} />
               </div>
             </div>
           </div>

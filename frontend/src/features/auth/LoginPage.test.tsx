@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import LoginPage from './LoginPage';
 import { ApiRequestError } from '../../api/envelope';
@@ -10,6 +10,18 @@ function renderLoginPage() {
   return render(
     <MemoryRouter>
       <LoginPage />
+    </MemoryRouter>,
+  );
+}
+
+function renderLoginJourney() {
+  return render(
+    <MemoryRouter initialEntries={['/login']}>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/panel" element={<div>temporary panel reached</div>} />
+        <Route path="/two-factor" element={<div>two factor reached</div>} />
+      </Routes>
     </MemoryRouter>,
   );
 }
@@ -30,6 +42,50 @@ const baseAuth = {
 };
 
 describe('LoginPage', () => {
+  it('enters the panel directly only for a temporary password-only response', async () => {
+    const requestLogin = vi.fn().mockResolvedValue({
+      loginMode: 'TEMPORARY_PASSWORD_ONLY' as const,
+      accessToken: 'temporary-access-token',
+      temporaryAccessExpiresAt: '2026-08-12T00:00:00.000Z',
+      user: {
+        id: 'uat-it',
+        fullName: 'UAT IT Manager',
+        role: 'IT_MANAGER' as const,
+        preferredLocale: 'FA' as const,
+        mustChangePassword: false,
+      },
+    });
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      ...baseAuth,
+      requestLogin,
+    });
+    renderLoginJourney();
+
+    await userEvent.type(screen.getByLabelText('نام کاربری'), 'uat.it');
+    await userEvent.type(screen.getByLabelText('رمز عبور'), 'Strong!Password7');
+    await userEvent.click(screen.getByRole('button', { name: 'ورود به سامانه' }));
+
+    expect(await screen.findByText('temporary panel reached')).toBeInTheDocument();
+  });
+
+  it('keeps ordinary staff on the 2FA journey', async () => {
+    const requestLogin = vi.fn().mockResolvedValue({
+      loginMode: 'TWO_FACTOR' as const,
+      challengeId: 'challenge-1',
+    });
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      ...baseAuth,
+      requestLogin,
+    });
+    renderLoginJourney();
+
+    await userEvent.type(screen.getByLabelText('نام کاربری'), 'finance');
+    await userEvent.type(screen.getByLabelText('رمز عبور'), 'Strong!Password7');
+    await userEvent.click(screen.getByRole('button', { name: 'ورود به سامانه' }));
+
+    expect(await screen.findByText('two factor reached')).toBeInTheDocument();
+  });
+
   it('renders RTL with Persian labels', () => {
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue(baseAuth);
     renderLoginPage();

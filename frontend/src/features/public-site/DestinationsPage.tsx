@@ -7,23 +7,6 @@ import { useIsMobile } from '../../hooks/useIsMobile';
 import { formatToman } from '../../lib/fa-format';
 import type { PublicHomeContent } from '../../types/site-content';
 
-// Mock catalog matching design-reference/مقاصد.dc.html — presentational
-// metadata (duration, badges, map pins) stays static; destination prices,
-// cover images, and popular routes read CMS highlights via GET /site-content/home
-// with static fallbacks when the API is unavailable.
-interface Dest {
-  name: Record<StoredLocale, string>;
-  code: string;
-  region: 'dom' | 'intl';
-  tomanPrice: number;
-  dur: Record<StoredLocale, string>;
-  perWeek: Record<StoredLocale, string>;
-  badge?: Record<StoredLocale, string>;
-  feat?: boolean;
-  hue: [string, string];
-  imageUrl?: string | null;
-}
-
 const CITY_NAMES: Record<string, Record<StoredLocale, string>> = {
   THR: { fa: 'تهران', en: 'Tehran', ar: 'طهران' },
   MHD: { fa: 'مشهد', en: 'Mashhad', ar: 'مشهد' },
@@ -33,10 +16,17 @@ const CITY_NAMES: Record<string, Record<StoredLocale, string>> = {
   SYZ: { fa: 'شیراز', en: 'Shiraz', ar: 'شيراز' },
 };
 
-const ROUTE_FREQ_FALLBACK: Record<StoredLocale, string> = {
-  fa: 'پروازهای هفتگی',
-  en: 'Weekly flights',
-  ar: 'رحلات أسبوعية',
+/** Presentation-only metadata. Prices, availability, duration and frequency
+ * are never sourced from this map. */
+const DESTINATION_VISUALS: Record<
+  string,
+  { region: 'dom' | 'intl'; hue: [string, string] }
+> = {
+  KIH: { region: 'dom', hue: ['#1668c4', '#0d3b66'] },
+  MHD: { region: 'dom', hue: ['#caa53a', '#7d651e'] },
+  IST: { region: 'intl', hue: ['#d64545', '#7a2626'] },
+  DXB: { region: 'intl', hue: ['#1f8a5b', '#0e4a30'] },
+  SYZ: { region: 'dom', hue: ['#8a5bc4', '#4a2d70'] },
 };
 
 function cityLabel(code: string, cityFa?: string): Record<StoredLocale, string> {
@@ -45,48 +35,6 @@ function cityLabel(code: string, cityFa?: string): Record<StoredLocale, string> 
   return { fa, en: fa, ar: fa };
 }
 
-const DESTS: Dest[] = [
-  { name: { fa: 'کیش', en: 'Kish', ar: 'كيش' }, code: 'KIH', region: 'dom', tomanPrice: 1_480_000, dur: { fa: '۱ ساعت ۴۵ دقیقه', en: '1h 45m', ar: '١ ساعة و٤٥ دقيقة' }, perWeek: { fa: '۲۸ پرواز در هفته', en: '28 flights/week', ar: '٢٨ رحلة أسبوعيًا' }, badge: { fa: 'پرفروش این فصل', en: 'Popular this season', ar: 'الأكثر مبيعًا هذا الموسم' }, feat: true, hue: ['#1668c4', '#0d3b66'] },
-  { name: { fa: 'مشهد', en: 'Mashhad', ar: 'مشهد' }, code: 'MHD', region: 'dom', tomanPrice: 980_000, dur: { fa: '۱ ساعت ۲۵ دقیقه', en: '1h 25m', ar: '١ ساعة و٢٥ دقيقة' }, perWeek: { fa: '۴۲ پرواز در هفته', en: '42 flights/week', ar: '٤٢ رحلة أسبوعيًا' }, hue: ['#caa53a', '#7d651e'] },
-  { name: { fa: 'استانبول', en: 'Istanbul', ar: 'إسطنبول' }, code: 'IST', region: 'intl', tomanPrice: 6_800_000, dur: { fa: '۳ ساعت ۱۵ دقیقه', en: '3h 15m', ar: '٣ ساعة و١٥ دقيقة' }, perWeek: { fa: '۱۴ پرواز در هفته', en: '14 flights/week', ar: '١٤ رحلة أسبوعيًا' }, badge: { fa: 'پرواز مستقیم', en: 'Direct flight', ar: 'رحلة مباشرة' }, feat: true, hue: ['#d64545', '#7a2626'] },
-  { name: { fa: 'دبی', en: 'Dubai', ar: 'دبي' }, code: 'DXB', region: 'intl', tomanPrice: 5_200_000, dur: { fa: '۲ ساعت ۱۰ دقیقه', en: '2h 10m', ar: '٢ ساعة و١٠ دقيقة' }, perWeek: { fa: '۱۸ پرواز در هفته', en: '18 flights/week', ar: '١٨ رحلة أسبوعيًا' }, hue: ['#1f8a5b', '#0e4a30'] },
-  { name: { fa: 'شیراز', en: 'Shiraz', ar: 'شيراز' }, code: 'SYZ', region: 'dom', tomanPrice: 1_150_000, dur: { fa: '۱ ساعت ۲۰ دقیقه', en: '1h 20m', ar: '١ ساعة و٢٠ دقيقة' }, perWeek: { fa: '۲۴ پرواز در هفته', en: '24 flights/week', ar: '٢٤ رحلة أسبوعيًا' }, hue: ['#8a5bc4', '#4a2d70'] },
-  { name: { fa: 'اصفهان', en: 'Isfahan', ar: 'أصفهان' }, code: 'IFN', region: 'dom', tomanPrice: 890_000, dur: { fa: '۵۵ دقیقه', en: '55m', ar: '٥٥ دقيقة' }, perWeek: { fa: '۲۱ پرواز در هفته', en: '21 flights/week', ar: '٢١ رحلة أسبوعيًا' }, hue: ['#12809c', '#0a4655'] },
-  { name: { fa: 'تبریز', en: 'Tabriz', ar: 'تبريز' }, code: 'TBZ', region: 'dom', tomanPrice: 1_050_000, dur: { fa: '۱ ساعت ۱۰ دقیقه', en: '1h 10m', ar: '١ ساعة و١٠ دقيقة' }, perWeek: { fa: '۱۶ پرواز در هفته', en: '16 flights/week', ar: '١٦ رحلة أسبوعيًا' }, hue: ['#c46a16', '#6e3a0a'] },
-  { name: { fa: 'تفلیس', en: 'Tbilisi', ar: 'تبليسي' }, code: 'TBS', region: 'intl', tomanPrice: 5_900_000, dur: { fa: '۲ ساعت ۳۰ دقیقه', en: '2h 30m', ar: '٢ ساعة و٣٠ دقيقة' }, perWeek: { fa: '۶ پرواز در هفته', en: '6 flights/week', ar: '٦ رحلة أسبوعيًا' }, hue: ['#4a6e8a', '#243d50'] },
-  { name: { fa: 'اهواز', en: 'Ahvaz', ar: 'الأهواز' }, code: 'AWZ', region: 'dom', tomanPrice: 950_000, dur: { fa: '۱ ساعت ۵ دقیقه', en: '1h 5m', ar: '١ ساعة و٥ دقائق' }, perWeek: { fa: '۱۹ پرواز در هفته', en: '19 flights/week', ar: '١٩ رحلة أسبوعيًا' }, hue: ['#9c6a12', '#553a08'] },
-  { name: { fa: 'نجف', en: 'Najaf', ar: 'النجف' }, code: 'NJF', region: 'intl', tomanPrice: 4_900_000, dur: { fa: '۱ ساعت ۵۰ دقیقه', en: '1h 50m', ar: '١ ساعة و٥٠ دقيقة' }, perWeek: { fa: '۱۰ پرواز در هفته', en: '10 flights/week', ar: '١٠ رحلة أسبوعيًا' }, hue: ['#6a8a4a', '#3a5026'] },
-  { name: { fa: 'بندرعباس', en: 'Bandar Abbas', ar: 'بندر عباس' }, code: 'BND', region: 'dom', tomanPrice: 1_320_000, dur: { fa: '۱ ساعت ۵۰ دقیقه', en: '1h 50m', ar: '١ ساعة و٥٠ دقيقة' }, perWeek: { fa: '۱۲ پرواز در هفته', en: '12 flights/week', ar: '١٢ رحلة أسبوعيًا' }, hue: ['#12809c', '#083945'] },
-  { name: { fa: 'قشم', en: 'Qeshm', ar: 'قشم' }, code: 'GSM', region: 'dom', tomanPrice: 1_390_000, dur: { fa: '۱ ساعت ۵۵ دقیقه', en: '1h 55m', ar: '١ ساعة و٥٥ دقيقة' }, perWeek: { fa: '۸ پرواز در هفته', en: '8 flights/week', ar: '٨ رحلة أسبوعيًا' }, hue: ['#1668c4', '#123a66'] },
-];
-
-interface Route {
-  fromName: Record<StoredLocale, string>;
-  fromCode: string;
-  toName: Record<StoredLocale, string>;
-  toCode: string;
-  tomanPrice: number;
-  freq: Record<StoredLocale, string>;
-}
-
-const ROUTES: Route[] = [
-  { fromName: { fa: 'تهران', en: 'Tehran', ar: 'طهران' }, fromCode: 'THR', toName: { fa: 'مشهد', en: 'Mashhad', ar: 'مشهد' }, toCode: 'MHD', tomanPrice: 980_000, freq: { fa: 'روزانه ۶ پرواز', en: '6 daily flights', ar: '٦ رحلة يوميًا' } },
-  { fromName: { fa: 'تهران', en: 'Tehran', ar: 'طهران' }, fromCode: 'THR', toName: { fa: 'کیش', en: 'Kish', ar: 'كيش' }, toCode: 'KIH', tomanPrice: 1_480_000, freq: { fa: 'روزانه ۴ پرواز', en: '4 daily flights', ar: '٤ رحلة يوميًا' } },
-  { fromName: { fa: 'تهران', en: 'Tehran', ar: 'طهران' }, fromCode: 'THR', toName: { fa: 'استانبول', en: 'Istanbul', ar: 'إسطنبول' }, toCode: 'IST', tomanPrice: 6_800_000, freq: { fa: 'روزانه ۲ پرواز', en: '2 daily flights', ar: '٢ رحلة يوميًا' } },
-  { fromName: { fa: 'تهران', en: 'Tehran', ar: 'طهران' }, fromCode: 'THR', toName: { fa: 'دبی', en: 'Dubai', ar: 'دبي' }, toCode: 'DXB', tomanPrice: 5_200_000, freq: { fa: 'روزانه ۲ پرواز', en: '2 daily flights', ar: '٢ رحلة يوميًا' } },
-  { fromName: { fa: 'مشهد', en: 'Mashhad', ar: 'مشهد' }, fromCode: 'MHD', toName: { fa: 'کیش', en: 'Kish', ar: 'كيش' }, toCode: 'KIH', tomanPrice: 2_100_000, freq: { fa: 'هفته‌ای ۸ پرواز', en: '8 flights/week', ar: '٨ رحلة أسبوعيًا' } },
-  { fromName: { fa: 'تهران', en: 'Tehran', ar: 'طهران' }, fromCode: 'THR', toName: { fa: 'نجف', en: 'Najaf', ar: 'النجف' }, toCode: 'NJF', tomanPrice: 4_900_000, freq: { fa: 'هفته‌ای ۱۰ پرواز', en: '10 flights/week', ar: '١٠ رحلة أسبوعيًا' } },
-];
-
-const PINS: Record<StoredLocale, string>[] = [
-  { fa: 'تهران', en: 'Tehran', ar: 'طهران' },
-  { fa: 'مشهد', en: 'Mashhad', ar: 'مشهد' },
-  { fa: 'تبریز', en: 'Tabriz', ar: 'تبريز' },
-  { fa: 'شیراز', en: 'Shiraz', ar: 'شيراز' },
-  { fa: 'اصفهان', en: 'Isfahan', ar: 'أصفهان' },
-  { fa: 'کیش', en: 'Kish', ar: 'كيش' },
-  { fa: 'اهواز', en: 'Ahvaz', ar: 'الأهواز' },
-];
 const PIN_POS = [
   { top: '40%', right: '52%' },
   { top: '30%', right: '22%' },
@@ -226,39 +174,32 @@ export default function DestinationsPage() {
     fetchPublicHomeContent()
       .then(setHomeContent)
       .catch(() => {
-        /* static fallbacks */
+        /* Keep the honest empty state; never fabricate destinations/prices. */
       });
   }, []);
 
   const destinations = useMemo(() => {
-    const cmsByCode = new Map(
-      (homeContent?.destinations ?? []).map((d) => [
-        d.airportCode,
-        { tomanPrice: Math.round(Number(d.priceIrr) / 10), imageUrl: d.imageUrl },
-      ]),
-    );
-    return DESTS.map((d) => {
-      const cms = cmsByCode.get(d.code);
-      if (!cms) return d;
-      return { ...d, tomanPrice: cms.tomanPrice, imageUrl: cms.imageUrl };
+    return (homeContent?.destinations ?? []).map((d) => {
+      const visual = DESTINATION_VISUALS[d.airportCode];
+      return {
+        code: d.airportCode,
+        name: cityLabel(d.airportCode, d.cityFa),
+        region: visual?.region ?? ('intl' as const),
+        hue: visual?.hue ?? (['#1668c4', '#0d3b66'] as [string, string]),
+        tomanPrice: Math.round(Number(d.priceIrr) / 10),
+        imageUrl: d.imageUrl,
+      };
     });
   }, [homeContent]);
 
   const routes = useMemo(() => {
-    if (!homeContent?.routes?.length) return ROUTES;
-    const staticByKey = new Map(
-      ROUTES.map((r) => [`${r.fromCode}-${r.toCode}`, r]),
-    );
-    return homeContent.routes.map((r) => {
-      const key = `${r.fromAirportCode}-${r.toAirportCode}`;
-      const fallback = staticByKey.get(key);
+    return (homeContent?.routes ?? []).map((r) => {
       return {
-        fromName: fallback?.fromName ?? cityLabel(r.fromAirportCode, r.fromCityFa),
+        fromName: cityLabel(r.fromAirportCode, r.fromCityFa),
         fromCode: r.fromAirportCode,
-        toName: fallback?.toName ?? cityLabel(r.toAirportCode, r.toCityFa),
+        toName: cityLabel(r.toAirportCode, r.toCityFa),
         toCode: r.toAirportCode,
         tomanPrice: Math.round(Number(r.priceIrr) / 10),
-        freq: fallback?.freq ?? ROUTE_FREQ_FALLBACK,
       };
     });
   }, [homeContent]);
@@ -269,7 +210,6 @@ export default function DestinationsPage() {
       (tab === 'all' || d.region === tab) &&
       (!query || d.name[locale].includes(query) || d.code.toUpperCase().includes(query.toUpperCase())),
   );
-  const filterActive = tab !== 'all' || !!query;
   const gridTitle = query ? t.gridTitleSearch(query) : tab === 'dom' ? t.gridTitleDom : tab === 'intl' ? t.gridTitleIntl : t.gridTitleAll;
 
   const goToResults = (destCode: string) =>
@@ -349,7 +289,7 @@ export default function DestinationsPage() {
                 href={`/results?origin=THR&dest=${d.code}&date=${TODAY_ISO}`}
                 style={{
                   position: 'relative',
-                  gridColumn: `span ${!isMobile && !filterActive && d.feat ? 2 : 1}`,
+                  gridColumn: 'span 1',
                   gridRow: 'span 2',
                   borderRadius: 18,
                   overflow: 'hidden',
@@ -363,11 +303,6 @@ export default function DestinationsPage() {
                 }}
               >
                 <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,rgba(13,38,64,0) 40%,rgba(13,38,64,.82))', pointerEvents: 'none' }} />
-                {d.badge && (
-                  <span style={{ position: 'absolute', top: 12, right: 12, whiteSpace: 'nowrap', background: '#caa53a', color: '#fff', fontSize: 10, fontWeight: 800, padding: '4px 11px', borderRadius: 14 }}>
-                    {d.badge[locale]}
-                  </span>
-                )}
                 <span style={{ position: 'absolute', top: 12, left: 12, background: 'rgba(255,255,255,.16)', color: '#fff', fontSize: '9.5px', fontWeight: 700, padding: '3px 9px', borderRadius: 12, pointerEvents: 'none' }}>
                   {d.region === 'dom' ? t.domestic : t.international}
                 </span>
@@ -378,9 +313,6 @@ export default function DestinationsPage() {
                       <span style={{ fontSize: 10, fontWeight: 600, color: '#c9dcf3' }} dir="ltr">
                         {d.code}
                       </span>
-                    </span>
-                    <span style={{ display: 'block', color: '#c9dcf3', fontSize: '10.5px' }}>
-                      {d.dur[locale]} · {d.perWeek[locale]}
                     </span>
                   </span>
                   <span style={{ textAlign: 'left', lineHeight: 1.5, whiteSpace: 'nowrap' }}>
@@ -419,9 +351,8 @@ export default function DestinationsPage() {
             </p>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               {[
-                [formatToman(8, locale), t.statAirports],
-                [formatToman(4, locale), t.statIntl],
-                [`+${formatToman(320, locale)}`, t.statFlightsPerWeek],
+                [formatToman(destinations.length, locale), t.statAirports],
+                [formatToman(destinations.filter((d) => d.region === 'intl').length, locale), t.statIntl],
               ].map(([value, label]) => (
                 <div key={label} style={{ background: 'rgba(255,255,255,.09)', border: '1px solid rgba(255,255,255,.14)', borderRadius: 13, padding: '11px 17px' }}>
                   <div style={{ fontSize: 19, fontWeight: 900 }}>{value}</div>
@@ -432,11 +363,11 @@ export default function DestinationsPage() {
           </div>
           <div style={{ position: 'relative', background: '#fff', borderRadius: 16, padding: 10 }}>
             <div style={{ position: 'relative', width: '100%', height: 390, background: 'linear-gradient(150deg,#eaf2fb,#d7e6f7)', borderRadius: 12 }}>
-              {PINS.map((p, i) => (
+              {destinations.slice(0, PIN_POS.length).map((d, i) => (
                 <div
-                  key={p.fa}
+                  key={d.code}
                   onClick={() => {
-                    setQ(p[locale]);
+                    setQ(d.name[locale]);
                     setTab('all');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
@@ -444,7 +375,7 @@ export default function DestinationsPage() {
                 >
                   <span style={{ width: 14, height: 14, borderRadius: '50%', background: '#1668c4', border: '3px solid #fff', boxShadow: '0 2px 7px rgba(13,38,102,.45)' }} />
                   <span style={{ fontSize: 11, fontWeight: 800, color: '#0d2640', background: '#fff', padding: '2px 7px', borderRadius: 9, whiteSpace: 'nowrap', boxShadow: '0 1px 4px rgba(13,38,102,.12)' }}>
-                    {p[locale]}
+                    {d.name[locale]}
                   </span>
                 </div>
               ))}
@@ -476,7 +407,6 @@ export default function DestinationsPage() {
                       {r.fromCode}
                     </span>
                   </span>
-                  <span style={{ display: 'block', fontSize: '10.5px', color: '#8a96a6' }}>{r.freq[locale]}</span>
                 </span>
                 <span style={{ color: '#1668c4', fontSize: 15 }}>✈</span>
                 <span style={{ lineHeight: 1.6, textAlign: 'left' }}>

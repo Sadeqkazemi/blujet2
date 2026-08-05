@@ -66,7 +66,19 @@ describe('CheckoutPage', () => {
     sessionStorage.clear();
     vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale: 'fa', setLocale: vi.fn() });
     vi.spyOn(useIsMobileModule, 'useIsMobile').mockReturnValue(false);
-    vi.spyOn(publicSiteApi, 'fetchSavedPassengers').mockResolvedValue([]);
+    vi.spyOn(publicSiteApi, 'fetchSavedPassengers').mockResolvedValue([
+      {
+        id: 'saved-1',
+        fullName: 'سارا احمدی',
+        latinName: 'SARA AHMADI',
+        nationalId: '0499370899',
+        passportNo: null,
+        mobile: null,
+        isChild: false,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    ]);
     vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({
       isMember: true,
       level: 'GOLD',
@@ -125,7 +137,7 @@ describe('CheckoutPage', () => {
     await screen.findByTestId('checkout-from-saved-0');
     await user.click(screen.getByTestId('checkout-from-saved-0'));
     expect(await screen.findByTestId('checkout-saved-panel-0')).toBeInTheDocument();
-    expect(screen.getByTestId('checkout-saved-chip-demo-negar')).toBeInTheDocument();
+    expect(screen.getByTestId('checkout-saved-chip-saved-1')).toHaveTextContent('سارا احمدی');
   });
 
   it('mobile layout shows flight route + passenger form above pricing', async () => {

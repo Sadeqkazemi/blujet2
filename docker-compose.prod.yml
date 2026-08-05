@@ -56,8 +56,10 @@ services:
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       ML_SERVICE_URL: http://ml-service:8000
       ML_SERVICE_INTERNAL_TOKEN: ${ML_SERVICE_INTERNAL_TOKEN}
-      SMS_PROVIDER: mock
-      PAYMENT_GATEWAY: sandbox
+      # Production is fail-closed. Kavenegar is configured through the IT
+      # panel; a real PSP adapter must replace `disabled` before ticket sales.
+      SMS_PROVIDER: kavenegar
+      PAYMENT_GATEWAY: ${PAYMENT_GATEWAY:-disabled}
       SENTRY_DSN: ${SENTRY_DSN:-}
       CORS_ORIGINS: http://${SERVER_IP}
       PII_ENCRYPTION_KEY: ${PII_ENCRYPTION_KEY}

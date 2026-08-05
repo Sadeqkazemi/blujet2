@@ -9,6 +9,7 @@ jest.mock('kavenegar');
 
 describe('KavenegarSmsProvider (unit)', () => {
   const originalSender = process.env.KAVENEGAR_SENDER_LINE;
+  const originalNodeEnv = process.env.NODE_ENV;
   const kavenegarApiMock = kavenegar.KavenegarApi as jest.Mock;
 
   beforeAll(() => {
@@ -17,7 +18,21 @@ describe('KavenegarSmsProvider (unit)', () => {
 
   afterEach(() => {
     process.env.KAVENEGAR_SENDER_LINE = originalSender;
+    process.env.NODE_ENV = originalNodeEnv;
     kavenegarApiMock.mockReset();
+  });
+
+  it('fails closed in production when Kavenegar is not configured', async () => {
+    process.env.NODE_ENV = 'production';
+    const mock = new MockSmsProvider();
+    const mockSend = jest.spyOn(mock, 'send');
+    const provider = new KavenegarSmsProvider(makeConfigRepo(null), mock);
+
+    const result = await provider.send('09121234567', 'پیام', 'OTP');
+
+    expect(result.success).toBe(false);
+    expect(result.failureReason).toContain('Kavenegar');
+    expect(mockSend).not.toHaveBeenCalled();
   });
 
   function makeConfigRepo(config: unknown) {

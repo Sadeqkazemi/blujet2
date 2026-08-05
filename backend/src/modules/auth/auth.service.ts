@@ -24,6 +24,7 @@ import { CustomerReferralsService } from '../customer-referrals/customer-referra
 import type { Locale, Role } from '../../database/enums';
 import { normalizeIranPhone } from '../../common/normalize-iran-phone';
 import { generateOtpCode } from '../../common/generate-otp-code';
+import { getTemporaryPanelAccessState } from '../../database/temporary-panel-accounts';
 
 export interface AuthUserView {
   id: string;
@@ -32,6 +33,16 @@ export interface AuthUserView {
   preferredLocale: Locale;
   mustChangePassword: boolean;
 }
+
+export type StaffLoginResult =
+  | { loginMode: 'TWO_FACTOR'; challengeId: string }
+  | {
+      loginMode: 'TEMPORARY_PASSWORD_ONLY';
+      accessToken: string;
+      refreshToken: string;
+      user: AuthUserView;
+      temporaryAccessExpiresAt: string;
+    };
 
 function toAuthUserView(user: {
   id: string;
@@ -375,7 +386,8 @@ export class AuthService {
   async staffLogin(
     username: string,
     password: string,
-  ): Promise<{ challengeId: string }> {
+    context: { userAgent?: string; ip?: string },
+  ): Promise<StaffLoginResult> {
     const user = await this.userRepo.findOneBy({ username });
 
     if (
@@ -403,6 +415,54 @@ export class AuthService {
       });
     }
 
+    const temporaryAccessState = getTemporaryPanelAccessState(user);
+    if (temporaryAccessState !== 'NONE') {
+      if (temporaryAccessState !== 'ACTIVE') {
+        throw new ForbiddenException({
+          code: ErrorCode.TEMPORARY_ACCESS_EXPIRED,
+          message:
+            'مهلت دسترسی آزمایشی این حساب به پایان رسیده است. برای ادامه با مدیر IT تماس بگیرید.',
+        });
+      }
+
+      const deadline = user.temporaryPasswordOnlyUntil!;
+      const jwtUser: AuthenticatedUser = {
+        id: user.id,
+        role: user.role,
+        fullName: user.fullName,
+      };
+      await this.userRepo.update(
+        { id: user.id },
+        { lastLoginAt: new Date(), updatedAt: new Date() },
+      );
+      const accessToken = this.signAccessToken(jwtUser, deadline);
+      const refreshToken = await this.issueRefreshToken(
+        user.id,
+        context,
+        deadline,
+      );
+      await this.audit.record({
+        actorId: user.id,
+        actorRole: user.role,
+        category: 'SECURITY',
+        action: 'ورود آزمایشی موقت بدون OTP',
+        detail: `حساب UAT ${user.username} در بازه موقت تأییدشده وارد پنل شد.`,
+        entityType: 'User',
+        entityId: user.id,
+        metadata: {
+          loginMode: 'TEMPORARY_PASSWORD_ONLY',
+          expiresAt: deadline.toISOString(),
+        },
+      });
+      return {
+        loginMode: 'TEMPORARY_PASSWORD_ONLY',
+        accessToken,
+        refreshToken,
+        user: toAuthUserView(user),
+        temporaryAccessExpiresAt: deadline.toISOString(),
+      };
+    }
+
     const code = generateSixDigitCode();
     const challenge = await this.challengeRepo.save(
       this.challengeRepo.create({
@@ -415,7 +475,7 @@ export class AuthService {
 
     await this.twoFactorProvider.sendCode(user, code);
 
-    return { challengeId: challenge.id };
+    return { loginMode: 'TWO_FACTOR', challengeId: challenge.id };
   }
 
   async verifyTwoFactor(
@@ -860,6 +920,18 @@ export class AuthService {
         message: 'این حساب مسدود شده است.',
       });
     }
+    const temporaryAccessState = getTemporaryPanelAccessState(stored.user);
+    if (temporaryAccessState !== 'NONE' && temporaryAccessState !== 'ACTIVE') {
+      await this.refreshTokenRepo.update(
+        { userId: stored.userId, revokedAt: IsNull() },
+        { revokedAt: new Date() },
+      );
+      throw new UnauthorizedException({
+        code: ErrorCode.TEMPORARY_ACCESS_EXPIRED,
+        message:
+          'مهلت دسترسی آزمایشی این حساب به پایان رسیده است. دوباره وارد نشوید و با مدیر IT تماس بگیرید.',
+      });
+    }
     if (stored.user.role === 'AGENCY') {
       const profile = await this.agencyProfileRepo.findOne({
         where: { userId: stored.userId },
@@ -878,12 +950,23 @@ export class AuthService {
       { revokedAt: new Date() },
     );
 
-    const accessToken = this.signAccessToken({
-      id: stored.user.id,
-      role: stored.user.role,
-      fullName: stored.user.fullName,
-    });
-    const refreshToken = await this.issueRefreshToken(stored.userId, context);
+    const temporaryDeadline =
+      temporaryAccessState === 'ACTIVE'
+        ? stored.user.temporaryPasswordOnlyUntil!
+        : undefined;
+    const accessToken = this.signAccessToken(
+      {
+        id: stored.user.id,
+        role: stored.user.role,
+        fullName: stored.user.fullName,
+      },
+      temporaryDeadline,
+    );
+    const refreshToken = await this.issueRefreshToken(
+      stored.userId,
+      context,
+      temporaryDeadline,
+    );
 
     return { accessToken, refreshToken };
   }
@@ -912,25 +995,47 @@ export class AuthService {
     return this.twoFactorProvider.getLastCode(user.id) ?? null;
   }
 
-  private signAccessToken(user: AuthenticatedUser): string {
+  private signAccessToken(
+    user: AuthenticatedUser,
+    absoluteExpiresAt?: Date,
+  ): string {
+    const remainingSeconds = absoluteExpiresAt
+      ? Math.floor((absoluteExpiresAt.getTime() - Date.now()) / 1000)
+      : null;
+    if (remainingSeconds !== null && remainingSeconds < 1) {
+      throw new UnauthorizedException({
+        code: ErrorCode.TEMPORARY_ACCESS_EXPIRED,
+        message: 'مهلت دسترسی آزمایشی این حساب به پایان رسیده است.',
+      });
+    }
+    const expiresIn =
+      remainingSeconds === null
+        ? ACCESS_TOKEN_TTL
+        : Math.min(15 * 60, remainingSeconds);
     return this.jwt.sign(
       { sub: user.id, role: user.role, fullName: user.fullName },
-      { secret: process.env.JWT_ACCESS_SECRET, expiresIn: ACCESS_TOKEN_TTL },
+      { secret: process.env.JWT_ACCESS_SECRET, expiresIn },
     );
   }
 
   private async issueRefreshToken(
     userId: string,
     context: { userAgent?: string; ip?: string },
+    absoluteExpiresAt?: Date,
   ): Promise<string> {
     const token = crypto.randomBytes(48).toString('hex');
+    const normalExpiry = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
+    const expiresAt =
+      absoluteExpiresAt && absoluteExpiresAt < normalExpiry
+        ? absoluteExpiresAt
+        : normalExpiry;
     await this.refreshTokenRepo.save(
       this.refreshTokenRepo.create({
         userId,
         tokenHash: hashToken(token),
         userAgent: context.userAgent,
         ip: context.ip,
-        expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
+        expiresAt,
       }),
     );
     return token;

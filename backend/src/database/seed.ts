@@ -125,6 +125,11 @@ async function upsertBy<T extends object>(
 }
 
 async function main() {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'Demo seed is forbidden when NODE_ENV=production. Use audited production bootstrap data instead.',
+    );
+  }
   const userRepo = dataSource.getRepository(User);
   const routeRepo = dataSource.getRepository(Route);
   const flightRepo = dataSource.getRepository(Flight);

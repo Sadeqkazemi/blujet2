@@ -33,8 +33,12 @@ export default function LoginPage() {
     setError(null);
     setSubmitting(true);
     try {
-      const challengeId = await requestLogin(username.trim(), password);
-      navigate('/two-factor', { state: { challengeId } });
+      const result = await requestLogin(username.trim(), password);
+      if (result.loginMode === 'TEMPORARY_PASSWORD_ONLY') {
+        navigate('/panel', { replace: true });
+      } else {
+        navigate('/two-factor', { state: { challengeId: result.challengeId } });
+      }
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : 'خطا در ورود. دوباره تلاش کنید.');
     } finally {

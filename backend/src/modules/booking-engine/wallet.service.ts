@@ -1,4 +1,8 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { WalletEntry } from '../../database/entities/wallet-entry.entity';
@@ -32,6 +36,13 @@ export class WalletService {
   }
 
   async topup(userId: string, amountIrr: Irr) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new ServiceUnavailableException({
+        code: 'WALLET_TOPUP_UNAVAILABLE',
+        message:
+          'شارژ کیف پول تا اتصال و تأیید درگاه پرداخت واقعی غیرفعال است.',
+      });
+    }
     await this.walletRepo.save(
       this.walletRepo.create({
         userId,

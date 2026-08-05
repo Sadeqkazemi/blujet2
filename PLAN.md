@@ -19,6 +19,9 @@ below for what's landed from that port so far.
 
 ## Status
 
+- [ ] **Production data integrity + operational golden path (2026-08-05)** — remove production-visible demo fallbacks, prevent production seed/mock provider execution, add a dry-run-first seed audit/cleanup path, and prove flight search → details → passenger → seat → booking → payment → ticket/refund plus operational role visibility. Acceptance and release gates: `docs/features/production-data-integrity.md`.
+- [x] **Sandbox multi-role operational UAT gate (2026-08-05)** — converted the cross-role acceptance audit into a repeatable, flow-selectable runner (`scripts/run-sandbox-multirole-uat.mjs`) over the existing database-backed E2E and Playwright proofs, with a fail-closed guard against accidental browser mutations on a non-local environment. Live smoke evaluation against `http://202.133.90.31` is recorded in `docs/features/sandbox-multirole-operational-uat.md`. Release decision is **NO-GO for real passenger sales** until HTTPS, production seed cleanup, real SMS/OTP, a certified payment gateway, and the documented agency/incomplete-profile product gaps are resolved.
+
 - [x] Repo scaffold (frontend/backend/ml-service skeletons, design-reference import)
 - [x] Design extraction — all 6 panels + shared shell + `ReservationSystem` read in full; findings folded into `docs/API.md` / `docs/DB_SCHEMA.md`
 - [x] **Phase 1 — staff auth + RBAC + panel shell + dashboard/reporting** — see `docs/features/panel-shell-dashboard.md` for the proven checklist (35 backend + 21 frontend unit + 5 E2E tests, all passing; lint+typecheck clean in both packages). Known deferred scope, not silently dropped: IT Manager's real (service-health) dashboard, day/month/flight chart-mode UI, pixel-diff visual regression — see that doc's scope notes.
@@ -1652,6 +1655,14 @@ a passing test — see `docs/features/panel-shell-dashboard.md` for Phase 1.
   order; added a single-line Jalali date trigger and regression coverage.
   Verified with 527 frontend tests, lint, production build, and browser
   measurements. See `docs/features/flight-status-control-alignment.md`.
+
+- [x] **Secure production panel-account bootstrap (2026-08-05)** - added a
+  fail-closed, stdin-driven operation for named management account owners with
+  unique SMS-2FA mobiles, generated one-time passwords, Argon2 hashes,
+  first-login password rotation, atomic audit records, and initial encrypted
+  Kavenegar configuration to avoid the IT-panel/2FA bootstrap deadlock. No
+  credentials or contact details are stored in Git. See
+  `docs/features/production-panel-accounts.md` and `docs/RUNBOOK.md`.
 
 ## Notable findings from design extraction (informs later phases)
 

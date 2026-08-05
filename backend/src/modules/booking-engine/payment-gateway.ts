@@ -1,4 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type { Irr } from '../../common/money';
 
@@ -27,6 +31,29 @@ export interface PaymentGateway {
 }
 
 export const PAYMENT_GATEWAY = Symbol('PAYMENT_GATEWAY');
+
+@Injectable()
+export class UnavailablePaymentGateway implements PaymentGateway {
+  private unavailable(): ServiceUnavailableException {
+    return new ServiceUnavailableException({
+      code: 'PAYMENT_GATEWAY_UNAVAILABLE',
+      message:
+        'درگاه پرداخت واقعی هنوز پیکربندی نشده است؛ هیچ مبلغی کسر نشده است.',
+    });
+  }
+
+  request(): Promise<GatewayRequestResult> {
+    return Promise.reject(this.unavailable());
+  }
+
+  verify(): Promise<GatewayVerifyResult> {
+    return Promise.reject(this.unavailable());
+  }
+
+  reverse(): Promise<void> {
+    return Promise.reject(this.unavailable());
+  }
+}
 
 @Injectable()
 export class SandboxPaymentGateway implements PaymentGateway {
