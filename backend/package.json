@@ -28,6 +28,7 @@
     "data:reset:prod": "node dist/database/production-data-reset.js --execute-reset",
     "accounts:bootstrap:prod": "node dist/database/bootstrap-panel-accounts.js",
     "accounts:bootstrap:temporary:prod": "node dist/database/bootstrap-temporary-panel-accounts.js",
+    "accounts:rotate:temporary:prod": "node dist/database/rotate-temporary-panel-passwords.js",
     "accounts:cleanup:temporary:prod": "node dist/database/cleanup-temporary-panel-accounts.js"
   },
   "dependencies": {
