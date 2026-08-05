@@ -157,6 +157,65 @@ line numbers.
   issuance work; the seat-commitment enforcement and dual-approval parts
   of the request are real, unbuilt features.**
 
+## 6. فلوهای پیشنهادی تکمیلی
+
+آیتم‌های زیر جزو ۵ فلوی سناریوی اولیه نبودند، اما طبق قوانین صریح
+`CLAUDE.md` (بخش‌های Testing، Financial Rules، Club/Wallet/Agencies،
+Locale & Direction) برای یک تست sandbox جامع مهم‌اند. همه‌ی این‌ها در
+کد بررسی شدند — نتیجه: **همه از قبل پیاده‌سازی و تست شده‌اند**، پس
+می‌توانند بدون هیچ کد جدیدی به دور تست فعلی اضافه شوند.
+
+- [x] **رزرو همزمان آخرین صندلی** — دقیقاً یکی از دو خریدار همزمان
+  موفق می‌شود، موجودی هرگز منفی نمی‌شود. Proven by: تست concurrent-
+  last-seat در `booking-engine` (Phase 2)، race test صندلی در
+  `backend/src/database/entities/seat-lock.entity.ts` (partial unique
+  index، Phase 9)، و تست ۵-درخواست‌همزمان در `pnr.service.ts`
+  `issue()`/`changeSeat()`.
+- [x] **انقضای خودکار HELD (تایمر ۱۰ دقیقه‌ای)** — `materializeExpiry`
+  یک رزرو HELD منقضی‌شده را در لحظه‌ی خواندن/پرداخت به EXPIRED تبدیل
+  می‌کند و صندلی آزاد می‌شود (بدون cron جداگانه).
+  Proven by: booking-engine e2e tests (Phase 2).
+- [x] **ری‌پرایسینگ قبل از پرداخت** — `getCabinPrice` تابع مشترک بین
+  نتایج جستجو و پرداخت است؛ اگر قیمت عوض شده باشد، `POST
+  /bookings/:id/pay` نیاز به تایید صریح قیمت جدید از سمت کلاینت دارد.
+  Proven by: booking-engine e2e tests (Phase 2).
+- [x] **استرداد (Refund)** — محاسبه‌ی جریمه طبق قوانین کرایه، صف تایید،
+  ledger reversal. Proven by: `backend/test/refunds.e2e-spec.ts`,
+  `refund-submission.e2e-spec.ts`, `customer-account-refunds.e2e-spec.ts`;
+  مستند در `docs/features/refunds.md`, `customer-account-refunds.md`.
+- [x] **قفل قیمت هوشمند** — فقط اعضای طلایی، ۷۲ ساعت، کارمزد ثابت
+  محاسبه‌شده در NestJS (کارمزد متغیر پیشنهادی AI هنوز deferred است —
+  طبق طراحی، نه باگ). Proven by: `docs/features/wallet-price-lock.md`,
+  `PriceLock` entity.
+- [x] **باشگاه مشتریان و کیف پول** — `ClubPointsEntry` ledger (نه
+  ستون قابل‌تغییر)، `WalletEntry` ledger، پرداخت با امتیاز/کیف‌پول در
+  صفحه‌ی پرداخت. Proven by: `backend/test/club.e2e-spec.ts`,
+  `docs/features/vip-club.md`, `club-tier-rules.md`.
+- [x] **کد تخفیف** — `PromoCode`/`PromoRedemption`، اعتبارسنجی کامل
+  مسیر/کابین/بازه‌ی تاریخ/سقف مصرف کلی و به‌ازای هر کاربر، در صفحه‌ی
+  پرداخت. Proven by: Phase 4 e2e tests (PLAN.md line 45).
+- [x] **مدیریت رزرو (PNR)** — مسافر با کد رزرو + شماره تماس، بلیط را
+  پیدا/تغییر/استرداد می‌کند، جدا از فلوی اصلی خرید. Proven by:
+  `backend/test/phase13e-pnr-lifecycle-reconciliation.e2e-spec.ts`,
+  `docs/features/manage-booking-page-i18n.md`.
+- [x] **تسویه‌حساب آژانس** — تسویه‌ی دوره‌ای در پنل مدیر مالی، با
+  قفل ردیف (`SELECT ... FOR UPDATE`) برای جلوگیری از تسویه‌ی دوبار.
+  Proven by: `backend/test/phase27-employee-fl-manage-ag-settle-fn-invoices.e2e-spec.ts`,
+  concurrency fix مستندشده در PLAN.md (بخش 2026-08-01).
+- [x] **سوییچ زبان fa/en/ar** — روی کل سایت عمومی، پنل کاربر، و پنل
+  آژانس؛ با تقویم جلالی و RTL/LTR صحیح. Proven by: بیش از ۲۰ سند
+  `docs/features/*-i18n*.md` (هر صفحه‌ی عمومی/آژانس جداگانه پوشش
+  داده شده) + `i18n-responsive-foundation.md`.
+- [x] **باطل‌شدن فوری session حین مسدودسازی کارمند/آژانس** — مسدود
+  کردن یک حساب کارمند یا آژانس بلافاصله refresh-token‌های فعال آن را
+  باطل می‌کند (نه فقط جلوگیری از ورود بعدی). Proven by: e2e tests
+  اضافه‌شده در بازبینی کد ۲۰۲۶-۰۸-۰۱ (`auth.service.ts` `refresh()`,
+  `admins.service.ts` `setBlocked()`, `agencies.service.ts` `suspend()`).
+- [x] **رادار هوشمند قیمت + graceful degradation** — پیشنهاد
+  خرید-الان/صبرکن روی صفحه‌ی نتایج، با timeout ۲ ثانیه‌ای و ادامه‌ی
+  کار جستجو/رزرو/پرداخت وقتی سرویس ML خاموش است. Proven by: یک سفر
+  Playwright با سرویس واقعی روشن و یک سفر با سرویس خاموش (Phase 6).
+
 ## Summary
 
 | # | Flow | Status |
@@ -166,12 +225,13 @@ line numbers.
 | 3 | CEO/Board Chair manual seat lock | Fully implemented |
 | 4 | Passenger registration → payment + document warning | Core flow implemented; visibility/consistency gap in the incomplete-docs warning |
 | 5 | Agency onboarding + per-agency seat commitment | Registration/portal/API-key flow implemented; dual-approval and real seat-commitment enforcement are unbuilt |
+| 6 | Supplementary flows (concurrency, HELD expiry, re-pricing, refunds, price lock, club/wallet, promo codes, PNR manage, agency settlement, i18n, session revocation, AI radar) | All 12 items already fully implemented — no new code needed, add to the sandbox test run |
 
 ## Next steps
 
-Flows 1-3 need no new code — they should be exercised as manual/e2e
-sandbox tests against the existing implementation to confirm they behave
-as this doc claims. Flows 4 and 5 each have an open product decision
-(see above) that must be resolved, then documented in `docs/API.md` /
-`docs/DB_SCHEMA.md`, before any implementation code is written, per
-`CLAUDE.md` Workflow Rules 1 and 4.
+Flows 1, 2, 3, and 6 need no new code — they should be exercised as
+manual/e2e sandbox tests against the existing implementation to confirm
+they behave as this doc claims. Flows 4 and 5 each have an open product
+decision (see above) that must be resolved, then documented in
+`docs/API.md` / `docs/DB_SCHEMA.md`, before any implementation code is
+written, per `CLAUDE.md` Workflow Rules 1 and 4.
