@@ -8,6 +8,7 @@
 - [x] The route-mode origin, destination, date, and search controls remain aligned.
 - [x] The focused/interactive field styling remains consistent with the existing public-site design.
 - [x] Focused frontend tests, lint, and production build pass.
+- [x] Flight-number text is visually right-aligned while preserving the left-to-right order of codes such as `BJ-410`.
 
 ## Verification
 
@@ -15,6 +16,7 @@
 - `npm.cmd run lint`: completed with only pre-existing warnings outside this change.
 - `npm.cmd run build`: production build passed.
 - Browser measurement: flight-number and date controls both rendered at 56px with identical vertical bounds, 12px corner radius, and `#fafbfd` background.
+- Flight-number alignment regression: the field keeps `direction: ltr` and applies `text-align: right`.
 
 ## Scope
 
