@@ -74,17 +74,14 @@ describe('temporary panel accounts', () => {
     ).toBe('INVALID');
   });
 
-  it('generates unique strong passwords', () => {
+  it('generates unique 16-character letters-and-digits-only passwords', () => {
     const passwords = new Set(
       Array.from({ length: 50 }, generateTemporaryPanelPassword),
     );
     expect(passwords.size).toBe(50);
     for (const password of passwords) {
-      expect(password.length).toBeGreaterThanOrEqual(28);
-      expect(password).toMatch(/[A-Z]/);
-      expect(password).toMatch(/[a-z]/);
-      expect(password).toMatch(/[0-9]/);
-      expect(password).toMatch(/[^A-Za-z0-9]/);
+      expect(password).toHaveLength(16);
+      expect(password).toMatch(/^[A-Za-z0-9]{16}$/);
     }
   });
 });
