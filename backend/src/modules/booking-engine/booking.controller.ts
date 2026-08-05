@@ -70,7 +70,7 @@ export class BookingController {
   })
   @ApiOperation({
     summary:
-      'پرداخت درگاه sandbox، صدور بلیط — قیمت بلافاصله پیش از پرداخت بازبینی می‌شود',
+      'پرداخت و صدور بلیط — در production بدون درگاه واقعی fail-closed است و قیمت پیش از پرداخت بازبینی می‌شود',
   })
   async pay(
     @CurrentUser() user: AuthenticatedUser,

@@ -40,7 +40,10 @@ export class WalletPointsLockController {
   }
 
   @Post('my/wallet/topup')
-  @ApiOperation({ summary: 'شارژ کیف پول (درگاه sandbox)' })
+  @ApiOperation({
+    summary:
+      'شارژ کیف پول (فقط غیرproduction تا اتصال درگاه واقعی؛ production غیرفعال)',
+  })
   async topup(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: TopupWalletDto,

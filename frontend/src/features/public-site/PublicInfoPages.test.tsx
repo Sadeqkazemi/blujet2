@@ -9,6 +9,26 @@ import TravelInfoPage from './TravelInfoPage';
 import * as useAuthModule from '../../hooks/useAuth';
 import * as useLocaleModule from '../../hooks/useLocale';
 import * as supportTicketsApi from '../../api/support-tickets';
+import * as siteContentApi from '../../api/site-content';
+
+const REAL_HOME_CONTENT = {
+  blocks: [],
+  destinations: [
+    { airportCode: 'KIH', cityFa: 'کیش', priceIrr: '14800000', imageUrl: null },
+    { airportCode: 'MHD', cityFa: 'مشهد', priceIrr: '9800000', imageUrl: null },
+    { airportCode: 'IST', cityFa: 'استانبول', priceIrr: '68000000', imageUrl: null },
+    { airportCode: 'DXB', cityFa: 'دبی', priceIrr: '52000000', imageUrl: null },
+  ],
+  routes: [
+    {
+      fromAirportCode: 'THR',
+      toAirportCode: 'KIH',
+      fromCityFa: 'تهران',
+      toCityFa: 'کیش',
+      priceIrr: '14800000',
+    },
+  ],
+};
 
 function mockLocale(locale: 'fa' | 'en' | 'ar') {
   vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale, setLocale: vi.fn() });
@@ -24,6 +44,9 @@ beforeEach(() => {
     agencyLogin: vi.fn(),
     signOut: vi.fn(),
   });
+  vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockResolvedValue(
+    REAL_HOME_CONTENT,
+  );
 });
 
 function renderWithRouter(node: React.ReactNode) {
@@ -31,11 +54,11 @@ function renderWithRouter(node: React.ReactNode) {
 }
 
 describe('DestinationsPage', () => {
-  it('renders the mock destination catalog with Persian prices', () => {
+  it('renders destination and price rows returned by the CMS API', async () => {
     renderWithRouter(<DestinationsPage />);
     expect(screen.getByText('مقصد بعدی شما کجاست؟')).toBeInTheDocument();
-    expect(screen.getByTestId('dest-card-KIH')).toBeInTheDocument();
-    expect(screen.getByTestId('dest-card-IST')).toBeInTheDocument();
+    expect(await screen.findByTestId('dest-card-KIH')).toBeInTheDocument();
+    expect(await screen.findByTestId('dest-card-IST')).toBeInTheDocument();
     expect(screen.getAllByText(/تومان/).length).toBeGreaterThan(0);
     expect(screen.getByText('مسیرهای پرتردد')).toBeInTheDocument();
   });
@@ -45,7 +68,7 @@ describe('DestinationsPage', () => {
     await userEvent.click(screen.getByText('پروازهای خارجی'));
     expect(screen.getByText('مقاصد بین‌المللی')).toBeInTheDocument();
     expect(screen.queryByTestId('dest-card-MHD')).not.toBeInTheDocument();
-    expect(screen.getByTestId('dest-card-DXB')).toBeInTheDocument();
+    expect(await screen.findByTestId('dest-card-DXB')).toBeInTheDocument();
   });
 
   it('shows the empty state for an unmatched search', async () => {
@@ -54,28 +77,28 @@ describe('DestinationsPage', () => {
     expect(screen.getByText('مقصدی با این مشخصات پیدا نشد')).toBeInTheDocument();
   });
 
-  it('links destination cards to the real results page', () => {
+  it('links destination cards to the real results page', async () => {
     renderWithRouter(<DestinationsPage />);
-    const card = screen.getByTestId('dest-card-KIH');
+    const card = await screen.findByTestId('dest-card-KIH');
     expect(card).toHaveAttribute('href', expect.stringContaining('/results?origin=THR&dest=KIH'));
   });
 
-  it('renders translated catalog with Latin-digit toman prices in English', () => {
+  it('renders translated catalog with Latin-digit toman prices in English', async () => {
     mockLocale('en');
     renderWithRouter(<DestinationsPage />);
     expect(screen.getByText("Where's your next destination?")).toBeInTheDocument();
-    expect(screen.getAllByText('Kish').length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('Kish')).length).toBeGreaterThan(0);
     expect(screen.getAllByText('Istanbul').length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Toman/).length).toBeGreaterThan(0);
     expect(screen.getByText('Popular routes')).toBeInTheDocument();
     expect(screen.getAllByText(/1,480,000/).length).toBeGreaterThan(0);
   });
 
-  it('renders translated catalog with Eastern Arabic-Indic digits in Arabic', () => {
+  it('renders translated catalog with Eastern Arabic-Indic digits in Arabic', async () => {
     mockLocale('ar');
     renderWithRouter(<DestinationsPage />);
     expect(screen.getByText('ما هي وجهتك القادمة؟')).toBeInTheDocument();
-    expect(screen.getAllByText('كيش').length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('كيش')).length).toBeGreaterThan(0);
     expect(screen.getByText('المسارات الأكثر طلبًا')).toBeInTheDocument();
     expect(screen.getAllByText(/١٬٤٨٠٬٠٠٠/).length).toBeGreaterThan(0);
   });

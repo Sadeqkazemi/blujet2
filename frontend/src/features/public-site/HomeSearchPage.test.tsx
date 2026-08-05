@@ -151,26 +151,25 @@ describe('HomeSearchPage', () => {
     expect(screen.getByText('پromo CMS')).toBeInTheDocument();
     expect(screen.getByTestId('popular-dest-DXB')).toBeInTheDocument();
     expect(screen.getByTestId('popular-route-MHD')).toBeInTheDocument();
-    expect(screen.getByText('پیشنهادهای ویژه')).toBeInTheDocument();
     expect(screen.getByText('با رسیدن به حد امتیاز، کارت عضویت بگیر')).toBeInTheDocument();
     const appStore = screen.getByTestId('app-link-app_store');
     expect(appStore.tagName).toBe('A');
     expect(appStore).toHaveAttribute('href', 'https://apps.apple.com/blujet');
   });
 
-  it('falls back to static marketing when CMS fetch fails', async () => {
+  it('does not fabricate prices, promotions, or notices when CMS fetch fails', async () => {
     vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
     vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockRejectedValue(new Error('offline'));
     vi.spyOn(settingsApi, 'fetchPublicAppLinks').mockResolvedValue({ links: [] });
     renderPage();
     await screen.findByTestId('home-origin');
 
-    expect(screen.getByText('پیشنهادهای ویژه')).toBeInTheDocument();
-    expect(screen.getByTestId('offer-THR-IST')).toBeInTheDocument();
-    expect(screen.getByText('تا ۴۰٪ تخفیف روی پروازهای خارجی')).toBeInTheDocument();
-    expect(screen.getByText('مقصدهای محبوب')).toBeInTheDocument();
-    expect(screen.getByTestId('popular-dest-DXB')).toBeInTheDocument();
-    expect(screen.getByTestId('popular-route-MHD')).toBeInTheDocument();
+    expect(screen.queryByText('پیشنهادهای ویژه')).not.toBeInTheDocument();
+    expect(screen.queryByText('تا ۴۰٪ تخفیف روی پروازهای خارجی')).not.toBeInTheDocument();
+    expect(screen.queryByText('مقصدهای محبوب')).not.toBeInTheDocument();
+    expect(screen.queryByText(/اطلاعیه مهم/)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('popular-dest-DXB')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('popular-route-MHD')).not.toBeInTheDocument();
     expect(screen.getByText('با رسیدن به حد امتیاز، کارت عضویت بگیر')).toBeInTheDocument();
     expect(screen.getByText('سفرت را همراه خودت ببر')).toBeInTheDocument();
   });
@@ -187,7 +186,7 @@ describe('HomeSearchPage', () => {
     expect(screen.getByTestId('home-dest')).toHaveTextContent('مشهد');
   });
 
-  it('lists fallback cities when airports API has not loaded yet', async () => {
+  it('does not invent airports while the airports API is pending', async () => {
     vi.spyOn(publicSiteApi, 'fetchAirports').mockReturnValue(new Promise(() => {}));
     vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockResolvedValue(CMS_HOME);
     vi.spyOn(settingsApi, 'fetchPublicAppLinks').mockResolvedValue({ links: [] });
@@ -195,8 +194,8 @@ describe('HomeSearchPage', () => {
     await screen.findByTestId('home-origin');
 
     await userEvent.click(screen.getByTestId('home-origin'));
-    expect(await screen.findByTestId('airport-option-THR')).toBeInTheDocument();
-    expect(screen.getByTestId('airport-option-MHD')).toBeInTheDocument();
+    expect(screen.queryByTestId('airport-option-THR')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('airport-option-MHD')).not.toBeInTheDocument();
   });
 
   it('blocks destination picker until origin is chosen', async () => {
@@ -243,11 +242,9 @@ describe('HomeSearchPage', () => {
     await screen.findByTestId('home-origin');
 
     expect(screen.getByText('Book your next flight with blujet')).toBeInTheDocument();
-    expect(screen.getByText('Special Offers')).toBeInTheDocument();
     expect(screen.getByText('Up to 40% off international flights')).toBeInTheDocument();
     expect(screen.getByText('Popular Destinations')).toBeInTheDocument();
     expect(screen.getByText('Take your trip with you')).toBeInTheDocument();
-    expect(screen.getByTestId('offer-THR-IST')).toHaveTextContent('19% OFF');
     expect(screen.getByTestId('popular-route-MHD')).toHaveTextContent('1,600,000');
   });
 
@@ -264,9 +261,7 @@ describe('HomeSearchPage', () => {
     await screen.findByTestId('home-origin');
 
     expect(screen.getByText('احجز رحلتك القادمة مع blujet')).toBeInTheDocument();
-    expect(screen.getByText('عروض خاصة')).toBeInTheDocument();
     expect(screen.getByText('الوجهات الشائعة')).toBeInTheDocument();
-    expect(screen.getByTestId('offer-THR-IST')).toHaveTextContent('١٩٪ خصم');
     expect(screen.getByTestId('popular-route-MHD')).toHaveTextContent('١٬٦٠٠٬٠٠٠');
   });
 });
@@ -287,16 +282,12 @@ describe('HomeSearchPage — responsive layout (frozen)', () => {
     expect(services).not.toHaveClass('hscroll');
     expect(services).toHaveStyle({ display: 'grid' });
 
-    const offers = screen.getByTestId('special-offers-scroll');
-    expect(offers).not.toHaveClass('hscroll');
-    expect(offers).toHaveStyle({ display: 'grid' });
-
     expect(screen.getByText('مقصدهای محبوب')).toBeInTheDocument();
     expect(screen.getByTestId('popular-dest-DXB')).toBeInTheDocument();
     expect(screen.getByText('با رسیدن به حد امتیاز، کارت عضویت بگیر')).toBeInTheDocument();
   });
 
-  it('mobile: horizontal hscroll for services/offers/destinations, carousel hidden', async () => {
+  it('mobile: horizontal hscroll for services/destinations, carousel hidden', async () => {
     mockMobile();
     renderPage();
     await screen.findByTestId('home-origin');
@@ -308,13 +299,6 @@ describe('HomeSearchPage — responsive layout (frozen)', () => {
     const serviceButtons = services.querySelectorAll('button');
     expect(serviceButtons.length).toBe(4);
     expect(serviceButtons[0]).toHaveStyle({ flex: '0 0 calc(50% - 6.5px)' });
-
-    const offers = screen.getByTestId('special-offers-scroll');
-    expect(offers).toHaveClass('hscroll');
-    expect(offers).toHaveStyle({ display: 'flex', overflowX: 'auto' });
-
-    const offerButtons = offers.querySelectorAll('button');
-    expect(offerButtons[0]).toHaveStyle({ flex: '0 0 calc(50% - 9px)' });
 
     expect(screen.getByText('مقصدهای محبوب')).toBeInTheDocument();
     expect(screen.getByTestId('popular-dest-DXB')).toBeInTheDocument();

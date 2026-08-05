@@ -80,53 +80,6 @@ export function monthNameToValue(month: string): string {
   return '';
 }
 
-/**
- * Design-reference demo list from `تکمیل خرید.dc.html` — used when the
- * account has no saved passengers yet so the UI stays exercisable.
- */
-export function demoCheckoutSavedPassengers(locale: StoredLocale): CheckoutSavedPaxOption[] {
-  const isEn = locale === 'en';
-  const isAr = locale === 'ar';
-  return [
-    {
-      id: 'demo-negar',
-      label: isEn ? 'Negar Rezaei' : isAr ? 'نيغار رضائي' : 'نگار رضایی',
-      firstNameLatin: 'Negar',
-      lastNameLatin: 'Rezaei',
-      gender: 'female',
-      nationalId: '0074185969',
-      passportNo: '',
-      birthDay: '13',
-      birthMonth: monthNameToValue(isEn ? 'June' : isAr ? 'يونيو' : 'خرداد'),
-      birthYear: isEn || isAr ? '1991' : '1370',
-    },
-    {
-      id: 'demo-sadeq',
-      label: isEn ? 'Sadeq Kazemi' : isAr ? 'صادق كاظمي' : 'صادق کاظمی',
-      firstNameLatin: 'Sadeq',
-      lastNameLatin: 'Kazemi',
-      gender: 'male',
-      nationalId: '0060326786',
-      passportNo: '',
-      birthDay: '26',
-      birthMonth: monthNameToValue(isEn ? 'August' : isAr ? 'أغسطس' : 'مرداد'),
-      birthYear: isEn || isAr ? '1986' : '1365',
-    },
-    {
-      id: 'demo-mohammad',
-      label: isEn ? 'Mohammad Rezaei' : isAr ? 'محمد رضائي' : 'محمد رضایی',
-      firstNameLatin: 'Mohammad',
-      lastNameLatin: 'Rezaei',
-      gender: 'male',
-      nationalId: '0012345679',
-      passportNo: '',
-      birthDay: '19',
-      birthMonth: monthNameToValue(isEn ? 'January' : isAr ? 'يناير' : 'دی'),
-      birthYear: isEn || isAr ? '1964' : '1342',
-    },
-  ];
-}
-
 function splitLatinName(latinName: string): { first: string; last: string } {
   const parts = latinName.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return { first: '', last: '' };
@@ -134,45 +87,33 @@ function splitLatinName(latinName: string): { first: string; last: string } {
   return { first: parts[0]!, last: parts.slice(1).join(' ') };
 }
 
-/** Enrich API rows with design demo DOB/gender when nationalId matches. */
-function demoByNationalId(locale: StoredLocale): Map<string, CheckoutSavedPaxOption> {
-  const map = new Map<string, CheckoutSavedPaxOption>();
-  for (const d of demoCheckoutSavedPassengers(locale)) {
-    if (d.nationalId) map.set(d.nationalId, d);
-  }
-  return map;
-}
-
 export function apiToCheckoutSavedOptions(
   rows: SavedPassenger[],
-  locale: StoredLocale,
+  _locale: StoredLocale,
 ): CheckoutSavedPaxOption[] {
-  const demos = demoByNationalId(locale);
   return rows.map((row) => {
     const { first, last } = splitLatinName(row.latinName || '');
-    const demo = row.nationalId ? demos.get(row.nationalId) : undefined;
     return {
       id: row.id,
       label: row.fullName,
-      firstNameLatin: first || demo?.firstNameLatin || '',
-      lastNameLatin: last || demo?.lastNameLatin || '',
-      gender: demo?.gender ?? '',
-      nationalId: row.nationalId ?? demo?.nationalId ?? '',
+      firstNameLatin: first,
+      lastNameLatin: last,
+      gender: '',
+      nationalId: row.nationalId ?? '',
       passportNo: row.passportNo ?? '',
-      birthDay: demo?.birthDay ?? '',
-      birthMonth: demo?.birthMonth ?? '',
-      birthYear: demo?.birthYear ?? '',
+      birthDay: '',
+      birthMonth: '',
+      birthYear: '',
     };
   });
 }
 
-/** Prefer live account list; fall back to design demo chips when empty. */
+/** Only live account passengers are eligible for checkout autofill. */
 export function resolveCheckoutSavedPassengers(
   apiRows: SavedPassenger[],
   locale: StoredLocale,
 ): CheckoutSavedPaxOption[] {
-  if (apiRows.length > 0) return apiToCheckoutSavedOptions(apiRows, locale);
-  return demoCheckoutSavedPassengers(locale);
+  return apiToCheckoutSavedOptions(apiRows, locale);
 }
 
 export function savedOptionToPassengerPatch(

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   monthNameToValue,
-  demoCheckoutSavedPassengers,
   resolveCheckoutSavedPassengers,
   savedOptionToPassengerPatch,
 } from './checkout-saved-pax';
@@ -15,17 +14,23 @@ describe('checkout-saved-pax', () => {
     expect(monthNameToValue('6')).toBe('6');
   });
 
-  it('demo list matches design names for fa', () => {
-    const demo = demoCheckoutSavedPassengers('fa');
-    expect(demo.map((d) => d.label)).toEqual(['نگار رضایی', 'صادق کاظمی', 'محمد رضایی']);
-  });
-
-  it('falls back to demo when API is empty', () => {
-    expect(resolveCheckoutSavedPassengers([], 'fa')).toHaveLength(3);
+  it('returns no fabricated passenger when the account list is empty', () => {
+    expect(resolveCheckoutSavedPassengers([], 'fa')).toEqual([]);
   });
 
   it('savedOptionToPassengerPatch uppercases Latin names', () => {
-    const patch = savedOptionToPassengerPatch(demoCheckoutSavedPassengers('fa')[0]!);
+    const patch = savedOptionToPassengerPatch({
+      id: 'saved-1',
+      label: 'Real Passenger',
+      firstNameLatin: 'Negar',
+      lastNameLatin: 'Rezaei',
+      gender: 'female',
+      nationalId: '0011223344',
+      passportNo: '',
+      birthDay: '13',
+      birthMonth: '6',
+      birthYear: '1370',
+    });
     expect(patch.firstNameLatin).toBe('NEGAR');
     expect(patch.lastNameLatin).toBe('REZAEI');
   });

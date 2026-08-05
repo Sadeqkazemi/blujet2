@@ -17,6 +17,12 @@ export class MockNiraProvider implements NiraProvider {
     departureAt: Date,
     passengers: NiraManifestPassenger[],
   ): Promise<NiraSubmissionResult> {
+    if (process.env.NODE_ENV === 'production') {
+      this.logger.error(
+        `NIRA provider is not configured; manifest for ${flightNo} was not submitted.`,
+      );
+      return Promise.resolve({ success: false });
+    }
     this.logger.log(
       `نیرا manifest for ${flightNo} (${departureAt.toISOString()}): ${passengers.length} passenger(s)`,
     );

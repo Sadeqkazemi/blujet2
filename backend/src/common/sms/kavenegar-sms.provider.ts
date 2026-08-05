@@ -69,6 +69,12 @@ export class KavenegarSmsProvider implements SmsProvider {
       key: KAVENEGAR_SERVICE_KEY,
     });
     if (!config?.enabled || !config.apiKeyEncrypted) {
+      if (process.env.NODE_ENV === 'production') {
+        const failureReason =
+          'Kavenegar is disabled or missing an API key in ExternalServiceConfig.';
+        this.logger.error(failureReason);
+        return { success: false, failureReason };
+      }
       return this.mock.send(phone, message, messageType);
     }
 

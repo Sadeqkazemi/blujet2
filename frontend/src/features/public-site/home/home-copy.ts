@@ -39,10 +39,6 @@ type BaseCopy = {
   airlineTitle: string;
   airlineSub: string;
   airlineBtn: string;
-  appMockup: string;
-  offerImgTags: Record<string, string>;
-  destImgTags: Record<string, string>;
-  cabinOffer: string;
 };
 
 export const HOME_EXTRA: Record<StoredLocale, BaseCopy> = {
@@ -84,10 +80,6 @@ export const HOME_EXTRA: Record<StoredLocale, BaseCopy> = {
     airlineTitle: 'پرواز با ۴۵+ ایرلاین معتبر بین‌المللی',
     airlineSub: 'تمام پروازها با ایرلاین‌های دارای مجوز رسمی و پوشش بیمه مسافرتی رزرو می‌شوند.',
     airlineBtn: 'مشاهده ایرلاین‌ها',
-    appMockup: '[ موکاپ اپلیکیشن ]',
-    offerImgTags: { 'THR-IST': '[ عکس استانبول ]', 'THR-DXB': '[ عکس دبی ]', 'MHD-KIH': '[ عکس کیش ]', 'THR-MHD': '[ عکس مشهد ]' },
-    destImgTags: { IST: '[ عکس استانبول ]', DXB: '[ عکس دبی ]', MHD: '[ عکس مشهد ]', KIH: '[ عکس کیش ]' },
-    cabinOffer: 'اکونومی',
   },
   en: {
     heroCta: 'See offers',
@@ -127,10 +119,6 @@ export const HOME_EXTRA: Record<StoredLocale, BaseCopy> = {
     airlineTitle: 'Fly with 45+ trusted international airlines',
     airlineSub: 'All flights are booked with officially licensed airlines and travel insurance coverage.',
     airlineBtn: 'View Airlines',
-    appMockup: '[ App mockup ]',
-    offerImgTags: { 'THR-IST': '[ Istanbul photo ]', 'THR-DXB': '[ Dubai photo ]', 'MHD-KIH': '[ Kish photo ]', 'THR-MHD': '[ Mashhad photo ]' },
-    destImgTags: { IST: '[ Istanbul photo ]', DXB: '[ Dubai photo ]', MHD: '[ Mashhad photo ]', KIH: '[ Kish photo ]' },
-    cabinOffer: 'Economy',
   },
   ar: {
     heroCta: 'عرض العروض',
@@ -170,10 +158,6 @@ export const HOME_EXTRA: Record<StoredLocale, BaseCopy> = {
     airlineTitle: 'طِر مع أكثر من ٤٥ شركة طيران دولية موثوقة',
     airlineSub: 'جميع الرحلات محجوزة مع شركات طيران مرخصة رسمياً وتغطية تأمين السفر.',
     airlineBtn: 'عرض شركات الطيران',
-    appMockup: '[ موكاپ التطبيق ]',
-    offerImgTags: { 'THR-IST': '[ صورة إسطنبول ]', 'THR-DXB': '[ صورة دبي ]', 'MHD-KIH': '[ صورة كيش ]', 'THR-MHD': '[ صورة مشهد ]' },
-    destImgTags: { IST: '[ صورة إسطنبول ]', DXB: '[ صورة دبي ]', MHD: '[ صورة مشهد ]', KIH: '[ صورة كيش ]' },
-    cabinOffer: 'اقتصادية',
   },
 };
 

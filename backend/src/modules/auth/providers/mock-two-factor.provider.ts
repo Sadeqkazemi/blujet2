@@ -1,8 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { TwoFactorProvider } from './two-factor-provider.interface';
 import { SmsService } from '../../sms/sms.service';
 
-/** Dev/test provider — logs the code instead of sending SMS/email. Never used in production. */
+/** SMS-backed provider. Capturing a code is allowed only outside production
+ * so deterministic automated OTP tests can inspect it. */
 @Injectable()
 export class MockTwoFactorProvider implements TwoFactorProvider {
   private readonly logger = new Logger(MockTwoFactorProvider.name);
@@ -14,21 +19,40 @@ export class MockTwoFactorProvider implements TwoFactorProvider {
     user: { id: string; fullName: string; phone: string | null },
     code: string,
   ): Promise<void> {
-    this.lastCodeByUserId.set(user.id, code);
-    // Deliberately .log() (info), not .debug(): this mock provider is the
-    // ONLY delivery channel until a real SMS/2FA vendor is wired, and
-    // production log level is 'info' — a .debug() call here would make the
-    // code permanently unreadable on any production deployment.
-    this.logger.log(`2FA code for ${user.fullName} (${user.id}): ${code}`);
-    // Phase 14: real send log — only when this challenge is phone-bound
-    // (the interface also serves email-delivered 2FA, which isn't an SMS).
+    const production = process.env.NODE_ENV === 'production';
+    if (!production) {
+      this.lastCodeByUserId.set(user.id, code);
+      this.logger.debug(
+        `2FA test code for ${user.fullName} (${user.id}): ${code}`,
+      );
+    }
+
     if (user.phone) {
-      await this.sms.send(user.phone, `کد ورود بلوجت: ${code}`, 'OTP');
+      const result = await this.sms.send(
+        user.phone,
+        `کد ورود بلوجت: ${code}`,
+        'OTP',
+      );
+      if (!result.success) {
+        throw new ServiceUnavailableException({
+          code: 'OTP_DELIVERY_UNAVAILABLE',
+          message: 'ارسال کد ورود انجام نشد؛ لطفاً بعداً دوباره تلاش کنید.',
+        });
+      }
+      return;
+    }
+
+    if (production) {
+      throw new ServiceUnavailableException({
+        code: 'OTP_DELIVERY_UNAVAILABLE',
+        message: 'برای این حساب شماره موبایل معتبر ثبت نشده است.',
+      });
     }
   }
 
   /** Test-only helper to read back the last code sent to a user. */
   getLastCode(userId: string): string | undefined {
+    if (process.env.NODE_ENV === 'production') return undefined;
     return this.lastCodeByUserId.get(userId);
   }
 }

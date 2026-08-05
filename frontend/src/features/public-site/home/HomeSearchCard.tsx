@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import JalaliDatePicker from '../../../components/JalaliDatePicker';
 import type { Airport } from '../../../types/public-site';
 import type { StoredLocale } from '../../../hooks/useLocale';
-import { airportCityName, FALLBACK_AIRPORTS } from '../../../lib/airport-cities';
+import { airportCityName } from '../../../lib/airport-cities';
 import { formatToman } from '../../../lib/fa-format';
 import {
   DomesticFlightIcon,
@@ -398,7 +398,7 @@ export default function HomeSearchCard({
   ];
   const paxSummary = `${paxParts.join('، ')}، ${cabinLabel}`;
 
-  const airportOptions = airports.length > 0 ? airports : FALLBACK_AIRPORTS;
+  const airportOptions = airports;
 
   function originDisplay() {
     if (!origin) return t.originPlaceholder;

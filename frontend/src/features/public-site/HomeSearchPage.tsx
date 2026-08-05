@@ -9,17 +9,15 @@ import type { PublicHomeContent } from '../../types/site-content';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
-import { formatLocalePercent, formatToman } from '../../lib/fa-format';
+import { formatToman } from '../../lib/fa-format';
 import { destinationGradient } from './site-content-shared';
 import HomeSearchCard from './home/HomeSearchCard';
 import HomePromoCarousel from './home/HomePromoCarousel';
 import { QUICK_LINK_ICONS } from './home/home-icons';
 import { HOME_EXTRA, buildSearchCopy } from './home/home-copy';
-import { AIRPORT_CITY_NAMES, airportCityName } from '../../lib/airport-cities';
+import { airportCityName } from '../../lib/airport-cities';
 
 const TODAY_ISO = new Date().toISOString().slice(0, 10);
-
-const CITY_NAMES = AIRPORT_CITY_NAMES;
 
 const COUNTRY_NAMES: Record<string, Record<StoredLocale, string>> = {
   IST: { fa: 'ترکیه', en: 'Turkey', ar: 'تركيا' },
@@ -36,28 +34,6 @@ const DEST_HOURS: Record<string, number> = {
   SYZ: 1.5,
   THR: 1,
 };
-
-const POPULAR_ROUTES_FALLBACK: { fromCode: string; toCode: string; tomanPrice: number }[] = [
-  { fromCode: 'THR', toCode: 'MHD', tomanPrice: 1_600_000 },
-  { fromCode: 'THR', toCode: 'IST', tomanPrice: 4_200_000 },
-  { fromCode: 'THR', toCode: 'DXB', tomanPrice: 3_800_000 },
-  { fromCode: 'MHD', toCode: 'KIH', tomanPrice: 2_100_000 },
-  { fromCode: 'SYZ', toCode: 'THR', tomanPrice: 1_450_000 },
-];
-
-const OFFERS: { fromCode: string; toCode: string; was: number; now: number; offPct: number; deadlineDays: number | 'today'; grad: string }[] = [
-  { fromCode: 'THR', toCode: 'IST', was: 5_200_000, now: 4_200_000, offPct: 19, deadlineDays: 2, grad: 'linear-gradient(160deg,#bcd6f2,#e3eefb)' },
-  { fromCode: 'THR', toCode: 'DXB', was: 4_900_000, now: 3_800_000, offPct: 22, deadlineDays: 3, grad: 'linear-gradient(160deg,#c8d9ec,#e8eef6)' },
-  { fromCode: 'MHD', toCode: 'KIH', was: 2_800_000, now: 2_100_000, offPct: 25, deadlineDays: 'today', grad: 'linear-gradient(160deg,#bfe0d8,#e6f2ee)' },
-  { fromCode: 'THR', toCode: 'MHD', was: 2_100_000, now: 1_600_000, offPct: 24, deadlineDays: 1, grad: 'linear-gradient(160deg,#cdd9ec,#eaeff7)' },
-];
-
-const POPULAR_DESTS_FALLBACK: { code: string; hours: number; tomanPrice: number; grad: string }[] = [
-  { code: 'IST', hours: 3, tomanPrice: 4_200_000, grad: 'linear-gradient(160deg,#bcd6f2,#e3eefb)' },
-  { code: 'DXB', hours: 2, tomanPrice: 3_800_000, grad: 'linear-gradient(160deg,#c8d9ec,#e8eef6)' },
-  { code: 'MHD', hours: 1.5, tomanPrice: 1_600_000, grad: 'linear-gradient(160deg,#bfe0d8,#e6f2ee)' },
-  { code: 'KIH', hours: 1.5, tomanPrice: 2_100_000, grad: 'linear-gradient(160deg,#cdd9ec,#eaeff7)' },
-];
 
 const STR: Record<StoredLocale, {
   announcement: string;
@@ -336,7 +312,7 @@ export default function HomeSearchPage() {
     fetchPublicHomeContent(locale)
       .then(setHomeContent)
       .catch(() => {
-        /* keep static fallbacks */
+        /* Keep brand shell only; never fabricate operational CMS data. */
       });
     fetchPublicAppLinks()
       .then((res) => setAppLinks(res.links.map((l) => ({ id: l.id, url: l.url }))))
@@ -362,7 +338,7 @@ export default function HomeSearchPage() {
         tomanPrice: Math.round(Number(r.priceIrr) / 10),
       }));
     }
-    return POPULAR_ROUTES_FALLBACK;
+    return [];
   }, [homeContent]);
 
   const popularDests = useMemo(() => {
@@ -375,7 +351,7 @@ export default function HomeSearchPage() {
         imageUrl: d.imageUrl,
       }));
     }
-    return POPULAR_DESTS_FALLBACK;
+    return [];
   }, [homeContent]);
 
   const cityName = useMemo(
@@ -404,16 +380,16 @@ export default function HomeSearchPage() {
   });
 
   const announcementBar =
-    !annClosed && annBlock?.enabled !== false ? (
+    !annClosed && annBlock?.enabled === true ? (
       <div style={{ background: 'linear-gradient(90deg,#0a1f36,#0d2640 40%,#123457)', color: '#fff', position: 'relative', zIndex: 60 }}>
         <div style={{ maxWidth: 1320, margin: '0 auto', padding: isMobile ? '8px 44px 8px 14px' : '11px 26px', display: 'flex', alignItems: 'center', justifyContent: isMobile ? 'flex-start' : 'center', gap: 10, flexWrap: isMobile ? 'nowrap' : 'wrap' }}>
-          <span style={{ fontSize: isMobile ? '11.5px' : '13.5px', fontWeight: 800, textAlign: isMobile ? 'right' : 'center' }}>{annBlock?.title || t.announcement}</span>
+          <span style={{ fontSize: isMobile ? '11.5px' : '13.5px', fontWeight: 800, textAlign: isMobile ? 'right' : 'center' }}>{annBlock.title}</span>
           <button
             type="button"
             onClick={() => navigate('/flight-status')}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#f2c94c', color: '#0d2640', padding: '6px 16px', borderRadius: 20, fontSize: 12, fontWeight: 800, border: 'none', cursor: 'pointer', flex: 'none', fontFamily: 'inherit' }}
           >
-            {annBlock?.buttonText || t.annView} <span style={{ fontSize: 12 }}>{locale === 'en' ? '→' : '←'}</span>
+            {annBlock.buttonText || t.annView} <span style={{ fontSize: 12 }}>{locale === 'en' ? '→' : '←'}</span>
           </button>
           <button
             type="button"
@@ -492,7 +468,7 @@ export default function HomeSearchPage() {
                 </p>
                 <button
                   type="button"
-                  onClick={() => document.getElementById('offers')?.scrollIntoView({ behavior: 'smooth' })}
+                onClick={() => document.getElementById('search-card')?.scrollIntoView({ behavior: 'smooth' })}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#ffffff', color: '#0d2640', padding: '11px 23px', borderRadius: 11, fontSize: '13.5px', fontWeight: 800, border: 'none', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 12px 28px -14px rgba(11,33,56,.5)' }}
                 >
                   {extra.heroCta} <span style={{ fontSize: '15.5px' }}>{locale === 'en' ? '→' : '←'}</span>
@@ -551,91 +527,7 @@ export default function HomeSearchPage() {
         </div>
       </section>
 
-      {/* SPECIAL OFFERS */}
-      <section id="offers" style={{ maxWidth: 1180, margin: '0 auto', padding: isMobile ? '14px 26px 7px' : '18px 26px 7px', scrollMarginTop: 96 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 10 }}>
-          <div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#eaf6ef', color: '#1f8a5b', padding: '4px 10px', borderRadius: 20, fontSize: '11.5px', fontWeight: 700, marginBottom: 10 }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#1f8a5b' }} />
-              {t.limitedTime}
-            </div>
-            <h2 style={{ fontSize: 19, fontWeight: 800, margin: '0 0 6px', letterSpacing: '-.5px', color: '#16202e' }}>{t.specialOffersTitle}</h2>
-            <p style={{ fontSize: 12, color: '#6b7585', margin: 0 }}>{t.specialOffersSub}</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => navigate('/destinations')}
-            style={{ fontSize: '12.5px', color: '#1668c4', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', fontFamily: 'inherit' }}
-          >
-            <span>{locale === 'en' ? '→' : '←'}</span>{t.viewAllOffers}
-          </button>
-        </div>
-        <div
-          data-testid="special-offers-scroll"
-          className={isMobile ? 'hscroll' : undefined}
-          style={{
-            display: isMobile ? 'flex' : 'grid',
-            gridTemplateColumns: isMobile ? undefined : 'repeat(4, 1fr)',
-            gap: 18,
-            overflowX: isMobile ? 'auto' : 'visible',
-            scrollSnapType: isMobile ? 'x mandatory' : undefined,
-            paddingBottom: isMobile ? 8 : 0,
-          }}
-        >
-          {OFFERS.map((o) => (
-            <button
-              type="button"
-              key={`${o.fromCode}-${o.toCode}`}
-              data-testid={`offer-${o.fromCode}-${o.toCode}`}
-              onClick={() => navigate(`/results?origin=${o.fromCode}&dest=${o.toCode}&date=${TODAY_ISO}`)}
-              style={{
-                textAlign: locale === 'en' ? 'left' : 'right',
-                background: '#fff',
-                border: '1px solid #e8eef6',
-                borderRadius: 16,
-                overflow: 'hidden',
-                boxShadow: '0 14px 34px -22px rgba(13,38,102,.4)',
-                display: 'flex',
-                flexDirection: 'column',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                padding: 0,
-                flex: isMobile ? '0 0 calc(50% - 9px)' : undefined,
-                scrollSnapAlign: isMobile ? 'start' : undefined,
-              }}
-            >
-              <div style={{ position: 'relative', height: 100, background: o.grad, display: 'flex', alignItems: 'flex-end', padding: 8, width: '100%', boxSizing: 'border-box' }}>
-                <span style={{ position: 'absolute', top: 12, right: 12, background: '#1f8a5b', color: '#fff', fontSize: 11, fontWeight: 800, padding: '4px 9px', borderRadius: 9 }}>
-                  {formatLocalePercent(o.offPct, locale)} {t.off}
-                </span>
-                <span style={{ position: 'absolute', top: 13, left: 13, fontFamily: 'Roboto Mono, monospace', fontSize: '8.5px', color: '#5e7fa8' }}>
-                  {extra.offerImgTags[`${o.fromCode}-${o.toCode}`] ?? ''}
-                </span>
-                <span style={{ background: '#0d2640', color: '#fff', fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 20 }}>{extra.cabinOffer}</span>
-              </div>
-              <div style={{ padding: 11, width: '100%', boxSizing: 'border-box' }}>
-                <div style={{ fontSize: 12, fontWeight: 800, color: '#16202e', marginBottom: 9 }}>
-                  {CITY_NAMES[o.fromCode]?.[locale]} <span style={{ color: '#b9c2cf', fontWeight: 600 }}>{locale === 'en' ? '→' : '←'}</span> {CITY_NAMES[o.toCode]?.[locale]}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, marginBottom: 13 }}>
-                  <span style={{ fontSize: '11.5px', color: '#9aa4b2', textDecoration: 'line-through' }}>{formatToman(o.was, locale)}</span>
-                  <span style={{ fontSize: '14.5px', fontWeight: 900, color: '#1668c4' }}>{formatToman(o.now, locale)}</span>
-                  <span style={{ fontSize: 11, color: '#6b7585' }}>{t.toman}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '10.5px', color: '#e5484d', fontWeight: 700 }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#e5484d' }} />
-                    {t.deadlinePrefix}{o.deadlineDays === 'today' ? t.today : `${formatToman(o.deadlineDays, locale)}${t.daySuffix}`}
-                  </span>
-                  <span style={{ fontSize: '11.5px', fontWeight: 800, color: '#fff', background: '#1668c4', padding: '6px 13px', borderRadius: 9 }}>{t.book}</span>
-                </div>
-              </div>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      {(promoBlock?.enabled !== false) && (
+      {(promoBlock?.enabled === true) && (
       <section style={{ maxWidth: 1180, margin: '44px auto 0', padding: '0 26px' }}>
         <div style={{ position: 'relative', borderRadius: 24, overflow: 'hidden', minHeight: isMobile ? 175 : 208, boxShadow: '0 18px 44px -28px rgba(13,38,102,.4)' }}>
           {promoImage && (
@@ -646,11 +538,11 @@ export default function HomeSearchPage() {
             <div style={{ maxWidth: 560 }}>
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#ffffff22', color: '#fff', padding: '5px 11px', borderRadius: 20, fontSize: '11.5px', fontWeight: 600, marginBottom: 14 }}>
                 <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#7ee0b0' }} />
-                {promoBlock?.badgeText || t.saleBadge}
+                {promoBlock.badgeText}
               </div>
-              <h2 style={{ fontSize: isMobile ? 19 : 25, fontWeight: 800, color: '#fff', margin: '0 0 10px', letterSpacing: '-.5px' }}>{promoBlock?.title || t.saleTitle}</h2>
+              <h2 style={{ fontSize: isMobile ? 19 : 25, fontWeight: 800, color: '#fff', margin: '0 0 10px', letterSpacing: '-.5px' }}>{promoBlock.title}</h2>
               <p style={{ fontSize: '13.5px', color: '#e7eefb', margin: 0, lineHeight: 1.7, maxWidth: 480 }}>
-                {promoBlock?.subtitle || t.saleSub}
+                {promoBlock.subtitle}
               </p>
             </div>
             <button
@@ -658,13 +550,14 @@ export default function HomeSearchPage() {
               onClick={() => navigate('/destinations')}
               style={{ flex: 'none', display: 'inline-flex', alignItems: 'center', gap: 7, padding: '11px 25px', background: '#fff', color: '#1668c4', borderRadius: 12, fontSize: '13.5px', fontWeight: 800, border: 'none', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 12px 28px -14px rgba(11,33,56,.5)' }}
             >
-              {promoBlock?.buttonText || t.saleBtn} <span style={{ fontSize: '15.5px' }}>{locale === 'en' ? '→' : '←'}</span>
+              {promoBlock.buttonText} <span style={{ fontSize: '15.5px' }}>{locale === 'en' ? '→' : '←'}</span>
             </button>
           </div>
         </div>
       </section>
       )}
 
+      {popularDests.length > 0 && (
       <section style={{ maxWidth: 1180, margin: '0 auto', padding: '39px 26px 20px' }}>
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 26 }}>
           <div>
@@ -727,9 +620,6 @@ export default function HomeSearchPage() {
                     : {}),
                 }}
               >
-                <span style={{ position: 'absolute', top: 14, right: 16, fontFamily: 'Roboto Mono, monospace', fontSize: 10, color: '#5e7fa8' }}>
-                  {extra.destImgTags[d.code] ?? ''}
-                </span>
                 <span style={{ background: '#ffffffe6', padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700, color: '#0d3b66' }}>{t.flightHours(d.hours)}</span>
               </div>
               <div style={{ padding: '14px 15px' }}>
@@ -749,9 +639,10 @@ export default function HomeSearchPage() {
           ))}
         </div>
       </section>
+      )}
 
       {!isMobile && (
-        <HomePromoCarousel locale={locale} copy={{ ...t, appMockup: extra.appMockup }} appLinks={appLinks} onLoyaltyClick={() => navigate('/club')} />
+        <HomePromoCarousel locale={locale} copy={t} appLinks={appLinks} onLoyaltyClick={() => navigate('/club')} />
       )}
     </PublicPageShell>
   );

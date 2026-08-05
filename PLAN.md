@@ -19,6 +19,7 @@ below for what's landed from that port so far.
 
 ## Status
 
+- [ ] **Production data integrity + operational golden path (2026-08-05)** — remove production-visible demo fallbacks, prevent production seed/mock provider execution, add a dry-run-first seed audit/cleanup path, and prove flight search → details → passenger → seat → booking → payment → ticket/refund plus operational role visibility. Acceptance and release gates: `docs/features/production-data-integrity.md`.
 - [x] **Sandbox multi-role operational UAT gate (2026-08-05)** — converted the cross-role acceptance audit into a repeatable, flow-selectable runner (`scripts/run-sandbox-multirole-uat.mjs`) over the existing database-backed E2E and Playwright proofs, with a fail-closed guard against accidental browser mutations on a non-local environment. Live smoke evaluation against `http://202.133.90.31` is recorded in `docs/features/sandbox-multirole-operational-uat.md`. Release decision is **NO-GO for real passenger sales** until HTTPS, production seed cleanup, real SMS/OTP, a certified payment gateway, and the documented agency/incomplete-profile product gaps are resolved.
 
 - [x] Repo scaffold (frontend/backend/ml-service skeletons, design-reference import)
