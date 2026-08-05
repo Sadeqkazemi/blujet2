@@ -2512,3 +2512,9 @@ seven days from creation. Its access and refresh tokens cannot outlive the
 timestamp. All ordinary staff retain mandatory 2FA. Cleanup deactivates the
 account, clears its password hash, and revokes its sessions while preserving
 audit and business references.
+
+The temporary credential format is 16 English letters/digits generated with a
+cryptographically secure RNG. The owner-approved format rotation changes no
+schema: it atomically replaces the seven existing Argon2 `passwordHash` values,
+preserves each `temporaryPasswordOnlyUntil`, records security audit rows, and
+revokes every active refresh token for those accounts.

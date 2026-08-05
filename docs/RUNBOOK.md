@@ -180,6 +180,14 @@ after creation. Repeated deploys do not recreate or rotate the accounts because
 `/root/.blujet-temporary-panel-bootstrap-complete` is retained. After the
 deadline, login and refresh are rejected even if the password is correct.
 
+The temporary passwords are 16-character values containing only English
+letters and digits. The owner-approved format migration is deployed once and
+uses `/root/.blujet-temporary-panel-password-format-v1-complete` as its
+sentinel. It preserves the current expiry, revokes active sessions, and
+atomically replaces `/root/blujet-temporary-panel-credentials.json`; read the
+new credentials from the same root-only path after deployment. A failed or
+partial rotation never replaces that file or writes the sentinel.
+
 As soon as Kavenegar works (or earlier on owner request), disable the accounts
 and revoke every active session without deleting referenced audit/business
 history:
