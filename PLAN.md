@@ -1652,6 +1652,29 @@ a passing test — see `docs/features/panel-shell-dashboard.md` for Phase 1.
   Verified with 527 frontend tests, lint, production build, and browser
   measurements. See `docs/features/flight-status-control-alignment.md`.
 
+- [ ] **Staff first-login mobile+OTP self-setup — backend (2026-08-06,
+  Phase 68)** — a user-provided design mockup for «ورود مدیران و
+  کارمندان» revealed a real production gap: staff/admin/employee accounts
+  never had a phone on file, so the mandatory `STAFF_LOGIN_2FA` code had
+  no working delivery channel. Backend now supports a passwordless
+  account (admin/IT creates one with `password` omitted) whose owner
+  chooses their own password and registers+verifies their mobile via OTP
+  on first login: `POST /auth/staff/lookup`,
+  `/auth/staff/first-login/otp/request`, `/otp/verify` (new
+  `TwoFactorPurpose.STAFF_FIRST_LOGIN_SETUP`, migration
+  `1786011343152`, reuses `TwoFactorChallenge` — no staging columns).
+  6-digit OTP and 8-char strong password (not the mockup's 5/8 split —
+  aligned to the project's existing standards); the lookup endpoint
+  deliberately reveals account existence, a considered posture change
+  from every other staff-auth endpoint (see the open decisions recorded
+  in `docs/features/staff-first-login-mobile-setup.md`, all resolved for
+  this backend pass). 13 new e2e tests; full backend suite 487/488
+  passing (the one failure, `identity-admin.e2e-spec.ts`, reproduces
+  identically with this branch's changes stashed out — confirmed
+  pre-existing and unrelated). **Frontend not started yet** (LoginPage
+  username-first step, first-time-setup screen, OTP screen reuse,
+  admin/employee creation form toggle) — next phase.
+
 ## Notable findings from design extraction (informs later phases)
 
 - Several panels contain orphaned tabs/handlers (coded, unreachable from
