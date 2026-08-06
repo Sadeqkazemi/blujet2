@@ -1713,3 +1713,11 @@ See `CLAUDE.md` → Commands. `docker compose up -d` starts Postgres+Redis;
   selected tenant identities, 15-minute non-refreshable tokens, and audit
   records; direct owner access to tenant APIs remains forbidden. Awaiting owner
   review before merge.
+
+- [x] **Customer account responsive sidebar (2026-08-06)** — the mobile
+  account sidebar now exposes profile, account information, trips, ticket
+  refunds, wallet, and loyalty points; the desktop sidebar exposes every
+  existing customer-account destination and scrolls within short viewports.
+  Persian/English/Arabic labels and responsive tab navigation are covered by
+  `AccountPage.test.tsx`. See
+  `docs/features/customer-account-responsive-sidebar.md`.

@@ -223,7 +223,7 @@ export default function AccountSidebar({
       ? (TIER_LABEL[club.level]?.[locale] ?? club.level)
       : t.newMember;
 
-  const sidebarNav = sidebarAccountNavItems();
+  const sidebarNav = sidebarAccountNavItems(isMobile);
 
   return (
     <aside
@@ -235,7 +235,10 @@ export default function AccountSidebar({
         background: '#fff',
         border: '1px solid #e9eef4',
         borderRadius: 18,
-        overflow: 'hidden',
+        maxHeight: isMobile ? 'none' : 'calc(100vh - 106px)',
+        overflowX: 'hidden',
+        overflowY: isMobile ? 'hidden' : 'auto',
+        overscrollBehavior: 'contain',
         boxShadow: '0 20px 44px -32px rgba(13,38,102,.55)',
       }}
     >
@@ -326,14 +329,18 @@ export default function AccountSidebar({
         </div>
       </div>
       <div style={{ padding: 9 }}>
-        {sidebarNav.map((item) => (
-          <NavButton
-            key={item.key}
-            tabKey={item.key}
-            label={item.label[locale]}
-            active={tab === item.key}
-            onSelect={() => onTabChange(item.key)}
-          />
+        {sidebarNav.map((item, index) => (
+          <div key={item.key}>
+            {index > 0 && sidebarNav[index - 1]?.group !== item.group && (
+              <div style={{ height: 1, background: '#eef1f5', margin: '11px 6px 7px' }} />
+            )}
+            <NavButton
+              tabKey={item.key}
+              label={item.label[locale]}
+              active={tab === item.key}
+              onSelect={() => onTabChange(item.key)}
+            />
+          </div>
         ))}
         <div style={{ height: 1, background: '#eef1f5', margin: '11px 6px 7px' }} />
         <button

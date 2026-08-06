@@ -565,7 +565,8 @@ describe('AccountPage', () => {
     renderPage('/account?tab=profile');
     expect(screen.getByTestId('account-tab-profile')).toHaveTextContent('My Profile');
     expect(screen.getByTestId('account-tab-account-info')).toHaveTextContent('Account Information');
-    expect(screen.queryByTestId('account-tab-club')).not.toBeInTheDocument();
+    expect(screen.getByTestId('account-tab-wallet')).toHaveTextContent('Wallet');
+    expect(screen.getByTestId('account-tab-club')).toHaveTextContent('Points & Loyalty Club');
     renderPage('/account?tab=club');
     expect(await screen.findByText('Gold Member')).toBeInTheDocument();
   });
@@ -576,19 +577,55 @@ describe('AccountPage', () => {
     renderPage('/account?tab=profile');
     expect(screen.getByTestId('account-tab-profile')).toHaveTextContent('ملفي الشخصي');
     expect(screen.getByTestId('account-tab-account-info')).toHaveTextContent('معلومات الحساب');
-    expect(screen.queryByTestId('account-tab-wallet')).not.toBeInTheDocument();
+    expect(screen.getByTestId('account-tab-wallet')).toHaveTextContent('المحفظة');
+    expect(screen.getByTestId('account-tab-club')).toHaveTextContent('النقاط ونادي الولاء');
     renderPage('/account?tab=club');
     expect(await screen.findByText('عضو ذهبية')).toBeInTheDocument();
   });
 
-  it('shows only profile and account-info links in the sidebar', async () => {
+  it('shows every existing account destination in the desktop sidebar', async () => {
     mockAuth('authenticated');
     renderPage('/account?tab=profile');
-    expect(screen.getByTestId('account-tab-profile')).toBeInTheDocument();
-    expect(screen.getByTestId('account-tab-account-info')).toBeInTheDocument();
-    expect(screen.queryByTestId('account-tab-trips')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('account-tab-wallet')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('account-tab-security')).not.toBeInTheDocument();
+    expect(screen.getByTestId('account-sidebar')).toHaveStyle({
+      maxHeight: 'calc(100vh - 106px)',
+      overflowY: 'auto',
+    });
+    for (const tabKey of [
+      'profile',
+      'account-info',
+      'trips',
+      'refunds',
+      'wallet',
+      'club',
+      'saved',
+      'price-locks',
+      'passengers',
+      'tickets',
+      'identity',
+      'security',
+      'banks',
+      'referral',
+    ]) {
+      expect(screen.getByTestId(`account-tab-${tabKey}`)).toBeInTheDocument();
+    }
+  });
+
+  it('shows the requested compact navigation in the mobile sidebar and opens its tabs', async () => {
+    vi.spyOn(useIsMobileModule, 'useIsMobile').mockReturnValue(true);
+    mockAuth('authenticated');
+    renderPage('/account?tab=profile');
+
+    expect(screen.getByTestId('account-sidebar')).toHaveStyle({ overflowY: 'hidden' });
+
+    for (const tabKey of ['profile', 'account-info', 'trips', 'refunds', 'wallet', 'club']) {
+      expect(screen.getByTestId(`account-tab-${tabKey}`)).toBeInTheDocument();
+    }
+    for (const tabKey of ['saved', 'price-locks', 'passengers', 'tickets', 'identity', 'security', 'banks', 'referral']) {
+      expect(screen.queryByTestId(`account-tab-${tabKey}`)).not.toBeInTheDocument();
+    }
+
+    await userEvent.click(screen.getByTestId('account-tab-refunds'));
+    expect(await screen.findByTestId('account-refunds')).toBeInTheDocument();
   });
 
   it('renders profile stats in a 2-column grid on mobile', async () => {
