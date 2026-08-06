@@ -254,7 +254,7 @@ export class AuthService {
     if (target.role === 'AGENCY') {
       const profile = await this.agencyProfileRepo.findOne({
         where: { userId: target.id },
-        select: { suspendedAt: true },
+        select: { userId: true, suspendedAt: true },
       });
       if (!profile || profile.suspendedAt) {
         throw new ForbiddenException({
@@ -1105,7 +1105,7 @@ export class AuthService {
     if (stored.user.role === 'AGENCY') {
       const profile = await this.agencyProfileRepo.findOne({
         where: { userId: stored.userId },
-        select: { suspendedAt: true },
+        select: { userId: true, suspendedAt: true },
       });
       if (profile?.suspendedAt) {
         throw new UnauthorizedException({
