@@ -24,11 +24,13 @@ describe('Agency Portal (e2e)', () => {
   let dataSource: DataSource;
 
   beforeEach(async () => {
+    delete process.env.AUTH_SANDBOX_ENABLED;
     app = await createTestApp();
     dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
+    delete process.env.AUTH_SANDBOX_ENABLED;
     await app.close();
   });
 
@@ -118,6 +120,45 @@ describe('Agency Portal (e2e)', () => {
   }
 
   // ── Login ──────────────────────────────────────────────────────────────
+
+  it('sandbox agency login requires 123456 before issuing tokens', async () => {
+    process.env.AUTH_SANDBOX_ENABLED = 'true';
+    const agency = await createFreshAgency();
+    const login = await request(app.getHttpServer())
+      .post('/auth/agency/login')
+      .send({ phone: agency.phone, password: AGENCY_PASSWORD });
+    expect(login.status).toBe(200);
+    expect(login.body.data.loginMode).toBe('TWO_FACTOR');
+    expect(login.body.data.accessToken).toBeUndefined();
+
+    const verify = await request(app.getHttpServer())
+      .post('/auth/agency/login/verify')
+      .send({ challengeId: login.body.data.challengeId, code: '123456' });
+    expect(verify.status).toBe(200);
+    expect(verify.body.data.user.role).toBe('AGENCY');
+    expect(verify.body.data.accessToken).toBeTruthy();
+  });
+
+  it('sandbox agency first-login activation sets a chosen password then verifies OTP', async () => {
+    process.env.AUTH_SANDBOX_ENABLED = 'true';
+    const agency = await createFreshAgency();
+    await dataSource
+      .getRepository(User)
+      .update(
+        { id: agency.id },
+        { mustChangePassword: true, lastLoginAt: null },
+      );
+
+    const setup = await request(app.getHttpServer())
+      .post('/auth/agency/first-login/request')
+      .send({ phone: agency.phone, newPassword: 'AgencyNew@1405' });
+    expect(setup.status).toBe(200);
+    const verify = await request(app.getHttpServer())
+      .post('/auth/agency/login/verify')
+      .send({ challengeId: setup.body.data.challengeId, code: '123456' });
+    expect(verify.status).toBe(200);
+    expect(verify.body.data.user.mustChangePassword).toBe(false);
+  });
 
   it('POST /auth/agency/login: phone+password, no 2FA, issues tokens directly', async () => {
     const agency = await createFreshAgency();

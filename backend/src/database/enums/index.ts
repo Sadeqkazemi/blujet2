@@ -27,6 +27,7 @@ export type Locale = (typeof Locale)[keyof typeof Locale];
 
 export const TwoFactorPurpose = {
   STAFF_LOGIN_2FA: 'STAFF_LOGIN_2FA',
+  AGENCY_LOGIN_2FA: 'AGENCY_LOGIN_2FA',
   CUSTOMER_OTP_LOGIN: 'CUSTOMER_OTP_LOGIN',
   STEP_UP_VERIFICATION: 'STEP_UP_VERIFICATION',
   EMAIL_VERIFY: 'EMAIL_VERIFY',

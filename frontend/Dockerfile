@@ -7,8 +7,10 @@ COPY . .
 # Passed as build-args from docker-compose.prod.yml.
 ARG VITE_API_URL
 ARG VITE_SENTRY_DSN
+ARG VITE_SANDBOX_AUTH
 ENV VITE_API_URL=${VITE_API_URL}
 ENV VITE_SENTRY_DSN=${VITE_SENTRY_DSN}
+ENV VITE_SANDBOX_AUTH=${VITE_SANDBOX_AUTH}
 RUN npm run build
 
 FROM nginx:1.27-alpine AS production

@@ -25,6 +25,7 @@ import type { Locale, Role } from '../../database/enums';
 import { normalizeIranPhone } from '../../common/normalize-iran-phone';
 import { generateOtpCode } from '../../common/generate-otp-code';
 import { getTemporaryPanelAccessState } from '../../database/temporary-panel-accounts';
+import { isSandboxAuthEnabled } from '../../common/sandbox-auth';
 
 export interface AuthUserView {
   id: string;
@@ -57,6 +58,14 @@ export type StaffLoginResult =
       refreshToken: string;
       user: AuthUserView;
       temporaryAccessExpiresAt: string;
+    };
+
+export type AgencyLoginResult =
+  | { loginMode: 'TWO_FACTOR'; challengeId: string }
+  | {
+      accessToken: string;
+      refreshToken: string;
+      user: AuthUserView;
     };
 
 function toAuthUserView(
@@ -646,6 +655,102 @@ export class AuthService {
     await this.twoFactorProvider.sendCode(user, code);
 
     return { loginMode: 'TWO_FACTOR', challengeId: challenge.id };
+  }
+
+  async staffLoginMode(
+    username: string,
+  ): Promise<{ mode: 'FIRST_LOGIN_SETUP' | 'PASSWORD' }> {
+    if (!isSandboxAuthEnabled()) return { mode: 'PASSWORD' };
+    const user = await this.userRepo.findOneBy({ username: username.trim() });
+    const isStaff =
+      user && STAFF_ROLES.includes(user.role as (typeof STAFF_ROLES)[number]);
+    const firstLogin =
+      isStaff &&
+      user.isActive &&
+      !user.isSuperAdmin &&
+      user.lastLoginAt === null &&
+      getTemporaryPanelAccessState(user) === 'NONE';
+    return { mode: firstLogin ? 'FIRST_LOGIN_SETUP' : 'PASSWORD' };
+  }
+
+  async requestStaffFirstLogin(
+    username: string,
+    phone: string,
+    newPassword: string,
+  ): Promise<{ challengeId: string }> {
+    if (!isSandboxAuthEnabled()) {
+      throw new ForbiddenException({
+        code: 'SANDBOX_AUTH_DISABLED',
+        message: 'راه‌اندازی آزمایشی ورود در این محیط فعال نیست.',
+      });
+    }
+    const user = await this.userRepo.findOneBy({ username: username.trim() });
+    if (
+      !user ||
+      !STAFF_ROLES.includes(user.role as (typeof STAFF_ROLES)[number]) ||
+      user.isSuperAdmin ||
+      user.lastLoginAt !== null ||
+      getTemporaryPanelAccessState(user) !== 'NONE'
+    ) {
+      throw new UnauthorizedException({
+        code: ErrorCode.UNAUTHORIZED,
+        message: 'امکان راه‌اندازی اولین ورود برای این حساب وجود ندارد.',
+      });
+    }
+    if (!user.isActive) {
+      throw new ForbiddenException({
+        code: 'ACCOUNT_SUSPENDED',
+        message: 'این حساب مسدود شده است.',
+      });
+    }
+
+    const normalizedPhone = normalizeIranPhone(phone);
+    const phoneOwner = await this.userRepo.findOneBy({ phone: normalizedPhone });
+    if (phoneOwner && phoneOwner.id !== user.id) {
+      throw new UnauthorizedException({
+        code: ErrorCode.UNAUTHORIZED,
+        message: 'امکان ثبت این شماره موبایل وجود ندارد.',
+      });
+    }
+
+    await this.userRepo.update(
+      { id: user.id },
+      {
+        phone: normalizedPhone,
+        passwordHash: await argon2.hash(newPassword),
+        twoFactorEnabled: true,
+        mustChangePassword: false,
+        updatedAt: new Date(),
+      },
+    );
+    user.phone = normalizedPhone;
+    user.passwordHash = 'configured';
+    user.mustChangePassword = false;
+
+    await this.challengeRepo.update(
+      { userId: user.id, purpose: 'STAFF_LOGIN_2FA', consumedAt: IsNull() },
+      { consumedAt: new Date() },
+    );
+    const code = generateSixDigitCode();
+    const challenge = await this.challengeRepo.save(
+      this.challengeRepo.create({
+        userId: user.id,
+        purpose: 'STAFF_LOGIN_2FA',
+        codeHash: await argon2.hash(code),
+        expiresAt: new Date(Date.now() + TWO_FACTOR_TTL_MS),
+      }),
+    );
+    await this.twoFactorProvider.sendCode(user, code);
+    await this.audit.record({
+      actorId: user.id,
+      actorRole: user.role,
+      category: 'SECURITY',
+      action: 'راه‌اندازی اولین ورود در Sandbox',
+      detail: `${user.fullName} رمز عبور و شماره موبایل اولین ورود خود را ثبت کرد.`,
+      entityType: 'User',
+      entityId: user.id,
+    });
+    return { challengeId: challenge.id };
   }
 
   async verifyTwoFactor(

@@ -52,6 +52,15 @@ class EnvironmentVariables {
    * (Phase 66). Falls back to the local dev frontend origin when unset. */
   @IsOptional()
   FRONTEND_URL?: string;
+
+  /** Explicit opt-in for deterministic OTP in a hosted production-mode UAT. */
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  AUTH_SANDBOX_ENABLED?: string;
+
+  @IsOptional()
+  @IsNumberString()
+  AUTH_SANDBOX_OTP?: string;
 }
 
 export function validateEnv(config: Record<string, unknown>) {

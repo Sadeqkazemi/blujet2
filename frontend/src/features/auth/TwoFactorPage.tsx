@@ -6,13 +6,16 @@ import { StaffLoginLayout } from './StaffLoginLayout';
 
 interface LocationState {
   challengeId?: string;
+  firstLogin?: boolean;
+  phone?: string;
 }
 
 export default function TwoFactorPage() {
   const { confirmTwoFactor } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const challengeId = (location.state as LocationState | null)?.challengeId;
+  const state = location.state as LocationState | null;
+  const challengeId = state?.challengeId;
 
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +59,12 @@ export default function TwoFactorPage() {
       <div className="mb-5 text-[11.5px] leading-[1.9] text-[#64748b]">
         کد ۶ رقمی ارسال‌شده به موبایل ثبت‌شده را وارد کنید.
       </div>
+
+      {(import.meta.env.DEV || import.meta.env.VITE_SANDBOX_AUTH === 'true') && (
+        <div data-testid="staff-otp-sandbox-hint" className="mb-4 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-[11px] leading-5 text-blue-700">
+          حالت Sandbox فعال است؛ اگر پیامک دریافت نشد، کد ۱۲۳۴۵۶ را وارد کنید.
+        </div>
+      )}
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
         <div>

@@ -98,6 +98,11 @@ jobs:
             set -e
             cd /opt/app
             git pull origin main
+            # This host is the owner-approved UAT sandbox. Keep the backend
+            # mock OTP and the matching frontend notice in sync for every
+            # compose build/recreation without writing secrets to the repo.
+            export AUTH_SANDBOX_ENABLED=true
+            export VITE_SANDBOX_AUTH=true
             docker compose -f docker-compose.prod.yml build
             docker compose -f docker-compose.prod.yml up -d --wait
             # One-time, owner-approved UAT access while Kavenegar is repaired.

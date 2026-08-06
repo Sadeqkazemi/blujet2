@@ -1,23 +1,15 @@
 import * as crypto from 'crypto';
-
-const DEFAULT_DEV_OTP = '123456';
+import { getSandboxOtpCode, isSandboxAuthEnabled } from './sandbox-auth';
 
 /** Issue OTP codes. In non-production, returns a fixed dev code (123456 by
  * default, overridable via DEV_FIXED_OTP_CODE) so local login never needs
  * log scraping. Production always uses cryptographically random codes. */
 export function generateOtpCode(): string {
-  if (process.env.NODE_ENV === 'production') {
-    if (process.env.DEV_FIXED_OTP_CODE) {
-      throw new Error('DEV_FIXED_OTP_CODE must not be set in production.');
-    }
-    return crypto.randomInt(0, 1_000_000).toString().padStart(6, '0');
+  if (isSandboxAuthEnabled()) return getSandboxOtpCode();
+  if (process.env.AUTH_SANDBOX_OTP || process.env.DEV_FIXED_OTP_CODE) {
+    throw new Error(
+      'A fixed OTP is configured while AUTH_SANDBOX_ENABLED is disabled.',
+    );
   }
-  const fixed = process.env.DEV_FIXED_OTP_CODE?.trim();
-  if (fixed) {
-    if (!/^\d{6}$/.test(fixed)) {
-      throw new Error('DEV_FIXED_OTP_CODE must be exactly 6 digits.');
-    }
-    return fixed;
-  }
-  return DEFAULT_DEV_OTP;
+  return crypto.randomInt(0, 1_000_000).toString().padStart(6, '0');
 }

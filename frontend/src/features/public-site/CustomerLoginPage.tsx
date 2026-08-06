@@ -675,7 +675,7 @@ export default function CustomerLoginPage() {
                   ))}
                 </div>
               </div>
-              {import.meta.env.DEV && (
+              {(import.meta.env.DEV || import.meta.env.VITE_SANDBOX_AUTH === 'true') && (
                 <p data-testid="signin-dev-otp-hint" style={{ margin: 0, fontSize: 11, color: '#6b7585', textAlign: 'center' }}>
                   {locale === 'en' ? 'Dev OTP code: 123456' : 'کد توسعه (OTP): ۱۲۳۴۵۶'}
                 </p>
