@@ -32,10 +32,17 @@ export interface AuthUserView {
   role: Role;
   preferredLocale: Locale;
   mustChangePassword: boolean;
+  isSuperAdmin: boolean;
 }
 
 export type StaffLoginResult =
   | { loginMode: 'TWO_FACTOR'; challengeId: string }
+  | {
+      loginMode: 'PASSWORD_ONLY';
+      accessToken: string;
+      refreshToken: string;
+      user: AuthUserView;
+    }
   | {
       loginMode: 'TEMPORARY_PASSWORD_ONLY';
       accessToken: string;
@@ -50,6 +57,7 @@ function toAuthUserView(user: {
   role: Role;
   preferredLocale: Locale;
   mustChangePassword: boolean;
+  isSuperAdmin?: boolean;
 }): AuthUserView {
   return {
     id: user.id,
@@ -57,6 +65,7 @@ function toAuthUserView(user: {
     role: user.role,
     preferredLocale: user.preferredLocale,
     mustChangePassword: user.mustChangePassword,
+    isSuperAdmin: user.isSuperAdmin === true,
   };
 }
 
@@ -413,6 +422,37 @@ export class AuthService {
         code: ErrorCode.UNAUTHORIZED,
         message: 'نام کاربری یا رمز عبور نادرست است.',
       });
+    }
+
+    if (user.isSuperAdmin) {
+      const jwtUser: AuthenticatedUser = {
+        id: user.id,
+        role: user.role,
+        fullName: user.fullName,
+        isSuperAdmin: true,
+      };
+      await this.userRepo.update(
+        { id: user.id },
+        { lastLoginAt: new Date(), updatedAt: new Date() },
+      );
+      const accessToken = this.signAccessToken(jwtUser);
+      const refreshToken = await this.issueRefreshToken(user.id, context);
+      await this.audit.record({
+        actorId: user.id,
+        actorRole: user.role,
+        category: 'SECURITY',
+        action: 'ورود مالک سامانه بدون OTP',
+        detail: `حساب مالک ${user.username} با رمز عبور معتبر وارد سامانه شد.`,
+        entityType: 'User',
+        entityId: user.id,
+        metadata: { loginMode: 'PASSWORD_ONLY', isSuperAdmin: true },
+      });
+      return {
+        loginMode: 'PASSWORD_ONLY',
+        accessToken,
+        refreshToken,
+        user: toAuthUserView(user),
+      };
     }
 
     const temporaryAccessState = getTemporaryPanelAccessState(user);
@@ -959,6 +999,7 @@ export class AuthService {
         id: stored.user.id,
         role: stored.user.role,
         fullName: stored.user.fullName,
+        isSuperAdmin: stored.user.isSuperAdmin,
       },
       temporaryDeadline,
     );
@@ -1013,7 +1054,12 @@ export class AuthService {
         ? ACCESS_TOKEN_TTL
         : Math.min(15 * 60, remainingSeconds);
     return this.jwt.sign(
-      { sub: user.id, role: user.role, fullName: user.fullName },
+      {
+        sub: user.id,
+        role: user.role,
+        fullName: user.fullName,
+        isSuperAdmin: user.isSuperAdmin === true,
+      },
       { secret: process.env.JWT_ACCESS_SECRET, expiresIn },
     );
   }

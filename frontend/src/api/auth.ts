@@ -14,6 +14,11 @@ function normalizeOtpCode(code: string) {
 export type StaffLoginResult =
   | { loginMode: 'TWO_FACTOR'; challengeId: string }
   | {
+      loginMode: 'PASSWORD_ONLY';
+      accessToken: string;
+      user: AuthUser;
+    }
+  | {
       loginMode: 'TEMPORARY_PASSWORD_ONLY';
       accessToken: string;
       user: AuthUser;
@@ -25,7 +30,10 @@ export async function staffLogin(username: string, password: string) {
     username,
     password,
   });
-  if (result.loginMode === 'TEMPORARY_PASSWORD_ONLY') {
+  if (
+    result.loginMode === 'TEMPORARY_PASSWORD_ONLY' ||
+    result.loginMode === 'PASSWORD_ONLY'
+  ) {
     setAccessToken(result.accessToken);
   }
   return result;

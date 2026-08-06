@@ -39,7 +39,7 @@ export class PanelsController {
   @Roles('CEO', 'SENIOR_MANAGER', 'IT_MANAGER')
   @ApiOperation({ summary: 'Sibling panels this role may enable/disable' })
   async getAccess(@CurrentUser() user: AuthenticatedUser) {
-    return { success: true, data: await this.panels.getAccessFlags(user.role) };
+    return { success: true, data: await this.panels.getAccessFlags(user) };
   }
 
   @Patch('access/:panelKey')

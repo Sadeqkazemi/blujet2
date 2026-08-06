@@ -64,6 +64,60 @@ describe('Auth (e2e)', () => {
     expect(res.body.data.accessToken).toBeUndefined();
   });
 
+  it('owner super-admin uses password-only login, must replace the bootstrap password, then reaches an IT-only panel', async () => {
+    const userRepo = dataSource.getRepository(User);
+    const owner = await userRepo.findOneByOrFail({ username: 'site.admin' });
+    const originalHash = owner.passwordHash;
+    const agent = request.agent(app.getHttpServer());
+
+    await userRepo.update(
+      { id: owner.id },
+      { isSuperAdmin: true, mustChangePassword: true },
+    );
+
+    try {
+      const login = await agent
+        .post('/auth/staff/login')
+        .send({ username: 'site.admin', password: 'Blujet@1404' });
+
+      expect(login.status).toBe(200);
+      expect(login.body.data.loginMode).toBe('PASSWORD_ONLY');
+      expect(login.body.data.challengeId).toBeUndefined();
+      expect(login.body.data.user.isSuperAdmin).toBe(true);
+      expect(login.body.data.user.mustChangePassword).toBe(true);
+      expect(login.body.data.accessToken).toBeDefined();
+
+      const blocked = await agent
+        .get('/it/security/policy')
+        .set('Authorization', `Bearer ${login.body.data.accessToken}`);
+      expect(blocked.status).toBe(403);
+      expect(blocked.body.error.code).toBe('PASSWORD_CHANGE_REQUIRED');
+
+      const changed = await agent
+        .post('/auth/change-password')
+        .set('Authorization', `Bearer ${login.body.data.accessToken}`)
+        .send({
+          currentPassword: 'Blujet@1404',
+          newPassword: 'OwnerChanged!1405',
+        });
+      expect(changed.status).toBe(200);
+
+      const elevated = await agent
+        .get('/it/security/policy')
+        .set('Authorization', `Bearer ${login.body.data.accessToken}`);
+      expect(elevated.status).toBe(200);
+    } finally {
+      await userRepo.update(
+        { id: owner.id },
+        {
+          passwordHash: originalHash,
+          isSuperAdmin: false,
+          mustChangePassword: false,
+        },
+      );
+    }
+  });
+
   it('allows only an unexpired reserved UAT account to bypass OTP and caps/revokes its session at expiry', async () => {
     const userRepo = dataSource.getRepository(User);
     const now = new Date();

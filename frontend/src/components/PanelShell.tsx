@@ -99,9 +99,10 @@ export default function PanelShell() {
 
   const visibleNav = useMemo(() => {
     if (nav === null) return null;
+    if (user?.isSuperAdmin) return nav;
     if (user?.role !== 'SITE_ADMIN') return nav;
     return nav.filter((item) => !SITE_ADMIN_SIDEBAR_DENYLIST.has(item.key));
-  }, [nav, user?.role]);
+  }, [nav, user?.role, user?.isSuperAdmin]);
 
   const navKeys = useMemo(
     () => new Set(visibleNav?.map((item) => item.key) ?? []),
@@ -332,7 +333,11 @@ export default function PanelShell() {
     navigate('/login', { replace: true });
   }
 
-  const roleLabel = user ? (ROLE_LABELS[user.role] ?? user.role) : '';
+  const roleLabel = user?.isSuperAdmin
+    ? 'سوپر ادمین'
+    : user
+      ? (ROLE_LABELS[user.role] ?? user.role)
+      : '';
   const brandSub =
     (user?.role ? ROLE_BRAND_SUB[user.role] : undefined) ?? 'پنل مدیریت';
 

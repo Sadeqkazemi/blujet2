@@ -49,6 +49,9 @@ export class User {
   @Column({ type: 'boolean', default: false })
   twoFactorEnabled!: boolean;
 
+  @Column({ type: 'boolean', default: false })
+  isSuperAdmin!: boolean;
+
   @Column({ type: 'text', nullable: true })
   twoFactorSecret!: string | null;
 

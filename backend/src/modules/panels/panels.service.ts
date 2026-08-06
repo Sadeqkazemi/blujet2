@@ -34,6 +34,15 @@ export class PanelsService {
   ) {}
 
   async getNav(user: AuthenticatedUser): Promise<PanelNavItem[]> {
+    if (user.isSuperAdmin) {
+      const byKey = new Map<string, PanelNavItem>();
+      for (const roleItems of Object.values(PANEL_NAV)) {
+        for (const item of roleItems ?? []) {
+          if (!byKey.has(item.key)) byKey.set(item.key, item);
+        }
+      }
+      return [...byKey.values()];
+    }
     if (user.role !== 'EMPLOYEE') {
       const items = PANEL_NAV[user.role] ?? [];
       if (user.role === 'SITE_ADMIN') {
@@ -150,13 +159,14 @@ export class PanelsService {
     };
   }
 
-  async getAccessFlags(role: AuthenticatedUser['role']) {
+  async getAccessFlags(actor: AuthenticatedUser) {
     // Phase 12: IT_MANAGER has no toggle rights but reads the full flag set
     // for its informational tab; the PATCH route never allows it to write.
-    const togglable =
-      role === 'IT_MANAGER'
+    const togglable = actor.isSuperAdmin
+      ? ALL_PANEL_KEYS
+      : actor.role === 'IT_MANAGER'
         ? (PANEL_ACCESS_TOGGLE_RIGHTS.SENIOR_MANAGER ?? [])
-        : (PANEL_ACCESS_TOGGLE_RIGHTS[role] ?? []);
+        : (PANEL_ACCESS_TOGGLE_RIGHTS[actor.role] ?? []);
     const rows = await this.panelAccessFlagRepo.find({
       where: { panelKey: In(togglable) },
     });
@@ -174,7 +184,9 @@ export class PanelsService {
     panelKey: string,
     enabled: boolean,
   ) {
-    const allowed = PANEL_ACCESS_TOGGLE_RIGHTS[actor.role] ?? [];
+    const allowed = actor.isSuperAdmin
+      ? ALL_PANEL_KEYS
+      : (PANEL_ACCESS_TOGGLE_RIGHTS[actor.role] ?? []);
     if (!allowed.includes(panelKey) || !ALL_PANEL_KEYS.includes(panelKey)) {
       throw new ForbiddenException({
         code: ErrorCode.FORBIDDEN,

@@ -20,6 +20,7 @@ function renderLoginJourney() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/panel" element={<div>temporary panel reached</div>} />
+        <Route path="/required-password-change" element={<div>password change reached</div>} />
         <Route path="/two-factor" element={<div>two factor reached</div>} />
       </Routes>
     </MemoryRouter>,
@@ -68,7 +69,7 @@ describe('LoginPage', () => {
 
     await continueWithUsername('uat.it');
     await userEvent.type(screen.getByLabelText('رمز عبور'), 'Strong!Password7');
-    await userEvent.click(screen.getByRole('button', { name: 'ارسال کد یک‌بارمصرف' }));
+    await userEvent.click(screen.getByRole('button', { name: 'ورود و ادامه' }));
 
     expect(await screen.findByText('temporary panel reached')).toBeInTheDocument();
   });
@@ -86,9 +87,36 @@ describe('LoginPage', () => {
 
     await continueWithUsername('finance');
     await userEvent.type(screen.getByLabelText('رمز عبور'), 'Strong!Password7');
-    await userEvent.click(screen.getByRole('button', { name: 'ارسال کد یک‌بارمصرف' }));
+    await userEvent.click(screen.getByRole('button', { name: 'ورود و ادامه' }));
 
     expect(await screen.findByText('two factor reached')).toBeInTheDocument();
+  });
+
+  it('sends a first-login super admin directly to required password change without OTP', async () => {
+    const requestLogin = vi.fn().mockResolvedValue({
+      loginMode: 'PASSWORD_ONLY' as const,
+      accessToken: 'owner-access-token',
+      user: {
+        id: 'owner-1',
+        fullName: 'مالک سامانه',
+        role: 'SITE_ADMIN' as const,
+        preferredLocale: 'FA' as const,
+        mustChangePassword: true,
+        isSuperAdmin: true,
+      },
+    });
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      ...baseAuth,
+      requestLogin,
+    });
+    renderLoginJourney();
+
+    await continueWithUsername('superadmin');
+    await userEvent.type(screen.getByLabelText('رمز عبور'), 'OneTime!Password7');
+    await userEvent.click(screen.getByRole('button', { name: 'ورود و ادامه' }));
+
+    expect(await screen.findByText('password change reached')).toBeInTheDocument();
+    expect(screen.queryByText('two factor reached')).not.toBeInTheDocument();
   });
 
   it('renders RTL with Persian labels', () => {
@@ -139,7 +167,7 @@ describe('LoginPage', () => {
 
     await continueWithUsername('finance');
     await userEvent.type(screen.getByLabelText('رمز عبور'), 'wrong-password');
-    await userEvent.click(screen.getByRole('button', { name: 'ارسال کد یک‌بارمصرف' }));
+    await userEvent.click(screen.getByRole('button', { name: 'ورود و ادامه' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('نام کاربری یا رمز عبور نادرست است.');
   });

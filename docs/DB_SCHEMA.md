@@ -2518,3 +2518,18 @@ cryptographically secure RNG. The owner-approved format rotation changes no
 schema: it atomically replaces the seven existing Argon2 `passwordHash` values,
 preserves each `temporaryPasswordOnlyUntil`, records security audit rows, and
 revokes every active refresh token for those accounts.
+
+## Owner super-admin access (2026-08-06)
+
+`User.isSuperAdmin boolean NOT NULL DEFAULT false` identifies the single
+owner-controlled break-glass management account. It is deliberately separate
+from the `Role` enum: the persisted role remains `SITE_ADMIN`, while server
+guards use this flag to grant management-role endpoints only. `USER` and
+`AGENCY` owner-scoped resources are excluded from elevation.
+
+The production bootstrap enforces at most one active `isSuperAdmin` row in its
+transaction, normalizes the Iranian mobile into the existing unique `phone`
+column, stores only an Argon2 password hash, sets `mustChangePassword=true`,
+clears `temporaryPasswordOnlyUntil`, revokes prior refresh sessions on
+rotation, and records an `AuditLog(category=SECURITY)` row without password
+material.

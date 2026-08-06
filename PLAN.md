@@ -1704,3 +1704,9 @@ See `CLAUDE.md` → Commands. `docker compose up -d` starts Postgres+Redis;
 - `cd frontend && npm run test:e2e` — Playwright, needs both dev servers
   running (`backend: npm run start:dev` on :3000, `frontend: npm run dev`
   on :5173).
+
+- [ ] **Owner super-admin first login (2026-08-06)** — owner-only
+  password login without OTP, forced password replacement on first session,
+  management-role guard elevation (never USER/AGENCY), all-management-panel
+  navigation, production-only audited bootstrap, migration and regression
+  tests. Awaiting implementation and owner review before merge.

@@ -20,4 +20,5 @@ export interface AuthUser {
   role: Role;
   preferredLocale: Locale;
   mustChangePassword: boolean;
+  isSuperAdmin?: boolean;
 }

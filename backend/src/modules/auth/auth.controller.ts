@@ -100,6 +100,11 @@ export class AuthController {
     if (result.loginMode === 'TWO_FACTOR') {
       return { success: true, data: result };
     }
+    if (result.loginMode === 'PASSWORD_ONLY') {
+      const { refreshToken, ...publicResult } = result;
+      setRefreshCookie(res, refreshToken);
+      return { success: true, data: publicResult };
+    }
     const { refreshToken, temporaryAccessExpiresAt, ...publicResult } = result;
     setRefreshCookie(res, refreshToken, new Date(temporaryAccessExpiresAt));
     return {

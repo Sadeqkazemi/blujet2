@@ -99,8 +99,16 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       const result = await requestLogin(username.trim(), password);
-      if (result.loginMode === 'TEMPORARY_PASSWORD_ONLY') {
-        navigate('/panel', { replace: true });
+      if (
+        result.loginMode === 'TEMPORARY_PASSWORD_ONLY' ||
+        result.loginMode === 'PASSWORD_ONLY'
+      ) {
+        navigate(
+          result.user.mustChangePassword
+            ? '/required-password-change'
+            : '/panel',
+          { replace: true },
+        );
       } else {
         navigate('/two-factor', { state: { challengeId: result.challengeId } });
       }
@@ -213,7 +221,7 @@ export default function LoginPage() {
             {error && <div className="mb-4"><ErrorMessage>{error}</ErrorMessage></div>}
 
             <button type="submit" disabled={submitting} className="flex h-12 w-full items-center justify-center gap-[9px] rounded-xl bg-gradient-to-br from-accent to-navy-2 text-[13.5px] font-extrabold text-white shadow-[0_14px_28px_-10px_rgba(37,99,235,.55)] transition hover:brightness-110 disabled:opacity-60">
-              {submitting ? 'در حال بررسی…' : 'ارسال کد یک‌بارمصرف'}
+              {submitting ? 'در حال بررسی…' : 'ورود و ادامه'}
               {!submitting && <ArrowLeftIcon />}
             </button>
           </form>

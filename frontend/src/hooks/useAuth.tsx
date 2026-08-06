@@ -52,7 +52,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const requestLogin = useCallback(async (username: string, password: string) => {
     const result = await authApi.staffLogin(username, password);
-    if (result.loginMode === 'TEMPORARY_PASSWORD_ONLY') {
+    if (
+      result.loginMode === 'TEMPORARY_PASSWORD_ONLY' ||
+      result.loginMode === 'PASSWORD_ONLY'
+    ) {
       setUser(result.user);
       setStatus('authenticated');
     }

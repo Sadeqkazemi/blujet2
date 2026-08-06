@@ -3094,3 +3094,26 @@ Temporary UAT credentials use a 16-character, letters-and-digits-only format.
 The owner-approved one-time format migration is an offline operation (there is
 no password-rotation HTTP endpoint), preserves the existing access deadline,
 and revokes active refresh sessions after replacing the Argon2 hashes.
+
+## Owner super-admin password-only access (2026-08-06)
+
+One production owner account may be marked `isSuperAdmin=true`. It keeps the
+database role `SITE_ADMIN`, but `RolesGuard` grants it every **management
+staff** role protected endpoint. This elevation never grants `USER` or
+`AGENCY` tenant/owner endpoints. `PanelAccessGuard` also permits the owner to
+recover a disabled management panel. Every elevated login is audited.
+
+`POST /auth/staff/login` returns
+`{ loginMode: "PASSWORD_ONLY", accessToken, user }` for this account after a
+valid Argon2 password and sets the normal refresh cookie directly; no OTP
+challenge is created. The first session has `mustChangePassword=true`, so all
+routes except `/auth/me`, `/auth/change-password`, and logout remain blocked
+until the owner replaces the one-time bootstrap password. The new password is
+stored only as an Argon2 hash.
+
+Creation/rotation has no public HTTP endpoint. The production-only offline
+command `npm run accounts:bootstrap:super-admin:prod -- --execute` requires
+`SUPER_ADMIN_BOOTSTRAP_CONFIRM=CREATE_OR_ROTATE_OWNER_SUPER_ADMIN`,
+`SUPER_ADMIN_PHONE`, and optionally `SUPER_ADMIN_USERNAME` (default
+`superadmin`). It refuses to convert an unrelated existing identity and emits
+the generated one-time password once after the transaction commits.
