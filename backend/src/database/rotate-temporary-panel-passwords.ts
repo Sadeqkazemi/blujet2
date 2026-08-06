@@ -6,22 +6,27 @@ import { AuditLog } from './entities/audit-log.entity';
 import { RefreshToken } from './entities/refresh-token.entity';
 import { User } from './entities/user.entity';
 import { dataSourceOptions } from './data-source.options';
+import { resolveUatSharedPassword } from '../common/uat-shared-password';
 import {
   TEMPORARY_PANEL_ACCOUNTS,
-  generateTemporaryPanelPassword,
+  TEMPORARY_PHONE_LOGIN_ACCOUNTS,
   getTemporaryPanelAccessState,
 } from './temporary-panel-accounts';
 
-const CONFIRMATION = 'ROTATE_TEMPORARY_PANEL_PASSWORDS_ALPHANUMERIC_V1';
+const CONFIRMATION = 'ROTATE_TEMPORARY_PANEL_PASSWORDS_SHARED_V1';
 
 async function main(): Promise<void> {
+  const allAccounts: ReadonlyArray<{ username: string; role: string }> = [
+    ...TEMPORARY_PANEL_ACCOUNTS,
+    ...TEMPORARY_PHONE_LOGIN_ACCOUNTS,
+  ];
+
   if (!process.argv.includes('--execute')) {
     process.stdout.write(
       `${JSON.stringify(
         {
           mode: 'DRY_RUN',
-          passwordFormat: '16 ASCII letters or digits',
-          usernames: TEMPORARY_PANEL_ACCOUNTS.map(({ username }) => username),
+          usernames: allAccounts.map(({ username }) => username),
         },
         null,
         2,
@@ -37,11 +42,8 @@ async function main(): Promise<void> {
       `Rotation refused: TEMP_PANEL_ROTATE_CONFIRM must equal ${CONFIRMATION}.`,
     );
   }
+  const sharedPassword = resolveUatSharedPassword();
 
-  const credentials = TEMPORARY_PANEL_ACCOUNTS.map((account) => ({
-    ...account,
-    password: generateTemporaryPanelPassword(),
-  }));
   const dataSource = new DataSource(dataSourceOptions);
   await dataSource.initialize();
 
@@ -49,13 +51,15 @@ async function main(): Promise<void> {
     const result = await dataSource.transaction(async (manager) => {
       const userRepository = manager.getRepository(User);
       const users = await userRepository.find({
-        where: {
-          username: In(credentials.map(({ username }) => username)),
-        },
+        where: { username: In(allAccounts.map(({ username }) => username)) },
       });
-      if (users.length !== credentials.length) {
+      if (users.length !== allAccounts.length) {
+        const found = new Set(users.map((u) => u.username));
+        const missing = allAccounts
+          .map(({ username }) => username)
+          .filter((username) => !found.has(username));
         throw new Error(
-          `Rotation refused: expected ${credentials.length} temporary accounts but found ${users.length}.`,
+          `Rotation refused: missing temporary accounts (${missing.join(', ')}). Run bootstrap first.`,
         );
       }
 
@@ -63,18 +67,18 @@ async function main(): Promise<void> {
       const usersByUsername = new Map(
         users.map((user) => [user.username, user] as const),
       );
-      for (const credential of credentials) {
-        const user = usersByUsername.get(credential.username);
+      for (const account of allAccounts) {
+        const user = usersByUsername.get(account.username);
         if (
           !user ||
-          user.role !== credential.role ||
+          user.role !== account.role ||
           !user.isActive ||
           user.deletedAt !== null ||
           user.passwordHash === null ||
           getTemporaryPanelAccessState(user, now) !== 'ACTIVE'
         ) {
           throw new Error(
-            `Rotation refused: ${credential.username} is not an active, unexpired temporary ${credential.role} account.`,
+            `Rotation refused: ${account.username} is not an active, unexpired temporary ${account.role} account.`,
           );
         }
       }
@@ -88,9 +92,10 @@ async function main(): Promise<void> {
         );
       }
 
-      for (const credential of credentials) {
-        const user = usersByUsername.get(credential.username)!;
-        user.passwordHash = await argon2.hash(credential.password);
+      const passwordHash = await argon2.hash(sharedPassword);
+      for (const account of allAccounts) {
+        const user = usersByUsername.get(account.username)!;
+        user.passwordHash = passwordHash;
         user.updatedAt = now;
         await userRepository.save(user);
         await manager.getRepository(AuditLog).save(
@@ -99,11 +104,11 @@ async function main(): Promise<void> {
             actorRole: user.role,
             category: 'SECURITY',
             action: 'Temporary panel password rotated',
-            detail: `Password format migrated for ${user.username}; expiry was preserved.`,
+            detail: `Shared UAT password rotated for ${user.username}; expiry was preserved.`,
             entityType: 'User',
             entityId: user.id,
             metadata: {
-              source: 'temporary-panel-password-format-v1-rotation',
+              source: 'temporary-panel-shared-password-rotation',
               expiresAt: user.temporaryPasswordOnlyUntil!.toISOString(),
             },
             requestId: null,
@@ -111,6 +116,8 @@ async function main(): Promise<void> {
         );
       }
 
+      // Every previously-issued session/refresh token for these accounts is
+      // invalidated the instant the shared password changes.
       await manager.getRepository(RefreshToken).update(
         {
           userId: In(users.map(({ id }) => id)),
@@ -122,6 +129,11 @@ async function main(): Promise<void> {
       return {
         rotatedAt: now.toISOString(),
         expiresAt: users[0].temporaryPasswordOnlyUntil!.toISOString(),
+        accounts: allAccounts.map(({ username, role }) => ({
+          username,
+          role,
+          status: 'rotated' as const,
+        })),
       };
     });
 
@@ -130,14 +142,6 @@ async function main(): Promise<void> {
         {
           ...result,
           loginPath: '/login',
-          accounts: credentials.map(
-            ({ username, role, fullName, password }) => ({
-              username,
-              role,
-              fullName,
-              password,
-            }),
-          ),
         },
         null,
         2,

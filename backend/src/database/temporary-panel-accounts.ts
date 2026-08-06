@@ -7,6 +7,8 @@ export const TEMPORARY_PANEL_PASSWORD_LENGTH = 16;
 const TEMPORARY_PANEL_PASSWORD_ALPHABET =
   'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
+/** Username-login temporary accounts — every role that authenticates via
+ * `/auth/staff/login` (username + password). */
 export const TEMPORARY_PANEL_ACCOUNTS = [
   { username: 'uat.siteadmin', role: 'SITE_ADMIN', fullName: 'UAT Site Admin' },
   { username: 'uat.it', role: 'IT_MANAGER', fullName: 'UAT IT Manager' },
@@ -31,15 +33,52 @@ export const TEMPORARY_PANEL_ACCOUNTS = [
     role: 'BOARD_CHAIR',
     fullName: 'UAT Board Chair',
   },
+  {
+    username: 'uat.employee',
+    role: 'EMPLOYEE',
+    fullName: 'UAT Employee',
+    // A real catalog dept so panel nav/permission-scoping code paths behave
+    // exactly like a real employee account instead of hitting a null-dept
+    // edge case that only a synthetic UAT row could ever produce.
+    dept: 'commercial',
+  },
 ] as const satisfies ReadonlyArray<{
   username: string;
   role: Role;
   fullName: string;
+  dept?: string;
 }>;
 
-const temporaryUsernames = new Set<string>(
-  TEMPORARY_PANEL_ACCOUNTS.map(({ username }) => username),
-);
+/** Phone-login temporary accounts — AGENCY (`/auth/agency/login`) and USER
+ * (`/auth/customer/login-password`) authenticate by phone, not username;
+ * `username` is kept only for audit/display and UAT-purge-policy matching.
+ * The `09000000xxx` block is a reserved, obviously-synthetic range, but
+ * bootstrap still refuses if either number is already a real account's
+ * phone — see `bootstrap-temporary-panel-accounts.ts`. */
+export const TEMPORARY_PHONE_LOGIN_ACCOUNTS = [
+  {
+    username: 'uat.agency',
+    role: 'AGENCY',
+    fullName: 'UAT Agency',
+    phone: '09000000001',
+  },
+  {
+    username: 'uat.customer',
+    role: 'USER',
+    fullName: 'UAT Customer',
+    phone: '09000000002',
+  },
+] as const satisfies ReadonlyArray<{
+  username: string;
+  role: Role;
+  fullName: string;
+  phone: string;
+}>;
+
+const temporaryUsernames = new Set<string>([
+  ...TEMPORARY_PANEL_ACCOUNTS.map(({ username }) => username),
+  ...TEMPORARY_PHONE_LOGIN_ACCOUNTS.map(({ username }) => username),
+]);
 
 export function isTemporaryPanelUsername(username: string | null): boolean {
   return username !== null && temporaryUsernames.has(username.toLowerCase());
@@ -77,6 +116,11 @@ export function createTemporaryPanelExpiry(now = new Date()): Date {
   return new Date(now.getTime() + TEMPORARY_PANEL_ACCESS_MAX_MS);
 }
 
+/** Still used by `bootstrap-owner-super-admin.ts` for the real owner
+ * account's one-time password — that script is out of scope for the UAT
+ * shared-password feature and keeps generating its own random value. Not
+ * used by the temporary-panel bootstrap/rotation scripts anymore; those now
+ * read one shared password from `UAT_PANEL_SHARED_PASSWORD` instead. */
 export function generateTemporaryPanelPassword(): string {
   return Array.from(
     { length: TEMPORARY_PANEL_PASSWORD_LENGTH },

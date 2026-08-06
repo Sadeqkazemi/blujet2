@@ -5,14 +5,21 @@ import { AuditLog } from './entities/audit-log.entity';
 import { RefreshToken } from './entities/refresh-token.entity';
 import { User } from './entities/user.entity';
 import { dataSourceOptions } from './data-source.options';
-import { TEMPORARY_PANEL_ACCOUNTS } from './temporary-panel-accounts';
+import {
+  TEMPORARY_PANEL_ACCOUNTS,
+  TEMPORARY_PHONE_LOGIN_ACCOUNTS,
+} from './temporary-panel-accounts';
 
 const CONFIRMATION = 'DISABLE_TEMPORARY_PANEL_TEST_ACCOUNTS';
+const ALL_TEMPORARY_USERNAMES = [
+  ...TEMPORARY_PANEL_ACCOUNTS,
+  ...TEMPORARY_PHONE_LOGIN_ACCOUNTS,
+].map(({ username }) => username);
 
 async function main(): Promise<void> {
   if (!process.argv.includes('--execute')) {
     process.stdout.write(
-      `${JSON.stringify({ mode: 'DRY_RUN', usernames: TEMPORARY_PANEL_ACCOUNTS.map(({ username }) => username) }, null, 2)}\n`,
+      `${JSON.stringify({ mode: 'DRY_RUN', usernames: ALL_TEMPORARY_USERNAMES }, null, 2)}\n`,
     );
     return;
   }
@@ -31,11 +38,7 @@ async function main(): Promise<void> {
     const disabled = await dataSource.transaction(async (manager) => {
       const userRepository = manager.getRepository(User);
       const users = await userRepository.find({
-        where: {
-          username: In(
-            TEMPORARY_PANEL_ACCOUNTS.map(({ username }) => username),
-          ),
-        },
+        where: { username: In(ALL_TEMPORARY_USERNAMES) },
       });
       if (users.length === 0) return 0;
 

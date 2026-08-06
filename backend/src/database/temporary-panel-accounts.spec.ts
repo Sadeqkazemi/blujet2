@@ -1,5 +1,6 @@
 import {
   TEMPORARY_PANEL_ACCOUNTS,
+  TEMPORARY_PHONE_LOGIN_ACCOUNTS,
   isTemporaryPanelUsername,
   TEMPORARY_PANEL_ACCESS_MAX_MS,
   createTemporaryPanelExpiry,
@@ -15,7 +16,12 @@ describe('temporary panel accounts', () => {
     expect(isTemporaryPanelUsername(null)).toBe(false);
   });
 
-  it('defines exactly one reserved account for every management panel role', () => {
+  it('also identifies the phone-login temporary accounts (agency, customer)', () => {
+    expect(isTemporaryPanelUsername('uat.agency')).toBe(true);
+    expect(isTemporaryPanelUsername('UAT.CUSTOMER')).toBe(true);
+  });
+
+  it('defines exactly one reserved username-login account for every staff/manager role', () => {
     expect(TEMPORARY_PANEL_ACCOUNTS.map(({ role }) => role).sort()).toEqual(
       [
         'SITE_ADMIN',
@@ -25,6 +31,7 @@ describe('temporary panel accounts', () => {
         'SENIOR_MANAGER',
         'CEO',
         'BOARD_CHAIR',
+        'EMPLOYEE',
       ].sort(),
     );
     expect(
@@ -33,6 +40,20 @@ describe('temporary panel accounts', () => {
     expect(
       TEMPORARY_PANEL_ACCOUNTS.every(({ username }) =>
         username.startsWith('uat.'),
+      ),
+    ).toBe(true);
+  });
+
+  it('defines exactly one reserved phone-login account for AGENCY and USER', () => {
+    expect(
+      TEMPORARY_PHONE_LOGIN_ACCOUNTS.map(({ role }) => role).sort(),
+    ).toEqual(['AGENCY', 'USER'].sort());
+    expect(
+      new Set(TEMPORARY_PHONE_LOGIN_ACCOUNTS.map(({ phone }) => phone)).size,
+    ).toBe(TEMPORARY_PHONE_LOGIN_ACCOUNTS.length);
+    expect(
+      TEMPORARY_PHONE_LOGIN_ACCOUNTS.every(({ phone }) =>
+        /^09\d{9}$/.test(phone),
       ),
     ).toBe(true);
   });

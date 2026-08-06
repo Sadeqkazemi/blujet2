@@ -2,6 +2,7 @@ import {
   isUatAccessAccount,
   operationalTables,
   UAT_PRESERVED_TABLES,
+  UAT_ROW_FILTERED_TABLES,
 } from './uat-demo-data-purge-policy';
 
 describe('UAT demo data purge policy', () => {
@@ -25,6 +26,7 @@ describe('UAT demo data purge policy', () => {
       'club_card_requests',
       'wallet_entries',
       'agency_profiles',
+      'agency_credit_lines',
       'airports',
       'permissions',
       'system_settings',
@@ -32,7 +34,6 @@ describe('UAT demo data purge policy', () => {
     ]);
 
     expect(result).toEqual([
-      'agency_profiles',
       'bookings',
       'club_card_requests',
       'club_members',
@@ -44,5 +45,16 @@ describe('UAT demo data purge policy', () => {
     ]);
     expect(UAT_PRESERVED_TABLES.has('airports')).toBe(true);
     expect(UAT_PRESERVED_TABLES.has('bookings')).toBe(false);
+  });
+
+  it('excludes agency_profiles/agency_credit_lines from blanket purge — a UAT temp agency needs its own profile row to survive', () => {
+    expect(UAT_ROW_FILTERED_TABLES.map(({ table }) => table).sort()).toEqual([
+      'agency_credit_lines',
+      'agency_profiles',
+    ]);
+    // Child (agency_credit_lines, FK -> agency_profiles) must be listed
+    // before its parent so the purge script deletes in FK-safe order.
+    expect(UAT_ROW_FILTERED_TABLES[0].table).toBe('agency_credit_lines');
+    expect(UAT_ROW_FILTERED_TABLES[1].table).toBe('agency_profiles');
   });
 });

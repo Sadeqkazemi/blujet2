@@ -392,6 +392,49 @@ export class AuthService {
       });
     }
 
+    // UAT shared-password temp customer account — same deadline-scoped
+    // token treatment as staffLogin/agencyLogin's temp accounts. Only ever
+    // set by the UAT bootstrap script, so real customers never hit this.
+    const temporaryAccessState = getTemporaryPanelAccessState(user);
+    if (temporaryAccessState !== 'NONE') {
+      if (temporaryAccessState !== 'ACTIVE') {
+        throw new ForbiddenException({
+          code: ErrorCode.TEMPORARY_ACCESS_EXPIRED,
+          message: 'مهلت دسترسی آزمایشی این حساب به پایان رسیده است.',
+        });
+      }
+      const deadline = user.temporaryPasswordOnlyUntil!;
+      await this.userRepo.update(
+        { id: user.id },
+        { lastLoginAt: new Date(), updatedAt: new Date() },
+      );
+      const jwtUser: AuthenticatedUser = {
+        id: user.id,
+        role: user.role,
+        fullName: user.fullName,
+      };
+      const accessToken = this.signAccessToken(jwtUser, deadline);
+      const refreshToken = await this.issueRefreshToken(
+        user.id,
+        context,
+        deadline,
+      );
+      await this.audit.record({
+        actorId: user.id,
+        actorRole: user.role,
+        category: 'SECURITY',
+        action: 'ورود آزمایشی موقت بدون OTP',
+        detail: `حساب UAT ${user.username} در بازه موقت تأییدشده وارد پنل کاربر شد.`,
+        entityType: 'User',
+        entityId: user.id,
+        metadata: {
+          loginMode: 'TEMPORARY_PASSWORD_ONLY',
+          expiresAt: deadline.toISOString(),
+        },
+      });
+      return { accessToken, refreshToken, user: toAuthUserView(user) };
+    }
+
     await this.userRepo.update(
       { id: user.id },
       { lastLoginAt: new Date(), updatedAt: new Date() },
@@ -705,7 +748,9 @@ export class AuthService {
     }
 
     const normalizedPhone = normalizeIranPhone(phone);
-    const phoneOwner = await this.userRepo.findOneBy({ phone: normalizedPhone });
+    const phoneOwner = await this.userRepo.findOneBy({
+      phone: normalizedPhone,
+    });
     if (phoneOwner && phoneOwner.id !== user.id) {
       throw new UnauthorizedException({
         code: ErrorCode.UNAUTHORIZED,
@@ -860,6 +905,50 @@ export class AuthService {
       });
     }
 
+    // UAT shared-password temp agency account: same bypass-2FA,
+    // deadline-scoped-token treatment staffLogin gives its temporary
+    // accounts above. `temporaryPasswordOnlyUntil` is only ever set by the
+    // UAT bootstrap script, so this branch never triggers for a real agency.
+    const temporaryAccessState = getTemporaryPanelAccessState(user);
+    if (temporaryAccessState !== 'NONE') {
+      if (temporaryAccessState !== 'ACTIVE') {
+        throw new ForbiddenException({
+          code: ErrorCode.TEMPORARY_ACCESS_EXPIRED,
+          message: 'مهلت دسترسی آزمایشی این حساب به پایان رسیده است.',
+        });
+      }
+      const deadline = user.temporaryPasswordOnlyUntil!;
+      await this.userRepo.update(
+        { id: user.id },
+        { lastLoginAt: new Date(), updatedAt: new Date() },
+      );
+      const jwtUser: AuthenticatedUser = {
+        id: user.id,
+        role: user.role,
+        fullName: user.fullName,
+      };
+      const accessToken = this.signAccessToken(jwtUser, deadline);
+      const refreshToken = await this.issueRefreshToken(
+        user.id,
+        context,
+        deadline,
+      );
+      await this.audit.record({
+        actorId: user.id,
+        actorRole: user.role,
+        category: 'SECURITY',
+        action: 'ورود آزمایشی موقت بدون OTP',
+        detail: `حساب UAT ${user.username} در بازه موقت تأییدشده وارد پنل آژانس شد.`,
+        entityType: 'User',
+        entityId: user.id,
+        metadata: {
+          loginMode: 'TEMPORARY_PASSWORD_ONLY',
+          expiresAt: deadline.toISOString(),
+        },
+      });
+      return { accessToken, refreshToken, user: toAuthUserView(user) };
+    }
+
     if (isSandboxAuthEnabled()) {
       await this.challengeRepo.update(
         { userId: user.id, purpose: 'AGENCY_LOGIN_2FA', consumedAt: IsNull() },
@@ -905,7 +994,9 @@ export class AuthService {
         message: 'فعال‌سازی آزمایشی آژانس در این محیط فعال نیست.',
       });
     }
-    const user = await this.userRepo.findOneBy({ phone: normalizeIranPhone(phone) });
+    const user = await this.userRepo.findOneBy({
+      phone: normalizeIranPhone(phone),
+    });
     if (
       !user ||
       user.role !== 'AGENCY' ||
@@ -917,11 +1008,19 @@ export class AuthService {
       });
     }
     if (!user.isActive) {
-      throw new ForbiddenException({ code: 'ACCOUNT_SUSPENDED', message: 'این حساب غیرفعال شده است.' });
+      throw new ForbiddenException({
+        code: 'ACCOUNT_SUSPENDED',
+        message: 'این حساب غیرفعال شده است.',
+      });
     }
-    const agencyProfile = await this.agencyProfileRepo.findOneBy({ userId: user.id });
+    const agencyProfile = await this.agencyProfileRepo.findOneBy({
+      userId: user.id,
+    });
     if (agencyProfile?.suspendedAt) {
-      throw new ForbiddenException({ code: 'ACCOUNT_SUSPENDED', message: 'حساب آژانس شما تعلیق شده است.' });
+      throw new ForbiddenException({
+        code: 'ACCOUNT_SUSPENDED',
+        message: 'حساب آژانس شما تعلیق شده است.',
+      });
     }
 
     await this.userRepo.update(
@@ -955,39 +1054,74 @@ export class AuthService {
     challengeId: string,
     code: string,
     context: { userAgent?: string; ip?: string },
-  ): Promise<{ accessToken: string; refreshToken: string; user: AuthUserView }> {
+  ): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    user: AuthUserView;
+  }> {
     const challenge = await this.challengeRepo.findOne({
       where: { id: challengeId },
       relations: { user: true },
     });
-    if (!challenge || challenge.purpose !== 'AGENCY_LOGIN_2FA' || challenge.user.role !== 'AGENCY') {
-      throw new UnauthorizedException({ code: 'TWO_FACTOR_INVALID', message: 'کد نامعتبر است.' });
+    if (
+      !challenge ||
+      challenge.purpose !== 'AGENCY_LOGIN_2FA' ||
+      challenge.user.role !== 'AGENCY'
+    ) {
+      throw new UnauthorizedException({
+        code: 'TWO_FACTOR_INVALID',
+        message: 'کد نامعتبر است.',
+      });
     }
     if (challenge.consumedAt || challenge.attempts >= TWO_FACTOR_MAX_ATTEMPTS) {
-      throw new UnauthorizedException({ code: 'TWO_FACTOR_INVALID', message: 'این کد قابل استفاده نیست.' });
+      throw new UnauthorizedException({
+        code: 'TWO_FACTOR_INVALID',
+        message: 'این کد قابل استفاده نیست.',
+      });
     }
     if (challenge.expiresAt < new Date()) {
-      throw new UnauthorizedException({ code: 'TWO_FACTOR_EXPIRED', message: 'کد منقضی شده است.' });
+      throw new UnauthorizedException({
+        code: 'TWO_FACTOR_EXPIRED',
+        message: 'کد منقضی شده است.',
+      });
     }
     if (!(await argon2.verify(challenge.codeHash, code))) {
       await this.challengeRepo.increment({ id: challenge.id }, 'attempts', 1);
-      throw new UnauthorizedException({ code: 'TWO_FACTOR_INVALID', message: 'کد واردشده نادرست است.' });
+      throw new UnauthorizedException({
+        code: 'TWO_FACTOR_INVALID',
+        message: 'کد واردشده نادرست است.',
+      });
     }
 
     const user = challenge.user;
     if (!user.isActive) {
-      throw new ForbiddenException({ code: 'ACCOUNT_SUSPENDED', message: 'این حساب غیرفعال شده است.' });
+      throw new ForbiddenException({
+        code: 'ACCOUNT_SUSPENDED',
+        message: 'این حساب غیرفعال شده است.',
+      });
     }
-    const agencyProfile = await this.agencyProfileRepo.findOneBy({ userId: user.id });
+    const agencyProfile = await this.agencyProfileRepo.findOneBy({
+      userId: user.id,
+    });
     if (agencyProfile?.suspendedAt) {
-      throw new ForbiddenException({ code: 'ACCOUNT_SUSPENDED', message: 'حساب آژانس شما تعلیق شده است.' });
+      throw new ForbiddenException({
+        code: 'ACCOUNT_SUSPENDED',
+        message: 'حساب آژانس شما تعلیق شده است.',
+      });
     }
-    await this.challengeRepo.update({ id: challenge.id }, { consumedAt: new Date() });
+    await this.challengeRepo.update(
+      { id: challenge.id },
+      { consumedAt: new Date() },
+    );
     await this.userRepo.update(
       { id: user.id },
       { lastLoginAt: new Date(), updatedAt: new Date() },
     );
-    const jwtUser: AuthenticatedUser = { id: user.id, role: user.role, fullName: user.fullName };
+    const jwtUser: AuthenticatedUser = {
+      id: user.id,
+      role: user.role,
+      fullName: user.fullName,
+    };
     return {
       accessToken: this.signAccessToken(jwtUser),
       refreshToken: await this.issueRefreshToken(user.id, context),

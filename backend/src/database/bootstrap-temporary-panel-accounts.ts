@@ -2,21 +2,48 @@ import 'dotenv/config';
 import 'reflect-metadata';
 import * as argon2 from 'argon2';
 import { DataSource, In } from 'typeorm';
+import { AgencyCreditLine } from './entities/agency-credit-line.entity';
+import { AgencyProfile } from './entities/agency-profile.entity';
 import { AuditLog } from './entities/audit-log.entity';
 import { User } from './entities/user.entity';
 import { dataSourceOptions } from './data-source.options';
+import { normalizeIranPhone } from '../common/normalize-iran-phone';
+import { resolveUatSharedPassword } from '../common/uat-shared-password';
 import {
   TEMPORARY_PANEL_ACCOUNTS,
+  TEMPORARY_PHONE_LOGIN_ACCOUNTS,
   createTemporaryPanelExpiry,
-  generateTemporaryPanelPassword,
 } from './temporary-panel-accounts';
 
 const CONFIRMATION = 'CREATE_7_DAY_PANEL_TEST_ACCOUNTS';
 
+interface BootstrapResult {
+  username: string;
+  role: string;
+  fullName: string;
+  status: 'created' | 'already_exists';
+}
+
 async function main(): Promise<void> {
+  const allAccounts = [
+    ...TEMPORARY_PANEL_ACCOUNTS,
+    ...TEMPORARY_PHONE_LOGIN_ACCOUNTS,
+  ];
+
   if (!process.argv.includes('--execute')) {
     process.stdout.write(
-      `${JSON.stringify({ mode: 'DRY_RUN', accounts: TEMPORARY_PANEL_ACCOUNTS }, null, 2)}\n`,
+      `${JSON.stringify(
+        {
+          mode: 'DRY_RUN',
+          accounts: allAccounts.map(({ username, role, fullName }) => ({
+            username,
+            role,
+            fullName,
+          })),
+        },
+        null,
+        2,
+      )}\n`,
     );
     return;
   }
@@ -28,42 +55,52 @@ async function main(): Promise<void> {
       `Bootstrap refused: TEMP_PANEL_BOOTSTRAP_CONFIRM must equal ${CONFIRMATION}.`,
     );
   }
+  // Never generated/echoed — resolved once, hashed per account below, never
+  // written to a log line, error message, or the stdout summary.
+  const sharedPassword = resolveUatSharedPassword();
 
   const createdAt = new Date();
   const expiresAt = createTemporaryPanelExpiry(createdAt);
-  const credentials = TEMPORARY_PANEL_ACCOUNTS.map((account) => ({
-    ...account,
-    password: generateTemporaryPanelPassword(),
-  }));
   const dataSource = new DataSource(dataSourceOptions);
   await dataSource.initialize();
 
   try {
-    await dataSource.transaction(async (manager) => {
+    const results = await dataSource.transaction(async (manager) => {
       const userRepository = manager.getRepository(User);
-      const existing = await userRepository.find({
+      const passwordHash = await argon2.hash(sharedPassword);
+      const out: BootstrapResult[] = [];
+
+      // Username-login accounts (SITE_ADMIN..BOARD_CHAIR, EMPLOYEE).
+      const existingUsernameAccounts = await userRepository.find({
         where: {
-          username: In(credentials.map(({ username }) => username)),
+          username: In(
+            TEMPORARY_PANEL_ACCOUNTS.map(({ username }) => username),
+          ),
         },
         select: { username: true },
       });
-      if (existing.length > 0) {
-        throw new Error(
-          `Bootstrap refused: temporary usernames already exist (${existing
-            .map(({ username }) => username)
-            .join(', ')}). Existing accounts were not changed.`,
-        );
-      }
+      const existingUsernames = new Set(
+        existingUsernameAccounts.map((u) => u.username),
+      );
 
-      for (const credential of credentials) {
+      for (const account of TEMPORARY_PANEL_ACCOUNTS) {
+        if (existingUsernames.has(account.username)) {
+          out.push({
+            username: account.username,
+            role: account.role,
+            fullName: account.fullName,
+            status: 'already_exists',
+          });
+          continue;
+        }
         const user = await userRepository.save(
           userRepository.create({
-            role: credential.role,
+            role: account.role,
             phone: null,
-            username: credential.username,
-            passwordHash: await argon2.hash(credential.password),
+            username: account.username,
+            passwordHash,
             email: null,
-            fullName: credential.fullName,
+            fullName: account.fullName,
             twoFactorEnabled: false,
             twoFactorSecret: null,
             temporaryPasswordOnlyUntil: expiresAt,
@@ -72,7 +109,7 @@ async function main(): Promise<void> {
             createdAt,
             updatedAt: createdAt,
             createdById: null,
-            dept: null,
+            dept: 'dept' in account ? account.dept : null,
             lastLoginAt: null,
             mustChangePassword: false,
             rank: null,
@@ -102,7 +139,121 @@ async function main(): Promise<void> {
             requestId: null,
           }),
         );
+        out.push({
+          username: account.username,
+          role: account.role,
+          fullName: account.fullName,
+          status: 'created',
+        });
       }
+
+      // Phone-login accounts (AGENCY, USER).
+      for (const account of TEMPORARY_PHONE_LOGIN_ACCOUNTS) {
+        const normalizedPhone = normalizeIranPhone(account.phone);
+        const existingByUsername = await userRepository.findOneBy({
+          username: account.username,
+        });
+        if (existingByUsername) {
+          out.push({
+            username: account.username,
+            role: account.role,
+            fullName: account.fullName,
+            status: 'already_exists',
+          });
+          continue;
+        }
+        const phoneOwner = await userRepository.findOneBy({
+          phone: normalizedPhone,
+        });
+        if (phoneOwner) {
+          throw new Error(
+            `Bootstrap refused: reserved UAT phone ${account.phone} is already assigned to another account.`,
+          );
+        }
+
+        const user = await userRepository.save(
+          userRepository.create({
+            role: account.role,
+            phone: normalizedPhone,
+            username: account.username,
+            passwordHash,
+            email: null,
+            fullName: account.fullName,
+            twoFactorEnabled: false,
+            twoFactorSecret: null,
+            temporaryPasswordOnlyUntil: expiresAt,
+            isActive: true,
+            deletedAt: null,
+            createdAt,
+            updatedAt: createdAt,
+            createdById: null,
+            dept: null,
+            lastLoginAt: null,
+            mustChangePassword: false,
+            rank: null,
+            referralScope: null,
+            nationalIdEnc: null,
+            nationalIdHash: null,
+            passportNoEnc: null,
+            birthDate: null,
+            emailVerifiedAt: null,
+            preferredLocale: 'FA',
+            referralCode: null,
+          }),
+        );
+
+        if (account.role === 'AGENCY') {
+          // Same minimal, honest-zero shape a freshly-approved real agency
+          // starts with (agencies.service.ts approveRequest) — no
+          // fabricated bookings/credit history, just the scaffolding an
+          // AGENCY login requires to resolve a profile at all.
+          await manager.getRepository(AgencyProfile).save(
+            manager.getRepository(AgencyProfile).create({
+              userId: user.id,
+              licenseNo: 'UAT-TEMP',
+              managerName: user.fullName,
+              phone: normalizedPhone,
+              email: '',
+              city: '',
+              address: '',
+              tier: 'NORMAL',
+            }),
+          );
+          await manager.getRepository(AgencyCreditLine).save(
+            manager.getRepository(AgencyCreditLine).create({
+              agencyId: user.id,
+              limitIrr: 0n,
+              updatedById: null,
+              updatedAt: createdAt,
+            }),
+          );
+        }
+
+        await manager.getRepository(AuditLog).save(
+          manager.getRepository(AuditLog).create({
+            actorId: user.id,
+            actorRole: user.role,
+            category: 'SECURITY',
+            action: 'ایجاد دسترسی آزمایشی موقت پنل',
+            detail: `حساب ${user.username} فقط برای UAT و تا ${expiresAt.toISOString()} ایجاد شد.`,
+            entityType: 'User',
+            entityId: user.id,
+            metadata: {
+              source: 'temporary-panel-account-bootstrap',
+              expiresAt: expiresAt.toISOString(),
+            },
+            requestId: null,
+          }),
+        );
+        out.push({
+          username: account.username,
+          role: account.role,
+          fullName: account.fullName,
+          status: 'created',
+        });
+      }
+
+      return out;
     });
 
     process.stdout.write(
@@ -111,14 +262,10 @@ async function main(): Promise<void> {
           createdAt: createdAt.toISOString(),
           expiresAt: expiresAt.toISOString(),
           loginPath: '/login',
-          accounts: credentials.map(
-            ({ username, role, fullName, password }) => ({
-              username,
-              role,
-              fullName,
-              password,
-            }),
-          ),
+          // Password is never included — it is the operator's already-known
+          // UAT_PANEL_SHARED_PASSWORD secret, not a per-account generated
+          // value that needs to be surfaced.
+          accounts: results,
         },
         null,
         2,
