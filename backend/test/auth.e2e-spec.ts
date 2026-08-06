@@ -170,7 +170,7 @@ describe('Auth (e2e)', () => {
       const ownerToken = login.body.data.accessToken as string;
 
       const directTenant = await request(app.getHttpServer())
-        .get('/bookings')
+        .get('/bookings/me')
         .set('Authorization', `Bearer ${ownerToken}`);
       expect(directTenant.status).toBe(403);
 
