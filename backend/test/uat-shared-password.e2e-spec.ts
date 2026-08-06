@@ -8,6 +8,7 @@ import { DataSource, In } from 'typeorm';
 import { AgencyCreditLine } from '../src/database/entities/agency-credit-line.entity';
 import { AgencyProfile } from '../src/database/entities/agency-profile.entity';
 import { AuditLog } from '../src/database/entities/audit-log.entity';
+import { Booking } from '../src/database/entities/booking.entity';
 import { RefreshToken } from '../src/database/entities/refresh-token.entity';
 import { User } from '../src/database/entities/user.entity';
 import { getSandboxOtpCode } from '../src/common/sandbox-auth';
@@ -79,13 +80,8 @@ describe('UAT shared panel password — bootstrap & rotation (e2e, Phase: shared
     });
     if (existing.length > 0) {
       const ids = existing.map((u) => u.id);
-      // Child before parent, both before the users delete — same FK order
-      // uat-demo-data-purge.ts's row-filtered delete uses. AuditLog.actorId
-      // is ON DELETE RESTRICT too (every bootstrap/rotate run writes one).
-      await dataSource
-        .getRepository(AgencyCreditLine)
-        .delete({ agencyId: In(ids) });
-      await dataSource.getRepository(AgencyProfile).delete({ userId: In(ids) });
+      // AuditLog.actorId is ON DELETE RESTRICT (every bootstrap/rotate run
+      // writes one) — must be cleared before the users delete.
       await dataSource.getRepository(AuditLog).delete({ actorId: In(ids) });
       await dataSource
         .getRepository(RefreshToken)
@@ -119,7 +115,7 @@ describe('UAT shared panel password — bootstrap & rotation (e2e, Phase: shared
     expect(result.stdout).not.toContain(STRONG_PASSWORD);
   });
 
-  it('every bootstrapped account verifies against the exact same shared password', async () => {
+  it('every bootstrapped account authenticates with the exact same shared password', async () => {
     bootstrap();
     const users = await dataSource
       .getRepository(User)
@@ -132,16 +128,32 @@ describe('UAT shared panel password — bootstrap & rotation (e2e, Phase: shared
     }
   });
 
-  it('creates a real AgencyProfile + zero-limit credit line for the temp agency account (not fake business data)', async () => {
+  it('hashes each account separately — passwordHash values differ even though the password is shared', async () => {
+    bootstrap();
+    const users = await dataSource
+      .getRepository(User)
+      .find({ where: { username: In(ALL_USERNAMES) } });
+    const hashes = users.map((u) => u.passwordHash);
+    expect(new Set(hashes).size).toBe(hashes.length);
+  });
+
+  it('does not create any AgencyProfile, AgencyCreditLine, or operational business data for the temp agency account', async () => {
     bootstrap();
     const agencyUser = await dataSource
       .getRepository(User)
       .findOneByOrFail({ username: 'uat.agency' });
     const profile = await dataSource
       .getRepository(AgencyProfile)
-      .findOneByOrFail({ userId: agencyUser.id });
-    expect(profile.tier).toBe('NORMAL');
-    expect(profile.suspendedAt).toBeNull();
+      .findOneBy({ userId: agencyUser.id });
+    expect(profile).toBeNull();
+    const creditLine = await dataSource
+      .getRepository(AgencyCreditLine)
+      .findOneBy({ agencyId: agencyUser.id });
+    expect(creditLine).toBeNull();
+    const bookings = await dataSource
+      .getRepository(Booking)
+      .count({ where: { agencyId: agencyUser.id } });
+    expect(bookings).toBe(0);
   });
 
   it('bootstrap is idempotent — a second run skips already-created accounts without changing their password', async () => {
@@ -203,7 +215,7 @@ describe('UAT shared panel password — bootstrap & rotation (e2e, Phase: shared
       expect(result.status).toBe(0);
     });
 
-    it('rotates every account to the new shared password and revokes their active refresh tokens', async () => {
+    it('rotates every account to the new shared password (fresh hash per account) and revokes their active refresh tokens', async () => {
       const userRepo = dataSource.getRepository(User);
       const users = await userRepo.find({
         where: { username: In(ALL_USERNAMES) },
@@ -229,6 +241,8 @@ describe('UAT shared panel password — bootstrap & rotation (e2e, Phase: shared
       const rotatedUsers = await userRepo.find({
         where: { username: In(ALL_USERNAMES) },
       });
+      const hashes = rotatedUsers.map((u) => u.passwordHash);
+      expect(new Set(hashes).size).toBe(hashes.length);
       for (const user of rotatedUsers) {
         expect(
           await argon2.verify(user.passwordHash!, OTHER_STRONG_PASSWORD),
@@ -238,16 +252,12 @@ describe('UAT shared panel password — bootstrap & rotation (e2e, Phase: shared
         );
       }
 
-      const remainingActive = await refreshRepo.count({
-        where: { userId: In(users.map((u) => u.id)), revokedAt: undefined },
-      });
       const activeTokens = await refreshRepo
         .createQueryBuilder('rt')
         .where('rt.userId IN (:...ids)', { ids: users.map((u) => u.id) })
         .andWhere('rt.revokedAt IS NULL')
         .getCount();
       expect(activeTokens).toBe(0);
-      void remainingActive;
     });
 
     it('refuses rotation without AUTH_SANDBOX_ENABLED', () => {
@@ -278,7 +288,7 @@ describe('UAT shared panel password — bootstrap & rotation (e2e, Phase: shared
       expect(res.body.data.accessToken).toBeDefined();
     });
 
-    it('the temp agency account logs in with the shared password via /auth/agency/login', async () => {
+    it('the temp agency account logs in with the shared password via /auth/agency/login even with no AgencyProfile', async () => {
       const res = await request(app.getHttpServer())
         .post('/auth/agency/login')
         .send({ phone: '09000000001', password: STRONG_PASSWORD });
@@ -306,6 +316,47 @@ describe('UAT shared panel password — bootstrap & rotation (e2e, Phase: shared
         .send({ username: 'uat.siteadmin', password: STRONG_PASSWORD });
       expect(res.status).toBe(403);
       expect(res.body.error.code).toBe('TEMPORARY_ACCESS_EXPIRED');
+    });
+
+    describe('sandbox disabled at login time', () => {
+      const originalSandbox = process.env.AUTH_SANDBOX_ENABLED;
+      const originalNodeEnv = process.env.NODE_ENV;
+
+      beforeEach(() => {
+        // The app under test (not the bootstrap subprocess) must itself
+        // see the sandbox flag as off for this describe block.
+        process.env.AUTH_SANDBOX_ENABLED = 'false';
+        process.env.NODE_ENV = 'production';
+      });
+
+      afterEach(() => {
+        process.env.AUTH_SANDBOX_ENABLED = originalSandbox;
+        process.env.NODE_ENV = originalNodeEnv;
+      });
+
+      it('rejects a temp staff login even with the correct shared password', async () => {
+        const res = await request(app.getHttpServer())
+          .post('/auth/staff/login')
+          .send({ username: 'uat.employee', password: STRONG_PASSWORD });
+        expect(res.status).toBe(403);
+        expect(res.body.error.code).toBe('SANDBOX_AUTH_DISABLED');
+      });
+
+      it('rejects a temp agency login even with the correct shared password', async () => {
+        const res = await request(app.getHttpServer())
+          .post('/auth/agency/login')
+          .send({ phone: '09000000001', password: STRONG_PASSWORD });
+        expect(res.status).toBe(403);
+        expect(res.body.error.code).toBe('SANDBOX_AUTH_DISABLED');
+      });
+
+      it('rejects a temp customer login even with the correct shared password', async () => {
+        const res = await request(app.getHttpServer())
+          .post('/auth/customer/login-password')
+          .send({ phone: '09000000002', password: STRONG_PASSWORD });
+        expect(res.status).toBe(403);
+        expect(res.body.error.code).toBe('SANDBOX_AUTH_DISABLED');
+      });
     });
   });
 

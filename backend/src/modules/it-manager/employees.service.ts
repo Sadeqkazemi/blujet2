@@ -22,6 +22,7 @@ import {
   catalogDeptFor,
 } from './permission-catalog';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
+import { isTemporaryPanelUsername } from '../../database/temporary-panel-accounts';
 import type {
   CreateEmployeeDto,
   ListEmployeesQueryDto,
@@ -117,16 +118,20 @@ export class EmployeesService {
         : base,
       order: { createdAt: 'DESC' },
     });
-    return employees.map((e) => ({
-      id: e.id,
-      fullName: e.fullName,
-      username: e.username,
-      dept: e.dept,
-      rank: e.rank,
-      isActive: e.isActive,
-      lastLoginAt: e.lastLoginAt,
-      createdAt: e.createdAt,
-    }));
+    // UAT temporary identity/access accounts are infrastructure, never a
+    // real employee — excluded from the roster IT_MANAGER sees.
+    return employees
+      .filter((e) => !isTemporaryPanelUsername(e.username))
+      .map((e) => ({
+        id: e.id,
+        fullName: e.fullName,
+        username: e.username,
+        dept: e.dept,
+        rank: e.rank,
+        isActive: e.isActive,
+        lastLoginAt: e.lastLoginAt,
+        createdAt: e.createdAt,
+      }));
   }
 
   async create(actor: AuthenticatedUser, dto: CreateEmployeeDto) {

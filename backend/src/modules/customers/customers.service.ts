@@ -17,6 +17,7 @@ import {
   toLatinDigits,
   toLocalIranMobile,
 } from '../../common/normalize-iran-phone';
+import { TEMPORARY_PANEL_USERNAME_PREFIX } from '../../database/temporary-panel-accounts';
 import type { ListCustomersQueryDto } from './dto/list-customers-query.dto';
 
 /** Design: incomplete when missing name or national ID. */
@@ -57,7 +58,12 @@ export class CustomersService {
     return this.userRepo
       .createQueryBuilder('u')
       .where('u.role = :role', { role: Role.USER })
-      .andWhere('u.deletedAt IS NULL');
+      .andWhere('u.deletedAt IS NULL')
+      // UAT temporary identity/access accounts are infrastructure, never a
+      // real customer — excluded from every list/count this service exposes.
+      .andWhere('LOWER(COALESCE(u.username, \'\')) NOT LIKE :uatPrefix', {
+        uatPrefix: `${TEMPORARY_PANEL_USERNAME_PREFIX}%`,
+      });
   }
 
   async list(query: ListCustomersQueryDto) {

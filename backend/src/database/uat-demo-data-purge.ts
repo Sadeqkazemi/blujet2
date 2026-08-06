@@ -7,7 +7,6 @@ import {
   UAT_PRESERVED_TABLES,
   UAT_PURGE_CONFIRMATION,
   UAT_PURGE_FLAG,
-  UAT_ROW_FILTERED_TABLES,
 } from './uat-demo-data-purge-policy';
 
 type CountRow = { count: string };
@@ -15,12 +14,6 @@ type CountRow = { count: string };
 function quoteIdentifier(value: string): string {
   return `"${value.replaceAll('"', '""')}"`;
 }
-
-const PRESERVED_USER_WHERE = `(
-  "isSuperAdmin" = true
-  OR LOWER(COALESCE("username", '')) LIKE 'uat.%'
-  OR LOWER(COALESCE("username", '')) LIKE 'panel.%'
-)`;
 
 async function tableCounts(dataSource: DataSource, tables: string[]) {
   const counts: Record<string, number> = {};
@@ -44,22 +37,15 @@ async function main() {
     const preservedTables = entityTables
       .filter((table) => UAT_PRESERVED_TABLES.has(table))
       .sort();
-    const rowFilteredTables = UAT_ROW_FILTERED_TABLES.filter(({ table }) =>
-      entityTables.includes(table),
-    );
     const [usersToDelete] = await dataSource.query<CountRow[]>(
-      `SELECT COUNT(*)::text AS count FROM "users" WHERE NOT ${PRESERVED_USER_WHERE}`,
+      `SELECT COUNT(*)::text AS count
+       FROM "users"
+       WHERE NOT (
+         "isSuperAdmin" = true
+         OR LOWER(COALESCE("username", '')) LIKE 'uat.%'
+         OR LOWER(COALESCE("username", '')) LIKE 'panel.%'
+       )`,
     );
-    const rowFilteredToDelete: Record<string, number> = {};
-    for (const { table, userIdColumn } of rowFilteredTables) {
-      const [row] = await dataSource.query<CountRow[]>(
-        `SELECT COUNT(*)::text AS count
-         FROM ${quoteIdentifier(table)} t
-         JOIN "users" u ON u."id" = t.${quoteIdentifier(userIdColumn)}
-         WHERE NOT ${PRESERVED_USER_WHERE.replaceAll('"isSuperAdmin"', 'u."isSuperAdmin"').replaceAll('"username"', 'u."username"')}`,
-      );
-      rowFilteredToDelete[table] = Number(row?.count ?? 0);
-    }
 
     console.log(
       JSON.stringify(
@@ -68,7 +54,6 @@ async function main() {
           database: new URL(process.env.DATABASE_URL ?? '').pathname.slice(1),
           usersToDelete: Number(usersToDelete?.count ?? 0),
           purgeTableCounts: await tableCounts(dataSource, purgeTables),
-          rowFilteredTableRowsToDelete: rowFilteredToDelete,
           preservedTableCounts: await tableCounts(dataSource, preservedTables),
           preservedUserRule: [
             'isSuperAdmin=true',
@@ -117,19 +102,13 @@ async function main() {
           `TRUNCATE TABLE ${quotedTables} RESTART IDENTITY CASCADE`,
         );
       }
-      // Row-filtered tables (e.g. a UAT temp agency's own profile/credit
-      // line) go child-before-parent, both before the `users` DELETE below,
-      // to satisfy their ON DELETE RESTRICT foreign keys.
-      for (const { table, userIdColumn } of rowFilteredTables) {
-        await runner.query(
-          `DELETE FROM ${quoteIdentifier(table)} t
-           USING "users" u
-           WHERE u."id" = t.${quoteIdentifier(userIdColumn)}
-             AND NOT ${PRESERVED_USER_WHERE.replaceAll('"isSuperAdmin"', 'u."isSuperAdmin"').replaceAll('"username"', 'u."username"')}`,
-        );
-      }
       await runner.query(
-        `DELETE FROM "users" WHERE NOT ${PRESERVED_USER_WHERE}`,
+        `DELETE FROM "users"
+         WHERE NOT (
+           "isSuperAdmin" = true
+           OR LOWER(COALESCE("username", '')) LIKE 'uat.%'
+           OR LOWER(COALESCE("username", '')) LIKE 'panel.%'
+         )`,
       );
       await runner.commitTransaction();
     } catch (error) {

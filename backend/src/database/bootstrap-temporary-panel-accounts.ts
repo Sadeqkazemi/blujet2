@@ -2,8 +2,6 @@ import 'dotenv/config';
 import 'reflect-metadata';
 import * as argon2 from 'argon2';
 import { DataSource, In } from 'typeorm';
-import { AgencyCreditLine } from './entities/agency-credit-line.entity';
-import { AgencyProfile } from './entities/agency-profile.entity';
 import { AuditLog } from './entities/audit-log.entity';
 import { User } from './entities/user.entity';
 import { dataSourceOptions } from './data-source.options';
@@ -67,7 +65,6 @@ async function main(): Promise<void> {
   try {
     const results = await dataSource.transaction(async (manager) => {
       const userRepository = manager.getRepository(User);
-      const passwordHash = await argon2.hash(sharedPassword);
       const out: BootstrapResult[] = [];
 
       // Username-login accounts (SITE_ADMIN..BOARD_CHAIR, EMPLOYEE).
@@ -93,6 +90,10 @@ async function main(): Promise<void> {
           });
           continue;
         }
+        // Same shared password, but a fresh argon2 hash (own salt) per
+        // account — hashes never match each other even though the
+        // underlying password is intentionally identical.
+        const passwordHash = await argon2.hash(sharedPassword);
         const user = await userRepository.save(
           userRepository.create({
             role: account.role,
@@ -171,6 +172,8 @@ async function main(): Promise<void> {
           );
         }
 
+        // Same shared password, fresh argon2 hash per account.
+        const passwordHash = await argon2.hash(sharedPassword);
         const user = await userRepository.save(
           userRepository.create({
             role: account.role,
@@ -202,32 +205,10 @@ async function main(): Promise<void> {
           }),
         );
 
-        if (account.role === 'AGENCY') {
-          // Same minimal, honest-zero shape a freshly-approved real agency
-          // starts with (agencies.service.ts approveRequest) — no
-          // fabricated bookings/credit history, just the scaffolding an
-          // AGENCY login requires to resolve a profile at all.
-          await manager.getRepository(AgencyProfile).save(
-            manager.getRepository(AgencyProfile).create({
-              userId: user.id,
-              licenseNo: 'UAT-TEMP',
-              managerName: user.fullName,
-              phone: normalizedPhone,
-              email: '',
-              city: '',
-              address: '',
-              tier: 'NORMAL',
-            }),
-          );
-          await manager.getRepository(AgencyCreditLine).save(
-            manager.getRepository(AgencyCreditLine).create({
-              agencyId: user.id,
-              limitIrr: 0n,
-              updatedById: null,
-              updatedAt: createdAt,
-            }),
-          );
-        }
+        // Deliberately NOT creating an AgencyProfile/AgencyCreditLine here —
+        // this is identity/access infrastructure only, never business data.
+        // The agency portal must show a real empty state for this account,
+        // not a fabricated profile (see agency-portal.service.ts).
 
         await manager.getRepository(AuditLog).save(
           manager.getRepository(AuditLog).create({

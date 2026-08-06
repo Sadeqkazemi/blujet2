@@ -11,7 +11,9 @@ Originally every temporary account got its own independently-generated
 stdout). This addendum replaces that with **one shared password**, read
 from `UAT_PANEL_SHARED_PASSWORD`, and extends account coverage beyond the
 original seven manager/admin roles. Nothing about expiry, session
-revocation, real-account isolation, or the mock OTP changes.
+revocation, real-account isolation, or the mock OTP changes. Revised
+after a review pass — see "Review corrections" below for what changed
+from the first version of this addendum.
 
 - **Coverage**: `TEMPORARY_PANEL_ACCOUNTS` (username + password via
   `/auth/staff/login`) gained `uat.employee` (`EMPLOYEE`, `dept:
@@ -19,11 +21,13 @@ revocation, real-account isolation, or the mock OTP changes.
   `TEMPORARY_PHONE_LOGIN_ACCOUNTS` covers `uat.agency` (`AGENCY`, phone
   `09000000001`, via `/auth/agency/login`) and `uat.customer` (`USER`,
   phone `09000000002`, via `/auth/customer/login-password`) — both
-  password-based login surfaces, per scope. `uat.agency` also gets a real
-  (not fabricated-business-data) `AgencyProfile` + zero-limit
-  `AgencyCreditLine`, the same minimal shape a freshly-approved real
-  agency starts with — required for the account to resolve a profile at
-  login at all, not sample booking/credit/settlement history.
+  password-based login surfaces, per scope. These are **identity/access
+  infrastructure only** — no `AgencyProfile`, `AgencyCreditLine`, or any
+  other business row is ever created for `uat.agency`; it stays a bare
+  `User` row, and the existing `agency-portal.service.ts` already returns
+  a clean `404 NOT_FOUND` ("پروفایل آژانس یافت نشد") for a profile-less
+  agency on every portal endpoint — a real empty state, not fabricated
+  data — so no code change was needed there.
 - **One shared password, not one per account**: `backend/src/common/
   uat-shared-password.ts`'s `resolveUatSharedPassword()` is the only
   source. It refuses (clear `Error`, never including the password value)
@@ -33,40 +37,54 @@ revocation, real-account isolation, or the mock OTP changes.
   unset/empty, or the value fails the existing `IsStrongPassword` policy
   (≥8 chars, upper+lower+digit+symbol — same policy already used for
   customer self-service passwords, not a new one).
-- Bootstrap (`bootstrap-temporary-panel-accounts.ts`) hashes the shared
-  password once and assigns the same hash to every account — no
-  per-account generation. It's now idempotent per account (skips ones
-  that already exist with `status: 'already_exists'`) so it can safely run
-  again on a server that already has the original seven, to add the newly
-  configured ones.
-- Rotation (`rotate-temporary-panel-passwords.ts`) still requires every
-  configured account to exist, be active, unexpired, and share one
-  expiry, then rotates all of them to the new shared password atomically
-  and revokes every active refresh token for those accounts — unchanged
-  from the original behavior, just against a shared password source
-  instead of per-account random generation.
+- Bootstrap (`bootstrap-temporary-panel-accounts.ts`) and rotation
+  (`rotate-temporary-panel-passwords.ts`) call `argon2.hash(sharedPassword)`
+  **separately for every account** — same plaintext password, but each
+  row gets its own salt/hash, so `passwordHash` values never match across
+  accounts even though the password itself is intentionally identical.
+  Bootstrap is idempotent per account (skips ones that already exist with
+  `status: 'already_exists'`) so it can safely run again on a server that
+  already has the original seven, to add the newly configured ones.
 - **Neither script's stdout ever includes a password field** — only
   `username`, `role`, `fullName`/`expiresAt`/`status` per account. The
   shared password is the operator's own already-known secret; there is
   nothing to echo back.
-- `agencyLogin()` and `customerPasswordLogin()` (`auth.service.ts`) gained
-  the same `getTemporaryPanelAccessState` bypass-2FA/deadline-scoped-token
-  branch `staffLogin()` already had for its temp accounts — additive only,
-  keyed off `User.temporaryPasswordOnlyUntil`, which is `null` for every
-  real agency/customer, so this never changes real-account behavior.
-- `uat-demo-data-purge-policy.ts` gained `UAT_ROW_FILTERED_TABLES`
-  (`agency_credit_lines`, `agency_profiles`): these two tables can't be
-  blanket-preserved (real agencies have rows there too) or blanket-purged
-  (the UAT temp agency's own row must survive the purge like its `users`
-  row does), so `uat-demo-data-purge.ts` now deletes non-UAT rows from
-  them individually, in FK-safe order, before the `users` DELETE.
-- `.github/workflows/deploy.yml` passes `UAT_PANEL_SHARED_PASSWORD` from
-  `${{ secrets.UAT_PANEL_SHARED_PASSWORD }}` to both scripts via `docker
-  compose exec -T -e ...`, never printed; the existing two historical
-  one-time sentinel blocks are untouched (already consumed on the live
-  server), with a new third one-time block
+- `staffLogin()`'s pre-existing temp-account bypass branch, and the new
+  matching branches added to `agencyLogin()`/`customerPasswordLogin()`
+  (`auth.service.ts`), all now explicitly check `isSandboxAuthEnabled()`
+  first and reject with `403 SANDBOX_AUTH_DISABLED` if it's off — a
+  temporary account's password alone is never sufficient outside a
+  sandbox-flagged environment. Keyed off `User.temporaryPasswordOnlyUntil`,
+  which is `null` for every real staff/agency/customer, so this branch
+  and its sandbox check never affect a real account's login.
+- `employees.service.ts`'s `list()` and `customers.service.ts`'s
+  `list()`/`countIncomplete()` now exclude `uat.*` usernames, so
+  `uat.employee`/`uat.customer` never appear in the IT-manager employee
+  roster or the SITE_ADMIN customer list/incomplete-count badge.
+  `AdminsService.list()` and the staff directory already excluded `uat.*`
+  before this change. The agency list/count endpoints
+  (`agencies.service.ts`, `reporting.service.ts`) start from
+  `AgencyProfile`, not `User`, so `uat.agency` — which has no profile row
+  — was already excluded without any code change.
+- `.github/workflows/deploy.yml`'s SSH step forwards
+  `UAT_PANEL_SHARED_PASSWORD` via `appleboy/ssh-action`'s `env:`/`envs:`
+  mechanism (not interpolated as literal text into the script string) and
+  refuses with a clear message if the forwarded value is empty before
+  running anything; existing historical sentinel blocks are untouched
+  (already consumed on the live server), with a new one-time block
   (`.blujet-uat-shared-password-v1-complete`) that bootstraps any missing
   accounts and rotates every temporary account to the shared password.
+
+### Review corrections (kept for context, not re-litigated)
+
+A first version of this addendum also gave `uat.agency` a real
+`AgencyProfile` + zero-limit `AgencyCreditLine` ("same shape a freshly
+approved agency starts with") and taught `uat-demo-data-purge-policy.ts` a
+new `UAT_ROW_FILTERED_TABLES` mechanism to keep those two rows alive
+across a UAT data purge. Review flagged this as still business data that
+doesn't belong on a pure identity/access account and unnecessary
+complexity in the purge policy — both were reverted. `uat-demo-data-purge.ts`
+and `uat-demo-data-purge-policy.ts` are back to their pre-addendum state.
 
 ### Acceptance checklist (addendum)
 
@@ -89,6 +107,15 @@ revocation, real-account isolation, or the mock OTP changes.
   `uat-shared-password.e2e-spec.ts`.
 - [x] A temp EMPLOYEE/AGENCY/USER account logs in with the shared
   password on its real endpoint and an expired one is rejected —
+  `uat-shared-password.e2e-spec.ts`.
+- [x] Each account's `passwordHash` differs from every other account's,
+  even though the plaintext password is shared, both at bootstrap and
+  after rotation — `uat-shared-password.e2e-spec.ts`.
+- [x] A temp staff/agency/customer login is rejected with
+  `SANDBOX_AUTH_DISABLED` when `AUTH_SANDBOX_ENABLED` is off, even with
+  the correct shared password — `uat-shared-password.e2e-spec.ts`.
+- [x] Bootstrap never creates an `AgencyProfile`, `AgencyCreditLine`, or
+  any operational/business row for `uat.agency` —
   `uat-shared-password.e2e-spec.ts`.
 
 ## Acceptance checklist

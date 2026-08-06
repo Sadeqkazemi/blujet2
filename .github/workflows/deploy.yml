@@ -104,10 +104,16 @@ jobs:
     steps:
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1
+        env:
+          # Forwarded into the remote session by name (envs: below)
+          # rather than interpolated as literal text into the script -
+          # the value never appears in the rendered workflow/script string.
+          UAT_PANEL_SHARED_PASSWORD: ${{ secrets.UAT_PANEL_SHARED_PASSWORD }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: UAT_PANEL_SHARED_PASSWORD
           script: |
             set -e
             cd /opt/app
@@ -161,24 +167,30 @@ jobs:
             fi
             # One-time move to a single shared UAT password (owner-approved):
             # bootstraps any temporary accounts added since the original
-            # seven (uat.employee, uat.agency, uat.customer — bootstrap
+            # seven (uat.employee, uat.agency, uat.customer - bootstrap
             # skips ones that already exist) and rotates every temporary
-            # account's password to UAT_PANEL_SHARED_PASSWORD. The secret is
-            # only ever passed via -e into the container; neither script
-            # prints it, so it never reaches this stdout redirect or the
-            # Actions log.
+            # account's password to UAT_PANEL_SHARED_PASSWORD.
+            # $UAT_PANEL_SHARED_PASSWORD is forwarded into this session by
+            # appleboy/ssh-action's `envs:` (see the step's `env:` above) -
+            # never interpolated into this script as literal text by GitHub's
+            # ${{ }} templating, and the two scripts below never print it, so
+            # it never reaches these stdout redirects or the Actions log.
             shared_password_sentinel=/root/.blujet-uat-shared-password-v1-complete
             if [ ! -f "$shared_password_sentinel" ]; then
+              if [ -z "${UAT_PANEL_SHARED_PASSWORD:-}" ]; then
+                echo "Refusing: UAT_PANEL_SHARED_PASSWORD secret is empty or unset." >&2
+                exit 1
+              fi
               umask 077
               docker compose -f docker-compose.prod.yml exec -T \
                 -e TEMP_PANEL_BOOTSTRAP_CONFIRM=CREATE_7_DAY_PANEL_TEST_ACCOUNTS \
-                -e UAT_PANEL_SHARED_PASSWORD="${{ secrets.UAT_PANEL_SHARED_PASSWORD }}" \
+                -e UAT_PANEL_SHARED_PASSWORD="$UAT_PANEL_SHARED_PASSWORD" \
                 backend node dist/database/bootstrap-temporary-panel-accounts.js --execute \
                 > /root/blujet-uat-shared-password-bootstrap-v1.json
               chmod 600 /root/blujet-uat-shared-password-bootstrap-v1.json
               docker compose -f docker-compose.prod.yml exec -T \
                 -e TEMP_PANEL_ROTATE_CONFIRM=ROTATE_TEMPORARY_PANEL_PASSWORDS_SHARED_V1 \
-                -e UAT_PANEL_SHARED_PASSWORD="${{ secrets.UAT_PANEL_SHARED_PASSWORD }}" \
+                -e UAT_PANEL_SHARED_PASSWORD="$UAT_PANEL_SHARED_PASSWORD" \
                 backend node dist/database/rotate-temporary-panel-passwords.js --execute \
                 > /root/blujet-uat-shared-password-rotation-v1.json
               chmod 600 /root/blujet-uat-shared-password-rotation-v1.json

@@ -19,21 +19,6 @@ export const UAT_PRESERVED_TABLES = new Set([
   'system_settings',
 ]);
 
-/**
- * Tables that can't be blanket-preserved (real production agencies also
- * have rows here) or blanket-purged (a UAT temp agency account's own
- * profile/credit-line row must survive, same as its `users` row does) —
- * purged per-row by the same protected-user rule as `users`, in FK-safe
- * order (child before parent, both before the `users` DELETE).
- */
-export const UAT_ROW_FILTERED_TABLES: ReadonlyArray<{
-  table: string;
-  userIdColumn: string;
-}> = [
-  { table: 'agency_credit_lines', userIdColumn: 'agencyId' },
-  { table: 'agency_profiles', userIdColumn: 'userId' },
-];
-
 export function isUatAccessAccount(
   username: string | null,
   isSuperAdmin: boolean,
@@ -44,15 +29,7 @@ export function isUatAccessAccount(
 }
 
 export function operationalTables(entityTableNames: string[]): string[] {
-  const rowFiltered = new Set(
-    UAT_ROW_FILTERED_TABLES.map(({ table }) => table),
-  );
   return [...new Set(entityTableNames)]
-    .filter(
-      (table) =>
-        table !== 'users' &&
-        !UAT_PRESERVED_TABLES.has(table) &&
-        !rowFiltered.has(table),
-    )
+    .filter((table) => table !== 'users' && !UAT_PRESERVED_TABLES.has(table))
     .sort();
 }

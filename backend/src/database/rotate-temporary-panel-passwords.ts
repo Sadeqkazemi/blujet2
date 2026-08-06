@@ -92,10 +92,10 @@ async function main(): Promise<void> {
         );
       }
 
-      const passwordHash = await argon2.hash(sharedPassword);
       for (const account of allAccounts) {
         const user = usersByUsername.get(account.username)!;
-        user.passwordHash = passwordHash;
+        // Same shared password, fresh argon2 hash (own salt) per account.
+        user.passwordHash = await argon2.hash(sharedPassword);
         user.updatedAt = now;
         await userRepository.save(user);
         await manager.getRepository(AuditLog).save(
