@@ -11,7 +11,14 @@ interface AuthContextValue {
   user: AuthUser | null;
   requestLogin: (username: string, password: string) => Promise<StaffLoginResult>;
   confirmTwoFactor: (challengeId: string, code: string) => Promise<AuthUser>;
-  agencyLogin: (phone: string, password: string) => Promise<AuthUser>;
+  agencyLogin: (
+    phone: string,
+    password: string,
+  ) => Promise<AuthUser | { challengeId: string }>;
+  confirmAgencyTwoFactor?: (
+    challengeId: string,
+    code: string,
+  ) => Promise<AuthUser>;
   signOut: () => Promise<void>;
   refreshMe: () => Promise<AuthUser>;
   // Public purchase engine (customer phone+OTP login) — optional so every
@@ -74,11 +81,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const agencyLogin = useCallback(async (phone: string, password: string) => {
-    const { user: loggedInUser } = await authApi.agencyLogin(phone, password);
+    const result = await authApi.agencyLogin(phone, password);
+    if ('challengeId' in result) return { challengeId: result.challengeId };
+    const loggedInUser = result.user;
     setUser(loggedInUser);
     setStatus('authenticated');
     return loggedInUser;
   }, []);
+
+  const confirmAgencyTwoFactor = useCallback(
+    async (challengeId: string, code: string) => {
+      const { user: loggedInUser } = await authApi.verifyAgencyLogin(
+        challengeId,
+        code,
+      );
+      setUser(loggedInUser);
+      setStatus('authenticated');
+      return loggedInUser;
+    },
+    [],
+  );
 
   const requestOtp = useCallback(async (phone: string) => {
     const { challengeId } = await authApi.requestOtp(phone);
@@ -153,6 +175,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       requestLogin,
       confirmTwoFactor,
       agencyLogin,
+      confirmAgencyTwoFactor,
       signOut,
       refreshMe,
       requestOtp,
@@ -170,6 +193,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       requestLogin,
       confirmTwoFactor,
       agencyLogin,
+      confirmAgencyTwoFactor,
       signOut,
       refreshMe,
       requestOtp,

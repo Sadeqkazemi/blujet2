@@ -32,6 +32,25 @@ export type StaffLoginResult =
       temporaryAccessExpiresAt: string;
     };
 
+export function resolveStaffLoginMode(username: string) {
+  return apiPost<{ mode: 'FIRST_LOGIN_SETUP' | 'PASSWORD' }>(
+    '/auth/staff/login-mode',
+    { username },
+  );
+}
+
+export function requestStaffFirstLogin(
+  username: string,
+  phone: string,
+  newPassword: string,
+) {
+  return apiPost<{ challengeId: string }>('/auth/staff/first-login/request', {
+    username,
+    phone: normalizePhone(phone),
+    newPassword,
+  });
+}
+
 export async function staffLogin(username: string, password: string) {
   const result = await apiPost<StaffLoginResult>('/auth/staff/login', {
     username,
@@ -47,10 +66,26 @@ export async function staffLogin(username: string, password: string) {
 }
 
 export async function agencyLogin(phone: string, password: string) {
-  const result = await apiPost<{ accessToken: string; user: AuthUser }>('/auth/agency/login', {
+  const result = await apiPost<
+    | { loginMode: 'TWO_FACTOR'; challengeId: string }
+    | { accessToken: string; user: AuthUser }
+  >('/auth/agency/login', { phone: normalizePhone(phone), password });
+  if ('accessToken' in result) setAccessToken(result.accessToken);
+  return result;
+}
+
+export function requestAgencyFirstLogin(phone: string, newPassword: string) {
+  return apiPost<{ challengeId: string }>('/auth/agency/first-login/request', {
     phone: normalizePhone(phone),
-    password,
+    newPassword,
   });
+}
+
+export async function verifyAgencyLogin(challengeId: string, code: string) {
+  const result = await apiPost<{ accessToken: string; user: AuthUser }>(
+    '/auth/agency/login/verify',
+    { challengeId, code: normalizeOtpCode(code) },
+  );
   setAccessToken(result.accessToken);
   return result;
 }

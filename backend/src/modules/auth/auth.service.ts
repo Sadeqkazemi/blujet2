@@ -828,11 +828,7 @@ export class AuthService {
     phone: string,
     password: string,
     context: { userAgent?: string; ip?: string },
-  ): Promise<{
-    accessToken: string;
-    refreshToken: string;
-    user: AuthUserView;
-  }> {
+  ): Promise<AgencyLoginResult> {
     const user = await this.userRepo.findOneBy({
       phone: normalizeIranPhone(phone),
     });
@@ -864,6 +860,24 @@ export class AuthService {
       });
     }
 
+    if (isSandboxAuthEnabled()) {
+      await this.challengeRepo.update(
+        { userId: user.id, purpose: 'AGENCY_LOGIN_2FA', consumedAt: IsNull() },
+        { consumedAt: new Date() },
+      );
+      const code = generateSixDigitCode();
+      const challenge = await this.challengeRepo.save(
+        this.challengeRepo.create({
+          userId: user.id,
+          purpose: 'AGENCY_LOGIN_2FA',
+          codeHash: await argon2.hash(code),
+          expiresAt: new Date(Date.now() + TWO_FACTOR_TTL_MS),
+        }),
+      );
+      await this.twoFactorProvider.sendCode(user, code);
+      return { loginMode: 'TWO_FACTOR', challengeId: challenge.id };
+    }
+
     await this.userRepo.update(
       { id: user.id },
       { lastLoginAt: new Date(), updatedAt: new Date() },
@@ -878,6 +892,107 @@ export class AuthService {
     const refreshToken = await this.issueRefreshToken(user.id, context);
 
     return { accessToken, refreshToken, user: toAuthUserView(user) };
+  }
+
+  /** Sandbox-only activation for an approved agency's first portal login. */
+  async requestAgencyFirstLogin(
+    phone: string,
+    newPassword: string,
+  ): Promise<{ challengeId: string }> {
+    if (!isSandboxAuthEnabled()) {
+      throw new ForbiddenException({
+        code: 'SANDBOX_AUTH_DISABLED',
+        message: 'فعال‌سازی آزمایشی آژانس در این محیط فعال نیست.',
+      });
+    }
+    const user = await this.userRepo.findOneBy({ phone: normalizeIranPhone(phone) });
+    if (
+      !user ||
+      user.role !== 'AGENCY' ||
+      (user.lastLoginAt !== null && !user.mustChangePassword)
+    ) {
+      throw new UnauthorizedException({
+        code: ErrorCode.UNAUTHORIZED,
+        message: 'امکان فعال‌سازی اولین ورود برای این حساب وجود ندارد.',
+      });
+    }
+    if (!user.isActive) {
+      throw new ForbiddenException({ code: 'ACCOUNT_SUSPENDED', message: 'این حساب غیرفعال شده است.' });
+    }
+    const agencyProfile = await this.agencyProfileRepo.findOneBy({ userId: user.id });
+    if (agencyProfile?.suspendedAt) {
+      throw new ForbiddenException({ code: 'ACCOUNT_SUSPENDED', message: 'حساب آژانس شما تعلیق شده است.' });
+    }
+
+    await this.userRepo.update(
+      { id: user.id },
+      {
+        passwordHash: await argon2.hash(newPassword),
+        mustChangePassword: false,
+        updatedAt: new Date(),
+      },
+    );
+    user.passwordHash = 'configured';
+    user.mustChangePassword = false;
+    await this.challengeRepo.update(
+      { userId: user.id, purpose: 'AGENCY_LOGIN_2FA', consumedAt: IsNull() },
+      { consumedAt: new Date() },
+    );
+    const code = generateSixDigitCode();
+    const challenge = await this.challengeRepo.save(
+      this.challengeRepo.create({
+        userId: user.id,
+        purpose: 'AGENCY_LOGIN_2FA',
+        codeHash: await argon2.hash(code),
+        expiresAt: new Date(Date.now() + TWO_FACTOR_TTL_MS),
+      }),
+    );
+    await this.twoFactorProvider.sendCode(user, code);
+    return { challengeId: challenge.id };
+  }
+
+  async verifyAgencyLogin(
+    challengeId: string,
+    code: string,
+    context: { userAgent?: string; ip?: string },
+  ): Promise<{ accessToken: string; refreshToken: string; user: AuthUserView }> {
+    const challenge = await this.challengeRepo.findOne({
+      where: { id: challengeId },
+      relations: { user: true },
+    });
+    if (!challenge || challenge.purpose !== 'AGENCY_LOGIN_2FA' || challenge.user.role !== 'AGENCY') {
+      throw new UnauthorizedException({ code: 'TWO_FACTOR_INVALID', message: 'کد نامعتبر است.' });
+    }
+    if (challenge.consumedAt || challenge.attempts >= TWO_FACTOR_MAX_ATTEMPTS) {
+      throw new UnauthorizedException({ code: 'TWO_FACTOR_INVALID', message: 'این کد قابل استفاده نیست.' });
+    }
+    if (challenge.expiresAt < new Date()) {
+      throw new UnauthorizedException({ code: 'TWO_FACTOR_EXPIRED', message: 'کد منقضی شده است.' });
+    }
+    if (!(await argon2.verify(challenge.codeHash, code))) {
+      await this.challengeRepo.increment({ id: challenge.id }, 'attempts', 1);
+      throw new UnauthorizedException({ code: 'TWO_FACTOR_INVALID', message: 'کد واردشده نادرست است.' });
+    }
+
+    const user = challenge.user;
+    if (!user.isActive) {
+      throw new ForbiddenException({ code: 'ACCOUNT_SUSPENDED', message: 'این حساب غیرفعال شده است.' });
+    }
+    const agencyProfile = await this.agencyProfileRepo.findOneBy({ userId: user.id });
+    if (agencyProfile?.suspendedAt) {
+      throw new ForbiddenException({ code: 'ACCOUNT_SUSPENDED', message: 'حساب آژانس شما تعلیق شده است.' });
+    }
+    await this.challengeRepo.update({ id: challenge.id }, { consumedAt: new Date() });
+    await this.userRepo.update(
+      { id: user.id },
+      { lastLoginAt: new Date(), updatedAt: new Date() },
+    );
+    const jwtUser: AuthenticatedUser = { id: user.id, role: user.role, fullName: user.fullName };
+    return {
+      accessToken: this.signAccessToken(jwtUser),
+      refreshToken: await this.issueRefreshToken(user.id, context),
+      user: toAuthUserView(user),
+    };
   }
 
   /** Public purchase engine: customer phone+OTP login (design's ورود و

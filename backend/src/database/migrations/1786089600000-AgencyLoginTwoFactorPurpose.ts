@@ -1,7 +1,7 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AgencyLoginTwoFactorPurpose1786003200000 implements MigrationInterface {
-  name = 'AgencyLoginTwoFactorPurpose1786003200000';
+export class AgencyLoginTwoFactorPurpose1786089600000 implements MigrationInterface {
+  name = 'AgencyLoginTwoFactorPurpose1786089600000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
