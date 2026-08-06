@@ -64,6 +64,10 @@ services:
       CORS_ORIGINS: http://${SERVER_IP}
       PII_ENCRYPTION_KEY: ${PII_ENCRYPTION_KEY}
       SEED_ON_START: ${SEED_ON_START:-false}
+      # Temporary UAT switch. Keep false for real operation. When true, the
+      # owner may issue an audited 15-minute preview token for an existing
+      # active USER or AGENCY account.
+      SANDBOX_SUPER_ADMIN_TENANT_ACCESS: ${SANDBOX_SUPER_ADMIN_TENANT_ACCESS:-false}
       # Frontend and backend share one origin behind the frontend's nginx
       # proxy (port 80) — no TLS yet on a bare IP, so a Secure cookie would
       # be silently dropped by the browser. Flip to "true" once a real

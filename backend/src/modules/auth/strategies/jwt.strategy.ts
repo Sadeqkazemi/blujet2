@@ -8,6 +8,7 @@ interface AccessTokenPayload {
   role: AuthenticatedUser['role'];
   fullName: string;
   isSuperAdmin?: boolean;
+  sandboxOwnerId?: string;
 }
 
 @Injectable()
@@ -26,6 +27,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       role: payload.role,
       fullName: payload.fullName,
       isSuperAdmin: payload.isSuperAdmin === true,
+      sandboxOwnerId: payload.sandboxOwnerId,
     };
   }
 }

@@ -21,4 +21,5 @@ export interface AuthUser {
   preferredLocale: Locale;
   mustChangePassword: boolean;
   isSuperAdmin?: boolean;
+  isSandboxImpersonation?: boolean;
 }

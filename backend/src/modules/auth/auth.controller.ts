@@ -27,6 +27,7 @@ import { RequestStepUpDto } from './dto/step-up.dto';
 import { SetPasswordDto } from './dto/set-password.dto';
 import { CustomerPasswordLoginDto } from './dto/customer-password-login.dto';
 import { UpdateLocaleDto } from './dto/update-locale.dto';
+import { SandboxImpersonationDto } from './dto/sandbox-impersonation.dto';
 import { RequestPasswordResetEmailDto } from './dto/request-password-reset-email.dto';
 import { VerifyPasswordResetEmailDto } from './dto/verify-password-reset-email.dto';
 import {
@@ -281,6 +282,37 @@ export class AuthController {
   @ApiOperation({ summary: "Current authenticated user's identity and role" })
   async me(@CurrentUser() user: AuthenticatedUser) {
     const data = await this.auth.getMe(user);
+    return { success: true, data };
+  }
+
+  @Get('sandbox/tenant-accounts')
+  @SkipMustChangePassword()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary:
+      'Sandbox only: list active customer/agency accounts for owner preview',
+  })
+  async sandboxTenantAccounts(@CurrentUser() user: AuthenticatedUser) {
+    const data = await this.auth.listSandboxTenantAccounts(user);
+    return { success: true, data };
+  }
+
+  @Post('sandbox/impersonate')
+  @HttpCode(HttpStatus.OK)
+  @SkipMustChangePassword()
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @ApiOperation({
+    summary: 'Sandbox only: issue a short-lived customer/agency preview token',
+  })
+  async sandboxImpersonate(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: SandboxImpersonationDto,
+  ) {
+    const data = await this.auth.startSandboxImpersonation(
+      user,
+      dto.targetUserId,
+    );
     return { success: true, data };
   }
 

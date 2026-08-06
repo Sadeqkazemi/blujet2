@@ -3,6 +3,13 @@ import { setAccessToken } from './token-store';
 import { latinDigits, normalizeIranMobile } from '../lib/fa-format';
 import type { AuthUser, Locale } from '../types/auth';
 
+export interface SandboxTenantAccount {
+  id: string;
+  fullName: string;
+  role: 'USER' | 'AGENCY';
+  username: string | null;
+}
+
 function normalizePhone(phone: string) {
   return normalizeIranMobile(latinDigits(phone).replace(/\s/g, ''));
 }
@@ -80,6 +87,19 @@ export async function logout() {
 
 export function fetchMe() {
   return apiGet<AuthUser>('/auth/me');
+}
+
+export function fetchSandboxTenantAccounts() {
+  return apiGet<SandboxTenantAccount[]>('/auth/sandbox/tenant-accounts');
+}
+
+export async function startSandboxImpersonation(targetUserId: string) {
+  const result = await apiPost<{ accessToken: string; user: AuthUser }>(
+    '/auth/sandbox/impersonate',
+    { targetUserId },
+  );
+  setAccessToken(result.accessToken);
+  return result;
 }
 
 export function updateMyLocale(locale: Locale) {

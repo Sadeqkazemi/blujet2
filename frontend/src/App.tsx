@@ -77,12 +77,14 @@ import CareersAdminPage from './features/careers/CareersAdminPage';
 import BlogAdminPage from './features/blog/BlogAdminPage';
 import MediaAdminPage from './features/site-content/MediaAdminPage';
 import IdentityAdminPage from './features/identity-admin/IdentityAdminPage';
+import SandboxImpersonationBanner from './components/SandboxImpersonationBanner';
 
 export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
         <LocaleProvider>
+        <SandboxImpersonationBanner />
         <Routes>
           <Route path="/" element={<HomeSearchPage />} />
           <Route path="/results" element={<ResultsPage />} />

@@ -1707,6 +1707,9 @@ See `CLAUDE.md` → Commands. `docker compose up -d` starts Postgres+Redis;
 
 - [ ] **Owner super-admin first login (2026-08-06)** — owner-only
   password login without OTP, forced password replacement on first session,
-  management-role guard elevation (never USER/AGENCY), all-management-panel
-  navigation, production-only audited bootstrap, migration and regression
-  tests. Awaiting implementation and owner review before merge.
+  management-role guard elevation, all-management-panel navigation,
+  production-only audited bootstrap, migration and regression tests. Optional
+  Sandbox-only USER/AGENCY preview uses an explicit environment switch,
+  selected tenant identities, 15-minute non-refreshable tokens, and audit
+  records; direct owner access to tenant APIs remains forbidden. Awaiting owner
+  review before merge.

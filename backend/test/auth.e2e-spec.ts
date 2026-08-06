@@ -12,6 +12,8 @@ import { loginAs } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 import { normalizeIranPhone } from '../src/common/normalize-iran-phone';
 import { RefreshToken } from '../src/database/entities/refresh-token.entity';
+import { AgencyProfile } from '../src/database/entities/agency-profile.entity';
+import { randomInt } from 'node:crypto';
 
 describe('Auth (e2e)', () => {
   let app: INestApplication<App>;
@@ -115,6 +117,110 @@ describe('Auth (e2e)', () => {
           mustChangePassword: false,
         },
       );
+    }
+  });
+
+  it('lets the owner preview selected USER and AGENCY accounts only while the sandbox switch is enabled', async () => {
+    const userRepo = dataSource.getRepository(User);
+    const agencyProfileRepo = dataSource.getRepository(AgencyProfile);
+    const owner = await userRepo.findOneByOrFail({ username: 'site.admin' });
+    const originalOwnerFlag = owner.isSuperAdmin;
+    const previousSandboxFlag = process.env.SANDBOX_SUPER_ADMIN_TENANT_ACCESS;
+    const suffix = randomInt(10_000_000, 99_999_999).toString();
+    const customer = await userRepo.save(
+      userRepo.create({
+        role: 'USER',
+        phone: `+9891${suffix}`,
+        fullName: 'مشتری پیش‌نمایش Sandbox',
+        isActive: true,
+        updatedAt: new Date(),
+      }),
+    );
+    const agency = await userRepo.save(
+      userRepo.create({
+        role: 'AGENCY',
+        phone: `+9892${suffix}`,
+        fullName: 'آژانس پیش‌نمایش Sandbox',
+        isActive: true,
+        updatedAt: new Date(),
+      }),
+    );
+    await agencyProfileRepo.save(
+      agencyProfileRepo.create({
+        userId: agency.id,
+        licenseNo: `SB-${suffix}`,
+        managerName: 'مدیر Sandbox',
+        phone: agency.phone!,
+        email: `sandbox-${suffix}@example.test`,
+        city: 'تهران',
+        address: 'آدرس آزمایشی',
+        tier: 'NORMAL',
+        suspendedAt: null,
+        suspendReason: null,
+      }),
+    );
+
+    process.env.SANDBOX_SUPER_ADMIN_TENANT_ACCESS = 'true';
+    await userRepo.update({ id: owner.id }, { isSuperAdmin: true });
+
+    try {
+      const login = await request(app.getHttpServer())
+        .post('/auth/staff/login')
+        .send({ username: 'site.admin', password: 'Blujet@1404' });
+      const ownerToken = login.body.data.accessToken as string;
+
+      const directTenant = await request(app.getHttpServer())
+        .get('/bookings')
+        .set('Authorization', `Bearer ${ownerToken}`);
+      expect(directTenant.status).toBe(403);
+
+      const accounts = await request(app.getHttpServer())
+        .get('/auth/sandbox/tenant-accounts')
+        .set('Authorization', `Bearer ${ownerToken}`);
+      expect(accounts.status).toBe(200);
+      expect(accounts.body.data).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: customer.id, role: 'USER' }),
+          expect.objectContaining({ id: agency.id, role: 'AGENCY' }),
+        ]),
+      );
+
+      const customerPreview = await request(app.getHttpServer())
+        .post('/auth/sandbox/impersonate')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ targetUserId: customer.id });
+      expect(customerPreview.status).toBe(200);
+      expect(customerPreview.body.data.user).toMatchObject({
+        id: customer.id,
+        role: 'USER',
+        isSandboxImpersonation: true,
+      });
+
+      const agencyPreview = await request(app.getHttpServer())
+        .post('/auth/sandbox/impersonate')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ targetUserId: agency.id });
+      expect(agencyPreview.status).toBe(200);
+      const agencyProfile = await request(app.getHttpServer())
+        .get('/agency-portal/profile')
+        .set(
+          'Authorization',
+          `Bearer ${agencyPreview.body.data.accessToken as string}`,
+        );
+      expect(agencyProfile.status).toBe(200);
+      expect(agencyProfile.body.data.fullName).toBe(agency.fullName);
+    } finally {
+      if (previousSandboxFlag === undefined) {
+        delete process.env.SANDBOX_SUPER_ADMIN_TENANT_ACCESS;
+      } else {
+        process.env.SANDBOX_SUPER_ADMIN_TENANT_ACCESS = previousSandboxFlag;
+      }
+      await userRepo.update(
+        { id: owner.id },
+        { isSuperAdmin: originalOwnerFlag },
+      );
+      await agencyProfileRepo.delete({ userId: agency.id });
+      await userRepo.delete([customer.id, agency.id]);
     }
   });
 

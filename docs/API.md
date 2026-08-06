@@ -3100,7 +3100,7 @@ and revokes active refresh sessions after replacing the Argon2 hashes.
 One production owner account may be marked `isSuperAdmin=true`. It keeps the
 database role `SITE_ADMIN`, but `RolesGuard` grants it every **management
 staff** role protected endpoint. This elevation never grants `USER` or
-`AGENCY` tenant/owner endpoints. `PanelAccessGuard` also permits the owner to
+`AGENCY` tenant/owner endpoints directly. `PanelAccessGuard` also permits the owner to
 recover a disabled management panel. Every elevated login is audited.
 
 `POST /auth/staff/login` returns
@@ -3117,3 +3117,22 @@ command `npm run accounts:bootstrap:super-admin:prod -- --execute` requires
 `SUPER_ADMIN_PHONE`, and optionally `SUPER_ADMIN_USERNAME` (default
 `superadmin`). It refuses to convert an unrelated existing identity and emits
 the generated one-time password once after the transaction commits.
+
+### Temporary Sandbox tenant preview
+
+When `SANDBOX_SUPER_ADMIN_TENANT_ACCESS=true`, the owner may explicitly select
+an existing active customer or agency account in the management sidebar. The
+server issues a non-refreshable 15-minute access token whose `sub` and `role`
+belong to that selected account, while the owner's refresh cookie remains
+unchanged. Starting the preview is recorded as a `SECURITY` audit event. The
+UI shows a persistent Sandbox banner and returns to the owner by refreshing
+the unchanged owner session.
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/auth/sandbox/tenant-accounts` | owner super-admin + Sandbox flag | Lists up to 200 active `USER`/`AGENCY` accounts available for preview. |
+| POST | `/auth/sandbox/impersonate` | owner super-admin + Sandbox flag | Accepts `{ targetUserId }` and returns a 15-minute preview access token. |
+
+This switch defaults to `false` in Compose and must be set back to `false`
+before go-live. Turning it off immediately blocks creation of new preview
+tokens; already-issued preview tokens expire within 15 minutes.
