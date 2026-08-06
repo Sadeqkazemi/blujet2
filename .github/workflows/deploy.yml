@@ -88,7 +88,9 @@ jobs:
   deploy:
     needs: [backend, frontend, ml-service]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-22.04
+    # Deploy uses a separate runner pool so it cannot time out behind the
+    # three test jobs when GitHub's hosted Ubuntu 22 pool is saturated.
+    runs-on: ubuntu-24.04
     steps:
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1
