@@ -150,7 +150,10 @@ export class EmployeesService {
         })
       : [];
 
-    const passwordHash = await argon2.hash(dto.password);
+    // Phase 68: omitting `password` creates a passwordless account — the
+    // employee chooses their own password + registers their mobile via
+    // «راه‌اندازی اولین ورود» on first login.
+    const passwordHash = dto.password ? await argon2.hash(dto.password) : null;
     const employeeId = await this.userRepo.manager.transaction(async (tx) => {
       const employee = await tx.save(
         tx.create(User, {
@@ -192,7 +195,7 @@ export class EmployeesService {
       action: 'ایجاد حساب کارمند',
       detail: `کارمند «${dto.fullName}» (${dto.username}) توسط ${actor.fullName} ایجاد و اعلان برای ${
         deptLabel[dto.dept] ?? 'واحد سازمانی'
-      } ارسال شد.`,
+      } ارسال شد.${dto.password ? '' : ' بدون رمز اولیه؛ کارمند رمز و موبایل خود را در اولین ورود ثبت می‌کند.'}`,
       entityType: 'User',
       entityId: employeeId,
     });

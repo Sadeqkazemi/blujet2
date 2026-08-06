@@ -19,6 +19,7 @@ import {
   IsOptional,
   IsString,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 import { AdminsService } from './admins.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -58,14 +59,23 @@ export class CreateAdminDto {
   @IsIn(CREATABLE_ROLES)
   role: Role;
 
-  @ApiProperty({ example: 'Blujet@1404', minLength: 6 })
+  // Phase 68: omit entirely to create the account passwordless — the
+  // owner then chooses their own password + registers their mobile via
+  // «راه‌اندازی اولین ورود» (POST /auth/staff/first-login/otp/*) on first
+  // login. Supplying it keeps today's admin-assigns-a-temp-password flow.
+  @ApiPropertyOptional({ example: 'Blujet@1404', minLength: 6 })
+  @IsOptional()
   @IsString()
   @MinLength(6)
-  password: string;
+  password?: string;
 
-  @ApiProperty({ enum: ['sms', 'email'] })
+  @ApiPropertyOptional({
+    enum: ['sms', 'email'],
+    description: 'Ignored when `password` is omitted (nothing to deliver).',
+  })
+  @ValidateIf((o: CreateAdminDto) => !!o.password)
   @IsIn(['sms', 'email'])
-  delivery: 'sms' | 'email';
+  delivery?: 'sms' | 'email';
 
   @ApiProperty({
     description: 'از POST /auth/step-up/request (scope: ADMIN_ROLE_CHANGE)',

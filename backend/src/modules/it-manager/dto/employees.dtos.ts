@@ -34,10 +34,14 @@ export class CreateEmployeeDto {
   @MinLength(2)
   username: string;
 
-  @ApiProperty({ description: 'رمز عبور اولیه — حداقل ۶ کاراکتر' })
+  // Phase 68: omit to create the account passwordless — the owner
+  // chooses their own password + registers their mobile via
+  // «راه‌اندازی اولین ورود» on first login instead.
+  @ApiPropertyOptional({ description: 'رمز عبور اولیه — حداقل ۶ کاراکتر' })
+  @IsOptional()
   @IsString()
   @MinLength(6)
-  password: string;
+  password?: string;
 
   @ApiProperty({
     example: 'commercial',

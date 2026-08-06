@@ -141,8 +141,8 @@ export class AdminsService {
       email: string;
       username: string;
       role: Role;
-      password: string;
-      delivery: 'sms' | 'email';
+      password?: string;
+      delivery?: 'sms' | 'email';
       stepUpChallengeId: string;
       stepUpCode: string;
     },
@@ -171,7 +171,12 @@ export class AdminsService {
       });
     }
 
-    const passwordHash = await argon2.hash(dto.password);
+    // Phase 68: omitting `password` creates a passwordless account — the
+    // owner chooses their own password + registers their mobile via
+    // «راه‌اندازی اولین ورود» on first login instead of an admin-assigned
+    // temp password. `mustChangePassword` only means something once a
+    // password exists, so it stays false for the passwordless mode.
+    const passwordHash = dto.password ? await argon2.hash(dto.password) : null;
     const user = await this.userRepo.save(
       this.userRepo.create({
         role: dto.role,
@@ -179,7 +184,7 @@ export class AdminsService {
         email: dto.email,
         fullName: dto.fullName,
         passwordHash,
-        mustChangePassword: true,
+        mustChangePassword: !!dto.password,
         twoFactorEnabled: true,
         isActive: true,
         updatedAt: new Date(),
@@ -189,7 +194,7 @@ export class AdminsService {
     // Phase 14: a real send now backs this claim — SmsService logs a
     // genuine FAILED row when the account has no phone on file (create
     // never collects one), rather than the audit note alone asserting delivery.
-    if (dto.delivery === 'sms') {
+    if (dto.password && dto.delivery === 'sms') {
       await this.sms.send(
         user.phone,
         `رمز عبور موقت شما در بلوجت: ${dto.password}`,
@@ -202,7 +207,9 @@ export class AdminsService {
       actorRole: actor.role,
       category: 'ACCOUNT',
       action: 'ایجاد حساب مدیر / ادمین',
-      detail: `حساب «${dto.fullName}» (${ROLE_LABEL_FA[dto.role] ?? dto.role}) توسط ${actor.fullName} ایجاد و رمز اولیه از طریق ${dto.delivery === 'sms' ? 'پیامک' : 'ایمیل سازمانی'} ارسال شد.`,
+      detail: dto.password
+        ? `حساب «${dto.fullName}» (${ROLE_LABEL_FA[dto.role] ?? dto.role}) توسط ${actor.fullName} ایجاد و رمز اولیه از طریق ${dto.delivery === 'sms' ? 'پیامک' : 'ایمیل سازمانی'} ارسال شد.`
+        : `حساب «${dto.fullName}» (${ROLE_LABEL_FA[dto.role] ?? dto.role}) توسط ${actor.fullName} ایجاد شد — بدون رمز اولیه؛ کاربر رمز و موبایل خود را در اولین ورود ثبت می‌کند.`,
       entityType: 'User',
       entityId: user.id,
     });

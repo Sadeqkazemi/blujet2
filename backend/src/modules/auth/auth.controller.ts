@@ -18,6 +18,11 @@ import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { StepUpService } from './step-up.service';
 import { StaffLoginDto } from './dto/staff-login.dto';
+import { StaffLookupDto } from './dto/staff-lookup.dto';
+import {
+  RequestStaffFirstLoginOtpDto,
+  VerifyStaffFirstLoginOtpDto,
+} from './dto/staff-first-login.dto';
 import { AgencyLoginDto } from './dto/agency-login.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { VerifyTwoFactorDto } from './dto/verify-two-factor.dto';
@@ -108,6 +113,65 @@ export class AuthController {
         ip: req.ip,
       },
     );
+    setRefreshCookie(res, refreshToken);
+    return { success: true, data: { accessToken, user } };
+  }
+
+  @Post('staff/lookup')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({
+    summary:
+      'راه‌اندازی اولین ورود — گام ۱: بررسی نام کاربری و نیاز به راه‌اندازی اولیه',
+  })
+  @ApiResponse({ status: 200, description: 'needsSetup flag' })
+  @ApiResponse({ status: 404, description: 'Unknown staff username' })
+  async staffLookup(@Body() dto: StaffLookupDto) {
+    const result = await this.auth.staffLookup(dto.username);
+    return { success: true, data: result };
+  }
+
+  @Post('staff/first-login/otp/request')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({
+    summary:
+      'راه‌اندازی اولین ورود — گام ۲: ارسال کد یک‌بارمصرف به موبایل واردشده',
+  })
+  @ApiResponse({ status: 200, description: 'Challenge issued' })
+  @ApiResponse({ status: 404, description: 'Unknown staff username' })
+  @ApiResponse({ status: 409, description: 'Account already has a password' })
+  async requestStaffFirstLoginOtp(@Body() dto: RequestStaffFirstLoginOtpDto) {
+    const result = await this.auth.requestStaffFirstLoginOtp(
+      dto.username,
+      dto.mobile,
+    );
+    return { success: true, data: result };
+  }
+
+  @Post('staff/first-login/otp/verify')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({
+    summary:
+      'راه‌اندازی اولین ورود — گام ۳: تأیید کد، ثبت رمز و موبایل، صدور توکن',
+  })
+  @ApiResponse({ status: 200, description: 'Login complete' })
+  @ApiResponse({ status: 401, description: 'Invalid/expired code' })
+  @ApiResponse({ status: 409, description: 'Account already has a password' })
+  async verifyStaffFirstLoginOtp(
+    @Body() dto: VerifyStaffFirstLoginOtpDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { accessToken, refreshToken, user } =
+      await this.auth.verifyStaffFirstLoginOtp(
+        dto.challengeId,
+        dto.code,
+        dto.newPassword,
+        dto.mobile,
+        { userAgent: req.headers['user-agent'], ip: req.ip },
+      );
     setRefreshCookie(res, refreshToken);
     return { success: true, data: { accessToken, user } };
   }

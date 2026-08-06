@@ -1,7 +1,9 @@
 import {
+  ConflictException,
   ForbiddenException,
   Inject,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -476,6 +478,197 @@ export class AuthService {
     );
 
     const user = challenge.user;
+    const jwtUser: AuthenticatedUser = {
+      id: user.id,
+      role: user.role,
+      fullName: user.fullName,
+    };
+    const accessToken = this.signAccessToken(jwtUser);
+    const refreshToken = await this.issueRefreshToken(user.id, context);
+
+    return { accessToken, refreshToken, user: toAuthUserView(user) };
+  }
+
+  /** Phase 68 — «راه‌اندازی اولین ورود». Deliberately reveals whether a
+   * username exists (⚑ posture change, see docs/DB_SCHEMA.md Phase 68):
+   * the frontend needs to branch between "normal password screen" and
+   * "first-time setup screen" before the user has typed anything else. */
+  async staffLookup(username: string): Promise<{ needsSetup: boolean }> {
+    const user = await this.userRepo.findOneBy({ username });
+    if (
+      !user ||
+      !STAFF_ROLES.includes(user.role as (typeof STAFF_ROLES)[number])
+    ) {
+      throw new NotFoundException({
+        code: 'STAFF_ACCOUNT_NOT_FOUND',
+        message: 'چنین کاربری در سامانه ثبت نشده است.',
+      });
+    }
+    return { needsSetup: !user.passwordHash };
+  }
+
+  /** Sends the OTP to the SUBMITTED mobile — nothing is persisted yet.
+   * The chosen password/mobile only ever live in the frontend's form
+   * state between this call and `verifyStaffFirstLoginOtp`, same as
+   * every other multi-step OTP flow in this module (no staging columns). */
+  async requestStaffFirstLoginOtp(
+    username: string,
+    mobile: string,
+  ): Promise<{ challengeId: string }> {
+    const user = await this.userRepo.findOneBy({ username });
+    if (
+      !user ||
+      !STAFF_ROLES.includes(user.role as (typeof STAFF_ROLES)[number])
+    ) {
+      throw new NotFoundException({
+        code: 'STAFF_ACCOUNT_NOT_FOUND',
+        message: 'چنین کاربری در سامانه ثبت نشده است.',
+      });
+    }
+    if (user.passwordHash) {
+      throw new ConflictException({
+        code: 'ALREADY_SET_UP',
+        message: 'برای این کاربر پیش‌تر رمز عبور ثبت شده است.',
+      });
+    }
+
+    await this.challengeRepo.update(
+      {
+        userId: user.id,
+        purpose: 'STAFF_FIRST_LOGIN_SETUP',
+        consumedAt: IsNull(),
+      },
+      { consumedAt: new Date() },
+    );
+
+    const code = generateSixDigitCode();
+    const challenge = await this.challengeRepo.save(
+      this.challengeRepo.create({
+        userId: user.id,
+        purpose: 'STAFF_FIRST_LOGIN_SETUP',
+        codeHash: await argon2.hash(code),
+        expiresAt: new Date(Date.now() + TWO_FACTOR_TTL_MS),
+      }),
+    );
+
+    await this.twoFactorProvider.sendCode(
+      {
+        id: user.id,
+        fullName: user.fullName,
+        email: user.email,
+        phone: mobile,
+      },
+      code,
+    );
+
+    return { challengeId: challenge.id };
+  }
+
+  async verifyStaffFirstLoginOtp(
+    challengeId: string,
+    code: string,
+    newPassword: string,
+    mobile: string,
+    context: { userAgent?: string; ip?: string },
+  ): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    user: AuthUserView;
+  }> {
+    const challenge = await this.challengeRepo.findOne({
+      where: { id: challengeId },
+      relations: { user: true },
+    });
+
+    if (!challenge || challenge.purpose !== 'STAFF_FIRST_LOGIN_SETUP') {
+      throw new UnauthorizedException({
+        code: 'TWO_FACTOR_INVALID',
+        message: 'کد نامعتبر است.',
+      });
+    }
+    if (challenge.consumedAt) {
+      throw new UnauthorizedException({
+        code: 'TWO_FACTOR_INVALID',
+        message: 'این کد قبلاً استفاده شده است.',
+      });
+    }
+    if (challenge.expiresAt < new Date()) {
+      throw new UnauthorizedException({
+        code: 'TWO_FACTOR_EXPIRED',
+        message: 'کد منقضی شده است.',
+      });
+    }
+    if (challenge.attempts >= TWO_FACTOR_MAX_ATTEMPTS) {
+      throw new UnauthorizedException({
+        code: 'TWO_FACTOR_INVALID',
+        message: 'تعداد تلاش‌های مجاز به پایان رسید.',
+      });
+    }
+
+    const codeValid = await argon2.verify(challenge.codeHash, code);
+    if (!codeValid) {
+      await this.challengeRepo.increment({ id: challenge.id }, 'attempts', 1);
+      throw new UnauthorizedException({
+        code: 'TWO_FACTOR_INVALID',
+        message: 'کد وارد شده نادرست است.',
+      });
+    }
+
+    const passwordHash = await argon2.hash(newPassword);
+    const normalizedPhone = normalizeIranPhone(mobile);
+
+    const user = await this.userRepo.manager.transaction(async (tx) => {
+      // Re-lock and re-check: guards against a second concurrent setup
+      // attempt (or an admin-issued reset) racing this same account
+      // between challenge creation and this confirm step.
+      const locked = await tx
+        .createQueryBuilder(User, 'u')
+        .setLock('pessimistic_write')
+        .where('u.id = :id', { id: challenge.userId })
+        .getOne();
+      if (!locked) {
+        throw new NotFoundException({
+          code: ErrorCode.NOT_FOUND,
+          message: 'حساب کاربری یافت نشد.',
+        });
+      }
+      if (locked.passwordHash) {
+        throw new ConflictException({
+          code: 'ALREADY_SET_UP',
+          message: 'برای این کاربر پیش‌تر رمز عبور ثبت شده است.',
+        });
+      }
+
+      await tx.update(
+        User,
+        { id: locked.id },
+        {
+          passwordHash,
+          phone: normalizedPhone,
+          twoFactorEnabled: true,
+          mustChangePassword: false,
+          lastLoginAt: new Date(),
+          updatedAt: new Date(),
+        },
+      );
+      await tx.update(
+        TwoFactorChallenge,
+        { id: challenge.id },
+        { consumedAt: new Date() },
+      );
+      return { ...locked, passwordHash, phone: normalizedPhone };
+    });
+
+    await this.audit.record({
+      actorId: user.id,
+      actorRole: user.role,
+      category: 'ACCOUNT',
+      action: 'راه‌اندازی اولین ورود',
+      detail: `${user.fullName} رمز عبور و شماره موبایل خود را برای اولین بار ثبت کرد.`,
+      entityType: 'User',
+      entityId: user.id,
+    });
+
     const jwtUser: AuthenticatedUser = {
       id: user.id,
       role: user.role,

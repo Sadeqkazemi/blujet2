@@ -32,6 +32,7 @@ export const TwoFactorPurpose = {
   EMAIL_VERIFY: 'EMAIL_VERIFY',
   PASSWORD_RESET_EMAIL: 'PASSWORD_RESET_EMAIL',
   AGENCY_PASSWORD_RESET: 'AGENCY_PASSWORD_RESET',
+  STAFF_FIRST_LOGIN_SETUP: 'STAFF_FIRST_LOGIN_SETUP',
 } as const;
 export type TwoFactorPurpose =
   (typeof TwoFactorPurpose)[keyof typeof TwoFactorPurpose];
