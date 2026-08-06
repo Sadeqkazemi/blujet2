@@ -88,7 +88,9 @@ jobs:
 
   deploy:
     needs: [backend, frontend, ml-service]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     # Deploy uses a separate runner pool so it cannot time out behind the
     # three test jobs when GitHub's hosted Ubuntu 22 pool is saturated.
     runs-on: ubuntu-24.04
