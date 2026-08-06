@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { TwoFactorProvider } from './two-factor-provider.interface';
 import { SmsService } from '../../sms/sms.service';
+import { isSandboxAuthEnabled } from '../../../common/sandbox-auth';
 
 /** SMS-backed provider. Capturing a code is allowed only outside production
  * so deterministic automated OTP tests can inspect it. */
@@ -19,6 +20,7 @@ export class MockTwoFactorProvider implements TwoFactorProvider {
     user: { id: string; fullName: string; phone: string | null },
     code: string,
   ): Promise<void> {
+    const sandbox = isSandboxAuthEnabled();
     const production = process.env.NODE_ENV === 'production';
     if (!production) {
       this.lastCodeByUserId.set(user.id, code);
@@ -34,6 +36,12 @@ export class MockTwoFactorProvider implements TwoFactorProvider {
         'OTP',
       );
       if (!result.success) {
+        if (sandbox) {
+          this.logger.warn(
+            `OTP delivery unavailable for ${user.id}; sandbox mock code remains valid.`,
+          );
+          return;
+        }
         throw new ServiceUnavailableException({
           code: 'OTP_DELIVERY_UNAVAILABLE',
           message: 'ارسال کد ورود انجام نشد؛ لطفاً بعداً دوباره تلاش کنید.',
@@ -42,11 +50,17 @@ export class MockTwoFactorProvider implements TwoFactorProvider {
       return;
     }
 
-    if (production) {
+    if (production && !sandbox) {
       throw new ServiceUnavailableException({
         code: 'OTP_DELIVERY_UNAVAILABLE',
         message: 'برای این حساب شماره موبایل معتبر ثبت نشده است.',
       });
+    }
+
+    if (sandbox) {
+      this.logger.warn(
+        `No mobile is registered for ${user.id}; sandbox mock code remains valid.`,
+      );
     }
   }
 

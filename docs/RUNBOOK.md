@@ -200,3 +200,18 @@ docker compose --env-file .env -f docker-compose.prod.yml exec -T \
 
 Keep the sentinel so a later deployment cannot recreate the exception. After
 cleanup, securely delete only the credential file from the server.
+# Hosted Sandbox authentication
+
+For a temporary UAT deployment that must use OTP `123456`, set both flags in
+the server environment before building/deploying:
+
+```env
+AUTH_SANDBOX_ENABLED=true
+VITE_SANDBOX_AUTH=true
+```
+
+The backend flag accepts the deterministic OTP and tolerates an unavailable
+SMS vendor; the Vite flag is build-time and displays the matching hint and
+first-login controls. Remove both flags (or set them to `false`) before a real
+production launch, then rebuild the frontend image. Ordinary production is
+fail-closed by default.

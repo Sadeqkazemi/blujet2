@@ -34,6 +34,11 @@ import {
   AgencyPasswordResetRequestDto,
   AgencyPasswordResetVerifyDto,
 } from './dto/agency-password-reset.dto';
+import {
+  AgencyFirstLoginRequestDto,
+  StaffFirstLoginRequestDto,
+  StaffLoginModeDto,
+} from './dto/sandbox-first-login.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { SkipMustChangePassword } from '../../common/decorators/skip-must-change-password.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -78,6 +83,30 @@ export class AuthController {
     private readonly auth: AuthService,
     private readonly stepUp: StepUpService,
   ) {}
+
+  @Post('staff/login-mode')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Resolve the sandbox staff first-login UI mode' })
+  async staffLoginMode(@Body() dto: StaffLoginModeDto) {
+    const data = await this.auth.staffLoginMode(dto.username);
+    return { success: true, data };
+  }
+
+  @Post('staff/first-login/request')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({
+    summary: 'Sandbox staff first login: set password/mobile and issue OTP',
+  })
+  async staffFirstLogin(@Body() dto: StaffFirstLoginRequestDto) {
+    const data = await this.auth.requestStaffFirstLogin(
+      dto.username,
+      dto.phone,
+      dto.newPassword,
+    );
+    return { success: true, data };
+  }
 
   @Post('staff/login')
   @HttpCode(HttpStatus.OK)
@@ -154,11 +183,46 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const { accessToken, refreshToken, user } = await this.auth.agencyLogin(
+    const result = await this.auth.agencyLogin(dto.phone, dto.password, {
+      userAgent: req.headers['user-agent'],
+      ip: req.ip,
+    });
+    if ('challengeId' in result) {
+      return { success: true, data: result };
+    }
+    const { accessToken, refreshToken, user } = result;
+    setRefreshCookie(res, refreshToken);
+    return { success: true, data: { accessToken, user } };
+  }
+
+  @Post('agency/first-login/request')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({
+    summary: 'Sandbox agency first login: set password and issue OTP',
+  })
+  async agencyFirstLogin(@Body() dto: AgencyFirstLoginRequestDto) {
+    const data = await this.auth.requestAgencyFirstLogin(
       dto.phone,
-      dto.password,
-      { userAgent: req.headers['user-agent'], ip: req.ip },
+      dto.newPassword,
     );
+    return { success: true, data };
+  }
+
+  @Post('agency/login/verify')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Verify agency sandbox login OTP and issue tokens' })
+  async agencyLoginVerify(
+    @Body() dto: VerifyTwoFactorDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { accessToken, refreshToken, user } =
+      await this.auth.verifyAgencyLogin(dto.challengeId, dto.code, {
+        userAgent: req.headers['user-agent'],
+        ip: req.ip,
+      });
     setRefreshCookie(res, refreshToken);
     return { success: true, data: { accessToken, user } };
   }

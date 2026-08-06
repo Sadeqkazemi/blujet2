@@ -60,6 +60,7 @@ services:
       # panel; a real PSP adapter must replace `disabled` before ticket sales.
       SMS_PROVIDER: kavenegar
       PAYMENT_GATEWAY: ${PAYMENT_GATEWAY:-disabled}
+      AUTH_SANDBOX_ENABLED: ${AUTH_SANDBOX_ENABLED:-false}
       SENTRY_DSN: ${SENTRY_DSN:-}
       CORS_ORIGINS: http://${SERVER_IP}
       PII_ENCRYPTION_KEY: ${PII_ENCRYPTION_KEY}
@@ -102,6 +103,7 @@ services:
         # time (see frontend/nginx.conf).
         VITE_API_URL: ''
         VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
+        VITE_SANDBOX_AUTH: ${VITE_SANDBOX_AUTH:-false}
     restart: unless-stopped
     depends_on:
       backend:

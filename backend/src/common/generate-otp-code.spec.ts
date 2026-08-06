@@ -6,6 +6,8 @@ describe('generateOtpCode', () => {
   beforeEach(() => {
     process.env = { ...env, NODE_ENV: 'development' };
     delete process.env.DEV_FIXED_OTP_CODE;
+    delete process.env.AUTH_SANDBOX_ENABLED;
+    delete process.env.AUTH_SANDBOX_OTP;
   });
 
   afterAll(() => {
@@ -27,5 +29,11 @@ describe('generateOtpCode', () => {
     const b = generateOtpCode();
     expect(a).toMatch(/^\d{6}$/);
     expect(b).toMatch(/^\d{6}$/);
+  });
+
+  it('uses 123456 in an explicitly enabled production-mode sandbox', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.AUTH_SANDBOX_ENABLED = 'true';
+    expect(generateOtpCode()).toBe('123456');
   });
 });

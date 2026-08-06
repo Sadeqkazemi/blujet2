@@ -2,12 +2,13 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { ApiRequestError } from '../../api/envelope';
+import { requestStaffFirstLogin, resolveStaffLoginMode } from '../../api/auth';
 import { StaffLoginLayout } from './StaffLoginLayout';
 
 const FORGOT_TOAST =
   'برای بازیابی رمز عبور، با واحد فناوری اطلاعات (مدیر IT) تماس بگیرید';
 
-type LoginPhase = 'username' | 'password';
+type LoginPhase = 'username' | 'password' | 'firstSetup';
 
 function ArrowLeftIcon() {
   return (
@@ -67,6 +68,8 @@ export default function LoginPage() {
   const [phase, setPhase] = useState<LoginPhase>('username');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [phone, setPhone] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -78,7 +81,7 @@ export default function LoginPage() {
     return () => window.clearTimeout(timer);
   }, [toast]);
 
-  function onUsernameSubmit(e: FormEvent) {
+  async function onUsernameSubmit(e: FormEvent) {
     e.preventDefault();
     if (!username.trim()) {
       setError('نام کاربری را وارد کنید.');
@@ -86,7 +89,48 @@ export default function LoginPage() {
     }
     setError(null);
     setPassword('');
-    setPhase('password');
+    setSubmitting(true);
+    try {
+      const { mode } = await resolveStaffLoginMode(username.trim());
+      setPhase(mode === 'FIRST_LOGIN_SETUP' ? 'firstSetup' : 'password');
+    } catch {
+      // A mode lookup failure must not block established password login.
+      setPhase('password');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function onFirstSetupSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (password.length < 8) {
+      setError('رمز عبور باید حداقل ۸ کاراکتر و شامل حروف بزرگ، کوچک، عدد و نماد باشد.');
+      return;
+    }
+    if (password !== passwordConfirm) {
+      setError('تکرار رمز عبور با رمز جدید یکسان نیست.');
+      return;
+    }
+    if (!/^09\d{9}$/.test(phone.replace(/\s/g, ''))) {
+      setError('شماره موبایل معتبر وارد کنید؛ مثال: 09121234567');
+      return;
+    }
+    setError(null);
+    setSubmitting(true);
+    try {
+      const { challengeId } = await requestStaffFirstLogin(
+        username.trim(),
+        phone,
+        password,
+      );
+      navigate('/two-factor', {
+        state: { challengeId, firstLogin: true, phone },
+      });
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : 'خطا در راه‌اندازی اولین ورود.');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   async function onPasswordSubmit(e: FormEvent) {
@@ -122,6 +166,8 @@ export default function LoginPage() {
   function editUsername() {
     setPhase('username');
     setPassword('');
+    setPasswordConfirm('');
+    setPhone('');
     setShowPassword(false);
     setError(null);
   }
@@ -164,6 +210,75 @@ export default function LoginPage() {
             <ArrowLeftIcon />
           </button>
         </form>
+      ) : phase === 'firstSetup' ? (
+        <div className="animate-[fadeUp_.25s_ease]">
+          <button type="button" onClick={editUsername} className="mb-4 inline-flex items-center gap-1.5 text-[11.5px] font-bold text-[#64748b] transition hover:text-accent">
+            <span aria-hidden>‹</span>
+            ویرایش نام کاربری
+          </button>
+          <div className="mb-4 flex h-[46px] w-[46px] items-center justify-center rounded-[14px] bg-gradient-to-br from-[#eff6ff] to-[#dbeafe] text-accent">
+            <UserIcon />
+          </div>
+          <h2 className="mb-1.5 text-[19px] font-black text-[#0f172a]">راه‌اندازی اولین ورود</h2>
+          <p className="mb-5 text-[11.5px] leading-[1.9] text-[#64748b]">
+            برای <span dir="ltr" className="font-bold text-[#0f172a]">{username.trim()}</span> رمز عبور و شماره موبایل خود را ثبت کنید.
+          </p>
+
+          <form onSubmit={onFirstSetupSubmit} className="space-y-3.5" noValidate>
+            <div>
+              <label htmlFor="first-password" className="mb-[7px] block text-[11px] font-bold text-[#334155]">رمز عبور جدید</label>
+              <input
+                id="first-password"
+                data-testid="staff-first-password"
+                type="password"
+                dir="ltr"
+                autoComplete="new-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="حداقل ۸ کاراکتر"
+                className="h-[46px] w-full rounded-xl border-[1.5px] border-[#e2e8f0] bg-[#f8fafc] px-3.5 text-right text-[13px] outline-none focus:border-accent focus:bg-white"
+              />
+            </div>
+            <div>
+              <label htmlFor="first-password-confirm" className="mb-[7px] block text-[11px] font-bold text-[#334155]">تکرار رمز عبور</label>
+              <input
+                id="first-password-confirm"
+                data-testid="staff-first-password-confirm"
+                type="password"
+                dir="ltr"
+                autoComplete="new-password"
+                value={passwordConfirm}
+                onChange={(e) => setPasswordConfirm(e.target.value)}
+                placeholder="تکرار رمز عبور"
+                className="h-[46px] w-full rounded-xl border-[1.5px] border-[#e2e8f0] bg-[#f8fafc] px-3.5 text-right text-[13px] outline-none focus:border-accent focus:bg-white"
+              />
+            </div>
+            <div>
+              <label htmlFor="first-phone" className="mb-[7px] block text-[11px] font-bold text-[#334155]">شماره موبایل</label>
+              <input
+                id="first-phone"
+                data-testid="staff-first-phone"
+                type="tel"
+                inputMode="numeric"
+                dir="ltr"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, '').slice(0, 11))}
+                placeholder="09121234567"
+                className="font-num h-[46px] w-full rounded-xl border-[1.5px] border-[#e2e8f0] bg-[#f8fafc] px-3.5 text-right text-[13px] outline-none focus:border-accent focus:bg-white"
+              />
+            </div>
+            {(import.meta.env.DEV || import.meta.env.VITE_SANDBOX_AUTH === 'true') && (
+              <div data-testid="staff-sandbox-hint" className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-[11px] leading-5 text-blue-700">
+                حالت Sandbox فعال است؛ اگر پیامک دریافت نشد، کد ۱۲۳۴۵۶ را وارد کنید.
+              </div>
+            )}
+            {error && <ErrorMessage>{error}</ErrorMessage>}
+            <button type="submit" disabled={submitting} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-accent to-navy-2 text-[13.5px] font-extrabold text-white shadow-lg disabled:opacity-60">
+              {submitting ? 'در حال ثبت…' : 'ثبت و ارسال کد یک‌بارمصرف'}
+              {!submitting && <ArrowLeftIcon />}
+            </button>
+          </form>
+        </div>
       ) : (
         <div className="animate-[fadeUp_.25s_ease]">
           <button type="button" onClick={editUsername} className="mb-4 inline-flex items-center gap-1.5 text-[11.5px] font-bold text-[#64748b] transition hover:text-accent">
@@ -221,7 +336,7 @@ export default function LoginPage() {
             {error && <div className="mb-4"><ErrorMessage>{error}</ErrorMessage></div>}
 
             <button type="submit" disabled={submitting} className="flex h-12 w-full items-center justify-center gap-[9px] rounded-xl bg-gradient-to-br from-accent to-navy-2 text-[13.5px] font-extrabold text-white shadow-[0_14px_28px_-10px_rgba(37,99,235,.55)] transition hover:brightness-110 disabled:opacity-60">
-              {submitting ? 'در حال بررسی…' : 'ورود و ادامه'}
+              {submitting ? 'در حال بررسی…' : 'ارسال کد یک‌بارمصرف'}
               {!submitting && <ArrowLeftIcon />}
             </button>
           </form>

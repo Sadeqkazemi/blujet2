@@ -1,10 +1,15 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import LoginPage from './LoginPage';
 import { ApiRequestError } from '../../api/envelope';
 import * as useAuthModule from '../../hooks/useAuth';
+import * as authApi from '../../api/auth';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 function renderLoginPage() {
   return render(
@@ -20,7 +25,6 @@ function renderLoginJourney() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/panel" element={<div>temporary panel reached</div>} />
-        <Route path="/required-password-change" element={<div>password change reached</div>} />
         <Route path="/two-factor" element={<div>two factor reached</div>} />
       </Routes>
     </MemoryRouter>,
@@ -48,6 +52,24 @@ const baseAuth = {
 };
 
 describe('LoginPage', () => {
+  it('runs the sandbox first-login setup before the OTP screen', async () => {
+    vi.spyOn(authApi, 'resolveStaffLoginMode').mockResolvedValue({ mode: 'FIRST_LOGIN_SETUP' });
+    const firstLogin = vi
+      .spyOn(authApi, 'requestStaffFirstLogin')
+      .mockResolvedValue({ challengeId: 'first-challenge' });
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue(baseAuth);
+    renderLoginJourney();
+
+    await continueWithUsername('ceo');
+    await userEvent.type(screen.getByTestId('staff-first-password'), 'Sandbox@1405');
+    await userEvent.type(screen.getByTestId('staff-first-password-confirm'), 'Sandbox@1405');
+    await userEvent.type(screen.getByTestId('staff-first-phone'), '09121234567');
+    await userEvent.click(screen.getByRole('button', { name: 'ثبت و ارسال کد یک‌بارمصرف' }));
+
+    expect(firstLogin).toHaveBeenCalledWith('ceo', '09121234567', 'Sandbox@1405');
+    expect(await screen.findByText('two factor reached')).toBeInTheDocument();
+  });
+
   it('enters the panel directly only for a temporary password-only response', async () => {
     const requestLogin = vi.fn().mockResolvedValue({
       loginMode: 'TEMPORARY_PASSWORD_ONLY' as const,
@@ -69,7 +91,7 @@ describe('LoginPage', () => {
 
     await continueWithUsername('uat.it');
     await userEvent.type(screen.getByLabelText('رمز عبور'), 'Strong!Password7');
-    await userEvent.click(screen.getByRole('button', { name: 'ورود و ادامه' }));
+    await userEvent.click(screen.getByRole('button', { name: 'ارسال کد یک‌بارمصرف' }));
 
     expect(await screen.findByText('temporary panel reached')).toBeInTheDocument();
   });
@@ -87,36 +109,9 @@ describe('LoginPage', () => {
 
     await continueWithUsername('finance');
     await userEvent.type(screen.getByLabelText('رمز عبور'), 'Strong!Password7');
-    await userEvent.click(screen.getByRole('button', { name: 'ورود و ادامه' }));
+    await userEvent.click(screen.getByRole('button', { name: 'ارسال کد یک‌بارمصرف' }));
 
     expect(await screen.findByText('two factor reached')).toBeInTheDocument();
-  });
-
-  it('sends a first-login super admin directly to required password change without OTP', async () => {
-    const requestLogin = vi.fn().mockResolvedValue({
-      loginMode: 'PASSWORD_ONLY' as const,
-      accessToken: 'owner-access-token',
-      user: {
-        id: 'owner-1',
-        fullName: 'مالک سامانه',
-        role: 'SITE_ADMIN' as const,
-        preferredLocale: 'FA' as const,
-        mustChangePassword: true,
-        isSuperAdmin: true,
-      },
-    });
-    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
-      ...baseAuth,
-      requestLogin,
-    });
-    renderLoginJourney();
-
-    await continueWithUsername('superadmin');
-    await userEvent.type(screen.getByLabelText('رمز عبور'), 'OneTime!Password7');
-    await userEvent.click(screen.getByRole('button', { name: 'ورود و ادامه' }));
-
-    expect(await screen.findByText('password change reached')).toBeInTheDocument();
-    expect(screen.queryByText('two factor reached')).not.toBeInTheDocument();
   });
 
   it('renders RTL with Persian labels', () => {
@@ -167,7 +162,7 @@ describe('LoginPage', () => {
 
     await continueWithUsername('finance');
     await userEvent.type(screen.getByLabelText('رمز عبور'), 'wrong-password');
-    await userEvent.click(screen.getByRole('button', { name: 'ورود و ادامه' }));
+    await userEvent.click(screen.getByRole('button', { name: 'ارسال کد یک‌بارمصرف' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('نام کاربری یا رمز عبور نادرست است.');
   });

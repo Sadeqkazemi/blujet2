@@ -8,13 +8,14 @@ import * as useLocaleModule from '../../hooks/useLocale';
 import * as agenciesApi from '../../api/agencies';
 import * as authApi from '../../api/auth';
 
-function mockAuth(agencyLogin = vi.fn(), signOut = vi.fn()) {
+function mockAuth(agencyLogin = vi.fn(), signOut = vi.fn(), confirmAgencyTwoFactor = vi.fn()) {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status: 'unauthenticated',
     user: null,
     requestLogin: vi.fn(),
     confirmTwoFactor: vi.fn(),
     agencyLogin,
+    confirmAgencyTwoFactor,
     signOut,
   });
 }
@@ -25,9 +26,59 @@ function mockLocale(locale: 'fa' | 'en' | 'ar') {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
 });
 
 describe('AgencyLoginPage', () => {
+  it('requires and verifies an agency OTP when sandbox login returns a challenge', async () => {
+    const agencyLogin = vi.fn().mockResolvedValue({ loginMode: 'TWO_FACTOR', challengeId: 'agency-challenge' });
+    const confirm = vi.fn().mockResolvedValue({
+      id: 'a1',
+      fullName: 'آژانس تست',
+      role: 'AGENCY',
+      preferredLocale: 'FA',
+      mustChangePassword: false,
+    });
+    mockAuth(agencyLogin, vi.fn(), confirm);
+    render(
+      <MemoryRouter>
+        <AgencyLoginPage />
+      </MemoryRouter>,
+    );
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText('شماره تماس آژانس'), '+989120000002');
+    await user.type(screen.getByLabelText('رمز عبور'), 'Blujet@1404');
+    await user.click(screen.getByRole('button', { name: 'ورود به پنل آژانس' }));
+    await user.type(await screen.findByTestId('agency-login-otp'), '123456');
+    await user.click(screen.getByRole('button', { name: 'تأیید و ورود به پنل' }));
+
+    expect(confirm).toHaveBeenCalledWith('agency-challenge', '123456');
+  });
+
+  it('activates an agency first login with a chosen password in sandbox', async () => {
+    vi.stubEnv('VITE_SANDBOX_AUTH', 'true');
+    const requestFirst = vi
+      .spyOn(authApi, 'requestAgencyFirstLogin')
+      .mockResolvedValue({ challengeId: 'agency-first-challenge' });
+    mockAuth();
+    render(
+      <MemoryRouter>
+        <AgencyLoginPage />
+      </MemoryRouter>,
+    );
+
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId('agency-first-login'));
+    await user.type(screen.getByLabelText('شماره تماس آژانس'), '09121234567');
+    await user.type(screen.getByTestId('agency-first-password'), 'Agency@1405');
+    await user.type(screen.getByTestId('agency-first-password-confirm'), 'Agency@1405');
+    await user.click(screen.getByRole('button', { name: 'ثبت و ارسال کد' }));
+
+    expect(requestFirst).toHaveBeenCalledWith('09121234567', 'Agency@1405');
+    expect(await screen.findByTestId('agency-login-otp')).toBeInTheDocument();
+  });
+
   it('requires phone and password before submitting', async () => {
     const agencyLogin = vi.fn();
     mockAuth(agencyLogin);

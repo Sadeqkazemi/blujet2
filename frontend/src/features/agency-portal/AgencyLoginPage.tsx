@@ -4,6 +4,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { ApiRequestError } from '../../api/envelope';
 import { requestAgencySignupOtp, submitAgencyRequest } from '../../api/agencies';
 import {
+  requestAgencyFirstLogin,
   requestAgencyPasswordReset,
   setPassword as apiSetPassword,
   verifyAgencyPasswordReset,
@@ -297,12 +298,16 @@ const inputStyle: CSSProperties = {
 };
 
 function AgencyLoginForm() {
-  const { agencyLogin, signOut } = useAuth();
+  const { agencyLogin, confirmAgencyTwoFactor, signOut } = useAuth();
   const { locale } = useLocale();
   const t = STR[locale];
   const navigate = useNavigate();
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [phase, setPhase] = useState<'login' | 'setup' | 'otp'>('login');
+  const [challengeId, setChallengeId] = useState('');
+  const [otp, setOtp] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [forgotOpen, setForgotOpen] = useState(false);
@@ -321,13 +326,119 @@ function AgencyLoginForm() {
     setError(null);
     setSubmitting(true);
     try {
-      const loggedIn = await agencyLogin(phone.trim(), password);
-      navigate(loggedIn.mustChangePassword ? '/required-password-change' : '/agency', { replace: true });
+      const result = await agencyLogin(phone.trim(), password);
+      if ('challengeId' in result) {
+        setChallengeId(result.challengeId);
+        setPhase('otp');
+      } else {
+        navigate(result.mustChangePassword ? '/required-password-change' : '/agency', { replace: true });
+      }
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.loginFailedFallback);
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function onSetupSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!phoneValid || password.length < 8) {
+      setError('شماره موبایل معتبر و رمز عبور قوی حداقل ۸ کاراکتری وارد کنید.');
+      return;
+    }
+    if (password !== passwordConfirm) {
+      setError('تکرار رمز عبور با رمز جدید یکسان نیست.');
+      return;
+    }
+    setError(null);
+    setSubmitting(true);
+    try {
+      const result = await requestAgencyFirstLogin(phone, password);
+      setChallengeId(result.challengeId);
+      setPhase('otp');
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : 'خطا در فعال‌سازی اولین ورود آژانس.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function onOtpSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (otp.length !== 6 || !confirmAgencyTwoFactor) {
+      setError('کد ۶ رقمی را کامل وارد کنید.');
+      return;
+    }
+    setError(null);
+    setSubmitting(true);
+    try {
+      const loggedIn = await confirmAgencyTwoFactor(challengeId, otp);
+      navigate(loggedIn.mustChangePassword ? '/required-password-change' : '/agency', { replace: true });
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : 'خطا در تأیید کد.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (phase === 'otp') {
+    return (
+      <form onSubmit={onOtpSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }} noValidate>
+        <button type="button" onClick={() => { setPhase('login'); setOtp(''); setError(null); }} style={{ alignSelf: 'flex-start', border: 0, background: 'none', color: NAVY, cursor: 'pointer', fontFamily: 'inherit' }}>
+          {locale === 'en' ? 'Edit login information' : 'ویرایش اطلاعات ورود'}
+        </button>
+        <h2 style={{ margin: 0, fontSize: 20, color: NAVY }}>{locale === 'en' ? 'Enter verification code' : 'کد تأیید را وارد کنید'}</h2>
+        <p style={{ margin: 0, fontSize: 12, color: '#7d8ba0', lineHeight: 2 }}>
+          {locale === 'en' ? 'Enter the 6-digit code sent to the agency mobile.' : 'کد ۶ رقمی ارسال‌شده به موبایل آژانس را وارد کنید.'}
+        </p>
+        <input
+          data-testid="agency-login-otp"
+          aria-label={locale === 'en' ? 'Verification code' : 'کد تأیید'}
+          inputMode="numeric"
+          dir="ltr"
+          maxLength={6}
+          value={otp}
+          onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+          autoComplete="one-time-code"
+          style={{ ...inputStyle, textAlign: 'center', fontSize: 20, letterSpacing: '0.35em' }}
+        />
+        {(import.meta.env.DEV || import.meta.env.VITE_SANDBOX_AUTH === 'true') && (
+          <div data-testid="agency-sandbox-hint" style={{ border: '1px solid #dbeafe', background: '#eff6ff', color: '#1d4ed8', borderRadius: 12, padding: '9px 12px', fontSize: 11, lineHeight: 1.8 }}>
+            {locale === 'en' ? 'Sandbox: if no SMS arrives, use 123456.' : 'حالت Sandbox: اگر پیامک دریافت نشد، کد ۱۲۳۴۵۶ را وارد کنید.'}
+          </div>
+        )}
+        {error && <p role="alert" style={{ margin: 0, fontSize: 12, color: '#e5484d' }}>{error}</p>}
+        <button type="submit" disabled={submitting || otp.length !== 6} style={primaryButtonStyle(!submitting && otp.length === 6)}>
+          {submitting ? (locale === 'en' ? 'Checking…' : 'در حال بررسی…') : (locale === 'en' ? 'Verify and enter panel' : 'تأیید و ورود به پنل')}
+        </button>
+      </form>
+    );
+  }
+
+  if (phase === 'setup') {
+    return (
+      <form onSubmit={onSetupSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }} noValidate>
+        <button type="button" onClick={() => { setPhase('login'); setError(null); }} style={{ alignSelf: 'flex-start', border: 0, background: 'none', color: NAVY, cursor: 'pointer', fontFamily: 'inherit' }}>
+          {locale === 'en' ? 'Back to login' : 'بازگشت به ورود'}
+        </button>
+        <h2 style={{ margin: 0, fontSize: 20, color: NAVY }}>{locale === 'en' ? 'First login activation' : 'فعال‌سازی اولین ورود آژانس'}</h2>
+        <p style={{ margin: 0, fontSize: 12, color: '#7d8ba0', lineHeight: 2 }}>
+          {locale === 'en' ? 'Set your portal password; ownership is verified by SMS.' : 'رمز پنل را تعیین کنید؛ مالکیت شماره با کد پیامکی تأیید می‌شود.'}
+        </p>
+        <input aria-label={t.phoneLabel} type="tel" dir="ltr" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="09121234567" style={inputStyle} />
+        <input data-testid="agency-first-password" aria-label={locale === 'en' ? 'New password' : 'رمز عبور جدید'} type="password" dir="ltr" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" placeholder={locale === 'en' ? 'Strong password' : 'رمز قوی حداقل ۸ کاراکتر'} style={inputStyle} />
+        <input data-testid="agency-first-password-confirm" aria-label={locale === 'en' ? 'Confirm password' : 'تکرار رمز عبور'} type="password" dir="ltr" value={passwordConfirm} onChange={(e) => setPasswordConfirm(e.target.value)} autoComplete="new-password" placeholder={locale === 'en' ? 'Repeat password' : 'تکرار رمز عبور'} style={inputStyle} />
+        {(import.meta.env.DEV || import.meta.env.VITE_SANDBOX_AUTH === 'true') && (
+          <div style={{ border: '1px solid #dbeafe', background: '#eff6ff', color: '#1d4ed8', borderRadius: 12, padding: '9px 12px', fontSize: 11 }}>
+            {locale === 'en' ? 'Sandbox OTP: 123456' : 'کد OTP در Sandbox: ۱۲۳۴۵۶'}
+          </div>
+        )}
+        {error && <p role="alert" style={{ margin: 0, fontSize: 12, color: '#e5484d' }}>{error}</p>}
+        <button type="submit" disabled={submitting} style={primaryButtonStyle(!submitting)}>
+          {submitting ? (locale === 'en' ? 'Saving…' : 'در حال ثبت…') : (locale === 'en' ? 'Save and send code' : 'ثبت و ارسال کد')}
+        </button>
+      </form>
+    );
   }
 
   return (
@@ -407,6 +518,27 @@ function AgencyLoginForm() {
         >
           {t.forgotPassword}
         </button>
+
+        {(import.meta.env.DEV || import.meta.env.VITE_SANDBOX_AUTH === 'true') && (
+          <button
+            type="button"
+            data-testid="agency-first-login"
+            onClick={() => { setPhase('setup'); setPassword(''); setError(null); }}
+            style={{
+              alignSelf: 'flex-start',
+              fontSize: 11.5,
+              fontWeight: 800,
+              color: GOLD,
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              padding: 0,
+            }}
+          >
+            {locale === 'en' ? 'First login / activate account' : 'اولین ورود / فعال‌سازی حساب'}
+          </button>
+        )}
 
         {error && (
           <p role="alert" style={{ margin: 0, fontSize: 12, color: '#e5484d' }}>

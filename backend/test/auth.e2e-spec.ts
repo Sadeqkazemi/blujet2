@@ -1,6 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import * as argon2 from 'argon2';
+import * as crypto from 'node:crypto';
 import { App } from 'supertest/types';
 import { DataSource, IsNull } from 'typeorm';
 import { User } from '../src/database/entities/user.entity';
@@ -22,12 +23,67 @@ describe('Auth (e2e)', () => {
   // Fresh app per test — each app instance gets its own in-memory throttler
   // storage, so the strict login/2FA rate limit can't leak between tests.
   beforeEach(async () => {
+    delete process.env.AUTH_SANDBOX_ENABLED;
     app = await createTestApp();
     dataSource = app.get(DataSource);
   });
 
   afterEach(async () => {
+    delete process.env.AUTH_SANDBOX_ENABLED;
     await app.close();
+  });
+
+  it('sandbox first login sets staff password/mobile, accepts 123456 and issues a session', async () => {
+    process.env.AUTH_SANDBOX_ENABLED = 'true';
+    const suffix = crypto.randomUUID().slice(0, 8);
+    const username = `sandbox.${suffix}`;
+    const phone = `0911${crypto.randomInt(1_000_000, 10_000_000)}`;
+    const userRepo = dataSource.getRepository(User);
+    const user = await userRepo.save(
+      userRepo.create({
+        role: 'EMPLOYEE',
+        username,
+        phone: null,
+        passwordHash: null,
+        fullName: 'کارمند تست Sandbox',
+        twoFactorEnabled: true,
+        isActive: true,
+        lastLoginAt: null,
+        updatedAt: new Date(),
+      }),
+    );
+
+    const mode = await request(app.getHttpServer())
+      .post('/auth/staff/login-mode')
+      .send({ username });
+    expect(mode.status).toBe(200);
+    expect(mode.body.data.mode).toBe('FIRST_LOGIN_SETUP');
+
+    const setup = await request(app.getHttpServer())
+      .post('/auth/staff/first-login/request')
+      .send({ username, phone, newPassword: 'Sandbox@1405' });
+    expect(setup.status).toBe(200);
+
+    const verify = await request(app.getHttpServer())
+      .post('/auth/staff/login/verify')
+      .send({ challengeId: setup.body.data.challengeId, code: '123456' });
+    expect(verify.status).toBe(200);
+    expect(verify.body.data.user.role).toBe('EMPLOYEE');
+    expect(verify.body.data.accessToken).toBeTruthy();
+
+    const updated = await userRepo.findOneByOrFail({ id: user.id });
+    expect(updated.phone).toBe(normalizeIranPhone(phone));
+    expect(updated.passwordHash).toBeTruthy();
+    expect(updated.lastLoginAt).toBeTruthy();
+  });
+
+  it('sandbox login-mode does not disclose an unknown username', async () => {
+    process.env.AUTH_SANDBOX_ENABLED = 'true';
+    const mode = await request(app.getHttpServer())
+      .post('/auth/staff/login-mode')
+      .send({ username: 'does.not.exist' });
+    expect(mode.status).toBe(200);
+    expect(mode.body.data.mode).toBe('PASSWORD');
   });
 
   it('rejects a wrong password with 401 INVALID credentials, no challenge issued', async () => {
