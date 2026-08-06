@@ -9,9 +9,9 @@ on:
 
 jobs:
   backend:
-    # Pin a stable hosted-runner pool. ubuntu-latest was repeatedly left
-    # unassigned by GitHub and timed out before checkout on 2026-08-06.
-    runs-on: ubuntu-22.04
+    # Spread independent jobs across hosted-runner image pools. A single
+    # saturated image queue must not block the complete UAT deployment.
+    runs-on: ubuntu-latest
     services:
       postgres:
         image: postgres:16-alpine
@@ -57,7 +57,7 @@ jobs:
       - run: npm run test:e2e
 
   frontend:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: frontend
@@ -74,7 +74,7 @@ jobs:
       - run: npm test
 
   ml-service:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-20.04
     defaults:
       run:
         working-directory: ml-service
@@ -91,9 +91,8 @@ jobs:
     if: >-
       github.ref == 'refs/heads/main' &&
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-    # Deploy uses a separate runner pool so it cannot time out behind the
-    # three test jobs when GitHub's hosted Ubuntu 22 pool is saturated.
-    runs-on: ubuntu-24.04
+    # Deploy uses its own pool so it cannot wait behind any of the test jobs.
+    runs-on: ubuntu-22.04
     steps:
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1
