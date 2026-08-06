@@ -2488,4 +2488,67 @@ Plus on `StoredFile`: `siteMediaAsset`, `contentBlockImage`, `destHighlightFor`.
 - Prices stored as IRR (`BigInt`); UI converts to toman at render time only.
 - Blocks auto-created with Persian defaults on first admin/public read if missing.
 - `PANEL_NAV.SITE_ADMIN` gains `{ key: 'media', implemented: true }`.
+
+## Phase 68 — ورود مدیران و کارمندان: راه‌اندازی اولین ورود (خود-تعیینی رمز + موبایل)
+
+Design source: user-provided mockup, 2026-08-06 (supersedes the flat
+single-screen `design-reference-v2/ورود مدیران و کارمندان.dc.html`, which
+has no first-login or 2FA concept at all). See `docs/API.md`'s Phase 68
+section for the full endpoint design and the audit that motivated it.
+
+**The real problem this closes**: `AdminsService.create()` and
+`EmployeesService.create()` today always set `passwordHash` themselves
+and never collect a phone number for staff accounts — so `User.phone` is
+permanently `null` for every admin/manager/employee row (confirmed against
+`seed.ts`). `TwoFactorChallenge`'s `STAFF_LOGIN_2FA` code is sent via
+`TwoFactorProvider.sendCode(user, code)`, which for a phone-based channel
+has nothing to send to. Staff 2FA — mandatory per CLAUDE.md — has no
+working delivery path today. This phase lets the staff member themselves
+supply and verify the one piece of contact info the account was always
+missing, the first time they ever sign in.
+
+**Additive only — no new tables, one new enum value, reuses
+`TwoFactorChallenge` and the existing nullable `User.phone`/
+`passwordHash` columns exactly as `Phase 51`'s email-reset path reused
+them for a different purpose.**
+
+- New `TwoFactorPurpose` enum value: `STAFF_FIRST_LOGIN_SETUP`. Kept
+  distinct from `STAFF_LOGIN_2FA` for the same reason `PASSWORD_RESET_EMAIL`
+  was kept distinct from `EMAIL_VERIFY` (Phase 51) — a leaked/replayed
+  challenge id from one purpose must never satisfy a different trust
+  decision.
+- **No staging columns.** The chosen password and mobile number are held
+  only in the frontend's in-memory form state between the "submit setup"
+  step and the "confirm OTP" step (same as every other multi-step OTP
+  flow already in this app — the server never needs to remember an
+  unconfirmed password). The verify call resends `newPassword` + `mobile`
+  alongside the OTP code; the server hashes and persists both only after
+  the code checks out, inside the same transaction that marks the
+  challenge consumed and re-checks `passwordHash IS NULL` (defends
+  against a second concurrent setup attempt or an admin-issued reset
+  racing the same account).
+- `User.passwordHash IS NULL` becomes a meaningful, intentional state for
+  staff roles for the first time — "account exists, awaiting first-login
+  setup." `AdminsService.create()` / `EmployeesService.create()` DTOs get
+  `password` changed from required to optional: omitting it creates the
+  account passwordless (`passwordHash: null`, `mustChangePassword` not
+  applicable — there is no password yet to force a change on), skips the
+  temp-credential delivery step entirely (nothing to deliver). Supplying
+  it keeps today's exact behavior (admin-assigned temp password, forced
+  change) unchanged — this is a strictly additive second mode, not a
+  replacement.
+- `User.phone` gets populated for a staff account for the first time ever
+  once first-login setup succeeds — the same column customers/agencies
+  already use, no parallel "staff mobile" field.
+
+⚑ **Open decision (not yet resolved — flagged for explicit user
+confirmation before implementation, see `docs/features/staff-first-login-mobile-setup.md`)**:
+the new username-lookup step (`POST /auth/staff/lookup`, API.md Phase 68)
+deliberately reveals whether a username exists and whether it needs
+setup, matching the mockup's explicit "چنین کاربری در سامانه ثبت نشده
+است" error. Every existing staff-auth endpoint today deliberately
+collapses "not found" and "wrong password" into one generic 401 to avoid
+username enumeration. This is a real, deliberate posture change for this
+one new endpoint, not an oversight — needs an explicit yes before it
+ships.
 - Seed: three blocks + five routes + four destinations matching home mock data.

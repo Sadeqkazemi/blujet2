@@ -3069,3 +3069,75 @@ media tab «صفحات سایت» section.
 | GET | `/settings/site-content` | public | Static page copy for public rendering. |
 
 See `docs/features/site-admin-static-pages.md`.
+
+## Phase 68 — ورود مدیران و کارمندان: راه‌اندازی اولین ورود
+
+See `docs/DB_SCHEMA.md`'s Phase 68 for the full reasoning. Sandbox-UAT
+audit (2026-08-06, `docs/features/sandbox-multirole-uat.md`) plus a
+user-provided design mockup surfaced a real gap: staff/admin/employee
+accounts never collect a phone number today, so the mandatory staff 2FA
+code (`STAFF_LOGIN_2FA`) has no working delivery channel. This phase adds
+a self-service first-login step where a pre-created account (no password
+yet) lets its owner choose a password and register + verify their own
+mobile number via OTP, closing that gap. **Spec only — not yet
+implemented**; see the acceptance checklist in
+`docs/features/staff-first-login-mobile-setup.md` for open decisions
+that need confirmation before backend/frontend work starts, per
+`CLAUDE.md` Workflow Rule 1.
+
+### `backend/src/modules/auth/` (additions)
+
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| POST | `/auth/staff/lookup` | public, `@Throttle` 10/min per-IP | `{ username }` → 404 `STAFF_ACCOUNT_NOT_FOUND` if no staff-role user matches (⚑ deliberately reveals existence — see DB_SCHEMA.md's open decision); else `{ needsSetup: boolean }` (`true` when `passwordHash IS NULL`). Drives the frontend's branch between the password screen and the first-time-setup screen. |
+| POST | `/auth/staff/first-login/otp/request` | public, `@Throttle` 5/min per-IP + per-mobile | `{ username, mobile }` (`^09\d{9}$`) → re-validates `needsSetup` (409 `ALREADY_SET_UP` if a password already exists — closes the race with a concurrent setup or an admin-issued reset). Creates `TwoFactorChallenge(purpose: STAFF_FIRST_LOGIN_SETUP, userId)`, sends the code via the existing `TwoFactorProvider.sendCode` to the **submitted** mobile (not yet persisted). Returns `{ challengeId }`. |
+| POST | `/auth/staff/first-login/otp/verify` | public, same throttle as `otp/verify` | `{ challengeId, code, newPassword, mobile }` → same challenge ownership/expiry/attempts/code checks every other OTP verify uses, scoped to `STAFF_FIRST_LOGIN_SETUP` only. Re-validates `newPassword` (≥8 chars, matching the customer-side policy — see open decision below) and `mobile` format; re-checks `passwordHash IS NULL` inside the transaction. On success: `passwordHash = argon2.hash(newPassword)`, `phone = mobile`, `twoFactorEnabled = true`; consumes the challenge; issues tokens exactly like `verifyTwoFactor` (logs the user straight into their panel, no separate password screen needed); `AuditLog(category: ACCOUNT, action: "راه‌اندازی اولین ورود")`. |
+
+Existing `POST /auth/staff/login` is unchanged — a passwordless account
+still gets the same generic 401 from a direct login attempt as any wrong
+credential does; the two endpoints above are the only path into a
+passwordless account.
+
+### `backend/src/modules/admins/`, `backend/src/modules/it-manager/` (changes)
+
+| Method | Path | Change |
+|---|---|---|
+| POST | `/admins` | `password` becomes optional. Omitted → account created with `passwordHash: null`, no temp-credential SMS/email delivery, `delivery` field ignored. Provided → today's exact behavior (unchanged). |
+| POST | `/it/employees` | Same optional-`password` change, same passwordless mode. |
+
+Frontend forms for both («افزودن مدیر / ادمین», «افزودن کارمند») gain a
+choice: «تعیین رمز توسط ادمین» (today's flow) vs. «کاربر در اولین ورود
+رمز و موبایل خودش را تعیین کند» (new flow) — the latter hides the
+password/delivery fields entirely.
+
+### Open decisions (must be confirmed before implementation)
+
+1. **Username-enumeration posture** — see DB_SCHEMA.md's ⚑. Confirm
+   `POST /auth/staff/lookup` should reveal account existence as designed,
+   or that a less revealing variant is required instead.
+2. **OTP length** — the mockup uses a 5-digit code; every other OTP in
+   this codebase (`STAFF_LOGIN_2FA`, `CUSTOMER_OTP_LOGIN`, etc.) is
+   6-digit/2-min TTL per CLAUDE.md Security Rules. This spec uses 6 for
+   consistency — confirm, or state a reason this flow should differ.
+3. **Password minimum length** — the mockup's "≥8 chars" actually matches
+   the existing **customer**-side policy (`ForgotPasswordPage`'s
+   «رمز عبور باید حداقل ۸ کاراکتر باشد.»), not the weaker legacy
+   staff/admin/employee minimum of 6 used in `AdminsService`/
+   `EmployeesService` today. This spec adopts 8 for self-chosen staff
+   passwords (higher-privilege accounts, self-chosen rather than
+   admin-vetted) — confirm, or keep it at 6 to match the legacy staff DTOs.
+4. **Delivery channel is not production-ready yet, independent of this
+   feature**: the only class implementing `TwoFactorProvider` anywhere in
+   the codebase is `MockTwoFactorProvider` (`auth.module.ts`) — no real
+   SMS-backed implementation is wired for ANY staff 2FA purpose today.
+   This phase's OTP will not actually reach a real phone until that's
+   addressed (likely by wrapping the same Kavenegar-backed `SmsProvider`
+   already used for IT-managed external services and customer OTP) —
+   flagged as a prerequisite, not part of this phase's own scope.
+5. **Staff self-service forgot-password** — the mockup also designs a
+   forgot-password screen that reuses this same OTP mechanism for staff
+   who already have a password (today `LoginPage`'s «فراموشی رمز عبور؟»
+   is a toast stub telling the user to call IT). Deferred out of this
+   phase's scope (which only covers first-ever login) — natural
+   follow-up once a staff member has a verified mobile on file, which
+   this phase is what first makes possible.
