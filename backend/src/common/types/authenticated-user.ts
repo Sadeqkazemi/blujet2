@@ -4,4 +4,6 @@ export interface AuthenticatedUser {
   id: string;
   role: Role;
   fullName: string;
+  isSuperAdmin?: boolean;
+  sandboxOwnerId?: string;
 }

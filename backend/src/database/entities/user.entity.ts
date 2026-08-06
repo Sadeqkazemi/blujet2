@@ -17,7 +17,7 @@ import { RefreshToken } from './refresh-token.entity';
 @Index('users_nationalIdHash_idx', ['nationalIdHash'])
 @Index('users_phone_key', ['phone'], { unique: true })
 @Index('users_referralCode_key', ['referralCode'], { unique: true })
-@Index('users_username_key', ['username'], { unique: true })
+@Index('users_username_key', ['username'], { unique: true })@Index('users_one_active_super_admin_idx', ['isSuperAdmin'], {  unique: true,  where: '"isSuperAdmin" = true AND "deletedAt" IS NULL',})
 @Entity('users')
 export class User {
   @PrimaryColumn({ type: 'text', primaryKeyConstraintName: 'users_pkey' })
@@ -48,6 +48,9 @@ export class User {
 
   @Column({ type: 'boolean', default: false })
   twoFactorEnabled!: boolean;
+
+  @Column({ type: 'boolean', default: false })
+  isSuperAdmin!: boolean;
 
   @Column({ type: 'text', nullable: true })
   twoFactorSecret!: string | null;

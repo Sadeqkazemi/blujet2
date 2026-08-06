@@ -8,7 +8,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
 import * as crypto from 'node:crypto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { In, IsNull, Repository } from 'typeorm';
 import { User } from '../../database/entities/user.entity';
 import { TwoFactorChallenge } from '../../database/entities/two-factor-challenge.entity';
 import { RefreshToken } from '../../database/entities/refresh-token.entity';
@@ -32,10 +32,25 @@ export interface AuthUserView {
   role: Role;
   preferredLocale: Locale;
   mustChangePassword: boolean;
+  isSuperAdmin: boolean;
+  isSandboxImpersonation: boolean;
+}
+
+export interface SandboxTenantAccountView {
+  id: string;
+  fullName: string;
+  role: 'USER' | 'AGENCY';
+  username: string | null;
 }
 
 export type StaffLoginResult =
   | { loginMode: 'TWO_FACTOR'; challengeId: string }
+  | {
+      loginMode: 'PASSWORD_ONLY';
+      accessToken: string;
+      refreshToken: string;
+      user: AuthUserView;
+    }
   | {
       loginMode: 'TEMPORARY_PASSWORD_ONLY';
       accessToken: string;
@@ -44,19 +59,25 @@ export type StaffLoginResult =
       temporaryAccessExpiresAt: string;
     };
 
-function toAuthUserView(user: {
-  id: string;
-  fullName: string;
-  role: Role;
-  preferredLocale: Locale;
-  mustChangePassword: boolean;
-}): AuthUserView {
+function toAuthUserView(
+  user: {
+    id: string;
+    fullName: string;
+    role: Role;
+    preferredLocale: Locale;
+    mustChangePassword: boolean;
+    isSuperAdmin?: boolean;
+  },
+  isSandboxImpersonation = false,
+): AuthUserView {
   return {
     id: user.id,
     fullName: user.fullName,
     role: user.role,
     preferredLocale: user.preferredLocale,
     mustChangePassword: user.mustChangePassword,
+    isSuperAdmin: user.isSuperAdmin === true,
+    isSandboxImpersonation,
   };
 }
 
@@ -64,6 +85,7 @@ const TWO_FACTOR_TTL_MS = 2 * 60 * 1000;
 const TWO_FACTOR_MAX_ATTEMPTS = 5;
 const ACCESS_TOKEN_TTL = '15m';
 const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const SANDBOX_IMPERSONATION_TTL = '15m';
 
 const STAFF_ROLES = [
   'EMPLOYEE',
@@ -153,9 +175,126 @@ export class AuthService {
         role: true,
         preferredLocale: true,
         mustChangePassword: true,
+        isSuperAdmin: true,
       },
     });
-    return toAuthUserView(user);
+    return toAuthUserView(user, Boolean(actor.sandboxOwnerId));
+  }
+
+  private assertSandboxOwner(actor: AuthenticatedUser): void {
+    if (
+      !actor.isSuperAdmin ||
+      process.env.SANDBOX_SUPER_ADMIN_TENANT_ACCESS !== 'true'
+    ) {
+      throw new ForbiddenException({
+        code: ErrorCode.FORBIDDEN,
+        message: 'دسترسی آزمایشی به حساب کاربران و آژانس‌ها غیرفعال است.',
+      });
+    }
+  }
+
+  async listSandboxTenantAccounts(
+    actor: AuthenticatedUser,
+  ): Promise<SandboxTenantAccountView[]> {
+    this.assertSandboxOwner(actor);
+    const [customers, agencies] = await Promise.all(
+      (['USER', 'AGENCY'] as const).map((role) =>
+        this.userRepo.find({
+          where: { role, isActive: true, deletedAt: IsNull() },
+          select: { id: true, fullName: true, role: true, username: true },
+          order: { createdAt: 'ASC' },
+          take: 100,
+        }),
+      ),
+    );
+    const activeAgencyProfiles = agencies.length
+      ? await this.agencyProfileRepo.find({
+          where: {
+            userId: In(agencies.map((agency) => agency.id)),
+            suspendedAt: IsNull(),
+          },
+          select: { userId: true },
+        })
+      : [];
+    const activeAgencyIds = new Set(
+      activeAgencyProfiles.map((profile) => profile.userId),
+    );
+    const users = [
+      ...customers,
+      ...agencies.filter((agency) => activeAgencyIds.has(agency.id)),
+    ];
+
+    return users.map((user) => ({
+      id: user.id,
+      fullName: user.fullName,
+      role: user.role as 'USER' | 'AGENCY',
+      username: user.username,
+    }));
+  }
+
+  async startSandboxImpersonation(
+    actor: AuthenticatedUser,
+    targetUserId: string,
+  ): Promise<{ accessToken: string; user: AuthUserView }> {
+    this.assertSandboxOwner(actor);
+    const target = await this.userRepo.findOne({
+      where: {
+        id: targetUserId,
+        role: In(['USER', 'AGENCY']),
+        isActive: true,
+        deletedAt: IsNull(),
+      },
+    });
+    if (!target) {
+      throw new ForbiddenException({
+        code: ErrorCode.FORBIDDEN,
+        message: 'حساب آزمایشی انتخاب‌شده در دسترس نیست.',
+      });
+    }
+    if (target.role === 'AGENCY') {
+      const profile = await this.agencyProfileRepo.findOne({
+        where: { userId: target.id },
+        select: { userId: true, suspendedAt: true },
+      });
+      if (!profile || profile.suspendedAt) {
+        throw new ForbiddenException({
+          code: ErrorCode.FORBIDDEN,
+          message: 'پروفایل آژانس انتخاب‌شده فعال نیست.',
+        });
+      }
+    }
+
+    const accessToken = this.jwt.sign(
+      {
+        sub: target.id,
+        role: target.role,
+        fullName: target.fullName,
+        isSuperAdmin: false,
+        sandboxOwnerId: actor.id,
+      },
+      {
+        secret: process.env.JWT_ACCESS_SECRET,
+        expiresIn: SANDBOX_IMPERSONATION_TTL,
+      },
+    );
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'SECURITY',
+      action: 'شروع مشاهده آزمایشی حساب',
+      detail: `مالک سامانه یک نشست آزمایشی کوتاه برای نقش ${target.role} آغاز کرد.`,
+      entityType: 'User',
+      entityId: target.id,
+      metadata: {
+        sandboxImpersonation: true,
+        targetRole: target.role,
+      },
+    });
+
+    return {
+      accessToken,
+      user: toAuthUserView(target, true),
+    };
   }
 
   /** Display-language preference — the DB row is only the cross-device sync
@@ -413,6 +552,37 @@ export class AuthService {
         code: ErrorCode.UNAUTHORIZED,
         message: 'نام کاربری یا رمز عبور نادرست است.',
       });
+    }
+
+    if (user.isSuperAdmin) {
+      const jwtUser: AuthenticatedUser = {
+        id: user.id,
+        role: user.role,
+        fullName: user.fullName,
+        isSuperAdmin: true,
+      };
+      await this.userRepo.update(
+        { id: user.id },
+        { lastLoginAt: new Date(), updatedAt: new Date() },
+      );
+      const accessToken = this.signAccessToken(jwtUser);
+      const refreshToken = await this.issueRefreshToken(user.id, context);
+      await this.audit.record({
+        actorId: user.id,
+        actorRole: user.role,
+        category: 'SECURITY',
+        action: 'ورود مالک سامانه بدون OTP',
+        detail: `حساب مالک ${user.username} با رمز عبور معتبر وارد سامانه شد.`,
+        entityType: 'User',
+        entityId: user.id,
+        metadata: { loginMode: 'PASSWORD_ONLY', isSuperAdmin: true },
+      });
+      return {
+        loginMode: 'PASSWORD_ONLY',
+        accessToken,
+        refreshToken,
+        user: toAuthUserView(user),
+      };
     }
 
     const temporaryAccessState = getTemporaryPanelAccessState(user);
@@ -935,7 +1105,7 @@ export class AuthService {
     if (stored.user.role === 'AGENCY') {
       const profile = await this.agencyProfileRepo.findOne({
         where: { userId: stored.userId },
-        select: { suspendedAt: true },
+        select: { userId: true, suspendedAt: true },
       });
       if (profile?.suspendedAt) {
         throw new UnauthorizedException({
@@ -959,6 +1129,7 @@ export class AuthService {
         id: stored.user.id,
         role: stored.user.role,
         fullName: stored.user.fullName,
+        isSuperAdmin: stored.user.isSuperAdmin,
       },
       temporaryDeadline,
     );
@@ -1013,7 +1184,13 @@ export class AuthService {
         ? ACCESS_TOKEN_TTL
         : Math.min(15 * 60, remainingSeconds);
     return this.jwt.sign(
-      { sub: user.id, role: user.role, fullName: user.fullName },
+      {
+        sub: user.id,
+        role: user.role,
+        fullName: user.fullName,
+        isSuperAdmin: user.isSuperAdmin === true,
+        sandboxOwnerId: user.sandboxOwnerId,
+      },
       { secret: process.env.JWT_ACCESS_SECRET, expiresIn },
     );
   }

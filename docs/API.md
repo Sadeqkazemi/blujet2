@@ -3094,3 +3094,45 @@ Temporary UAT credentials use a 16-character, letters-and-digits-only format.
 The owner-approved one-time format migration is an offline operation (there is
 no password-rotation HTTP endpoint), preserves the existing access deadline,
 and revokes active refresh sessions after replacing the Argon2 hashes.
+
+## Owner super-admin password-only access (2026-08-06)
+
+One production owner account may be marked `isSuperAdmin=true`. It keeps the
+database role `SITE_ADMIN`, but `RolesGuard` grants it every **management
+staff** role protected endpoint. This elevation never grants `USER` or
+`AGENCY` tenant/owner endpoints directly. `PanelAccessGuard` also permits the owner to
+recover a disabled management panel. Every elevated login is audited.
+
+`POST /auth/staff/login` returns
+`{ loginMode: "PASSWORD_ONLY", accessToken, user }` for this account after a
+valid Argon2 password and sets the normal refresh cookie directly; no OTP
+challenge is created. The first session has `mustChangePassword=true`, so all
+routes except `/auth/me`, `/auth/change-password`, and logout remain blocked
+until the owner replaces the one-time bootstrap password. The new password is
+stored only as an Argon2 hash.
+
+Creation/rotation has no public HTTP endpoint. The production-only offline
+command `npm run accounts:bootstrap:super-admin:prod -- --execute` requires
+`SUPER_ADMIN_BOOTSTRAP_CONFIRM=CREATE_OR_ROTATE_OWNER_SUPER_ADMIN`,
+`SUPER_ADMIN_PHONE`, and optionally `SUPER_ADMIN_USERNAME` (default
+`superadmin`). It refuses to convert an unrelated existing identity and emits
+the generated one-time password once after the transaction commits.
+
+### Temporary Sandbox tenant preview
+
+When `SANDBOX_SUPER_ADMIN_TENANT_ACCESS=true`, the owner may explicitly select
+an existing active customer or agency account in the management sidebar. The
+server issues a non-refreshable 15-minute access token whose `sub` and `role`
+belong to that selected account, while the owner's refresh cookie remains
+unchanged. Starting the preview is recorded as a `SECURITY` audit event. The
+UI shows a persistent Sandbox banner and returns to the owner by refreshing
+the unchanged owner session.
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/auth/sandbox/tenant-accounts` | owner super-admin + Sandbox flag | Lists up to 200 active `USER`/`AGENCY` accounts available for preview. |
+| POST | `/auth/sandbox/impersonate` | owner super-admin + Sandbox flag | Accepts `{ targetUserId }` and returns a 15-minute preview access token. |
+
+This switch defaults to `false` in Compose and must be set back to `false`
+before go-live. Turning it off immediately blocks creation of new preview
+tokens; already-issued preview tokens expire within 15 minutes.

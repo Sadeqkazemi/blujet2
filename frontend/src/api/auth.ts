@@ -3,6 +3,13 @@ import { setAccessToken } from './token-store';
 import { latinDigits, normalizeIranMobile } from '../lib/fa-format';
 import type { AuthUser, Locale } from '../types/auth';
 
+export interface SandboxTenantAccount {
+  id: string;
+  fullName: string;
+  role: 'USER' | 'AGENCY';
+  username: string | null;
+}
+
 function normalizePhone(phone: string) {
   return normalizeIranMobile(latinDigits(phone).replace(/\s/g, ''));
 }
@@ -13,6 +20,11 @@ function normalizeOtpCode(code: string) {
 
 export type StaffLoginResult =
   | { loginMode: 'TWO_FACTOR'; challengeId: string }
+  | {
+      loginMode: 'PASSWORD_ONLY';
+      accessToken: string;
+      user: AuthUser;
+    }
   | {
       loginMode: 'TEMPORARY_PASSWORD_ONLY';
       accessToken: string;
@@ -25,7 +37,10 @@ export async function staffLogin(username: string, password: string) {
     username,
     password,
   });
-  if (result.loginMode === 'TEMPORARY_PASSWORD_ONLY') {
+  if (
+    result.loginMode === 'TEMPORARY_PASSWORD_ONLY' ||
+    result.loginMode === 'PASSWORD_ONLY'
+  ) {
     setAccessToken(result.accessToken);
   }
   return result;
@@ -72,6 +87,19 @@ export async function logout() {
 
 export function fetchMe() {
   return apiGet<AuthUser>('/auth/me');
+}
+
+export function fetchSandboxTenantAccounts() {
+  return apiGet<SandboxTenantAccount[]>('/auth/sandbox/tenant-accounts');
+}
+
+export async function startSandboxImpersonation(targetUserId: string) {
+  const result = await apiPost<{ accessToken: string; user: AuthUser }>(
+    '/auth/sandbox/impersonate',
+    { targetUserId },
+  );
+  setAccessToken(result.accessToken);
+  return result;
 }
 
 export function updateMyLocale(locale: Locale) {

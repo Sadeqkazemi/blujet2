@@ -12,6 +12,8 @@ import { loginAs } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 import { normalizeIranPhone } from '../src/common/normalize-iran-phone';
 import { RefreshToken } from '../src/database/entities/refresh-token.entity';
+import { AgencyProfile } from '../src/database/entities/agency-profile.entity';
+import { randomInt } from 'node:crypto';
 
 describe('Auth (e2e)', () => {
   let app: INestApplication<App>;
@@ -62,6 +64,164 @@ describe('Auth (e2e)', () => {
     expect(res.body.data.loginMode).toBe('TWO_FACTOR');
     expect(res.body.data.challengeId).toBeDefined();
     expect(res.body.data.accessToken).toBeUndefined();
+  });
+
+  it('owner super-admin uses password-only login, must replace the bootstrap password, then reaches an IT-only panel', async () => {
+    const userRepo = dataSource.getRepository(User);
+    const owner = await userRepo.findOneByOrFail({ username: 'site.admin' });
+    const originalHash = owner.passwordHash;
+    const agent = request.agent(app.getHttpServer());
+
+    await userRepo.update(
+      { id: owner.id },
+      { isSuperAdmin: true, mustChangePassword: true },
+    );
+
+    try {
+      const login = await agent
+        .post('/auth/staff/login')
+        .send({ username: 'site.admin', password: 'Blujet@1404' });
+
+      expect(login.status).toBe(200);
+      expect(login.body.data.loginMode).toBe('PASSWORD_ONLY');
+      expect(login.body.data.challengeId).toBeUndefined();
+      expect(login.body.data.user.isSuperAdmin).toBe(true);
+      expect(login.body.data.user.mustChangePassword).toBe(true);
+      expect(login.body.data.accessToken).toBeDefined();
+
+      const blocked = await agent
+        .get('/it/security/policy')
+        .set('Authorization', `Bearer ${login.body.data.accessToken}`);
+      expect(blocked.status).toBe(403);
+      expect(blocked.body.error.code).toBe('PASSWORD_CHANGE_REQUIRED');
+
+      const changed = await agent
+        .post('/auth/change-password')
+        .set('Authorization', `Bearer ${login.body.data.accessToken}`)
+        .send({
+          currentPassword: 'Blujet@1404',
+          newPassword: 'OwnerChanged!1405',
+        });
+      expect(changed.status).toBe(200);
+
+      const elevated = await agent
+        .get('/it/security/policy')
+        .set('Authorization', `Bearer ${login.body.data.accessToken}`);
+      expect(elevated.status).toBe(200);
+    } finally {
+      await userRepo.update(
+        { id: owner.id },
+        {
+          passwordHash: originalHash,
+          isSuperAdmin: false,
+          mustChangePassword: false,
+        },
+      );
+    }
+  });
+
+  it('lets the owner preview selected USER and AGENCY accounts only while the sandbox switch is enabled', async () => {
+    const userRepo = dataSource.getRepository(User);
+    const agencyProfileRepo = dataSource.getRepository(AgencyProfile);
+    const owner = await userRepo.findOneByOrFail({ username: 'site.admin' });
+    const originalOwnerFlag = owner.isSuperAdmin;
+    const previousSandboxFlag = process.env.SANDBOX_SUPER_ADMIN_TENANT_ACCESS;
+    const suffix = randomInt(10_000_000, 99_999_999).toString();
+    const customer = await userRepo.save(
+      userRepo.create({
+        role: 'USER',
+        phone: `+9891${suffix}`,
+        fullName: 'مشتری پیش‌نمایش Sandbox',
+        isActive: true,
+        updatedAt: new Date(),
+      }),
+    );
+    const agency = await userRepo.save(
+      userRepo.create({
+        role: 'AGENCY',
+        phone: `+9892${suffix}`,
+        fullName: 'آژانس پیش‌نمایش Sandbox',
+        isActive: true,
+        updatedAt: new Date(),
+      }),
+    );
+    await agencyProfileRepo.save(
+      agencyProfileRepo.create({
+        userId: agency.id,
+        licenseNo: `SB-${suffix}`,
+        managerName: 'مدیر Sandbox',
+        phone: agency.phone!,
+        email: `sandbox-${suffix}@example.test`,
+        city: 'تهران',
+        address: 'آدرس آزمایشی',
+        tier: 'NORMAL',
+        suspendedAt: null,
+        suspendReason: null,
+      }),
+    );
+
+    process.env.SANDBOX_SUPER_ADMIN_TENANT_ACCESS = 'true';
+    await userRepo.update({ id: owner.id }, { isSuperAdmin: true });
+
+    try {
+      const login = await request(app.getHttpServer())
+        .post('/auth/staff/login')
+        .send({ username: 'site.admin', password: 'Blujet@1404' });
+      const ownerToken = login.body.data.accessToken as string;
+
+      const directTenant = await request(app.getHttpServer())
+        .get('/bookings/me')
+        .set('Authorization', `Bearer ${ownerToken}`);
+      expect(directTenant.status).toBe(403);
+
+      const accounts = await request(app.getHttpServer())
+        .get('/auth/sandbox/tenant-accounts')
+        .set('Authorization', `Bearer ${ownerToken}`);
+      expect(accounts.status).toBe(200);
+      expect(accounts.body.data).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: customer.id, role: 'USER' }),
+          expect.objectContaining({ id: agency.id, role: 'AGENCY' }),
+        ]),
+      );
+
+      const customerPreview = await request(app.getHttpServer())
+        .post('/auth/sandbox/impersonate')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ targetUserId: customer.id });
+      expect(customerPreview.status).toBe(200);
+      expect(customerPreview.body.data.user).toMatchObject({
+        id: customer.id,
+        role: 'USER',
+        isSandboxImpersonation: true,
+      });
+
+      const agencyPreview = await request(app.getHttpServer())
+        .post('/auth/sandbox/impersonate')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ targetUserId: agency.id });
+      expect(agencyPreview.status).toBe(200);
+      const agencyProfile = await request(app.getHttpServer())
+        .get('/agency-portal/profile')
+        .set(
+          'Authorization',
+          `Bearer ${agencyPreview.body.data.accessToken as string}`,
+        );
+      expect(agencyProfile.status).toBe(200);
+      expect(agencyProfile.body.data.fullName).toBe(agency.fullName);
+    } finally {
+      if (previousSandboxFlag === undefined) {
+        delete process.env.SANDBOX_SUPER_ADMIN_TENANT_ACCESS;
+      } else {
+        process.env.SANDBOX_SUPER_ADMIN_TENANT_ACCESS = previousSandboxFlag;
+      }
+      await userRepo.update(
+        { id: owner.id },
+        { isSuperAdmin: originalOwnerFlag },
+      );
+      await agencyProfileRepo.delete({ userId: agency.id });
+      await userRepo.delete([customer.id, agency.id]);
+    }
   });
 
   it('allows only an unexpired reserved UAT account to bypass OTP and caps/revokes its session at expiry', async () => {

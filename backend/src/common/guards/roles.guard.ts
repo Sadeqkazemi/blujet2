@@ -10,6 +10,17 @@ import { ROLES_KEY } from '../decorators/roles.decorator';
 import { AuthenticatedUser } from '../types/authenticated-user';
 import { ErrorCode } from '../errors';
 
+const SUPER_ADMIN_MANAGEMENT_ROLES: AuthenticatedUser['role'][] = [
+  'EMPLOYEE',
+  'IT_MANAGER',
+  'COMMERCIAL_MANAGER',
+  'FINANCE_MANAGER',
+  'SENIOR_MANAGER',
+  'CEO',
+  'BOARD_CHAIR',
+  'SITE_ADMIN',
+];
+
 /**
  * Enforces @Roles(...) server-side. Panel tab visibility is also computed
  * server-side (see panels/nav) — this guard is the backstop that makes
@@ -30,6 +41,12 @@ export class RolesGuard implements CanActivate {
       .switchToHttp()
       .getRequest<Request & { user?: AuthenticatedUser }>();
     const user = request.user;
+    if (
+      user?.isSuperAdmin &&
+      requiredRoles.some((role) => SUPER_ADMIN_MANAGEMENT_ROLES.includes(role))
+    ) {
+      return true;
+    }
     if (!user || !requiredRoles.includes(user.role)) {
       throw new ForbiddenException({
         code: ErrorCode.FORBIDDEN,

@@ -18,6 +18,7 @@ export class PanelAccessGuard implements CanActivate {
       .getRequest<Request & { user?: AuthenticatedUser }>();
     const user = request.user;
     if (!user) return true;
+    if (user.isSuperAdmin) return true;
 
     await this.panels.assertPanelEnabledForSelf(user.role);
     return true;

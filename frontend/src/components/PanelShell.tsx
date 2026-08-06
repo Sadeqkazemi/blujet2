@@ -18,6 +18,7 @@ import PanelNotificationBell, { type PanelNotificationItem } from './PanelNotifi
 import PanelNotifBell from './PanelNotifBell';
 import PanelSearchBox from './PanelSearchBox';
 import { PANEL_BRAND_PLANE_ICON, panelNavIcon } from './panel-nav-icons';
+import SuperAdminSandboxAccess from './SuperAdminSandboxAccess';
 
 const ROLE_LABELS: Record<string, string> = {
   CEO: 'مدیر عامل',
@@ -99,9 +100,10 @@ export default function PanelShell() {
 
   const visibleNav = useMemo(() => {
     if (nav === null) return null;
+    if (user?.isSuperAdmin) return nav;
     if (user?.role !== 'SITE_ADMIN') return nav;
     return nav.filter((item) => !SITE_ADMIN_SIDEBAR_DENYLIST.has(item.key));
-  }, [nav, user?.role]);
+  }, [nav, user?.role, user?.isSuperAdmin]);
 
   const navKeys = useMemo(
     () => new Set(visibleNav?.map((item) => item.key) ?? []),
@@ -332,7 +334,11 @@ export default function PanelShell() {
     navigate('/login', { replace: true });
   }
 
-  const roleLabel = user ? (ROLE_LABELS[user.role] ?? user.role) : '';
+  const roleLabel = user?.isSuperAdmin
+    ? 'سوپر ادمین'
+    : user
+      ? (ROLE_LABELS[user.role] ?? user.role)
+      : '';
   const brandSub =
     (user?.role ? ROLE_BRAND_SUB[user.role] : undefined) ?? 'پنل مدیریت';
 
@@ -394,6 +400,8 @@ export default function PanelShell() {
             </div>
           </div>
         )}
+
+        <SuperAdminSandboxAccess />
 
         <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
           {visibleNav === null && <div className="px-2 py-3 text-xs text-panel-muted-2">در حال بارگذاری…</div>}

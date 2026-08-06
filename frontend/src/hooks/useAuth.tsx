@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import * as authApi from '../api/auth';
 import type { AuthUser } from '../types/auth';
 import type { StaffLoginResult } from '../api/auth';
+import type { SandboxTenantAccount } from '../api/auth';
 
 type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
 
@@ -23,6 +24,9 @@ interface AuthContextValue {
   // Phase 51 — فراموشی رمز email path, alongside the phone+OTP path above.
   requestPasswordResetEmail?: (email: string) => Promise<string>;
   verifyPasswordResetEmail?: (challengeId: string, code: string) => Promise<AuthUser>;
+  listSandboxTenantAccounts?: () => Promise<SandboxTenantAccount[]>;
+  startSandboxImpersonation?: (targetUserId: string) => Promise<AuthUser>;
+  returnFromSandboxImpersonation?: () => Promise<AuthUser>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -52,7 +56,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const requestLogin = useCallback(async (username: string, password: string) => {
     const result = await authApi.staffLogin(username, password);
-    if (result.loginMode === 'TEMPORARY_PASSWORD_ONLY') {
+    if (
+      result.loginMode === 'TEMPORARY_PASSWORD_ONLY' ||
+      result.loginMode === 'PASSWORD_ONLY'
+    ) {
       setUser(result.user);
       setStatus('authenticated');
     }
@@ -104,6 +111,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return loggedInUser;
   }, []);
 
+  const listSandboxTenantAccounts = useCallback(() => authApi.fetchSandboxTenantAccounts(), []);
+
+  const startSandboxImpersonation = useCallback(async (targetUserId: string) => {
+    const { user: impersonatedUser } = await authApi.startSandboxImpersonation(targetUserId);
+    setUser(impersonatedUser);
+    setStatus('authenticated');
+    return impersonatedUser;
+  }, []);
+
+  const returnFromSandboxImpersonation = useCallback(async () => {
+    await authApi.refreshSession();
+    const owner = await authApi.fetchMe();
+    setUser(owner);
+    setStatus('authenticated');
+    return owner;
+  }, []);
+
   const signOut = useCallback(async () => {
     // Best-effort server-side revoke — a failed/rate-limited call must never
     // trap the user in a session they clicked "sign out" on.
@@ -136,6 +160,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       passwordLogin,
       requestPasswordResetEmail,
       verifyPasswordResetEmail,
+      listSandboxTenantAccounts,
+      startSandboxImpersonation,
+      returnFromSandboxImpersonation,
     }),
     [
       status,
@@ -150,6 +177,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       passwordLogin,
       requestPasswordResetEmail,
       verifyPasswordResetEmail,
+      listSandboxTenantAccounts,
+      startSandboxImpersonation,
+      returnFromSandboxImpersonation,
     ],
   );
 
