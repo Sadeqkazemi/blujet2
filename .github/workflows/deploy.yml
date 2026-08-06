@@ -9,6 +9,7 @@ on:
 
 jobs:
   backend:
+    if: github.event_name != 'workflow_dispatch'
     # Spread independent jobs across hosted-runner image pools. A single
     # saturated image queue must not block the complete UAT deployment.
     runs-on: ubuntu-latest
@@ -57,6 +58,7 @@ jobs:
       - run: npm run test:e2e
 
   frontend:
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -74,6 +76,7 @@ jobs:
       - run: npm test
 
   ml-service:
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-20.04
     defaults:
       run:
@@ -89,10 +92,15 @@ jobs:
   deploy:
     needs: [backend, frontend, ml-service]
     if: >-
+      always() &&
       github.ref == 'refs/heads/main' &&
-      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-    # Deploy uses its own pool so it cannot wait behind any of the test jobs.
-    runs-on: ubuntu-22.04
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' &&
+      needs.backend.result == 'success' &&
+      needs.frontend.result == 'success' &&
+      needs['ml-service'].result == 'success'))
+    # Manual recovery uses the ARM pool and skips already-passed test jobs.
+    runs-on: ubuntu-24.04-arm
     steps:
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1
