@@ -26,6 +26,11 @@ function renderLoginJourney() {
   );
 }
 
+async function continueWithUsername(username: string) {
+  await userEvent.type(screen.getByLabelText('نام کاربری'), username);
+  await userEvent.click(screen.getByRole('button', { name: 'ادامه' }));
+}
+
 const baseAuth = {
   status: 'unauthenticated' as const,
   user: null,
@@ -61,9 +66,9 @@ describe('LoginPage', () => {
     });
     renderLoginJourney();
 
-    await userEvent.type(screen.getByLabelText('نام کاربری'), 'uat.it');
+    await continueWithUsername('uat.it');
     await userEvent.type(screen.getByLabelText('رمز عبور'), 'Strong!Password7');
-    await userEvent.click(screen.getByRole('button', { name: 'ورود به سامانه' }));
+    await userEvent.click(screen.getByRole('button', { name: 'ارسال کد یک‌بارمصرف' }));
 
     expect(await screen.findByText('temporary panel reached')).toBeInTheDocument();
   });
@@ -79,9 +84,9 @@ describe('LoginPage', () => {
     });
     renderLoginJourney();
 
-    await userEvent.type(screen.getByLabelText('نام کاربری'), 'finance');
+    await continueWithUsername('finance');
     await userEvent.type(screen.getByLabelText('رمز عبور'), 'Strong!Password7');
-    await userEvent.click(screen.getByRole('button', { name: 'ورود به سامانه' }));
+    await userEvent.click(screen.getByRole('button', { name: 'ارسال کد یک‌بارمصرف' }));
 
     expect(await screen.findByText('two factor reached')).toBeInTheDocument();
   });
@@ -92,18 +97,39 @@ describe('LoginPage', () => {
 
     expect(screen.getByText('به سامانهٔ مدیریت داخلی blujet خوش آمدید')).toBeInTheDocument();
     expect(screen.getByLabelText('نام کاربری')).toBeInTheDocument();
-    expect(screen.getByLabelText('رمز عبور')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'ورود به سامانه' })).toBeInTheDocument();
-    expect(screen.getByTestId('staff-passenger-link')).toHaveAttribute('href', '/signin');
-    expect(screen.getByTestId('staff-agency-link')).toHaveAttribute('href', '/agency/login');
+    expect(screen.queryByLabelText('رمز عبور')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'ادامه' })).toBeInTheDocument();
+  });
+
+  it('does not call the authentication API until the password step is submitted', async () => {
+    const requestLogin = vi.fn();
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ ...baseAuth, requestLogin });
+    renderLoginPage();
+
+    await continueWithUsername('finance');
+
+    expect(requestLogin).not.toHaveBeenCalled();
+    expect(screen.getByText('رمز عبور خود را وارد کنید')).toBeInTheDocument();
+    expect(screen.getByText('finance')).toBeInTheDocument();
+  });
+
+  it('lets staff edit the username before submitting credentials', async () => {
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue(baseAuth);
+    renderLoginPage();
+
+    await continueWithUsername('finance');
+    await userEvent.click(screen.getByRole('button', { name: 'ویرایش نام کاربری' }));
+
+    expect(screen.getByLabelText('نام کاربری')).toHaveValue('finance');
+    expect(screen.queryByLabelText('رمز عبور')).not.toBeInTheDocument();
   });
 
   it('shows an inline Persian validation error when submitted empty', async () => {
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue(baseAuth);
     renderLoginPage();
 
-    await userEvent.click(screen.getByRole('button', { name: 'ورود به سامانه' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('نام کاربری و رمز عبور را وارد کنید.');
+    await userEvent.click(screen.getByRole('button', { name: 'ادامه' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('نام کاربری را وارد کنید.');
   });
 
   it('shows the server error message when login fails', async () => {
@@ -111,9 +137,9 @@ describe('LoginPage', () => {
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ ...baseAuth, requestLogin });
     renderLoginPage();
 
-    await userEvent.type(screen.getByLabelText('نام کاربری'), 'finance');
+    await continueWithUsername('finance');
     await userEvent.type(screen.getByLabelText('رمز عبور'), 'wrong-password');
-    await userEvent.click(screen.getByRole('button', { name: 'ورود به سامانه' }));
+    await userEvent.click(screen.getByRole('button', { name: 'ارسال کد یک‌بارمصرف' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('نام کاربری یا رمز عبور نادرست است.');
   });
@@ -122,6 +148,7 @@ describe('LoginPage', () => {
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue(baseAuth);
     renderLoginPage();
 
+    await continueWithUsername('finance');
     await userEvent.click(screen.getByTestId('staff-forgot-password'));
     expect(await screen.findByTestId('staff-forgot-toast')).toHaveTextContent(
       'برای بازیابی رمز عبور، با واحد فناوری اطلاعات (مدیر IT) تماس بگیرید',
