@@ -145,4 +145,28 @@ jobs:
               chmod 600 "$rotation_sentinel"
               trap - EXIT
             fi
+            # One-time UAT cleanup. A root-only PostgreSQL backup is completed
+            # before the safeguarded purge; required access accounts and
+            # reference/configuration tables are retained by the purge policy.
+            purge_sentinel=/root/.blujet-uat-demo-data-purge-v1-complete
+            if [ ! -f "$purge_sentinel" ]; then
+              umask 077
+              purge_backup="/root/blujet-uat-before-demo-purge-$(date -u +%Y%m%dT%H%M%SZ).dump"
+              purge_audit=/root/blujet-uat-demo-data-purge-v1.json
+              docker compose -f docker-compose.prod.yml exec -T db \
+                pg_dump -U blujet -d blujet --format=custom > "$purge_backup"
+              chmod 600 "$purge_backup"
+              docker compose -f docker-compose.prod.yml exec -T backend \
+                node dist/database/uat-demo-data-purge.js > "$purge_audit"
+              docker compose -f docker-compose.prod.yml exec -T \
+                -e UAT_DEMO_PURGE_CONFIRM=PURGE_BLUJET_UAT_DEMO_DATA \
+                -e UAT_DEMO_PURGE_BACKUP_REF="$purge_backup" \
+                backend node dist/database/uat-demo-data-purge.js --execute-purge \
+                >> "$purge_audit"
+              chmod 600 "$purge_audit"
+              docker compose -f docker-compose.prod.yml exec -T redis \
+                redis-cli FLUSHDB > /dev/null
+              touch "$purge_sentinel"
+              chmod 600 "$purge_sentinel"
+            fi
             docker image prune -f

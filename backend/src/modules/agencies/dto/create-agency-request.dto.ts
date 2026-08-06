@@ -7,7 +7,7 @@ export class CreateAgencyRequestDto {
   @MinLength(2)
   applicantName: string;
 
-  @ApiProperty({ example: 'نگار رضایی' })
+  @ApiProperty({ example: 'نام و نام خانوادگی' })
   @IsString()
   @MinLength(2)
   managerName: string;

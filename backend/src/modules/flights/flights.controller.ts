@@ -70,7 +70,7 @@ class CreateFlightDto {
   @Matches(/^[A-Z]{3}$/)
   destCode: string;
 
-  @ApiProperty({ description: 'شماره پرواز', example: 'EP-901' })
+  @ApiProperty({ description: 'شماره پرواز', example: 'کد پرواز' })
   @IsString()
   @Matches(/^[A-Z0-9]{2}-\d{2,4}$/)
   flightNo: string;

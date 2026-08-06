@@ -25,7 +25,7 @@ describe('PassengerReportsPage', () => {
 
     render(<PassengerReportsPage />);
     const user = userEvent.setup();
-    await user.type(screen.getByPlaceholderText('مثال: نگار رضایی'), 'نگار');
+    await user.type(screen.getByPlaceholderText('نام مسافر یا کد ملی'), 'نگار');
     await user.click(screen.getByRole('button', { name: 'جستجو' }));
 
     expect(searchSpy).toHaveBeenCalledWith('نگار');
@@ -40,9 +40,17 @@ describe('PassengerReportsPage', () => {
 
     render(<PassengerReportsPage />);
     const user = userEvent.setup();
-    await user.type(screen.getByPlaceholderText('مثال: نگار رضایی'), 'ناموجود');
+    await user.type(screen.getByPlaceholderText('نام مسافر یا کد ملی'), 'ناموجود');
     await user.click(screen.getByRole('button', { name: 'جستجو' }));
 
     expect(await screen.findByText('مسافری با این نام یافت نشد.')).toBeInTheDocument();
+  });
+
+  it('does not expose demo passenger suggestions before a real search', () => {
+    render(<PassengerReportsPage />);
+
+    expect(screen.queryByText('نگار رضایی')).not.toBeInTheDocument();
+    expect(screen.queryByText('رضا کریمی')).not.toBeInTheDocument();
+    expect(screen.queryByText('سارا محمدی')).not.toBeInTheDocument();
   });
 });

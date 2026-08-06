@@ -8,7 +8,7 @@ import {
 } from 'class-validator';
 
 export class UpdateProfileDto {
-  @ApiPropertyOptional({ example: 'نگار رضایی' })
+  @ApiPropertyOptional({ example: 'نام و نام خانوادگی' })
   @IsOptional()
   @IsString()
   @MinLength(2)

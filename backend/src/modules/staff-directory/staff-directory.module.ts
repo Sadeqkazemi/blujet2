@@ -17,6 +17,7 @@ import {
 } from '../../common/exec-roles';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { Role } from '../../database/enums';
+import { isTemporaryPanelUsername } from '../../database/temporary-panel-accounts';
 
 @Injectable()
 export class StaffDirectoryService {
@@ -39,10 +40,17 @@ export class StaffDirectoryService {
         isActive: true,
         id: Not(excludeUserId),
       },
-      select: { id: true, fullName: true, role: true },
+      select: { id: true, fullName: true, role: true, username: true },
       order: { fullName: 'ASC' },
     });
-    return users.map((u) => ({ ...u, roleLabelFa: ROLE_LABELS_FA[u.role] }));
+    return users
+      .filter((user) => !isTemporaryPanelUsername(user.username))
+      .map((u) => ({
+        id: u.id,
+        fullName: u.fullName,
+        role: u.role,
+        roleLabelFa: ROLE_LABELS_FA[u.role],
+      }));
   }
 }
 

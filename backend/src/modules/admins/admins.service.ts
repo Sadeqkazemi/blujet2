@@ -18,6 +18,7 @@ import { SmsService } from '../sms/sms.service';
 import { StepUpService } from '../auth/step-up.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { Role } from '../../database/enums';
+import { isTemporaryPanelUsername } from '../../database/temporary-panel-accounts';
 
 const ROLE_LABEL_FA: Partial<Record<Role, string>> = {
   SENIOR_MANAGER: 'مدیر ارشد',
@@ -90,15 +91,17 @@ export class AdminsService {
 
   async list(actor: AuthenticatedUser) {
     const managed = this.managedRolesFor(actor);
-    // The list shows every manager/admin account; managedByCaller marks the
-    // rows the caller may block/reset (server re-checks on every write).
+    // Temporary UAT access identities are authentication infrastructure, not
+    // operational manager records, so they never appear in this directory.
     const allAdminRoles = MANAGED_ROLES.CEO!;
     const now = new Date();
 
-    const users = await this.userRepo.find({
-      where: { role: In(allAdminRoles), deletedAt: IsNull() },
-      order: { createdAt: 'ASC' },
-    });
+    const users = (
+      await this.userRepo.find({
+        where: { role: In(allAdminRoles), deletedAt: IsNull() },
+        order: { createdAt: 'ASC' },
+      })
+    ).filter((user) => !isTemporaryPanelUsername(user.username));
 
     // Real derivation — an unexpired, unrevoked refresh token means a live
     // session; never a fabricated presence flag.

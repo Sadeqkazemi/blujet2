@@ -41,6 +41,10 @@ const temporaryUsernames = new Set<string>(
   TEMPORARY_PANEL_ACCOUNTS.map(({ username }) => username),
 );
 
+export function isTemporaryPanelUsername(username: string | null): boolean {
+  return username !== null && temporaryUsernames.has(username.toLowerCase());
+}
+
 export interface TemporaryPanelAccessUser {
   username: string | null;
   twoFactorEnabled: boolean;
@@ -59,7 +63,7 @@ export function getTemporaryPanelAccessState(
   if (deadline === null) return 'NONE';
   if (
     user.username === null ||
-    !temporaryUsernames.has(user.username) ||
+    !isTemporaryPanelUsername(user.username) ||
     user.twoFactorEnabled ||
     deadline.getTime() >
       user.createdAt.getTime() + TEMPORARY_PANEL_ACCESS_MAX_MS

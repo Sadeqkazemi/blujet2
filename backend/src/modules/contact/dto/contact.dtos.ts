@@ -2,7 +2,10 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsString, MinLength } from 'class-validator';
 
 export class SubmitContactMessageDto {
-  @ApiProperty({ example: 'نگار رضایی', description: 'نام و نام خانوادگی' })
+  @ApiProperty({
+    example: 'نام و نام خانوادگی',
+    description: 'نام و نام خانوادگی',
+  })
   @IsString()
   @MinLength(2)
   name: string;

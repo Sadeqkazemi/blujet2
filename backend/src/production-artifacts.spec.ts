@@ -14,12 +14,20 @@ const compose = readFileSync(
   join(backendRoot, '..', 'docker-compose.prod.yml'),
   'utf8',
 );
+const deployWorkflow = readFileSync(
+  join(backendRoot, '..', '.github', 'workflows', 'deploy.yml'),
+  'utf8',
+);
 const seedSource = readFileSync(
   join(backendRoot, 'src', 'database', 'seed.ts'),
   'utf8',
 );
 const resetSource = readFileSync(
   join(backendRoot, 'src', 'database', 'production-data-reset.ts'),
+  'utf8',
+);
+const uatPurgeSource = readFileSync(
+  join(backendRoot, 'src', 'database', 'uat-demo-data-purge.ts'),
   'utf8',
 );
 
@@ -58,5 +66,22 @@ describe('production backend artifacts', () => {
     expect(resetSource).toContain('PRODUCTION_RESET_BACKUP_REF');
     expect(resetSource).toContain('PRODUCTION_RESET_CONFIRM');
     expect(resetSource).toContain('Dry run only');
+  });
+
+  it('guards the UAT demo purge with sandbox, confirmation, and backup checks', () => {
+    expect(packageJson.scripts['data:purge:uat']).toContain(
+      'uat-demo-data-purge.js',
+    );
+    expect(packageJson.scripts['data:purge:uat:execute']).toContain(
+      '--execute-purge',
+    );
+    expect(uatPurgeSource).toContain("NODE_ENV !== 'production'");
+    expect(uatPurgeSource).toContain("AUTH_SANDBOX_ENABLED !== 'true'");
+    expect(uatPurgeSource).toContain('UAT_DEMO_PURGE_CONFIRM');
+    expect(uatPurgeSource).toContain('UAT_DEMO_PURGE_BACKUP_REF');
+    expect(uatPurgeSource).toContain('Dry run only');
+    expect(deployWorkflow).toContain('pg_dump -U blujet -d blujet');
+    expect(deployWorkflow).toContain('.blujet-uat-demo-data-purge-v1-complete');
+    expect(deployWorkflow).toContain('redis-cli FLUSHDB');
   });
 });

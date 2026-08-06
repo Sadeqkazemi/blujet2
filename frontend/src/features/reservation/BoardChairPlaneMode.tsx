@@ -91,16 +91,6 @@ const STATUS_LABEL: Record<string, { label: string; className: string; color: st
   },
 };
 
-/** Design-reference service roster (visual parity with approved screenshots). */
-const DESIGN_SERVICES = [
-  { name: 'reservation-api', fa: 'سرویس رزرواسیون مرکزی', latency: '42ms' },
-  { name: 'pnr-store', fa: 'پایگاه ذخیره PNR', latency: '18ms' },
-  { name: 'payment-gateway', fa: 'درگاه پرداخت', latency: '88ms' },
-  { name: 'agency-api', fa: 'پلتفرم API آژانس‌ها', latency: '61ms' },
-  { name: 'seat-inventory', fa: 'موجودی صندلی', latency: '25ms' },
-  { name: 'notification-svc', fa: 'سرویس اعلان و پیامک', latency: '34ms' },
-] as const;
-
 function toLatinDigits(value: string): string {
   return value
     .replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
@@ -407,20 +397,32 @@ export default function BoardChairPlaneMode() {
             <section className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[15px]">
               <div className="mb-1 flex items-center justify-between">
                 <h3 className="m-0 text-[13.5px] font-extrabold text-white">وضعیت سرویس‌های سامانه</h3>
-                <span className="rounded-[14px] bg-[rgba(16,185,129,.14)] px-2.5 py-1 text-[10px] font-bold text-[#34d399]">
-                  پایدار
+                <span
+                  className={`rounded-[14px] px-2.5 py-1 text-[10px] font-bold ${
+                    stats?.servicesStable
+                      ? 'bg-[rgba(16,185,129,.14)] text-[#34d399]'
+                      : 'bg-[rgba(248,113,113,.14)] text-[#f87171]'
+                  }`}
+                >
+                  {stats ? (stats.servicesStable ? 'پایدار' : 'نیازمند بررسی') : 'بدون داده'}
                 </span>
               </div>
               <div className="mb-4 text-[11px] text-[#6b7b94]">
                 معماری میکروسرویس رزرواسیون — از API Gateway تا پلتفرم API شرکا
               </div>
               <div className="flex flex-col gap-1.5">
-                {DESIGN_SERVICES.map((s) => (
+                {(stats?.services ?? []).map((s) => (
                   <div
                     key={s.name}
                     className="flex items-center gap-2.5 rounded-[11px] border border-[#22304a] bg-[#0f1623] px-[11px] py-[9px]"
                   >
-                    <span className="h-[9px] w-[9px] shrink-0 rounded-full bg-[#34d399] shadow-[0_0_0_3px_rgba(16,185,129,.18)]" />
+                    <span
+                      className={`h-[9px] w-[9px] shrink-0 rounded-full ${
+                        s.ok
+                          ? 'bg-[#34d399] shadow-[0_0_0_3px_rgba(16,185,129,.18)]'
+                          : 'bg-[#f87171] shadow-[0_0_0_3px_rgba(248,113,113,.18)]'
+                      }`}
+                    />
                     <div className="min-w-0 flex-1">
                       <div className="text-xs font-bold text-[#e7ecf3]" dir="ltr">
                         {s.name}
@@ -428,11 +430,22 @@ export default function BoardChairPlaneMode() {
                       <div className="text-[10px] text-[#6b7b94]">{s.fa}</div>
                     </div>
                     <span className="font-num text-[10px] text-[#7d8aa0]" dir="ltr">
-                      {s.latency}
+                      {s.latencyMs === null ? '—' : `${faDigits(s.latencyMs)}ms`}
                     </span>
-                    <span className="w-16 text-left text-[10px] font-bold text-[#34d399]">سالم</span>
+                    <span
+                      className={`w-16 text-left text-[10px] font-bold ${
+                        s.ok ? 'text-[#34d399]' : 'text-[#f87171]'
+                      }`}
+                    >
+                      {s.statusLabel}
+                    </span>
                   </div>
                 ))}
+                {stats && stats.services.length === 0 && (
+                  <div className="rounded-[11px] border border-dashed border-[#28344c] px-4 py-6 text-center text-[11px] text-[#6b7b94]">
+                    داده‌ای از وضعیت سرویس‌ها دریافت نشده است.
+                  </div>
+                )}
               </div>
             </section>
 

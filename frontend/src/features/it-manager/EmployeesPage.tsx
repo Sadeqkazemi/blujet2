@@ -31,25 +31,6 @@ const DEPT_LABELS: Record<string, string> = {
 
 const RANK_OPTIONS = ['کارآموز', 'کارشناس', 'کارشناس ارشد', 'سرپرست واحد', 'معاون'];
 
-const PERM_MATRIX = [
-  { role: 'مدیر مالی', managedBy: 'تحت مدیریت IT', caps: [true, true, false, false, false] },
-  { role: 'مدیر بازرگانی', managedBy: 'تحت مدیریت IT', caps: [true, false, false, true, false] },
-  { role: 'ادمین سایت', managedBy: 'تحت مدیریت IT', caps: [true, false, true, false, true] },
-  { role: 'آژانس', managedBy: 'تحت مدیریت IT', caps: [true, false, false, false, false] },
-  { role: 'مدیر ارشد', managedBy: 'فقط رئیس هیئت مدیره', caps: [true, true, true, true, true] },
-  { role: 'رئیس هیئت مدیره', managedBy: 'بالاترین سطح', caps: [true, true, true, true, true] },
-];
-
-const PERM_COLS = ['داشبورد', 'مالی', 'محتوا', 'کاربران', 'تنظیمات'];
-
-const IT_SCOPE = [
-  { label: 'مدیریت کاربران و حساب‌ها', status: 'مجاز', ok: true },
-  { label: 'بازنشانی و مدیریت رمز عبور', status: 'مجاز', ok: true },
-  { label: 'تعیین دسترسی نقش‌ها', status: 'مجاز', ok: true },
-  { label: 'دسترسی به پنل مدیر ارشد', status: 'غیرمجاز', ok: false },
-  { label: 'دسترسی به پنل رئیس هیئت مدیره', status: 'غیرمجاز', ok: false },
-];
-
 function deptRoleLabel(
   dept: string | null,
   rank: string | null,
@@ -324,54 +305,17 @@ export default function EmployeesPage() {
         />
       </section>
 
-      <div className="mb-3 flex items-center gap-2">
-        <span className="h-5 w-1 rounded bg-[#f59e0b]" />
-        <div>
-          <h2 className="text-[14.5px] font-extrabold text-white">دسترسی و سطوح کارمندان</h2>
-          <p className="text-[11px] text-[#6b7b94]">تعیین سطح دسترسی کارمندان واحدها و مدیریت رمز عبور</p>
-        </div>
-      </div>
-
-      <div className="mb-4 rounded-xl border border-[#1f2a3d] bg-[#141d2e] p-4 text-xs leading-6 text-[#cdd6e3]">
-        واحد IT فقط دسترسی <strong className="text-[#e7ecf3]">کارمندان</strong> واحدها را تعیین می‌کند.
-        دسترسی به پنل‌های مدیریتی توسط <strong className="text-[#e7ecf3]">مدیر عامل</strong> و{' '}
-        <strong className="text-[#e7ecf3]">مدیر ارشد</strong> مدیریت می‌شود.
-      </div>
-
-      <section className="mb-6 overflow-hidden rounded-xl border border-[#1f2a3d] bg-[#141d2e]">
-        <div className="grid grid-cols-[1.4fr_repeat(5,1fr)] gap-2 border-b border-[#1f2a3d] bg-[#18223a] px-4 py-2.5 text-[10.5px] font-bold text-[#6b7b94]">
-          <span>نقش</span>
-          {PERM_COLS.map((c) => (
-            <span key={c} className="text-center">
-              {c}
-            </span>
-          ))}
-        </div>
-        {PERM_MATRIX.map((p) => (
-          <div
-            key={p.role}
-            className="grid grid-cols-[1.4fr_repeat(5,1fr)] items-center gap-2 border-t border-[#1f2a3d] px-4 py-3 text-xs"
-          >
-            <div>
-              <div className="font-bold text-[#e7ecf3]">{p.role}</div>
-              <div className="text-[10px] text-[#6b7b94]">{p.managedBy}</div>
-            </div>
-            {p.caps.map((ok, i) => (
-              <span key={i} className="text-center text-base">
-                {ok ? '✓' : '—'}
-              </span>
-            ))}
-          </div>
-        ))}
-      </section>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <section className="rounded-xl border border-[#1f2a3d] bg-[#141d2e] p-5">
+      <section className="rounded-xl border border-[#1f2a3d] bg-[#141d2e] p-5">
           <h3 className="mb-1 text-[14.5px] font-extrabold text-white">مدیریت رمز عبور کارمندان</h3>
           <p className="mb-3 text-[10.5px] text-[#6b7b94]">
             فقط رمز عبور کارمندان واحدها قابل بازنشانی است.
           </p>
           <div className="flex flex-col gap-2">
+            {employees.length === 0 && (
+              <div className="rounded-lg border border-dashed border-[#28344c] p-5 text-center text-xs text-[#6b7b94]">
+                کارمندی ثبت نشده است.
+              </div>
+            )}
             {employees.map((e) => (
               <div key={e.id} className="flex items-center gap-2 rounded-lg border border-[#1f2a3d] p-2.5 text-xs">
                 <span className="flex-1 font-bold text-[#e7ecf3]">
@@ -387,24 +331,7 @@ export default function EmployeesPage() {
               </div>
             ))}
           </div>
-        </section>
-
-        <section className="rounded-xl border border-[#1f2a3d] bg-[#141d2e] p-5">
-          <h3 className="mb-3 text-[14.5px] font-extrabold text-white">سطح دسترسی واحد IT</h3>
-          <ul className="divide-y divide-[#1f2a3d]">
-            {IT_SCOPE.map((s) => (
-              <li key={s.label} className="flex items-center justify-between py-2.5 text-xs">
-                <span className="text-[#cdd6e3]">{s.label}</span>
-                <span
-                  className={`font-bold ${s.ok ? 'text-[#34d399]' : 'text-[#f87171]'}`}
-                >
-                  {s.status}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      </div>
+      </section>
 
       {addOpen && (
         <Modal variant="dark" title="ایجاد کارمند جدید" onClose={() => setAddOpen(false)}>

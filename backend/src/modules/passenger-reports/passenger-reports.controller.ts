@@ -11,7 +11,10 @@ import { EmployeePermissionGuard } from '../../common/guards/employee-permission
 import { RequiresPermission } from '../../common/decorators/requires-permission.decorator';
 
 export class PassengerSearchQueryDto {
-  @ApiProperty({ example: 'نگار رضایی', description: 'نام مسافر یا کد ملی' })
+  @ApiProperty({
+    example: 'نام مسافر یا کد ملی',
+    description: 'نام مسافر یا کد ملی',
+  })
   @IsString()
   @MinLength(2)
   q: string;

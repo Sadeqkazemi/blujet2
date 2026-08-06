@@ -437,7 +437,7 @@ export default function AddFlightPage({ onClose, onSuccess }: AddFlightPageProps
               <input
                 id="af-no"
                 dir="ltr"
-                placeholder="مثلاً EP-905"
+                placeholder="شماره پرواز"
                 value={flightNo}
                 onChange={(e) => setFlightNo(e.target.value)}
                 className={`${inputClass} text-right`}

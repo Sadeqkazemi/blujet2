@@ -98,6 +98,24 @@ function mockRole(role: Role) {
 }
 
 describe('ReservationPage', () => {
+  it('BOARD_CHAIR uses API service health and shows an honest empty state', async () => {
+    mockRole('BOARD_CHAIR');
+    vi.spyOn(reservationApi, 'fetchReservationDashboardStats').mockResolvedValue({
+      ...STATS,
+      services: [],
+      servicesStable: false,
+    });
+    vi.spyOn(reservationApi, 'fetchPnrList').mockResolvedValue([]);
+
+    render(<ReservationPage />);
+
+    expect(
+      await screen.findByText('داده‌ای از وضعیت سرویس‌ها دریافت نشده است.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('reservation-api')).not.toBeInTheDocument();
+    expect(screen.getByText('نیازمند بررسی')).toBeInTheDocument();
+  });
+
   it('renders the design four-tab shell and dashboard KPIs/services/channels', async () => {
     mockRole('IT_MANAGER');
     vi.spyOn(reservationApi, 'fetchReservationDashboardStats').mockResolvedValue(STATS);

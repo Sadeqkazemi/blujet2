@@ -1242,7 +1242,7 @@ function VipAddFormFields({
             id="vip-name"
             value={form.fullName}
             onChange={(e) => setForm({ ...form, fullName: e.target.value })}
-            placeholder="مثلاً نگار رضایی"
+            placeholder="نام و نام خانوادگی"
             className={field}
           />
         </div>

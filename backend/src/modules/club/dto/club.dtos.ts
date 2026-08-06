@@ -27,7 +27,7 @@ export class ListMembersQueryDto {
 }
 
 export class CreateMemberDto {
-  @ApiProperty({ example: 'نگار رضایی' })
+  @ApiProperty({ example: 'نام و نام خانوادگی' })
   @IsString()
   @MinLength(1)
   fullName: string;

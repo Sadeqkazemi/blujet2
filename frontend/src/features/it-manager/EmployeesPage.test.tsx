@@ -33,6 +33,17 @@ const CATALOG: PermissionCatalog = {
 };
 
 describe('EmployeesPage', () => {
+  it('shows a real empty state without a hardcoded manager permission matrix', async () => {
+    vi.spyOn(itApi, 'fetchEmployees').mockResolvedValue([]);
+    vi.spyOn(itApi, 'fetchPermissionCatalog').mockResolvedValue({});
+
+    render(<EmployeesPage />);
+
+    expect(await screen.findAllByText('کارمندی ثبت نشده است.')).not.toHaveLength(0);
+    expect(screen.queryByText('تحت مدیریت IT')).not.toBeInTheDocument();
+    expect(screen.queryByText('سطح دسترسی واحد IT')).not.toBeInTheDocument();
+  });
+
   it('renders the employee list and validates the create form (short password)', async () => {
     vi.spyOn(itApi, 'fetchEmployees').mockResolvedValue(EMPLOYEES);
     vi.spyOn(itApi, 'fetchPermissionCatalog').mockResolvedValue(CATALOG);

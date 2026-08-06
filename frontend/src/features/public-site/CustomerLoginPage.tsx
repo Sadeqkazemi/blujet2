@@ -109,7 +109,7 @@ const STR: Record<
     phoneHintOk: '✓ شماره معتبر است',
     phoneHintBad: 'شماره باید با ۰۹ شروع شود و ۱۱ رقم باشد',
     fullNameLabel: 'نام و نام خانوادگی',
-    namePlaceholder: 'مثال: نگار رضایی',
+    namePlaceholder: 'نام و نام خانوادگی',
     termsLink: 'قوانین و مقررات',
     termsSuffix: 'و حریم خصوصی blujet را می‌پذیرم.',
     sendLogin: 'ارسال کد ورود',

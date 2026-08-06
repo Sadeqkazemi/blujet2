@@ -1,5 +1,6 @@
 import {
   TEMPORARY_PANEL_ACCOUNTS,
+  isTemporaryPanelUsername,
   TEMPORARY_PANEL_ACCESS_MAX_MS,
   createTemporaryPanelExpiry,
   generateTemporaryPanelPassword,
@@ -7,6 +8,13 @@ import {
 } from './temporary-panel-accounts';
 
 describe('temporary panel accounts', () => {
+  it('identifies temporary UAT usernames without matching real panel accounts', () => {
+    expect(isTemporaryPanelUsername('uat.it')).toBe(true);
+    expect(isTemporaryPanelUsername('UAT.IT')).toBe(true);
+    expect(isTemporaryPanelUsername('panel.it')).toBe(false);
+    expect(isTemporaryPanelUsername(null)).toBe(false);
+  });
+
   it('defines exactly one reserved account for every management panel role', () => {
     expect(TEMPORARY_PANEL_ACCOUNTS.map(({ role }) => role).sort()).toEqual(
       [

@@ -16,8 +16,6 @@ const STATUS_LABEL: Record<string, string> = {
   REFUNDED: 'مستردشده',
 };
 
-const QUICK_PASSENGER_NAMES = ['نگار رضایی', 'رضا کریمی', 'سارا محمدی'];
-
 export default function PassengerReportsPage() {
   const [query, setQuery] = useState('');
   const [hits, setHits] = useState<PassengerReportHit[] | null>(null);
@@ -53,7 +51,7 @@ export default function PassengerReportsPage() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="مثال: نگار رضایی"
+            placeholder="نام مسافر یا کد ملی"
             className="flex-1 rounded-[10px] border border-[#28344c] bg-[#0f1726] px-3.5 py-2.5 text-sm text-[#e7ecf3] outline-none placeholder:text-[#6b7b94] focus:border-[#3b82f6]"
           />
           <button
@@ -64,22 +62,6 @@ export default function PassengerReportsPage() {
             {searching ? 'در حال جستجو…' : 'جستجو'}
           </button>
         </form>
-
-        <div className="mt-3 flex flex-wrap gap-2">
-          {QUICK_PASSENGER_NAMES.map((name) => (
-            <button
-              key={name}
-              type="button"
-              onClick={() => {
-                setQuery(name);
-                void searchPassengers(name).then(setHits).catch(() => setError('خطا در جستجوی مسافر.'));
-              }}
-              className="rounded-full border border-[#28344c] bg-[#18223a] px-3 py-1 text-[11px] text-[#9fb0c7] transition hover:border-[#3b82f666] hover:text-white"
-            >
-              {name}
-            </button>
-          ))}
-        </div>
 
         {error && (
           <p role="alert" className="mt-4 text-xs text-[#f87171]">
