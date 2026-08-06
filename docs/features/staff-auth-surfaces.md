@@ -35,6 +35,14 @@ Skipped routes (decorator `@SkipMustChangePassword()`): `/auth/me`,
 - `LoginPage` / `StaffLoginLayout` / `TwoFactorPage` visual polish to match
   the staff login design (button copy, toast for forgot-password, SVG feature
   icons, 2FA back link).
+- `LoginPage` follows the reference's progressive sign-in flow: the first
+  step asks only for the organizational username and the second step asks for
+  the password. Advancing from the username step is client-side only and does
+  not reveal whether an account exists; the real credential check still uses
+  `POST /auth/staff/login` when the password step is submitted.
+- The mock browser credential directory, first-login password setup and
+  `localStorage` authentication found in the exported reference are explicitly
+  excluded. Real password setup/reset and 2FA continue to use backend routes.
 
 ## Acceptance checklist
 
@@ -47,5 +55,7 @@ Skipped routes (decorator `@SkipMustChangePassword()`): `/auth/me`,
 ### Frontend
 - [x] `ForcePasswordChangePage` submits and refreshes session — `ForcePasswordChangePage.test.tsx`
 - [x] `LoginPage` button «ورود به سامانه», forgot-password toast — `LoginPage.test.tsx`
+- [x] `LoginPage` username → password progression, editable username and no
+  authentication request before password submission — `LoginPage.test.tsx`
 - [x] `TwoFactorPage` back link + redirects to force-change when flagged — `TwoFactorPage.test.tsx`
 - [ ] Playwright: reset employee password → login → force change → reach panel — deferred (manual path covered by e2e + unit tests)
