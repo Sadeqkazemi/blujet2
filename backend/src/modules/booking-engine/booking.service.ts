@@ -18,6 +18,8 @@ import { PriceLock } from '../../database/entities/price-lock.entity';
 import { PaymentReconciliation } from '../../database/entities/payment-reconciliation.entity';
 import { PayIdempotencyRecord } from '../../database/entities/pay-idempotency-record.entity';
 import { LedgerEntry } from '../../database/entities/ledger-entry.entity';
+import { AgencyAllotment } from '../../database/entities/agency-allotment.entity';
+import { AgencyCreditLine } from '../../database/entities/agency-credit-line.entity';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
 import {
@@ -40,6 +42,7 @@ import { CustomerReferralsService } from '../customer-referrals/customer-referra
 import { applyPromoCode } from './promo.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { CreateBookingDto } from './dto/create-booking.dto';
+import type { CreateAllotmentBookingDto } from '../agency-portal/dto/create-allotment-booking.dto';
 
 export type PaymentMethod = 'GATEWAY' | 'WALLET' | 'POINTS';
 
@@ -77,6 +80,8 @@ export class BookingService {
     private readonly payIdempotencyRepo: Repository<PayIdempotencyRecord>,
     @InjectRepository(LedgerEntry)
     private readonly ledgerRepo: Repository<LedgerEntry>,
+    @InjectRepository(AgencyAllotment)
+    private readonly allotmentRepo: Repository<AgencyAllotment>,
     private readonly audit: AuditService,
     private readonly search: SearchService,
     private readonly priceLocks: PriceLockService,
@@ -154,6 +159,9 @@ export class BookingService {
       cabin: b.cabin,
       priceIrr: b.priceIrr,
       taxIrr: b.taxIrr,
+      channel: b.channel,
+      agencyId: b.agencyId,
+      allotmentId: b.allotmentId,
       holdExpiresAt: b.holdExpiresAt,
       flightInstanceId: b.flightInstanceId,
       flightNo: b.flightInstance.flight.flightNo,
@@ -479,6 +487,272 @@ export class BookingService {
    * actual net amount, and earns club points on real-money payments — all
    * inside one transaction.
    */
+  async createAgencyAllotmentBooking(
+    actor: AuthenticatedUser,
+    allotmentId: string,
+    dto: CreateAllotmentBookingDto,
+    idempotencyKey?: string,
+  ) {
+    if (idempotencyKey) {
+      const existing = await this.findBookingWithRelations({ idempotencyKey });
+      if (existing) {
+        if (
+          existing.channel !== 'AGENCY' ||
+          existing.agencyId !== actor.id ||
+          existing.allotmentId !== allotmentId
+        ) {
+          throw new ConflictException({
+            code: ErrorCode.CONFLICT,
+            message: 'کلید تکرار برای درخواست دیگری استفاده شده است.',
+          });
+        }
+        return this.toDetail(existing);
+      }
+    }
+
+    const allotment = await this.allotmentRepo.findOne({
+      where: { id: allotmentId, agencyId: actor.id },
+      relations: { flightInstance: { flight: true } },
+    });
+    const instance = allotment?.flightInstance;
+    const now = new Date();
+    if (
+      !allotment ||
+      !instance ||
+      instance.status !== 'SCHEDULED' ||
+      (allotment.type === 'SOFT' &&
+        !!allotment.releaseAt &&
+        allotment.releaseAt <= now)
+    ) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'سهمیه فعال و متعلق به این آژانس یافت نشد.',
+      });
+    }
+    if (
+      (instance.saleStartsAt && instance.saleStartsAt > now) ||
+      (instance.saleEndsAt && instance.saleEndsAt < now)
+    ) {
+      throw new ConflictException({
+        code: ErrorCode.SALE_WINDOW_CLOSED,
+        message: 'مهلت فروش این پرواز به پایان رسیده یا هنوز آغاز نشده است.',
+      });
+    }
+
+    const map = await this.seatMapRepo.findOneBy({
+      aircraftType: resolveAircraftType(instance),
+    });
+    if (!map) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'نقشه صندلی برای این هواپیما تعریف نشده است.',
+      });
+    }
+    const seatsByCode = new Map(
+      enumerateSeats(map).map((seat) => [seat.seatCode, seat]),
+    );
+    const requestedCodes = dto.passengers.map(
+      (passenger) => passenger.seatCode,
+    );
+    if (new Set(requestedCodes).size !== requestedCodes.length) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'صندلی تکراری انتخاب شده است.',
+      });
+    }
+    for (const passenger of dto.passengers) {
+      const seat = seatsByCode.get(passenger.seatCode);
+      if (!seat || seat.cabin !== dto.cabin) {
+        throw new BadRequestException({
+          code: ErrorCode.VALIDATION_FAILED,
+          message: `صندلی ${passenger.seatCode} برای کلاس انتخابی معتبر نیست.`,
+        });
+      }
+      if (
+        passenger.nationalId &&
+        !isValidIranianNationalId(normalizeNationalId(passenger.nationalId))
+      ) {
+        throw new BadRequestException({
+          code: ErrorCode.VALIDATION_FAILED,
+          message: `کد ملی «${passenger.fullName}» معتبر نیست.`,
+        });
+      }
+    }
+
+    const fareClass = await resolveFareClass(
+      this.bookingRepo.manager,
+      instance.id,
+      dto.cabin,
+    );
+    const unitPriceIrr =
+      allotment.contractPriceIrr ??
+      (await getCabinPrice(this.bookingRepo.manager, instance.id, dto.cabin));
+    const passengerCount = BigInt(dto.passengers.length);
+    const taxIrr = (fareClass?.taxIrr ?? 0n) * passengerCount;
+    const priceIrr = unitPriceIrr * passengerCount + taxIrr;
+    const contactUser = await this.userRepo.findOneByOrFail({ id: actor.id });
+
+    const transactionResult = await this.bookingRepo.manager.transaction(
+      async (tx) => {
+        await tx
+          .createQueryBuilder(FlightInstance, 'fi')
+          .setLock('pessimistic_write')
+          .where('fi.id = :id', { id: instance.id })
+          .getOneOrFail();
+        const lockedAllotment = await tx.findOne(AgencyAllotment, {
+          where: { id: allotmentId, agencyId: actor.id },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (
+          !lockedAllotment ||
+          (lockedAllotment.type === 'SOFT' &&
+            !!lockedAllotment.releaseAt &&
+            lockedAllotment.releaseAt <= new Date())
+        ) {
+          throw new ConflictException({
+            code: ErrorCode.CONFLICT,
+            message: 'سهمیه دیگر فعال نیست.',
+          });
+        }
+
+        if (idempotencyKey) {
+          const concurrentExisting = await tx.findOne(Booking, {
+            where: { idempotencyKey },
+          });
+          if (concurrentExisting) {
+            if (
+              concurrentExisting.channel !== 'AGENCY' ||
+              concurrentExisting.agencyId !== actor.id ||
+              concurrentExisting.allotmentId !== allotmentId
+            ) {
+              throw new ConflictException({
+                code: ErrorCode.CONFLICT,
+                message: 'کلید تکرار برای درخواست دیگری استفاده شده است.',
+              });
+            }
+            return { booking: concurrentExisting, created: false };
+          }
+        }
+
+        const taken = await this.search.takenSeatCodes(instance.id);
+        const seatConflict = requestedCodes.find((code) => taken.has(code));
+        if (seatConflict) {
+          throw new ConflictException({
+            code: ErrorCode.CONFLICT,
+            message: `صندلی ${seatConflict} هم‌اکنون در دسترس نیست.`,
+          });
+        }
+
+        const usedSeats = await tx
+          .createQueryBuilder(Passenger, 'p')
+          .innerJoin(Booking, 'b', 'b.id = p.bookingId')
+          .where('b.allotmentId = :allotmentId', { allotmentId })
+          .andWhere(
+            `(b.status IN ('PAID', 'TICKETED', 'FLOWN', 'NO_SHOW') OR (b.status = 'HELD' AND b.holdExpiresAt > :now))`,
+            { now: new Date() },
+          )
+          .getCount();
+        if (
+          usedSeats + dto.passengers.length >
+          lockedAllotment.seatsAllocated
+        ) {
+          throw new ConflictException({
+            code: ErrorCode.POOL_EXHAUSTED,
+            message: 'ظرفیت سهمیه این آژانس تکمیل شده است.',
+          });
+        }
+
+        const credit = await tx.findOne(AgencyCreditLine, {
+          where: { agencyId: actor.id },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (!credit) {
+          throw new ConflictException({
+            code: ErrorCode.CONFLICT,
+            message: 'خط اعتباری آژانس تعریف نشده است.',
+          });
+        }
+        const ledgerSum = await tx
+          .createQueryBuilder(LedgerEntry, 'entry')
+          .select('SUM(entry.signedAmountIrr)', 'sum')
+          .where('entry.agencyId = :agencyId', { agencyId: actor.id })
+          .andWhere('entry.type IN (:...types)', {
+            types: ['SALE', 'SETTLEMENT'],
+          })
+          .getRawOne<{ sum: string | null }>();
+        const rawUsedIrr = BigInt(ledgerSum?.sum ?? '0');
+        const usedIrr = rawUsedIrr > 0n ? rawUsedIrr : 0n;
+        if (priceIrr > credit.limitIrr - usedIrr) {
+          throw new ConflictException({
+            code: ErrorCode.CONFLICT,
+            message: 'اعتبار باقی‌مانده آژانس برای این فروش کافی نیست.',
+          });
+        }
+
+        const created = await tx.save(
+          tx.create(Booking, {
+            pnr: generatePnr(),
+            flightInstanceId: instance.id,
+            channel: 'AGENCY',
+            agencyId: actor.id,
+            allotmentId,
+            status: 'TICKETED',
+            cabin: dto.cabin,
+            fareClassCode: fareClass?.classCode ?? null,
+            priceIrr,
+            taxIrr,
+            userId: null,
+            contactPhone: contactUser.phone ?? null,
+            holdExpiresAt: null,
+            idempotencyKey: idempotencyKey ?? null,
+          }),
+        );
+        await tx.save(
+          dto.passengers.map((passenger) => {
+            const nationalId = passenger.nationalId
+              ? normalizeNationalId(passenger.nationalId)
+              : undefined;
+            return tx.create(Passenger, {
+              bookingId: created.id,
+              fullName: passenger.fullName,
+              seatCode: passenger.seatCode,
+              nationalIdEnc: nationalId ? encryptPii(nationalId) : null,
+              nationalIdHash: nationalId ? hashPii(nationalId) : null,
+              mobileEnc: passenger.mobile ? encryptPii(passenger.mobile) : null,
+            });
+          }),
+        );
+        await tx.save(
+          tx.create(LedgerEntry, {
+            bookingId: created.id,
+            agencyId: actor.id,
+            type: 'SALE',
+            signedAmountIrr: priceIrr,
+            createdById: actor.id,
+          }),
+        );
+        return { booking: created, created: true };
+      },
+    );
+
+    const booking = transactionResult.booking;
+    if (transactionResult.created) {
+      await this.search.invalidateForInstance(instance.id);
+      await this.audit.record({
+        actorId: actor.id,
+        actorRole: actor.role,
+        category: 'RESERVATION',
+        action: 'فروش قطعی از سهمیه آژانس',
+        detail: `بلیت ${booking.pnr} از سهمیه آژانس برای پرواز ${instance.flight.flightNo} صادر شد.`,
+        entityType: 'Booking',
+        entityId: booking.id,
+        metadata: { allotmentId, priceIrr },
+      });
+    }
+    const saved = await this.findBookingWithRelations({ id: booking.id });
+    return this.toDetail(saved!);
+  }
+
   async pay(
     id: string,
     user: AuthenticatedUser,

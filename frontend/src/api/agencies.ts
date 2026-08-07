@@ -65,15 +65,23 @@ export function fetchAgencyRequest(id: string) {
 }
 
 export function approveAgencyRequest(id: string) {
-  return apiPatch<{ agencyId: string }>(`/agencies/requests/${id}/approve`);
+  return apiPatch<
+    | { stage: 'AWAITING_FINANCE'; request: AgencyMembershipRequest }
+    | { stage: 'APPROVED'; agencyId: string; tempPassword: string }
+  >(`/agencies/requests/${id}/approve`);
 }
 
 export function rejectAgencyRequest(id: string, reviewNote?: string) {
-  return apiPatch<AgencyMembershipRequest>(`/agencies/requests/${id}/reject`, { reviewNote });
+  return apiPatch<AgencyMembershipRequest>(`/agencies/requests/${id}/reject`, {
+    reviewNote,
+  });
 }
 
 export function referAgencyRequest(id: string, referredToId: string, note?: string) {
-  return apiPatch<AgencyMembershipRequest>(`/agencies/requests/${id}/refer`, { referredToId, note });
+  return apiPatch<AgencyMembershipRequest>(`/agencies/requests/${id}/refer`, {
+    referredToId,
+    note,
+  });
 }
 
 export function fetchAgencyApiKeys(id: string) {
@@ -106,7 +114,10 @@ export function fetchAgencyInvoices(id: string) {
 }
 
 export function issueAgencyInvoice(id: string, amountIrr: number, dueAt: string) {
-  return apiPost<AgencyInvoice>(`/agencies/${id}/invoices`, { amountIrr, dueAt });
+  return apiPost<AgencyInvoice>(`/agencies/${id}/invoices`, {
+    amountIrr,
+    dueAt,
+  });
 }
 
 export function payAgencyInvoice(id: string, invoiceId: string) {
@@ -130,7 +141,9 @@ export function fetchAgencyDocuments(id: string) {
 }
 
 export function decideAgencyDocument(id: string, docId: string, approve: boolean) {
-  return apiPatch<AgencyDocument>(`/agencies/${id}/documents/${docId}/decide`, { approve });
+  return apiPatch<AgencyDocument>(`/agencies/${id}/documents/${docId}/decide`, {
+    approve,
+  });
 }
 
 export function notifyAllDebtors() {
@@ -138,9 +151,7 @@ export function notifyAllDebtors() {
 }
 
 export function fetchAgencyCreditRequests(id: string) {
-  return apiGet<import('../types/agency-portal').AgencyCreditRequest[]>(
-    `/agencies/${id}/credit-requests`,
-  );
+  return apiGet<import('../types/agency-portal').AgencyCreditRequest[]>(`/agencies/${id}/credit-requests`);
 }
 
 export function decideAgencyCreditRequest(id: string, reqId: string, approve: boolean) {
@@ -151,17 +162,13 @@ export function decideAgencyCreditRequest(id: string, reqId: string, approve: bo
 }
 
 export function fetchAgencyWebserviceRequests(id: string) {
-  return apiGet<import('../types/agency-portal').AgencyWebserviceRequest[]>(
-    `/agencies/${id}/webservice-requests`,
-  );
+  return apiGet<import('../types/agency-portal').AgencyWebserviceRequest[]>(`/agencies/${id}/webservice-requests`);
 }
 
 /** SITE_ADMIN / commercial — all agencies' webservice purchase requests */
 export function fetchAllWebserviceRequests(status?: 'PENDING' | 'APPROVED' | 'REJECTED') {
   const qs = status ? `?status=${encodeURIComponent(status)}` : '';
-  return apiGet<import('../types/agency-portal').AgencyWebserviceQueueRow[]>(
-    `/agencies/webservice-requests${qs}`,
-  );
+  return apiGet<import('../types/agency-portal').AgencyWebserviceQueueRow[]>(`/agencies/webservice-requests${qs}`);
 }
 
 export function decideAgencyWebserviceRequest(

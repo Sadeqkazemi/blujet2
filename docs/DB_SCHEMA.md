@@ -2533,3 +2533,41 @@ column, stores only an Argon2 password hash, sets `mustChangePassword=true`,
 clears `temporaryPasswordOnlyUntil`, revokes prior refresh sessions on
 rotation, and records an `AuditLog(category=SECURITY)` row without password
 material.
+## Phase 68 — complete multi-role sandbox UAT
+
+### Customer completion
+
+No new customer columns. `profileIncomplete`, `completionPct`, and missing
+fields are derived from the existing User fields `fullName`, `nationalIdEnc`,
+`birthDate`, `passportNoEnc`, and `emailVerifiedAt`. One shared backend helper
+is the source of truth; the database is never updated with a duplicate cached
+percentage.
+
+### Dual agency approval
+
+`AgencyMembershipRequest` adds nullable, audited fields:
+
+- `commercialApprovedById -> User`, `commercialApprovedAt`
+- `financeApprovedById -> User`, `financeApprovedAt`
+
+The existing status enum remains stable. `PENDING|REFERRED` plus no commercial
+timestamp means awaiting commercial review; a commercial timestamp without a
+finance timestamp means awaiting finance review; `APPROVED` requires both.
+Account/profile/credit creation and the final request update run in one
+transaction after a pessimistic request-row lock, preventing duplicate final
+approval.
+
+### Agency allotment consumption
+
+`Booking` adds nullable `allotmentId -> AgencyAllotment` (`ON DELETE RESTRICT`,
+indexed). It is required by service validation whenever `channel=AGENCY`.
+Allotment usage is derived from Passenger rows belonging to non-cancelled,
+non-expired bookings with that exact `allotmentId`; no mutable consumed counter
+is stored.
+
+Agency sale locks, in order, FlightInstance, AgencyAllotment, and
+AgencyCreditLine. Within the same transaction it verifies physical seat
+availability, `used + requested <= seatsAllocated`, and
+`outstanding SALE+SETTLEMENT + price <= limitIrr`; then writes Booking,
+Passengers, and one positive SALE LedgerEntry. This serializes concurrent
+attempts and keeps inventory, allotment, and credit consistent.

@@ -77,6 +77,7 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
   // `reservation` labeled هواپیما like CEO (content: ExecReservationView).
   SENIOR_MANAGER: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
+    { key: 'customers', labelFa: 'مشتریان', implemented: true },
     { key: 'admins', labelFa: 'مدیران و ادمین‌ها', implemented: true },
     { key: 'finance', labelFa: 'مالی', implemented: true },
     { key: 'cartable', labelFa: 'کارتابل', implemented: true },
