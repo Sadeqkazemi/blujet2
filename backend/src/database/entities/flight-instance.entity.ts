@@ -67,6 +67,7 @@ export class FlightInstance {
   agencySeatsAllocated!: number | null;
 
   @Column({ type: 'bigint', nullable: true, transformer: bigintTransformer })
+  @Index('flight_instances_definitionStatus_idx', ['definitionStatus'])
   basePriceIrr!: bigint | null;
 
   @Column({ type: 'jsonb', nullable: true })
