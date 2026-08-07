@@ -34,6 +34,15 @@ const RESULT: SearchFlightResult = {
   ],
 };
 
+const RESULT_WITH_COMFORT: SearchFlightResult = {
+  ...RESULT,
+  cabins: [
+    { cabin: 'ECONOMY', priceIrr: '380000000', seatsLeft: 10 },
+    { cabin: 'COMFORT', priceIrr: '480000000', seatsLeft: 5 },
+    { cabin: 'BUSINESS', priceIrr: '680000000', seatsLeft: 2 },
+  ],
+};
+
 function mockSearchApis() {
   vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
 }
@@ -318,5 +327,67 @@ describe('ResultsPage', () => {
     expect(await screen.findByTestId('empty-results')).toBeInTheDocument();
     expect(screen.getByText('لم يتم العثور على رحلات')).toBeInTheDocument();
     expect(screen.getByText('رادار الأسعار الذكي')).toBeInTheDocument();
+  });
+
+  describe('COMFORT cabin', () => {
+    it('allows selecting COMFORT and navigating to checkout with cabin COMFORT', async () => {
+      mockLocale('fa');
+      mockSearchApis();
+      vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT_WITH_COMFORT]);
+      vi.spyOn(useIsMobileModule, 'useIsMobile').mockReturnValue(false);
+      vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+        status: 'unauthenticated',
+        user: null,
+        requestLogin: vi.fn(),
+        confirmTwoFactor: vi.fn(),
+        agencyLogin: vi.fn(),
+        signOut: vi.fn(),
+      });
+
+      render(
+        <MemoryRouter initialEntries={['/results?origin=THR&dest=MHD&date=2026-08-01']}>
+          <Routes>
+            <Route path="/results" element={<ResultsPage />} />
+            <Route path="/checkout/new" element={<div data-testid="checkout-page">checkout</div>} />
+          </Routes>
+        </MemoryRouter>,
+      );
+
+      await screen.findByTestId('result-card');
+      await expandFirstCard();
+
+      expect(screen.getByTestId('cabin-selector')).toBeInTheDocument();
+      await userEvent.click(screen.getByTestId('cabin-option-COMFORT'));
+      await userEvent.click(screen.getByRole('button', { name: 'خرید بلیط' }));
+
+      expect(await screen.findByTestId('checkout-page')).toBeInTheDocument();
+    });
+
+    it('calls createPriceLock with cabin COMFORT when COMFORT is selected', async () => {
+      mockLocale('fa');
+      mockSearchApis();
+      vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT_WITH_COMFORT]);
+      vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({ isMember: true, level: 'GOLD', balance: 500 });
+      const createLock = vi.spyOn(publicSiteApi, 'createPriceLock').mockResolvedValue({
+        id: 'pl-comfort',
+        flightInstanceId: 'fi-1',
+        cabin: 'COMFORT',
+        lockedPriceIrr: '480000000',
+        feeIrr: '1440000',
+        status: 'ACTIVE',
+        expiresAt: '2026-08-04T05:00:00.000Z',
+        createdAt: '2026-08-01T00:00:00.000Z',
+        bookingId: null,
+        flight: { flightNo: 'BJ-100', originCode: 'THR', destCode: 'MHD', departureAt: '2026-08-01T05:00:00.000Z' },
+      });
+      renderPage('authenticated');
+      await screen.findByTestId('result-card');
+      await expandFirstCard();
+
+      await userEvent.click(screen.getByTestId('cabin-option-COMFORT'));
+      await userEvent.click(screen.getByTestId('real-lock-fi-1-COMFORT'));
+
+      expect(createLock).toHaveBeenCalledWith('fi-1', 'COMFORT');
+    });
   });
 });

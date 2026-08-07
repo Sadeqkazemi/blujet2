@@ -73,9 +73,34 @@ export type FlightInstanceStatus =
 
 export const CabinClass = {
   ECONOMY: 'ECONOMY',
+  COMFORT: 'COMFORT',
   BUSINESS: 'BUSINESS',
 } as const;
 export type CabinClass = (typeof CabinClass)[keyof typeof CabinClass];
+
+/** Flight definition / revision workflow (frontend: PENDING_CEO ≡ PENDING_APPROVAL). */
+export const FlightDefinitionStatus = {
+  DRAFT: 'DRAFT',
+  PENDING_CEO: 'PENDING_CEO',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+  PENDING_REVISION: 'PENDING_REVISION',
+} as const;
+export type FlightDefinitionStatus =
+  (typeof FlightDefinitionStatus)[keyof typeof FlightDefinitionStatus];
+
+export const ChargeCalculationMode = {
+  FIXED: 'FIXED',
+  PERCENTAGE: 'PERCENTAGE',
+} as const;
+export type ChargeCalculationMode =
+  (typeof ChargeCalculationMode)[keyof typeof ChargeCalculationMode];
+
+export const ChargeKind = {
+  TAX: 'TAX',
+  FEE: 'FEE',
+} as const;
+export type ChargeKind = (typeof ChargeKind)[keyof typeof ChargeKind];
 
 export const BookingChannel = {
   SYSTEM: 'SYSTEM',
@@ -288,6 +313,7 @@ export type ClubCardAssignee =
 export const PricingProposalStatus = {
   PENDING: 'PENDING',
   REGISTERED: 'REGISTERED',
+  REJECTED: 'REJECTED',
 } as const;
 export type PricingProposalStatus =
   (typeof PricingProposalStatus)[keyof typeof PricingProposalStatus];

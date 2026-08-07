@@ -37,7 +37,24 @@ describe('Phase 27 — EMPLOYEE fl_manage/ag_settle/fn_invoices (e2e)', () => {
   });
 
   function uniqueFlightNo() {
-    return `TS-${(Date.now() % 9000) + 1000}`;
+    return `TS${(Date.now() % 9000) + 1000}`;
+  }
+
+  function flightDefinitionBody(flightNo = uniqueFlightNo()) {
+    return {
+      originCode: 'THR',
+      destCode: 'MHD',
+      flightNo,
+      departureAt: new Date(Date.now() + 5 * 24 * 3_600_000).toISOString(),
+      durationMinutes: 90,
+      capacity: 146,
+      cabinCapacities: [
+        { cabin: 'ECONOMY', seats: 110 },
+        { cabin: 'COMFORT', seats: 20 },
+        { cabin: 'BUSINESS', seats: 16 },
+      ],
+      basePriceIrr: 25_000_000,
+    };
   }
 
   async function createInstance() {
@@ -52,7 +69,7 @@ describe('Phase 27 — EMPLOYEE fl_manage/ag_settle/fn_invoices (e2e)', () => {
         flightId: flight.id,
         departureAt,
         arrivalAt: new Date(departureAt.getTime() + 3 * 3_600_000),
-        capacity: 180,
+        capacity: 146,
         charterSeats: 60,
         status: 'SCHEDULED',
         basePriceIrr: 30_000_000n,
@@ -137,14 +154,7 @@ describe('Phase 27 — EMPLOYEE fl_manage/ag_settle/fn_invoices (e2e)', () => {
       const create = await request(app.getHttpServer())
         .post('/flights')
         .set('Authorization', `Bearer ${accessToken}`)
-        .send({
-          originCode: 'THR',
-          destCode: 'MHD',
-          flightNo: uniqueFlightNo(),
-          departureAt: new Date(Date.now() + 5 * 24 * 3_600_000).toISOString(),
-          capacity: 160,
-          basePriceIrr: 25_000_000,
-        });
+        .send(flightDefinitionBody());
       expect(create.status).toBe(201);
 
       const instance = await createInstance();
@@ -160,14 +170,7 @@ describe('Phase 27 — EMPLOYEE fl_manage/ag_settle/fn_invoices (e2e)', () => {
       const denied = await request(app.getHttpServer())
         .post('/flights')
         .set('Authorization', `Bearer ${viewOnly.accessToken}`)
-        .send({
-          originCode: 'THR',
-          destCode: 'MHD',
-          flightNo: uniqueFlightNo(),
-          departureAt: new Date(Date.now() + 5 * 24 * 3_600_000).toISOString(),
-          capacity: 160,
-          basePriceIrr: 25_000_000,
-        });
+        .send(flightDefinitionBody());
       expect(denied.status).toBe(403);
     });
 

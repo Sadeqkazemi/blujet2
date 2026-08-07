@@ -33,6 +33,7 @@ describe('UAT demo data purge policy', () => {
 
     expect(result).toEqual([
       'agency_profiles',
+      'airports',
       'bookings',
       'club_card_requests',
       'club_members',
@@ -42,7 +43,7 @@ describe('UAT demo data purge policy', () => {
       'passengers',
       'wallet_entries',
     ]);
-    expect(UAT_PRESERVED_TABLES.has('airports')).toBe(true);
+    expect(UAT_PRESERVED_TABLES.has('airports')).toBe(false);
     expect(UAT_PRESERVED_TABLES.has('bookings')).toBe(false);
   });
 });

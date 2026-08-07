@@ -1,0 +1,89 @@
+import type { INestApplication } from '@nestjs/common';
+import request from 'supertest';
+import type { App } from 'supertest/types';
+import { DataSource } from 'typeorm';
+import { TravelExtraSetting } from '../src/database/entities/travel-extra-setting.entity';
+import { createTestApp } from './helpers/app.helper';
+import { loginAs } from './helpers/login.helper';
+
+describe('Travel costs (e2e)', () => {
+  let app: INestApplication<App>;
+  let dataSource: DataSource;
+
+  beforeEach(async () => {
+    app = await createTestApp();
+    dataSource = app.get(DataSource);
+    await dataSource.getRepository(TravelExtraSetting).clear();
+  });
+
+  afterEach(async () => {
+    await app.close();
+  });
+
+  it('starts empty and only allows the commercial manager to manage costs', async () => {
+    await request(app.getHttpServer())
+      .get('/public/travel-costs')
+      .expect(200)
+      .expect(({ body }) => expect(body.data).toEqual([]));
+
+    const finance = await loginAs(app, 'finance');
+    await request(app.getHttpServer())
+      .get('/travel-costs')
+      .set('Authorization', `Bearer ${finance.accessToken}`)
+      .expect(403);
+
+    const commercial = await loginAs(app, 'comm');
+    await request(app.getHttpServer())
+      .get('/travel-costs')
+      .set('Authorization', `Bearer ${commercial.accessToken}`)
+      .expect(200)
+      .expect(({ body }) => expect(body.data).toEqual([]));
+  });
+
+  it('publishes only active manager-defined costs and supports updates/removal', async () => {
+    const commercial = await loginAs(app, 'comm');
+    const auth = { Authorization: `Bearer ${commercial.accessToken}` };
+    const createRes = await request(app.getHttpServer())
+      .post('/travel-costs')
+      .set(auth)
+      .send({
+        code: 'EXTRA_BAGGAGE',
+        titleFa: 'بار اضافه',
+        billingUnit: 'PER_KG',
+        priceIrr: '4500000',
+        active: true,
+        purchaseEnabled: true,
+      })
+      .expect(201);
+
+    const id = createRes.body.data.id as string;
+    await request(app.getHttpServer())
+      .get('/public/travel-costs')
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.data).toHaveLength(1);
+        expect(body.data[0]).toMatchObject({
+          id,
+          code: 'EXTRA_BAGGAGE',
+          priceIrr: '4500000',
+        });
+      });
+
+    await request(app.getHttpServer())
+      .patch(`/travel-costs/${id}`)
+      .set(auth)
+      .send({ active: false, priceIrr: '5000000' })
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .get('/public/travel-costs')
+      .expect(200)
+      .expect(({ body }) => expect(body.data).toEqual([]));
+
+    await request(app.getHttpServer())
+      .delete(`/travel-costs/${id}`)
+      .set(auth)
+      .expect(200);
+    expect(await dataSource.getRepository(TravelExtraSetting).count()).toBe(0);
+  });
+});

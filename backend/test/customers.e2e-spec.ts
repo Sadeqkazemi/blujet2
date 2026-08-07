@@ -8,7 +8,7 @@ import { encryptPii, hashPii } from '../src/common/pii-crypto';
 import { loginAs } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
-describe('Customers (SITE_ADMIN) (e2e)', () => {
+describe('Customers (SITE_ADMIN and SENIOR_MANAGER) (e2e)', () => {
   let app: INestApplication<App>;
   let dataSource: DataSource;
 
@@ -45,6 +45,9 @@ describe('Customers (SITE_ADMIN) (e2e)', () => {
         email: 'negar@email.example',
         nationalIdEnc: encryptPii('0012345679'),
         nationalIdHash: hashPii('0012345679'),
+        birthDate: new Date('1990-01-01'),
+        passportNoEnc: encryptPii('A12345678'),
+        emailVerifiedAt: new Date(),
         updatedAt: new Date(),
       },
     );
@@ -76,6 +79,8 @@ describe('Customers (SITE_ADMIN) (e2e)', () => {
     expect(found).toBeTruthy();
     expect(found.fullName).toBe('نگار رضایی');
     expect(found.profileIncomplete).toBe(false);
+    expect(found.completionPct).toBe(100);
+    expect(found.missingProfileFields).toEqual([]);
     expect(found.nationalId).toBe('0012345679');
 
     const search = await request(app.getHttpServer())
@@ -109,6 +114,15 @@ describe('Customers (SITE_ADMIN) (e2e)', () => {
     expect(Array.isArray(detail.body.data.contacts)).toBe(true);
     expect(Array.isArray(detail.body.data.docs)).toBe(true);
     expect(Array.isArray(detail.body.data.refunds)).toBe(true);
+
+    const senior = await loginAs(app, 'senior');
+    const seniorDetail = await request(app.getHttpServer())
+      .get(`/customers/${negar.id}`)
+      .set('Authorization', `Bearer ${senior.accessToken}`);
+    expect(seniorDetail.status).toBe(200);
+    expect(seniorDetail.body.data.profileIncomplete).toBe(false);
+    expect(seniorDetail.body.data.nationalId).not.toBe('0012345679');
+    expect(seniorDetail.body.data.nationalId).toMatch(/\*/);
   });
 
   it('returns 404 for unknown customer id', async () => {

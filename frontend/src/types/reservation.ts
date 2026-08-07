@@ -28,7 +28,7 @@ export interface SeatCell {
 
 export interface SeatRow {
   row: number;
-  cabin: 'BUSINESS' | 'ECONOMY';
+  cabin: 'BUSINESS' | 'COMFORT' | 'ECONOMY';
   seats: SeatCell[];
 }
 
@@ -42,7 +42,7 @@ export interface SeatMap {
   destCityFa?: string;
   departureAt: string;
   rows: SeatRow[];
-  cabinLayout: Record<'BUSINESS' | 'ECONOMY', { aisleAfterIndex: number }>;
+  cabinLayout: Partial<Record<'BUSINESS' | 'COMFORT' | 'ECONOMY', { aisleAfterIndex: number }>>;
   capacity: number;
   soldCount: number;
   lockedCount: number;

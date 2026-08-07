@@ -70,6 +70,34 @@ export class AgencyMembershipRequest {
   reviewNote!: string | null;
 
   @Column({ type: 'text', nullable: true })
+  commercialApprovedById!: string | null;
+
+  @ManyToOne(() => User, { onDelete: 'SET NULL', onUpdate: 'CASCADE' })
+  @JoinColumn({
+    name: 'commercialApprovedById',
+    foreignKeyConstraintName:
+      'agency_membership_requests_commercialApprovedById_fkey',
+  })
+  commercialApprovedBy!: User | null;
+
+  @Column({ type: 'timestamp', precision: 3, nullable: true })
+  commercialApprovedAt!: Date | null;
+
+  @Column({ type: 'text', nullable: true })
+  financeApprovedById!: string | null;
+
+  @ManyToOne(() => User, { onDelete: 'SET NULL', onUpdate: 'CASCADE' })
+  @JoinColumn({
+    name: 'financeApprovedById',
+    foreignKeyConstraintName:
+      'agency_membership_requests_financeApprovedById_fkey',
+  })
+  financeApprovedBy!: User | null;
+
+  @Column({ type: 'timestamp', precision: 3, nullable: true })
+  financeApprovedAt!: Date | null;
+
+  @Column({ type: 'text', nullable: true })
   reviewedById!: string | null;
 
   @ManyToOne(() => User, { onDelete: 'SET NULL', onUpdate: 'CASCADE' })

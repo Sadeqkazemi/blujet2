@@ -5,7 +5,7 @@ export interface Airport {
   tz: string;
 }
 
-export type CabinClass = 'ECONOMY' | 'BUSINESS';
+export type CabinClass = 'ECONOMY' | 'COMFORT' | 'BUSINESS';
 
 export interface SearchCabinOption {
   cabin: CabinClass;
@@ -74,10 +74,7 @@ export interface SeatMapCabinLayout {
 export interface SeatMapResult {
   flightInstanceId: string;
   aircraftType?: string;
-  cabinLayout?: {
-    BUSINESS: SeatMapCabinLayout;
-    ECONOMY: SeatMapCabinLayout;
-  };
+  cabinLayout?: Partial<Record<CabinClass, SeatMapCabinLayout>>;
   excludedSeatCodes?: string[];
   seats: SeatMapCell[];
 }
@@ -95,6 +92,17 @@ export interface BookingDetail {
   status: BookingStatus;
   cabin: CabinClass;
   priceIrr: string;
+  taxIrr?: string;
+  extrasIrr?: string;
+  extras?: Array<{
+    id: string;
+    code: string;
+    titleFa: string;
+    billingUnit: string;
+    unitPriceIrr: string;
+    quantity: number;
+    totalIrr: string;
+  }>;
   holdExpiresAt: string | null;
   flightInstanceId: string;
   flightNo: string;
@@ -198,11 +206,7 @@ export interface CustomerReferralDashboard {
   invites: CustomerReferralInvite[];
 }
 
-export type CustomerIdentityStatus =
-  | 'NOT_STARTED'
-  | 'SUBMITTED'
-  | 'APPROVED'
-  | 'REJECTED';
+export type CustomerIdentityStatus = 'NOT_STARTED' | 'SUBMITTED' | 'APPROVED' | 'REJECTED';
 
 export interface CustomerIdentityView {
   status: CustomerIdentityStatus;
@@ -286,4 +290,6 @@ export interface UserProfile {
   email: string | null;
   emailVerifiedAt: string | null;
   completionPct: number;
+  profileIncomplete: boolean;
+  missingProfileFields: ('fullName' | 'nationalId' | 'birthDate' | 'passportNo' | 'verifiedEmail')[];
 }

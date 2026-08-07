@@ -43,15 +43,15 @@ Error codes: `INVALID_CREDENTIALS`, `TWO_FACTOR_REQUIRED`, `TWO_FACTOR_INVALID`,
 | GET | `/panels/access` | CEO, SENIOR_MANAGER, IT_MANAGER | Current `PanelAccessFlag` states for the panels that role is allowed to toggle (CEO: finance/commercial/IT; Senior Manager: +CEO panel, site admin; IT: none — IT's "دسترسی به پنل‌ها" tab in the design is read-only informational, no toggle wired). |
 | PATCH | `/panels/access/:panelKey` | CEO, SENIOR_MANAGER | `{ enabled }` → toggles a sibling panel; writes an `AuditLog(category=ACCESS)` row. |
 
-### Customers — SITE_ADMIN (`backend/src/modules/customers/`)
+### Customers — SITE_ADMIN / SENIOR_MANAGER (`backend/src/modules/customers/`)
 
 پنل ادمین سایت → تب «مشتریان» (فهرست USERها، جستجو با موبایل، جزئیات).
 
 | Method | Path | Roles | Notes |
 |---|---|---|---|
-| GET | `/customers` | SITE_ADMIN | Query: `q?` (mobile digits). Returns `{ customers[], incompleteCount, total }`. Incomplete = missing name or national ID (design warn badge). National ID decrypted for site admin. |
-| GET | `/customers/incomplete-count` | SITE_ADMIN | `{ count }` for sidebar badge. |
-| GET | `/customers/:id` | SITE_ADMIN | Detail for tabs: profile, `docs` (KYC id-card), `purchases` (bookings), `refunds` (استرداد via booking.userId), `contacts` (support tickets by userId/phone), `club`. |
+| GET | `/customers` | SITE_ADMIN, SENIOR_MANAGER | Query: `q?` (mobile digits). Returns `{ customers[], incompleteCount, total }`. Completion uses the five canonical fields defined in Phase 68. National ID is decrypted for site admin and masked for senior manager. |
+| GET | `/customers/incomplete-count` | SITE_ADMIN, SENIOR_MANAGER | `{ count }` for sidebar badge. |
+| GET | `/customers/:id` | SITE_ADMIN, SENIOR_MANAGER | Read-only detail for tabs: profile, `docs` (KYC id-card), `purchases` (bookings), `refunds` (استرداد via booking.userId), `contacts` (support tickets by userId/phone), `club`. Sensitive identity data is masked for senior manager. |
 
 ### Reporting (`backend/src/modules/reporting/`)
 
@@ -380,13 +380,23 @@ stays untouched on the same page).
 - POST `/flights/airports` — `{ cityFa, code, tz? }` — add a city/airport
   to the catalog (Commercial «شهرهای پروازی» tab); 409 on duplicate code or
   city name; audited.
-- POST `/flights` — full-page «افزودن پرواز جدید» (Commercial design):
-  `{ originCode, destCode, flightNo, departureAt (UTC ISO), capacity,
-  basePriceIrr, aircraftType?, charterSeats? }` — find-or-create
-  Route/Flight, create instance; optional aircraft/charter applied at
-  create. Client then posts fare-rules + `PUT .../proposal` for CEO
-  approval. Server rules: origin≠dest, future date, charterSeats &lt;
-  capacity, aircraft in seat-map catalog; audited.
+- POST `/flights` — full flight **definition** (Commercial/Senior +
+  `fl_manage`): `{ originCode, destCode, flightNo (^\[A-Z\]{2}\d{4}$ —
+  uppercased only, no trim/strip), departureAt (UTC ISO),
+  durationMinutes (arrivalAt = departureAt + duration), capacity,
+  cabinCapacities[{cabin: ECONOMY|COMFORT|BUSINESS, seats}], basePriceIrr
+  (decimal string), aircraftType?, charterSeats?, chargeRules?,
+  competitorPriceIrr? }`. Cabin capacities must fit the aircraft seat-map
+  (COMFORT requires real comfort rows; never merged into ECONOMY). Starts
+  as `definitionStatus=DRAFT`. Then `PUT /pricing/flights/:id/proposal`
+  → `PENDING_CEO`; CEO register → `APPROVED` (bookable).
+- GET `/flights/:id/definition` — editable definition detail (real sold /
+  derivedStatus). Under `PENDING_REVISION`, form fields come from
+  `pendingRevisionSnapshot` (includes `charterSeats`); live approved
+  inventory stays sellable until CEO re-approves.
+- PUT `/flights/:id/definition` — edit DRAFT/REJECTED in place; edit of
+  APPROVED stages `PENDING_REVISION` without mutating live inventory.
+  Audited.
 - GET `/flights/:instanceId` — flight detail modal: sold/cap, ضریب اشغال,
   قیمت پایه, real channel breakdown (seats + revenue per سیستمی/چارتری/
   آژانس) and مجموع درآمد from bookings.
@@ -730,10 +740,13 @@ orphan like prior phases' dead blocks).
   - GET `/club/card-requests` — the panels' queue (server filters to REFERRED/APPROVED/REJECTED — SUBMITTED lives in the site-admin track); includes history timeline. All 3 roles.
   - PATCH `/club/card-requests/:id/approve` | `/reject` — «تأیید و صدور کارت» / «انصراف» — CEO/BOARD_CHAIR: any REFERRED; SENIOR_MANAGER: only `assignedTo=SENIOR` (⚑); transactional + audited; 409 on non-REFERRED.
 - **Phase 6 — Ticket pricing** (`backend/src/modules/pricing/` + `backend/src/modules/ai/` + `ml-service/`):
-  - GET `/pricing/proposals` — CEO: pending + registered lists with counts; COMMERCIAL_MANAGER: upcoming SCHEDULED flight instances joined with their proposal (the design's «تعیین قیمت پرواز و ارسال به مدیر عامل» rows with «قیمت‌گذاری نشده/در انتظار تأیید/قفل‌شده» states).
-  - PUT `/pricing/flights/:flightInstanceId/proposal` — COMMERCIAL_MANAGER — `{ proposedPriceIrr, legalRateIrr?, note? }`; upsert, editable while PENDING («می‌توانید تا زمان تأیید آن را ویرایش کنید»), 409 once REGISTERED.
+  - GET `/pricing/proposals` — CEO: pending + registered (+ rejected) lists and `pendingApprovalsCount`; COMMERCIAL_MANAGER: upcoming SCHEDULED instances joined with their proposal.
+  - GET `/pricing/proposals/pending-count` — CEO only → `{ pendingApprovalsCount }` (empty DB → 0).
+  - PUT `/pricing/flights/:flightInstanceId/proposal` — COMMERCIAL_MANAGER / EMPLOYEE+`pr_propose` — `{ proposedPriceIrr, legalRateIrr?, note? }` (IRR decimal strings). Atomic with `definitionStatus→PENDING_CEO`. `competitorPriceIrr` is taken from the flight definition when set; **never** fabricated (+3% removed). Nullable competitor → UI «—». 409 once REGISTERED.
   - PATCH `/pricing/proposals/:id/legal-rate` — CEO — «ثبت نرخ قانونی»; audited.
-  - PATCH `/pricing/proposals/:id/register` — CEO — `{ source: 'PROPOSED' | 'AI' }`; AI source requires a persisted suggestion; PENDING→REGISTERED, locked, audited; 409 on re-register.
+  - PATCH `/pricing/proposals/:id/register` — CEO + step-up; atomic with definition promote; idempotent if already REGISTERED.
+  - PATCH `/pricing/proposals/:id/reject` — CEO + step-up + rejectionReason; atomic; live APPROVED inventory kept under PENDING_REVISION.
+  - Sellability: search/seat-map/booking/price-lock only APPROVED|PENDING_REVISION (not DRAFT/PENDING_CEO/REJECTED).
   - POST `/pricing/proposals/ai-analysis` — CEO — «تحلیل و پیشنهاد قیمت هوش مصنوعی» for all PENDING proposals via the NestJS→ml-service client (2s timeout, graceful fallback, usage logged); persists suggestions with modelVersion. Advisory only.
   - ml-service: `POST /internal/v1/price-suggestion` (internal token; pydantic; versioned heuristic model; pytest) + `GET /health`.
 - **Phase 7 — Refunds** (`backend/src/modules/refunds/`; FINANCE_MANAGER only — the executives' panels have no live refund surface, confirmed):
@@ -3136,3 +3149,44 @@ the unchanged owner session.
 This switch defaults to `false` in Compose and must be set back to `false`
 before go-live. Turning it off immediately blocks creation of new preview
 tokens; already-issued preview tokens expire within 15 minutes.
+## Phase 68 — complete multi-role sandbox UAT
+
+### Canonical customer completion
+
+- `GET /profile` keeps its response and additionally returns
+  `profileIncomplete` and `missingProfileFields`. `completionPct` is computed
+  only on the server from five equally weighted fields: `fullName`,
+  `nationalId`, `birthDate`, `passportNo`, and verified email.
+- `GET /customers`, `GET /customers/incomplete-count`, and
+  `GET /customers/:id` allow `SITE_ADMIN|SENIOR_MANAGER`. The senior-manager
+  view is read-only and masks national ID; all incomplete flags/counts use the
+  same five-field server helper. Other roles remain forbidden.
+
+### Ordered dual agency approval
+
+- `PATCH /agencies/requests/:id/approve` allows
+  `COMMERCIAL_MANAGER|FINANCE_MANAGER` but is stage-aware:
+  - COMMERCIAL_MANAGER records the first approval and returns
+    `{ stage: "AWAITING_FINANCE", request }`; it creates no account.
+  - FINANCE_MANAGER is rejected until commercial approval exists. Its approval
+    creates User + AgencyProfile + AgencyCreditLine atomically, marks the
+    request APPROVED, sends the temporary password once, and returns
+    `{ stage: "APPROVED", agencyId, tempPassword }`.
+- Request list/detail responses expose `approvalStage`,
+  `commercialApprovedAt`, and `financeApprovedAt` (actor IDs are retained for
+  audit but are not required by the UI).
+
+### Agency allotment sale
+
+- `POST /agency-portal/allotments/:allotmentId/bookings` — AGENCY only;
+  header `Idempotency-Key` is optional but recommended. Body:
+  `{ cabin: ECONOMY|BUSINESS, passengers: [{ fullName, nationalId?, mobile?, seatCode }] }`.
+  The allotment determines the flight and price (`contractPriceIrr` when set,
+  otherwise the registered live cabin price). A successful call atomically
+  checks ownership, active/release state, physical seats, remaining allotment,
+  and remaining agency credit; then creates an `AGENCY/TICKETED` booking,
+  passengers, and agency SALE ledger entry. Returns booking detail including
+  `allotmentId`.
+- Failure codes: 404 missing allotment/flight, 403 ownership or temporary UAT
+  read-only account, 409 released/exhausted/seat conflict/insufficient credit,
+  and 400 invalid cabin/passenger/national ID.

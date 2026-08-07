@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   arDigits,
+  compareIrrStrings,
   faDigits,
   faMoney,
   faMoneyCompact,
@@ -8,7 +9,10 @@ import {
   faPercent,
   formatLocalePercent,
   formatToman,
+  irrPercentDelta,
+  irrToTomanInput,
   localeMoney,
+  parseTomanToRialString,
 } from './fa-format';
 
 describe('faDigits', () => {
@@ -101,5 +105,27 @@ describe('localeMoney', () => {
 
   it('accepts a decimal string, the real API wire shape for IRR fields', () => {
     expect(localeMoney('380000000', 'fa')).toBe('۳۸٬۰۰۰٬۰۰۰');
+  });
+});
+
+describe('parseTomanToRialString / irrToTomanInput', () => {
+  it('multiplies toman by 10 as a BigInt decimal string', () => {
+    expect(parseTomanToRialString('3850000')).toBe('38500000');
+    expect(parseTomanToRialString('۳٬۸۵۰٬۰۰۰')).toBe('38500000');
+    expect(parseTomanToRialString('')).toBeNull();
+    expect(parseTomanToRialString('12.5')).toBeNull();
+  });
+
+  it('prefills toman via integer division by 10n', () => {
+    expect(irrToTomanInput('38500000')).toBe('3850000');
+    expect(irrToTomanInput(null)).toBe('');
+    expect(irrToTomanInput('15')).toBe('1');
+  });
+
+  it('compares and deltas IRR strings with BigInt', () => {
+    expect(compareIrrStrings('100', '200')).toBe(-1);
+    expect(compareIrrStrings('200', '200')).toBe(0);
+    expect(irrPercentDelta('103', '100')).toBe(3);
+    expect(irrPercentDelta('97', '100')).toBe(-3);
   });
 });

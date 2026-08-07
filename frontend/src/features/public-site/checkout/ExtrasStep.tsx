@@ -1,9 +1,9 @@
 import { useState, type ReactNode } from 'react';
 import type { StoredLocale } from '../../../hooks/useLocale';
-import { faDigits, formatToman } from '../../../lib/fa-format';
+import { faDigits, localeMoney } from '../../../lib/fa-format';
 import type { CabinClass, SeatMapCell } from '../../../types/public-site';
 import { CHECKOUT_COPY } from './checkout-copy';
-import type { ExtraServiceState } from './checkout-types';
+import { extraTitle, extraTotalIrr, type ExtraServiceState } from './checkout-types';
 import Md80SeatMap from './Md80SeatMap';
 import {
   buildMd80Seats,
@@ -14,7 +14,17 @@ import {
 
 function SvgBag() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
       <rect x="3" y="7" width="18" height="13" rx="2" />
       <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
       <path d="M3 12h18" />
@@ -24,7 +34,17 @@ function SvgBag() {
 
 function SvgMeal() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
       <path d="M3 17h18" />
       <path d="M4 17a8 6 0 0 1 16 0" />
       <path d="M12 8V5" />
@@ -35,7 +55,17 @@ function SvgMeal() {
 
 function SvgIns() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
       <path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z" />
       <path d="M9 12l2 2 4-4" />
     </svg>
@@ -44,17 +74,27 @@ function SvgIns() {
 
 function SvgCip() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
       <path d="M12 3l2.6 5.6 6 .7-4.4 4.2 1.1 6-5.3-3-5.3 3 1.1-6-4.4-4.2 6-.7z" />
     </svg>
   );
 }
 
-const EXTRA_ICONS: Record<ExtraServiceState['id'], ReactNode> = {
-  baggage: <SvgBag />,
-  meal: <SvgMeal />,
-  insurance: <SvgIns />,
-  cip: <SvgCip />,
+const EXTRA_ICONS: Partial<Record<ExtraServiceState['code'], ReactNode>> = {
+  EXTRA_BAGGAGE: <SvgBag />,
+  SPECIAL_MEAL: <SvgMeal />,
+  TRAVEL_INSURANCE: <SvgIns />,
+  CIP: <SvgCip />,
 };
 
 /** Left block is always 2 seats for generic maps; aisle before index 2. */
@@ -150,6 +190,8 @@ export default function ExtrasStep({
   locale,
   extras,
   onToggleExtra,
+  onExtraQuantityChange,
+  passengerCount,
   seats,
   selectedSeats,
   onToggleSeat,
@@ -160,6 +202,8 @@ export default function ExtrasStep({
   locale: StoredLocale;
   extras: ExtraServiceState[];
   onToggleExtra: (id: ExtraServiceState['id']) => void;
+  onExtraQuantityChange: (id: ExtraServiceState['id'], quantity: number) => void;
+  passengerCount: number;
   seats: SeatMapCell[] | null;
   selectedSeats: string[];
   onToggleSeat: (seatCode: string) => void;
@@ -176,9 +220,7 @@ export default function ExtrasStep({
   const displaySeats = useMd80
     ? (() => {
         const takenRaw = rawSeats.filter((s) => s.status === 'TAKEN').map((s) => s.seatCode);
-        const taken = looksLikeLegacyA320SeatPayload(rawSeats)
-          ? mapLegacyTakenSeatsToMd80(takenRaw)
-          : takenRaw;
+        const taken = looksLikeLegacyA320SeatPayload(rawSeats) ? mapLegacyTakenSeatsToMd80(takenRaw) : takenRaw;
         return buildMd80Seats(taken).map((built) => {
           const fromApi = rawSeats.find((s) => s.seatCode === built.seatCode);
           return fromApi ?? built;
@@ -205,46 +247,77 @@ export default function ExtrasStep({
 
       <div className="mb-4 grid grid-cols-1 gap-2.5 md:grid-cols-2">
         {extras.map((sv) => {
-          const copy = t.extras[sv.id];
+          const title = extraTitle(sv, locale);
+          const description = locale === 'fa' ? sv.descriptionFa : null;
           return (
-            <button
+            <div
               key={sv.id}
-              type="button"
               data-testid={`checkout-extra-${sv.id}`}
-              onClick={() => onToggleExtra(sv.id)}
               className={`flex items-center justify-between gap-2.5 rounded-[13px] border-[1.5px] px-3.5 py-[13px] text-start ${
                 sv.selected ? 'border-[#1668c4] bg-[#f6faff]' : 'border-[#e6eaf0] bg-white'
               }`}
             >
-              <div className="flex items-center gap-[11px]">
+              <button
+                type="button"
+                onClick={() => onToggleExtra(sv.id)}
+                data-testid={`checkout-extra-${sv.id}-toggle`}
+                className="flex min-w-0 flex-1 items-center gap-[11px] text-start"
+              >
                 <span className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-[11px] bg-[#f2f6fb] text-[#1668c4]">
-                  {EXTRA_ICONS[sv.id]}
+                  {EXTRA_ICONS[sv.code] ?? <SvgCip />}
                 </span>
                 <div className="leading-relaxed">
-                  <div className="text-[12.5px] font-extrabold text-[#0d2640]">{copy.title}</div>
-                  <div className="text-[10.5px] text-[#8a96a6]">{copy.desc}</div>
+                  <div className="text-[12.5px] font-extrabold text-[#0d2640]">{title}</div>
+                  {description && <div className="text-[10.5px] text-[#8a96a6]">{description}</div>}
                 </div>
-              </div>
+              </button>
               <div className="flex flex-none flex-col items-end gap-1.5">
                 <div className="text-xs font-extrabold text-[#1668c4]">
-                  {formatToman(sv.priceToman, locale)} {t.toman}
+                  {localeMoney(extraTotalIrr(sv, passengerCount).toString(), locale)} {t.toman}
                 </div>
-                <span
-                  className={`relative inline-block h-5 w-[34px] rounded-xl transition-colors ${
-                    sv.selected ? 'bg-[#1668c4]' : 'bg-[#d7dee8]'
-                  }`}
-                  aria-hidden
-                >
-                  <span
-                    className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.25)] transition-all ${
-                      sv.selected ? 'right-0.5 left-auto' : 'left-0.5 right-auto'
-                    }`}
-                  />
-                </span>
+                {sv.billingUnit === 'PER_KG' && sv.selected ? (
+                  <div className="flex items-center gap-2" dir="ltr">
+                    <button
+                      type="button"
+                      aria-label="کاهش کیلوگرم"
+                      onClick={() => onExtraQuantityChange(sv.id, Math.max(1, sv.quantity - 1))}
+                      className="h-6 w-6 rounded bg-[#e8eef6] text-[#1668c4]"
+                    >
+                      −
+                    </button>
+                    <span className="min-w-8 text-center text-[11px] text-[#5a6678]">
+                      {locale === 'en' ? sv.quantity : faDigits(sv.quantity)} kg
+                    </span>
+                    <button
+                      type="button"
+                      aria-label="افزایش کیلوگرم"
+                      onClick={() => onExtraQuantityChange(sv.id, Math.min(50, sv.quantity + 1))}
+                      className="h-6 w-6 rounded bg-[#e8eef6] text-[#1668c4]"
+                    >
+                      +
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    aria-label={title}
+                    onClick={() => onToggleExtra(sv.id)}
+                    className={`relative inline-block h-5 w-[34px] rounded-xl transition-colors ${sv.selected ? 'bg-[#1668c4]' : 'bg-[#d7dee8]'}`}
+                  >
+                    <span
+                      className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.25)] transition-all ${sv.selected ? 'right-0.5 left-auto' : 'left-0.5 right-auto'}`}
+                    />
+                  </button>
+                )}
               </div>
-            </button>
+            </div>
           );
         })}
+        {extras.length === 0 && (
+          <p className="col-span-full rounded-[13px] border border-dashed border-[#d7dee8] px-4 py-6 text-center text-xs text-[#8a96a6]">
+            در حال حاضر هزینه یا خدمت جانبی فعالی ثبت نشده است.
+          </p>
+        )}
       </div>
 
       <div className="border-t border-[#f0f2f6] pt-[15px]">
@@ -258,9 +331,7 @@ export default function ExtrasStep({
             <div className="text-[13px] font-extrabold text-[#0d2640]">
               {t.seatMapCaption(useMd80 ? 'MD-80' : aircraft)}
             </div>
-            {businessLocked && (
-              <div className="mt-1 text-[10.5px] text-[#96701a]">🔒 {t.bizLockedHint}</div>
-            )}
+            {businessLocked && <div className="mt-1 text-[10.5px] text-[#96701a]">🔒 {t.bizLockedHint}</div>}
           </div>
           <span
             className="flex-none text-sm text-[#8a96a6] transition-transform"
@@ -315,9 +386,8 @@ export default function ExtrasStep({
                 </b>
               </div>
               <div>
-                {t.totalSold}:{' '}
-                <b className="text-[#c0343a]">{locale === 'en' ? sold : faDigits(sold)}</b>{' '}
-                {t.ofLabel} <b>{locale === 'en' ? cap : faDigits(cap)}</b>
+                {t.totalSold}: <b className="text-[#c0343a]">{locale === 'en' ? sold : faDigits(sold)}</b> {t.ofLabel}{' '}
+                <b>{locale === 'en' ? cap : faDigits(cap)}</b>
               </div>
             </div>
           </>

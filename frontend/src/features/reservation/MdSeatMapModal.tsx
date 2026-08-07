@@ -386,7 +386,7 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
           ) : (
             <div className="mx-auto w-max max-w-full">
               {rowsWithBands.map(({ row, band, showDivider }) => {
-                const aisleAfter = seatMap.cabinLayout[row.cabin].aisleAfterIndex;
+                const aisleAfter = seatMap.cabinLayout[row.cabin]!.aisleAfterIndex;
                 return (
                   <div key={row.row}>
                     {showDivider && (

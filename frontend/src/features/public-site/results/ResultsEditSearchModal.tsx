@@ -285,9 +285,10 @@ export default function ResultsEditSearchModal({
   const classOptions = useMemo(
     () => [
       { value: 'ECONOMY', label: copy.economyLabel },
+      { value: 'COMFORT', label: copy.comfortLabel },
       { value: 'BUSINESS', label: locale === 'en' ? 'Business' : locale === 'ar' ? 'رجال الأعمال' : 'بیزنس' },
     ],
-    [copy.economyLabel, locale],
+    [copy.comfortLabel, copy.economyLabel, locale],
   );
 
   function openCalendar(target: 'departure' | 'return') {

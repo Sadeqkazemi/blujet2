@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import CheckoutPage from './CheckoutPage';
 import * as publicSiteApi from '../../api/publicSite';
+import * as travelCostsApi from '../../api/travel-costs';
 import * as useAuthModule from '../../hooks/useAuth';
 import * as useLocaleModule from '../../hooks/useLocale';
 import * as useIsMobileModule from '../../hooks/useIsMobile';
@@ -50,6 +51,8 @@ const FLIGHT_STATE = {
   },
 };
 
+const BAGGAGE_ID = '11111111-1111-4111-8111-111111111111';
+
 function mockAuth(status: 'authenticated' | 'unauthenticated' = 'authenticated') {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status,
@@ -64,7 +67,10 @@ function mockAuth(status: 'authenticated' | 'unauthenticated' = 'authenticated')
 describe('CheckoutPage', () => {
   beforeEach(() => {
     sessionStorage.clear();
-    vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale: 'fa', setLocale: vi.fn() });
+    vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({
+      locale: 'fa',
+      setLocale: vi.fn(),
+    });
     vi.spyOn(useIsMobileModule, 'useIsMobile').mockReturnValue(false);
     vi.spyOn(publicSiteApi, 'fetchSavedPassengers').mockResolvedValue([
       {
@@ -85,6 +91,20 @@ describe('CheckoutPage', () => {
       balance: 20_000,
     });
     vi.spyOn(publicSiteApi, 'fetchSeatMap').mockResolvedValue(SEATMAP);
+    vi.spyOn(travelCostsApi, 'fetchPublicTravelCosts').mockResolvedValue([
+      {
+        id: BAGGAGE_ID,
+        code: 'EXTRA_BAGGAGE',
+        titleFa: 'بار اضافه',
+        titleEn: 'Extra baggage',
+        titleAr: null,
+        descriptionFa: 'به ازای هر کیلوگرم',
+        billingUnit: 'PER_KG',
+        priceIrr: '4500000',
+        purchaseEnabled: true,
+        sortOrder: 0,
+      },
+    ]);
   });
 
   it('renders the passenger wizard step for /checkout/new', async () => {
@@ -110,9 +130,7 @@ describe('CheckoutPage', () => {
     expect(screen.getByTestId('checkout-route-label')).toHaveTextContent('تهران به مشهد');
     expect(screen.getByTestId('checkout-pricing-sidebar')).toBeInTheDocument();
     expect(screen.getByTestId('checkout-step-pax')).toBeInTheDocument();
-    expect(screen.getByTestId('checkout-from-saved-0')).toHaveTextContent(
-      'از مسافران ذخیره‌شده',
-    );
+    expect(screen.getByTestId('checkout-from-saved-0')).toHaveTextContent('از مسافران ذخیره‌شده');
   });
 
   it('opens saved-passenger chips from the passenger step', async () => {
@@ -229,7 +247,7 @@ describe('CheckoutPage', () => {
     expect(await screen.findByTestId('checkout-extras-step')).toBeInTheDocument();
 
     await userEvent.click(await screen.findByTestId('checkout-seat-7A'));
-    await userEvent.click(screen.getByTestId('checkout-extra-baggage'));
+    await userEvent.click(screen.getByTestId(`checkout-extra-${BAGGAGE_ID}-toggle`));
     await userEvent.click(screen.getByTestId('checkout-next'));
 
     expect(await screen.findByTestId('checkout-review-step')).toBeInTheDocument();
@@ -247,6 +265,7 @@ describe('CheckoutPage', () => {
             seatCode: '7A',
           }),
         ],
+        extras: [{ id: BAGGAGE_ID, quantity: 1 }],
       }),
     );
     expect(await screen.findByTestId('payment-page')).toBeInTheDocument();

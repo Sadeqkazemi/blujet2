@@ -1,13 +1,16 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AgencySeatsPage from './AgencySeatsPage';
 import * as portalApi from '../../api/agency-portal';
+import * as publicApi from '../../api/publicSite';
 import * as useLocaleModule from '../../hooks/useLocale';
 import type { AgencyAllotmentRow } from '../../types/agency-portal';
 
 const ROWS: AgencyAllotmentRow[] = [
   {
     id: 'al1',
+    flightInstanceId: 'fi1',
     route: 'تهران → دبی',
     flightNo: 'BJ-100',
     departureAt: '2026-08-01T05:00:00.000Z',
@@ -64,5 +67,87 @@ describe('AgencySeatsPage', () => {
 
     expect(await screen.findByText('مخصَّص')).toBeInTheDocument();
     expect(screen.getByText('نشط')).toBeInTheDocument();
+  });
+
+  it('submits a real ticket sale from a free seat and refreshes allotments', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(portalApi, 'fetchAllotments').mockResolvedValue(ROWS);
+    vi.spyOn(publicApi, 'fetchSeatMap').mockResolvedValue({
+      flightInstanceId: 'fi1',
+      seats: [{ seatCode: '4A', row: 4, cabin: 'ECONOMY', status: 'FREE' }],
+    });
+    const create = vi.spyOn(portalApi, 'createAllotmentBooking').mockResolvedValue({
+      id: 'b1',
+      pnr: 'BJ123ABC',
+      status: 'TICKETED',
+      cabin: 'ECONOMY',
+      priceIrr: '10000000',
+      holdExpiresAt: null,
+      flightInstanceId: 'fi1',
+      flightNo: 'BJ-100',
+      originCode: 'THR',
+      destCode: 'DXB',
+      departureAt: '2026-08-01T05:00:00.000Z',
+      arrivalAt: '2026-08-01T07:00:00.000Z',
+      isPriceLocked: false,
+      passengers: [{ fullName: 'نگار رضایی', seatCode: '4A' }],
+    });
+    render(<AgencySeatsPage />);
+
+    await user.click(await screen.findByRole('button', { name: 'ثبت فروش' }));
+    await user.type(screen.getByLabelText('نام و نام خانوادگی مسافر'), 'نگار رضایی');
+    await user.selectOptions(screen.getByLabelText('صندلی'), '4A');
+    await user.click(screen.getByRole('button', { name: 'صدور قطعی بلیت' }));
+
+    expect(await screen.findByText(/BJ123ABC/)).toBeInTheDocument();
+    expect(create).toHaveBeenCalledWith(
+      'al1',
+      expect.objectContaining({
+        cabin: 'ECONOMY',
+        passengers: [expect.objectContaining({ fullName: 'نگار رضایی', seatCode: '4A' })],
+      }),
+      expect.any(String),
+    );
+  });
+
+  it('can pick COMFORT cabin and submit a COMFORT seat sale', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(portalApi, 'fetchAllotments').mockResolvedValue(ROWS);
+    vi.spyOn(publicApi, 'fetchSeatMap').mockResolvedValue({
+      flightInstanceId: 'fi1',
+      seats: [{ seatCode: '12A', row: 12, cabin: 'COMFORT', status: 'FREE' }],
+    });
+    const create = vi.spyOn(portalApi, 'createAllotmentBooking').mockResolvedValue({
+      id: 'b2',
+      pnr: 'BJ456DEF',
+      status: 'TICKETED',
+      cabin: 'COMFORT',
+      priceIrr: '12000000',
+      holdExpiresAt: null,
+      flightInstanceId: 'fi1',
+      flightNo: 'BJ-100',
+      originCode: 'THR',
+      destCode: 'DXB',
+      departureAt: '2026-08-01T05:00:00.000Z',
+      arrivalAt: '2026-08-01T07:00:00.000Z',
+      isPriceLocked: false,
+      passengers: [{ fullName: 'نگار رضایی', seatCode: '12A' }],
+    });
+    render(<AgencySeatsPage />);
+
+    await user.click(await screen.findByRole('button', { name: 'ثبت فروش' }));
+    await user.selectOptions(screen.getByLabelText('کلاس پروازی'), 'COMFORT');
+    await user.type(screen.getByLabelText('نام و نام خانوادگی مسافر'), 'نگار رضایی');
+    await user.selectOptions(screen.getByLabelText('صندلی'), '12A');
+    await user.click(screen.getByRole('button', { name: 'صدور قطعی بلیت' }));
+
+    expect(create).toHaveBeenCalledWith(
+      'al1',
+      expect.objectContaining({
+        cabin: 'COMFORT',
+        passengers: [expect.objectContaining({ fullName: 'نگار رضایی', seatCode: '12A' })],
+      }),
+      expect.any(String),
+    );
   });
 });

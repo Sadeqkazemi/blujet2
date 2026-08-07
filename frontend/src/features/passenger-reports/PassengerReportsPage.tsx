@@ -128,7 +128,7 @@ export default function PassengerReportsPage() {
                     <dt className="text-[10px] text-[#6b7b94]">صندلی / کلاس</dt>
                     <dd className="mt-1 font-bold text-[#e7ecf3]">
                       {h.seatCode ? `${faDigits(h.seatCode)} · ` : ''}
-                      {h.cabin === 'BUSINESS' ? 'بیزنس' : h.cabin === 'ECONOMY' ? 'اکونومی' : '—'}
+                      {h.cabin === 'BUSINESS' ? 'بیزنس' : h.cabin === 'COMFORT' ? 'کامفورت' : h.cabin === 'ECONOMY' ? 'اکونومی' : '—'}
                     </dd>
                   </div>
                   <div>

@@ -22,6 +22,7 @@ import { TWO_FACTOR_PROVIDER } from '../auth/providers/two-factor-provider.inter
 import type { TwoFactorProvider } from '../auth/providers/two-factor-provider.interface';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { UpdateProfileDto } from './dto/profile.dtos';
+import { assessProfileCompletion } from '../../common/profile-completion';
 
 function generateSixDigitCode(): string {
   return crypto.randomInt(0, 1_000_000).toString().padStart(6, '0');
@@ -41,18 +42,7 @@ export class ProfileService {
   ) {}
 
   private shape(user: User) {
-    const fields = [
-      user.fullName,
-      user.nationalIdEnc,
-      user.birthDate,
-      user.passportNoEnc,
-      user.emailVerifiedAt,
-    ];
-    const completionPct = Math.round(
-      (fields.filter((f) => f !== null && f !== undefined).length /
-        fields.length) *
-        100,
-    );
+    const completion = assessProfileCompletion(user);
     return {
       fullName: user.fullName,
       nationalId: user.nationalIdEnc ? decryptPii(user.nationalIdEnc) : null,
@@ -60,7 +50,7 @@ export class ProfileService {
       passportNo: user.passportNoEnc ? decryptPii(user.passportNoEnc) : null,
       email: user.email,
       emailVerifiedAt: user.emailVerifiedAt,
-      completionPct,
+      ...completion,
     };
   }
 

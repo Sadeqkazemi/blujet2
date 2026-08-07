@@ -7,6 +7,7 @@ import {
   fetchSavedPassengers,
   fetchSeatMap,
 } from '../../api/publicSite';
+import { fetchPublicTravelCosts } from '../../api/travel-costs';
 import { ApiRequestError } from '../../api/envelope';
 import { useAuth } from '../../hooks/useAuth';
 import { useLocale } from '../../hooks/useLocale';
@@ -16,11 +17,7 @@ import type { BookingDetail, CabinClass, SavedPassenger, SeatMapCell } from '../
 import PublicPageShell from '../../components/public/PublicPageShell';
 import FlowStepper from '../../components/public/FlowStepper';
 import { CHECKOUT_COPY } from './checkout/checkout-copy';
-import {
-  clearCheckoutDraft,
-  loadCheckoutDraft,
-  saveCheckoutDraft,
-} from './checkout/checkout-draft';
+import { clearCheckoutDraft, loadCheckoutDraft, saveCheckoutDraft } from './checkout/checkout-draft';
 import CheckoutStepBar from './checkout/CheckoutStepBar';
 import ExtrasStep from './checkout/ExtrasStep';
 import FlightSummaryCard from './checkout/FlightSummaryCard';
@@ -29,14 +26,15 @@ import PricingSidebar from './checkout/PricingSidebar';
 import ReviewStep from './checkout/ReviewStep';
 import OtpLoginInline from './OtpLoginInline';
 import {
-  defaultExtras,
   emptyPassenger,
+  extraTotalIrr,
   passengerFullName,
   type CheckoutDraft,
   type CheckoutWizardStep,
   type ExtraServiceState,
   type FlightSnapshot,
   type PassengerFormDraft,
+  toExtraState,
 } from './checkout/checkout-types';
 import {
   buildMd80Seats,
@@ -72,7 +70,7 @@ export default function CheckoutPage() {
   const [draft, setDraft] = useState<CheckoutDraft | null>(null);
   const [step, setStep] = useState<CheckoutWizardStep>('pax');
   const [passengers, setPassengers] = useState<PassengerFormDraft[]>([emptyPassenger('')]);
-  const [extras, setExtras] = useState<ExtraServiceState[]>(defaultExtras());
+  const [extras, setExtras] = useState<ExtraServiceState[]>([]);
   const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
   const [seats, setSeats] = useState<SeatMapCell[] | null>(null);
   const [savedPassengers, setSavedPassengers] = useState<SavedPassenger[]>([]);
@@ -93,17 +91,12 @@ export default function CheckoutPage() {
   // Must run even while OTP gate is showing so cities survive login remount.
   useEffect(() => {
     if (!isWizard) return;
-    const stateFlight = (location.state as { flight?: FlightSnapshot; cabin?: CabinClass } | null)
-      ?.flight;
+    const stateFlight = (location.state as { flight?: FlightSnapshot; cabin?: CabinClass } | null)?.flight;
     const stateCabin = (location.state as { cabin?: CabinClass } | null)?.cabin;
     const fromStorage = loadCheckoutDraft();
     const flightInstanceId =
       params.get('flightInstanceId') || stateFlight?.flightInstanceId || fromStorage?.flightInstanceId;
-    const cabin =
-      (params.get('cabin') as CabinClass | null) ||
-      stateCabin ||
-      fromStorage?.cabin ||
-      'ECONOMY';
+    const cabin = (params.get('cabin') as CabinClass | null) || stateCabin || fromStorage?.cabin || 'ECONOMY';
     const originFromQuery = (params.get('origin') || '').toUpperCase();
     const destFromQuery = (params.get('dest') || '').toUpperCase();
 
@@ -118,10 +111,7 @@ export default function CheckoutPage() {
           ? base.destCode
           : destFromQuery || fromStorage?.flight.destCode || base.destCode,
       flightNo: base.flightNo !== '—' ? base.flightNo : fromStorage?.flight.flightNo || base.flightNo,
-      priceIrr:
-        base.priceIrr && base.priceIrr !== '0'
-          ? base.priceIrr
-          : fromStorage?.flight.priceIrr || base.priceIrr,
+      priceIrr: base.priceIrr && base.priceIrr !== '0' ? base.priceIrr : fromStorage?.flight.priceIrr || base.priceIrr,
       aircraftType: base.aircraftType || fromStorage?.flight.aircraftType,
       departureAt: base.departureAt || fromStorage?.flight.departureAt || new Date().toISOString(),
       arrivalAt: base.arrivalAt || fromStorage?.flight.arrivalAt || new Date().toISOString(),
@@ -157,11 +147,11 @@ export default function CheckoutPage() {
         selectedSeats: [],
         flight: mergeFlight({
           flightInstanceId,
-          flightNo: 'BJ',
-          originCode: originFromQuery || 'THR',
-          destCode: destFromQuery || 'MHD',
-          departureAt: new Date().toISOString(),
-          arrivalAt: new Date().toISOString(),
+          flightNo: '—',
+          originCode: originFromQuery || '—',
+          destCode: destFromQuery || '—',
+          departureAt: '',
+          arrivalAt: '',
           priceIrr: '0',
         }),
       };
@@ -173,6 +163,13 @@ export default function CheckoutPage() {
   }, [isWizard, location.state, params, t.notFound]);
 
   useEffect(() => {
+    if (!isWizard) return;
+    fetchPublicTravelCosts()
+      .then((values) => setExtras(values.filter((value) => value.purchaseEnabled).map(toExtraState)))
+      .catch(() => setExtras([]));
+  }, [isWizard]);
+
+  useEffect(() => {
     if (!draft) return;
     // Full aircraft map. For MD-80, if the API is empty or still on legacy
     // lettering, fall back to the PDF chart inventory so the picker is never blank.
@@ -182,9 +179,7 @@ export default function CheckoutPage() {
         const useMd80 = shouldUseMd80SeatMap(aircraft, m.seats);
         if (useMd80 && !looksLikeMd80SeatPayload(m.seats)) {
           const takenRaw = m.seats.filter((s) => s.status === 'TAKEN').map((s) => s.seatCode);
-          const taken = looksLikeLegacyA320SeatPayload(m.seats)
-            ? mapLegacyTakenSeatsToMd80(takenRaw)
-            : takenRaw;
+          const taken = looksLikeLegacyA320SeatPayload(m.seats) ? mapLegacyTakenSeatsToMd80(takenRaw) : takenRaw;
           setSeats(buildMd80Seats(taken));
           return;
         }
@@ -231,9 +226,7 @@ export default function CheckoutPage() {
 
   function toggleSeat(seatCode: string) {
     setSelectedSeats((prev) => {
-      const next = prev.includes(seatCode)
-        ? prev.filter((s) => s !== seatCode)
-        : [...prev, seatCode];
+      const next = prev.includes(seatCode) ? prev.filter((s) => s !== seatCode) : [...prev, seatCode];
       if (draft) {
         const updated = { ...draft, selectedSeats: next };
         setDraft(updated);
@@ -245,6 +238,10 @@ export default function CheckoutPage() {
 
   function toggleExtra(id: ExtraServiceState['id']) {
     setExtras((arr) => arr.map((e) => (e.id === id ? { ...e, selected: !e.selected } : e)));
+  }
+
+  function changeExtraQuantity(id: ExtraServiceState['id'], quantity: number) {
+    setExtras((arr) => arr.map((e) => (e.id === id ? { ...e, quantity } : e)));
   }
 
   function goNext() {
@@ -294,7 +291,9 @@ export default function CheckoutPage() {
   async function submitBooking() {
     if (!draft) return;
     if (status !== 'authenticated') {
-      navigate('/signin', { state: { from: location.pathname + location.search } });
+      navigate('/signin', {
+        state: { from: location.pathname + location.search },
+      });
       return;
     }
     if (passengers.some((p) => !isPassengerComplete(p))) {
@@ -302,13 +301,17 @@ export default function CheckoutPage() {
       setStep('pax');
       return;
     }
-    const seatCodes = resolveSeatCodesForBooking();
-    if (!seatCodes) {
+    if (!draft.flight.priceIrr || draft.flight.priceIrr === '0') {
       setError(
         locale === 'en'
-          ? 'No free seats left for this cabin.'
-          : 'صندلی خالی برای این کلاس باقی نمانده است.',
+          ? 'The flight price is unavailable.'
+          : 'نرخ واقعی این پرواز دریافت نشد؛ امکان ثبت رزرو وجود ندارد.',
       );
+      return;
+    }
+    const seatCodes = resolveSeatCodesForBooking();
+    if (!seatCodes) {
+      setError(locale === 'en' ? 'No free seats left for this cabin.' : 'صندلی خالی برای این کلاس باقی نمانده است.');
       setStep('extras');
       return;
     }
@@ -323,6 +326,7 @@ export default function CheckoutPage() {
           nationalId: p.docType === 'NATIONAL_ID' ? p.nationalId || undefined : undefined,
           seatCode: seatCodes[i]!,
         })),
+        extras: extras.filter((extra) => extra.selected).map((extra) => ({ id: extra.id, quantity: extra.quantity })),
       });
       clearCheckoutDraft();
       navigate(`/payment/${booking.id}`);
@@ -333,7 +337,9 @@ export default function CheckoutPage() {
             ? 'Your session expired. Please sign in again.'
             : 'نشست شما منقضی شده است. لطفاً دوباره وارد شوید.',
         );
-        navigate('/signin', { state: { from: location.pathname + location.search } });
+        navigate('/signin', {
+          state: { from: location.pathname + location.search },
+        });
         return;
       }
       setError(err instanceof ApiRequestError ? err.message : t.notFound);
@@ -439,14 +445,13 @@ export default function CheckoutPage() {
     );
   }
 
-  const priceIrr =
-    draft.flight.priceIrr && draft.flight.priceIrr !== '0'
-      ? draft.flight.priceIrr
-      : String(397_000_000 * Math.max(1, passengers.length));
-  const extrasIrr =
-    extras.filter((e) => e.selected).reduce((s, e) => s + e.priceToman, 0) * 10;
-  const grandIrr = Number(priceIrr) + extrasIrr;
-  const grandDisplay = localeMoney(grandIrr, locale);
+  const priceIrr = draft.flight.priceIrr && draft.flight.priceIrr !== '0' ? draft.flight.priceIrr : '0';
+  const passengerCount = Math.max(1, passengers.length);
+  const extrasIrr = extras
+    .filter((extra) => extra.selected)
+    .reduce((sum, extra) => sum + extraTotalIrr(extra, passengerCount), 0n);
+  const grandIrr = BigInt(priceIrr) * BigInt(passengerCount) + extrasIrr;
+  const grandDisplay = localeMoney(grandIrr.toString(), locale);
 
   const stepBody = (
     <>
@@ -463,6 +468,8 @@ export default function CheckoutPage() {
           locale={locale}
           extras={extras}
           onToggleExtra={toggleExtra}
+          onExtraQuantityChange={changeExtraQuantity}
+          passengerCount={passengerCount}
           seats={seats}
           selectedSeats={selectedSeats}
           onToggleSeat={toggleSeat}
@@ -472,12 +479,7 @@ export default function CheckoutPage() {
         />
       )}
       {step === 'review' && (
-        <ReviewStep
-          locale={locale}
-          passengers={passengers}
-          extras={extras}
-          selectedSeats={selectedSeats}
-        />
+        <ReviewStep locale={locale} passengers={passengers} extras={extras} selectedSeats={selectedSeats} />
       )}
     </>
   );

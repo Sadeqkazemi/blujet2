@@ -69,7 +69,27 @@ describe('Flights (e2e)', () => {
   });
 
   function uniqueFlightNo() {
-    return `TS-${(Date.now() % 9000) + 1000}`;
+    return `TS${(Date.now() % 9000) + 1000}`;
+  }
+
+  function definitionBase(over: Record<string, unknown> = {}) {
+    // Airbus A320 physical map: 16 business + 20 comfort + 110 economy.
+    const capacity = 146;
+    return {
+      originCode: 'THR',
+      destCode: 'MHD',
+      flightNo: uniqueFlightNo(),
+      departureAt: new Date(Date.now() + 5 * 24 * 3_600_000).toISOString(),
+      durationMinutes: 90,
+      capacity,
+      cabinCapacities: [
+        { cabin: 'ECONOMY', seats: 110 },
+        { cabin: 'COMFORT', seats: 20 },
+        { cabin: 'BUSINESS', seats: 16 },
+      ],
+      basePriceIrr: 25_000_000,
+      ...over,
+    };
   }
 
   async function createInstance(
@@ -259,14 +279,7 @@ describe('Flights (e2e)', () => {
 
   it('POST /flights: validations (same origin/dest, past date, duplicate flightNo on another route) then a clean create', async () => {
     const { accessToken } = await loginAs(app, 'senior');
-    const base = {
-      originCode: 'THR',
-      destCode: 'MHD',
-      flightNo: uniqueFlightNo(),
-      departureAt: new Date(Date.now() + 5 * 24 * 3_600_000).toISOString(),
-      capacity: 160,
-      basePriceIrr: 25_000_000,
-    };
+    const base = definitionBase();
 
     const sameCity = await request(app.getHttpServer())
       .post('/flights')
@@ -283,12 +296,12 @@ describe('Flights (e2e)', () => {
       });
     expect(pastDate.status).toBe(400);
 
-    // EP-821 belongs to the seeded THR→DXB route — reusing it on THR→MHD → 409.
-    const dupNo = await request(app.getHttpServer())
+    // Legacy hyphenated numbers are rejected by the new ^[A-Z]{2}\d{4}$ rule.
+    const legacyNo = await request(app.getHttpServer())
       .post('/flights')
       .set('Authorization', `Bearer ${accessToken}`)
       .send({ ...base, flightNo: 'EP-821' });
-    expect(dupNo.status).toBe(409);
+    expect(legacyNo.status).toBe(400);
 
     const ok = await request(app.getHttpServer())
       .post('/flights')
@@ -298,16 +311,39 @@ describe('Flights (e2e)', () => {
     expect(ok.body.data.derivedStatus).toBe('ACTIVE');
     expect(ok.body.data.sold).toBe(0);
 
-    const withExtras = await request(app.getHttpServer())
+    // Same flightNo on a different route → 409.
+    const dupNo = await request(app.getHttpServer())
       .post('/flights')
       .set('Authorization', `Bearer ${accessToken}`)
       .send({
-        ...base,
-        flightNo: uniqueFlightNo(),
-        capacity: 180,
-        charterSeats: 40,
-        aircraftType: 'Airbus A320',
+        ...definitionBase({
+          flightNo: base.flightNo,
+          destCode: 'DXB',
+          cabinCapacities: [
+            { cabin: 'ECONOMY', seats: 110 },
+            { cabin: 'COMFORT', seats: 20 },
+            { cabin: 'BUSINESS', seats: 16 },
+          ],
+        }),
       });
+    expect(dupNo.status).toBe(409);
+
+    const withExtras = await request(app.getHttpServer())
+      .post('/flights')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send(
+        definitionBase({
+          flightNo: uniqueFlightNo(),
+          capacity: 146,
+          cabinCapacities: [
+            { cabin: 'ECONOMY', seats: 110 },
+            { cabin: 'COMFORT', seats: 20 },
+            { cabin: 'BUSINESS', seats: 16 },
+          ],
+          charterSeats: 40,
+          aircraftType: 'Airbus A320',
+        }),
+      );
     expect(withExtras.status).toBe(201);
     const extrasInstance = await dataSource
       .getRepository(FlightInstance)
@@ -321,12 +357,18 @@ describe('Flights (e2e)', () => {
     const badCharter = await request(app.getHttpServer())
       .post('/flights')
       .set('Authorization', `Bearer ${accessToken}`)
-      .send({
-        ...base,
-        flightNo: uniqueFlightNo(),
-        capacity: 100,
-        charterSeats: 100,
-      });
+      .send(
+        definitionBase({
+          flightNo: uniqueFlightNo(),
+          capacity: 146,
+          cabinCapacities: [
+            { cabin: 'ECONOMY', seats: 110 },
+            { cabin: 'COMFORT', seats: 20 },
+            { cabin: 'BUSINESS', seats: 16 },
+          ],
+          charterSeats: 146, // must be strictly less than capacity
+        }),
+      );
     expect(badCharter.status).toBe(400);
 
     const instance = await dataSource
@@ -338,10 +380,11 @@ describe('Flights (e2e)', () => {
       .getOneOrFail();
     expect(instance.flight.route.originCode).toBe('THR');
     expect(instance.flight.route.destCode).toBe('MHD');
-    // arrivalAt = departure + the route's seeded duration (default 120min).
+    // arrivalAt is derived from durationMinutes (documented contract).
     expect(instance.arrivalAt.getTime() - instance.departureAt.getTime()).toBe(
-      instance.flight.route.durationMin * 60_000,
+      90 * 60_000,
     );
+    expect(instance.durationMinutes).toBe(90);
 
     const audit = await dataSource
       .getRepository(AuditLog)
@@ -378,7 +421,7 @@ describe('Flights (e2e)', () => {
   it('plan: agency-seat cap enforced; commercial save upserts a PENDING Phase 6 proposal; REGISTERED price → 409', async () => {
     const instance = await createInstance({
       departureAt: new Date(Date.now() + 20 * 24 * 3_600_000),
-      capacity: 180,
+      capacity: 146,
       charterSeats: 60,
     });
     const commercial = await loginAs(app, 'comm');
@@ -386,7 +429,7 @@ describe('Flights (e2e)', () => {
     const overCap = await request(app.getHttpServer())
       .patch(`/flights/${instance.id}/plan`)
       .set('Authorization', `Bearer ${commercial.accessToken}`)
-      .send({ priceIrr: 39_000_000, agencySeats: 121 }); // max = 180 − 60
+      .send({ priceIrr: 39_000_000, agencySeats: 87 }); // max = 146 − 60
     expect(overCap.status).toBe(400);
 
     const ok = await request(app.getHttpServer())
@@ -396,7 +439,8 @@ describe('Flights (e2e)', () => {
     expect(ok.status).toBe(200);
     expect(ok.body.data.basePriceIrr).toBe('39000000');
     expect(ok.body.data.agencySeatsAllocated).toBe(60);
-    expect(ok.body.data.directSeats).toBe(60);
+    // direct = capacity − charter − agency = 146 − 60 − 60
+    expect(ok.body.data.directSeats).toBe(26);
     expect(ok.body.data.proposalPending).toBe(true);
 
     // ⚑ The plan never registers a bookable price — the proposal stays PENDING.

@@ -107,6 +107,7 @@ export type AgencyDocumentStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
 export interface AgencyAllotmentRow {
   id: string;
+  flightInstanceId: string;
   flightNo: string;
   route: string;
   departureAt: string;

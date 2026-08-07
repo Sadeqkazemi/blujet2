@@ -261,6 +261,7 @@ export default function Md80SeatMap({
   const byCode = new Map(inventory.map((s) => [s.seatCode, s]));
   for (const s of seats) {
     if (MD80_EXCLUDED.has(s.seatCode)) continue;
+    if (s.cabin === 'COMFORT') continue;
     if (byCode.has(s.seatCode)) {
       byCode.set(s.seatCode, {
         seatCode: s.seatCode,

@@ -23,4 +23,24 @@ describe('enumerateSeats', () => {
     expect(seats.find((s) => s.seatCode === '28D')).toBeDefined();
     expect(seats.find((s) => s.seatCode === '31A')).toBeDefined();
   });
+
+  it('enumerates COMFORT seats when comfort rows are configured', () => {
+    const seats = enumerateSeats({
+      businessRowStart: 3,
+      businessRowEnd: 6,
+      businessColsLeft: ['A', 'B'],
+      businessColsRight: ['C', 'D'],
+      comfortRowStart: 7,
+      comfortRowEnd: 10,
+      comfortColsLeft: ['A', 'B'],
+      comfortColsRight: ['C', 'D', 'E'],
+      economyRowStart: 11,
+      economyRowEnd: 32,
+      economyColsLeft: ['A', 'B'],
+      economyColsRight: ['C', 'D', 'E'],
+    });
+    expect(seats.find((s) => s.seatCode === '7A')?.cabin).toBe('COMFORT');
+    expect(seats.find((s) => s.seatCode === '11A')?.cabin).toBe('ECONOMY');
+    expect(seats.filter((s) => s.cabin === 'COMFORT')).toHaveLength(20);
+  });
 });

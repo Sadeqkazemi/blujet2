@@ -13,8 +13,10 @@ import { Booking } from '../../database/entities/booking.entity';
 import { Passenger } from '../../database/entities/passenger.entity';
 import { SeatLock } from '../../database/entities/seat-lock.entity';
 import { FarePricingProposal } from '../../database/entities/fare-pricing-proposal.entity';
+import { FlightChargeRule } from '../../database/entities/flight-charge-rule.entity';
 import { FlightsController } from './flights.controller';
 import { FlightsService } from './flights.service';
+import { FlightDefinitionService } from './flight-definition.service';
 import { PanelsModule } from '../panels/panels.module';
 import { AuditModule } from '../audit/audit.module';
 import { AiModule } from '../ai/ai.module';
@@ -36,6 +38,7 @@ import { AuthModule } from '../auth/auth.module';
       Passenger,
       SeatLock,
       FarePricingProposal,
+      FlightChargeRule,
     ]),
     PanelsModule,
     AuditModule,
@@ -43,6 +46,7 @@ import { AuthModule } from '../auth/auth.module';
     AuthModule,
   ],
   controllers: [FlightsController],
-  providers: [FlightsService],
+  providers: [FlightsService, FlightDefinitionService],
+  exports: [FlightDefinitionService],
 })
 export class FlightsModule {}
