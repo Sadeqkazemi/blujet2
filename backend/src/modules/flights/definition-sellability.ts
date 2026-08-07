@@ -15,10 +15,11 @@ export const SELLABLE_DEFINITION_STATUSES: FlightDefinitionStatusT[] = [
 
 export function isSellableDefinitionStatus(
   status: FlightDefinitionStatusT | null | undefined,
+  hasApprovedSnapshot = false,
 ): boolean {
   return (
     status === FlightDefinitionStatus.APPROVED ||
-    status === FlightDefinitionStatus.PENDING_REVISION
+    (status === FlightDefinitionStatus.PENDING_REVISION && hasApprovedSnapshot)
   );
 }
 
@@ -27,9 +28,15 @@ export function applySellableDefinitionFilter<T extends FlightInstance>(
   qb: SelectQueryBuilder<T>,
   alias = 'fi',
 ): SelectQueryBuilder<T> {
-  return qb.andWhere(`${alias}.definitionStatus IN (:...sellableDefs)`, {
-    sellableDefs: SELLABLE_DEFINITION_STATUSES,
-  });
+  return qb.andWhere(
+    `(${alias}.definitionStatus = :approvedDefinition OR (` +
+      `${alias}.definitionStatus = :pendingRevisionDefinition AND ` +
+      `${alias}.approvedSnapshot IS NOT NULL))`,
+    {
+      approvedDefinition: FlightDefinitionStatus.APPROVED,
+      pendingRevisionDefinition: FlightDefinitionStatus.PENDING_REVISION,
+    },
+  );
 }
 
 /**
@@ -37,7 +44,10 @@ export function applySellableDefinitionFilter<T extends FlightInstance>(
  * customer-sellable — avoids leaking draft/pending/rejected inventory.
  */
 export function assertSellableForSale(
-  instance: Pick<FlightInstance, 'definitionStatus' | 'status'> | null,
+  instance: Pick<
+    FlightInstance,
+    'definitionStatus' | 'status' | 'approvedSnapshot'
+  > | null,
 ): asserts instance is NonNullable<typeof instance> {
   if (!instance || instance.status !== 'SCHEDULED') {
     throw new NotFoundException({
@@ -45,7 +55,12 @@ export function assertSellableForSale(
       message: 'پرواز یافت نشد یا دیگر قابل رزرو نیست.',
     });
   }
-  if (!isSellableDefinitionStatus(instance.definitionStatus)) {
+  if (
+    !isSellableDefinitionStatus(
+      instance.definitionStatus,
+      instance.approvedSnapshot != null,
+    )
+  ) {
     throw new NotFoundException({
       code: ErrorCode.NOT_FOUND,
       message: 'پرواز یافت نشد یا دیگر قابل رزرو نیست.',
@@ -54,9 +69,14 @@ export function assertSellableForSale(
 }
 
 export function assertSellableOrConflict(
-  instance: Pick<FlightInstance, 'definitionStatus'>,
+  instance: Pick<FlightInstance, 'definitionStatus' | 'approvedSnapshot'>,
 ): void {
-  if (!isSellableDefinitionStatus(instance.definitionStatus)) {
+  if (
+    !isSellableDefinitionStatus(
+      instance.definitionStatus,
+      instance.approvedSnapshot != null,
+    )
+  ) {
     throw new ConflictException({
       code: ErrorCode.CONFLICT,
       message: 'این پرواز هنوز برای فروش تأیید نشده است.',

@@ -6,12 +6,15 @@ import {
 } from './definition-sellability';
 
 describe('definition-sellability', () => {
-  it('treats APPROVED and PENDING_REVISION as sellable', () => {
+  it('requires an approved snapshot for PENDING_REVISION', () => {
     expect(isSellableDefinitionStatus(FlightDefinitionStatus.APPROVED)).toBe(
       true,
     );
     expect(
       isSellableDefinitionStatus(FlightDefinitionStatus.PENDING_REVISION),
+    ).toBe(false);
+    expect(
+      isSellableDefinitionStatus(FlightDefinitionStatus.PENDING_REVISION, true),
     ).toBe(true);
     expect(isSellableDefinitionStatus(FlightDefinitionStatus.DRAFT)).toBe(
       false,
@@ -23,6 +26,7 @@ describe('definition-sellability', () => {
       assertSellableForSale({
         status: 'SCHEDULED',
         definitionStatus: FlightDefinitionStatus.DRAFT,
+        approvedSnapshot: null,
       }),
     ).toThrow(NotFoundException);
   });
@@ -32,7 +36,18 @@ describe('definition-sellability', () => {
       assertSellableForSale({
         status: 'SCHEDULED',
         definitionStatus: FlightDefinitionStatus.APPROVED,
+        approvedSnapshot: null,
       }),
     ).not.toThrow();
+  });
+
+  it('rejects a pending revision without a live approved snapshot', () => {
+    expect(() =>
+      assertSellableForSale({
+        status: 'SCHEDULED',
+        definitionStatus: FlightDefinitionStatus.PENDING_REVISION,
+        approvedSnapshot: null,
+      }),
+    ).toThrow(NotFoundException);
   });
 });

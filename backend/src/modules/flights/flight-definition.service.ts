@@ -444,16 +444,14 @@ export class FlightDefinitionService {
 
     const aircraftType =
       (dto.aircraftType ?? 'Airbus A320').trim() || 'Airbus A320';
-    if (dto.aircraftType) {
-      const map = await this.seatMapRepo.findOneBy({ aircraftType });
-      if (!map) {
-        throw new BadRequestException({
-          code: ErrorCode.VALIDATION_FAILED,
-          message: 'نوع هواپیمای انتخاب‌شده در کاتالوگ نیست.',
-        });
-      }
-      this.validateCabinCapacitiesAgainstSeatMap(map, cabinCapacities);
+    const map = await this.seatMapRepo.findOneBy({ aircraftType });
+    if (!map) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'نوع هواپیمای انتخاب‌شده در کاتالوگ نیست.',
+      });
     }
+    this.validateCabinCapacitiesAgainstSeatMap(map, cabinCapacities);
 
     const createdId = await this.dataSource.transaction(async (manager) => {
       let route = await manager.findOneBy(Route, {
@@ -585,16 +583,14 @@ export class FlightDefinitionService {
     const aircraftType =
       (dto.aircraftType ?? resolveAircraftType(instance)).trim() ||
       'Airbus A320';
-    if (dto.aircraftType) {
-      const map = await this.seatMapRepo.findOneBy({ aircraftType });
-      if (!map) {
-        throw new BadRequestException({
-          code: ErrorCode.VALIDATION_FAILED,
-          message: 'نوع هواپیمای انتخاب‌شده در کاتالوگ نیست.',
-        });
-      }
-      this.validateCabinCapacitiesAgainstSeatMap(map, cabinCapacities);
+    const map = await this.seatMapRepo.findOneBy({ aircraftType });
+    if (!map) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'نوع هواپیمای انتخاب‌شده در کاتالوگ نیست.',
+      });
     }
+    this.validateCabinCapacitiesAgainstSeatMap(map, cabinCapacities);
 
     const status = instance.definitionStatus;
 

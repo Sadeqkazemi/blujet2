@@ -386,7 +386,10 @@ export class SearchService {
     if (
       !instance ||
       instance.status !== 'SCHEDULED' ||
-      !isSellableDefinitionStatus(instance.definitionStatus)
+      !isSellableDefinitionStatus(
+        instance.definitionStatus,
+        instance.approvedSnapshot != null,
+      )
     ) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,

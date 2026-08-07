@@ -21,46 +21,23 @@ export class ComfortSeatMapAndNullableCompetitor1786348800000 implements Migrati
       `ALTER TABLE "aircraft_seat_maps" ADD COLUMN IF NOT EXISTS "comfortColsRight" text[]`,
     );
 
-    // Carve comfort rows 7–10 out of economy for Airbus A320 (keeps total seats).
-    await queryRunner.query(`
-      UPDATE "aircraft_seat_maps"
-      SET
-        "comfortRowStart" = 7,
-        "comfortRowEnd" = 10,
-        "comfortColsLeft" = "economyColsLeft",
-        "comfortColsRight" = "economyColsRight",
-        "economyRowStart" = 11
-      WHERE "aircraftType" = 'Airbus A320'
-        AND "comfortRowStart" IS NULL
-        AND "economyRowStart" = 7
-    `);
-
     await queryRunner.query(
       `ALTER TABLE "fare_pricing_proposals" ALTER COLUMN "competitorPriceIrr" DROP NOT NULL`,
     );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`
-      UPDATE "fare_pricing_proposals"
-      SET "competitorPriceIrr" = COALESCE("competitorPriceIrr", "basePriceIrr")
-      WHERE "competitorPriceIrr" IS NULL
-    `);
+    const nullCompetitors = (await queryRunner.query(
+      `SELECT 1 FROM "fare_pricing_proposals" WHERE "competitorPriceIrr" IS NULL LIMIT 1`,
+    )) as unknown[];
+    if (nullCompetitors.length > 0) {
+      throw new Error(
+        'Cannot revert nullable competitor prices while null values exist.',
+      );
+    }
     await queryRunner.query(
       `ALTER TABLE "fare_pricing_proposals" ALTER COLUMN "competitorPriceIrr" SET NOT NULL`,
     );
-
-    await queryRunner.query(`
-      UPDATE "aircraft_seat_maps"
-      SET
-        "economyRowStart" = COALESCE("comfortRowStart", "economyRowStart"),
-        "comfortRowStart" = NULL,
-        "comfortRowEnd" = NULL,
-        "comfortColsLeft" = NULL,
-        "comfortColsRight" = NULL
-      WHERE "aircraftType" = 'Airbus A320'
-        AND "comfortRowStart" IS NOT NULL
-    `);
 
     await queryRunner.query(
       `ALTER TABLE "aircraft_seat_maps" DROP COLUMN IF EXISTS "comfortColsRight"`,

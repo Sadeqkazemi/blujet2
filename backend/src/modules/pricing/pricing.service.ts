@@ -250,10 +250,23 @@ export class PricingService {
       });
     }
 
-    await this.proposalRepo.update(
-      { id },
+    if (proposal.status !== PricingProposalStatus.PENDING) {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: LOCKED_MESSAGE,
+      });
+    }
+
+    const legalRateUpdate = await this.proposalRepo.update(
+      { id, status: PricingProposalStatus.PENDING },
       { legalRateIrr, updatedAt: new Date() },
     );
+    if ((legalRateUpdate.affected ?? 0) === 0) {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: LOCKED_MESSAGE,
+      });
+    }
     const updated = await this.withProposalRelations(
       this.proposalRepo.createQueryBuilder('p'),
     )
@@ -310,37 +323,6 @@ export class PricingService {
       });
     }
 
-    let price: Irr = proposal.proposedPriceIrr;
-    if (source === 'AI') {
-      const suggestion =
-        proposal.aiSuggestion as unknown as PersistedAiSuggestion | null;
-      if (!suggestion?.priceIrr) {
-        throw new ConflictException({
-          code: ErrorCode.CONFLICT,
-          message: 'برای این پیشنهاد تحلیل هوش مصنوعی ثبت نشده است.',
-        });
-      }
-      // The CEO's explicit registration action (this authenticated,
-      // step-up-verified endpoint) is what actually authorizes the price —
-      // the AI suggestion itself never sets it. Individual fare amounts are
-      // far below 2^53, so converting the advisory JSON number to Irr here
-      // loses no precision.
-      price = toIrr(suggestion.priceIrr);
-      // AI output is advisory only (CLAUDE.md: an ML suggestion can never
-      // set a bookable price by itself) — it must never exceed the CEO's
-      // own approved legal/regulatory ceiling for this flight.
-      if (
-        proposal.legalRateIrr != null &&
-        compareIrr(price, proposal.legalRateIrr) > 0
-      ) {
-        throw new ConflictException({
-          code: ErrorCode.CONFLICT,
-          message:
-            'قیمت پیشنهادی هوش مصنوعی از نرخ قانونی (مصوب) بیشتر است و قابل ثبت نیست.',
-        });
-      }
-    }
-
     // Conditional update + definition approval in one transaction.
     const registered = await this.dataSource.transaction(async (manager) => {
       await manager
@@ -360,7 +342,33 @@ export class PricingService {
         });
       }
       if (lockedProposal.status === PricingProposalStatus.REGISTERED) {
-        return { alreadyRegistered: true as const };
+        return {
+          alreadyRegistered: true as const,
+          price: lockedProposal.registeredPriceIrr,
+        };
+      }
+
+      let price: Irr = lockedProposal.proposedPriceIrr;
+      if (source === 'AI') {
+        const suggestion =
+          lockedProposal.aiSuggestion as unknown as PersistedAiSuggestion | null;
+        if (!suggestion?.priceIrr) {
+          throw new ConflictException({
+            code: ErrorCode.CONFLICT,
+            message: 'برای این پیشنهاد تحلیل هوش مصنوعی ثبت نشده است.',
+          });
+        }
+        price = toIrr(suggestion.priceIrr);
+        if (
+          lockedProposal.legalRateIrr != null &&
+          compareIrr(price, lockedProposal.legalRateIrr) > 0
+        ) {
+          throw new ConflictException({
+            code: ErrorCode.CONFLICT,
+            message:
+              'قیمت پیشنهادی هوش مصنوعی از نرخ قانونی (مصوب) بیشتر است و قابل ثبت نیست.',
+          });
+        }
       }
       if (lockedProposal.status === PricingProposalStatus.REJECTED) {
         throw new ConflictException({
@@ -388,7 +396,10 @@ export class PricingService {
           where: { id },
         });
         if (raced?.status === PricingProposalStatus.REGISTERED) {
-          return { alreadyRegistered: true as const };
+          return {
+            alreadyRegistered: true as const,
+            price: raced.registeredPriceIrr,
+          };
         }
         throw new ConflictException({
           code: ErrorCode.CONFLICT,
@@ -400,7 +411,7 @@ export class PricingService {
         manager,
         lockedProposal.flightInstanceId,
       );
-      return { alreadyRegistered: false as const };
+      return { alreadyRegistered: false as const, price };
     });
 
     if (registered.alreadyRegistered) {
@@ -422,7 +433,7 @@ export class PricingService {
       detail: `قیمت پرواز ${proposal.flightInstance.flight.flightNo} توسط ${actor.fullName} تأیید و ثبت شد.`,
       entityType: 'FarePricingProposal',
       entityId: id,
-      metadata: { registeredPriceIrr: price, source },
+      metadata: { registeredPriceIrr: registered.price, source },
     });
 
     // Newly APPROVED inventory must appear in search immediately.
@@ -601,7 +612,10 @@ export class PricingService {
     )
       .where('p.status = :status', { status: 'PENDING' })
       .getMany();
-    if (pending.length === 0) return { analyzed: 0, available: true };
+    const analyzable = pending.filter((p) => p.competitorPriceIrr != null);
+    if (analyzable.length === 0) {
+      return { analyzed: 0, available: true };
+    }
 
     const result = await this.priceSuggestions.suggest(
       // ADVISORY-ONLY ML boundary (CLAUDE.md ML Service Rules): the
@@ -610,16 +624,13 @@ export class PricingService {
       // back into a stored/authoritative field without going through
       // NestJS's own re-pricing/registration logic above. Individual fare
       // amounts are far below 2^53, so Number() loses no precision here.
-      pending.map((p) => ({
+      analyzable.map((p) => ({
         proposal_id: p.id,
         origin_code: p.flightInstance.flight.route.originCode,
         dest_code: p.flightInstance.flight.route.destCode,
         departure_at: p.flightInstance.departureAt.toISOString(),
         base_price_irr: Number(p.basePriceIrr),
-        // ML schema requires competitor_price_irr > 0. When the definition
-        // has no competitor, anchor on base — never invent base+3% and never
-        // persist this fallback as competitorPriceIrr.
-        competitor_price_irr: Number(p.competitorPriceIrr ?? p.basePriceIrr),
+        competitor_price_irr: Number(p.competitorPriceIrr),
         proposed_price_irr: Number(p.proposedPriceIrr),
         capacity: p.flightInstance.capacity,
         charter_seats: p.flightInstance.charterSeats,
@@ -631,7 +642,7 @@ export class PricingService {
     if (!result) return { analyzed: 0, available: false };
 
     const generatedAt = new Date().toISOString();
-    const pendingById = new Map(pending.map((p) => [p.id, p]));
+    const pendingById = new Map(analyzable.map((p) => [p.id, p]));
     for (const s of result.suggestions) {
       const suggestion: PersistedAiSuggestion = {
         priceIrr: s.price_irr,

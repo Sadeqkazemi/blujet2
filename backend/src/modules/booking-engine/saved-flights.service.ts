@@ -65,7 +65,10 @@ export class SavedFlightsService {
         if (
           inst.status === 'SCHEDULED' &&
           inst.departureAt > now &&
-          isSellableDefinitionStatus(inst.definitionStatus)
+          isSellableDefinitionStatus(
+            inst.definitionStatus,
+            inst.approvedSnapshot != null,
+          )
         ) {
           try {
             priceIrr = await getCabinPrice(
