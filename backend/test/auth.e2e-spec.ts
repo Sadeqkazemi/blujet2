@@ -281,6 +281,7 @@ describe('Auth (e2e)', () => {
   });
 
   it('allows only an unexpired reserved UAT account to bypass OTP and caps/revokes its session at expiry', async () => {
+    process.env.AUTH_SANDBOX_ENABLED = 'true';
     const userRepo = dataSource.getRepository(User);
     const now = new Date();
     const deadline = new Date(now.getTime() + 5 * 60 * 1000);
