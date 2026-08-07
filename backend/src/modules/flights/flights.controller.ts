@@ -422,6 +422,22 @@ export class FlightsController {
     return { success: true, data };
   }
 
+  @Delete('airports/:id')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_manage')
+  @ApiOperation({
+    summary: 'حذف فرودگاه ثبت‌شده در صورت استفاده‌نشدن در مسیرها',
+  })
+  async removeAirport(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    return {
+      success: true,
+      data: await this.flights.removeAirport(actor, id),
+    };
+  }
+
   @Get('aircraft-types')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
   @RequiresPermission('fl_view')

@@ -1,4 +1,5 @@
 import type { CabinClass } from '../../../types/public-site';
+import type { PublicTravelCost, TravelExtraBillingUnit, TravelExtraCode } from '../../../types/travel-costs';
 
 export interface FlightSnapshot {
   flightInstanceId: string;
@@ -34,14 +35,17 @@ export interface PassengerFormDraft {
   seatCode: string;
 }
 
-export interface ExtraServiceId {
-  id: 'baggage' | 'meal' | 'insurance' | 'cip';
-}
-
 export interface ExtraServiceState {
-  id: ExtraServiceId['id'];
+  id: string;
+  code: TravelExtraCode;
+  titleFa: string;
+  titleEn: string | null;
+  titleAr: string | null;
+  descriptionFa: string | null;
+  billingUnit: TravelExtraBillingUnit;
+  priceIrr: string;
   selected: boolean;
-  priceToman: number;
+  quantity: number;
 }
 
 export type CheckoutWizardStep = 'pax' | 'extras' | 'review';
@@ -65,12 +69,17 @@ export function passengerFullName(p: PassengerFormDraft): string {
   return `${p.firstNameLatin.trim()} ${p.lastNameLatin.trim()}`.trim();
 }
 
-/** Prices from design-reference-v2/تکمیل خرید.dc.html (تومان). */
-export function defaultExtras(): ExtraServiceState[] {
-  return [
-    { id: 'baggage', selected: false, priceToman: 450_000 },
-    { id: 'meal', selected: false, priceToman: 280_000 },
-    { id: 'insurance', selected: false, priceToman: 120_000 },
-    { id: 'cip', selected: false, priceToman: 900_000 },
-  ];
+export function toExtraState(value: PublicTravelCost): ExtraServiceState {
+  return { ...value, selected: false, quantity: 1 };
+}
+
+export function extraTitle(extra: ExtraServiceState, locale: 'fa' | 'en' | 'ar'): string {
+  if (locale === 'en') return extra.titleEn || extra.titleFa;
+  if (locale === 'ar') return extra.titleAr || extra.titleFa;
+  return extra.titleFa;
+}
+
+export function extraTotalIrr(extra: ExtraServiceState, passengerCount: number): bigint {
+  const quantity = extra.billingUnit === 'PER_PASSENGER' ? Math.max(1, passengerCount) : Math.max(1, extra.quantity);
+  return BigInt(extra.priceIrr) * BigInt(quantity);
 }

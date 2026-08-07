@@ -60,6 +60,7 @@ export function createBooking(dto: {
   flightInstanceId: string;
   cabin: 'ECONOMY' | 'BUSINESS';
   passengers: CreateBookingPassenger[];
+  extras?: Array<{ id: string; quantity: number }>;
 }) {
   return apiPost<BookingDetail>('/bookings', dto);
 }
@@ -229,10 +230,7 @@ export function fetchMyIdentity() {
 export function uploadIdentityIdCard(file: File) {
   const form = new FormData();
   form.append('file', file);
-  return apiPostForm<{ id: string; fileName: string; sizeBytes: number }>(
-    '/my/identity/id-card',
-    form,
-  );
+  return apiPostForm<{ id: string; fileName: string; sizeBytes: number }>('/my/identity/id-card', form);
 }
 
 export function submitIdentityVerification() {
@@ -265,7 +263,10 @@ export function requestEmailVerify() {
 }
 
 export function verifyEmail(challengeId: string, code: string) {
-  return apiPost<{ verified: true }>('/my/profile/email/verify', { challengeId, code });
+  return apiPost<{ verified: true }>('/my/profile/email/verify', {
+    challengeId,
+    code,
+  });
 }
 
 export function fetchPrivacyExport() {

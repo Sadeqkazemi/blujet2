@@ -11,6 +11,7 @@ import { LedgerEntry } from '../src/database/entities/ledger-entry.entity';
 import { Passenger } from '../src/database/entities/passenger.entity';
 import { PaymentReconciliation } from '../src/database/entities/payment-reconciliation.entity';
 import { Route } from '../src/database/entities/route.entity';
+import { TravelExtraSetting } from '../src/database/entities/travel-extra-setting.entity';
 import { loginAsCustomer } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
@@ -191,6 +192,56 @@ describe('Booking engine (e2e)', () => {
     expect(ledger!.signedAmountIrr).toBe(
       BigInt(String(payRes.body.data.booking.priceIrr)),
     );
+  });
+
+  it('prices selected travel costs from server configuration and stores an immutable snapshot', async () => {
+    const instance = await freshInstance();
+    const { accessToken } = await loginAsCustomer(app, '09130000991');
+    const repo = dataSource.getRepository(TravelExtraSetting);
+    await repo.delete({ code: 'EXTRA_BAGGAGE' });
+    const extra = await repo.save(
+      repo.create({
+        code: 'EXTRA_BAGGAGE',
+        titleFa: 'بار اضافه',
+        titleEn: null,
+        titleAr: null,
+        descriptionFa: null,
+        billingUnit: 'PER_KG',
+        priceIrr: 4_500_000n,
+        active: true,
+        purchaseEnabled: true,
+        sortOrder: 0,
+        updatedById: null,
+      }),
+    );
+
+    const createRes = await request(app.getHttpServer())
+      .post('/bookings')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        flightInstanceId: instance.id,
+        cabin: 'ECONOMY',
+        passengers: [{ fullName: 'مسافر هزینه سفر', seatCode: '2A' }],
+        extras: [{ id: extra.id, quantity: 2 }],
+      })
+      .expect(201);
+
+    expect(createRes.body.data.extrasIrr).toBe('9000000');
+    expect(createRes.body.data.extras).toEqual([
+      expect.objectContaining({
+        id: extra.id,
+        code: 'EXTRA_BAGGAGE',
+        unitPriceIrr: '4500000',
+        quantity: 2,
+        totalIrr: '9000000',
+      }),
+    ]);
+
+    await repo.update({ id: extra.id }, { priceIrr: 9_000_000n });
+    const stored = await dataSource
+      .getRepository(Booking)
+      .findOneByOrFail({ id: createRes.body.data.id });
+    expect(stored.extrasSnapshot[0]?.unitPriceIrr).toBe('4500000');
   });
 
   it('a booking cannot be paid twice', async () => {

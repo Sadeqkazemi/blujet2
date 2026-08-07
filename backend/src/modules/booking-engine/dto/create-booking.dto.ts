@@ -1,11 +1,16 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   ArrayMinSize,
   IsArray,
   IsIn,
+  IsInt,
   IsOptional,
   IsString,
+  IsUUID,
+  Max,
+  Min,
   ValidateNested,
 } from 'class-validator';
 
@@ -29,6 +34,18 @@ export class BookingPassengerDto {
   seatCode: string;
 }
 
+export class BookingExtraSelectionDto {
+  @ApiProperty({ description: 'شناسه هزینه سفر فعال از کاتالوگ عمومی' })
+  @IsUUID()
+  id!: string;
+
+  @ApiProperty({ default: 1, description: 'برای بار اضافه: تعداد کیلوگرم' })
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  quantity!: number;
+}
+
 export class CreateBookingDto {
   @ApiProperty()
   @IsString()
@@ -44,4 +61,12 @@ export class CreateBookingDto {
   @ValidateNested({ each: true })
   @Type(() => BookingPassengerDto)
   passengers: BookingPassengerDto[];
+
+  @ApiProperty({ required: false, type: [BookingExtraSelectionDto] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @ValidateNested({ each: true })
+  @Type(() => BookingExtraSelectionDto)
+  extras?: BookingExtraSelectionDto[];
 }

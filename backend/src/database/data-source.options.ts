@@ -76,6 +76,7 @@ import { SystemSetting } from './entities/system-setting.entity';
 import { TwoFactorChallenge } from './entities/two-factor-challenge.entity';
 import { User } from './entities/user.entity';
 import { WalletEntry } from './entities/wallet-entry.entity';
+import { TravelExtraSetting } from './entities/travel-extra-setting.entity';
 
 /**
  * All 77 entities, mirroring prisma/schema.prisma's 77 models exactly (see
@@ -167,6 +168,7 @@ export const dataSourceOptions: DataSourceOptions = {
     TwoFactorChallenge,
     User,
     WalletEntry,
+    TravelExtraSetting,
   ],
   migrations: [__dirname + '/migrations/*{.ts,.js}'],
 };

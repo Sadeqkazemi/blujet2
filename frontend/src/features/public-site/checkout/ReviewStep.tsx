@@ -1,11 +1,7 @@
 import type { StoredLocale } from '../../../hooks/useLocale';
 import { faDigits } from '../../../lib/fa-format';
 import { CHECKOUT_COPY } from './checkout-copy';
-import {
-  passengerFullName,
-  type ExtraServiceState,
-  type PassengerFormDraft,
-} from './checkout-types';
+import { extraTitle, passengerFullName, type ExtraServiceState, type PassengerFormDraft } from './checkout-types';
 
 export default function ReviewStep({
   locale,
@@ -19,7 +15,7 @@ export default function ReviewStep({
   selectedSeats: string[];
 }) {
   const t = CHECKOUT_COPY[locale];
-  const picked = extras.filter((e) => e.selected).map((e) => t.extras[e.id].title);
+  const picked = extras.filter((e) => e.selected).map((e) => extraTitle(e, locale));
   const genderLabel = (g: PassengerFormDraft['gender']) =>
     g === 'female' ? t.female : g === 'male' ? t.male : t.noneSelected;
 
@@ -43,10 +39,7 @@ export default function ReviewStep({
           <span className="hidden md:inline">{t.gender}</span>
         </div>
         {passengers.map((p, i) => {
-          const doc =
-            p.docType === 'PASSPORT'
-              ? p.passportNo || t.passport
-              : p.nationalId || t.nationalId;
+          const doc = p.docType === 'PASSPORT' ? p.passportNo || t.passport : p.nationalId || t.nationalId;
           const birth =
             p.birthDay && p.birthMonth && p.birthYear
               ? `${locale === 'en' ? p.birthYear : faDigits(p.birthYear)}/${

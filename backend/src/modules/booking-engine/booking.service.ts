@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as crypto from 'node:crypto';
-import { EntityManager, IsNull, Repository } from 'typeorm';
+import { EntityManager, In, IsNull, Repository } from 'typeorm';
 import { Booking } from '../../database/entities/booking.entity';
 import { Passenger } from '../../database/entities/passenger.entity';
 import { FlightInstance } from '../../database/entities/flight-instance.entity';
@@ -20,6 +20,7 @@ import { PayIdempotencyRecord } from '../../database/entities/pay-idempotency-re
 import { LedgerEntry } from '../../database/entities/ledger-entry.entity';
 import { AgencyAllotment } from '../../database/entities/agency-allotment.entity';
 import { AgencyCreditLine } from '../../database/entities/agency-credit-line.entity';
+import { TravelExtraSetting } from '../../database/entities/travel-extra-setting.entity';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
 import {
@@ -82,6 +83,8 @@ export class BookingService {
     private readonly ledgerRepo: Repository<LedgerEntry>,
     @InjectRepository(AgencyAllotment)
     private readonly allotmentRepo: Repository<AgencyAllotment>,
+    @InjectRepository(TravelExtraSetting)
+    private readonly travelExtraRepo: Repository<TravelExtraSetting>,
     private readonly audit: AuditService,
     private readonly search: SearchService,
     private readonly priceLocks: PriceLockService,
@@ -159,6 +162,8 @@ export class BookingService {
       cabin: b.cabin,
       priceIrr: b.priceIrr,
       taxIrr: b.taxIrr,
+      extrasIrr: b.extrasIrr,
+      extras: b.extrasSnapshot,
       channel: b.channel,
       agencyId: b.agencyId,
       allotmentId: b.allotmentId,
@@ -287,13 +292,63 @@ export class BookingService {
           instance.id,
           dto.cabin,
         );
+    const requestedExtras = dto.extras ?? [];
+    const requestedExtraIds = requestedExtras.map((extra) => extra.id);
+    if (new Set(requestedExtraIds).size !== requestedExtraIds.length) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'هر هزینه سفر فقط یک‌بار قابل انتخاب است.',
+      });
+    }
+    const configuredExtras = requestedExtraIds.length
+      ? await this.travelExtraRepo.findBy({ id: In(requestedExtraIds) })
+      : [];
+    if (
+      configuredExtras.length !== requestedExtraIds.length ||
+      configuredExtras.some((extra) => !extra.active || !extra.purchaseEnabled)
+    ) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'یکی از هزینه‌های سفر انتخاب‌شده دیگر فعال نیست.',
+      });
+    }
+    const configuredById = new Map(
+      configuredExtras.map((extra) => [extra.id, extra]),
+    );
+    const extrasSnapshot = requestedExtras.map((selection) => {
+      const extra = configuredById.get(selection.id)!;
+      if (extra.billingUnit !== 'PER_KG' && selection.quantity !== 1) {
+        throw new BadRequestException({
+          code: ErrorCode.VALIDATION_FAILED,
+          message: 'تعداد فقط برای هزینه بار اضافه قابل تغییر است.',
+        });
+      }
+      const quantity =
+        extra.billingUnit === 'PER_PASSENGER'
+          ? dto.passengers.length
+          : selection.quantity;
+      const totalIrr = extra.priceIrr * BigInt(quantity);
+      return {
+        id: extra.id,
+        code: extra.code,
+        titleFa: extra.titleFa,
+        billingUnit: extra.billingUnit,
+        unitPriceIrr: extra.priceIrr.toString(),
+        quantity,
+        totalIrr: totalIrr.toString(),
+      };
+    });
+    const extrasIrr = extrasSnapshot.reduce(
+      (total, extra) => total + BigInt(extra.totalIrr),
+      0n,
+    );
     // Tax/fee is per-fare-class (Phase 13 Part B) and included in the
     // stored total so ledger/refunds/reporting — which all read
     // priceIrr as-is — never need to know tax exists; taxIrr is stored
     // alongside purely for receipt display.
     const passengerCount = BigInt(dto.passengers.length);
     const taxIrr: Irr = (fareClass?.taxIrr ?? 0n) * passengerCount;
-    const priceIrr: Irr = unitPriceIrr * passengerCount + taxIrr;
+    const priceIrr: Irr = unitPriceIrr * passengerCount + taxIrr + extrasIrr;
     const contactUser = await this.userRepo
       .createQueryBuilder('u')
       .select(['u.id', 'u.phone'])
@@ -348,6 +403,8 @@ export class BookingService {
           fareClassCode: fareClass?.classCode ?? null,
           priceIrr,
           taxIrr,
+          extrasIrr,
+          extrasSnapshot,
           userId: user.id,
           contactPhone: contactUser.phone ?? null,
           holdExpiresAt: new Date(Date.now() + HOLD_TTL_MS),
@@ -399,6 +456,10 @@ export class BookingService {
       detail: `رزرو ${booking.pnr} برای پرواز ${instance.flight.flightNo} توسط مشتری ثبت شد.`,
       entityType: 'Booking',
       entityId: booking.id,
+      metadata: {
+        extrasIrr: extrasIrr.toString(),
+        extraCodes: extrasSnapshot.map((extra) => extra.code),
+      },
     });
 
     // `bookingWithRelations` is re-fetched right after the priceLock claim
@@ -834,7 +895,8 @@ export class BookingService {
           booking.cabin,
         )) *
           bookingPassengerCount +
-        currentTaxIrr;
+        currentTaxIrr +
+        booking.extrasIrr;
 
     if (!isLocked && currentPriceIrr !== booking.priceIrr) {
       if (options.confirmedPriceIrr !== currentPriceIrr) {

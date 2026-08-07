@@ -133,4 +133,20 @@ export class Booking {
 
   @Column({ type: 'bigint', default: 0, transformer: bigintTransformer })
   taxIrr!: bigint;
+
+  /** Immutable purchase-time snapshot. Later manager price changes must not
+   * alter an already held/paid booking. */
+  @Column({ type: 'jsonb', default: () => "'[]'::jsonb" })
+  extrasSnapshot!: {
+    id: string;
+    code: string;
+    titleFa: string;
+    billingUnit: string;
+    unitPriceIrr: string;
+    quantity: number;
+    totalIrr: string;
+  }[];
+
+  @Column({ type: 'bigint', default: 0, transformer: bigintTransformer })
+  extrasIrr!: bigint;
 }

@@ -24,6 +24,10 @@ export function createAirport(payload: { cityFa: string; code: string; tz?: stri
   return apiPost<AirportEntry>('/flights/airports', payload);
 }
 
+export function deleteAirport(id: string) {
+  return apiDelete<{ id: string }>(`/flights/airports/${id}`);
+}
+
 export function fetchAircraftTypes() {
   return apiGet<AircraftTypeOption[]>('/flights/aircraft-types');
 }
@@ -64,10 +68,10 @@ export function changeFlightAircraft(
   aircraftType: string,
   stepUp: { stepUpChallengeId: string; stepUpCode: string },
 ) {
-  return apiPatch<{ id: string; aircraftType: string; capacity: number }>(
-    `/flights/${id}/aircraft`,
-    { aircraftType, ...stepUp },
-  );
+  return apiPatch<{ id: string; aircraftType: string; capacity: number }>(`/flights/${id}/aircraft`, {
+    aircraftType,
+    ...stepUp,
+  });
 }
 
 export function runFlightsAiAnalysis() {

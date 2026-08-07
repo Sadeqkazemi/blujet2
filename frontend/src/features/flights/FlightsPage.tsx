@@ -23,6 +23,7 @@ import FareRulesSection from '../../components/FareRulesSection';
 import JalaliDatePicker from '../../components/JalaliDatePicker';
 import PricingPage from '../pricing/PricingPage';
 import FlightCitiesTab from './FlightCitiesTab';
+import TravelCostsTab from './TravelCostsTab';
 import AddFlightPage from './AddFlightPage';
 import type {
   AircraftTypeOption,
@@ -61,7 +62,7 @@ export default function FlightsPage() {
   const { user } = useAuth();
   const [data, setData] = useState<FlightsOverview | null>(null);
   const [airports, setAirports] = useState<AirportEntry[]>([]);
-  const [subTab, setSubTab] = useState<'active' | 'done' | 'future' | 'cities'>('active');
+  const [subTab, setSubTab] = useState<'active' | 'done' | 'future' | 'cities' | 'costs'>('active');
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -96,10 +97,7 @@ export default function FlightsPage() {
   const [newAllotmentReleaseAt, setNewAllotmentReleaseAt] = useState<string | null>(null);
   const [allotmentError, setAllotmentError] = useState<string | null>(null);
 
-  const cityByCode = useMemo(
-    () => new Map(airports.map((a) => [a.code, a.cityFa])),
-    [airports],
-  );
+  const cityByCode = useMemo(() => new Map(airports.map((a) => [a.code, a.cityFa])), [airports]);
   const routeLabel = useCallback(
     (originCode: string, destCode: string) =>
       `${cityByCode.get(originCode) ?? originCode} ← ${cityByCode.get(destCode) ?? destCode}`,
@@ -150,7 +148,11 @@ export default function FlightsPage() {
     try {
       const fields = await aircraftStepUp.confirm();
       const result = await changeFlightAircraft(detail.id, selectedAircraftType, fields);
-      setDetail({ ...detail, aircraftType: result.aircraftType, capacity: result.capacity });
+      setDetail({
+        ...detail,
+        aircraftType: result.aircraftType,
+        capacity: result.capacity,
+      });
       setAircraftChangeOpen(false);
       await load();
     } catch (err) {
@@ -165,12 +167,7 @@ export default function FlightsPage() {
     setPlan(row);
     const initial = row.basePriceIrr ?? row.aiSuggestion?.priceIrr ?? null;
     setPlanPrice(initial != null ? String(Math.round(Number(initial) / 10)) : '');
-    setPlanAgency(
-      String(
-        row.agencySeatsAllocated ??
-          Math.round((row.capacity - row.charterSeats) / 2),
-      ),
-    );
+    setPlanAgency(String(row.agencySeatsAllocated ?? Math.round((row.capacity - row.charterSeats) / 2)));
     setAllotmentError(null);
     setNewAllotmentAgencyId('');
     setNewAllotmentSeats('');
@@ -208,7 +205,7 @@ export default function FlightsPage() {
         seatsAllocated: seats,
         type: newAllotmentType,
         contractPriceIrr: contractPriceIrr ?? undefined,
-        releaseAt: newAllotmentType === 'SOFT' ? newAllotmentReleaseAt ?? undefined : undefined,
+        releaseAt: newAllotmentType === 'SOFT' ? (newAllotmentReleaseAt ?? undefined) : undefined,
       });
       setNewAllotmentAgencyId('');
       setNewAllotmentSeats('');
@@ -297,9 +294,7 @@ export default function FlightsPage() {
   }, [future]);
 
   const visibleFuture = futureDay
-    ? future.filter(
-        (f) => dayjs(f.departureAt).calendar('jalali').format('YYYY/MM/DD') === futureDay,
-      )
+    ? future.filter((f) => dayjs(f.departureAt).calendar('jalali').format('YYYY/MM/DD') === futureDay)
     : future;
 
   const activePager = usePagination(data?.active ?? []);
@@ -314,6 +309,7 @@ export default function FlightsPage() {
         ['active', 'پروازهای فعال'],
         ['done', 'پروازهای انجام‌شده'],
         ['cities', 'شهرهای پروازی'],
+        ['costs', 'هزینه‌های سفر'],
       ] as const)
     : ([
         ['active', 'پروازهای فعال'],
@@ -347,9 +343,7 @@ export default function FlightsPage() {
             <div className="text-[11px] text-panel-muted">صندلی فروخته‌شده</div>
           </div>
           <div className="rounded-xl border border-panel-border bg-panel-surface p-4">
-            <div className="font-num text-lg font-black text-[#b45309]">
-              {faDigits(kpis.meanOccupancyPct)}٪
-            </div>
+            <div className="font-num text-lg font-black text-[#b45309]">{faDigits(kpis.meanOccupancyPct)}٪</div>
             <div className="text-[11px] text-panel-muted">میانگین ضریب اشغال</div>
           </div>
         </div>
@@ -404,13 +398,9 @@ export default function FlightsPage() {
                             onClick={() => void openDetail(f.id)}
                             className="grid w-full grid-cols-[1.7fr_1.1fr_1.4fr_1.5fr_1.2fr_0.9fr] items-center gap-3 border-b border-panel-border px-5 py-3 text-right text-xs transition hover:bg-panel-surface-2/50"
                           >
-                            <span className="font-bold text-panel-ink">
-                              {routeLabel(f.originCode, f.destCode)}
-                            </span>
+                            <span className="font-bold text-panel-ink">{routeLabel(f.originCode, f.destCode)}</span>
                             <span className="ltr font-num text-panel-muted">{f.flightNo}</span>
-                            <span className="font-num text-panel-muted">
-                              {formatJalaliDateTime(f.departureAt)}
-                            </span>
+                            <span className="font-num text-panel-muted">{formatJalaliDateTime(f.departureAt)}</span>
                             <span>
                               <span className="font-num block text-[10px] text-panel-muted">
                                 {faDigits(f.sold)} / {faDigits(f.capacity)}
@@ -572,7 +562,9 @@ export default function FlightsPage() {
                               <span className="font-num font-black text-[#34d399]">
                                 {Number(d.profitIrr) > 0 ? `${faMoney(d.profitIrr)}` : '—'}
                               </span>
-                              <span className={`font-num font-black ${Number(d.lossIrr) > 0 ? 'text-danger' : 'text-panel-muted'}`}>
+                              <span
+                                className={`font-num font-black ${Number(d.lossIrr) > 0 ? 'text-danger' : 'text-panel-muted'}`}
+                              >
                                 {Number(d.lossIrr) > 0 ? faMoney(d.lossIrr) : '—'}
                               </span>
                             </button>
@@ -584,7 +576,9 @@ export default function FlightsPage() {
                                 </div>
                                 <div>
                                   <div className="text-[10px] text-panel-muted">نرخ اصلی بلیط</div>
-                                  <div className="font-num font-bold text-panel-ink">{faMoney(d.basePriceIrr)} تومان</div>
+                                  <div className="font-num font-bold text-panel-ink">
+                                    {faMoney(d.basePriceIrr)} تومان
+                                  </div>
                                 </div>
                                 <div>
                                   <div className="text-[10px] text-panel-muted">جمع فروش</div>
@@ -592,7 +586,9 @@ export default function FlightsPage() {
                                 </div>
                                 <div>
                                   <div className="text-[10px] text-panel-muted">متوسط نرخ بلیط فروخته‌شده</div>
-                                  <div className="font-num font-bold text-panel-ink">{faMoney(d.avgPriceIrr)} تومان</div>
+                                  <div className="font-num font-bold text-panel-ink">
+                                    {faMoney(d.avgPriceIrr)} تومان
+                                  </div>
                                 </div>
                                 <div>
                                   <div className="text-[10px] text-panel-muted">سود حاصله</div>
@@ -602,7 +598,9 @@ export default function FlightsPage() {
                                 </div>
                                 <div>
                                   <div className="text-[10px] text-panel-muted">ضرر</div>
-                                  <div className={`font-num font-bold ${Number(d.lossIrr) > 0 ? 'text-danger' : 'text-panel-muted'}`}>
+                                  <div
+                                    className={`font-num font-bold ${Number(d.lossIrr) > 0 ? 'text-danger' : 'text-panel-muted'}`}
+                                  >
                                     {Number(d.lossIrr) > 0 ? `${faMoney(d.lossIrr)} تومان` : '—'}
                                   </div>
                                 </div>
@@ -630,15 +628,20 @@ export default function FlightsPage() {
           {subTab === 'cities' && isCommercial && (
             <FlightCitiesTab
               airports={airports}
-              onCreated={(a) => setAirports((prev) => [...prev, a].sort((x, y) => x.cityFa.localeCompare(y.cityFa, 'fa')))}
+              onCreated={(a) =>
+                setAirports((prev) => [...prev, a].sort((x, y) => x.cityFa.localeCompare(y.cityFa, 'fa')))
+              }
+              onDeleted={(id) => setAirports((prev) => prev.filter((airport) => airport.id !== id))}
             />
           )}
+
+          {subTab === 'costs' && isCommercial && <TravelCostsTab />}
 
           {showFuturePanel && data && (
             <div className="flex flex-col gap-4">
               <p className="rounded-xl border border-accent/25 bg-accent/5 p-3 text-[11px] leading-6 text-panel-muted">
-                برنامه‌ریزی پروازهای آینده: ظرفیت، تعهد چارتری و قیمت‌گذاری پیشنهادی هوش مصنوعی بر اساس تحلیل
-                تقاضا و رقبا.
+                برنامه‌ریزی پروازهای آینده: ظرفیت، تعهد چارتری و قیمت‌گذاری پیشنهادی هوش مصنوعی بر اساس تحلیل تقاضا و
+                رقبا.
               </p>
 
               <div className="flex flex-wrap items-center gap-3">
@@ -767,9 +770,7 @@ export default function FlightsPage() {
                             <div className="mt-3 grid grid-cols-4 gap-2 text-[11px]">
                               <div className="rounded-lg border border-panel-border bg-panel-surface p-2.5">
                                 <div className="text-[10px] text-panel-muted">ظرفیت صندلی</div>
-                                <div className="font-num font-bold text-panel-ink">
-                                  {faDigits(u.capacity)} صندلی
-                                </div>
+                                <div className="font-num font-bold text-panel-ink">{faDigits(u.capacity)} صندلی</div>
                               </div>
                               <div className="rounded-lg border border-panel-border bg-panel-surface p-2.5">
                                 <div className="text-[10px] text-panel-muted">تعهد چارتری</div>
@@ -898,9 +899,7 @@ export default function FlightsPage() {
 
           <div className="mt-3 flex items-center justify-between rounded-lg bg-panel-canvas p-3">
             <span className="text-xs font-bold text-panel-ink">مجموع درآمد پرواز</span>
-            <span className="font-num text-sm font-black text-accent">
-              {faMoney(detail.totalRevenueIrr)} تومان
-            </span>
+            <span className="font-num text-sm font-black text-accent">{faMoney(detail.totalRevenueIrr)} تومان</span>
           </div>
 
           <div className="mt-3 rounded-lg border border-panel-border p-3">
@@ -1029,15 +1028,21 @@ export default function FlightsPage() {
           <div className="mb-3 flex h-2 overflow-hidden rounded bg-panel-surface-2">
             <div
               className="bg-[#7c3aed]"
-              style={{ width: `${plan.capacity > 0 ? (plan.charterSeats / plan.capacity) * 100 : 0}%` }}
+              style={{
+                width: `${plan.capacity > 0 ? (plan.charterSeats / plan.capacity) * 100 : 0}%`,
+              }}
             />
             <div
               className="bg-[#34d399]"
-              style={{ width: `${plan.capacity > 0 ? (agencySeatsNum / plan.capacity) * 100 : 0}%` }}
+              style={{
+                width: `${plan.capacity > 0 ? (agencySeatsNum / plan.capacity) * 100 : 0}%`,
+              }}
             />
             <div
               className="bg-accent"
-              style={{ width: `${plan.capacity > 0 ? (directSeats / plan.capacity) * 100 : 0}%` }}
+              style={{
+                width: `${plan.capacity > 0 ? (directSeats / plan.capacity) * 100 : 0}%`,
+              }}
             />
           </div>
 

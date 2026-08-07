@@ -28,6 +28,8 @@
     "data:reset:prod": "node dist/database/production-data-reset.js --execute-reset",
     "data:purge:uat": "node dist/database/uat-demo-data-purge.js",
     "data:purge:uat:execute": "node dist/database/uat-demo-data-purge.js --execute-purge",
+    "data:cleanup:uat-flight-catalog": "node dist/database/uat-flight-catalog-cleanup.js",
+    "data:cleanup:uat-flight-catalog:execute": "node dist/database/uat-flight-catalog-cleanup.js --execute-cleanup",
     "accounts:bootstrap:prod": "node dist/database/bootstrap-panel-accounts.js",
     "accounts:bootstrap:temporary:prod": "node dist/database/bootstrap-temporary-panel-accounts.js",
     "accounts:rotate:temporary:prod": "node dist/database/rotate-temporary-panel-passwords.js",

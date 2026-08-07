@@ -1,14 +1,15 @@
 import { useState } from 'react';
-import { createAirport } from '../../api/flights';
+import { createAirport, deleteAirport } from '../../api/flights';
 import { faDigits, latinDigits } from '../../lib/fa-format';
 import type { AirportEntry } from '../../types/flights';
 
 interface FlightCitiesTabProps {
   airports: AirportEntry[];
   onCreated: (airport: AirportEntry) => void;
+  onDeleted: (id: string) => void;
 }
 
-export default function FlightCitiesTab({ airports, onCreated }: FlightCitiesTabProps) {
+export default function FlightCitiesTab({ airports, onCreated, onDeleted }: FlightCitiesTabProps) {
   const [cityFa, setCityFa] = useState('');
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -35,6 +36,19 @@ export default function FlightCitiesTab({ airports, onCreated }: FlightCitiesTab
       setError(e instanceof Error ? e.message : 'خطا در ثبت شهر.');
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function onDelete(airport: AirportEntry) {
+    if (!window.confirm(`فرودگاه ${airport.cityFa} حذف شود؟`)) return;
+    setError(null);
+    setNotice(null);
+    try {
+      await deleteAirport(airport.id);
+      onDeleted(airport.id);
+      setNotice(`فرودگاه «${airport.cityFa}» حذف شد.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'خطا در حذف فرودگاه.');
     }
   }
 
@@ -88,28 +102,34 @@ export default function FlightCitiesTab({ airports, onCreated }: FlightCitiesTab
 
       <section className="rounded-xl border border-border bg-white">
         <div className="flex items-center justify-between border-b border-border px-5 py-3">
-          <h2 className="text-sm font-bold text-ink">شهرهای دارای پرواز</h2>
+          <h2 className="text-sm font-bold text-ink">شهرها و فرودگاه‌های ثبت‌شده</h2>
           <span className="text-[11px] text-muted">{faDigits(airports.length)} شهر</span>
         </div>
         <div className="overflow-x-auto">
           <div className="min-w-[480px]">
-            <div className="grid grid-cols-[1.2fr_0.7fr_1.6fr] gap-3 border-b border-border px-5 py-2 text-[10px] font-bold text-muted">
+            <div className="grid grid-cols-[1.2fr_0.7fr_1.6fr_auto] gap-3 border-b border-border px-5 py-2 text-[10px] font-bold text-muted">
               <span>شهر</span>
               <span>کد</span>
               <span>فرودگاه</span>
+              <span>عملیات</span>
             </div>
             {airports.map((a) => (
               <div
                 key={a.id}
-                className="grid grid-cols-[1.2fr_0.7fr_1.6fr] gap-3 border-b border-border px-5 py-3 text-xs"
+                className="grid grid-cols-[1.2fr_0.7fr_1.6fr_auto] items-center gap-3 border-b border-border px-5 py-3 text-xs"
               >
                 <span className="font-bold text-ink">{a.cityFa}</span>
                 <span className="ltr font-num text-muted">{a.code}</span>
                 <span className="text-muted">فرودگاه {a.cityFa}</span>
+                <button onClick={() => void onDelete(a)} className="text-danger">
+                  حذف
+                </button>
               </div>
             ))}
             {airports.length === 0 && (
-              <p className="py-6 text-center text-xs text-muted">شهری ثبت نشده است.</p>
+              <p className="py-8 text-center text-xs leading-6 text-muted">
+                هنوز هیچ شهر پروازی ثبت نشده است. در سندباکس فقط شهرهایی که مدیر بازرگانی ثبت می‌کند نمایش داده می‌شوند.
+              </p>
             )}
           </div>
         </div>

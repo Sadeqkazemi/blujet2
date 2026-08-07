@@ -263,7 +263,7 @@ describe('FlightsPage', () => {
 
     const { default: userEvent } = await import('@testing-library/user-event');
     await userEvent.click(screen.getByRole('button', { name: 'شهرهای پروازی' }));
-    expect(await screen.findByText('شهرهای دارای پرواز')).toBeInTheDocument();
+    expect(await screen.findByText('شهرها و فرودگاه‌های ثبت‌شده')).toBeInTheDocument();
     expect(screen.getByText('تهران')).toBeInTheDocument();
   });
 

@@ -95,6 +95,17 @@ export interface BookingDetail {
   status: BookingStatus;
   cabin: CabinClass;
   priceIrr: string;
+  taxIrr?: string;
+  extrasIrr?: string;
+  extras?: Array<{
+    id: string;
+    code: string;
+    titleFa: string;
+    billingUnit: string;
+    unitPriceIrr: string;
+    quantity: number;
+    totalIrr: string;
+  }>;
   holdExpiresAt: string | null;
   flightInstanceId: string;
   flightNo: string;

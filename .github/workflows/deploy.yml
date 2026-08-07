@@ -134,11 +134,11 @@ jobs:
             # One-time UAT cleanup. A root-only PostgreSQL backup is completed
             # before the safeguarded purge; required access accounts and
             # reference/configuration tables are retained by the purge policy.
-            purge_sentinel=/root/.blujet-uat-demo-data-purge-v1-complete
+              purge_sentinel=/root/.blujet-uat-demo-data-purge-v1-complete
             if [ ! -f "$purge_sentinel" ]; then
               umask 077
-              purge_backup="/root/blujet-uat-before-demo-purge-$(date -u +%Y%m%dT%H%M%SZ).dump"
-              purge_audit=/root/blujet-uat-demo-data-purge-v1.json
+                purge_backup="/root/blujet-uat-before-demo-purge-$(date -u +%Y%m%dT%H%M%SZ).dump"
+                purge_audit=/root/blujet-uat-demo-data-purge-v1.json
               docker compose -f docker-compose.prod.yml exec -T db \
                 pg_dump -U blujet -d blujet --format=custom > "$purge_backup"
               chmod 600 "$purge_backup"
@@ -154,5 +154,24 @@ jobs:
                 redis-cli FLUSHDB > /dev/null
               touch "$purge_sentinel"
               chmod 600 "$purge_sentinel"
-            fi
-            docker image prune -f
+              fi
+              catalog_sentinel=/root/.blujet-uat-flight-catalog-cleanup-v1-complete
+              if [ ! -f "$catalog_sentinel" ]; then
+                umask 077
+                catalog_backup="/root/blujet-uat-before-flight-catalog-cleanup-$(date -u +%Y%m%dT%H%M%SZ).dump"
+                catalog_audit=/root/blujet-uat-flight-catalog-cleanup-v1.json
+                docker compose -f docker-compose.prod.yml exec -T db \
+                  pg_dump -U blujet -d blujet --format=custom > "$catalog_backup"
+                chmod 600 "$catalog_backup"
+                docker compose -f docker-compose.prod.yml exec -T \
+                  -e UAT_FLIGHT_CATALOG_CLEANUP_CONFIRM=CLEAR_BLUJET_UAT_FLIGHT_CATALOG \
+                  -e UAT_FLIGHT_CATALOG_CLEANUP_BACKUP_REF="$catalog_backup" \
+                  backend node dist/database/uat-flight-catalog-cleanup.js --execute-cleanup \
+                  > "$catalog_audit"
+                chmod 600 "$catalog_audit"
+                docker compose -f docker-compose.prod.yml exec -T redis \
+                  redis-cli FLUSHDB > /dev/null
+                touch "$catalog_sentinel"
+                chmod 600 "$catalog_sentinel"
+              fi
+              docker image prune -f
