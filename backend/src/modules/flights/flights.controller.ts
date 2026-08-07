@@ -58,6 +58,15 @@ class CreateAirportDto {
 
   @ApiProperty({
     required: false,
+    description: 'نام فرودگاه؛ خالی بماند یعنی «فرودگاه {نام شهر}»',
+    example: 'فرودگاه وان',
+  })
+  @IsOptional()
+  @IsString()
+  airportNameFa?: string;
+
+  @ApiProperty({
+    required: false,
     description: 'منطقه زمانی IANA',
     example: 'Asia/Tehran',
   })

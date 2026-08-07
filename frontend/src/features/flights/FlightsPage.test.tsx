@@ -22,9 +22,9 @@ import type {
 import type { Role } from "../../types/auth";
 
 const AIRPORTS: AirportEntry[] = [
-  { id: "a1", code: "THR", cityFa: "تهران", tz: "Asia/Tehran" },
-  { id: "a2", code: "MHD", cityFa: "مشهد", tz: "Asia/Tehran" },
-  { id: "a3", code: "DXB", cityFa: "دبی", tz: "Asia/Dubai" },
+  { id: "a1", code: "THR", cityFa: "تهران", airportNameFa: "فرودگاه مهرآباد / امام", tz: "Asia/Tehran" },
+  { id: "a2", code: "MHD", cityFa: "مشهد", airportNameFa: "فرودگاه شهید هاشمی‌نژاد", tz: "Asia/Tehran" },
+  { id: "a3", code: "DXB", cityFa: "دبی", airportNameFa: "فرودگاه بین‌المللی دبی", tz: "Asia/Dubai" },
 ];
 
 const FUTURE_ROW: FutureFlightRow = {
@@ -166,8 +166,8 @@ describe("FlightsPage", () => {
     mockRole("SENIOR_MANAGER");
     mockData();
     vi.spyOn(flightsApi, "fetchAirports").mockResolvedValue([
-      { id: "a1", code: "THR", cityFa: "تهران", tz: "Asia/Tehran" },
-      { id: "a2", code: "MHD", cityFa: "مشهد", tz: "Asia/Tehran" },
+      { id: "a1", code: "THR", cityFa: "تهران", airportNameFa: "فرودگاه مهرآباد / امام", tz: "Asia/Tehran" },
+      { id: "a2", code: "MHD", cityFa: "مشهد", airportNameFa: "فرودگاه شهید هاشمی‌نژاد", tz: "Asia/Tehran" },
     ]);
     vi.spyOn(flightsApi, "fetchAircraftTypes").mockResolvedValue([
       { aircraftType: "Airbus A320", capacity: 180 },
@@ -306,7 +306,7 @@ describe("FlightsPage", () => {
       screen.getByRole("button", { name: "شهرهای پروازی" }),
     );
     expect(
-      await screen.findByText("شهرها و فرودگاه‌های ثبت‌شده"),
+      await screen.findByText("شهرهای دارای پرواز"),
     ).toBeInTheDocument();
     expect(screen.getByText("تهران")).toBeInTheDocument();
   });

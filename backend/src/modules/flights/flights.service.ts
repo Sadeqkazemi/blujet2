@@ -275,7 +275,7 @@ export class FlightsService {
 
   async createAirport(
     actor: AuthenticatedUser,
-    dto: { code: string; cityFa: string; tz?: string },
+    dto: { code: string; cityFa: string; airportNameFa?: string; tz?: string },
   ) {
     const code = dto.code.trim().toUpperCase();
     const cityFa = dto.cityFa.trim();
@@ -299,10 +299,12 @@ export class FlightsService {
         message: 'این شهر قبلاً ثبت شده است.',
       });
     }
+    const airportNameFa = dto.airportNameFa?.trim() || `فرودگاه ${cityFa}`;
     const created = await this.airportRepo.save(
       this.airportRepo.create({
         code,
         cityFa,
+        airportNameFa,
         tz: dto.tz?.trim() || 'Asia/Tehran',
       }),
     );

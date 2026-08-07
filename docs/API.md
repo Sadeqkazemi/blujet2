@@ -377,9 +377,10 @@ stays untouched on the same page).
     suggestion (if any), and the Jalali day list for the calendar filter.
 - GET `/flights/airports` — seeded airport catalog for the add-flight
   selects.
-- POST `/flights/airports` — `{ cityFa, code, tz? }` — add a city/airport
-  to the catalog (Commercial «شهرهای پروازی» tab); 409 on duplicate code or
-  city name; audited.
+- POST `/flights/airports` — `{ cityFa, code, airportNameFa?, tz? }` — add
+  a city/airport to the catalog (Commercial «شهرهای پروازی» tab);
+  `airportNameFa` defaults to `فرودگاه {cityFa}` when omitted; 409 on
+  duplicate code or city name; audited.
 - POST `/flights` — full flight **definition** (Commercial/Senior +
   `fl_manage`): `{ originCode, destCode, flightNo (^\[A-Z\]{2}\d{4}$ —
   uppercased only, no trim/strip), departureAt (UTC ISO),

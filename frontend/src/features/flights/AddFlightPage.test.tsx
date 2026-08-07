@@ -8,8 +8,8 @@ import * as pricingApi from "../../api/pricing";
 describe("AddFlightPage", () => {
   beforeEach(() => {
     vi.spyOn(flightsApi, "fetchAirports").mockResolvedValue([
-      { id: "a1", code: "THR", cityFa: "تهران", tz: "Asia/Tehran" },
-      { id: "a2", code: "DXB", cityFa: "دبی", tz: "Asia/Dubai" },
+      { id: "a1", code: "THR", cityFa: "تهران", airportNameFa: "فرودگاه مهرآباد / امام", tz: "Asia/Tehran" },
+      { id: "a2", code: "DXB", cityFa: "دبی", airportNameFa: "فرودگاه بین‌المللی دبی", tz: "Asia/Dubai" },
     ]);
     vi.spyOn(flightsApi, "fetchAircraftTypes").mockResolvedValue([
       { aircraftType: "Airbus A320", capacity: 180 },

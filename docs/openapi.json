@@ -9204,6 +9204,11 @@
             "description": "کد IATA فرودگاه",
             "example": "VAS"
           },
+          "airportNameFa": {
+            "type": "string",
+            "description": "نام فرودگاه؛ خالی بماند یعنی «فرودگاه {نام شهر}»",
+            "example": "فرودگاه وان"
+          },
           "tz": {
             "type": "string",
             "description": "منطقه زمانی IANA",

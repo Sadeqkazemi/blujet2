@@ -6,7 +6,13 @@ import * as flightsApi from "../../api/flights";
 import type { AirportEntry } from "../../types/flights";
 
 const AIRPORTS: AirportEntry[] = [
-  { id: "a1", code: "THR", cityFa: "تهران", tz: "Asia/Tehran" },
+  {
+    id: "a1",
+    code: "THR",
+    cityFa: "تهران",
+    airportNameFa: "فرودگاه مهرآباد / امام",
+    tz: "Asia/Tehran",
+  },
 ];
 
 describe("FlightCitiesTab", () => {
@@ -15,6 +21,7 @@ describe("FlightCitiesTab", () => {
       id: "a2",
       code: "VAS",
       cityFa: "وان",
+      airportNameFa: "فرودگاه وان",
       tz: "Asia/Tehran",
     };
     const createSpy = vi
@@ -32,11 +39,28 @@ describe("FlightCitiesTab", () => {
 
     await userEvent.type(screen.getByLabelText("نام شهر *"), "وان");
     await userEvent.type(screen.getByLabelText("کد فرودگاه *"), "VAS");
+    await userEvent.type(screen.getByLabelText("نام فرودگاه"), "فرودگاه وان");
     await userEvent.click(screen.getByRole("button", { name: "افزودن شهر" }));
 
     await waitFor(() =>
-      expect(createSpy).toHaveBeenCalledWith({ cityFa: "وان", code: "VAS" }),
+      expect(createSpy).toHaveBeenCalledWith({
+        cityFa: "وان",
+        code: "VAS",
+        airportNameFa: "فرودگاه وان",
+      }),
     );
     expect(onCreated).toHaveBeenCalledWith(created);
+  });
+
+  it("shows the registered airport name, not a fabricated one", () => {
+    render(
+      <FlightCitiesTab
+        airports={AIRPORTS}
+        onCreated={vi.fn()}
+        onDeleted={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("فرودگاه مهرآباد / امام")).toBeInTheDocument();
   });
 });

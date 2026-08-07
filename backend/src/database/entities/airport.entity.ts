@@ -19,6 +19,9 @@ export class Airport {
   cityFa!: string;
 
   @Column({ type: 'text' })
+  airportNameFa!: string;
+
+  @Column({ type: 'text' })
   tz!: string;
 
   @Column({ type: 'int', default: 60 })

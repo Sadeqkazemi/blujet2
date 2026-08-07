@@ -16,6 +16,7 @@ export default function FlightCitiesTab({
 }: FlightCitiesTabProps) {
   const [cityFa, setCityFa] = useState("");
   const [code, setCode] = useState("");
+  const [airportNameFa, setAirportNameFa] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -25,15 +26,21 @@ export default function FlightCitiesTab({
     setNotice(null);
     const name = cityFa.trim();
     const iata = latinDigits(code.trim()).toUpperCase();
+    const airportName = airportNameFa.trim();
     if (!name || iata.length !== 3) {
       setError("نام شهر و کد فرودگاه (۳ حرف) الزامی است.");
       return;
     }
     setBusy(true);
     try {
-      const created = await createAirport({ cityFa: name, code: iata });
+      const created = await createAirport({
+        cityFa: name,
+        code: iata,
+        airportNameFa: airportName || undefined,
+      });
       setCityFa("");
       setCode("");
+      setAirportNameFa("");
       setNotice(
         `شهر «${name}» اضافه شد و در جستجوی بلیط سایت نمایش داده می‌شود ✓`,
       );
@@ -62,7 +69,7 @@ export default function FlightCitiesTab({
     <div className="flex flex-col gap-4">
       <section className="rounded-xl border border-border bg-white p-5">
         <h2 className="mb-4 text-sm font-bold text-ink">افزودن شهر جدید</h2>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_auto]">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_1.4fr_auto]">
           <div>
             <label
               htmlFor="city-name"
@@ -95,6 +102,21 @@ export default function FlightCitiesTab({
               className="font-num h-10 w-full rounded-lg border border-border px-3 text-xs outline-none"
             />
           </div>
+          <div>
+            <label
+              htmlFor="airport-name"
+              className="mb-1 block text-[11px] font-bold text-muted"
+            >
+              نام فرودگاه
+            </label>
+            <input
+              id="airport-name"
+              value={airportNameFa}
+              onChange={(e) => setAirportNameFa(e.target.value)}
+              placeholder="مثلاً فرودگاه وان"
+              className="h-10 w-full rounded-lg border border-border px-3 text-xs outline-none"
+            />
+          </div>
           <div className="flex items-end">
             <button
               disabled={busy}
@@ -117,9 +139,7 @@ export default function FlightCitiesTab({
 
       <section className="rounded-xl border border-border bg-white">
         <div className="flex items-center justify-between border-b border-border px-5 py-3">
-          <h2 className="text-sm font-bold text-ink">
-            شهرها و فرودگاه‌های ثبت‌شده
-          </h2>
+          <h2 className="text-sm font-bold text-ink">شهرهای دارای پرواز</h2>
           <span className="text-[11px] text-muted">
             {faDigits(airports.length)} شهر
           </span>
@@ -139,7 +159,7 @@ export default function FlightCitiesTab({
               >
                 <span className="font-bold text-ink">{a.cityFa}</span>
                 <span className="ltr font-num text-muted">{a.code}</span>
-                <span className="text-muted">فرودگاه {a.cityFa}</span>
+                <span className="text-muted">{a.airportNameFa}</span>
                 <button
                   onClick={() => void onDelete(a)}
                   className="text-danger"

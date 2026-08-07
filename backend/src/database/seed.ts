@@ -2129,33 +2129,39 @@ async function main() {
   }
 
   // ── Phase 10: airport catalog + flight-management seed ────────────────
-  const AIRPORTS: Array<[string, string, string]> = [
-    ['THR', 'تهران', 'Asia/Tehran'],
-    ['MHD', 'مشهد', 'Asia/Tehran'],
-    ['SYZ', 'شیراز', 'Asia/Tehran'],
-    ['IFN', 'اصفهان', 'Asia/Tehran'],
-    ['TBZ', 'تبریز', 'Asia/Tehran'],
-    ['KIH', 'کیش', 'Asia/Tehran'],
-    ['GSM', 'قشم', 'Asia/Tehran'],
-    ['BND', 'بندرعباس', 'Asia/Tehran'],
-    ['AWZ', 'اهواز', 'Asia/Tehran'],
-    ['RAS', 'رشت', 'Asia/Tehran'],
-    ['SRY', 'ساری', 'Asia/Tehran'],
-    ['GBT', 'گرگان', 'Asia/Tehran'],
-    ['KER', 'کرمان', 'Asia/Tehran'],
-    ['KSH', 'کرمانشاه', 'Asia/Tehran'],
-    ['OMH', 'ارومیه', 'Asia/Tehran'],
-    ['ADU', 'اردبیل', 'Asia/Tehran'],
-    ['ZAH', 'زاهدان', 'Asia/Tehran'],
-    ['BUZ', 'بوشهر', 'Asia/Tehran'],
-    ['AZD', 'یزد', 'Asia/Tehran'],
-    ['PGU', 'عسلویه', 'Asia/Tehran'],
-    ['DXB', 'دبی', 'Asia/Dubai'],
-    ['IST', 'استانبول', 'Europe/Istanbul'],
-    ['NJF', 'نجف', 'Asia/Baghdad'],
+  // City/airport names match design-reference-v2/site-data.js's getCities().
+  const AIRPORTS: Array<[string, string, string, string]> = [
+    ['THR', 'تهران', 'فرودگاه مهرآباد / امام', 'Asia/Tehran'],
+    ['MHD', 'مشهد', 'فرودگاه شهید هاشمی‌نژاد', 'Asia/Tehran'],
+    ['SYZ', 'شیراز', 'فرودگاه شهید دستغیب', 'Asia/Tehran'],
+    ['IFN', 'اصفهان', 'فرودگاه شهید بهشتی', 'Asia/Tehran'],
+    ['TBZ', 'تبریز', 'فرودگاه شهید مدنی', 'Asia/Tehran'],
+    ['KIH', 'کیش', 'فرودگاه بین‌المللی کیش', 'Asia/Tehran'],
+    ['GSM', 'قشم', 'فرودگاه بین‌المللی قشم', 'Asia/Tehran'],
+    ['BND', 'بندرعباس', 'فرودگاه بین‌المللی بندرعباس', 'Asia/Tehran'],
+    ['AWZ', 'اهواز', 'فرودگاه بین‌المللی اهواز', 'Asia/Tehran'],
+    ['RAS', 'رشت', 'فرودگاه سردار جنگل', 'Asia/Tehran'],
+    ['SRY', 'ساری', 'فرودگاه دشت ناز', 'Asia/Tehran'],
+    ['GBT', 'گرگان', 'فرودگاه گرگان', 'Asia/Tehran'],
+    ['KER', 'کرمان', 'فرودگاه آیت‌الله هاشمی رفسنجانی', 'Asia/Tehran'],
+    ['KSH', 'کرمانشاه', 'فرودگاه شهید اشرفی اصفهانی', 'Asia/Tehran'],
+    ['OMH', 'ارومیه', 'فرودگاه شهید باکری', 'Asia/Tehran'],
+    ['ADU', 'اردبیل', 'فرودگاه اردبیل', 'Asia/Tehran'],
+    ['ZAH', 'زاهدان', 'فرودگاه بین‌المللی زاهدان', 'Asia/Tehran'],
+    ['BUZ', 'بوشهر', 'فرودگاه بوشهر', 'Asia/Tehran'],
+    ['AZD', 'یزد', 'فرودگاه شهید صدوقی', 'Asia/Tehran'],
+    ['PGU', 'عسلویه', 'فرودگاه خلیج فارس', 'Asia/Tehran'],
+    ['DXB', 'دبی', 'فرودگاه بین‌المللی دبی', 'Asia/Dubai'],
+    ['IST', 'استانبول', 'فرودگاه بین‌المللی استانبول', 'Europe/Istanbul'],
+    ['NJF', 'نجف', 'فرودگاه بین‌المللی نجف', 'Asia/Baghdad'],
   ];
-  for (const [code, cityFa, tz] of AIRPORTS) {
-    await upsertBy(airportRepo, { code }, { code, cityFa, tz }, { cityFa, tz });
+  for (const [code, cityFa, airportNameFa, tz] of AIRPORTS) {
+    await upsertBy(
+      airportRepo,
+      { code },
+      { code, cityFa, airportNameFa, tz },
+      { cityFa, airportNameFa, tz },
+    );
   }
 
   // Seeded per-route durations (the add-flight form has no arrival input).
