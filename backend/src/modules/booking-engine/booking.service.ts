@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as crypto from 'node:crypto';
-import { EntityManager, IsNull, Repository } from 'typeorm';
+import { EntityManager, IsNull, Repository, type UpdateResult } from 'typeorm';
 import { Booking } from '../../database/entities/booking.entity';
 import { Passenger } from '../../database/entities/passenger.entity';
 import { FlightInstance } from '../../database/entities/flight-instance.entity';
@@ -31,6 +31,7 @@ import {
 import { enumerateSeats } from '../reservation/seat-layout';
 import { matchesLastName } from '../../common/passenger-name.util';
 import { resolveAircraftType } from '../flights/aircraft-type.util';
+import { assertSellableForSale } from '../flights/definition-sellability';
 import { calculateActiveCharges } from '../flights/charge-rules';
 import { getCabinPrice, resolveFareClass } from './pricing';
 import type { Irr } from '../../common/money';
@@ -230,6 +231,7 @@ export class BookingService {
         message: 'پرواز یافت نشد یا دیگر قابل رزرو نیست.',
       });
     }
+    assertSellableForSale(instance);
     const now = new Date();
     if (
       (instance.saleStartsAt && instance.saleStartsAt > now) ||
@@ -312,7 +314,7 @@ export class BookingService {
       instance.id,
       unitPriceIrr,
       dto.cabin,
-      now,
+      instance.departureAt,
     );
     const chargePerPax = BigInt(unitCharges.totalChargesIrr);
     const taxIrr: Irr =
@@ -555,6 +557,7 @@ export class BookingService {
         message: 'سهمیه فعال و متعلق به این آژانس یافت نشد.',
       });
     }
+    assertSellableForSale(instance);
     if (
       (instance.saleStartsAt && instance.saleStartsAt > now) ||
       (instance.saleEndsAt && instance.saleEndsAt < now)
@@ -619,7 +622,7 @@ export class BookingService {
       instance.id,
       unitPriceIrr,
       dto.cabin,
-      now,
+      instance.departureAt,
     );
     const chargePerPax = BigInt(unitCharges.totalChargesIrr);
     const taxIrr =
@@ -863,6 +866,7 @@ export class BookingService {
     const bookingPassengerCount = BigInt(booking.passengers.length);
     let currentTaxIrr: Irr = 0n;
     let currentPriceIrr: Irr = booking.priceIrr;
+    let currentChargeSnapshot = booking.chargeSnapshot;
     if (!isLocked) {
       const unitFare = await getCabinPrice(
         this.bookingRepo.manager,
@@ -874,13 +878,14 @@ export class BookingService {
         booking.flightInstanceId,
         unitFare,
         booking.cabin,
-        new Date(),
+        booking.flightInstance.departureAt,
       );
       const chargePerPax = BigInt(unitCharges.totalChargesIrr);
       currentTaxIrr =
         (currentFareClass?.taxIrr ?? 0n) * bookingPassengerCount +
         chargePerPax * bookingPassengerCount;
       currentPriceIrr = unitFare * bookingPassengerCount + currentTaxIrr;
+      currentChargeSnapshot = unitCharges;
     }
 
     if (!isLocked && currentPriceIrr !== booking.priceIrr) {
@@ -972,11 +977,26 @@ export class BookingService {
       // Explicit state machine: payment capture flips HELD→PAID, ticket
       // issuance then flips PAID→TICKETED — both inside this transaction,
       // each guarded so a concurrent double-pay hits affected===0 and 409s.
-      const captured = await tx.update(
-        Booking,
-        { id, status: 'HELD' },
-        { status: 'PAID', priceIrr: finalPriceIrr },
-      );
+      let captured: UpdateResult;
+      if (isLocked) {
+        captured = await tx.update(
+          Booking,
+          { id, status: 'HELD' },
+          { status: 'PAID', priceIrr: finalPriceIrr },
+        );
+      } else {
+        captured = await tx
+          .createQueryBuilder()
+          .update(Booking)
+          .set({
+            status: 'PAID',
+            priceIrr: finalPriceIrr,
+            taxIrr: currentTaxIrr,
+            chargeSnapshot: currentChargeSnapshot,
+          })
+          .where('id = :id AND status = :status', { id, status: 'HELD' })
+          .execute();
+      }
       if ((captured.affected ?? 0) === 0) {
         const latestRaw = await this.bookingWithFlightQuery(tx)
           .where('b.id = :id', { id })

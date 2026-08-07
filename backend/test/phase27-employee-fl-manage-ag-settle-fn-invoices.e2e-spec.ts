@@ -47,11 +47,11 @@ describe('Phase 27 — EMPLOYEE fl_manage/ag_settle/fn_invoices (e2e)', () => {
       flightNo,
       departureAt: new Date(Date.now() + 5 * 24 * 3_600_000).toISOString(),
       durationMinutes: 90,
-      capacity: 160,
+      capacity: 146,
       cabinCapacities: [
-        { cabin: 'ECONOMY', seats: 120 },
+        { cabin: 'ECONOMY', seats: 110 },
         { cabin: 'COMFORT', seats: 20 },
-        { cabin: 'BUSINESS', seats: 20 },
+        { cabin: 'BUSINESS', seats: 16 },
       ],
       basePriceIrr: 25_000_000,
     };
@@ -69,7 +69,7 @@ describe('Phase 27 — EMPLOYEE fl_manage/ag_settle/fn_invoices (e2e)', () => {
         flightId: flight.id,
         departureAt,
         arrivalAt: new Date(departureAt.getTime() + 3 * 3_600_000),
-        capacity: 180,
+        capacity: 146,
         charterSeats: 60,
         status: 'SCHEDULED',
         basePriceIrr: 30_000_000n,

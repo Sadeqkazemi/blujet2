@@ -5,8 +5,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, SelectQueryBuilder } from 'typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, Repository, SelectQueryBuilder } from 'typeorm';
 import { FarePricingProposal } from '../../database/entities/fare-pricing-proposal.entity';
 import { FlightInstance } from '../../database/entities/flight-instance.entity';
 import { Flight } from '../../database/entities/flight.entity';
@@ -20,14 +20,9 @@ import {
 } from '../ai/price-suggestion.provider';
 import { StepUpService } from '../auth/step-up.service';
 import { FlightDefinitionService } from '../flights/flight-definition.service';
+import { SearchService } from '../booking-engine/search.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import {
-  addIrr,
-  compareIrr,
-  pctOfIrr,
-  roundIrrTo,
-  toIrr,
-} from '../../common/money';
+import { compareIrr, toIrr } from '../../common/money';
 import type { Irr } from '../../common/money';
 
 const LOCKED_MESSAGE =
@@ -47,6 +42,8 @@ export interface PersistedAiSuggestion {
 @Injectable()
 export class PricingService {
   constructor(
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
     @InjectRepository(FarePricingProposal)
     private readonly proposalRepo: Repository<FarePricingProposal>,
     @InjectRepository(FlightInstance)
@@ -60,6 +57,7 @@ export class PricingService {
     private readonly priceSuggestions: PriceSuggestionProvider,
     private readonly stepUp: StepUpService,
     private readonly definitions: FlightDefinitionService,
+    private readonly search: SearchService,
   ) {}
 
   private withProposalRelations(
@@ -141,19 +139,6 @@ export class PricingService {
     flightInstanceId: string,
     dto: { proposedPriceIrr: Irr; legalRateIrr?: Irr; note?: string },
   ) {
-    const instance = await this.instanceRepo
-      .createQueryBuilder('fi')
-      .leftJoinAndSelect('fi.flight', 'flight')
-      .leftJoinAndSelect('flight.route', 'route')
-      .where('fi.id = :id', { id: flightInstanceId })
-      .getOne();
-    if (!instance) {
-      throw new NotFoundException({
-        code: ErrorCode.NOT_FOUND,
-        message: 'پرواز یافت نشد.',
-      });
-    }
-
     const existing = await this.proposalRepo
       .createQueryBuilder('p')
       .where('p.flightInstanceId = :id', { id: flightInstanceId })
@@ -165,56 +150,69 @@ export class PricingService {
       });
     }
 
-    let proposalId: string;
-    if (existing) {
-      existing.proposedPriceIrr = dto.proposedPriceIrr;
-      if (dto.legalRateIrr !== undefined)
-        existing.legalRateIrr = dto.legalRateIrr;
-      if (dto.note !== undefined) existing.note = dto.note;
-      existing.proposedById = actor.id;
-      // Re-open a rejected proposal for a new CEO cycle.
-      existing.status = PricingProposalStatus.PENDING;
-      existing.rejectionReason = null;
-      existing.rejectedAt = null;
-      existing.rejectedById = null;
-      // Any edit to the proposal's inputs invalidates a previously
-      // generated AI suggestion — it was computed against the old
-      // price/legal-rate and must not be registerable anymore.
-      existing.aiSuggestion = null;
-      if (instance.competitorPriceIrr != null) {
-        existing.competitorPriceIrr = instance.competitorPriceIrr;
+    const proposalId = await this.dataSource.transaction(async (manager) => {
+      // Lock the instance row alone — FOR UPDATE + LEFT JOIN fails on Postgres
+      // ("nullable side of an outer join"). Relations are not needed here.
+      const instance = await manager
+        .createQueryBuilder(FlightInstance, 'fi')
+        .setLock('pessimistic_write')
+        .where('fi.id = :id', { id: flightInstanceId })
+        .getOne();
+      if (!instance) {
+        throw new NotFoundException({
+          code: ErrorCode.NOT_FOUND,
+          message: 'پرواز یافت نشد.',
+        });
       }
-      if (instance.basePriceIrr != null) {
-        existing.basePriceIrr = instance.basePriceIrr;
+
+      const lockedExisting = await manager
+        .createQueryBuilder(FarePricingProposal, 'p')
+        .where('p.flightInstanceId = :id', { id: flightInstanceId })
+        .getOne();
+
+      let savedId: string;
+      if (lockedExisting) {
+        lockedExisting.proposedPriceIrr = dto.proposedPriceIrr;
+        if (dto.legalRateIrr !== undefined) {
+          lockedExisting.legalRateIrr = dto.legalRateIrr;
+        }
+        if (dto.note !== undefined) lockedExisting.note = dto.note;
+        lockedExisting.proposedById = actor.id;
+        lockedExisting.status = PricingProposalStatus.PENDING;
+        lockedExisting.rejectionReason = null;
+        lockedExisting.rejectedAt = null;
+        lockedExisting.rejectedById = null;
+        lockedExisting.aiSuggestion = null;
+        if (instance.competitorPriceIrr != null) {
+          lockedExisting.competitorPriceIrr = instance.competitorPriceIrr;
+        }
+        if (instance.basePriceIrr != null) {
+          lockedExisting.basePriceIrr = instance.basePriceIrr;
+        }
+        lockedExisting.updatedAt = new Date();
+        const saved = await manager.save(lockedExisting);
+        savedId = saved.id;
+      } else {
+        const basePriceIrr = instance.basePriceIrr ?? dto.proposedPriceIrr;
+        const created = await manager.save(
+          manager.create(FarePricingProposal, {
+            flightInstanceId,
+            basePriceIrr,
+            competitorPriceIrr: instance.competitorPriceIrr ?? null,
+            proposedPriceIrr: dto.proposedPriceIrr,
+            legalRateIrr: dto.legalRateIrr,
+            note: dto.note,
+            proposedById: actor.id,
+            status: PricingProposalStatus.PENDING,
+            updatedAt: new Date(),
+          }),
+        );
+        savedId = created.id;
       }
-      existing.updatedAt = new Date();
-      const saved = await this.proposalRepo.save(existing);
-      proposalId = saved.id;
-    } else {
-      const basePriceIrr = instance.basePriceIrr ?? dto.proposedPriceIrr;
-      // Prefer staff-supplied competitor on the definition; otherwise a
-      // transparent +3% marker derived from base (not a fabricated market feed).
-      const competitorPriceIrr =
-        instance.competitorPriceIrr ??
-        roundIrrTo(addIrr(basePriceIrr, pctOfIrr(basePriceIrr, 3)), 100_000n);
 
-      const created = await this.proposalRepo.save(
-        this.proposalRepo.create({
-          flightInstanceId,
-          basePriceIrr,
-          competitorPriceIrr,
-          proposedPriceIrr: dto.proposedPriceIrr,
-          legalRateIrr: dto.legalRateIrr,
-          note: dto.note,
-          proposedById: actor.id,
-          status: PricingProposalStatus.PENDING,
-          updatedAt: new Date(),
-        }),
-      );
-      proposalId = created.id;
-    }
-
-    await this.definitions.markPendingCeo(flightInstanceId);
+      await this.definitions.markPendingCeoInTx(manager, flightInstanceId);
+      return savedId;
+    });
 
     const proposal = await this.withProposalRelations(
       this.proposalRepo.createQueryBuilder('p'),
@@ -343,35 +341,75 @@ export class PricingService {
       }
     }
 
-    // Conditional update guards against a concurrent double-register.
-    const updated = await this.proposalRepo.update(
-      { id, status: PricingProposalStatus.PENDING },
-      {
-        status: PricingProposalStatus.REGISTERED,
-        registeredPriceIrr: price,
-        approvedById: actor.id,
-        approvedAt: new Date(),
-        updatedAt: new Date(),
-        rejectionReason: null,
-        rejectedAt: null,
-        rejectedById: null,
-      },
-    );
-    if ((updated.affected ?? 0) === 0) {
-      // Lost the race — reload; if peer registered, return that (idempotent).
-      const raced = await this.withProposalRelations(
+    // Conditional update + definition approval in one transaction.
+    const registered = await this.dataSource.transaction(async (manager) => {
+      await manager
+        .createQueryBuilder(FlightInstance, 'fi')
+        .setLock('pessimistic_write')
+        .where('fi.id = :id', { id: proposal.flightInstanceId })
+        .getOne();
+
+      const lockedProposal = await manager.findOne(FarePricingProposal, {
+        where: { id },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!lockedProposal) {
+        throw new NotFoundException({
+          code: ErrorCode.NOT_FOUND,
+          message: 'پیشنهاد قیمت یافت نشد.',
+        });
+      }
+      if (lockedProposal.status === PricingProposalStatus.REGISTERED) {
+        return { alreadyRegistered: true as const };
+      }
+      if (lockedProposal.status === PricingProposalStatus.REJECTED) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'این پیشنهاد رد شده است؛ ابتدا پیشنهاد جدید ارسال کنید.',
+        });
+      }
+
+      const updated = await manager.update(
+        FarePricingProposal,
+        { id, status: PricingProposalStatus.PENDING },
+        {
+          status: PricingProposalStatus.REGISTERED,
+          registeredPriceIrr: price,
+          approvedById: actor.id,
+          approvedAt: new Date(),
+          updatedAt: new Date(),
+          rejectionReason: null,
+          rejectedAt: null,
+          rejectedById: null,
+        },
+      );
+      if ((updated.affected ?? 0) === 0) {
+        const raced = await manager.findOne(FarePricingProposal, {
+          where: { id },
+        });
+        if (raced?.status === PricingProposalStatus.REGISTERED) {
+          return { alreadyRegistered: true as const };
+        }
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: LOCKED_MESSAGE,
+        });
+      }
+
+      await this.definitions.applyCeoApprovalInTx(
+        manager,
+        lockedProposal.flightInstanceId,
+      );
+      return { alreadyRegistered: false as const };
+    });
+
+    if (registered.alreadyRegistered) {
+      return this.withProposalRelations(
         this.proposalRepo.createQueryBuilder('p'),
       )
         .where('p.id = :id', { id })
         .getOneOrFail();
-      if (raced.status === PricingProposalStatus.REGISTERED) return raced;
-      throw new ConflictException({
-        code: ErrorCode.CONFLICT,
-        message: LOCKED_MESSAGE,
-      });
     }
-
-    await this.definitions.applyCeoApproval(proposal.flightInstanceId);
 
     await this.audit.record({
       actorId: actor.id,
@@ -386,6 +424,9 @@ export class PricingService {
       entityId: id,
       metadata: { registeredPriceIrr: price, source },
     });
+
+    // Newly APPROVED inventory must appear in search immediately.
+    await this.search.invalidateForInstance(proposal.flightInstanceId);
 
     return this.withProposalRelations(this.proposalRepo.createQueryBuilder('p'))
       .where('p.id = :id', { id })
@@ -437,30 +478,72 @@ export class PricingService {
       });
     }
 
-    const updated = await this.proposalRepo.update(
-      { id, status: PricingProposalStatus.PENDING },
-      {
-        status: PricingProposalStatus.REJECTED,
-        rejectionReason: reason,
-        rejectedById: actor.id,
-        rejectedAt: new Date(),
-        updatedAt: new Date(),
-      },
-    );
-    if ((updated.affected ?? 0) === 0) {
-      const raced = await this.withProposalRelations(
+    const rejected = await this.dataSource.transaction(async (manager) => {
+      await manager
+        .createQueryBuilder(FlightInstance, 'fi')
+        .setLock('pessimistic_write')
+        .where('fi.id = :id', { id: proposal.flightInstanceId })
+        .getOne();
+
+      const lockedProposal = await manager.findOne(FarePricingProposal, {
+        where: { id },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!lockedProposal) {
+        throw new NotFoundException({
+          code: ErrorCode.NOT_FOUND,
+          message: 'پیشنهاد قیمت یافت نشد.',
+        });
+      }
+      if (lockedProposal.status === PricingProposalStatus.REJECTED) {
+        return { alreadyRejected: true as const };
+      }
+      if (lockedProposal.status === PricingProposalStatus.REGISTERED) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: LOCKED_MESSAGE,
+        });
+      }
+
+      const updated = await manager.update(
+        FarePricingProposal,
+        { id, status: PricingProposalStatus.PENDING },
+        {
+          status: PricingProposalStatus.REJECTED,
+          rejectionReason: reason,
+          rejectedById: actor.id,
+          rejectedAt: new Date(),
+          updatedAt: new Date(),
+        },
+      );
+      if ((updated.affected ?? 0) === 0) {
+        const raced = await manager.findOne(FarePricingProposal, {
+          where: { id },
+        });
+        if (raced?.status === PricingProposalStatus.REJECTED) {
+          return { alreadyRejected: true as const };
+        }
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'وضعیت پیشنهاد قابل رد نیست.',
+        });
+      }
+
+      await this.definitions.applyCeoRejectionInTx(
+        manager,
+        lockedProposal.flightInstanceId,
+        reason,
+      );
+      return { alreadyRejected: false as const };
+    });
+
+    if (rejected.alreadyRejected) {
+      return this.withProposalRelations(
         this.proposalRepo.createQueryBuilder('p'),
       )
         .where('p.id = :id', { id })
         .getOneOrFail();
-      if (raced.status === PricingProposalStatus.REJECTED) return raced;
-      throw new ConflictException({
-        code: ErrorCode.CONFLICT,
-        message: 'وضعیت پیشنهاد قابل رد نیست.',
-      });
     }
-
-    await this.definitions.applyCeoRejection(proposal.flightInstanceId, reason);
 
     await this.audit.record({
       actorId: actor.id,
@@ -533,7 +616,10 @@ export class PricingService {
         dest_code: p.flightInstance.flight.route.destCode,
         departure_at: p.flightInstance.departureAt.toISOString(),
         base_price_irr: Number(p.basePriceIrr),
-        competitor_price_irr: Number(p.competitorPriceIrr),
+        // ML schema requires competitor_price_irr > 0. When the definition
+        // has no competitor, anchor on base — never invent base+3% and never
+        // persist this fallback as competitorPriceIrr.
+        competitor_price_irr: Number(p.competitorPriceIrr ?? p.basePriceIrr),
         proposed_price_irr: Number(p.proposedPriceIrr),
         capacity: p.flightInstance.capacity,
         charter_seats: p.flightInstance.charterSeats,

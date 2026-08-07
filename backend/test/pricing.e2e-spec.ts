@@ -181,7 +181,10 @@ describe('Pricing (e2e)', () => {
       .patch(`/pricing/proposals/${proposalId}/register`)
       .set('Authorization', `Bearer ${ceo.accessToken}`)
       .send({ source: 'PROPOSED', ...stepUp2 });
-    expect(reRegister.status).toBe(409);
+    // Re-register is idempotent (same REGISTERED row); commercial re-edit stays 409.
+    expect(reRegister.status).toBe(200);
+    expect(reRegister.body.data.status).toBe('REGISTERED');
+    expect(reRegister.body.data.registeredPriceIrr).toBe('38500000');
   });
 
   it('register with source=AI without a stored suggestion → 409 with a clear message', async () => {

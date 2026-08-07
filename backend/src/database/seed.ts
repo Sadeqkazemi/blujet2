@@ -1683,13 +1683,16 @@ async function main() {
     { aircraftType: 'Airbus A320' },
     {
       aircraftType: 'Airbus A320',
-      // Legacy reservation-panel layout (kept for existing e2e fixtures):
-      // rows 3-6 business 2-2 (16 seats), rows 7-32 economy 2-3 (130 seats).
+      // rows 3-6 business 2-2 (16), 7-10 comfort 2-3 (20), 11-32 economy 2-3 (110).
       businessRowStart: 3,
       businessRowEnd: 6,
       businessColsLeft: ['A', 'B'],
       businessColsRight: ['C', 'D'],
-      economyRowStart: 7,
+      comfortRowStart: 7,
+      comfortRowEnd: 10,
+      comfortColsLeft: ['A', 'B'],
+      comfortColsRight: ['C', 'D', 'E'],
+      economyRowStart: 11,
       economyRowEnd: 32,
       economyColsLeft: ['A', 'B'],
       economyColsRight: ['C', 'D', 'E'],

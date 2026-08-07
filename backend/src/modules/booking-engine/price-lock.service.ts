@@ -15,6 +15,7 @@ import { getCabinPrice } from './pricing';
 import { pctOfIrr, roundIrrTo } from '../../common/money';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { CabinClass } from '../../database/enums';
+import { assertSellableForSale } from '../flights/definition-sellability';
 
 const LOCK_TTL_MS = 72 * 60 * 60 * 1000;
 /** Flat, NestJS-computed fee — CLAUDE.md: "fee/risk suggested by the ML
@@ -62,6 +63,7 @@ export class PriceLockService {
         message: 'پرواز یافت نشد یا دیگر قابل رزرو نیست.',
       });
     }
+    assertSellableForSale(instance);
 
     const existing = await this.priceLockRepo.findOneBy({
       userId: user.id,

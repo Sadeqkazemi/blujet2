@@ -125,8 +125,11 @@ migrations doesn't require renaming.
 
 - `Route { id, originCode, destCode }`
 - `Flight { id, flightNo, routeId→Route, aircraftType }`
-- `FlightInstance { id, flightId→Flight, departureAt(UTC), arrivalAt(UTC), capacity, charterSeats, status: SCHEDULED|DEPARTED|CANCELLED }`
-- `Booking { id, pnr unique, flightInstanceId→FlightInstance, channel: DIRECT|AGENCY|VIP|MANAGERIAL, agencyId→User?, status: DRAFT|HELD|PAID|TICKETED|CANCELLED|EXPIRED|REFUNDED, priceIrr Int, createdAt }` — full state machine per CLAUDE.md; Phase 1 dashboards only read `PAID`/`TICKETED` rows.
+- `FlightInstance { id, flightId→Flight, departureAt(UTC), arrivalAt(UTC), capacity, charterSeats, status: SCHEDULED|DEPARTED|CANCELLED, durationMinutes?, competitorPriceIrr?, cabinCapacities jsonb [{cabin,seats}], definitionStatus: DRAFT|PENDING_CEO|APPROVED|REJECTED|PENDING_REVISION (legacy default APPROVED), rejectionReason?, approvedSnapshot jsonb?, pendingRevisionSnapshot jsonb? }` — public sale only for APPROVED and PENDING_REVISION (live approved inventory).
+- `FlightChargeRule { id, flightInstanceId, title, kind: TAX|FEE, calculationMode: FIXED|PERCENTAGE, fixedAmountIrr?, percentageBasisPoints?, cabin null=all, effectiveFrom/To, isActive, isPendingRevision }` — server-authoritative taxes/fees; booking stores immutable `chargeSnapshot`.
+- `AircraftSeatMap` — business + optional comfort + economy row/col bands; COMFORT cannot be sold without comfort rows.
+- `FarePricingProposal.status` — PENDING|REGISTERED|REJECTED; `competitorPriceIrr` nullable.
+- `Booking { id, pnr unique, flightInstanceId→FlightInstance, channel: DIRECT|AGENCY|VIP|MANAGERIAL, agencyId→User?, status: DRAFT|HELD|PAID|TICKETED|CANCELLED|EXPIRED|REFUNDED, priceIrr Int, taxIrr, chargeSnapshot jsonb?, createdAt }` — full state machine per CLAUDE.md; Phase 1 dashboards only read `PAID`/`TICKETED` rows.
 - `Passenger { id, bookingId→Booking, fullName, nationalId(encrypted), mobile(encrypted) }`
 - `LedgerEntry { id, bookingId→Booking?, agencyId→AgencyProfile?, type: SALE|REFUND|SETTLEMENT|COMMISSION, signedAmountIrr Int, occurredAt, createdBy→User? }` — double-entry, immutable, append-only; refunds/settlements are new rows, never edits. `agencyId` (added in Phase 3) is set on agency-channel `SALE` rows (mirroring `booking.agencyId`) and on every `SETTLEMENT` row, since a settlement (invoice payment or a direct "ثبت تسویه") isn't necessarily tied to one `Booking` — this lets `AgencyCreditLine.usedIrr` derive from a single `agencyId` filter instead of a join through `Booking` that `SETTLEMENT` rows wouldn't have anyway.
 

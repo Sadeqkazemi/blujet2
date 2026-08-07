@@ -7,13 +7,14 @@ import {
 import { BadRequestException } from '@nestjs/common';
 
 describe('flight-definition.util', () => {
-  it('accepts XY1234 and uppercases letters without stripping hyphens/spaces', () => {
+  it('accepts XY1234 and uppercases letters without trimming or stripping', () => {
     expect(normalizeFlightNo('xy1234')).toBe('XY1234');
-    expect(normalizeFlightNo(' XY1234 ')).toBe('XY1234');
-    // Hyphen/space are NOT auto-stripped — validation must reject them.
+    // Leading/trailing spaces are preserved so validation can reject them.
+    expect(normalizeFlightNo(' XY1234 ')).toBe(' XY1234 ');
     expect(normalizeFlightNo('XY-1234')).toBe('XY-1234');
     expect(normalizeFlightNo('XY 1234')).toBe('XY 1234');
     expect(() => assertValidFlightNo('XY1234')).not.toThrow();
+    expect(() => assertValidFlightNo(' XY1234 ')).toThrow(BadRequestException);
     expect(() => assertValidFlightNo('XY-1234')).toThrow(BadRequestException);
     expect(() => assertValidFlightNo('XY 1234')).toThrow(BadRequestException);
     expect(() => assertValidFlightNo('X1234')).toThrow(BadRequestException);

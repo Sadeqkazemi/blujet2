@@ -19,13 +19,16 @@ export type NormalizedCabinCapacity = {
   capacity: number;
 };
 
-/** Uppercase only — does NOT strip spaces or hyphens (those fail validation). */
+/**
+ * Uppercase only — does NOT trim and does NOT strip spaces/hyphens.
+ * Leading/trailing spaces therefore fail `assertValidFlightNo`.
+ */
 export function normalizeFlightNo(raw: string): string {
-  return raw.trim().toUpperCase();
+  return raw.toUpperCase();
 }
 
 export function assertValidFlightNo(flightNo: string): void {
-  if (!FLIGHT_NO_PATTERN.test(flightNo)) {
+  if (flightNo !== flightNo.trim() || !FLIGHT_NO_PATTERN.test(flightNo)) {
     throw new BadRequestException({
       code: ErrorCode.VALIDATION_FAILED,
       message:

@@ -5,9 +5,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { Airport } from '../../database/entities/airport.entity';
 import { AircraftSeatMap } from '../../database/entities/aircraft-seat-map.entity';
+import { Booking } from '../../database/entities/booking.entity';
 import { Flight } from '../../database/entities/flight.entity';
 import { FlightChargeRule } from '../../database/entities/flight-charge-rule.entity';
 import { FlightInstance } from '../../database/entities/flight-instance.entity';
@@ -37,6 +38,12 @@ import {
   type NormalizedCabinCapacity,
 } from './flight-definition.util';
 import { resolveAircraftType } from './aircraft-type.util';
+import {
+  countSeatsByCabin,
+  type AircraftSeatMapLike,
+} from '../reservation/seat-layout';
+
+const SOLD_STATUSES = ['PAID', 'TICKETED'] as const;
 
 export type DefinitionSnapshot = {
   flightNo: string;
@@ -46,6 +53,7 @@ export type DefinitionSnapshot = {
   durationMinutes: number;
   aircraftType: string;
   capacity: number;
+  charterSeats: number;
   cabinCapacities: NormalizedCabinCapacity[];
   basePriceIrr: string | null;
   competitorPriceIrr: string | null;
@@ -71,19 +79,76 @@ export class FlightDefinitionService {
     private readonly chargeRuleRepo: Repository<FlightChargeRule>,
     @InjectRepository(FarePricingProposal)
     private readonly proposalRepo: Repository<FarePricingProposal>,
+    @InjectRepository(Booking)
+    private readonly bookingRepo: Repository<Booking>,
     private readonly audit: AuditService,
   ) {}
 
-  private async findOrCreateRoute(originCode: string, destCode: string) {
-    const existing = await this.routeRepo.findOneBy({ originCode, destCode });
-    if (existing) return existing;
-    return this.routeRepo.save(
-      this.routeRepo.create({
+  private async findOrCreateRoute(
+    originCode: string,
+    destCode: string,
+    durationMinutes: number,
+    manager?: EntityManager,
+  ) {
+    const routeRepo = manager ? manager.getRepository(Route) : this.routeRepo;
+    const existing = await routeRepo.findOneBy({ originCode, destCode });
+    if (existing) {
+      if (existing.durationMin !== durationMinutes) {
+        existing.durationMin = durationMinutes;
+        await routeRepo.save(existing);
+      }
+      return existing;
+    }
+    return routeRepo.save(
+      routeRepo.create({
         originCode,
         destCode,
-        durationMin: 120,
+        durationMin: durationMinutes,
       }),
     );
+  }
+
+  private validateCabinCapacitiesAgainstSeatMap(
+    map: AircraftSeatMapLike,
+    cabinCapacities: NormalizedCabinCapacity[],
+  ) {
+    const physical = countSeatsByCabin(map);
+    for (const row of cabinCapacities) {
+      const configured = row.seats;
+      const phys = physical[row.cabin];
+      if (configured > 0 && phys === 0) {
+        throw new BadRequestException({
+          code: ErrorCode.VALIDATION_FAILED,
+          message: `کلاس ${row.cabin} در نقشه صندلی این هواپیما تعریف نشده است.`,
+        });
+      }
+      if (phys < configured) {
+        throw new BadRequestException({
+          code: ErrorCode.VALIDATION_FAILED,
+          message: `ظرفیت ${row.cabin} از تعداد صندلی فیزیکی (${phys}) بیشتر است.`,
+        });
+      }
+    }
+  }
+
+  private derivedStatus(
+    status: string,
+    sold: number,
+    capacity: number,
+  ): 'ACTIVE' | 'SELLING' | 'FULL' | 'CANCELLED' {
+    if (status === 'CANCELLED') return 'CANCELLED';
+    if (capacity > 0 && sold >= capacity) return 'FULL';
+    if (sold > 0) return 'SELLING';
+    return 'ACTIVE';
+  }
+
+  private async countSold(flightInstanceId: string): Promise<number> {
+    return this.bookingRepo.count({
+      where: {
+        flightInstanceId,
+        status: In([...SOLD_STATUSES]),
+      },
+    });
   }
 
   private async findOrCreateFlight(
@@ -120,6 +185,7 @@ export class FlightDefinitionService {
     durationMinutes: number;
     aircraftType: string;
     capacity: number;
+    charterSeats: number;
     cabinCapacities: NormalizedCabinCapacity[];
     basePriceIrr: Irr | null;
     competitorPriceIrr: Irr | null;
@@ -133,6 +199,7 @@ export class FlightDefinitionService {
       durationMinutes: input.durationMinutes,
       aircraftType: input.aircraftType,
       capacity: input.capacity,
+      charterSeats: input.charterSeats,
       cabinCapacities: input.cabinCapacities,
       basePriceIrr:
         input.basePriceIrr == null ? null : String(input.basePriceIrr),
@@ -213,8 +280,14 @@ export class FlightDefinitionService {
       where: { flightInstanceId: instance.id, isPendingRevision: true },
       order: { createdAt: 'ASC' },
     });
-    const cabinCapacities = serializeCabinCapacities(instance.cabinCapacities);
-    const durationMinutes =
+    const sold = await this.countSold(instance.id);
+    const derivedStatus = this.derivedStatus(
+      instance.status,
+      sold,
+      instance.capacity,
+    );
+
+    const liveDurationMinutes =
       instance.durationMinutes ??
       Math.max(
         1,
@@ -223,20 +296,60 @@ export class FlightDefinitionService {
             60_000,
         ),
       );
-    const base = instance.basePriceIrr ?? 0n;
-    const rulesForPreview =
-      instance.definitionStatus === FlightDefinitionStatus.PENDING_REVISION &&
-      pendingRules.length > 0
-        ? pendingRules
-        : activeRules;
-    const calculatedChargeBreakdown = this.calculatedBreakdown(
-      base,
-      rulesForPreview.filter((r) => r.isActive),
-      instance.departureAt,
-    );
+
     const approvalStatus = instance.definitionStatus;
     const pendingRevision =
       approvalStatus === FlightDefinitionStatus.PENDING_REVISION;
+    const pendingSnap =
+      pendingRevision && instance.pendingRevisionSnapshot
+        ? (instance.pendingRevisionSnapshot as DefinitionSnapshot)
+        : null;
+
+    const formFlightNo = pendingSnap?.flightNo ?? instance.flight.flightNo;
+    const formOriginCode =
+      pendingSnap?.originCode ?? instance.flight.route.originCode;
+    const formDestCode =
+      pendingSnap?.destCode ?? instance.flight.route.destCode;
+    const formDepartureAt = pendingSnap
+      ? new Date(pendingSnap.departureAt)
+      : instance.departureAt;
+    const formDurationMinutes =
+      pendingSnap?.durationMinutes ?? liveDurationMinutes;
+    const formArrivalAt = pendingSnap
+      ? arrivalFromDuration(formDepartureAt, formDurationMinutes)
+      : instance.arrivalAt;
+    const formCapacity = pendingSnap?.capacity ?? instance.capacity;
+    const formCharterSeats = pendingSnap?.charterSeats ?? instance.charterSeats;
+    const formCabinCapacities = pendingSnap
+      ? pendingSnap.cabinCapacities
+      : serializeCabinCapacities(instance.cabinCapacities);
+    const formBasePriceIrr =
+      pendingSnap?.basePriceIrr != null
+        ? BigInt(pendingSnap.basePriceIrr)
+        : instance.basePriceIrr;
+    const formCompetitorPriceIrr =
+      pendingSnap?.competitorPriceIrr != null
+        ? BigInt(pendingSnap.competitorPriceIrr)
+        : instance.competitorPriceIrr;
+    const formAircraftType =
+      pendingSnap?.aircraftType ?? resolveAircraftType(instance);
+
+    const chargeRulesForResponse =
+      pendingRevision && pendingRules.length > 0
+        ? pendingRules.map(serializeChargeRule)
+        : pendingSnap?.chargeRules?.length
+          ? pendingSnap.chargeRules
+          : activeRules.map(serializeChargeRule);
+    const rulesForPreview =
+      pendingRevision && pendingRules.length > 0 ? pendingRules : activeRules;
+
+    const base = formBasePriceIrr ?? 0n;
+    const calculatedChargeBreakdown = this.calculatedBreakdown(
+      base,
+      rulesForPreview.filter((r) => r.isActive),
+      formDepartureAt,
+    );
+
     // Definition edits are allowed except while the first submission sits
     // with the CEO (PENDING_CEO). PENDING_REVISION keeps the live snapshot
     // and stages a new draft the commercial team can still adjust.
@@ -247,24 +360,21 @@ export class FlightDefinitionService {
 
     return {
       id: instance.id,
-      flightNo: instance.flight.flightNo,
-      originCode: instance.flight.route.originCode,
-      destCode: instance.flight.route.destCode,
-      departureAt: instance.departureAt.toISOString(),
-      arrivalAt: instance.arrivalAt.toISOString(),
-      capacity: instance.capacity,
-      charterSeats: instance.charterSeats,
-      sold: 0,
-      basePriceIrr: instance.basePriceIrr,
-      competitorPriceIrr: instance.competitorPriceIrr,
-      derivedStatus: 'ACTIVE' as const,
-      aircraftType: resolveAircraftType(instance),
-      durationMinutes,
-      cabinCapacities,
-      chargeRules: (pendingRevision && pendingRules.length > 0
-        ? pendingRules
-        : activeRules
-      ).map(serializeChargeRule),
+      flightNo: formFlightNo,
+      originCode: formOriginCode,
+      destCode: formDestCode,
+      departureAt: formDepartureAt.toISOString(),
+      arrivalAt: formArrivalAt.toISOString(),
+      capacity: formCapacity,
+      charterSeats: formCharterSeats,
+      sold,
+      basePriceIrr: formBasePriceIrr,
+      competitorPriceIrr: formCompetitorPriceIrr,
+      derivedStatus,
+      aircraftType: formAircraftType,
+      durationMinutes: formDurationMinutes,
+      cabinCapacities: formCabinCapacities,
+      chargeRules: chargeRulesForResponse,
       calculatedChargeBreakdown,
       approvalStatus,
       rejectionReason: instance.rejectionReason,
@@ -342,6 +452,7 @@ export class FlightDefinitionService {
           message: 'نوع هواپیمای انتخاب‌شده در کاتالوگ نیست.',
         });
       }
+      this.validateCabinCapacitiesAgainstSeatMap(map, cabinCapacities);
     }
 
     const createdId = await this.dataSource.transaction(async (manager) => {
@@ -474,6 +585,16 @@ export class FlightDefinitionService {
     const aircraftType =
       (dto.aircraftType ?? resolveAircraftType(instance)).trim() ||
       'Airbus A320';
+    if (dto.aircraftType) {
+      const map = await this.seatMapRepo.findOneBy({ aircraftType });
+      if (!map) {
+        throw new BadRequestException({
+          code: ErrorCode.VALIDATION_FAILED,
+          message: 'نوع هواپیمای انتخاب‌شده در کاتالوگ نیست.',
+        });
+      }
+      this.validateCabinCapacitiesAgainstSeatMap(map, cabinCapacities);
+    }
 
     const status = instance.definitionStatus;
 
@@ -491,7 +612,12 @@ export class FlightDefinitionService {
         instance.approvedSnapshot != null);
 
     await this.dataSource.transaction(async (manager) => {
-      const route = await this.findOrCreateRoute(dto.originCode, dto.destCode);
+      const route = await this.findOrCreateRoute(
+        dto.originCode,
+        dto.destCode,
+        durationMinutes,
+        manager,
+      );
       const flight = await manager.findOneByOrFail(Flight, {
         id: instance.flightId,
       });
@@ -542,6 +668,7 @@ export class FlightDefinitionService {
         durationMinutes,
         aircraftType,
         capacity: dto.capacity,
+        charterSeats,
         cabinCapacities,
         basePriceIrr: dto.basePriceIrr,
         competitorPriceIrr: dto.competitorPriceIrr ?? null,
@@ -640,123 +767,129 @@ export class FlightDefinitionService {
    * Promote pending revision (or first approval) onto the live instance.
    * Called from pricing.register after CEO step-up.
    */
-  async applyCeoApproval(flightInstanceId: string): Promise<void> {
-    await this.dataSource.transaction(async (manager) => {
-      const instance = await manager.findOne(FlightInstance, {
-        where: { id: flightInstanceId },
-        relations: { flight: { route: true } },
-      });
-      if (!instance?.flight?.route) return;
+  async applyCeoApprovalInTx(
+    manager: EntityManager,
+    flightInstanceId: string,
+  ): Promise<void> {
+    const instance = await manager.findOne(FlightInstance, {
+      where: { id: flightInstanceId },
+      relations: { flight: { route: true } },
+    });
+    if (!instance?.flight?.route) return;
 
-      if (
-        instance.definitionStatus === FlightDefinitionStatus.PENDING_REVISION &&
-        instance.pendingRevisionSnapshot
-      ) {
-        const snap = instance.pendingRevisionSnapshot as DefinitionSnapshot;
-        const departureAt = new Date(snap.departureAt);
-        const arrivalAt = arrivalFromDuration(
-          departureAt,
-          snap.durationMinutes,
-        );
-        instance.departureAt = departureAt;
-        instance.arrivalAt = arrivalAt;
-        instance.durationMinutes = snap.durationMinutes;
-        instance.capacity = snap.capacity;
-        instance.basePriceIrr =
-          snap.basePriceIrr != null ? BigInt(snap.basePriceIrr) : null;
-        instance.competitorPriceIrr =
-          snap.competitorPriceIrr != null
-            ? BigInt(snap.competitorPriceIrr)
-            : null;
-        instance.cabinCapacities = snap.cabinCapacities;
-        instance.approvedSnapshot = snap;
-        instance.pendingRevisionSnapshot = null;
-        instance.definitionStatus = FlightDefinitionStatus.APPROVED;
-        instance.rejectionReason = null;
-
-        const flight = await manager.findOneByOrFail(Flight, {
-          id: instance.flightId,
-        });
-        flight.flightNo = snap.flightNo;
-        flight.aircraftType = snap.aircraftType;
-        const route = await this.findOrCreateRoute(
-          snap.originCode,
-          snap.destCode,
-        );
-        flight.routeId = route.id;
-        await manager.save(flight);
-
-        // Promote pending rules → active.
-        await manager.delete(FlightChargeRule, {
-          flightInstanceId: instance.id,
-          isPendingRevision: false,
-        });
-        await manager
-          .createQueryBuilder()
-          .update(FlightChargeRule)
-          .set({ isPendingRevision: false })
-          .where('"flightInstanceId" = :id AND "isPendingRevision" = true', {
-            id: instance.id,
-          })
-          .execute();
-
-        await manager.save(instance);
-        return;
-      }
-
-      // First-time approval of DRAFT / PENDING_CEO / REJECTED→pending path.
-      const activeRules = await manager.find(FlightChargeRule, {
-        where: {
-          flightInstanceId: instance.id,
-          isPendingRevision: false,
-        },
-      });
-      const cabinCapacities = serializeCabinCapacities(
-        instance.cabinCapacities,
-      );
-      const durationMinutes =
-        instance.durationMinutes ??
-        Math.max(
-          1,
-          Math.round(
-            (instance.arrivalAt.getTime() - instance.departureAt.getTime()) /
-              60_000,
-          ),
-        );
-      const snapshot = this.buildSnapshot({
-        flightNo: instance.flight.flightNo,
-        originCode: instance.flight.route.originCode,
-        destCode: instance.flight.route.destCode,
-        departureAt: instance.departureAt,
-        durationMinutes,
-        aircraftType: resolveAircraftType(instance),
-        capacity: instance.capacity,
-        cabinCapacities,
-        basePriceIrr: instance.basePriceIrr,
-        competitorPriceIrr: instance.competitorPriceIrr,
-        chargeRules: activeRules.map(serializeChargeRule),
-      });
-      instance.approvedSnapshot = snapshot;
+    if (
+      instance.definitionStatus === FlightDefinitionStatus.PENDING_REVISION &&
+      instance.pendingRevisionSnapshot
+    ) {
+      const snap = instance.pendingRevisionSnapshot as DefinitionSnapshot;
+      const departureAt = new Date(snap.departureAt);
+      const arrivalAt = arrivalFromDuration(departureAt, snap.durationMinutes);
+      instance.departureAt = departureAt;
+      instance.arrivalAt = arrivalAt;
+      instance.durationMinutes = snap.durationMinutes;
+      instance.capacity = snap.capacity;
+      instance.charterSeats = snap.charterSeats;
+      instance.basePriceIrr =
+        snap.basePriceIrr != null ? BigInt(snap.basePriceIrr) : null;
+      instance.competitorPriceIrr =
+        snap.competitorPriceIrr != null
+          ? BigInt(snap.competitorPriceIrr)
+          : null;
+      instance.cabinCapacities = snap.cabinCapacities;
+      instance.approvedSnapshot = snap;
       instance.pendingRevisionSnapshot = null;
       instance.definitionStatus = FlightDefinitionStatus.APPROVED;
       instance.rejectionReason = null;
+
+      const flight = await manager.findOneByOrFail(Flight, {
+        id: instance.flightId,
+      });
+      flight.flightNo = snap.flightNo;
+      flight.aircraftType = snap.aircraftType;
+      const route = await this.findOrCreateRoute(
+        snap.originCode,
+        snap.destCode,
+        snap.durationMinutes,
+        manager,
+      );
+      flight.routeId = route.id;
+      await manager.save(flight);
+
+      // Promote pending rules → active.
+      await manager.delete(FlightChargeRule, {
+        flightInstanceId: instance.id,
+        isPendingRevision: false,
+      });
+      await manager
+        .createQueryBuilder()
+        .update(FlightChargeRule)
+        .set({ isPendingRevision: false })
+        .where('"flightInstanceId" = :id AND "isPendingRevision" = true', {
+          id: instance.id,
+        })
+        .execute();
+
       await manager.save(instance);
+      return;
+    }
+
+    // First-time approval of DRAFT / PENDING_CEO / REJECTED→pending path.
+    const activeRules = await manager.find(FlightChargeRule, {
+      where: {
+        flightInstanceId: instance.id,
+        isPendingRevision: false,
+      },
     });
+    const cabinCapacities = serializeCabinCapacities(instance.cabinCapacities);
+    const durationMinutes =
+      instance.durationMinutes ??
+      Math.max(
+        1,
+        Math.round(
+          (instance.arrivalAt.getTime() - instance.departureAt.getTime()) /
+            60_000,
+        ),
+      );
+    const snapshot = this.buildSnapshot({
+      flightNo: instance.flight.flightNo,
+      originCode: instance.flight.route.originCode,
+      destCode: instance.flight.route.destCode,
+      departureAt: instance.departureAt,
+      durationMinutes,
+      aircraftType: resolveAircraftType(instance),
+      capacity: instance.capacity,
+      charterSeats: instance.charterSeats,
+      cabinCapacities,
+      basePriceIrr: instance.basePriceIrr,
+      competitorPriceIrr: instance.competitorPriceIrr,
+      chargeRules: activeRules.map(serializeChargeRule),
+    });
+    instance.approvedSnapshot = snapshot;
+    instance.pendingRevisionSnapshot = null;
+    instance.definitionStatus = FlightDefinitionStatus.APPROVED;
+    instance.rejectionReason = null;
+    await manager.save(instance);
   }
 
-  async applyCeoRejection(
+  async applyCeoApproval(flightInstanceId: string): Promise<void> {
+    await this.dataSource.transaction((manager) =>
+      this.applyCeoApprovalInTx(manager, flightInstanceId),
+    );
+  }
+
+  async applyCeoRejectionInTx(
+    manager: EntityManager,
     flightInstanceId: string,
     reason: string,
   ): Promise<void> {
-    const instance = await this.instanceRepo
-      .createQueryBuilder('fi')
-      .where('fi.id = :id', { id: flightInstanceId })
-      .getOne();
+    const instance = await manager.findOne(FlightInstance, {
+      where: { id: flightInstanceId },
+    });
     if (!instance) return;
 
     if (instance.definitionStatus === FlightDefinitionStatus.PENDING_REVISION) {
       // Discard pending revision; keep approved live version.
-      await this.chargeRuleRepo.delete({
+      await manager.delete(FlightChargeRule, {
         flightInstanceId,
         isPendingRevision: true,
       });
@@ -772,15 +905,26 @@ export class FlightDefinitionService {
     } else {
       instance.rejectionReason = reason;
     }
-    await this.instanceRepo.save(instance);
+    await manager.save(instance);
+  }
+
+  async applyCeoRejection(
+    flightInstanceId: string,
+    reason: string,
+  ): Promise<void> {
+    await this.dataSource.transaction((manager) =>
+      this.applyCeoRejectionInTx(manager, flightInstanceId, reason),
+    );
   }
 
   /** Mark definition awaiting CEO when a pricing proposal is submitted. */
-  async markPendingCeo(flightInstanceId: string): Promise<void> {
-    const instance = await this.instanceRepo
-      .createQueryBuilder('fi')
-      .where('fi.id = :id', { id: flightInstanceId })
-      .getOne();
+  async markPendingCeoInTx(
+    manager: EntityManager,
+    flightInstanceId: string,
+  ): Promise<void> {
+    const instance = await manager.findOne(FlightInstance, {
+      where: { id: flightInstanceId },
+    });
     if (!instance) return;
     if (
       instance.definitionStatus === FlightDefinitionStatus.DRAFT ||
@@ -788,7 +932,13 @@ export class FlightDefinitionService {
     ) {
       instance.definitionStatus = FlightDefinitionStatus.PENDING_CEO;
       instance.rejectionReason = null;
-      await this.instanceRepo.save(instance);
+      await manager.save(instance);
     }
+  }
+
+  async markPendingCeo(flightInstanceId: string): Promise<void> {
+    await this.dataSource.transaction((manager) =>
+      this.markPendingCeoInTx(manager, flightInstanceId),
+    );
   }
 }

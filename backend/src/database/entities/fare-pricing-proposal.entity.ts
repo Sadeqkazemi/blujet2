@@ -48,8 +48,9 @@ export class FarePricingProposal {
   @Column({ type: 'bigint', transformer: bigintTransformer })
   basePriceIrr!: bigint;
 
-  @Column({ type: 'bigint', transformer: bigintTransformer })
-  competitorPriceIrr!: bigint;
+  /** Optional competitor observation — null means unknown (UI shows «—»). */
+  @Column({ type: 'bigint', nullable: true, transformer: bigintTransformer })
+  competitorPriceIrr!: bigint | null;
 
   @Column({ type: 'bigint', transformer: bigintTransformer })
   proposedPriceIrr!: bigint;

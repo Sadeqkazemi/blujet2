@@ -380,13 +380,23 @@ stays untouched on the same page).
 - POST `/flights/airports` — `{ cityFa, code, tz? }` — add a city/airport
   to the catalog (Commercial «شهرهای پروازی» tab); 409 on duplicate code or
   city name; audited.
-- POST `/flights` — full-page «افزودن پرواز جدید» (Commercial design):
-  `{ originCode, destCode, flightNo, departureAt (UTC ISO), capacity,
-  basePriceIrr, aircraftType?, charterSeats? }` — find-or-create
-  Route/Flight, create instance; optional aircraft/charter applied at
-  create. Client then posts fare-rules + `PUT .../proposal` for CEO
-  approval. Server rules: origin≠dest, future date, charterSeats &lt;
-  capacity, aircraft in seat-map catalog; audited.
+- POST `/flights` — full flight **definition** (Commercial/Senior +
+  `fl_manage`): `{ originCode, destCode, flightNo (^\[A-Z\]{2}\d{4}$ —
+  uppercased only, no trim/strip), departureAt (UTC ISO),
+  durationMinutes (arrivalAt = departureAt + duration), capacity,
+  cabinCapacities[{cabin: ECONOMY|COMFORT|BUSINESS, seats}], basePriceIrr
+  (decimal string), aircraftType?, charterSeats?, chargeRules?,
+  competitorPriceIrr? }`. Cabin capacities must fit the aircraft seat-map
+  (COMFORT requires real comfort rows; never merged into ECONOMY). Starts
+  as `definitionStatus=DRAFT`. Then `PUT /pricing/flights/:id/proposal`
+  → `PENDING_CEO`; CEO register → `APPROVED` (bookable).
+- GET `/flights/:id/definition` — editable definition detail (real sold /
+  derivedStatus). Under `PENDING_REVISION`, form fields come from
+  `pendingRevisionSnapshot` (includes `charterSeats`); live approved
+  inventory stays sellable until CEO re-approves.
+- PUT `/flights/:id/definition` — edit DRAFT/REJECTED in place; edit of
+  APPROVED stages `PENDING_REVISION` without mutating live inventory.
+  Audited.
 - GET `/flights/:instanceId` — flight detail modal: sold/cap, ضریب اشغال,
   قیمت پایه, real channel breakdown (seats + revenue per سیستمی/چارتری/
   آژانس) and مجموع درآمد from bookings.
@@ -730,10 +740,13 @@ orphan like prior phases' dead blocks).
   - GET `/club/card-requests` — the panels' queue (server filters to REFERRED/APPROVED/REJECTED — SUBMITTED lives in the site-admin track); includes history timeline. All 3 roles.
   - PATCH `/club/card-requests/:id/approve` | `/reject` — «تأیید و صدور کارت» / «انصراف» — CEO/BOARD_CHAIR: any REFERRED; SENIOR_MANAGER: only `assignedTo=SENIOR` (⚑); transactional + audited; 409 on non-REFERRED.
 - **Phase 6 — Ticket pricing** (`backend/src/modules/pricing/` + `backend/src/modules/ai/` + `ml-service/`):
-  - GET `/pricing/proposals` — CEO: pending + registered lists with counts; COMMERCIAL_MANAGER: upcoming SCHEDULED flight instances joined with their proposal (the design's «تعیین قیمت پرواز و ارسال به مدیر عامل» rows with «قیمت‌گذاری نشده/در انتظار تأیید/قفل‌شده» states).
-  - PUT `/pricing/flights/:flightInstanceId/proposal` — COMMERCIAL_MANAGER — `{ proposedPriceIrr, legalRateIrr?, note? }`; upsert, editable while PENDING («می‌توانید تا زمان تأیید آن را ویرایش کنید»), 409 once REGISTERED.
+  - GET `/pricing/proposals` — CEO: pending + registered (+ rejected) lists and `pendingApprovalsCount`; COMMERCIAL_MANAGER: upcoming SCHEDULED instances joined with their proposal.
+  - GET `/pricing/proposals/pending-count` — CEO only → `{ pendingApprovalsCount }` (empty DB → 0).
+  - PUT `/pricing/flights/:flightInstanceId/proposal` — COMMERCIAL_MANAGER / EMPLOYEE+`pr_propose` — `{ proposedPriceIrr, legalRateIrr?, note? }` (IRR decimal strings). Atomic with `definitionStatus→PENDING_CEO`. `competitorPriceIrr` is taken from the flight definition when set; **never** fabricated (+3% removed). Nullable competitor → UI «—». 409 once REGISTERED.
   - PATCH `/pricing/proposals/:id/legal-rate` — CEO — «ثبت نرخ قانونی»; audited.
-  - PATCH `/pricing/proposals/:id/register` — CEO — `{ source: 'PROPOSED' | 'AI' }`; AI source requires a persisted suggestion; PENDING→REGISTERED, locked, audited; 409 on re-register.
+  - PATCH `/pricing/proposals/:id/register` — CEO + step-up; atomic with definition promote; idempotent if already REGISTERED.
+  - PATCH `/pricing/proposals/:id/reject` — CEO + step-up + rejectionReason; atomic; live APPROVED inventory kept under PENDING_REVISION.
+  - Sellability: search/seat-map/booking/price-lock only APPROVED|PENDING_REVISION (not DRAFT/PENDING_CEO/REJECTED).
   - POST `/pricing/proposals/ai-analysis` — CEO — «تحلیل و پیشنهاد قیمت هوش مصنوعی» for all PENDING proposals via the NestJS→ml-service client (2s timeout, graceful fallback, usage logged); persists suggestions with modelVersion. Advisory only.
   - ml-service: `POST /internal/v1/price-suggestion` (internal token; pydantic; versioned heuristic model; pytest) + `GET /health`.
 - **Phase 7 — Refunds** (`backend/src/modules/refunds/`; FINANCE_MANAGER only — the executives' panels have no live refund surface, confirmed):

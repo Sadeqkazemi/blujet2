@@ -73,7 +73,8 @@ describe('Flights (e2e)', () => {
   }
 
   function definitionBase(over: Record<string, unknown> = {}) {
-    const capacity = 160;
+    // Airbus A320 physical map: 16 business + 20 comfort + 110 economy.
+    const capacity = 146;
     return {
       originCode: 'THR',
       destCode: 'MHD',
@@ -82,9 +83,9 @@ describe('Flights (e2e)', () => {
       durationMinutes: 90,
       capacity,
       cabinCapacities: [
-        { cabin: 'ECONOMY', seats: 120 },
+        { cabin: 'ECONOMY', seats: 110 },
         { cabin: 'COMFORT', seats: 20 },
-        { cabin: 'BUSINESS', seats: 20 },
+        { cabin: 'BUSINESS', seats: 16 },
       ],
       basePriceIrr: 25_000_000,
       ...over,
@@ -319,9 +320,9 @@ describe('Flights (e2e)', () => {
           flightNo: base.flightNo,
           destCode: 'DXB',
           cabinCapacities: [
-            { cabin: 'ECONOMY', seats: 120 },
+            { cabin: 'ECONOMY', seats: 110 },
             { cabin: 'COMFORT', seats: 20 },
-            { cabin: 'BUSINESS', seats: 20 },
+            { cabin: 'BUSINESS', seats: 16 },
           ],
         }),
       });
@@ -333,11 +334,11 @@ describe('Flights (e2e)', () => {
       .send(
         definitionBase({
           flightNo: uniqueFlightNo(),
-          capacity: 180,
+          capacity: 146,
           cabinCapacities: [
-            { cabin: 'ECONOMY', seats: 140 },
+            { cabin: 'ECONOMY', seats: 110 },
             { cabin: 'COMFORT', seats: 20 },
-            { cabin: 'BUSINESS', seats: 20 },
+            { cabin: 'BUSINESS', seats: 16 },
           ],
           charterSeats: 40,
           aircraftType: 'Airbus A320',
@@ -359,13 +360,13 @@ describe('Flights (e2e)', () => {
       .send(
         definitionBase({
           flightNo: uniqueFlightNo(),
-          capacity: 100,
+          capacity: 146,
           cabinCapacities: [
-            { cabin: 'ECONOMY', seats: 60 },
+            { cabin: 'ECONOMY', seats: 110 },
             { cabin: 'COMFORT', seats: 20 },
-            { cabin: 'BUSINESS', seats: 20 },
+            { cabin: 'BUSINESS', seats: 16 },
           ],
-          charterSeats: 100,
+          charterSeats: 146, // must be strictly less than capacity
         }),
       );
     expect(badCharter.status).toBe(400);
@@ -420,7 +421,7 @@ describe('Flights (e2e)', () => {
   it('plan: agency-seat cap enforced; commercial save upserts a PENDING Phase 6 proposal; REGISTERED price → 409', async () => {
     const instance = await createInstance({
       departureAt: new Date(Date.now() + 20 * 24 * 3_600_000),
-      capacity: 180,
+      capacity: 146,
       charterSeats: 60,
     });
     const commercial = await loginAs(app, 'comm');
@@ -428,7 +429,7 @@ describe('Flights (e2e)', () => {
     const overCap = await request(app.getHttpServer())
       .patch(`/flights/${instance.id}/plan`)
       .set('Authorization', `Bearer ${commercial.accessToken}`)
-      .send({ priceIrr: 39_000_000, agencySeats: 121 }); // max = 180 − 60
+      .send({ priceIrr: 39_000_000, agencySeats: 87 }); // max = 146 − 60
     expect(overCap.status).toBe(400);
 
     const ok = await request(app.getHttpServer())
@@ -438,7 +439,8 @@ describe('Flights (e2e)', () => {
     expect(ok.status).toBe(200);
     expect(ok.body.data.basePriceIrr).toBe('39000000');
     expect(ok.body.data.agencySeatsAllocated).toBe(60);
-    expect(ok.body.data.directSeats).toBe(60);
+    // direct = capacity − charter − agency = 146 − 60 − 60
+    expect(ok.body.data.directSeats).toBe(26);
     expect(ok.body.data.proposalPending).toBe(true);
 
     // ⚑ The plan never registers a bookable price — the proposal stays PENDING.

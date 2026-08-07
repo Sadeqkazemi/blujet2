@@ -10,7 +10,8 @@ import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter
 import { Booking } from '../src/database/entities/booking.entity';
 import { FlightChargeRule } from '../src/database/entities/flight-charge-rule.entity';
 import { FlightInstance } from '../src/database/entities/flight-instance.entity';
-import { loginAs, stepUpFor } from './helpers/login.helper';
+import { RedisService } from '../src/redis/redis.service';
+import { loginAs, loginAsCustomer, stepUpFor } from './helpers/login.helper';
 
 describe('Flight definition + charge rules + CEO approval (e2e)', () => {
   let app: INestApplication<App>;
@@ -53,11 +54,11 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
       flightNo: uniqueFlightNo(),
       departureAt: new Date(Date.now() + 10 * 24 * 3_600_000).toISOString(),
       durationMinutes: 95,
-      capacity: 180,
+      capacity: 146,
       cabinCapacities: [
-        { cabin: 'ECONOMY', seats: 140 },
+        { cabin: 'ECONOMY', seats: 110 },
         { cabin: 'COMFORT', seats: 20 },
-        { cabin: 'BUSINESS', seats: 20 },
+        { cabin: 'BUSINESS', seats: 16 },
       ],
       basePriceIrr: '38000000',
       chargeRules: [
@@ -99,9 +100,9 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
     expect(create.body.success).toBe(true);
     expect(create.body.data.cabinCapacities).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ cabin: 'ECONOMY', seats: 140 }),
+        expect.objectContaining({ cabin: 'ECONOMY', seats: 110 }),
         expect.objectContaining({ cabin: 'COMFORT', seats: 20 }),
-        expect.objectContaining({ cabin: 'BUSINESS', seats: 20 }),
+        expect.objectContaining({ cabin: 'BUSINESS', seats: 16 }),
       ]),
     );
     expect(create.body.data.durationMinutes).toBe(95);
@@ -140,11 +141,11 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
       .set('Authorization', `Bearer ${accessToken}`)
       .send(
         payload({
-          capacity: 180,
+          capacity: 146,
           cabinCapacities: [
             { cabin: 'ECONOMY', seats: 100 },
             { cabin: 'COMFORT', seats: 20 },
-            { cabin: 'BUSINESS', seats: 20 },
+            { cabin: 'BUSINESS', seats: 16 },
           ],
         }),
       );
@@ -173,7 +174,7 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
     expect(proposal.status).toBe(200);
 
     const { accessToken: ceo } = await loginAs(app, 'ceo');
-    const stepUp = await stepUpFor(app, ceo, 'ceo', 'PRICE_CAPACITY_CHANGE');
+    const stepUp = await stepUpFor(app, ceo!, 'ceo', 'PRICE_CAPACITY_CHANGE');
     const reg = await request(app.getHttpServer())
       .patch(`/pricing/proposals/${proposal.body.data.id}/register`)
       .set('Authorization', `Bearer ${ceo}`)
@@ -185,6 +186,7 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
       .get(`/flights/${id}/definition`)
       .set('Authorization', `Bearer ${comm}`);
     expect(defAfter.body.data.approvalStatus).toBe('APPROVED');
+    expect(defAfter.body.data.approvedSnapshot?.charterSeats).toBe(0);
 
     const revised = await request(app.getHttpServer())
       .put(`/flights/${id}/definition`)
@@ -277,7 +279,7 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
       .put(`/pricing/flights/${created2.body.data.id}/proposal`)
       .set('Authorization', `Bearer ${comm}`)
       .send({ proposedPriceIrr: '39100000' });
-    const stepUp = await stepUpFor(app, ceo, 'ceo', 'PRICE_CAPACITY_CHANGE');
+    const stepUp = await stepUpFor(app, ceo!, 'ceo', 'PRICE_CAPACITY_CHANGE');
     const rejected = await request(app.getHttpServer())
       .patch(`/pricing/proposals/${p2.body.data.id}/reject`)
       .set('Authorization', `Bearer ${ceo}`)
@@ -293,7 +295,7 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
       .getOneOrFail();
     // Rejected first-cycle definition becomes REJECTED; capacity unchanged.
     expect(live.definitionStatus).toBe('REJECTED');
-    expect(live.capacity).toBe(180);
+    expect(live.capacity).toBe(146);
 
     // Register path + idempotency
     const created3 = await request(app.getHttpServer())
@@ -304,13 +306,13 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
       .put(`/pricing/flights/${created3.body.data.id}/proposal`)
       .set('Authorization', `Bearer ${comm}`)
       .send({ proposedPriceIrr: '39200000' });
-    const su1 = await stepUpFor(app, ceo, 'ceo', 'PRICE_CAPACITY_CHANGE');
+    const su1 = await stepUpFor(app, ceo!, 'ceo', 'PRICE_CAPACITY_CHANGE');
     const r1 = await request(app.getHttpServer())
       .patch(`/pricing/proposals/${p3.body.data.id}/register`)
       .set('Authorization', `Bearer ${ceo}`)
       .send({ source: 'PROPOSED', ...su1 });
     expect(r1.status).toBe(200);
-    const su2 = await stepUpFor(app, ceo, 'ceo', 'PRICE_CAPACITY_CHANGE');
+    const su2 = await stepUpFor(app, ceo!, 'ceo', 'PRICE_CAPACITY_CHANGE');
     const r2 = await request(app.getHttpServer())
       .patch(`/pricing/proposals/${p3.body.data.id}/register`)
       .set('Authorization', `Bearer ${ceo}`)
@@ -340,5 +342,107 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
       where: { flightInstanceId: created.body.data.id },
     });
     expect(bookings).toBe(0);
+  });
+
+  it('DRAFT is hidden from search; APPROVED COMFORT seat is bookable end-to-end', async () => {
+    const { accessToken: comm } = await loginAs(app, 'comm');
+    const body = payload({ flightNo: uniqueFlightNo() });
+    const created = await request(app.getHttpServer())
+      .post('/flights')
+      .set('Authorization', `Bearer ${comm}`)
+      .send(body);
+    expect(created.status).toBe(201);
+    const id = created.body.data.id as string;
+    const date = String(body.departureAt).slice(0, 10);
+
+    const draftSearch = await request(app.getHttpServer())
+      .get('/search/flights')
+      .query({ origin: 'THR', dest: 'MHD', date });
+    expect(draftSearch.status).toBe(200);
+    expect(
+      (draftSearch.body.data as { flightInstanceId: string }[]).some(
+        (r) => r.flightInstanceId === id,
+      ),
+    ).toBe(false);
+
+    const draftSeatmap = await request(app.getHttpServer()).get(
+      `/search/flights/${id}/seatmap`,
+    );
+    expect(draftSeatmap.status).toBe(404);
+
+    const proposal = await request(app.getHttpServer())
+      .put(`/pricing/flights/${id}/proposal`)
+      .set('Authorization', `Bearer ${comm}`)
+      .send({ proposedPriceIrr: '39000000' });
+    expect(proposal.status).toBe(200);
+
+    const { accessToken: ceo } = await loginAs(app, 'ceo');
+    const stepUp = await stepUpFor(app, ceo!, 'ceo', 'PRICE_CAPACITY_CHANGE');
+    const reg = await request(app.getHttpServer())
+      .patch(`/pricing/proposals/${proposal.body.data.id}/register`)
+      .set('Authorization', `Bearer ${ceo}`)
+      .send({ source: 'PROPOSED', ...stepUp });
+    expect(reg.status).toBe(200);
+
+    // Bust any stale route+date cache from the DRAFT search above.
+    await app.get(RedisService).del(`search:flights:THR:MHD:${date}`);
+
+    const search = await request(app.getHttpServer())
+      .get('/search/flights')
+      .query({ origin: 'THR', dest: 'MHD', date });
+    expect(search.status).toBe(200);
+    const row = (
+      search.body.data as {
+        flightInstanceId: string;
+        cabins: { cabin: string; seatsLeft: number }[];
+      }[]
+    ).find((r) => r.flightInstanceId === id);
+    expect(row).toBeDefined();
+    const comfort = row!.cabins.find((c) => c.cabin === 'COMFORT');
+    expect(comfort).toBeDefined();
+    expect(comfort!.seatsLeft).toBeGreaterThan(0);
+
+    const seatmap = await request(app.getHttpServer()).get(
+      `/search/flights/${id}/seatmap`,
+    );
+    expect(seatmap.status).toBe(200);
+    const comfortSeat = (
+      seatmap.body.data.seats as { seatCode: string; cabin: string }[]
+    ).find((s) => s.cabin === 'COMFORT');
+    expect(comfortSeat?.seatCode).toMatch(
+      /^7[A-F]$|^8[A-F]$|^9[A-F]$|^10[A-F]$/,
+    );
+
+    const { accessToken: customer } = await loginAsCustomer(app, '09138880001');
+    const book = await request(app.getHttpServer())
+      .post('/bookings')
+      .set('Authorization', `Bearer ${customer}`)
+      .send({
+        flightInstanceId: id,
+        cabin: 'COMFORT',
+        passengers: [
+          {
+            fullName: 'مسافر کامفورت',
+            nationalId: '0012345679',
+            seatCode: comfortSeat!.seatCode,
+          },
+        ],
+      });
+    expect(book.status).toBe(201);
+    expect(book.body.data.status).toBe('HELD');
+    expect(book.body.data.cabin).toBe('COMFORT');
+    expect(typeof book.body.data.priceIrr).toBe('string');
+    expect(typeof book.body.data.taxIrr).toBe('string');
+  });
+
+  it('rejects flight numbers with leading/trailing spaces', async () => {
+    const { accessToken } = await loginAs(app, 'comm');
+    for (const flightNo of [' XY1234', 'XY1234 ', ' XY1234 ']) {
+      const res = await request(app.getHttpServer())
+        .post('/flights')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send(payload({ flightNo }));
+      expect(res.status).toBe(400);
+    }
   });
 });
