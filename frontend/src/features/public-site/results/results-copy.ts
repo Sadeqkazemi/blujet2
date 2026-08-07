@@ -59,6 +59,7 @@ export type ResultsCopy = {
   baggageLabel: string;
   cabinLabel: string;
   economyLabel: string;
+  comfortLabel: string;
   priceDetailsLabel: string;
   adultPaxLabel: string;
   basePriceLabel: string;
@@ -159,6 +160,7 @@ export const RESULTS_COPY: Record<StoredLocale, ResultsCopy> = {
     baggageLabel: 'مجاز بار',
     cabinLabel: 'کلاس پروازی',
     economyLabel: 'اکونومی',
+    comfortLabel: 'کامفورت',
     priceDetailsLabel: 'جزئیات قیمت',
     adultPaxLabel: 'مسافر بزرگسال (۱)',
     basePriceLabel: 'قیمت پایه',
@@ -257,6 +259,7 @@ export const RESULTS_COPY: Record<StoredLocale, ResultsCopy> = {
     baggageLabel: 'Baggage allowance',
     cabinLabel: 'Cabin',
     economyLabel: 'Economy',
+    comfortLabel: 'Comfort',
     priceDetailsLabel: 'Price details',
     adultPaxLabel: 'Adult passenger (1)',
     basePriceLabel: 'Base price',
@@ -355,6 +358,7 @@ export const RESULTS_COPY: Record<StoredLocale, ResultsCopy> = {
     baggageLabel: 'حد الأمتعة',
     cabinLabel: 'الدرجة',
     economyLabel: 'اقتصادية',
+    comfortLabel: 'كومفورت',
     priceDetailsLabel: 'تفاصيل السعر',
     adultPaxLabel: 'مسافر بالغ (١)',
     basePriceLabel: 'السعر الأساسي',

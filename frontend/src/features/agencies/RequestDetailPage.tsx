@@ -1,12 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import {
-  fetchAgencyRequest,
-  approveAgencyRequest,
-  rejectAgencyRequest,
-  referAgencyRequest,
-} from '../../api/agencies';
+import { fetchAgencyRequest, approveAgencyRequest, rejectAgencyRequest, referAgencyRequest } from '../../api/agencies';
 import { fetchStaffDirectory } from '../../api/cartable';
 import { formatJalaliDate } from '../../lib/jalali';
 import type { AgencyMembershipRequest } from '../../types/agencies';
@@ -25,11 +20,10 @@ export default function RequestDetailPage() {
   const { user } = useAuth();
   // The refer block appears in Senior/Commercial + Site Admin (design).
   const canRefer =
-    user?.role === 'SENIOR_MANAGER' ||
-    user?.role === 'COMMERCIAL_MANAGER' ||
-    user?.role === 'SITE_ADMIN';
-  // Final approval creates the User+AgencyProfile — COMMERCIAL_MANAGER only.
-  const canApprove = user?.role === 'COMMERCIAL_MANAGER';
+    user?.role === 'SENIOR_MANAGER' || user?.role === 'COMMERCIAL_MANAGER' || user?.role === 'SITE_ADMIN';
+  // Commercial routes the request; finance performs the final account creation.
+  const canApproveCommercial = user?.role === 'COMMERCIAL_MANAGER';
+  const canApproveFinance = user?.role === 'FINANCE_MANAGER';
 
   const [request, setRequest] = useState<AgencyMembershipRequest | null>(null);
   const [loading, setLoading] = useState(true);
@@ -82,8 +76,14 @@ export default function RequestDetailPage() {
     setBusy(true);
     setError(null);
     try {
-      const { agencyId } = await approveAgencyRequest(requestId);
-      navigate(`/panel/agencies/${agencyId}`, { replace: true });
+      const result = await approveAgencyRequest(requestId);
+      if (result.stage === 'AWAITING_FINANCE') {
+        setNotice('تأیید بازرگانی ثبت شد؛ درخواست اکنون منتظر تأیید مدیر مالی است.');
+        await load();
+        setBusy(false);
+        return;
+      }
+      navigate(`/panel/agencies/${result.agencyId}`, { replace: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'خطا در تأیید درخواست.');
       setBusy(false);
@@ -114,6 +114,9 @@ export default function RequestDetailPage() {
     );
 
   const decidable = request.status === 'PENDING' || request.status === 'REFERRED';
+  const canApprove =
+    (canApproveCommercial && request.approvalStage === 'AWAITING_COMMERCIAL') ||
+    (canApproveFinance && request.approvalStage === 'AWAITING_FINANCE');
 
   return (
     <div className="space-y-4 p-8">
@@ -132,7 +135,9 @@ export default function RequestDetailPage() {
             <h1 className="text-lg font-black">{request.applicantName}</h1>
             <p className="mt-1 text-xs text-white/70">درخواست عضویت به‌عنوان آژانس همکار</p>
           </div>
-          <span className="rounded-full bg-white/15 px-3 py-1 text-[11px] font-bold">{STATUS_LABELS[request.status]}</span>
+          <span className="rounded-full bg-white/15 px-3 py-1 text-[11px] font-bold">
+            {STATUS_LABELS[request.status]}
+          </span>
         </div>
       </header>
 
@@ -178,14 +183,33 @@ export default function RequestDetailPage() {
         )}
       </section>
 
+      <section className="grid gap-3 md:grid-cols-2">
+        <div className="rounded-xl border border-panel-border bg-panel-surface p-4 text-xs">
+          <p className="font-bold text-panel-ink">تأیید مدیر بازرگانی</p>
+          <p className="mt-2 text-panel-muted">
+            {request.commercialApprovedAt
+              ? `ثبت‌شده در ${formatJalaliDate(request.commercialApprovedAt)}`
+              : 'در انتظار بررسی'}
+          </p>
+        </div>
+        <div className="rounded-xl border border-panel-border bg-panel-surface p-4 text-xs">
+          <p className="font-bold text-panel-ink">تأیید مدیر مالی</p>
+          <p className="mt-2 text-panel-muted">
+            {request.financeApprovedAt
+              ? `ثبت‌شده در ${formatJalaliDate(request.financeApprovedAt)}`
+              : request.commercialApprovedAt
+                ? 'در انتظار بررسی'
+                : 'پس از تأیید بازرگانی فعال می‌شود'}
+          </p>
+        </div>
+      </section>
+
       {notice && <p className="rounded-lg bg-[#34d39915] p-3 text-sm text-[#34d399]">{notice}</p>}
 
       {decidable && canRefer && (
         <section className="rounded-xl border border-panel-border bg-panel-surface p-5">
           <h2 className="text-sm font-bold text-panel-ink">ارجاع درخواست</h2>
-          <p className="mt-1 text-[11px] text-panel-muted">
-            می‌توانید بررسی این درخواست را به مدیران دیگر ارجاع دهید.
-          </p>
+          <p className="mt-1 text-[11px] text-panel-muted">می‌توانید بررسی این درخواست را به مدیران دیگر ارجاع دهید.</p>
           <div className="mt-3 grid gap-3 md:grid-cols-2">
             <div>
               <label className="mb-1 block text-xs font-bold text-panel-ink" htmlFor="refer-to">
@@ -245,7 +269,7 @@ export default function RequestDetailPage() {
                 onClick={() => void onApprove()}
                 className="rounded-lg bg-[#34d399] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#2bb583] disabled:opacity-60"
               >
-                تأیید و ایجاد پروفایل
+                {canApproveFinance ? 'تأیید مالی و ایجاد پروفایل آژانس' : 'تأیید بازرگانی و ارسال به مالی'}
               </button>
             )}
           </div>

@@ -116,6 +116,11 @@ export class AgencyPortalService {
     }
   }
 
+  async assertAgencyWritable(actor: AuthenticatedUser): Promise<void> {
+    await this.assertAgencyPortalWritable(actor);
+    await this.getOwnProfileOrThrow(actor);
+  }
+
   // ── Dashboard ──────────────────────────────────────────────────────
 
   async dashboard(actor: AuthenticatedUser) {
@@ -538,18 +543,17 @@ export class AgencyPortalService {
     const now = new Date();
     return Promise.all(
       rows.map(async (r) => {
-        // No allotmentId FK on Booking (see docs/DB_SCHEMA.md Phase 16 ⚑ —
-        // "book against own allotment" isn't built yet) — consumed is
-        // derived from this agency's real bookings on the same flight.
-        const usedSeats = await this.bookingRepo.count({
-          where: {
-            agencyId: id,
-            flightInstanceId: r.flightInstanceId,
-            status: In([...SOLD_STATUSES]),
-          },
-        });
+        const usedSeats = await this.passengerRepo
+          .createQueryBuilder('passenger')
+          .innerJoin('passenger.booking', 'booking')
+          .where('booking.allotmentId = :allotmentId', { allotmentId: r.id })
+          .andWhere('booking.status IN (:...statuses)', {
+            statuses: [...SOLD_STATUSES],
+          })
+          .getCount();
         return {
           id: r.id,
+          flightInstanceId: r.flightInstanceId,
           flightNo: r.flightInstance.flight.flightNo,
           route: `${r.flightInstance.flight.route.originCode} → ${r.flightInstance.flight.route.destCode}`,
           departureAt: r.flightInstance.departureAt,

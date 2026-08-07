@@ -1,5 +1,6 @@
 export type AgencyTier = 'NORMAL' | 'SILVER' | 'GOLD';
 export type AgencyMembershipStatus = 'PENDING' | 'REFERRED' | 'APPROVED' | 'REJECTED';
+export type AgencyMembershipApprovalStage = 'AWAITING_COMMERCIAL' | 'AWAITING_FINANCE' | 'APPROVED' | 'REJECTED';
 export type AgencyApiScope = 'FULL' | 'SEARCH_BOOK' | 'SEARCH_ONLY';
 export type AgencyApiKeyStatus = 'ACTIVE' | 'SUSPENDED';
 export type AgencyInvoiceStatus = 'UNPAID' | 'PAID' | 'OVERDUE';
@@ -112,8 +113,13 @@ export interface AgencyMembershipRequest {
   phone: string;
   email: string;
   status: AgencyMembershipStatus;
+  approvalStage: AgencyMembershipApprovalStage;
   referredToId: string | null;
   reviewNote: string | null;
+  commercialApprovedById: string | null;
+  commercialApprovedAt: string | null;
+  financeApprovedById: string | null;
+  financeApprovedAt: string | null;
   reviewedById: string | null;
   reviewedAt: string | null;
   createdAt: string;

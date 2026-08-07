@@ -128,9 +128,67 @@ export function isValidIranMobile(phone: string): boolean {
  * Parses a تومان amount typed by the user (Persian or Latin digits, optional
  * ٬/, separators) into integer IRR. The rial↔toman conversion lives ONLY in
  * this module. Returns null for non-numeric input.
+ *
+ * @deprecated Prefer `parseTomanToRialString` for API payloads — JS `number`
+ * cannot safely hold IRR above 2^53. Kept for display-adjacent call sites
+ * that still expect a number.
  */
 export function parseTomanToRial(input: string): number | null {
+  const asString = parseTomanToRialString(input);
+  if (asString === null) return null;
+  const n = Number(asString);
+  return Number.isSafeInteger(n) ? n : null;
+}
+
+/**
+ * Parses تومان user input into an IRR decimal string (toman × 10) without
+ * `Number`/`float`. Returns null for empty or non-digit input.
+ */
+export function parseTomanToRialString(input: string): string | null {
   const cleaned = latinDigits(input).replace(/[٬,\s]/g, '');
-  if (!/^\d+$/.test(cleaned)) return null;
-  return Number(cleaned) * 10;
+  if (!cleaned || !/^\d+$/.test(cleaned)) return null;
+  return (BigInt(cleaned) * 10n).toString();
+}
+
+/**
+ * Prefill helper: IRR decimal string → integer تومان digits (no separators).
+ * Uses BigInt integer division by 10n — never `Number(x) / 10`.
+ */
+export function irrToTomanInput(irr: string | null | undefined): string {
+  if (irr == null || irr === '') return '';
+  const cleaned = latinDigits(String(irr)).replace(/[٬,\s]/g, '');
+  if (!cleaned || !/^-?\d+$/.test(cleaned)) return '';
+  try {
+    return (BigInt(cleaned) / 10n).toString();
+  } catch {
+    return '';
+  }
+}
+
+/** Compare two IRR decimal strings as BigInt. Returns -1 / 0 / 1. */
+export function compareIrrStrings(a: string, b: string): number {
+  const left = BigInt(a);
+  const right = BigInt(b);
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
+}
+
+/**
+ * Percent delta of `proposed` vs `competitor` using BigInt math.
+ * Returns null when competitor is zero / unparsable.
+ */
+export function irrPercentDelta(
+  proposed: string | number,
+  competitor: string | number,
+): number | null {
+  try {
+    const p = BigInt(String(proposed));
+    const c = BigInt(String(competitor));
+    if (c === 0n) return null;
+    // Hundredths of a percent: ((p-c)*10000)/c, then ÷100 for display percent.
+    return Number(((p - c) * 10000n) / c) / 100;
+  } catch {
+    return null;
+  }
 }

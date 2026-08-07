@@ -1,18 +1,19 @@
 export interface SeatCell {
   seatCode: string;
   row: number;
-  cabin: 'BUSINESS' | 'ECONOMY';
+  cabin: 'BUSINESS' | 'COMFORT' | 'ECONOMY';
 }
 
-/** Structural shape shared by the Prisma-generated `AircraftSeatMap` (still
- * used by unconverted callers) and the TypeORM entity (which correctly
- * models these `text[]` columns as nullable) — accepting either lets this
- * util stay ORM-agnostic during the migration. */
+/** Structural shape shared by seat-map rows — ORM-agnostic. */
 export interface AircraftSeatMapLike {
   businessRowStart: number;
   businessRowEnd: number;
   businessColsLeft: string[] | null;
   businessColsRight: string[] | null;
+  comfortRowStart?: number | null;
+  comfortRowEnd?: number | null;
+  comfortColsLeft?: string[] | null;
+  comfortColsRight?: string[] | null;
   economyRowStart: number;
   economyRowEnd: number;
   economyColsLeft: string[] | null;
@@ -20,33 +21,77 @@ export interface AircraftSeatMapLike {
   excludedSeatCodes?: string[] | null;
 }
 
-/** Enumerates every seat code from a data-driven AircraftSeatMap config —
- * CLAUDE.md: "seat map config lives per aircraft type in the DB, not
- * hardcoded." Never a fixed row/column literal in application code. */
+function pushCabinRows(
+  seats: SeatCell[],
+  excluded: Set<string>,
+  rowStart: number | null | undefined,
+  rowEnd: number | null | undefined,
+  colsLeft: string[] | null | undefined,
+  colsRight: string[] | null | undefined,
+  cabin: SeatCell['cabin'],
+) {
+  if (
+    rowStart == null ||
+    rowEnd == null ||
+    !Number.isFinite(rowStart) ||
+    !Number.isFinite(rowEnd) ||
+    rowEnd < rowStart
+  ) {
+    return;
+  }
+  const cols = [...(colsLeft ?? []), ...(colsRight ?? [])];
+  if (cols.length === 0) return;
+  for (let row = rowStart; row <= rowEnd; row++) {
+    for (const col of cols) {
+      const seatCode = `${row}${col}`;
+      if (excluded.has(seatCode)) continue;
+      seats.push({ seatCode, row, cabin });
+    }
+  }
+}
+
+/** Enumerates every seat code from a data-driven AircraftSeatMap config. */
 export function enumerateSeats(map: AircraftSeatMapLike): SeatCell[] {
   const excluded = new Set(map.excludedSeatCodes ?? []);
   const seats: SeatCell[] = [];
-  for (let row = map.businessRowStart; row <= map.businessRowEnd; row++) {
-    for (const col of [
-      ...(map.businessColsLeft ?? []),
-      ...(map.businessColsRight ?? []),
-    ]) {
-      const seatCode = `${row}${col}`;
-      if (excluded.has(seatCode)) continue;
-      seats.push({ seatCode, row, cabin: 'BUSINESS' });
-    }
-  }
-  for (let row = map.economyRowStart; row <= map.economyRowEnd; row++) {
-    for (const col of [
-      ...(map.economyColsLeft ?? []),
-      ...(map.economyColsRight ?? []),
-    ]) {
-      const seatCode = `${row}${col}`;
-      if (excluded.has(seatCode)) continue;
-      seats.push({ seatCode, row, cabin: 'ECONOMY' });
-    }
-  }
+  pushCabinRows(
+    seats,
+    excluded,
+    map.businessRowStart,
+    map.businessRowEnd,
+    map.businessColsLeft,
+    map.businessColsRight,
+    'BUSINESS',
+  );
+  pushCabinRows(
+    seats,
+    excluded,
+    map.comfortRowStart,
+    map.comfortRowEnd,
+    map.comfortColsLeft,
+    map.comfortColsRight,
+    'COMFORT',
+  );
+  pushCabinRows(
+    seats,
+    excluded,
+    map.economyRowStart,
+    map.economyRowEnd,
+    map.economyColsLeft,
+    map.economyColsRight,
+    'ECONOMY',
+  );
   return seats;
+}
+
+export function countSeatsByCabin(
+  map: AircraftSeatMapLike,
+): Record<'BUSINESS' | 'COMFORT' | 'ECONOMY', number> {
+  const out = { BUSINESS: 0, COMFORT: 0, ECONOMY: 0 };
+  for (const seat of enumerateSeats(map)) {
+    out[seat.cabin] += 1;
+  }
+  return out;
 }
 
 export function isKnownSeat(

@@ -17,6 +17,8 @@ const LIST: CustomersListResult = {
       email: 'negar@email.com',
       nationalId: '0012345678',
       profileIncomplete: false,
+      completionPct: 100,
+      missingProfileFields: [],
       createdAt: '2025-05-31T00:00:00.000Z',
       club: { isMember: true, level: 'GOLD', points: 12450 },
     },
@@ -27,6 +29,8 @@ const LIST: CustomersListResult = {
       email: null,
       nationalId: null,
       profileIncomplete: true,
+      completionPct: 0,
+      missingProfileFields: ['fullName', 'nationalId', 'birthDate', 'passportNo', 'verifiedEmail'],
       createdAt: '2026-01-01T00:00:00.000Z',
       club: { isMember: false, level: null, points: 0 },
     },
@@ -40,6 +44,8 @@ const DETAIL: CustomerDetail = {
   email: 'negar@email.com',
   nationalId: '0012345678',
   profileIncomplete: false,
+  completionPct: 100,
+  missingProfileFields: [],
   registeredAt: '2025-05-31T00:00:00.000Z',
   club: {
     isMember: true,
@@ -48,9 +54,7 @@ const DETAIL: CustomerDetail = {
     cardStatus: 'ISSUED',
     cardNo: 'GOLD-8842',
   },
-  docs: [
-    { type: 'کارت ملی', file: 'national-id-negar.jpg', status: 'verified' },
-  ],
+  docs: [{ type: 'کارت ملی', file: 'national-id-negar.jpg', status: 'verified' }],
   purchases: [
     {
       id: 'b1',

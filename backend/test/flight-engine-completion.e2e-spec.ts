@@ -286,7 +286,7 @@ describe('Flight engine completion', () => {
       .send({
         flightInstanceId: instance.id,
         cabin: 'ECONOMY',
-        passengers: [{ fullName: 'مسافر کلاس نرخی', seatCode: '10A' }],
+        passengers: [{ fullName: 'مسافر کلاس نرخی', seatCode: '11A' }],
       })
       .expect(201);
     expect(booking.body.data.priceIrr).toBe('30000000');

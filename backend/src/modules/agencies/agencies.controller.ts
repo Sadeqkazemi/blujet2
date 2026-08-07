@@ -93,10 +93,10 @@ export class AgenciesController {
   }
 
   @Patch('requests/:id/approve')
-  @Roles('COMMERCIAL_MANAGER')
+  @Roles('COMMERCIAL_MANAGER', 'FINANCE_MANAGER')
   @ApiOperation({
     summary:
-      'تأیید نهایی درخواست — فقط مدیر بازرگانی؛ ایجاد User+AgencyProfile تراکنشی + پیامک تأیید',
+      'تأیید دومرحله‌ای درخواست: مدیر بازرگانی سپس مدیر مالی؛ ایجاد حساب فقط در مرحله مالی',
   })
   async approveRequest(
     @CurrentUser() actor: AuthenticatedUser,

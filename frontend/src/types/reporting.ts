@@ -164,7 +164,7 @@ export interface PassengerReportHit {
   destCode: string;
   departureAt: string;
   seatCode: string | null;
-  cabin: 'BUSINESS' | 'ECONOMY' | null;
+  cabin: 'BUSINESS' | 'COMFORT' | 'ECONOMY' | null;
   priceIrr: string;
 }
 

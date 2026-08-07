@@ -1,4 +1,5 @@
 export type CustomerClubLevel = 'SILVER' | 'GOLD' | 'PLATINUM';
+export type ProfileCompletionField = 'fullName' | 'nationalId' | 'birthDate' | 'passportNo' | 'verifiedEmail';
 
 export interface CustomerListItem {
   id: string;
@@ -7,6 +8,8 @@ export interface CustomerListItem {
   email: string | null;
   nationalId: string | null;
   profileIncomplete: boolean;
+  completionPct: number;
+  missingProfileFields: ProfileCompletionField[];
   createdAt: string;
   club: {
     isMember: boolean;
@@ -66,6 +69,8 @@ export interface CustomerDetail {
   email: string | null;
   nationalId: string | null;
   profileIncomplete: boolean;
+  completionPct: number;
+  missingProfileFields: ProfileCompletionField[];
   registeredAt: string;
   club: {
     isMember: boolean;

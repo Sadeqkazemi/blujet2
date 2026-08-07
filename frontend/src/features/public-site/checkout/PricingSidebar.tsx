@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom';
 import type { StoredLocale } from '../../../hooks/useLocale';
-import { faDigits, formatToman, localeMoney } from '../../../lib/fa-format';
+import { faDigits, localeMoney } from '../../../lib/fa-format';
 import { CHECKOUT_COPY } from './checkout-copy';
-import type { ExtraServiceState } from './checkout-types';
+import { extraTitle, extraTotalIrr, type ExtraServiceState } from './checkout-types';
 
 export default function PricingSidebar({
   locale,
@@ -31,11 +31,9 @@ export default function PricingSidebar({
   hideActions?: boolean;
 }) {
   const t = CHECKOUT_COPY[locale];
-  const taxesIrr = Math.round(Number(priceIrr) * 0.084);
-  const ticketIrr = Number(priceIrr) - taxesIrr;
-  const extrasToman = extras.filter((e) => e.selected).reduce((s, e) => s + e.priceToman, 0);
-  const extrasIrr = extrasToman * 10;
-  const grandIrr = Number(priceIrr) + extrasIrr;
+  const ticketIrr = BigInt(priceIrr || '0') * BigInt(Math.max(1, paxCount));
+  const extrasIrr = extras.filter((e) => e.selected).reduce((sum, extra) => sum + extraTotalIrr(extra, paxCount), 0n);
+  const grandIrr = ticketIrr + extrasIrr;
   return (
     <aside
       className="flex flex-col rounded-[18px] border border-[#eef1f5] bg-white p-[22px] lg:sticky lg:top-[90px]"
@@ -54,11 +52,7 @@ export default function PricingSidebar({
               ? t.ticketPrice(paxCount)
               : t.ticketPrice(paxCount).replace(String(paxCount), faDigits(paxCount))}
           </span>
-          <span className="font-bold text-[#16202e]">{localeMoney(ticketIrr, locale)}</span>
-        </div>
-        <div className="grid grid-cols-[1fr_auto] items-center gap-2 border-t border-[#eef1f5] px-3.5 py-2.5 text-[13px] text-[#5a6678]">
-          <span>{t.taxesFees}</span>
-          <span className="font-bold text-[#16202e]">{localeMoney(taxesIrr, locale)}</span>
+          <span className="font-bold text-[#16202e]">{localeMoney(ticketIrr.toString(), locale)}</span>
         </div>
         {extras
           .filter((e) => e.selected)
@@ -67,22 +61,20 @@ export default function PricingSidebar({
               key={e.id}
               className="grid grid-cols-[1fr_auto] items-center gap-2 border-t border-[#eef1f5] px-3.5 py-2.5 text-[13px] text-[#5a6678]"
             >
-              <span className="truncate">{t.extras[e.id].title}</span>
-              <span className="font-bold text-[#16202e]">{formatToman(e.priceToman, locale)}</span>
+              <span className="truncate">{extraTitle(e, locale)}</span>
+              <span className="font-bold text-[#16202e]">
+                {localeMoney(extraTotalIrr(e, paxCount).toString(), locale)}
+              </span>
             </div>
           ))}
       </div>
 
       <div className="mb-3.5 flex items-center justify-between rounded-[13px] bg-[#eef4fb] px-4 py-3.5">
         <span className="text-[14.5px] font-extrabold text-[#0d2640]">{t.total}</span>
-        <span className="text-[19px] font-black text-[#1668c4]">
-          {localeMoney(grandIrr, locale)}
-        </span>
+        <span className="text-[19px] font-black text-[#1668c4]">{localeMoney(grandIrr.toString(), locale)}</span>
       </div>
 
-      <div className="mb-4 flex items-center gap-1.5 text-[11.5px] text-[#8a96a6]">
-        🔒 {t.securePayment}
-      </div>
+      <div className="mb-4 flex items-center gap-1.5 text-[11.5px] text-[#8a96a6]">🔒 {t.securePayment}</div>
 
       {!hideActions && (
         <>

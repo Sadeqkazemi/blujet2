@@ -16,6 +16,7 @@ import { CartableModule } from '../cartable/cartable.module';
 import { AgenciesModule } from '../agencies/agencies.module';
 import { FilesModule } from '../files/files.module';
 import { WebservicePricingModule } from '../webservice-pricing/webservice-pricing.module';
+import { BookingEngineModule } from '../booking-engine/booking-engine.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { WebservicePricingModule } from '../webservice-pricing/webservice-pricin
     AgenciesModule,
     FilesModule,
     WebservicePricingModule,
+    BookingEngineModule,
   ],
   controllers: [AgencyPortalController],
   providers: [AgencyPortalService],

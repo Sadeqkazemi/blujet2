@@ -82,6 +82,10 @@ describe('production backend artifacts', () => {
     expect(uatPurgeSource).toContain('Dry run only');
     expect(deployWorkflow).toContain('pg_dump -U blujet -d blujet');
     expect(deployWorkflow).toContain('.blujet-uat-demo-data-purge-v1-complete');
+    expect(deployWorkflow).toContain(
+      '.blujet-uat-flight-catalog-cleanup-v1-complete',
+    );
+    expect(deployWorkflow).toContain('CLEAR_BLUJET_UAT_FLIGHT_CATALOG');
     expect(deployWorkflow).toContain('redis-cli FLUSHDB');
   });
 });

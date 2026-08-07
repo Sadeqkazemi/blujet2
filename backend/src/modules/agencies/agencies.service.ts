@@ -74,6 +74,9 @@ const DECIDABLE_STATUSES: AgencyMembershipStatus[] = ['PENDING', 'REFERRED'];
 const REQUEST_OTP_TTL_MS = 2 * 60 * 1000;
 const REQUEST_OTP_MAX_ATTEMPTS = 5;
 
+type MembershipApprovalStage =
+  'AWAITING_COMMERCIAL' | 'AWAITING_FINANCE' | 'APPROVED' | 'REJECTED';
+
 @Injectable()
 export class AgenciesService {
   constructor(
@@ -771,11 +774,28 @@ export class AgenciesService {
 
   // ── Membership requests ──────────────────────────────────────────────
 
+  private membershipApprovalStage(
+    request: AgencyMembershipRequest,
+  ): MembershipApprovalStage {
+    if (request.status === 'APPROVED') return 'APPROVED';
+    if (request.status === 'REJECTED') return 'REJECTED';
+    if (request.commercialApprovedAt) return 'AWAITING_FINANCE';
+    return 'AWAITING_COMMERCIAL';
+  }
+
+  private shapeMembershipRequest(request: AgencyMembershipRequest) {
+    return {
+      ...request,
+      approvalStage: this.membershipApprovalStage(request),
+    };
+  }
+
   async listRequests(status?: AgencyMembershipStatus) {
-    return this.membershipRequestRepo.find({
+    const requests = await this.membershipRequestRepo.find({
       where: status ? { status } : {},
       order: { createdAt: 'DESC' },
     });
+    return requests.map((request) => this.shapeMembershipRequest(request));
   }
 
   async getRequest(id: string) {
@@ -788,12 +808,68 @@ export class AgenciesService {
       },
       order: { createdAt: 'DESC' },
     });
-    return { ...request, history };
+    return { ...this.shapeMembershipRequest(request), history };
   }
 
   async approveRequest(actor: AuthenticatedUser, id: string) {
+    if (actor.role === 'COMMERCIAL_MANAGER') {
+      const approved = await this.profileRepo.manager.transaction(
+        async (tx) => {
+          const request = await tx.findOne(AgencyMembershipRequest, {
+            where: { id },
+            lock: { mode: 'pessimistic_write' },
+          });
+          if (!request) {
+            throw new NotFoundException({
+              code: ErrorCode.NOT_FOUND,
+              message: 'درخواست عضویت آژانس یافت نشد.',
+            });
+          }
+          if (
+            !DECIDABLE_STATUSES.includes(request.status) ||
+            request.commercialApprovedAt
+          ) {
+            throw new ConflictException({
+              code: ErrorCode.CONFLICT,
+              message: 'این مرحله از درخواست قبلاً بررسی شده است.',
+            });
+          }
+
+          request.commercialApprovedById = actor.id;
+          request.commercialApprovedAt = new Date();
+          return tx.save(request);
+        },
+      );
+
+      await this.audit.record({
+        actorId: actor.id,
+        actorRole: actor.role,
+        category: 'AGENCY',
+        action: 'تأیید بازرگانی درخواست عضویت آژانس',
+        detail: `درخواست «${approved.applicantName}» توسط ${actor.fullName} تأیید بازرگانی و برای بررسی مالی ارسال شد.`,
+        entityType: 'AgencyMembershipRequest',
+        entityId: id,
+      });
+
+      return {
+        stage: 'AWAITING_FINANCE' as const,
+        request: this.shapeMembershipRequest(approved),
+      };
+    }
+
+    if (actor.role !== 'FINANCE_MANAGER') {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'نقش کاربر برای این مرحله معتبر نیست.',
+      });
+    }
+
     const request = await this.getRequestOrThrow(id);
-    if (!DECIDABLE_STATUSES.includes(request.status)) {
+    if (
+      !DECIDABLE_STATUSES.includes(request.status) ||
+      !request.commercialApprovedAt ||
+      request.financeApprovedAt
+    ) {
       throw new ConflictException({
         code: ErrorCode.CONFLICT,
         message: 'این درخواست قبلاً بررسی شده است.',
@@ -807,6 +883,22 @@ export class AgenciesService {
 
     const { agencyUserId } = await this.profileRepo.manager.transaction(
       async (tx) => {
+        const lockedRequest = await tx.findOne(AgencyMembershipRequest, {
+          where: { id },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (
+          !lockedRequest ||
+          !DECIDABLE_STATUSES.includes(lockedRequest.status) ||
+          !lockedRequest.commercialApprovedAt ||
+          lockedRequest.financeApprovedAt
+        ) {
+          throw new ConflictException({
+            code: ErrorCode.CONFLICT,
+            message: 'این مرحله از درخواست قبلاً بررسی شده است.',
+          });
+        }
+
         const user = await tx.save(
           tx.create(User, {
             role: 'AGENCY',
@@ -848,6 +940,8 @@ export class AgenciesService {
           { id },
           {
             status: 'APPROVED',
+            financeApprovedById: actor.id,
+            financeApprovedAt: new Date(),
             reviewedById: actor.id,
             reviewedAt: new Date(),
           },
@@ -876,7 +970,7 @@ export class AgenciesService {
     });
 
     // Plaintext temp password is returned exactly once and never stored.
-    return { agencyId: agencyUserId, tempPassword };
+    return { stage: 'APPROVED' as const, agencyId: agencyUserId, tempPassword };
   }
 
   async rejectRequest(

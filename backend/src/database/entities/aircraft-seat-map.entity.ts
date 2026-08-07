@@ -32,6 +32,19 @@ export class AircraftSeatMap {
   @Column({ type: 'text', array: true, nullable: true })
   businessColsRight!: string[] | null;
 
+  /** Optional comfort cabin band between business and economy. Null = no COMFORT seats. */
+  @Column({ type: 'int', nullable: true })
+  comfortRowStart!: number | null;
+
+  @Column({ type: 'int', nullable: true })
+  comfortRowEnd!: number | null;
+
+  @Column({ type: 'text', array: true, nullable: true })
+  comfortColsLeft!: string[] | null;
+
+  @Column({ type: 'text', array: true, nullable: true })
+  comfortColsRight!: string[] | null;
+
   @Column({ type: 'int' })
   economyRowStart!: number;
 

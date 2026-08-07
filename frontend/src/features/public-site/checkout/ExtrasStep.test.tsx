@@ -3,7 +3,48 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { SeatMapCell } from '../../../types/public-site';
 import ExtrasStep from './ExtrasStep';
-import { defaultExtras } from './checkout-types';
+import type { ExtraServiceState } from './checkout-types';
+
+function testExtras(): ExtraServiceState[] {
+  return [
+    {
+      id: 'extra-baggage',
+      code: 'EXTRA_BAGGAGE',
+      titleFa: 'بار اضافه',
+      titleEn: 'Extra baggage',
+      titleAr: null,
+      descriptionFa: 'به ازای هر کیلوگرم',
+      billingUnit: 'PER_KG',
+      priceIrr: '4500000',
+      selected: false,
+      quantity: 1,
+    },
+    {
+      id: 'extra-cip',
+      code: 'CIP',
+      titleFa: 'خدمات CIP',
+      titleEn: 'CIP',
+      titleAr: null,
+      descriptionFa: null,
+      billingUnit: 'PER_BOOKING',
+      priceIrr: '9000000',
+      selected: false,
+      quantity: 1,
+    },
+    {
+      id: 'extra-insurance',
+      code: 'TRAVEL_INSURANCE',
+      titleFa: 'بیمه مسافرتی',
+      titleEn: 'Insurance',
+      titleAr: null,
+      descriptionFa: null,
+      billingUnit: 'PER_PASSENGER',
+      priceIrr: '1200000',
+      selected: false,
+      quantity: 1,
+    },
+  ];
+}
 
 const SEATS: SeatMapCell[] = [
   { seatCode: '3A', row: 3, cabin: 'BUSINESS', status: 'FREE' },
@@ -22,8 +63,10 @@ describe('ExtrasStep — design parity', () => {
     render(
       <ExtrasStep
         locale="fa"
-        extras={defaultExtras()}
+        extras={testExtras()}
         onToggleExtra={vi.fn()}
+        onExtraQuantityChange={vi.fn()}
+        passengerCount={1}
         seats={SEATS}
         selectedSeats={[]}
         onToggleSeat={vi.fn()}
@@ -34,20 +77,20 @@ describe('ExtrasStep — design parity', () => {
     );
 
     expect(screen.getByText('خدمات جانبی سفر')).toBeInTheDocument();
-    expect(
-      screen.getByText('خدماتی که می‌خواهید انتخاب کنید — هزینه به مجموع شما اضافه می‌شود'),
-    ).toBeInTheDocument();
-    expect(screen.getByText('بار اضافه (۱۰ کیلوگرم)')).toBeInTheDocument();
-    expect(screen.getByTestId('checkout-extra-baggage')).toHaveTextContent('۴۵۰٬۰۰۰');
-    expect(screen.getByTestId('checkout-extra-cip')).toHaveTextContent('۹۰۰٬۰۰۰');
+    expect(screen.getByText('خدماتی که می‌خواهید انتخاب کنید — هزینه به مجموع شما اضافه می‌شود')).toBeInTheDocument();
+    expect(screen.getByText('بار اضافه')).toBeInTheDocument();
+    expect(screen.getByTestId('checkout-extra-extra-baggage')).toHaveTextContent('۴۵۰٬۰۰۰');
+    expect(screen.getByTestId('checkout-extra-extra-cip')).toHaveTextContent('۹۰۰٬۰۰۰');
   });
 
   it('renders the MD-80 aircraft seat chart from the PDF layout', () => {
     render(
       <ExtrasStep
         locale="fa"
-        extras={defaultExtras()}
+        extras={testExtras()}
         onToggleExtra={vi.fn()}
+        onExtraQuantityChange={vi.fn()}
+        passengerCount={1}
         seats={SEATS}
         selectedSeats={[]}
         onToggleSeat={vi.fn()}
@@ -89,8 +132,10 @@ describe('ExtrasStep — design parity', () => {
     render(
       <ExtrasStep
         locale="fa"
-        extras={defaultExtras()}
+        extras={testExtras()}
         onToggleExtra={vi.fn()}
+        onExtraQuantityChange={vi.fn()}
+        passengerCount={1}
         seats={legacyA320}
         selectedSeats={[]}
         onToggleSeat={vi.fn()}
@@ -109,8 +154,10 @@ describe('ExtrasStep — design parity', () => {
     render(
       <ExtrasStep
         locale="fa"
-        extras={defaultExtras()}
+        extras={testExtras()}
         onToggleExtra={vi.fn()}
+        onExtraQuantityChange={vi.fn()}
+        passengerCount={1}
         seats={[]}
         selectedSeats={[]}
         onToggleSeat={vi.fn()}
@@ -132,8 +179,10 @@ describe('ExtrasStep — design parity', () => {
     render(
       <ExtrasStep
         locale="fa"
-        extras={defaultExtras()}
+        extras={testExtras()}
         onToggleExtra={onToggle}
+        onExtraQuantityChange={vi.fn()}
+        passengerCount={1}
         seats={SEATS}
         selectedSeats={[]}
         onToggleSeat={vi.fn()}
@@ -143,8 +192,8 @@ describe('ExtrasStep — design parity', () => {
       />,
     );
 
-    await user.click(screen.getByTestId('checkout-extra-insurance'));
-    expect(onToggle).toHaveBeenCalledWith('insurance');
+    await user.click(screen.getByTestId('checkout-extra-extra-insurance-toggle'));
+    expect(onToggle).toHaveBeenCalledWith('extra-insurance');
   });
 
   it('only allows selecting seats in the booked cabin', async () => {
@@ -153,8 +202,10 @@ describe('ExtrasStep — design parity', () => {
     render(
       <ExtrasStep
         locale="fa"
-        extras={defaultExtras()}
+        extras={testExtras()}
         onToggleExtra={vi.fn()}
+        onExtraQuantityChange={vi.fn()}
+        passengerCount={1}
         seats={SEATS}
         selectedSeats={[]}
         onToggleSeat={onToggleSeat}

@@ -33,6 +33,7 @@ import { ExternalServiceConfig } from './entities/external-service-config.entity
 import { FarePricingProposal } from './entities/fare-pricing-proposal.entity';
 import { FareRule } from './entities/fare-rule.entity';
 import { Flight } from './entities/flight.entity';
+import { FlightChargeRule } from './entities/flight-charge-rule.entity';
 import { FlightInstance } from './entities/flight-instance.entity';
 import { InternalService } from './entities/internal-service.entity';
 import { JobApplication } from './entities/job-application.entity';
@@ -76,6 +77,7 @@ import { SystemSetting } from './entities/system-setting.entity';
 import { TwoFactorChallenge } from './entities/two-factor-challenge.entity';
 import { User } from './entities/user.entity';
 import { WalletEntry } from './entities/wallet-entry.entity';
+import { TravelExtraSetting } from './entities/travel-extra-setting.entity';
 
 /**
  * All 77 entities, mirroring prisma/schema.prisma's 77 models exactly (see
@@ -124,6 +126,7 @@ export const dataSourceOptions: DataSourceOptions = {
     FarePricingProposal,
     FareRule,
     Flight,
+    FlightChargeRule,
     FlightInstance,
     InternalService,
     JobApplication,
@@ -167,6 +170,7 @@ export const dataSourceOptions: DataSourceOptions = {
     TwoFactorChallenge,
     User,
     WalletEntry,
+    TravelExtraSetting,
   ],
   migrations: [__dirname + '/migrations/*{.ts,.js}'],
 };

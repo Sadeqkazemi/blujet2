@@ -7,7 +7,6 @@ export const UAT_PURGE_CONFIRMATION = 'PURGE_BLUJET_UAT_DEMO_DATA';
  */
 export const UAT_PRESERVED_TABLES = new Set([
   'aircraft_seat_maps',
-  'airports',
   'careers_settings',
   'club_tier_rules',
   'external_service_configs',

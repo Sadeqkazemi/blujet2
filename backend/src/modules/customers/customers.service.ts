@@ -19,11 +19,11 @@ import {
 } from '../../common/normalize-iran-phone';
 import { TEMPORARY_PANEL_USERNAME_PREFIX } from '../../database/temporary-panel-accounts';
 import type { ListCustomersQueryDto } from './dto/list-customers-query.dto';
-
-/** Design: incomplete when missing name or national ID. */
-function isIncomplete(user: User): boolean {
-  return !user.fullName?.trim() || !user.nationalIdEnc;
-}
+import {
+  assessProfileCompletion,
+  maskIdentityValue,
+  profileIncompleteSql,
+} from '../../common/profile-completion';
 
 function displayPhone(phone: string | null): string | null {
   if (!phone) return null;
@@ -55,18 +55,20 @@ export class CustomersService {
   ) {}
 
   private userBaseQb() {
-    return this.userRepo
-      .createQueryBuilder('u')
-      .where('u.role = :role', { role: Role.USER })
-      .andWhere('u.deletedAt IS NULL')
-      // UAT temporary identity/access accounts are infrastructure, never a
-      // real customer — excluded from every list/count this service exposes.
-      .andWhere('LOWER(COALESCE(u.username, \'\')) NOT LIKE :uatPrefix', {
-        uatPrefix: `${TEMPORARY_PANEL_USERNAME_PREFIX}%`,
-      });
+    return (
+      this.userRepo
+        .createQueryBuilder('u')
+        .where('u.role = :role', { role: Role.USER })
+        .andWhere('u.deletedAt IS NULL')
+        // UAT temporary identity/access accounts are infrastructure, never a
+        // real customer — excluded from every list/count this service exposes.
+        .andWhere("LOWER(COALESCE(u.username, '')) NOT LIKE :uatPrefix", {
+          uatPrefix: `${TEMPORARY_PANEL_USERNAME_PREFIX}%`,
+        })
+    );
   }
 
-  async list(query: ListCustomersQueryDto) {
+  async list(query: ListCustomersQueryDto, maskSensitive = false) {
     const qb = this.userBaseQb().orderBy('u.createdAt', 'DESC');
 
     const rawQ = (query.q ?? '').trim();
@@ -106,16 +108,19 @@ export class CustomersService {
     const clubByUser = new Map(clubs.map((c) => [c.userId!, c]));
 
     const customers = users.map((u) => {
-      const incomplete = isIncomplete(u);
+      const completion = assessProfileCompletion(u);
       const club = clubByUser.get(u.id);
-      const nationalId = tryDecryptPii(u.nationalIdEnc);
+      const rawNationalId = tryDecryptPii(u.nationalIdEnc);
+      const nationalId = maskSensitive
+        ? maskIdentityValue(rawNationalId)
+        : rawNationalId;
       return {
         id: u.id,
         fullName: u.fullName?.trim() || '',
         phone: displayPhone(u.phone),
         email: u.email,
         nationalId,
-        profileIncomplete: incomplete,
+        ...completion,
         createdAt: u.createdAt.toISOString(),
         club: club
           ? {
@@ -139,14 +144,10 @@ export class CustomersService {
   }
 
   private async countIncomplete(): Promise<number> {
-    return this.userBaseQb()
-      .andWhere(
-        `(TRIM(COALESCE(u.fullName, '')) = '' OR u.nationalIdEnc IS NULL)`,
-      )
-      .getCount();
+    return this.userBaseQb().andWhere(profileIncompleteSql('u')).getCount();
   }
 
-  async getById(id: string) {
+  async getById(id: string, maskSensitive = false) {
     const user = await this.userRepo.findOne({
       where: { id, role: Role.USER, deletedAt: IsNull() },
     });
@@ -157,8 +158,11 @@ export class CustomersService {
       });
     }
 
-    const incomplete = isIncomplete(user);
-    const nationalId = tryDecryptPii(user.nationalIdEnc);
+    const completion = assessProfileCompletion(user);
+    const rawNationalId = tryDecryptPii(user.nationalIdEnc);
+    const nationalId = maskSensitive
+      ? maskIdentityValue(rawNationalId)
+      : rawNationalId;
 
     const club = await this.clubRepo.findOne({ where: { userId: user.id } });
 
@@ -309,7 +313,7 @@ export class CustomersService {
       phone: displayPhone(user.phone),
       email: user.email,
       nationalId,
-      profileIncomplete: incomplete,
+      ...completion,
       registeredAt: user.createdAt.toISOString(),
       club: club
         ? {

@@ -19,12 +19,16 @@ against the REAL uvicorn ml-service, spawned/killed by the spec).
 - [x] PUT on REGISTERED → 409 — `'CEO registers with source=PROPOSED; proposal locks; further edits/registers → 409'`
 - [x] PUT as CEO 403 / unknown flight 404 / missing price 400 — `'PUT as CEO → 403; unknown flight → 404; missing price → 400'`
 - [x] Commercial GET rows joined to real instances with the three states — `'role-shaped GET: CEO gets pending/registered lists, Commercial gets flight rows joined with proposals'` + UI states in `PricingPage.test.tsx: 'Commercial sees the three row states...'`
+- [x] Upsert is atomic with `definitionStatus → PENDING_CEO` (pessimistic instance lock) — `pricing.service.ts` upsert transaction + flight-definition e2e propose/register path
+- [x] `competitorPriceIrr` is nullable; never fabricated as base+3% — migration `1786348800000-…`, register/upsert use definition value or null; UI shows «—»
 
 ### Registration (CEO)
 - [x] source=PROPOSED registers + locks + audits — `'CEO registers with source=PROPOSED...'`
 - [x] source=AI uses persisted suggestion; 409 without one — `'register with source=AI without a stored suggestion → 409...'` + the AI test below
 - [x] Re-register 409; Commercial register 403 — covered in the lock test + role test
 - [x] legal-rate PATCH stores + audits — `'CEO legal-rate PATCH stores + audits; Finance/Board Chair get 403 everywhere'`
+- [x] Register + `applyCeoApproval` and reject + `applyCeoRejection` run in one transaction with row locks — `pricing.service.ts` register/reject; e2e `'CEO reject requires reason…'` + `'GET/PUT definition; APPROVED edit…'`
+- [x] Reject keeps live APPROVED inventory under `PENDING_REVISION` when a prior approval exists; first-cycle → `REJECTED` — same e2e
 
 ### AI analysis (ML service + ai module)
 - [x] Persists aiSuggestion with modelVersion on PENDING proposals — `'AI analysis persists suggestions with modelVersion, mutates nothing else, and register {source:AI} uses it'`

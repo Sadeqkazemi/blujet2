@@ -46,6 +46,7 @@ import { SiteContentModule } from './modules/site-content/site-content.module';
 import { CustomerReferralsModule } from './modules/customer-referrals/customer-referrals.module';
 import { WebservicePricingModule } from './modules/webservice-pricing/webservice-pricing.module';
 import { CustomersModule } from './modules/customers/customers.module';
+import { TravelCostsModule } from './modules/travel-costs/travel-costs.module';
 
 @Module({
   imports: [
@@ -121,6 +122,7 @@ import { CustomersModule } from './modules/customers/customers.module';
     SiteContentModule,
     WebservicePricingModule,
     CustomersModule,
+    TravelCostsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

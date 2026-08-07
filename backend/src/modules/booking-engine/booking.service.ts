@@ -8,7 +8,13 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as crypto from 'node:crypto';
-import { EntityManager, IsNull, Repository } from 'typeorm';
+import {
+  EntityManager,
+  In,
+  IsNull,
+  Repository,
+  type UpdateResult,
+} from 'typeorm';
 import { Booking } from '../../database/entities/booking.entity';
 import { Passenger } from '../../database/entities/passenger.entity';
 import { FlightInstance } from '../../database/entities/flight-instance.entity';
@@ -18,6 +24,9 @@ import { PriceLock } from '../../database/entities/price-lock.entity';
 import { PaymentReconciliation } from '../../database/entities/payment-reconciliation.entity';
 import { PayIdempotencyRecord } from '../../database/entities/pay-idempotency-record.entity';
 import { LedgerEntry } from '../../database/entities/ledger-entry.entity';
+import { AgencyAllotment } from '../../database/entities/agency-allotment.entity';
+import { AgencyCreditLine } from '../../database/entities/agency-credit-line.entity';
+import { TravelExtraSetting } from '../../database/entities/travel-extra-setting.entity';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
 import {
@@ -29,8 +38,11 @@ import {
 import { enumerateSeats } from '../reservation/seat-layout';
 import { matchesLastName } from '../../common/passenger-name.util';
 import { resolveAircraftType } from '../flights/aircraft-type.util';
+import { assertSellableForSale } from '../flights/definition-sellability';
+import { calculateActiveCharges } from '../flights/charge-rules';
 import { getCabinPrice, resolveFareClass } from './pricing';
 import type { Irr } from '../../common/money';
+import type { CabinClass } from '../../database/enums';
 import { PAYMENT_GATEWAY, type PaymentGateway } from './payment-gateway';
 import { SearchService } from './search.service';
 import { PriceLockService } from './price-lock.service';
@@ -40,12 +52,26 @@ import { CustomerReferralsService } from '../customer-referrals/customer-referra
 import { applyPromoCode } from './promo.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { CreateBookingDto } from './dto/create-booking.dto';
+import type { CreateAllotmentBookingDto } from '../agency-portal/dto/create-allotment-booking.dto';
 
 export type PaymentMethod = 'GATEWAY' | 'WALLET' | 'POINTS';
 
 /** CLAUDE.md: "HELD has a 10-minute TTL (matches the design's hold timer);
  * expiry releases inventory automatically." */
 const HOLD_TTL_MS = 10 * 60 * 1000;
+
+function cabinLabelFa(cabin: CabinClass): string {
+  switch (cabin) {
+    case 'BUSINESS':
+      return 'بیزینس';
+    case 'COMFORT':
+      return 'کامفورت';
+    case 'ECONOMY':
+      return 'اکونومی';
+    default:
+      return cabin;
+  }
+}
 
 function generatePnr(): string {
   return `BJ${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
@@ -77,6 +103,10 @@ export class BookingService {
     private readonly payIdempotencyRepo: Repository<PayIdempotencyRecord>,
     @InjectRepository(LedgerEntry)
     private readonly ledgerRepo: Repository<LedgerEntry>,
+    @InjectRepository(AgencyAllotment)
+    private readonly allotmentRepo: Repository<AgencyAllotment>,
+    @InjectRepository(TravelExtraSetting)
+    private readonly travelExtraRepo: Repository<TravelExtraSetting>,
     private readonly audit: AuditService,
     private readonly search: SearchService,
     private readonly priceLocks: PriceLockService,
@@ -154,6 +184,11 @@ export class BookingService {
       cabin: b.cabin,
       priceIrr: b.priceIrr,
       taxIrr: b.taxIrr,
+      extrasIrr: b.extrasIrr,
+      extras: b.extrasSnapshot,
+      channel: b.channel,
+      agencyId: b.agencyId,
+      allotmentId: b.allotmentId,
       holdExpiresAt: b.holdExpiresAt,
       flightInstanceId: b.flightInstanceId,
       flightNo: b.flightInstance.flight.flightNo,
@@ -207,6 +242,7 @@ export class BookingService {
         message: 'پرواز یافت نشد یا دیگر قابل رزرو نیست.',
       });
     }
+    assertSellableForSale(instance);
     const now = new Date();
     if (
       (instance.saleStartsAt && instance.saleStartsAt > now) ||
@@ -242,7 +278,7 @@ export class BookingService {
       if (!seat || seat.cabin !== dto.cabin) {
         throw new BadRequestException({
           code: ErrorCode.VALIDATION_FAILED,
-          message: `صندلی ${code} در کلاس ${dto.cabin === 'BUSINESS' ? 'بیزینس' : 'اکونومی'} معتبر نیست.`,
+          message: `صندلی ${code} در کلاس ${cabinLabelFa(dto.cabin)} معتبر نیست.`,
         });
       }
     }
@@ -279,13 +315,77 @@ export class BookingService {
           instance.id,
           dto.cabin,
         );
+    const requestedExtras = dto.extras ?? [];
+    const requestedExtraIds = requestedExtras.map((extra) => extra.id);
+    if (new Set(requestedExtraIds).size !== requestedExtraIds.length) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'هر هزینه سفر فقط یک‌بار قابل انتخاب است.',
+      });
+    }
+    const configuredExtras = requestedExtraIds.length
+      ? await this.travelExtraRepo.findBy({ id: In(requestedExtraIds) })
+      : [];
+    if (
+      configuredExtras.length !== requestedExtraIds.length ||
+      configuredExtras.some((extra) => !extra.active || !extra.purchaseEnabled)
+    ) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'یکی از هزینه‌های سفر انتخاب‌شده دیگر فعال نیست.',
+      });
+    }
+    const configuredById = new Map(
+      configuredExtras.map((extra) => [extra.id, extra]),
+    );
+    const extrasSnapshot = requestedExtras.map((selection) => {
+      const extra = configuredById.get(selection.id)!;
+      if (extra.billingUnit !== 'PER_KG' && selection.quantity !== 1) {
+        throw new BadRequestException({
+          code: ErrorCode.VALIDATION_FAILED,
+          message: 'تعداد فقط برای هزینه بار اضافه قابل تغییر است.',
+        });
+      }
+      const quantity =
+        extra.billingUnit === 'PER_PASSENGER'
+          ? dto.passengers.length
+          : selection.quantity;
+      const totalIrr = extra.priceIrr * BigInt(quantity);
+      return {
+        id: extra.id,
+        code: extra.code,
+        titleFa: extra.titleFa,
+        billingUnit: extra.billingUnit,
+        unitPriceIrr: extra.priceIrr.toString(),
+        quantity,
+        totalIrr: totalIrr.toString(),
+      };
+    });
+    const extrasIrr = extrasSnapshot.reduce(
+      (total, extra) => total + BigInt(extra.totalIrr),
+      0n,
+    );
     // Tax/fee is per-fare-class (Phase 13 Part B) and included in the
     // stored total so ledger/refunds/reporting — which all read
     // priceIrr as-is — never need to know tax exists; taxIrr is stored
     // alongside purely for receipt display.
+    // Tax/fee is per-fare-class (Phase 13 Part B) plus active charge rules;
+    // both are included in the stored total so ledger/refunds/reporting — which
+    // all read priceIrr as-is — never need to recompute; taxIrr and
+    // chargeSnapshot are stored for receipt display and audit.
     const passengerCount = BigInt(dto.passengers.length);
-    const taxIrr: Irr = (fareClass?.taxIrr ?? 0n) * passengerCount;
-    const priceIrr: Irr = unitPriceIrr * passengerCount + taxIrr;
+    const unitCharges = await calculateActiveCharges(
+      this.bookingRepo.manager,
+      instance.id,
+      unitPriceIrr,
+      dto.cabin,
+      instance.departureAt,
+    );
+    const chargePerPax = BigInt(unitCharges.totalChargesIrr);
+    const taxIrr: Irr =
+      (fareClass?.taxIrr ?? 0n) * passengerCount +
+      chargePerPax * passengerCount;
+    const priceIrr: Irr = unitPriceIrr * passengerCount + taxIrr + extrasIrr;
     const contactUser = await this.userRepo
       .createQueryBuilder('u')
       .select(['u.id', 'u.phone'])
@@ -340,6 +440,9 @@ export class BookingService {
           fareClassCode: fareClass?.classCode ?? null,
           priceIrr,
           taxIrr,
+          extrasIrr,
+          extrasSnapshot,
+          chargeSnapshot: unitCharges,
           userId: user.id,
           contactPhone: contactUser.phone ?? null,
           holdExpiresAt: new Date(Date.now() + HOLD_TTL_MS),
@@ -391,6 +494,10 @@ export class BookingService {
       detail: `رزرو ${booking.pnr} برای پرواز ${instance.flight.flightNo} توسط مشتری ثبت شد.`,
       entityType: 'Booking',
       entityId: booking.id,
+      metadata: {
+        extrasIrr: extrasIrr.toString(),
+        extraCodes: extrasSnapshot.map((extra) => extra.code),
+      },
     });
 
     // `bookingWithRelations` is re-fetched right after the priceLock claim
@@ -479,6 +586,284 @@ export class BookingService {
    * actual net amount, and earns club points on real-money payments — all
    * inside one transaction.
    */
+  async createAgencyAllotmentBooking(
+    actor: AuthenticatedUser,
+    allotmentId: string,
+    dto: CreateAllotmentBookingDto,
+    idempotencyKey?: string,
+  ) {
+    if (idempotencyKey) {
+      const existing = await this.findBookingWithRelations({ idempotencyKey });
+      if (existing) {
+        if (
+          existing.channel !== 'AGENCY' ||
+          existing.agencyId !== actor.id ||
+          existing.allotmentId !== allotmentId
+        ) {
+          throw new ConflictException({
+            code: ErrorCode.CONFLICT,
+            message: 'کلید تکرار برای درخواست دیگری استفاده شده است.',
+          });
+        }
+        return this.toDetail(existing);
+      }
+    }
+
+    const allotment = await this.allotmentRepo.findOne({
+      where: { id: allotmentId, agencyId: actor.id },
+      relations: { flightInstance: { flight: true } },
+    });
+    const instance = allotment?.flightInstance;
+    const now = new Date();
+    if (
+      !allotment ||
+      !instance ||
+      instance.status !== 'SCHEDULED' ||
+      (allotment.type === 'SOFT' &&
+        !!allotment.releaseAt &&
+        allotment.releaseAt <= now)
+    ) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'سهمیه فعال و متعلق به این آژانس یافت نشد.',
+      });
+    }
+    assertSellableForSale(instance);
+    if (
+      (instance.saleStartsAt && instance.saleStartsAt > now) ||
+      (instance.saleEndsAt && instance.saleEndsAt < now)
+    ) {
+      throw new ConflictException({
+        code: ErrorCode.SALE_WINDOW_CLOSED,
+        message: 'مهلت فروش این پرواز به پایان رسیده یا هنوز آغاز نشده است.',
+      });
+    }
+
+    const map = await this.seatMapRepo.findOneBy({
+      aircraftType: resolveAircraftType(instance),
+    });
+    if (!map) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'نقشه صندلی برای این هواپیما تعریف نشده است.',
+      });
+    }
+    const seatsByCode = new Map(
+      enumerateSeats(map).map((seat) => [seat.seatCode, seat]),
+    );
+    const requestedCodes = dto.passengers.map(
+      (passenger) => passenger.seatCode,
+    );
+    if (new Set(requestedCodes).size !== requestedCodes.length) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'صندلی تکراری انتخاب شده است.',
+      });
+    }
+    for (const passenger of dto.passengers) {
+      const seat = seatsByCode.get(passenger.seatCode);
+      if (!seat || seat.cabin !== dto.cabin) {
+        throw new BadRequestException({
+          code: ErrorCode.VALIDATION_FAILED,
+          message: `صندلی ${passenger.seatCode} برای کلاس انتخابی معتبر نیست.`,
+        });
+      }
+      if (
+        passenger.nationalId &&
+        !isValidIranianNationalId(normalizeNationalId(passenger.nationalId))
+      ) {
+        throw new BadRequestException({
+          code: ErrorCode.VALIDATION_FAILED,
+          message: `کد ملی «${passenger.fullName}» معتبر نیست.`,
+        });
+      }
+    }
+
+    const fareClass = await resolveFareClass(
+      this.bookingRepo.manager,
+      instance.id,
+      dto.cabin,
+    );
+    const unitPriceIrr =
+      allotment.contractPriceIrr ??
+      (await getCabinPrice(this.bookingRepo.manager, instance.id, dto.cabin));
+    const passengerCount = BigInt(dto.passengers.length);
+    const unitCharges = await calculateActiveCharges(
+      this.bookingRepo.manager,
+      instance.id,
+      unitPriceIrr,
+      dto.cabin,
+      instance.departureAt,
+    );
+    const chargePerPax = BigInt(unitCharges.totalChargesIrr);
+    const taxIrr =
+      (fareClass?.taxIrr ?? 0n) * passengerCount +
+      chargePerPax * passengerCount;
+    const priceIrr = unitPriceIrr * passengerCount + taxIrr;
+    const contactUser = await this.userRepo.findOneByOrFail({ id: actor.id });
+
+    const transactionResult = await this.bookingRepo.manager.transaction(
+      async (tx) => {
+        await tx
+          .createQueryBuilder(FlightInstance, 'fi')
+          .setLock('pessimistic_write')
+          .where('fi.id = :id', { id: instance.id })
+          .getOneOrFail();
+        const lockedAllotment = await tx.findOne(AgencyAllotment, {
+          where: { id: allotmentId, agencyId: actor.id },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (
+          !lockedAllotment ||
+          (lockedAllotment.type === 'SOFT' &&
+            !!lockedAllotment.releaseAt &&
+            lockedAllotment.releaseAt <= new Date())
+        ) {
+          throw new ConflictException({
+            code: ErrorCode.CONFLICT,
+            message: 'سهمیه دیگر فعال نیست.',
+          });
+        }
+
+        if (idempotencyKey) {
+          const concurrentExisting = await tx.findOne(Booking, {
+            where: { idempotencyKey },
+          });
+          if (concurrentExisting) {
+            if (
+              concurrentExisting.channel !== 'AGENCY' ||
+              concurrentExisting.agencyId !== actor.id ||
+              concurrentExisting.allotmentId !== allotmentId
+            ) {
+              throw new ConflictException({
+                code: ErrorCode.CONFLICT,
+                message: 'کلید تکرار برای درخواست دیگری استفاده شده است.',
+              });
+            }
+            return { booking: concurrentExisting, created: false };
+          }
+        }
+
+        const taken = await this.search.takenSeatCodes(instance.id);
+        const seatConflict = requestedCodes.find((code) => taken.has(code));
+        if (seatConflict) {
+          throw new ConflictException({
+            code: ErrorCode.CONFLICT,
+            message: `صندلی ${seatConflict} هم‌اکنون در دسترس نیست.`,
+          });
+        }
+
+        const usedSeats = await tx
+          .createQueryBuilder(Passenger, 'p')
+          .innerJoin(Booking, 'b', 'b.id = p.bookingId')
+          .where('b.allotmentId = :allotmentId', { allotmentId })
+          .andWhere(
+            `(b.status IN ('PAID', 'TICKETED', 'FLOWN', 'NO_SHOW') OR (b.status = 'HELD' AND b.holdExpiresAt > :now))`,
+            { now: new Date() },
+          )
+          .getCount();
+        if (
+          usedSeats + dto.passengers.length >
+          lockedAllotment.seatsAllocated
+        ) {
+          throw new ConflictException({
+            code: ErrorCode.POOL_EXHAUSTED,
+            message: 'ظرفیت سهمیه این آژانس تکمیل شده است.',
+          });
+        }
+
+        const credit = await tx.findOne(AgencyCreditLine, {
+          where: { agencyId: actor.id },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (!credit) {
+          throw new ConflictException({
+            code: ErrorCode.CONFLICT,
+            message: 'خط اعتباری آژانس تعریف نشده است.',
+          });
+        }
+        const ledgerSum = await tx
+          .createQueryBuilder(LedgerEntry, 'entry')
+          .select('SUM(entry.signedAmountIrr)', 'sum')
+          .where('entry.agencyId = :agencyId', { agencyId: actor.id })
+          .andWhere('entry.type IN (:...types)', {
+            types: ['SALE', 'SETTLEMENT'],
+          })
+          .getRawOne<{ sum: string | null }>();
+        const rawUsedIrr = BigInt(ledgerSum?.sum ?? '0');
+        const usedIrr = rawUsedIrr > 0n ? rawUsedIrr : 0n;
+        if (priceIrr > credit.limitIrr - usedIrr) {
+          throw new ConflictException({
+            code: ErrorCode.CONFLICT,
+            message: 'اعتبار باقی‌مانده آژانس برای این فروش کافی نیست.',
+          });
+        }
+
+        const created = await tx.save(
+          tx.create(Booking, {
+            pnr: generatePnr(),
+            flightInstanceId: instance.id,
+            channel: 'AGENCY',
+            agencyId: actor.id,
+            allotmentId,
+            status: 'TICKETED',
+            cabin: dto.cabin,
+            fareClassCode: fareClass?.classCode ?? null,
+            priceIrr,
+            taxIrr,
+            chargeSnapshot: unitCharges,
+            userId: null,
+            contactPhone: contactUser.phone ?? null,
+            holdExpiresAt: null,
+            idempotencyKey: idempotencyKey ?? null,
+          }),
+        );
+        await tx.save(
+          dto.passengers.map((passenger) => {
+            const nationalId = passenger.nationalId
+              ? normalizeNationalId(passenger.nationalId)
+              : undefined;
+            return tx.create(Passenger, {
+              bookingId: created.id,
+              fullName: passenger.fullName,
+              seatCode: passenger.seatCode,
+              nationalIdEnc: nationalId ? encryptPii(nationalId) : null,
+              nationalIdHash: nationalId ? hashPii(nationalId) : null,
+              mobileEnc: passenger.mobile ? encryptPii(passenger.mobile) : null,
+            });
+          }),
+        );
+        await tx.save(
+          tx.create(LedgerEntry, {
+            bookingId: created.id,
+            agencyId: actor.id,
+            type: 'SALE',
+            signedAmountIrr: priceIrr,
+            createdById: actor.id,
+          }),
+        );
+        return { booking: created, created: true };
+      },
+    );
+
+    const booking = transactionResult.booking;
+    if (transactionResult.created) {
+      await this.search.invalidateForInstance(instance.id);
+      await this.audit.record({
+        actorId: actor.id,
+        actorRole: actor.role,
+        category: 'RESERVATION',
+        action: 'فروش قطعی از سهمیه آژانس',
+        detail: `بلیت ${booking.pnr} از سهمیه آژانس برای پرواز ${instance.flight.flightNo} صادر شد.`,
+        entityType: 'Booking',
+        entityId: booking.id,
+        metadata: { allotmentId, priceIrr },
+      });
+    }
+    const saved = await this.findBookingWithRelations({ id: booking.id });
+    return this.toDetail(saved!);
+  }
+
   async pay(
     id: string,
     user: AuthenticatedUser,
@@ -550,17 +935,30 @@ export class BookingService {
           booking.cabin,
         );
     const bookingPassengerCount = BigInt(booking.passengers.length);
-    const currentTaxIrr: Irr =
-      (currentFareClass?.taxIrr ?? 0n) * bookingPassengerCount;
-    const currentPriceIrr: Irr = isLocked
-      ? booking.priceIrr
-      : (await getCabinPrice(
-          this.bookingRepo.manager,
-          booking.flightInstanceId,
-          booking.cabin,
-        )) *
-          bookingPassengerCount +
-        currentTaxIrr;
+    let currentTaxIrr: Irr = 0n;
+    let currentPriceIrr: Irr = booking.priceIrr;
+    let currentChargeSnapshot = booking.chargeSnapshot;
+    if (!isLocked) {
+      const unitFare = await getCabinPrice(
+        this.bookingRepo.manager,
+        booking.flightInstanceId,
+        booking.cabin,
+      );
+      const unitCharges = await calculateActiveCharges(
+        this.bookingRepo.manager,
+        booking.flightInstanceId,
+        unitFare,
+        booking.cabin,
+        booking.flightInstance.departureAt,
+      );
+      const chargePerPax = BigInt(unitCharges.totalChargesIrr);
+      currentTaxIrr =
+        (currentFareClass?.taxIrr ?? 0n) * bookingPassengerCount +
+        chargePerPax * bookingPassengerCount;
+      currentPriceIrr =
+        unitFare * bookingPassengerCount + currentTaxIrr + booking.extrasIrr;
+      currentChargeSnapshot = unitCharges;
+    }
 
     if (!isLocked && currentPriceIrr !== booking.priceIrr) {
       if (options.confirmedPriceIrr !== currentPriceIrr) {
@@ -651,11 +1049,26 @@ export class BookingService {
       // Explicit state machine: payment capture flips HELD→PAID, ticket
       // issuance then flips PAID→TICKETED — both inside this transaction,
       // each guarded so a concurrent double-pay hits affected===0 and 409s.
-      const captured = await tx.update(
-        Booking,
-        { id, status: 'HELD' },
-        { status: 'PAID', priceIrr: finalPriceIrr },
-      );
+      let captured: UpdateResult;
+      if (isLocked) {
+        captured = await tx.update(
+          Booking,
+          { id, status: 'HELD' },
+          { status: 'PAID', priceIrr: finalPriceIrr },
+        );
+      } else {
+        captured = await tx
+          .createQueryBuilder()
+          .update(Booking)
+          .set({
+            status: 'PAID',
+            priceIrr: finalPriceIrr,
+            taxIrr: currentTaxIrr,
+            chargeSnapshot: currentChargeSnapshot,
+          })
+          .where('id = :id AND status = :status', { id, status: 'HELD' })
+          .execute();
+      }
       if ((captured.affected ?? 0) === 0) {
         const latestRaw = await this.bookingWithFlightQuery(tx)
           .where('b.id = :id', { id })

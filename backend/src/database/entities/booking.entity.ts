@@ -10,12 +10,15 @@ import {
   PrimaryColumn,
 } from 'typeorm';
 import { BookingChannel, BookingStatus, CabinClass } from '../enums';
+import type { JsonValue } from '../json-types';
 import { bigintTransformer } from '../transformers/bigint.transformer';
 import { AgencyProfile } from './agency-profile.entity';
+import { AgencyAllotment } from './agency-allotment.entity';
 import { FlightInstance } from './flight-instance.entity';
 import { User } from './user.entity';
 
 @Index('bookings_agencyId_idx', ['agencyId'])
+@Index('bookings_allotmentId_idx', ['allotmentId'])
 @Index('bookings_channel_idx', ['channel'])
 @Index('bookings_flightInstanceId_status_idx', ['flightInstanceId', 'status'])
 @Index('bookings_idempotencyKey_key', ['idempotencyKey'], { unique: true })
@@ -38,6 +41,7 @@ export class Booking {
   @BeforeInsert()
   defaultTaxIrr() {
     this.taxIrr ??= 0n;
+    this.extrasIrr ??= 0n;
   }
 
   @Column({ type: 'text' })
@@ -68,6 +72,19 @@ export class Booking {
     foreignKeyConstraintName: 'bookings_agencyId_fkey',
   })
   agency!: AgencyProfile | null;
+
+  @Column({ type: 'text', nullable: true })
+  allotmentId!: string | null;
+
+  @ManyToOne(() => AgencyAllotment, {
+    onDelete: 'RESTRICT',
+    onUpdate: 'CASCADE',
+  })
+  @JoinColumn({
+    name: 'allotmentId',
+    foreignKeyConstraintName: 'bookings_allotmentId_fkey',
+  })
+  allotment!: AgencyAllotment | null;
 
   @Column({
     type: 'enum',
@@ -118,4 +135,27 @@ export class Booking {
 
   @Column({ type: 'bigint', default: 0, transformer: bigintTransformer })
   taxIrr!: bigint;
+
+  /** Immutable purchase-time snapshot. Later manager price changes must not
+   * alter an already held/paid booking. */
+  @Column({ type: 'jsonb', default: [] })
+  extrasSnapshot!: {
+    id: string;
+    code: string;
+    titleFa: string;
+    billingUnit: string;
+    unitPriceIrr: string;
+    quantity: number;
+    totalIrr: string;
+  }[];
+
+  @Column({ type: 'bigint', default: 0, transformer: bigintTransformer })
+  extrasIrr!: bigint;
+
+  /**
+   * Immutable charge/tax breakdown captured at booking time so later rule
+   * edits never rewrite historical reservations.
+   */
+  @Column({ type: 'jsonb', nullable: true })
+  chargeSnapshot!: JsonValue | null;
 }

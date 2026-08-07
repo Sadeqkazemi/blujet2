@@ -1,4 +1,12 @@
-export type PricingStatus = 'PENDING' | 'REGISTERED';
+import type {
+  CabinCapacity,
+  CalculatedChargeBreakdown,
+  ChargeRule,
+  FlightDefinitionSnapshot,
+} from "./flights";
+import type { FlightApprovalStatus } from "../lib/flight-definition";
+
+export type PricingStatus = "PENDING" | "REGISTERED" | "REJECTED";
 
 export interface AiSuggestion {
   // Advisory-only ML output, persisted as a plain JSON blob (not a native
@@ -27,22 +35,39 @@ export interface PricingProposal {
   status: PricingStatus;
   registeredPriceIrr: string | null;
   approvedAt: string | null;
+  rejectionReason?: string | null;
   aiSuggestion: AiSuggestion | null;
   createdAt: string;
   proposedBy: { id: string; fullName: string; role: string };
   approvedBy: { id: string; fullName: string; role: string } | null;
+  calculatedChargeBreakdown?: CalculatedChargeBreakdown | null;
+  chargeRules?: ChargeRule[];
+  cabinCapacities?: CabinCapacity[];
+  durationMinutes?: number;
+  aircraftType?: string;
+  approvalStatus?: FlightApprovalStatus;
+  pendingRevision?: boolean;
+  approvedSnapshot?: FlightDefinitionSnapshot | null;
+  changeSummary?: string[];
   flightInstance: {
     id: string;
     departureAt: string;
     capacity: number;
     charterSeats: number;
-    flight: { flightNo: string; route: { originCode: string; destCode: string } };
+    durationMinutes?: number;
+    aircraftType?: string;
+    cabinCapacities?: CabinCapacity[];
+    flight: {
+      flightNo: string;
+      route: { originCode: string; destCode: string };
+    };
   };
 }
 
 export interface CeoPricingResult {
   pending: PricingProposal[];
   registered: PricingProposal[];
+  pendingApprovalsCount?: number;
 }
 
 export interface CommercialFlightRow {
@@ -52,6 +77,8 @@ export interface CommercialFlightRow {
   charterSeats: number;
   /** Instance base fare (ریال) — shown even before a proposal exists. */
   basePriceIrr: string | null;
+  /** Real competitor fare when present — never invent base+3% client-side. */
+  competitorPriceIrr?: string | null;
   flight: { flightNo: string; route: { originCode: string; destCode: string } };
   pricing: PricingProposal | null;
 }

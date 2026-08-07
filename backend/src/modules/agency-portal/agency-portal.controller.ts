@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   Param,
   Post,
   Res,
@@ -30,13 +31,18 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
+import { BookingService } from '../booking-engine/booking.service';
+import { CreateAllotmentBookingDto } from './dto/create-allotment-booking.dto';
 
 @ApiTags('agency-portal')
 @Controller('agency-portal')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('AGENCY')
 export class AgencyPortalController {
-  constructor(private readonly portal: AgencyPortalService) {}
+  constructor(
+    private readonly portal: AgencyPortalService,
+    private readonly bookings: BookingService,
+  ) {}
 
   @Get('dashboard')
   @ApiOperation({ summary: 'داشبورد خودِ آژانس — KPI + نمودار ۶ماهه + اعتبار' })
@@ -146,6 +152,28 @@ export class AgencyPortalController {
   @ApiOperation({ summary: 'سهمیه‌های صندلی تخصیص‌یافته به خودِ آژانس' })
   async allotments(@CurrentUser() actor: AuthenticatedUser) {
     return { success: true, data: await this.portal.allotments(actor) };
+  }
+
+  @Post('allotments/:allotmentId/bookings')
+  @ApiOperation({
+    summary: 'فروش قطعی بلیت از سهمیه فعال آژانس و کسر اعتبار',
+  })
+  async createAllotmentBooking(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('allotmentId') allotmentId: string,
+    @Body() dto: CreateAllotmentBookingDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    await this.portal.assertAgencyWritable(actor);
+    return {
+      success: true,
+      data: await this.bookings.createAgencyAllotmentBooking(
+        actor,
+        allotmentId,
+        dto,
+        idempotencyKey,
+      ),
+    };
   }
 
   @Get('documents')

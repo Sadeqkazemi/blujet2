@@ -58,4 +58,29 @@ describe('BookPage', () => {
       expect(screen.getByTestId('signin-page')).toBeInTheDocument();
     });
   });
+
+  it('redirects authenticated users into checkout with cabin=COMFORT', async () => {
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      status: 'authenticated',
+      user: { id: 'u1', fullName: 'Test', role: 'USER', preferredLocale: 'FA', mustChangePassword: false },
+      requestLogin: vi.fn(),
+      confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
+      signOut: vi.fn(),
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/book/fi-1?cabin=COMFORT']}>
+        <Routes>
+          <Route path="/book/:flightInstanceId" element={<BookPage />} />
+          <Route
+            path="/checkout/new"
+            element={<div data-testid="checkout-wizard">checkout</div>}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByTestId('checkout-wizard')).toBeInTheDocument();
+  });
 });

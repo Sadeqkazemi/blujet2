@@ -86,6 +86,15 @@ describe('Pricing (e2e)', () => {
     );
   }
 
+  async function setProposalCompetitor(
+    proposalId: string,
+    competitorPriceIrr = 40_000_000n,
+  ) {
+    await dataSource
+      .getRepository(FarePricingProposal)
+      .update({ id: proposalId }, { competitorPriceIrr });
+  }
+
   it('Commercial proposes a price for a scheduled flight; re-PUT while PENDING edits it', async () => {
     const instance = await createScheduledInstance();
     const { accessToken } = await loginAs(app, 'comm');
@@ -181,7 +190,10 @@ describe('Pricing (e2e)', () => {
       .patch(`/pricing/proposals/${proposalId}/register`)
       .set('Authorization', `Bearer ${ceo.accessToken}`)
       .send({ source: 'PROPOSED', ...stepUp2 });
-    expect(reRegister.status).toBe(409);
+    // Re-register is idempotent (same REGISTERED row); commercial re-edit stays 409.
+    expect(reRegister.status).toBe(200);
+    expect(reRegister.body.data.status).toBe('REGISTERED');
+    expect(reRegister.body.data.registeredPriceIrr).toBe('38500000');
   });
 
   it('register with source=AI without a stored suggestion → 409 with a clear message', async () => {
@@ -215,6 +227,7 @@ describe('Pricing (e2e)', () => {
       .set('Authorization', `Bearer ${commercial.accessToken}`)
       .send({ proposedPriceIrr: 38_500_000 });
     const proposalId = created.body.data.id as string;
+    await setProposalCompetitor(proposalId);
 
     fakeMl.nextResult = {
       model_version: 'heuristic-test',
@@ -279,6 +292,7 @@ describe('Pricing (e2e)', () => {
       .set('Authorization', `Bearer ${commercial.accessToken}`)
       .send({ proposedPriceIrr: 38_500_000 });
     const proposalId = created.body.data.id as string;
+    await setProposalCompetitor(proposalId);
 
     fakeMl.nextResult = {
       model_version: 'heuristic-test',
@@ -336,6 +350,7 @@ describe('Pricing (e2e)', () => {
       .set('Authorization', `Bearer ${commercial.accessToken}`)
       .send({ proposedPriceIrr: 38_500_000, legalRateIrr: 40_000_000 });
     const proposalId = created.body.data.id as string;
+    await setProposalCompetitor(proposalId);
 
     fakeMl.nextResult = {
       model_version: 'heuristic-test',
@@ -407,6 +422,27 @@ describe('Pricing (e2e)', () => {
     expect(registered.status).toBe(200);
   });
 
+  it('ai-analysis skips proposals without a real competitor price', async () => {
+    const instance = await createScheduledInstance();
+    const commercial = await loginAs(app, 'comm');
+    await request(app.getHttpServer())
+      .put(`/pricing/flights/${instance.id}/proposal`)
+      .set('Authorization', `Bearer ${commercial.accessToken}`)
+      .send({ proposedPriceIrr: 38_500_000 });
+
+    await dataSource
+      .getRepository(FarePricingProposal)
+      .update({ status: 'PENDING' }, { competitorPriceIrr: null });
+
+    const ceo = await loginAs(app, 'ceo');
+    const analysis = await request(app.getHttpServer())
+      .post('/pricing/proposals/ai-analysis')
+      .set('Authorization', `Bearer ${ceo.accessToken}`);
+    expect(analysis.status).toBe(201);
+    expect(analysis.body.data).toEqual({ analyzed: 0, available: true });
+    expect(fakeMl.lastItems).toEqual([]);
+  });
+
   it('CEO legal-rate PATCH stores + audits; Finance/Board Chair get 403 everywhere', async () => {
     const instance = await createScheduledInstance();
     const commercial = await loginAs(app, 'comm');
@@ -423,6 +459,24 @@ describe('Pricing (e2e)', () => {
       .send({ legalRateIrr: 45_000_000 });
     expect(legal.status).toBe(200);
     expect(legal.body.data.legalRateIrr).toBe('45000000');
+
+    const stepUp = await stepUpFor(
+      app,
+      ceo.accessToken!,
+      'ceo',
+      'PRICE_CAPACITY_CHANGE',
+    );
+    const registered = await request(app.getHttpServer())
+      .patch(`/pricing/proposals/${proposalId}/register`)
+      .set('Authorization', `Bearer ${ceo.accessToken}`)
+      .send({ source: 'PROPOSED', ...stepUp });
+    expect(registered.status).toBe(200);
+
+    const lockedLegalRate = await request(app.getHttpServer())
+      .patch(`/pricing/proposals/${proposalId}/legal-rate`)
+      .set('Authorization', `Bearer ${ceo.accessToken}`)
+      .send({ legalRateIrr: 46_000_000 });
+    expect(lockedLegalRate.status).toBe(409);
 
     const finance = await loginAs(app, 'finance');
     const listForbidden = await request(app.getHttpServer())

@@ -143,7 +143,7 @@ describe('Phase 16 — agency self-registration (e2e)', () => {
     expect(replay.status).toBe(401);
   });
 
-  it('review chain: SITE_ADMIN can list+refer, COMMERCIAL_MANAGER approves (SMS sent), other roles cannot approve', async () => {
+  it('review chain: commercial then finance approval creates the agency and sends credentials', async () => {
     const phone = '09121110003';
     const created = await submitFreshRequest(phone);
     const requestId = created.body.data.id as string;
@@ -168,11 +168,22 @@ describe('Phase 16 — agency self-registration (e2e)', () => {
       .patch(`/agencies/requests/${requestId}/approve`)
       .set('Authorization', auth(commercial.accessToken));
     expect(approve.status).toBe(200);
-    expect(approve.body.data.tempPassword).toBeTruthy();
+    expect(approve.body.data.stage).toBe('AWAITING_FINANCE');
+    expect(
+      await dataSource.getRepository(User).findOneBy({ phone }),
+    ).toBeNull();
+
+    const finance = await loginAs(app, 'finance');
+    const finalApproval = await request(app.getHttpServer())
+      .patch(`/agencies/requests/${requestId}/approve`)
+      .set('Authorization', auth(finance.accessToken));
+    expect(finalApproval.status).toBe(200);
+    expect(finalApproval.body.data.stage).toBe('APPROVED');
+    expect(finalApproval.body.data.tempPassword).toBeTruthy();
 
     const agencyUser = await dataSource
       .getRepository(User)
-      .findOneByOrFail({ id: approve.body.data.agencyId });
+      .findOneByOrFail({ id: finalApproval.body.data.agencyId });
     expect(agencyUser.role).toBe('AGENCY');
     expect(agencyUser.phone).toBe(phone);
 
