@@ -58,7 +58,7 @@ export interface CreateBookingPassenger {
 
 export function createBooking(dto: {
   flightInstanceId: string;
-  cabin: 'ECONOMY' | 'BUSINESS';
+  cabin: CabinClass;
   passengers: CreateBookingPassenger[];
 }) {
   return apiPost<BookingDetail>('/bookings', dto);

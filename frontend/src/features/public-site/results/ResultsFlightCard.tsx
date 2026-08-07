@@ -1,6 +1,8 @@
+import { useEffect, useState } from 'react';
 import type { StoredLocale } from '../../../hooks/useLocale';
 import { faDigits, localeMoney } from '../../../lib/fa-format';
 import { formatJalaliDate } from '../../../lib/jalali';
+import { publicCabinLabel } from '../../../lib/flight-definition';
 import type { CabinClass, SearchFlightResult } from '../../../types/public-site';
 import type { ResultsCopy } from './results-copy';
 import {
@@ -54,8 +56,22 @@ export default function ResultsFlightCard({
   onLock,
   onSave,
 }: Props) {
-  const cabin = primaryCabin(flight);
+  const defaultCabin = primaryCabin(flight);
+  const [selectedCabinClass, setSelectedCabinClass] = useState<CabinClass>(
+    defaultCabin?.cabin ?? 'ECONOMY',
+  );
+
+  useEffect(() => {
+    const next = primaryCabin(flight);
+    if (next) setSelectedCabinClass(next.cabin);
+  }, [flight.flightInstanceId, flight.cabins]);
+
+  const cabin =
+    flight.cabins.find((c) => c.cabin === selectedCabinClass) ?? defaultCabin;
   if (!cabin) return null;
+
+  const cabinLabel = publicCabinLabel(cabin.cabin, locale);
+  const hasMultipleCabins = flight.cabins.length > 1;
 
   const airline = flightAirlineLabel(flight.flightNo);
   const dep = formatFlightClock(flight.departureAt, locale, originTz);
@@ -311,7 +327,7 @@ export default function ResultsFlightCard({
                 [copy.flightNoLabel, flight.flightNo],
                 [copy.aircraftLabel, flight.aircraftType],
                 [copy.baggageLabel, '20 kg'],
-                [copy.cabinLabel, copy.economyLabel],
+                [copy.cabinLabel, cabinLabel],
               ].map(([label, value]) => (
                 <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5 }}>
                   <span style={{ color: '#6b7787' }}>{label}</span>
@@ -336,6 +352,37 @@ export default function ResultsFlightCard({
             }}
           >
             <div style={{ fontSize: 14.5, fontWeight: 800, color: '#16202e', marginBottom: 18 }}>{copy.priceDetailsLabel}</div>
+            {hasMultipleCabins && (
+              <div
+                style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}
+                data-testid="cabin-selector"
+              >
+                {flight.cabins.map((opt) => {
+                  const active = opt.cabin === cabin.cabin;
+                  return (
+                    <button
+                      key={opt.cabin}
+                      type="button"
+                      data-testid={`cabin-option-${opt.cabin}`}
+                      onClick={() => setSelectedCabinClass(opt.cabin)}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: 10,
+                        border: active ? '1.5px solid #1668c4' : '1px solid #d5e1f0',
+                        background: active ? '#eef4fb' : '#fff',
+                        color: active ? '#1668c4' : '#5a6678',
+                        fontSize: 12.5,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                      }}
+                    >
+                      {publicCabinLabel(opt.cabin, locale)}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             <div style={{ fontSize: 13.5, color: '#5a6678', marginBottom: 12 }}>{copy.adultPaxLabel}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 9, fontSize: 13.5 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>

@@ -7,10 +7,11 @@ import {
   isValidHhMm,
   minutesFromDuration,
   previewChargeTotalIrr,
+  previewChargeTotalsByCabin,
   sanitizeFlightNoInput,
   sumCabinSeats,
 } from "./flight-definition";
-import { formatTomanGrouped, tomanDigitsOnly } from "../components/MoneyInput";
+import { formatTomanGrouped, tomanDigitsOnly } from "./money-input";
 import { parseTomanToRial } from "./fa-format";
 
 describe("flight number", () => {
@@ -58,24 +59,67 @@ describe("money grouping", () => {
 });
 
 describe("charge preview", () => {
-  it("adds fixed and percent lines", () => {
-    const preview = previewChargeTotalIrr(10_000_000, [
-      {
-        kind: "TAX",
-        method: "FIXED",
-        amount: 100_000,
-        cabin: "ALL",
-        active: true,
-      },
-      {
-        kind: "FEE",
-        method: "PERCENT",
-        amount: 10,
-        cabin: "ECONOMY",
-        active: true,
-      },
-    ]);
+  const mixedRules = [
+    {
+      kind: "TAX" as const,
+      method: "FIXED" as const,
+      amount: 100_000,
+      cabin: "ALL" as const,
+      active: true,
+    },
+    {
+      kind: "FEE" as const,
+      method: "PERCENT" as const,
+      amount: 10,
+      cabin: "ECONOMY" as const,
+      active: true,
+    },
+  ];
+
+  it("adds fixed and percent lines for a specific cabin", () => {
+    const preview = previewChargeTotalIrr(
+      10_000_000,
+      mixedRules,
+      "ECONOMY",
+    );
     expect(preview.lines).toHaveLength(2);
     expect(preview.totalIrr).toBe(11_100_000);
+  });
+
+  it("returns per-cabin summaries via previewChargeTotalsByCabin", () => {
+    const byCabin = previewChargeTotalsByCabin(10_000_000, mixedRules);
+    expect(byCabin.ECONOMY.totalIrr).toBe(11_100_000);
+    expect(byCabin.COMFORT.totalIrr).toBe(10_100_000);
+    expect(byCabin.BUSINESS.totalIrr).toBe(10_100_000);
+  });
+
+  it("does not include BUSINESS tax in ECONOMY total", () => {
+    const rules = [
+      {
+        kind: "TAX" as const,
+        method: "FIXED" as const,
+        amount: 500_000,
+        cabin: "BUSINESS" as const,
+        active: true,
+        title: "مالیات بیزینس",
+      },
+      {
+        kind: "TAX" as const,
+        method: "FIXED" as const,
+        amount: 100_000,
+        cabin: "ECONOMY" as const,
+        active: true,
+        title: "مالیات اکونومی",
+      },
+    ];
+    const economy = previewChargeTotalIrr(10_000_000, rules, "ECONOMY");
+    const business = previewChargeTotalIrr(10_000_000, rules, "BUSINESS");
+
+    expect(economy.lines).toHaveLength(1);
+    expect(economy.lines[0]?.title).toBe("مالیات اکونومی");
+    expect(economy.totalIrr).toBe(10_100_000);
+    expect(business.lines).toHaveLength(1);
+    expect(business.lines[0]?.title).toBe("مالیات بیزینس");
+    expect(business.totalIrr).toBe(10_500_000);
   });
 });

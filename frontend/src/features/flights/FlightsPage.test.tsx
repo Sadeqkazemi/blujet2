@@ -319,6 +319,38 @@ describe("FlightsPage", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("Senior future flights show pricing status but not the CEO pricing panel link", async () => {
+    mockRole("SENIOR_MANAGER");
+    mockData({
+      ...OVERVIEW,
+      future: [
+        {
+          ...FUTURE_ROW,
+          approvalStatus: "PENDING_CEO",
+          pricingRegistered: false,
+        },
+      ],
+    });
+
+    const { default: userEvent } = await import("@testing-library/user-event");
+    render(<FlightsPage />);
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "پروازهای آینده" }),
+    );
+    expect(screen.getAllByText("در انتظار تأیید مدیرعامل").length).toBeGreaterThan(
+      0,
+    );
+    expect(
+      screen.queryByRole("button", {
+        name: "مشاهده در پنل تأیید مدیرعامل",
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("پنل تأیید مدیرعامل — قیمت‌گذاری"),
+    ).not.toBeInTheDocument();
+  });
+
   describe("aircraft-type change", () => {
     const AIRCRAFT_TYPES: AircraftTypeOption[] = [
       { aircraftType: "Airbus A320", capacity: 180 },

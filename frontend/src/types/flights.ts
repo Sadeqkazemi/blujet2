@@ -18,10 +18,12 @@ export interface ChargeRule {
   id?: string;
   title: string;
   kind: ChargeKind;
-  method: ChargeMethod;
-  /** FIXED: IRR integer; PERCENT: basis points-free percent integer/decimal as number. */
-  amount: number;
-  cabin: CabinKind | "ALL";
+  /** Backend contract — not the form method name. */
+  calculationMode: 'FIXED' | 'PERCENTAGE';
+  fixedAmountIrr?: number | null;
+  percentageBasisPoints?: number | null;
+  /** null = all cabins. */
+  cabin: CabinKind | null;
   validFrom: string | null;
   validUntil: string | null;
   active: boolean;

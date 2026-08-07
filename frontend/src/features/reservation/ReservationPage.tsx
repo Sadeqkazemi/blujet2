@@ -1840,7 +1840,11 @@ function SeatMapModal({
   }, [seatMap.rows]);
 
   const cabinSections = useMemo(() => {
-    const sections: { cabin: 'BUSINESS' | 'ECONOMY'; label: string; rows: SeatMap['rows'] }[] = [];
+    const sections: {
+      cabin: 'BUSINESS' | 'COMFORT' | 'ECONOMY';
+      label: string;
+      rows: SeatMap['rows'];
+    }[] = [];
     for (const row of seatMap.rows) {
       const last = sections[sections.length - 1];
       if (!last || last.cabin !== row.cabin) {
@@ -1849,7 +1853,9 @@ function SeatMapModal({
           label:
             row.cabin === 'BUSINESS'
               ? 'کلاس بیزینس (Business)'
-              : 'کلاس اقتصادی (Economy)',
+              : row.cabin === 'COMFORT'
+                ? 'کلاس کامفورت (Comfort)'
+                : 'کلاس اقتصادی (Economy)',
           rows: [row],
         });
       } else {
@@ -1916,7 +1922,10 @@ function SeatMapModal({
                     <div className="mb-2 text-[11px] font-bold text-[#9fb0c7]">{section.label}</div>
                     <div className="flex flex-col gap-1.5">
                       {section.rows.map((row) => {
-                        const aisleAfterIndex = seatMap.cabinLayout[row.cabin].aisleAfterIndex;
+                        const aisleAfterIndex =
+                          seatMap.cabinLayout[row.cabin]?.aisleAfterIndex ??
+                          seatMap.cabinLayout.ECONOMY?.aisleAfterIndex ??
+                          2;
                         return (
                           <div key={row.row} className="flex items-center justify-center gap-1.5">
                             <span className="font-num w-5 text-center text-[9px] font-bold text-[#6b7b94]">

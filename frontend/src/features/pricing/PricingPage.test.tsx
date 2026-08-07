@@ -138,9 +138,28 @@ function renderPage() {
 }
 
 describe("PricingPage", () => {
+  it("SENIOR_MANAGER sees access denied and does not call pricing APIs", async () => {
+    mockRole("SENIOR_MANAGER");
+    const fetchCeo = vi.spyOn(pricingApi, "fetchCeoPricing");
+    const fetchCommercial = vi.spyOn(pricingApi, "fetchCommercialPricing");
+    const fetchCount = vi.spyOn(pricingApi, "fetchPendingApprovalsCount");
+
+    renderPage();
+
+    expect(await screen.findByTestId("pricing-access-denied")).toHaveTextContent(
+      "دسترسی به این بخش مجاز نیست.",
+    );
+    expect(fetchCeo).not.toHaveBeenCalled();
+    expect(fetchCommercial).not.toHaveBeenCalled();
+    expect(fetchCount).not.toHaveBeenCalled();
+  });
+
   it("CEO sees the workflow banner, AI button, pending cards with the three price columns and register buttons", async () => {
     mockRole("CEO");
     vi.spyOn(pricingApi, "fetchCeoPricing").mockResolvedValue(CEO_DATA);
+    vi.spyOn(pricingApi, "fetchPendingApprovalsCount").mockResolvedValue({
+      pendingApprovalsCount: 2,
+    });
 
     renderPage();
 
@@ -178,6 +197,9 @@ describe("PricingPage", () => {
       pending: [],
       registered: [],
     });
+    vi.spyOn(pricingApi, "fetchPendingApprovalsCount").mockResolvedValue({
+      pendingApprovalsCount: 0,
+    });
 
     renderPage();
 
@@ -191,6 +213,9 @@ describe("PricingPage", () => {
   it("CEO approving proposed price calls registerProposal with step-up", async () => {
     mockRole("CEO");
     vi.spyOn(pricingApi, "fetchCeoPricing").mockResolvedValue(CEO_DATA);
+    vi.spyOn(pricingApi, "fetchPendingApprovalsCount").mockResolvedValue({
+      pendingApprovalsCount: 2,
+    });
     vi.spyOn(authApi, "requestStepUp").mockResolvedValue({
       challengeId: "ch1",
     });
@@ -232,6 +257,9 @@ describe("PricingPage", () => {
   it("CEO reject requires a reason before calling the API", async () => {
     mockRole("CEO");
     vi.spyOn(pricingApi, "fetchCeoPricing").mockResolvedValue(CEO_DATA);
+    vi.spyOn(pricingApi, "fetchPendingApprovalsCount").mockResolvedValue({
+      pendingApprovalsCount: 2,
+    });
     vi.spyOn(authApi, "requestStepUp").mockResolvedValue({
       challengeId: "ch2",
     });
@@ -290,6 +318,9 @@ describe("PricingPage", () => {
   it("CEO registering with AI calls the API with source=AI", async () => {
     mockRole("CEO");
     vi.spyOn(pricingApi, "fetchCeoPricing").mockResolvedValue(CEO_DATA);
+    vi.spyOn(pricingApi, "fetchPendingApprovalsCount").mockResolvedValue({
+      pendingApprovalsCount: 2,
+    });
     vi.spyOn(authApi, "requestStepUp").mockResolvedValue({
       challengeId: "ch1",
     });
@@ -326,6 +357,9 @@ describe("PricingPage", () => {
   it("CEO AI-analysis outage shows the graceful degradation message", async () => {
     mockRole("CEO");
     vi.spyOn(pricingApi, "fetchCeoPricing").mockResolvedValue(CEO_DATA);
+    vi.spyOn(pricingApi, "fetchPendingApprovalsCount").mockResolvedValue({
+      pendingApprovalsCount: 2,
+    });
     vi.spyOn(pricingApi, "runAiAnalysis").mockResolvedValue({
       analyzed: 0,
       available: false,
@@ -344,6 +378,62 @@ describe("PricingPage", () => {
         "سرویس تحلیل هوش مصنوعی در دسترس نیست؛ تأیید قیمت پیشنهادی همچنان ممکن است.",
       ),
     ).toBeInTheDocument();
+  });
+
+  it("CEO pending badge uses fetchPendingApprovalsCount when API succeeds", async () => {
+    mockRole("CEO");
+    vi.spyOn(pricingApi, "fetchCeoPricing").mockResolvedValue({
+      pending: [PROPOSAL],
+      registered: [],
+      pendingApprovalsCount: 1,
+    });
+    vi.spyOn(pricingApi, "fetchPendingApprovalsCount").mockResolvedValue({
+      pendingApprovalsCount: 5,
+    });
+
+    renderPage();
+
+    expect(
+      await screen.findByText("پروازهای در انتظار تأیید نهایی"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("۵")).toBeInTheDocument();
+  });
+
+  it("CEO pending badge shows zero when count API returns zero", async () => {
+    mockRole("CEO");
+    vi.spyOn(pricingApi, "fetchCeoPricing").mockResolvedValue({
+      pending: [],
+      registered: [],
+    });
+    vi.spyOn(pricingApi, "fetchPendingApprovalsCount").mockResolvedValue({
+      pendingApprovalsCount: 0,
+    });
+
+    renderPage();
+
+    expect(
+      await screen.findByText("پروازهای در انتظار تأیید نهایی"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("۰")).toBeInTheDocument();
+    expect(screen.getByText("اطلاعاتی یافت نشد")).toBeInTheDocument();
+  });
+
+  it("CEO pending badge falls back to pending.length when count API fails", async () => {
+    mockRole("CEO");
+    vi.spyOn(pricingApi, "fetchCeoPricing").mockResolvedValue({
+      pending: [PROPOSAL, WITH_AI],
+      registered: [],
+    });
+    vi.spyOn(pricingApi, "fetchPendingApprovalsCount").mockRejectedValue(
+      new Error("network"),
+    );
+
+    renderPage();
+
+    const pendingHeading = await screen.findByText(
+      "پروازهای در انتظار تأیید نهایی",
+    );
+    expect(pendingHeading.parentElement).toHaveTextContent("۲");
   });
 
   it("Commercial sees the three row states and the correct button labels", async () => {

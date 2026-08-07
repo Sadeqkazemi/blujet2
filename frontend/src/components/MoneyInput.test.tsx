@@ -2,7 +2,8 @@ import { useState } from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import MoneyInput, { formatTomanGrouped } from "./MoneyInput";
+import { formatTomanGrouped } from "../lib/money-input";
+import MoneyInput from "./MoneyInput";
 import JalaliDatePicker from "./JalaliDatePicker";
 import { dayjs, toIsoDateOnly } from "../lib/jalali";
 

@@ -5,7 +5,7 @@ export interface Airport {
   tz: string;
 }
 
-export type CabinClass = 'ECONOMY' | 'BUSINESS';
+export type CabinClass = 'ECONOMY' | 'COMFORT' | 'BUSINESS';
 
 export interface SearchCabinOption {
   cabin: CabinClass;
@@ -74,10 +74,7 @@ export interface SeatMapCabinLayout {
 export interface SeatMapResult {
   flightInstanceId: string;
   aircraftType?: string;
-  cabinLayout?: {
-    BUSINESS: SeatMapCabinLayout;
-    ECONOMY: SeatMapCabinLayout;
-  };
+  cabinLayout?: Partial<Record<CabinClass, SeatMapCabinLayout>>;
   excludedSeatCodes?: string[];
   seats: SeatMapCell[];
 }

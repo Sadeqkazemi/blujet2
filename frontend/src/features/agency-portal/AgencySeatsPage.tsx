@@ -8,10 +8,11 @@ import { useEffect, useState } from 'react';
 import { createAllotmentBooking, fetchAllotments } from '../../api/agency-portal';
 import { fetchSeatMap } from '../../api/publicSite';
 import { faDigits } from '../../lib/fa-format';
+import { publicCabinLabel } from '../../lib/flight-definition';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import type { AgencyAllotmentRow } from '../../types/agency-portal';
-import type { SeatMapResult } from '../../types/public-site';
+import type { CabinClass, SeatMapResult } from '../../types/public-site';
 
 const STR: Record<
   StoredLocale,
@@ -106,7 +107,7 @@ export default function AgencySeatsPage() {
     fullName: '',
     nationalId: '',
     mobile: '',
-    cabin: 'ECONOMY' as 'ECONOMY' | 'BUSINESS',
+    cabin: 'ECONOMY' as CabinClass,
     seatCode: '',
   });
 
@@ -277,14 +278,21 @@ export default function AgencySeatsPage() {
                           onChange={(event) =>
                             setForm({
                               ...form,
-                              cabin: event.target.value as 'ECONOMY' | 'BUSINESS',
+                              cabin: event.target.value as CabinClass,
                               seatCode: '',
                             })
                           }
                           className="mt-1 w-full rounded-lg border border-[#d6e4f8] bg-white p-2.5 text-sm outline-none"
                         >
-                          <option value="ECONOMY">Economy</option>
-                          <option value="BUSINESS">Business</option>
+                          <option value="ECONOMY">
+                            {publicCabinLabel('ECONOMY', locale)}
+                          </option>
+                          <option value="COMFORT">
+                            {publicCabinLabel('COMFORT', locale)}
+                          </option>
+                          <option value="BUSINESS">
+                            {publicCabinLabel('BUSINESS', locale)}
+                          </option>
                         </select>
                       </label>
                       <label className="text-[11px] font-bold text-[#3f546b]">

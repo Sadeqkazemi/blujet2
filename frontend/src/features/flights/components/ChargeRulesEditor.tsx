@@ -1,68 +1,27 @@
 import { useMemo, useState } from "react";
 import JalaliDatePicker from "../../../components/JalaliDatePicker";
-import MoneyInput, {
-  moneyInputToRial,
-  formatTomanGrouped,
-} from "../../../components/MoneyInput";
+import MoneyInput from "../../../components/MoneyInput";
 import {
+  type DraftChargeRule,
+  draftRulesForPreview,
+  emptyDraftChargeRule,
+} from "../../../lib/charge-rules-adapter";
+import {
+  CABIN_KIND_ORDER,
   CABIN_OPTIONS,
+  cabinLabel,
+  previewChargeTotalsByCabin,
   type CabinKind,
   type ChargeKind,
   type ChargeMethod,
-  previewChargeTotalIrr,
 } from "../../../lib/flight-definition";
+import { moneyInputToRial } from "../../../lib/money-input";
 import { faDigits, faMoney, latinDigits } from "../../../lib/fa-format";
-import { toIsoDateOnly, dayjs, isoDateAtNoon } from "../../../lib/jalali";
+import { dayjs } from "../../../lib/jalali";
 
 const inputClass =
   "w-full box-border h-11 rounded-[10px] border border-[#28344c] bg-[#0f1726] px-3 text-[13px] text-[#e7ecf3] outline-none";
 const selectClass = inputClass;
-
-export interface DraftChargeRule {
-  key: string;
-  title: string;
-  kind: ChargeKind;
-  method: ChargeMethod;
-  /** Display: toman grouped for FIXED, percent digits for PERCENT. */
-  amountInput: string;
-  cabin: CabinKind | "ALL";
-  validFromIso: string | null;
-  validUntilIso: string | null;
-  active: boolean;
-}
-
-function emptyRule(): DraftChargeRule {
-  return {
-    key: `ch-${Date.now()}`,
-    title: "",
-    kind: "TAX",
-    method: "FIXED",
-    amountInput: "",
-    cabin: "ALL",
-    validFromIso: null,
-    validUntilIso: null,
-    active: true,
-  };
-}
-
-export function draftRulesToApi(rules: DraftChargeRule[]) {
-  return rules.map((r) => {
-    const amount =
-      r.method === "FIXED"
-        ? (moneyInputToRial(r.amountInput) ?? 0)
-        : Number(latinDigits(r.amountInput).replace(/[^\d.]/g, "")) || 0;
-    return {
-      title: r.title.trim(),
-      kind: r.kind,
-      method: r.method,
-      amount,
-      cabin: r.cabin,
-      validFrom: r.validFromIso,
-      validUntil: r.validUntilIso,
-      active: r.active,
-    };
-  });
-}
 
 export default function ChargeRulesEditor({
   rules,
@@ -76,19 +35,13 @@ export default function ChargeRulesEditor({
   const [editing, setEditing] = useState<DraftChargeRule | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const preview = useMemo(() => {
-    const apiLike = draftRulesToApi(rules).map((r) => ({
-      kind: r.kind,
-      method: r.method,
-      amount: r.amount,
-      cabin: r.cabin,
-      active: r.active,
-    }));
-    return previewChargeTotalIrr(basePriceIrr, apiLike);
+  const previewsByCabin = useMemo(() => {
+    const apiLike = draftRulesForPreview(rules);
+    return previewChargeTotalsByCabin(basePriceIrr, apiLike);
   }, [rules, basePriceIrr]);
 
   function openCreate() {
-    setEditing(emptyRule());
+    setEditing(emptyDraftChargeRule());
     setFormError(null);
   }
 
@@ -405,62 +358,49 @@ export default function ChargeRulesEditor({
         className="rounded-xl border border-[#2a3550] bg-[#0f1623] p-3"
         data-testid="charge-breakdown-preview"
       >
-        <div className="mb-2 text-[12px] font-extrabold text-white">
+        <div className="mb-3 text-[12px] font-extrabold text-white">
           خلاصه محاسبه (پیش‌نمایش)
         </div>
-        <div className="flex justify-between text-[11.5px] text-[#9fb0c7]">
-          <span>قیمت پایه</span>
-          <span className="font-num text-[#e7ecf3]">
-            {faMoney(basePriceIrr)} تومان
-          </span>
-        </div>
-        {preview.lines.map((line, i) => (
-          <div
-            key={`${line.title}-${i}`}
-            className="mt-1 flex justify-between text-[11.5px] text-[#9fb0c7]"
-          >
-            <span>{line.title}</span>
-            <span className="font-num text-[#e7ecf3]">
-              {faMoney(line.amountIrr)} تومان
-            </span>
-          </div>
-        ))}
-        <div className="mt-2 flex justify-between border-t border-[#28344c] pt-2 text-[12.5px] font-extrabold text-white">
-          <span>مجموع نهایی</span>
-          <span className="font-num">{faMoney(preview.totalIrr)} تومان</span>
+        <div className="flex flex-col gap-3">
+          {CABIN_KIND_ORDER.map((cabin) => {
+            const preview = previewsByCabin[cabin];
+            return (
+              <div
+                key={cabin}
+                className="rounded-lg border border-[#28344c] bg-[#141d2e] p-3"
+                data-testid={`charge-preview-${cabin}`}
+              >
+                <div className="mb-2 text-[11.5px] font-extrabold text-[#60a5fa]">
+                  {cabinLabel(cabin)}
+                </div>
+                <div className="flex justify-between text-[11.5px] text-[#9fb0c7]">
+                  <span>قیمت پایه</span>
+                  <span className="font-num text-[#e7ecf3]">
+                    {faMoney(basePriceIrr)} تومان
+                  </span>
+                </div>
+                {preview.lines.map((line, i) => (
+                  <div
+                    key={`${cabin}-${line.title}-${i}`}
+                    className="mt-1 flex justify-between text-[11.5px] text-[#9fb0c7]"
+                  >
+                    <span>{line.title}</span>
+                    <span className="font-num text-[#e7ecf3]">
+                      {faMoney(line.amountIrr)} تومان
+                    </span>
+                  </div>
+                ))}
+                <div className="mt-2 flex justify-between border-t border-[#28344c] pt-2 text-[12px] font-extrabold text-white">
+                  <span>مجموع نهایی</span>
+                  <span className="font-num">
+                    {faMoney(preview.totalIrr)} تومان
+                  </span>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </section>
   );
-}
-
-export function chargeRuleFromApi(rule: {
-  id?: string;
-  title: string;
-  kind: ChargeKind;
-  method: ChargeMethod;
-  amount: number;
-  cabin: CabinKind | "ALL";
-  validFrom: string | null;
-  validUntil: string | null;
-  active: boolean;
-}): DraftChargeRule {
-  return {
-    key: rule.id ?? `ch-${Math.random().toString(36).slice(2)}`,
-    title: rule.title,
-    kind: rule.kind,
-    method: rule.method,
-    amountInput:
-      rule.method === "FIXED"
-        ? formatTomanGrouped(String(Math.round(rule.amount / 10)))
-        : String(rule.amount),
-    cabin: rule.cabin,
-    validFromIso: rule.validFrom
-      ? isoDateAtNoon(toIsoDateOnly(dayjs(rule.validFrom)))
-      : null,
-    validUntilIso: rule.validUntil
-      ? isoDateAtNoon(toIsoDateOnly(dayjs(rule.validUntil)))
-      : null,
-    active: rule.active,
-  };
 }

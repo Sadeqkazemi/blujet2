@@ -220,7 +220,9 @@ export default function FlightSeatMapModal({
                   let prevCabin: string | null = null;
                   return map.rows.map((row) => {
                     const aisleAfter =
-                      map.cabinLayout[row.cabin as 'BUSINESS' | 'ECONOMY']?.aisleAfterIndex ?? 2;
+                      map.cabinLayout[row.cabin]?.aisleAfterIndex ??
+                      map.cabinLayout.ECONOMY?.aisleAfterIndex ??
+                      2;
                     const label = genericCabinLabel(row.cabin, prevCabin);
                     prevCabin = row.cabin;
 

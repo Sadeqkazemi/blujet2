@@ -357,7 +357,9 @@ export default function FlightsPage() {
   const futurePager = usePagination(visibleFuture);
 
   const kpis = data?.kpis;
-  const isCommercial = user?.role === "COMMERCIAL_MANAGER";
+  const isCommercial =
+    user?.role === "COMMERCIAL_MANAGER" || user?.role === "EMPLOYEE";
+  const isCeo = user?.role === "CEO";
   const showFuturePanel =
     subTab === "future" || (isCommercial && subTab === "active");
   const subTabs = isCommercial
@@ -401,7 +403,9 @@ export default function FlightsPage() {
       });
       return;
     }
-    setPricingOverlayOpen(true);
+    if (isCeo) {
+      setPricingOverlayOpen(true);
+    }
   }
 
   return (
@@ -996,21 +1000,41 @@ export default function FlightsPage() {
                                   </span>
                                 )}
                                 {pricingVisible && (
-                                  <>
-                                    <span className="text-[10px] text-panel-muted">
-                                      {pricingStatusLabel(u)}
-                                    </span>
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        openPricingView();
-                                      }}
-                                      className="text-[10px] font-bold text-accent underline-offset-2 hover:underline"
-                                    >
-                                      مشاهده در پنل تأیید مدیرعامل
-                                    </button>
-                                  </>
+                                  <span className="text-[10px] text-panel-muted">
+                                    {pricingStatusLabel(u)}
+                                  </span>
+                                )}
+                                {pricingVisible && isCeo && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openPricingView();
+                                    }}
+                                    className="text-[10px] font-bold text-accent underline-offset-2 hover:underline"
+                                  >
+                                    مشاهده در پنل تأیید مدیرعامل
+                                  </button>
+                                )}
+                                {pricingVisible && isCommercial && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSubTab("active");
+                                      window.setTimeout(() => {
+                                        pricingSectionRef.current?.scrollIntoView(
+                                          {
+                                            behavior: "smooth",
+                                            block: "start",
+                                          },
+                                        );
+                                      }, 0);
+                                    }}
+                                    className="text-[10px] font-bold text-accent underline-offset-2 hover:underline"
+                                  >
+                                    مشاهده در پنل قیمت‌گذاری
+                                  </button>
                                 )}
                               </span>
                             </span>
@@ -1165,7 +1189,7 @@ export default function FlightsPage() {
         />
       )}
 
-      {pricingOverlayOpen && (
+      {pricingOverlayOpen && isCeo && (
         <div className="fixed inset-0 z-[110] overflow-y-auto bg-[#0b1220]">
           <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#1f2a3d] bg-[#0b1220] px-6 py-3">
             <h2 className="text-sm font-black text-white">

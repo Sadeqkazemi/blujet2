@@ -10,11 +10,17 @@ import {
 import { upsertProposal } from "../../api/pricing";
 import { ApiRequestError } from "../../api/envelope";
 import JalaliDatePicker from "../../components/JalaliDatePicker";
-import MoneyInput, {
+import MoneyInput from "../../components/MoneyInput";
+import {
+  chargeRuleFromApi,
+  draftRulesToApi,
+  type DraftChargeRule,
+} from "../../lib/charge-rules-adapter";
+import {
   formatTomanGrouped,
   moneyInputToRial,
   tomanDigitsOnly,
-} from "../../components/MoneyInput";
+} from "../../lib/money-input";
 import {
   cabinLabel,
   computeArrivalHhMm,
@@ -34,11 +40,7 @@ import type {
 import CabinCapacityEditor, {
   type CabinCapacityRow,
 } from "./components/CabinCapacityEditor";
-import ChargeRulesEditor, {
-  chargeRuleFromApi,
-  draftRulesToApi,
-  type DraftChargeRule,
-} from "./components/ChargeRulesEditor";
+import ChargeRulesEditor from "./components/ChargeRulesEditor";
 import DurationFields from "./components/DurationFields";
 import FlightNumberInput from "./components/FlightNumberInput";
 

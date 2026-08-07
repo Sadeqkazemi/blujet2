@@ -3,6 +3,7 @@ import { useAuth } from "../../hooks/useAuth";
 import {
   fetchCeoPricing,
   fetchCommercialPricing,
+  fetchPendingApprovalsCount,
   registerProposal,
   rejectProposal,
   runAiAnalysis,
@@ -15,7 +16,8 @@ import { dayjs, formatJalaliDate } from "../../lib/jalali";
 import { cabinLabel, formatDurationFa } from "../../lib/flight-definition";
 import { useStepUp } from "../../hooks/useStepUp";
 import Modal from "../../components/Modal";
-import MoneyInput, { moneyInputToRial } from "../../components/MoneyInput";
+import MoneyInput from "../../components/MoneyInput";
+import { moneyInputToRial } from "../../lib/money-input";
 import Pagination from "../../components/Pagination";
 import { usePagination } from "../../hooks/usePagination";
 import type {
@@ -95,9 +97,25 @@ function cabinCapacitiesLabel(
     .join(" · ");
 }
 
+function PricingAccessDenied() {
+  return (
+    <div
+      className="px-[21px] pb-[34px] pt-[18px]"
+      data-testid="pricing-access-denied"
+    >
+      <p className="rounded-lg bg-[rgba(248,113,113,.12)] p-4 text-sm text-[#f87171]">
+        دسترسی به این بخش مجاز نیست.
+      </p>
+    </div>
+  );
+}
+
 /** CEO view — «تعیین قیمت بلیط». */
 function CeoPricing() {
   const [data, setData] = useState<CeoPricingResult | null>(null);
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState<
+    number | null
+  >(null);
   const [airports, setAirports] = useState<AirportEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -125,6 +143,9 @@ function CeoPricing() {
   const load = useCallback(async () => {
     try {
       setData(await fetchCeoPricing());
+      fetchPendingApprovalsCount()
+        .then((r) => setPendingApprovalsCount(r.pendingApprovalsCount))
+        .catch(() => setPendingApprovalsCount(null));
     } catch {
       setError("خطا در دریافت پیشنهادهای قیمت.");
     }
@@ -132,6 +153,9 @@ function CeoPricing() {
 
   useEffect(() => {
     void load();
+    fetchPendingApprovalsCount()
+      .then((r) => setPendingApprovalsCount(r.pendingApprovalsCount))
+      .catch(() => setPendingApprovalsCount(null));
     fetchAirports()
       .then(setAirports)
       .catch(() => setAirports([]));
@@ -213,7 +237,8 @@ function CeoPricing() {
 
   const pending = data?.pending ?? [];
   const registered = data?.registered ?? [];
-  const pendingCount = data?.pendingApprovalsCount ?? pending.length;
+  const pendingCount =
+    pendingApprovalsCount ?? data?.pendingApprovalsCount ?? pending.length;
   const pendingPager = usePagination(pending);
   const registeredPager = usePagination(registered);
 
@@ -480,9 +505,9 @@ function CeoPricing() {
                             <li key={i}>
                               {rule.title} (
                               {rule.kind === "TAX" ? "مالیات" : "عوارض"}) —{" "}
-                              {rule.method === "FIXED"
-                                ? `${faMoney(rule.amount)} تومان`
-                                : `${faDigits(rule.amount)}٪`}
+                              {rule.calculationMode === "FIXED"
+                                ? `${faMoney(rule.fixedAmountIrr ?? 0)} تومان`
+                                : `${faDigits((rule.percentageBasisPoints ?? 0) / 100)}٪`}
                             </li>
                           ))}
                       </ul>
@@ -1198,9 +1223,11 @@ export default function PricingPage({
   embedded?: boolean;
 }) {
   const { user } = useAuth();
-  return user?.role === "COMMERCIAL_MANAGER" || user?.role === "EMPLOYEE" ? (
-    <CommercialPricing embedded={embedded} />
-  ) : (
-    <CeoPricing />
-  );
+  if (user?.role === "COMMERCIAL_MANAGER" || user?.role === "EMPLOYEE") {
+    return <CommercialPricing embedded={embedded} />;
+  }
+  if (user?.role === "CEO") {
+    return <CeoPricing />;
+  }
+  return <PricingAccessDenied />;
 }

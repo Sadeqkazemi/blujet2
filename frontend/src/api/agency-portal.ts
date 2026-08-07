@@ -86,7 +86,7 @@ export function fetchAllotments() {
 export function createAllotmentBooking(
   allotmentId: string,
   dto: {
-    cabin: 'ECONOMY' | 'BUSINESS';
+    cabin: 'ECONOMY' | 'COMFORT' | 'BUSINESS';
     passengers: {
       fullName: string;
       nationalId?: string;

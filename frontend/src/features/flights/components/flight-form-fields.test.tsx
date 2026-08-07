@@ -6,9 +6,8 @@ import CabinCapacityEditor, {
 } from "./CabinCapacityEditor";
 import DurationFields from "./DurationFields";
 import FlightNumberInput from "./FlightNumberInput";
-import ChargeRulesEditor, {
-  type DraftChargeRule,
-} from "./ChargeRulesEditor";
+import type { DraftChargeRule } from "../../../lib/charge-rules-adapter";
+import ChargeRulesEditor from "./ChargeRulesEditor";
 import { useState } from "react";
 
 describe("FlightNumberInput", () => {

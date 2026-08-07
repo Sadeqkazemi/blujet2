@@ -6,7 +6,7 @@ import { fetchCartable, fetchMyReferrals, fetchReferrals } from '../api/cartable
 import { fetchRefunds } from '../api/refunds';
 import { fetchLowSalesAlerts, fetchStaffReports } from '../api/reporting';
 import { fetchLogsBadgeCount } from '../api/audit';
-import { fetchCeoPricing } from '../api/pricing';
+import { fetchCeoPricing, fetchPendingApprovalsCount } from '../api/pricing';
 import { fetchSupportTickets } from '../api/support-tickets';
 import { fetchCustomersIncompleteCount } from '../api/customers';
 import { faDigits } from '../lib/fa-format';
@@ -264,16 +264,27 @@ export default function PanelShell() {
 
     if (navKeys.has('pricing') && user?.role === 'CEO') {
       tasks.push(
-        fetchCeoPricing()
+        fetchPendingApprovalsCount()
           .then((r) => {
-            if (r.pending.length > 0) {
+            if (r.pendingApprovalsCount > 0) {
               next.pricing = {
-                count: r.pending.length,
+                count: r.pendingApprovalsCount,
                 className: 'bg-[#a78bfa] text-white',
               };
             }
           })
-          .catch(() => undefined),
+          .catch(() =>
+            fetchCeoPricing()
+              .then((r) => {
+                if (r.pending.length > 0) {
+                  next.pricing = {
+                    count: r.pending.length,
+                    className: 'bg-[#a78bfa] text-white',
+                  };
+                }
+              })
+              .catch(() => undefined),
+          ),
       );
     }
 

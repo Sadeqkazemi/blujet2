@@ -265,7 +265,8 @@ export default function Md80SeatMap({
       byCode.set(s.seatCode, {
         seatCode: s.seatCode,
         row: s.row,
-        cabin: s.cabin,
+        // MD-80 chart only models BUSINESS|ECONOMY bands; map COMFORT → ECONOMY for inventory merge.
+        cabin: s.cabin === 'BUSINESS' ? 'BUSINESS' : 'ECONOMY',
         status: s.status,
       });
     }
@@ -281,7 +282,10 @@ export default function Md80SeatMap({
 
   function isLocked(cabin: CabinClass, status: 'FREE' | 'TAKEN') {
     if (status === 'TAKEN') return true;
-    if (cabin !== bookedCabin) return true;
+    // Chart bands are BUSINESS|ECONOMY; COMFORT bookings use the ECONOMY band.
+    const bookedBand: 'BUSINESS' | 'ECONOMY' =
+      bookedCabin === 'BUSINESS' ? 'BUSINESS' : 'ECONOMY';
+    if (cabin !== bookedBand) return true;
     if (cabin === 'BUSINESS' && businessLocked) return true;
     return false;
   }
