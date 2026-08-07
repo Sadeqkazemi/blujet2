@@ -435,10 +435,21 @@ describe('UAT shared panel password — bootstrap & rotation (e2e, Phase: shared
 
         const profile = await get('/agency-portal/profile');
         expect(profile.status).toBe(200);
-        expect(profile.body.data.fullName).toBe('UAT Agency');
-        expect(profile.body.data.tier).toBeNull();
-        expect(profile.body.data.isActive).toBe(true);
-        expect(profile.body.data.suspendedAt).toBeNull();
+        expect(profile.body.data).toEqual({
+          fullName: 'UAT Agency',
+          managerName: null,
+          licenseNo: null,
+          phone: '+989000000001',
+          email: null,
+          city: null,
+          address: null,
+          tier: null,
+          isActive: true,
+          suspendedAt: null,
+          suspendReason: null,
+          joinedAt: expect.any(String),
+          isTemporaryReadOnly: true,
+        });
 
         const documents = await get('/agency-portal/documents');
         expect(documents.status).toBe(200);

@@ -448,6 +448,7 @@ export class AgencyPortalService {
         suspendedAt: null,
         suspendReason: null,
         joinedAt: uatUser.createdAt,
+        isTemporaryReadOnly: true,
       };
     }
     const profile = await this.getOwnProfileOrThrow(actor);
@@ -464,6 +465,7 @@ export class AgencyPortalService {
       suspendedAt: profile.suspendedAt,
       suspendReason: profile.suspendReason,
       joinedAt: profile.joinedAt,
+      isTemporaryReadOnly: false,
     };
   }
 

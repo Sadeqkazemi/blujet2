@@ -444,6 +444,7 @@ describe('Agency Portal (e2e)', () => {
       .set('Authorization', auth(accessToken));
     expect(res.status).toBe(200);
     expect(res.body.data.licenseNo).toMatch(/^AG-TEST-/);
+    expect(res.body.data.isTemporaryReadOnly).toBe(false);
     expect(res.body.data.recentActivity).toBeUndefined();
     expect(res.body.data.activityScore).toBeUndefined();
   });

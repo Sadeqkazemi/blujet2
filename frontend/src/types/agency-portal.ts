@@ -84,17 +84,22 @@ export interface AgencyMessage {
 
 export interface AgencyProfile {
   fullName: string;
-  managerName: string;
-  licenseNo: string;
+  // Null for an identity-only account with no submitted business profile
+  // (e.g. the UAT sandbox agency) — never a fabricated placeholder value.
+  managerName: string | null;
+  licenseNo: string | null;
   phone: string;
-  email: string;
-  city: string;
-  address: string;
-  tier: 'NORMAL' | 'SILVER' | 'GOLD';
+  email: string | null;
+  city: string | null;
+  address: string | null;
+  tier: 'NORMAL' | 'SILVER' | 'GOLD' | null;
   isActive: boolean;
   suspendedAt: string | null;
   suspendReason: string | null;
   joinedAt: string;
+  /** True only for the UAT sandbox temporary agency account — the portal
+   * is browsable but every mutating endpoint refuses with 403. */
+  isTemporaryReadOnly: boolean;
 }
 
 export type AgencyDocumentType = 'LICENSE' | 'CONTRACT' | 'OTHER';

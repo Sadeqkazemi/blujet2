@@ -19,7 +19,7 @@ interface Tr {
   ar: string;
 }
 
-const TIER_LABEL_LOCAL: Record<AgencyProfile['tier'], Tr> = {
+const TIER_LABEL_LOCAL: Record<NonNullable<AgencyProfile['tier']>, Tr> = {
   GOLD: { fa: 'طلایی', en: 'Gold', ar: 'ذهبية' },
   SILVER: { fa: 'نقره‌ای', en: 'Silver', ar: 'فضية' },
   NORMAL: { fa: 'عادی', en: 'Standard', ar: 'عادية' },
@@ -50,6 +50,8 @@ const STR: Record<StoredLocale, {
   fieldEmail: string;
   fieldPartnershipType: string;
   partnershipValue: (tier: string) => string;
+  emptyValue: string;
+  readOnlyNotice: string;
   uploadHeading: string;
   noFileSelected: string;
   uploadErrorFallback: string;
@@ -71,6 +73,8 @@ const STR: Record<StoredLocale, {
     fieldEmail: 'ایمیل',
     fieldPartnershipType: 'نوع همکاری',
     partnershipValue: (tier) => `آژانس همکار ${tier}`,
+    emptyValue: '—',
+    readOnlyNotice: 'این حساب آزمایشی فقط برای مشاهده است؛ امکان آپلود مدرک وجود ندارد.',
     uploadHeading: 'آپلود مدرک جدید',
     noFileSelected: 'فایلی انتخاب نشده است.',
     uploadErrorFallback: 'خطا در آپلود مدرک.',
@@ -92,6 +96,8 @@ const STR: Record<StoredLocale, {
     fieldEmail: 'Email',
     fieldPartnershipType: 'Partnership Type',
     partnershipValue: (tier) => `${tier} Partner Agency`,
+    emptyValue: '—',
+    readOnlyNotice: 'This is a read-only sandbox test account; document upload is not available.',
     uploadHeading: 'Upload New Document',
     noFileSelected: 'No file selected.',
     uploadErrorFallback: 'Error uploading the document.',
@@ -113,6 +119,8 @@ const STR: Record<StoredLocale, {
     fieldEmail: 'البريد الإلكتروني',
     fieldPartnershipType: 'نوع الشراكة',
     partnershipValue: (tier) => `وكالة شريكة ${tier}`,
+    emptyValue: '—',
+    readOnlyNotice: 'هذا حساب اختباري للقراءة فقط؛ رفع المستندات غير متاح.',
     uploadHeading: 'رفع مستند جديد',
     noFileSelected: 'لم يتم اختيار ملف.',
     uploadErrorFallback: 'خطأ في رفع المستند.',
@@ -168,58 +176,71 @@ export default function AgencyProfilePage() {
   if (error) return <p className="p-8 text-sm text-danger">{error}</p>;
   if (!profile) return <p className="p-8 text-sm text-muted">{t.loading}</p>;
 
-  const fields: [string, string][] = [
+  const tierLabel = profile.tier ? TIER_LABEL_LOCAL[profile.tier][locale] : null;
+  const fields: [string, string | null][] = [
     [t.fieldManager, profile.managerName],
     [t.fieldLicenseNo, profile.licenseNo],
     [t.fieldCity, profile.city],
     [t.fieldPhone, profile.phone],
     [t.fieldEmail, profile.email],
-    [t.fieldPartnershipType, t.partnershipValue(TIER_LABEL_LOCAL[profile.tier][locale])],
+    [t.fieldPartnershipType, tierLabel ? t.partnershipValue(tierLabel) : null],
   ];
 
   return (
     <div>
+      {profile.isTemporaryReadOnly && (
+        <p
+          data-testid="agency-profile-readonly-notice"
+          role="status"
+          className="mb-6 rounded-xl border border-border bg-[#f59e0b14] p-4 text-xs font-bold text-[#b45309]"
+        >
+          {t.readOnlyNotice}
+        </p>
+      )}
+
       <div className="mb-6 rounded-xl border border-border bg-white p-5">
         <div className="mb-4 text-sm font-bold text-ink">{t.agencyInfoHeading}</div>
         <dl className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {fields.map(([label, value]) => (
             <div key={label}>
               <dt className="text-[11px] text-muted">{label}</dt>
-              <dd className="ltr mt-1 text-sm font-bold text-ink">{value}</dd>
+              <dd className="ltr mt-1 text-sm font-bold text-ink">{value ?? t.emptyValue}</dd>
             </div>
           ))}
         </dl>
       </div>
 
-      <div className="mb-6 rounded-xl border border-border bg-white p-5">
-        <div className="mb-4 text-sm font-bold text-ink">{t.uploadHeading}</div>
-        <div className="flex flex-wrap items-center gap-3">
-          <select
-            value={docType}
-            onChange={(e) => setDocType(e.target.value as AgencyDocumentType)}
-            className="rounded-lg border border-border bg-white px-3 py-2 text-xs"
-          >
-            {(Object.keys(DOC_TYPE_LABEL) as AgencyDocumentType[]).map((dt) => (
-              <option key={dt} value={dt}>
-                {DOC_TYPE_LABEL[dt][locale]}
-              </option>
-            ))}
-          </select>
-          <input ref={fileInputRef} type="file" accept=".pdf,.png,.jpg,.jpeg" className="text-xs" />
-          <button
-            disabled={uploading}
-            onClick={() => void onUpload()}
-            className="rounded-lg bg-accent px-4 py-2 text-xs font-bold text-white transition hover:brightness-110 disabled:opacity-60"
-          >
-            {uploading ? t.uploadingBtn : t.uploadBtn}
-          </button>
+      {!profile.isTemporaryReadOnly && (
+        <div className="mb-6 rounded-xl border border-border bg-white p-5">
+          <div className="mb-4 text-sm font-bold text-ink">{t.uploadHeading}</div>
+          <div className="flex flex-wrap items-center gap-3">
+            <select
+              value={docType}
+              onChange={(e) => setDocType(e.target.value as AgencyDocumentType)}
+              className="rounded-lg border border-border bg-white px-3 py-2 text-xs"
+            >
+              {(Object.keys(DOC_TYPE_LABEL) as AgencyDocumentType[]).map((dt) => (
+                <option key={dt} value={dt}>
+                  {DOC_TYPE_LABEL[dt][locale]}
+                </option>
+              ))}
+            </select>
+            <input ref={fileInputRef} type="file" accept=".pdf,.png,.jpg,.jpeg" className="text-xs" />
+            <button
+              disabled={uploading}
+              onClick={() => void onUpload()}
+              className="rounded-lg bg-accent px-4 py-2 text-xs font-bold text-white transition hover:brightness-110 disabled:opacity-60"
+            >
+              {uploading ? t.uploadingBtn : t.uploadBtn}
+            </button>
+          </div>
+          {uploadError && (
+            <p role="alert" className="mt-3 text-xs text-danger">
+              {uploadError}
+            </p>
+          )}
         </div>
-        {uploadError && (
-          <p role="alert" className="mt-3 text-xs text-danger">
-            {uploadError}
-          </p>
-        )}
-      </div>
+      )}
 
       <div className="rounded-xl border border-border bg-white p-5">
         <div className="mb-4 text-sm font-bold text-ink">{t.documentsHeading}</div>
