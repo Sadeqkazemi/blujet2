@@ -173,7 +173,7 @@ jobs:
             # $UAT_PANEL_SHARED_PASSWORD is forwarded into this session by
             # appleboy/ssh-action's `envs:` (see the step's `env:` above) -
             # never interpolated into this script as literal text by GitHub's
-            # ${{ }} templating, and the two scripts below never print it, so
+            # expression templating, and the two scripts below never print it, so
             # it never reaches these stdout redirects or the Actions log.
             shared_password_sentinel=/root/.blujet-uat-shared-password-v1-complete
             if [ ! -f "$shared_password_sentinel" ]; then
