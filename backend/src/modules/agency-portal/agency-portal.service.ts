@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -13,6 +14,8 @@ import { AgencyAllotment } from '../../database/entities/agency-allotment.entity
 import { LedgerEntry } from '../../database/entities/ledger-entry.entity';
 import { Booking } from '../../database/entities/booking.entity';
 import { Passenger } from '../../database/entities/passenger.entity';
+import { User } from '../../database/entities/user.entity';
+import { isActiveUatSandboxAgency } from '../../database/temporary-panel-accounts';
 import { AuditService } from '../audit/audit.service';
 import { CartableService } from '../cartable/cartable.service';
 import { AgenciesService } from '../agencies/agencies.service';
@@ -58,6 +61,8 @@ export class AgencyPortalService {
     private readonly bookingRepo: Repository<Booking>,
     @InjectRepository(Passenger)
     private readonly passengerRepo: Repository<Passenger>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
     private readonly audit: AuditService,
     private readonly cartable: CartableService,
     private readonly agencies: AgenciesService,
@@ -79,9 +84,56 @@ export class AgencyPortalService {
     return profile;
   }
 
+  // `uat.agency` is identity/access infrastructure only — no AgencyProfile
+  // or AgencyCreditLine is ever created for it (see docs/features/
+  // temporary-panel-password-access.md). These two guards let every read
+  // endpoint below return a real, honest empty state instead of the normal
+  // 404, and every mutating endpoint refuse instead of writing a business
+  // row for an account with no real agency behind it.
+
+  private async loadUatSandboxAgencyUser(
+    actor: AuthenticatedUser,
+  ): Promise<User | null> {
+    const user = await this.userRepo.findOneBy({ id: actor.id });
+    return user && isActiveUatSandboxAgency(user) ? user : null;
+  }
+
+  private async isUatSandboxAgencyActor(
+    actor: AuthenticatedUser,
+  ): Promise<boolean> {
+    return (await this.loadUatSandboxAgencyUser(actor)) !== null;
+  }
+
+  private async assertAgencyPortalWritable(
+    actor: AuthenticatedUser,
+  ): Promise<void> {
+    if (await this.isUatSandboxAgencyActor(actor)) {
+      throw new ForbiddenException({
+        code: ErrorCode.UAT_TEMPORARY_ACCOUNT_READ_ONLY,
+        message:
+          'این حساب آزمایشی UAT فقط برای مشاهده است و امکان ثبت تغییر ندارد.',
+      });
+    }
+  }
+
   // ── Dashboard ──────────────────────────────────────────────────────
 
   async dashboard(actor: AuthenticatedUser) {
+    if (await this.isUatSandboxAgencyActor(actor)) {
+      return {
+        credit: {
+          limitIrr: ZERO_IRR,
+          usedIrr: ZERO_IRR,
+          remainingIrr: ZERO_IRR,
+        },
+        kpis: {
+          salesThisMonthIrr: ZERO_IRR,
+          ticketsIssuedTotal: 0,
+          seatsSoldThisMonth: 0,
+        },
+        monthlySales: [],
+      };
+    }
     await this.getOwnProfileOrThrow(actor);
     const id = actor.id;
     const now = new Date();
@@ -164,6 +216,7 @@ export class AgencyPortalService {
   }
 
   async ledger(actor: AuthenticatedUser) {
+    if (await this.isUatSandboxAgencyActor(actor)) return [];
     await this.getOwnProfileOrThrow(actor);
     return this.ledgerRepo.find({
       where: { agencyId: actor.id },
@@ -175,16 +228,21 @@ export class AgencyPortalService {
   // ── Credit & invoices ────────────────────────────────────────────────
 
   async credit(actor: AuthenticatedUser) {
+    if (await this.isUatSandboxAgencyActor(actor)) {
+      return { limitIrr: ZERO_IRR, usedIrr: ZERO_IRR, remainingIrr: ZERO_IRR };
+    }
     await this.getOwnProfileOrThrow(actor);
     return this.agencies.getCredit(actor.id);
   }
 
   async invoices(actor: AuthenticatedUser) {
+    if (await this.isUatSandboxAgencyActor(actor)) return [];
     await this.getOwnProfileOrThrow(actor);
     return this.agencies.listInvoices(actor.id);
   }
 
   async payInvoice(actor: AuthenticatedUser, invoiceId: string) {
+    await this.assertAgencyPortalWritable(actor);
     await this.getOwnProfileOrThrow(actor);
     return this.agencies.payInvoice(actor, actor.id, invoiceId);
   }
@@ -193,6 +251,7 @@ export class AgencyPortalService {
     actor: AuthenticatedUser,
     dto: { requestedLimitIrr: Irr; note?: string },
   ) {
+    await this.assertAgencyPortalWritable(actor);
     await this.getOwnProfileOrThrow(actor);
     const current = await this.agencies.getCredit(actor.id);
     if (dto.requestedLimitIrr <= current.limitIrr) {
@@ -231,6 +290,7 @@ export class AgencyPortalService {
   }
 
   async myCreditRequests(actor: AuthenticatedUser) {
+    if (await this.isUatSandboxAgencyActor(actor)) return [];
     await this.getOwnProfileOrThrow(actor);
     return this.creditRequestRepo.find({
       where: { agencyId: actor.id },
@@ -241,6 +301,18 @@ export class AgencyPortalService {
   // ── Sales & report ───────────────────────────────────────────────────
 
   async sales(actor: AuthenticatedUser) {
+    if (await this.isUatSandboxAgencyActor(actor)) {
+      return {
+        tickets: [],
+        perFlight: [],
+        summary: {
+          totalSalesIrr: ZERO_IRR,
+          ticketsIssued: 0,
+          avgFareIrr: ZERO_IRR,
+          refundRatePct: 0,
+        },
+      };
+    }
     await this.getOwnProfileOrThrow(actor);
     const id = actor.id;
 
@@ -347,11 +419,13 @@ export class AgencyPortalService {
   // ── Inbox ────────────────────────────────────────────────────────────
 
   async inbox(actor: AuthenticatedUser) {
+    if (await this.isUatSandboxAgencyActor(actor)) return [];
     await this.getOwnProfileOrThrow(actor);
     return this.agencies.listMessages(actor.id);
   }
 
   async postInboxMessage(actor: AuthenticatedUser, body: string) {
+    await this.assertAgencyPortalWritable(actor);
     await this.getOwnProfileOrThrow(actor);
     return this.agencies.postMessage(actor, actor.id, body, true);
   }
@@ -359,6 +433,23 @@ export class AgencyPortalService {
   // ── Profile & documents ──────────────────────────────────────────────
 
   async profile(actor: AuthenticatedUser) {
+    const uatUser = await this.loadUatSandboxAgencyUser(actor);
+    if (uatUser) {
+      return {
+        fullName: uatUser.fullName,
+        managerName: null,
+        licenseNo: null,
+        phone: uatUser.phone,
+        email: uatUser.email,
+        city: null,
+        address: null,
+        tier: null,
+        isActive: true,
+        suspendedAt: null,
+        suspendReason: null,
+        joinedAt: uatUser.createdAt,
+      };
+    }
     const profile = await this.getOwnProfileOrThrow(actor);
     return {
       fullName: profile.user.fullName,
@@ -377,6 +468,7 @@ export class AgencyPortalService {
   }
 
   async documents(actor: AuthenticatedUser) {
+    if (await this.isUatSandboxAgencyActor(actor)) return [];
     await this.getOwnProfileOrThrow(actor);
     const docs = await this.documentRepo.find({
       where: { agencyId: actor.id },
@@ -398,6 +490,7 @@ export class AgencyPortalService {
     file: Express.Multer.File,
     dto: UploadDocumentDto,
   ) {
+    await this.assertAgencyPortalWritable(actor);
     await this.getOwnProfileOrThrow(actor);
     const stored = await this.files.store(actor, file);
     const saved = await this.documentRepo.save(
@@ -430,6 +523,7 @@ export class AgencyPortalService {
   // ── Phase 16: real seat allotments (replaces AgencySeatsPage mock) ─────
 
   async allotments(actor: AuthenticatedUser) {
+    if (await this.isUatSandboxAgencyActor(actor)) return [];
     await this.getOwnProfileOrThrow(actor);
     const id = actor.id;
 
@@ -473,6 +567,7 @@ export class AgencyPortalService {
   // (replaces AgencyWebservicePage mock's local-only "requested"/"keyShown")
 
   async assertAgency(actor: AuthenticatedUser) {
+    if (await this.isUatSandboxAgencyActor(actor)) return;
     await this.getOwnProfileOrThrow(actor);
   }
 
@@ -491,6 +586,7 @@ export class AgencyPortalService {
   }
 
   async requestWebservice(actor: AuthenticatedUser, dto: RequestWebserviceDto) {
+    await this.assertAgencyPortalWritable(actor);
     await this.getOwnProfileOrThrow(actor);
     const planPrices = await this.webservicePricing.getPlanPrices();
     const planPriceIrr = planPrices[dto.months];
@@ -534,6 +630,7 @@ export class AgencyPortalService {
   }
 
   async myWebserviceRequests(actor: AuthenticatedUser) {
+    if (await this.isUatSandboxAgencyActor(actor)) return [];
     await this.getOwnProfileOrThrow(actor);
     return this.webserviceRequestRepo.find({
       where: { agencyId: actor.id },
@@ -542,6 +639,7 @@ export class AgencyPortalService {
   }
 
   async apiKeys(actor: AuthenticatedUser) {
+    if (await this.isUatSandboxAgencyActor(actor)) return [];
     await this.getOwnProfileOrThrow(actor);
     const keys = await this.agencies.listApiKeys(actor.id);
     // The raw key is retrievable exactly once, at approval time, and is

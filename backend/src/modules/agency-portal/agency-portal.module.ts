@@ -8,6 +8,7 @@ import { AgencyAllotment } from '../../database/entities/agency-allotment.entity
 import { LedgerEntry } from '../../database/entities/ledger-entry.entity';
 import { Booking } from '../../database/entities/booking.entity';
 import { Passenger } from '../../database/entities/passenger.entity';
+import { User } from '../../database/entities/user.entity';
 import { AgencyPortalController } from './agency-portal.controller';
 import { AgencyPortalService } from './agency-portal.service';
 import { AuditModule } from '../audit/audit.module';
@@ -27,6 +28,7 @@ import { WebservicePricingModule } from '../webservice-pricing/webservice-pricin
       LedgerEntry,
       Booking,
       Passenger,
+      User,
     ]),
     AuditModule,
     CartableModule,

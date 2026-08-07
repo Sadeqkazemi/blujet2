@@ -9,6 +9,7 @@ import { AgencyCreditLine } from '../src/database/entities/agency-credit-line.en
 import { AgencyProfile } from '../src/database/entities/agency-profile.entity';
 import { AuditLog } from '../src/database/entities/audit-log.entity';
 import { Booking } from '../src/database/entities/booking.entity';
+import { LedgerEntry } from '../src/database/entities/ledger-entry.entity';
 import { RefreshToken } from '../src/database/entities/refresh-token.entity';
 import { User } from '../src/database/entities/user.entity';
 import { getSandboxOtpCode } from '../src/common/sandbox-auth';
@@ -83,9 +84,7 @@ describe('UAT shared panel password — bootstrap & rotation (e2e, Phase: shared
       // AuditLog.actorId is ON DELETE RESTRICT (every bootstrap/rotate run
       // writes one) — must be cleared before the users delete.
       await dataSource.getRepository(AuditLog).delete({ actorId: In(ids) });
-      await dataSource
-        .getRepository(RefreshToken)
-        .delete({ userId: In(ids) });
+      await dataSource.getRepository(RefreshToken).delete({ userId: In(ids) });
       await userRepo.delete({ username: In(ALL_USERNAMES) });
     }
   }
@@ -277,6 +276,16 @@ describe('UAT shared panel password — bootstrap & rotation (e2e, Phase: shared
     beforeEach(() => {
       const result = bootstrap();
       expect(result.status).toBe(0);
+      // The app under test (not the bootstrap subprocess) must itself see
+      // the sandbox flag as on for temp-account login to succeed — set
+      // explicitly rather than relying on another spec file's leftover
+      // process.env mutation (Jest's node test environment shares the real
+      // `process` object across spec files in the same worker).
+      process.env.AUTH_SANDBOX_ENABLED = 'true';
+    });
+
+    afterEach(() => {
+      delete process.env.AUTH_SANDBOX_ENABLED;
     });
 
     it('a temp EMPLOYEE account logs in directly with the shared password, bypassing 2FA', async () => {
@@ -316,6 +325,208 @@ describe('UAT shared panel password — bootstrap & rotation (e2e, Phase: shared
         .send({ username: 'uat.siteadmin', password: STRONG_PASSWORD });
       expect(res.status).toBe(403);
       expect(res.body.error.code).toBe('TEMPORARY_ACCESS_EXPIRED');
+    });
+
+    describe('agency-portal real empty state for the UAT sandbox agency (no fabricated data)', () => {
+      async function loginUatAgency(): Promise<string> {
+        const res = await request(app.getHttpServer())
+          .post('/auth/agency/login')
+          .send({ phone: '09000000001', password: STRONG_PASSWORD });
+        expect(res.status).toBe(200);
+        return res.body.data.accessToken as string;
+      }
+
+      async function assertNoAgencyBusinessData() {
+        const agencyUser = await dataSource
+          .getRepository(User)
+          .findOneByOrFail({ username: 'uat.agency' });
+        expect(
+          await dataSource
+            .getRepository(AgencyProfile)
+            .findOneBy({ userId: agencyUser.id }),
+        ).toBeNull();
+        expect(
+          await dataSource
+            .getRepository(AgencyCreditLine)
+            .findOneBy({ agencyId: agencyUser.id }),
+        ).toBeNull();
+        expect(
+          await dataSource
+            .getRepository(Booking)
+            .count({ where: { agencyId: agencyUser.id } }),
+        ).toBe(0);
+        expect(
+          await dataSource
+            .getRepository(LedgerEntry)
+            .count({ where: { agencyId: agencyUser.id } }),
+        ).toBe(0);
+      }
+
+      it('dashboard returns 200 with real zero-value/empty data, no AgencyProfile/CreditLine/Booking/Ledger row ever created', async () => {
+        const accessToken = await loginUatAgency();
+        const res = await request(app.getHttpServer())
+          .get('/agency-portal/dashboard')
+          .set('Authorization', `Bearer ${accessToken}`);
+        expect(res.status).toBe(200);
+        expect(res.body.data).toEqual({
+          credit: { limitIrr: '0', usedIrr: '0', remainingIrr: '0' },
+          kpis: {
+            salesThisMonthIrr: '0',
+            ticketsIssuedTotal: 0,
+            seatsSoldThisMonth: 0,
+          },
+          monthlySales: [],
+        });
+        await assertNoAgencyBusinessData();
+      });
+
+      it('allotments returns 200 with an empty array, no fabricated rows', async () => {
+        const accessToken = await loginUatAgency();
+        const res = await request(app.getHttpServer())
+          .get('/agency-portal/allotments')
+          .set('Authorization', `Bearer ${accessToken}`);
+        expect(res.status).toBe(200);
+        expect(res.body.data).toEqual([]);
+        await assertNoAgencyBusinessData();
+      });
+
+      it('every other read endpoint returns a real empty state (200) instead of the profile-not-found 404', async () => {
+        const accessToken = await loginUatAgency();
+        const auth = `Bearer ${accessToken}`;
+        const get = (endpoint: string) =>
+          request(app.getHttpServer()).get(endpoint).set('Authorization', auth);
+
+        const credit = await get('/agency-portal/credit');
+        expect(credit.status).toBe(200);
+        expect(credit.body.data).toEqual({
+          limitIrr: '0',
+          usedIrr: '0',
+          remainingIrr: '0',
+        });
+
+        const ledger = await get('/agency-portal/ledger');
+        expect(ledger.status).toBe(200);
+        expect(ledger.body.data).toEqual([]);
+
+        const invoices = await get('/agency-portal/invoices');
+        expect(invoices.status).toBe(200);
+        expect(invoices.body.data).toEqual([]);
+
+        const creditRequests = await get('/agency-portal/credit-requests');
+        expect(creditRequests.status).toBe(200);
+        expect(creditRequests.body.data).toEqual([]);
+
+        const sales = await get('/agency-portal/sales');
+        expect(sales.status).toBe(200);
+        expect(sales.body.data).toEqual({
+          tickets: [],
+          perFlight: [],
+          summary: {
+            totalSalesIrr: '0',
+            ticketsIssued: 0,
+            avgFareIrr: '0',
+            refundRatePct: 0,
+          },
+        });
+
+        const inbox = await get('/agency-portal/inbox');
+        expect(inbox.status).toBe(200);
+        expect(inbox.body.data).toEqual([]);
+
+        const profile = await get('/agency-portal/profile');
+        expect(profile.status).toBe(200);
+        expect(profile.body.data.fullName).toBe('UAT Agency');
+        expect(profile.body.data.tier).toBeNull();
+        expect(profile.body.data.isActive).toBe(true);
+        expect(profile.body.data.suspendedAt).toBeNull();
+
+        const documents = await get('/agency-portal/documents');
+        expect(documents.status).toBe(200);
+        expect(documents.body.data).toEqual([]);
+
+        const webserviceRequests = await get(
+          '/agency-portal/webservice-requests',
+        );
+        expect(webserviceRequests.status).toBe(200);
+        expect(webserviceRequests.body.data).toEqual([]);
+
+        const apiKeys = await get('/agency-portal/api-keys');
+        expect(apiKeys.status).toBe(200);
+        expect(apiKeys.body.data).toEqual([]);
+
+        await assertNoAgencyBusinessData();
+      });
+
+      it('a mutating request is refused with 403 UAT_TEMPORARY_ACCOUNT_READ_ONLY and writes nothing', async () => {
+        const accessToken = await loginUatAgency();
+        const res = await request(app.getHttpServer())
+          .post('/agency-portal/inbox')
+          .set('Authorization', `Bearer ${accessToken}`)
+          .send({ body: 'سلام' });
+        expect(res.status).toBe(403);
+        expect(res.body.error.code).toBe('UAT_TEMPORARY_ACCOUNT_READ_ONLY');
+        await assertNoAgencyBusinessData();
+      });
+
+      it('every other mutating endpoint is refused the same way', async () => {
+        const accessToken = await loginUatAgency();
+        const auth = `Bearer ${accessToken}`;
+
+        const creditIncrease = await request(app.getHttpServer())
+          .post('/agency-portal/credit-requests')
+          .set('Authorization', auth)
+          .send({ requestedLimitIrr: '1000000000' });
+        expect(creditIncrease.status).toBe(403);
+        expect(creditIncrease.body.error.code).toBe(
+          'UAT_TEMPORARY_ACCOUNT_READ_ONLY',
+        );
+
+        const webserviceRequest = await request(app.getHttpServer())
+          .post('/agency-portal/webservice-requests')
+          .set('Authorization', auth)
+          .send({ scope: 'SEARCH_BOOK', months: 1 });
+        expect(webserviceRequest.status).toBe(403);
+        expect(webserviceRequest.body.error.code).toBe(
+          'UAT_TEMPORARY_ACCOUNT_READ_ONLY',
+        );
+
+        const payInvoice = await request(app.getHttpServer())
+          .post('/agency-portal/invoices/nonexistent-invoice-id/pay')
+          .set('Authorization', auth);
+        expect(payInvoice.status).toBe(403);
+        expect(payInvoice.body.error.code).toBe(
+          'UAT_TEMPORARY_ACCOUNT_READ_ONLY',
+        );
+
+        await assertNoAgencyBusinessData();
+      });
+
+      describe('the exception never activates outside an active sandbox temp account', () => {
+        it('AUTH_SANDBOX_ENABLED=false: dashboard falls back to the normal profile-not-found 404', async () => {
+          const accessToken = await loginUatAgency();
+          process.env.AUTH_SANDBOX_ENABLED = 'false';
+          const res = await request(app.getHttpServer())
+            .get('/agency-portal/dashboard')
+            .set('Authorization', `Bearer ${accessToken}`);
+          expect(res.status).toBe(404);
+          expect(res.body.error.code).toBe('NOT_FOUND');
+        });
+
+        it('expired temp account: dashboard falls back to the normal profile-not-found 404', async () => {
+          const accessToken = await loginUatAgency();
+          await dataSource
+            .getRepository(User)
+            .update(
+              { username: 'uat.agency' },
+              { temporaryPasswordOnlyUntil: new Date(Date.now() - 1000) },
+            );
+          const res = await request(app.getHttpServer())
+            .get('/agency-portal/dashboard')
+            .set('Authorization', `Bearer ${accessToken}`);
+          expect(res.status).toBe(404);
+          expect(res.body.error.code).toBe('NOT_FOUND');
+        });
+      });
     });
 
     describe('sandbox disabled at login time', () => {

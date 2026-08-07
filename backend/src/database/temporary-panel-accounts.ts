@@ -1,4 +1,5 @@
 import { randomInt } from 'node:crypto';
+import { isSandboxAuthEnabled } from '../common/sandbox-auth';
 import type { Role } from './enums';
 
 export const TEMPORARY_PANEL_ACCESS_MAX_MS = 7 * 24 * 60 * 60 * 1000;
@@ -114,6 +115,28 @@ export function getTemporaryPanelAccessState(
 
 export function createTemporaryPanelExpiry(now = new Date()): Date {
   return new Date(now.getTime() + TEMPORARY_PANEL_ACCESS_MAX_MS);
+}
+
+export interface UatSandboxAgencyCandidate extends TemporaryPanelAccessUser {
+  role: Role;
+}
+
+/** Centralized detection for "active UAT sandbox AGENCY temporary account" —
+ * the single place agency-portal read/write guards check before serving a
+ * real empty state (reads) or refusing a mutation (writes) for `uat.agency`,
+ * instead of creating an AgencyProfile/AgencyCreditLine just to satisfy the
+ * panel. Never true outside `AUTH_SANDBOX_ENABLED`, and never true once the
+ * account's temporary-access window has expired — both fall through to the
+ * normal AgencyProfile-based behavior (a real 404). */
+export function isActiveUatSandboxAgency(
+  user: UatSandboxAgencyCandidate,
+  now = new Date(),
+): boolean {
+  return (
+    user.role === 'AGENCY' &&
+    isSandboxAuthEnabled() &&
+    getTemporaryPanelAccessState(user, now) === 'ACTIVE'
+  );
 }
 
 /** Still used by `bootstrap-owner-super-admin.ts` for the real owner

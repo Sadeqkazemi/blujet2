@@ -86,6 +86,61 @@ doesn't belong on a pure identity/access account and unnecessary
 complexity in the purge policy — both were reverted. `uat-demo-data-purge.ts`
 and `uat-demo-data-purge-policy.ts` are back to their pre-addendum state.
 
+### Follow-up fix: real empty state for `uat.agency`'s own portal
+
+Removing the `AgencyProfile` (above) fixed the data-fabrication concern but
+left `uat.agency` unable to actually use `/agency-portal/*` — every
+endpoint fell through to `AgencyPortalService.getOwnProfileOrThrow()`'s
+`404 NOT_FOUND`, which the agency portal's `AgencyDashboardPage` surfaced
+as a red "خطا در دریافت داشبورد" error instead of a working (empty) panel.
+
+- **Central detection**: `isActiveUatSandboxAgency()` in
+  `database/temporary-panel-accounts.ts` is the one place this is decided —
+  true only when the actor is role `AGENCY`, `isSandboxAuthEnabled()`, and
+  `getTemporaryPanelAccessState(user) === 'ACTIVE'`. Outside sandbox mode
+  or once the account's 7-day window expires, it's always `false` and every
+  endpoint falls straight back to the original `AgencyProfile`-based 404 —
+  no new behavior for a real agency, ever.
+- **Reads return real empty states, never fabricated rows**:
+  `AgencyPortalService`'s guard (`isUatSandboxAgencyActor()` /
+  `loadUatSandboxAgencyUser()`) short-circuits every GET method — dashboard
+  (zero KPIs, zero credit, empty 6-month chart), allotments/ledger/
+  invoices/credit-requests/inbox/documents/webservice-requests/api-keys
+  (`[]`), sales (zeroed summary + empty arrays), profile (the account's own
+  real `User` fields — `fullName`, `phone`, `email` — with the
+  business-only fields `managerName`/`licenseNo`/`city`/`address`/`tier`
+  explicitly `null`, not invented). `credit()`/`dashboard()` no longer call
+  `AgenciesService.getCredit()` for this account, since that call has its
+  own independent `AgencyProfile` guard that would 404 regardless.
+- **Writes are refused, not silently faked**: every mutating method
+  (`payInvoice`, `requestCreditIncrease`, `postInboxMessage`,
+  `uploadDocument`, `requestWebservice`) throws `403
+  UAT_TEMPORARY_ACCOUNT_READ_ONLY` via `assertAgencyPortalWritable()` before
+  touching any repository — this account can look around the panel but
+  can never create a booking, ledger entry, or request row.
+- **Frontend needed no production change**: `AgencyDashboardPage.tsx`
+  already rendered zero-valued KPI cards and an empty chart whenever its
+  API calls resolved (it only showed the red error on a rejected promise),
+  so returning `200` with honest zero/empty data was sufficient — the
+  existing UI *is* the empty state.
+
+Acceptance:
+
+- [x] No `AgencyProfile`/`AgencyCreditLine`/booking/ledger row is ever
+  created by logging in as `uat.agency` or browsing its portal —
+  `uat-shared-password.e2e-spec.ts`.
+- [x] `dashboard`/`allotments` and every other read endpoint return `200`
+  with real zero/empty data for `uat.agency` — `uat-shared-password.e2e-spec.ts`.
+- [x] Every mutating agency-portal endpoint returns `403
+  UAT_TEMPORARY_ACCOUNT_READ_ONLY` for `uat.agency` —
+  `uat-shared-password.e2e-spec.ts`.
+- [x] The exception never activates with `AUTH_SANDBOX_ENABLED=false` or
+  once the account's temporary-access window has expired (falls back to
+  the normal `404`) — `uat-shared-password.e2e-spec.ts`.
+- [x] `AgencyDashboardPage` renders the empty state, not the red error
+  message, when the API returns zero/empty data —
+  `AgencyDashboardPage.test.tsx`.
+
 ### Acceptance checklist (addendum)
 
 - [x] Every temporary account (all 10, across both login surfaces) hashes

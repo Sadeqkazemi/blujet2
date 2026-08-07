@@ -93,4 +93,24 @@ describe('AgencyDashboardPage', () => {
     expect(await screen.findByText('مبيعات هذا الشهر')).toBeInTheDocument();
     expect(screen.getByText('عرض كشف الحساب')).toBeInTheDocument();
   });
+
+  it('renders a real zero-value empty state (e.g. the UAT sandbox agency account) without an error message', async () => {
+    vi.spyOn(portalApi, 'fetchAllotments').mockResolvedValue([]);
+    vi.spyOn(portalApi, 'fetchDashboard').mockResolvedValue({
+      credit: { limitIrr: '0', usedIrr: '0', remainingIrr: '0' },
+      kpis: { salesThisMonthIrr: '0', ticketsIssuedTotal: 0, seatsSoldThisMonth: 0 },
+      monthlySales: [],
+    });
+    render(
+      <MemoryRouter>
+        <AgencyDashboardPage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByTestId('agency-dashboard')).toBeInTheDocument();
+    expect(screen.queryByText('خطا در دریافت داشبورد.')).not.toBeInTheDocument();
+    expect(screen.getByText('فروش این ماه')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'نمودار فروش ۶ ماه اخیر' })).toBeInTheDocument();
+    expect(screen.getAllByText('۰ تومان').length).toBeGreaterThan(0);
+  });
 });

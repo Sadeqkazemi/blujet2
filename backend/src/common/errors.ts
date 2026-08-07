@@ -22,6 +22,8 @@ export enum ErrorCode {
   // Phase 66 — passenger survey
   SURVEY_ALREADY_SUBMITTED = 'SURVEY_ALREADY_SUBMITTED',
   SURVEY_DISABLED = 'SURVEY_DISABLED',
+  // UAT shared-password addendum — identity-only sandbox agency account
+  UAT_TEMPORARY_ACCOUNT_READ_ONLY = 'UAT_TEMPORARY_ACCOUNT_READ_ONLY',
 }
 
 export interface ApiErrorBody {
