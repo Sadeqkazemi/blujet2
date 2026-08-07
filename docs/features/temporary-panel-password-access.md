@@ -49,6 +49,10 @@ from the first version of this addendum.
   `username`, `role`, `fullName`/`expiresAt`/`status` per account. The
   shared password is the operator's own already-known secret; there is
   nothing to echo back.
+- Rotation preserves each account's existing expiry independently. This is
+  required when an idempotent bootstrap adds new UAT accounts after older
+  temporary accounts already exist; a shared password does not imply a
+  shared access deadline.
 - `staffLogin()`'s pre-existing temp-account bypass branch, and the new
   matching branches added to `agencyLogin()`/`customerPasswordLogin()`
   (`auth.service.ts`), all now explicitly check `isSandboxAuthEnabled()`

@@ -83,15 +83,6 @@ async function main(): Promise<void> {
         }
       }
 
-      const expiryTimes = new Set(
-        users.map((user) => user.temporaryPasswordOnlyUntil!.getTime()),
-      );
-      if (expiryTimes.size !== 1) {
-        throw new Error(
-          'Rotation refused: temporary accounts do not share one expiry.',
-        );
-      }
-
       for (const account of allAccounts) {
         const user = usersByUsername.get(account.username)!;
         // Same shared password, fresh argon2 hash (own salt) per account.
@@ -128,12 +119,15 @@ async function main(): Promise<void> {
 
       return {
         rotatedAt: now.toISOString(),
-        expiresAt: users[0].temporaryPasswordOnlyUntil!.toISOString(),
-        accounts: allAccounts.map(({ username, role }) => ({
-          username,
-          role,
-          status: 'rotated' as const,
-        })),
+        accounts: allAccounts.map(({ username, role }) => {
+          const user = usersByUsername.get(username)!;
+          return {
+            username,
+            role,
+            expiresAt: user.temporaryPasswordOnlyUntil!.toISOString(),
+            status: 'rotated' as const,
+          };
+        }),
       };
     });
 

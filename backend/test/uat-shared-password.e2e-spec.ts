@@ -27,17 +27,28 @@ const ALL_USERNAMES = [
 
 const STRONG_PASSWORD = 'Blujet@UAT-Shared1404!';
 const OTHER_STRONG_PASSWORD = 'Blujet@UAT-Shared1404-Rotated!';
+const TSX_CLI = path.join(
+  backendRoot,
+  'node_modules',
+  'tsx',
+  'dist',
+  'cli.mjs',
+);
 
 function runScript(
   script: string,
   extraEnv: Record<string, string | undefined>,
 ): { status: number; stdout: string; stderr: string } {
   try {
-    const stdout = execFileSync('npx', ['tsx', script, '--execute'], {
-      cwd: backendRoot,
-      env: { ...process.env, ...extraEnv },
-      encoding: 'utf8',
-    });
+    const stdout = execFileSync(
+      process.execPath,
+      [TSX_CLI, script, '--execute'],
+      {
+        cwd: backendRoot,
+        env: { ...process.env, ...extraEnv },
+        encoding: 'utf8',
+      },
+    );
     return { status: 0, stdout, stderr: '' };
   } catch (error) {
     const err = error as { status?: number; stdout?: string; stderr?: string };
@@ -257,6 +268,46 @@ describe('UAT shared panel password — bootstrap & rotation (e2e, Phase: shared
         .andWhere('rt.revokedAt IS NULL')
         .getCount();
       expect(activeTokens).toBe(0);
+    });
+
+    it('preserves each account expiry when existing and newly bootstrapped accounts have different deadlines', async () => {
+      const userRepo = dataSource.getRepository(User);
+      const earlierExpiry = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
+      await userRepo.update(
+        { username: 'uat.siteadmin' },
+        { temporaryPasswordOnlyUntil: earlierExpiry },
+      );
+
+      const before = await userRepo.find({
+        where: { username: In(ALL_USERNAMES) },
+      });
+      const expiryByUsername = new Map(
+        before.map((user) => [
+          user.username!,
+          user.temporaryPasswordOnlyUntil!.toISOString(),
+        ]),
+      );
+
+      const result = rotate();
+      expect(result.status).toBe(0);
+      const parsed = JSON.parse(result.stdout) as {
+        accounts: Array<{ username: string; expiresAt: string }>;
+      };
+      expect(
+        new Set(parsed.accounts.map(({ expiresAt }) => expiresAt)).size,
+      ).toBeGreaterThan(1);
+
+      const after = await userRepo.find({
+        where: { username: In(ALL_USERNAMES) },
+      });
+      for (const user of after) {
+        expect(user.temporaryPasswordOnlyUntil!.toISOString()).toBe(
+          expiryByUsername.get(user.username!),
+        );
+        expect(
+          await argon2.verify(user.passwordHash!, OTHER_STRONG_PASSWORD),
+        ).toBe(true);
+      }
     });
 
     it('refuses rotation without AUTH_SANDBOX_ENABLED', () => {
