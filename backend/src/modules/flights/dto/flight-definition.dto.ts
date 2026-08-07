@@ -1,0 +1,219 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform, Type } from 'class-transformer';
+import {
+  ArrayMinSize,
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsISO8601,
+  IsOptional,
+  IsString,
+  Matches,
+  Max,
+  Min,
+  ValidateIf,
+  ValidateNested,
+} from 'class-validator';
+import {
+  IsIrrAmount,
+  MinIrrAmount,
+  TransformToIrr,
+} from '../../../common/dto/irr.decorator';
+import type { Irr } from '../../../common/money';
+import {
+  CabinClass,
+  ChargeCalculationMode,
+  ChargeKind,
+} from '../../../database/enums';
+import { normalizeFlightNo } from '../flight-definition.util';
+
+export class CabinCapacityDto {
+  @ApiProperty({ enum: ['ECONOMY', 'COMFORT', 'BUSINESS'] })
+  @IsIn(['ECONOMY', 'COMFORT', 'BUSINESS'])
+  cabin!: CabinClass;
+
+  @ApiPropertyOptional({
+    description: 'ظرفیت کابین (نام frontend)',
+    example: 120,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(1000)
+  seats?: number;
+
+  @ApiPropertyOptional({
+    description: 'ظرفیت کابین (نام مشخصات — alias seats)',
+    example: 120,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(1000)
+  capacity?: number;
+}
+
+export class ChargeRuleDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  id?: string;
+
+  @ApiProperty({ example: 'مالیات بر ارزش افزوده' })
+  @IsString()
+  title!: string;
+
+  @ApiProperty({ enum: ['TAX', 'FEE'] })
+  @IsIn(['TAX', 'FEE'])
+  kind!: ChargeKind;
+
+  @ApiProperty({ enum: ['FIXED', 'PERCENTAGE'] })
+  @IsIn(['FIXED', 'PERCENTAGE'])
+  calculationMode!: ChargeCalculationMode;
+
+  @ApiPropertyOptional({ type: String, example: '500000' })
+  @ValidateIf((o: ChargeRuleDto) => o.calculationMode === 'FIXED')
+  @IsIrrAmount()
+  @MinIrrAmount(0n)
+  @TransformToIrr()
+  fixedAmountIrr?: Irr | null;
+
+  @ApiPropertyOptional({
+    example: 1000,
+    description: 'Basis points — 1000 = 10%',
+  })
+  @ValidateIf((o: ChargeRuleDto) => o.calculationMode === 'PERCENTAGE')
+  @IsInt()
+  @Min(0)
+  @Max(100_000)
+  percentageBasisPoints?: number | null;
+
+  @ApiPropertyOptional({
+    enum: ['ECONOMY', 'COMFORT', 'BUSINESS', null],
+    nullable: true,
+    description: 'null = همه کابین‌ها',
+  })
+  @IsOptional()
+  @IsIn(['ECONOMY', 'COMFORT', 'BUSINESS', null])
+  cabin?: CabinClass | null;
+
+  @ApiPropertyOptional({ description: 'alias effectiveFrom (frontend)' })
+  @IsOptional()
+  @IsISO8601()
+  validFrom?: string | null;
+
+  @ApiPropertyOptional({ description: 'alias effectiveTo (frontend)' })
+  @IsOptional()
+  @IsISO8601()
+  validUntil?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsISO8601()
+  effectiveFrom?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsISO8601()
+  effectiveTo?: string | null;
+
+  @ApiPropertyOptional({ description: 'alias isActive (frontend)' })
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+}
+
+export class CreateFlightDefinitionDto {
+  @ApiProperty({ example: 'THR' })
+  @IsString()
+  @Matches(/^[A-Z]{3}$/)
+  originCode!: string;
+
+  @ApiProperty({ example: 'MHD' })
+  @IsString()
+  @Matches(/^[A-Z]{3}$/)
+  destCode!: string;
+
+  @ApiProperty({
+    example: 'XY1234',
+    description:
+      'Pattern ^[A-Z]{2}\\d{4}$ — uppercased; hyphens/spaces NOT stripped',
+  })
+  @Transform(({ value }: { value: unknown }) => {
+    if (typeof value !== 'string') return '';
+    return normalizeFlightNo(value);
+  })
+  @IsString()
+  @Matches(/^[A-Z]{2}\d{4}$/, {
+    message:
+      'شماره پرواز باید دقیقاً دو حرف لاتین و چهار رقم باشد (مثال: XY1234)',
+  })
+  flightNo!: string;
+
+  @ApiProperty({ description: 'UTC ISO departure' })
+  @IsISO8601()
+  departureAt!: string;
+
+  @ApiProperty({
+    example: 90,
+    description:
+      'Positive integer minutes. arrivalAt is derived as departureAt + durationMinutes.',
+  })
+  @IsInt()
+  @Min(1)
+  @Max(24 * 60)
+  durationMinutes!: number;
+
+  @ApiProperty({ example: 180 })
+  @IsInt()
+  @Min(1)
+  @Max(1000)
+  capacity!: number;
+
+  @ApiProperty({ type: [CabinCapacityDto] })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => CabinCapacityDto)
+  cabinCapacities!: CabinCapacityDto[];
+
+  @ApiProperty({ type: String, example: '38000000' })
+  @IsIrrAmount()
+  @MinIrrAmount(1n)
+  @TransformToIrr()
+  basePriceIrr!: Irr;
+
+  @ApiPropertyOptional({ example: 'Airbus A320' })
+  @IsOptional()
+  @IsString()
+  aircraftType?: string;
+
+  @ApiPropertyOptional({ example: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(1000)
+  charterSeats?: number;
+
+  @ApiPropertyOptional({ type: [ChargeRuleDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ChargeRuleDto)
+  chargeRules?: ChargeRuleDto[];
+
+  @ApiPropertyOptional({ type: String, example: '40000000' })
+  @IsOptional()
+  @IsIrrAmount()
+  @MinIrrAmount(1n)
+  @TransformToIrr()
+  competitorPriceIrr?: Irr;
+}
+
+export class UpdateFlightDefinitionDto extends CreateFlightDefinitionDto {}

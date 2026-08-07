@@ -94,6 +94,22 @@ export class FarePricingProposal {
   @Column({ type: 'timestamp', precision: 3, nullable: true })
   approvedAt!: Date | null;
 
+  @Column({ type: 'text', nullable: true })
+  rejectionReason!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  rejectedById!: string | null;
+
+  @ManyToOne(() => User, { onDelete: 'SET NULL', onUpdate: 'CASCADE' })
+  @JoinColumn({
+    name: 'rejectedById',
+    foreignKeyConstraintName: 'fare_pricing_proposals_rejectedById_fkey',
+  })
+  rejectedBy!: User | null;
+
+  @Column({ type: 'timestamp', precision: 3, nullable: true })
+  rejectedAt!: Date | null;
+
   @Column({ type: 'jsonb', nullable: true })
   aiSuggestion!: JsonValue | null;
 

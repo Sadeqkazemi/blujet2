@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Inject,
   Injectable,
@@ -10,6 +11,7 @@ import { FarePricingProposal } from '../../database/entities/fare-pricing-propos
 import { FlightInstance } from '../../database/entities/flight-instance.entity';
 import { Flight } from '../../database/entities/flight.entity';
 import { Booking } from '../../database/entities/booking.entity';
+import { PricingProposalStatus } from '../../database/enums';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
 import {
@@ -17,6 +19,7 @@ import {
   type PriceSuggestionProvider,
 } from '../ai/price-suggestion.provider';
 import { StepUpService } from '../auth/step-up.service';
+import { FlightDefinitionService } from '../flights/flight-definition.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import {
   addIrr,
@@ -56,6 +59,7 @@ export class PricingService {
     @Inject(PRICE_SUGGESTION_PROVIDER)
     private readonly priceSuggestions: PriceSuggestionProvider,
     private readonly stepUp: StepUpService,
+    private readonly definitions: FlightDefinitionService,
   ) {}
 
   private withProposalRelations(
@@ -72,17 +76,33 @@ export class PricingService {
       .addSelect(['approvedBy.id', 'approvedBy.fullName', 'approvedBy.role']);
   }
 
-  /** CEO view: pending + registered lists. */
+  /** CEO view: pending + registered lists (+ pendingApprovalsCount). */
   async listForCeo() {
     const proposals = await this.withProposalRelations(
       this.proposalRepo.createQueryBuilder('p'),
     )
       .orderBy('p.createdAt', 'DESC')
       .getMany();
+    const pending = proposals.filter(
+      (p) => p.status === PricingProposalStatus.PENDING,
+    );
     return {
-      pending: proposals.filter((p) => p.status === 'PENDING'),
-      registered: proposals.filter((p) => p.status === 'REGISTERED'),
+      pending,
+      registered: proposals.filter(
+        (p) => p.status === PricingProposalStatus.REGISTERED,
+      ),
+      rejected: proposals.filter(
+        (p) => p.status === PricingProposalStatus.REJECTED,
+      ),
+      pendingApprovalsCount: pending.length,
     };
+  }
+
+  async pendingApprovalsCount(): Promise<{ pendingApprovalsCount: number }> {
+    const count = await this.proposalRepo.count({
+      where: { status: PricingProposalStatus.PENDING },
+    });
+    return { pendingApprovalsCount: count };
   }
 
   /** Commercial view: upcoming SCHEDULED instances joined with their proposal. */
@@ -138,7 +158,7 @@ export class PricingService {
       .createQueryBuilder('p')
       .where('p.flightInstanceId = :id', { id: flightInstanceId })
       .getOne();
-    if (existing?.status === 'REGISTERED') {
+    if (existing?.status === PricingProposalStatus.REGISTERED) {
       throw new ConflictException({
         code: ErrorCode.CONFLICT,
         message: LOCKED_MESSAGE,
@@ -152,34 +172,31 @@ export class PricingService {
         existing.legalRateIrr = dto.legalRateIrr;
       if (dto.note !== undefined) existing.note = dto.note;
       existing.proposedById = actor.id;
+      // Re-open a rejected proposal for a new CEO cycle.
+      existing.status = PricingProposalStatus.PENDING;
+      existing.rejectionReason = null;
+      existing.rejectedAt = null;
+      existing.rejectedById = null;
       // Any edit to the proposal's inputs invalidates a previously
       // generated AI suggestion — it was computed against the old
       // price/legal-rate and must not be registerable anymore.
       existing.aiSuggestion = null;
+      if (instance.competitorPriceIrr != null) {
+        existing.competitorPriceIrr = instance.competitorPriceIrr;
+      }
+      if (instance.basePriceIrr != null) {
+        existing.basePriceIrr = instance.basePriceIrr;
+      }
       existing.updatedAt = new Date();
       const saved = await this.proposalRepo.save(existing);
       proposalId = saved.id;
     } else {
-      // Competitor/base figures come from the flight context for now: base is
-      // the design's «قیمت پایهٔ شرکت». Until Phase 10's flight management
-      // stores real base/competitor rates, derive base from recent sale prices
-      // and competitor from the proposal's own market observation (the design
-      // shows both as read-only tiles fed by flight data).
-      const recentSale = await this.bookingRepo
-        .createQueryBuilder('b')
-        .leftJoin('b.flightInstance', 'fi2')
-        .select(['b.priceIrr'])
-        .where('fi2.flightId = :flightId', { flightId: instance.flightId })
-        .orderBy('b.createdAt', 'DESC')
-        .getOne();
-      const basePriceIrr = recentSale?.priceIrr ?? dto.proposedPriceIrr;
-      // Design's "competitor" tile = base + 3%, rounded to the nearest
-      // 100,000 IRR "round number" price — same roundIrrTo pattern as the
-      // business-cabin multiplier in pricing.ts, no float involved.
-      const competitorPriceIrr = roundIrrTo(
-        addIrr(basePriceIrr, pctOfIrr(basePriceIrr, 3)),
-        100_000n,
-      );
+      const basePriceIrr = instance.basePriceIrr ?? dto.proposedPriceIrr;
+      // Prefer staff-supplied competitor on the definition; otherwise a
+      // transparent +3% marker derived from base (not a fabricated market feed).
+      const competitorPriceIrr =
+        instance.competitorPriceIrr ??
+        roundIrrTo(addIrr(basePriceIrr, pctOfIrr(basePriceIrr, 3)), 100_000n);
 
       const created = await this.proposalRepo.save(
         this.proposalRepo.create({
@@ -190,11 +207,14 @@ export class PricingService {
           legalRateIrr: dto.legalRateIrr,
           note: dto.note,
           proposedById: actor.id,
+          status: PricingProposalStatus.PENDING,
           updatedAt: new Date(),
         }),
       );
       proposalId = created.id;
     }
+
+    await this.definitions.markPendingCeo(flightInstanceId);
 
     const proposal = await this.withProposalRelations(
       this.proposalRepo.createQueryBuilder('p'),
@@ -280,10 +300,15 @@ export class PricingService {
         message: 'پیشنهاد قیمت یافت نشد.',
       });
     }
-    if (proposal.status === 'REGISTERED') {
+    // Idempotent: a second successful register returns the already-registered
+    // row after step-up, without mutating the active definition again.
+    if (proposal.status === PricingProposalStatus.REGISTERED) {
+      return proposal;
+    }
+    if (proposal.status === PricingProposalStatus.REJECTED) {
       throw new ConflictException({
         code: ErrorCode.CONFLICT,
-        message: LOCKED_MESSAGE,
+        message: 'این پیشنهاد رد شده است؛ ابتدا پیشنهاد جدید ارسال کنید.',
       });
     }
 
@@ -320,21 +345,33 @@ export class PricingService {
 
     // Conditional update guards against a concurrent double-register.
     const updated = await this.proposalRepo.update(
-      { id, status: 'PENDING' },
+      { id, status: PricingProposalStatus.PENDING },
       {
-        status: 'REGISTERED',
+        status: PricingProposalStatus.REGISTERED,
         registeredPriceIrr: price,
         approvedById: actor.id,
         approvedAt: new Date(),
         updatedAt: new Date(),
+        rejectionReason: null,
+        rejectedAt: null,
+        rejectedById: null,
       },
     );
     if ((updated.affected ?? 0) === 0) {
+      // Lost the race — reload; if peer registered, return that (idempotent).
+      const raced = await this.withProposalRelations(
+        this.proposalRepo.createQueryBuilder('p'),
+      )
+        .where('p.id = :id', { id })
+        .getOneOrFail();
+      if (raced.status === PricingProposalStatus.REGISTERED) return raced;
       throw new ConflictException({
         code: ErrorCode.CONFLICT,
         message: LOCKED_MESSAGE,
       });
     }
+
+    await this.definitions.applyCeoApproval(proposal.flightInstanceId);
 
     await this.audit.record({
       actorId: actor.id,
@@ -348,6 +385,92 @@ export class PricingService {
       entityType: 'FarePricingProposal',
       entityId: id,
       metadata: { registeredPriceIrr: price, source },
+    });
+
+    return this.withProposalRelations(this.proposalRepo.createQueryBuilder('p'))
+      .where('p.id = :id', { id })
+      .getOneOrFail();
+  }
+
+  async reject(
+    actor: AuthenticatedUser,
+    id: string,
+    dto: {
+      rejectionReason: string;
+      stepUpChallengeId: string;
+      stepUpCode: string;
+    },
+  ) {
+    await this.stepUp.verify(
+      actor,
+      dto.stepUpChallengeId,
+      dto.stepUpCode,
+      'PRICE_CAPACITY_CHANGE',
+    );
+
+    const reason = (dto.rejectionReason ?? '').trim();
+    if (!reason) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'دلیل رد الزامی است.',
+      });
+    }
+
+    const proposal = await this.withProposalRelations(
+      this.proposalRepo.createQueryBuilder('p'),
+    )
+      .where('p.id = :id', { id })
+      .getOne();
+    if (!proposal) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'پیشنهاد قیمت یافت نشد.',
+      });
+    }
+    if (proposal.status === PricingProposalStatus.REJECTED) {
+      return proposal;
+    }
+    if (proposal.status === PricingProposalStatus.REGISTERED) {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: LOCKED_MESSAGE,
+      });
+    }
+
+    const updated = await this.proposalRepo.update(
+      { id, status: PricingProposalStatus.PENDING },
+      {
+        status: PricingProposalStatus.REJECTED,
+        rejectionReason: reason,
+        rejectedById: actor.id,
+        rejectedAt: new Date(),
+        updatedAt: new Date(),
+      },
+    );
+    if ((updated.affected ?? 0) === 0) {
+      const raced = await this.withProposalRelations(
+        this.proposalRepo.createQueryBuilder('p'),
+      )
+        .where('p.id = :id', { id })
+        .getOneOrFail();
+      if (raced.status === PricingProposalStatus.REJECTED) return raced;
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'وضعیت پیشنهاد قابل رد نیست.',
+      });
+    }
+
+    await this.definitions.applyCeoRejection(proposal.flightInstanceId, reason);
+
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'PRICING',
+      action: 'رد پیشنهاد قیمت پرواز',
+      detail: `پیشنهاد قیمت پرواز ${proposal.flightInstance.flight.flightNo} توسط ${actor.fullName} رد شد.`,
+      entityType: 'FarePricingProposal',
+      entityId: id,
+      metadata: { rejectionReason: reason },
     });
 
     return this.withProposalRelations(this.proposalRepo.createQueryBuilder('p'))

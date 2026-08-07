@@ -10,6 +10,7 @@ import {
   PrimaryColumn,
 } from 'typeorm';
 import { BookingChannel, BookingStatus, CabinClass } from '../enums';
+import type { JsonValue } from '../json-types';
 import { bigintTransformer } from '../transformers/bigint.transformer';
 import { AgencyProfile } from './agency-profile.entity';
 import { AgencyAllotment } from './agency-allotment.entity';
@@ -133,4 +134,11 @@ export class Booking {
 
   @Column({ type: 'bigint', default: 0, transformer: bigintTransformer })
   taxIrr!: bigint;
+
+  /**
+   * Immutable charge/tax breakdown captured at booking time so later rule
+   * edits never rewrite historical reservations.
+   */
+  @Column({ type: 'jsonb', nullable: true })
+  chargeSnapshot!: JsonValue | null;
 }

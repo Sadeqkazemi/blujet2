@@ -10,6 +10,7 @@ import { AiModule } from '../ai/ai.module';
 import { PanelsModule } from '../panels/panels.module';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
+import { FlightsModule } from '../flights/flights.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { AuthModule } from '../auth/auth.module';
     PanelsModule,
     AuditModule,
     AuthModule,
+    FlightsModule,
   ],
   controllers: [PricingController],
   providers: [PricingService],

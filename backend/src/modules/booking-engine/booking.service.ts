@@ -31,8 +31,10 @@ import {
 import { enumerateSeats } from '../reservation/seat-layout';
 import { matchesLastName } from '../../common/passenger-name.util';
 import { resolveAircraftType } from '../flights/aircraft-type.util';
+import { calculateActiveCharges } from '../flights/charge-rules';
 import { getCabinPrice, resolveFareClass } from './pricing';
 import type { Irr } from '../../common/money';
+import type { CabinClass } from '../../database/enums';
 import { PAYMENT_GATEWAY, type PaymentGateway } from './payment-gateway';
 import { SearchService } from './search.service';
 import { PriceLockService } from './price-lock.service';
@@ -49,6 +51,19 @@ export type PaymentMethod = 'GATEWAY' | 'WALLET' | 'POINTS';
 /** CLAUDE.md: "HELD has a 10-minute TTL (matches the design's hold timer);
  * expiry releases inventory automatically." */
 const HOLD_TTL_MS = 10 * 60 * 1000;
+
+function cabinLabelFa(cabin: CabinClass): string {
+  switch (cabin) {
+    case 'BUSINESS':
+      return 'بیزینس';
+    case 'COMFORT':
+      return 'کامفورت';
+    case 'ECONOMY':
+      return 'اکونومی';
+    default:
+      return cabin;
+  }
+}
 
 function generatePnr(): string {
   return `BJ${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
@@ -250,7 +265,7 @@ export class BookingService {
       if (!seat || seat.cabin !== dto.cabin) {
         throw new BadRequestException({
           code: ErrorCode.VALIDATION_FAILED,
-          message: `صندلی ${code} در کلاس ${dto.cabin === 'BUSINESS' ? 'بیزینس' : 'اکونومی'} معتبر نیست.`,
+          message: `صندلی ${code} در کلاس ${cabinLabelFa(dto.cabin)} معتبر نیست.`,
         });
       }
     }
@@ -287,12 +302,22 @@ export class BookingService {
           instance.id,
           dto.cabin,
         );
-    // Tax/fee is per-fare-class (Phase 13 Part B) and included in the
-    // stored total so ledger/refunds/reporting — which all read
-    // priceIrr as-is — never need to know tax exists; taxIrr is stored
-    // alongside purely for receipt display.
+    // Tax/fee is per-fare-class (Phase 13 Part B) plus active charge rules;
+    // both are included in the stored total so ledger/refunds/reporting — which
+    // all read priceIrr as-is — never need to recompute; taxIrr and
+    // chargeSnapshot are stored for receipt display and audit.
     const passengerCount = BigInt(dto.passengers.length);
-    const taxIrr: Irr = (fareClass?.taxIrr ?? 0n) * passengerCount;
+    const unitCharges = await calculateActiveCharges(
+      this.bookingRepo.manager,
+      instance.id,
+      unitPriceIrr,
+      dto.cabin,
+      now,
+    );
+    const chargePerPax = BigInt(unitCharges.totalChargesIrr);
+    const taxIrr: Irr =
+      (fareClass?.taxIrr ?? 0n) * passengerCount +
+      chargePerPax * passengerCount;
     const priceIrr: Irr = unitPriceIrr * passengerCount + taxIrr;
     const contactUser = await this.userRepo
       .createQueryBuilder('u')
@@ -348,6 +373,7 @@ export class BookingService {
           fareClassCode: fareClass?.classCode ?? null,
           priceIrr,
           taxIrr,
+          chargeSnapshot: unitCharges,
           userId: user.id,
           contactPhone: contactUser.phone ?? null,
           holdExpiresAt: new Date(Date.now() + HOLD_TTL_MS),
@@ -588,7 +614,17 @@ export class BookingService {
       allotment.contractPriceIrr ??
       (await getCabinPrice(this.bookingRepo.manager, instance.id, dto.cabin));
     const passengerCount = BigInt(dto.passengers.length);
-    const taxIrr = (fareClass?.taxIrr ?? 0n) * passengerCount;
+    const unitCharges = await calculateActiveCharges(
+      this.bookingRepo.manager,
+      instance.id,
+      unitPriceIrr,
+      dto.cabin,
+      now,
+    );
+    const chargePerPax = BigInt(unitCharges.totalChargesIrr);
+    const taxIrr =
+      (fareClass?.taxIrr ?? 0n) * passengerCount +
+      chargePerPax * passengerCount;
     const priceIrr = unitPriceIrr * passengerCount + taxIrr;
     const contactUser = await this.userRepo.findOneByOrFail({ id: actor.id });
 
@@ -701,6 +737,7 @@ export class BookingService {
             fareClassCode: fareClass?.classCode ?? null,
             priceIrr,
             taxIrr,
+            chargeSnapshot: unitCharges,
             userId: null,
             contactPhone: contactUser.phone ?? null,
             holdExpiresAt: null,
@@ -824,17 +861,27 @@ export class BookingService {
           booking.cabin,
         );
     const bookingPassengerCount = BigInt(booking.passengers.length);
-    const currentTaxIrr: Irr =
-      (currentFareClass?.taxIrr ?? 0n) * bookingPassengerCount;
-    const currentPriceIrr: Irr = isLocked
-      ? booking.priceIrr
-      : (await getCabinPrice(
-          this.bookingRepo.manager,
-          booking.flightInstanceId,
-          booking.cabin,
-        )) *
-          bookingPassengerCount +
-        currentTaxIrr;
+    let currentTaxIrr: Irr = 0n;
+    let currentPriceIrr: Irr = booking.priceIrr;
+    if (!isLocked) {
+      const unitFare = await getCabinPrice(
+        this.bookingRepo.manager,
+        booking.flightInstanceId,
+        booking.cabin,
+      );
+      const unitCharges = await calculateActiveCharges(
+        this.bookingRepo.manager,
+        booking.flightInstanceId,
+        unitFare,
+        booking.cabin,
+        new Date(),
+      );
+      const chargePerPax = BigInt(unitCharges.totalChargesIrr);
+      currentTaxIrr =
+        (currentFareClass?.taxIrr ?? 0n) * bookingPassengerCount +
+        chargePerPax * bookingPassengerCount;
+      currentPriceIrr = unitFare * bookingPassengerCount + currentTaxIrr;
+    }
 
     if (!isLocked && currentPriceIrr !== booking.priceIrr) {
       if (options.confirmedPriceIrr !== currentPriceIrr) {

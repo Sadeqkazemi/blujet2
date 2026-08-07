@@ -11,9 +11,11 @@ import { getCabinPrice } from './pricing';
 import type { Irr } from '../../common/money';
 import { enumerateSeats } from '../reservation/seat-layout';
 import { resolveAircraftType } from '../flights/aircraft-type.util';
+import { serializeCabinCapacities } from '../flights/flight-definition.util';
 import type { CabinClass } from '../../database/enums';
 
 const ACTIVE_BOOKING_STATUSES = ['DRAFT', 'HELD', 'PAID', 'TICKETED'] as const;
+const SEARCH_CABINS: readonly CabinClass[] = ['ECONOMY', 'COMFORT', 'BUSINESS'];
 
 // CLAUDE.md: search-result cache TTL 5-10 min; Redis is never the source of
 // truth for seats/bookings — availability is still re-checked (takenSeatCodes
@@ -115,6 +117,32 @@ export class SearchService {
     return qb;
   }
 
+  /** seatsLeft for a cabin: prefer flight-definition cabinCapacities when
+   * present; otherwise derive from the seat map. Returns null when the cabin
+   * has no sellable capacity (COMFORT is never merged into ECONOMY). */
+  private seatsLeftForCabin(
+    instance: FlightInstance,
+    cabin: CabinClass,
+    seats: { seatCode: string; cabin: CabinClass }[],
+    taken: Set<string>,
+  ): number | null {
+    const capacities = serializeCabinCapacities(instance.cabinCapacities);
+    if (capacities.length > 0) {
+      const cap = capacities.find((row) => row.cabin === cabin);
+      if (!cap || cap.seats === 0) return null;
+      const cabinSeatCodes = new Set(
+        seats.filter((s) => s.cabin === cabin).map((s) => s.seatCode),
+      );
+      const takenInCabin = [...taken].filter((code) =>
+        cabinSeatCodes.has(code),
+      ).length;
+      return Math.max(0, cap.seats - takenInCabin);
+    }
+    const cabinSeats = seats.filter((s) => s.cabin === cabin);
+    if (cabinSeats.length === 0) return null;
+    return cabinSeats.filter((s) => !taken.has(s.seatCode)).length;
+  }
+
   private async searchUncached(origin: string, dest: string, date: string) {
     const dayStart = new Date(date);
     dayStart.setUTCHours(0, 0, 0, 0);
@@ -157,12 +185,9 @@ export class SearchService {
         priceIrr: Irr;
         seatsLeft: number;
       }[] = [];
-      for (const cabin of ['ECONOMY', 'BUSINESS'] as const) {
-        const cabinSeats = seats.filter((s) => s.cabin === cabin);
-        const seatsLeft = cabinSeats.filter(
-          (s) => !taken.has(s.seatCode),
-        ).length;
-        if (cabinSeats.length === 0) continue;
+      for (const cabin of SEARCH_CABINS) {
+        const seatsLeft = this.seatsLeftForCabin(instance, cabin, seats, taken);
+        if (seatsLeft === null) continue;
         cabins.push({
           cabin,
           priceIrr: await getCabinPrice(
@@ -292,7 +317,7 @@ export class SearchService {
         priceIrr: Irr;
         seatsLeft: number;
       }[] = [];
-      for (const cabin of ['ECONOMY', 'BUSINESS'] as const) {
+      for (const cabin of SEARCH_CABINS) {
         let priceSum: Irr = 0n;
         let seatsLeft = Number.MAX_SAFE_INTEGER;
         let ok = true;
@@ -300,18 +325,18 @@ export class SearchService {
           const map = await this.seatMapRepo.findOneBy({
             aircraftType: resolveAircraftType(leg),
           });
-          const seats = (map ? enumerateSeats(map) : []).filter(
-            (s) => s.cabin === cabin,
+          const legSeats = map ? enumerateSeats(map) : [];
+          const left = this.seatsLeftForCabin(
+            leg,
+            cabin,
+            legSeats,
+            await this.takenSeatCodes(leg.id),
           );
-          if (seats.length === 0) {
+          if (left === null) {
             ok = false;
             break;
           }
-          const taken = await this.takenSeatCodes(leg.id);
-          seatsLeft = Math.min(
-            seatsLeft,
-            seats.filter((s) => !taken.has(s.seatCode)).length,
-          );
+          seatsLeft = Math.min(seatsLeft, left);
           priceSum += await getCabinPrice(
             this.flightInstanceRepo.manager,
             leg.id,

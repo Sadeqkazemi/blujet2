@@ -451,9 +451,12 @@ async function main() {
     ];
     for (const s of agencyBookingSeeds) {
       for (let i = 0; i < s.count; i++) {
-        const existing = await bookingRepo.findOneBy({
-          pnr: `BJAG${s.agencyId.slice(0, 4)}${i}`,
-        });
+        const existing = await bookingRepo
+          .createQueryBuilder('b')
+          .where('b.pnr = :pnr', {
+            pnr: `BJAG${s.agencyId.slice(0, 4)}${i}`,
+          })
+          .getOne();
         if (existing) continue;
 
         const booking = await bookingRepo.save(
@@ -1477,9 +1480,10 @@ async function main() {
   }
 
   if ((await refundRequestRepo.count()) === 0) {
-    const someBooking = await bookingRepo.findOneBy({
-      status: BookingStatus.TICKETED,
-    });
+    const someBooking = await bookingRepo
+      .createQueryBuilder('b')
+      .where('b.status = :status', { status: BookingStatus.TICKETED })
+      .getOne();
     if (someBooking) {
       const financeStaffName = 'مریم کاظمی';
       const refundSeeds: {

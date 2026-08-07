@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -24,6 +25,11 @@ import {
 } from 'class-validator';
 import type { Request } from 'express';
 import { FlightsService } from './flights.service';
+import { FlightDefinitionService } from './flight-definition.service';
+import {
+  CreateFlightDefinitionDto,
+  UpdateFlightDefinitionDto,
+} from './dto/flight-definition.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -38,6 +44,7 @@ import {
 } from '../../common/dto/irr.decorator';
 import type { Irr } from '../../common/money';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
+import { Role } from '../../database/enums';
 
 class CreateAirportDto {
   @ApiProperty({ description: 'نام شهر', example: 'وان' })
@@ -57,63 +64,6 @@ class CreateAirportDto {
   @IsOptional()
   @IsString()
   tz?: string;
-}
-
-class CreateFlightDto {
-  @ApiProperty({ description: 'کد فرودگاه مبدأ', example: 'THR' })
-  @IsString()
-  @Matches(/^[A-Z]{3}$/)
-  originCode: string;
-
-  @ApiProperty({ description: 'کد فرودگاه مقصد', example: 'DXB' })
-  @IsString()
-  @Matches(/^[A-Z]{3}$/)
-  destCode: string;
-
-  @ApiProperty({ description: 'شماره پرواز', example: 'کد پرواز' })
-  @IsString()
-  @Matches(/^[A-Z0-9]{2}-\d{2,4}$/)
-  flightNo: string;
-
-  @ApiProperty({ description: 'زمان پرواز (UTC ISO — تبدیل جلالی در فرانت)' })
-  @IsISO8601()
-  departureAt: string;
-
-  @ApiProperty({ description: 'ظرفیت صندلی', example: 180 })
-  @IsInt()
-  @Min(1)
-  @Max(1000)
-  capacity: number;
-
-  @ApiProperty({
-    description: 'قیمت پایه (ریال)',
-    example: '38000000',
-    type: String,
-  })
-  @IsIrrAmount()
-  @MinIrrAmount(1n)
-  @TransformToIrr()
-  basePriceIrr: Irr;
-
-  @ApiProperty({
-    description: 'نوع هواپیما (از کاتالوگ aircraft-types)',
-    example: 'Airbus A320',
-    required: false,
-  })
-  @IsOptional()
-  @IsString()
-  aircraftType?: string;
-
-  @ApiProperty({
-    description: 'تعهد چارتری (صندلی) — باید کمتر از ظرفیت باشد',
-    example: 60,
-    required: false,
-  })
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  @Max(1000)
-  charterSeats?: number;
 }
 
 class CreateScheduleDto {
@@ -209,9 +159,9 @@ class ChangeAircraftTypeDto {
 }
 
 class CreateFareRuleDto {
-  @ApiProperty({ enum: ['ECONOMY', 'BUSINESS'] })
-  @IsIn(['ECONOMY', 'BUSINESS'])
-  cabin: 'ECONOMY' | 'BUSINESS';
+  @ApiProperty({ enum: ['ECONOMY', 'COMFORT', 'BUSINESS'] })
+  @IsIn(['ECONOMY', 'COMFORT', 'BUSINESS'])
+  cabin: 'ECONOMY' | 'COMFORT' | 'BUSINESS';
 
   @ApiProperty({ description: 'کد کلاس نرخی', example: 'Y' })
   @IsString()
@@ -385,7 +335,10 @@ class CreateAllotmentDto {
 @UseGuards(JwtAuthGuard, RolesGuard, PanelAccessGuard, EmployeePermissionGuard)
 @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER')
 export class FlightsController {
-  constructor(private readonly flights: FlightsService) {}
+  constructor(
+    private readonly flights: FlightsService,
+    private readonly definitions: FlightDefinitionService,
+  ) {}
 
   // EMPLOYEE: PERMISSION_CATALOG's fl_view for the GET endpoints below;
   // fl_manage (Phase 27) additionally unlocks every write endpoint —
@@ -432,17 +385,42 @@ export class FlightsController {
   }
 
   @Post()
-  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @Roles(Role.SENIOR_MANAGER, Role.COMMERCIAL_MANAGER, Role.EMPLOYEE)
   @RequiresPermission('fl_manage')
   @ApiOperation({
     summary:
-      'افزودن پرواز جدید — مشخصات + هواپیما/چارتر؛ سپس کلاس نرخی و پیشنهاد قیمت جداگانه',
+      'افزودن تعریف پرواز — مدت، ظرفیت کابین (ECONOMY/COMFORT/BUSINESS)، قوانین مالیات/عوارض',
   })
   async create(
     @CurrentUser() actor: AuthenticatedUser,
-    @Body() dto: CreateFlightDto,
+    @Body() dto: CreateFlightDefinitionDto,
   ) {
-    const data = await this.flights.create(actor, dto);
+    const data = await this.definitions.createDefinition(actor, dto);
+    return { success: true, data };
+  }
+
+  @Get(':id/definition')
+  @Roles(Role.SENIOR_MANAGER, Role.COMMERCIAL_MANAGER, Role.EMPLOYEE)
+  @RequiresPermission('fl_view')
+  @ApiOperation({ summary: 'دریافت تعریف کامل قابل ویرایش پرواز' })
+  async getDefinition(@Param('id') id: string) {
+    const data = await this.definitions.getDefinition(id);
+    return { success: true, data };
+  }
+
+  @Put(':id/definition')
+  @Roles(Role.SENIOR_MANAGER, Role.COMMERCIAL_MANAGER, Role.EMPLOYEE)
+  @RequiresPermission('fl_manage')
+  @ApiOperation({
+    summary:
+      'ویرایش تعریف پرواز — روی نسخه تأییدشده revision جدید (PENDING_REVISION) می‌سازد',
+  })
+  async updateDefinition(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateFlightDefinitionDto,
+  ) {
+    const data = await this.definitions.updateDefinition(actor, id, dto);
     return { success: true, data };
   }
 

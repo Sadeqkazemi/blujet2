@@ -4,9 +4,9 @@ import { ArrayMinSize, IsArray, IsIn, ValidateNested } from 'class-validator';
 import { BookingPassengerDto } from '../../booking-engine/dto/create-booking.dto';
 
 export class CreateAllotmentBookingDto {
-  @ApiProperty({ enum: ['ECONOMY', 'BUSINESS'] })
-  @IsIn(['ECONOMY', 'BUSINESS'])
-  cabin: 'ECONOMY' | 'BUSINESS';
+  @ApiProperty({ enum: ['ECONOMY', 'COMFORT', 'BUSINESS'] })
+  @IsIn(['ECONOMY', 'COMFORT', 'BUSINESS'])
+  cabin: 'ECONOMY' | 'COMFORT' | 'BUSINESS';
 
   @ApiProperty({ type: [BookingPassengerDto] })
   @IsArray()

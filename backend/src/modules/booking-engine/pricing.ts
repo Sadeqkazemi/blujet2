@@ -53,9 +53,14 @@ export async function getCabinPrice(
       ? (pricing.registeredPriceIrr as Irr)
       : ((instance?.basePriceIrr as Irr | null) ?? FALLBACK_ECONOMY_PRICE_IRR);
 
-  return cabin === 'BUSINESS'
-    ? roundIrrTo(pctOfIrr(economyPrice, BUSINESS_MULTIPLIER_PCT), 100_000n)
-    : economyPrice;
+  if (cabin === 'BUSINESS') {
+    return roundIrrTo(
+      pctOfIrr(economyPrice, BUSINESS_MULTIPLIER_PCT),
+      100_000n,
+    );
+  }
+  // ECONOMY and COMFORT share the economy base when no CabinFare / fare-class row exists.
+  return economyPrice;
 }
 
 /**
