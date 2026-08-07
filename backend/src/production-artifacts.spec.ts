@@ -30,6 +30,10 @@ const uatPurgeSource = readFileSync(
   join(backendRoot, 'src', 'database', 'uat-demo-data-purge.ts'),
   'utf8',
 );
+const uatFlightCatalogCleanupSource = readFileSync(
+  join(backendRoot, 'src', 'database', 'uat-flight-catalog-cleanup.ts'),
+  'utf8',
+);
 
 describe('production backend artifacts', () => {
   it('uses the JavaScript layout emitted by nest build', () => {
@@ -86,6 +90,13 @@ describe('production backend artifacts', () => {
       '.blujet-uat-flight-catalog-cleanup-v1-complete',
     );
     expect(deployWorkflow).toContain('CLEAR_BLUJET_UAT_FLIGHT_CATALOG');
+    expect(deployWorkflow).toContain('DELETE_BLUJET_UAT_ROUTES');
+    expect(uatFlightCatalogCleanupSource).toContain(
+      'UAT_FLIGHT_CATALOG_DELETE_ROUTES_CONFIRM',
+    );
+    expect(uatFlightCatalogCleanupSource).toContain(
+      'TRUNCATE TABLE "routes", "airports" RESTART IDENTITY CASCADE',
+    );
     expect(deployWorkflow).toContain('redis-cli FLUSHDB');
   });
 });

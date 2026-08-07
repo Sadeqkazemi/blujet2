@@ -5,6 +5,7 @@ import { dataSourceOptions } from './data-source.options';
 
 const EXECUTE_FLAG = '--execute-cleanup';
 const CONFIRMATION = 'CLEAR_BLUJET_UAT_FLIGHT_CATALOG';
+const ROUTE_DELETION_CONFIRMATION = 'DELETE_BLUJET_UAT_ROUTES';
 
 type CountRow = { count: string };
 
@@ -58,14 +59,20 @@ async function main() {
         'UAT flight catalog cleanup refused: a verified backup reference is required.',
       );
     }
-    if (routeCount > 0) {
+    if (
+      routeCount > 0 &&
+      process.env.UAT_FLIGHT_CATALOG_DELETE_ROUTES_CONFIRM !==
+        ROUTE_DELETION_CONFIRMATION
+    ) {
       throw new Error(
-        `UAT flight catalog cleanup refused: ${routeCount} real route(s) exist; remove or migrate them explicitly.`,
+        `UAT flight catalog cleanup refused: ${routeCount} real route(s) exist; route deletion confirmation must equal ${ROUTE_DELETION_CONFIRMATION}.`,
       );
     }
 
     await dataSource.transaction(async (manager) => {
-      await manager.query('TRUNCATE TABLE "airports" RESTART IDENTITY');
+      await manager.query(
+        'TRUNCATE TABLE "routes", "airports" RESTART IDENTITY CASCADE',
+      );
     });
     console.log(
       `UAT flight catalog cleanup completed. Backup reference: ${process.env.UAT_FLIGHT_CATALOG_CLEANUP_BACKUP_REF}`,
