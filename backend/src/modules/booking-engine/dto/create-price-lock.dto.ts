@@ -6,7 +6,7 @@ export class CreatePriceLockDto {
   @IsString()
   flightInstanceId: string;
 
-  @ApiProperty({ enum: ['ECONOMY', 'BUSINESS'] })
-  @IsIn(['ECONOMY', 'BUSINESS'])
-  cabin: 'ECONOMY' | 'BUSINESS';
+  @ApiProperty({ enum: ['ECONOMY', 'COMFORT', 'BUSINESS'] })
+  @IsIn(['ECONOMY', 'COMFORT', 'BUSINESS'])
+  cabin: 'ECONOMY' | 'COMFORT' | 'BUSINESS';
 }

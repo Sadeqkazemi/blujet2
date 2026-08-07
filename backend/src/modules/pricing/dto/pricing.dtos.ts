@@ -65,3 +65,22 @@ export class RegisterProposalDto {
   @IsString()
   stepUpCode: string;
 }
+
+export class RejectProposalDto {
+  @ApiProperty({
+    example: 'نرخ پیشنهادی با نرخ قانونی سازگار نیست',
+    description: 'دلیل رد — اجباری، پس از trim خالی نباشد',
+  })
+  @IsString()
+  rejectionReason: string;
+
+  @ApiProperty({
+    description: 'از POST /auth/step-up/request (scope: PRICE_CAPACITY_CHANGE)',
+  })
+  @IsString()
+  stepUpChallengeId: string;
+
+  @ApiProperty({ example: '482913' })
+  @IsString()
+  stepUpCode: string;
+}

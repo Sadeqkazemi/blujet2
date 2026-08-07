@@ -26,6 +26,7 @@ import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
 import { enumerateSeats } from '../reservation/seat-layout';
 import { resolveAircraftType } from './aircraft-type.util';
+import { serializeCabinCapacities } from './flight-definition.util';
 import { materializeDepartedInstances } from './flight-lifecycle.util';
 import {
   PRICE_SUGGESTION_PROVIDER,
@@ -42,6 +43,7 @@ import {
   subIrr,
 } from '../../common/money';
 import type { Irr } from '../../common/money';
+import type { CabinClass } from '../../database/enums';
 
 /** SCHEDULED instances departing beyond this window belong to the
  * پروازهای آینده sub-tab; the rest are پروازهای فعال. */
@@ -954,23 +956,38 @@ export class FlightsService {
     });
   }
 
-  /** Physical seat count for one cabin of this instance's (possibly
-   * overridden, Phase 13 Part A) aircraft type — the ceiling that
-   * seatsAllocated across every fare rule sharing this cabin must never
-   * exceed (the user spec's explicit anti-oversell rule for fare classes
-   * sharing one physical cabin). */
+  /** Physical seat count for one cabin — prefers flight-definition
+   * cabinCapacities when present; otherwise counts seats on the map. */
   private async cabinSeatCount(
     instance: {
       flight: { aircraftType: string };
       aircraftTypeOverride: string | null;
+      cabinCapacities?: unknown;
     },
-    cabin: 'ECONOMY' | 'BUSINESS',
+    cabin: CabinClass,
   ): Promise<number> {
+    const capacities = serializeCabinCapacities(instance.cabinCapacities);
+    if (capacities.length > 0) {
+      return capacities.find((row) => row.cabin === cabin)?.seats ?? 0;
+    }
     const map = await this.seatMapRepo.findOneBy({
       aircraftType: resolveAircraftType(instance),
     });
     if (!map) return 0;
     return enumerateSeats(map).filter((s) => s.cabin === cabin).length;
+  }
+
+  private cabinLabelFa(cabin: CabinClass): string {
+    switch (cabin) {
+      case 'BUSINESS':
+        return 'بیزینس';
+      case 'COMFORT':
+        return 'کامفورت';
+      case 'ECONOMY':
+        return 'اکونومی';
+      default:
+        return cabin;
+    }
   }
 
   private validateFareRuleWindow(dto: {
@@ -993,7 +1010,7 @@ export class FlightsService {
     actor: AuthenticatedUser,
     instanceId: string,
     dto: {
-      cabin: 'ECONOMY' | 'BUSINESS';
+      cabin: CabinClass;
       classCode: string;
       priceIrr: Irr;
       seatsAllocated: number;
@@ -1027,7 +1044,7 @@ export class FlightsService {
     if (existingTotal + dto.seatsAllocated > cabinSeats) {
       throw new BadRequestException({
         code: ErrorCode.VALIDATION_FAILED,
-        message: `مجموع صندلی تخصیص‌یافته کلاس‌های نرخی (${existingTotal + dto.seatsAllocated}) از ظرفیت کابین ${dto.cabin === 'BUSINESS' ? 'بیزینس' : 'اکونومی'} (${cabinSeats}) بیشتر است.`,
+        message: `مجموع صندلی تخصیص‌یافته کلاس‌های نرخی (${existingTotal + dto.seatsAllocated}) از ظرفیت کابین ${this.cabinLabelFa(dto.cabin)} (${cabinSeats}) بیشتر است.`,
       });
     }
 
@@ -1110,7 +1127,7 @@ export class FlightsService {
       if (othersTotal + dto.seatsAllocated > cabinSeats) {
         throw new BadRequestException({
           code: ErrorCode.VALIDATION_FAILED,
-          message: `مجموع صندلی تخصیص‌یافته کلاس‌های نرخی (${othersTotal + dto.seatsAllocated}) از ظرفیت کابین ${rule.cabin === 'BUSINESS' ? 'بیزینس' : 'اکونومی'} (${cabinSeats}) بیشتر است.`,
+          message: `مجموع صندلی تخصیص‌یافته کلاس‌های نرخی (${othersTotal + dto.seatsAllocated}) از ظرفیت کابین ${this.cabinLabelFa(rule.cabin)} (${cabinSeats}) بیشتر است.`,
         });
       }
     }
@@ -1161,12 +1178,15 @@ export class FlightsService {
         message: 'کلاس نرخی یافت نشد.',
       });
     }
-    const activeBooking = await this.bookingRepo.findOneBy({
-      flightInstanceId: instanceId,
-      cabin: rule.cabin,
-      fareClassCode: rule.classCode,
-      status: In(['DRAFT', 'HELD', 'PAID', 'TICKETED']),
-    });
+    const activeBooking = await this.bookingRepo
+      .createQueryBuilder('b')
+      .where('b.flightInstanceId = :instanceId', { instanceId })
+      .andWhere('b.cabin = :cabin', { cabin: rule.cabin })
+      .andWhere('b.fareClassCode = :classCode', { classCode: rule.classCode })
+      .andWhere('b.status IN (:...statuses)', {
+        statuses: ['DRAFT', 'HELD', 'PAID', 'TICKETED'],
+      })
+      .getOne();
     if (activeBooking) {
       throw new ConflictException({
         code: ErrorCode.CONFLICT,
@@ -1320,11 +1340,14 @@ export class FlightsService {
         message: 'سهمیه یافت نشد.',
       });
     }
-    const activeBooking = await this.bookingRepo.findOneBy({
-      flightInstanceId: instanceId,
-      agencyId: allotment.agencyId,
-      status: In(['DRAFT', 'HELD', 'PAID', 'TICKETED']),
-    });
+    const activeBooking = await this.bookingRepo
+      .createQueryBuilder('b')
+      .where('b.flightInstanceId = :instanceId', { instanceId })
+      .andWhere('b.agencyId = :agencyId', { agencyId: allotment.agencyId })
+      .andWhere('b.status IN (:...statuses)', {
+        statuses: ['DRAFT', 'HELD', 'PAID', 'TICKETED'],
+      })
+      .getOne();
     if (activeBooking) {
       throw new ConflictException({
         code: ErrorCode.CONFLICT,

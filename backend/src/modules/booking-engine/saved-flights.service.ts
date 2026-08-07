@@ -14,6 +14,10 @@ import { getCabinPrice } from './pricing';
 import { ZERO_IRR, isPositiveIrr } from '../../common/money';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { CabinClass } from '../../database/enums';
+import {
+  assertSellableForSale,
+  isSellableDefinitionStatus,
+} from '../flights/definition-sellability';
 
 const MAX_SAVED = 20;
 
@@ -58,7 +62,14 @@ export class SavedFlightsService {
         const destCode = inst.flight.route.destCode;
         let priceIrr = ZERO_IRR;
         let bookable = false;
-        if (inst.status === 'SCHEDULED' && inst.departureAt > now) {
+        if (
+          inst.status === 'SCHEDULED' &&
+          inst.departureAt > now &&
+          isSellableDefinitionStatus(
+            inst.definitionStatus,
+            inst.approvedSnapshot != null,
+          )
+        ) {
           try {
             priceIrr = await getCabinPrice(
               this.savedFlightRepo.manager,
@@ -104,6 +115,7 @@ export class SavedFlightsService {
         message: 'پرواز یافت نشد یا دیگر قابل ذخیره نیست.',
       });
     }
+    assertSellableForSale(instance);
     if (instance.departureAt <= new Date()) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,

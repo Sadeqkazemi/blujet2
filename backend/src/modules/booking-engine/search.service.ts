@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, MoreThan, Repository, SelectQueryBuilder } from 'typeorm';
 import { Airport } from '../../database/entities/airport.entity';
@@ -7,13 +7,20 @@ import { AircraftSeatMap } from '../../database/entities/aircraft-seat-map.entit
 import { Passenger } from '../../database/entities/passenger.entity';
 import { SeatLock } from '../../database/entities/seat-lock.entity';
 import { RedisService } from '../../redis/redis.service';
+import { ErrorCode } from '../../common/errors';
 import { getCabinPrice } from './pricing';
 import type { Irr } from '../../common/money';
 import { enumerateSeats } from '../reservation/seat-layout';
 import { resolveAircraftType } from '../flights/aircraft-type.util';
+import { serializeCabinCapacities } from '../flights/flight-definition.util';
+import {
+  applySellableDefinitionFilter,
+  isSellableDefinitionStatus,
+} from '../flights/definition-sellability';
 import type { CabinClass } from '../../database/enums';
 
 const ACTIVE_BOOKING_STATUSES = ['DRAFT', 'HELD', 'PAID', 'TICKETED'] as const;
+const SEARCH_CABINS: readonly CabinClass[] = ['ECONOMY', 'COMFORT', 'BUSINESS'];
 
 // CLAUDE.md: search-result cache TTL 5-10 min; Redis is never the source of
 // truth for seats/bookings — availability is still re-checked (takenSeatCodes
@@ -115,6 +122,31 @@ export class SearchService {
     return qb;
   }
 
+  /** seatsLeft: physical seat-map seats are authoritative. cabinCapacities
+   * may only lower the cap — never invent COMFORT (or any cabin) without
+   * real seat cells. */
+  private seatsLeftForCabin(
+    instance: FlightInstance,
+    cabin: CabinClass,
+    seats: { seatCode: string; cabin: CabinClass }[],
+    taken: Set<string>,
+  ): number | null {
+    const cabinSeats = seats.filter((s) => s.cabin === cabin);
+    if (cabinSeats.length === 0) return null;
+    const capacities = serializeCabinCapacities(instance.cabinCapacities);
+    const configured = capacities.find((row) => row.cabin === cabin)?.seats;
+    const capacity =
+      configured == null
+        ? cabinSeats.length
+        : Math.min(configured, cabinSeats.length);
+    if (capacity <= 0) return null;
+    const cabinSeatCodes = new Set(cabinSeats.map((s) => s.seatCode));
+    const takenInCabin = [...taken].filter((code) =>
+      cabinSeatCodes.has(code),
+    ).length;
+    return Math.max(0, capacity - takenInCabin);
+  }
+
   private async searchUncached(origin: string, dest: string, date: string) {
     const dayStart = new Date(date);
     dayStart.setUTCHours(0, 0, 0, 0);
@@ -133,6 +165,7 @@ export class SearchService {
       .andWhere('LOWER(route.destCode) = LOWER(:dest)', { dest })
       .orderBy('fi.departureAt', 'ASC');
     this.applySaleWindowOpen(qb, 'fi', now);
+    applySellableDefinitionFilter(qb, 'fi');
     const instances = await qb.getMany();
 
     const results: {
@@ -157,12 +190,9 @@ export class SearchService {
         priceIrr: Irr;
         seatsLeft: number;
       }[] = [];
-      for (const cabin of ['ECONOMY', 'BUSINESS'] as const) {
-        const cabinSeats = seats.filter((s) => s.cabin === cabin);
-        const seatsLeft = cabinSeats.filter(
-          (s) => !taken.has(s.seatCode),
-        ).length;
-        if (cabinSeats.length === 0) continue;
+      for (const cabin of SEARCH_CABINS) {
+        const seatsLeft = this.seatsLeftForCabin(instance, cabin, seats, taken);
+        if (seatsLeft === null) continue;
         cabins.push({
           cabin,
           priceIrr: await getCabinPrice(
@@ -218,6 +248,7 @@ export class SearchService {
       .andWhere('fi.departureAt < :dayEnd', { dayEnd })
       .andWhere('LOWER(route.originCode) = LOWER(:origin)', { origin });
     this.applySaleWindowOpen(firstLegsQb, 'fi', now);
+    applySellableDefinitionFilter(firstLegsQb, 'fi');
 
     const secondLegsQb = this.flightInstanceRepo
       .createQueryBuilder('fi')
@@ -227,6 +258,7 @@ export class SearchService {
       .andWhere('fi.departureAt >= :dayStart', { dayStart })
       .andWhere('LOWER(route.destCode) = LOWER(:dest)', { dest });
     this.applySaleWindowOpen(secondLegsQb, 'fi', now);
+    applySellableDefinitionFilter(secondLegsQb, 'fi');
 
     const [firstLegs, secondLegs] = await Promise.all([
       firstLegsQb.getMany(),
@@ -292,7 +324,7 @@ export class SearchService {
         priceIrr: Irr;
         seatsLeft: number;
       }[] = [];
-      for (const cabin of ['ECONOMY', 'BUSINESS'] as const) {
+      for (const cabin of SEARCH_CABINS) {
         let priceSum: Irr = 0n;
         let seatsLeft = Number.MAX_SAFE_INTEGER;
         let ok = true;
@@ -300,18 +332,18 @@ export class SearchService {
           const map = await this.seatMapRepo.findOneBy({
             aircraftType: resolveAircraftType(leg),
           });
-          const seats = (map ? enumerateSeats(map) : []).filter(
-            (s) => s.cabin === cabin,
+          const legSeats = map ? enumerateSeats(map) : [];
+          const left = this.seatsLeftForCabin(
+            leg,
+            cabin,
+            legSeats,
+            await this.takenSeatCodes(leg.id),
           );
-          if (seats.length === 0) {
+          if (left === null) {
             ok = false;
             break;
           }
-          const taken = await this.takenSeatCodes(leg.id);
-          seatsLeft = Math.min(
-            seatsLeft,
-            seats.filter((s) => !taken.has(s.seatCode)).length,
-          );
+          seatsLeft = Math.min(seatsLeft, left);
           priceSum += await getCabinPrice(
             this.flightInstanceRepo.manager,
             leg.id,
@@ -350,7 +382,20 @@ export class SearchService {
       .createQueryBuilder('fi')
       .leftJoinAndSelect('fi.flight', 'flight')
       .where('fi.id = :id', { id: flightInstanceId })
-      .getOneOrFail();
+      .getOne();
+    if (
+      !instance ||
+      instance.status !== 'SCHEDULED' ||
+      !isSellableDefinitionStatus(
+        instance.definitionStatus,
+        instance.approvedSnapshot != null,
+      )
+    ) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'پرواز یافت نشد یا دیگر قابل رزرو نیست.',
+      });
+    }
     const map = await this.seatMapRepo.findOneByOrFail({
       aircraftType: resolveAircraftType(instance),
     });
@@ -365,6 +410,11 @@ export class SearchService {
           colsLeft: map.businessColsLeft,
           colsRight: map.businessColsRight,
           aisleAfterIndex: map.businessColsLeft?.length ?? 0,
+        },
+        COMFORT: {
+          colsLeft: map.comfortColsLeft,
+          colsRight: map.comfortColsRight,
+          aisleAfterIndex: map.comfortColsLeft?.length ?? 0,
         },
         ECONOMY: {
           colsLeft: map.economyColsLeft,

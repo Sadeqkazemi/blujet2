@@ -33,6 +33,7 @@ import { ExternalServiceConfig } from './entities/external-service-config.entity
 import { FarePricingProposal } from './entities/fare-pricing-proposal.entity';
 import { FareRule } from './entities/fare-rule.entity';
 import { Flight } from './entities/flight.entity';
+import { FlightChargeRule } from './entities/flight-charge-rule.entity';
 import { FlightInstance } from './entities/flight-instance.entity';
 import { InternalService } from './entities/internal-service.entity';
 import { JobApplication } from './entities/job-application.entity';
@@ -124,6 +125,7 @@ export const dataSourceOptions: DataSourceOptions = {
     FarePricingProposal,
     FareRule,
     Flight,
+    FlightChargeRule,
     FlightInstance,
     InternalService,
     JobApplication,

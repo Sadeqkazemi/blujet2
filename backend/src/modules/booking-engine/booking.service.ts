@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as crypto from 'node:crypto';
-import { EntityManager, IsNull, Repository } from 'typeorm';
+import { EntityManager, IsNull, Repository, type UpdateResult } from 'typeorm';
 import { Booking } from '../../database/entities/booking.entity';
 import { Passenger } from '../../database/entities/passenger.entity';
 import { FlightInstance } from '../../database/entities/flight-instance.entity';
@@ -31,8 +31,11 @@ import {
 import { enumerateSeats } from '../reservation/seat-layout';
 import { matchesLastName } from '../../common/passenger-name.util';
 import { resolveAircraftType } from '../flights/aircraft-type.util';
+import { assertSellableForSale } from '../flights/definition-sellability';
+import { calculateActiveCharges } from '../flights/charge-rules';
 import { getCabinPrice, resolveFareClass } from './pricing';
 import type { Irr } from '../../common/money';
+import type { CabinClass } from '../../database/enums';
 import { PAYMENT_GATEWAY, type PaymentGateway } from './payment-gateway';
 import { SearchService } from './search.service';
 import { PriceLockService } from './price-lock.service';
@@ -49,6 +52,19 @@ export type PaymentMethod = 'GATEWAY' | 'WALLET' | 'POINTS';
 /** CLAUDE.md: "HELD has a 10-minute TTL (matches the design's hold timer);
  * expiry releases inventory automatically." */
 const HOLD_TTL_MS = 10 * 60 * 1000;
+
+function cabinLabelFa(cabin: CabinClass): string {
+  switch (cabin) {
+    case 'BUSINESS':
+      return 'بیزینس';
+    case 'COMFORT':
+      return 'کامفورت';
+    case 'ECONOMY':
+      return 'اکونومی';
+    default:
+      return cabin;
+  }
+}
 
 function generatePnr(): string {
   return `BJ${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
@@ -215,6 +231,7 @@ export class BookingService {
         message: 'پرواز یافت نشد یا دیگر قابل رزرو نیست.',
       });
     }
+    assertSellableForSale(instance);
     const now = new Date();
     if (
       (instance.saleStartsAt && instance.saleStartsAt > now) ||
@@ -250,7 +267,7 @@ export class BookingService {
       if (!seat || seat.cabin !== dto.cabin) {
         throw new BadRequestException({
           code: ErrorCode.VALIDATION_FAILED,
-          message: `صندلی ${code} در کلاس ${dto.cabin === 'BUSINESS' ? 'بیزینس' : 'اکونومی'} معتبر نیست.`,
+          message: `صندلی ${code} در کلاس ${cabinLabelFa(dto.cabin)} معتبر نیست.`,
         });
       }
     }
@@ -287,12 +304,22 @@ export class BookingService {
           instance.id,
           dto.cabin,
         );
-    // Tax/fee is per-fare-class (Phase 13 Part B) and included in the
-    // stored total so ledger/refunds/reporting — which all read
-    // priceIrr as-is — never need to know tax exists; taxIrr is stored
-    // alongside purely for receipt display.
+    // Tax/fee is per-fare-class (Phase 13 Part B) plus active charge rules;
+    // both are included in the stored total so ledger/refunds/reporting — which
+    // all read priceIrr as-is — never need to recompute; taxIrr and
+    // chargeSnapshot are stored for receipt display and audit.
     const passengerCount = BigInt(dto.passengers.length);
-    const taxIrr: Irr = (fareClass?.taxIrr ?? 0n) * passengerCount;
+    const unitCharges = await calculateActiveCharges(
+      this.bookingRepo.manager,
+      instance.id,
+      unitPriceIrr,
+      dto.cabin,
+      instance.departureAt,
+    );
+    const chargePerPax = BigInt(unitCharges.totalChargesIrr);
+    const taxIrr: Irr =
+      (fareClass?.taxIrr ?? 0n) * passengerCount +
+      chargePerPax * passengerCount;
     const priceIrr: Irr = unitPriceIrr * passengerCount + taxIrr;
     const contactUser = await this.userRepo
       .createQueryBuilder('u')
@@ -348,6 +375,7 @@ export class BookingService {
           fareClassCode: fareClass?.classCode ?? null,
           priceIrr,
           taxIrr,
+          chargeSnapshot: unitCharges,
           userId: user.id,
           contactPhone: contactUser.phone ?? null,
           holdExpiresAt: new Date(Date.now() + HOLD_TTL_MS),
@@ -529,6 +557,7 @@ export class BookingService {
         message: 'سهمیه فعال و متعلق به این آژانس یافت نشد.',
       });
     }
+    assertSellableForSale(instance);
     if (
       (instance.saleStartsAt && instance.saleStartsAt > now) ||
       (instance.saleEndsAt && instance.saleEndsAt < now)
@@ -588,7 +617,17 @@ export class BookingService {
       allotment.contractPriceIrr ??
       (await getCabinPrice(this.bookingRepo.manager, instance.id, dto.cabin));
     const passengerCount = BigInt(dto.passengers.length);
-    const taxIrr = (fareClass?.taxIrr ?? 0n) * passengerCount;
+    const unitCharges = await calculateActiveCharges(
+      this.bookingRepo.manager,
+      instance.id,
+      unitPriceIrr,
+      dto.cabin,
+      instance.departureAt,
+    );
+    const chargePerPax = BigInt(unitCharges.totalChargesIrr);
+    const taxIrr =
+      (fareClass?.taxIrr ?? 0n) * passengerCount +
+      chargePerPax * passengerCount;
     const priceIrr = unitPriceIrr * passengerCount + taxIrr;
     const contactUser = await this.userRepo.findOneByOrFail({ id: actor.id });
 
@@ -701,6 +740,7 @@ export class BookingService {
             fareClassCode: fareClass?.classCode ?? null,
             priceIrr,
             taxIrr,
+            chargeSnapshot: unitCharges,
             userId: null,
             contactPhone: contactUser.phone ?? null,
             holdExpiresAt: null,
@@ -824,17 +864,29 @@ export class BookingService {
           booking.cabin,
         );
     const bookingPassengerCount = BigInt(booking.passengers.length);
-    const currentTaxIrr: Irr =
-      (currentFareClass?.taxIrr ?? 0n) * bookingPassengerCount;
-    const currentPriceIrr: Irr = isLocked
-      ? booking.priceIrr
-      : (await getCabinPrice(
-          this.bookingRepo.manager,
-          booking.flightInstanceId,
-          booking.cabin,
-        )) *
-          bookingPassengerCount +
-        currentTaxIrr;
+    let currentTaxIrr: Irr = 0n;
+    let currentPriceIrr: Irr = booking.priceIrr;
+    let currentChargeSnapshot = booking.chargeSnapshot;
+    if (!isLocked) {
+      const unitFare = await getCabinPrice(
+        this.bookingRepo.manager,
+        booking.flightInstanceId,
+        booking.cabin,
+      );
+      const unitCharges = await calculateActiveCharges(
+        this.bookingRepo.manager,
+        booking.flightInstanceId,
+        unitFare,
+        booking.cabin,
+        booking.flightInstance.departureAt,
+      );
+      const chargePerPax = BigInt(unitCharges.totalChargesIrr);
+      currentTaxIrr =
+        (currentFareClass?.taxIrr ?? 0n) * bookingPassengerCount +
+        chargePerPax * bookingPassengerCount;
+      currentPriceIrr = unitFare * bookingPassengerCount + currentTaxIrr;
+      currentChargeSnapshot = unitCharges;
+    }
 
     if (!isLocked && currentPriceIrr !== booking.priceIrr) {
       if (options.confirmedPriceIrr !== currentPriceIrr) {
@@ -925,11 +977,26 @@ export class BookingService {
       // Explicit state machine: payment capture flips HELD→PAID, ticket
       // issuance then flips PAID→TICKETED — both inside this transaction,
       // each guarded so a concurrent double-pay hits affected===0 and 409s.
-      const captured = await tx.update(
-        Booking,
-        { id, status: 'HELD' },
-        { status: 'PAID', priceIrr: finalPriceIrr },
-      );
+      let captured: UpdateResult;
+      if (isLocked) {
+        captured = await tx.update(
+          Booking,
+          { id, status: 'HELD' },
+          { status: 'PAID', priceIrr: finalPriceIrr },
+        );
+      } else {
+        captured = await tx
+          .createQueryBuilder()
+          .update(Booking)
+          .set({
+            status: 'PAID',
+            priceIrr: finalPriceIrr,
+            taxIrr: currentTaxIrr,
+            chargeSnapshot: currentChargeSnapshot,
+          })
+          .where('id = :id AND status = :status', { id, status: 'HELD' })
+          .execute();
+      }
       if ((captured.affected ?? 0) === 0) {
         const latestRaw = await this.bookingWithFlightQuery(tx)
           .where('b.id = :id', { id })

@@ -8,7 +8,7 @@ import {
   ManyToOne,
   PrimaryColumn,
 } from 'typeorm';
-import { FlightInstanceStatus } from '../enums';
+import { FlightDefinitionStatus, FlightInstanceStatus } from '../enums';
 import { bigintTransformer } from '../transformers/bigint.transformer';
 import type { JsonValue } from '../json-types';
 import { Flight } from './flight.entity';
@@ -96,4 +96,42 @@ export class FlightInstance {
 
   @Column({ type: 'timestamp', precision: 3, nullable: true })
   niraSubmittedAt!: Date | null;
+
+  /** Block time in minutes. When set, arrivalAt = departureAt + durationMinutes. */
+  @Column({ type: 'int', nullable: true })
+  durationMinutes!: number | null;
+
+  /** Optional competitor observation (IRR) for commercial pricing UI. */
+  @Column({ type: 'bigint', nullable: true, transformer: bigintTransformer })
+  competitorPriceIrr!: bigint | null;
+
+  /**
+   * Per-cabin capacities: [{ cabin, seats }]. COMFORT is independent of ECONOMY.
+   * Null on legacy rows (pre-definition migration).
+   */
+  @Column({ type: 'jsonb', nullable: true })
+  cabinCapacities!: JsonValue | null;
+
+  /**
+   * Definition workflow. Legacy rows default to APPROVED so existing inventory
+   * stays bookable without a CEO re-approval.
+   */
+  @Column({
+    type: 'enum',
+    enum: FlightDefinitionStatus,
+    enumName: 'FlightDefinitionStatus',
+    default: FlightDefinitionStatus.APPROVED,
+  })
+  definitionStatus!: FlightDefinitionStatus;
+
+  @Column({ type: 'text', nullable: true })
+  rejectionReason!: string | null;
+
+  /** Last CEO-approved definition snapshot (immutable until next approval). */
+  @Column({ type: 'jsonb', nullable: true })
+  approvedSnapshot!: JsonValue | null;
+
+  /** Pending definition while definitionStatus = PENDING_REVISION. */
+  @Column({ type: 'jsonb', nullable: true })
+  pendingRevisionSnapshot!: JsonValue | null;
 }

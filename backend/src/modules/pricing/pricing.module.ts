@@ -10,6 +10,8 @@ import { AiModule } from '../ai/ai.module';
 import { PanelsModule } from '../panels/panels.module';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
+import { FlightsModule } from '../flights/flights.module';
+import { BookingEngineModule } from '../booking-engine/booking-engine.module';
 
 @Module({
   imports: [
@@ -23,6 +25,8 @@ import { AuthModule } from '../auth/auth.module';
     PanelsModule,
     AuditModule,
     AuthModule,
+    FlightsModule,
+    BookingEngineModule,
   ],
   controllers: [PricingController],
   providers: [PricingService],

@@ -14,6 +14,7 @@ import type { Request } from 'express';
 import { PricingService } from './pricing.service';
 import {
   RegisterProposalDto,
+  RejectProposalDto,
   SetLegalRateDto,
   UpsertProposalDto,
 } from './dto/pricing.dtos';
@@ -25,6 +26,7 @@ import { PanelAccessGuard } from '../panels/panel-access.guard';
 import { EmployeePermissionGuard } from '../../common/guards/employee-permission.guard';
 import { RequiresPermission } from '../../common/decorators/requires-permission.decorator';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
+import { Role } from '../../database/enums';
 
 @ApiTags('pricing')
 @Controller('pricing')
@@ -35,8 +37,18 @@ export class PricingController {
   // EMPLOYEE: PERMISSION_CATALOG's pr_propose ("ثبت نرخ پیشنهادی") — reads
   // the same commercial-style list COMMERCIAL_MANAGER gets (proposal
   // read/write only, never CEO's legal-rate/register/ai-analysis powers).
+  @Get('proposals/pending-count')
+  @Roles(Role.CEO)
+  @ApiOperation({
+    summary: 'تعداد پیشنهادهای در انتظار تأیید مدیرعامل (badge)',
+  })
+  async pendingCount() {
+    const data = await this.pricing.pendingApprovalsCount();
+    return { success: true, data };
+  }
+
   @Get('proposals')
-  @Roles('CEO', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @Roles(Role.CEO, Role.COMMERCIAL_MANAGER, Role.EMPLOYEE)
   @RequiresPermission('pr_propose')
   @ApiOperation({
     summary:
@@ -44,14 +56,14 @@ export class PricingController {
   })
   async list(@CurrentUser() actor: AuthenticatedUser) {
     const data =
-      actor.role === 'CEO'
+      actor.role === Role.CEO
         ? await this.pricing.listForCeo()
         : await this.pricing.listForCommercial();
     return { success: true, data };
   }
 
   @Put('flights/:flightInstanceId/proposal')
-  @Roles('COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @Roles(Role.COMMERCIAL_MANAGER, Role.EMPLOYEE)
   @RequiresPermission('pr_propose')
   @ApiOperation({
     summary: 'ارسال/ویرایش نرخ پیشنهادی — تا قبل از تأیید قابل ویرایش',
@@ -70,7 +82,7 @@ export class PricingController {
   }
 
   @Patch('proposals/:id/legal-rate')
-  @Roles('CEO')
+  @Roles(Role.CEO)
   @ApiOperation({ summary: 'ثبت نرخ قانونی (مصوب سازمان هواپیمایی)' })
   async setLegalRate(
     @CurrentUser() actor: AuthenticatedUser,
@@ -82,9 +94,9 @@ export class PricingController {
   }
 
   @Patch('proposals/:id/register')
-  @Roles('CEO')
+  @Roles(Role.CEO)
   @ApiOperation({
-    summary: 'تأیید و ثبت قیمت — «تأیید بازرگانی» یا «ثبت با AI»',
+    summary: 'تأیید و ثبت قیمت — «تأیید بازرگانی» یا «ثبت با AI» (idempotent)',
   })
   async register(
     @CurrentUser() actor: AuthenticatedUser,
@@ -98,6 +110,21 @@ export class PricingController {
       dto.stepUpChallengeId,
       dto.stepUpCode,
     );
+    return { success: true, data };
+  }
+
+  @Patch('proposals/:id/reject')
+  @Roles(Role.CEO)
+  @ApiOperation({
+    summary:
+      'رد پیشنهاد قیمت با دلیل اجباری + step-up — نسخه فعال پرواز تغییر نمی‌کند',
+  })
+  async reject(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: RejectProposalDto,
+  ) {
+    const data = await this.pricing.reject(actor, id, dto);
     return { success: true, data };
   }
 

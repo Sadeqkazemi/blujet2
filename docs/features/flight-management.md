@@ -70,6 +70,15 @@ untouched). Design source: FLIGHTS MANAGEMENT sections of
 - [x] Flight-detail modal shows current نوع هواپیما, تغییر reveals a real dropdown (not free text) sourced from the catalog endpoint, requires step-up 2FA (`PRICE_CAPACITY_CHANGE` scope, same as نرخ‌گذاری), and calls `PATCH /flights/:instanceId/aircraft` on submit — `frontend/src/features/flights/FlightsPage.test.tsx › "aircraft-type change" › "success flow with step-up"`
 - [x] `CAPACITY_BELOW_CONFIRMED` conflict from the backend is surfaced inline in the same modal — `FlightsPage.test.tsx › "aircraft-type change" › "error-display flow"`
 
+### Flight definition workflow (UAT / Codex review)
+- [x] Sellability: DRAFT / PENDING_CEO / REJECTED hidden from search, seat-map, user/agency booking; APPROVED and live inventory under PENDING_REVISION remain sellable — `definition-sellability.spec.ts` + `flight-definition.e2e-spec.ts › 'DRAFT is hidden from search; APPROVED COMFORT seat is bookable end-to-end'`
+- [x] PENDING_REVISION form fields come from `pendingRevisionSnapshot` (incl. `charterSeats`); `sold` / `derivedStatus` from live bookings — `flight-definition.service.ts` + e2e `'GET/PUT definition; APPROVED edit stages PENDING_REVISION'`
+- [x] `findOrCreateRoute` uses the same `EntityManager`; `durationMinutes` is real (not hardcoded) — create/update/CEO promote paths in `flight-definition.service.ts`
+- [x] Charges/taxes evaluated at `departureAt`; pay reprice updates `taxIrr` + `chargeSnapshot` — `booking.service.ts` create/pay
+- [x] COMFORT is end-to-end bookable when the aircraft seat-map has comfort rows; capacities must match physical map — seat-layout + migration comfort columns + e2e COMFORT booking
+- [x] Flight number: no trim in normalize; leading/trailing spaces rejected — `flight-definition.util.spec.ts` + e2e `'rejects flight numbers with leading/trailing spaces'`
+- [x] IRR amounts on the wire are decimal strings — bigint JSON + e2e priceIrr/taxIrr typeof string
+
 ### Deferred (explicit, per docs)
 - خروجی Excel (both sub-tabs) — same deferral as Phase 3
 - RRULE recurring schedules — no design UI exists; single-instance creation only
