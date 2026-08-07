@@ -1,16 +1,52 @@
-import { useEffect, useMemo, useState } from 'react';
-import { createFareRule, createFlight, fetchAircraftTypes, fetchAirports } from '../../api/flights';
-import { upsertProposal } from '../../api/pricing';
-import { ApiRequestError } from '../../api/envelope';
-import { faDigits, faMoney, latinDigits, parseTomanToRial } from '../../lib/fa-format';
-import { parseJalaliDateToIso } from '../../lib/jalali';
-import type { AircraftTypeOption, AirportEntry, CreateFareRulePayload } from '../../types/flights';
+import { useEffect, useMemo, useState } from "react";
+import {
+  createFareRule,
+  createFlight,
+  fetchAircraftTypes,
+  fetchAirports,
+  fetchFlightDefinition,
+  updateFlightDefinition,
+} from "../../api/flights";
+import { upsertProposal } from "../../api/pricing";
+import { ApiRequestError } from "../../api/envelope";
+import JalaliDatePicker from "../../components/JalaliDatePicker";
+import MoneyInput, {
+  formatTomanGrouped,
+  moneyInputToRial,
+  tomanDigitsOnly,
+} from "../../components/MoneyInput";
+import {
+  cabinLabel,
+  computeArrivalHhMm,
+  isValidFlightNo,
+  isValidHhMm,
+  minutesFromDuration,
+  splitDurationMinutes,
+  type CabinKind,
+} from "../../lib/flight-definition";
+import { faDigits, faMoney, latinDigits } from "../../lib/fa-format";
+import { dayjs, isoDateAtNoon, toIsoDateOnly } from "../../lib/jalali";
+import type {
+  AircraftTypeOption,
+  AirportEntry,
+  CreateFareRulePayload,
+} from "../../types/flights";
+import CabinCapacityEditor, {
+  type CabinCapacityRow,
+} from "./components/CabinCapacityEditor";
+import ChargeRulesEditor, {
+  chargeRuleFromApi,
+  draftRulesToApi,
+  type DraftChargeRule,
+} from "./components/ChargeRulesEditor";
+import DurationFields from "./components/DurationFields";
+import FlightNumberInput from "./components/FlightNumberInput";
 
-type Channel = 'SYSTEM' | 'CHARTER' | 'AGENCY';
+type Channel = "SYSTEM" | "CHARTER" | "AGENCY";
 
 interface DraftFare {
   tempId: string;
-  cabin: 'ECONOMY' | 'BUSINESS';
+  cabin: CabinKind;
   cabinLabel: string;
   classCode: string;
   priceIrr: number;
@@ -31,29 +67,48 @@ interface AiSuggestion {
 }
 
 const CHANNEL_OPTS: { key: Channel; label: string }[] = [
-  { key: 'SYSTEM', label: 'سیستمی' },
-  { key: 'CHARTER', label: 'چارتری' },
-  { key: 'AGENCY', label: 'آژانس' },
+  { key: "SYSTEM", label: "سیستمی" },
+  { key: "CHARTER", label: "چارتری" },
+  { key: "AGENCY", label: "آژانس" },
 ];
 
 const inputClass =
-  'w-full box-border h-11 rounded-[10px] border border-[#28344c] bg-[#0f1726] px-3 text-[13px] text-[#e7ecf3] outline-none';
-const labelClass = 'mb-[7px] block text-[11.5px] text-[#9fb0c7]';
+  "w-full box-border h-11 rounded-[10px] border border-[#28344c] bg-[#0f1726] px-3 text-[13px] text-[#e7ecf3] outline-none";
+const labelClass = "mb-[7px] block text-[11.5px] text-[#9fb0c7]";
 
 function emptyFareForm() {
   return {
-    cabin: 'ECONOMY' as 'ECONOMY' | 'BUSINESS',
-    classCode: '',
-    priceToman: '',
-    taxToman: '0',
-    seatsAllocated: '',
-    baggageKg: '',
+    cabin: "ECONOMY" as CabinKind,
+    classCode: "",
+    priceToman: "",
+    taxToman: "0",
+    seatsAllocated: "",
+    baggageKg: "",
     refundable: true,
     changeable: true,
-    validFrom: '',
-    validUntil: '',
+    validFrom: null as string | null,
+    validUntil: null as string | null,
     allowedChannels: [] as Channel[],
   };
+}
+
+function defaultCabinRows(): CabinCapacityRow[] {
+  return [{ key: "cab-init", cabin: "ECONOMY", seats: "" }];
+}
+
+function buildDepartureIso(
+  dateIso: string | null,
+  timeHhMm: string,
+): string | null {
+  if (!dateIso || !isValidHhMm(timeHhMm)) return null;
+  const day = dateIso.slice(0, 10);
+  const [h, m] = timeHhMm.split(":").map(Number);
+  return dayjs(`${day}T00:00:00`)
+    .hour(h!)
+    .minute(m!)
+    .second(0)
+    .millisecond(0)
+    .toISOString();
 }
 
 /** Design-matching heuristic when ML is unavailable (design mock fallback). */
@@ -62,66 +117,47 @@ function suggestPriceHeuristic(opts: {
   compToman: number;
   capacity: number;
   charter: number;
-  dateLabel: string;
+  dateIso: string | null;
   routeLabel: string;
 }): AiSuggestion {
-  const { baseToman, compToman, capacity, charter, dateLabel, routeLabel } = opts;
-  const months = [
-    'فروردین',
-    'اردیبهشت',
-    'خرداد',
-    'تیر',
-    'مرداد',
-    'شهریور',
-    'مهر',
-    'آبان',
-    'آذر',
-    'دی',
-    'بهمن',
-    'اسفند',
-  ];
+  const { baseToman, compToman, capacity, charter, dateIso, routeLabel } = opts;
   let m = 4;
-  for (let i = 0; i < 12; i++) {
-    if (dateLabel.includes(months[i]!)) {
-      m = i + 1;
-      break;
-    }
+  if (dateIso) {
+    m = dayjs(dateIso).calendar("jalali").month() + 1;
   }
-  // Also detect YYYY/MM/DD Jalali
-  const jm = /^(\d{4})\/(\d{1,2})\//.exec(latinDigits(dateLabel));
-  if (jm) m = Number(jm[2]);
-
   const season =
     m >= 4 && m <= 6
-      ? { n: 'تابستان', d: 1.1, t: 'تعطیلات تابستانهٔ مدارس و اوج سفرها' }
+      ? { n: "تابستان", d: 1.1, t: "تعطیلات تابستانهٔ مدارس و اوج سفرها" }
       : m >= 1 && m <= 3
-        ? { n: 'بهار', d: 1.0, t: 'سفرهای بهاری' }
+        ? { n: "بهار", d: 1.0, t: "سفرهای بهاری" }
         : m >= 7 && m <= 9
-          ? { n: 'پاییز', d: 0.95, t: 'کاهش تدریجی تقاضا' }
-          : { n: 'زمستان', d: 1.05, t: 'تعطیلات پایان سال' };
+          ? { n: "پاییز", d: 0.95, t: "کاهش تدریجی تقاضا" }
+          : { n: "زمستان", d: 1.05, t: "تعطیلات پایان سال" };
   const occ =
     m === 1
-      ? { b: 0.12, t: 'تعطیلات نوروز' }
+      ? { b: 0.12, t: "تعطیلات نوروز" }
       : m === 4 || m === 5
-        ? { b: 0.06, t: 'تعطیلات تابستانهٔ مدارس' }
+        ? { b: 0.06, t: "تعطیلات تابستانهٔ مدارس" }
         : m === 12
-          ? { b: 0.07, t: 'تعطیلات پایان سال' }
-          : routeLabel.includes('نجف')
-            ? { b: 0.08, t: 'ایام زیارتی مذهبی' }
-            : { b: 0, t: 'بدون مناسبت خاص' };
+          ? { b: 0.07, t: "تعطیلات پایان سال" }
+          : routeLabel.includes("نجف")
+            ? { b: 0.08, t: "ایام زیارتی مذهبی" }
+            : { b: 0, t: "بدون مناسبت خاص" };
   const chPct = capacity > 0 ? Math.round((charter / capacity) * 100) : 0;
   const df = season.d + occ.b + (chPct >= 50 ? 0.05 : chPct >= 30 ? 0.02 : 0);
   const high = df >= 1.12;
   const ref = compToman || baseToman || 0;
-  const target = Math.round(((ref * (high ? 1.02 : 0.98) * (1 + (df - 1) * 0.5)) / 50_000) * 50_000);
+  const target = Math.round(
+    ((ref * (high ? 1.02 : 0.98) * (1 + (df - 1) * 0.5)) / 50_000) * 50_000,
+  );
   return {
     priceToman: target,
     reason: `با توجه به فصل «${season.n}» (${season.t}) و ${
-      occ.b > 0 ? `مناسبت «${occ.t}»، ` : 'نبود مناسبت خاص، '
-    }سطح تقاضا ${high ? 'بالا' : 'متوسط'} برآورد می‌شود؛ ${
+      occ.b > 0 ? `مناسبت «${occ.t}»، ` : "نبود مناسبت خاص، "
+    }سطح تقاضا ${high ? "بالا" : "متوسط"} برآورد می‌شود؛ ${
       high
-        ? 'قیمت هم‌تراز یا کمی بالاتر از رقبا برای بیشینه‌سازی درآمد.'
-        : 'قیمت اندکی پایین‌تر از رقبا برای جذب تقاضا.'
+        ? "قیمت هم‌تراز یا کمی بالاتر از رقبا برای بیشینه‌سازی درآمد."
+        : "قیمت اندکی پایین‌تر از رقبا برای جذب تقاضا."
     }`,
     factors: [
       `فصل: ${season.n} — ${season.t}`,
@@ -136,24 +172,36 @@ function suggestPriceHeuristic(opts: {
 export interface AddFlightPageProps {
   onClose: () => void;
   onSuccess: (message: string) => void;
+  mode?: "create" | "edit";
+  flightId?: string;
 }
 
-export default function AddFlightPage({ onClose, onSuccess }: AddFlightPageProps) {
+export default function AddFlightPage({
+  onClose,
+  onSuccess,
+  mode = "create",
+  flightId,
+}: AddFlightPageProps) {
+  const isEdit = mode === "edit" && Boolean(flightId);
+
   const [airports, setAirports] = useState<AirportEntry[]>([]);
   const [aircraftTypes, setAircraftTypes] = useState<AircraftTypeOption[]>([]);
+  const [loadingDefinition, setLoadingDefinition] = useState(isEdit);
 
-  const [flightNo, setFlightNo] = useState('');
-  const [originCode, setOriginCode] = useState('');
-  const [destCode, setDestCode] = useState('');
-  const [cityOpen, setCityOpen] = useState<'origin' | 'dest' | null>(null);
-  const [cityQuery, setCityQuery] = useState('');
-  const [date, setDate] = useState('');
-  const [time, setTime] = useState('');
-  const [duration, setDuration] = useState('');
-  const [arrival, setArrival] = useState('');
-  const [aircraft, setAircraft] = useState('Airbus A320');
-  const [capacity, setCapacity] = useState('');
-  const [charter, setCharter] = useState('');
+  const [flightNo, setFlightNo] = useState("");
+  const [originCode, setOriginCode] = useState("");
+  const [destCode, setDestCode] = useState("");
+  const [cityOpen, setCityOpen] = useState<"origin" | "dest" | null>(null);
+  const [cityQuery, setCityQuery] = useState("");
+  const [dateIso, setDateIso] = useState<string | null>(null);
+  const [time, setTime] = useState("");
+  const [durationHours, setDurationHours] = useState(0);
+  const [durationMins, setDurationMins] = useState(0);
+  const [aircraft, setAircraft] = useState("Airbus A320");
+  const [cabinRows, setCabinRows] =
+    useState<CabinCapacityRow[]>(defaultCabinRows);
+  const [charter, setCharter] = useState("");
+  const [chargeRules, setChargeRules] = useState<DraftChargeRule[]>([]);
 
   const [fares, setFares] = useState<DraftFare[]>([]);
   const [fareFormOpen, setFareFormOpen] = useState(false);
@@ -161,16 +209,51 @@ export default function AddFlightPage({ onClose, onSuccess }: AddFlightPageProps
   const [fareForm, setFareForm] = useState(emptyFareForm());
   const [fareError, setFareError] = useState<string | null>(null);
 
-  const [baseToman, setBaseToman] = useState('');
-  const [compToman, setCompToman] = useState('');
-  const [proposedToman, setProposedToman] = useState('');
-  const [legalToman, setLegalToman] = useState('');
-  const [note, setNote] = useState('');
+  const [baseToman, setBaseToman] = useState("");
+  const [compToman, setCompToman] = useState("");
+  const [proposedToman, setProposedToman] = useState("");
+  const [legalToman, setLegalToman] = useState("");
+  const [note, setNote] = useState("");
   const [ai, setAi] = useState<AiSuggestion | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [showValidation, setShowValidation] = useState(false);
+
+  const todayIso = useMemo(() => isoDateAtNoon(toIsoDateOnly(dayjs())), []);
+
+  const dateMin = useMemo(() => {
+    if (!isEdit) return todayIso;
+    if (!dateIso) return todayIso;
+    const flightDay = dateIso.slice(0, 10);
+    const todayDay = todayIso.slice(0, 10);
+    return flightDay >= todayDay ? todayIso : undefined;
+  }, [isEdit, dateIso, todayIso]);
+
+  const durationMinutes = minutesFromDuration(durationHours, durationMins);
+  const arrival = computeArrivalHhMm(time, durationMinutes ?? 0) ?? "";
+
+  const capacity = useMemo(
+    () =>
+      cabinRows.reduce(
+        (acc, row) => acc + (Number(latinDigits(row.seats)) || 0),
+        0,
+      ),
+    [cabinRows],
+  );
+
+  const basePriceIrr = moneyInputToRial(baseToman) ?? 0;
+
+  const cabinCapacityError = useMemo(() => {
+    if (!showValidation) return null;
+    const seats = cabinRows.map((r) => Number(latinDigits(r.seats)) || 0);
+    if (!seats.some((s) => s > 0))
+      return "حداقل یک کابین با صندلی بیشتر از صفر لازم است";
+    const cabins = cabinRows.map((r) => r.cabin);
+    if (new Set(cabins).size !== cabins.length) return "کابین تکراری مجاز نیست";
+    return null;
+  }, [cabinRows, showValidation]);
 
   useEffect(() => {
     fetchAirports()
@@ -179,29 +262,82 @@ export default function AddFlightPage({ onClose, onSuccess }: AddFlightPageProps
     fetchAircraftTypes()
       .then((list) => {
         setAircraftTypes(list);
-        if (list.length > 0 && !list.some((a) => a.aircraftType === 'Airbus A320')) {
+        if (
+          list.length > 0 &&
+          !list.some((a) => a.aircraftType === "Airbus A320")
+        ) {
           setAircraft(list[0]!.aircraftType);
         }
       })
       .catch(() => setAircraftTypes([]));
   }, []);
 
-  const cityByCode = useMemo(() => new Map(airports.map((a) => [a.code, a.cityFa])), [airports]);
+  useEffect(() => {
+    if (!isEdit || !flightId) return;
+    setLoadingDefinition(true);
+    fetchFlightDefinition(flightId)
+      .then((def) => {
+        setFlightNo(def.flightNo);
+        setOriginCode(def.originCode);
+        setDestCode(def.destCode);
+        const dep = dayjs(def.departureAt);
+        setDateIso(isoDateAtNoon(toIsoDateOnly(dep)));
+        setTime(dep.format("HH:mm"));
+        const split = splitDurationMinutes(def.durationMinutes);
+        setDurationHours(split.hours);
+        setDurationMins(split.minutes);
+        setCabinRows(
+          def.cabinCapacities.length > 0
+            ? def.cabinCapacities.map((c, i) => ({
+                key: `cab-${i}`,
+                cabin: c.cabin,
+                seats: String(c.seats),
+              }))
+            : defaultCabinRows(),
+        );
+        setCharter(String(def.charterSeats ?? 0));
+        setAircraft(def.aircraftType || "Airbus A320");
+        setChargeRules(def.chargeRules.map(chargeRuleFromApi));
+        if (def.basePriceIrr) {
+          setBaseToman(
+            formatTomanGrouped(
+              String(Math.round(Number(def.basePriceIrr) / 10)),
+            ),
+          );
+        }
+      })
+      .catch((e) => {
+        setError(
+          e instanceof ApiRequestError
+            ? e.message
+            : e instanceof Error
+              ? e.message
+              : "خطا در بارگذاری پرواز.",
+        );
+      })
+      .finally(() => setLoadingDefinition(false));
+  }, [isEdit, flightId]);
+
+  const cityByCode = useMemo(
+    () => new Map(airports.map((a) => [a.code, a.cityFa])),
+    [airports],
+  );
 
   const filteredCities = useMemo(() => {
     const q = cityQuery.trim().toLowerCase();
     if (!q) return airports;
     return airports.filter(
-      (a) => a.cityFa.includes(cityQuery.trim()) || a.code.toLowerCase().includes(q),
+      (a) =>
+        a.cityFa.includes(cityQuery.trim()) || a.code.toLowerCase().includes(q),
     );
   }, [airports, cityQuery]);
 
   function originLabel() {
-    if (!originCode) return 'انتخاب شهر مبدأ';
+    if (!originCode) return "انتخاب شهر مبدأ";
     return cityByCode.get(originCode) ?? originCode;
   }
   function destLabel() {
-    if (!destCode) return 'انتخاب شهر مقصد';
+    if (!destCode) return "انتخاب شهر مقصد";
     return cityByCode.get(destCode) ?? destCode;
   }
 
@@ -217,14 +353,14 @@ export default function AddFlightPage({ onClose, onSuccess }: AddFlightPageProps
     setFareForm({
       cabin: f.cabin,
       classCode: f.classCode,
-      priceToman: String(Math.round(f.priceIrr / 10)),
-      taxToman: String(Math.round(f.taxIrr / 10)),
+      priceToman: formatTomanGrouped(String(Math.round(f.priceIrr / 10))),
+      taxToman: formatTomanGrouped(String(Math.round(f.taxIrr / 10))),
       seatsAllocated: String(f.seatsAllocated),
-      baggageKg: f.baggageAllowanceKg ? String(f.baggageAllowanceKg) : '',
+      baggageKg: f.baggageAllowanceKg ? String(f.baggageAllowanceKg) : "",
       refundable: f.refundable,
       changeable: f.changeable,
-      validFrom: f.validFrom,
-      validUntil: f.validUntil,
+      validFrom: f.validFrom || null,
+      validUntil: f.validUntil || null,
       allowedChannels: [...f.allowedChannels],
     });
     setFareError(null);
@@ -233,61 +369,56 @@ export default function AddFlightPage({ onClose, onSuccess }: AddFlightPageProps
 
   function saveFareDraft() {
     setFareError(null);
-    const priceIrr = parseTomanToRial(fareForm.priceToman);
-    const taxIrr = parseTomanToRial(fareForm.taxToman) ?? 0;
+    const priceIrr = moneyInputToRial(fareForm.priceToman);
+    const taxIrr = moneyInputToRial(fareForm.taxToman) ?? 0;
     const seats = Number(latinDigits(fareForm.seatsAllocated));
-    const cap = Number(latinDigits(capacity)) || 0;
     if (!fareForm.classCode.trim()) {
-      setFareError('کد کلاس نرخی را وارد کنید');
+      setFareError("کد کلاس نرخی را وارد کنید");
       return;
     }
     if (priceIrr == null || priceIrr <= 0) {
-      setFareError('قیمت پایه را وارد کنید');
+      setFareError("قیمت پایه را وارد کنید");
       return;
     }
     if (!Number.isInteger(seats) || seats <= 0) {
-      setFareError('ظرفیت اختصاصی را وارد کنید');
+      setFareError("ظرفیت اختصاصی را وارد کنید");
       return;
     }
-    const fromIso = fareForm.validFrom ? parseJalaliDateToIso(fareForm.validFrom) : null;
-    const untilIso = fareForm.validUntil ? parseJalaliDateToIso(fareForm.validUntil) : null;
-    if (fareForm.validFrom && !fromIso) {
-      setFareError('تاریخ شروع اعتبار را به صورت ۱۴۰۵/۰۴/۰۱ وارد کنید');
-      return;
-    }
-    if (fareForm.validUntil && !untilIso) {
-      setFareError('تاریخ پایان اعتبار را به صورت ۱۴۰۵/۰۴/۰۱ وارد کنید');
-      return;
-    }
-    if (fromIso && untilIso && untilIso <= fromIso) {
-      setFareError('تاریخ پایان اعتبار باید بعد از تاریخ شروع باشد');
+    if (
+      fareForm.validFrom &&
+      fareForm.validUntil &&
+      fareForm.validUntil.slice(0, 10) <= fareForm.validFrom.slice(0, 10)
+    ) {
+      setFareError("تاریخ پایان اعتبار باید بعد از تاریخ شروع باشد");
       return;
     }
     const excludeId = fareEditingId;
     const others = fares.filter(
       (r) => r.cabin === fareForm.cabin && r.tempId !== excludeId,
     );
-    const allocatedSum = others.reduce((a, b) => a + b.seatsAllocated, 0) + seats;
-    if (cap && allocatedSum > cap) {
+    const allocatedSum =
+      others.reduce((a, b) => a + b.seatsAllocated, 0) + seats;
+    if (capacity && allocatedSum > capacity) {
       setFareError(
-        `مجموع ظرفیت کلاس‌های کابین از تعداد صندلی موجود (${faDigits(cap)}) بیشتر است`,
+        `مجموع ظرفیت کلاس‌های کابین از تعداد صندلی موجود (${faDigits(capacity)}) بیشتر است`,
       );
       return;
     }
-    const cabinLabel = fareForm.cabin === 'BUSINESS' ? 'بیزنس' : 'اکونومی';
     const rec: DraftFare = {
       tempId: excludeId ?? `tmp-${Date.now()}`,
       cabin: fareForm.cabin,
-      cabinLabel,
+      cabinLabel: cabinLabel(fareForm.cabin),
       classCode: latinDigits(fareForm.classCode.trim()).toUpperCase(),
       priceIrr,
       taxIrr,
       seatsAllocated: seats,
-      baggageAllowanceKg: fareForm.baggageKg ? Number(latinDigits(fareForm.baggageKg)) : 0,
+      baggageAllowanceKg: fareForm.baggageKg
+        ? Number(latinDigits(fareForm.baggageKg))
+        : 0,
       refundable: fareForm.refundable,
       changeable: fareForm.changeable,
-      validFrom: fareForm.validFrom,
-      validUntil: fareForm.validUntil,
+      validFrom: fareForm.validFrom ?? "",
+      validUntil: fareForm.validUntil ?? "",
       allowedChannels: [...fareForm.allowedChannels],
     };
     setFares((list) => [...list.filter((x) => x.tempId !== rec.tempId), rec]);
@@ -296,71 +427,124 @@ export default function AddFlightPage({ onClose, onSuccess }: AddFlightPageProps
   }
 
   function runAi() {
-    const comp = Number(latinDigits(compToman));
+    const comp = Number(tomanDigitsOnly(compToman));
     if (!comp || comp <= 0) {
-      setError('برای تحلیل، قیمت رقبا را وارد کنید');
+      setError("برای تحلیل، قیمت رقبا را وارد کنید");
       return;
     }
     setError(null);
     setAiLoading(true);
     const suggestion = suggestPriceHeuristic({
-      baseToman: Number(latinDigits(baseToman)) || 0,
+      baseToman: Number(tomanDigitsOnly(baseToman)) || 0,
       compToman: comp,
-      capacity: Number(latinDigits(capacity)) || 180,
+      capacity: capacity || 180,
       charter: Number(latinDigits(charter)) || 0,
-      dateLabel: date,
+      dateIso,
       routeLabel: `${cityByCode.get(originCode) ?? originCode} ← ${cityByCode.get(destCode) ?? destCode}`,
     });
     setAi(suggestion);
-    setProposedToman(String(suggestion.priceToman));
+    setProposedToman(formatTomanGrouped(String(suggestion.priceToman)));
     setAiLoading(false);
   }
 
   async function onSubmit() {
+    setShowValidation(true);
     setError(null);
-    const no = latinDigits(flightNo.trim()).toUpperCase();
-    const cap = Number(latinDigits(capacity));
-    const charterSeats = Number(latinDigits(charter)) || 0;
-    const proposedIrr = parseTomanToRial(proposedToman);
-    const baseIrr = parseTomanToRial(baseToman) ?? proposedIrr;
 
-    if (!no || !originCode || !destCode || !date || !cap || proposedIrr == null) {
-      setError('موارد الزامی (شماره، مسیر، تاریخ، صندلی، نرخ پیشنهادی) را کامل کنید');
+    const no = flightNo.trim().toUpperCase();
+    const charterSeats = Number(latinDigits(charter)) || 0;
+    const proposedIrr = moneyInputToRial(proposedToman);
+    const baseIrr = moneyInputToRial(baseToman) ?? proposedIrr;
+    const compIrr = moneyInputToRial(compToman);
+
+    if (!isValidFlightNo(no)) {
+      setError("شماره پرواز معتبر نیست (مثال: XY1234)");
+      return;
+    }
+    if (
+      !originCode ||
+      !destCode ||
+      !dateIso ||
+      !time ||
+      durationMinutes == null ||
+      proposedIrr == null
+    ) {
+      setError(
+        "موارد الزامی (شماره، مسیر، تاریخ، ساعت، مدت، نرخ پیشنهادی) را کامل کنید",
+      );
+      return;
+    }
+    if (!isValidHhMm(time)) {
+      setError("ساعت پرواز را به صورت HH:mm وارد کنید.");
       return;
     }
     if (originCode === destCode) {
-      setError('مبدأ و مقصد نمی‌توانند یکسان باشند.');
+      setError("مبدأ و مقصد نمی‌توانند یکسان باشند.");
       return;
     }
-    const dateIso = parseJalaliDateToIso(date);
-    const timeMatch = /^(\d{1,2}):(\d{2})$/.exec(latinDigits((time || '08:00').trim()));
-    if (!dateIso || !timeMatch) {
-      setError('تاریخ را به صورت ۱۴۰۵/۰۴/۲۵ و ساعت را به صورت 08:30 وارد کنید.');
+    if (capacity <= 0 || cabinCapacityError) {
+      setError(cabinCapacityError ?? "ظرفیت کابین‌ها را وارد کنید");
       return;
     }
-    if (charterSeats >= cap) {
-      setError('تعهد چارتری باید کمتر از تعداد صندلی موجود باشد.');
+    if (charterSeats >= capacity) {
+      setError("تعهد چارتری باید کمتر از تعداد صندلی موجود باشد.");
       return;
     }
 
-    const departure = new Date(dateIso);
-    departure.setHours(Number(timeMatch[1]), Number(timeMatch[2]), 0, 0);
+    const departureAt = buildDepartureIso(dateIso, time);
+    if (!departureAt) {
+      setError("تاریخ و ساعت پرواز معتبر نیست.");
+      return;
+    }
+
+    const cabinCapacities = cabinRows
+      .map((r) => ({
+        cabin: r.cabin,
+        seats: Number(latinDigits(r.seats)) || 0,
+      }))
+      .filter((c) => c.seats > 0);
+
+    const payload = {
+      originCode,
+      destCode,
+      flightNo: no,
+      departureAt,
+      durationMinutes,
+      capacity,
+      cabinCapacities,
+      basePriceIrr: baseIrr!,
+      aircraftType: aircraft || undefined,
+      charterSeats: charterSeats,
+      chargeRules: draftRulesToApi(chargeRules),
+      competitorPriceIrr: compIrr ?? undefined,
+    };
 
     setSaving(true);
     try {
-      const created = await createFlight({
-        originCode,
-        destCode,
-        flightNo: no,
-        departureAt: departure.toISOString(),
-        capacity: cap,
-        basePriceIrr: baseIrr!,
-        aircraftType: aircraft || undefined,
-        charterSeats,
-      });
+      if (isEdit && flightId) {
+        const updated = await updateFlightDefinition(flightId, payload);
+        const legalIrr = moneyInputToRial(legalToman);
+        await upsertProposal(flightId, {
+          proposedPriceIrr: proposedIrr,
+          legalRateIrr: legalIrr ?? undefined,
+          note: note.trim() || undefined,
+        });
+        const route = `${cityByCode.get(originCode) ?? originCode} ← ${cityByCode.get(destCode) ?? destCode}`;
+        if (
+          updated.pendingRevision ||
+          updated.approvalStatus === "PENDING_REVISION"
+        ) {
+          onSuccess("تغییرات برای تأیید مجدد مدیرعامل ارسال شد.");
+        } else {
+          onSuccess(`مشخصات پرواز به‌روزرسانی شد ✓ — ${route}`);
+        }
+        return;
+      }
+
+      const created = await createFlight(payload);
 
       for (const f of fares) {
-        const payload: CreateFareRulePayload = {
+        const farePayload: CreateFareRulePayload = {
           cabin: f.cabin,
           classCode: f.classCode,
           priceIrr: f.priceIrr,
@@ -369,14 +553,16 @@ export default function AddFlightPage({ onClose, onSuccess }: AddFlightPageProps
           refundable: f.refundable,
           changeable: f.changeable,
           baggageAllowanceKg: f.baggageAllowanceKg || undefined,
-          allowedChannels: f.allowedChannels.length ? f.allowedChannels : undefined,
-          validFrom: f.validFrom ? parseJalaliDateToIso(f.validFrom) ?? undefined : undefined,
-          validUntil: f.validUntil ? parseJalaliDateToIso(f.validUntil) ?? undefined : undefined,
+          allowedChannels: f.allowedChannels.length
+            ? f.allowedChannels
+            : undefined,
+          validFrom: f.validFrom || undefined,
+          validUntil: f.validUntil || undefined,
         };
-        await createFareRule(created.id, payload);
+        await createFareRule(created.id, farePayload);
       }
 
-      const legalIrr = parseTomanToRial(legalToman);
+      const legalIrr = moneyInputToRial(legalToman);
       await upsertProposal(created.id, {
         proposedPriceIrr: proposedIrr,
         legalRateIrr: legalIrr ?? undefined,
@@ -384,16 +570,36 @@ export default function AddFlightPage({ onClose, onSuccess }: AddFlightPageProps
       });
 
       const route = `${cityByCode.get(originCode) ?? originCode} ← ${cityByCode.get(destCode) ?? destCode}`;
-      onSuccess(`پرواز جدید ثبت و قیمت برای تأیید مدیر عامل ارسال شد ✓ — ${route}`);
+      onSuccess(
+        `پرواز جدید ثبت و قیمت برای تأیید مدیر عامل ارسال شد ✓ — ${route}`,
+      );
     } catch (e) {
-      setError(e instanceof ApiRequestError ? e.message : e instanceof Error ? e.message : 'خطا در ثبت پرواز.');
+      setError(
+        e instanceof ApiRequestError
+          ? e.message
+          : e instanceof Error
+            ? e.message
+            : "خطا در ثبت پرواز.",
+      );
     } finally {
       setSaving(false);
     }
   }
 
+  const pageTitle = isEdit ? "ویرایش مشخصات پرواز" : "افزودن پرواز جدید";
+  const submitLabel = isEdit
+    ? saving
+      ? "در حال ذخیره…"
+      : "ذخیره تغییرات"
+    : saving
+      ? "در حال ثبت…"
+      : "ثبت پرواز و ارسال قیمت برای تأیید مدیر عامل";
+
   return (
-    <div className="fixed inset-0 z-[120] overflow-y-auto bg-[#0b1220]" data-testid="add-flight-page">
+    <div
+      className="fixed inset-0 z-[120] overflow-y-auto bg-[#0b1220]"
+      data-testid="add-flight-page"
+    >
       <div className="mx-auto max-w-[940px] px-[22px] pb-[60px] pt-[26px]">
         <div className="mb-[22px] flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -403,14 +609,23 @@ export default function AddFlightPage({ onClose, onSuccess }: AddFlightPageProps
               aria-label="بازگشت"
               className="flex h-10 w-10 flex-none items-center justify-center rounded-[11px] border border-[#24304a] bg-[#141d2e] text-[#9fb0c7]"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+              >
                 <path d="M9 18l6-6-6-6" />
               </svg>
             </button>
             <div>
-              <h1 className="m-0 text-xl font-black text-white">افزودن پرواز جدید</h1>
+              <h1 className="m-0 text-xl font-black text-white">{pageTitle}</h1>
               <p className="mt-[3px] text-xs text-[#6b7b94]">
-                اطلاعات پرواز را وارد کنید، قیمت را با کمک هوش مصنوعی تعیین و برای تأیید مدیر عامل ارسال کنید.
+                {isEdit
+                  ? "مشخصات پرواز را ویرایش کنید؛ تغییرات پرواز تأییدشده برای تأیید مجدد مدیرعامل ارسال می‌شود."
+                  : "اطلاعات پرواز را وارد کنید، قیمت را با کمک هوش مصنوعی تعیین و برای تأیید مدیر عامل ارسال کنید."}
               </p>
             </div>
           </div>
@@ -423,594 +638,697 @@ export default function AddFlightPage({ onClose, onSuccess }: AddFlightPageProps
           </button>
         </div>
 
-        {/* مشخصات پرواز */}
-        <section className="mb-[15px] rounded-2xl border border-[#1f2a3d] bg-[#141d2e] px-[19px] py-[18px]">
-          <div className="mb-4 flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-[#3b82f6]" />
-            <h2 className="m-0 text-[14.5px] font-extrabold text-white">مشخصات پرواز</h2>
-          </div>
-          <div className="grid grid-cols-1 gap-[13px] md:grid-cols-3">
-            <div>
-              <label className={labelClass} htmlFor="af-no">
-                شماره پرواز *
-              </label>
-              <input
-                id="af-no"
-                dir="ltr"
-                placeholder="شماره پرواز"
-                value={flightNo}
-                onChange={(e) => setFlightNo(e.target.value)}
-                className={`${inputClass} text-right`}
-              />
-            </div>
-            <div className="relative">
-              <span className={labelClass}>مبدأ *</span>
-              <button
-                type="button"
-                onClick={() => {
-                  setCityOpen(cityOpen === 'origin' ? null : 'origin');
-                  setCityQuery('');
-                }}
-                className={`${inputClass} flex items-center justify-between ${originCode ? 'text-[#e7ecf3]' : 'text-[#6b7b94]'}`}
-              >
-                <span>{originLabel()}</span>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7b94" strokeWidth="2">
-                  <path d="M6 9l6 6 6-6" />
-                </svg>
-              </button>
-              {cityOpen === 'origin' && (
-                <CityDropdown
-                  query={cityQuery}
-                  onQuery={setCityQuery}
-                  cities={filteredCities}
-                  onPick={(code) => {
-                    setOriginCode(code);
-                    setCityOpen(null);
-                  }}
-                  onClose={() => setCityOpen(null)}
-                />
-              )}
-            </div>
-            <div className="relative">
-              <span className={labelClass}>مقصد *</span>
-              <button
-                type="button"
-                onClick={() => {
-                  setCityOpen(cityOpen === 'dest' ? null : 'dest');
-                  setCityQuery('');
-                }}
-                className={`${inputClass} flex items-center justify-between ${destCode ? 'text-[#e7ecf3]' : 'text-[#6b7b94]'}`}
-              >
-                <span>{destLabel()}</span>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7b94" strokeWidth="2">
-                  <path d="M6 9l6 6 6-6" />
-                </svg>
-              </button>
-              {cityOpen === 'dest' && (
-                <CityDropdown
-                  query={cityQuery}
-                  onQuery={setCityQuery}
-                  cities={filteredCities}
-                  onPick={(code) => {
-                    setDestCode(code);
-                    setCityOpen(null);
-                  }}
-                  onClose={() => setCityOpen(null)}
-                />
-              )}
-            </div>
-            <div>
-              <label className={labelClass} htmlFor="af-date">
-                تاریخ پرواز *
-              </label>
-              <input
-                id="af-date"
-                placeholder="مثلاً ۱۴۰۵/۰۴/۲۸"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className={labelClass} htmlFor="af-time">
-                ساعت پرواز
-              </label>
-              <input
-                id="af-time"
-                dir="ltr"
-                placeholder="مثلاً 08:30"
-                value={time}
-                onChange={(e) => setTime(e.target.value)}
-                className={`${inputClass} text-right`}
-              />
-            </div>
-            <div>
-              <label className={labelClass} htmlFor="af-duration">
-                مدت پرواز
-              </label>
-              <input
-                id="af-duration"
-                placeholder="مثلاً ۲ ساعت و ۱۵ دقیقه"
-                value={duration}
-                onChange={(e) => setDuration(e.target.value)}
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className={labelClass} htmlFor="af-arrival">
-                زمان رسیدن
-              </label>
-              <input
-                id="af-arrival"
-                dir="ltr"
-                placeholder="مثلاً 10:45"
-                value={arrival}
-                onChange={(e) => setArrival(e.target.value)}
-                className={`${inputClass} text-right`}
-              />
-            </div>
-            <div>
-              <label className={labelClass} htmlFor="af-aircraft">
-                نوع هواپیما
-              </label>
-              <select
-                id="af-aircraft"
-                value={aircraft}
-                onChange={(e) => setAircraft(e.target.value)}
-                className={`${inputClass} cursor-pointer`}
-              >
-                {(aircraftTypes.length
-                  ? aircraftTypes.map((a) => a.aircraftType)
-                  : ['Airbus A320']
-                ).map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className={labelClass} htmlFor="af-cap">
-                تعداد صندلی موجود *
-              </label>
-              <input
-                id="af-cap"
-                dir="ltr"
-                placeholder="مثلاً ۱۸۰"
-                value={capacity}
-                onChange={(e) => setCapacity(e.target.value)}
-                className={`${inputClass} text-right`}
-              />
-            </div>
-            <div>
-              <label className={labelClass} htmlFor="af-charter">
-                تعهد چارتری (صندلی)
-              </label>
-              <input
-                id="af-charter"
-                dir="ltr"
-                placeholder="مثلاً ۶۰"
-                value={charter}
-                onChange={(e) => setCharter(e.target.value)}
-                className={`${inputClass} text-right`}
-              />
-            </div>
-          </div>
-        </section>
-
-        {/* کلاس‌های نرخی */}
-        <section className="mb-[15px] rounded-2xl border border-[#1f2a3d] bg-[#141d2e] px-[19px] py-[18px]">
-          <div className="mb-3.5 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-[#60a5fa]" />
-              <h2 className="m-0 text-[14.5px] font-extrabold text-white">کلاس‌های نرخی پرواز</h2>
-            </div>
-            <button
-              type="button"
-              onClick={openFareCreate}
-              className="flex items-center gap-1.5 rounded-[9px] bg-[#3b82f6] px-[13px] py-2 text-[11.5px] font-bold text-white"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-              افزودن کلاس نرخی
-            </button>
-          </div>
-          <p className="mb-[13px] text-[11px] text-[#6b7b94]">
-            کلاس‌های Y/B/M و... این پرواز را پیش از ثبت نهایی تعریف کنید؛ ظرفیت هر کلاس در برابر تعداد صندلی موجود بالا
-            اعتبارسنجی می‌شود.
+        {loadingDefinition ? (
+          <p className="py-8 text-center text-sm text-[#9fb0c7]">
+            در حال بارگذاری مشخصات پرواز…
           </p>
-
-          {fareFormOpen && (
-            <div className="mb-3 rounded-xl border border-[#2a3550] bg-[#0f1623] p-3">
-              <div className="mb-2.5 text-[11.5px] font-extrabold text-[#e7ecf3]">
-                {fareEditingId ? 'ویرایش کلاس نرخی' : 'کلاس نرخی جدید'}
+        ) : (
+          <>
+            {/* مشخصات پرواز */}
+            <section className="mb-[15px] rounded-2xl border border-[#1f2a3d] bg-[#141d2e] px-[19px] py-[18px]">
+              <div className="mb-4 flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-[#3b82f6]" />
+                <h2 className="m-0 text-[14.5px] font-extrabold text-white">
+                  مشخصات پرواز
+                </h2>
               </div>
-              {fareError && (
-                <div className="mb-2.5 rounded-[9px] border border-[rgba(248,113,113,.3)] bg-[rgba(248,113,113,.1)] px-2.5 py-2 text-[11px] font-semibold text-[#f87171]">
-                  {fareError}
-                </div>
-              )}
-              <div className="mb-[9px] grid grid-cols-1 gap-[9px] sm:grid-cols-2">
-                <div>
-                  <label className="mb-1.5 block text-[10.5px] text-[#9fb0c7]">نام کابین</label>
-                  <select
-                    value={fareForm.cabin}
-                    onChange={(e) =>
-                      setFareForm((f) => ({
-                        ...f,
-                        cabin: e.target.value as 'ECONOMY' | 'BUSINESS',
-                      }))
-                    }
-                    className="h-10 w-full rounded-[9px] border border-[#28344c] bg-[#141d2e] px-[9px] text-[11.5px] text-[#e7ecf3]"
+              <div className="grid grid-cols-1 gap-[13px] md:grid-cols-3">
+                <FlightNumberInput
+                  value={flightNo}
+                  onChange={setFlightNo}
+                  showError={showValidation}
+                />
+                <div className="relative">
+                  <span className={labelClass}>مبدأ *</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCityOpen(cityOpen === "origin" ? null : "origin");
+                      setCityQuery("");
+                    }}
+                    className={`${inputClass} flex items-center justify-between ${originCode ? "text-[#e7ecf3]" : "text-[#6b7b94]"}`}
                   >
-                    <option value="ECONOMY">اکونومی</option>
-                    <option value="BUSINESS">بیزنس</option>
+                    <span>{originLabel()}</span>
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#6b7b94"
+                      strokeWidth="2"
+                    >
+                      <path d="M6 9l6 6 6-6" />
+                    </svg>
+                  </button>
+                  {cityOpen === "origin" && (
+                    <CityDropdown
+                      query={cityQuery}
+                      onQuery={setCityQuery}
+                      cities={filteredCities}
+                      onPick={(code) => {
+                        setOriginCode(code);
+                        setCityOpen(null);
+                      }}
+                      onClose={() => setCityOpen(null)}
+                    />
+                  )}
+                </div>
+                <div className="relative">
+                  <span className={labelClass}>مقصد *</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCityOpen(cityOpen === "dest" ? null : "dest");
+                      setCityQuery("");
+                    }}
+                    className={`${inputClass} flex items-center justify-between ${destCode ? "text-[#e7ecf3]" : "text-[#6b7b94]"}`}
+                  >
+                    <span>{destLabel()}</span>
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#6b7b94"
+                      strokeWidth="2"
+                    >
+                      <path d="M6 9l6 6 6-6" />
+                    </svg>
+                  </button>
+                  {cityOpen === "dest" && (
+                    <CityDropdown
+                      query={cityQuery}
+                      onQuery={setCityQuery}
+                      cities={filteredCities}
+                      onPick={(code) => {
+                        setDestCode(code);
+                        setCityOpen(null);
+                      }}
+                      onClose={() => setCityOpen(null)}
+                    />
+                  )}
+                </div>
+                <div>
+                  <span className={labelClass}>تاریخ پرواز *</span>
+                  <div className="h-11 rounded-[10px] border border-[#28344c] bg-[#0f1726]">
+                    <JalaliDatePicker
+                      label="تاریخ پرواز"
+                      value={dateIso}
+                      onChange={setDateIso}
+                      theme="dark"
+                      singleLine
+                      minDate={dateMin}
+                      testId="af-date"
+                      placeholder="انتخاب تاریخ"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className={labelClass} htmlFor="af-time">
+                    ساعت پرواز *
+                  </label>
+                  <input
+                    id="af-time"
+                    type="time"
+                    step={300}
+                    dir="ltr"
+                    value={time}
+                    onChange={(e) => setTime(e.target.value)}
+                    className={`${inputClass} text-left font-num`}
+                  />
+                </div>
+                <DurationFields
+                  hours={durationHours}
+                  minutes={durationMins}
+                  onHours={setDurationHours}
+                  onMinutes={setDurationMins}
+                  showError={showValidation}
+                />
+                <div>
+                  <label className={labelClass} htmlFor="af-arrival">
+                    زمان رسیدن
+                  </label>
+                  <input
+                    id="af-arrival"
+                    dir="ltr"
+                    readOnly
+                    value={arrival}
+                    placeholder="—"
+                    className={`${inputClass} text-left font-num opacity-80`}
+                  />
+                </div>
+                <div>
+                  <label className={labelClass} htmlFor="af-aircraft">
+                    نوع هواپیما
+                  </label>
+                  <select
+                    id="af-aircraft"
+                    value={aircraft}
+                    onChange={(e) => setAircraft(e.target.value)}
+                    className={`${inputClass} cursor-pointer`}
+                  >
+                    {(aircraftTypes.length
+                      ? aircraftTypes.map((a) => a.aircraftType)
+                      : ["Airbus A320"]
+                    ).map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-[10.5px] text-[#9fb0c7]">کد کلاس (مثلاً Y)</label>
+                  <label className={labelClass} htmlFor="af-charter">
+                    تعهد چارتری (صندلی)
+                  </label>
                   <input
+                    id="af-charter"
                     dir="ltr"
-                    value={fareForm.classCode}
-                    onChange={(e) => setFareForm((f) => ({ ...f, classCode: e.target.value }))}
-                    className="h-10 w-full rounded-[9px] border border-[#28344c] bg-[#141d2e] px-[9px] font-num text-left text-[11.5px] text-[#e7ecf3]"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-[10.5px] text-[#9fb0c7]">قیمت پایه (تومان)</label>
-                  <input
-                    dir="ltr"
-                    value={fareForm.priceToman}
-                    onChange={(e) => setFareForm((f) => ({ ...f, priceToman: e.target.value }))}
-                    className="h-10 w-full rounded-[9px] border border-[#28344c] bg-[#141d2e] px-[9px] text-left text-[11.5px] text-[#e7ecf3]"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-[10.5px] text-[#9fb0c7]">مالیات و عوارض (تومان)</label>
-                  <input
-                    dir="ltr"
-                    value={fareForm.taxToman}
-                    onChange={(e) => setFareForm((f) => ({ ...f, taxToman: e.target.value }))}
-                    className="h-10 w-full rounded-[9px] border border-[#28344c] bg-[#141d2e] px-[9px] text-left text-[11.5px] text-[#e7ecf3]"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-[10.5px] text-[#9fb0c7]">ظرفیت اختصاصی (صندلی)</label>
-                  <input
-                    dir="ltr"
-                    value={fareForm.seatsAllocated}
-                    onChange={(e) => setFareForm((f) => ({ ...f, seatsAllocated: e.target.value }))}
-                    className="h-10 w-full rounded-[9px] border border-[#28344c] bg-[#141d2e] px-[9px] text-left text-[11.5px] text-[#e7ecf3]"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-[10.5px] text-[#9fb0c7]">سهمیه بار مجاز (کیلوگرم)</label>
-                  <input
-                    dir="ltr"
-                    value={fareForm.baggageKg}
-                    onChange={(e) => setFareForm((f) => ({ ...f, baggageKg: e.target.value }))}
-                    className="h-10 w-full rounded-[9px] border border-[#28344c] bg-[#141d2e] px-[9px] text-left text-[11.5px] text-[#e7ecf3]"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-[10.5px] text-[#9fb0c7]">شروع اعتبار (مثال ۱۴۰۵/۰۴/۰۱)</label>
-                  <input
-                    dir="ltr"
-                    value={fareForm.validFrom}
-                    onChange={(e) => setFareForm((f) => ({ ...f, validFrom: e.target.value }))}
-                    className="h-10 w-full rounded-[9px] border border-[#28344c] bg-[#141d2e] px-[9px] font-num text-left text-[11px] text-[#e7ecf3]"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-[10.5px] text-[#9fb0c7]">پایان اعتبار</label>
-                  <input
-                    dir="ltr"
-                    value={fareForm.validUntil}
-                    onChange={(e) => setFareForm((f) => ({ ...f, validUntil: e.target.value }))}
-                    className="h-10 w-full rounded-[9px] border border-[#28344c] bg-[#141d2e] px-[9px] font-num text-left text-[11px] text-[#e7ecf3]"
+                    inputMode="numeric"
+                    placeholder="مثلاً ۶۰"
+                    value={charter}
+                    onChange={(e) =>
+                      setCharter(
+                        latinDigits(e.target.value)
+                          .replace(/\D/g, "")
+                          .slice(0, 4),
+                      )
+                    }
+                    className={`${inputClass} text-left font-num`}
                   />
                 </div>
               </div>
-              <div className="mb-2.5 flex items-center gap-4">
-                <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-[#e7ecf3]">
-                  <input
-                    type="checkbox"
-                    checked={fareForm.refundable}
-                    onChange={(e) => setFareForm((f) => ({ ...f, refundable: e.target.checked }))}
-                  />
-                  استرداد‌پذیر
-                </label>
-                <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-[#e7ecf3]">
-                  <input
-                    type="checkbox"
-                    checked={fareForm.changeable}
-                    onChange={(e) => setFareForm((f) => ({ ...f, changeable: e.target.checked }))}
-                  />
-                  قابل تغییر تاریخ
-                </label>
+              <div className="mt-4 border-t border-[#28344c] pt-4">
+                <CabinCapacityEditor
+                  rows={cabinRows}
+                  onChange={setCabinRows}
+                  error={cabinCapacityError}
+                />
               </div>
-              <div className="mb-3">
-                <div className="mb-[7px] text-[10.5px] text-[#9fb0c7]">کانال‌های مجاز فروش</div>
-                <div className="flex flex-wrap gap-[7px]">
-                  {CHANNEL_OPTS.map((ch) => {
-                    const on = fareForm.allowedChannels.includes(ch.key);
-                    return (
-                      <button
-                        key={ch.key}
-                        type="button"
-                        onClick={() =>
+            </section>
+
+            <ChargeRulesEditor
+              rules={chargeRules}
+              onChange={setChargeRules}
+              basePriceIrr={basePriceIrr}
+            />
+
+            {/* کلاس‌های نرخی */}
+            <section className="mb-[15px] rounded-2xl border border-[#1f2a3d] bg-[#141d2e] px-[19px] py-[18px]">
+              <div className="mb-3.5 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-[#60a5fa]" />
+                  <h2 className="m-0 text-[14.5px] font-extrabold text-white">
+                    کلاس‌های نرخی پرواز
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={openFareCreate}
+                  className="flex items-center gap-1.5 rounded-[9px] bg-[#3b82f6] px-[13px] py-2 text-[11.5px] font-bold text-white"
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.4"
+                  >
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                  افزودن کلاس نرخی
+                </button>
+              </div>
+              <p className="mb-[13px] text-[11px] text-[#6b7b94]">
+                کلاس‌های Y/B/M و... این پرواز را پیش از ثبت نهایی تعریف کنید؛
+                ظرفیت هر کلاس در برابر جمع صندلی کابین‌ها اعتبارسنجی می‌شود.
+              </p>
+
+              {fareFormOpen && (
+                <div className="mb-3 rounded-xl border border-[#2a3550] bg-[#0f1623] p-3">
+                  <div className="mb-2.5 text-[11.5px] font-extrabold text-[#e7ecf3]">
+                    {fareEditingId ? "ویرایش کلاس نرخی" : "کلاس نرخی جدید"}
+                  </div>
+                  {fareError && (
+                    <div className="mb-2.5 rounded-[9px] border border-[rgba(248,113,113,.3)] bg-[rgba(248,113,113,.1)] px-2.5 py-2 text-[11px] font-semibold text-[#f87171]">
+                      {fareError}
+                    </div>
+                  )}
+                  <div className="mb-[9px] grid grid-cols-1 gap-[9px] sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1.5 block text-[10.5px] text-[#9fb0c7]">
+                        نام کابین
+                      </label>
+                      <select
+                        value={fareForm.cabin}
+                        onChange={(e) =>
                           setFareForm((f) => ({
                             ...f,
-                            allowedChannels: on
-                              ? f.allowedChannels.filter((c) => c !== ch.key)
-                              : [...f.allowedChannels, ch.key],
+                            cabin: e.target.value as CabinKind,
                           }))
                         }
-                        className={`rounded-lg border px-[11px] py-1.5 text-[10.5px] font-bold ${
-                          on
-                            ? 'border-[#3b82f6] bg-[rgba(59,130,246,.16)] text-[#60a5fa]'
-                            : 'border-[#28344c] bg-transparent text-[#9fb0c7]'
-                        }`}
+                        className="h-10 w-full rounded-[9px] border border-[#28344c] bg-[#141d2e] px-[9px] text-[11.5px] text-[#e7ecf3]"
                       >
-                        {ch.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={saveFareDraft}
-                  className="flex h-10 flex-1 items-center justify-center rounded-[9px] bg-[#3b82f6] text-[11.5px] font-extrabold text-white"
-                >
-                  ثبت کلاس نرخی
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFareFormOpen(false);
-                    setFareEditingId(null);
-                  }}
-                  className="flex h-10 items-center justify-center rounded-[9px] border border-[#28344c] px-4 text-[11.5px] font-semibold text-[#9fb0c7]"
-                >
-                  انصراف
-                </button>
-              </div>
-            </div>
-          )}
-
-          <div className="flex flex-col gap-[9px]">
-            {fares.map((c) => (
-              <div key={c.tempId} className="rounded-xl border border-[#28344c] bg-[#18223a] p-[11px]">
-                <div className="mb-[9px] flex items-center justify-between">
-                  <div className="flex items-center gap-[7px]">
-                    <span
-                      dir="ltr"
-                      className="rounded-[7px] bg-[rgba(59,130,246,.14)] px-[9px] py-[3px] font-num text-[11px] font-black text-[#60a5fa]"
-                    >
-                      {c.classCode}
-                    </span>
-                    <span className="text-[11.5px] font-bold text-[#e7ecf3]">{c.cabinLabel}</span>
-                  </div>
-                  <div className="flex gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => openFareEdit(c)}
-                      className="rounded-lg bg-[rgba(59,130,246,.1)] px-2.5 py-1.5 text-[10.5px] font-bold text-[#60a5fa]"
-                    >
-                      ویرایش
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFares((list) => list.filter((x) => x.tempId !== c.tempId))}
-                      className="rounded-lg bg-[rgba(248,113,113,.1)] px-2.5 py-1.5 text-[10.5px] font-bold text-[#f87171]"
-                    >
-                      حذف
-                    </button>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-[10.5px]">
-                  <div>
-                    <span className="text-[#6b7b94]">قیمت پایه</span>
-                    <div className="mt-0.5 font-bold text-[#e7ecf3]">{faMoney(c.priceIrr)} تومان</div>
-                  </div>
-                  <div>
-                    <span className="text-[#6b7b94]">مالیات و عوارض</span>
-                    <div className="mt-0.5 font-bold text-[#e7ecf3]">{faMoney(c.taxIrr)} تومان</div>
-                  </div>
-                  <div>
-                    <span className="text-[#6b7b94]">ظرفیت اختصاصی</span>
-                    <div className="mt-0.5 font-bold text-[#e7ecf3]">{faDigits(c.seatsAllocated)} صندلی</div>
-                  </div>
-                  <div>
-                    <span className="text-[#6b7b94]">سهمیه بار مجاز</span>
-                    <div className="mt-0.5 font-bold text-[#e7ecf3]">
-                      {c.baggageAllowanceKg ? `${faDigits(c.baggageAllowanceKg)} کیلوگرم` : '—'}
+                        <option value="ECONOMY">اکونومی</option>
+                        <option value="COMFORT">کامفورت</option>
+                        <option value="BUSINESS">بیزنس</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-[10.5px] text-[#9fb0c7]">
+                        کد کلاس (مثلاً Y)
+                      </label>
+                      <input
+                        dir="ltr"
+                        value={fareForm.classCode}
+                        onChange={(e) =>
+                          setFareForm((f) => ({
+                            ...f,
+                            classCode: e.target.value,
+                          }))
+                        }
+                        className="h-10 w-full rounded-[9px] border border-[#28344c] bg-[#141d2e] px-[9px] font-num text-left text-[11.5px] text-[#e7ecf3]"
+                      />
+                    </div>
+                    <MoneyInput
+                      label="قیمت پایه (تومان)"
+                      valueToman={fareForm.priceToman}
+                      onChangeToman={(v) =>
+                        setFareForm((f) => ({ ...f, priceToman: v }))
+                      }
+                      testId="fare-price-money"
+                    />
+                    <MoneyInput
+                      label="مالیات و عوارض (تومان)"
+                      valueToman={fareForm.taxToman}
+                      onChangeToman={(v) =>
+                        setFareForm((f) => ({ ...f, taxToman: v }))
+                      }
+                      testId="fare-tax-money"
+                    />
+                    <div>
+                      <label className="mb-1.5 block text-[10.5px] text-[#9fb0c7]">
+                        ظرفیت اختصاصی (صندلی)
+                      </label>
+                      <input
+                        dir="ltr"
+                        value={fareForm.seatsAllocated}
+                        onChange={(e) =>
+                          setFareForm((f) => ({
+                            ...f,
+                            seatsAllocated: e.target.value,
+                          }))
+                        }
+                        className="h-10 w-full rounded-[9px] border border-[#28344c] bg-[#141d2e] px-[9px] font-num text-left text-[11.5px] text-[#e7ecf3]"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-[10.5px] text-[#9fb0c7]">
+                        سهمیه بار مجاز (کیلوگرم)
+                      </label>
+                      <input
+                        dir="ltr"
+                        value={fareForm.baggageKg}
+                        onChange={(e) =>
+                          setFareForm((f) => ({
+                            ...f,
+                            baggageKg: e.target.value,
+                          }))
+                        }
+                        className="h-10 w-full rounded-[9px] border border-[#28344c] bg-[#141d2e] px-[9px] font-num text-left text-[11.5px] text-[#e7ecf3]"
+                      />
+                    </div>
+                    <div className="h-10 rounded-[9px] border border-[#28344c] bg-[#141d2e]">
+                      <JalaliDatePicker
+                        label="شروع اعتبار"
+                        value={fareForm.validFrom}
+                        onChange={(iso) =>
+                          setFareForm((f) => ({ ...f, validFrom: iso }))
+                        }
+                        theme="dark"
+                        singleLine
+                        testId="fare-valid-from"
+                        placeholder="شروع اعتبار"
+                      />
+                    </div>
+                    <div className="h-10 rounded-[9px] border border-[#28344c] bg-[#141d2e]">
+                      <JalaliDatePicker
+                        label="پایان اعتبار"
+                        value={fareForm.validUntil}
+                        onChange={(iso) =>
+                          setFareForm((f) => ({ ...f, validUntil: iso }))
+                        }
+                        theme="dark"
+                        singleLine
+                        minDate={fareForm.validFrom ?? undefined}
+                        testId="fare-valid-until"
+                        placeholder="پایان اعتبار"
+                      />
                     </div>
                   </div>
-                </div>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  <span
-                    className={`rounded-[14px] px-[9px] py-1 text-[10px] font-bold ${
-                      c.refundable
-                        ? 'bg-[rgba(52,211,153,.14)] text-[#34d399]'
-                        : 'bg-[rgba(248,113,113,.14)] text-[#f87171]'
-                    }`}
-                  >
-                    {c.refundable ? 'استرداد‌پذیر' : 'غیرقابل استرداد'}
-                  </span>
-                  <span
-                    className={`rounded-[14px] px-[9px] py-1 text-[10px] font-bold ${
-                      c.changeable
-                        ? 'bg-[rgba(52,211,153,.14)] text-[#34d399]'
-                        : 'bg-[rgba(248,113,113,.14)] text-[#f87171]'
-                    }`}
-                  >
-                    {c.changeable ? 'قابل تغییر' : 'غیرقابل تغییر'}
-                  </span>
-                  {c.allowedChannels.map((ch) => (
-                    <span
-                      key={ch}
-                      className="rounded-[14px] bg-[#0f1623] px-[9px] py-1 text-[10px] font-semibold text-[#9fb0c7]"
+                  <div className="mb-2.5 flex items-center gap-4">
+                    <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-[#e7ecf3]">
+                      <input
+                        type="checkbox"
+                        checked={fareForm.refundable}
+                        onChange={(e) =>
+                          setFareForm((f) => ({
+                            ...f,
+                            refundable: e.target.checked,
+                          }))
+                        }
+                      />
+                      استرداد‌پذیر
+                    </label>
+                    <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-[#e7ecf3]">
+                      <input
+                        type="checkbox"
+                        checked={fareForm.changeable}
+                        onChange={(e) =>
+                          setFareForm((f) => ({
+                            ...f,
+                            changeable: e.target.checked,
+                          }))
+                        }
+                      />
+                      قابل تغییر تاریخ
+                    </label>
+                  </div>
+                  <div className="mb-3">
+                    <div className="mb-[7px] text-[10.5px] text-[#9fb0c7]">
+                      کانال‌های مجاز فروش
+                    </div>
+                    <div className="flex flex-wrap gap-[7px]">
+                      {CHANNEL_OPTS.map((ch) => {
+                        const on = fareForm.allowedChannels.includes(ch.key);
+                        return (
+                          <button
+                            key={ch.key}
+                            type="button"
+                            onClick={() =>
+                              setFareForm((f) => ({
+                                ...f,
+                                allowedChannels: on
+                                  ? f.allowedChannels.filter(
+                                      (c) => c !== ch.key,
+                                    )
+                                  : [...f.allowedChannels, ch.key],
+                              }))
+                            }
+                            className={`rounded-lg border px-[11px] py-1.5 text-[10.5px] font-bold ${
+                              on
+                                ? "border-[#3b82f6] bg-[rgba(59,130,246,.16)] text-[#60a5fa]"
+                                : "border-[#28344c] bg-transparent text-[#9fb0c7]"
+                            }`}
+                          >
+                            {ch.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={saveFareDraft}
+                      className="flex h-10 flex-1 items-center justify-center rounded-[9px] bg-[#3b82f6] text-[11.5px] font-extrabold text-white"
                     >
-                      {CHANNEL_OPTS.find((o) => o.key === ch)?.label ?? ch}
-                    </span>
-                  ))}
+                      ثبت کلاس نرخی
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFareFormOpen(false);
+                        setFareEditingId(null);
+                      }}
+                      className="flex h-10 items-center justify-center rounded-[9px] border border-[#28344c] px-4 text-[11.5px] font-semibold text-[#9fb0c7]"
+                    >
+                      انصراف
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
-            {fares.length === 0 && (
-              <div className="px-4 py-4 text-center text-[11px] text-[#6b7b94]">
-                هنوز کلاس نرخی برای این پرواز تعریف نشده است.
-              </div>
-            )}
-          </div>
-        </section>
+              )}
 
-        {/* قیمت‌گذاری */}
-        <section className="mb-[15px] rounded-2xl border border-[#1f2a3d] bg-[#141d2e] px-[19px] py-[18px]">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-[#a78bfa]" />
-              <h2 className="m-0 text-[14.5px] font-extrabold text-white">قیمت‌گذاری</h2>
-            </div>
-            <button
-              type="button"
-              onClick={runAi}
-              disabled={aiLoading}
-              className="inline-flex items-center gap-2 rounded-[10px] bg-gradient-to-br from-[#7c3aed] to-[#6d28d9] px-4 py-2.5 text-xs font-extrabold text-white disabled:opacity-60"
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 3l1.9 4.6L18.5 9l-4.6 1.4L12 15l-1.9-4.6L5.5 9l4.6-1.4z" />
-              </svg>
-              {aiLoading ? 'در حال تحلیل…' : 'پیشنهاد قیمت هوش مصنوعی'}
-            </button>
-          </div>
-          <div className="mb-[13px] grid grid-cols-1 gap-[13px] sm:grid-cols-2">
-            <div>
-              <label className={labelClass} htmlFor="af-base">
-                قیمت پایهٔ شرکت (تومان)
-              </label>
-              <input
-                id="af-base"
-                dir="ltr"
-                placeholder="مثلاً ۶۸۰۰۰۰۰"
-                value={baseToman}
-                onChange={(e) => setBaseToman(e.target.value)}
-                className={`${inputClass} text-right`}
-              />
-            </div>
-            <div>
-              <label className={labelClass} htmlFor="af-comp">
-                قیمت رقبا (تومان)
-              </label>
-              <input
-                id="af-comp"
-                dir="ltr"
-                placeholder="برای تحلیل هوش مصنوعی لازم است"
-                value={compToman}
-                onChange={(e) => setCompToman(e.target.value)}
-                className={`${inputClass} text-right`}
-              />
-            </div>
-          </div>
-
-          {ai && (
-            <div className="mb-3.5 rounded-[13px] border border-[rgba(124,58,237,.32)] bg-[rgba(124,58,237,.08)] p-3.5">
-              <div className="mb-[9px] flex flex-wrap items-center justify-between gap-2.5">
-                <div className="flex items-center gap-2">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2">
-                    <path d="M12 3l1.9 4.6L18.5 9l-4.6 1.4L12 15l-1.9-4.6L5.5 9l4.6-1.4z" />
-                  </svg>
-                  <span className="text-[12.5px] font-extrabold text-[#c4b5fd]">پیشنهاد هوش مصنوعی</span>
-                </div>
-                <div className="text-left">
-                  <span className="text-[9.5px] text-[#8b7fb8]">قیمت پیشنهادی</span>
-                  <div className="text-[15px] font-black text-white">{faDigits(ai.priceToman.toLocaleString('en-US'))}</div>
-                </div>
-              </div>
-              <p className="mb-[9px] text-xs leading-[2] text-[#dbe3f0]">{ai.reason}</p>
-              <div className="flex flex-col gap-1.5">
-                {ai.factors.map((f) => (
-                  <div key={f} className="flex items-start gap-2 text-[11.5px] leading-[1.8] text-[#aebbd0]">
-                    <span className="mt-[7px] h-[5px] w-[5px] flex-none rounded-full bg-[#a78bfa]" />
-                    <span>{f}</span>
+              <div className="flex flex-col gap-[9px]">
+                {fares.map((c) => (
+                  <div
+                    key={c.tempId}
+                    className="rounded-xl border border-[#28344c] bg-[#18223a] p-[11px]"
+                  >
+                    <div className="mb-[9px] flex items-center justify-between">
+                      <div className="flex items-center gap-[7px]">
+                        <span
+                          dir="ltr"
+                          className="rounded-[7px] bg-[rgba(59,130,246,.14)] px-[9px] py-[3px] font-num text-[11px] font-black text-[#60a5fa]"
+                        >
+                          {c.classCode}
+                        </span>
+                        <span className="text-[11.5px] font-bold text-[#e7ecf3]">
+                          {c.cabinLabel}
+                        </span>
+                      </div>
+                      <div className="flex gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => openFareEdit(c)}
+                          className="rounded-lg bg-[rgba(59,130,246,.1)] px-2.5 py-1.5 text-[10.5px] font-bold text-[#60a5fa]"
+                        >
+                          ویرایش
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFares((list) =>
+                              list.filter((x) => x.tempId !== c.tempId),
+                            )
+                          }
+                          className="rounded-lg bg-[rgba(248,113,113,.1)] px-2.5 py-1.5 text-[10.5px] font-bold text-[#f87171]"
+                        >
+                          حذف
+                        </button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-[10.5px]">
+                      <div>
+                        <span className="text-[#6b7b94]">قیمت پایه</span>
+                        <div className="mt-0.5 font-bold text-[#e7ecf3]">
+                          {faMoney(c.priceIrr)} تومان
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-[#6b7b94]">مالیات و عوارض</span>
+                        <div className="mt-0.5 font-bold text-[#e7ecf3]">
+                          {faMoney(c.taxIrr)} تومان
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-[#6b7b94]">ظرفیت اختصاصی</span>
+                        <div className="mt-0.5 font-bold text-[#e7ecf3]">
+                          {faDigits(c.seatsAllocated)} صندلی
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-[#6b7b94]">سهمیه بار مجاز</span>
+                        <div className="mt-0.5 font-bold text-[#e7ecf3]">
+                          {c.baggageAllowanceKg
+                            ? `${faDigits(c.baggageAllowanceKg)} کیلوگرم`
+                            : "—"}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      <span
+                        className={`rounded-[14px] px-[9px] py-1 text-[10px] font-bold ${
+                          c.refundable
+                            ? "bg-[rgba(52,211,153,.14)] text-[#34d399]"
+                            : "bg-[rgba(248,113,113,.14)] text-[#f87171]"
+                        }`}
+                      >
+                        {c.refundable ? "استرداد‌پذیر" : "غیرقابل استرداد"}
+                      </span>
+                      <span
+                        className={`rounded-[14px] px-[9px] py-1 text-[10px] font-bold ${
+                          c.changeable
+                            ? "bg-[rgba(52,211,153,.14)] text-[#34d399]"
+                            : "bg-[rgba(248,113,113,.14)] text-[#f87171]"
+                        }`}
+                      >
+                        {c.changeable ? "قابل تغییر" : "غیرقابل تغییر"}
+                      </span>
+                      {c.allowedChannels.map((ch) => (
+                        <span
+                          key={ch}
+                          className="rounded-[14px] bg-[#0f1623] px-[9px] py-1 text-[10px] font-semibold text-[#9fb0c7]"
+                        >
+                          {CHANNEL_OPTS.find((o) => o.key === ch)?.label ?? ch}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 ))}
+                {fares.length === 0 && (
+                  <div className="px-4 py-4 text-center text-[11px] text-[#6b7b94]">
+                    هنوز کلاس نرخی برای این پرواز تعریف نشده است.
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            </section>
 
-          <div className="grid grid-cols-1 gap-[13px] sm:grid-cols-2">
-            <div>
-              <label className={labelClass} htmlFor="af-proposed">
-                نرخ پیشنهادی نهایی (تومان) *
-              </label>
-              <input
-                id="af-proposed"
-                dir="ltr"
-                placeholder="نرخ پیشنهادی برای مدیر عامل"
-                value={proposedToman}
-                onChange={(e) => setProposedToman(e.target.value)}
-                className={`${inputClass} border-[#3b4a6b] text-right`}
-              />
-            </div>
-            <div>
-              <label className="mb-[7px] block text-[11.5px] text-[#60a5fa]" htmlFor="af-legal">
-                نرخ قانونی / مصوب (تومان)
-              </label>
-              <input
-                id="af-legal"
-                dir="ltr"
-                placeholder="سقف نرخ مصوب سازمان"
-                value={legalToman}
-                onChange={(e) => setLegalToman(e.target.value)}
-                className={`${inputClass} text-right`}
-              />
-            </div>
-          </div>
-          <div className="mt-[13px]">
-            <label className={labelClass} htmlFor="af-note">
-              یادداشت برای مدیر عامل (اختیاری)
-            </label>
-            <textarea
-              id="af-note"
-              placeholder="توضیح دلیل قیمت پیشنهادی…"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              className="min-h-[66px] w-full resize-y rounded-[10px] border border-[#28344c] bg-[#0f1726] px-3 py-2.5 text-[12.5px] leading-[1.8] text-[#e7ecf3] outline-none"
-            />
-          </div>
-        </section>
+            {/* قیمت‌گذاری */}
+            <section className="mb-[15px] rounded-2xl border border-[#1f2a3d] bg-[#141d2e] px-[19px] py-[18px]">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-[#a78bfa]" />
+                  <h2 className="m-0 text-[14.5px] font-extrabold text-white">
+                    قیمت‌گذاری
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={runAi}
+                  disabled={aiLoading}
+                  className="inline-flex items-center gap-2 rounded-[10px] bg-gradient-to-br from-[#7c3aed] to-[#6d28d9] px-4 py-2.5 text-xs font-extrabold text-white disabled:opacity-60"
+                >
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M12 3l1.9 4.6L18.5 9l-4.6 1.4L12 15l-1.9-4.6L5.5 9l4.6-1.4z" />
+                  </svg>
+                  {aiLoading ? "در حال تحلیل…" : "پیشنهاد قیمت هوش مصنوعی"}
+                </button>
+              </div>
+              <div className="mb-[13px] grid grid-cols-1 gap-[13px] sm:grid-cols-2">
+                <MoneyInput
+                  id="af-base"
+                  label="قیمت پایهٔ شرکت (تومان)"
+                  valueToman={baseToman}
+                  onChangeToman={setBaseToman}
+                  testId="af-base-money"
+                />
+                <MoneyInput
+                  id="af-comp"
+                  label="قیمت رقبا (تومان)"
+                  valueToman={compToman}
+                  onChangeToman={setCompToman}
+                  testId="af-comp-money"
+                />
+              </div>
 
-        {error && (
-          <p role="alert" className="mb-3 text-xs text-[#f87171]">
-            {error}
-          </p>
+              {ai && (
+                <div className="mb-3.5 rounded-[13px] border border-[rgba(124,58,237,.32)] bg-[rgba(124,58,237,.08)] p-3.5">
+                  <div className="mb-[9px] flex flex-wrap items-center justify-between gap-2.5">
+                    <div className="flex items-center gap-2">
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#a78bfa"
+                        strokeWidth="2"
+                      >
+                        <path d="M12 3l1.9 4.6L18.5 9l-4.6 1.4L12 15l-1.9-4.6L5.5 9l4.6-1.4z" />
+                      </svg>
+                      <span className="text-[12.5px] font-extrabold text-[#c4b5fd]">
+                        پیشنهاد هوش مصنوعی
+                      </span>
+                    </div>
+                    <div className="text-left">
+                      <span className="text-[9.5px] text-[#8b7fb8]">
+                        قیمت پیشنهادی
+                      </span>
+                      <div className="text-[15px] font-black text-white">
+                        {faDigits(ai.priceToman.toLocaleString("en-US"))}
+                      </div>
+                    </div>
+                  </div>
+                  <p className="mb-[9px] text-xs leading-[2] text-[#dbe3f0]">
+                    {ai.reason}
+                  </p>
+                  <div className="flex flex-col gap-1.5">
+                    {ai.factors.map((f) => (
+                      <div
+                        key={f}
+                        className="flex items-start gap-2 text-[11.5px] leading-[1.8] text-[#aebbd0]"
+                      >
+                        <span className="mt-[7px] h-[5px] w-[5px] flex-none rounded-full bg-[#a78bfa]" />
+                        <span>{f}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 gap-[13px] sm:grid-cols-2">
+                <MoneyInput
+                  id="af-proposed"
+                  label="نرخ پیشنهادی نهایی (تومان) *"
+                  valueToman={proposedToman}
+                  onChangeToman={setProposedToman}
+                  testId="af-proposed-money"
+                />
+                <MoneyInput
+                  id="af-legal"
+                  label="نرخ قانونی / مصوب (تومان)"
+                  valueToman={legalToman}
+                  onChangeToman={setLegalToman}
+                  testId="af-legal-money"
+                />
+              </div>
+              <div className="mt-[13px]">
+                <label className={labelClass} htmlFor="af-note">
+                  یادداشت برای مدیر عامل (اختیاری)
+                </label>
+                <textarea
+                  id="af-note"
+                  placeholder="توضیح دلیل قیمت پیشنهادی…"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  className="min-h-[66px] w-full resize-y rounded-[10px] border border-[#28344c] bg-[#0f1726] px-3 py-2.5 text-[12.5px] leading-[1.8] text-[#e7ecf3] outline-none"
+                />
+              </div>
+            </section>
+
+            {error && (
+              <p role="alert" className="mb-3 text-xs text-[#f87171]">
+                {error}
+              </p>
+            )}
+
+            <div className="flex gap-[11px]">
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => void onSubmit()}
+                className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-[#3b82f6] text-[13.5px] font-extrabold text-white disabled:opacity-60"
+              >
+                <svg
+                  width="17"
+                  height="17"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M22 2L11 13M22 2l-7 20-4-9-9-4z" />
+                </svg>
+                {submitLabel}
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex h-12 items-center justify-center rounded-xl border border-[#28344c] bg-[#18223a] px-[22px] text-[13px] font-bold text-[#9fb0c7]"
+              >
+                انصراف
+              </button>
+            </div>
+          </>
         )}
-
-        <div className="flex gap-[11px]">
-          <button
-            type="button"
-            disabled={saving}
-            onClick={() => void onSubmit()}
-            className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-[#3b82f6] text-[13.5px] font-extrabold text-white disabled:opacity-60"
-          >
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M22 2L11 13M22 2l-7 20-4-9-9-4z" />
-            </svg>
-            {saving ? 'در حال ثبت…' : 'ثبت پرواز و ارسال قیمت برای تأیید مدیر عامل'}
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-12 items-center justify-center rounded-xl border border-[#28344c] bg-[#18223a] px-[22px] text-[13px] font-bold text-[#9fb0c7]"
-          >
-            انصراف
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -1056,7 +1374,9 @@ function CityDropdown({
           </button>
         ))}
         {cities.length === 0 && (
-          <div className="px-3 py-3.5 text-center text-[11.5px] text-[#6b7b94]">شهری یافت نشد.</div>
+          <div className="px-3 py-3.5 text-center text-[11.5px] text-[#6b7b94]">
+            شهری یافت نشد.
+          </div>
         )}
       </div>
     </>

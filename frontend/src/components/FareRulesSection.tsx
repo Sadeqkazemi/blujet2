@@ -6,6 +6,7 @@ import {
   updateFareRule,
 } from '../api/flights';
 import { faDigits, faMoney, latinDigits, parseTomanToRial } from '../lib/fa-format';
+import { CABIN_OPTIONS, cabinLabel, type CabinKind } from '../lib/flight-definition';
 import { formatJalaliDate } from '../lib/jalali';
 import type { CreateFareRulePayload, FareRuleRow } from '../types/flights';
 
@@ -16,7 +17,7 @@ const CHANNEL_LABELS: Record<string, string> = {
 };
 
 const EMPTY_FORM = {
-  cabin: 'ECONOMY' as 'ECONOMY' | 'BUSINESS',
+  cabin: 'ECONOMY' as CabinKind,
   classCode: '',
   priceToman: '',
   taxToman: '0',
@@ -150,7 +151,7 @@ export default function FareRulesSection({ instanceId }: FareRulesSectionProps) 
               <span className="font-bold text-ink">
                 <span className="ltr font-num inline-block">{r.classCode}</span>
                 {' · '}
-                {r.cabin === 'BUSINESS' ? 'بیزینس' : 'اکونومی'}
+                {cabinLabel(r.cabin)}
               </span>
               <span className="font-num text-muted">{faMoney(r.priceIrr)} تومان</span>
             </div>
@@ -192,12 +193,15 @@ export default function FareRulesSection({ instanceId }: FareRulesSectionProps) 
               value={form.cabin}
               disabled={!!editingId}
               onChange={(e) =>
-                setForm((f) => ({ ...f, cabin: e.target.value as 'ECONOMY' | 'BUSINESS' }))
+                setForm((f) => ({ ...f, cabin: e.target.value as CabinKind }))
               }
               className="h-9 rounded-lg border border-border px-2 text-xs outline-none disabled:opacity-60"
             >
-              <option value="ECONOMY">اکونومی</option>
-              <option value="BUSINESS">بیزینس</option>
+              {CABIN_OPTIONS.map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.label}
+                </option>
+              ))}
             </select>
             <input
               aria-label="کد کلاس"

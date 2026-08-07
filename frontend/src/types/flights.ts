@@ -1,4 +1,56 @@
-export type DerivedFlightStatus = 'ACTIVE' | 'SELLING' | 'FULL' | 'CANCELLED';
+import type {
+  CabinKind,
+  ChargeKind,
+  ChargeMethod,
+  FlightApprovalStatus,
+} from "../lib/flight-definition";
+
+export type DerivedFlightStatus = "ACTIVE" | "SELLING" | "FULL" | "CANCELLED";
+
+export type { CabinKind, ChargeKind, ChargeMethod, FlightApprovalStatus };
+
+export interface CabinCapacity {
+  cabin: CabinKind;
+  seats: number;
+}
+
+export interface ChargeRule {
+  id?: string;
+  title: string;
+  kind: ChargeKind;
+  method: ChargeMethod;
+  /** FIXED: IRR integer; PERCENT: basis points-free percent integer/decimal as number. */
+  amount: number;
+  cabin: CabinKind | "ALL";
+  validFrom: string | null;
+  validUntil: string | null;
+  active: boolean;
+}
+
+export interface ChargeBreakdownLine {
+  title: string;
+  kind: ChargeKind;
+  amountIrr: string;
+}
+
+export interface CalculatedChargeBreakdown {
+  basePriceIrr: string;
+  lines: ChargeBreakdownLine[];
+  totalSellableIrr: string;
+}
+
+export interface FlightDefinitionSnapshot {
+  flightNo: string;
+  originCode: string;
+  destCode: string;
+  departureAt: string;
+  durationMinutes: number;
+  aircraftType: string;
+  capacity: number;
+  cabinCapacities: CabinCapacity[];
+  basePriceIrr: string | null;
+  chargeRules: ChargeRule[];
+}
 
 export interface FlightRow {
   id: string;
@@ -13,6 +65,16 @@ export interface FlightRow {
   // on the backend — a JS number can't safely hold IRR amounts above 2^53).
   basePriceIrr: string | null;
   derivedStatus: DerivedFlightStatus;
+  durationMinutes?: number;
+  cabinCapacities?: CabinCapacity[];
+  chargeRules?: ChargeRule[];
+  calculatedChargeBreakdown?: CalculatedChargeBreakdown | null;
+  approvalStatus?: FlightApprovalStatus;
+  rejectionReason?: string | null;
+  canEdit?: boolean;
+  editBlockedReason?: string | null;
+  pendingRevision?: boolean;
+  approvedSnapshot?: FlightDefinitionSnapshot | null;
 }
 
 export interface FlightAiSuggestion {
@@ -29,9 +91,11 @@ export interface FlightAiSuggestion {
   generatedAt: string;
 }
 
-export interface FutureFlightRow extends Omit<FlightRow, 'derivedStatus'> {
+export interface FutureFlightRow extends Omit<FlightRow, "derivedStatus"> {
   agencySeatsAllocated: number | null;
   aiSuggestion: FlightAiSuggestion | null;
+  aircraftType?: string;
+  pricingRegistered?: boolean;
 }
 
 export interface CompletedFlightRow {
@@ -72,7 +136,11 @@ export interface AirportEntry {
 }
 
 export interface FlightDetail extends FlightRow {
-  channels: { channel: 'SYSTEM' | 'CHARTER' | 'AGENCY'; seats: number; revenueIrr: string }[];
+  channels: {
+    channel: "SYSTEM" | "CHARTER" | "AGENCY";
+    seats: number;
+    revenueIrr: string;
+  }[];
   totalRevenueIrr: string;
   occupancyPct: number;
   aircraftType: string;
@@ -96,7 +164,7 @@ export interface AllotmentRow {
   agencyId: string;
   agencyName: string;
   seatsAllocated: number;
-  type: 'SOFT' | 'HARD';
+  type: "SOFT" | "HARD";
   releaseAt: string | null;
   contractPriceIrr: string | null;
   createdAt: string;
@@ -106,7 +174,7 @@ export interface AllotmentRow {
 export interface FareRuleRow {
   id: string;
   flightInstanceId: string;
-  cabin: 'ECONOMY' | 'BUSINESS';
+  cabin: CabinKind;
   classCode: string;
   priceIrr: number;
   seatsAllocated: number;
@@ -116,11 +184,11 @@ export interface FareRuleRow {
   baggageAllowanceKg: number | null;
   validFrom: string | null;
   validUntil: string | null;
-  allowedChannels: ('SYSTEM' | 'CHARTER' | 'AGENCY')[];
+  allowedChannels: ("SYSTEM" | "CHARTER" | "AGENCY")[];
 }
 
 export interface CreateFareRulePayload {
-  cabin: 'ECONOMY' | 'BUSINESS';
+  cabin: CabinKind;
   classCode: string;
   priceIrr: number;
   seatsAllocated: number;
@@ -130,7 +198,38 @@ export interface CreateFareRulePayload {
   baggageAllowanceKg?: number;
   validFrom?: string;
   validUntil?: string;
-  allowedChannels?: ('SYSTEM' | 'CHARTER' | 'AGENCY')[];
+  allowedChannels?: ("SYSTEM" | "CHARTER" | "AGENCY")[];
+}
+
+export interface CreateFlightDefinitionPayload {
+  originCode: string;
+  destCode: string;
+  flightNo: string;
+  departureAt: string;
+  durationMinutes: number;
+  capacity: number;
+  cabinCapacities: CabinCapacity[];
+  basePriceIrr: number;
+  aircraftType?: string;
+  charterSeats?: number;
+  chargeRules?: Omit<ChargeRule, "id">[];
+  competitorPriceIrr?: number;
+}
+
+export interface UpdateFlightDefinitionPayload extends CreateFlightDefinitionPayload {}
+
+export interface FlightDefinitionDetail extends FlightRow {
+  aircraftType: string;
+  durationMinutes: number;
+  cabinCapacities: CabinCapacity[];
+  chargeRules: ChargeRule[];
+  calculatedChargeBreakdown: CalculatedChargeBreakdown | null;
+  approvalStatus: FlightApprovalStatus;
+  rejectionReason: string | null;
+  canEdit: boolean;
+  editBlockedReason: string | null;
+  pendingRevision: boolean;
+  approvedSnapshot: FlightDefinitionSnapshot | null;
 }
 
 export interface UpdateFareRulePayload {
@@ -142,5 +241,5 @@ export interface UpdateFareRulePayload {
   baggageAllowanceKg?: number;
   validFrom?: string;
   validUntil?: string;
-  allowedChannels?: ('SYSTEM' | 'CHARTER' | 'AGENCY')[];
+  allowedChannels?: ("SYSTEM" | "CHARTER" | "AGENCY")[];
 }

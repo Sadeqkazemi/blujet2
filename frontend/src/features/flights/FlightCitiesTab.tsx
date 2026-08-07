@@ -1,16 +1,19 @@
-import { useState } from 'react';
-import { createAirport } from '../../api/flights';
-import { faDigits, latinDigits } from '../../lib/fa-format';
-import type { AirportEntry } from '../../types/flights';
+import { useState } from "react";
+import { createAirport } from "../../api/flights";
+import { faDigits, latinDigits } from "../../lib/fa-format";
+import type { AirportEntry } from "../../types/flights";
 
 interface FlightCitiesTabProps {
   airports: AirportEntry[];
   onCreated: (airport: AirportEntry) => void;
 }
 
-export default function FlightCitiesTab({ airports, onCreated }: FlightCitiesTabProps) {
-  const [cityFa, setCityFa] = useState('');
-  const [code, setCode] = useState('');
+export default function FlightCitiesTab({
+  airports,
+  onCreated,
+}: FlightCitiesTabProps) {
+  const [cityFa, setCityFa] = useState("");
+  const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -21,18 +24,20 @@ export default function FlightCitiesTab({ airports, onCreated }: FlightCitiesTab
     const name = cityFa.trim();
     const iata = latinDigits(code.trim()).toUpperCase();
     if (!name || iata.length !== 3) {
-      setError('نام شهر و کد فرودگاه (۳ حرف) الزامی است.');
+      setError("نام شهر و کد فرودگاه (۳ حرف) الزامی است.");
       return;
     }
     setBusy(true);
     try {
       const created = await createAirport({ cityFa: name, code: iata });
-      setCityFa('');
-      setCode('');
-      setNotice(`شهر «${name}» اضافه شد و در جستجوی بلیط سایت نمایش داده می‌شود ✓`);
+      setCityFa("");
+      setCode("");
+      setNotice(
+        `شهر «${name}» اضافه شد و در جستجوی بلیط سایت نمایش داده می‌شود ✓`,
+      );
       onCreated(created);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'خطا در ثبت شهر.');
+      setError(e instanceof Error ? e.message : "خطا در ثبت شهر.");
     } finally {
       setBusy(false);
     }
@@ -44,7 +49,10 @@ export default function FlightCitiesTab({ airports, onCreated }: FlightCitiesTab
         <h2 className="mb-4 text-sm font-bold text-ink">افزودن شهر جدید</h2>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_auto]">
           <div>
-            <label htmlFor="city-name" className="mb-1 block text-[11px] font-bold text-muted">
+            <label
+              htmlFor="city-name"
+              className="mb-1 block text-[11px] font-bold text-muted"
+            >
               نام شهر *
             </label>
             <input
@@ -56,7 +64,10 @@ export default function FlightCitiesTab({ airports, onCreated }: FlightCitiesTab
             />
           </div>
           <div>
-            <label htmlFor="city-code" className="mb-1 block text-[11px] font-bold text-muted">
+            <label
+              htmlFor="city-code"
+              className="mb-1 block text-[11px] font-bold text-muted"
+            >
               کد فرودگاه *
             </label>
             <input
@@ -75,21 +86,26 @@ export default function FlightCitiesTab({ airports, onCreated }: FlightCitiesTab
               onClick={() => void onSubmit()}
               className="h-10 rounded-lg bg-accent px-5 text-xs font-bold text-white disabled:opacity-50"
             >
-              {busy ? 'در حال ثبت…' : 'افزودن شهر'}
+              {busy ? "در حال ثبت…" : "افزودن شهر"}
             </button>
           </div>
         </div>
         {error && <p className="mt-2 text-[11px] text-danger">{error}</p>}
-        {notice && <p className="mt-2 text-[11px] font-bold text-[#059669]">{notice}</p>}
+        {notice && (
+          <p className="mt-2 text-[11px] font-bold text-[#059669]">{notice}</p>
+        )}
         <p className="mt-3 text-[11px] text-muted">
-          این شهرها همان لیستی هستند که در باکس جستجوی بلیط در صفحهٔ اصلی سایت هم نمایش داده می‌شوند.
+          این شهرها همان لیستی هستند که در باکس جستجوی بلیط در صفحهٔ اصلی سایت
+          هم نمایش داده می‌شوند.
         </p>
       </section>
 
       <section className="rounded-xl border border-border bg-white">
         <div className="flex items-center justify-between border-b border-border px-5 py-3">
           <h2 className="text-sm font-bold text-ink">شهرهای دارای پرواز</h2>
-          <span className="text-[11px] text-muted">{faDigits(airports.length)} شهر</span>
+          <span className="text-[11px] text-muted">
+            {faDigits(airports.length)} شهر
+          </span>
         </div>
         <div className="overflow-x-auto">
           <div className="min-w-[480px]">
@@ -109,7 +125,9 @@ export default function FlightCitiesTab({ airports, onCreated }: FlightCitiesTab
               </div>
             ))}
             {airports.length === 0 && (
-              <p className="py-6 text-center text-xs text-muted">شهری ثبت نشده است.</p>
+              <p className="py-6 text-center text-xs text-muted">
+                شهری ثبت نشده است.
+              </p>
             )}
           </div>
         </div>

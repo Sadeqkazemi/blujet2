@@ -1,89 +1,140 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useAuth } from '../../hooks/useAuth';
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useAuth } from "../../hooks/useAuth";
 import {
   fetchCeoPricing,
   fetchCommercialPricing,
   registerProposal,
+  rejectProposal,
   runAiAnalysis,
   setLegalRate,
   upsertProposal,
-} from '../../api/pricing';
-import { fetchAirports } from '../../api/flights';
-import { faDigits, faMoney, parseTomanToRial } from '../../lib/fa-format';
-import { formatJalaliDate } from '../../lib/jalali';
-import { useStepUp } from '../../hooks/useStepUp';
-import Modal from '../../components/Modal';
-import Pagination from '../../components/Pagination';
-import { usePagination } from '../../hooks/usePagination';
+} from "../../api/pricing";
+import { fetchAirports } from "../../api/flights";
+import { faDigits, faMoney, parseTomanToRial } from "../../lib/fa-format";
+import { dayjs, formatJalaliDate } from "../../lib/jalali";
+import { cabinLabel, formatDurationFa } from "../../lib/flight-definition";
+import { useStepUp } from "../../hooks/useStepUp";
+import Modal from "../../components/Modal";
+import MoneyInput, { moneyInputToRial } from "../../components/MoneyInput";
+import Pagination from "../../components/Pagination";
+import { usePagination } from "../../hooks/usePagination";
 import type {
   CeoPricingResult,
   CommercialFlightRow,
   CommercialPricingResult,
   PricingProposal,
-} from '../../types/pricing';
-import type { AirportEntry } from '../../types/flights';
+} from "../../types/pricing";
+import type { AirportEntry } from "../../types/flights";
 
 /** Design hint-placeholder-count for commercial pricing rows = 5. */
 /** Global panel list rule: 10 records per page. */
 const COMMERCIAL_PRICING_PAGE_SIZE = 10;
 
 function routeCodes(p: {
-  flight: { flightNo?: string; route: { originCode: string; destCode: string } };
+  flight: {
+    flightNo?: string;
+    route: { originCode: string; destCode: string };
+  };
 }) {
   return `${p.flight.route.originCode} ← ${p.flight.route.destCode}`;
 }
 
 /** @deprecated alias — CEO list still uses airport codes. */
 function routeLabel(p: {
-  flight: { flightNo?: string; route: { originCode: string; destCode: string } };
+  flight: {
+    flightNo?: string;
+    route: { originCode: string; destCode: string };
+  };
 }) {
   return routeCodes(p);
 }
 
-function vsCompetitorLabel(proposed: string | number, competitor: string | number): string {
+function vsCompetitorLabel(
+  proposed: string | number,
+  competitor: string | number,
+): string {
   // Money fields are decimal STRINGs on the wire — parsed here for this
   // display-only ratio; individual proposal amounts are far below 2^53.
-  const delta = ((Number(proposed) - Number(competitor)) / Number(competitor)) * 100;
-  if (Math.abs(delta) < 1) return 'هم‌تراز رقبا';
+  const delta =
+    ((Number(proposed) - Number(competitor)) / Number(competitor)) * 100;
+  if (Math.abs(delta) < 1) return "هم‌تراز رقبا";
   const pct = faDigits(Math.abs(Math.round(delta)));
   return delta < 0 ? `${pct}٪ پایین‌تر از رقبا` : `${pct}٪ بالاتر از رقبا`;
 }
 
 function moneyOrDash(irr: string | number | null | undefined): string {
-  if (irr == null || irr === '') return '—';
+  if (irr == null || irr === "") return "—";
   const n = Number(irr);
-  if (!Number.isFinite(n) || n <= 0) return '—';
+  if (!Number.isFinite(n) || n <= 0) return "—";
   return `${faMoney(irr)} تومان`;
 }
 
 /** Match backend upsert: competitor ≈ base + 3% when no proposal yet. */
-function derivedCompetitorIrr(baseIrr: string | null | undefined): string | null {
-  if (baseIrr == null || baseIrr === '') return null;
+function derivedCompetitorIrr(
+  baseIrr: string | null | undefined,
+): string | null {
+  if (baseIrr == null || baseIrr === "") return null;
   const base = Number(baseIrr);
   if (!Number.isFinite(base) || base <= 0) return null;
   return String(Math.round((base * 1.03) / 100_000) * 100_000);
 }
 
+function formatDepartureTime(departureAt: string): string {
+  return faDigits(dayjs(departureAt).calendar("jalali").format("HH:mm"));
+}
+
+function cabinCapacitiesLabel(
+  rows: { cabin: string; seats: number }[] | undefined,
+): string {
+  if (!rows?.length) return "—";
+  return rows
+    .map(
+      (c) =>
+        `${cabinLabel(c.cabin as Parameters<typeof cabinLabel>[0])}: ${faDigits(c.seats)}`,
+    )
+    .join(" · ");
+}
+
 /** CEO view — «تعیین قیمت بلیط». */
 function CeoPricing() {
   const [data, setData] = useState<CeoPricingResult | null>(null);
+  const [airports, setAirports] = useState<AirportEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [aiRunning, setAiRunning] = useState(false);
   const [legalInputs, setLegalInputs] = useState<Record<string, string>>({});
   const [factorsOpen, setFactorsOpen] = useState<Record<string, boolean>>({});
-  const stepUp = useStepUp('PRICE_CAPACITY_CHANGE');
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const stepUp = useStepUp("PRICE_CAPACITY_CHANGE");
+
+  const cityByCode = useMemo(
+    () => new Map(airports.map((a) => [a.code, a.cityFa])),
+    [airports],
+  );
+
+  const persianRoute = useCallback(
+    (originCode: string, destCode: string) => {
+      const o = cityByCode.get(originCode) ?? originCode;
+      const d = cityByCode.get(destCode) ?? destCode;
+      return `${o} ← ${d}`;
+    },
+    [cityByCode],
+  );
 
   const load = useCallback(async () => {
     try {
       setData(await fetchCeoPricing());
     } catch {
-      setError('خطا در دریافت پیشنهادهای قیمت.');
+      setError("خطا در دریافت پیشنهادهای قیمت.");
     }
   }, []);
 
   useEffect(() => {
     void load();
+    fetchAirports()
+      .then(setAirports)
+      .catch(() => setAirports([]));
   }, [load]);
 
   async function onRunAi() {
@@ -93,56 +144,87 @@ function CeoPricing() {
     try {
       const result = await runAiAnalysis();
       if (!result.available) {
-        setError('سرویس تحلیل هوش مصنوعی در دسترس نیست؛ تأیید قیمت پیشنهادی همچنان ممکن است.');
+        setError(
+          "سرویس تحلیل هوش مصنوعی در دسترس نیست؛ تأیید قیمت پیشنهادی همچنان ممکن است.",
+        );
       } else {
-        setNotice('تحلیل کامل هوش مصنوعی (فصل، تعطیلات و رقبا) انجام و پیشنهاد قیمت ارائه شد ✓');
+        setNotice(
+          "تحلیل کامل هوش مصنوعی (فصل، تعطیلات و رقبا) انجام و پیشنهاد قیمت ارائه شد ✓",
+        );
       }
       await load();
     } catch {
-      setError('خطا در اجرای تحلیل هوش مصنوعی.');
+      setError("خطا در اجرای تحلیل هوش مصنوعی.");
     } finally {
       setAiRunning(false);
     }
   }
 
-  async function onRegister(p: PricingProposal, source: 'PROPOSED' | 'AI') {
+  async function onRegister(p: PricingProposal, source: "PROPOSED" | "AI") {
     setError(null);
     try {
       const fields = await stepUp.confirm();
       await registerProposal(p.id, source, fields);
-      setNotice('قیمت پرواز تأیید و ثبت شد ✓');
+      setNotice("قیمت پرواز تأیید و ثبت شد ✓");
       await load();
     } catch (e) {
-      if (e instanceof Error && e.message === 'CANCELLED') return;
-      setError(e instanceof Error ? e.message : 'خطا در ثبت قیمت.');
+      if (e instanceof Error && e.message === "CANCELLED") return;
+      setError(e instanceof Error ? e.message : "خطا در ثبت قیمت.");
     }
   }
 
   async function onSaveLegal(p: PricingProposal) {
-    const rial = parseTomanToRial(legalInputs[p.id] ?? '');
+    const rial = moneyInputToRial(legalInputs[p.id] ?? "");
     if (rial === null) {
-      setError('نرخ قانونی را وارد کنید');
+      setError("نرخ قانونی را وارد کنید");
       return;
     }
     try {
       await setLegalRate(p.id, rial);
-      setNotice('نرخ قانونی (مصوب) ثبت شد ✓');
-      setLegalInputs({ ...legalInputs, [p.id]: '' });
+      setNotice("نرخ قانونی (مصوب) ثبت شد ✓");
+      setLegalInputs({ ...legalInputs, [p.id]: "" });
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'خطا در ثبت نرخ قانونی.');
+      setError(e instanceof Error ? e.message : "خطا در ثبت نرخ قانونی.");
+    }
+  }
+
+  async function onReject(p: PricingProposal) {
+    if (!rejectReason.trim()) {
+      setError("دلیل رد درخواست را وارد کنید.");
+      return;
+    }
+    setError(null);
+    try {
+      const fields = await stepUp.confirm();
+      await rejectProposal(p.id, {
+        rejectionReason: rejectReason.trim(),
+        ...fields,
+      });
+      setRejectingId(null);
+      setRejectReason("");
+      setNotice("درخواست قیمت‌گذاری رد شد ✓");
+      await load();
+    } catch (e) {
+      if (e instanceof Error && e.message === "CANCELLED") return;
+      setError(e instanceof Error ? e.message : "خطا در رد درخواست.");
     }
   }
 
   const pending = data?.pending ?? [];
   const registered = data?.registered ?? [];
+  const pendingCount = data?.pendingApprovalsCount ?? pending.length;
   const pendingPager = usePagination(pending);
   const registeredPager = usePagination(registered);
 
-  function vsColor(proposed: string | number, competitor: string | number): string {
-    const delta = ((Number(proposed) - Number(competitor)) / Number(competitor)) * 100;
-    if (Math.abs(delta) < 1) return '#9fb0c7';
-    return delta < 0 ? '#34d399' : '#f87171';
+  function vsColor(
+    proposed: string | number,
+    competitor: string | number,
+  ): string {
+    const delta =
+      ((Number(proposed) - Number(competitor)) / Number(competitor)) * 100;
+    if (Math.abs(delta) < 1) return "#9fb0c7";
+    return delta < 0 ? "#34d399" : "#f87171";
   }
 
   return (
@@ -150,15 +232,20 @@ function CeoPricing() {
       <div className="mb-5">
         <h1 className="text-[20.5px] font-black text-white">تعیین قیمت بلیط</h1>
         <p className="mt-1 text-[11.5px] text-[#6b7b94]">
-          قیمت پیشنهادی مدیر بازرگانی، تحلیل هوش مصنوعی و تأیید نهایی مدیر عامل برای ثبت قیمت پرواز
+          قیمت پیشنهادی مدیر بازرگانی، تحلیل هوش مصنوعی و تأیید نهایی مدیر عامل
+          برای ثبت قیمت پرواز
         </p>
       </div>
 
       {error && (
-        <p className="mb-4 rounded-lg bg-[rgba(248,113,113,.12)] p-3 text-sm text-[#f87171]">{error}</p>
+        <p className="mb-4 rounded-lg bg-[rgba(248,113,113,.12)] p-3 text-sm text-[#f87171]">
+          {error}
+        </p>
       )}
       {notice && (
-        <p className="mb-4 rounded-lg bg-[rgba(16,185,129,.12)] p-3 text-sm text-[#34d399]">{notice}</p>
+        <p className="mb-4 rounded-lg bg-[rgba(16,185,129,.12)] p-3 text-sm text-[#34d399]">
+          {notice}
+        </p>
       )}
 
       <div className="mb-[15px] flex flex-wrap items-center justify-between gap-3.5 rounded-2xl border border-[#26324a] bg-gradient-to-br from-[#1a2740] to-[#141d2e] px-[18px] py-4">
@@ -167,9 +254,18 @@ function CeoPricing() {
             <span className="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-[rgba(59,130,246,.18)] text-[11px] font-extrabold text-[#60a5fa]">
               ۱
             </span>
-            <span className="text-xs text-[#cdd9ec]">۱ پیشنهاد مدیر بازرگانی</span>
+            <span className="text-xs text-[#cdd9ec]">
+              ۱ پیشنهاد مدیر بازرگانی
+            </span>
           </div>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#41506b" strokeWidth="2">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#41506b"
+            strokeWidth="2"
+          >
             <path d="M15 6l-6 6 6 6" />
           </svg>
           <div className="flex items-center gap-2">
@@ -178,14 +274,23 @@ function CeoPricing() {
             </span>
             <span className="text-xs text-[#cdd9ec]">۲ تحلیل هوش مصنوعی</span>
           </div>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#41506b" strokeWidth="2">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#41506b"
+            strokeWidth="2"
+          >
             <path d="M15 6l-6 6 6 6" />
           </svg>
           <div className="flex items-center gap-2">
             <span className="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-[rgba(16,185,129,.18)] text-[11px] font-extrabold text-[#34d399]">
               ۳
             </span>
-            <span className="text-xs text-[#cdd9ec]">۳ تأیید و ثبت مدیر عامل</span>
+            <span className="text-xs text-[#cdd9ec]">
+              ۳ تأیید و ثبت مدیر عامل
+            </span>
           </div>
         </div>
         <button
@@ -194,20 +299,36 @@ function CeoPricing() {
           disabled={aiRunning}
           className="inline-flex items-center gap-2 rounded-[11px] bg-gradient-to-br from-[#7c3aed] to-[#6d28d9] px-[18px] py-[11px] text-xs font-extrabold text-white transition disabled:opacity-60"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <path d="M12 3l1.9 4.6L18.5 9l-4.6 1.4L12 15l-1.9-4.6L5.5 9l4.6-1.4z" />
             <path d="M19 14l.8 2 .2.8-2-.8-.8.8" />
           </svg>
-          {aiRunning ? 'در حال تحلیل قیمت رقبا…' : 'تحلیل و پیشنهاد قیمت هوش مصنوعی'}
+          {aiRunning
+            ? "در حال تحلیل قیمت رقبا…"
+            : "تحلیل و پیشنهاد قیمت هوش مصنوعی"}
         </button>
       </div>
 
-      <div className="mb-3 flex items-center gap-2.5">
-        <span className="h-2 w-2 rounded-full bg-[#a78bfa]" />
-        <h2 className="m-0 text-sm font-extrabold text-white">در انتظار تأیید مدیر عامل</h2>
-        <span className="font-num rounded-xl bg-[rgba(167,139,250,.16)] px-2.5 py-0.5 text-[11px] font-extrabold text-[#a78bfa]">
-          {faDigits(pending.length)}
-        </span>
+      <div className="mb-3">
+        <div className="mb-1.5 flex items-center gap-2.5">
+          <span className="h-2 w-2 rounded-full bg-[#a78bfa]" />
+          <h2 className="m-0 text-sm font-extrabold text-white">
+            پروازهای در انتظار تأیید نهایی
+          </h2>
+          <span className="font-num rounded-xl bg-[rgba(167,139,250,.16)] px-2.5 py-0.5 text-[11px] font-extrabold text-[#a78bfa]">
+            {faDigits(pendingCount)}
+          </span>
+        </div>
+        <p className="text-[11.5px] leading-6 text-[#8494ac]">
+          پس از تأیید مدیرعامل، پرواز برای فروش فعال می‌شود.
+        </p>
       </div>
 
       {pending.length === 0 ? (
@@ -216,153 +337,372 @@ function CeoPricing() {
         </div>
       ) : (
         <div className="mb-4 flex flex-col gap-2.5">
-          {pendingPager.pageItems.map((p) => (
-            <div
-              key={p.id}
-              className="rounded-[13px] border border-[#1f2a3d] bg-[#141d2e] px-[17px] py-[15px]"
-            >
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="min-w-[180px] flex-1">
-                  <div className="mb-1 flex flex-wrap items-center gap-2">
-                    <span className="text-[17px] font-black text-white">
-                      {routeLabel(p.flightInstance)}
-                    </span>
-                    <span className="ltr font-num rounded-[7px] bg-[#0f1726] px-2.5 py-0.5 text-[11.5px] font-bold text-[#9fb0c7]">
-                      {p.flightInstance.flight.flightNo}
-                    </span>
-                  </div>
-                  <div className="font-num text-xs text-[#8494ac]">
-                    {formatJalaliDate(p.flightInstance.departureAt)} · ظرفیت{' '}
-                    {faDigits(p.flightInstance.capacity)} · چارتری{' '}
-                    {faDigits(p.flightInstance.charterSeats)} · {p.proposedBy.fullName}
-                  </div>
-                </div>
-                <div className="flex-none text-center">
-                  <div className="mb-0.5 text-[11px] text-[#8494ac]">رقبا</div>
-                  <div className="font-num whitespace-nowrap text-[15px] font-extrabold text-[#f59e0b]">
-                    {faMoney(p.competitorPriceIrr)} تومان
-                  </div>
-                </div>
-                <div className="flex-none text-center">
-                  <div className="mb-0.5 text-[11px] text-[#8fb4f5]">پیشنهاد بازرگانی</div>
-                  <div className="font-num whitespace-nowrap text-[15px] font-black text-white">
-                    {faMoney(p.proposedPriceIrr)} تومان
-                  </div>
-                  <div
-                    className="mt-0.5 text-[10.5px] font-bold"
-                    style={{ color: vsColor(p.proposedPriceIrr, p.competitorPriceIrr) }}
-                  >
-                    {vsCompetitorLabel(p.proposedPriceIrr, p.competitorPriceIrr)}
-                  </div>
-                </div>
-                {p.aiSuggestion && (
-                  <div className="flex-none border-s border-[#24304a] ps-[15px] text-center">
-                    <div className="mb-0.5 text-[11px] text-[#a78bfa]">هوش مصنوعی</div>
-                    <div className="font-num whitespace-nowrap text-[15px] font-black text-[#c4b5fd]">
-                      {faMoney(p.aiSuggestion.priceIrr)} تومان
+          {pendingPager.pageItems.map((p) => {
+            const fi = p.flightInstance;
+            const route = persianRoute(
+              fi.flight.route.originCode,
+              fi.flight.route.destCode,
+            );
+            const durationMin = p.durationMinutes ?? fi.durationMinutes;
+            const aircraft = p.aircraftType ?? fi.aircraftType;
+            const cabins = p.cabinCapacities ?? fi.cabinCapacities;
+            const rejecting = rejectingId === p.id;
+
+            return (
+              <div
+                key={p.id}
+                className="rounded-[13px] border border-[#1f2a3d] bg-[#141d2e] px-[17px] py-[15px]"
+              >
+                <div className="flex flex-wrap items-start gap-4">
+                  <div className="min-w-[200px] flex-1">
+                    <div className="mb-1 flex flex-wrap items-center gap-2">
+                      <span className="text-[17px] font-black text-white">
+                        {route}
+                      </span>
+                      <span className="ltr font-num rounded-[7px] bg-[#0f1726] px-2.5 py-0.5 text-[11.5px] font-bold text-[#9fb0c7]">
+                        {fi.flight.flightNo}
+                      </span>
+                    </div>
+                    <div className="font-num text-xs leading-6 text-[#8494ac]">
+                      {formatJalaliDate(fi.departureAt)} · ساعت{" "}
+                      {formatDepartureTime(fi.departureAt)}
+                      {durationMin != null
+                        ? ` · ${formatDurationFa(durationMin)}`
+                        : ""}
+                    </div>
+                    <div className="mt-1 text-[11px] leading-6 text-[#9fb0c7]">
+                      {aircraft ? (
+                        <span>
+                          هواپیما:{" "}
+                          <span className="font-bold text-[#cdd9ec]">
+                            {aircraft}
+                          </span>
+                        </span>
+                      ) : null}
+                      {aircraft && cabins?.length ? " · " : null}
+                      {cabins?.length ? (
+                        <span>
+                          کابین:{" "}
+                          <span className="font-bold text-[#cdd9ec]">
+                            {cabinCapacitiesLabel(cabins)}
+                          </span>
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="font-num mt-1 text-[11px] text-[#6b7b94]">
+                      پیشنهاددهنده: {p.proposedBy.fullName}
                     </div>
                   </div>
+                  <div className="flex flex-wrap gap-3">
+                    <div className="flex-none text-center">
+                      <div className="mb-0.5 text-[11px] text-[#8494ac]">
+                        قیمت پایه
+                      </div>
+                      <div className="font-num whitespace-nowrap text-[15px] font-extrabold text-[#93c5fd]">
+                        {faMoney(p.basePriceIrr)} تومان
+                      </div>
+                    </div>
+                    <div className="flex-none text-center">
+                      <div className="mb-0.5 text-[11px] text-[#8494ac]">
+                        رقبا
+                      </div>
+                      <div className="font-num whitespace-nowrap text-[15px] font-extrabold text-[#f59e0b]">
+                        {faMoney(p.competitorPriceIrr)} تومان
+                      </div>
+                    </div>
+                    <div className="flex-none text-center">
+                      <div className="mb-0.5 text-[11px] text-[#8fb4f5]">
+                        پیشنهاد بازرگانی
+                      </div>
+                      <div className="font-num whitespace-nowrap text-[15px] font-black text-white">
+                        {faMoney(p.proposedPriceIrr)} تومان
+                      </div>
+                      <div
+                        className="mt-0.5 text-[10.5px] font-bold"
+                        style={{
+                          color: vsColor(
+                            p.proposedPriceIrr,
+                            p.competitorPriceIrr,
+                          ),
+                        }}
+                      >
+                        {vsCompetitorLabel(
+                          p.proposedPriceIrr,
+                          p.competitorPriceIrr,
+                        )}
+                      </div>
+                    </div>
+                    {p.aiSuggestion && (
+                      <div className="flex-none border-s border-[#24304a] ps-[15px] text-center">
+                        <div className="mb-0.5 text-[11px] text-[#a78bfa]">
+                          هوش مصنوعی
+                        </div>
+                        <div className="font-num whitespace-nowrap text-[15px] font-black text-[#c4b5fd]">
+                          {faMoney(p.aiSuggestion.priceIrr)} تومان
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {(p.calculatedChargeBreakdown || p.chargeRules?.length) && (
+                  <div className="mt-3 rounded-[11px] border border-[#1c2740] bg-[#0f1726] px-3.5 py-[11px] text-[11px]">
+                    <div className="mb-1.5 font-bold text-[#cdd9ec]">
+                      جمع قابل فروش (با عوارض)
+                    </div>
+                    {p.calculatedChargeBreakdown ? (
+                      <>
+                        <ul className="mb-1.5 flex flex-col gap-1 text-[#8494ac]">
+                          {p.calculatedChargeBreakdown.lines.map((line, i) => (
+                            <li key={i} className="flex justify-between gap-3">
+                              <span>{line.title}</span>
+                              <span className="font-num font-bold text-[#e7ecf3]">
+                                {faMoney(line.amountIrr)} تومان
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                        <div className="font-num flex justify-between border-t border-[#24304a] pt-2 font-extrabold text-[#34d399]">
+                          <span>جمع نهایی</span>
+                          <span>
+                            {faMoney(
+                              p.calculatedChargeBreakdown.totalSellableIrr,
+                            )}{" "}
+                            تومان
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <ul className="flex flex-col gap-1 text-[#8494ac]">
+                        {p
+                          .chargeRules!.filter((r) => r.active)
+                          .map((rule, i) => (
+                            <li key={i}>
+                              {rule.title} (
+                              {rule.kind === "TAX" ? "مالیات" : "عوارض"}) —{" "}
+                              {rule.method === "FIXED"
+                                ? `${faMoney(rule.amount)} تومان`
+                                : `${faDigits(rule.amount)}٪`}
+                            </li>
+                          ))}
+                      </ul>
+                    )}
+                  </div>
                 )}
-                <div className="flex flex-none gap-2">
+
+                {p.changeSummary && p.changeSummary.length > 0 && (
+                  <div className="mt-3 rounded-[11px] border border-[rgba(245,158,11,.25)] bg-[rgba(245,158,11,.08)] px-3.5 py-[11px]">
+                    <div className="mb-1.5 text-[11.5px] font-extrabold text-[#fcd34d]">
+                      خلاصه تغییرات
+                    </div>
+                    <ul className="flex flex-col gap-1">
+                      {p.changeSummary.map((line, i) => (
+                        <li
+                          key={i}
+                          className="text-[11px] leading-6 text-[#dbe3f0]"
+                        >
+                          • {line}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {p.approvedSnapshot &&
+                  p.changeSummary &&
+                  p.changeSummary.length > 0 && (
+                    <div className="mt-2 text-[10.5px] leading-6 text-[#6b7b94]">
+                      نسخه تأییدشده قبلی: {p.approvedSnapshot.flightNo} ·{" "}
+                      {formatJalaliDate(p.approvedSnapshot.departureAt)} · ظرفیت{" "}
+                      {faDigits(p.approvedSnapshot.capacity)}
+                    </div>
+                  )}
+
+                <div className="mt-[13px] flex flex-wrap items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => void onRegister(p, 'PROPOSED')}
+                    onClick={() => void onRegister(p, "PROPOSED")}
                     className="whitespace-nowrap rounded-[10px] bg-[#16a34a] px-[15px] py-2.5 text-[12.5px] font-extrabold text-white"
                   >
-                    تأیید بازرگانی
+                    تأیید نهایی
                   </button>
                   {p.aiSuggestion && (
                     <button
                       type="button"
-                      onClick={() => void onRegister(p, 'AI')}
+                      onClick={() => void onRegister(p, "AI")}
                       className="whitespace-nowrap rounded-[10px] border-[1.5px] border-[rgba(124,58,237,.5)] px-[15px] py-2.5 text-[12.5px] font-extrabold text-[#c4b5fd]"
                     >
                       ثبت با AI
                     </button>
                   )}
+                  {!rejecting ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRejectingId(p.id);
+                        setRejectReason("");
+                        setError(null);
+                      }}
+                      className="whitespace-nowrap rounded-[10px] border border-[rgba(248,113,113,.45)] px-[15px] py-2.5 text-[12.5px] font-extrabold text-[#f87171]"
+                    >
+                      رد درخواست
+                    </button>
+                  ) : null}
                 </div>
-              </div>
 
-              <div className="mt-[13px] flex flex-wrap items-center gap-3 rounded-[11px] border border-[#1c2740] bg-[#0f1726] px-3.5 py-[11px]">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-[26px] w-[26px] flex-none items-center justify-center rounded-lg bg-[rgba(37,99,235,.16)] text-[#60a5fa]">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M3 21h18M6 21V10M10 21V10M14 21V10M18 21V10M4 10h16L12 3z" />
-                    </svg>
-                  </span>
-                  <span className="text-[12.5px] font-bold text-[#cdd9ec]">
-                    نرخ قانونی (مصوب سازمان هواپیمایی)
-                  </span>
-                </div>
-                <div className="flex min-w-[200px] flex-1 items-center gap-1.5">
-                  <input
-                    dir="ltr"
-                    value={legalInputs[p.id] ?? ''}
-                    onChange={(e) => setLegalInputs({ ...legalInputs, [p.id]: e.target.value })}
-                    placeholder="مبلغ به تومان"
-                    className="font-num h-9 min-w-[120px] flex-1 rounded-[9px] border border-[#2a3550] bg-[#141d2e] px-3 text-[12.5px] text-[#e7ecf3] outline-none focus:border-[#3b82f6]"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => void onSaveLegal(p)}
-                    className="whitespace-nowrap rounded-[9px] bg-[#2563eb] px-[15px] py-2 text-xs font-extrabold text-white"
-                  >
-                    ثبت نرخ قانونی
-                  </button>
-                </div>
-                <span className="font-num text-[11.5px] text-[#8494ac]">
-                  ثبت‌شده:{' '}
-                  <span className="font-extrabold text-[#93c5fd]">
-                    {p.legalRateIrr ? `${faMoney(p.legalRateIrr)} تومان` : '—'}
-                  </span>
-                </span>
-              </div>
+                {rejecting && (
+                  <div className="mt-3 rounded-[11px] border border-[rgba(248,113,113,.35)] bg-[rgba(248,113,113,.08)] px-3.5 py-3">
+                    <label
+                      className="mb-1.5 block text-[11.5px] font-bold text-[#fca5a5]"
+                      htmlFor={`reject-${p.id}`}
+                    >
+                      دلیل رد درخواست (الزامی)
+                    </label>
+                    <textarea
+                      id={`reject-${p.id}`}
+                      value={rejectReason}
+                      onChange={(e) => setRejectReason(e.target.value)}
+                      rows={3}
+                      placeholder="دلیل رد را برای مدیر بازرگانی بنویسید…"
+                      className="mb-2 w-full rounded-[10px] border border-[#28344c] bg-[#0f1726] px-3 py-2.5 text-[12.5px] leading-[1.8] text-[#e7ecf3] outline-none"
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void onReject(p)}
+                        className="rounded-[9px] bg-[#dc2626] px-[15px] py-2 text-xs font-extrabold text-white"
+                      >
+                        ثبت رد
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRejectingId(null);
+                          setRejectReason("");
+                        }}
+                        className="rounded-[9px] border border-[#28344c] bg-[#18223a] px-[15px] py-2 text-xs font-bold text-[#9fb0c7]"
+                      >
+                        انصراف
+                      </button>
+                    </div>
+                  </div>
+                )}
 
-              {p.aiSuggestion ? (
-                <div className="mt-[13px] rounded-xl border border-[rgba(124,58,237,.32)] bg-[rgba(124,58,237,.08)] px-3.5 py-[13px]">
-                  <div className="mb-2 flex flex-wrap items-center gap-2">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2">
-                      <path d="M12 3l1.9 4.6L18.5 9l-4.6 1.4L12 15l-1.9-4.6L5.5 9l4.6-1.4z" />
-                    </svg>
-                    <span className="text-[13px] font-extrabold text-[#c4b5fd]">تحلیل کامل هوش مصنوعی</span>
-                    <span className="rounded-xl bg-[rgba(59,130,246,.14)] px-2.5 py-0.5 text-[10.5px] font-bold text-[#93c5fd]">
-                      فصل: {p.aiSuggestion.season}
+                <div className="mt-[13px] flex flex-wrap items-end gap-3 rounded-[11px] border border-[#1c2740] bg-[#0f1726] px-3.5 py-[11px]">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-[26px] w-[26px] flex-none items-center justify-center rounded-lg bg-[rgba(37,99,235,.16)] text-[#60a5fa]">
+                      <svg
+                        width="15"
+                        height="15"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <path d="M3 21h18M6 21V10M10 21V10M14 21V10M18 21V10M4 10h16L12 3z" />
+                      </svg>
                     </span>
-                    <span className="rounded-xl bg-[rgba(202,165,58,.16)] px-2.5 py-0.5 text-[10.5px] font-bold text-[#fcd34d]">
-                      مناسبت: {p.aiSuggestion.occasion}
-                    </span>
-                    <span className="font-num rounded-xl bg-[rgba(16,185,129,.14)] px-2.5 py-0.5 text-[10.5px] font-bold text-[#34d399]">
-                      اطمینان: {faDigits(Math.round(p.aiSuggestion.confidence * 100))}٪
+                    <span className="text-[12.5px] font-bold text-[#cdd9ec]">
+                      نرخ قانونی (مصوب سازمان هواپیمایی)
                     </span>
                   </div>
-                  <p className="text-[12.5px] leading-[2] text-[#dbe3f0]">{p.aiSuggestion.reason}</p>
-                  {factorsOpen[p.id] && (
-                    <div className="mt-[11px] flex flex-col gap-1.5 border-t border-[rgba(124,58,237,.25)] pt-[11px]">
-                      {p.aiSuggestion.factors.map((f, i) => (
-                        <div key={i} className="flex items-start gap-2 text-xs leading-[1.8] text-[#aebbd0]">
-                          <span className="mt-[7px] h-1.5 w-1.5 flex-none rounded-full bg-[#a78bfa]" />
-                          <span>{f}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setFactorsOpen({ ...factorsOpen, [p.id]: !factorsOpen[p.id] })}
-                    className="mt-[11px] inline-flex items-center gap-1.5 text-[11.5px] font-bold text-[#c4b5fd]"
-                  >
-                    {factorsOpen[p.id] ? 'بستن جزئیات تحلیل' : 'مشاهدهٔ کامل عوامل تحلیل'}
-                  </button>
+                  <div className="flex min-w-[200px] flex-1 flex-wrap items-end gap-1.5">
+                    <MoneyInput
+                      id={`legal-${p.id}`}
+                      aria-label="نرخ قانونی تومان"
+                      valueToman={legalInputs[p.id] ?? ""}
+                      onChangeToman={(v) =>
+                        setLegalInputs({ ...legalInputs, [p.id]: v })
+                      }
+                      placeholder="مبلغ به تومان"
+                      className="min-w-[140px] flex-1"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void onSaveLegal(p)}
+                      className="whitespace-nowrap rounded-[9px] bg-[#2563eb] px-[15px] py-2 text-xs font-extrabold text-white"
+                    >
+                      ثبت نرخ قانونی
+                    </button>
+                  </div>
+                  <span className="font-num text-[11.5px] text-[#8494ac]">
+                    ثبت‌شده:{" "}
+                    <span className="font-extrabold text-[#93c5fd]">
+                      {p.legalRateIrr
+                        ? `${faMoney(p.legalRateIrr)} تومان`
+                        : "—"}
+                    </span>
+                  </span>
                 </div>
-              ) : (
-                p.note && (
-                  <p className="mt-[11px] text-xs leading-[1.9] text-[#8494ac]">
-                    یادداشت مدیر بازرگانی: {p.note}
-                  </p>
-                )
-              )}
-            </div>
-          ))}
+
+                {p.aiSuggestion ? (
+                  <div className="mt-[13px] rounded-xl border border-[rgba(124,58,237,.32)] bg-[rgba(124,58,237,.08)] px-3.5 py-[13px]">
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#a78bfa"
+                        strokeWidth="2"
+                      >
+                        <path d="M12 3l1.9 4.6L18.5 9l-4.6 1.4L12 15l-1.9-4.6L5.5 9l4.6-1.4z" />
+                      </svg>
+                      <span className="text-[13px] font-extrabold text-[#c4b5fd]">
+                        تحلیل کامل هوش مصنوعی
+                      </span>
+                      <span className="rounded-xl bg-[rgba(59,130,246,.14)] px-2.5 py-0.5 text-[10.5px] font-bold text-[#93c5fd]">
+                        فصل: {p.aiSuggestion.season}
+                      </span>
+                      <span className="rounded-xl bg-[rgba(202,165,58,.16)] px-2.5 py-0.5 text-[10.5px] font-bold text-[#fcd34d]">
+                        مناسبت: {p.aiSuggestion.occasion}
+                      </span>
+                      <span className="font-num rounded-xl bg-[rgba(16,185,129,.14)] px-2.5 py-0.5 text-[10.5px] font-bold text-[#34d399]">
+                        اطمینان:{" "}
+                        {faDigits(Math.round(p.aiSuggestion.confidence * 100))}٪
+                      </span>
+                    </div>
+                    <p className="text-[12.5px] leading-[2] text-[#dbe3f0]">
+                      {p.aiSuggestion.reason}
+                    </p>
+                    {factorsOpen[p.id] && (
+                      <div className="mt-[11px] flex flex-col gap-1.5 border-t border-[rgba(124,58,237,.25)] pt-[11px]">
+                        {p.aiSuggestion.factors.map((f, i) => (
+                          <div
+                            key={i}
+                            className="flex items-start gap-2 text-xs leading-[1.8] text-[#aebbd0]"
+                          >
+                            <span className="mt-[7px] h-1.5 w-1.5 flex-none rounded-full bg-[#a78bfa]" />
+                            <span>{f}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFactorsOpen({
+                          ...factorsOpen,
+                          [p.id]: !factorsOpen[p.id],
+                        })
+                      }
+                      className="mt-[11px] inline-flex items-center gap-1.5 text-[11.5px] font-bold text-[#c4b5fd]"
+                    >
+                      {factorsOpen[p.id]
+                        ? "بستن جزئیات تحلیل"
+                        : "مشاهدهٔ کامل عوامل تحلیل"}
+                    </button>
+                  </div>
+                ) : (
+                  p.note && (
+                    <p className="mt-[11px] text-xs leading-[1.9] text-[#8494ac]">
+                      یادداشت مدیر بازرگانی: {p.note}
+                    </p>
+                  )
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -377,7 +717,9 @@ function CeoPricing() {
         <section className="mt-1">
           <div className="mb-3 flex items-center gap-2.5">
             <span className="h-2 w-2 rounded-full bg-[#34d399]" />
-            <h2 className="m-0 text-sm font-extrabold text-white">قیمت‌های ثبت‌شده</h2>
+            <h2 className="m-0 text-sm font-extrabold text-white">
+              قیمت‌های ثبت‌شده
+            </h2>
             <span className="font-num rounded-xl bg-[rgba(16,185,129,.14)] px-2.5 py-0.5 text-[11px] font-extrabold text-[#34d399]">
               {faDigits(registered.length)}
             </span>
@@ -389,7 +731,14 @@ function CeoPricing() {
                 className="flex flex-wrap items-center gap-3 rounded-[13px] border border-[#1f2a3d] bg-[#141d2e] px-[15px] py-[13px]"
               >
                 <span className="flex h-[34px] w-[34px] flex-none items-center justify-center rounded-[10px] bg-[rgba(16,185,129,.14)] text-[#34d399]">
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
+                  <svg
+                    width="17"
+                    height="17"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.4"
+                  >
                     <path d="M20 6L9 17l-5-5" />
                   </svg>
                 </span>
@@ -399,7 +748,8 @@ function CeoPricing() {
                       {routeLabel(p.flightInstance)}
                     </span>
                     <span className="ltr font-num text-[10px] text-[#6b7b94]">
-                      {p.flightInstance.flight.flightNo} · {formatJalaliDate(p.flightInstance.departureAt)}
+                      {p.flightInstance.flight.flightNo} ·{" "}
+                      {formatJalaliDate(p.flightInstance.departureAt)}
                     </span>
                     <span className="rounded-[10px] bg-[rgba(59,130,246,.14)] px-2 py-0.5 text-[9.5px] font-extrabold text-[#93c5fd]">
                       قفل‌شده
@@ -407,11 +757,15 @@ function CeoPricing() {
                   </div>
                   <div className="font-num mt-0.5 text-[10.5px] text-[#6b7b94]">
                     پیشنهاد بازرگانی: {faMoney(p.proposedPriceIrr)} تومان
-                    {p.legalRateIrr ? ` · نرخ قانونی: ${faMoney(p.legalRateIrr)} تومان` : ''}
+                    {p.legalRateIrr
+                      ? ` · نرخ قانونی: ${faMoney(p.legalRateIrr)} تومان`
+                      : ""}
                   </div>
                 </div>
                 <div className="flex-none text-start">
-                  <div className="text-[9.5px] text-[#6b7b94]">قیمت ثبت‌شدهٔ پرواز</div>
+                  <div className="text-[9.5px] text-[#6b7b94]">
+                    قیمت ثبت‌شدهٔ پرواز
+                  </div>
                   <div className="font-num text-sm font-black text-[#34d399]">
                     {faMoney(p.registeredPriceIrr ?? p.proposedPriceIrr)} تومان
                   </div>
@@ -439,9 +793,9 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [selected, setSelected] = useState<CommercialFlightRow | null>(null);
-  const [proposedInput, setProposedInput] = useState('');
-  const [legalInput, setLegalInput] = useState('');
-  const [noteInput, setNoteInput] = useState('');
+  const [proposedInput, setProposedInput] = useState("");
+  const [legalInput, setLegalInput] = useState("");
+  const [noteInput, setNoteInput] = useState("");
   const [modalError, setModalError] = useState<string | null>(null);
 
   const cityByCode = useMemo(
@@ -451,8 +805,11 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
 
   const persianRoute = useCallback(
     (row: CommercialFlightRow) => {
-      const o = cityByCode.get(row.flight.route.originCode) ?? row.flight.route.originCode;
-      const d = cityByCode.get(row.flight.route.destCode) ?? row.flight.route.destCode;
+      const o =
+        cityByCode.get(row.flight.route.originCode) ??
+        row.flight.route.originCode;
+      const d =
+        cityByCode.get(row.flight.route.destCode) ?? row.flight.route.destCode;
       return `${o} ← ${d}`;
     },
     [cityByCode],
@@ -462,7 +819,7 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
     try {
       setData(await fetchCommercialPricing());
     } catch {
-      setError('خطا در دریافت فهرست قیمت‌گذاری.');
+      setError("خطا در دریافت فهرست قیمت‌گذاری.");
     }
   }, []);
 
@@ -481,33 +838,33 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
     btnBg: string;
     btnColor: string;
   } {
-    if (row.pricing?.status === 'REGISTERED') {
+    if (row.pricing?.status === "REGISTERED") {
       return {
-        label: 'تأییدشده و قفل‌شده',
-        color: '#34d399',
-        bg: 'rgba(16,185,129,.14)',
-        btn: 'قفل‌شده',
-        btnBg: '#18223a',
-        btnColor: '#6b7b94',
+        label: "تأییدشده و قفل‌شده",
+        color: "#34d399",
+        bg: "rgba(16,185,129,.14)",
+        btn: "قفل‌شده",
+        btnBg: "#18223a",
+        btnColor: "#6b7b94",
       };
     }
     if (row.pricing) {
       return {
-        label: 'در انتظار تأیید مدیر عامل',
-        color: '#a78bfa',
-        bg: 'rgba(167,139,250,.16)',
-        btn: 'ویرایش پیشنهاد',
-        btnBg: '#3b82f6',
-        btnColor: '#fff',
+        label: "در انتظار تأیید مدیر عامل",
+        color: "#a78bfa",
+        bg: "rgba(167,139,250,.16)",
+        btn: "ویرایش پیشنهاد",
+        btnBg: "#3b82f6",
+        btnColor: "#fff",
       };
     }
     return {
-      label: 'قیمت‌گذاری نشده',
-      color: '#8494ac',
-      bg: 'rgba(130,145,168,.12)',
-      btn: 'تعیین قیمت',
-      btnBg: '#3b82f6',
-      btnColor: '#fff',
+      label: "قیمت‌گذاری نشده",
+      color: "#8494ac",
+      bg: "rgba(130,145,168,.12)",
+      btn: "تعیین قیمت",
+      btnBg: "#3b82f6",
+      btnColor: "#fff",
     };
   }
 
@@ -516,24 +873,32 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
   }
 
   function competitorIrr(row: CommercialFlightRow): string | null {
-    return row.pricing?.competitorPriceIrr ?? derivedCompetitorIrr(baseIrr(row));
+    return (
+      row.pricing?.competitorPriceIrr ?? derivedCompetitorIrr(baseIrr(row))
+    );
   }
 
   function openModal(row: CommercialFlightRow) {
     setSelected(row);
     setModalError(null);
-    if (row.pricing && row.pricing.status !== 'REGISTERED') {
-      setProposedInput(String(Math.round(Number(row.pricing.proposedPriceIrr) / 10)));
-      setLegalInput(
-        row.pricing.legalRateIrr ? String(Math.round(Number(row.pricing.legalRateIrr) / 10)) : '',
+    if (row.pricing && row.pricing.status !== "REGISTERED") {
+      setProposedInput(
+        String(Math.round(Number(row.pricing.proposedPriceIrr) / 10)),
       );
-      setNoteInput(row.pricing.note ?? '');
+      setLegalInput(
+        row.pricing.legalRateIrr
+          ? String(Math.round(Number(row.pricing.legalRateIrr) / 10))
+          : "",
+      );
+      setNoteInput(row.pricing.note ?? "");
     } else {
       setProposedInput(
-        row.basePriceIrr ? String(Math.round(Number(row.basePriceIrr) / 10)) : '',
+        row.basePriceIrr
+          ? String(Math.round(Number(row.basePriceIrr) / 10))
+          : "",
       );
-      setLegalInput('');
-      setNoteInput('');
+      setLegalInput("");
+      setNoteInput("");
     }
   }
 
@@ -541,12 +906,14 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
     if (!selected) return;
     const rial = parseTomanToRial(proposedInput);
     if (rial === null) {
-      setModalError('نرخ پیشنهادی را وارد کنید');
+      setModalError("نرخ پیشنهادی را وارد کنید");
       return;
     }
-    const legalRial = legalInput.trim() ? parseTomanToRial(legalInput) : undefined;
+    const legalRial = legalInput.trim()
+      ? parseTomanToRial(legalInput)
+      : undefined;
     if (legalInput.trim() && legalRial === null) {
-      setModalError('نرخ قانونی معتبر نیست.');
+      setModalError("نرخ قانونی معتبر نیست.");
       return;
     }
     try {
@@ -555,35 +922,41 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
         legalRateIrr: legalRial ?? undefined,
         note: noteInput.trim() || undefined,
       });
-      setNotice('نرخ پیشنهادی برای تأیید به مدیر عامل ارسال شد ✓');
+      setNotice("نرخ پیشنهادی برای تأیید به مدیر عامل ارسال شد ✓");
       setSelected(null);
       await load();
     } catch (e) {
-      setModalError(e instanceof Error ? e.message : 'خطا در ارسال پیشنهاد.');
+      setModalError(e instanceof Error ? e.message : "خطا در ارسال پیشنهاد.");
     }
   }
 
   const flights = data?.flights ?? [];
   const flightsPager = usePagination(flights, COMMERCIAL_PRICING_PAGE_SIZE);
-  const locked = selected?.pricing?.status === 'REGISTERED';
+  const locked = selected?.pricing?.status === "REGISTERED";
 
   return (
-    <div className={embedded ? '' : 'px-[21px] pb-[34px] pt-[18px]'}>
+    <div className={embedded ? "" : "px-[21px] pb-[34px] pt-[18px]"}>
       {!embedded && (
         <div className="mb-6">
-          <h1 className="m-0 text-[20.5px] font-black text-white">تعیین قیمت پرواز و ارسال به مدیر عامل</h1>
+          <h1 className="m-0 text-[20.5px] font-black text-white">
+            تعیین قیمت پرواز و ارسال به مدیر عامل
+          </h1>
           <p className="mt-1 text-[11.5px] text-[#6b7b94]">
-            نرخ پیشنهادی و نرخ قانونی هر پرواز را تعیین کنید؛ پس از تأیید مدیر عامل، قیمت ثبت و قفل می‌شود و قابل
-            تغییر نخواهد بود.
+            نرخ پیشنهادی و نرخ قانونی هر پرواز را تعیین کنید؛ پس از تأیید مدیر
+            عامل، قیمت ثبت و قفل می‌شود و قابل تغییر نخواهد بود.
           </p>
         </div>
       )}
 
       {error && (
-        <p className="mb-4 rounded-lg bg-[rgba(248,113,113,.12)] p-3 text-sm text-[#f87171]">{error}</p>
+        <p className="mb-4 rounded-lg bg-[rgba(248,113,113,.12)] p-3 text-sm text-[#f87171]">
+          {error}
+        </p>
       )}
       {notice && (
-        <p className="mb-4 rounded-lg bg-[rgba(52,211,153,.12)] p-3 text-sm text-[#34d399]">{notice}</p>
+        <p className="mb-4 rounded-lg bg-[rgba(52,211,153,.12)] p-3 text-sm text-[#34d399]">
+          {notice}
+        </p>
       )}
 
       <div className="overflow-hidden rounded-[14px] border border-[#1f2a3d] bg-[#141d2e]">
@@ -593,8 +966,8 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
               تعیین قیمت پرواز و ارسال به مدیر عامل
             </h2>
             <p className="mt-1 text-[11.5px] text-[#6b7b94]">
-              نرخ پیشنهادی و نرخ قانونی هر پرواز را تعیین کنید؛ پس از تأیید مدیر عامل، قیمت ثبت و قفل می‌شود و
-              قابل تغییر نخواهد بود.
+              نرخ پیشنهادی و نرخ قانونی هر پرواز را تعیین کنید؛ پس از تأیید مدیر
+              عامل، قیمت ثبت و قفل می‌شود و قابل تغییر نخواهد بود.
             </p>
           </div>
         )}
@@ -616,7 +989,9 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
                 >
                   <div className="min-w-[170px] flex-1">
                     <div className="mb-[3px] flex flex-wrap items-center gap-2">
-                      <span className="text-[13.5px] font-extrabold text-[#e7ecf3]">{persianRoute(row)}</span>
+                      <span className="text-[13.5px] font-extrabold text-[#e7ecf3]">
+                        {persianRoute(row)}
+                      </span>
                       <span
                         dir="ltr"
                         className="rounded-[7px] bg-[#0f1623] px-2 py-0.5 font-num text-[10px] font-bold text-[#9fb0c7]"
@@ -625,28 +1000,38 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
                       </span>
                     </div>
                     <div className="text-[10.5px] text-[#6b7b94]">
-                      تاریخ {formatJalaliDate(row.departureAt)} · پایه {moneyOrDash(base)} · رقبا{' '}
-                      {moneyOrDash(comp)}
+                      تاریخ {formatJalaliDate(row.departureAt)} · پایه{" "}
+                      {moneyOrDash(base)} · رقبا {moneyOrDash(comp)}
                     </div>
                   </div>
 
                   <div className="flex-none text-center">
-                    <div className="mb-0.5 text-[9.5px] text-[#8494ac]">نرخ پیشنهادی</div>
+                    <div className="mb-0.5 text-[9.5px] text-[#8494ac]">
+                      نرخ پیشنهادی
+                    </div>
                     <div className="whitespace-nowrap text-[12.5px] font-extrabold text-[#e7ecf3]">
-                      {row.pricing ? moneyOrDash(row.pricing.proposedPriceIrr) : '—'}
+                      {row.pricing
+                        ? moneyOrDash(row.pricing.proposedPriceIrr)
+                        : "—"}
                     </div>
                   </div>
 
                   <div className="flex-none text-center">
-                    <div className="mb-0.5 text-[9.5px] text-[#60a5fa]">نرخ قانونی</div>
+                    <div className="mb-0.5 text-[9.5px] text-[#60a5fa]">
+                      نرخ قانونی
+                    </div>
                     <div className="whitespace-nowrap text-[12.5px] font-extrabold text-[#93c5fd]">
-                      {row.pricing?.legalRateIrr ? moneyOrDash(row.pricing.legalRateIrr) : '—'}
+                      {row.pricing?.legalRateIrr
+                        ? moneyOrDash(row.pricing.legalRateIrr)
+                        : "—"}
                     </div>
                   </div>
 
-                  {row.pricing?.status === 'REGISTERED' && (
+                  {row.pricing?.status === "REGISTERED" && (
                     <div className="flex-none text-center">
-                      <div className="mb-0.5 text-[9.5px] text-[#34d399]">قیمت قفل‌شده</div>
+                      <div className="mb-0.5 text-[9.5px] text-[#34d399]">
+                        قیمت قفل‌شده
+                      </div>
                       <div className="whitespace-nowrap text-[12.5px] font-black text-[#34d399]">
                         {moneyOrDash(row.pricing.registeredPriceIrr)}
                       </div>
@@ -663,7 +1048,7 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
                   <button
                     type="button"
                     onClick={() => openModal(row)}
-                    disabled={st.btn === 'قفل‌شده'}
+                    disabled={st.btn === "قفل‌شده"}
                     className="flex-none whitespace-nowrap rounded-[9px] px-[15px] py-[9px] text-[11.5px] font-extrabold disabled:cursor-default"
                     style={{ background: st.btnBg, color: st.btnColor }}
                   >
@@ -684,19 +1069,26 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
       />
 
       {selected && (
-        <Modal title={`تعیین قیمت پرواز — ${persianRoute(selected)}`} onClose={() => setSelected(null)}>
+        <Modal
+          title={`تعیین قیمت پرواز — ${persianRoute(selected)}`}
+          onClose={() => setSelected(null)}
+        >
           <div className="mb-1 font-num text-[11px] text-[#6b7b94]" dir="ltr">
             {selected.flight.flightNo}
           </div>
           <div className="mb-3.5 grid grid-cols-2 gap-2.5">
             <div className="rounded-[11px] border border-[#22304a] bg-[#0f1623] px-[13px] py-[11px]">
-              <div className="mb-1.5 text-[10.5px] text-[#6b7b94]">قیمت پایهٔ شرکت</div>
+              <div className="mb-1.5 text-[10.5px] text-[#6b7b94]">
+                قیمت پایهٔ شرکت
+              </div>
               <div className="font-num text-[13.5px] font-extrabold text-[#cdd9ec]">
                 {moneyOrDash(baseIrr(selected))}
               </div>
             </div>
             <div className="rounded-[11px] border border-[#22304a] bg-[#0f1623] px-[13px] py-[11px]">
-              <div className="mb-1.5 text-[10.5px] text-[#6b7b94]">قیمت رقبا</div>
+              <div className="mb-1.5 text-[10.5px] text-[#6b7b94]">
+                قیمت رقبا
+              </div>
               <div className="font-num text-[13.5px] font-extrabold text-[#f59e0b]">
                 {moneyOrDash(competitorIrr(selected))}
               </div>
@@ -713,19 +1105,26 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
               </p>
               {selected.pricing?.legalRateIrr && (
                 <p className="font-num mt-1.5 text-[11px] text-[#8494ac]">
-                  نرخ قانونی ثبت‌شده: {moneyOrDash(selected.pricing.legalRateIrr)}
+                  نرخ قانونی ثبت‌شده:{" "}
+                  {moneyOrDash(selected.pricing.legalRateIrr)}
                 </p>
               )}
-              <p className="mt-1 text-[11px] text-[#8494ac]">این قیمت دیگر قابل تغییر نیست.</p>
+              <p className="mt-1 text-[11px] text-[#8494ac]">
+                این قیمت دیگر قابل تغییر نیست.
+              </p>
             </div>
           ) : (
             <>
               {selected.pricing && (
                 <p className="mb-[13px] flex items-center gap-[7px] rounded-[10px] border border-[rgba(167,139,250,.3)] bg-[rgba(167,139,250,.1)] px-3 py-[9px] text-[11px] text-[#c4b5fd]">
-                  این پیشنهاد در انتظار تأیید مدیر عامل است؛ می‌توانید تا زمان تأیید آن را ویرایش کنید.
+                  این پیشنهاد در انتظار تأیید مدیر عامل است؛ می‌توانید تا زمان
+                  تأیید آن را ویرایش کنید.
                 </p>
               )}
-              <label className="mb-1.5 block text-[11.5px] text-[#9fb0c7]" htmlFor="proposed-input">
+              <label
+                className="mb-1.5 block text-[11.5px] text-[#9fb0c7]"
+                htmlFor="proposed-input"
+              >
                 نرخ پیشنهادی (تومان)
               </label>
               <input
@@ -736,7 +1135,10 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
                 placeholder="مثلاً ۳۸۵۰۰۰۰"
                 className="font-num h-11 w-full rounded-[10px] border border-[#28344c] bg-[#0f1726] px-3 text-right text-[13px] text-[#e7ecf3] outline-none"
               />
-              <label className="mb-1.5 mt-3 block text-[11.5px] text-[#9fb0c7]" htmlFor="legal-input">
+              <label
+                className="mb-1.5 mt-3 block text-[11.5px] text-[#9fb0c7]"
+                htmlFor="legal-input"
+              >
                 نرخ قانونی / مصوب سازمان هواپیمایی (تومان)
               </label>
               <input
@@ -747,7 +1149,10 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
                 placeholder="سقف نرخ مصوب"
                 className="font-num h-11 w-full rounded-[10px] border border-[#28344c] bg-[#0f1726] px-3 text-right text-[13px] text-[#e7ecf3] outline-none"
               />
-              <label className="mb-1.5 mt-3 block text-[11.5px] text-[#9fb0c7]" htmlFor="note-input">
+              <label
+                className="mb-1.5 mt-3 block text-[11.5px] text-[#9fb0c7]"
+                htmlFor="note-input"
+              >
                 یادداشت برای مدیر عامل (اختیاری)
               </label>
               <textarea
@@ -767,7 +1172,14 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
                 onClick={() => void onSubmit()}
                 className="mt-4 flex h-[46px] w-full items-center justify-center gap-2 rounded-[11px] bg-[#3b82f6] text-[13px] font-extrabold text-white"
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <path d="M22 2L11 13M22 2l-7 20-4-9-9-4z" />
                 </svg>
                 ارسال نرخ پیشنهادی برای تأیید مدیر عامل
@@ -780,9 +1192,13 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
   );
 }
 
-export default function PricingPage({ embedded = false }: { embedded?: boolean }) {
+export default function PricingPage({
+  embedded = false,
+}: {
+  embedded?: boolean;
+}) {
   const { user } = useAuth();
-  return user?.role === 'COMMERCIAL_MANAGER' || user?.role === 'EMPLOYEE' ? (
+  return user?.role === "COMMERCIAL_MANAGER" || user?.role === "EMPLOYEE" ? (
     <CommercialPricing embedded={embedded} />
   ) : (
     <CeoPricing />

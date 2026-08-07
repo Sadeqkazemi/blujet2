@@ -1,46 +1,60 @@
-import { apiGet, apiPatch, apiPost, apiDelete } from './http';
+import { apiGet, apiPatch, apiPost, apiDelete, apiRequest } from "./http";
 import type {
   AircraftTypeOption,
   AirportEntry,
   AllotmentRow,
   CreateFareRulePayload,
+  CreateFlightDefinitionPayload,
   FareRuleRow,
+  FlightDefinitionDetail,
   FlightDetail,
   FlightRow,
   FlightsOverview,
   PlanResult,
   UpdateFareRulePayload,
-} from '../types/flights';
+  UpdateFlightDefinitionPayload,
+} from "../types/flights";
 
 export function fetchFlightsOverview() {
-  return apiGet<FlightsOverview>('/flights/overview');
+  return apiGet<FlightsOverview>("/flights/overview");
 }
 
 export function fetchAirports() {
-  return apiGet<AirportEntry[]>('/flights/airports');
+  return apiGet<AirportEntry[]>("/flights/airports");
 }
 
-export function createAirport(payload: { cityFa: string; code: string; tz?: string }) {
-  return apiPost<AirportEntry>('/flights/airports', payload);
+export function createAirport(payload: {
+  cityFa: string;
+  code: string;
+  tz?: string;
+}) {
+  return apiPost<AirportEntry>("/flights/airports", payload);
 }
 
 export function fetchAircraftTypes() {
-  return apiGet<AircraftTypeOption[]>('/flights/aircraft-types');
+  return apiGet<AircraftTypeOption[]>("/flights/aircraft-types");
 }
 
-export interface CreateFlightPayload {
-  originCode: string;
-  destCode: string;
-  flightNo: string;
-  departureAt: string;
-  capacity: number;
-  basePriceIrr: number;
-  aircraftType?: string;
-  charterSeats?: number;
-}
+export interface CreateFlightPayload extends CreateFlightDefinitionPayload {}
 
 export function createFlight(payload: CreateFlightPayload) {
-  return apiPost<FlightRow>('/flights', payload);
+  return apiPost<FlightRow>("/flights", payload);
+}
+
+/** Expected: GET /flights/:id/definition — full editable flight definition. */
+export function fetchFlightDefinition(id: string) {
+  return apiGet<FlightDefinitionDetail>(`/flights/${id}/definition`);
+}
+
+/** Expected: PUT /flights/:id/definition — create/update specs (may open CEO revision). */
+export function updateFlightDefinition(
+  id: string,
+  payload: UpdateFlightDefinitionPayload,
+) {
+  return apiRequest<FlightDefinitionDetail>(`/flights/${id}/definition`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
 }
 
 export function fetchFlightDetail(id: string) {
@@ -71,7 +85,9 @@ export function changeFlightAircraft(
 }
 
 export function runFlightsAiAnalysis() {
-  return apiPost<{ analyzed: number; available: boolean }>('/flights/ai-analysis');
+  return apiPost<{ analyzed: number; available: boolean }>(
+    "/flights/ai-analysis",
+  );
 }
 
 export function fetchAllotments(instanceId: string) {
@@ -83,7 +99,7 @@ export function createAllotment(
   dto: {
     agencyId: string;
     seatsAllocated: number;
-    type?: 'SOFT' | 'HARD';
+    type?: "SOFT" | "HARD";
     releaseAt?: string;
     contractPriceIrr?: number;
   },
@@ -92,7 +108,9 @@ export function createAllotment(
 }
 
 export function deleteAllotment(instanceId: string, allotmentId: string) {
-  return apiDelete<{ id: string }>(`/flights/${instanceId}/allotments/${allotmentId}`);
+  return apiDelete<{ id: string }>(
+    `/flights/${instanceId}/allotments/${allotmentId}`,
+  );
 }
 
 export function fetchFareRules(instanceId: string) {
@@ -103,10 +121,19 @@ export function createFareRule(instanceId: string, dto: CreateFareRulePayload) {
   return apiPost<FareRuleRow>(`/flights/${instanceId}/fare-rules`, dto);
 }
 
-export function updateFareRule(instanceId: string, ruleId: string, dto: UpdateFareRulePayload) {
-  return apiPatch<FareRuleRow>(`/flights/${instanceId}/fare-rules/${ruleId}`, dto);
+export function updateFareRule(
+  instanceId: string,
+  ruleId: string,
+  dto: UpdateFareRulePayload,
+) {
+  return apiPatch<FareRuleRow>(
+    `/flights/${instanceId}/fare-rules/${ruleId}`,
+    dto,
+  );
 }
 
 export function deleteFareRule(instanceId: string, ruleId: string) {
-  return apiDelete<{ success: boolean }>(`/flights/${instanceId}/fare-rules/${ruleId}`);
+  return apiDelete<{ success: boolean }>(
+    `/flights/${instanceId}/fare-rules/${ruleId}`,
+  );
 }
