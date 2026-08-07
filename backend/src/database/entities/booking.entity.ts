@@ -78,7 +78,7 @@ export class Booking {
 
   @ManyToOne(() => AgencyAllotment, {
     onDelete: 'RESTRICT',
-    onUpdate: 'CASCADE',
+    onUpdate: 'CASCADE',@Column({ type: 'jsonb', default: [] })
   })
   @JoinColumn({
     name: 'allotmentId',
