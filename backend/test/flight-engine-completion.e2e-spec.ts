@@ -197,7 +197,7 @@ describe('Flight engine completion', () => {
     });
     // an infeasible second leg 10 minutes after arrival must NOT be used
     await makeInstance({
-      originCode: 'SRY',
+      originCode: 'SRY',seatCode: '11A'
       destCode: 'ADU',
       flightNo: 'BJ-83',
       departureAt: new Date(leg1.arrivalAt.getTime() + 10 * 60_000),
