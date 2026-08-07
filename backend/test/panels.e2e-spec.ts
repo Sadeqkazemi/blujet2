@@ -73,7 +73,6 @@ describe('Panels (e2e)', () => {
     const keys = res.body.data.map((t: { key: string }) => t.key);
     expect(keys).toEqual([
       'dashboard',
-      'customers',
       'admins',
       'finance',
       'cartable',
@@ -99,6 +98,7 @@ describe('Panels (e2e)', () => {
     const keys = res.body.data.map((t: { key: string }) => t.key);
     expect(keys).toEqual([
       'dashboard',
+      'customers',
       'admins',
       'finance',
       'cartable',
