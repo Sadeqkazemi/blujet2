@@ -387,9 +387,11 @@ stays untouched on the same page).
   cabinCapacities[{cabin: ECONOMY|COMFORT|BUSINESS, seats}], basePriceIrr
   (decimal string), aircraftType?, charterSeats?, chargeRules?,
   competitorPriceIrr? }`. Cabin capacities must fit the aircraft seat-map
-  (COMFORT requires real comfort rows; never merged into ECONOMY). Starts
-  as `definitionStatus=DRAFT`. Then `PUT /pricing/flights/:id/proposal`
-  → `PENDING_CEO`; CEO register → `APPROVED` (bookable).
+  (COMFORT requires real comfort rows; never merged into ECONOMY). The flight,
+  charge rules and exactly one initial pricing proposal are created in one
+  transaction and returned as `definitionStatus=PENDING_CEO`; CEO register →
+  `APPROVED` (bookable). `PUT /pricing/flights/:id/proposal` may refine the
+  proposed/legal rate, but is no longer required for CEO visibility.
 - GET `/flights/:id/definition` — editable definition detail (real sold /
   derivedStatus). Under `PENDING_REVISION`, form fields come from
   `pendingRevisionSnapshot` (includes `charterSeats`); live approved

@@ -62,6 +62,8 @@ describe('Phase 18 — SITE_ADMIN + EMPLOYEE panel access (e2e)', () => {
         channel: 'SYSTEM',
         status: 'TICKETED',
         priceIrr: 20_000_000n,
+        extrasSnapshot: [],
+        extrasIrr: 0n,
       }),
     );
     const refundRepo = dataSource.getRepository(RefundRequest);

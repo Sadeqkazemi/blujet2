@@ -34,14 +34,15 @@ export class Booking {
     this.id ??= randomUUID();
   }
 
-  /** The `bigintTransformer` maps `undefined` to `null` (never omits the
-   * column), so an unset `taxIrr` would insert a literal NULL instead of
-   * falling through to the DB's `default: 0` — every TypeORM `.create()`
-   * needs this defaulted explicitly. */
+  /** TypeORM transformers map `undefined` to `null` instead of omitting the
+   * column, so entity defaults must be applied before every insert. This also
+   * keeps staff, agency, and customer booking channels on the same snapshot
+   * contract. */
   @BeforeInsert()
   defaultTaxIrr() {
     this.taxIrr ??= 0n;
     this.extrasIrr ??= 0n;
+    this.extrasSnapshot ??= [];
   }
 
   @Column({ type: 'text' })

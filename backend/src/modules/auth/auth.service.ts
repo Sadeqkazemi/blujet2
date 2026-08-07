@@ -212,7 +212,6 @@ export class AuthService {
           where: { role, isActive: true, deletedAt: IsNull() },
           select: { id: true, fullName: true, role: true, username: true },
           order: { createdAt: 'ASC' },
-          take: 100,
         }),
       ),
     );
