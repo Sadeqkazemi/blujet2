@@ -1,106 +1,28 @@
-name: CI & Deploy
+name: Deploy UAT
 
 on:
   workflow_dispatch:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: uat-deployment
+  cancel-in-progress: false
 
 jobs:
-  backend:
-    if: github.event_name != 'workflow_dispatch'
-    # Spread independent jobs across hosted-runner image pools. A single
-    # saturated image queue must not block the complete UAT deployment.
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: blujet
-          POSTGRES_PASSWORD: blujet
-          POSTGRES_DB: blujet_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U blujet"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-    defaults:
-      run:
-        working-directory: backend
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: backend/package-lock.json
-      - run: npm ci
-      - run: cp .env.test .env
-      - run: npm run migration:run
-      # E2E suites expect seeded staff/users/flights (ceo, finance, …).
-      # Migrations alone leave an empty schema → systemic 401 / User-not-found.
-      - run: npm run seed
-      - run: npm run lint
-      - run: npm run build
-      - run: npm test
-      - run: npm run test:e2e
-
-  frontend:
-    if: github.event_name != 'workflow_dispatch'
-    runs-on: ubuntu-24.04
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run build
-      - run: npm test
-
-  ml-service:
-    if: github.event_name != 'workflow_dispatch'
-    runs-on: ubuntu-20.04
-    defaults:
-      run:
-        working-directory: ml-service
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - run: pip install -e ".[dev]"
-      - run: pytest
+  ci:
+    name: Required CI
+    uses: ./.github/workflows/ci.yml
 
   deploy:
-    needs: [backend, frontend, ml-service]
-    if: >-
-      always() &&
-      github.ref == 'refs/heads/main' &&
-      (github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'push' &&
-      needs.backend.result == 'success' &&
-      needs.frontend.result == 'success' &&
-      needs['ml-service'].result == 'success'))
-    # Manual recovery uses the ARM pool and skips already-passed test jobs.
+    name: Deploy exact commit
+    needs: ci
+    environment: uat
     runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
     steps:
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1
@@ -109,15 +31,27 @@ jobs:
           # rather than interpolated as literal text into the script -
           # the value never appears in the rendered workflow/script string.
           UAT_PANEL_SHARED_PASSWORD: ${{ secrets.UAT_PANEL_SHARED_PASSWORD }}
+          DEPLOY_SHA: ${{ github.sha }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          envs: UAT_PANEL_SHARED_PASSWORD
+          envs: UAT_PANEL_SHARED_PASSWORD,DEPLOY_SHA
           script: |
             set -e
             cd /opt/app
-            git pull origin main
+            case "${DEPLOY_SHA:-}" in
+              ''|*[!0-9a-f]*)
+                echo "Refusing deploy: invalid commit SHA." >&2
+                exit 1
+                ;;
+            esac
+            if [ "${#DEPLOY_SHA}" -ne 40 ]; then
+              echo "Refusing deploy: commit SHA must have 40 characters." >&2
+              exit 1
+            fi
+            git fetch --no-tags origin "$DEPLOY_SHA"
+            git checkout --detach "$DEPLOY_SHA"
             # This host is the owner-approved UAT sandbox. Keep the backend
             # mock OTP and the matching frontend notice in sync for every
             # compose build/recreation without writing secrets to the repo.

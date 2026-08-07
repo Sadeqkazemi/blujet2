@@ -79,8 +79,12 @@ for a real incident to find out backups are broken.
 
 ## Rolling back a bad deploy
 
-Deploys happen via GitHub Actions on push to `main`. To roll back to the
-previous commit:
+Deployments are serialized by the GitHub `uat` environment and always check
+out the exact workflow commit SHA. The preferred rollback is a reviewed revert
+PR to `main`; after merge, the normal workflow deploys that revert commit.
+
+For an active incident only, an operator may temporarily restore the previous
+commit on the server while the revert PR is being prepared:
 
 ```bash
 cd /opt/app
@@ -88,10 +92,12 @@ git log --oneline -5              # find the last good commit SHA
 git checkout <good-sha>
 docker compose -f docker-compose.prod.yml build
 docker compose -f docker-compose.prod.yml up -d
-git checkout main                 # return HEAD to main once stable
+git checkout --detach <good-sha>
 ```
 
-The backend container runs `npm run migration:run:prod` (TypeORM) automatically
+Do not pull or merge `main` on the server. The next approved GitHub Actions
+deployment will check out its own exact SHA. The backend container runs
+`npm run migration:run:prod` (TypeORM) automatically
 on startup (see `backend/docker-entrypoint.sh`) — rolling back code does NOT
 undo an already-applied schema migration. Check
 `backend/src/database/migrations/` before rolling back a release that touched
