@@ -197,7 +197,7 @@ describe('Flight engine completion', () => {
     });
     // an infeasible second leg 10 minutes after arrival must NOT be used
     await makeInstance({
-      originCode: 'SRY',seatCode: '11A'
+      originCode: 'SRY',
       destCode: 'ADU',
       flightNo: 'BJ-83',
       departureAt: new Date(leg1.arrivalAt.getTime() + 10 * 60_000),
@@ -286,7 +286,7 @@ describe('Flight engine completion', () => {
       .send({
         flightInstanceId: instance.id,
         cabin: 'ECONOMY',
-        passengers: [{ fullName: 'مسافر کلاس نرخی', seatCode: '10A' }],
+        passengers: [{ fullName: 'مسافر کلاس نرخی', seatCode: '11A' }],
       })
       .expect(201);
     expect(booking.body.data.priceIrr).toBe('30000000');
