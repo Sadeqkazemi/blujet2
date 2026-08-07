@@ -41,6 +41,7 @@ export class Booking {
   @BeforeInsert()
   defaultTaxIrr() {
     this.taxIrr ??= 0n;
+    this.extrasIrr ??= 0n;
   }
 
   @Column({ type: 'text' })
