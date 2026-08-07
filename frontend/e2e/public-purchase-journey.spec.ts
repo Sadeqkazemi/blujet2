@@ -104,6 +104,30 @@ async function createFreshInstance(page: Page) {
   };
 }
 
+async function loginCustomerBeforeSearch(page: Page, phone: string) {
+  await page.goto('/signin');
+  await page.getByTestId('signin-phone').fill(phone);
+  await page.getByTestId('signin-request').click();
+  await expect(page.getByTestId('signin-code')).toBeVisible();
+
+  let otpCode = '123456';
+  if (!(await page.getByTestId('signin-dev-otp-hint').isVisible().catch(() => false))) {
+    const otpRes = await page.evaluate(
+      async ({ api, phone: customerPhone }) =>
+        (await fetch(`${api}/auth/_test/last-otp/${customerPhone}`)).json(),
+      { api: API_URL, phone },
+    );
+    otpCode = (otpRes as { data?: { code?: string } }).data?.code ?? '';
+  }
+  expect(otpCode).toHaveLength(6);
+  for (let i = 0; i < otpCode.length; i++) {
+    const input = i === 0 ? page.getByTestId('signin-code') : page.getByTestId(`signin-otp-${i}`);
+    await input.fill(otpCode[i]!);
+  }
+  await page.getByTestId('signin-verify').click();
+  await page.waitForURL('**/');
+}
+
 test('golden path: search -> results -> OTP login -> seat+passenger -> pay -> e-ticket -> refund submission', async ({
   page,
 }) => {
@@ -180,4 +204,49 @@ test('golden path: search -> results -> OTP login -> seat+passenger -> pay -> e-
   await page.getByTestId('refund-iban').fill('IR820170000000332211009900');
   await page.getByTestId('submit-refund').click();
   await expect(page.getByText(/درخواست استرداد ثبت شد/)).toBeVisible();
+});
+
+test('authenticated customer: search -> checkout without another OTP -> pay -> e-ticket', async ({ page }) => {
+  page.on('pageerror', (err) => console.log(`[pageerror] ${err.message}`));
+
+  const phone = `09${String(Date.now() + 1).slice(-9)}`;
+  await loginCustomerBeforeSearch(page, phone);
+  const { date, originCode, destCode } = await createFreshInstance(page);
+
+  await page.selectOption('#origin', originCode);
+  await page.selectOption('#dest', destCode);
+  await pickJalaliDate(page, date);
+  await page.getByTestId('home-search-submit').click();
+
+  await page.waitForURL('**/results**');
+  await expect(page.getByTestId('result-card').first()).toBeVisible();
+  await page.getByTestId('result-card').first().getByRole('button', { name: 'انتخاب' }).first().click();
+
+  await page.waitForURL('**/checkout/**');
+  await expect(page.getByTestId('otp-phone')).toHaveCount(0);
+  await expect(page.getByTestId('checkout-pax-step')).toBeVisible();
+  await page.getByTestId('checkout-pax-first-0').fill('SIGNEDIN');
+  await page.getByTestId('checkout-pax-last-0').fill('CUSTOMER');
+  await page.getByTestId('checkout-pax-gender-0').selectOption('male');
+  await page.getByTestId('checkout-pax-nid-0').fill('0012345678');
+  const dobSelects = page.locator('[data-testid="checkout-pax-card-0"] select');
+  await dobSelects.nth(1).selectOption('1');
+  await dobSelects.nth(2).selectOption('1');
+  await dobSelects.nth(3).selectOption('1370');
+  await page.getByTestId('checkout-next').click();
+
+  await expect(page.getByTestId('checkout-extras-step')).toBeVisible();
+  const freeSeat = page.locator('button[data-testid^="checkout-seat-"]:not([disabled])').first();
+  await expect(freeSeat).toBeVisible();
+  await freeSeat.click();
+  await page.getByTestId('checkout-next').click();
+
+  await expect(page.getByTestId('checkout-review-step')).toBeVisible();
+  await page.getByTestId('checkout-next').click();
+  await page.waitForURL('**/payment/**');
+  await page.getByTestId('pay-submit').click();
+
+  await page.waitForURL('**/ticket/**', { timeout: 20_000 });
+  await expect(page.getByText('صادر شده')).toBeVisible();
+  await expect(page.getByText('SIGNEDIN CUSTOMER')).toBeVisible();
 });

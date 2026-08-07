@@ -11,7 +11,6 @@ import { Booking } from '../src/database/entities/booking.entity';
 import { FlightChargeRule } from '../src/database/entities/flight-charge-rule.entity';
 import { FlightInstance } from '../src/database/entities/flight-instance.entity';
 import { FarePricingProposal } from '../src/database/entities/fare-pricing-proposal.entity';
-import { RedisService } from '../src/redis/redis.service';
 import { loginAs, loginAsCustomer, stepUpFor } from './helpers/login.helper';
 
 describe('Flight definition + charge rules + CEO approval (e2e)', () => {
@@ -350,7 +349,7 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
     expect(bookings).toBe(0);
   });
 
-  it('DRAFT is hidden from search; APPROVED COMFORT seat is bookable end-to-end', async () => {
+  it('PENDING_CEO is hidden; CEO approval makes COMFORT searchable, bookable, and payable', async () => {
     const { accessToken: comm } = await loginAs(app, 'comm');
     const body = payload({ flightNo: uniqueFlightNo() });
     const created = await request(app.getHttpServer())
@@ -389,9 +388,6 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
       .set('Authorization', `Bearer ${ceo}`)
       .send({ source: 'PROPOSED', ...stepUp });
     expect(reg.status).toBe(200);
-
-    // Bust any stale route+date cache from the DRAFT search above.
-    await app.get(RedisService).del(`search:flights:THR:MHD:${date}`);
 
     const search = await request(app.getHttpServer())
       .get('/search/flights')
@@ -439,6 +435,23 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
     expect(book.body.data.cabin).toBe('COMFORT');
     expect(typeof book.body.data.priceIrr).toBe('string');
     expect(typeof book.body.data.taxIrr).toBe('string');
+
+    const pay = await request(app.getHttpServer())
+      .post(`/bookings/${book.body.data.id}/pay`)
+      .set('Authorization', `Bearer ${customer}`)
+      .set('idempotency-key', `flight-definition-pay-${id}`)
+      .send({ paymentMethod: 'GATEWAY' });
+    expect(pay.status).toBe(201);
+    expect(pay.body.data.priceChanged).toBe(false);
+    expect(pay.body.data.booking.status).toBe('TICKETED');
+    expect(pay.body.data.booking.pnr).toBe(book.body.data.pnr);
+
+    const ticket = await request(app.getHttpServer())
+      .get(`/bookings/pnr/${book.body.data.pnr}`)
+      .set('Authorization', `Bearer ${customer}`);
+    expect(ticket.status).toBe(200);
+    expect(ticket.body.data.status).toBe('TICKETED');
+    expect(ticket.body.data.flightInstanceId).toBe(id);
   });
 
   it('rejects flight numbers with leading/trailing spaces', async () => {
