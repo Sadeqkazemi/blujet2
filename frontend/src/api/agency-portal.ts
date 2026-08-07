@@ -1,4 +1,5 @@
-import { apiGet, apiGetBlob, apiPost, apiPostForm } from './http';
+import { apiGet, apiGetBlob, apiPost, apiPostForm, apiRequest } from './http';
+import type { BookingDetail } from '../types/public-site';
 import type {
   AgencyAllotmentRow,
   AgencyApiKeySummary,
@@ -37,7 +38,10 @@ export function payInvoice(invoiceId: string) {
 }
 
 export function requestCreditIncrease(requestedLimitIrr: number, note?: string) {
-  return apiPost<AgencyCreditRequest>('/agency-portal/credit-requests', { requestedLimitIrr, note });
+  return apiPost<AgencyCreditRequest>('/agency-portal/credit-requests', {
+    requestedLimitIrr,
+    note,
+  });
 }
 
 export function fetchMyCreditRequests() {
@@ -79,6 +83,26 @@ export function fetchAllotments() {
   return apiGet<AgencyAllotmentRow[]>('/agency-portal/allotments');
 }
 
+export function createAllotmentBooking(
+  allotmentId: string,
+  dto: {
+    cabin: 'ECONOMY' | 'BUSINESS';
+    passengers: {
+      fullName: string;
+      nationalId?: string;
+      mobile?: string;
+      seatCode: string;
+    }[];
+  },
+  idempotencyKey: string,
+) {
+  return apiRequest<BookingDetail>(`/agency-portal/allotments/${allotmentId}/bookings`, {
+    method: 'POST',
+    headers: { 'Idempotency-Key': idempotencyKey },
+    body: JSON.stringify(dto),
+  });
+}
+
 export function requestWebservice(scope: AgencyApiScope, months: 1 | 3 | 12, note?: string) {
   return apiPost<AgencyWebserviceRequest>('/agency-portal/webservice-requests', { scope, months, note });
 }
@@ -88,9 +112,7 @@ export function fetchMyWebserviceRequests() {
 }
 
 export function fetchAgencyPortalWebservicePlans() {
-  return apiGet<{ plans: { months: 1 | 3 | 12; priceIrr: number }[] }>(
-    '/agency-portal/webservice-plans',
-  );
+  return apiGet<{ plans: { months: 1 | 3 | 12; priceIrr: number }[] }>('/agency-portal/webservice-plans');
 }
 
 export function fetchApiKeys() {

@@ -198,11 +198,7 @@ export interface CustomerReferralDashboard {
   invites: CustomerReferralInvite[];
 }
 
-export type CustomerIdentityStatus =
-  | 'NOT_STARTED'
-  | 'SUBMITTED'
-  | 'APPROVED'
-  | 'REJECTED';
+export type CustomerIdentityStatus = 'NOT_STARTED' | 'SUBMITTED' | 'APPROVED' | 'REJECTED';
 
 export interface CustomerIdentityView {
   status: CustomerIdentityStatus;
@@ -286,4 +282,6 @@ export interface UserProfile {
   email: string | null;
   emailVerifiedAt: string | null;
   completionPct: number;
+  profileIncomplete: boolean;
+  missingProfileFields: ('fullName' | 'nationalId' | 'birthDate' | 'passportNo' | 'verifiedEmail')[];
 }

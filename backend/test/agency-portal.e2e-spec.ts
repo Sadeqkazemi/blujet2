@@ -14,6 +14,7 @@ import { FlightInstance } from '../src/database/entities/flight-instance.entity'
 import { LedgerEntry } from '../src/database/entities/ledger-entry.entity';
 import { StoredFile } from '../src/database/entities/stored-file.entity';
 import { User } from '../src/database/entities/user.entity';
+import { AgencyAllotment } from '../src/database/entities/agency-allotment.entity';
 import { loginAs, stepUpFor } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
@@ -219,6 +220,7 @@ describe('Agency Portal (e2e)', () => {
 
   it('approving a membership request issues a one-time temp password that logs in', async () => {
     const commercial = await loginAs(app, 'comm');
+    const finance = await loginAs(app, 'finance');
     const suffix = crypto.randomUUID().slice(0, 6);
     const membershipRepo = dataSource.getRepository(AgencyMembershipRequest);
     const reqRow = await membershipRepo.save(
@@ -232,9 +234,15 @@ describe('Agency Portal (e2e)', () => {
         status: 'PENDING',
       }),
     );
-    const approveRes = await request(app.getHttpServer())
+    const commercialApproval = await request(app.getHttpServer())
       .patch(`/agencies/requests/${reqRow.id}/approve`)
       .set('Authorization', auth(commercial.accessToken));
+    expect(commercialApproval.status).toBe(200);
+    expect(commercialApproval.body.data.stage).toBe('AWAITING_FINANCE');
+
+    const approveRes = await request(app.getHttpServer())
+      .patch(`/agencies/requests/${reqRow.id}/approve`)
+      .set('Authorization', auth(finance.accessToken));
     expect(approveRes.status).toBe(200);
     const tempPassword = approveRes.body.data.tempPassword as string;
     expect(tempPassword).toBeTruthy();
@@ -705,5 +713,210 @@ describe('Agency Portal (e2e)', () => {
       .set('Authorization', auth(employee.accessToken))
       .send({ approve: true });
     expect(decideRes.status).toBe(403);
+  });
+
+  it('issues one ticket from the owned allotment and charges agency credit idempotently', async () => {
+    const agency = await createFreshAgency({ limitIrr: 1_000_000_000 });
+    const agencyLogin = await loginAsAgency(agency.phone);
+    const commercial = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ username: 'comm' });
+    const instance = await dataSource
+      .getRepository(FlightInstance)
+      .createQueryBuilder('instance')
+      .leftJoinAndSelect('instance.flight', 'flight')
+      .where('instance.status = :status', { status: 'SCHEDULED' })
+      .getOneOrFail();
+    await dataSource
+      .getRepository(FlightInstance)
+      .update({ id: instance.id }, { saleStartsAt: null, saleEndsAt: null });
+    const allotmentRepo = dataSource.getRepository(AgencyAllotment);
+    const allotment = await allotmentRepo.save(
+      allotmentRepo.create({
+        agencyId: agency.id,
+        flightInstanceId: instance.id,
+        seatsAllocated: 1,
+        type: 'HARD',
+        releaseAt: null,
+        contractPriceIrr: 10_000_000n,
+        createdById: commercial.id,
+      }),
+    );
+    const seatMap = await request(app.getHttpServer()).get(
+      `/search/flights/${instance.id}/seatmap`,
+    );
+    const seat = seatMap.body.data.seats.find(
+      (candidate: { status: string }) => candidate.status === 'FREE',
+    ) as { seatCode: string; cabin: 'ECONOMY' | 'BUSINESS' };
+    expect(seat).toBeTruthy();
+
+    const key = crypto.randomUUID();
+    const body = {
+      cabin: seat.cabin,
+      passengers: [{ fullName: 'مسافر واقعی تست', seatCode: seat.seatCode }],
+    };
+    const first = await request(app.getHttpServer())
+      .post(`/agency-portal/allotments/${allotment.id}/bookings`)
+      .set('Authorization', auth(agencyLogin.accessToken))
+      .set('Idempotency-Key', key)
+      .send(body);
+    expect(first.status).toBe(201);
+    expect(first.body.data.status).toBe('TICKETED');
+    expect(first.body.data.allotmentId).toBe(allotment.id);
+
+    const second = await request(app.getHttpServer())
+      .post(`/agency-portal/allotments/${allotment.id}/bookings`)
+      .set('Authorization', auth(agencyLogin.accessToken))
+      .set('Idempotency-Key', key)
+      .send(body);
+    expect(second.status).toBe(201);
+    expect(second.body.data.id).toBe(first.body.data.id);
+    expect(
+      await dataSource.getRepository(LedgerEntry).countBy({
+        bookingId: first.body.data.id as string,
+        type: 'SALE',
+      }),
+    ).toBe(1);
+  });
+
+  it('rejects another agency, released allotments, and insufficient credit', async () => {
+    const owner = await createFreshAgency();
+    const other = await createFreshAgency();
+    const ownerLogin = await loginAsAgency(owner.phone);
+    const otherLogin = await loginAsAgency(other.phone);
+    const commercial = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ username: 'comm' });
+    const instance = await dataSource
+      .getRepository(FlightInstance)
+      .createQueryBuilder('instance')
+      .where('instance.status = :status', { status: 'SCHEDULED' })
+      .getOneOrFail();
+    await dataSource
+      .getRepository(FlightInstance)
+      .update({ id: instance.id }, { saleStartsAt: null, saleEndsAt: null });
+    const allotmentRepo = dataSource.getRepository(AgencyAllotment);
+    const allotment = await allotmentRepo.save(
+      allotmentRepo.create({
+        agencyId: owner.id,
+        flightInstanceId: instance.id,
+        seatsAllocated: 1,
+        type: 'HARD',
+        releaseAt: null,
+        contractPriceIrr: 10_000_000n,
+        createdById: commercial.id,
+      }),
+    );
+    const seatMap = await request(app.getHttpServer()).get(
+      `/search/flights/${instance.id}/seatmap`,
+    );
+    const seat = seatMap.body.data.seats.find(
+      (candidate: { status: string }) => candidate.status === 'FREE',
+    ) as { seatCode: string; cabin: 'ECONOMY' | 'BUSINESS' };
+    const body = {
+      cabin: seat.cabin,
+      passengers: [{ fullName: 'مسافر کنترل دسترسی', seatCode: seat.seatCode }],
+    };
+
+    const wrongOwner = await request(app.getHttpServer())
+      .post(`/agency-portal/allotments/${allotment.id}/bookings`)
+      .set('Authorization', auth(otherLogin.accessToken))
+      .send(body);
+    expect(wrongOwner.status).toBe(404);
+
+    await allotmentRepo.update(
+      { id: allotment.id },
+      { type: 'SOFT', releaseAt: new Date(Date.now() - 60_000) },
+    );
+    const released = await request(app.getHttpServer())
+      .post(`/agency-portal/allotments/${allotment.id}/bookings`)
+      .set('Authorization', auth(ownerLogin.accessToken))
+      .send(body);
+    expect(released.status).toBe(404);
+
+    const noCredit = await createFreshAgency({ limitIrr: 0 });
+    const noCreditLogin = await loginAsAgency(noCredit.phone);
+    const noCreditAllotment = await allotmentRepo.save(
+      allotmentRepo.create({
+        agencyId: noCredit.id,
+        flightInstanceId: instance.id,
+        seatsAllocated: 1,
+        type: 'HARD',
+        releaseAt: null,
+        contractPriceIrr: 10_000_000n,
+        createdById: commercial.id,
+      }),
+    );
+    const denied = await request(app.getHttpServer())
+      .post(`/agency-portal/allotments/${noCreditAllotment.id}/bookings`)
+      .set('Authorization', auth(noCreditLogin.accessToken))
+      .send(body);
+    expect(denied.status).toBe(409);
+    expect(
+      await dataSource
+        .getRepository(Booking)
+        .countBy({ allotmentId: noCreditAllotment.id }),
+    ).toBe(0);
+  });
+
+  it('serializes concurrent buyers of the last allotment seat', async () => {
+    const agency = await createFreshAgency({ limitIrr: 1_000_000_000 });
+    const agencyLogin = await loginAsAgency(agency.phone);
+    const commercial = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ username: 'comm' });
+    const instance = await dataSource
+      .getRepository(FlightInstance)
+      .createQueryBuilder('instance')
+      .where('instance.status = :status', { status: 'SCHEDULED' })
+      .getOneOrFail();
+    await dataSource
+      .getRepository(FlightInstance)
+      .update({ id: instance.id }, { saleStartsAt: null, saleEndsAt: null });
+    const allotmentRepo = dataSource.getRepository(AgencyAllotment);
+    const allotment = await allotmentRepo.save(
+      allotmentRepo.create({
+        agencyId: agency.id,
+        flightInstanceId: instance.id,
+        seatsAllocated: 1,
+        type: 'HARD',
+        releaseAt: null,
+        contractPriceIrr: 10_000_000n,
+        createdById: commercial.id,
+      }),
+    );
+    const seatMap = await request(app.getHttpServer()).get(
+      `/search/flights/${instance.id}/seatmap`,
+    );
+    const freeSeats = seatMap.body.data.seats.filter(
+      (candidate: { status: string }) => candidate.status === 'FREE',
+    ) as { seatCode: string; cabin: 'ECONOMY' | 'BUSINESS' }[];
+    expect(freeSeats.length).toBeGreaterThanOrEqual(2);
+
+    const responses = await Promise.all(
+      freeSeats.slice(0, 2).map((seat, index) =>
+        request(app.getHttpServer())
+          .post(`/agency-portal/allotments/${allotment.id}/bookings`)
+          .set('Authorization', auth(agencyLogin.accessToken))
+          .set('Idempotency-Key', crypto.randomUUID())
+          .send({
+            cabin: seat.cabin,
+            passengers: [
+              {
+                fullName: `مسافر هم‌زمان ${index + 1}`,
+                seatCode: seat.seatCode,
+              },
+            ],
+          }),
+      ),
+    );
+    expect(responses.map((response) => response.status).sort()).toEqual([
+      201, 409,
+    ]);
+    expect(
+      await dataSource
+        .getRepository(Booking)
+        .countBy({ allotmentId: allotment.id }),
+    ).toBe(1);
   });
 });

@@ -43,15 +43,15 @@ Error codes: `INVALID_CREDENTIALS`, `TWO_FACTOR_REQUIRED`, `TWO_FACTOR_INVALID`,
 | GET | `/panels/access` | CEO, SENIOR_MANAGER, IT_MANAGER | Current `PanelAccessFlag` states for the panels that role is allowed to toggle (CEO: finance/commercial/IT; Senior Manager: +CEO panel, site admin; IT: none — IT's "دسترسی به پنل‌ها" tab in the design is read-only informational, no toggle wired). |
 | PATCH | `/panels/access/:panelKey` | CEO, SENIOR_MANAGER | `{ enabled }` → toggles a sibling panel; writes an `AuditLog(category=ACCESS)` row. |
 
-### Customers — SITE_ADMIN (`backend/src/modules/customers/`)
+### Customers — SITE_ADMIN / SENIOR_MANAGER (`backend/src/modules/customers/`)
 
 پنل ادمین سایت → تب «مشتریان» (فهرست USERها، جستجو با موبایل، جزئیات).
 
 | Method | Path | Roles | Notes |
 |---|---|---|---|
-| GET | `/customers` | SITE_ADMIN | Query: `q?` (mobile digits). Returns `{ customers[], incompleteCount, total }`. Incomplete = missing name or national ID (design warn badge). National ID decrypted for site admin. |
-| GET | `/customers/incomplete-count` | SITE_ADMIN | `{ count }` for sidebar badge. |
-| GET | `/customers/:id` | SITE_ADMIN | Detail for tabs: profile, `docs` (KYC id-card), `purchases` (bookings), `refunds` (استرداد via booking.userId), `contacts` (support tickets by userId/phone), `club`. |
+| GET | `/customers` | SITE_ADMIN, SENIOR_MANAGER | Query: `q?` (mobile digits). Returns `{ customers[], incompleteCount, total }`. Completion uses the five canonical fields defined in Phase 68. National ID is decrypted for site admin and masked for senior manager. |
+| GET | `/customers/incomplete-count` | SITE_ADMIN, SENIOR_MANAGER | `{ count }` for sidebar badge. |
+| GET | `/customers/:id` | SITE_ADMIN, SENIOR_MANAGER | Read-only detail for tabs: profile, `docs` (KYC id-card), `purchases` (bookings), `refunds` (استرداد via booking.userId), `contacts` (support tickets by userId/phone), `club`. Sensitive identity data is masked for senior manager. |
 
 ### Reporting (`backend/src/modules/reporting/`)
 
@@ -3136,3 +3136,44 @@ the unchanged owner session.
 This switch defaults to `false` in Compose and must be set back to `false`
 before go-live. Turning it off immediately blocks creation of new preview
 tokens; already-issued preview tokens expire within 15 minutes.
+## Phase 68 — complete multi-role sandbox UAT
+
+### Canonical customer completion
+
+- `GET /profile` keeps its response and additionally returns
+  `profileIncomplete` and `missingProfileFields`. `completionPct` is computed
+  only on the server from five equally weighted fields: `fullName`,
+  `nationalId`, `birthDate`, `passportNo`, and verified email.
+- `GET /customers`, `GET /customers/incomplete-count`, and
+  `GET /customers/:id` allow `SITE_ADMIN|SENIOR_MANAGER`. The senior-manager
+  view is read-only and masks national ID; all incomplete flags/counts use the
+  same five-field server helper. Other roles remain forbidden.
+
+### Ordered dual agency approval
+
+- `PATCH /agencies/requests/:id/approve` allows
+  `COMMERCIAL_MANAGER|FINANCE_MANAGER` but is stage-aware:
+  - COMMERCIAL_MANAGER records the first approval and returns
+    `{ stage: "AWAITING_FINANCE", request }`; it creates no account.
+  - FINANCE_MANAGER is rejected until commercial approval exists. Its approval
+    creates User + AgencyProfile + AgencyCreditLine atomically, marks the
+    request APPROVED, sends the temporary password once, and returns
+    `{ stage: "APPROVED", agencyId, tempPassword }`.
+- Request list/detail responses expose `approvalStage`,
+  `commercialApprovedAt`, and `financeApprovedAt` (actor IDs are retained for
+  audit but are not required by the UI).
+
+### Agency allotment sale
+
+- `POST /agency-portal/allotments/:allotmentId/bookings` — AGENCY only;
+  header `Idempotency-Key` is optional but recommended. Body:
+  `{ cabin: ECONOMY|BUSINESS, passengers: [{ fullName, nationalId?, mobile?, seatCode }] }`.
+  The allotment determines the flight and price (`contractPriceIrr` when set,
+  otherwise the registered live cabin price). A successful call atomically
+  checks ownership, active/release state, physical seats, remaining allotment,
+  and remaining agency credit; then creates an `AGENCY/TICKETED` booking,
+  passengers, and agency SALE ledger entry. Returns booking detail including
+  `allotmentId`.
+- Failure codes: 404 missing allotment/flight, 403 ownership or temporary UAT
+  read-only account, 409 released/exhausted/seat conflict/insufficient credit,
+  and 400 invalid cabin/passenger/national ID.

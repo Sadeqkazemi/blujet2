@@ -12,10 +12,12 @@ import {
 import { BookingChannel, BookingStatus, CabinClass } from '../enums';
 import { bigintTransformer } from '../transformers/bigint.transformer';
 import { AgencyProfile } from './agency-profile.entity';
+import { AgencyAllotment } from './agency-allotment.entity';
 import { FlightInstance } from './flight-instance.entity';
 import { User } from './user.entity';
 
 @Index('bookings_agencyId_idx', ['agencyId'])
+@Index('bookings_allotmentId_idx', ['allotmentId'])
 @Index('bookings_channel_idx', ['channel'])
 @Index('bookings_flightInstanceId_status_idx', ['flightInstanceId', 'status'])
 @Index('bookings_idempotencyKey_key', ['idempotencyKey'], { unique: true })
@@ -68,6 +70,19 @@ export class Booking {
     foreignKeyConstraintName: 'bookings_agencyId_fkey',
   })
   agency!: AgencyProfile | null;
+
+  @Column({ type: 'text', nullable: true })
+  allotmentId!: string | null;
+
+  @ManyToOne(() => AgencyAllotment, {
+    onDelete: 'RESTRICT',
+    onUpdate: 'CASCADE',
+  })
+  @JoinColumn({
+    name: 'allotmentId',
+    foreignKeyConstraintName: 'bookings_allotmentId_fkey',
+  })
+  allotment!: AgencyAllotment | null;
 
   @Column({
     type: 'enum',

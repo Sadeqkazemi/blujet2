@@ -423,16 +423,27 @@ describe('Agencies (e2e)', () => {
 
   // ── Membership requests ───────────────────────────────────────────────
 
-  it('approving a request creates both User(role=AGENCY) and AgencyProfile transactionally', async () => {
+  it('creates an agency only after commercial then finance approval', async () => {
     const reqRow = await createFreshMembershipRequest('PENDING');
-    const { accessToken } = await loginAs(app, 'comm');
+    const commercial = await loginAs(app, 'comm');
 
-    const res = await request(app.getHttpServer())
+    const commercialRes = await request(app.getHttpServer())
       .patch(`/agencies/requests/${reqRow.id}/approve`)
-      .set('Authorization', `Bearer ${accessToken}`);
-    expect(res.status).toBe(200);
+      .set('Authorization', `Bearer ${commercial.accessToken}`);
+    expect(commercialRes.status).toBe(200);
+    expect(commercialRes.body.data.stage).toBe('AWAITING_FINANCE');
+    expect(
+      await dataSource.getRepository(User).findOneBy({ phone: reqRow.phone }),
+    ).toBeNull();
 
-    const newAgencyId = res.body.data.agencyId as string;
+    const finance = await loginAs(app, 'finance');
+    const financeRes = await request(app.getHttpServer())
+      .patch(`/agencies/requests/${reqRow.id}/approve`)
+      .set('Authorization', `Bearer ${finance.accessToken}`);
+    expect(financeRes.status).toBe(200);
+    expect(financeRes.body.data.stage).toBe('APPROVED');
+
+    const newAgencyId = financeRes.body.data.agencyId as string;
     const user = await dataSource
       .getRepository(User)
       .findOneBy({ id: newAgencyId });
@@ -458,6 +469,52 @@ describe('Agencies (e2e)', () => {
       .getRepository(User)
       .find({ where: { phone: reqRow.phone } });
     expect(usersWithThisPhone).toHaveLength(0);
+  });
+
+  it('rejects finance approval before commercial approval', async () => {
+    const reqRow = await createFreshMembershipRequest('PENDING');
+    const finance = await loginAs(app, 'finance');
+    const res = await request(app.getHttpServer())
+      .patch(`/agencies/requests/${reqRow.id}/approve`)
+      .set('Authorization', `Bearer ${finance.accessToken}`);
+    expect(res.status).toBe(409);
+    expect(
+      await dataSource.getRepository(User).countBy({ phone: reqRow.phone }),
+    ).toBe(0);
+  });
+
+  it('creates exactly one account under concurrent finance approvals', async () => {
+    const reqRow = await createFreshMembershipRequest('PENDING');
+    const commercial = await loginAs(app, 'comm');
+    await request(app.getHttpServer())
+      .patch(`/agencies/requests/${reqRow.id}/approve`)
+      .set('Authorization', `Bearer ${commercial.accessToken}`);
+    const finance = await loginAs(app, 'finance');
+    const responses = await Promise.all([
+      request(app.getHttpServer())
+        .patch(`/agencies/requests/${reqRow.id}/approve`)
+        .set('Authorization', `Bearer ${finance.accessToken}`),
+      request(app.getHttpServer())
+        .patch(`/agencies/requests/${reqRow.id}/approve`)
+        .set('Authorization', `Bearer ${finance.accessToken}`),
+    ]);
+    expect(responses.map((response) => response.status).sort()).toEqual([
+      200, 409,
+    ]);
+    const users = await dataSource
+      .getRepository(User)
+      .findBy({ phone: reqRow.phone });
+    expect(users).toHaveLength(1);
+    expect(
+      await dataSource
+        .getRepository(AgencyProfile)
+        .countBy({ userId: users[0].id }),
+    ).toBe(1);
+    expect(
+      await dataSource
+        .getRepository(AgencyCreditLine)
+        .countBy({ agencyId: users[0].id }),
+    ).toBe(1);
   });
 
   it('PATCH .../refer is 403 for FINANCE_MANAGER', async () => {

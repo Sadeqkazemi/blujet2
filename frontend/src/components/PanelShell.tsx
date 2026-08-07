@@ -105,10 +105,7 @@ export default function PanelShell() {
     return nav.filter((item) => !SITE_ADMIN_SIDEBAR_DENYLIST.has(item.key));
   }, [nav, user?.role, user?.isSuperAdmin]);
 
-  const navKeys = useMemo(
-    () => new Set(visibleNav?.map((item) => item.key) ?? []),
-    [visibleNav],
-  );
+  const navKeys = useMemo(() => new Set(visibleNav?.map((item) => item.key) ?? []), [visibleNav]);
 
   useEffect(() => {
     if (!visibleNav || visibleNav.length === 0) return;
@@ -141,10 +138,7 @@ export default function PanelShell() {
       );
     }
 
-    if (
-      navKeys.has('refund') &&
-      (user?.role === 'FINANCE_MANAGER' || user?.role === 'SITE_ADMIN')
-    ) {
+    if (navKeys.has('refund') && (user?.role === 'FINANCE_MANAGER' || user?.role === 'SITE_ADMIN')) {
       tasks.push(
         fetchRefunds()
           .then((r) => {
@@ -163,9 +157,7 @@ export default function PanelShell() {
                 });
               }
             } else {
-              const awaiting = r.requests.filter(
-                (row) => row.status === 'SUBMITTED' || row.status === 'REVIEW',
-              ).length;
+              const awaiting = r.requests.filter((row) => row.status === 'SUBMITTED' || row.status === 'REVIEW').length;
               if (awaiting > 0) {
                 next.refund = {
                   count: awaiting,
@@ -308,7 +300,7 @@ export default function PanelShell() {
       );
     }
 
-    if (navKeys.has('customers') && user?.role === 'SITE_ADMIN') {
+    if (navKeys.has('customers') && (user?.role === 'SITE_ADMIN' || user?.role === 'SENIOR_MANAGER')) {
       tasks.push(
         fetchCustomersIncompleteCount()
           .then((r) => {
@@ -334,13 +326,8 @@ export default function PanelShell() {
     navigate('/login', { replace: true });
   }
 
-  const roleLabel = user?.isSuperAdmin
-    ? 'سوپر ادمین'
-    : user
-      ? (ROLE_LABELS[user.role] ?? user.role)
-      : '';
-  const brandSub =
-    (user?.role ? ROLE_BRAND_SUB[user.role] : undefined) ?? 'پنل مدیریت';
+  const roleLabel = user?.isSuperAdmin ? 'سوپر ادمین' : user ? (ROLE_LABELS[user.role] ?? user.role) : '';
+  const brandSub = (user?.role ? ROLE_BRAND_SUB[user.role] : undefined) ?? 'پنل مدیریت';
 
   /** Dark executive chrome: CEO / Board / Senior / Commercial (design v2 shells). */
   const executiveShell =
@@ -350,10 +337,7 @@ export default function PanelShell() {
     user?.role === 'COMMERCIAL_MANAGER';
   /** Finance + Employee + Site Admin get avatar footer chrome. */
   const avatarShell =
-    executiveShell ||
-    user?.role === 'FINANCE_MANAGER' ||
-    user?.role === 'EMPLOYEE' ||
-    user?.role === 'SITE_ADMIN';
+    executiveShell || user?.role === 'FINANCE_MANAGER' || user?.role === 'EMPLOYEE' || user?.role === 'SITE_ADMIN';
   const roleInitial =
     user?.role === 'CEO'
       ? 'مع'
@@ -423,9 +407,7 @@ export default function PanelShell() {
                   }`
                 }
               >
-                <span className="flex h-5 w-5 flex-none items-center justify-center">
-                  {panelNavIcon(item.key)}
-                </span>
+                <span className="flex h-5 w-5 flex-none items-center justify-center">{panelNavIcon(item.key)}</span>
                 <span className="flex-1">{item.labelFa}</span>
                 {badge && (
                   <span
