@@ -111,6 +111,44 @@ describe('Panels (e2e)', () => {
     ]);
   });
 
+  it('returns the confirmed tab set for Board Chair', async () => {
+    const { accessToken } = await loginAs(app, 'chair');
+    const res = await request(app.getHttpServer())
+      .get('/panels/nav')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.map((t: { key: string }) => t.key)).toEqual([
+      'dashboard',
+      'admins',
+      'finance',
+      'cartable',
+      'club',
+      'reservation',
+      'mgrreports',
+      'survey',
+    ]);
+  });
+
+  it('returns the confirmed tab set for IT Manager', async () => {
+    const { accessToken } = await loginAs(app, 'itadmin');
+    const res = await request(app.getHttpServer())
+      .get('/panels/nav')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.map((t: { key: string }) => t.key)).toEqual([
+      'dashboard',
+      'users',
+      'security',
+      'services',
+      'reservation',
+      'panels',
+      'logs',
+      'survey',
+      'backup',
+      'settings',
+    ]);
+  });
+
   it('an EMPLOYEE with no granted permissions still gets dashboard + referrals, not an error', async () => {
     const { accessToken } = await loginAs(app, 'emp.none');
     const res = await request(app.getHttpServer())

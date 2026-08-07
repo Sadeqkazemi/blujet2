@@ -10,6 +10,7 @@ import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter
 import { Booking } from '../src/database/entities/booking.entity';
 import { FlightChargeRule } from '../src/database/entities/flight-charge-rule.entity';
 import { FlightInstance } from '../src/database/entities/flight-instance.entity';
+import { FarePricingProposal } from '../src/database/entities/fare-pricing-proposal.entity';
 import { RedisService } from '../src/redis/redis.service';
 import { loginAs, loginAsCustomer, stepUpFor } from './helpers/login.helper';
 
@@ -107,7 +108,17 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
     );
     expect(create.body.data.durationMinutes).toBe(95);
     expect(create.body.data.chargeRules.length).toBe(2);
-    expect(create.body.data.approvalStatus).toBe('DRAFT');
+    expect(create.body.data.approvalStatus).toBe('PENDING_CEO');
+    const proposals = await dataSource
+      .getRepository(FarePricingProposal)
+      .findBy({ flightInstanceId: create.body.data.id });
+    expect(proposals).toHaveLength(1);
+    expect(proposals[0]).toMatchObject({
+      status: 'PENDING',
+      proposedById: expect.any(String),
+      proposedPriceIrr: 38000000n,
+      basePriceIrr: 38000000n,
+    });
   });
 
   it('rejects flight numbers XY-1234, XY 1234, X1234', async () => {
@@ -224,15 +235,10 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
 
     const before = emptyish.body.data.pendingApprovalsCount as number;
     const { accessToken: comm } = await loginAs(app, 'comm');
-    const created = await request(app.getHttpServer())
+    await request(app.getHttpServer())
       .post('/flights')
       .set('Authorization', `Bearer ${comm}`)
       .send(payload());
-    await request(app.getHttpServer())
-      .put(`/pricing/flights/${created.body.data.id}/proposal`)
-      .set('Authorization', `Bearer ${comm}`)
-      .send({ proposedPriceIrr: '39000000' });
-
     const after = await request(app.getHttpServer())
       .get('/pricing/proposals/pending-count')
       .set('Authorization', `Bearer ${ceo}`);

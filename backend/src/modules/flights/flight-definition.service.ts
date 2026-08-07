@@ -14,7 +14,11 @@ import { FlightChargeRule } from '../../database/entities/flight-charge-rule.ent
 import { FlightInstance } from '../../database/entities/flight-instance.entity';
 import { Route } from '../../database/entities/route.entity';
 import { FarePricingProposal } from '../../database/entities/fare-pricing-proposal.entity';
-import { CabinClass, FlightDefinitionStatus } from '../../database/enums';
+import {
+  CabinClass,
+  FlightDefinitionStatus,
+  PricingProposalStatus,
+} from '../../database/enums';
 import { ErrorCode } from '../../common/errors';
 import type { Irr } from '../../common/money';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
@@ -502,7 +506,7 @@ export class FlightDefinitionService {
           durationMinutes,
           competitorPriceIrr: dto.competitorPriceIrr ?? null,
           cabinCapacities,
-          definitionStatus: FlightDefinitionStatus.DRAFT,
+          definitionStatus: FlightDefinitionStatus.PENDING_CEO,
           rejectionReason: null,
           approvedSnapshot: null,
           pendingRevisionSnapshot: null,
@@ -513,6 +517,19 @@ export class FlightDefinitionService {
       );
 
       await this.replaceChargeRules(manager, instance.id, chargeInputs, false);
+      await manager.save(
+        manager.create(FarePricingProposal, {
+          flightInstanceId: instance.id,
+          basePriceIrr: dto.basePriceIrr,
+          competitorPriceIrr: dto.competitorPriceIrr ?? null,
+          proposedPriceIrr: dto.basePriceIrr,
+          legalRateIrr: null,
+          note: null,
+          proposedById: actor.id,
+          status: PricingProposalStatus.PENDING,
+          updatedAt: new Date(),
+        }),
+      );
       return instance.id;
     });
 
@@ -520,14 +537,15 @@ export class FlightDefinitionService {
       actorId: actor.id,
       actorRole: actor.role,
       category: 'SYSTEM',
-      action: 'افزودن تعریف پرواز',
-      detail: `تعریف پرواز ${dto.flightNo} (${dto.originCode} ← ${dto.destCode}) توسط ${actor.fullName} ایجاد شد.`,
+      action: 'افزودن و ارسال تعریف پرواز',
+      detail: `تعریف پرواز ${dto.flightNo} (${dto.originCode} ← ${dto.destCode}) توسط ${actor.fullName} ایجاد و برای تأیید مدیرعامل ارسال شد.`,
       entityType: 'FlightInstance',
       entityId: createdId,
       metadata: {
         durationMinutes,
         cabinCapacities,
         chargeRuleCount: chargeInputs.length,
+        definitionStatus: FlightDefinitionStatus.PENDING_CEO,
       },
     });
 
