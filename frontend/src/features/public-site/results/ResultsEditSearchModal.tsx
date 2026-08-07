@@ -209,8 +209,13 @@ function AirportPicker({
                   >
                     ✈
                   </span>
-                  <div style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 700, color: '#16202e' }}>
-                    {airportCityName(a.code, locale, a.cityFa)}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: '#16202e' }}>
+                      {airportDisplayLabel(a, locale)}
+                    </div>
+                    <div style={{ marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11, color: '#8a96a6' }}>
+                      {a.airportNameFa || `فرودگاه ${a.cityFa}`}
+                    </div>
                   </div>
                 </button>
               ))}

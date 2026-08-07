@@ -332,17 +332,19 @@ export default function AddFlightPage({
     if (!q) return airports;
     return airports.filter(
       (a) =>
-        a.cityFa.includes(cityQuery.trim()) || a.code.toLowerCase().includes(q),
+        a.cityFa.includes(cityQuery.trim()) ||
+        a.code.toLowerCase().includes(q) ||
+        a.airportNameFa?.includes(cityQuery.trim()),
     );
   }, [airports, cityQuery]);
 
   function originLabel() {
     if (!originCode) return "انتخاب شهر مبدأ";
-    return cityByCode.get(originCode) ?? originCode;
+    return `${cityByCode.get(originCode) ?? originCode} (${originCode})`;
   }
   function destLabel() {
     if (!destCode) return "انتخاب شهر مقصد";
-    return cityByCode.get(destCode) ?? destCode;
+    return `${cityByCode.get(destCode) ?? destCode} (${destCode})`;
   }
 
   function openFareCreate() {
@@ -1373,8 +1375,16 @@ function CityDropdown({
             onClick={() => onPick(c.code)}
             className="flex w-full items-center justify-between px-3 py-[9px] text-[12.5px] text-[#e7ecf3] hover:bg-[#1c2740]"
           >
-            <span>{c.cityFa}</span>
-            <span dir="ltr" className="font-num text-[11px] text-[#6b7b94]">
+            <span className="min-w-0 text-start">
+              <span className="block font-bold">{c.cityFa}</span>
+              <span className="mt-0.5 block truncate text-[10.5px] text-[#6b7b94]">
+                {c.airportNameFa || `فرودگاه ${c.cityFa}`}
+              </span>
+            </span>
+            <span
+              dir="ltr"
+              className="font-num rounded-md bg-[#22304a] px-2 py-1 text-[11px] font-bold text-[#8fb8ff]"
+            >
               {c.code}
             </span>
           </button>

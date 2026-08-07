@@ -270,15 +270,24 @@ export class FlightsService {
   }
 
   async airports() {
-    return this.airportRepo.find({ order: { cityFa: 'ASC' } });
+    return this.airportRepo.find({
+      where: { active: true },
+      order: { cityFa: 'ASC', code: 'ASC' },
+    });
   }
 
   async createAirport(
     actor: AuthenticatedUser,
-    dto: { code: string; cityFa: string; tz?: string },
+    dto: {
+      code: string;
+      cityFa: string;
+      airportNameFa?: string;
+      tz?: string;
+    },
   ) {
     const code = dto.code.trim().toUpperCase();
     const cityFa = dto.cityFa.trim();
+    const airportNameFa = dto.airportNameFa?.trim() || null;
     if (!cityFa) {
       throw new BadRequestException({
         code: ErrorCode.VALIDATION_FAILED,
@@ -287,23 +296,38 @@ export class FlightsService {
     }
     const existing = await this.airportRepo.findOneBy({ code });
     if (existing) {
+      if (!existing.active) {
+        existing.cityFa = cityFa;
+        existing.airportNameFa = airportNameFa;
+        existing.tz = dto.tz?.trim() || existing.tz || 'Asia/Tehran';
+        existing.active = true;
+        const restored = await this.airportRepo.save(existing);
+        await this.redis.del('search:airports');
+        await this.audit.record({
+          actorId: actor.id,
+          actorRole: actor.role,
+          category: 'SYSTEM',
+          action: 'بازگردانی شهر پروازی',
+          detail: `شهر «${cityFa}» (${code}) توسط ${actor.fullName} دوباره فعال شد.`,
+          entityType: 'Airport',
+          entityId: restored.id,
+        });
+        return restored;
+      }
       throw new ConflictException({
         code: ErrorCode.CONFLICT,
         message: 'فرودگاهی با این کد قبلاً ثبت شده است.',
       });
     }
-    const duplicateCity = await this.airportRepo.findOneBy({ cityFa });
-    if (duplicateCity) {
-      throw new ConflictException({
-        code: ErrorCode.CONFLICT,
-        message: 'این شهر قبلاً ثبت شده است.',
-      });
-    }
+    // A city may legitimately have more than one airport (THR/IKA,
+    // DXB/DWC, IST/SAW); uniqueness belongs to the IATA code, not city name.
     const created = await this.airportRepo.save(
       this.airportRepo.create({
         code,
         cityFa,
+        airportNameFa,
         tz: dto.tz?.trim() || 'Asia/Tehran',
+        active: true,
       }),
     );
     await this.redis.del('search:airports');
@@ -327,19 +351,10 @@ export class FlightsService {
         message: 'فرودگاه یافت نشد.',
       });
     }
-    const routeCount = await this.routeRepo
-      .createQueryBuilder('route')
-      .where('route.originCode = :code OR route.destCode = :code', {
-        code: airport.code,
-      })
-      .getCount();
-    if (routeCount > 0) {
-      throw new ConflictException({
-        code: ErrorCode.CONFLICT,
-        message: 'این فرودگاه در مسیر پروازی استفاده شده و قابل حذف نیست.',
-      });
-    }
-    await this.airportRepo.remove(airport);
+    // Soft-delete keeps historical route/ticket/report labels resolvable while
+    // immediately removing the city from every new-flight/search selector.
+    airport.active = false;
+    await this.airportRepo.save(airport);
     await this.redis.del('search:airports');
     await this.audit.record({
       actorId: actor.id,
@@ -415,7 +430,7 @@ export class FlightsService {
       });
     }
     const airports = await this.airportRepo.find({
-      where: { code: In([dto.originCode, dto.destCode]) },
+      where: { code: In([dto.originCode, dto.destCode]), active: true },
     });
     if (airports.length !== 2) {
       throw new BadRequestException({
@@ -841,7 +856,7 @@ export class FlightsService {
       });
     }
     const airports = await this.airportRepo.find({
-      where: { code: In([dto.originCode, dto.destCode]) },
+      where: { code: In([dto.originCode, dto.destCode]), active: true },
     });
     if (airports.length !== 2) {
       throw new BadRequestException({

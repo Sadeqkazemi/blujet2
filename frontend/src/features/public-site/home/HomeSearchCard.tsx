@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import JalaliDatePicker from '../../../components/JalaliDatePicker';
 import type { Airport } from '../../../types/public-site';
 import type { StoredLocale } from '../../../hooks/useLocale';
-import { airportCityName } from '../../../lib/airport-cities';
+import { airportCityLabel, airportCityName } from '../../../lib/airport-cities';
 import { formatToman } from '../../../lib/fa-format';
 import {
   DomesticFlightIcon,
@@ -194,6 +194,7 @@ function AirportCell({
       return (
         a.code.toLowerCase().includes(q) ||
         a.cityFa.toLowerCase().includes(q) ||
+        a.airportNameFa?.toLowerCase().includes(q) ||
         city.toLowerCase().includes(q)
       );
     });
@@ -326,9 +327,17 @@ function AirportCell({
                   >
                     <PlaneIcon size={15} />
                   </span>
-                  <div style={{ flex: 1, minWidth: 0, fontSize: isMobile ? '13.5px' : '12.5px', fontWeight: 700, color: '#16202e' }}>
-                    {airportCityName(a.code, locale, a.cityFa)}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: isMobile ? '13.5px' : '12.5px', fontWeight: 700, color: '#16202e' }}>
+                      {airportCityName(a.code, locale, a.cityFa)}
+                    </div>
+                    <div style={{ marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: isMobile ? 11.5 : 10.5, color: '#9aa4b2' }}>
+                      {a.airportNameFa || `${cityListLabel} · ${a.code}`}
+                    </div>
                   </div>
+                  <span dir="ltr" style={{ borderRadius: 7, background: '#eef4fb', padding: '3px 7px', color: '#1668c4', fontSize: 10.5, fontWeight: 800 }}>
+                    {a.code}
+                  </span>
                 </div>
               ))}
               {filtered.length === 0 && (
@@ -403,13 +412,13 @@ export default function HomeSearchCard({
   function originDisplay() {
     if (!origin) return t.originPlaceholder;
     const ap = airportOptions.find((a) => a.code === origin);
-    return cityName(origin, ap?.cityFa);
+    return airportCityLabel(origin, locale, cityName(origin, ap?.cityFa));
   }
 
   function destDisplay() {
     if (!dest) return t.destPlaceholder;
     const ap = airportOptions.find((a) => a.code === dest);
-    return cityName(dest, ap?.cityFa);
+    return airportCityLabel(dest, locale, cityName(dest, ap?.cityFa));
   }
 
   function onSearch() {

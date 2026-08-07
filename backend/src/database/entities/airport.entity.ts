@@ -18,9 +18,19 @@ export class Airport {
   @Column({ type: 'text' })
   cityFa!: string;
 
+  @Column({ type: 'text', nullable: true })
+  airportNameFa!: string | null;
+
   @Column({ type: 'text' })
   tz!: string;
 
   @Column({ type: 'int', default: 60 })
   minConnectMin!: number;
+
+  /**
+   * Airports are deactivated instead of being physically removed so old
+   * routes, tickets and reports can still resolve their historical codes.
+   */
+  @Column({ type: 'boolean', default: true })
+  active!: boolean;
 }

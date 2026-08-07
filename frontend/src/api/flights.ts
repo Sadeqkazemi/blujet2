@@ -26,6 +26,7 @@ export function fetchAirports() {
 export function createAirport(payload: {
   cityFa: string;
   code: string;
+  airportNameFa?: string;
   tz?: string;
 }) {
   return apiPost<AirportEntry>("/flights/airports", payload);

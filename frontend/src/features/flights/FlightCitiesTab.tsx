@@ -1,6 +1,12 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { createAirport, deleteAirport } from "../../api/flights";
-import { faDigits, latinDigits } from "../../lib/fa-format";
+import PanelAlert from "../panel/PanelAlert";
+import PanelModal from "../panel/PanelModal";
+import {
+  AIRPORT_REFERENCE_CATALOG,
+  AIRPORT_REFERENCE_COUNTRIES,
+} from "../../lib/airport-reference-catalog";
+import { faDigits } from "../../lib/fa-format";
 import type { AirportEntry } from "../../types/flights";
 
 interface FlightCitiesTabProps {
@@ -9,154 +15,248 @@ interface FlightCitiesTabProps {
   onDeleted: (id: string) => void;
 }
 
+function TrashIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M4 7h16M9 7V4h6v3m-9 0 1 13h10l1-13M10 11v5m4-5v5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export default function FlightCitiesTab({
   airports,
   onCreated,
   onDeleted,
 }: FlightCitiesTabProps) {
-  const [cityFa, setCityFa] = useState("");
-  const [code, setCode] = useState("");
+  const [selectedCode, setSelectedCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<AirportEntry | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const activeCodes = useMemo(
+    () => new Set(airports.map((airport) => airport.code)),
+    [airports],
+  );
+  const selectedAirport = useMemo(
+    () => AIRPORT_REFERENCE_CATALOG.find((item) => item.code === selectedCode),
+    [selectedCode],
+  );
 
   async function onSubmit() {
     setError(null);
     setNotice(null);
-    const name = cityFa.trim();
-    const iata = latinDigits(code.trim()).toUpperCase();
-    if (!name || iata.length !== 3) {
-      setError("نام شهر و کد فرودگاه (۳ حرف) الزامی است.");
+    if (!selectedAirport) {
+      setError("یک شهر و فرودگاه را از فهرست انتخاب کنید.");
       return;
     }
     setBusy(true);
     try {
-      const created = await createAirport({ cityFa: name, code: iata });
-      setCityFa("");
-      setCode("");
-      setNotice(
-        `شهر «${name}» اضافه شد و در جستجوی بلیط سایت نمایش داده می‌شود ✓`,
-      );
+      const created = await createAirport({
+        cityFa: selectedAirport.cityFa,
+        code: selectedAirport.code,
+        airportNameFa: selectedAirport.airportNameFa,
+        tz: selectedAirport.tz,
+      });
+      setSelectedCode("");
       onCreated(created);
+      setNotice(
+        `«${selectedAirport.airportNameFa}» اضافه شد و از اکنون در انتخابگرهای پرواز و جستجوی سایت نمایش داده می‌شود.`,
+      );
     } catch (e) {
-      setError(e instanceof Error ? e.message : "خطا در ثبت شهر.");
+      setError(e instanceof Error ? e.message : "خطا در ثبت فرودگاه.");
     } finally {
       setBusy(false);
     }
   }
 
-  async function onDelete(airport: AirportEntry) {
-    if (!window.confirm(`فرودگاه ${airport.cityFa} حذف شود؟`)) return;
+  async function confirmDelete() {
+    if (!pendingDelete) return;
     setError(null);
     setNotice(null);
+    setDeleting(true);
     try {
-      await deleteAirport(airport.id);
-      onDeleted(airport.id);
-      setNotice(`فرودگاه «${airport.cityFa}» حذف شد.`);
+      await deleteAirport(pendingDelete.id);
+      onDeleted(pendingDelete.id);
+      setNotice(
+        `«${pendingDelete.airportNameFa || `فرودگاه ${pendingDelete.cityFa}`}» از شهرهای قابل انتخاب حذف شد. سوابق پروازهای قبلی محفوظ است.`,
+      );
+      setPendingDelete(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "خطا در حذف فرودگاه.");
+    } finally {
+      setDeleting(false);
     }
   }
 
   return (
     <div className="flex flex-col gap-4">
-      <section className="rounded-xl border border-border bg-white p-5">
-        <h2 className="mb-4 text-sm font-bold text-ink">افزودن شهر جدید</h2>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_auto]">
-          <div>
-            <label
-              htmlFor="city-name"
-              className="mb-1 block text-[11px] font-bold text-muted"
-            >
-              نام شهر *
-            </label>
-            <input
-              id="city-name"
-              value={cityFa}
-              onChange={(e) => setCityFa(e.target.value)}
-              placeholder="مثلاً وان"
-              className="h-10 w-full rounded-lg border border-border px-3 text-xs outline-none"
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="city-code"
-              className="mb-1 block text-[11px] font-bold text-muted"
-            >
-              کد فرودگاه *
-            </label>
-            <input
-              id="city-code"
-              dir="ltr"
-              value={code}
-              onChange={(e) => setCode(e.target.value.toUpperCase())}
-              placeholder="VAS"
-              maxLength={3}
-              className="font-num h-10 w-full rounded-lg border border-border px-3 text-xs outline-none"
-            />
-          </div>
-          <div className="flex items-end">
-            <button
-              disabled={busy}
-              onClick={() => void onSubmit()}
-              className="h-10 rounded-lg bg-accent px-5 text-xs font-bold text-white disabled:opacity-50"
-            >
-              {busy ? "در حال ثبت…" : "افزودن شهر"}
-            </button>
-          </div>
+      {error && <PanelAlert>{error}</PanelAlert>}
+      {notice && <PanelAlert tone="success">{notice}</PanelAlert>}
+
+      <section className="rounded-[14px] border border-panel-border bg-panel-card p-5">
+        <div className="mb-5 flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-panel-accent" />
+          <h2 className="text-sm font-bold text-white">افزودن شهر جدید</h2>
         </div>
-        {error && <p className="mt-2 text-[11px] text-danger">{error}</p>}
-        {notice && (
-          <p className="mt-2 text-[11px] font-bold text-[#059669]">{notice}</p>
-        )}
-        <p className="mt-3 text-[11px] text-muted">
-          این شهرها همان لیستی هستند که در باکس جستجوی بلیط در صفحهٔ اصلی سایت
-          هم نمایش داده می‌شوند.
+
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.25fr_.65fr_1.25fr_auto] xl:items-end">
+          <label className="block">
+            <span className="mb-2 block text-[11px] font-bold text-panel-muted">
+              نام شهر و فرودگاه *
+            </span>
+            <select
+              aria-label="نام شهر و فرودگاه"
+              value={selectedCode}
+              onChange={(event) => setSelectedCode(event.target.value)}
+              className="h-11 w-full rounded-lg border border-panel-border-2 bg-panel-elevated px-3 text-xs text-panel-text outline-none focus:border-panel-accent"
+            >
+              <option value="">انتخاب از فهرست فرودگاه‌ها</option>
+              {AIRPORT_REFERENCE_COUNTRIES.map((country) => {
+                const rows = AIRPORT_REFERENCE_CATALOG.filter(
+                  (item) => item.countryFa === country && !activeCodes.has(item.code),
+                );
+                if (rows.length === 0) return null;
+                return (
+                  <optgroup key={country} label={country}>
+                    {rows.map((item) => (
+                      <option key={item.code} value={item.code}>
+                        {item.cityFa} — {item.airportNameFa} ({item.code})
+                      </option>
+                    ))}
+                  </optgroup>
+                );
+              })}
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="mb-2 block text-[11px] font-bold text-panel-muted">
+              کد فرودگاه
+            </span>
+            <input
+              aria-label="کد فرودگاه"
+              readOnly
+              dir="ltr"
+              value={selectedAirport?.code ?? ""}
+              placeholder="IATA"
+              className="font-num h-11 w-full rounded-lg border border-panel-border-2 bg-panel-elevated px-3 text-xs font-bold text-panel-link outline-none"
+            />
+          </label>
+
+          <label className="block">
+            <span className="mb-2 block text-[11px] font-bold text-panel-muted">
+              نام فرودگاه
+            </span>
+            <input
+              aria-label="نام فرودگاه"
+              readOnly
+              value={selectedAirport?.airportNameFa ?? ""}
+              placeholder="پس از انتخاب شهر تکمیل می‌شود"
+              className="h-11 w-full rounded-lg border border-panel-border-2 bg-panel-elevated px-3 text-xs text-panel-text outline-none"
+            />
+          </label>
+
+          <button
+            type="button"
+            disabled={busy || !selectedAirport}
+            onClick={() => void onSubmit()}
+            className="h-11 rounded-lg bg-panel-accent px-6 text-xs font-bold text-white transition hover:bg-panel-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {busy ? "در حال ثبت…" : "افزودن شهر"}
+          </button>
+        </div>
+
+        <p className="mt-4 text-[11px] leading-6 text-panel-muted">
+          فهرست مرجع شامل فرودگاه‌های ایران و مقاصد منتخب امارات، عمان، قطر،
+          ترکیه، ارمنستان و عراق است. فقط شهرهای ثبت‌شده در این صفحه در جستجوی
+          بلیط سایت نمایش داده می‌شوند.
         </p>
       </section>
 
-      <section className="rounded-xl border border-border bg-white">
-        <div className="flex items-center justify-between border-b border-border px-5 py-3">
-          <h2 className="text-sm font-bold text-ink">
-            شهرها و فرودگاه‌های ثبت‌شده
-          </h2>
-          <span className="text-[11px] text-muted">
-            {faDigits(airports.length)} شهر
+      <section className="overflow-hidden rounded-[14px] border border-panel-border bg-panel-card">
+        <div className="flex items-center justify-between border-b border-panel-border px-5 py-4">
+          <h2 className="text-sm font-bold text-white">شهرهای دارای پرواز</h2>
+          <span className="text-[11px] text-panel-muted">
+            {faDigits(airports.length)} شهر / فرودگاه
           </span>
         </div>
+
         <div className="overflow-x-auto">
-          <div className="min-w-[480px]">
-            <div className="grid grid-cols-[1.2fr_0.7fr_1.6fr_auto] gap-3 border-b border-border px-5 py-2 text-[10px] font-bold text-muted">
+          <div className="min-w-[650px]">
+            <div className="grid grid-cols-[1fr_.55fr_1.5fr_42px] gap-4 border-b border-panel-border px-5 py-3 text-[10px] font-bold text-panel-muted">
               <span>شهر</span>
               <span>کد</span>
               <span>فرودگاه</span>
-              <span>عملیات</span>
+              <span className="sr-only">عملیات</span>
             </div>
-            {airports.map((a) => (
+            {airports.map((airport) => (
               <div
-                key={a.id}
-                className="grid grid-cols-[1.2fr_0.7fr_1.6fr_auto] items-center gap-3 border-b border-border px-5 py-3 text-xs"
+                key={airport.id}
+                className="grid grid-cols-[1fr_.55fr_1.5fr_42px] items-center gap-4 border-b border-panel-border px-5 py-4 text-xs last:border-b-0 hover:bg-panel-elevated/45"
               >
-                <span className="font-bold text-ink">{a.cityFa}</span>
-                <span className="ltr font-num text-muted">{a.code}</span>
-                <span className="text-muted">فرودگاه {a.cityFa}</span>
-                <button
-                  onClick={() => void onDelete(a)}
-                  className="text-danger"
+                <span className="font-bold text-white">{airport.cityFa}</span>
+                <span
+                  dir="ltr"
+                  className="font-num w-fit rounded-md bg-panel-elevated px-2 py-1 font-bold text-panel-link"
                 >
-                  حذف
+                  {airport.code}
+                </span>
+                <span className="text-panel-muted-2">
+                  {airport.airportNameFa || `فرودگاه ${airport.cityFa}`}
+                </span>
+                <button
+                  type="button"
+                  aria-label={`حذف ${airport.cityFa} ${airport.code}`}
+                  onClick={() => setPendingDelete(airport)}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-danger transition hover:bg-danger/10"
+                >
+                  <TrashIcon />
                 </button>
               </div>
             ))}
             {airports.length === 0 && (
-              <p className="py-8 text-center text-xs leading-6 text-muted">
-                هنوز هیچ شهر پروازی ثبت نشده است. در سندباکس فقط شهرهایی که مدیر
-                بازرگانی ثبت می‌کند نمایش داده می‌شوند.
+              <p className="px-5 py-10 text-center text-xs leading-6 text-panel-muted">
+                هنوز شهری برای فروش بلیط فعال نشده است. یک فرودگاه را از فهرست
+                مرجع انتخاب و اضافه کنید.
               </p>
             )}
           </div>
         </div>
       </section>
+
+      {pendingDelete && (
+        <PanelModal
+          title="حذف شهر پروازی"
+          onClose={() => !deleting && setPendingDelete(null)}
+          footer={
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => setPendingDelete(null)}
+                className="rounded-lg border border-panel-border-2 px-4 py-2 text-xs font-bold text-panel-muted-2"
+              >
+                انصراف
+              </button>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => void confirmDelete()}
+                className="rounded-lg bg-danger px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
+              >
+                {deleting ? "در حال حذف…" : "تأیید حذف"}
+              </button>
+            </div>
+          }
+        >
+          <p className="text-xs leading-7 text-panel-text">
+            «{pendingDelete.airportNameFa || `فرودگاه ${pendingDelete.cityFa}`}»
+            از انتخابگر شهرها حذف شود؟ پروازها و گزارش‌های قبلی محفوظ می‌مانند.
+          </p>
+        </PanelModal>
+      )}
     </div>
   );
 }

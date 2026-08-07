@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import type { AuthUser } from '../../../types/auth';
 import { faDigits } from '../../../lib/fa-format';
 import { useLocale, type StoredLocale } from '../../../hooks/useLocale';
 import type { TabKey } from './account-types';
 import { sidebarAccountNavItems } from './account-nav-items';
+import ConfirmActionDialog from '../../../components/ConfirmActionDialog';
 
 const TIER_LABEL: Record<string, Record<StoredLocale, string>> = {
   SILVER: { fa: 'عضو نقره‌ای باشگاه', en: 'Silver Club Member', ar: 'عضو فضية النادي' },
@@ -16,6 +18,11 @@ const STR: Record<
     loyaltyPoints: string;
     walletLink: string;
     logout: string;
+    logoutTitle: string;
+    logoutMessage: string;
+    logoutConfirm: string;
+    logoutCancel: string;
+    logoutBusy: string;
     defaultUserName: string;
     newMember: string;
   }
@@ -24,6 +31,11 @@ const STR: Record<
     loyaltyPoints: 'امتیاز باشگاه',
     walletLink: 'کیف پول',
     logout: 'خروج از حساب',
+    logoutTitle: 'خروج از حساب',
+    logoutMessage: 'آیا مطمئن هستید که می‌خواهید از حساب کاربری خود خارج شوید؟',
+    logoutConfirm: 'بله، خارج شو',
+    logoutCancel: 'انصراف',
+    logoutBusy: 'در حال خروج…',
     defaultUserName: 'کاربر',
     newMember: 'عضو جدید باشگاه',
   },
@@ -31,6 +43,11 @@ const STR: Record<
     loyaltyPoints: 'Loyalty Points',
     walletLink: 'Wallet',
     logout: 'Log Out',
+    logoutTitle: 'Sign out',
+    logoutMessage: 'Are you sure you want to sign out of your account?',
+    logoutConfirm: 'Yes, sign out',
+    logoutCancel: 'Cancel',
+    logoutBusy: 'Signing out…',
     defaultUserName: 'User',
     newMember: 'New Club Member',
   },
@@ -38,6 +55,11 @@ const STR: Record<
     loyaltyPoints: 'نقاط الولاء',
     walletLink: 'المحفظة',
     logout: 'تسجيل الخروج',
+    logoutTitle: 'تسجيل الخروج',
+    logoutMessage: 'هل أنت متأكد من رغبتك في تسجيل الخروج من حسابك؟',
+    logoutConfirm: 'نعم، تسجيل الخروج',
+    logoutCancel: 'إلغاء',
+    logoutBusy: 'جارٍ تسجيل الخروج…',
     defaultUserName: 'مستخدم',
     newMember: 'عضو جديد النادي',
   },
@@ -217,6 +239,8 @@ export default function AccountSidebar({
 }: Props) {
   const { locale } = useLocale();
   const t = STR[locale];
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  const [logoutBusy, setLogoutBusy] = useState(false);
   const displayName = user?.fullName ?? t.defaultUserName;
   const membershipBadge =
     club?.isMember && club.level
@@ -224,6 +248,16 @@ export default function AccountSidebar({
       : t.newMember;
 
   const sidebarNav = sidebarAccountNavItems(isMobile);
+
+  async function confirmSignOut() {
+    setLogoutBusy(true);
+    try {
+      await onSignOut();
+      setLogoutConfirmOpen(false);
+    } finally {
+      setLogoutBusy(false);
+    }
+  }
 
   return (
     <aside
@@ -346,7 +380,7 @@ export default function AccountSidebar({
         <button
           type="button"
           data-testid="account-logout"
-          onClick={() => void onSignOut()}
+          onClick={() => setLogoutConfirmOpen(true)}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -374,6 +408,19 @@ export default function AccountSidebar({
           {t.logout}
         </button>
       </div>
+      <ConfirmActionDialog
+        open={logoutConfirmOpen}
+        title={t.logoutTitle}
+        message={t.logoutMessage}
+        confirmLabel={t.logoutConfirm}
+        cancelLabel={t.logoutCancel}
+        busy={logoutBusy}
+        busyLabel={t.logoutBusy}
+        onCancel={() => setLogoutConfirmOpen(false)}
+        onConfirm={confirmSignOut}
+        variant="light"
+        testId="account-logout-confirm"
+      />
     </aside>
   );
 }

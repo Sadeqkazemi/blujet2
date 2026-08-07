@@ -6,16 +6,23 @@ import * as flightsApi from "../../api/flights";
 import type { AirportEntry } from "../../types/flights";
 
 const AIRPORTS: AirportEntry[] = [
-  { id: "a1", code: "THR", cityFa: "تهران", tz: "Asia/Tehran" },
+  {
+    id: "a1",
+    code: "THR",
+    cityFa: "تهران",
+    airportNameFa: "فرودگاه بین‌المللی مهرآباد",
+    tz: "Asia/Tehran",
+  },
 ];
 
 describe("FlightCitiesTab", () => {
-  it("creates a city and refreshes the list", async () => {
+  it("creates an airport from the real reference catalog", async () => {
     const created: AirportEntry = {
       id: "a2",
-      code: "VAS",
+      code: "VAN",
       cityFa: "وان",
-      tz: "Asia/Tehran",
+      airportNameFa: "فرودگاه فرید ملن",
+      tz: "Europe/Istanbul",
     };
     const createSpy = vi
       .spyOn(flightsApi, "createAirport")
@@ -30,13 +37,52 @@ describe("FlightCitiesTab", () => {
       />,
     );
 
-    await userEvent.type(screen.getByLabelText("نام شهر *"), "وان");
-    await userEvent.type(screen.getByLabelText("کد فرودگاه *"), "VAS");
+    await userEvent.selectOptions(screen.getByLabelText("نام شهر و فرودگاه"), "VAN");
+    expect(screen.getByLabelText("کد فرودگاه")).toHaveValue("VAN");
+    expect(screen.getByLabelText("نام فرودگاه")).toHaveValue("فرودگاه فرید ملن");
     await userEvent.click(screen.getByRole("button", { name: "افزودن شهر" }));
 
     await waitFor(() =>
-      expect(createSpy).toHaveBeenCalledWith({ cityFa: "وان", code: "VAS" }),
+      expect(createSpy).toHaveBeenCalledWith({
+        cityFa: "وان",
+        code: "VAN",
+        airportNameFa: "فرودگاه فرید ملن",
+        tz: "Europe/Istanbul",
+      }),
     );
     expect(onCreated).toHaveBeenCalledWith(created);
+  });
+
+  it("confirms deletion, removes the row, and shows a success notification", async () => {
+    vi.spyOn(flightsApi, "deleteAirport").mockResolvedValue({ id: "a1" });
+    const onDeleted = vi.fn();
+
+    render(
+      <FlightCitiesTab
+        airports={AIRPORTS}
+        onCreated={vi.fn()}
+        onDeleted={onDeleted}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "حذف تهران THR" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "تأیید حذف" }));
+
+    await waitFor(() => expect(onDeleted).toHaveBeenCalledWith("a1"));
+    expect(screen.getByText(/از شهرهای قابل انتخاب حذف شد/)).toBeInTheDocument();
+  });
+
+  it("supports two airports in the same city", () => {
+    render(
+      <FlightCitiesTab
+        airports={AIRPORTS}
+        onCreated={vi.fn()}
+        onDeleted={vi.fn()}
+      />,
+    );
+
+    const picker = screen.getByLabelText("نام شهر و فرودگاه");
+    expect(picker).toHaveTextContent("فرودگاه بین‌المللی امام خمینی (IKA)");
   });
 });

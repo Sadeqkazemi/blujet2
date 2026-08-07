@@ -51,6 +51,15 @@ class CreateAirportDto {
   @IsString()
   cityFa: string;
 
+  @ApiProperty({
+    required: false,
+    description: 'نام فارسی فرودگاه',
+    example: 'فرودگاه بین‌المللی وان',
+  })
+  @IsOptional()
+  @IsString()
+  airportNameFa?: string;
+
   @ApiProperty({ description: 'کد IATA فرودگاه', example: 'VAS' })
   @IsString()
   @Matches(/^[A-Za-z]{3}$/)

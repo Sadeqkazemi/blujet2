@@ -12,6 +12,7 @@ import { Flight } from '../src/database/entities/flight.entity';
 import { FlightInstance } from '../src/database/entities/flight-instance.entity';
 import { Booking } from '../src/database/entities/booking.entity';
 import { Airport } from '../src/database/entities/airport.entity';
+import { Route } from '../src/database/entities/route.entity';
 import { AuditLog } from '../src/database/entities/audit-log.entity';
 import { FarePricingProposal } from '../src/database/entities/fare-pricing-proposal.entity';
 import {
@@ -246,7 +247,7 @@ describe('Flights (e2e)', () => {
     expect(denied.status).toBe(403);
   });
 
-  it('POST /flights/airports creates a new airport and rejects duplicates', async () => {
+  it('airport catalog creates real labels, soft-deletes used cities, and rejects active duplicate codes', async () => {
     const { accessToken } = await loginAs(app, 'comm');
     // A timestamp-derived 2-letter suffix has too little entropy (only ~1300
     // combinations) not to occasionally collide with a real seeded IATA code
@@ -263,18 +264,52 @@ describe('Flights (e2e)', () => {
       ).join('');
     } while (existing.has(code));
     const cityFa = `شهر تست ${code}`;
+    const airportNameFa = `فرودگاه تست ${code}`;
     const created = await request(app.getHttpServer())
       .post('/flights/airports')
       .set('Authorization', `Bearer ${accessToken}`)
-      .send({ cityFa, code });
+      .send({ cityFa, code, airportNameFa });
     expect(created.status).toBe(201);
     expect(created.body.data.code).toBe(code);
+    expect(created.body.data.airportNameFa).toBe(airportNameFa);
 
     const dup = await request(app.getHttpServer())
       .post('/flights/airports')
       .set('Authorization', `Bearer ${accessToken}`)
       .send({ cityFa: `${cityFa} ۲`, code });
     expect(dup.status).toBe(409);
+
+    // Historical route usage must no longer make the UI deletion appear to
+    // do nothing. The airport is hidden from new searches but the route row
+    // remains intact for old tickets/reports.
+    const routeRepo = dataSource.getRepository(Route);
+    const route = await routeRepo.save(
+      routeRepo.create({ originCode: code, destCode: 'THR', durationMin: 75 }),
+    );
+    const removed = await request(app.getHttpServer())
+      .delete(`/flights/airports/${created.body.data.id}`)
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(removed.status).toBe(200);
+    expect(removed.body.data).toEqual({ id: created.body.data.id });
+
+    const stored = await dataSource.getRepository(Airport).findOneByOrFail({
+      id: created.body.data.id,
+    });
+    expect(stored.active).toBe(false);
+    expect(await routeRepo.findOneBy({ id: route.id })).not.toBeNull();
+
+    const staffCatalog = await request(app.getHttpServer())
+      .get('/flights/airports')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(staffCatalog.body.data).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ code })]),
+    );
+    const publicCatalog = await request(app.getHttpServer()).get(
+      '/search/airports',
+    );
+    expect(publicCatalog.body.data).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ code })]),
+    );
   });
 
   it('POST /flights: validations (same origin/dest, past date, duplicate flightNo on another route) then a clean create', async () => {

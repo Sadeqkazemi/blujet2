@@ -7,11 +7,12 @@ import { useIsMobile } from '../../hooks/useIsMobile';
 import AgencyPortalHeader from './AgencyPortalHeader';
 import AgencyPortalSidebar from './AgencyPortalSidebar';
 import { AGENCY_PAGE_META, agencyNavKeyFromPath } from './agency-nav-config';
+import ConfirmActionDialog from '../../components/ConfirmActionDialog';
 
-const STR: Record<StoredLocale, { newMessage: string }> = {
-  fa: { newMessage: 'پیام جدید' },
-  en: { newMessage: 'New message' },
-  ar: { newMessage: 'رسالة جديدة' },
+const STR: Record<StoredLocale, { newMessage: string; logoutTitle: string; logoutMessage: string; logoutConfirm: string; logoutCancel: string; logoutBusy: string }> = {
+  fa: { newMessage: 'پیام جدید', logoutTitle: 'خروج از حساب', logoutMessage: 'آیا مطمئن هستید که می‌خواهید از پنل آژانس خارج شوید؟', logoutConfirm: 'بله، خارج شو', logoutCancel: 'انصراف', logoutBusy: 'در حال خروج…' },
+  en: { newMessage: 'New message', logoutTitle: 'Sign out', logoutMessage: 'Are you sure you want to sign out of the agency portal?', logoutConfirm: 'Yes, sign out', logoutCancel: 'Cancel', logoutBusy: 'Signing out…' },
+  ar: { newMessage: 'رسالة جديدة', logoutTitle: 'تسجيل الخروج', logoutMessage: 'هل أنت متأكد من رغبتك في تسجيل الخروج من بوابة الوكالة؟', logoutConfirm: 'نعم، تسجيل الخروج', logoutCancel: 'إلغاء', logoutBusy: 'جارٍ تسجيل الخروج…' },
 };
 
 /** Agency portal shell — matches design-reference-v2/پنل آژانس.dc.html layout. */
@@ -28,6 +29,8 @@ export default function AgencyPortalShell() {
   const [agencyName, setAgencyName] = useState(user?.fullName ?? '');
   const [licenseNo, setLicenseNo] = useState<string | null>(null);
   const [inboxCount, setInboxCount] = useState(0);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  const [logoutBusy, setLogoutBusy] = useState(false);
 
   useEffect(() => {
     fetchProfile()
@@ -44,8 +47,13 @@ export default function AgencyPortalShell() {
   }, []);
 
   async function onSignOut() {
-    await signOut();
-    navigate('/agency/login', { replace: true });
+    setLogoutBusy(true);
+    try {
+      await signOut();
+      navigate('/agency/login', { replace: true });
+    } finally {
+      setLogoutBusy(false);
+    }
   }
 
   return (
@@ -64,7 +72,7 @@ export default function AgencyPortalShell() {
         isMobile={isMobile}
         activeKey={activeKey}
         agencyName={agencyName}
-        onSignOut={() => void onSignOut()}
+        onSignOut={() => setLogoutConfirmOpen(true)}
       />
 
       {!isMobile && (
@@ -73,7 +81,7 @@ export default function AgencyPortalShell() {
           agencyName={agencyName}
           licenseNo={licenseNo}
           inboxCount={inboxCount}
-          onSignOut={() => void onSignOut()}
+          onSignOut={() => setLogoutConfirmOpen(true)}
         />
       )}
 
@@ -140,6 +148,19 @@ export default function AgencyPortalShell() {
         </div>
         <Outlet />
       </main>
+      <ConfirmActionDialog
+        open={logoutConfirmOpen}
+        title={t.logoutTitle}
+        message={t.logoutMessage}
+        confirmLabel={t.logoutConfirm}
+        cancelLabel={t.logoutCancel}
+        busy={logoutBusy}
+        busyLabel={t.logoutBusy}
+        onCancel={() => setLogoutConfirmOpen(false)}
+        onConfirm={onSignOut}
+        variant="light"
+        testId="agency-logout-confirm"
+      />
     </div>
   );
 }
