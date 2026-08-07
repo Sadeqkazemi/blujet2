@@ -165,6 +165,7 @@ jobs:
                 chmod 600 "$catalog_backup"
                 docker compose -f docker-compose.prod.yml exec -T \
                   -e UAT_FLIGHT_CATALOG_CLEANUP_CONFIRM=CLEAR_BLUJET_UAT_FLIGHT_CATALOG \
+                  -e UAT_FLIGHT_CATALOG_DELETE_ROUTES_CONFIRM=DELETE_BLUJET_UAT_ROUTES \
                   -e UAT_FLIGHT_CATALOG_CLEANUP_BACKUP_REF="$catalog_backup" \
                   backend node dist/database/uat-flight-catalog-cleanup.js --execute-cleanup \
                   > "$catalog_audit"
