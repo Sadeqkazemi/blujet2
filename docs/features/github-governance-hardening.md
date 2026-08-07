@@ -17,8 +17,8 @@ dependency/security checks.
 - [x] Dependency updates are automated for npm, pip, and GitHub Actions.
 - [x] CodeQL scans JavaScript/TypeScript and Python on PRs and weekly.
 - [x] The README documents structure, local checks, and the release path.
-- [ ] GitHub `main` branch protection is enabled after this PR merges.
-- [ ] GitHub `uat` environment protection is enabled after this PR merges.
+- [x] GitHub `main` branch protection requires PRs and all five checks.
+- [x] GitHub `uat` environment protection requires owner approval.
 
 ## Verification
 
