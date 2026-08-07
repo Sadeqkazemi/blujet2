@@ -78,7 +78,7 @@ export class Booking {
 
   @ManyToOne(() => AgencyAllotment, {
     onDelete: 'RESTRICT',
-    onUpdate: 'CASCADE',@Column({ type: 'jsonb', default: [] })
+    onUpdate: 'CASCADE',
   })
   @JoinColumn({
     name: 'allotmentId',
@@ -138,7 +138,7 @@ export class Booking {
 
   /** Immutable purchase-time snapshot. Later manager price changes must not
    * alter an already held/paid booking. */
-  @Column({ type: 'jsonb', default: () => "'[]'::jsonb" })
+  @Column({ type: 'jsonb', default: [] })
   extrasSnapshot!: {
     id: string;
     code: string;
