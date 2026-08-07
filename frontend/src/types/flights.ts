@@ -20,7 +20,7 @@ export interface ChargeRule {
   kind: ChargeKind;
   /** Backend contract — not the form method name. */
   calculationMode: 'FIXED' | 'PERCENTAGE';
-  fixedAmountIrr?: number | null;
+  fixedAmountIrr?: string | number | null;
   percentageBasisPoints?: number | null;
   /** null = all cabins. */
   cabin: CabinKind | null;
@@ -211,11 +211,12 @@ export interface CreateFlightDefinitionPayload {
   durationMinutes: number;
   capacity: number;
   cabinCapacities: CabinCapacity[];
-  basePriceIrr: number;
+  /** IRR decimal string (or legacy number) — prefer string on the wire. */
+  basePriceIrr: string | number;
   aircraftType?: string;
   charterSeats?: number;
   chargeRules?: Omit<ChargeRule, "id">[];
-  competitorPriceIrr?: number;
+  competitorPriceIrr?: string | number;
 }
 
 export interface UpdateFlightDefinitionPayload extends CreateFlightDefinitionPayload {}

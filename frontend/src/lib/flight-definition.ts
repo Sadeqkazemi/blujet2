@@ -36,15 +36,20 @@ export const APPROVAL_STATUS_META: Record<
   },
 };
 
-/** Strip separators / hyphens and force A-Z0-9 uppercase, max 6 chars. */
+/**
+ * Normalize flight-number input: Persian/Arabic digits → Latin, uppercase.
+ * Does NOT trim and does NOT strip spaces/hyphens — pasted `" XY1234 "` must
+ * stay invalid (backend rejects anything outside `^[A-Z]{2}\\d{4}$`).
+ * When the value is already pure A-Z0-9, cap at 6 chars for typing UX.
+ */
 export function sanitizeFlightNoInput(raw: string): string {
-  return latinDigits(raw)
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, "")
-    .slice(0, 6);
+  const upper = latinDigits(raw).toUpperCase();
+  if (/[^A-Z0-9]/.test(upper)) return upper;
+  return upper.slice(0, 6);
 }
 
 export function isValidFlightNo(value: string): boolean {
+  if (value !== value.trim()) return false;
   return FLIGHT_NO_PATTERN.test(value);
 }
 
@@ -138,48 +143,71 @@ export function sumCabinSeats(rows: { seats: number }[]): number {
 export type PreviewChargeRule = {
   kind: ChargeKind;
   method: ChargeMethod;
-  /** FIXED: IRR; PERCENT: percent points (10 = 10%). */
-  amount: number;
+  /** FIXED: IRR (number or decimal string); PERCENT: percent points (10 = 10%). */
+  amount: number | string;
   cabin: CabinKind | 'ALL';
   active: boolean;
   title?: string;
 };
 
+export type ChargePreviewLine = { title: string; amountIrr: string };
+export type ChargePreviewResult = {
+  lines: ChargePreviewLine[];
+  totalIrr: string;
+};
+
+function toIrrBigInt(value: number | string | bigint): bigint {
+  if (typeof value === 'bigint') return value;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return 0n;
+    return BigInt(Math.round(value));
+  }
+  const cleaned = String(value).replace(/[٬,\s]/g, '');
+  if (!cleaned || !/^-?\d+$/.test(cleaned)) return 0n;
+  return BigInt(cleaned);
+}
+
 /**
  * Preview-only charge total for ONE specific cabin.
  * Rules with cabin=ALL apply to every cabin; cabin-specific rules apply only
- * to that cabin. Passing cabin="ALL" is rejected — use previewChargeTotalsByCabin.
+ * to that cabin. Totals are BigInt-backed decimal strings (no float IRR math).
  */
 export function previewChargeTotalIrr(
-  basePriceIrr: number,
+  basePriceIrr: number | string | bigint,
   rules: PreviewChargeRule[],
   cabin: CabinKind,
-): { lines: { title: string; amountIrr: number }[]; totalIrr: number } {
-  const lines: { title: string; amountIrr: number }[] = [];
-  let total = basePriceIrr;
+): ChargePreviewResult {
+  const lines: ChargePreviewLine[] = [];
+  const base = toIrrBigInt(basePriceIrr);
+  let total = base;
   for (const rule of rules) {
     if (!rule.active) continue;
     if (rule.cabin !== 'ALL' && rule.cabin !== cabin) continue;
-    const amountIrr =
-      rule.method === 'FIXED'
-        ? Math.round(rule.amount)
-        : Math.round((basePriceIrr * rule.amount) / 100);
+    let amountIrr: bigint;
+    if (rule.method === 'FIXED') {
+      amountIrr = toIrrBigInt(rule.amount);
+    } else {
+      // Percent points are small display numbers (e.g. 10 = 10%) — safe as number.
+      const pct = Number(rule.amount);
+      const pctRounded = Number.isFinite(pct) ? Math.round(pct) : 0;
+      amountIrr = (base * BigInt(pctRounded)) / 100n;
+    }
     lines.push({
       title:
         rule.title?.trim() ||
         (rule.kind === 'TAX' ? 'مالیات' : 'عوارض'),
-      amountIrr,
+      amountIrr: amountIrr.toString(),
     });
     total += amountIrr;
   }
-  return { lines, totalIrr: total };
+  return { lines, totalIrr: total.toString() };
 }
 
 /** Per-cabin preview summaries — never merges BUSINESS taxes into ECONOMY. */
 export function previewChargeTotalsByCabin(
-  basePriceIrr: number,
+  basePriceIrr: number | string | bigint,
   rules: PreviewChargeRule[],
-): Record<CabinKind, { lines: { title: string; amountIrr: number }[]; totalIrr: number }> {
+): Record<CabinKind, ChargePreviewResult> {
   return {
     ECONOMY: previewChargeTotalIrr(basePriceIrr, rules, 'ECONOMY'),
     COMFORT: previewChargeTotalIrr(basePriceIrr, rules, 'COMFORT'),

@@ -77,6 +77,8 @@ export interface CommercialFlightRow {
   charterSeats: number;
   /** Instance base fare (ریال) — shown even before a proposal exists. */
   basePriceIrr: string | null;
+  /** Real competitor fare when present — never invent base+3% client-side. */
+  competitorPriceIrr?: string | null;
   flight: { flightNo: string; route: { originCode: string; destCode: string } };
   pricing: PricingProposal | null;
 }

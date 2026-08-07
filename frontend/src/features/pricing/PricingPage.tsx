@@ -11,13 +11,19 @@ import {
   upsertProposal,
 } from "../../api/pricing";
 import { fetchAirports } from "../../api/flights";
-import { faDigits, faMoney, parseTomanToRial } from "../../lib/fa-format";
+import {
+  faDigits,
+  faMoney,
+  irrPercentDelta,
+  irrToTomanInput,
+  parseTomanToRialString,
+} from "../../lib/fa-format";
 import { dayjs, formatJalaliDate } from "../../lib/jalali";
 import { cabinLabel, formatDurationFa } from "../../lib/flight-definition";
 import { useStepUp } from "../../hooks/useStepUp";
 import Modal from "../../components/Modal";
 import MoneyInput from "../../components/MoneyInput";
-import { moneyInputToRial } from "../../lib/money-input";
+import { moneyInputToRialString } from "../../lib/money-input";
 import Pagination from "../../components/Pagination";
 import { usePagination } from "../../hooks/usePagination";
 import type {
@@ -55,30 +61,21 @@ function vsCompetitorLabel(
   proposed: string | number,
   competitor: string | number,
 ): string {
-  // Money fields are decimal STRINGs on the wire — parsed here for this
-  // display-only ratio; individual proposal amounts are far below 2^53.
-  const delta =
-    ((Number(proposed) - Number(competitor)) / Number(competitor)) * 100;
-  if (Math.abs(delta) < 1) return "هم‌تراز رقبا";
+  const delta = irrPercentDelta(proposed, competitor);
+  if (delta == null || Math.abs(delta) < 1) return "هم‌تراز رقبا";
   const pct = faDigits(Math.abs(Math.round(delta)));
   return delta < 0 ? `${pct}٪ پایین‌تر از رقبا` : `${pct}٪ بالاتر از رقبا`;
 }
 
 function moneyOrDash(irr: string | number | null | undefined): string {
   if (irr == null || irr === "") return "—";
-  const n = Number(irr);
-  if (!Number.isFinite(n) || n <= 0) return "—";
+  try {
+    const n = BigInt(String(irr).replace(/[٬,\s]/g, ""));
+    if (n <= 0n) return "—";
+  } catch {
+    return "—";
+  }
   return `${faMoney(irr)} تومان`;
-}
-
-/** Match backend upsert: competitor ≈ base + 3% when no proposal yet. */
-function derivedCompetitorIrr(
-  baseIrr: string | null | undefined,
-): string | null {
-  if (baseIrr == null || baseIrr === "") return null;
-  const base = Number(baseIrr);
-  if (!Number.isFinite(base) || base <= 0) return null;
-  return String(Math.round((base * 1.03) / 100_000) * 100_000);
 }
 
 function formatDepartureTime(departureAt: string): string {
@@ -198,7 +195,7 @@ function CeoPricing() {
   }
 
   async function onSaveLegal(p: PricingProposal) {
-    const rial = moneyInputToRial(legalInputs[p.id] ?? "");
+    const rial = moneyInputToRialString(legalInputs[p.id] ?? "");
     if (rial === null) {
       setError("نرخ قانونی را وارد کنید");
       return;
@@ -246,9 +243,8 @@ function CeoPricing() {
     proposed: string | number,
     competitor: string | number,
   ): string {
-    const delta =
-      ((Number(proposed) - Number(competitor)) / Number(competitor)) * 100;
-    if (Math.abs(delta) < 1) return "#9fb0c7";
+    const delta = irrPercentDelta(proposed, competitor);
+    if (delta == null || Math.abs(delta) < 1) return "#9fb0c7";
     return delta < 0 ? "#34d399" : "#f87171";
   }
 
@@ -898,30 +894,18 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
   }
 
   function competitorIrr(row: CommercialFlightRow): string | null {
-    return (
-      row.pricing?.competitorPriceIrr ?? derivedCompetitorIrr(baseIrr(row))
-    );
+    return row.pricing?.competitorPriceIrr ?? row.competitorPriceIrr ?? null;
   }
 
   function openModal(row: CommercialFlightRow) {
     setSelected(row);
     setModalError(null);
     if (row.pricing && row.pricing.status !== "REGISTERED") {
-      setProposedInput(
-        String(Math.round(Number(row.pricing.proposedPriceIrr) / 10)),
-      );
-      setLegalInput(
-        row.pricing.legalRateIrr
-          ? String(Math.round(Number(row.pricing.legalRateIrr) / 10))
-          : "",
-      );
+      setProposedInput(irrToTomanInput(row.pricing.proposedPriceIrr));
+      setLegalInput(irrToTomanInput(row.pricing.legalRateIrr));
       setNoteInput(row.pricing.note ?? "");
     } else {
-      setProposedInput(
-        row.basePriceIrr
-          ? String(Math.round(Number(row.basePriceIrr) / 10))
-          : "",
-      );
+      setProposedInput(irrToTomanInput(row.basePriceIrr));
       setLegalInput("");
       setNoteInput("");
     }
@@ -929,13 +913,13 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
 
   async function onSubmit() {
     if (!selected) return;
-    const rial = parseTomanToRial(proposedInput);
+    const rial = parseTomanToRialString(proposedInput);
     if (rial === null) {
       setModalError("نرخ پیشنهادی را وارد کنید");
       return;
     }
     const legalRial = legalInput.trim()
-      ? parseTomanToRial(legalInput)
+      ? parseTomanToRialString(legalInput)
       : undefined;
     if (legalInput.trim() && legalRial === null) {
       setModalError("نرخ قانونی معتبر نیست.");

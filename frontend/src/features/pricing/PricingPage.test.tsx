@@ -464,6 +464,34 @@ describe("PricingPage", () => {
     expect(screen.getAllByText("۳٬۸۵۰٬۰۰۰ تومان").length).toBeGreaterThan(0);
   });
 
+  it("Commercial shows — for missing competitor and never invents base+3%", async () => {
+    mockRole("COMMERCIAL_MANAGER");
+    vi.spyOn(pricingApi, "fetchCommercialPricing").mockResolvedValue({
+      flights: [
+        {
+          id: "fi-nocomp",
+          departureAt: "2026-08-06T08:30:00.000Z",
+          capacity: 180,
+          charterSeats: 60,
+          basePriceIrr: "38000000",
+          competitorPriceIrr: null,
+          flight: {
+            flightNo: "XY1234",
+            route: { originCode: "THR", destCode: "DXB" },
+          },
+          pricing: null,
+        },
+      ],
+    });
+
+    renderPage();
+
+    const subtitle = await screen.findByText(/پایه/);
+    expect(subtitle).toHaveTextContent("رقبا —");
+    // Old fabricated competitor was ~39,100,000 IRR → ۳٬۹۱۰٬۰۰۰ تومان.
+    expect(screen.queryByText(/۳٬۹۱۰٬۰۰۰/)).not.toBeInTheDocument();
+  });
+
   it("Commercial set-price modal validates the proposed price and submits toman→rial", async () => {
     mockRole("COMMERCIAL_MANAGER");
     vi.spyOn(pricingApi, "fetchCommercialPricing").mockResolvedValue(
@@ -498,10 +526,10 @@ describe("PricingPage", () => {
         name: "ارسال نرخ پیشنهادی برای تأیید مدیر عامل",
       }),
     );
-    // 3,850,000 toman -> 38,500,000 rial
+    // 3,850,000 toman -> 38,500,000 rial (decimal string on the wire)
     await waitFor(() =>
       expect(upsert).toHaveBeenCalledWith("fi2", {
-        proposedPriceIrr: 38_500_000,
+        proposedPriceIrr: "38500000",
         legalRateIrr: undefined,
         note: undefined,
       }),

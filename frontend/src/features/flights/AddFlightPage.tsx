@@ -19,6 +19,7 @@ import {
 import {
   formatTomanGrouped,
   moneyInputToRial,
+  moneyInputToRialString,
   tomanDigitsOnly,
 } from "../../lib/money-input";
 import {
@@ -30,7 +31,12 @@ import {
   splitDurationMinutes,
   type CabinKind,
 } from "../../lib/flight-definition";
-import { faDigits, faMoney, latinDigits } from "../../lib/fa-format";
+import {
+  faDigits,
+  faMoney,
+  irrToTomanInput,
+  latinDigits,
+} from "../../lib/fa-format";
 import { dayjs, isoDateAtNoon, toIsoDateOnly } from "../../lib/jalali";
 import type {
   AircraftTypeOption,
@@ -245,7 +251,7 @@ export default function AddFlightPage({
     [cabinRows],
   );
 
-  const basePriceIrr = moneyInputToRial(baseToman) ?? 0;
+  const basePriceIrr = moneyInputToRialString(baseToman) ?? "0";
 
   const cabinCapacityError = useMemo(() => {
     if (!showValidation) return null;
@@ -301,11 +307,7 @@ export default function AddFlightPage({
         setAircraft(def.aircraftType || "Airbus A320");
         setChargeRules(def.chargeRules.map(chargeRuleFromApi));
         if (def.basePriceIrr) {
-          setBaseToman(
-            formatTomanGrouped(
-              String(Math.round(Number(def.basePriceIrr) / 10)),
-            ),
-          );
+          setBaseToman(formatTomanGrouped(irrToTomanInput(def.basePriceIrr)));
         }
       })
       .catch((e) => {
@@ -453,11 +455,13 @@ export default function AddFlightPage({
     setShowValidation(true);
     setError(null);
 
-    const no = flightNo.trim().toUpperCase();
+    // FlightNumberInput already uppercases; do not trim — leading/trailing
+    // spaces must fail validation (same as backend ^[A-Z]{2}\d{4}$).
+    const no = flightNo;
     const charterSeats = Number(latinDigits(charter)) || 0;
-    const proposedIrr = moneyInputToRial(proposedToman);
-    const baseIrr = moneyInputToRial(baseToman) ?? proposedIrr;
-    const compIrr = moneyInputToRial(compToman);
+    const proposedIrr = moneyInputToRialString(proposedToman);
+    const baseIrr = moneyInputToRialString(baseToman) ?? proposedIrr;
+    const compIrr = moneyInputToRialString(compToman);
 
     if (!isValidFlightNo(no)) {
       setError("شماره پرواز معتبر نیست (مثال: XY1234)");
@@ -525,7 +529,7 @@ export default function AddFlightPage({
     try {
       if (isEdit && flightId) {
         const updated = await updateFlightDefinition(flightId, payload);
-        const legalIrr = moneyInputToRial(legalToman);
+        const legalIrr = moneyInputToRialString(legalToman);
         await upsertProposal(flightId, {
           proposedPriceIrr: proposedIrr,
           legalRateIrr: legalIrr ?? undefined,
@@ -564,7 +568,7 @@ export default function AddFlightPage({
         await createFareRule(created.id, farePayload);
       }
 
-      const legalIrr = moneyInputToRial(legalToman);
+      const legalIrr = moneyInputToRialString(legalToman);
       await upsertProposal(created.id, {
         proposedPriceIrr: proposedIrr,
         legalRateIrr: legalIrr ?? undefined,

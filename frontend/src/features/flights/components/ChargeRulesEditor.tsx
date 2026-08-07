@@ -15,7 +15,7 @@ import {
   type ChargeKind,
   type ChargeMethod,
 } from "../../../lib/flight-definition";
-import { moneyInputToRial } from "../../../lib/money-input";
+import { moneyInputToRialString } from "../../../lib/money-input";
 import { faDigits, faMoney, latinDigits } from "../../../lib/fa-format";
 import { dayjs } from "../../../lib/jalali";
 
@@ -30,7 +30,7 @@ export default function ChargeRulesEditor({
 }: {
   rules: DraftChargeRule[];
   onChange: (rules: DraftChargeRule[]) => void;
-  basePriceIrr: number;
+  basePriceIrr: number | string;
 }) {
   const [editing, setEditing] = useState<DraftChargeRule | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -57,8 +57,8 @@ export default function ChargeRulesEditor({
       return;
     }
     if (editing.method === "FIXED") {
-      const rial = moneyInputToRial(editing.amountInput);
-      if (rial == null || rial < 0) {
+      const rial = moneyInputToRialString(editing.amountInput);
+      if (rial == null || BigInt(rial) < 0n) {
         setFormError("مبلغ تومان معتبر وارد کنید");
         return;
       }

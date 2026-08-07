@@ -8,7 +8,7 @@ import {
 import { previewChargeTotalIrr } from './flight-definition';
 
 describe('charge-rules-adapter', () => {
-  it('maps FIXED form rules to calculationMode FIXED + fixedAmountIrr', () => {
+  it('maps FIXED form rules to calculationMode FIXED + fixedAmountIrr string', () => {
     const draft: DraftChargeRule = {
       key: '1',
       title: 'مالیات فرودگاهی',
@@ -23,7 +23,7 @@ describe('charge-rules-adapter', () => {
     const api = draftRuleToApi(draft);
     expect(api).toMatchObject({
       calculationMode: 'FIXED',
-      fixedAmountIrr: 100_000,
+      fixedAmountIrr: '100000',
       percentageBasisPoints: null,
       cabin: null,
     });
@@ -56,7 +56,7 @@ describe('charge-rules-adapter', () => {
       title: 'مالیات',
       kind: 'TAX',
       calculationMode: 'FIXED',
-      fixedAmountIrr: 50_000,
+      fixedAmountIrr: '50000',
       percentageBasisPoints: null,
       cabin: null,
       validFrom: null,
@@ -66,7 +66,7 @@ describe('charge-rules-adapter', () => {
     expect(draft.method).toBe('FIXED');
     expect(draft.cabin).toBe('ALL');
     const again = draftRuleToApi(draft);
-    expect(again.fixedAmountIrr).toBe(50_000);
+    expect(again.fixedAmountIrr).toBe('50000');
     expect(again.cabin).toBeNull();
   });
 
@@ -87,7 +87,7 @@ describe('charge-rules-adapter', () => {
     const previewRules = draftRulesForPreview(drafts);
     const economy = previewChargeTotalIrr(10_000_000, previewRules, 'ECONOMY');
     const business = previewChargeTotalIrr(10_000_000, previewRules, 'BUSINESS');
-    expect(economy.totalIrr).toBe(10_000_000);
-    expect(business.totalIrr).toBe(10_050_000);
+    expect(economy.totalIrr).toBe('10000000');
+    expect(business.totalIrr).toBe('10050000');
   });
 });

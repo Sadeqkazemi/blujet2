@@ -1,6 +1,6 @@
 import type { CabinKind, ChargeKind } from './flight-definition';
-import { formatTomanGrouped, moneyInputToRial } from './money-input';
-import { latinDigits } from './fa-format';
+import { formatTomanGrouped, moneyInputToRialString } from './money-input';
+import { irrToTomanInput, latinDigits } from './fa-format';
 import { dayjs, isoDateAtNoon, toIsoDateOnly } from './jalali';
 
 /** Form-side calculation mode (UI). */
@@ -29,8 +29,8 @@ export interface ApiChargeRulePayload {
   title: string;
   kind: ChargeKind;
   calculationMode: ApiChargeCalculationMode;
-  /** Present when calculationMode === FIXED (IRR integer). */
-  fixedAmountIrr: number | null;
+  /** Present when calculationMode === FIXED (IRR decimal string). */
+  fixedAmountIrr: string | null;
   /** Present when calculationMode === PERCENTAGE (e.g. 10% → 1000). */
   percentageBasisPoints: number | null;
   /** null = apply to all cabins. */
@@ -61,7 +61,7 @@ export function draftRuleToApi(rule: DraftChargeRule): ApiChargeRulePayload {
       title: rule.title.trim(),
       kind: rule.kind,
       calculationMode: 'FIXED',
-      fixedAmountIrr: moneyInputToRial(rule.amountInput) ?? 0,
+      fixedAmountIrr: moneyInputToRialString(rule.amountInput) ?? '0',
       percentageBasisPoints: null,
       cabin: rule.cabin === 'ALL' ? null : rule.cabin,
       validFrom: rule.validFromIso,
@@ -100,8 +100,8 @@ export function chargeRuleFromApi(rule: {
   calculationMode?: ApiChargeCalculationMode;
   /** Legacy form-compat fields (pre-adapter); prefer calculationMode. */
   method?: FormChargeMethod;
-  amount?: number;
-  fixedAmountIrr?: number | null;
+  amount?: number | string;
+  fixedAmountIrr?: number | string | null;
   percentageBasisPoints?: number | null;
   cabin: CabinKind | 'ALL' | null;
   validFrom: string | null;
@@ -115,9 +115,13 @@ export function chargeRuleFromApi(rule: {
     rule.cabin == null || rule.cabin === 'ALL' ? 'ALL' : rule.cabin;
 
   if (mode === 'PERCENTAGE') {
+    const legacyPercent =
+      rule.amount != null ? Number(rule.amount) : null;
     const bp =
       rule.percentageBasisPoints ??
-      (rule.amount != null ? Math.round(rule.amount * 100) : 0);
+      (legacyPercent != null && Number.isFinite(legacyPercent)
+        ? Math.round(legacyPercent * 100)
+        : 0);
     const percentDisplay = (bp / 100).toString();
     return {
       key: rule.id ?? `ch-${Math.random().toString(36).slice(2)}`,
@@ -136,13 +140,13 @@ export function chargeRuleFromApi(rule: {
     };
   }
 
-  const fixedIrr = rule.fixedAmountIrr ?? rule.amount ?? 0;
+  const fixedIrr = rule.fixedAmountIrr ?? rule.amount ?? '0';
   return {
     key: rule.id ?? `ch-${Math.random().toString(36).slice(2)}`,
     title: rule.title,
     kind: rule.kind,
     method: 'FIXED',
-    amountInput: formatTomanGrouped(String(Math.round(fixedIrr / 10))),
+    amountInput: formatTomanGrouped(irrToTomanInput(String(fixedIrr))),
     cabin,
     validFromIso: rule.validFrom
       ? isoDateAtNoon(toIsoDateOnly(dayjs(rule.validFrom)))
@@ -158,9 +162,9 @@ export function chargeRuleFromApi(rule: {
 export function draftRulesForPreview(rules: DraftChargeRule[]) {
   return rules.map((r) => {
     const api = draftRuleToApi(r);
-    const amount =
+    const amount: number | string =
       api.calculationMode === 'FIXED'
-        ? (api.fixedAmountIrr ?? 0)
+        ? (api.fixedAmountIrr ?? '0')
         : (api.percentageBasisPoints ?? 0) / 100;
     return {
       kind: r.kind,

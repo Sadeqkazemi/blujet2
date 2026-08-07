@@ -15,7 +15,12 @@ export function fetchCommercialPricing() {
 
 export function upsertProposal(
   flightInstanceId: string,
-  dto: { proposedPriceIrr: number; legalRateIrr?: number; note?: string },
+  dto: {
+    /** IRR decimal string on the wire (never a JS float). */
+    proposedPriceIrr: string | number;
+    legalRateIrr?: string | number;
+    note?: string;
+  },
 ) {
   return apiRequest<PricingProposal>(
     `/pricing/flights/${flightInstanceId}/proposal`,
@@ -26,7 +31,7 @@ export function upsertProposal(
   );
 }
 
-export function setLegalRate(id: string, legalRateIrr: number) {
+export function setLegalRate(id: string, legalRateIrr: string | number) {
   return apiPatch<PricingProposal>(`/pricing/proposals/${id}/legal-rate`, {
     legalRateIrr,
   });

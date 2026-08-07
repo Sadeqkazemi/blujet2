@@ -12,18 +12,27 @@ import {
   sumCabinSeats,
 } from "./flight-definition";
 import { formatTomanGrouped, tomanDigitsOnly } from "./money-input";
-import { parseTomanToRial } from "./fa-format";
+import { parseTomanToRial, parseTomanToRialString } from "./fa-format";
 
 describe("flight number", () => {
-  it("sanitizes and uppercases XY1234 style input", () => {
-    expect(sanitizeFlightNoInput("xy-12 34")).toBe("XY1234");
+  it("uppercases pure alnum input and caps at 6 chars", () => {
+    expect(sanitizeFlightNoInput("xy1234")).toBe("XY1234");
     expect(sanitizeFlightNoInput("ab99999")).toBe("AB9999");
   });
 
-  it("validates ^[A-Z]{2}\\d{4}$", () => {
+  it("does not strip spaces or hyphens (paste stays invalid)", () => {
+    expect(sanitizeFlightNoInput(" XY1234 ")).toBe(" XY1234 ");
+    expect(sanitizeFlightNoInput("xy-12 34")).toBe("XY-12 34");
+    expect(isValidFlightNo(" XY1234 ")).toBe(false);
+    expect(isValidFlightNo("XY-1234")).toBe(false);
+  });
+
+  it("validates ^[A-Z]{2}\\d{4}$ and rejects untrimmed values", () => {
     expect(isValidFlightNo("XY1234")).toBe(true);
     expect(isValidFlightNo("EP905")).toBe(false);
+    expect(isValidFlightNo("XY1234 ")).toBe(false);
     expect(flightNoError("AB12")).toMatch(/دو حرف/);
+    expect(flightNoError(" XY1234 ")).toMatch(/دو حرف/);
   });
 });
 
@@ -55,6 +64,9 @@ describe("money grouping", () => {
     expect(formatTomanGrouped("1,234,567")).toBe("۱٬۲۳۴٬۵۶۷");
     expect(tomanDigitsOnly("۱٬۲۳۴٬۵۶۷")).toBe("1234567");
     expect(parseTomanToRial(tomanDigitsOnly("۱٬۲۳۴٬۵۶۷"))).toBe(12_345_670);
+    expect(parseTomanToRialString(tomanDigitsOnly("۱٬۲۳۴٬۵۶۷"))).toBe(
+      "12345670",
+    );
   });
 });
 
@@ -78,19 +90,19 @@ describe("charge preview", () => {
 
   it("adds fixed and percent lines for a specific cabin", () => {
     const preview = previewChargeTotalIrr(
-      10_000_000,
+      "10000000",
       mixedRules,
       "ECONOMY",
     );
     expect(preview.lines).toHaveLength(2);
-    expect(preview.totalIrr).toBe(11_100_000);
+    expect(preview.totalIrr).toBe("11100000");
   });
 
   it("returns per-cabin summaries via previewChargeTotalsByCabin", () => {
-    const byCabin = previewChargeTotalsByCabin(10_000_000, mixedRules);
-    expect(byCabin.ECONOMY.totalIrr).toBe(11_100_000);
-    expect(byCabin.COMFORT.totalIrr).toBe(10_100_000);
-    expect(byCabin.BUSINESS.totalIrr).toBe(10_100_000);
+    const byCabin = previewChargeTotalsByCabin("10000000", mixedRules);
+    expect(byCabin.ECONOMY.totalIrr).toBe("11100000");
+    expect(byCabin.COMFORT.totalIrr).toBe("10100000");
+    expect(byCabin.BUSINESS.totalIrr).toBe("10100000");
   });
 
   it("does not include BUSINESS tax in ECONOMY total", () => {
@@ -98,7 +110,7 @@ describe("charge preview", () => {
       {
         kind: "TAX" as const,
         method: "FIXED" as const,
-        amount: 500_000,
+        amount: "500000",
         cabin: "BUSINESS" as const,
         active: true,
         title: "مالیات بیزینس",
@@ -106,20 +118,20 @@ describe("charge preview", () => {
       {
         kind: "TAX" as const,
         method: "FIXED" as const,
-        amount: 100_000,
+        amount: "100000",
         cabin: "ECONOMY" as const,
         active: true,
         title: "مالیات اکونومی",
       },
     ];
-    const economy = previewChargeTotalIrr(10_000_000, rules, "ECONOMY");
-    const business = previewChargeTotalIrr(10_000_000, rules, "BUSINESS");
+    const economy = previewChargeTotalIrr("10000000", rules, "ECONOMY");
+    const business = previewChargeTotalIrr("10000000", rules, "BUSINESS");
 
     expect(economy.lines).toHaveLength(1);
     expect(economy.lines[0]?.title).toBe("مالیات اکونومی");
-    expect(economy.totalIrr).toBe(10_100_000);
+    expect(economy.totalIrr).toBe("10100000");
     expect(business.lines).toHaveLength(1);
     expect(business.lines[0]?.title).toBe("مالیات بیزینس");
-    expect(business.totalIrr).toBe(10_500_000);
+    expect(business.totalIrr).toBe("10500000");
   });
 });

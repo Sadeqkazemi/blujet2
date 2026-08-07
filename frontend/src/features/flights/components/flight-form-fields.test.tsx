@@ -11,15 +11,29 @@ import ChargeRulesEditor from "./ChargeRulesEditor";
 import { useState } from "react";
 
 describe("FlightNumberInput", () => {
-  it("uppercases and strips invalid characters", async () => {
+  it("uppercases pure alnum typing", async () => {
     const user = userEvent.setup();
     function H() {
       const [v, setV] = useState("");
       return <FlightNumberInput value={v} onChange={setV} showError />;
     }
     render(<H />);
-    await user.type(screen.getByTestId("flight-no-input"), "xy-12ab");
+    await user.type(screen.getByTestId("flight-no-input"), "xy12ab");
     expect(screen.getByTestId("flight-no-input")).toHaveValue("XY12AB");
+  });
+
+  it("keeps pasted spaces so validation rejects them", async () => {
+    const user = userEvent.setup();
+    function H() {
+      const [v, setV] = useState("");
+      return <FlightNumberInput value={v} onChange={setV} showError />;
+    }
+    render(<H />);
+    const input = screen.getByTestId("flight-no-input");
+    await user.click(input);
+    await user.paste(" XY1234 ");
+    expect(input).toHaveValue(" XY1234 ");
+    expect(screen.getByRole("alert")).toHaveTextContent(/دو حرف/);
   });
 });
 

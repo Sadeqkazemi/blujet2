@@ -64,7 +64,7 @@ export function fetchFlightDetail(id: string) {
 export function planFlight(
   id: string,
   payload: {
-    priceIrr: number;
+    priceIrr: string | number;
     agencySeats: number;
     saleStartsAt?: string;
     saleEndsAt?: string;
@@ -101,7 +101,7 @@ export function createAllotment(
     seatsAllocated: number;
     type?: "SOFT" | "HARD";
     releaseAt?: string;
-    contractPriceIrr?: number;
+    contractPriceIrr?: string | number;
   },
 ) {
   return apiPost<AllotmentRow>(`/flights/${instanceId}/allotments`, dto);

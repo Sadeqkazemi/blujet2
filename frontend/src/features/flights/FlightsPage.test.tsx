@@ -254,7 +254,7 @@ describe("FlightsPage", () => {
     await waitFor(() =>
       expect(planSpy).toHaveBeenCalledWith(
         "fu1",
-        expect.objectContaining({ priceIrr: 41_000_000, agencySeats: 50 }),
+        expect.objectContaining({ priceIrr: "41000000", agencySeats: 50 }),
       ),
     );
     expect(

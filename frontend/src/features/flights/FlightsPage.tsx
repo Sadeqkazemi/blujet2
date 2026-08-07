@@ -17,8 +17,9 @@ import { useStepUp } from "../../hooks/useStepUp";
 import {
   faDigits,
   faMoney,
+  irrToTomanInput,
   latinDigits,
-  parseTomanToRial,
+  parseTomanToRialString,
 } from "../../lib/fa-format";
 import {
   APPROVAL_STATUS_META,
@@ -203,9 +204,7 @@ export default function FlightsPage() {
   function openPlan(row: FutureFlightRow) {
     setPlan(row);
     const initial = row.basePriceIrr ?? row.aiSuggestion?.priceIrr ?? null;
-    setPlanPrice(
-      initial != null ? String(Math.round(Number(initial) / 10)) : "",
-    );
+    setPlanPrice(irrToTomanInput(initial != null ? String(initial) : null));
     setPlanAgency(
       String(
         row.agencySeatsAllocated ??
@@ -238,7 +237,7 @@ export default function FlightsPage() {
     }
     try {
       const contractPriceIrr = newAllotmentContractToman.trim()
-        ? parseTomanToRial(newAllotmentContractToman)
+        ? parseTomanToRialString(newAllotmentContractToman)
         : undefined;
       if (newAllotmentContractToman.trim() && contractPriceIrr == null) {
         setAllotmentError("نرخ قراردادی معتبر وارد کنید.");
@@ -278,7 +277,7 @@ export default function FlightsPage() {
   async function onSubmitPlan() {
     if (!plan) return;
     setError(null);
-    const priceIrr = parseTomanToRial(planPrice);
+    const priceIrr = parseTomanToRialString(planPrice);
     if (priceIrr == null) {
       setError("نرخ نهایی را به تومان و با رقم وارد کنید.");
       return;
@@ -1374,9 +1373,7 @@ export default function FlightsPage() {
             {plan.aiSuggestion && (
               <button
                 onClick={() =>
-                  setPlanPrice(
-                    String(Math.round(plan.aiSuggestion!.priceIrr / 10)),
-                  )
+                  setPlanPrice(irrToTomanInput(String(plan.aiSuggestion!.priceIrr)))
                 }
                 className="rounded-lg border border-[#9333ea55] bg-[#9333ea14] px-3 text-[11px] font-bold text-[#7c3aed]"
               >

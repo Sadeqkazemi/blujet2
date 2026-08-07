@@ -32,7 +32,7 @@ export default function FlightNumberInput({
         dir="ltr"
         spellCheck={false}
         autoComplete="off"
-        maxLength={6}
+        maxLength={8}
         placeholder="XY1234"
         value={value}
         onChange={(e) => onChange(sanitizeFlightNoInput(e.target.value))}

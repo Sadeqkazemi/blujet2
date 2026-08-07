@@ -103,7 +103,7 @@ describe("AddFlightPage", () => {
     await waitFor(() =>
       expect(pricingApi.upsertProposal).toHaveBeenCalledWith(
         "inst-1",
-        expect.objectContaining({ proposedPriceIrr: 72_000_000 }),
+        expect.objectContaining({ proposedPriceIrr: "72000000" }),
       ),
     );
     expect(onSuccess).toHaveBeenCalled();
