@@ -13,6 +13,7 @@ import { Flight } from '../../database/entities/flight.entity';
 import { Booking } from '../../database/entities/booking.entity';
 import { PricingProposalStatus } from '../../database/enums';
 import { AuditService } from '../audit/audit.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { ErrorCode } from '../../common/errors';
 import {
   PRICE_SUGGESTION_PROVIDER,
@@ -52,6 +53,7 @@ export class PricingService {
     @InjectRepository(Booking)
     private readonly bookingRepo: Repository<Booking>,
     private readonly audit: AuditService,
+    private readonly notifications: NotificationsService,
     @Inject(PRICE_SUGGESTION_PROVIDER)
     private readonly priceSuggestions: PriceSuggestionProvider,
     private readonly definitions: FlightDefinitionService,
@@ -301,8 +303,8 @@ export class PricingService {
         message: 'پیشنهاد قیمت یافت نشد.',
       });
     }
-    // Idempotent: a second successful register returns the already-registered
-    // row after step-up, without mutating the active definition again.
+    // Idempotent: a second successful register call just returns the
+    // already-registered row, without mutating the active definition again.
     if (proposal.status === PricingProposalStatus.REGISTERED) {
       return proposal;
     }
@@ -424,6 +426,17 @@ export class PricingService {
       entityType: 'FarePricingProposal',
       entityId: id,
       metadata: { registeredPriceIrr: registered.price, source },
+    });
+
+    await this.notifications.notify({
+      recipientId: proposal.proposedById,
+      category: 'APPROVAL',
+      action: 'APPROVED',
+      title: 'پیشنهاد قیمت شما تأیید شد',
+      body: `مدیرعامل قیمت پرواز ${proposal.flightInstance.flight.flightNo} را تأیید و منتشر کرد.`,
+      entityType: 'FarePricingProposal',
+      entityId: id,
+      dedupeKey: `FarePricingProposal:${id}:APPROVED`,
     });
 
     // Newly APPROVED inventory must appear in search immediately.
@@ -557,6 +570,17 @@ export class PricingService {
       entityType: 'FarePricingProposal',
       entityId: id,
       metadata: { rejectionReason: reason },
+    });
+
+    await this.notifications.notify({
+      recipientId: proposal.proposedById,
+      category: 'APPROVAL',
+      action: 'REJECTED',
+      title: 'پیشنهاد قیمت شما رد شد',
+      body: `مدیرعامل پیشنهاد قیمت پرواز ${proposal.flightInstance.flight.flightNo} را رد کرد: ${reason}`,
+      entityType: 'FarePricingProposal',
+      entityId: id,
+      dedupeKey: `FarePricingProposal:${id}:REJECTED`,
     });
 
     return this.withProposalRelations(this.proposalRepo.createQueryBuilder('p'))

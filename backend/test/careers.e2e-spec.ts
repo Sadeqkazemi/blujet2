@@ -215,6 +215,87 @@ describe('Careers (e2e)', () => {
       expect(badNationalId.status).toBe(400);
     });
 
+    it('a posting with null generalReqs/specialReqs at the DB level still returns real arrays (never null) in list and detail', async () => {
+      const jobPostingRepo = dataSource.getRepository(JobPosting);
+      const posting = await jobPostingRepo.save(
+        jobPostingRepo.create({
+          title: `آگهی بدون الزامات ${crypto.randomUUID().slice(0, 6)}`,
+          dept: 'کنترل کیفیت',
+          city: 'تهران',
+          type: JobType.FULL_TIME,
+          generalReqs: null,
+          specialReqs: null,
+          active: true,
+          updatedAt: new Date(),
+        }),
+      );
+      createdPostingIds.push(posting.id);
+
+      const detail = await request(app.getHttpServer()).get(
+        `/careers/jobs/${posting.id}`,
+      );
+      expect(detail.status).toBe(200);
+      expect(detail.body.data.generalReqs).toEqual([]);
+      expect(detail.body.data.specialReqs).toEqual([]);
+
+      const admin = await loginAs(app, 'site.admin');
+      const adminList = await request(app.getHttpServer())
+        .get('/careers/postings')
+        .set(auth(admin.accessToken));
+      const row = (
+        adminList.body.data as {
+          id: string;
+          generalReqs: unknown;
+          specialReqs: unknown;
+        }[]
+      ).find((p) => p.id === posting.id)!;
+      expect(row.generalReqs).toEqual([]);
+      expect(row.specialReqs).toEqual([]);
+    });
+
+    it('education/work/language entries round-trip through apply() and application detail with the real frontend field shapes', async () => {
+      const posting = await createPostingDirect();
+      const eduEntries = [
+        {
+          major: 'مهندسی کامپیوتر',
+          degree: 'کارشناسی',
+          courses: 'دوره React',
+          otherCourses: '',
+        },
+      ];
+      const workEntries = [
+        {
+          company: 'شرکت الف',
+          position: 'توسعه‌دهنده',
+          fromYear: '1399',
+          toYear: '1402',
+          reason: 'رشد شغلی',
+        },
+      ];
+      const langEntries = [{ lang: 'انگلیسی', level: 'پیشرفته' }];
+
+      const res = await request(app.getHttpServer())
+        .post(`/careers/jobs/${posting.id}/apply`)
+        .field('firstName', 'نگار')
+        .field('lastName', 'رضایی')
+        .field('nationalId', VALID_NATIONAL_ID)
+        .field('phone', '09121234567')
+        .field('eduEntries', JSON.stringify(eduEntries))
+        .field('workEntries', JSON.stringify(workEntries))
+        .field('langEntries', JSON.stringify(langEntries));
+      expect(res.status).toBe(201);
+      createdApplicationIds.push(res.body.data.id);
+
+      const admin = await loginAs(app, 'site.admin');
+      const detail = await request(app.getHttpServer())
+        .get(`/careers/applications/${res.body.data.id}`)
+        .set(auth(admin.accessToken));
+      expect(detail.status).toBe(200);
+      expect(detail.body.data.eduEntries).toEqual(eduEntries);
+      expect(detail.body.data.workEntries).toEqual(workEntries);
+      expect(detail.body.data.langEntries).toEqual(langEntries);
+    });
+
     it('POST .../apply 404s for an unknown or inactive job id', async () => {
       const inactivePosting = await createPostingDirect({ active: false });
       const res = await request(app.getHttpServer())

@@ -133,17 +133,18 @@ describe('Charter / agency seat commitments (e2e)', () => {
     return user;
   }
 
-  it('creates a charter commitment: 201, ACTIVE, real LedgerEntry(COMMITMENT) and AuditLog rows', async () => {
+  it('creates a charter commitment (no agencyId): 201, ACTIVE, real LedgerEntry(COMMITMENT) and AuditLog rows', async () => {
     const { accessToken } = await loginAs(app, 'comm');
     const instance = await freshInstance();
 
     const res = await request(app.getHttpServer())
-      .post(`/flights/${instance.id}/commitments/charter`)
+      .post(`/flights/${instance.id}/commitments`)
       .set('Authorization', `Bearer ${accessToken}`)
-      .send({ cabin: 'BUSINESS', seats: 1, amountIrr: '500000000' });
+      .send({ cabin: 'BUSINESS', seats: 1, contractPriceIrr: '500000000' });
     expect(res.status).toBe(201);
     expect(res.body.data.status).toBe('ACTIVE');
     expect(res.body.data.seats).toBe(1);
+    expect(res.body.data.type).toBe('CHARTER');
 
     const ledger = await dataSource
       .getRepository(LedgerEntry)
@@ -162,21 +163,37 @@ describe('Charter / agency seat commitments (e2e)', () => {
     expect(audit).not.toBeNull();
   });
 
-  it('creates an agency commitment enriched with agency name/license in the list endpoint', async () => {
+  it('creates an agency commitment (agencyId present) — response includes agencyId/cabin/seats/startDate/releaseAt/contractPriceIrr/status; enriched with agency name/license in the list endpoint', async () => {
     const { accessToken } = await loginAs(app, 'comm');
     const instance = await freshInstance();
     const agency = await createFreshAgency();
+    const startDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const releaseAt = new Date(
+      instance.departureAt.getTime() - 24 * 60 * 60 * 1000,
+    ).toISOString();
 
     const res = await request(app.getHttpServer())
-      .post(`/flights/${instance.id}/commitments/agency`)
+      .post(`/flights/${instance.id}/commitments`)
       .set('Authorization', `Bearer ${accessToken}`)
       .send({
         agencyId: agency.id,
         cabin: 'BUSINESS',
         seats: 1,
-        amountIrr: '300000000',
+        contractPriceIrr: '300000000',
+        startDate,
+        releaseAt,
       });
     expect(res.status).toBe(201);
+    expect(res.body.data.type).toBe('AGENCY');
+    expect(res.body.data).toMatchObject({
+      agencyId: agency.id,
+      cabin: 'BUSINESS',
+      seats: 1,
+      contractPriceIrr: '300000000',
+      status: 'ACTIVE',
+    });
+    expect(new Date(res.body.data.startDate).toISOString()).toBe(startDate);
+    expect(new Date(res.body.data.releaseAt).toISOString()).toBe(releaseAt);
 
     const list = await request(app.getHttpServer())
       .get(`/flights/${instance.id}/commitments`)
@@ -184,6 +201,27 @@ describe('Charter / agency seat commitments (e2e)', () => {
     expect(list.status).toBe(200);
     expect(list.body.data.agency).toHaveLength(1);
     expect(list.body.data.agency[0].agencyName).toBe('مدیر آژانس تست');
+    expect(list.body.data.agency[0].type).toBe('AGENCY');
+  });
+
+  it('accepts the endDate alias for releaseAt when releaseAt is omitted', async () => {
+    const { accessToken } = await loginAs(app, 'comm');
+    const instance = await freshInstance();
+    const endDate = new Date(
+      instance.departureAt.getTime() - 24 * 60 * 60 * 1000,
+    ).toISOString();
+
+    const res = await request(app.getHttpServer())
+      .post(`/flights/${instance.id}/commitments`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        cabin: 'BUSINESS',
+        seats: 1,
+        contractPriceIrr: '500000000',
+        endDate,
+      });
+    expect(res.status).toBe(201);
+    expect(new Date(res.body.data.releaseAt).toISOString()).toBe(endDate);
   });
 
   it('capacity summary reflects charter + agency commitments and availableOnline', async () => {
@@ -192,17 +230,17 @@ describe('Charter / agency seat commitments (e2e)', () => {
     const agency = await createFreshAgency();
 
     await request(app.getHttpServer())
-      .post(`/flights/${instance.id}/commitments/charter`)
+      .post(`/flights/${instance.id}/commitments`)
       .set('Authorization', `Bearer ${accessToken}`)
-      .send({ cabin: 'BUSINESS', seats: 1, amountIrr: '500000000' });
+      .send({ cabin: 'BUSINESS', seats: 1, contractPriceIrr: '500000000' });
     await request(app.getHttpServer())
-      .post(`/flights/${instance.id}/commitments/agency`)
+      .post(`/flights/${instance.id}/commitments`)
       .set('Authorization', `Bearer ${accessToken}`)
       .send({
         agencyId: agency.id,
         cabin: 'BUSINESS',
         seats: 1,
-        amountIrr: '300000000',
+        contractPriceIrr: '300000000',
       });
 
     const summary = await request(app.getHttpServer())
@@ -226,15 +264,15 @@ describe('Charter / agency seat commitments (e2e)', () => {
     const instance = await freshInstance();
 
     const first = await request(app.getHttpServer())
-      .post(`/flights/${instance.id}/commitments/charter`)
+      .post(`/flights/${instance.id}/commitments`)
       .set('Authorization', `Bearer ${accessToken}`)
-      .send({ cabin: 'BUSINESS', seats: 2, amountIrr: '500000000' });
+      .send({ cabin: 'BUSINESS', seats: 2, contractPriceIrr: '500000000' });
     expect(first.status).toBe(201);
 
     const second = await request(app.getHttpServer())
-      .post(`/flights/${instance.id}/commitments/charter`)
+      .post(`/flights/${instance.id}/commitments`)
       .set('Authorization', `Bearer ${accessToken}`)
-      .send({ cabin: 'BUSINESS', seats: 1, amountIrr: '500000000' });
+      .send({ cabin: 'BUSINESS', seats: 1, contractPriceIrr: '500000000' });
     expect(second.status).toBe(409);
   });
 
@@ -243,13 +281,13 @@ describe('Charter / agency seat commitments (e2e)', () => {
     const instance = await freshInstance();
 
     const res = await request(app.getHttpServer())
-      .post(`/flights/${instance.id}/commitments/charter`)
+      .post(`/flights/${instance.id}/commitments`)
       .set('Authorization', `Bearer ${accessToken}`)
       .send({
         cabin: 'BUSINESS',
         seats: 1,
-        amountIrr: '500000000',
-        periodEnd: new Date(
+        contractPriceIrr: '500000000',
+        releaseAt: new Date(
           instance.departureAt.getTime() + 24 * 60 * 60 * 1000,
         ).toISOString(),
       });
@@ -262,21 +300,21 @@ describe('Charter / agency seat commitments (e2e)', () => {
     const idempotencyKey = crypto.randomUUID();
 
     const first = await request(app.getHttpServer())
-      .post(`/flights/${instance.id}/commitments/charter`)
+      .post(`/flights/${instance.id}/commitments`)
       .set('Authorization', `Bearer ${accessToken}`)
       .send({
         cabin: 'BUSINESS',
         seats: 1,
-        amountIrr: '500000000',
+        contractPriceIrr: '500000000',
         idempotencyKey,
       });
     const second = await request(app.getHttpServer())
-      .post(`/flights/${instance.id}/commitments/charter`)
+      .post(`/flights/${instance.id}/commitments`)
       .set('Authorization', `Bearer ${accessToken}`)
       .send({
         cabin: 'BUSINESS',
         seats: 1,
-        amountIrr: '500000000',
+        contractPriceIrr: '500000000',
         idempotencyKey,
       });
     expect(first.status).toBe(201);
@@ -292,31 +330,50 @@ describe('Charter / agency seat commitments (e2e)', () => {
     expect(business.charterCommitted).toBe(1);
   });
 
-  it('cancels a commitment (idempotent) and frees its capacity back up', async () => {
+  it('cancels a commitment via DELETE /commitments/:id (idempotent, works for both charter and agency) and frees its capacity back up', async () => {
     const { accessToken } = await loginAs(app, 'comm');
     const instance = await freshInstance();
+    const agency = await createFreshAgency();
 
-    const created = await request(app.getHttpServer())
-      .post(`/flights/${instance.id}/commitments/charter`)
+    const charterCreated = await request(app.getHttpServer())
+      .post(`/flights/${instance.id}/commitments`)
       .set('Authorization', `Bearer ${accessToken}`)
-      .send({ cabin: 'BUSINESS', seats: 2, amountIrr: '500000000' });
-    expect(created.status).toBe(201);
+      .send({ cabin: 'BUSINESS', seats: 1, contractPriceIrr: '500000000' });
+    expect(charterCreated.status).toBe(201);
+    const agencyCreated = await request(app.getHttpServer())
+      .post(`/flights/${instance.id}/commitments`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        agencyId: agency.id,
+        cabin: 'BUSINESS',
+        seats: 1,
+        contractPriceIrr: '300000000',
+      });
+    expect(agencyCreated.status).toBe(201);
 
-    const cancel = await request(app.getHttpServer())
+    const cancelCharter = await request(app.getHttpServer())
       .delete(
-        `/flights/${instance.id}/commitments/charter/${created.body.data.id}`,
+        `/flights/${instance.id}/commitments/${charterCreated.body.data.id}`,
       )
       .set('Authorization', `Bearer ${accessToken}`);
-    expect(cancel.status).toBe(200);
-    expect(cancel.body.data.status).toBe('CANCELLED');
+    expect(cancelCharter.status).toBe(200);
+    expect(cancelCharter.body.data.status).toBe('CANCELLED');
 
     const cancelAgain = await request(app.getHttpServer())
       .delete(
-        `/flights/${instance.id}/commitments/charter/${created.body.data.id}`,
+        `/flights/${instance.id}/commitments/${charterCreated.body.data.id}`,
       )
       .set('Authorization', `Bearer ${accessToken}`);
     expect(cancelAgain.status).toBe(200);
     expect(cancelAgain.body.data.status).toBe('CANCELLED');
+
+    const cancelAgency = await request(app.getHttpServer())
+      .delete(
+        `/flights/${instance.id}/commitments/${agencyCreated.body.data.id}`,
+      )
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(cancelAgency.status).toBe(200);
+    expect(cancelAgency.body.data.status).toBe('CANCELLED');
 
     const summary = await request(app.getHttpServer())
       .get(`/flights/${instance.id}/commitments/summary`)
@@ -325,32 +382,48 @@ describe('Charter / agency seat commitments (e2e)', () => {
       (c: { cabin: string }) => c.cabin === 'BUSINESS',
     );
     expect(business.charterCommitted).toBe(0);
+    expect(business.agencyCommitted).toBe(0);
     expect(business.availableOnline).toBe(2);
+  });
+
+  it('DELETE on an unknown commitment id returns 404', async () => {
+    const { accessToken } = await loginAs(app, 'comm');
+    const instance = await freshInstance();
+    const res = await request(app.getHttpServer())
+      .delete(`/flights/${instance.id}/commitments/${crypto.randomUUID()}`)
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(res.status).toBe(404);
   });
 
   it('non-manager roles get 403 on commitment endpoints', async () => {
     const { accessToken } = await loginAs(app, 'finance');
     const instance = await freshInstance();
     const res = await request(app.getHttpServer())
-      .post(`/flights/${instance.id}/commitments/charter`)
+      .post(`/flights/${instance.id}/commitments`)
       .set('Authorization', `Bearer ${accessToken}`)
-      .send({ cabin: 'BUSINESS', seats: 1, amountIrr: '500000000' });
+      .send({ cabin: 'BUSINESS', seats: 1, contractPriceIrr: '500000000' });
     expect(res.status).toBe(403);
   });
 
-  it('exactly one of two concurrent charter commitments for the last seat succeeds', async () => {
+  it('exactly one of two concurrent commitments for the last seat succeeds (row-locked capacity check)', async () => {
     const { accessToken } = await loginAs(app, 'comm');
     const instance = await freshInstance();
+    const agency = await createFreshAgency();
 
     const [a, b] = await Promise.all([
       request(app.getHttpServer())
-        .post(`/flights/${instance.id}/commitments/charter`)
+        .post(`/flights/${instance.id}/commitments`)
         .set('Authorization', `Bearer ${accessToken}`)
-        .send({ cabin: 'BUSINESS', seats: 2, amountIrr: '500000000' }),
+        .send({ cabin: 'BUSINESS', seats: 2, contractPriceIrr: '500000000' }),
       request(app.getHttpServer())
-        .post(`/flights/${instance.id}/commitments/charter`)
+        .post(`/flights/${instance.id}/commitments`)
         .set('Authorization', `Bearer ${accessToken}`)
-        .send({ cabin: 'BUSINESS', seats: 2, amountIrr: '500000000' }),
+        .send({
+          agencyId: agency.id,
+          cabin: 'BUSINESS',
+          seats: 2,
+          contractPriceIrr: '500000000',
+        }),
     ]);
     const statuses = [a.status, b.status].sort();
     expect(statuses).toEqual([201, 409]);
@@ -360,9 +433,9 @@ describe('Charter / agency seat commitments (e2e)', () => {
     const { accessToken } = await loginAs(app, 'comm');
     const instance = await freshInstance();
     await request(app.getHttpServer())
-      .post(`/flights/${instance.id}/commitments/charter`)
+      .post(`/flights/${instance.id}/commitments`)
       .set('Authorization', `Bearer ${accessToken}`)
-      .send({ cabin: 'BUSINESS', seats: 1, amountIrr: '500000000' });
+      .send({ cabin: 'BUSINESS', seats: 1, contractPriceIrr: '500000000' });
 
     const date = instance.departureAt.toISOString().slice(0, 10);
     // Search results are cached 5-10min by route/date (CLAUDE.md); other
@@ -383,13 +456,50 @@ describe('Charter / agency seat commitments (e2e)', () => {
     expect(business.seatsLeft).toBe(1); // 2 physical - 1 committed
   });
 
+  it('concurrent commitment creation and real seat booking never over-allocate the same cabin', async () => {
+    const { accessToken: comm } = await loginAs(app, 'comm');
+    const instance = await freshInstance();
+    // 1 seat already sold in BUSINESS (physical seat "1C"), leaving 1
+    // physical seat ("1A") and full cabinCapacities headroom of 2.
+    const { accessToken: buyerToken } = await loginAsCustomer(
+      app,
+      '09130000601',
+    );
+    const sold = await request(app.getHttpServer())
+      .post('/bookings')
+      .set('Authorization', `Bearer ${buyerToken}`)
+      .send({
+        flightInstanceId: instance.id,
+        cabin: 'BUSINESS',
+        passengers: [{ fullName: 'مسافر واقعی', seatCode: '1C' }],
+      });
+    expect(sold.status).toBe(201);
+
+    // A commitment for the remaining 2 seats of cabinCapacities (still
+    // configured at 2, independent of physical sales) is over capacity by
+    // configuration alone (2 committed > 2 total is fine, but exceeding
+    // the physical-seat ceiling of 1 remaining seat is not) — only 1
+    // physical BUSINESS seat is left, so a 2-seat commitment must 409.
+    const commit = await request(app.getHttpServer())
+      .post(`/flights/${instance.id}/commitments`)
+      .set('Authorization', `Bearer ${comm}`)
+      .send({ cabin: 'BUSINESS', seats: 2, contractPriceIrr: '500000000' });
+    expect(commit.status).toBe(409);
+
+    const commitOk = await request(app.getHttpServer())
+      .post(`/flights/${instance.id}/commitments`)
+      .set('Authorization', `Bearer ${comm}`)
+      .send({ cabin: 'BUSINESS', seats: 1, contractPriceIrr: '500000000' });
+    expect(commitOk.status).toBe(201);
+  });
+
   it('blocks a SYSTEM (public) booking from consuming fully-committed cabin capacity: 409 POOL_EXHAUSTED', async () => {
     const { accessToken: comm } = await loginAs(app, 'comm');
     const instance = await freshInstance();
     const commit = await request(app.getHttpServer())
-      .post(`/flights/${instance.id}/commitments/charter`)
+      .post(`/flights/${instance.id}/commitments`)
       .set('Authorization', `Bearer ${comm}`)
-      .send({ cabin: 'BUSINESS', seats: 2, amountIrr: '500000000' });
+      .send({ cabin: 'BUSINESS', seats: 2, contractPriceIrr: '500000000' });
     expect(commit.status).toBe(201);
 
     const { accessToken } = await loginAsCustomer(app, '09130000501');

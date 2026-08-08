@@ -42,6 +42,7 @@ import {
   type NormalizedCabinCapacity,
 } from './flight-definition.util';
 import { resolveAircraftType } from './aircraft-type.util';
+import { toPublishStatus } from './definition-sellability';
 import {
   countSeatsByCabin,
   type AircraftSeatMapLike,
@@ -399,6 +400,10 @@ export class FlightDefinitionService {
       approvedSnapshot: instance.approvedSnapshot,
       pendingRevisionSnapshot: instance.pendingRevisionSnapshot,
       definitionStatus: instance.definitionStatus,
+      publishStatus: toPublishStatus(
+        instance.definitionStatus,
+        instance.approvedSnapshot != null,
+      ),
     };
   }
 

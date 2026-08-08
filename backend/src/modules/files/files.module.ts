@@ -7,6 +7,7 @@ import { ManagerMessage } from '../../database/entities/manager-message.entity';
 import { CartableTask } from '../../database/entities/cartable-task.entity';
 import { FilesController } from './files.controller';
 import { FilesService } from './files.service';
+import { AuditModule } from '../audit/audit.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { FilesService } from './files.service';
       ManagerMessage,
       CartableTask,
     ]),
+    AuditModule,
   ],
   controllers: [FilesController],
   providers: [FilesService],

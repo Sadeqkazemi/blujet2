@@ -3317,3 +3317,91 @@ independent of, and in addition to, the pre-existing whole-flight
   established TS2589 type-recursion-avoidance convention (no ORM relation
   metadata for these columns) and keeps `schema-parity.e2e-spec.ts` green,
   which derives its expected schema purely from entity relation metadata.
+
+## Phase 70 — API contract completion for frontend PR #126
+
+Branch: `agent/commercial-operations-backend` (continuation of Phase 69, no
+new branch). Backend/migrations/tests/docs only — no frontend, workflow, or
+deploy changes; not merged/deployed by this phase.
+
+**Full endpoint-by-endpoint contract (paths, DTOs, enums, error codes,
+sample payloads) lives in `docs/api-contract-pr126.md` — read that file
+first when wiring up the frontend.** Summary of what changed:
+
+- **Aircraft**: canonical `/flights/aircraft-definitions*` routes added
+  alongside the existing `/flights/aircraft*` (same handlers, both work);
+  detail response now embeds the full `seatMap`. MD-80 unchanged.
+- **Commitments**: unified `GET/POST /flights/:instanceId/commitments` +
+  `DELETE .../commitments/:id` (was split charter/agency endpoints);
+  `contractPriceIrr`/`startDate`/`releaseAt` field renames (migration
+  `RenameCommitmentFields`); new `GET .../commitments/summary` capacity
+  breakdown; fixed a real overbooking bug where already-sold seats weren't
+  counted against commitment capacity.
+- **CEO approve/reject**: confirmed and permanently alias-locked — no
+  step-up/OTP on `PATCH /pricing/proposals/:id/{register,approve,reject}`;
+  new `.../approve` canonical alias for `.../register`.
+- **Search/publish status**: `definitionStatus`/`publishStatus` added to
+  every search result row and to `GET /flights/:id/definition`;
+  `publishStatus` is a pure derived mapping (`toPublishStatus()`), the DB
+  enum itself was not renamed. Verified end-to-end (THR→MHD): create →
+  propose → CEO approve → publish → search → visible with the right
+  status, cache invalidated for both old/new route+date keys.
+- **Notifications**: new module and table (migration `Notifications`) —
+  `GET /notifications`, `GET /notifications/unread-count`,
+  `PATCH /notifications/:id/read`, `PATCH /notifications/read-all`;
+  idempotent via `dedupeKey`; wired into commitments, pricing, access
+  revocation, cartable transfer, and agency-request create/refer.
+- **Access revocation**: `JwtAuthGuard` now re-checks live `User.isActive`
+  (+ `AgencyProfile.suspendedAt` for role `AGENCY`) on every authenticated
+  request, not just at login — an already-issued access token stops
+  working on its very next use after a block/suspend, returning
+  `403 { code: "ACCESS_REVOKED" }`. Refresh tokens are also revoked
+  immediately. Covered for manager/employee/agency block-suspend paths.
+- **Audit logs**: `GET /audit/manager-reports`, `/audit/logs`,
+  `/audit/system-events` gained pagination (`page`/`limit`) and
+  `actor`/`action`/`resource`/`dateFrom`/`dateTo` filters, returned via a
+  new `meta: {total,page,limit}` sibling field — `data`'s existing array
+  shape is unchanged (fully backward compatible).
+- **Cartable/referrals**: `POST /agencies/requests` (public submission) now
+  creates a cartable task + notification for every active SITE_ADMIN, not
+  just on manual referral; new `GET /cartable/:id` (detail + history,
+  marks read) and `GET /cartable/unread-count`; migration
+  `CartableTaskReadAt` adds the `readAt` column; `PATCH
+  /agencies/requests/:id/{refer,reject}` are now transaction+lock
+  concurrency-safe (previously a plain read-then-write race) and `refer`
+  now also notifies the target.
+- **Careers**: `generalReqs`/`specialReqs` are now guaranteed real arrays
+  (never `null`) in both `GET /careers/jobs/:id` and
+  `GET /careers/postings`; new general-purpose `DELETE /files/:id`
+  (owner-only, safe/idempotent, used for job-posting cover images among
+  other attachment types — deleting one clears
+  `JobPosting.imageFileId` via `ON DELETE SET NULL`).
+- **Sandbox active-flight purge**: new local/CI-only maintenance script
+  (`backend/src/database/sandbox-active-flight-purge.ts`, `npm run
+  data:purge:sandbox-flights[:execute]`) — deletes a specific flight (by
+  `flightNo`) or all flights and every dependent row (instances, bookings,
+  passengers, seat locks, cabin fares/fare rules, commitments, allotments,
+  survey rows) in the correct FK-safe order inside one transaction. Refuses
+  to run outside a non-production sandbox (`NODE_ENV≠production` +
+  `AUTH_SANDBOX_ENABLED=true` — the inverse gate of the existing
+  production-only `uat-demo-data-purge`/`uat-flight-catalog-cleanup`
+  scripts), requires a real actor + confirmation phrase to execute, always
+  reports counts before deleting (dry-run is the default), never deletes
+  the immutable ledger/wallet/club-points rows (only detaches them via
+  `ON DELETE SET NULL`, matching CLAUDE.md's ledger-immutability rule), and
+  writes both an `AuditLog` row and a sentinel JSON file on every real
+  execution. **Not run against any real database in this phase** — only
+  exercised via its own e2e tests against disposable, test-created fixture
+  flights.
+
+### Migrations
+
+- `1786694400000-RenameCommitmentFields` — renames
+  `periodStart→startDate`, `periodEnd→releaseAt`, `amountIrr→contractPriceIrr`
+  on `charter_commitments`/`agency_seat_commitments`.
+- `1786780800000-Notifications` — `NotificationCategory` enum;
+  `notifications` table.
+- `1786867200000-CartableTaskReadAt` — adds `cartable_tasks.readAt`.
+- All three are additive/reversible (`down()` implemented), rewrite no
+  existing row data, and follow the same plain-column/no-DB-FK convention
+  as Phase 69 where applicable.

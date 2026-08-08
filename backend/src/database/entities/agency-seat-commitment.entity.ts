@@ -48,13 +48,15 @@ export class AgencySeatCommitment {
   seats!: number;
 
   @Column({ type: 'bigint', transformer: bigintTransformer })
-  amountIrr!: bigint;
+  contractPriceIrr!: bigint;
 
   @Column({ type: 'timestamp', precision: 3, nullable: true })
-  periodStart!: Date | null;
+  startDate!: Date | null;
 
+  /** aka "endDate" in the API contract — named to match the pre-existing
+   * AgencyAllotment.releaseAt convention. */
   @Column({ type: 'timestamp', precision: 3, nullable: true })
-  periodEnd!: Date | null;
+  releaseAt!: Date | null;
 
   @Column({
     type: 'enum',

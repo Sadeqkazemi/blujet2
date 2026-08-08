@@ -478,13 +478,25 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
     const row = (
       search.body.data as {
         flightInstanceId: string;
+        definitionStatus: string;
+        publishStatus: string;
         cabins: { cabin: string; seatsLeft: number }[];
       }[]
     ).find((r) => r.flightInstanceId === id);
     expect(row).toBeDefined();
+    // The DB's canonical enum value stays APPROVED; publishStatus is the
+    // API-contract mapping to the customer-facing "PUBLISHED" name.
+    expect(row!.definitionStatus).toBe('APPROVED');
+    expect(row!.publishStatus).toBe('PUBLISHED');
     const comfort = row!.cabins.find((c) => c.cabin === 'COMFORT');
     expect(comfort).toBeDefined();
     expect(comfort!.seatsLeft).toBeGreaterThan(0);
+
+    const definitionAfterApproval = await request(app.getHttpServer())
+      .get(`/flights/${id}/definition`)
+      .set('Authorization', `Bearer ${comm}`);
+    expect(definitionAfterApproval.body.data.definitionStatus).toBe('APPROVED');
+    expect(definitionAfterApproval.body.data.publishStatus).toBe('PUBLISHED');
 
     const seatmap = await request(app.getHttpServer()).get(
       `/search/flights/${id}/seatmap`,

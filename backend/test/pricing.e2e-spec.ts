@@ -207,6 +207,31 @@ describe('Pricing (e2e)', () => {
     expect(reRegister.body.data.registeredPriceIrr).toBe('38500000');
   });
 
+  it('PATCH .../approve is a canonical alias for register — same result, still no step-up', async () => {
+    const instance = await createScheduledInstance();
+    const commercial = await loginAs(app, 'comm');
+    const created = await request(app.getHttpServer())
+      .put(`/pricing/flights/${instance.id}/proposal`)
+      .set('Authorization', `Bearer ${commercial.accessToken}`)
+      .send({ proposedPriceIrr: 38_500_000 });
+    const proposalId = created.body.data.id as string;
+
+    const ceo = await loginAs(app, 'ceo');
+    const approved = await request(app.getHttpServer())
+      .patch(`/pricing/proposals/${proposalId}/approve`)
+      .set('Authorization', `Bearer ${ceo.accessToken}`)
+      .send({ source: 'PROPOSED' });
+    expect(approved.status).toBe(200);
+    expect(approved.body.data.status).toBe('REGISTERED');
+    expect(approved.body.data.registeredPriceIrr).toBe('38500000');
+
+    const forbidden = await request(app.getHttpServer())
+      .patch(`/pricing/proposals/${proposalId}/approve`)
+      .set('Authorization', `Bearer ${commercial.accessToken}`)
+      .send({ source: 'PROPOSED' });
+    expect(forbidden.status).toBe(403);
+  });
+
   it('register with source=AI without a stored suggestion → 409 with a clear message', async () => {
     const instance = await createScheduledInstance();
     const commercial = await loginAs(app, 'comm');

@@ -48,6 +48,7 @@ import { ManagerMessage } from './entities/manager-message.entity';
 import { ManagerReferral } from './entities/manager-referral.entity';
 import { ManagerReferralRecipient } from './entities/manager-referral-recipient.entity';
 import { ManagerReferralReport } from './entities/manager-referral-report.entity';
+import { Notification } from './entities/notification.entity';
 import { PanelAccessFlag } from './entities/panel-access-flag.entity';
 import { Passenger } from './entities/passenger.entity';
 import { PasswordResetEvent } from './entities/password-reset-event.entity';
@@ -146,6 +147,7 @@ export const dataSourceOptions: DataSourceOptions = {
     ManagerReferral,
     ManagerReferralRecipient,
     ManagerReferralReport,
+    Notification,
     PanelAccessFlag,
     Passenger,
     PasswordResetEvent,

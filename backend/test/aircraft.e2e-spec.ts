@@ -237,4 +237,79 @@ describe('Aircraft definition catalog (e2e)', () => {
     expect(md80After.comfortRowStart).toBeNull();
     expect(md80After.firstRowStart).toBeNull();
   });
+
+  describe('/flights/aircraft-definitions (canonical alias, PR #126)', () => {
+    it('GET list, POST create, GET/PUT/PATCH by id, GET seat-map — same data as /flights/aircraft', async () => {
+      const { accessToken } = await loginAs(app, 'comm');
+
+      const list = await request(app.getHttpServer())
+        .get('/flights/aircraft-definitions')
+        .set('Authorization', `Bearer ${accessToken}`);
+      expect(list.status).toBe(200);
+      expect((list.body.data as { code: string }[]).map((a) => a.code)).toEqual(
+        expect.arrayContaining(['Airbus A320', 'MD-80']),
+      );
+
+      const created = await request(app.getHttpServer())
+        .post('/flights/aircraft-definitions')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send(payload());
+      expect(created.status).toBe(201);
+      const id = created.body.data.id as string;
+
+      const detail = await request(app.getHttpServer())
+        .get(`/flights/aircraft-definitions/${id}`)
+        .set('Authorization', `Bearer ${accessToken}`);
+      expect(detail.status).toBe(200);
+      expect(detail.body.data.totalCapacity).toBe(24);
+      expect(detail.body.data.cabins.length).toBeGreaterThan(0);
+      expect(detail.body.data.seatMap.cabinLayout.ECONOMY.colsLeft).toEqual([
+        'A',
+        'B',
+      ]);
+      expect(detail.body.data.seatMap.seats.length).toBe(24);
+
+      const seatMap = await request(app.getHttpServer())
+        .get(`/flights/aircraft-definitions/${id}/seat-map`)
+        .set('Authorization', `Bearer ${accessToken}`);
+      expect(seatMap.status).toBe(200);
+      expect(seatMap.body.data).toEqual(detail.body.data.seatMap);
+
+      const put = await request(app.getHttpServer())
+        .put(`/flights/aircraft-definitions/${id}`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send(payload({ code: created.body.data.code, title: 'PUT شد' }));
+      expect(put.status).toBe(200);
+      expect(put.body.data.version).toBe(2);
+      expect(put.body.data.title).toBe('PUT شد');
+
+      const patch = await request(app.getHttpServer())
+        .patch(`/flights/aircraft-definitions/${id}`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send(payload({ code: created.body.data.code, title: 'PATCH شد' }));
+      expect(patch.status).toBe(200);
+      expect(patch.body.data.version).toBe(3);
+      expect(patch.body.data.title).toBe('PATCH شد');
+
+      // Same underlying row as the legacy /flights/aircraft/:id path.
+      const legacyDetail = await request(app.getHttpServer())
+        .get(`/flights/aircraft/${id}`)
+        .set('Authorization', `Bearer ${accessToken}`);
+      expect(legacyDetail.body.data.title).toBe('PATCH شد');
+      expect(legacyDetail.body.data.version).toBe(3);
+    });
+
+    it('an aircraft created via the legacy /flights/aircraft path is reachable via /flights/aircraft-definitions/:id', async () => {
+      const { accessToken } = await loginAs(app, 'comm');
+      const created = await request(app.getHttpServer())
+        .post('/flights/aircraft')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send(payload());
+      const viaAlias = await request(app.getHttpServer())
+        .get(`/flights/aircraft-definitions/${created.body.data.id}`)
+        .set('Authorization', `Bearer ${accessToken}`);
+      expect(viaAlias.status).toBe(200);
+      expect(viaAlias.body.data.code).toBe(created.body.data.code);
+    });
+  });
 });

@@ -12,6 +12,7 @@ import { User } from '../../database/entities/user.entity';
 import { RefreshToken } from '../../database/entities/refresh-token.entity';
 import { findOneOrThrow } from '../../database/utils/find-one-or-throw';
 import { AuditService } from '../audit/audit.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { ErrorCode } from '../../common/errors';
 import { generateTempPassword } from '../../common/temp-password';
 import { SmsService } from '../sms/sms.service';
@@ -61,6 +62,7 @@ export class AdminsService {
     @InjectRepository(RefreshToken)
     private readonly refreshTokenRepo: Repository<RefreshToken>,
     private readonly audit: AuditService,
+    private readonly notifications: NotificationsService,
     private readonly sms: SmsService,
     private readonly stepUp: StepUpService,
   ) {}
@@ -246,6 +248,19 @@ export class AdminsService {
       entityType: 'User',
       entityId: id,
     });
+
+    if (blocked) {
+      await this.notifications.notify({
+        recipientId: id,
+        category: 'SYSTEM',
+        action: 'ACCESS_REVOKED',
+        title: 'دسترسی حساب شما لغو شد',
+        body: `دسترسی حساب مدیریتی شما توسط ${actor.fullName} مسدود شد.`,
+        entityType: 'User',
+        entityId: id,
+        dedupeKey: `User:${id}:ACCESS_REVOKED:${updated.updatedAt.toISOString()}`,
+      });
+    }
 
     return { id: updated.id, isActive: updated.isActive };
   }

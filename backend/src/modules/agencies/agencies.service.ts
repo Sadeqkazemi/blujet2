@@ -28,6 +28,7 @@ import { AuditLog } from '../../database/entities/audit-log.entity';
 import { RefreshToken } from '../../database/entities/refresh-token.entity';
 import { AuditService } from '../audit/audit.service';
 import { CartableService } from '../cartable/cartable.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { ErrorCode } from '../../common/errors';
 import { generateTempPassword } from '../../common/temp-password';
 import { StepUpService } from '../auth/step-up.service';
@@ -114,6 +115,7 @@ export class AgenciesService {
     private readonly refreshTokenRepo: Repository<RefreshToken>,
     private readonly audit: AuditService,
     private readonly cartable: CartableService,
+    private readonly notifications: NotificationsService,
     private readonly stepUp: StepUpService,
     private readonly sms: SmsService,
     @Inject(TWO_FACTOR_PROVIDER)
@@ -203,6 +205,40 @@ export class AgenciesService {
         status: 'PENDING',
       }),
     );
+
+    // The public front door has no staff actor — the site-admin cartable is
+    // the delivery surface for a brand-new request, same as referRequest()
+    // is for one already under review.
+    await this.cartable.createTasksForRoles(['SITE_ADMIN'], {
+      category: 'AGENCY',
+      title: `درخواست عضویت آژانس جدید: ${dto.applicantName}`,
+      description: `آژانس «${dto.applicantName}» (مدیر: ${dto.managerName}، پروانه: ${dto.licenseNo}) درخواست همکاری ثبت کرد.`,
+      senderLabelFa: `${dto.applicantName} · متقاضی عمومی`,
+      sourceType: 'AGENCY_REQUEST',
+      sourceId: request.id,
+    });
+
+    const siteAdmins = await this.userRepo.find({
+      where: { role: 'SITE_ADMIN', isActive: true },
+      select: { id: true },
+    });
+    for (const admin of siteAdmins) {
+      await this.notifications.notify({
+        recipientId: admin.id,
+        category: 'REQUEST',
+        action: 'CREATED',
+        title: 'درخواست همکاری آژانس جدید',
+        body: `آژانس «${dto.applicantName}» درخواست همکاری ثبت کرد.`,
+        entityType: 'AgencyMembershipRequest',
+        entityId: request.id,
+        dedupeKey: `AgencyMembershipRequest:${request.id}:CREATED:${admin.id}`,
+      });
+    }
+
+    // No audit row here by design: audit_logs.actorId is FK-bound to a real
+    // User and an anonymous applicant has none — same precedent as
+    // RefundsService.submitAnonymous(). The cartable task + notifications
+    // above are the record of this submission.
 
     return { id: request.id };
   }
@@ -643,6 +679,17 @@ export class AgenciesService {
       entityId: id,
     });
 
+    await this.notifications.notify({
+      recipientId: id,
+      category: 'SYSTEM',
+      action: 'ACCESS_REVOKED',
+      title: 'دسترسی پنل آژانس شما تعلیق شد',
+      body: `آژانس شما توسط ${actor.fullName} تعلیق شد. دلیل: ${reason}`,
+      entityType: 'AgencyProfile',
+      entityId: id,
+      dedupeKey: `AgencyProfile:${id}:ACCESS_REVOKED:${updated.suspendedAt!.toISOString()}`,
+    });
+
     return updated;
   }
 
@@ -978,26 +1025,42 @@ export class AgenciesService {
     id: string,
     reviewNote?: string,
   ) {
-    const request = await this.getRequestOrThrow(id);
-    if (!DECIDABLE_STATUSES.includes(request.status)) {
-      throw new ConflictException({
-        code: ErrorCode.CONFLICT,
-        message: 'این درخواست قبلاً بررسی شده است.',
-      });
-    }
+    // Pessimistic lock + status check inside the transaction — the same
+    // fix as approveRequest()/referRequest(), so a reject can't race a
+    // concurrent refer/approve into a lost update on the same row.
+    const updated = await this.membershipRequestRepo.manager.transaction(
+      async (tx) => {
+        const locked = await tx.findOne(AgencyMembershipRequest, {
+          where: { id },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (!locked) {
+          throw new NotFoundException({
+            code: ErrorCode.NOT_FOUND,
+            message: 'درخواست عضویت آژانس یافت نشد.',
+          });
+        }
+        if (!DECIDABLE_STATUSES.includes(locked.status)) {
+          throw new ConflictException({
+            code: ErrorCode.CONFLICT,
+            message: 'این درخواست قبلاً بررسی شده است.',
+          });
+        }
 
-    request.status = 'REJECTED';
-    request.reviewNote = reviewNote ?? null;
-    request.reviewedById = actor.id;
-    request.reviewedAt = new Date();
-    const updated = await this.membershipRequestRepo.save(request);
+        locked.status = 'REJECTED';
+        locked.reviewNote = reviewNote ?? null;
+        locked.reviewedById = actor.id;
+        locked.reviewedAt = new Date();
+        return tx.save(locked);
+      },
+    );
 
     await this.audit.record({
       actorId: actor.id,
       actorRole: actor.role,
       category: 'AGENCY',
       action: 'رد درخواست عضویت آژانس',
-      detail: `درخواست «${request.applicantName}» توسط ${actor.fullName} رد شد.${reviewNote ? ` دلیل: ${reviewNote}` : ''}`,
+      detail: `درخواست «${updated.applicantName}» توسط ${actor.fullName} رد شد.${reviewNote ? ` دلیل: ${reviewNote}` : ''}`,
       entityType: 'AgencyMembershipRequest',
       entityId: id,
     });
@@ -1011,14 +1074,6 @@ export class AgenciesService {
     referredToId: string,
     note?: string,
   ) {
-    const request = await this.getRequestOrThrow(id);
-    if (!DECIDABLE_STATUSES.includes(request.status)) {
-      throw new ConflictException({
-        code: ErrorCode.CONFLICT,
-        message: 'این درخواست قبلاً بررسی شده است.',
-      });
-    }
-
     const target = await this.userRepo.findOneBy({ id: referredToId });
     if (!target) {
       throw new BadRequestException({
@@ -1027,12 +1082,36 @@ export class AgenciesService {
       });
     }
 
-    request.status = 'REFERRED';
-    request.referredToId = referredToId;
-    request.reviewNote = note ?? null;
-    request.reviewedById = actor.id;
-    request.reviewedAt = new Date();
-    const updated = await this.membershipRequestRepo.save(request);
+    // Pessimistic lock + a status check inside the same transaction — two
+    // concurrent referrals (or a referral racing an approve/reject) can no
+    // longer both succeed, matching approveRequest()'s established pattern.
+    const { request, updated } =
+      await this.membershipRequestRepo.manager.transaction(async (tx) => {
+        const locked = await tx.findOne(AgencyMembershipRequest, {
+          where: { id },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (!locked) {
+          throw new NotFoundException({
+            code: ErrorCode.NOT_FOUND,
+            message: 'درخواست عضویت آژانس یافت نشد.',
+          });
+        }
+        if (!DECIDABLE_STATUSES.includes(locked.status)) {
+          throw new ConflictException({
+            code: ErrorCode.CONFLICT,
+            message: 'این درخواست قبلاً بررسی شده است.',
+          });
+        }
+
+        locked.status = 'REFERRED';
+        locked.referredToId = referredToId;
+        locked.reviewNote = note ?? null;
+        locked.reviewedById = actor.id;
+        locked.reviewedAt = new Date();
+        const saved = await tx.save(locked);
+        return { request: locked, updated: saved };
+      });
 
     // Phase 4 wiring (⚑): the referred-to manager receives the request in
     // their cartable — that IS the delivery surface for referrals.
@@ -1046,6 +1125,17 @@ export class AgenciesService {
       senderId: actor.id,
       sourceType: 'AGENCY_REQUEST',
       sourceId: id,
+    });
+
+    await this.notifications.notify({
+      recipientId: referredToId,
+      category: 'REQUEST',
+      action: 'REFERRED',
+      title: 'ارجاع درخواست عضویت آژانس',
+      body: `درخواست «${request.applicantName}» توسط ${actor.fullName} برای بررسی به شما ارجاع شد.`,
+      entityType: 'AgencyMembershipRequest',
+      entityId: id,
+      dedupeKey: `AgencyMembershipRequest:${id}:REFERRED:${referredToId}:${request.reviewedAt!.toISOString()}`,
     });
 
     await this.audit.record({

@@ -17,14 +17,12 @@ import { CabinClass, CommitmentStatus } from '../../database/enums';
 import { ErrorCode } from '../../common/errors';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import { AuditService } from '../audit/audit.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { serializeCabinCapacities } from './flight-definition.util';
 import { resolveAircraftType } from './aircraft-type.util';
 import { sumActiveCommittedSeats } from './commitment-capacity.util';
 import { countSeatsByCabin } from '../reservation/seat-layout';
-import type {
-  CreateAgencySeatCommitmentDto,
-  CreateCharterCommitmentDto,
-} from './dto/commitment.dto';
+import type { CreateCommitmentDto } from './dto/commitment.dto';
 
 const HELD_STATUSES = ['DRAFT', 'HELD', 'PAID', 'TICKETED'] as const;
 
@@ -46,6 +44,7 @@ export class CommitmentsService {
     @InjectRepository(AircraftSeatMap)
     private readonly seatMapRepo: Repository<AircraftSeatMap>,
     private readonly audit: AuditService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   private async loadInstanceOrThrow(id: string): Promise<FlightInstance> {
@@ -70,11 +69,11 @@ export class CommitmentsService {
 
   private validatePeriod(
     instance: FlightInstance,
-    periodStart?: string,
-    periodEnd?: string,
-  ): { periodStart: Date | null; periodEnd: Date | null } {
-    const start = periodStart ? new Date(periodStart) : null;
-    const end = periodEnd ? new Date(periodEnd) : null;
+    startDate?: string,
+    releaseAt?: string,
+  ): { startDate: Date | null; releaseAt: Date | null } {
+    const start = startDate ? new Date(startDate) : null;
+    const end = releaseAt ? new Date(releaseAt) : null;
     if (start && Number.isNaN(start.getTime())) {
       throw new BadRequestException({
         code: ErrorCode.VALIDATION_FAILED,
@@ -106,7 +105,7 @@ export class CommitmentsService {
         message: 'بازه تعهد باید داخل بازه پرواز (تا زمان پرواز) باشد.',
       });
     }
-    return { periodStart: start, periodEnd: end };
+    return { startDate: start, releaseAt: end };
   }
 
   /** Real seats already sold/held for a cabin — needs the physical seat
@@ -166,9 +165,10 @@ export class CommitmentsService {
     const profileById = new Map(profiles.map((p) => [p.userId, p]));
 
     return {
-      charter,
+      charter: charter.map((c) => ({ ...c, type: 'CHARTER' as const })),
       agency: agency.map((a) => ({
         ...a,
+        type: 'AGENCY' as const,
         agencyName: profileById.get(a.agencyId)?.managerName ?? null,
         agencyLicenseNo: profileById.get(a.agencyId)?.licenseNo ?? null,
       })),
@@ -293,6 +293,12 @@ export class CommitmentsService {
     const committed =
       Number(charterSum?.sum ?? 0) + Number(agencySum?.sum ?? 0);
 
+    // Seats already sold/held (real passengers, not just other
+    // commitments) also eat into the same cabin — without this a
+    // commitment could be created on top of already-sold inventory,
+    // overbooking the cabin the moment both sides are counted together.
+    const sold = await this.soldCountForCabin(instance, cabin);
+
     // The physical seat map is the hard ceiling too — a commitment can
     // never exceed real seats even if cabinCapacities were configured
     // higher than the aircraft's actual layout for that cabin.
@@ -301,30 +307,67 @@ export class CommitmentsService {
     });
     const physical = map ? countSeatsByCabin(map)[cabin] : capacity;
 
-    if (committed + seats > capacity || committed + seats > physical) {
+    const projected = committed + sold + seats;
+    if (projected > capacity || projected > physical) {
       throw new ConflictException({
         code: ErrorCode.CONFLICT,
-        message: `مجموع تعهدات چارتر و آژانس (${committed + seats}) از ظرفیت کابین ${cabin} تجاوز می‌کند.`,
+        message: `مجموع تعهدات و صندلی‌های فروخته‌شده (${projected}) از ظرفیت کابین ${cabin} تجاوز می‌کند.`,
       });
     }
   }
 
-  async createCharter(
+  /** POST /flights/:instanceId/commitments — the single, canonical creation
+   * endpoint: `dto.agencyId` present -> agency commitment, absent -> charter
+   * commitment. `releaseAt` wins over `endDate` when both are sent. */
+  async create(
     actor: AuthenticatedUser,
     instanceId: string,
-    dto: CreateCharterCommitmentDto,
+    dto: CreateCommitmentDto,
+  ) {
+    const releaseAt = dto.releaseAt ?? dto.endDate;
+    if (dto.agencyId) {
+      return this.createAgency(actor, instanceId, dto.agencyId, {
+        cabin: dto.cabin,
+        seats: dto.seats,
+        contractPriceIrr: dto.contractPriceIrr,
+        startDate: dto.startDate,
+        releaseAt,
+        idempotencyKey: dto.idempotencyKey,
+      });
+    }
+    return this.createCharter(actor, instanceId, {
+      cabin: dto.cabin,
+      seats: dto.seats,
+      contractPriceIrr: dto.contractPriceIrr,
+      startDate: dto.startDate,
+      releaseAt,
+      idempotencyKey: dto.idempotencyKey,
+    });
+  }
+
+  private async createCharter(
+    actor: AuthenticatedUser,
+    instanceId: string,
+    dto: {
+      cabin: CabinClass;
+      seats: number;
+      contractPriceIrr: bigint;
+      startDate?: string;
+      releaseAt?: string;
+      idempotencyKey?: string;
+    },
   ) {
     if (dto.idempotencyKey) {
       const existing = await this.charterRepo.findOneBy({
         idempotencyKey: dto.idempotencyKey,
       });
-      if (existing) return existing;
+      if (existing) return { ...existing, type: 'CHARTER' as const };
     }
     const instance = await this.loadInstanceOrThrow(instanceId);
-    const { periodStart, periodEnd } = this.validatePeriod(
+    const { startDate, releaseAt } = this.validatePeriod(
       instance,
-      dto.periodStart,
-      dto.periodEnd,
+      dto.startDate,
+      dto.releaseAt,
     );
 
     const created = await this.dataSource.transaction(async (manager) => {
@@ -343,9 +386,9 @@ export class CommitmentsService {
           flightInstanceId: instanceId,
           cabin: dto.cabin,
           seats: dto.seats,
-          amountIrr: dto.amountIrr,
-          periodStart,
-          periodEnd,
+          contractPriceIrr: dto.contractPriceIrr,
+          startDate,
+          releaseAt,
           status: CommitmentStatus.ACTIVE,
           idempotencyKey: dto.idempotencyKey ?? null,
           createdById: actor.id,
@@ -356,7 +399,7 @@ export class CommitmentsService {
       await manager.save(
         manager.create(LedgerEntry, {
           type: 'COMMITMENT',
-          signedAmountIrr: dto.amountIrr,
+          signedAmountIrr: dto.contractPriceIrr,
           createdById: actor.id,
         }),
       );
@@ -375,26 +418,34 @@ export class CommitmentsService {
       metadata: {
         cabin: dto.cabin,
         seats: dto.seats,
-        amountIrr: String(dto.amountIrr),
+        contractPriceIrr: String(dto.contractPriceIrr),
       },
     });
 
-    return created;
+    return { ...created, type: 'CHARTER' as const };
   }
 
-  async createAgency(
+  private async createAgency(
     actor: AuthenticatedUser,
     instanceId: string,
-    dto: CreateAgencySeatCommitmentDto,
+    agencyId: string,
+    dto: {
+      cabin: CabinClass;
+      seats: number;
+      contractPriceIrr: bigint;
+      startDate?: string;
+      releaseAt?: string;
+      idempotencyKey?: string;
+    },
   ) {
     if (dto.idempotencyKey) {
       const existing = await this.agencyCommitmentRepo.findOneBy({
         idempotencyKey: dto.idempotencyKey,
       });
-      if (existing) return existing;
+      if (existing) return { ...existing, type: 'AGENCY' as const };
     }
     const agency = await this.agencyProfileRepo.findOneBy({
-      userId: dto.agencyId,
+      userId: agencyId,
     });
     if (!agency) {
       throw new NotFoundException({
@@ -403,10 +454,10 @@ export class CommitmentsService {
       });
     }
     const instance = await this.loadInstanceOrThrow(instanceId);
-    const { periodStart, periodEnd } = this.validatePeriod(
+    const { startDate, releaseAt } = this.validatePeriod(
       instance,
-      dto.periodStart,
-      dto.periodEnd,
+      dto.startDate,
+      dto.releaseAt,
     );
 
     const created = await this.dataSource.transaction(async (manager) => {
@@ -421,12 +472,12 @@ export class CommitmentsService {
       const entity = await manager.save(
         manager.create(AgencySeatCommitment, {
           flightInstanceId: instanceId,
-          agencyId: dto.agencyId,
+          agencyId,
           cabin: dto.cabin,
           seats: dto.seats,
-          amountIrr: dto.amountIrr,
-          periodStart,
-          periodEnd,
+          contractPriceIrr: dto.contractPriceIrr,
+          startDate,
+          releaseAt,
           status: CommitmentStatus.ACTIVE,
           idempotencyKey: dto.idempotencyKey ?? null,
           createdById: actor.id,
@@ -437,9 +488,9 @@ export class CommitmentsService {
       await manager.save(
         manager.create(LedgerEntry, {
           type: 'COMMITMENT',
-          signedAmountIrr: dto.amountIrr,
+          signedAmountIrr: dto.contractPriceIrr,
           createdById: actor.id,
-          agencyId: dto.agencyId,
+          agencyId,
         }),
       );
 
@@ -455,35 +506,61 @@ export class CommitmentsService {
       entityType: 'AgencySeatCommitment',
       entityId: created.id,
       metadata: {
-        agencyId: dto.agencyId,
+        agencyId,
         cabin: dto.cabin,
         seats: dto.seats,
-        amountIrr: String(dto.amountIrr),
+        contractPriceIrr: String(dto.contractPriceIrr),
       },
     });
 
-    return created;
+    await this.notifications.notify({
+      recipientId: agencyId,
+      category: 'APPROVAL',
+      action: 'CREATED',
+      title: 'تعهد صندلی جدید برای آژانس شما ثبت شد',
+      body: `${dto.seats} صندلی کابین ${dto.cabin} برای یک پرواز به نام آژانس شما تعهد شد.`,
+      entityType: 'AgencySeatCommitment',
+      entityId: created.id,
+      dedupeKey: `AgencySeatCommitment:${created.id}:CREATED`,
+    });
+
+    return { ...created, type: 'AGENCY' as const };
   }
 
-  async cancelCharter(
-    actor: AuthenticatedUser,
-    instanceId: string,
-    id: string,
-  ) {
-    const existing = await this.charterRepo
+  /** DELETE /flights/:instanceId/commitments/:id — the caller doesn't know
+   * (and shouldn't need to know) whether `id` is a charter or an agency
+   * commitment; try charter first, then agency. */
+  async cancel(actor: AuthenticatedUser, instanceId: string, id: string) {
+    const charter = await this.charterRepo
       .createQueryBuilder('c')
       .where('c.id = :id', { id })
       .andWhere('c.flightInstanceId = :instanceId', { instanceId })
       .getOne();
-    if (!existing) {
-      throw new NotFoundException({
-        code: ErrorCode.NOT_FOUND,
-        message: 'تعهد یافت نشد.',
-      });
+    if (charter) {
+      return this.cancelCharter(actor, id, charter);
     }
+    const agency = await this.agencyCommitmentRepo
+      .createQueryBuilder('a')
+      .where('a.id = :id', { id })
+      .andWhere('a.flightInstanceId = :instanceId', { instanceId })
+      .getOne();
+    if (agency) {
+      return this.cancelAgency(actor, id, agency);
+    }
+    throw new NotFoundException({
+      code: ErrorCode.NOT_FOUND,
+      message: 'تعهد یافت نشد.',
+    });
+  }
+
+  private async cancelCharter(
+    actor: AuthenticatedUser,
+    id: string,
+    existing: CharterCommitment,
+  ) {
     if (existing.status === CommitmentStatus.CANCELLED) {
       // Idempotent: cancelling an already-cancelled commitment is a no-op.
-      return existing;
+      return { ...existing, type: 'CHARTER' as const };
     }
 
     const now = new Date();
@@ -511,27 +588,21 @@ export class CommitmentsService {
       });
     }
 
-    return this.charterRepo
+    const reloaded = await this.charterRepo
       .createQueryBuilder('c')
       .where('c.id = :id', { id })
       .getOneOrFail();
+    return { ...reloaded, type: 'CHARTER' as const };
   }
 
-  async cancelAgency(actor: AuthenticatedUser, instanceId: string, id: string) {
-    const existing = await this.agencyCommitmentRepo
-      .createQueryBuilder('a')
-      .where('a.id = :id', { id })
-      .andWhere('a.flightInstanceId = :instanceId', { instanceId })
-      .getOne();
-    if (!existing) {
-      throw new NotFoundException({
-        code: ErrorCode.NOT_FOUND,
-        message: 'تعهد یافت نشد.',
-      });
-    }
+  private async cancelAgency(
+    actor: AuthenticatedUser,
+    id: string,
+    existing: AgencySeatCommitment,
+  ) {
     if (existing.status === CommitmentStatus.CANCELLED) {
       // Idempotent: cancelling an already-cancelled commitment is a no-op.
-      return existing;
+      return { ...existing, type: 'AGENCY' as const };
     }
 
     const now = new Date();
@@ -557,11 +628,22 @@ export class CommitmentsService {
         entityType: 'AgencySeatCommitment',
         entityId: id,
       });
+      await this.notifications.notify({
+        recipientId: existing.agencyId,
+        category: 'SYSTEM',
+        action: 'DELETED',
+        title: 'تعهد صندلی آژانس شما لغو شد',
+        body: `تعهد ${existing.seats} صندلی کابین ${existing.cabin} برای آژانس شما لغو شد.`,
+        entityType: 'AgencySeatCommitment',
+        entityId: id,
+        dedupeKey: `AgencySeatCommitment:${id}:CANCELLED`,
+      });
     }
 
-    return this.agencyCommitmentRepo
+    const reloaded = await this.agencyCommitmentRepo
       .createQueryBuilder('a')
       .where('a.id = :id', { id })
       .getOneOrFail();
+    return { ...reloaded, type: 'AGENCY' as const };
   }
 }

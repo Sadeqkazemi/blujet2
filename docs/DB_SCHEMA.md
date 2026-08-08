@@ -2639,10 +2639,15 @@ pre-existing `AgencyAllotment` (unchanged; continues to drive actual
 per-ticket agency-channel booking). Both tables share the same shape:
 
 - `id`, `flightInstanceId` (plain, no FK — same convention as above),
-  `cabin` (`CabinClass`), `seats`, `amountIrr` (bigint), `periodStart`/
-  `periodEnd` (nullable), `status` (`CommitmentStatus`: ACTIVE/CANCELLED),
-  `idempotencyKey` (nullable, unique), `createdById`/`cancelledById`
-  (plain, no FK), `createdAt`/`cancelledAt`.
+  `cabin` (`CabinClass`), `seats`, `contractPriceIrr` (bigint, renamed from
+  `amountIrr`), `startDate`/`releaseAt` (nullable, renamed from
+  `periodStart`/`periodEnd` — `releaseAt` matches the pre-existing
+  `AgencyAllotment.releaseAt` convention; the API also accepts `endDate` as
+  an alias for `releaseAt`), `status` (`CommitmentStatus`:
+  ACTIVE/CANCELLED), `idempotencyKey` (nullable, unique),
+  `createdById`/`cancelledById` (plain, no FK), `createdAt`/`cancelledAt`.
+  Renamed in migration `1786694400000-RenameCommitmentFields` (Phase 70) —
+  data preserved, only column names changed.
 - `AgencySeatCommitment` additionally has `agencyId` (plain, no FK — an
   `AgencyProfile.userId`).
 - Indexed on `(flightInstanceId, cabin)` for the capacity-summary
@@ -2650,11 +2655,52 @@ per-ticket agency-channel booking). Both tables share the same shape:
 
 `LedgerEntry.type` gains `COMMITMENT` (irreversible enum-value addition,
 same convention as `CabinClass.FIRST`); every commitment create writes one
-`LedgerEntry` row with the commitment's `amountIrr` — no direct balance
-mutation, matching the codebase's double-entry-ledger rule.
+`LedgerEntry` row with the commitment's `contractPriceIrr` — no direct
+balance mutation, matching the codebase's double-entry-ledger rule.
 
 Capacity math (`CommitmentsService.assertCapacity`, row-locks the
 `FlightInstance` first) enforces `SUM(ACTIVE commitments for the cabin) +
-new seats <= min(configured cabinCapacities seats, physical seat-map seats
-for that cabin)` — a commitment can never exceed the aircraft's real
-layout even if `cabinCapacities` were configured higher.
+SUM(already-sold seats for the cabin) + new seats <= min(configured
+cabinCapacities seats, physical seat-map seats for that cabin)` — a
+commitment can never exceed the aircraft's real layout even if
+`cabinCapacities` were configured higher. **Phase 70 fix**: the sold-seats
+term was previously missing entirely, allowing a new commitment to be
+accepted even when the cabin was already fully (or over-)sold — caught by
+a new concurrency test exercising real seat sales against commitment
+capacity.
+
+## Phase 70 — Notifications, cartable unread state
+
+Branch: `agent/commercial-operations-backend`. See `docs/API.md`'s Phase 70
+section and `docs/api-contract-pr126.md` for the full endpoint contract.
+
+### `Notification` (new table, migration `1786780800000-Notifications`)
+
+- `id`, `recipientId` (plain text, no FK — same TS2589-avoidance convention
+  as every other new back-reference column in this file), `category`
+  (`NotificationCategory`: CARTABLE/MESSAGE/REQUEST/APPROVAL/SYSTEM),
+  `action` (text — stable English code, e.g. `CREATED`/`REFERRED`/
+  `APPROVED`/`REJECTED`/`ACCESS_REVOKED`), `title`, `body` (nullable),
+  `entityType`/`entityId` (nullable, plain — polymorphic reference, not a
+  real FK), `dedupeKey` (nullable, **unique** — the idempotency mechanism:
+  `notify()` checks-then-inserts on this key), `readAt` (nullable —
+  `NULL` means unread), `createdAt`.
+- Indexes: `(recipientId, readAt)`, `(recipientId, category, readAt)`
+  (both power the unread-count/list queries), unique on `dedupeKey`.
+
+### `CartableTask.readAt` (new column, migration
+`1786867200000-CartableTaskReadAt`)
+
+Nullable `timestamp`, same unread-state semantics as `Notification.readAt`
+(`NULL` = never viewed). Indexed as `(assigneeId, readAt)`. Existing rows
+are `NULL` on migrate — pre-existing tasks are treated as unread, matching
+prior behavior where every open task was effectively "new" until acted on.
+
+### `CharterCommitment`/`AgencySeatCommitment` — no DB FK confirmed by audit
+
+Re-confirmed during Phase 70 (cross-checked every entity file against every
+migration's raw `CREATE TABLE`/`FOREIGN KEY` DDL): both tables'
+`flightInstanceId` columns have **zero** DB-level constraint, matching
+their entity declarations — the sandbox purge script (see API.md Phase 70)
+therefore deletes these two tables explicitly by `flightInstanceId` rather
+than relying on any cascade.

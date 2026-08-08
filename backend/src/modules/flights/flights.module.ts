@@ -26,6 +26,7 @@ import { AircraftService } from './aircraft.service';
 import { CommitmentsService } from './commitments.service';
 import { PanelsModule } from '../panels/panels.module';
 import { AuditModule } from '../audit/audit.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { AiModule } from '../ai/ai.module';
 import { AuthModule } from '../auth/auth.module';
 
@@ -54,6 +55,7 @@ import { AuthModule } from '../auth/auth.module';
     ]),
     PanelsModule,
     AuditModule,
+    NotificationsModule,
     AiModule,
     AuthModule,
   ],

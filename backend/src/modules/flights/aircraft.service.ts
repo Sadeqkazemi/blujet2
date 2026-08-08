@@ -151,6 +151,65 @@ export class AircraftService {
         side: s.side,
         isBlocked: s.isBlocked,
       })),
+      seatMap: await this.seatMap(id),
+    };
+  }
+
+  /** Row/column band layout (colsLeft/colsRight/aisle position per cabin) —
+   * a static template derived from the linked AircraftSeatMap row, not tied
+   * to any specific flight instance (no TAKEN/FREE seat status here; that
+   * only exists once an instance/booking context is known — see
+   * SearchService.seatMap for the per-flight equivalent). */
+  async seatMap(id: string) {
+    await this.loadOrThrow(id);
+    const map = await this.seatMapRepo.findOneBy({ aircraftDefinitionId: id });
+    if (!map) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'نقشه صندلی برای این هواپیما تعریف نشده است.',
+      });
+    }
+    const seats = await this.seatRepo.find({
+      where: { aircraftDefinitionId: id },
+      order: { row: 'ASC', column: 'ASC' },
+    });
+    return {
+      aircraftDefinitionId: id,
+      cabinLayout: {
+        FIRST: map.firstColsLeft
+          ? {
+              colsLeft: map.firstColsLeft,
+              colsRight: map.firstColsRight,
+              aisleAfterIndex: map.firstColsLeft?.length ?? 0,
+            }
+          : null,
+        BUSINESS: {
+          colsLeft: map.businessColsLeft,
+          colsRight: map.businessColsRight,
+          aisleAfterIndex: map.businessColsLeft?.length ?? 0,
+        },
+        COMFORT: map.comfortColsLeft
+          ? {
+              colsLeft: map.comfortColsLeft,
+              colsRight: map.comfortColsRight,
+              aisleAfterIndex: map.comfortColsLeft?.length ?? 0,
+            }
+          : null,
+        ECONOMY: {
+          colsLeft: map.economyColsLeft,
+          colsRight: map.economyColsRight,
+          aisleAfterIndex: map.economyColsLeft?.length ?? 0,
+        },
+      },
+      excludedSeatCodes: map.excludedSeatCodes ?? [],
+      seats: seats.map((s) => ({
+        row: s.row,
+        column: s.column,
+        label: s.label,
+        cabinType: s.cabinType,
+        side: s.side,
+        isBlocked: s.isBlocked,
+      })),
     };
   }
 

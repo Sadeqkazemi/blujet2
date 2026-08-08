@@ -533,3 +533,17 @@ export const SiteContentBlockKey = {
 } as const;
 export type SiteContentBlockKey =
   (typeof SiteContentBlockKey)[keyof typeof SiteContentBlockKey];
+
+/** Which of the sidebar's separate unread badges a notification counts
+ * against — GET /notifications/unread-count breaks its total down by
+ * these exact keys. SYSTEM covers events with no more specific home
+ * (e.g. ACCESS_REVOKED). */
+export const NotificationCategory = {
+  CARTABLE: 'CARTABLE',
+  MESSAGE: 'MESSAGE',
+  REQUEST: 'REQUEST',
+  APPROVAL: 'APPROVAL',
+  SYSTEM: 'SYSTEM',
+} as const;
+export type NotificationCategory =
+  (typeof NotificationCategory)[keyof typeof NotificationCategory];

@@ -7,13 +7,15 @@ import {
 } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ILike, In, Repository } from 'typeorm';
+import { ILike, In, IsNull, Repository } from 'typeorm';
 import { User } from '../../database/entities/user.entity';
 import { Permission } from '../../database/entities/permission.entity';
 import { EmployeePermission } from '../../database/entities/employee-permission.entity';
 import { PasswordResetEvent } from '../../database/entities/password-reset-event.entity';
+import { RefreshToken } from '../../database/entities/refresh-token.entity';
 import { findOneOrThrow } from '../../database/utils/find-one-or-throw';
 import { AuditService } from '../audit/audit.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { ErrorCode } from '../../common/errors';
 import { generateTempPassword } from '../../common/temp-password';
 import {
@@ -36,7 +38,10 @@ export class EmployeesService {
     private readonly permissionRepo: Repository<Permission>,
     @InjectRepository(EmployeePermission)
     private readonly employeePermissionRepo: Repository<EmployeePermission>,
+    @InjectRepository(RefreshToken)
+    private readonly refreshTokenRepo: Repository<RefreshToken>,
     private readonly audit: AuditService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /** Grouped by dept -> sections -> perms, matching site-data.js's shape. */
@@ -249,6 +254,17 @@ export class EmployeesService {
     await this.userRepo.update({ id }, { isActive, updatedAt: new Date() });
     const updated = await findOneOrThrow(this.userRepo, { where: { id } });
 
+    if (!isActive) {
+      // Revoke outstanding refresh tokens immediately; JwtAuthGuard also
+      // re-checks live isActive on every request, so an already-issued
+      // access token stops working on its very next use too — access
+      // revocation doesn't wait for token expiry.
+      await this.refreshTokenRepo.update(
+        { userId: id, revokedAt: IsNull() },
+        { revokedAt: new Date() },
+      );
+    }
+
     await this.audit.record({
       actorId: actor.id,
       actorRole: actor.role,
@@ -260,6 +276,19 @@ export class EmployeesService {
       entityType: 'User',
       entityId: id,
     });
+
+    if (!isActive) {
+      await this.notifications.notify({
+        recipientId: id,
+        category: 'SYSTEM',
+        action: 'ACCESS_REVOKED',
+        title: 'دسترسی حساب شما لغو شد',
+        body: `دسترسی حساب کاربری شما توسط ${actor.fullName} مسدود شد.`,
+        entityType: 'User',
+        entityId: id,
+        dedupeKey: `User:${id}:ACCESS_REVOKED:${updated.updatedAt.toISOString()}`,
+      });
+    }
 
     return { id: updated.id, isActive: updated.isActive };
   }

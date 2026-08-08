@@ -14,6 +14,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { PanelsModule } from './modules/panels/panels.module';
 import { ReportingModule } from './modules/reporting/reporting.module';
 import { AuditModule } from './modules/audit/audit.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { AgenciesModule } from './modules/agencies/agencies.module';
 import { CartableModule } from './modules/cartable/cartable.module';
 import { StaffDirectoryModule } from './modules/staff-directory/staff-directory.module';
@@ -90,6 +91,7 @@ import { TravelCostsModule } from './modules/travel-costs/travel-costs.module';
     PanelsModule,
     ReportingModule,
     AuditModule,
+    NotificationsModule,
     AgenciesModule,
     CartableModule,
     StaffDirectoryModule,

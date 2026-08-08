@@ -141,8 +141,11 @@ export class CareersService {
       city: j.city,
       type: j.type,
       description: j.description,
-      generalReqs: j.generalReqs,
-      specialReqs: j.specialReqs,
+      // Always a real array on the wire — generalReqs/specialReqs are
+      // nullable at the DB level (defense-in-depth for hand-written rows),
+      // but frontend code (e.g. `job.generalReqs.length`) assumes string[].
+      generalReqs: j.generalReqs ?? [],
+      specialReqs: j.specialReqs ?? [],
       active: j.active,
       imageFileId: j.imageFileId,
       imageUrl: this.mediaUrl(j.imageFileId),
@@ -193,8 +196,8 @@ export class CareersService {
       city: job.city,
       type: job.type,
       description: job.description,
-      generalReqs: job.generalReqs,
-      specialReqs: job.specialReqs,
+      generalReqs: job.generalReqs ?? [],
+      specialReqs: job.specialReqs ?? [],
       imageFileId: job.imageFileId,
       imageUrl: this.mediaUrl(job.imageFileId),
     };

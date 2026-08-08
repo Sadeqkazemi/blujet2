@@ -1,5 +1,6 @@
 import {
   Controller,
+  Delete,
   Get,
   Param,
   Post,
@@ -56,5 +57,17 @@ export class FilesController {
       `inline; filename*=UTF-8''${encodeURIComponent(stored.fileName)}`,
     );
     stream.pipe(res);
+  }
+
+  @Delete(':id')
+  @ApiOperation({
+    summary: 'حذف پیوست — فقط مالک فایل؛ ایمن و idempotent',
+  })
+  async delete(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    const data = await this.files.delete(actor, id);
+    return { success: true, data };
   }
 }

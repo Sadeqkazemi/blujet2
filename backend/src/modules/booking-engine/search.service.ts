@@ -17,6 +17,8 @@ import { sumActiveCommittedSeats } from '../flights/commitment-capacity.util';
 import {
   applySellableDefinitionFilter,
   isSellableDefinitionStatus,
+  toPublishStatus,
+  type PublishStatus,
 } from '../flights/definition-sellability';
 import type { CabinClass } from '../../database/enums';
 
@@ -202,6 +204,8 @@ export class SearchService {
       destCode: string;
       departureAt: Date;
       arrivalAt: Date;
+      definitionStatus: string;
+      publishStatus: PublishStatus;
       cabins: { cabin: CabinClass; priceIrr: Irr; seatsLeft: number }[];
     }[] = [];
     for (const instance of instances) {
@@ -249,6 +253,11 @@ export class SearchService {
         destCode: instance.flight.route.destCode,
         departureAt: instance.departureAt,
         arrivalAt: instance.arrivalAt,
+        definitionStatus: instance.definitionStatus,
+        publishStatus: toPublishStatus(
+          instance.definitionStatus,
+          instance.approvedSnapshot != null,
+        ),
         cabins,
       });
     }
@@ -341,6 +350,8 @@ export class SearchService {
       destCode: string;
       departureAt: Date;
       arrivalAt: Date;
+      definitionStatus: string;
+      publishStatus: PublishStatus;
       cabins: { cabin: CabinClass; priceIrr: Irr; seatsLeft: number }[];
       connection: {
         via: string;
@@ -403,6 +414,11 @@ export class SearchService {
         destCode: b.flight.route.destCode,
         departureAt: a.departureAt,
         arrivalAt: b.arrivalAt,
+        definitionStatus: a.definitionStatus,
+        publishStatus: toPublishStatus(
+          a.definitionStatus,
+          a.approvedSnapshot != null,
+        ),
         cabins,
         connection: {
           via: a.flight.route.destCode,
