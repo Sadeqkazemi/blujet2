@@ -9,6 +9,7 @@ import {
   saveFlight,
   searchFlights,
 } from '../../api/publicSite';
+import FlightPriceCalendar from './components/FlightPriceCalendar';
 import { ApiRequestError } from '../../api/envelope';
 import { useAuth } from '../../hooks/useAuth';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
@@ -431,6 +432,18 @@ export default function ResultsPage() {
       </div>
 
       <ResultsAiRadar locale={locale} copy={copy} aiState={aiState} advisory={advisory} onAnalyze={() => void askAi()} />
+
+      <FlightPriceCalendar
+        origin={origin}
+        dest={dest}
+        selectedDate={date}
+        locale={locale}
+        onSelectDate={(nextDate) => {
+          const next = new URLSearchParams(params);
+          next.set('date', nextDate);
+          setParams(next);
+        }}
+      />
 
       <div style={{ maxWidth: 1320, margin: '0 auto', padding: '16px 26px 39px' }}>
         <div
