@@ -5,6 +5,7 @@ import type { Airport } from '../../../types/public-site';
 import type { StoredLocale } from '../../../hooks/useLocale';
 import { airportCityLabel, airportCityName } from '../../../lib/airport-cities';
 import { formatToman } from '../../../lib/fa-format';
+import FlightPriceCalendar from '../components/FlightPriceCalendar';
 import {
   DomesticFlightIcon,
   IntlFlightIcon,
@@ -915,6 +916,22 @@ export default function HomeSearchCard({
                       </span>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {origin && dest && origin !== dest && (
+                <div data-testid="home-price-calendar-wrap" style={{ marginTop: 16, maxWidth: '100%' }}>
+                  <FlightPriceCalendar
+                    origin={origin}
+                    dest={dest}
+                    selectedDate={(dateIso ?? TODAY_ISO).slice(0, 10)}
+                    locale={locale}
+                    compact
+                    onSelectDate={(nextDate) => {
+                      setDateIso(`${nextDate.slice(0, 10)}T12:00:00.000Z`);
+                      setError(null);
+                    }}
+                  />
                 </div>
               )}
             </>

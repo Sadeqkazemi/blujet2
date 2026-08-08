@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
@@ -29,6 +29,11 @@ function mockMobile() {
 
 function mockHomeApis() {
   vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
+  vi.spyOn(publicSiteApi, 'fetchPriceCalendar').mockResolvedValue([
+    { date: '2026-08-01', minPriceIrr: '38000000', dateLabelFa: '2026-08-01', isCenter: true },
+    { date: '2026-08-02', minPriceIrr: '0', dateLabelFa: '2026-08-02', isCenter: false },
+    { date: '2026-08-03', minPriceIrr: '35000000', dateLabelFa: '2026-08-03', isCenter: false },
+  ]);
   vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockResolvedValue(CMS_HOME);
   vi.spyOn(settingsApi, 'fetchPublicAppLinks').mockResolvedValue({
     links: [{ id: 'app_store', name: 'App Store', url: 'https://apps.apple.com/blujet' }],
@@ -184,6 +189,25 @@ describe('HomeSearchPage', () => {
 
     expect(screen.getByTestId('home-origin')).toHaveTextContent('تهران');
     expect(screen.getByTestId('home-dest')).toHaveTextContent('مشهد');
+  });
+
+  it('shows the responsive price calendar after origin/dest are chosen', async () => {
+    mockLocale('fa');
+    mockDesktop();
+    mockHomeApis();
+    renderPage();
+    await screen.findByTestId('home-origin');
+
+    expect(screen.queryByTestId('home-price-calendar-wrap')).not.toBeInTheDocument();
+
+    await pickAirport('home-origin', 'THR');
+    await pickAirport('home-dest', 'MHD');
+
+    expect(screen.getByTestId('home-price-calendar-wrap')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId('price-calendar-strip')).toBeInTheDocument();
+    });
+    expect(publicSiteApi.fetchPriceCalendar).toHaveBeenCalled();
   });
 
   it('does not invent airports while the airports API is pending', async () => {
