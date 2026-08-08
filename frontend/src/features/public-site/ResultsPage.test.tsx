@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
@@ -45,6 +45,15 @@ const RESULT_WITH_COMFORT: SearchFlightResult = {
 
 function mockSearchApis() {
   vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
+  vi.spyOn(publicSiteApi, 'fetchPriceCalendar').mockResolvedValue([
+    { date: '2026-07-29', minPriceIrr: '40000000', dateLabelFa: '2026-07-29', isCenter: false },
+    { date: '2026-07-30', minPriceIrr: '0', dateLabelFa: '2026-07-30', isCenter: false },
+    { date: '2026-07-31', minPriceIrr: '35000000', dateLabelFa: '2026-07-31', isCenter: false },
+    { date: '2026-08-01', minPriceIrr: '38000000', dateLabelFa: '2026-08-01', isCenter: true },
+    { date: '2026-08-02', minPriceIrr: '42000000', dateLabelFa: '2026-08-02', isCenter: false },
+    { date: '2026-08-03', minPriceIrr: '39000000', dateLabelFa: '2026-08-03', isCenter: false },
+    { date: '2026-08-04', minPriceIrr: '41000000', dateLabelFa: '2026-08-04', isCenter: false },
+  ]);
 }
 
 function renderPage(
@@ -77,6 +86,22 @@ async function expandFirstCard(locale: 'fa' | 'en' | 'ar' = 'fa') {
 }
 
 describe('ResultsPage', () => {
+  it('renders the price calendar and updates the search date on day select', async () => {
+    mockLocale('fa');
+    mockSearchApis();
+    const search = vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+    renderPage();
+
+    expect(await screen.findByTestId('price-calendar-strip')).toBeInTheDocument();
+    expect(screen.getByTestId('price-calendar-day-2026-08-01')).toHaveAttribute('data-selected', 'true');
+    expect(screen.getByTestId('price-calendar-day-2026-07-30')).toHaveAttribute('data-empty', 'true');
+
+    await userEvent.click(screen.getByTestId('price-calendar-day-2026-08-02'));
+    await waitFor(() => {
+      expect(search).toHaveBeenCalledWith('THR', 'MHD', '2026-08-02');
+    });
+  });
+
   it('renders flight cards with per-cabin price and seatsLeft', async () => {
     mockSearchApis();
     vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
