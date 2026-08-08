@@ -134,6 +134,7 @@ export interface AirportEntry {
   id: string;
   code: string;
   cityFa: string;
+  airportNameFa?: string | null;
   tz: string;
 }
 

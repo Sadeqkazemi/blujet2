@@ -50,6 +50,7 @@ export class SearchService {
     if (cached) return cached;
 
     const airports = await this.airportRepo.find({
+      where: { active: true },
       order: { cityFa: 'ASC' },
     });
     await this.redis.set(cacheKey, airports, AIRPORTS_TTL_SECONDS);

@@ -15,6 +15,14 @@ export default function globalSetup(): void {
     override: true,
     quiet: true,
   });
+  execSync(
+    'npx typeorm-ts-node-commonjs migration:run -d src/database/data-source.ts',
+    {
+      cwd: backendRoot,
+      stdio: 'inherit',
+      env: process.env,
+    },
+  );
   execSync('npx tsx src/database/seed.ts', {
     cwd: backendRoot,
     stdio: 'inherit',

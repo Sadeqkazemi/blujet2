@@ -19,6 +19,7 @@ import PanelNotifBell from './PanelNotifBell';
 import PanelSearchBox from './PanelSearchBox';
 import { PANEL_BRAND_PLANE_ICON, panelNavIcon } from './panel-nav-icons';
 import SuperAdminSandboxAccess from './SuperAdminSandboxAccess';
+import ConfirmActionDialog from './ConfirmActionDialog';
 
 const ROLE_LABELS: Record<string, string> = {
   CEO: 'مدیر عامل',
@@ -71,6 +72,8 @@ export default function PanelShell() {
   const [notifications, setNotifications] = useState<PanelNotificationItem[]>([]);
   const [lowSalesAlerts, setLowSalesAlerts] = useState<LowSalesAlert[]>([]);
   const [employeeCtx, setEmployeeCtx] = useState<EmployeeContext | null>(null);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  const [logoutBusy, setLogoutBusy] = useState(false);
 
   useEffect(() => {
     fetchNav()
@@ -333,8 +336,13 @@ export default function PanelShell() {
   }, [visibleNav, navKeys, user?.role, lowSalesAlerts]);
 
   async function onSignOut() {
-    await signOut();
-    navigate('/login', { replace: true });
+    setLogoutBusy(true);
+    try {
+      await signOut();
+      navigate('/login', { replace: true });
+    } finally {
+      setLogoutBusy(false);
+    }
   }
 
   const roleLabel = user?.isSuperAdmin ? 'سوپر ادمین' : user ? (ROLE_LABELS[user.role] ?? user.role) : '';
@@ -449,7 +457,7 @@ export default function PanelShell() {
                 ) : (
                   <button
                     type="button"
-                    onClick={() => void onSignOut()}
+                    onClick={() => setLogoutConfirmOpen(true)}
                     className="text-[10.5px] text-[#9fb0c7] transition hover:text-white"
                   >
                     خروج از حساب
@@ -459,7 +467,7 @@ export default function PanelShell() {
               {user?.role === 'EMPLOYEE' && (
                 <button
                   type="button"
-                  onClick={() => void onSignOut()}
+                  onClick={() => setLogoutConfirmOpen(true)}
                   title="خروج"
                   aria-label="خروج از حساب"
                   className="flex-none text-[#6b7b94] transition hover:text-white"
@@ -475,7 +483,7 @@ export default function PanelShell() {
         ) : (
           <div className="mt-auto border-t border-panel-border pt-3">
             <button
-              onClick={() => void onSignOut()}
+              onClick={() => setLogoutConfirmOpen(true)}
               className="w-full rounded-[11px] border border-panel-border py-2 text-xs text-panel-muted transition hover:bg-white/5"
             >
               خروج از حساب
@@ -506,6 +514,19 @@ export default function PanelShell() {
         )}
         <Outlet context={{ nav: visibleNav, lowSalesAlerts }} />
       </main>
+      <ConfirmActionDialog
+        open={logoutConfirmOpen}
+        title="خروج از حساب"
+        message="آیا مطمئن هستید که می‌خواهید از پنل مدیریت خارج شوید؟"
+        confirmLabel="بله، خارج شو"
+        cancelLabel="انصراف"
+        busy={logoutBusy}
+        busyLabel="در حال خروج…"
+        onCancel={() => setLogoutConfirmOpen(false)}
+        onConfirm={onSignOut}
+        variant="dark"
+        testId="panel-logout-confirm"
+      />
     </div>
   );
 }

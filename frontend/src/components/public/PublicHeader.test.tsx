@@ -22,6 +22,29 @@ function renderHeader(initialPath = '/') {
 }
 
 describe('PublicHeader — logged-in user', () => {
+  it('requires confirmation before signing a customer out', async () => {
+    mockLocale();
+    const signOut = vi.fn().mockResolvedValue(undefined);
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      status: 'authenticated',
+      user: mockAuthUser({ id: 'u1', fullName: 'نگار رضایی', role: 'USER' }),
+      requestLogin: vi.fn(),
+      confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
+      signOut,
+    });
+    vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({ isMember: true, level: 'GOLD', balance: 12450 });
+
+    renderHeader();
+    await userEvent.click(screen.getByTestId('public-user-menu-toggle'));
+    await userEvent.click(screen.getByTestId('public-logout'));
+
+    expect(signOut).not.toHaveBeenCalled();
+    expect(screen.getByTestId('public-logout-confirm')).toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('public-logout-confirm-confirm'));
+    expect(signOut).toHaveBeenCalledOnce();
+  });
+
   it('opens the notification dropdown with sample notifications', async () => {
     mockLocale();
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({

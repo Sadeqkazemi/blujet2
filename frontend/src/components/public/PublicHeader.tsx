@@ -11,6 +11,7 @@ import {
   mobileAccountNavItems,
   mobileAccountNavLabel,
 } from '../../features/public-site/account/account-nav-items';
+import ConfirmActionDialog from '../ConfirmActionDialog';
 
 const TIER_KEY: Record<string, 'tierSilver' | 'tierGold' | 'tierPlatinum'> = {
   SILVER: 'tierSilver',
@@ -41,6 +42,12 @@ const LANG_OPTIONS: { value: StoredLocale; label: string }[] = [
   { value: 'en', label: 'English' },
   { value: 'ar', label: 'العربية' },
 ];
+
+const LOGOUT_COPY: Record<StoredLocale, { title: string; message: string; confirm: string; cancel: string; busy: string }> = {
+  fa: { title: 'خروج از حساب', message: 'آیا مطمئن هستید که می‌خواهید از حساب کاربری خود خارج شوید؟', confirm: 'بله، خارج شو', cancel: 'انصراف', busy: 'در حال خروج…' },
+  en: { title: 'Sign out', message: 'Are you sure you want to sign out of your account?', confirm: 'Yes, sign out', cancel: 'Cancel', busy: 'Signing out…' },
+  ar: { title: 'تسجيل الخروج', message: 'هل أنت متأكد من رغبتك في تسجيل الخروج من حسابك؟', confirm: 'نعم، تسجيل الخروج', cancel: 'إلغاء', busy: 'جارٍ تسجيل الخروج…' },
+};
 
 function GlobeIcon({ size = 15 }: { size?: number }) {
   return (
@@ -112,11 +119,30 @@ export default function PublicHeader() {
   const [loginDrawerOpen, setLoginDrawerOpen] = useState(false);
   const [club, setClub] = useState<{ isMember: boolean; level: string | null; balance: number } | null>(null);
   const [profileIncomplete, setProfileIncomplete] = useState(false);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  const [logoutBusy, setLogoutBusy] = useState(false);
 
   const loggedIn = status === 'authenticated' && user?.role === 'USER';
   const notifications = NOTIFICATIONS[locale];
   const notifCount = notifications.length;
   const notifCountLabel = locale === 'fa' ? faDigits(notifCount) : String(notifCount);
+  const logoutCopy = LOGOUT_COPY[locale];
+
+  function requestSignOut() {
+    setMenuOpen(false);
+    setMobileMenuOpen(false);
+    setLogoutConfirmOpen(true);
+  }
+
+  async function confirmSignOut() {
+    setLogoutBusy(true);
+    try {
+      await signOut();
+      setLogoutConfirmOpen(false);
+    } finally {
+      setLogoutBusy(false);
+    }
+  }
 
   useEffect(() => {
     if (!loggedIn) {
@@ -290,10 +316,7 @@ export default function PublicHeader() {
       </Link>
       <span
         data-testid="public-logout"
-        onClick={() => {
-          setMenuOpen(false);
-          void signOut();
-        }}
+        onClick={requestSignOut}
         style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: '11.5px', color: '#e5484d', fontWeight: 600, cursor: 'pointer' }}
       >
         <span>↩</span>
@@ -824,10 +847,7 @@ export default function PublicHeader() {
             {loggedIn && user && (
               <span
                 data-testid="public-logout"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  void signOut();
-                }}
+                onClick={requestSignOut}
                 style={{ padding: '10px 0', color: '#e5484d', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
               >
                 ↩ {t('logoutLabel')}
@@ -926,6 +946,19 @@ export default function PublicHeader() {
           </div>
         </div>
       )}
+      <ConfirmActionDialog
+        open={logoutConfirmOpen}
+        title={logoutCopy.title}
+        message={logoutCopy.message}
+        confirmLabel={logoutCopy.confirm}
+        cancelLabel={logoutCopy.cancel}
+        busy={logoutBusy}
+        busyLabel={logoutCopy.busy}
+        onCancel={() => setLogoutConfirmOpen(false)}
+        onConfirm={confirmSignOut}
+        variant="light"
+        testId="public-logout-confirm"
+      />
     </header>
   );
 }

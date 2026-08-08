@@ -17,6 +17,35 @@ function renderShell() {
 }
 
 describe('PanelShell', () => {
+  it('does not sign a staff user out until the confirmation dialog is accepted', async () => {
+    const signOut = vi.fn().mockResolvedValue(undefined);
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      status: 'authenticated',
+      user: { id: 'u4', fullName: 'مدیر فناوری اطلاعات', role: 'IT_MANAGER', preferredLocale: 'FA' },
+      requestLogin: vi.fn(),
+      confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
+      signOut,
+    });
+    vi.spyOn(panelsApi, 'fetchNav').mockResolvedValue([
+      { key: 'dashboard', labelFa: 'داشبورد فنی', implemented: true },
+    ]);
+
+    const { default: userEvent } = await import('@testing-library/user-event');
+    renderShell();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'خروج از حساب' }));
+    expect(signOut).not.toHaveBeenCalled();
+    expect(screen.getByTestId('panel-logout-confirm')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId('panel-logout-confirm-cancel'));
+    expect(screen.queryByTestId('panel-logout-confirm')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'خروج از حساب' }));
+    await userEvent.click(screen.getByTestId('panel-logout-confirm-confirm'));
+    await waitFor(() => expect(signOut).toHaveBeenCalledOnce());
+  });
+
   it('shows sidebar badges for cartable, refund queue, and new staff events', async () => {
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
       status: 'authenticated',

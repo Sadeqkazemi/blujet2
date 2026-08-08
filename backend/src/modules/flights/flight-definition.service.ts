@@ -408,7 +408,7 @@ export class FlightDefinitionService {
       });
     }
     const airports = await this.airportRepo.find({
-      where: { code: In([dto.originCode, dto.destCode]) },
+      where: { code: In([dto.originCode, dto.destCode]), active: true },
     });
     if (airports.length !== 2) {
       throw new BadRequestException({
@@ -567,7 +567,7 @@ export class FlightDefinitionService {
       });
     }
     const airports = await this.airportRepo.find({
-      where: { code: In([dto.originCode, dto.destCode]) },
+      where: { code: In([dto.originCode, dto.destCode]), active: true },
     });
     if (airports.length !== 2) {
       throw new BadRequestException({

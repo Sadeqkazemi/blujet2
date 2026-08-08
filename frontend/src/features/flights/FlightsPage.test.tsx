@@ -306,7 +306,7 @@ describe("FlightsPage", () => {
       screen.getByRole("button", { name: "شهرهای پروازی" }),
     );
     expect(
-      await screen.findByText("شهرها و فرودگاه‌های ثبت‌شده"),
+      await screen.findByText("شهرهای دارای پرواز"),
     ).toBeInTheDocument();
     expect(screen.getByText("تهران")).toBeInTheDocument();
   });
