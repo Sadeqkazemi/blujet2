@@ -4,13 +4,16 @@ import { getAccessToken, setAccessToken } from './token-store';
 import {
   ACCESS_REVOKED_MESSAGE,
   emitAccessRevoked,
-  isAccessRevokedError,
 } from '../lib/access-revoked';
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? '';
 const REQUEST_TIMEOUT_MS = 15_000;
 
-let refreshInFlight: Promise<boolean> | null = null;
+type RefreshOutcome =
+  | { ok: true }
+  | { ok: false; revoked: boolean; status?: number; code?: string };
+
+let refreshInFlight: Promise<RefreshOutcome> | null = null;
 
 async function fetchWithTimeout(path: string, init: RequestInit): Promise<Response> {
   const controller = new AbortController();
@@ -31,29 +34,94 @@ async function fetchWithTimeout(path: string, init: RequestInit): Promise<Respon
   }
 }
 
-// Exported so the auth bootstrap effect (useAuth.tsx) can share this same
-// in-flight request instead of firing its own — two concurrent /auth/refresh
-// calls both racing to consume the same not-yet-rotated refresh-token cookie
-// trip the server's reuse-detection and revoke the whole session.
-export async function refreshAccessToken(): Promise<boolean> {
+/**
+ * Shared refresh attempt. Returns whether refresh succeeded and, on failure,
+ * whether the server explicitly reported ACCESS_REVOKED (block/suspend).
+ * Network errors and ordinary auth failures set `revoked: false`.
+ */
+async function tryRefreshAccessToken(): Promise<RefreshOutcome> {
   if (!refreshInFlight) {
-    refreshInFlight = (async () => {
+    refreshInFlight = (async (): Promise<RefreshOutcome> => {
       try {
-        const res = await fetchWithTimeout('/auth/refresh', { method: 'POST', credentials: 'include' });
-        const body = (await res.json()) as ApiEnvelope<{ accessToken: string }>;
-        if (body.success && body.data) {
-          setAccessToken(body.data.accessToken);
-          return true;
+        const res = await fetchWithTimeout('/auth/refresh', {
+          method: 'POST',
+          credentials: 'include',
+        });
+        let body: ApiEnvelope<{ accessToken: string }>;
+        try {
+          body = (await res.json()) as ApiEnvelope<{ accessToken: string }>;
+        } catch {
+          return { ok: false, revoked: false, status: res.status };
         }
-        return false;
+        if (body.success && body.data?.accessToken) {
+          setAccessToken(body.data.accessToken);
+          return { ok: true };
+        }
+        const code = body.error?.code;
+        return {
+          ok: false,
+          revoked: code === 'ACCESS_REVOKED',
+          status: res.status,
+          code,
+        };
       } catch {
-        return false;
+        // Network / timeout / abort — not an access-revoked signal.
+        return { ok: false, revoked: false };
       } finally {
         refreshInFlight = null;
       }
     })();
   }
   return refreshInFlight;
+}
+
+// Exported so the auth bootstrap effect (useAuth.tsx) can share this same
+// in-flight request instead of firing its own — two concurrent /auth/refresh
+// calls both racing to consume the same not-yet-rotated refresh-token cookie
+// trip the server's reuse-detection and revoke the whole session.
+export async function refreshAccessToken(): Promise<boolean> {
+  const outcome = await tryRefreshAccessToken();
+  return outcome.ok;
+}
+
+function throwApiError(
+  status: number,
+  code: string,
+  message: string,
+  options?: { hadSession?: boolean },
+): never {
+  const hadSession = options?.hadSession ?? Boolean(getAccessToken());
+  // Only emit when the real response code is ACCESS_REVOKED and a session
+  // was present before any local token clear.
+  if (hadSession && code === 'ACCESS_REVOKED') {
+    emitAccessRevoked({
+      message: ACCESS_REVOKED_MESSAGE,
+      status,
+      code,
+      source: 'http',
+    });
+  }
+  throw new ApiRequestError(code, message, status);
+}
+
+/** After a failed refresh: clear token only after capturing session presence. */
+function throwAfterFailedRefresh(outcome: Extract<RefreshOutcome, { ok: false }>): never {
+  const hadSession = Boolean(getAccessToken());
+  setAccessToken(null);
+  if (hadSession && outcome.revoked) {
+    throwApiError(
+      outcome.status ?? 403,
+      'ACCESS_REVOKED',
+      ACCESS_REVOKED_MESSAGE,
+      { hadSession: true },
+    );
+  }
+  throwApiError(
+    401,
+    'UNAUTHORIZED',
+    'نشست منقضی شده است. لطفاً دوباره وارد شوید.',
+    { hadSession: false },
+  );
 }
 
 async function doFetch(path: string, init: RequestInit): Promise<Response> {
@@ -68,37 +136,14 @@ async function doFetch(path: string, init: RequestInit): Promise<Response> {
   return fetchWithTimeout(path, { ...init, headers, credentials: 'include' });
 }
 
-function throwApiError(status: number, code: string, message: string): never {
-  const err = new ApiRequestError(code, message, status);
-  const hadSession = Boolean(getAccessToken());
-  // Contract: ACCESS_REVOKED arrives as HTTP 403 with that error code on
-  // any authenticated request after block/suspend. Also revoke after a
-  // failed refresh (401 ACCESS_REVOKED).
-  if (
-    hadSession &&
-    ((status === 403 && code === 'ACCESS_REVOKED') ||
-      (status === 401 && code === 'ACCESS_REVOKED') ||
-      isAccessRevokedError({ status, code, message }))
-  ) {
-    emitAccessRevoked({
-      message: ACCESS_REVOKED_MESSAGE,
-      status,
-      code,
-      source: 'http',
-    });
-  }
-  throw err;
-}
-
 /** All frontend HTTP calls go through here — components never call fetch directly. */
 export async function apiRequest<T>(path: string, init: RequestInit = {}, retry = true): Promise<T> {
   const res = await doFetch(path, init);
 
   if (res.status === 401 && retry && getAccessToken()) {
-    const refreshed = await refreshAccessToken();
-    if (refreshed) return apiRequest<T>(path, init, false);
-    setAccessToken(null);
-    throwApiError(401, 'ACCESS_REVOKED', ACCESS_REVOKED_MESSAGE);
+    const refreshed = await tryRefreshAccessToken();
+    if (refreshed.ok) return apiRequest<T>(path, init, false);
+    throwAfterFailedRefresh(refreshed);
   }
 
   const raw = await res.text();
@@ -133,10 +178,9 @@ export async function apiRequestPaged<T>(
   const res = await doFetch(path, init);
 
   if (res.status === 401 && retry && getAccessToken()) {
-    const refreshed = await refreshAccessToken();
-    if (refreshed) return apiRequestPaged<T>(path, init, false);
-    setAccessToken(null);
-    throwApiError(401, 'ACCESS_REVOKED', ACCESS_REVOKED_MESSAGE);
+    const refreshed = await tryRefreshAccessToken();
+    if (refreshed.ok) return apiRequestPaged<T>(path, init, false);
+    throwAfterFailedRefresh(refreshed);
   }
 
   const raw = await res.text();
@@ -181,10 +225,9 @@ export async function apiGetBlob(path: string, retry = true): Promise<Blob> {
   const res = await doFetch(path, { method: 'GET' });
 
   if (res.status === 401 && retry && getAccessToken()) {
-    const refreshed = await refreshAccessToken();
-    if (refreshed) return apiGetBlob(path, false);
-    setAccessToken(null);
-    throwApiError(401, 'ACCESS_REVOKED', ACCESS_REVOKED_MESSAGE);
+    const refreshed = await tryRefreshAccessToken();
+    if (refreshed.ok) return apiGetBlob(path, false);
+    throwAfterFailedRefresh(refreshed);
   }
 
   if (!res.ok) {

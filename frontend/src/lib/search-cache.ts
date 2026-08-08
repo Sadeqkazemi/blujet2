@@ -15,16 +15,13 @@ export function onSearchResultsInvalidate(handler: () => void): () => void {
 }
 
 /**
- * Backend search only returns sellable rows, but if publishStatus is present
- * keep only PUBLISHED. Rows without status pass through (legacy payloads).
+ * Only flights with publishStatus === PUBLISHED are sellable in results.
+ * APPROVED, DRAFT, PENDING*, REJECTED, missing/empty status are excluded.
  */
 export function filterSellableSearchFlights<
   T extends { definitionStatus?: string; publishStatus?: string },
 >(rows: T[]): T[] {
-  return rows.filter((row) => {
-    const status = row.publishStatus ?? row.definitionStatus;
-    if (!status) return true;
-    const upper = String(status).toUpperCase();
-    return upper === 'PUBLISHED' || upper === 'APPROVED';
-  });
+  return rows.filter(
+    (row) => String(row.publishStatus ?? '').toUpperCase() === 'PUBLISHED',
+  );
 }

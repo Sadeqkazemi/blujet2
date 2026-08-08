@@ -22,12 +22,40 @@ const PUBLISHED: SearchFlightResult = {
   cabins: [{ cabin: 'ECONOMY', priceIrr: '380000000', seatsLeft: 10 }],
 };
 
+const APPROVED_ONLY: SearchFlightResult = {
+  ...PUBLISHED,
+  flightInstanceId: 'fi-approved',
+  flightNo: 'BJ-202',
+  publishStatus: 'APPROVED',
+};
+
+const EMPTY_STATUS: SearchFlightResult = {
+  ...PUBLISHED,
+  flightInstanceId: 'fi-empty',
+  flightNo: 'BJ-203',
+  publishStatus: undefined,
+  definitionStatus: 'APPROVED',
+};
+
 const PENDING: SearchFlightResult = {
   ...PUBLISHED,
   flightInstanceId: 'fi-pending',
   flightNo: 'BJ-201',
-  publishStatus: undefined,
-  definitionStatus: 'PENDING_CEO',
+  publishStatus: 'PENDING_APPROVAL',
+};
+
+const DRAFT: SearchFlightResult = {
+  ...PUBLISHED,
+  flightInstanceId: 'fi-draft',
+  flightNo: 'BJ-204',
+  publishStatus: 'DRAFT',
+};
+
+const REJECTED: SearchFlightResult = {
+  ...PUBLISHED,
+  flightInstanceId: 'fi-rej',
+  flightNo: 'BJ-205',
+  publishStatus: 'REJECTED',
 };
 
 describe('ResultsPage published flights', () => {
@@ -52,8 +80,15 @@ describe('ResultsPage published flights', () => {
     ]);
   });
 
-  it('shows PUBLISHED flights and hides unapproved CEO-pending rows', async () => {
-    vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([PUBLISHED, PENDING]);
+  it('shows only PUBLISHED flights and hides APPROVED/empty/DRAFT/PENDING/REJECTED', async () => {
+    vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([
+      PUBLISHED,
+      APPROVED_ONLY,
+      EMPTY_STATUS,
+      PENDING,
+      DRAFT,
+      REJECTED,
+    ]);
 
     render(
       <MemoryRouter initialEntries={['/results?origin=THR&dest=MHD&date=2026-08-01']}>
@@ -68,6 +103,10 @@ describe('ResultsPage published flights', () => {
     await userEvent.click(screen.getByRole('button', { name: /جزئیات و رزرو/ }));
     expect(screen.getByText('BJ-200')).toBeInTheDocument();
     expect(screen.queryByText('BJ-201')).not.toBeInTheDocument();
+    expect(screen.queryByText('BJ-202')).not.toBeInTheDocument();
+    expect(screen.queryByText('BJ-203')).not.toBeInTheDocument();
+    expect(screen.queryByText('BJ-204')).not.toBeInTheDocument();
+    expect(screen.queryByText('BJ-205')).not.toBeInTheDocument();
   });
 
   it('refetches when search cache is invalidated after CEO publish', async () => {
