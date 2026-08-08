@@ -59,8 +59,9 @@ function mockSearchApis() {
 function renderPage(
   status: 'unauthenticated' | 'authenticated' = 'unauthenticated',
   search = 'origin=THR&dest=MHD&date=2026-08-01',
+  isMobile = false,
 ) {
-  vi.spyOn(useIsMobileModule, 'useIsMobile').mockReturnValue(false);
+  vi.spyOn(useIsMobileModule, 'useIsMobile').mockReturnValue(isMobile);
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status,
     user: status === 'authenticated' ? mockAuthUser({ id: 'u1', fullName: 'کاربر تست', role: 'USER' }) : null,
@@ -100,6 +101,18 @@ describe('ResultsPage', () => {
     await waitFor(() => {
       expect(search).toHaveBeenCalledWith('THR', 'MHD', '2026-08-02');
     });
+  });
+
+  it('does not render the standalone price calendar on mobile results', async () => {
+    mockLocale('fa');
+    mockSearchApis();
+    vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+    vi.clearAllMocks();
+    renderPage('unauthenticated', 'origin=THR&dest=MHD&date=2026-08-01', true);
+
+    expect(await screen.findByTestId('result-card')).toBeInTheDocument();
+    expect(screen.queryByTestId('price-calendar')).not.toBeInTheDocument();
+    expect(publicSiteApi.fetchPriceCalendar).not.toHaveBeenCalled();
   });
 
   it('renders flight cards with per-cabin price and seatsLeft', async () => {
