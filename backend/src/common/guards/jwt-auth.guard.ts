@@ -56,13 +56,11 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     // Every authenticated role is checked (manager/employee/agency/
     // customer alike). Super-admin accounts are exempt by product design
     // (they can't be blocked via the normal admin flow).
-    if (user.isSuperAdmin) return true;
-
     const row = await this.userRepo.findOne({
       where: { id: user.id },
       select: { isActive: true, mustChangePassword: true },
     });
-    if (!row || !row.isActive) {
+    if (!row || (!row.isActive && !user.isSuperAdmin)) {
       throw new ForbiddenException({
         code: ErrorCode.ACCESS_REVOKED,
         message: 'دسترسی شما لغو شده است. لطفاً دوباره وارد شوید.',
